@@ -114,11 +114,11 @@ FragmentOutput Fragment(FragmentInput input)
 		#endif
 	#else
 		float3 normal = normalize(input.normal);
-		float3 lighting = GetLighting(normal, input.worldPosition, input.position.xy, input.position.w);
+		float3 lighting = GetLighting(normal, input.worldPosition, input.position.xy, input.position.w) + _AmbientLightColor;
 
 		color.rgb *= lighting;
 		color.rgb += _EmissionColor;
-		color.rgb = ApplyFog(color.rgb, input.worldPosition, InterleavedGradientNoise(input.position.xy, 0));
+		color.rgb = ApplyFog(color.rgb, input.position.xy, input.position.w);
 		output.color = color;
 	
 		#ifdef MOTION_VECTORS_ON
