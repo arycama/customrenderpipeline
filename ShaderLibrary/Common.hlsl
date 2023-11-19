@@ -368,18 +368,27 @@ float CalculateLightFalloff(float rcpLightDist, float sqrLightDist, float rcpSqL
 }
 #endif
 
-float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, float eyeDepth, bool isVolumetric = false)
+#ifdef CUSTOM_LIGHTING_FALLOFF
+float3 CalculateLighting(float3 albedo, float3 f0, float roughness, float3 L);
+#else
+float3 CalculateLighting(float3 albedo, float3 f0, float roughness, float3 L)
+{
+	return albedo;
+}
+#endif
+
+float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, float eyeDepth, float3 albedo, float3 f0, float roughness, bool isVolumetric = false)
 {
 	// Directional lights
 	float3 lighting = 0.0;
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
-		float shadow = GetShadow(worldPosition, i);
-		if(!shadow)
+		float attenuation = GetShadow(worldPosition, i);
+		if(!attenuation)
 			continue;
 		
 		DirectionalLight light = _DirectionalLights[i];
-		lighting += (isVolumetric ? 1.0 : saturate(dot(normal, light.direction))) * light.color * shadow;
+		lighting += (isVolumetric ? 1.0 : saturate(dot(normal, light.direction))) * light.color * attenuation * CalculateLighting(albedo, f0, roughness, light.direction);
 	}
 	
 	uint3 clusterIndex;
@@ -418,8 +427,8 @@ float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, fl
 		
 		attenuation *= CalculateLightFalloff(rcpLightDist, sqrLightDist, rcp(Sq(light.range)));
 		
-		
-		lighting += (isVolumetric ? 1.0 : saturate(dot(normal, lightVector) * rcpLightDist)) * light.color * attenuation;
+		float3 L = lightVector * rcpLightDist;
+		lighting += (isVolumetric ? 1.0 : saturate(dot(normal, L))) * light.color * attenuation * CalculateLighting(albedo, f0, roughness, L);
 	}
 	
 	return lighting;

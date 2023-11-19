@@ -30,7 +30,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	float3 lighting = _AmbientLightColor;
 	
 	float viewDistance = distance(positionWS, _WorldSpaceCameraPos);
-	lighting += GetLighting(0.0, positionWS, pixelPosition, positionCS.w, true);
+	lighting += GetLighting(0.0, positionWS, pixelPosition, positionCS.w, 1.0, 0.0, 1.0, true);
 	
 	float extinction = viewDistance > _FogStartDistance && viewDistance < _FogEndDistance ? rcp(_FogEndDistance - viewDistance) : 0.0;
 	

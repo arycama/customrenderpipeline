@@ -60,7 +60,7 @@ cbuffer UnityPerMaterial
 {
 	float4 _BaseMap_ST, _BaseColor;
 	float3 _EmissionColor;
-	float _Cutoff;
+	float _Cutoff, _Smoothness;
 };
 
 Texture2D _BaseMap;
@@ -114,12 +114,12 @@ FragmentOutput Fragment(FragmentInput input)
 		#endif
 	#else
 		float3 normal = normalize(input.normal);
-		float3 lighting = GetLighting(normal, input.worldPosition, input.position.xy, input.position.w) + _AmbientLightColor;
+		float roughness = Sq(1.0 - _Smoothness);
+		float3 lighting = GetLighting(normal, input.worldPosition, input.position.xy, input.position.w, color.rgb, 0.04, roughness) + _AmbientLightColor * color.rgb;
 
-		color.rgb *= lighting;
-		color.rgb += _EmissionColor;
-		color.rgb = ApplyFog(color.rgb, input.position.xy, input.position.w);
-		output.color = color;
+		lighting.rgb += _EmissionColor;
+		lighting.rgb = ApplyFog(lighting.rgb, input.position.xy, input.position.w);
+		output.color = lighting;
 	
 		#ifdef MOTION_VECTORS_ON
 			output.velocity = unity_MotionVectorsParams.y ? MotionVectorFragment(input.nonJitteredPositionCS, input.previousPositionCS) : 0.0;
