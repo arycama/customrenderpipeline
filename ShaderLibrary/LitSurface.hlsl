@@ -60,7 +60,7 @@ cbuffer UnityPerMaterial
 {
 	float4 _BaseMap_ST, _BaseColor;
 	float3 _EmissionColor;
-	float _Cutoff, _Smoothness;
+	float _Cutoff, _Smoothness, _Metallic;
 };
 
 Texture2D _BaseMap;
@@ -115,7 +115,9 @@ FragmentOutput Fragment(FragmentInput input)
 	#else
 		float3 normal = normalize(input.normal);
 		float roughness = Sq(1.0 - _Smoothness);
-		float3 lighting = GetLighting(normal, input.worldPosition, input.position.xy, input.position.w, color.rgb, 0.04, roughness) + _AmbientLightColor * color.rgb;
+		float3 albedo = lerp(color.rgb, 0.0, _Metallic);
+		float3 f0 = lerp(0.04, color, _Metallic);
+		float3 lighting = GetLighting(normal, input.worldPosition, input.position.xy, input.position.w, albedo, f0, roughness) + _AmbientLightColor * albedo * rcp(Pi);
 
 		lighting.rgb += _EmissionColor;
 		lighting.rgb = ApplyFog(lighting.rgb, input.position.xy, input.position.w);
