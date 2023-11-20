@@ -2,12 +2,14 @@
 
 #include "../../Common.hlsl"
 
-RWTexture2D<float4> Result;
+RWTexture2D<float4> _Result;
 
 [numthreads(8,8,1)]
 void CSMain (uint2 id : SV_DispatchThreadID)
 {
-
+	float depth = _CameraDepth[id];
+	
+	_Result[id] = Linear01Depth(depth);
 
 
 	//float3 N = GBufferNormal(id);

@@ -11,22 +11,16 @@ public class CustomRenderPipelineAsset : RenderPipelineAsset
     [SerializeField] private TemporalAA.Settings temporalAASettings;
     [SerializeField] private ConvolutionBloom.Settings convolutionBloomSettings;
     [SerializeField] private Bloom.Settings bloomSettings;
-
-    [Header("Volumetric Lighting")]
-    [SerializeField] private int tileSize = 8;
-    [SerializeField] private int depthSlices = 128;
-    [SerializeField, Range(0.0f, 2.0f)] private float blurSigma = 1.0f;
-    [SerializeField] private bool nonLinearDepth = true;
+    [SerializeField] private AmbientOcclusion.Settings ambientOcclusionSettings;
+    [SerializeField] private VolumetricLighting.Settings volumetricLightingSettings;
+    [SerializeField] private DepthOfField.Settings depthOfFieldSettings;
 
     public Color waterAlbedo = Color.white;
     [ColorUsage(false, true)] public Color waterExtinction = Color.grey;
 
-    public DepthOfField.Settings depthOfFieldSettings;
-
-    public int TileSize => tileSize;
-    public int DepthSlices => depthSlices;
-    public float BlurSigma => blurSigma;
-    public bool NonLinearDepth => nonLinearDepth;
+    [SerializeField] private DefaultPipelineMaterials defaultMaterials = new();
+    [SerializeField] private DefaultPipelineShaders defaultShaders = new();
+    [SerializeField] private string[] renderingLayerNames = new string[32];
 
     public bool EnableSrpBatcher => enableSrpBatcher;
     public ShadowSettings ShadowSettings => shadowSettings;
@@ -34,6 +28,32 @@ public class CustomRenderPipelineAsset : RenderPipelineAsset
     public TemporalAA.Settings TemporalAASettings => temporalAASettings;
     public ConvolutionBloom.Settings ConvolutionBloomSettings => convolutionBloomSettings;
     public Bloom.Settings BloomSettings => bloomSettings;
+    public AmbientOcclusion.Settings AmbientOcclusionSettings => ambientOcclusionSettings;
+    public VolumetricLighting.Settings VolumetricLightingSettings => volumetricLightingSettings;
+    public DepthOfField.Settings DepthOfFieldSettigns => depthOfFieldSettings;
+
+    public override Material defaultMaterial => defaultMaterials.DefaultMaterial ?? base.defaultMaterial;
+    public override Material defaultUIMaterial => defaultMaterials.DefaultUIMaterial ?? base.defaultUIMaterial;
+    public override Material default2DMaterial => defaultMaterials.Default2DMaterial ?? base.default2DMaterial;
+    public override Material defaultLineMaterial => defaultMaterials.DefaultLineMaterial ?? base.defaultLineMaterial;
+    public override Material defaultParticleMaterial => defaultMaterials.DefaultParticleMaterial ?? base.defaultParticleMaterial;
+    public override Material defaultTerrainMaterial => defaultMaterials.DefaultTerrainMaterial ?? base.defaultTerrainMaterial;
+    public override Material defaultUIETC1SupportedMaterial => defaultMaterials.DefaultUIETC1SupportedMaterial ?? base.defaultUIETC1SupportedMaterial;
+    public override Material defaultUIOverdrawMaterial => defaultMaterials.DefaultUIOverdrawMaterial ?? base.defaultUIOverdrawMaterial;
+    public override Material default2DMaskMaterial => defaultMaterials.Default2DMaskMaterial;
+
+    public override Shader autodeskInteractiveMaskedShader => defaultShaders.AutodeskInteractiveMaskedShader ?? base.autodeskInteractiveMaskedShader;
+    public override Shader autodeskInteractiveShader => defaultShaders.AutodeskInteractiveShader ?? base.autodeskInteractiveShader;
+    public override Shader autodeskInteractiveTransparentShader => defaultShaders.AutodeskInteractiveTransparentShader ?? base.autodeskInteractiveTransparentShader;
+    public override Shader defaultSpeedTree7Shader => defaultShaders.DefaultSpeedTree7Shader ?? base.defaultSpeedTree7Shader;
+    public override Shader defaultSpeedTree8Shader => defaultShaders.DefaultSpeedTree8Shader ?? base.defaultSpeedTree8Shader;
+    public override Shader defaultShader => defaultShaders.DefaultShader ?? base.defaultShader;
+    public override Shader terrainDetailGrassBillboardShader => defaultShaders.TerrainDetailGrassBillboardShader ?? base.terrainDetailGrassBillboardShader;
+    public override Shader terrainDetailGrassShader => defaultShaders.TerrainDetailGrassShader ?? base.terrainDetailGrassShader;
+    public override Shader terrainDetailLitShader => defaultShaders.TerrainDetailLitShader ?? base.terrainDetailLitShader;
+
+    public override string[] renderingLayerMaskNames => renderingLayerNames;
+    public override string[] prefixedRenderingLayerMaskNames => renderingLayerNames;
 
     protected override RenderPipeline CreatePipeline()
     {

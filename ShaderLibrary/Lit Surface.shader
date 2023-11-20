@@ -2,37 +2,41 @@ Shader "Lit Surface"
 {
     Properties
     {
-        [MainColor] _BaseColor("Color", Color) = (1,1,1,1)
-        [Toggle] _AlphaClip("Cutout", Float) = 0.0
+        [KeywordEnum(Opaque, Cutout, Fade, Transparent)] Mode("Mode", Float) = 0.0
+        [Enum(Off, 2, On, 0)] _Cull("Double Sided", Float) = 2
+    
+        [Header(Material)]
+        [MainColor] _Color("Color", Color) = (1,1,1,1)
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
-        [MainTexture] _BaseMap("Albedo", 2D) = "white" {}
+        [MainTexture] _MainTex("Albedo", 2D) = "white" {}
 
+        [KeywordEnum(Metallic, Albedo)] Smoothness_Source("Smoothness Source", Float) = 1
         _Smoothness("Smoothness", Range(0.0, 1.0)) = 0.5
-        _SmoothnessTextureChannel("Smoothness texture channel", Float) = 0
 
-        _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
+        [Gamma] _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
         [NoScaleOffset] _MetallicGlossMap("Metallic", 2D) = "white" {}
 
-        _BumpScale("Scale", Float) = 1.0
+        _BumpScale("Normal Scale", Float) = 1.0
         [NoScaleOffset] _BumpMap("Normal Map", 2D) = "bump" {}
 
-        _Parallax("Scale", Range(0.005, 0.08)) = 0.005
+        _Parallax("Height Scale", Range(0.005, 0.08)) = 0.005
         [NoScaleOffset] _ParallaxMap("Height Map", 2D) = "black" {}
 
-        _OcclusionStrength("Strength", Range(0.0, 1.0)) = 1.0
+        _OcclusionStrength("Occlusion Scale", Range(0.0, 1.0)) = 1.0
         [NoScaleOffset] _OcclusionMap("Occlusion", 2D) = "white" {}
 
-        [HDR] _EmissionColor("Color", Color) = (0,0,0)
+        [HDR] _EmissionColor("Emission Color", Color) = (0,0,0)
         [NoScaleOffset] _EmissionMap("Emission", 2D) = "white" {}
 
-        _Cull("__cull", Float) = 2.0
-        [HideInInspector] _SrcBlend("__src", Float) = 1.0
-        [HideInInspector] _DstBlend("__dst", Float) = 0.0
+        [HideInInspector] _SrcBlend("Src Blend", Float) = 1.0
+        [HideInInspector] _DstBlend ("Dst Blend", Float) = 1.0
         [HideInInspector] _ZWrite("__zw", Float) = 1.0
     }
 
     SubShader
     {
+        Cull [_Cull]
+    
         Pass
         {
             Name "Base Pass"
@@ -44,7 +48,6 @@ Shader "Lit Surface"
             }
 
             Blend [_SrcBlend] [_DstBlend]
-            Cull [_Cull]
 			ZWrite [_ZWrite]
 
             HLSLPROGRAM
@@ -52,7 +55,7 @@ Shader "Lit Surface"
             #pragma fragment Fragment
 			#pragma target 5.0
             #pragma multi_compile_instancing
-			#pragma multi_compile _ _ALPHATEST_ON _ALPHABLEND_ON
+            #pragma shader_feature_local _ MODE_CUTOUT MODE_FADE MODE_TRANSPARENT
             #include "LitSurface.hlsl"
             ENDHLSL
         }
@@ -74,7 +77,7 @@ Shader "Lit Surface"
 			#pragma target 5.0
 
 			#pragma multi_compile_instancing
-			#pragma multi_compile _ _ALPHATEST_ON
+            #pragma shader_feature_local _ MODE_CUTOUT
 
 			#define MOTION_VECTORS_ON
 
@@ -85,9 +88,9 @@ Shader "Lit Surface"
         Pass
 		{
 			Colormask 0
-            Cull [_Cull]
-			ZClip[_ZClip]
+			ZClip [_ZClip]
 
+			Name "Shadow Caster"
             Tags { "LightMode" = "ShadowCaster" }
 
             HLSLPROGRAM
@@ -95,9 +98,11 @@ Shader "Lit Surface"
             #pragma vertex Vertex
             #pragma fragment Fragment
 			#pragma target 5.0
-			#pragma multi_compile _ _ALPHATEST_ON _ALPHABLEND_ON
+            #pragma shader_feature_local _ MODE_CUTOUT MODE_FADE MODE_TRANSPARENT
 			#include "LitSurface.hlsl"
 			ENDHLSL
 		}
     }
+    
+    CustomEditor "LitSurfaceShaderGUI"
 }

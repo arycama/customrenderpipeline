@@ -108,6 +108,9 @@ float3 Fragment(float4 positionCS : SV_Position) : SV_Target
 	float t = saturate(Max3(min(t0, t1)));
 	history = lerp(history, result, t);
 
+	if (any(IsInfOrNaN(history)))
+		return result;
+
 	float motionLength = length(longestMotion);
 	float weight = lerp(_FinalBlendParameters.x, _FinalBlendParameters.y, saturate(motionLength * _FinalBlendParameters.z));
 	return lerp(result, history, weight);

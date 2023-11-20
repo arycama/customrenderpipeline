@@ -5,7 +5,7 @@ struct VertexInput
 	uint instanceID : SV_InstanceID;
 	float3 position : POSITION;
 	
-	#if !defined(UNITY_PASS_SHADOWCASTER) || defined(_ALPHATEST_ON) || defined(_ALPHABLEND_ON)
+	#if !defined(UNITY_PASS_SHADOWCASTER) || defined(MODE_CUTOUT) || defined(MODE_FADE) || defined(MODE_TRANSPARENT)
 		float2 uv : TEXCOORD;
 	#endif
 	
@@ -24,7 +24,7 @@ struct FragmentInput
 {
 	float4 position : SV_Position;
 	
-#if !defined(UNITY_PASS_SHADOWCASTER) || defined(_ALPHATEST_ON) || defined(_ALPHABLEND_ON)
+#if !defined(UNITY_PASS_SHADOWCASTER) || defined(MODE_CUTOUT) || defined(MODE_FADE) || defined(MODE_TRANSPARENT)
 		float2 uv : TEXCOORD;
 	#endif
 	
@@ -44,7 +44,7 @@ struct FragmentInput
 struct FragmentOutput
 {
 	#ifndef UNITY_PASS_SHADOWCASTER
-		#ifdef _ALPHABLEND_ON
+		#if defined(MODE_FADE) || defined(MODE_TRANSPARENT)
 			float4 color : SV_Target0;
 		#else
 			float3 color : SV_Target0;
@@ -58,13 +58,13 @@ struct FragmentOutput
 
 cbuffer UnityPerMaterial
 {
-	float4 _BaseMap_ST, _BaseColor;
+	float4 _MainTex_ST, _Color;
 	float3 _EmissionColor;
 	float _Cutoff, _Smoothness, _Metallic;
 };
 
-Texture2D _BaseMap;
-SamplerState sampler_BaseMap;
+Texture2D _MainTex;
+SamplerState sampler_MainTex;
 
 FragmentInput Vertex(VertexInput input)
 {
@@ -73,8 +73,8 @@ FragmentInput Vertex(VertexInput input)
 	FragmentInput output;
 	output.position = WorldToClip(worldPosition);
 	
-	#if !defined(UNITY_PASS_SHADOWCASTER) || defined(_ALHPATEST_ON) || defined(_ALPHABLEND_ON)
-		output.uv = input.uv * _BaseMap_ST.xy + _BaseMap_ST.zw;
+	#if !defined(UNITY_PASS_SHADOWCASTER) || defined(_ALHPATEST_ON) || defined(MODE_TRANSPARENT)
+		output.uv = input.uv * _MainTex_ST.xy + _MainTex_ST.zw;
 	#endif
 	
 	#ifndef UNITY_PASS_SHADOWCASTER
@@ -98,30 +98,40 @@ FragmentOutput Fragment(FragmentInput input)
 		input.uv = UnjitterTextureUV(input.uv);
 	#endif
 	
-	#if !defined(UNITY_PASS_SHADOWCASTER) || defined(_ALPHATEST_ON) || defined(_ALPHABLEND_ON)
-		float4 color = _BaseMap.Sample(_LinearRepeatSampler, input.uv) * _BaseColor;
+	#if !defined(UNITY_PASS_SHADOWCASTER) || defined(MODE_CUTOUT) || defined(MODE_FADE) || defined(MODE_TRANSPARENT)
+		float4 color = _MainTex.Sample(_LinearRepeatSampler, input.uv) * _Color;
 	#endif
 	
-	#ifdef _ALPHATEST_ON
-		clip(color.a - _Cutoff)
+	#ifdef MODE_CUTOUT
+		clip(color.a - _Cutoff);
 	#endif
 	
 	FragmentOutput output;
 	
 	#if defined(UNITY_PASS_SHADOWCASTER) 
-		#ifdef _ALPHABLEND_ON
+		#if defined(MODE_FADE) || defined(MODE_TRANSPARENT)
 			clip(color.a - InterleavedGradientNoise(input.position.xy, 0));
 		#endif
 	#else
 		float3 normal = normalize(input.normal);
 		float roughness = Sq(1.0 - _Smoothness);
+		
 		float3 albedo = lerp(color.rgb, 0.0, _Metallic);
+		
+		#ifdef MODE_TRANSPARENT
+			albedo *= color.a;
+		#endif
+		
 		float3 f0 = lerp(0.04, color, _Metallic);
 		float3 lighting = GetLighting(normal, input.worldPosition, input.position.xy, input.position.w, albedo, f0, roughness) + _AmbientLightColor * albedo * rcp(Pi);
 
 		lighting.rgb += _EmissionColor;
 		lighting.rgb = ApplyFog(lighting.rgb, input.position.xy, input.position.w);
-		output.color = lighting;
+		output.color.rgb = lighting;
+		
+		#if defined(MODE_FADE) || defined(MODE_TRANSPARENT)
+			output.color.a = color.a;
+		#endif
 	
 		#ifdef MOTION_VECTORS_ON
 			output.velocity = unity_MotionVectorsParams.y ? MotionVectorFragment(input.nonJitteredPositionCS, input.previousPositionCS) : 0.0;

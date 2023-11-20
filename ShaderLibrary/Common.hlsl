@@ -43,11 +43,8 @@ float _BlockerRadius, _ClusterBias, _ClusterScale, _FogStartDistance, _FogEndDis
 matrix _InvVPMatrix, _PreviousVPMatrix, unity_MatrixVP, _NonJitteredVPMatrix, unity_MatrixV;
 uint _BlockerSamples, _DirectionalLightCount, _FrameCount, _PcfSamples, _PointLightCount, _TileSize, unity_BaseInstanceID;
 
-bool _HasLastPositionData;
-bool _ForceNoMotion;
-float _MotionVectorDepthBias;
-
 const static float Pi = radians(180.0);
+const static float HalfPi = Pi * rcp(0.5);
 
 cbuffer UnityPerDraw
 {
@@ -110,7 +107,6 @@ bool IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePositi
 	return IntersectRayPlane(rayOrigin, rayDirection, planePosition, planeNormal, t);
 }
 
-
 //From  Next Generation Post Processing in Call of Duty: Advanced Warfare [Jimenez 2014]
 // http://advances.floattimerendering.com/s2014/index.html
 float InterleavedGradientNoise(float2 pixCoord, int frameCount)
@@ -124,6 +120,11 @@ float InterleavedGradientNoise(float2 pixCoord, int frameCount)
 float2 ApplyScaleOffset(float2 uv, float4 scaleOffset)
 {
 	return uv * scaleOffset.xy + scaleOffset.zw;
+}
+
+float Linear01Depth(float depth)
+{
+	return 1.0 / (_ZBufferParams.x * depth + _ZBufferParams.y);
 }
 
 float LinearEyeDepth(float depth)
@@ -540,6 +541,7 @@ float4 SampleVolumetricLighting(float2 pixelPosition, float eyeDepth)
 	return _VolumetricLighting.SampleLevel(_LinearClampSampler, volumeUv, 0.0);
 }
 
+bool1 IsInfOrNaN(float1 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
 bool3 IsInfOrNaN(float3 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
 
 float3 ApplyFog(float3 color, float2 pixelPosition, float eyeDepth)

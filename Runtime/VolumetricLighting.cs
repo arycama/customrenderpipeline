@@ -1,23 +1,45 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 public class VolumetricLighting
 {
+    [Serializable]
+    public class Settings
+    {
+        [SerializeField] private int tileSize = 8;
+        [SerializeField] private int depthSlices = 128;
+        [SerializeField, Range(0.0f, 2.0f)] private float blurSigma = 1.0f;
+        [SerializeField] private bool nonLinearDepth = true;
+
+        public int TileSize => tileSize;
+        public int DepthSlices => depthSlices;
+        public float BlurSigma => blurSigma;
+        public bool NonLinearDepth => nonLinearDepth;
+    }
+
     private static readonly int volumetricLightingId = Shader.PropertyToID("_VolumetricLighting");
+
+    private Settings settings;
     private CameraTextureCache volumetricLightingTextureCache = new();
+
+    public VolumetricLighting(Settings settings)
+    {
+        this.settings = settings;
+    }
 
     public void Release()
     {
         volumetricLightingTextureCache.Dispose();
     }
 
-    public void Render(Camera camera, CommandBuffer command, int tileSize, int depthSlices, int frameCount, float blurSigma, bool nonLinearDepth)
+    public void Render(Camera camera, CommandBuffer command, int frameCount)
     {
         using var profilerScope = command.BeginScopedSample("Volumetric Lighting");
 
-        var width = Mathf.CeilToInt(camera.pixelWidth / (float)tileSize);
-        var height = Mathf.CeilToInt(camera.pixelHeight / (float)tileSize);
-        var depth = depthSlices;
+        var width = Mathf.CeilToInt(camera.pixelWidth / (float)settings.TileSize);
+        var height = Mathf.CeilToInt(camera.pixelHeight / (float)settings.TileSize);
+        var depth = settings.DepthSlices;
         var volumetricLightingDescriptor = new RenderTextureDescriptor(width, height, RenderTextureFormat.ARGBHalf)
         {
             dimension = TextureDimension.Tex3D,
@@ -32,9 +54,9 @@ public class VolumetricLighting
         command.SetGlobalFloat("_VolumeHeight", height);
         command.SetGlobalFloat("_VolumeSlices", depth);
         command.SetGlobalFloat("_VolumeDepth", camera.farClipPlane);
-        command.SetGlobalFloat("_NonLinearDepth", nonLinearDepth ? 1.0f : 0.0f);
-        command.SetComputeFloatParam(computeShader, "_BlurSigma", blurSigma);
-        command.SetComputeIntParam(computeShader, "_VolumeTileSize", tileSize);
+        command.SetGlobalFloat("_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
+        command.SetComputeFloatParam(computeShader, "_BlurSigma", settings.BlurSigma);
+        command.SetComputeIntParam(computeShader, "_VolumeTileSize", settings.TileSize);
 
         command.SetComputeTextureParam(computeShader, 0, "_Input", volumetricLightingHistory);
         command.SetComputeTextureParam(computeShader, 0, "_Result", volumetricLightingCurrent);

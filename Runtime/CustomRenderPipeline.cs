@@ -23,6 +23,7 @@ public class CustomRenderPipeline : RenderPipeline
     private readonly ConvolutionBloom convolutionBloom;
     private readonly DepthOfField depthOfField;
     private readonly Bloom bloom;
+    private readonly AmbientOcclusion ambientOcclusion;
 
     private Dictionary<Camera, int> cameraRenderedFrameCount = new();
     private Dictionary<Camera, Matrix4x4> previousMatrices = new();
@@ -42,14 +43,15 @@ public class CustomRenderPipeline : RenderPipeline
 
         lightingSetup = new(renderPipelineAsset.ShadowSettings);
         clusteredLightCulling = new(renderPipelineAsset.ClusteredLightingSettings);
-        volumetricLighting = new();
+        volumetricLighting = new(renderPipelineAsset.VolumetricLightingSettings);
         opaqueObjectRenderer = new(RenderQueueRange.opaque, SortingCriteria.CommonOpaque, true, PerObjectData.None, "SRPDefaultUnlit");
         motionVectorsRenderer = new(RenderQueueRange.opaque, SortingCriteria.CommonOpaque, false, PerObjectData.MotionVectors, "MotionVectors");
         transparentObjectRenderer = new(RenderQueueRange.transparent, SortingCriteria.CommonTransparent, false, PerObjectData.None, "SRPDefaultUnlit");
         temporalAA = new(renderPipelineAsset.TemporalAASettings);
         convolutionBloom = new(renderPipelineAsset.ConvolutionBloomSettings);
-        depthOfField = new(renderPipelineAsset.depthOfFieldSettings);
+        depthOfField = new(renderPipelineAsset.DepthOfFieldSettigns);
         bloom = new(renderPipelineAsset.BloomSettings);
+        ambientOcclusion = new(renderPipelineAsset.AmbientOcclusionSettings);
 
         motionVectorsMaterial = new Material(Shader.Find("Hidden/Camera Motion Vectors")) { hideFlags = HideFlags.HideAndDontSave };
         tonemappingMaterial = new Material(Shader.Find("Hidden/Tonemapping")) { hideFlags = HideFlags.HideAndDontSave };
@@ -168,7 +170,7 @@ public class CustomRenderPipeline : RenderPipeline
         context.SetupCameraProperties(camera);
 
         clusteredLightCulling.Render(command, camera);
-        volumetricLighting.Render(camera, command, renderPipelineAsset.TileSize, renderPipelineAsset.DepthSlices, frameCount, renderPipelineAsset.BlurSigma, renderPipelineAsset.NonLinearDepth);
+        volumetricLighting.Render(camera, command, frameCount);
 
         command.GetTemporaryRT(cameraTargetId, camera.pixelWidth, camera.pixelHeight, 0, FilterMode.Bilinear, RenderTextureFormat.RGB111110Float);
         command.GetTemporaryRT(cameraDepthId, camera.pixelWidth, camera.pixelHeight, 32, FilterMode.Point, RenderTextureFormat.Depth);
@@ -198,6 +200,9 @@ public class CustomRenderPipeline : RenderPipeline
             command.SetGlobalTexture("_CameraDepth", cameraDepthId);
             command.DrawProcedural(Matrix4x4.identity, motionVectorsMaterial, 0, MeshTopology.Triangles, 3);
         }
+
+        // Ambient occlusion
+        ambientOcclusion.Render(command, camera, cameraDepthId, cameraTargetId);
 
         // Copy scene texture
         command.GetTemporaryRT(sceneTextureId, camera.pixelWidth, camera.pixelHeight, 0, FilterMode.Bilinear, RenderTextureFormat.RGB111110Float);
@@ -238,13 +243,16 @@ public class CustomRenderPipeline : RenderPipeline
         clusteredLightCulling.CameraRenderingComplete(command);
         volumetricLighting.CameraRenderComplete(command);
 
-        //if (UnityEditor.Handles.ShouldRenderGizmos())
-        //{
-        //    context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
-        //    context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
-        //}
+        context.ExecuteCommandBuffer(command);
+        command.Clear();
+
+        if (UnityEditor.Handles.ShouldRenderGizmos())
+        {
+            context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
+            context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
+        }
 
         //if (camera.cameraType == CameraType.SceneView)
-           // ScriptableRenderContext.EmitGeometryForCamera(camera);
+        //    ScriptableRenderContext.EmitGeometryForCamera(camera);
     }
 }
