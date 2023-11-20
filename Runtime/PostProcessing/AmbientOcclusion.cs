@@ -35,6 +35,9 @@ public class AmbientOcclusion
 
     public void Render(CommandBuffer command, Camera camera, RenderTargetIdentifier depth, RenderTargetIdentifier scene)
     {
+        if (settings.Strength == 0.0f)
+            return;
+
         var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
         var tanHalfFovX = tanHalfFovY * camera.aspect;
         command.SetGlobalVector("_UvToView", new Vector4(tanHalfFovX * 2f, tanHalfFovY * 2f, -tanHalfFovX, -tanHalfFovY));
@@ -50,5 +53,8 @@ public class AmbientOcclusion
         command.SetGlobalTexture("_CameraDepth", depth);
         command.SetRenderTarget(new RenderTargetBinding(scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare, depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare) { flags = RenderTargetFlags.ReadOnlyDepthStencil });
         command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3);
+
+        if(RenderSettings.fog)
+            command.DrawProcedural(Matrix4x4.identity, material, 1, MeshTopology.Triangles, 3);
     }
 }

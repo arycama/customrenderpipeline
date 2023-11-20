@@ -153,6 +153,7 @@ public class CustomRenderPipeline : RenderPipeline
         command.SetGlobalFloat("_FogDensity", RenderSettings.fogDensity);
         command.SetGlobalFloat("_FogMode", (float)RenderSettings.fogMode);
         command.SetGlobalFloat("_FogEnabled", RenderSettings.fog ? 1.0f : 0.0f);
+        command.SetGlobalFloat("_AoEnabled", renderPipelineAsset.AmbientOcclusionSettings.Strength > 0.0f ? 1.0f : 0.0f);
 
         command.SetGlobalVector("_WaterAlbedo", renderPipelineAsset.waterAlbedo.linear);
         command.SetGlobalVector("_WaterExtinction", renderPipelineAsset.waterExtinction);

@@ -39,12 +39,12 @@ TextureCubeArray<float> _PointShadows;
 float4 _Time, _ProjectionParams, _ZBufferParams, _ScreenParams;
 float3 _AmbientLightColor, _WorldSpaceCameraPos, _FogColor, _WaterAlbedo, _WaterExtinction;
 float2 _Jitter;
-float _BlockerRadius, _ClusterBias, _ClusterScale, _FogStartDistance, _FogEndDistance, _FogEnabled, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _VolumeDepth, _NonLinearDepth;
+float _BlockerRadius, _ClusterBias, _ClusterScale, _FogStartDistance, _FogEndDistance, _FogEnabled, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _VolumeDepth, _NonLinearDepth, _AoEnabled;
 matrix _InvVPMatrix, _PreviousVPMatrix, unity_MatrixVP, _NonJitteredVPMatrix, unity_MatrixV;
 uint _BlockerSamples, _DirectionalLightCount, _FrameCount, _PcfSamples, _PointLightCount, _TileSize, unity_BaseInstanceID;
 
 const static float Pi = radians(180.0);
-const static float HalfPi = Pi * rcp(0.5);
+const static float HalfPi = Pi * 0.5;
 
 cbuffer UnityPerDraw
 {
@@ -465,8 +465,10 @@ float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, fl
 		DirectionalLight light = _DirectionalLights[i];
 		float NdotL = dot(normal, light.direction);
 		
-		if(NdotL > 0.0)
-			lighting += (isVolumetric ? 1.0 : saturate(NdotL) * CalculateLighting(albedo, f0, roughness, light.direction, V, normal)) * light.color * attenuation;
+		if (isVolumetric)
+			lighting += light.color * attenuation;
+		else if(NdotL > 0.0)
+			lighting += saturate(NdotL) * CalculateLighting(albedo, f0, roughness, light.direction, V, normal) * light.color * attenuation;
 	}
 	
 	uint3 clusterIndex;
