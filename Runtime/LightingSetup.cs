@@ -59,6 +59,8 @@ public class LightingSetup
 
     public void Render(CommandBuffer command, CullingResults cullingResults, ScriptableRenderContext context, Camera camera)
     {
+        //using var renderShadowsProfilerScope = command.BeginScopedSample("Render Shadows");
+
         var directionalLightList = ListPool<DirectionalLightData>.Get();
         var directionalShadowRequests = ListPool<ShadowRequest>.Get();
         var directionalShadowMatrices = ListPool<Matrix4x4>.Get();
@@ -218,13 +220,14 @@ public class LightingSetup
         camera.projectionMatrix = cameraProjectionMatrix;
 
         // Render Shadows
-        command.BeginSample("Render Shadows");
+
         command.SetGlobalDepthBias(settings.ShadowBias, settings.ShadowSlopeBias);
 
         if (directionalShadowRequests.Count > 0)
         {
             // Process directional shadows
-            command.BeginSample("Directional Shadows");
+            //using var directionalShadowsProfilerScope = command.BeginScopedSample("Directional Shadows");
+
             command.SetGlobalFloat("_ZClip", 0);
 
             // Setup shadow map for directional shadows
@@ -241,23 +244,22 @@ public class LightingSetup
             for (var i = 0; i < directionalShadowRequests.Count; i++)
             {
                 var shadowRequest = directionalShadowRequests[i];
-                command.BeginSample(cascadeStrings.GetString(i % 4));
+                //command.BeginSample(cascadeStrings.GetString(i % 4));
                 command.SetRenderTarget(directionalShadowsId, 0, CubemapFace.Unknown, i);
 
                 command.SetViewProjectionMatrices(shadowRequest.ViewMatrix, shadowRequest.ProjectionMatrix);
-                command.BeginSample("Render Shadows");
+                //command.BeginSample("Render Shadows");
                 context.ExecuteCommandBuffer(command);
                 command.Clear();
 
                 var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, shadowRequest.VisibleLightIndex) { splitData = shadowRequest.ShadowSplitData };
                 context.DrawShadows(ref shadowDrawingSettings);
 
-                command.EndSample("Render Shadows");
-                command.EndSample(cascadeStrings.GetString(i % 4));
+                //command.EndSample("Render Shadows");
+                //command.EndSample(cascadeStrings.GetString(i % 4));
             }
 
             command.SetGlobalFloat("_ZClip", 1);
-            command.EndSample("Directional Shadows");
         }
 
         // Process point shadows 
@@ -270,15 +272,16 @@ public class LightingSetup
                 volumeDepth = pointShadowRequests.Count * 6,
             };
 
-            command.BeginSample("Point Shadows");
+            //using var pointShadowsProfilerScope = command.BeginScopedSample("Point Shadows");
+
             command.GetTemporaryRT(pointShadowsId, pointShadowsDescriptor);
             command.SetRenderTarget(pointShadowsId, 0, CubemapFace.Unknown, -1);
             command.ClearRenderTarget(true, false, Color.clear);
 
             for (var i = 0; i < pointShadowRequests.Count; i++)
             {
-                command.BeginSample($"Light {i / 6}");
-                command.BeginSample($"Face {i % 6}");
+                //command.BeginSample($"Light {i / 6}");
+                //command.BeginSample($"Face {i % 6}");
 
                 var shadowRequest = pointShadowRequests[i];
                 if (!shadowRequest.IsValid)
@@ -287,19 +290,17 @@ public class LightingSetup
                 command.SetRenderTarget(pointShadowsId, 0, CubemapFace.Unknown, i);
 
                 command.SetViewProjectionMatrices(shadowRequest.ViewMatrix, shadowRequest.ProjectionMatrix);
-                command.BeginSample("Render Shadows");
+               //command.BeginSample("Render Shadows");
                 context.ExecuteCommandBuffer(command);
                 command.Clear();
 
                 var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, shadowRequest.VisibleLightIndex) { splitData = shadowRequest.ShadowSplitData };
                 context.DrawShadows(ref shadowDrawingSettings);
 
-                command.EndSample("Render Shadows");
-                command.EndSample($"Light {i % 6}");
-                command.EndSample($"Light {i / 6}");
+               // command.EndSample("Render Shadows");
+                //command.EndSample($"Light {i % 6}");
+                //command.EndSample($"Light {i / 6}");
             }
-
-            command.EndSample("Point Shadows");
         }
 
         command.SetGlobalDepthBias(0f, 0f);
@@ -343,6 +344,5 @@ public class LightingSetup
         command.SetGlobalInt("_BlockerSamples", settings.BlockerSamples);
         command.SetGlobalFloat("_BlockerRadius", settings.BlockerRadius);
         command.SetGlobalFloat("_PcssSoftness", settings.PcssSoftness);
-        command.EndSample("Render Shadows");
     }
 }
