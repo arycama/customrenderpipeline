@@ -95,7 +95,7 @@ FragmentInput Vertex(VertexInput input)
 FragmentOutput Fragment(FragmentInput input)
 {
 	#if !defined(UNITY_PASS_SHADOWCASTER)
-		input.uv = UnjitterTextureUV(input.uv);
+		//input.uv = UnjitterTextureUV(input.uv);
 	#endif
 	
 	#if !defined(UNITY_PASS_SHADOWCASTER) || defined(MODE_CUTOUT) || defined(MODE_FADE) || defined(MODE_TRANSPARENT)

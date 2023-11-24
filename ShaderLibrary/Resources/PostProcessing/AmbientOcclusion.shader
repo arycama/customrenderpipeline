@@ -5,7 +5,24 @@ Shader "Hidden/Ambient Occlusion"
         Cull Off
         ZWrite Off
         ZTest Always
+
+        Pass
+        {
+            Name "View Normals"
+            
+            Stencil
+            {
+                Ref 0
+                Comp NotEqual
+            }
         
+            HLSLPROGRAM
+            #pragma vertex Vertex
+            #pragma fragment FragmentViewNormals
+            #include "AmbientOcclusion.hlsl"
+            ENDHLSL
+        }
+
         Pass
         {
             Name "Compute"
