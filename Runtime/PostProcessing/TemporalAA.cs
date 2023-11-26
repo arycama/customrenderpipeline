@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
 public class TemporalAA
@@ -26,6 +28,7 @@ public class TemporalAA
     private CameraTextureCache textureCache = new();
     private Material material;
     private MaterialPropertyBlock propertyBlock;
+    private Dictionary<Camera, Matrix4x4> previousMatrices = new();
 
     public TemporalAA(Settings settings)
     {
@@ -39,24 +42,29 @@ public class TemporalAA
         textureCache.Dispose();
     }
 
-    public void OnPreRender(Camera camera, int frameCount, CommandBuffer command)
+    public void OnPreRender(Camera camera, int frameCount, out Vector2 jitter, out Matrix4x4 previousMatrix)
     {
         camera.ResetProjectionMatrix();
         camera.nonJitteredProjectionMatrix = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
 
         var sampleIndex = frameCount % settings.SampleCount;
 
-        Vector2 jitter;
-        jitter.x = Halton(sampleIndex, 2) - 0.5f;
-        jitter.y = Halton(sampleIndex, 3) - 0.5f;
-        jitter *= settings.JitterSpread;
+        jitter = new Vector2(Halton(sampleIndex + 1, 2) - 0.5f, Halton(sampleIndex + 1, 3) - 0.5f) * settings.JitterSpread;
 
         var matrix = camera.projectionMatrix;
         matrix[0, 2] = 2.0f * jitter.x / camera.pixelWidth;
         matrix[1, 2] = 2.0f * jitter.y / camera.pixelHeight;
         camera.projectionMatrix = matrix;
 
-        command.SetGlobalVector("_Jitter", jitter);
+        if (!previousMatrices.TryGetValue(camera, out previousMatrix))
+        {
+            previousMatrix = camera.nonJitteredProjectionMatrix;
+            previousMatrices.Add(camera, previousMatrix);
+        }
+        else
+        {
+            previousMatrices[camera] = camera.nonJitteredProjectionMatrix;
+        }
     }
 
     public RenderTargetIdentifier Render(Camera camera, CommandBuffer command, int frameCount, RenderTargetIdentifier input, RenderTargetIdentifier motion)
@@ -87,14 +95,14 @@ public class TemporalAA
     public static float Halton(int index, int radix)
     {
         float result = 0f;
-        float fraction = 1f / (float)radix;
+        float fraction = 1f / radix;
 
         while (index > 0)
         {
-            result += (float)(index % radix) * fraction;
+            result += index % radix * fraction;
 
             index /= radix;
-            fraction /= (float)radix;
+            fraction /= radix;
         }
 
         return result;
