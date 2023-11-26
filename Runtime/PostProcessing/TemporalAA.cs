@@ -7,26 +7,19 @@ public class TemporalAA
     [Serializable]
     public class Settings
     {
-        [SerializeField, Range(1, 32)]
-        private int sampleCount = 8;
-
-        [SerializeField, Range(0.0f, 1f), Tooltip("The diameter (in texels) inside which jitter samples are spread. Smaller values result in crisper but more aliased output, while larger values result in more stable, but blurrier, output.")]
-        private float jitterSpread = 0.75f;
-
-        [SerializeField, Range(0f, 3f), Tooltip("Controls the amount of sharpening applied to the color buffer. High values may introduce dark-border artifacts.")]
-        private float sharpness = 0.25f;
-
-        [SerializeField, Range(0f, 0.99f), Tooltip("The blend coefficient for a stationary fragment. Controls the percentage of history sample blended into the final color.")]
-        private float stationaryBlending = 0.95f;
-
-        [SerializeField, Range(0f, 0.99f), Tooltip("The blend coefficient for a fragment with significant motion. Controls the percentage of history sample blended into the final color.")]
-        private float motionBlending = 0.85f;
+        [SerializeField, Range(1, 32)] private int sampleCount = 8;
+        [SerializeField, Range(0.0f, 1f)] private float jitterSpread = 0.75f;
+        [SerializeField, Range(0f, 1f)] private float sharpness = 0.5f;
+        [SerializeField, Range(0f, 0.99f)] private float stationaryBlending = 0.95f;
+        [SerializeField, Range(0f, 0.99f)] private float motionBlending = 0.85f;
+        [SerializeField] private float motionWeight = 6000f;
 
         public int SampleCount => sampleCount;
         public float JitterSpread => jitterSpread;
         public float Sharpness => sharpness;
         public float StationaryBlending => stationaryBlending;
         public float MotionBlending => motionBlending;
+        public float MotionWeight => motionWeight;
     }
 
     private Settings settings;
@@ -76,8 +69,10 @@ public class TemporalAA
         propertyBlock.SetFloat("_Sharpness", settings.Sharpness);
         propertyBlock.SetFloat("_HasHistory", wasCreated ? 0f : 1f);
 
-        const float kMotionAmplification = 100f * 60f;
-        propertyBlock.SetVector("_FinalBlendParameters", new Vector4(settings.StationaryBlending, settings.MotionBlending, kMotionAmplification, 0f));
+        propertyBlock.SetFloat("_StationaryBlending", settings.StationaryBlending);
+        propertyBlock.SetFloat("_MotionBlending", settings.MotionBlending);
+        propertyBlock.SetFloat("_MotionWeight", settings.MotionWeight);
+
         propertyBlock.SetTexture("_History", previous);
 
         command.SetGlobalTexture("_Input", input);

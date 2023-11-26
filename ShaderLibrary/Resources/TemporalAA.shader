@@ -13,7 +13,6 @@ Shader"Hidden/Temporal AA"
             #pragma fragment Fragment
             #include "TemporalAA.hlsl"
             ENDHLSL
-          
         }
     }
 }
