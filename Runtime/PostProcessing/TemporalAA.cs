@@ -27,14 +27,12 @@ public class TemporalAA
     private Settings settings;
     private CameraTextureCache textureCache = new();
     private Material material;
-    private MaterialPropertyBlock propertyBlock;
     private Dictionary<Camera, Matrix4x4> previousMatrices = new();
 
     public TemporalAA(Settings settings)
     {
         this.settings = settings;
         material = new Material(Shader.Find("Hidden/Temporal AA")) { hideFlags = HideFlags.HideAndDontSave };
-        propertyBlock = new();
     }
 
     public void Release()
@@ -67,29 +65,50 @@ public class TemporalAA
         }
     }
 
-    public RenderTargetIdentifier Render(Camera camera, CommandBuffer command, int frameCount, RenderTargetIdentifier input, RenderTargetIdentifier motion)
+    class PassData
     {
-        using var profilerScope = command.BeginScopedSample("Temporal AA");
+        public TextureHandle color;
+        public TextureHandle motion;
+        public RenderTexture current, previous;
+        public bool wasCreated;
+        public Material material;
+    }
 
-        var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
-        var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous, frameCount);
+    public RenderTexture Render(Camera camera, int frameCount, RenderGraph renderGraph, TextureHandle color, TextureHandle motion)
+    {
+        using (var builder = renderGraph.AddRenderPass<PassData>("Temporal Anti-Aliasing", out var passData))
+        {
+            passData.color = builder.ReadTexture(color);
+            passData.motion = builder.ReadTexture(motion);
 
-        propertyBlock.SetFloat("_Sharpness", settings.Sharpness);
-        propertyBlock.SetFloat("_HasHistory", wasCreated ? 0f : 1f);
+            var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
+            passData.wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous, frameCount);
+            passData.current = current;
+            passData.previous = previous;
+            passData.material = material;
 
-        propertyBlock.SetFloat("_StationaryBlending", settings.StationaryBlending);
-        propertyBlock.SetFloat("_MotionBlending", settings.MotionBlending);
-        propertyBlock.SetFloat("_MotionWeight", settings.MotionWeight);
+            builder.SetRenderFunc<PassData>((data, context) =>
+            {
+                var propertyBlock = context.renderGraphPool.GetTempMaterialPropertyBlock();
 
-        propertyBlock.SetTexture("_History", previous);
+                propertyBlock.SetFloat("_Sharpness", settings.Sharpness);
+                propertyBlock.SetFloat("_HasHistory", data.wasCreated ? 0f : 1f);
 
-        command.SetGlobalTexture("_Input", input);
-        command.SetGlobalTexture("_Motion", motion);
+                propertyBlock.SetFloat("_StationaryBlending", settings.StationaryBlending);
+                propertyBlock.SetFloat("_MotionBlending", settings.MotionBlending);
+                propertyBlock.SetFloat("_MotionWeight", settings.MotionWeight);
 
-        command.SetRenderTarget(current);
-        command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
+                propertyBlock.SetTexture("_History", data.previous);
 
-        return current;
+                context.cmd.SetGlobalTexture("_Input", data.color);
+                context.cmd.SetGlobalTexture("_Motion", data.motion);
+
+                context.cmd.SetRenderTarget(data.current);
+                context.cmd.DrawProcedural(Matrix4x4.identity, data.material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
+            });
+
+            return current;
+        }
     }
 
     public static float Halton(int index, int radix)

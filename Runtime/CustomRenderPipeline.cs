@@ -139,6 +139,12 @@ public class CustomRenderPipeline : RenderPipeline
         public RendererListHandle rendererListHandle;
     }
 
+    public class TransparentRendererListPassData
+    {
+        public TextureHandle depthTextureHandle;
+        public RendererListHandle rendererListHandle;
+    }
+
     public class CameraMotionVectorsPassData
     {
         public TextureHandle depthTextureHandle;
@@ -167,9 +173,7 @@ public class CustomRenderPipeline : RenderPipeline
         cullingParameters.cullingOptions = CullingOptions.NeedsLighting | CullingOptions.DisablePerObjectCulling | CullingOptions.ShadowCasters;
         var cullingResults = context.Cull(ref cullingParameters);
 
-        lightingSetup.Render(cullingResults, camera, renderGraph);
-
-        context.SetupCameraProperties(camera);
+        var lightingResult = lightingSetup.Render(cullingResults, camera, renderGraph);
 
         using (var builder = renderGraph.AddRenderPass<EnvSetupPassData>("Environment Setup", out var passData))
         {
@@ -183,6 +187,8 @@ public class CustomRenderPipeline : RenderPipeline
 
             builder.SetRenderFunc<EnvSetupPassData>((data, context) =>
             {
+                context.renderContext.SetupCameraProperties(camera);
+
                 context.cmd.SetGlobalVector("_AmbientLightColor", RenderSettings.ambientLight.linear);
                 context.cmd.SetGlobalVector("_FogColor", RenderSettings.fogColor.linear);
                 context.cmd.SetGlobalFloat("_FogStartDistance", RenderSettings.fogStartDistance);
@@ -206,22 +212,20 @@ public class CustomRenderPipeline : RenderPipeline
             });
         }
 
-        clusteredLightCulling.Render(renderGraph, camera, out var lightClusterIndices);
-        volumetricLighting.Render(renderGraph, camera, currentFrameIndex, lightClusterIndices);
+        var clusteredLightCullingResult = clusteredLightCulling.Render(renderGraph, camera, lightingResult.pointLightBuffer);
+        volumetricLighting.Render(renderGraph, camera, currentFrameIndex, clusteredLightCullingResult.lightClusterIndices);
 
         // Base pass
         var cameraDepthId = renderGraph.CreateTexture(new TextureDesc(camera.pixelWidth, camera.pixelHeight) { depthBufferBits = DepthBits.Depth32, clearBuffer = true });
         var cameraTargetId = renderGraph.CreateTexture(new TextureDesc(camera.pixelWidth, camera.pixelHeight) { colorFormat = GraphicsFormat.B10G11R11_UFloatPack32, clearBuffer = true, clearColor = camera.backgroundColor.linear });
 
-        var opaqueRendererList = renderGraph.CreateRendererList(new(new ShaderTagId("SRPDefaultUnlit"), cullingResults, camera) { excludeObjectMotionVectors = true, sortingCriteria = SortingCriteria.CommonOpaque, renderQueueRange = RenderQueueRange.opaque });
-
         using (var builder = renderGraph.AddRenderPass<RendererListPassData>("Base Pass Rendering", out var passData))
         {
+            var opaqueRendererList = renderGraph.CreateRendererList(new(new ShaderTagId("SRPDefaultUnlit"), cullingResults, camera) { excludeObjectMotionVectors = true, sortingCriteria = SortingCriteria.CommonOpaque, renderQueueRange = RenderQueueRange.opaque });
+
             builder.UseDepthBuffer(cameraDepthId, DepthAccess.ReadWrite);
             builder.UseColorBuffer(cameraTargetId, 0);
-            builder.UseRendererList(opaqueRendererList);
-
-            passData.rendererListHandle = opaqueRendererList;
+            passData.rendererListHandle = builder.UseRendererList(opaqueRendererList);
 
             builder.SetRenderFunc<RendererListPassData>((data, context) =>
             {
@@ -230,17 +234,15 @@ public class CustomRenderPipeline : RenderPipeline
         };
 
         // Motion Vectors
-        var motionVectorsId = renderGraph.CreateTexture(new TextureDesc(camera.pixelWidth, camera.pixelHeight) { colorFormat = GraphicsFormat.R16G16_SFloat, clearBuffer = true, clearColor = Color.clear });
-
-        var motionVectorRendererList = renderGraph.CreateRendererList(new(new ShaderTagId("SRPDefaultUnlit"), cullingResults, camera) { sortingCriteria = SortingCriteria.CommonOpaque, rendererConfiguration = PerObjectData.MotionVectors, renderQueueRange = RenderQueueRange.opaque });
-
+        var motionVectorsId = renderGraph.CreateTexture(new TextureDesc(camera.pixelWidth, camera.pixelHeight) { colorFormat = GraphicsFormat.R16G16_SFloat, clearBuffer = true });
         using (var builder = renderGraph.AddRenderPass<RendererListPassData>("Motion Vector Rendering", out var passData))
         {
+            var motionVectorRendererList = renderGraph.CreateRendererList(new(new ShaderTagId("SRPDefaultUnlit"), cullingResults, camera) { sortingCriteria = SortingCriteria.CommonOpaque, rendererConfiguration = PerObjectData.MotionVectors, renderQueueRange = RenderQueueRange.opaque });
+
             builder.UseDepthBuffer(cameraDepthId, DepthAccess.ReadWrite);
             builder.UseColorBuffer(cameraTargetId, 0);
             builder.UseColorBuffer(motionVectorsId, 1);
-
-            passData.rendererListHandle = motionVectorRendererList;
+            passData.rendererListHandle = builder.UseRendererList(motionVectorRendererList);
 
             builder.SetRenderFunc<RendererListPassData>((data, context) =>
             {
@@ -251,10 +253,9 @@ public class CustomRenderPipeline : RenderPipeline
         // Camera motion vectors
         using (var builder = renderGraph.AddRenderPass<CameraMotionVectorsPassData>("Camera motion vectors", out var passData))
         {
-            builder.UseDepthBuffer(cameraDepthId, DepthAccess.ReadWrite);
             builder.UseColorBuffer(motionVectorsId, 0);
 
-            passData.depthTextureHandle = cameraDepthId;
+            passData.depthTextureHandle = builder.UseDepthBuffer(cameraDepthId, DepthAccess.Read);
             passData.motionVectorsMaterial = motionVectorsMaterial;
 
             builder.SetRenderFunc<CameraMotionVectorsPassData>((data, context) =>
@@ -274,10 +275,25 @@ public class CustomRenderPipeline : RenderPipeline
         //command.SetGlobalTexture(cameraDepthId, cameraDepthId);
 
         // Transparent
+        using (var builder = renderGraph.AddRenderPass<TransparentRendererListPassData>("Transparent Rendering", out var passData))
+        {
+            var transparentRendererList = renderGraph.CreateRendererList(new(new ShaderTagId("SRPDefaultUnlit"), cullingResults, camera) { excludeObjectMotionVectors = true, sortingCriteria = SortingCriteria.CommonTransparent, renderQueueRange = RenderQueueRange.transparent });
+
+            builder.UseColorBuffer(cameraTargetId, 0);
+
+            passData.depthTextureHandle = builder.UseDepthBuffer(cameraDepthId, DepthAccess.Read);
+            passData.rendererListHandle = builder.UseRendererList(transparentRendererList);
+
+            builder.SetRenderFunc<TransparentRendererListPassData>((data, context) =>
+            {
+                context.cmd.DrawRendererList(data.rendererListHandle);
+            });
+        };
+
         // command.SetRenderTarget(new RenderTargetBinding(cameraTargetId, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare, cameraDepthId, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare) { flags = RenderTargetFlags.ReadOnlyDepthStencil });
         //transparentObjectRenderer.Render(ref cullingResultsWrapper.cullingResults, camera, command, ref context);
 
-        // var taa = temporalAA.Render(camera, command, frameCount, cameraTargetId, motionVectorsId);
+        var taa = temporalAA.Render(camera, currentFrameIndex, renderGraph, cameraTargetId, motionVectorsId);
 
         //depthOfField.Render(camera, command, cameraDepthId, taa);
 
@@ -297,8 +313,8 @@ public class CustomRenderPipeline : RenderPipeline
 
             builder.SetRenderFunc<TonemappingPassData>((data, context) =>
             {
-                context.cmd.SetGlobalTexture("_MainTex", data.textureHandle);
-                //context.cmd.SetGlobalTexture("_MainTex", taa);
+                //context.cmd.SetGlobalTexture("_MainTex", data.textureHandle);
+                context.cmd.SetGlobalTexture("_MainTex", taa);
                // context.cmd.SetGlobalTexture("_Bloom", bloomResult);
                 context.cmd.SetGlobalFloat("_BloomStrength", data.bloomStrength);
                 context.cmd.SetGlobalFloat("_IsSceneView", data.camera.cameraType == CameraType.SceneView ? 1f : 0f);

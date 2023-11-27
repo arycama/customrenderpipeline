@@ -36,15 +36,22 @@ public class ClusteredLightCulling
         public Camera camera;
         public Settings settings;
         public TextureHandle lightClusterIndices;
+        public ComputeBufferHandle pointLights;
     }
 
-    public void Render(RenderGraph renderGraph, Camera camera, out TextureHandle lightClusterIndices)
+    public struct ResultData
+    {
+        public TextureHandle lightClusterIndices;
+    }
+
+    public ResultData Render(RenderGraph renderGraph, Camera camera, ComputeBufferHandle pointLights)
     {
         using var builder = renderGraph.AddRenderPass<PassData>("Clustered Light Culling", out var passData);
         passData.clusterWidth = DivRoundUp(camera.pixelWidth, settings.TileSize);
         passData.clusterHeight = DivRoundUp(camera.pixelHeight, settings.TileSize);
 
-        lightClusterIndices = renderGraph.CreateTexture(new TextureDesc(passData.clusterWidth, passData.clusterHeight) { colorFormat = GraphicsFormat.R32G32_UInt, dimension = TextureDimension.Tex3D, enableRandomWrite = true, slices = settings.ClusterDepth });
+        ResultData result;
+        result.lightClusterIndices = renderGraph.CreateTexture(new TextureDesc(passData.clusterWidth, passData.clusterHeight) { colorFormat = GraphicsFormat.R32G32_UInt, dimension = TextureDimension.Tex3D, enableRandomWrite = true, slices = settings.ClusterDepth });
 
         var clusterCount = passData.clusterWidth * passData.clusterHeight * settings.ClusterDepth;
         var lightList = renderGraph.CreateComputeBuffer(new ComputeBufferDesc(clusterCount * settings.MaxLightsPerTile, sizeof(int)));
@@ -53,7 +60,8 @@ public class ClusteredLightCulling
         passData.counterBuffer = builder.CreateTransientComputeBuffer(new ComputeBufferDesc(1, sizeof(uint)));
         passData.camera = camera;
         passData.settings = settings;
-        passData.lightClusterIndices = builder.WriteTexture(lightClusterIndices);
+        passData.lightClusterIndices = builder.WriteTexture(result.lightClusterIndices);
+        passData.pointLights = builder.ReadComputeBuffer(pointLights);
 
         builder.SetRenderFunc<PassData>((data, context) =>
         {
@@ -66,6 +74,7 @@ public class ClusteredLightCulling
             //command.SetComputeBufferParam(computeShader, 0, "_LightData", lightData);
             context.cmd.SetComputeBufferParam(computeShader, 0, "_LightCounter", data.counterBuffer);
             context.cmd.SetComputeBufferParam(computeShader, 0, "_LightClusterListWrite", data.lightList);
+            context.cmd.SetComputeBufferParam(computeShader, 0, "_PointLights", data.pointLights);
             context.cmd.SetComputeTextureParam(computeShader, 0, "_LightClusterIndicesWrite", data.lightClusterIndices);
             //command.SetComputeIntParam(computeShader, "_LightCount", lightData.Count);
             context.cmd.SetComputeIntParam(computeShader, "_TileSize", data.settings.TileSize);
@@ -78,5 +87,7 @@ public class ClusteredLightCulling
             context.cmd.SetGlobalFloat("_ClusterBias", clusterBias);
             context.cmd.SetGlobalInt("_TileSize", data.settings.TileSize);
         });
+
+        return result;
     }
 }
