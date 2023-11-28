@@ -126,7 +126,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	upsample += (a + c + g + i);
 	upsample *= 1.0 / 16.0;
 	
-	//input = lerp(input, upsample, _BloomStrength);
+	input = lerp(input, upsample, _BloomStrength);
 	
 	// Reinhard
 	//input *= rcp(1.0 + Luminance(input));

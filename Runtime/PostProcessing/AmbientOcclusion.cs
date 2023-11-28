@@ -1,5 +1,9 @@
 using System;
+using System.Collections;
+using System.Collections.Generic;
+using Unity.Profiling;
 using UnityEngine;
+using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
 public class AmbientOcclusion
@@ -24,11 +28,17 @@ public class AmbientOcclusion
 
     private Settings settings;
     private Material material;
+    private ComputeShader computeShader;
+    private CustomSampler sampler, csSampler;
 
     public AmbientOcclusion(Settings settings)
     {
         this.settings = settings;
         material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
+        computeShader = Resources.Load<ComputeShader>("PostProcessing/NormalsFromDepth");
+
+        sampler = CustomSampler.Create("Ambient Occlusion", true);
+        csSampler = CustomSampler.Create("Ambient Occlusion CS", true);
     }
 
     public void Render(CommandBuffer command, Camera camera, RenderTargetIdentifier depth, RenderTargetIdentifier scene)
@@ -36,11 +46,31 @@ public class AmbientOcclusion
         if (settings.Strength == 0.0f)
             return;
 
+
         var normals = Shader.PropertyToID("_ViewNormals");
         command.GetTemporaryRT(normals, new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.ARGB2101010) { enableRandomWrite = true });
 
         var viewDepth = Shader.PropertyToID("_ViewDepth");
         command.GetTemporaryRT(viewDepth, new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RHalf) { enableRandomWrite = true });
+
+        command.SetComputeTextureParam(computeShader, 0, "_CameraDepth", depth);
+        command.SetComputeTextureParam(computeShader, 0, "DepthResult", viewDepth);
+        command.SetComputeTextureParam(computeShader, 0, "NormalResult", normals);
+
+        command.SetComputeIntParam(computeShader, "Width", camera.pixelWidth);
+        command.SetComputeIntParam(computeShader, "Height", camera.pixelHeight);
+
+        computeShader.GetKernelThreadGroupSizes(0, out var x, out var y, out var z);
+
+        var threadGroupsX = (int)((camera.pixelWidth - 1) / x) + 1;
+        var threadGroupsY = (int)((camera.pixelHeight - 1) / y) + 1;
+
+        command.SetComputeIntParam(computeShader, "DispatchSizeX", threadGroupsX);
+        command.SetComputeIntParam(computeShader, "DispatchSizeY", threadGroupsY);
+
+        //command.BeginSample(csSampler);
+        //command.DispatchCompute(computeShader, 0, threadGroupsX, threadGroupsY, 1);
+        //command.EndSample(csSampler);
 
         command.SetGlobalVector("ScaleOffset", new Vector2(1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight));
 
@@ -50,7 +80,11 @@ public class AmbientOcclusion
             new [] { RenderBufferStoreAction.Store, RenderBufferStoreAction.Store },
             depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare) { flags = RenderTargetFlags.ReadOnlyDepthStencil });
 
+        //command.BeginSample(sampler);
         command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3);
+       // command.EndSample(sampler);
+
+       // Debug.Log($"{csSampler.GetRecorder().gpuElapsedNanoseconds}, {sampler.GetRecorder().gpuElapsedNanoseconds}");
 
         var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
         var tanHalfFovX = tanHalfFovY * camera.aspect;
@@ -72,5 +106,7 @@ public class AmbientOcclusion
 
         if(RenderSettings.fog)
             command.DrawProcedural(Matrix4x4.identity, material, 2, MeshTopology.Triangles, 3);
+
+
     }
 }

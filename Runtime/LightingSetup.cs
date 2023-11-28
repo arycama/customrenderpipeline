@@ -1,68 +1,73 @@
-﻿using System;
-using System.Collections.Generic;
-using Unity.Collections.LowLevel.Unsafe;
+﻿using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
-using UnityEngine.Experimental.Rendering;
-using UnityEngine.Experimental.Rendering.RenderGraphModule;
+using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
 public class LightingSetup
 {
     private static readonly Plane[] frustumPlanes = new Plane[6];
 
+    private static readonly int directionalShadowsId = Shader.PropertyToID("_DirectionalShadows");
+    private static readonly int pointShadowsId = Shader.PropertyToID("_PointShadows");
     private static readonly IndexedString cascadeStrings = new IndexedString("Cascade ");
     private static readonly IndexedString faceStrings = new IndexedString("Face ");
 
     private readonly ShadowSettings settings;
 
+    private ComputeBuffer directionalLightBuffer; // Can't be readonly as we resize if needed.
+    private ComputeBuffer pointLightBuffer; // Can't be readonly as we resize if needed.
+    private ComputeBuffer directionalMatrixBuffer;
+    private ComputeBuffer directionalTexelSizeBuffer;
+    private ComputeBuffer pointTexelSizeBuffer;
+
+    private RenderTexture emptyArray, emptyCubemapArray;
+
     public LightingSetup(ShadowSettings settings)
     {
         this.settings = settings;
+        directionalLightBuffer = new ComputeBuffer(1, UnsafeUtility.SizeOf<DirectionalLightData>());
+        pointLightBuffer = new ComputeBuffer(1, UnsafeUtility.SizeOf<PointLightData>());
+        directionalMatrixBuffer = new ComputeBuffer(1, UnsafeUtility.SizeOf<Matrix4x4>());
+        directionalTexelSizeBuffer = new ComputeBuffer(1, UnsafeUtility.SizeOf<Vector4>());
+        pointTexelSizeBuffer = new ComputeBuffer(1, UnsafeUtility.SizeOf<Vector4>());
 
+        emptyArray = new RenderTexture(1, 1, 0, RenderTextureFormat.Shadowmap)
+        {
+            dimension = TextureDimension.Tex2DArray,
+            hideFlags = HideFlags.HideAndDontSave,
+            volumeDepth = 1,
+        };
+
+        emptyCubemapArray = new RenderTexture(1, 1, 0, RenderTextureFormat.Shadowmap)
+        {
+            dimension = TextureDimension.CubeArray,
+            hideFlags = HideFlags.HideAndDontSave,
+            volumeDepth = 6,
+        };
     }
 
-    class PassData
+    public void Release()
     {
-        public CullingResults cullingResults;
-        public ShadowSettings settings;
-        public ComputeBufferHandle directionalLightBuffer;
-        public ComputeBufferHandle pointLightBuffer;
-        public ComputeBufferHandle directionalMatrixBuffer;
-        public ComputeBufferHandle directionalTexelSizeBuffer;
-        public ComputeBufferHandle pointTexelSizeBuffer;
-        public List<DirectionalLightData> directionalLightList;
-        public List<ShadowRequest> directionalShadowRequests;
-        public List<Matrix4x4> directionalShadowMatrices;
-        public List<Vector4> directionalShadowTexelSizes;
-        public List<PointLightData> pointLightList;
-        public List<ShadowRequest> pointShadowRequests;
-        public List<Vector4> pointShadowTexelSizes;
-        public TextureHandle directionalShadows;
-        public TextureHandle pointShadows;
+        directionalLightBuffer.Release();
+        pointLightBuffer.Release();
+        directionalMatrixBuffer.Release();
+        emptyArray.Release();
+        emptyCubemapArray.Release();
+        directionalTexelSizeBuffer.Release();
+        pointTexelSizeBuffer.Release();
     }
 
-    public struct ResultData
+    public void Render(CommandBuffer command, CullingResults cullingResults, ScriptableRenderContext context, Camera camera)
     {
-        public ComputeBufferHandle directionalLightBuffer;
-        public ComputeBufferHandle pointLightBuffer;
-        public ComputeBufferHandle directionalMatrixBuffer;
-        public ComputeBufferHandle directionalTexelSizeBuffer;
-        public ComputeBufferHandle pointTexelSizeBuffer;
-        public TextureHandle directionalShadows;
-        public TextureHandle pointShadows;
-    }
+        //using var renderShadowsProfilerScope = command.BeginScopedSample("Render Shadows");
 
-    public ResultData Render(CullingResults cullingResults, Camera camera, RenderGraph renderGraph)
-    {
-        using var builder = renderGraph.AddRenderPass<PassData>("Shadow Setup", out var passData);
-
-        passData.directionalLightList = ListPool<DirectionalLightData>.Get();
-        passData.directionalShadowRequests = ListPool<ShadowRequest>.Get();
-        passData.directionalShadowMatrices = ListPool<Matrix4x4>.Get();
-        passData.directionalShadowTexelSizes = ListPool<Vector4>.Get();
-        passData.pointLightList = ListPool<PointLightData>.Get();
-        passData.pointShadowRequests = ListPool<ShadowRequest>.Get();
-        passData.pointShadowTexelSizes = ListPool<Vector4>.Get();
+        var directionalLightList = ListPool<DirectionalLightData>.Get();
+        var directionalShadowRequests = ListPool<ShadowRequest>.Get();
+        var directionalShadowMatrices = ListPool<Matrix4x4>.Get();
+        var directionalShadowTexelSizes = ListPool<Vector4>.Get();
+        var pointLightList = ListPool<PointLightData>.Get();
+        var pointShadowRequests = ListPool<ShadowRequest>.Get();
+        var pointShadowTexelSizes = ListPool<Vector4>.Get();
 
         var cameraProjectionMatrix = camera.projectionMatrix;
         camera.ResetProjectionMatrix();
@@ -80,7 +85,7 @@ public class LightingSetup
                 var lightRotation = visibleLight.localToWorldMatrix.rotation;
                 var lightToWorld = Matrix4x4.Rotate(lightRotation);
 
-                if (light.shadows != LightShadows.None && ((CullingResults)cullingResults).GetShadowCasterBounds(i, out var bounds))
+                if (light.shadows != LightShadows.None && cullingResults.GetShadowCasterBounds(i, out var bounds))
                 {
                     Matrix4x4 viewMatrix, projectionMatrix;
                     ShadowSplitData shadowSplitData;
@@ -154,24 +159,24 @@ public class LightingSetup
 
                         cascadeCount++;
                         var directionalShadowRequest = new ShadowRequest(true, i, viewMatrix, projectionMatrix, shadowSplitData, 0);
-                        passData.directionalShadowRequests.Add(directionalShadowRequest);
+                        directionalShadowRequests.Add(directionalShadowRequest);
 
                         var shadowMatrix = (projectionMatrix * viewMatrix * lightToWorld).ConvertToAtlasMatrix();
-                        passData.directionalShadowMatrices.Add(shadowMatrix);
+                        directionalShadowMatrices.Add(shadowMatrix);
 
                         var width = projectionMatrix.OrthoWidth();
                         var height = projectionMatrix.OrthoHeight();
                         var near = projectionMatrix.OrthoNear();
                         var far = projectionMatrix.OrthoFar();
-                        passData.directionalShadowTexelSizes.Add(new(width, height, near, far));
+                        directionalShadowTexelSizes.Add(new(width, height, near, far));
                     }
 
                     if (cascadeCount > 0)
-                        shadowIndex = passData.directionalShadowRequests.Count - cascadeCount;
+                        shadowIndex = directionalShadowRequests.Count - cascadeCount;
                 }
 
                 var directionalLightData = new DirectionalLightData((Vector4)light.color.linear * light.intensity, shadowIndex, -light.transform.forward, cascadeCount, lightToWorld.inverse);
-                passData.directionalLightList.Add(directionalLightData);
+                directionalLightList.Add(directionalLightData);
             }
             else if (visibleLight.lightType == LightType.Point)
             {
@@ -197,157 +202,147 @@ public class LightingSetup
                         viewMatrix.SetRow(1, -viewMatrix.GetRow(1));
 
                         var shadowRequest = new ShadowRequest(isValid, i, viewMatrix, projectionMatrix, shadowSplitData, j);
-                        passData.pointShadowRequests.Add(shadowRequest);
+                        pointShadowRequests.Add(shadowRequest);
 
                         near = projectionMatrix[2, 3] / (projectionMatrix[2, 2] - 1f);
                         far = projectionMatrix[2, 3] / (projectionMatrix[2, 2] + 1f);
                     }
 
                     if (visibleFaceCount > 0)
-                        shadowIndex = (passData.pointShadowRequests.Count - visibleFaceCount) / 6;
+                        shadowIndex = (pointShadowRequests.Count - visibleFaceCount) / 6;
                 }
 
                 var pointLightData = new PointLightData(light.transform.position, light.range, (Vector4)light.color.linear * light.intensity, shadowIndex, visibleFaceMask, near, far);
-                passData.pointLightList.Add(pointLightData);
+                pointLightList.Add(pointLightData);
             }
         }
 
         camera.projectionMatrix = cameraProjectionMatrix;
 
-        ResultData result;
-        result.directionalLightBuffer = renderGraph.CreateComputeBuffer(new ComputeBufferDesc(Mathf.Max(1, passData.directionalLightList.Count), UnsafeUtility.SizeOf<DirectionalLightData>()));
-        result.pointLightBuffer = renderGraph.CreateComputeBuffer(new ComputeBufferDesc(Mathf.Max(1, passData.pointLightList.Count), UnsafeUtility.SizeOf<PointLightData>()));
-        result.directionalMatrixBuffer = renderGraph.CreateComputeBuffer(new ComputeBufferDesc(Mathf.Max(1, passData.directionalShadowMatrices.Count), UnsafeUtility.SizeOf<Matrix4x4>()));
-        result.directionalTexelSizeBuffer = renderGraph.CreateComputeBuffer(new ComputeBufferDesc(Mathf.Max(1, passData.directionalShadowTexelSizes.Count), UnsafeUtility.SizeOf<Vector4>()));
-        result.pointTexelSizeBuffer = renderGraph.CreateComputeBuffer(new ComputeBufferDesc(Mathf.Max(1, passData.pointShadowTexelSizes.Count), UnsafeUtility.SizeOf<Vector4>()));
-        result.directionalShadows = renderGraph.CreateTexture(new TextureDesc(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution)
+        // Render Shadows
+
+        command.SetGlobalDepthBias(settings.ShadowBias, settings.ShadowSlopeBias);
+
+        if (directionalShadowRequests.Count > 0)
         {
-            clearBuffer = true,
-            colorFormat = GraphicsFormat.D16_UNorm,
-            depthBufferBits = DepthBits.Depth16,
-            dimension = TextureDimension.Tex2DArray,
-            slices = Mathf.Max(1, passData.directionalShadowRequests.Count)
-        });
+            // Process directional shadows
+            //using var directionalShadowsProfilerScope = command.BeginScopedSample("Directional Shadows");
 
-        result.pointShadows = renderGraph.CreateTexture(new TextureDesc(settings.PointShadowResolution, settings.PointShadowResolution)
-        {
-            clearBuffer = true,
-            colorFormat = GraphicsFormat.D16_UNorm,
-            depthBufferBits = DepthBits.Depth16,
-            dimension = TextureDimension.CubeArray,
-            slices = Mathf.Max(1, passData.pointShadowRequests.Count) * 6
-        });
+            command.SetGlobalFloat("_ZClip", 0);
 
-        passData.cullingResults = cullingResults;
-        passData.settings = settings;
-        passData.directionalLightBuffer = builder.WriteComputeBuffer(result.directionalLightBuffer);
-        passData.pointLightBuffer = builder.WriteComputeBuffer(result.pointLightBuffer);
-        passData.directionalMatrixBuffer = builder.WriteComputeBuffer(result.directionalMatrixBuffer);
-        passData.directionalTexelSizeBuffer = builder.WriteComputeBuffer(result.directionalTexelSizeBuffer);
-        passData.pointTexelSizeBuffer = builder.WriteComputeBuffer(result.pointTexelSizeBuffer);
-        passData.directionalShadows = builder.WriteTexture(result.directionalShadows);
-        passData.pointShadows = builder.WriteTexture(result.pointShadows);
-
-        builder.SetRenderFunc<PassData>((data, context) =>
-        {
-            // Render Shadows
-            context.cmd.BeginSample("Render Shadows");
-            context.cmd.SetGlobalDepthBias(data.settings.ShadowBias, data.settings.ShadowSlopeBias);
-
-            if (data.directionalShadowRequests.Count > 0)
+            // Setup shadow map for directional shadows
+            var directionalShadowsDescriptor = new RenderTextureDescriptor(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, RenderTextureFormat.Shadowmap, 16)
             {
-                // Process directional shadows
-                context.cmd.SetGlobalFloat("_ZClip", 0);
-                context.cmd.BeginSample("Directional Shadows");
+                dimension = TextureDimension.Tex2DArray,
+                volumeDepth = directionalShadowRequests.Count,
+            };
 
-                for (var i = 0; i < data.directionalShadowRequests.Count; i++)
-                {
-                    var shadowRequest = data.directionalShadowRequests[i];
-                    context.cmd.SetRenderTarget(passData.directionalShadows, 0, CubemapFace.Unknown, i);
+            command.GetTemporaryRT(directionalShadowsId, directionalShadowsDescriptor);
+            command.SetRenderTarget(directionalShadowsId, 0, CubemapFace.Unknown, -1);
+            command.ClearRenderTarget(true, false, Color.clear);
 
-                    context.cmd.SetViewProjectionMatrices(shadowRequest.ViewMatrix, shadowRequest.ProjectionMatrix);
-                    context.renderContext.ExecuteCommandBuffer(context.cmd);
-                    context.cmd.Clear();
+            for (var i = 0; i < directionalShadowRequests.Count; i++)
+            {
+                var shadowRequest = directionalShadowRequests[i];
+                //command.BeginSample(cascadeStrings.GetString(i % 4));
+                command.SetRenderTarget(directionalShadowsId, 0, CubemapFace.Unknown, i);
 
-                    var shadowDrawingSettings = new ShadowDrawingSettings(data.cullingResults, shadowRequest.VisibleLightIndex) { splitData = shadowRequest.ShadowSplitData };
-                    context.renderContext.DrawShadows(ref shadowDrawingSettings);
-                }
+                command.SetViewProjectionMatrices(shadowRequest.ViewMatrix, shadowRequest.ProjectionMatrix);
+                //command.BeginSample("Render Shadows");
+                context.ExecuteCommandBuffer(command);
+                command.Clear();
 
-                context.cmd.SetGlobalFloat("_ZClip", 1);
-                context.cmd.EndSample("Directional Shadows");
+                var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, shadowRequest.VisibleLightIndex) { splitData = shadowRequest.ShadowSplitData };
+                context.DrawShadows(ref shadowDrawingSettings);
+
+                //command.EndSample("Render Shadows");
+                //command.EndSample(cascadeStrings.GetString(i % 4));
             }
 
-            // Process point shadows 
-            // Setup shadow map for point shadows
-            if (data.pointShadowRequests.Count > 0)
+            command.SetGlobalFloat("_ZClip", 1);
+        }
+
+        // Process point shadows 
+        // Setup shadow map for point shadows
+        if (pointShadowRequests.Count > 0)
+        {
+            var pointShadowsDescriptor = new RenderTextureDescriptor(settings.PointShadowResolution, settings.PointShadowResolution, RenderTextureFormat.Shadowmap, 16)
             {
-                context.cmd.BeginSample("Point Shadows");
+                dimension = TextureDimension.CubeArray,
+                volumeDepth = pointShadowRequests.Count * 6,
+            };
 
-                for (var i = 0; i < data.pointShadowRequests.Count; i++)
-                {
-                    var shadowRequest = data.pointShadowRequests[i];
-                    if (!shadowRequest.IsValid)
-                        continue;
+            //using var pointShadowsProfilerScope = command.BeginScopedSample("Point Shadows");
 
-                    context.cmd.SetRenderTarget(passData.directionalShadows, 0, CubemapFace.Unknown, i);
+            command.GetTemporaryRT(pointShadowsId, pointShadowsDescriptor);
+            command.SetRenderTarget(pointShadowsId, 0, CubemapFace.Unknown, -1);
+            command.ClearRenderTarget(true, false, Color.clear);
 
-                    context.cmd.SetViewProjectionMatrices(shadowRequest.ViewMatrix, shadowRequest.ProjectionMatrix);
-                    context.renderContext.ExecuteCommandBuffer(context.cmd);
-                    context.cmd.Clear();
+            for (var i = 0; i < pointShadowRequests.Count; i++)
+            {
+                //command.BeginSample($"Light {i / 6}");
+                //command.BeginSample($"Face {i % 6}");
 
-                    var shadowDrawingSettings = new ShadowDrawingSettings(data.cullingResults, shadowRequest.VisibleLightIndex) { splitData = shadowRequest.ShadowSplitData };
-                    context.renderContext.DrawShadows(ref shadowDrawingSettings);
-                }
+                var shadowRequest = pointShadowRequests[i];
+                if (!shadowRequest.IsValid)
+                    continue;
 
-                context.cmd.EndSample("Point Shadows");
+                command.SetRenderTarget(pointShadowsId, 0, CubemapFace.Unknown, i);
+
+                command.SetViewProjectionMatrices(shadowRequest.ViewMatrix, shadowRequest.ProjectionMatrix);
+               //command.BeginSample("Render Shadows");
+                context.ExecuteCommandBuffer(command);
+                command.Clear();
+
+                var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, shadowRequest.VisibleLightIndex) { splitData = shadowRequest.ShadowSplitData };
+                context.DrawShadows(ref shadowDrawingSettings);
+
+               // command.EndSample("Render Shadows");
+                //command.EndSample($"Light {i % 6}");
+                //command.EndSample($"Light {i / 6}");
             }
+        }
 
-            context.cmd.SetGlobalDepthBias(0f, 0f);
+        command.SetGlobalDepthBias(0f, 0f);
 
-            // Set directional light data
-            context.cmd.SetBufferData(data.directionalLightBuffer, data.directionalLightList);
-            context.cmd.SetGlobalBuffer("_DirectionalLights", data.directionalLightBuffer);
-            context.cmd.SetGlobalInt("_DirectionalLightCount", data.directionalLightList.Count);
-            ListPool<DirectionalLightData>.Release(data.directionalLightList);
+        // Set directional light data
+        command.ExpandAndSetComputeBufferData(ref directionalLightBuffer, directionalLightList);
+        command.SetGlobalBuffer("_DirectionalLights", directionalLightBuffer);
+        command.SetGlobalInt("_DirectionalLightCount", directionalLightList.Count);
+        ListPool<DirectionalLightData>.Release(directionalLightList);
 
-            context.cmd.SetGlobalTexture("_DirectionalShadows", data.directionalShadows);
+        command.SetGlobalTexture(directionalShadowsId, directionalShadowRequests.Count > 0 ? directionalShadowsId : emptyArray);
+        ListPool<ShadowRequest>.Release(directionalShadowRequests);
 
-            ListPool<ShadowRequest>.Release(data.directionalShadowRequests);
+        // Update directional shadow matrices
+        command.ExpandAndSetComputeBufferData(ref directionalMatrixBuffer, directionalShadowMatrices);
+        command.SetGlobalBuffer("_DirectionalMatrices", directionalMatrixBuffer);
+        ListPool<Matrix4x4>.Release(directionalShadowMatrices);
 
-            // Update directional shadow matrices
-            context.cmd.SetBufferData(data.directionalMatrixBuffer, data.directionalShadowMatrices);
-            context.cmd.SetGlobalBuffer("_DirectionalMatrices", data.directionalMatrixBuffer);
-            ListPool<Matrix4x4>.Release(data.directionalShadowMatrices);
+        // Update directional shadow texel sizes
+        command.ExpandAndSetComputeBufferData(ref directionalTexelSizeBuffer, directionalShadowTexelSizes);
+        command.SetBufferData(directionalTexelSizeBuffer, directionalShadowTexelSizes);
+        command.SetGlobalBuffer("_DirectionalShadowTexelSizes", directionalTexelSizeBuffer);
+        ListPool<Vector4>.Release(directionalShadowTexelSizes);
 
-            // Update directional shadow texel sizes
-            context.cmd.SetBufferData(data.directionalTexelSizeBuffer, data.directionalShadowTexelSizes);
-            context.cmd.SetGlobalBuffer("_DirectionalShadowTexelSizes", data.directionalTexelSizeBuffer);
-            ListPool<Vector4>.Release(data.directionalShadowTexelSizes);
+        // Set point light data
+        command.ExpandAndSetComputeBufferData(ref pointLightBuffer, pointLightList);
+        command.SetGlobalBuffer("_PointLights", pointLightBuffer);
+        command.SetGlobalInt("_PointLightCount", pointLightList.Count);
+        ListPool<PointLightData>.Release(pointLightList);
 
-            // Set point light data
-            context.cmd.SetBufferData(data.pointLightBuffer, data.pointLightList);
-            context.cmd.SetGlobalBuffer("_PointLights", data.pointLightBuffer);
-            context.cmd.SetGlobalInt("_PointLightCount", data.pointLightList.Count);
-            ListPool<PointLightData>.Release(data.pointLightList);
+        command.SetGlobalTexture(pointShadowsId, pointShadowRequests.Count > 0 ? pointShadowsId : emptyCubemapArray);
+        ListPool<ShadowRequest>.Release(pointShadowRequests);
 
-            context.cmd.SetGlobalTexture("_PointShadows", data.pointShadows);
+        command.ExpandAndSetComputeBufferData(ref pointTexelSizeBuffer, pointShadowTexelSizes);
+        command.SetGlobalBuffer("_PointShadowTexelSizes", pointTexelSizeBuffer);
 
-            ListPool<ShadowRequest>.Release(data.pointShadowRequests);
+        ListPool<Vector4>.Release(pointShadowTexelSizes);
 
-            context.cmd.SetBufferData(data.pointTexelSizeBuffer, data.pointShadowTexelSizes);
-            context.cmd.SetGlobalBuffer("_PointShadowTexelSizes", data.pointTexelSizeBuffer);
-
-            ListPool<Vector4>.Release(data.pointShadowTexelSizes);
-
-            context.cmd.SetGlobalInt("_PcfSamples", data.settings.PcfSamples);
-            context.cmd.SetGlobalFloat("_PcfRadius", data.settings.PcfRadius);
-            context.cmd.SetGlobalInt("_BlockerSamples", data.settings.BlockerSamples);
-            context.cmd.SetGlobalFloat("_BlockerRadius", data.settings.BlockerRadius);
-            context.cmd.SetGlobalFloat("_PcssSoftness", data.settings.PcssSoftness);
-
-            context.cmd.EndSample("Render Shadows"); 
-        });
-
-        return result;
+        command.SetGlobalInt("_PcfSamples", settings.PcfSamples);
+        command.SetGlobalFloat("_PcfRadius", settings.PcfRadius);
+        command.SetGlobalInt("_BlockerSamples", settings.BlockerSamples);
+        command.SetGlobalFloat("_BlockerRadius", settings.BlockerRadius);
+        command.SetGlobalFloat("_PcssSoftness", settings.PcssSoftness);
     }
 }

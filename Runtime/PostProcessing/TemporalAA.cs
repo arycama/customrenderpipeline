@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Experimental.Rendering.RenderGraphModule;
 using UnityEngine.Rendering;
 
 public class TemporalAA
@@ -27,12 +25,13 @@ public class TemporalAA
     private Settings settings;
     private CameraTextureCache textureCache = new();
     private Material material;
-    private Dictionary<Camera, Matrix4x4> previousMatrices = new();
+    private MaterialPropertyBlock propertyBlock;
 
     public TemporalAA(Settings settings)
     {
         this.settings = settings;
         material = new Material(Shader.Find("Hidden/Temporal AA")) { hideFlags = HideFlags.HideAndDontSave };
+        propertyBlock = new();
     }
 
     public void Release()
@@ -40,88 +39,62 @@ public class TemporalAA
         textureCache.Dispose();
     }
 
-    public void OnPreRender(Camera camera, int frameCount, out Vector2 jitter, out Matrix4x4 previousMatrix)
+    public void OnPreRender(Camera camera, int frameCount, CommandBuffer command)
     {
         camera.ResetProjectionMatrix();
         camera.nonJitteredProjectionMatrix = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
 
         var sampleIndex = frameCount % settings.SampleCount;
 
-        jitter = new Vector2(Halton(sampleIndex + 1, 2) - 0.5f, Halton(sampleIndex + 1, 3) - 0.5f) * settings.JitterSpread;
+        Vector2 jitter;
+        jitter.x = Halton(sampleIndex, 2) - 0.5f;
+        jitter.y = Halton(sampleIndex, 3) - 0.5f;
+        jitter *= settings.JitterSpread;
 
         var matrix = camera.projectionMatrix;
         matrix[0, 2] = 2.0f * jitter.x / camera.pixelWidth;
         matrix[1, 2] = 2.0f * jitter.y / camera.pixelHeight;
         camera.projectionMatrix = matrix;
 
-        if (!previousMatrices.TryGetValue(camera, out previousMatrix))
-        {
-            previousMatrix = camera.nonJitteredProjectionMatrix;
-            previousMatrices.Add(camera, previousMatrix);
-        }
-        else
-        {
-            previousMatrices[camera] = camera.nonJitteredProjectionMatrix;
-        }
+        command.SetGlobalVector("_Jitter", jitter);
     }
 
-    class PassData
+    public RenderTargetIdentifier Render(Camera camera, CommandBuffer command, int frameCount, RenderTargetIdentifier input, RenderTargetIdentifier motion)
     {
-        public TextureHandle color;
-        public TextureHandle motion;
-        public RenderTexture current, previous;
-        public bool wasCreated;
-        public Material material;
-    }
+        using var profilerScope = command.BeginScopedSample("Temporal AA");
 
-    public RenderTexture Render(Camera camera, int frameCount, RenderGraph renderGraph, TextureHandle color, TextureHandle motion)
-    {
-        using (var builder = renderGraph.AddRenderPass<PassData>("Temporal Anti-Aliasing", out var passData))
-        {
-            passData.color = builder.ReadTexture(color);
-            passData.motion = builder.ReadTexture(motion);
+        var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
+        var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous, frameCount);
 
-            var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
-            passData.wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous, frameCount);
-            passData.current = current;
-            passData.previous = previous;
-            passData.material = material;
+        propertyBlock.SetFloat("_Sharpness", settings.Sharpness);
+        propertyBlock.SetFloat("_HasHistory", wasCreated ? 0f : 1f);
 
-            builder.SetRenderFunc<PassData>((data, context) =>
-            {
-                var propertyBlock = context.renderGraphPool.GetTempMaterialPropertyBlock();
+        propertyBlock.SetFloat("_StationaryBlending", settings.StationaryBlending);
+        propertyBlock.SetFloat("_MotionBlending", settings.MotionBlending);
+        propertyBlock.SetFloat("_MotionWeight", settings.MotionWeight);
 
-                propertyBlock.SetFloat("_Sharpness", settings.Sharpness);
-                propertyBlock.SetFloat("_HasHistory", data.wasCreated ? 0f : 1f);
+        propertyBlock.SetTexture("_History", previous);
 
-                propertyBlock.SetFloat("_StationaryBlending", settings.StationaryBlending);
-                propertyBlock.SetFloat("_MotionBlending", settings.MotionBlending);
-                propertyBlock.SetFloat("_MotionWeight", settings.MotionWeight);
+        command.SetGlobalTexture("_Input", input);
+        command.SetGlobalTexture("_Motion", motion);
 
-                propertyBlock.SetTexture("_History", data.previous);
+        command.SetRenderTarget(current);
+        command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
 
-                context.cmd.SetGlobalTexture("_Input", data.color);
-                context.cmd.SetGlobalTexture("_Motion", data.motion);
-
-                context.cmd.SetRenderTarget(data.current);
-                context.cmd.DrawProcedural(Matrix4x4.identity, data.material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
-            });
-
-            return current;
-        }
+        return current;
     }
 
     public static float Halton(int index, int radix)
     {
         float result = 0f;
-        float fraction = 1f / radix;
+        float fraction = 1f / (float)radix;
 
         while (index > 0)
         {
-            result += index % radix * fraction;
+            result += (float)(index % radix) * fraction;
 
             index /= radix;
-            fraction /= radix;
+            fraction /= (float)radix;
         }
 
         return result;

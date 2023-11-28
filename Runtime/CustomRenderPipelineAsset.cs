@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 [CreateAssetMenu(menuName = "Custom Render Pipeline Asset")]
