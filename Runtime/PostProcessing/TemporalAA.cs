@@ -39,8 +39,11 @@ public class TemporalAA
         textureCache.Dispose();
     }
 
-    public void OnPreRender(Camera camera, int frameCount, CommandBuffer command)
+    public void OnPreRender(Camera camera, int frameCount, CommandBuffer command, float scale)
     {
+        var scaledWidth = (int)(camera.pixelWidth * scale);
+        var scaledHeight = (int)(camera.pixelHeight * scale);
+
         camera.ResetProjectionMatrix();
         camera.nonJitteredProjectionMatrix = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
 
@@ -52,18 +55,21 @@ public class TemporalAA
         jitter *= settings.JitterSpread;
 
         var matrix = camera.projectionMatrix;
-        matrix[0, 2] = 2.0f * jitter.x / camera.pixelWidth;
-        matrix[1, 2] = 2.0f * jitter.y / camera.pixelHeight;
+        matrix[0, 2] = 2.0f * jitter.x / scaledWidth;
+        matrix[1, 2] = 2.0f * jitter.y / scaledHeight;
         camera.projectionMatrix = matrix;
 
         command.SetGlobalVector("_Jitter", jitter);
     }
 
-    public RenderTargetIdentifier Render(Camera camera, CommandBuffer command, int frameCount, RenderTargetIdentifier input, RenderTargetIdentifier motion)
+    public RenderTargetIdentifier Render(Camera camera, CommandBuffer command, int frameCount, RenderTargetIdentifier input, RenderTargetIdentifier motion, float scale)
     {
         using var profilerScope = command.BeginScopedSample("Temporal AA");
 
-        var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
+        var scaledWidth = (int)(camera.pixelWidth * scale);
+        var scaledHeight = (int)(camera.pixelHeight * scale);
+
+        var descriptor = new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.RGB111110Float);
         var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous, frameCount);
 
         propertyBlock.SetFloat("_Sharpness", settings.Sharpness);

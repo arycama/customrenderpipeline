@@ -33,12 +33,15 @@ public class VolumetricLighting
         volumetricLightingTextureCache.Dispose();
     }
 
-    public void Render(Camera camera, CommandBuffer command, int frameCount)
+    public void Render(Camera camera, CommandBuffer command, int frameCount, float scale)
     {
+        var scaledWidth = (int)(camera.pixelWidth * scale);
+        var scaledHeight = (int)(camera.pixelHeight * scale);
+
         using var profilerScope = command.BeginScopedSample("Volumetric Lighting");
 
-        var width = Mathf.CeilToInt(camera.pixelWidth / (float)settings.TileSize);
-        var height = Mathf.CeilToInt(camera.pixelHeight / (float)settings.TileSize);
+        var width = Mathf.CeilToInt(scaledWidth / (float)settings.TileSize);
+        var height = Mathf.CeilToInt(scaledHeight / (float)settings.TileSize);
         var depth = settings.DepthSlices;
         var volumetricLightingDescriptor = new RenderTextureDescriptor(width, height, RenderTextureFormat.ARGBHalf)
         {

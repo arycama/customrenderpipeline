@@ -41,29 +41,31 @@ public class AmbientOcclusion
         csSampler = CustomSampler.Create("Ambient Occlusion CS", true);
     }
 
-    public void Render(CommandBuffer command, Camera camera, RenderTargetIdentifier depth, RenderTargetIdentifier scene)
+    public void Render(CommandBuffer command, Camera camera, RenderTargetIdentifier depth, RenderTargetIdentifier scene, float scale)
     {
         if (settings.Strength == 0.0f)
             return;
 
+        var scaledWidth = (int)(camera.pixelWidth * scale);
+        var scaledHeight = (int)(camera.pixelHeight * scale);
 
         var normals = Shader.PropertyToID("_ViewNormals");
-        command.GetTemporaryRT(normals, new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.ARGB2101010) { enableRandomWrite = true });
+        command.GetTemporaryRT(normals, new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.ARGB2101010) { enableRandomWrite = true });
 
         var viewDepth = Shader.PropertyToID("_ViewDepth");
-        command.GetTemporaryRT(viewDepth, new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RHalf) { enableRandomWrite = true });
+        command.GetTemporaryRT(viewDepth, new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.RHalf) { enableRandomWrite = true });
 
         command.SetComputeTextureParam(computeShader, 0, "_CameraDepth", depth);
         command.SetComputeTextureParam(computeShader, 0, "DepthResult", viewDepth);
         command.SetComputeTextureParam(computeShader, 0, "NormalResult", normals);
 
-        command.SetComputeIntParam(computeShader, "Width", camera.pixelWidth);
-        command.SetComputeIntParam(computeShader, "Height", camera.pixelHeight);
+        command.SetComputeIntParam(computeShader, "Width", scaledWidth);
+        command.SetComputeIntParam(computeShader, "Height", scaledHeight);
 
         computeShader.GetKernelThreadGroupSizes(0, out var x, out var y, out var z);
 
-        var threadGroupsX = (int)((camera.pixelWidth - 1) / x) + 1;
-        var threadGroupsY = (int)((camera.pixelHeight - 1) / y) + 1;
+        var threadGroupsX = (int)((scaledWidth - 1) / x) + 1;
+        var threadGroupsY = (int)((scaledHeight - 1) / y) + 1;
 
         command.SetComputeIntParam(computeShader, "DispatchSizeX", threadGroupsX);
         command.SetComputeIntParam(computeShader, "DispatchSizeY", threadGroupsY);
@@ -72,7 +74,7 @@ public class AmbientOcclusion
         //command.DispatchCompute(computeShader, 0, threadGroupsX, threadGroupsY, 1);
         //command.EndSample(csSampler);
 
-        command.SetGlobalVector("ScaleOffset", new Vector2(1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight));
+        command.SetGlobalVector("ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
 
         command.SetRenderTarget(new RenderTargetBinding(
             new [] { new RenderTargetIdentifier(normals), new RenderTargetIdentifier(viewDepth) }, 
@@ -91,7 +93,7 @@ public class AmbientOcclusion
         command.SetGlobalVector("_UvToView", new Vector4(tanHalfFovX * 2f, tanHalfFovY * 2f, -tanHalfFovX, -tanHalfFovY));
 
         command.SetGlobalVector("_Tint", settings.Tint.linear);
-        command.SetGlobalFloat("_Radius", settings.Radius * camera.pixelHeight / tanHalfFovY * 0.5f);
+        command.SetGlobalFloat("_Radius", settings.Radius * scaledHeight / tanHalfFovY * 0.5f);
         command.SetGlobalFloat("_AoStrength", settings.Strength);
         command.SetGlobalFloat("_FalloffScale", settings.Falloff == 1f ? 0f : 1f / (settings.Radius * settings.Falloff - settings.Radius));
         command.SetGlobalFloat("_FalloffBias", settings.Falloff == 1f ? 1f : 1f / (1f - settings.Falloff));

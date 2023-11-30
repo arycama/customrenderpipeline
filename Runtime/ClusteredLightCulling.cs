@@ -38,12 +38,15 @@ public class ClusteredLightCulling
         counterBuffer.Release();
     }
 
-    public void Render(CommandBuffer command, Camera camera)
+    public void Render(CommandBuffer command, Camera camera, float scale)
     {
+        var scaledWidth = (int)(camera.pixelWidth * scale);
+        var scaledHeight = (int)(camera.pixelHeight * scale);
+
         using var profilerScope = command.BeginScopedSample("Clustered Light Culling");
 
-        var clusterWidth = DivRoundUp(camera.pixelWidth, settings.TileSize);
-        var clusterHeight = DivRoundUp(camera.pixelHeight, settings.TileSize);
+        var clusterWidth = DivRoundUp(scaledWidth, settings.TileSize);
+        var clusterHeight = DivRoundUp(scaledHeight, settings.TileSize);
         var clusterCount = clusterWidth * clusterHeight * settings.ClusterDepth;
 
         GraphicsUtilities.SafeExpand(ref lightList, clusterCount * settings.MaxLightsPerTile, sizeof(int), ComputeBufferType.Default);

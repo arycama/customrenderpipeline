@@ -1,5 +1,9 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
 public class CustomRenderPipeline : RenderPipeline
@@ -24,12 +28,15 @@ public class CustomRenderPipeline : RenderPipeline
     private readonly DepthOfField depthOfField;
     private readonly Bloom bloom;
     private readonly AmbientOcclusion ambientOcclusion;
+    private readonly DynamicResolution dynamicResolution;
 
     private Dictionary<Camera, int> cameraRenderedFrameCount = new();
     private Dictionary<Camera, Matrix4x4> previousMatrices = new();
 
     private Material motionVectorsMaterial;
     private Material tonemappingMaterial;
+
+    private CustomSampler frameTimeSampler;
 
     public CustomRenderPipeline(CustomRenderPipelineAsset renderPipelineAsset)
     {
@@ -55,7 +62,7 @@ public class CustomRenderPipeline : RenderPipeline
 
         motionVectorsMaterial = new Material(Shader.Find("Hidden/Camera Motion Vectors")) { hideFlags = HideFlags.HideAndDontSave };
         tonemappingMaterial = new Material(Shader.Find("Hidden/Tonemapping")) { hideFlags = HideFlags.HideAndDontSave };
-        
+
         SupportedRenderingFeatures.active = new SupportedRenderingFeatures()
         {
             defaultMixedLightingModes = SupportedRenderingFeatures.LightmapMixedBakeModes.None,
@@ -86,6 +93,9 @@ public class CustomRenderPipeline : RenderPipeline
             enlightenLightmapper = false,
             reflectionProbesBlendDistance = false,
         };
+
+        dynamicResolution = new(renderPipelineAsset.DynamicResolutionSettings);
+        frameTimeSampler = CustomSampler.Create("Frame Time", true);
     }
 
     protected override void Dispose(bool disposing)
@@ -94,15 +104,20 @@ public class CustomRenderPipeline : RenderPipeline
         clusteredLightCulling.Release();
         volumetricLighting.Release();
         temporalAA.Release();
+        dynamicResolution.Release();
     }
 
     protected override void Render(ScriptableRenderContext context, Camera[] cameras)
     {
+        dynamicResolution.Update(frameTimeSampler.GetRecorder().gpuElapsedNanoseconds);
+
         var command = CommandBufferPool.Get("Render Camera");
+        command.BeginSample(frameTimeSampler);
 
         foreach (var camera in cameras)
             RenderCamera(context, camera, command);
 
+        command.EndSample(frameTimeSampler);
         context.ExecuteCommandBuffer(command);
         CommandBufferPool.Release(command);
 
@@ -120,10 +135,10 @@ public class CustomRenderPipeline : RenderPipeline
         {
             // Only increase when frame debugger not enabled, or we get flickering
             //if (!FrameDebugger.enabled)
-                cameraRenderedFrameCount[camera] = ++frameCount;
+            cameraRenderedFrameCount[camera] = ++frameCount;
         }
 
-        temporalAA.OnPreRender(camera, frameCount, command);
+        temporalAA.OnPreRender(camera, frameCount, command, dynamicResolution.ScaleFactor);
 
         if (!previousMatrices.TryGetValue(camera, out var previousMatrix))
         {
@@ -154,6 +169,7 @@ public class CustomRenderPipeline : RenderPipeline
         command.SetGlobalFloat("_FogMode", (float)RenderSettings.fogMode);
         command.SetGlobalFloat("_FogEnabled", RenderSettings.fog ? 1.0f : 0.0f);
         command.SetGlobalFloat("_AoEnabled", renderPipelineAsset.AmbientOcclusionSettings.Strength > 0.0f ? 1.0f : 0.0f);
+        command.SetGlobalFloat("_Scale", dynamicResolution.ScaleFactor);
 
         command.SetGlobalVector("_WaterAlbedo", renderPipelineAsset.waterAlbedo.linear);
         command.SetGlobalVector("_WaterExtinction", renderPipelineAsset.waterExtinction);
@@ -170,11 +186,14 @@ public class CustomRenderPipeline : RenderPipeline
 
         context.SetupCameraProperties(camera);
 
-        clusteredLightCulling.Render(command, camera);
-        volumetricLighting.Render(camera, command, frameCount);
+        clusteredLightCulling.Render(command, camera, dynamicResolution.ScaleFactor);
+        volumetricLighting.Render(camera, command, frameCount, dynamicResolution.ScaleFactor);
 
-        command.GetTemporaryRT(cameraTargetId, camera.pixelWidth, camera.pixelHeight, 0, FilterMode.Bilinear, RenderTextureFormat.RGB111110Float);
-        command.GetTemporaryRT(cameraDepthId, camera.pixelWidth, camera.pixelHeight, 32, FilterMode.Point, RenderTextureFormat.Depth);
+        var scaledWidth = (int)(camera.pixelWidth * dynamicResolution.ScaleFactor);
+        var scaledHeight = (int)(camera.pixelHeight * dynamicResolution.ScaleFactor);
+
+        command.GetTemporaryRT(cameraTargetId, new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.RGB111110Float));
+        command.GetTemporaryRT(cameraDepthId, new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.Depth, 32));
 
         // Base pass
         command.SetRenderTarget(new RenderTargetBinding(cameraTargetId, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, cameraDepthId, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store));
@@ -182,7 +201,7 @@ public class CustomRenderPipeline : RenderPipeline
         opaqueObjectRenderer.Render(ref cullingResults, camera, command, ref context);
 
         // Motion Vectors
-        command.GetTemporaryRT(motionVectorsId, camera.pixelWidth, camera.pixelHeight, 0, FilterMode.Point, RenderTextureFormat.RGHalf);
+        command.GetTemporaryRT(motionVectorsId, new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.RGHalf));
         command.SetRenderTarget(motionVectorsId);
         command.ClearRenderTarget(false, true, Color.clear);
 
@@ -203,10 +222,10 @@ public class CustomRenderPipeline : RenderPipeline
         }
 
         // Ambient occlusion
-        ambientOcclusion.Render(command, camera, cameraDepthId, cameraTargetId);
+        ambientOcclusion.Render(command, camera, cameraDepthId, cameraTargetId, dynamicResolution.ScaleFactor);
 
         // Copy scene texture
-        command.GetTemporaryRT(sceneTextureId, camera.pixelWidth, camera.pixelHeight, 0, FilterMode.Bilinear, RenderTextureFormat.RGB111110Float);
+        command.GetTemporaryRT(sceneTextureId, new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.RGB111110Float));
         command.CopyTexture(cameraTargetId, sceneTextureId);
         command.SetGlobalTexture(sceneTextureId, sceneTextureId);
         command.SetGlobalTexture(cameraDepthId, cameraDepthId);
@@ -215,13 +234,13 @@ public class CustomRenderPipeline : RenderPipeline
         command.SetRenderTarget(new RenderTargetBinding(cameraTargetId, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare, cameraDepthId, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare) { flags = RenderTargetFlags.ReadOnlyDepthStencil });
         transparentObjectRenderer.Render(ref cullingResults, camera, command, ref context);
 
-        var taa = temporalAA.Render(camera, command, frameCount, cameraTargetId, motionVectorsId);
+        var taa = temporalAA.Render(camera, command, frameCount, cameraTargetId, motionVectorsId, dynamicResolution.ScaleFactor);
 
         //depthOfField.Render(camera, command, cameraDepthId, taa);
 
         //convolutionBloom.Render(command, taa, cameraTargetId);
 
-        var bloomResult = bloom.Render(camera, command, taa);
+        var bloomResult = bloom.Render(camera, command, taa, dynamicResolution.ScaleFactor);
 
         using (var profilerScope = command.BeginScopedSample("Tonemapping"))
         {
@@ -255,5 +274,50 @@ public class CustomRenderPipeline : RenderPipeline
 
         //if (camera.cameraType == CameraType.SceneView)
         //    ScriptableRenderContext.EmitGeometryForCamera(camera);
+    }
+}
+
+public class DynamicResolution
+{
+    [Serializable]
+    public class Settings
+    {
+        [SerializeField] private int targetFrameRate = 60;
+        [SerializeField] private float minScaleFactor = 0.5f;
+        [SerializeField] private float maxScaleFactor = 1.0f;
+        [SerializeField] private float damping = 0.05f;
+
+        public int TargetFrameRate => targetFrameRate;
+        public float MinScaleFactor => minScaleFactor;
+        public float MaxScaleFactor => maxScaleFactor;
+        public float Damping => damping;
+    }
+
+    private Settings settings;
+
+    public DynamicResolution(Settings settings)
+    {
+        this.settings = settings;
+    }
+
+    public float ScaleFactor { get; private set; } = 1.0f;
+
+    public void Update(float timing)
+    {
+        var desiredFrameTime = 1000.0 / settings.TargetFrameRate;
+        var gpuTimeMs = timing / 1000.0 / 1000.0;
+        var newFactor = (float)(ScaleFactor * (desiredFrameTime / gpuTimeMs));
+        var newScale = Mathf.Lerp(ScaleFactor, newFactor, settings.Damping);
+        ScaleFactor = Mathf.Clamp(newScale, settings.MinScaleFactor, settings.MaxScaleFactor);
+    }
+
+    private void ResetScale()
+    {
+        ScaleFactor = 1.0f;
+    }
+
+    public void Release()
+    {
+        ResetScale();
     }
 }

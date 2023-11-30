@@ -25,11 +25,15 @@ public class Bloom
         material = new(Shader.Find("Hidden/Bloom")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public RenderTargetIdentifier Render(Camera camera, CommandBuffer command, RenderTargetIdentifier input)
+    public RenderTargetIdentifier Render(Camera camera, CommandBuffer command, RenderTargetIdentifier input, float scale)
     {
+        var scaledWidth = (int)(camera.pixelWidth * scale);
+        var scaledHeight = (int)(camera.pixelHeight * scale);
+
+
         using var profilerScope = command.BeginScopedSample("Bloom");
 
-        var mipCount = Mathf.Min(settings.MaxMips, (int)Mathf.Log(Mathf.Max(camera.pixelWidth, camera.pixelHeight), 2));
+        var mipCount = Mathf.Min(settings.MaxMips, (int)Mathf.Log(Mathf.Max(scaledWidth, scaledHeight), 2));
 
         // Downsample
         for (var i = 0; i < mipCount; i++)
@@ -44,8 +48,8 @@ public class Bloom
                 command.SetGlobalTexture("_MainTex", inputId);
             }
 
-            var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
-            var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
+            var width = Mathf.Max(1, scaledWidth >> (i + 1));
+            var height = Mathf.Max(1, scaledHeight >> (i + 1));
             var desc = new RenderTextureDescriptor(width, height, RenderTextureFormat.RGB111110Float) { enableRandomWrite = true };
 
             var resultId = bloomIds.GetProperty(i);
@@ -73,8 +77,8 @@ public class Bloom
                 command.SetRenderTarget(input);
             }
 
-            var width = Mathf.Max(1, camera.pixelWidth >> i);
-            var height = Mathf.Max(1, camera.pixelHeight >> i);
+            var width = Mathf.Max(1, scaledWidth >> i);
+            var height = Mathf.Max(1, scaledHeight >> i);
             command.SetGlobalVector("_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
 
             command.DrawProcedural(Matrix4x4.identity, material, 1, MeshTopology.Triangles, 3);

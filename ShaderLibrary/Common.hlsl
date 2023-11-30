@@ -39,7 +39,7 @@ TextureCubeArray<float> _PointShadows;
 float4 _Time, _ProjectionParams, _ZBufferParams, _ScreenParams;
 float3 _AmbientLightColor, _WorldSpaceCameraPos, _FogColor, _WaterAlbedo, _WaterExtinction;
 float2 _Jitter;
-float _BlockerRadius, _ClusterBias, _ClusterScale, _FogStartDistance, _FogEndDistance, _FogEnabled, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _VolumeDepth, _NonLinearDepth, _AoEnabled;
+float _BlockerRadius, _ClusterBias, _ClusterScale, _FogStartDistance, _FogEndDistance, _FogEnabled, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _VolumeDepth, _NonLinearDepth, _AoEnabled, _Scale;
 matrix _InvVPMatrix, _PreviousVPMatrix, unity_MatrixVP, _NonJitteredVPMatrix, unity_MatrixV;
 uint _BlockerSamples, _DirectionalLightCount, _FrameCount, _PcfSamples, _PointLightCount, _TileSize, unity_BaseInstanceID;
 

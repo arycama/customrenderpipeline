@@ -22,8 +22,12 @@ public class DepthOfField
         this.settings = settings;
     }
 
-    public void Render(Camera camera, CommandBuffer command, RenderTargetIdentifier depth, RenderTargetIdentifier scene)
+    public void Render(Camera camera, CommandBuffer command, RenderTargetIdentifier depth, RenderTargetIdentifier scene, float scale)
     {
+        var scaledWidth = (int)(camera.pixelWidth * scale);
+        var scaledHeight = (int)(camera.pixelHeight * scale);
+
+
         var gNear = camera.nearClipPlane;
 
         var nb = gNear;
@@ -37,7 +41,7 @@ public class DepthOfField
         var projParams = new Vector2(projMat[2, 2], projMat[3, 2]);
 
         var coc = Shader.PropertyToID("_Coc");
-        var cocDesc = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGFloat) { enableRandomWrite = true };
+        var cocDesc = new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.RGFloat) { enableRandomWrite = true };
 
         {
             var genCoc = Resources.Load<ComputeShader>("DepthOfField/GenCoC");
@@ -55,26 +59,26 @@ public class DepthOfField
 
             command.SetComputeTextureParam(genCoc, 0, "_CameraDepth", depth);
             command.SetComputeTextureParam(genCoc, 0, "_Result", coc);
-            command.DispatchNormalized(genCoc, 0, camera.pixelWidth, camera.pixelHeight, 1);
+            command.DispatchNormalized(genCoc, 0, scaledWidth, scaledHeight, 1);
         }
 
         var cocHalf = Shader.PropertyToID("_CocHalf");
         var cocHalf1 = Shader.PropertyToID("_CocHalf1");
-        var cocHalfDesc = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RFloat) { enableRandomWrite = true };
+        var cocHalfDesc = new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.RFloat) { enableRandomWrite = true };
 
         {
             var filterNearCoc = Resources.Load<ComputeShader>("DepthOfField/MaxfilterNearCoC");
             command.GetTemporaryRT(cocHalf, cocHalfDesc);
-            command.SetComputeVectorParam(filterNearCoc, "_Resolution", new Vector2(camera.pixelWidth >> 1, camera.pixelHeight >> 1));
+            command.SetComputeVectorParam(filterNearCoc, "_Resolution", new Vector2(scaledWidth >> 1, scaledHeight >> 1));
             command.SetComputeTextureParam(filterNearCoc, 0, "NearCoCTexture", coc);
             command.SetComputeTextureParam(filterNearCoc, 0, "FilteredNearCoC", cocHalf);
-            command.DispatchNormalized(filterNearCoc, 0, camera.pixelWidth >> 1, camera.pixelHeight >> 1, 1);
+            command.DispatchNormalized(filterNearCoc, 0, scaledWidth >> 1, scaledHeight >> 1, 1);
 
             command.GetTemporaryRT(cocHalf1, cocHalfDesc);
-            command.SetComputeVectorParam(filterNearCoc, "_Resolution", new Vector2(camera.pixelWidth >> 1, camera.pixelHeight >> 1));
+            command.SetComputeVectorParam(filterNearCoc, "_Resolution", new Vector2(scaledWidth >> 1, scaledHeight >> 1));
             command.SetComputeTextureParam(filterNearCoc, 1, "NearCoCTexture", coc);
             command.SetComputeTextureParam(filterNearCoc, 1, "FilteredNearCoC", cocHalf1);
-            command.DispatchNormalized(filterNearCoc, 1, camera.pixelWidth >> 1, camera.pixelHeight >> 1, 1);
+            command.DispatchNormalized(filterNearCoc, 1, scaledWidth >> 1, scaledHeight >> 1, 1);
         }
 
 

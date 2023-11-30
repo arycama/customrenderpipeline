@@ -14,6 +14,7 @@ public class CustomRenderPipelineAsset : RenderPipelineAsset
     [SerializeField] private AmbientOcclusion.Settings ambientOcclusionSettings;
     [SerializeField] private VolumetricLighting.Settings volumetricLightingSettings;
     [SerializeField] private DepthOfField.Settings depthOfFieldSettings;
+    [SerializeField] private DynamicResolution.Settings dynamicResolutionSettings;
 
     public Color waterAlbedo = Color.white;
     [ColorUsage(false, true)] public Color waterExtinction = Color.grey;
@@ -31,6 +32,7 @@ public class CustomRenderPipelineAsset : RenderPipelineAsset
     public AmbientOcclusion.Settings AmbientOcclusionSettings => ambientOcclusionSettings;
     public VolumetricLighting.Settings VolumetricLightingSettings => volumetricLightingSettings;
     public DepthOfField.Settings DepthOfFieldSettigns => depthOfFieldSettings;
+    public DynamicResolution.Settings DynamicResolutionSettings => dynamicResolutionSettings;
 
     public override Material defaultMaterial => defaultMaterials.DefaultMaterial ?? base.defaultMaterial;
     public override Material defaultUIMaterial => defaultMaterials.DefaultUIMaterial ?? base.defaultUIMaterial;
