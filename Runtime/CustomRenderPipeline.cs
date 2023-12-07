@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
@@ -219,5 +220,45 @@ public class CustomRenderPipeline : RenderPipeline
 
 public class AutoExposure
 {
+    [Serializable]
+    public class Settings
+    {
+        [SerializeField] private float minLogLuminance = -10f;
+        [SerializeField] private float maxLogLuminance = 2f;
+        [SerializeField] private float tau = 1.1f;
 
+        public float MinLogLuminance => minLogLuminance;
+        public float MaxLogLuminance => maxLogLuminance;
+        public float Tau => tau;
+    }
+
+    private Settings settings;
+    private ComputeShader computeShader;
+    private ComputeBuffer histogram, output;
+
+    public AutoExposure(Settings settings)
+    {
+        this.settings = settings;
+        computeShader = Resources.Load<ComputeShader>("PostProcessing/AutoExposure");
+
+        histogram = new ComputeBuffer(256, sizeof(uint));
+        output = new ComputeBuffer(1, sizeof(float));
+    }
+
+    public void Render(CommandBuffer command, RenderTargetIdentifier input, int width, int height)
+    {
+        command.SetComputeFloatParam(computeShader, "minLogLuminance", settings.MinLogLuminance);
+        command.SetComputeFloatParam(computeShader, "logLuminanceRange", settings.MaxLogLuminance - settings.MinLogLuminance);
+        command.SetComputeFloatParam(computeShader, "tau", settings.Tau);
+
+        command.SetComputeBufferParam(computeShader, 0, "LuminanceHistogram", histogram);
+        command.SetComputeTextureParam(computeShader, 0, "Input", input);
+        command.DispatchNormalized(computeShader, 0, width, height, 1);
+
+        command.SetComputeBufferParam(computeShader, 1, "LuminanceHistogram", histogram);
+        command.SetComputeBufferParam(computeShader, 1, "LuminanceOutput", output);
+        command.DispatchCompute(computeShader, 1, 1, 1, 1);
+
+        command.SetGlobalBuffer("LuminanceOutput", output);
+    }
 }
