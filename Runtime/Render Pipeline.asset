@@ -42,6 +42,7 @@ MonoBehaviour:
     sharpness: 0.25
     stationaryBlending: 0.95
     motionBlending: 0.85
+    motionWeight: 6000
   convolutionBloomSettings:
     resolution: 1024
     kernelTexture: {fileID: 2800000, guid: ba159027bff5c8845ac4916bfd145294, type: 3}
@@ -60,14 +61,80 @@ MonoBehaviour:
   bloomSettings:
     strength: 0.125
     maxMips: 6
-  tileSize: 8
-  depthSlices: 64
-  blurSigma: 1
-  nonLinearDepth: 0
-  waterAlbedo: {r: 0.050543994, g: 0.13698289, b: 0.21599996, a: 1}
-  waterExtinction: {r: 0.01, g: 0.0035, b: 0.003, a: 1}
+  ambientOcclusionSettings:
+    strength: 1
+    tint: {r: 0, g: 0, b: 0, a: 1}
+    radius: 5
+    falloff: 0.75
+    directionCount: 1
+    sampleCount: 8
+  volumetricLightingSettings:
+    tileSize: 8
+    depthSlices: 128
+    blurSigma: 1
+    nonLinearDepth: 1
   depthOfFieldSettings:
     focalPlaneDistance: 64
     focalTransitionRange: 32
     blend: 0.11
     filterRadius: 1
+  dynamicResolutionSettings:
+    targetFrameRate: 60
+    minScaleFactor: 0.5
+    maxScaleFactor: 0.5
+    damping: 0.05
+  waterAlbedo: {r: 0.050543994, g: 0.13698289, b: 0.21599996, a: 1}
+  waterExtinction: {r: 0.01, g: 0.0035, b: 0.003, a: 1}
+  defaultMaterials:
+    defaultMaterial: {fileID: 0}
+    defaultUIMaterial: {fileID: 0}
+    default2DMaterial: {fileID: 0}
+    defaultLineMaterial: {fileID: 0}
+    defaultParticleMaterial: {fileID: 0}
+    defaultTerrainMaterial: {fileID: 0}
+    defaultUIETC1SupportedMaterial: {fileID: 0}
+    defaultUIOverdrawMaterial: {fileID: 0}
+    default2DMaskMaterial: {fileID: 0}
+  defaultShaders:
+    autodeskInteractiveMaskedShader: {fileID: 0}
+    autodeskInteractiveShader: {fileID: 0}
+    autodeskInteractiveTransparentShader: {fileID: 0}
+    defaultSpeedTree7Shader: {fileID: 0}
+    defaultSpeedTree8Shader: {fileID: 0}
+    defaultShader: {fileID: 0}
+    terrainDetailGrassBillboardShader: {fileID: 0}
+    terrainDetailGrassShader: {fileID: 0}
+    terrainDetailLitShader: {fileID: 0}
+  renderingLayerNames:
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 

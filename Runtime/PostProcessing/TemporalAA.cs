@@ -52,6 +52,11 @@ public class TemporalAA
         Vector2 jitter;
         jitter.x = Halton(sampleIndex, 2) - 0.5f;
         jitter.y = Halton(sampleIndex, 3) - 0.5f;
+
+
+        //jitter.x = frameCount % 2 - 0.5f;
+       // jitter.y = frameCount / 2 % 2 - 0.5f;
+
         jitter *= settings.JitterSpread;
 
         var matrix = camera.projectionMatrix;
@@ -66,10 +71,7 @@ public class TemporalAA
     {
         using var profilerScope = command.BeginScopedSample("Temporal AA");
 
-        var scaledWidth = (int)(camera.pixelWidth * scale);
-        var scaledHeight = (int)(camera.pixelHeight * scale);
-
-        var descriptor = new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.RGB111110Float);
+        var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
         var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous, frameCount);
 
         propertyBlock.SetFloat("_Sharpness", settings.Sharpness);
@@ -78,6 +80,7 @@ public class TemporalAA
         propertyBlock.SetFloat("_StationaryBlending", settings.StationaryBlending);
         propertyBlock.SetFloat("_MotionBlending", settings.MotionBlending);
         propertyBlock.SetFloat("_MotionWeight", settings.MotionWeight);
+        propertyBlock.SetFloat("_Scale", scale);
 
         propertyBlock.SetTexture("_History", previous);
 

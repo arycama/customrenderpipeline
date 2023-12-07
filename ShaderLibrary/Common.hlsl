@@ -224,7 +224,7 @@ float3 ClipToWorld(float3 position)
 
 float3 PixelToWorld(float3 position)
 {
-	return ClipToWorld(float3(position.xy / _ScreenParams.xy * 2 - 1, position.z));
+	return ClipToWorld(float3(position.xy / floor(_ScreenParams.xy * _Scale) * 2 - 1, position.z));
 }
 
 float4 WorldToClipNonJittered(float3 position) { return MultiplyPoint(_NonJitteredVPMatrix, position); }
@@ -302,7 +302,7 @@ float GetShadow(float3 worldPosition, uint lightIndex)
 		return 1.0;
 	
 	float4 positionCS = PerspectiveDivide(WorldToClip(worldPosition));
-	positionCS.xy = (positionCS.xy * 0.5 + 0.5) * _ScreenParams.xy;
+	positionCS.xy = (positionCS.xy * 0.5 + 0.5) * floor(_ScreenParams.xy * _Scale);
 	
 	float2 jitter = _BlueNoise2D[uint2(positionCS.xy) % 128];
 	float3 lightPosition = MultiplyPoint3x4(light.worldToLight, worldPosition);
@@ -494,7 +494,7 @@ float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, fl
 		if (light.shadowIndex != ~0u)
 		{
 			uint visibleFaces = light.visibleFaces;
-			float dominantAxis = Max3(abs(lightVector * float3(-1, 1, -1)));
+			float dominantAxis = Max3(abs(lightVector));
 			float depth = rcp(dominantAxis) * light.far + light.near;
 			attenuation = _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), light.shadowIndex), depth);
 			
@@ -538,8 +538,11 @@ float GetVolumetricUv(float linearDepth)
 
 float4 SampleVolumetricLighting(float2 pixelPosition, float eyeDepth)
 {
+	if (!_FogEnabled)
+		return float4(0.0, 0.0, 0.0, 1.0);
+		
 	float normalizedDepth = GetVolumetricUv(eyeDepth);
-	float3 volumeUv = float3(pixelPosition / _ScreenParams.xy, normalizedDepth);
+	float3 volumeUv = float3(pixelPosition / floor(_ScreenParams.xy * _Scale), normalizedDepth);
 	return _VolumetricLighting.SampleLevel(_LinearClampSampler, volumeUv, 0.0);
 }
 
@@ -548,9 +551,6 @@ bool3 IsInfOrNaN(float3 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
 
 float3 ApplyFog(float3 color, float2 pixelPosition, float eyeDepth)
 {
-	if (!_FogEnabled)
-		return color;
-	
 	float4 volumetricLighting = SampleVolumetricLighting(pixelPosition, eyeDepth);
 	return color * volumetricLighting.a + volumetricLighting.rgb;
 }
