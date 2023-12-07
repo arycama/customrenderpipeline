@@ -33,7 +33,7 @@ public class VolumetricLighting
         volumetricLightingTextureCache.Dispose();
     }
 
-    public void Render(Camera camera, CommandBuffer command, int frameCount, float scale)
+    public void Render(Camera camera, CommandBuffer command, float scale)
     {
         var scaledWidth = (int)(camera.pixelWidth * scale);
         var scaledHeight = (int)(camera.pixelHeight * scale);
@@ -50,7 +50,7 @@ public class VolumetricLighting
             volumeDepth = depth,
         };
 
-        volumetricLightingTextureCache.GetTexture(camera, volumetricLightingDescriptor, out var volumetricLightingCurrent, out var volumetricLightingHistory, frameCount);
+        volumetricLightingTextureCache.GetTexture(camera, volumetricLightingDescriptor, out var volumetricLightingCurrent, out var volumetricLightingHistory);
 
         var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
         command.SetGlobalFloat("_VolumeWidth", width);

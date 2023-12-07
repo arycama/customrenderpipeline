@@ -39,24 +39,21 @@ public class TemporalAA
         textureCache.Dispose();
     }
 
-    public void OnPreRender(Camera camera, int frameCount, CommandBuffer command, float scale)
+    public void OnPreRender(Camera camera, CommandBuffer command, float scale, out Matrix4x4 previousMatrix)
     {
         var scaledWidth = (int)(camera.pixelWidth * scale);
         var scaledHeight = (int)(camera.pixelHeight * scale);
 
+        previousMatrix = camera.nonJitteredProjectionMatrix;
+
         camera.ResetProjectionMatrix();
         camera.nonJitteredProjectionMatrix = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
 
-        var sampleIndex = frameCount % settings.SampleCount;
+        var sampleIndex = Time.renderedFrameCount % settings.SampleCount;
 
         Vector2 jitter;
         jitter.x = Halton(sampleIndex, 2) - 0.5f;
         jitter.y = Halton(sampleIndex, 3) - 0.5f;
-
-
-        //jitter.x = frameCount % 2 - 0.5f;
-       // jitter.y = frameCount / 2 % 2 - 0.5f;
-
         jitter *= settings.JitterSpread;
 
         var matrix = camera.projectionMatrix;
@@ -67,12 +64,12 @@ public class TemporalAA
         command.SetGlobalVector("_Jitter", jitter);
     }
 
-    public RenderTargetIdentifier Render(Camera camera, CommandBuffer command, int frameCount, RenderTargetIdentifier input, RenderTargetIdentifier motion, float scale)
+    public RenderTargetIdentifier Render(Camera camera, CommandBuffer command, RenderTargetIdentifier input, RenderTargetIdentifier motion, float scale)
     {
         using var profilerScope = command.BeginScopedSample("Temporal AA");
 
         var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
-        var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous, frameCount);
+        var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);
 
         propertyBlock.SetFloat("_Sharpness", settings.Sharpness);
         propertyBlock.SetFloat("_HasHistory", wasCreated ? 0f : 1f);

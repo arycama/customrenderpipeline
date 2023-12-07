@@ -14,7 +14,7 @@ public class CameraTextureCache : IDisposable
         this.name = name;
     }
 
-    public bool GetTexture(Camera camera, RenderTextureDescriptor descriptor, out RenderTexture texture0, out RenderTexture texture1, int frameCount)
+    public bool GetTexture(Camera camera, RenderTextureDescriptor descriptor, out RenderTexture texture0, out RenderTexture texture1)
     {
         bool wasCreated;
         if (!cameraTextureCache.TryGetValue(camera, out var textures))
@@ -42,7 +42,7 @@ public class CameraTextureCache : IDisposable
             textures.Item2.Resize(descriptor.width, descriptor.height, descriptor.volumeDepth);
 
             // If already exists, swap textures
-            if ((frameCount & 1) == 0)
+            if ((Time.renderedFrameCount & 1) == 0)
                 textures = (textures.Item2, textures.Item1);
 
             wasCreated = false;
