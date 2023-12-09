@@ -1,5 +1,4 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Rendering;
 
 [CreateAssetMenu(menuName = "Custom Render Pipeline Asset")]
@@ -22,6 +21,9 @@ public class CustomRenderPipelineAsset : RenderPipelineAsset
     [SerializeField] private DefaultPipelineMaterials defaultMaterials = new();
     [SerializeField] private DefaultPipelineShaders defaultShaders = new();
     [SerializeField] private string[] renderingLayerNames = new string[32];
+    [SerializeField] private AutoExposure.Settings autoExposureSettings;
+    [SerializeField] private Tonemapping.Settings tonemappingSettings;
+    [SerializeField] private LensSettings lensSettings;
 
     public bool EnableSrpBatcher => enableSrpBatcher;
     public ShadowSettings ShadowSettings => shadowSettings;
@@ -31,8 +33,11 @@ public class CustomRenderPipelineAsset : RenderPipelineAsset
     public Bloom.Settings BloomSettings => bloomSettings;
     public AmbientOcclusion.Settings AmbientOcclusionSettings => ambientOcclusionSettings;
     public VolumetricLighting.Settings VolumetricLightingSettings => volumetricLightingSettings;
-    public DepthOfField.Settings DepthOfFieldSettigns => depthOfFieldSettings;
+    public DepthOfField.Settings DepthOfFieldSettings => depthOfFieldSettings;
     public DynamicResolution.Settings DynamicResolutionSettings => dynamicResolutionSettings;
+    public AutoExposure.Settings AutoExposureSettings => autoExposureSettings;
+    public Tonemapping.Settings TonemappingSettings => tonemappingSettings;
+    public LensSettings LensSettings => lensSettings;
 
     public override Material defaultMaterial => defaultMaterials.DefaultMaterial ?? base.defaultMaterial;
     public override Material defaultUIMaterial => defaultMaterials.DefaultUIMaterial ?? base.defaultUIMaterial;

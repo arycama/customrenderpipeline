@@ -52,8 +52,8 @@ public class TemporalAA
         var sampleIndex = Time.renderedFrameCount % settings.SampleCount;
 
         Vector2 jitter;
-        jitter.x = Halton(sampleIndex, 2) - 0.5f;
-        jitter.y = Halton(sampleIndex, 3) - 0.5f;
+        jitter.x = Halton(sampleIndex + 1, 2) - 0.5f;
+        jitter.y = Halton(sampleIndex + 1, 3) - 0.5f;
         jitter *= settings.JitterSpread;
 
         var matrix = camera.projectionMatrix;

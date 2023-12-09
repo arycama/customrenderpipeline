@@ -22,6 +22,11 @@ struct PointLight
 	float padding;
 };
 
+cbuffer Exposure
+{
+	float _Exposure;
+};
+
 Buffer<float4> _DirectionalShadowTexelSizes, _PointShadowTexelSizes;
 Buffer<uint> _LightClusterList;
 SamplerComparisonState _PointClampCompareSampler, _LinearClampCompareSampler;
@@ -466,9 +471,9 @@ float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, fl
 		float NdotL = dot(normal, light.direction);
 		
 		if (isVolumetric)
-			lighting += light.color * attenuation;
+			lighting += light.color * _Exposure * attenuation;
 		else if(NdotL > 0.0)
-			lighting += saturate(NdotL) * CalculateLighting(albedo, f0, roughness, light.direction, V, normal) * light.color * attenuation;
+			lighting += saturate(NdotL) * CalculateLighting(albedo, f0, roughness, light.direction, V, normal) * light.color * _Exposure * attenuation;
 	}
 	
 	uint3 clusterIndex;
@@ -510,12 +515,12 @@ float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, fl
 		float3 L = lightVector * rcpLightDist;
 		
 		if (isVolumetric)
-			lighting += light.color * attenuation;
+			lighting += light.color * _Exposure * attenuation;
 		else
 		{
 			float NdotL = dot(normal, L);
 			if (NdotL > 0.0)
-				lighting += CalculateLighting(albedo, f0, roughness, L, V, normal) * NdotL * attenuation * light.color;
+				lighting += CalculateLighting(albedo, f0, roughness, L, V, normal) * NdotL * attenuation * light.color * _Exposure;
 		}
 	}
 	
@@ -543,7 +548,7 @@ float4 SampleVolumetricLighting(float2 pixelPosition, float eyeDepth)
 		
 	float normalizedDepth = GetVolumetricUv(eyeDepth);
 	float3 volumeUv = float3(pixelPosition / floor(_ScreenParams.xy * _Scale), normalizedDepth);
-	return _VolumetricLighting.SampleLevel(_LinearClampSampler, volumeUv, 0.0);
+	return _VolumetricLighting.Sample(_LinearClampSampler, volumeUv);
 }
 
 bool1 IsInfOrNaN(float1 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }

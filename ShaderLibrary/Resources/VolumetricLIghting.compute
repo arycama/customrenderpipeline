@@ -35,19 +35,19 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	positionCS.w = Remap(normalizedDepth, 0.0, 1.0, _ProjectionParams.y, _ProjectionParams.z);
 	
 	float3 positionWS = ClipToWorld(positionCS.xyz);
-	float3 lighting = _AmbientLightColor;
-	
-	float viewDistance = distance(positionWS, _WorldSpaceCameraPos);
-	lighting += GetLighting(0.0, positionWS, pixelPosition, positionCS.w, 1.0, 0.0, 1.0, true);
-	
-	float extinction = viewDistance > _FogStartDistance && viewDistance < _FogEndDistance ? rcp(_FogEndDistance - viewDistance) : 0.0;
+	float3 lighting = _AmbientLightColor * _Exposure;
 	
 	// Todo: compute on CPU
 	float3 sunColor = 0.0;
 	for (uint i = 0; i < _DirectionalLightCount; i++)
 		sunColor += _DirectionalLights[i].color;
 	
-	float3 albedo = _FogColor / (sunColor + _AmbientLightColor);
+	float3 albedo = _FogColor / (_AmbientLightColor + sunColor);
+	
+	float viewDistance = distance(positionWS, _WorldSpaceCameraPos);
+	lighting += GetLighting(0.0, positionWS, pixelPosition, positionCS.w, 1.0, 0.0, 1.0, true);
+	
+	float extinction = viewDistance > _FogStartDistance && viewDistance < _FogEndDistance ? rcp(_FogEndDistance - viewDistance) : 0.0;
 	float4 luminanceExtinction = float4(albedo * lighting, extinction);
 	
 	// Reproject previous frame. Needs to use unjittered world position

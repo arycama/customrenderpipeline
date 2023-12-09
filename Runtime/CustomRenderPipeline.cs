@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
@@ -19,12 +17,17 @@ public class CustomRenderPipeline : RenderPipeline
     private readonly VolumetricLighting volumetricLighting;
     private readonly ObjectRenderer opaqueObjectRenderer;
     private readonly ObjectRenderer motionVectorsRenderer;
+    private readonly ObjectRenderer skyRenderer;
     private readonly CameraMotionVectors cameraMotionVectors;
     private readonly AmbientOcclusion ambientOcclusion;
     private readonly ObjectRenderer transparentObjectRenderer;
+    private readonly DepthOfField depthOfField;
+    private readonly AutoExposure autoExposure;
     private readonly TemporalAA temporalAA;
     private readonly Bloom bloom;
     private readonly Tonemapping tonemapping;
+
+    private readonly Material skyClearMaterial;
 
     public CustomRenderPipeline(CustomRenderPipelineAsset renderPipelineAsset)
     {
@@ -41,12 +44,17 @@ public class CustomRenderPipeline : RenderPipeline
         volumetricLighting = new(renderPipelineAsset.VolumetricLightingSettings);
         opaqueObjectRenderer = new(RenderQueueRange.opaque, SortingCriteria.CommonOpaque, true, PerObjectData.None, "SRPDefaultUnlit");
         motionVectorsRenderer = new(RenderQueueRange.opaque, SortingCriteria.CommonOpaque, false, PerObjectData.MotionVectors, "MotionVectors");
+
+        skyRenderer = new(RenderQueueRange.all, SortingCriteria.None, false, PerObjectData.None, "Sky");
+
         cameraMotionVectors = new();
         ambientOcclusion = new(renderPipelineAsset.AmbientOcclusionSettings);
         transparentObjectRenderer = new(RenderQueueRange.transparent, SortingCriteria.CommonTransparent, false, PerObjectData.None, "SRPDefaultUnlit");
+        depthOfField = new(renderPipelineAsset.DepthOfFieldSettings, renderPipelineAsset.LensSettings);
+        autoExposure = new AutoExposure(renderPipelineAsset.AutoExposureSettings, renderPipelineAsset.LensSettings);
         temporalAA = new(renderPipelineAsset.TemporalAASettings);
         bloom = new(renderPipelineAsset.BloomSettings);
-        tonemapping = new(renderPipelineAsset.BloomSettings);
+        tonemapping = new(renderPipelineAsset.TonemappingSettings, renderPipelineAsset.BloomSettings);
 
         SupportedRenderingFeatures.active = new SupportedRenderingFeatures()
         {
@@ -81,6 +89,8 @@ public class CustomRenderPipeline : RenderPipeline
 
         dynamicResolution = new(renderPipelineAsset.DynamicResolutionSettings);
         frameTimeSampler = CustomSampler.Create("Frame Time", true);
+
+        skyClearMaterial = new Material(Shader.Find("Hidden/SkyClear")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
     protected override void Dispose(bool disposing)
@@ -165,7 +175,7 @@ public class CustomRenderPipeline : RenderPipeline
 
         // Base pass
         command.SetRenderTarget(new RenderTargetBinding(cameraTargetId, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, cameraDepthId, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store));
-        command.ClearRenderTarget(true, true, camera.backgroundColor.linear);
+        command.ClearRenderTarget(true, true, Color.clear);
         opaqueObjectRenderer.Render(ref cullingResults, camera, command, ref context);
 
         // Motion Vectors
@@ -184,6 +194,13 @@ public class CustomRenderPipeline : RenderPipeline
         cameraMotionVectors.Render(command, motionVectorsId, cameraDepthId);
         ambientOcclusion.Render(command, camera, cameraDepthId, cameraTargetId, dynamicResolution.ScaleFactor);
 
+        // Render sky
+        command.SetRenderTarget(new RenderTargetBinding(cameraTargetId, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare, cameraDepthId, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare) { flags = RenderTargetFlags.ReadOnlyDepth });
+
+        command.DrawProcedural(Matrix4x4.identity, skyClearMaterial, 0, MeshTopology.Triangles, 3);
+
+        skyRenderer.Render(ref cullingResults, camera, command, ref context);
+
         // Copy scene texture
         var sceneTextureId = Shader.PropertyToID("_SceneTexture");
         command.GetTemporaryRT(sceneTextureId, new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.RGB111110Float));
@@ -193,20 +210,24 @@ public class CustomRenderPipeline : RenderPipeline
 
         // Transparent
         command.SetRenderTarget(new RenderTargetBinding(cameraTargetId, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare, cameraDepthId, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare) { flags = RenderTargetFlags.ReadOnlyDepthStencil });
+        volumetricLighting.CameraRenderComplete(command);
         transparentObjectRenderer.Render(ref cullingResults, camera, command, ref context);
+        clusteredLightCulling.CameraRenderingComplete(command);
+        command.ReleaseTemporaryRT(sceneTextureId);
 
-        var taa = temporalAA.Render(camera, command, cameraTargetId, motionVectorsId, dynamicResolution.ScaleFactor);
+        autoExposure.Render(command, cameraTargetId, scaledWidth, scaledHeight);
+
+        var dofResult = depthOfField.Render(command, scaledWidth, scaledHeight, camera.fieldOfView, cameraTargetId, cameraDepthId);
+        command.ReleaseTemporaryRT(cameraTargetId);
+
+        var taa = temporalAA.Render(camera, command, dofResult, motionVectorsId, dynamicResolution.ScaleFactor);
+
         var bloomResult = bloom.Render(camera, command, taa);
+
+
         tonemapping.Render(command, taa, bloomResult, camera.cameraType == CameraType.SceneView);
 
-        command.ReleaseTemporaryRT(sceneTextureId);
-        command.ReleaseTemporaryRT(cameraTargetId);
         command.ReleaseTemporaryRT(cameraDepthId);
-
-        // Should release these sooner.. ideally track where they are used and release once done
-        clusteredLightCulling.CameraRenderingComplete(command);
-        volumetricLighting.CameraRenderComplete(command);
-
         context.ExecuteCommandBuffer(command);
         command.Clear();
 
@@ -215,50 +236,5 @@ public class CustomRenderPipeline : RenderPipeline
             context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
             context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
         }
-    }
-}
-
-public class AutoExposure
-{
-    [Serializable]
-    public class Settings
-    {
-        [SerializeField] private float minLogLuminance = -10f;
-        [SerializeField] private float maxLogLuminance = 2f;
-        [SerializeField] private float tau = 1.1f;
-
-        public float MinLogLuminance => minLogLuminance;
-        public float MaxLogLuminance => maxLogLuminance;
-        public float Tau => tau;
-    }
-
-    private Settings settings;
-    private ComputeShader computeShader;
-    private ComputeBuffer histogram, output;
-
-    public AutoExposure(Settings settings)
-    {
-        this.settings = settings;
-        computeShader = Resources.Load<ComputeShader>("PostProcessing/AutoExposure");
-
-        histogram = new ComputeBuffer(256, sizeof(uint));
-        output = new ComputeBuffer(1, sizeof(float));
-    }
-
-    public void Render(CommandBuffer command, RenderTargetIdentifier input, int width, int height)
-    {
-        command.SetComputeFloatParam(computeShader, "minLogLuminance", settings.MinLogLuminance);
-        command.SetComputeFloatParam(computeShader, "logLuminanceRange", settings.MaxLogLuminance - settings.MinLogLuminance);
-        command.SetComputeFloatParam(computeShader, "tau", settings.Tau);
-
-        command.SetComputeBufferParam(computeShader, 0, "LuminanceHistogram", histogram);
-        command.SetComputeTextureParam(computeShader, 0, "Input", input);
-        command.DispatchNormalized(computeShader, 0, width, height, 1);
-
-        command.SetComputeBufferParam(computeShader, 1, "LuminanceHistogram", histogram);
-        command.SetComputeBufferParam(computeShader, 1, "LuminanceOutput", output);
-        command.DispatchCompute(computeShader, 1, 1, 1, 1);
-
-        command.SetGlobalBuffer("LuminanceOutput", output);
     }
 }

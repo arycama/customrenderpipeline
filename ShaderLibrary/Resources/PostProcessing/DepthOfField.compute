@@ -1,0 +1,135 @@
+#pragma kernel CSMain
+
+#include "../../Common.hlsl"
+
+RWTexture2D<float3> _Result;
+Texture2D<float3> _Input;
+Texture2D<float> _Depth;
+
+float _ApertureSize, _FocalDistance, _FocalLength, _SampleRadius, _MaxCoC, _SensorHeight;
+uint _SampleCount;
+
+float CalculateCoC(float depth)
+{
+	if (depth == _FocalDistance)
+		return 1.0;
+		
+	float maxBgdCoC = _ApertureSize * (_FocalLength / 1000.0) / (_FocalDistance - _FocalLength / 1000.0);
+	return abs(1.0 - _FocalDistance / depth) * maxBgdCoC;
+}
+
+float CocWeight(float coc)
+{
+	return rcp(coc);
+}
+
+float2 VogelDiskSample(int sampleIndex, int samplesCount, float phi)
+{
+	float GoldenAngle = Pi * (3.0 - sqrt(5.0));
+
+	float r = sqrt(sampleIndex + 0.5f) / sqrt(samplesCount);
+	float theta = sampleIndex * GoldenAngle + phi;
+
+	float sine, cosine;
+	sincos(theta, sine, cosine);
+
+	return float2(r * cosine, r * sine);
+}
+
+[numthreads(8, 8, 1)]
+void CSMain(uint2 id : SV_DispatchThreadID)
+{
+	// Get the initial color at this pixel.    
+	//float4 color = tex2D(sceneSampler, texCoord); 
+	//texCoord += velocity; 
+	
+	//for(int i = 1; i < g_numSamples; ++i, texCoord += velocity) 
+	//{   
+	//	// Sample the color buffer along the velocity vector.    
+	//	float4 currentColor = tex2D(sceneSampler, texCoord);   
+	//	// Add the current color to our color sum.   
+	//	color += currentColor; 
+	//} 
+	//// Average all of the samples to get the final blur color.    
+	//float4 finalColor = color / numSamples; 
+ 
+	float2 resolution = floor(_ScreenParams.xy * _Scale);
+
+	// Set to middle of screen
+	//_FocalDistance = LinearEyeDepth(_Depth[resolution / 2]);
+	float maxBgdCoC = _ApertureSize * (_FocalLength / 1000.0) / (_FocalDistance - _FocalLength / 1000.0);
+	
+	float centerDepth = LinearEyeDepth(_Depth[id]);
+	float centerCoc = CalculateCoC(centerDepth);
+	float centerWeight = CocWeight(centerCoc);
+	
+	float3 result = _Input[id] * centerWeight;
+	float weightSum = centerWeight;
+	
+	_SampleCount = clamp(_SampleCount, 0, 32000);
+	
+	float noise = _BlueNoise1D[id % 64];
+	for (uint i = 0; i < _SampleCount; i++)
+	{
+		float2 uv = id + VogelDiskSample(i, _SampleCount, noise * 2.0 * Pi) * _SampleRadius * resolution.y;
+		
+		if (any(uv < 0.0 || uv >= resolution))
+			continue;
+		
+		float sampleDepth = LinearEyeDepth(_Depth[uv]);
+		float coc = CalculateCoC(sampleDepth);
+		
+		//if (sampleDepth > centerDepth)
+		//	coc = clamp(coc, 0.0, centerCoc);
+		
+		float weight = CocWeight(coc);
+		float2 aspect = float2(resolution.x / resolution.y, 1);
+		
+		if (distance(id / resolution * aspect, uv / resolution * aspect) < coc * resolution.y)
+		{
+			result += _Input[uv] * weight;
+			weightSum += weight;
+		}
+	}
+	
+	if (weightSum > 0.0)
+		result *= rcp(weightSum);
+	
+	//result /= _SampleCount;
+	
+	_Result[id] = result;
+	
+	//if(id.x > resolution.x / 2)
+	//	_Result[id] = _Input[id];
+}
+
+[numthreads(8, 8, 1)]
+void CSMain1(uint2 id : SV_DispatchThreadID)
+{
+	float4 result = 0.0;
+	float noise = _BlueNoise1D[id % 64];
+	
+	float sampleDepth = length(PixelToWorld(float3(id + 0.5, _Depth[id])));
+	if (sampleDepth == _FocalLength)
+	{
+		_Result[id] = _Input[id];
+		return;
+	}
+	
+	float centerCoc = abs(CalculateCoC(sampleDepth)) * _SampleRadius;
+	for (uint i = 0; i < _SampleCount; i++)
+	{
+		float2 uv = VogelDiskSample(i, _SampleCount, noise * 2.0 * Pi);
+		float2 coord = id + uv * centerCoc;
+		float depth = length(PixelToWorld(float3(coord + 0.5, _Depth[coord])));
+		
+		float weight = depth > sampleDepth ? 1.0 : centerCoc;
+		result.rgb += _Input[coord] * weight;
+		result.a += weight;
+	}
+	
+	if (result.a != 0.0)
+		result.rgb *= rcp(result.a);
+	
+	_Result[id] = result.rgb;
+}

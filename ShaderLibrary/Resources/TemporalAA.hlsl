@@ -6,25 +6,16 @@ Texture2D<float> _Depth;
 
 float _HasHistory, _MotionBlending, _MotionWeight, _Sharpness, _StationaryBlending;
 
-struct FragmentInput
+float4 Vertex(uint id : SV_VertexID) : SV_Position
 {
-	float4 position : SV_Position;
-	float2 uv : TEXCOORD;
-};
-
-FragmentInput Vertex(uint id : SV_VertexID)
-{
-	FragmentInput output;
-	output.uv = float2((id << 1) & 2, id & 2);
-	output.position = float4(output.uv * 2.0 - 1.0, 1.0, 1.0);
-	output.uv.y = 1.0 - output.uv.y;
-	return output;
+	float2 uv = float2((id << 1) & 2, id & 2);
+	return float4(uv * 2.0 - 1.0, 1.0, 1.0);
 }
 
-float3 Fragment(FragmentInput input) : SV_Target
+float3 Fragment(float4 position : SV_Position) : SV_Target
 {
 	float2 scaledResolution = floor(_ScreenParams.xy * _Scale);
-	float2 uv = input.position.xy / _ScreenParams.xy;
+	float2 uv = position.xy / _ScreenParams.xy;
 	float2 unjitteredTexel = uv - (_Jitter / scaledResolution);
 	float2 scaledUv = unjitteredTexel * scaledResolution - 0.5 + rcp(512.0);
 	

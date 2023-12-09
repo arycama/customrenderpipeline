@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class DepthOfField
+public class ConvolutionDepthOfField
 {
     [Serializable]
     public class Settings
@@ -17,7 +17,7 @@ public class DepthOfField
 
     private Settings settings;
 
-    public DepthOfField(Settings settings)
+    public ConvolutionDepthOfField(Settings settings)
     {
         this.settings = settings;
     }

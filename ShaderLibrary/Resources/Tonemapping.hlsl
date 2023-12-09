@@ -128,9 +128,13 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	
 	input = lerp(input, upsample, _BloomStrength);
 	
+	//input *= 0.18;// * _Exposure;
+	
 	// Reinhard
 	//input *= rcp(1.0 + Luminance(input));
 	
+	//input = (ACESFilm((input)));
+	//input = SRGBToLinear(ACESFilm(LinearToSRGB(input)));
 	input = Uncharted2ToneMapping(input);
 	
 	//input = SRGBToLinear(ACESFitted(LinearToSRGB(input)));
