@@ -1,6 +1,9 @@
 ﻿using UnityEngine.Rendering;
 
-public abstract class CustomRenderPipeline : RenderPipeline
+namespace Arycama.CustomRenderPipeline
 {
-    
+    public abstract class CustomRenderPipeline : RenderPipeline
+    {
+
+    }
 }

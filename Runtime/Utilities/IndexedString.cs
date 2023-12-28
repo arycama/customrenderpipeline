@@ -1,24 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 
-public class IndexedString
+namespace Arycama.CustomRenderPipeline
 {
-    private List<string> strings = new();
-    private string id;
-
-    public IndexedString(string id)
+    public class IndexedString
     {
-        this.id = id;
-    }
+        private List<string> strings = new();
+        private string id;
 
-    public string GetString(int index)
-    {
-        if (index < 0)
-            throw new ArgumentOutOfRangeException(index.ToString());
+        public IndexedString(string id)
+        {
+            this.id = id;
+        }
 
-        while (strings.Count <= index)
-            strings.Add($"{id}{strings.Count}");
+        public string GetString(int index)
+        {
+            if (index < 0)
+                throw new ArgumentOutOfRangeException(index.ToString());
 
-        return strings[index];
+            while (strings.Count <= index)
+                strings.Add($"{id}{strings.Count}");
+
+            return strings[index];
+        }
     }
 }

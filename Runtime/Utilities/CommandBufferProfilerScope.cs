@@ -1,21 +1,24 @@
 ﻿using System;
 using UnityEngine.Rendering;
 
-public readonly struct CommandBufferProfilerScope : IDisposable
+namespace Arycama.CustomRenderPipeline
 {
-    private readonly string name;
-    private readonly CommandBuffer command;
-
-    public CommandBufferProfilerScope(CommandBuffer command, string name)
+    public readonly struct CommandBufferProfilerScope : IDisposable
     {
-        this.name = name;
-        this.command = command;
+        private readonly string name;
+        private readonly CommandBuffer command;
 
-        command.BeginSample(name);
-    }
+        public CommandBufferProfilerScope(CommandBuffer command, string name)
+        {
+            this.name = name;
+            this.command = command;
 
-    void IDisposable.Dispose()
-    {
-        command.EndSample(name);
+            command.BeginSample(name);
+        }
+
+        void IDisposable.Dispose()
+        {
+            command.EndSample(name);
+        }
     }
 }

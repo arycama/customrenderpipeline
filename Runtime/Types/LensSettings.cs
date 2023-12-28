@@ -1,21 +1,24 @@
 ﻿using System;
 using UnityEngine;
 
-[Serializable]
-public class LensSettings
+namespace Arycama.CustomRenderPipeline
 {
-    [SerializeField, Min(1.0f)] private float aperture = 11.0f;
-    [SerializeField] private float shutterSpeed = 200.0f;
-    [SerializeField] private float iso = 200f;
-    //[SerializeField] private float sensorWidth = 24.89f;
-    [SerializeField] private float sensorHeight = 24.89f;
-    [SerializeField] private float focalDistance = 15f;
+    [Serializable]
+    public class LensSettings
+    {
+        [SerializeField, Min(1.0f)] private float aperture = 11.0f;
+        [SerializeField] private float shutterSpeed = 200.0f;
+        [SerializeField] private float iso = 200f;
+        //[SerializeField] private float sensorWidth = 24.89f;
+        [SerializeField] private float sensorHeight = 24.89f;
+        [SerializeField] private float focalDistance = 15f;
 
-    public float Aperture => aperture;
-    public float ShutterSpeed => 1f / shutterSpeed;
-    public float Iso => iso;
-    public float SensorHeight => sensorHeight;
-    public float FocalDistance => focalDistance;
+        public float Aperture => aperture;
+        public float ShutterSpeed => 1f / shutterSpeed;
+        public float Iso => iso;
+        public float SensorHeight => sensorHeight;
+        public float FocalDistance => focalDistance;
 
-    public float GetFocalLength(float fov) => sensorHeight / (2.0f * Mathf.Tan(fov * Mathf.Deg2Rad / 2.0f));
+        public float GetFocalLength(float fov) => sensorHeight / (2.0f * Mathf.Tan(fov * Mathf.Deg2Rad / 2.0f));
+    }
 }

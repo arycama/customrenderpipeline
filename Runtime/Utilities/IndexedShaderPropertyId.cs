@@ -2,24 +2,27 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-public class IndexedShaderPropertyId
+namespace Arycama.CustomRenderPipeline
 {
-    private List<int> properties = new();
-    private string id;
-
-    public IndexedShaderPropertyId(string id)
+    public class IndexedShaderPropertyId
     {
-        this.id = id;
-    }
+        private List<int> properties = new();
+        private string id;
 
-    public int GetProperty(int index)
-    {
-        if (index < 0)
-            throw new ArgumentOutOfRangeException(index.ToString());
+        public IndexedShaderPropertyId(string id)
+        {
+            this.id = id;
+        }
 
-        while (properties.Count <= index)
-            properties.Add(Shader.PropertyToID($"{id}{properties.Count}"));
+        public int GetProperty(int index)
+        {
+            if (index < 0)
+                throw new ArgumentOutOfRangeException(index.ToString());
 
-        return properties[index];
+            while (properties.Count <= index)
+                properties.Add(Shader.PropertyToID($"{id}{properties.Count}"));
+
+            return properties[index];
+        }
     }
 }

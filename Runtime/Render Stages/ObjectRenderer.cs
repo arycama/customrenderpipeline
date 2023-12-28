@@ -2,39 +2,42 @@
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
 
-public class ObjectRenderer
+namespace Arycama.CustomRenderPipeline
 {
-    private RenderQueueRange renderQueueRange;
-    private SortingCriteria sortingCriteria;
-    private bool excludeObjectMotionVectors;
-    private PerObjectData perObjectData;
-    private string passName, profilerTag;
-
-    public ObjectRenderer(RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria, bool excludeObjectMotionVectors, PerObjectData perObjectData, string passName)
+    public class ObjectRenderer
     {
-        this.renderQueueRange = renderQueueRange;
-        this.sortingCriteria = sortingCriteria;
-        this.excludeObjectMotionVectors = excludeObjectMotionVectors;
-        this.passName = passName;
-        this.perObjectData = perObjectData;
+        private RenderQueueRange renderQueueRange;
+        private SortingCriteria sortingCriteria;
+        private bool excludeObjectMotionVectors;
+        private PerObjectData perObjectData;
+        private string passName, profilerTag;
 
-        profilerTag = $"Render Objects ({passName})";
-    }
-
-    public void Render(ref CullingResults cullingResults, Camera camera, CommandBuffer command, ref ScriptableRenderContext context)
-    {
-        using var profilerScope = command.BeginScopedSample(profilerTag);
-
-        var srpDefaultUnlitShaderPassName = new ShaderTagId(passName);
-        var rendererListDesc = new RendererListDesc(srpDefaultUnlitShaderPassName, cullingResults, camera)
+        public ObjectRenderer(RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria, bool excludeObjectMotionVectors, PerObjectData perObjectData, string passName)
         {
-            renderQueueRange = renderQueueRange,
-            sortingCriteria = sortingCriteria,
-            excludeObjectMotionVectors = excludeObjectMotionVectors,
-            rendererConfiguration = perObjectData
-        };
+            this.renderQueueRange = renderQueueRange;
+            this.sortingCriteria = sortingCriteria;
+            this.excludeObjectMotionVectors = excludeObjectMotionVectors;
+            this.passName = passName;
+            this.perObjectData = perObjectData;
 
-        var rendererList = context.CreateRendererList(rendererListDesc);
-        command.DrawRendererList(rendererList);
+            profilerTag = $"Render Objects ({passName})";
+        }
+
+        public void Render(ref CullingResults cullingResults, Camera camera, CommandBuffer command, ref ScriptableRenderContext context)
+        {
+            using var profilerScope = command.BeginScopedSample(profilerTag);
+
+            var srpDefaultUnlitShaderPassName = new ShaderTagId(passName);
+            var rendererListDesc = new RendererListDesc(srpDefaultUnlitShaderPassName, cullingResults, camera)
+            {
+                renderQueueRange = renderQueueRange,
+                sortingCriteria = sortingCriteria,
+                excludeObjectMotionVectors = excludeObjectMotionVectors,
+                rendererConfiguration = perObjectData
+            };
+
+            var rendererList = context.CreateRendererList(rendererListDesc);
+            command.DrawRendererList(rendererList);
+        }
     }
 }

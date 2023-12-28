@@ -1,19 +1,22 @@
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
-public static class CommandBufferPool
+namespace Arycama.CustomRenderPipeline
 {
-    static readonly ObjectPool<CommandBuffer> bufferPool = new(() => new CommandBuffer(), x => x.Clear());
-
-    public static CommandBuffer Get(string name)
+    public static class CommandBufferPool
     {
-        var cmd = bufferPool.Get();
-        cmd.name = name;
-        return cmd;
-    }
+        static readonly ObjectPool<CommandBuffer> bufferPool = new(() => new CommandBuffer(), x => x.Clear());
 
-    public static void Release(CommandBuffer buffer)
-    {
-        bufferPool.Release(buffer);
+        public static CommandBuffer Get(string name)
+        {
+            var cmd = bufferPool.Get();
+            cmd.name = name;
+            return cmd;
+        }
+
+        public static void Release(CommandBuffer buffer)
+        {
+            bufferPool.Release(buffer);
+        }
     }
 }
