@@ -1,44 +1,14 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-[CreateAssetMenu(menuName = "Custom Render Pipeline Asset")]
-public class CustomRenderPipelineAsset : RenderPipelineAsset
+public abstract class CustomRenderPipelineAsset : RenderPipelineAsset
 {
     [SerializeField] private bool enableSrpBatcher;
-    [SerializeField] private ShadowSettings shadowSettings;
-    [SerializeField] private ClusteredLightCulling.Settings clusteredLightingSettings;
-    [SerializeField] private TemporalAA.Settings temporalAASettings;
-    [SerializeField] private ConvolutionBloom.Settings convolutionBloomSettings;
-    [SerializeField] private Bloom.Settings bloomSettings;
-    [SerializeField] private AmbientOcclusion.Settings ambientOcclusionSettings;
-    [SerializeField] private VolumetricLighting.Settings volumetricLightingSettings;
-    [SerializeField] private DepthOfField.Settings depthOfFieldSettings;
-    [SerializeField] private DynamicResolution.Settings dynamicResolutionSettings;
-
-    public Color waterAlbedo = Color.white;
-    [ColorUsage(false, true)] public Color waterExtinction = Color.grey;
-
     [SerializeField] private DefaultPipelineMaterials defaultMaterials = new();
     [SerializeField] private DefaultPipelineShaders defaultShaders = new();
     [SerializeField] private string[] renderingLayerNames = new string[32];
-    [SerializeField] private AutoExposure.Settings autoExposureSettings;
-    [SerializeField] private Tonemapping.Settings tonemappingSettings;
-    [SerializeField] private LensSettings lensSettings;
 
     public bool EnableSrpBatcher => enableSrpBatcher;
-    public ShadowSettings ShadowSettings => shadowSettings;
-    public ClusteredLightCulling.Settings ClusteredLightingSettings => clusteredLightingSettings;
-    public TemporalAA.Settings TemporalAASettings => temporalAASettings;
-    public ConvolutionBloom.Settings ConvolutionBloomSettings => convolutionBloomSettings;
-    public Bloom.Settings BloomSettings => bloomSettings;
-    public AmbientOcclusion.Settings AmbientOcclusionSettings => ambientOcclusionSettings;
-    public VolumetricLighting.Settings VolumetricLightingSettings => volumetricLightingSettings;
-    public DepthOfField.Settings DepthOfFieldSettings => depthOfFieldSettings;
-    public DynamicResolution.Settings DynamicResolutionSettings => dynamicResolutionSettings;
-    public AutoExposure.Settings AutoExposureSettings => autoExposureSettings;
-    public Tonemapping.Settings TonemappingSettings => tonemappingSettings;
-    public LensSettings LensSettings => lensSettings;
-
     public override Material defaultMaterial => defaultMaterials.DefaultMaterial ?? base.defaultMaterial;
     public override Material defaultUIMaterial => defaultMaterials.DefaultUIMaterial ?? base.defaultUIMaterial;
     public override Material default2DMaterial => defaultMaterials.Default2DMaterial ?? base.default2DMaterial;
@@ -61,11 +31,6 @@ public class CustomRenderPipelineAsset : RenderPipelineAsset
 
     public override string[] renderingLayerMaskNames => renderingLayerNames;
     public override string[] prefixedRenderingLayerMaskNames => renderingLayerNames;
-
-    protected override RenderPipeline CreatePipeline()
-    {
-        return new CustomRenderPipeline(this);
-    }
 
     protected override void OnValidate()
     {

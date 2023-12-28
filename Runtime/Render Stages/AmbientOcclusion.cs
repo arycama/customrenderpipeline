@@ -1,9 +1,5 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
-using Unity.Profiling;
 using UnityEngine;
-using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
 public class AmbientOcclusion
@@ -28,17 +24,11 @@ public class AmbientOcclusion
 
     private Settings settings;
     private Material material;
-    private ComputeShader computeShader;
-    private CustomSampler sampler, csSampler;
 
     public AmbientOcclusion(Settings settings)
     {
         this.settings = settings;
         material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
-        computeShader = Resources.Load<ComputeShader>("PostProcessing/NormalsFromDepth");
-
-        sampler = CustomSampler.Create("Ambient Occlusion", true);
-        csSampler = CustomSampler.Create("Ambient Occlusion CS", true);
     }
 
     public void Render(CommandBuffer command, Camera camera, RenderTargetIdentifier depth, RenderTargetIdentifier scene, float scale)
@@ -54,25 +44,6 @@ public class AmbientOcclusion
 
         var viewDepth = Shader.PropertyToID("_ViewDepth");
         command.GetTemporaryRT(viewDepth, new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.RHalf) { enableRandomWrite = true });
-
-        command.SetComputeTextureParam(computeShader, 0, "_CameraDepth", depth);
-        command.SetComputeTextureParam(computeShader, 0, "DepthResult", viewDepth);
-        command.SetComputeTextureParam(computeShader, 0, "NormalResult", normals);
-
-        command.SetComputeIntParam(computeShader, "Width", scaledWidth);
-        command.SetComputeIntParam(computeShader, "Height", scaledHeight);
-
-        computeShader.GetKernelThreadGroupSizes(0, out var x, out var y, out var z);
-
-        var threadGroupsX = (int)((scaledWidth - 1) / x) + 1;
-        var threadGroupsY = (int)((scaledHeight - 1) / y) + 1;
-
-        command.SetComputeIntParam(computeShader, "DispatchSizeX", threadGroupsX);
-        command.SetComputeIntParam(computeShader, "DispatchSizeY", threadGroupsY);
-
-        //command.BeginSample(csSampler);
-        //command.DispatchCompute(computeShader, 0, threadGroupsX, threadGroupsY, 1);
-        //command.EndSample(csSampler);
 
         command.SetGlobalVector("ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
 
@@ -108,7 +79,5 @@ public class AmbientOcclusion
 
         if(RenderSettings.fog)
             command.DrawProcedural(Matrix4x4.identity, material, 2, MeshTopology.Triangles, 3);
-
-
     }
 }
