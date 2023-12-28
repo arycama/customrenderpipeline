@@ -7,6 +7,7 @@
 #define NUM_HISTOGRAM_BINS 256
 
 Texture2D<float3> Input;
+Texture2D<float> ExposureTexture;
 RWStructuredBuffer<uint> LuminanceHistogram;
 RWStructuredBuffer<float> LuminanceOutput;
 
@@ -19,87 +20,6 @@ float4 unity_DeltaTime;
 
 groupshared uint HistogramShared[NUM_HISTOGRAM_BINS];
 
-float ComputeEV100(float aperture, float shutterSpeed, float ISO)
-{
-    // EV number is defined as:
-    //   2^ EV_s = N^2 / t and EV_s = EV_100 + log2 (S /100)
-    // This gives
-    //   EV_s = log2 (N^2 / t)
-    //   EV_100 + log2 (S /100) = log2 (N^2 / t)
-    //   EV_100 = log2 (N^2 / t) - log2 (S /100)
-    //   EV_100 = log2 (N^2 / t . 100 / S)
-	return log2((aperture * aperture) / shutterSpeed * 100.0 / ISO);
-}
-
-float ComputeEV100FromAvgLuminance(float avgLuminance, float calibrationConstant)
-{
-	const float K = calibrationConstant;
-	return log2(avgLuminance * 100.0 / K);
-}
-
-float ComputeEV100FromAvgLuminance(float avgLuminance)
-{
-    // We later use the middle gray at 12.7% in order to have
-    // a middle gray at 18% with a sqrt(2) room for specular highlights
-    // But here we deal with the spot meter measuring the middle gray
-    // which is fixed at 12.5 for matching standard camera
-    // constructor settings (i.e. calibration constant K = 12.5)
-    // Reference: http://en.wikipedia.org/wiki/Film_speed
-	const float K = 12.5; // Reflected-light meter calibration constant
-	return ComputeEV100FromAvgLuminance(avgLuminance, K);
-}
-
-float ConvertEV100ToExposure(float EV100)
-{
-    // Compute the maximum luminance possible with H_sbs sensitivity
-    // maxLum = 78 / ( S * q ) * N^2 / t
-    //        = 78 / ( S * q ) * 2^ EV_100
-    //        = 78 / (100 * s_LensAttenuation) * 2^ EV_100
-    //        = exposureScale * 2^ EV
-    // Reference: http://en.wikipedia.org/wiki/Film_speed
-	float maxLuminance = 1.2 * pow(2.0, EV100);
-	return 1.0 / maxLuminance;
-}
-
-float ConvertEV100ToExposure(float EV100, float exposureScale)
-{
-    // Compute the maximum luminance possible with H_sbs sensitivity
-    // maxLum = 78 / ( S * q ) * N^2 / t
-    //        = 78 / ( S * q ) * 2^ EV_100
-    //        = 78 / (100 * s_LensAttenuation) * 2^ EV_100
-    //        = exposureScale * 2^ EV
-    // Reference: http://en.wikipedia.org/wiki/Film_speed
-	float maxLuminance = exposureScale * pow(2.0, EV100);
-	return 1.0 / maxLuminance;
-}
-
-float ComputeISO(float aperture, float shutterSpeed, float targetEV100)
-{
-    // Compute the required ISO to reach the target EV100
-	return ((aperture * aperture) * 100.0) / (shutterSpeed * pow(2.0, targetEV100));
-}
-
-float ComputeLuminanceAdaptation(float previousLuminance, float currentLuminance, float speedDarkToLight, float speedLightToDark, float deltaTime)
-{
-	float delta = currentLuminance - previousLuminance;
-	float speed = delta > 0.0 ? speedDarkToLight : speedLightToDark;
-
-    // Exponential decay
-	return previousLuminance + delta * (1.0 - exp2(-deltaTime * speed));
-}
-
-float ConvertExposureToEV100(float exposure)
-{
-    // Compute the maximum luminance possible with H_sbs sensitivity
-    // EV_100 = log2(   S * q    / (78 * exposure) )
-    //        = log2( 100 * s_LensAttenuation / (78 * exposure) )
-    //        = log2(    1.0f    / (lensImperfectionExposureScale * exposure) )
-    // Reference: http://en.wikipedia.org/wiki/Film_speed
-	float s_LensAttenuation = 0.65f;
-	float lensImperfectionExposureScale = (78.0f / (100.0 * s_LensAttenuation));
-	return log2(1.0 / (lensImperfectionExposureScale * exposure));
-}
-
 [numthreads(16, 16, 1)]
 void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : SV_DispatchThreadID)
 {
@@ -109,22 +29,14 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
     
 	if (all(threadId < floor(_ScreenParams.xy * _Scale)))
 	{
-		float lensAttenuation = 0.65;
-		float lensImperfectionExposureScale = 78.0 / (100.0 * lensAttenuation);
-		float prevExposure = ConvertEV100ToExposure(ConvertExposureToEV100(_Exposure), lensImperfectionExposureScale);
-	
 		float3 color = Input[threadId];
-		float luminance = Luminance(color) / prevExposure;
+		float luminance = Luminance(color) / _Exposure;
 		
-		uint binIndex;
-		if (luminance)
-		{
-			float logLuminance = saturate((ComputeEV100FromAvgLuminance(luminance) - MinEv) / (MaxEv - MinEv));
-			binIndex = uint(logLuminance * 254.0 + 1.0);
-		}
-		else
-			binIndex = 0;
+		float minLuminance = EV100ToLuminance(MinEv);
+		float maxLuminance = EV100ToLuminance(MaxEv);
+		luminance = clamp(luminance, minLuminance, maxLuminance);
 		
+		uint binIndex = Remap(LuminanceToEV100(luminance), MinEv, MaxEv, 0.0, 255.0);
 		InterlockedAdd(HistogramShared[binIndex], 1);
 	}
     
@@ -159,14 +71,20 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	{
 		float pixelCount = floor(_ScreenParams.x * _Scale) * floor(_ScreenParams.y * _Scale);
 	
-		float weightedLogAverage = (HistogramShared[0] / max(pixelCount - countForThisBin, 1.0)) - 1.0;
-		float weightedAverageEv = (weightedLogAverage / 254.0) * (MaxEv - MinEv) + MinEv;
-		
-		float evLastFrame = ConvertExposureToEV100(_Exposure);
-		float adaptedEv = lerp(weightedAverageEv, evLastFrame, exp(-unity_DeltaTime.x * AdaptationSpeed));
+		float weightedLogAverage = HistogramShared[0] / pixelCount;
+		float averageEv = Remap(HistogramShared[0] / pixelCount, 0.0, 255.0, MinEv, MaxEv);
 
-		//weightedAverageEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
+		float2 uv = Remap(averageEv, MinEv, MaxEv);
+		averageEv -= ExposureTexture.SampleLevel(_LinearClampSampler, float2(uv.x, 0.5), 0.0);
 		
-		LuminanceOutput[0] = ConvertEV100ToExposure(weightedAverageEv);
+		float evLastFrame = ExposureToEV100(_Exposure);
+		float adaptedEv = lerp(averageEv, evLastFrame, exp(-unity_DeltaTime.x * AdaptationSpeed));
+		
+		if (IsInfOrNaN(evLastFrame))
+			adaptedEv = averageEv;
+
+		//adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
+		
+		LuminanceOutput[0] = EV100ToExposure(adaptedEv);
 	}
 }

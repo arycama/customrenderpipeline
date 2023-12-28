@@ -54,7 +54,7 @@ public class CustomRenderPipeline : RenderPipeline
         autoExposure = new AutoExposure(renderPipelineAsset.AutoExposureSettings, renderPipelineAsset.LensSettings);
         temporalAA = new(renderPipelineAsset.TemporalAASettings);
         bloom = new(renderPipelineAsset.BloomSettings);
-        tonemapping = new(renderPipelineAsset.TonemappingSettings, renderPipelineAsset.BloomSettings);
+        tonemapping = new(renderPipelineAsset.TonemappingSettings, renderPipelineAsset.BloomSettings, renderPipelineAsset.LensSettings);
 
         SupportedRenderingFeatures.active = new SupportedRenderingFeatures()
         {
@@ -225,7 +225,7 @@ public class CustomRenderPipeline : RenderPipeline
         var bloomResult = bloom.Render(camera, command, taa);
 
 
-        tonemapping.Render(command, taa, bloomResult, camera.cameraType == CameraType.SceneView);
+        tonemapping.Render(command, taa, bloomResult, camera.cameraType == CameraType.SceneView, camera.pixelWidth, camera.pixelHeight);
 
         command.ReleaseTemporaryRT(cameraDepthId);
         context.ExecuteCommandBuffer(command);

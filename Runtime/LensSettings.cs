@@ -4,15 +4,15 @@ using UnityEngine;
 [Serializable]
 public class LensSettings
 {
-    [SerializeField] private float aperture = 16f;
-    [SerializeField] private float shutterSpeed = 0.005f;
+    [SerializeField, Min(1.0f)] private float aperture = 11.0f;
+    [SerializeField] private float shutterSpeed = 200.0f;
     [SerializeField] private float iso = 200f;
     //[SerializeField] private float sensorWidth = 24.89f;
     [SerializeField] private float sensorHeight = 24.89f;
     [SerializeField] private float focalDistance = 15f;
 
     public float Aperture => aperture;
-    public float ShutterSpeed => shutterSpeed;
+    public float ShutterSpeed => 1f / shutterSpeed;
     public float Iso => iso;
     public float SensorHeight => sensorHeight;
     public float FocalDistance => focalDistance;

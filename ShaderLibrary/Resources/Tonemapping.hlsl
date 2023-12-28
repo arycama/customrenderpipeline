@@ -1,7 +1,9 @@
 #include "../Common.hlsl"
 
 Texture2D<float3> _MainTex, _Bloom;
-float _IsSceneView, _BloomStrength;
+Texture2D<float> _GrainTexture;
+float4 _GrainTextureParams;
+float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, ShutterSpeed;
 
 float4 Vertex(uint id : SV_VertexID) : SV_Position
 {
@@ -135,9 +137,18 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	
 	//input = (ACESFilm((input)));
 	//input = SRGBToLinear(ACESFilm(LinearToSRGB(input)));
-	input = Uncharted2ToneMapping(input);
 	
-	//input = SRGBToLinear(ACESFitted(LinearToSRGB(input)));
+	input = SRGBToLinear(ACESFitted(LinearToSRGB(input)));
+	//input = Uncharted2ToneMapping(input);
+	
+	//float ev100 = ExposureToEV100(_Exposure);
+	float ev100 = LuminanceToEV100(Luminance(input));
+	float iso = ComputeISO(Aperture, ShutterSpeed, ev100);
+	
+	
+	float grain = _GrainTexture.Sample(_LinearRepeatSampler, position.xy / _ScreenParams.xy * _GrainTextureParams.xy + _GrainTextureParams.zw);
+	input = max(0.0, input * (1.0 + (grain * 2.0 - 1.0) * (NoiseIntensity / 1000) * iso));
+	
 	
 	return input;
 }
