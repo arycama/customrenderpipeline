@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class AutoExposure
+    public class AutoExposure : RenderFeature
     {
         [Serializable]
         public class Settings
@@ -34,7 +34,7 @@ namespace Arycama.CustomRenderPipeline
         private Texture2D exposureTexture;
         private float[] exposurePixels;
 
-        public AutoExposure(Settings settings, LensSettings lensSettings)
+        public AutoExposure(Settings settings, LensSettings lensSettings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
             this.lensSettings = lensSettings;
@@ -58,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.Apply(false, false);
         }
 
-        public void Render(CommandBuffer command, RenderTargetIdentifier input, int width, int height)
+        public void Render(RenderTargetIdentifier input, int width, int height)
         {
             exposurePixels = new float[settings.ExposureResolution];
             for (var i = 0; i < settings.ExposureResolution; i++)
@@ -71,31 +71,34 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.SetPixelData(exposurePixels, 0);
             exposureTexture.Apply(false, false);
 
-            command.SetComputeFloatParam(computeShader, "MinEv", settings.MinEv);
-            command.SetComputeFloatParam(computeShader, "MaxEv", settings.MaxEv);
-            command.SetComputeFloatParam(computeShader, "AdaptationSpeed", settings.AdaptationSpeed);
-            command.SetComputeFloatParam(computeShader, "ExposureCompensation", settings.ExposureCompensation);
+            renderGraph.AddRenderPass((command, context) =>
+            {
+                command.SetComputeFloatParam(computeShader, "MinEv", settings.MinEv);
+                command.SetComputeFloatParam(computeShader, "MaxEv", settings.MaxEv);
+                command.SetComputeFloatParam(computeShader, "AdaptationSpeed", settings.AdaptationSpeed);
+                command.SetComputeFloatParam(computeShader, "ExposureCompensation", settings.ExposureCompensation);
 
-            command.SetComputeFloatParam(computeShader, "Iso", lensSettings.Iso);
-            command.SetComputeFloatParam(computeShader, "Aperture", lensSettings.Aperture);
-            command.SetComputeFloatParam(computeShader, "ShutterSpeed", lensSettings.ShutterSpeed);
+                command.SetComputeFloatParam(computeShader, "Iso", lensSettings.Iso);
+                command.SetComputeFloatParam(computeShader, "Aperture", lensSettings.Aperture);
+                command.SetComputeFloatParam(computeShader, "ShutterSpeed", lensSettings.ShutterSpeed);
 
-            command.SetComputeFloatParam(computeShader, "HistogramMin", settings.HistogramPercentages.x);
-            command.SetComputeFloatParam(computeShader, "HistogramMax", settings.HistogramPercentages.y);
+                command.SetComputeFloatParam(computeShader, "HistogramMin", settings.HistogramPercentages.x);
+                command.SetComputeFloatParam(computeShader, "HistogramMax", settings.HistogramPercentages.y);
 
-            command.SetComputeBufferParam(computeShader, 0, "LuminanceHistogram", histogram);
-            command.SetComputeTextureParam(computeShader, 0, "Input", input);
-            command.SetComputeVectorParam(computeShader, "_ExposureCompensationRemap", GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1));
+                command.SetComputeBufferParam(computeShader, 0, "LuminanceHistogram", histogram);
+                command.SetComputeTextureParam(computeShader, 0, "Input", input);
+                command.SetComputeVectorParam(computeShader, "_ExposureCompensationRemap", GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1));
 
-            command.DispatchNormalized(computeShader, 0, width, height, 1);
+                command.DispatchNormalized(computeShader, 0, width, height, 1);
 
-            command.SetComputeBufferParam(computeShader, 1, "LuminanceHistogram", histogram);
-            command.SetComputeBufferParam(computeShader, 1, "LuminanceOutput", output);
-            command.SetComputeTextureParam(computeShader, 1, "ExposureTexture", exposureTexture);
-            command.DispatchCompute(computeShader, 1, 1, 1, 1);
+                command.SetComputeBufferParam(computeShader, 1, "LuminanceHistogram", histogram);
+                command.SetComputeBufferParam(computeShader, 1, "LuminanceOutput", output);
+                command.SetComputeTextureParam(computeShader, 1, "ExposureTexture", exposureTexture);
+                command.DispatchCompute(computeShader, 1, 1, 1, 1);
 
-            command.CopyBuffer(output, exposureBuffer);
-            command.SetGlobalConstantBuffer(exposureBuffer, "Exposure", 0, sizeof(float) * 4);
+                command.CopyBuffer(output, exposureBuffer);
+                command.SetGlobalConstantBuffer(exposureBuffer, "Exposure", 0, sizeof(float) * 4);
+            });
         }
     }
 }

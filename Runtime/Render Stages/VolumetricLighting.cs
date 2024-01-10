@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class VolumetricLighting
+    public class VolumetricLighting : RenderFeature
     {
         [Serializable]
         public class Settings
@@ -25,7 +25,7 @@ namespace Arycama.CustomRenderPipeline
         private Settings settings;
         private CameraTextureCache volumetricLightingTextureCache = new();
 
-        public VolumetricLighting(Settings settings)
+        public VolumetricLighting(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
         }
@@ -35,12 +35,10 @@ namespace Arycama.CustomRenderPipeline
             volumetricLightingTextureCache.Dispose();
         }
 
-        public void Render(Camera camera, CommandBuffer command, float scale)
+        public void Render(Camera camera, float scale)
         {
             var scaledWidth = (int)(camera.pixelWidth * scale);
             var scaledHeight = (int)(camera.pixelHeight * scale);
-
-            using var profilerScope = command.BeginScopedSample("Volumetric Lighting");
 
             var width = Mathf.CeilToInt(scaledWidth / (float)settings.TileSize);
             var height = Mathf.CeilToInt(scaledHeight / (float)settings.TileSize);
@@ -55,38 +53,39 @@ namespace Arycama.CustomRenderPipeline
             volumetricLightingTextureCache.GetTexture(camera, volumetricLightingDescriptor, out var volumetricLightingCurrent, out var volumetricLightingHistory);
 
             var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
-            command.SetGlobalFloat("_VolumeWidth", width);
-            command.SetGlobalFloat("_VolumeHeight", height);
-            command.SetGlobalFloat("_VolumeSlices", depth);
-            command.SetGlobalFloat("_VolumeDepth", camera.farClipPlane);
-            command.SetGlobalFloat("_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
-            command.SetComputeFloatParam(computeShader, "_BlurSigma", settings.BlurSigma);
-            command.SetComputeIntParam(computeShader, "_VolumeTileSize", settings.TileSize);
 
-            command.SetComputeTextureParam(computeShader, 0, "_Input", volumetricLightingHistory);
-            command.SetComputeTextureParam(computeShader, 0, "_Result", volumetricLightingCurrent);
-            command.DispatchNormalized(computeShader, 0, width, height, depth);
-            command.GetTemporaryRT(volumetricLightingId, volumetricLightingDescriptor);
+            renderGraph.AddRenderPass((command, context) =>
+            {
+                using var profilerScope = command.BeginScopedSample("Volumetric Lighting");
 
-            // Filter X
-            command.SetComputeTextureParam(computeShader, 1, "_Input", volumetricLightingCurrent);
-            command.SetComputeTextureParam(computeShader, 1, "_Result", volumetricLightingId);
-            command.DispatchNormalized(computeShader, 1, width, height, depth);
+                command.SetGlobalFloat("_VolumeWidth", width);
+                command.SetGlobalFloat("_VolumeHeight", height);
+                command.SetGlobalFloat("_VolumeSlices", depth);
+                command.SetGlobalFloat("_VolumeDepth", camera.farClipPlane);
+                command.SetGlobalFloat("_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
+                command.SetComputeFloatParam(computeShader, "_BlurSigma", settings.BlurSigma);
+                command.SetComputeIntParam(computeShader, "_VolumeTileSize", settings.TileSize);
 
-            // Filter Y
-            command.SetComputeTextureParam(computeShader, 2, "_Input", volumetricLightingId);
-            command.SetComputeTextureParam(computeShader, 2, "_Result", volumetricLightingHistory);
-            command.DispatchNormalized(computeShader, 2, width, height, depth);
+                command.SetComputeTextureParam(computeShader, 0, "_Input", volumetricLightingHistory);
+                command.SetComputeTextureParam(computeShader, 0, "_Result", volumetricLightingCurrent);
+                command.DispatchNormalized(computeShader, 0, width, height, depth);
+                command.GetTemporaryRT(volumetricLightingId, volumetricLightingDescriptor);
 
-            command.SetComputeTextureParam(computeShader, 3, "_Input", volumetricLightingHistory);
-            command.SetComputeTextureParam(computeShader, 3, "_Result", volumetricLightingId);
-            command.DispatchNormalized(computeShader, 3, width, height, 1);
-            command.SetGlobalTexture("_VolumetricLighting", volumetricLightingId);
-        }
+                // Filter X
+                command.SetComputeTextureParam(computeShader, 1, "_Input", volumetricLightingCurrent);
+                command.SetComputeTextureParam(computeShader, 1, "_Result", volumetricLightingId);
+                command.DispatchNormalized(computeShader, 1, width, height, depth);
 
-        public void CameraRenderComplete(CommandBuffer command)
-        {
-            command.ReleaseTemporaryRT(volumetricLightingId);
+                // Filter Y
+                command.SetComputeTextureParam(computeShader, 2, "_Input", volumetricLightingId);
+                command.SetComputeTextureParam(computeShader, 2, "_Result", volumetricLightingHistory);
+                command.DispatchNormalized(computeShader, 2, width, height, depth);
+
+                command.SetComputeTextureParam(computeShader, 3, "_Input", volumetricLightingHistory);
+                command.SetComputeTextureParam(computeShader, 3, "_Result", volumetricLightingId);
+                command.DispatchNormalized(computeShader, 3, width, height, 1);
+                command.SetGlobalTexture("_VolumetricLighting", volumetricLightingId);
+            });
         }
     }
 }

@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class ClusteredLightCulling
+    public class ClusteredLightCulling : RenderFeature
     {
         [Serializable]
         public class Settings
@@ -28,7 +28,7 @@ namespace Arycama.CustomRenderPipeline
 
         private int DivRoundUp(int x, int y) => (x + y - 1) / y;
 
-        public ClusteredLightCulling(Settings settings)
+        public ClusteredLightCulling(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
             counterBuffer = new ComputeBuffer(1, sizeof(uint)) { name = nameof(counterBuffer) };
@@ -40,12 +40,11 @@ namespace Arycama.CustomRenderPipeline
             counterBuffer.Release();
         }
 
-        public void Render(CommandBuffer command, Camera camera, float scale)
+        public void Render(Camera camera, float scale)
         {
             var scaledWidth = (int)(camera.pixelWidth * scale);
             var scaledHeight = (int)(camera.pixelHeight * scale);
 
-            using var profilerScope = command.BeginScopedSample("Clustered Light Culling");
 
             var clusterWidth = DivRoundUp(scaledWidth, settings.TileSize);
             var clusterHeight = DivRoundUp(scaledHeight, settings.TileSize);
@@ -65,27 +64,27 @@ namespace Arycama.CustomRenderPipeline
 
             var computeShader = Resources.Load<ComputeShader>("ClusteredLightCulling");
 
-            command.GetTemporaryRT(lightClusterIndicesId, descriptor);
-            command.SetBufferData(counterBuffer, zeroArray);
-            //command.SetComputeBufferParam(computeShader, 0, "_LightData", lightData);
-            command.SetComputeBufferParam(computeShader, 0, "_LightCounter", counterBuffer);
-            command.SetComputeBufferParam(computeShader, 0, "_LightClusterListWrite", lightList);
-            command.SetComputeTextureParam(computeShader, 0, "_LightClusterIndicesWrite", lightClusterIndicesId);
-            //command.SetComputeIntParam(computeShader, "_LightCount", lightData.Count);
-            command.SetComputeIntParam(computeShader, "_TileSize", settings.TileSize);
-            command.SetComputeFloatParam(computeShader, "_RcpClusterDepth", 1f / settings.ClusterDepth);
-            command.DispatchNormalized(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
+            renderGraph.AddRenderPass((command, context) =>
+            {
+                using var profilerScope = command.BeginScopedSample("Clustered Light Culling");
 
-            command.SetGlobalTexture(lightClusterIndicesId, lightClusterIndicesId);
-            command.SetGlobalBuffer("_LightClusterList", lightList);
-            command.SetGlobalFloat("_ClusterScale", clusterScale);
-            command.SetGlobalFloat("_ClusterBias", clusterBias);
-            command.SetGlobalInt("_TileSize", settings.TileSize);
-        }
+                command.GetTemporaryRT(lightClusterIndicesId, descriptor);
+                command.SetBufferData(counterBuffer, zeroArray);
+                //command.SetComputeBufferParam(computeShader, 0, "_LightData", lightData);
+                command.SetComputeBufferParam(computeShader, 0, "_LightCounter", counterBuffer);
+                command.SetComputeBufferParam(computeShader, 0, "_LightClusterListWrite", lightList);
+                command.SetComputeTextureParam(computeShader, 0, "_LightClusterIndicesWrite", lightClusterIndicesId);
+                //command.SetComputeIntParam(computeShader, "_LightCount", lightData.Count);
+                command.SetComputeIntParam(computeShader, "_TileSize", settings.TileSize);
+                command.SetComputeFloatParam(computeShader, "_RcpClusterDepth", 1f / settings.ClusterDepth);
+                command.DispatchNormalized(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
 
-        public void CameraRenderingComplete(CommandBuffer command)
-        {
-            command.ReleaseTemporaryRT(lightClusterIndicesId);
+                command.SetGlobalTexture(lightClusterIndicesId, lightClusterIndicesId);
+                command.SetGlobalBuffer("_LightClusterList", lightList);
+                command.SetGlobalFloat("_ClusterScale", clusterScale);
+                command.SetGlobalFloat("_ClusterBias", clusterBias);
+                command.SetGlobalInt("_TileSize", settings.TileSize);
+            });
         }
     }
 }

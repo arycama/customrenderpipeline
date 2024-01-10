@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class TemporalAA
+    public class TemporalAA : RenderFeature
     {
         [Serializable]
         public class Settings
@@ -29,7 +29,7 @@ namespace Arycama.CustomRenderPipeline
         private Material material;
         private MaterialPropertyBlock propertyBlock;
 
-        public TemporalAA(Settings settings)
+        public TemporalAA(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Temporal AA")) { hideFlags = HideFlags.HideAndDontSave };
@@ -41,7 +41,7 @@ namespace Arycama.CustomRenderPipeline
             textureCache.Dispose();
         }
 
-        public void OnPreRender(Camera camera, CommandBuffer command, float scale, out Matrix4x4 previousMatrix)
+        public void OnPreRender(Camera camera, float scale, out Matrix4x4 previousMatrix)
         {
             var scaledWidth = (int)(camera.pixelWidth * scale);
             var scaledHeight = (int)(camera.pixelHeight * scale);
@@ -63,31 +63,34 @@ namespace Arycama.CustomRenderPipeline
             matrix[1, 2] = 2.0f * jitter.y / scaledHeight;
             camera.projectionMatrix = matrix;
 
-            command.SetGlobalVector("_Jitter", jitter);
+            renderGraph.AddRenderPass((command, context) => command.SetGlobalVector("_Jitter", jitter));
         }
 
-        public RenderTargetIdentifier Render(Camera camera, CommandBuffer command, RenderTargetIdentifier input, RenderTargetIdentifier motion, float scale)
+        public RenderTargetIdentifier Render(Camera camera, RenderTargetIdentifier input, RenderTargetIdentifier motion, float scale)
         {
-            using var profilerScope = command.BeginScopedSample("Temporal AA");
-
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
             var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);
 
-            propertyBlock.SetFloat("_Sharpness", settings.Sharpness);
-            propertyBlock.SetFloat("_HasHistory", wasCreated ? 0f : 1f);
+            renderGraph.AddRenderPass((command, context) =>
+            {
+                using var profilerScope = command.BeginScopedSample("Temporal AA");
 
-            propertyBlock.SetFloat("_StationaryBlending", settings.StationaryBlending);
-            propertyBlock.SetFloat("_MotionBlending", settings.MotionBlending);
-            propertyBlock.SetFloat("_MotionWeight", settings.MotionWeight);
-            propertyBlock.SetFloat("_Scale", scale);
+                propertyBlock.SetFloat("_Sharpness", settings.Sharpness);
+                propertyBlock.SetFloat("_HasHistory", wasCreated ? 0f : 1f);
 
-            propertyBlock.SetTexture("_History", previous);
+                propertyBlock.SetFloat("_StationaryBlending", settings.StationaryBlending);
+                propertyBlock.SetFloat("_MotionBlending", settings.MotionBlending);
+                propertyBlock.SetFloat("_MotionWeight", settings.MotionWeight);
+                propertyBlock.SetFloat("_Scale", scale);
 
-            command.SetGlobalTexture("_Input", input);
-            command.SetGlobalTexture("_Motion", motion);
+                propertyBlock.SetTexture("_History", previous);
 
-            command.SetRenderTarget(current);
-            command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
+                command.SetGlobalTexture("_Input", input);
+                command.SetGlobalTexture("_Motion", motion);
+
+                command.SetRenderTarget(current);
+                command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
+            });
 
             return current;
         }
