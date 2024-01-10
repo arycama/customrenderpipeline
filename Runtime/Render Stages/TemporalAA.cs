@@ -84,9 +84,8 @@ namespace Arycama.CustomRenderPipeline
                 propertyBlock.SetFloat("_Scale", scale);
 
                 propertyBlock.SetTexture("_History", previous);
-
-                command.SetGlobalTexture("_Input", input);
-                command.SetGlobalTexture("_Motion", motion);
+                propertyBlock.SetTexture("_Input", input);
+                propertyBlock.SetTexture("_Motion", motion);
 
                 command.SetRenderTarget(current);
                 command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);

@@ -44,7 +44,6 @@ namespace Arycama.CustomRenderPipeline
             var scaledWidth = (int)(camera.pixelWidth * scale);
             var scaledHeight = (int)(camera.pixelHeight * scale);
 
-
             var clusterWidth = DivRoundUp(scaledWidth, settings.TileSize);
             var clusterHeight = DivRoundUp(scaledHeight, settings.TileSize);
             var clusterCount = clusterWidth * clusterHeight * settings.ClusterDepth;

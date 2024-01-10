@@ -46,37 +46,36 @@ namespace Arycama.CustomRenderPipeline
         {
             renderGraph.AddRenderPass((command, context) =>
             {
-                using var profilerScope = command.BeginScopedSample("Tonemapping");
+                using var propertyBlock = renderGraph.GetScopedPropertyBlock();
 
-                command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
-                command.SetGlobalTexture("_MainTex", input);
-                command.SetGlobalTexture("_Bloom", bloom);
-                command.SetGlobalFloat("_BloomStrength", bloomSettings.Strength);
-                command.SetGlobalFloat("_IsSceneView", isSceneView ? 1f : 0f);
+                propertyBlock.SetTexture("_MainTex", input);
+                propertyBlock.SetTexture("_Bloom", bloom);
 
-                command.SetGlobalFloat("ToeStrength", settings.ToeStrength);
-                command.SetGlobalFloat("ToeLength", settings.ToeLength);
-                command.SetGlobalFloat("ShoulderStrength", settings.ShoulderStrength);
-                command.SetGlobalFloat("ShoulderLength", settings.ShoulderLength);
-                command.SetGlobalFloat("ShoulderAngle", settings.ShoulderAngle);
-                command.SetGlobalFloat("NoiseIntensity", settings.NoiseIntensity);
-                command.SetGlobalFloat("NoiseResponse", settings.NoiseResponse);
+                propertyBlock.SetFloat("_BloomStrength", bloomSettings.Strength);
+                propertyBlock.SetFloat("_IsSceneView", isSceneView ? 1f : 0f);
+                propertyBlock.SetFloat("ToeStrength", settings.ToeStrength);
+                propertyBlock.SetFloat("ToeLength", settings.ToeLength);
+                propertyBlock.SetFloat("ShoulderStrength", settings.ShoulderStrength);
+                propertyBlock.SetFloat("ShoulderLength", settings.ShoulderLength);
+                propertyBlock.SetFloat("ShoulderAngle", settings.ShoulderAngle);
+                propertyBlock.SetFloat("NoiseIntensity", settings.NoiseIntensity);
+                propertyBlock.SetFloat("NoiseResponse", settings.NoiseResponse);
 
                 var filmGrainTexture = settings.FilmGrainTexture;
-                command.SetGlobalTexture("_GrainTexture", filmGrainTexture);
+                propertyBlock.SetTexture("_GrainTexture", filmGrainTexture);
 
                 var offsetX = Random.value;
                 var offsetY = Random.value;
-                float uvScaleX = filmGrainTexture ? width / (float)filmGrainTexture.width : 1.0f;
-                float uvScaleY = filmGrainTexture ? height / (float)filmGrainTexture.height : 1.0f;
-                float scaledOffsetX = offsetX * uvScaleX;
-                float scaledOffsetY = offsetY * uvScaleY;
+                var uvScaleX = filmGrainTexture ? width / (float)filmGrainTexture.width : 1.0f;
+                var uvScaleY = filmGrainTexture ? height / (float)filmGrainTexture.height : 1.0f;
 
-                command.SetGlobalVector("_GrainTextureParams", new Vector4(uvScaleX, uvScaleY, offsetX, offsetY));
-                command.SetGlobalFloat("ShutterSpeed", lensSettings.ShutterSpeed);
-                command.SetGlobalFloat("Aperture", lensSettings.Aperture);
+                propertyBlock.SetVector("_GrainTextureParams", new Vector4(uvScaleX, uvScaleY, offsetX, offsetY));
+                propertyBlock.SetFloat("ShutterSpeed", lensSettings.ShutterSpeed);
+                propertyBlock.SetFloat("Aperture", lensSettings.Aperture);
 
-                command.DrawProcedural(Matrix4x4.identity, tonemappingMaterial, 0, MeshTopology.Triangles, 3);
+                using var profilerScope = command.BeginScopedSample("Tonemapping");
+                command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
+                command.DrawProcedural(Matrix4x4.identity, tonemappingMaterial, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
             });
         }
     }

@@ -50,47 +50,40 @@ namespace Arycama.CustomRenderPipeline
                 // Downsample
                 for (var i = 0; i < mipCount; i++)
                 {
+                    using var propertyBlock = renderGraph.GetScopedPropertyBlock();
+
                     if (i == 0)
                     {
-                        command.SetGlobalTexture("_MainTex", input);
+                        propertyBlock.SetTexture("_MainTex", input);
                     }
                     else
                     {
                         var inputId = bloomIds[i - 1];
-                        command.SetGlobalTexture("_MainTex", inputId);
+                        propertyBlock.SetTexture("_MainTex", inputId);
                     }
 
                     var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
                     var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
-                    var resultId = bloomIds[i];
+                    propertyBlock.SetVector("_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
 
-                    command.SetRenderTarget(resultId);
-                    command.SetGlobalVector("_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
-                    command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3);
+                    command.SetRenderTarget(bloomIds[i]);
+                    command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
                 }
 
                 // Upsample
                 for (var i = mipCount - 1; i > 0; i--)
                 {
-                    var inputId = bloomIds[i];
-                    command.SetGlobalFloat("_Strength", settings.Strength);
-                    command.SetGlobalTexture("_MainTex", inputId);
+                    using var propertyBlock = renderGraph.GetScopedPropertyBlock();
 
-                    if (i > 0)
-                    {
-                        var resultId = bloomIds[i - 1];
-                        command.SetRenderTarget(resultId);
-                    }
-                    else
-                    {
-                        command.SetRenderTarget(input);
-                    }
+                    propertyBlock.SetFloat("_Strength", settings.Strength);
+                    propertyBlock.SetTexture("_MainTex", bloomIds[i]);
 
                     var width = Mathf.Max(1, camera.pixelWidth >> i);
                     var height = Mathf.Max(1, camera.pixelHeight >> i);
-                    command.SetGlobalVector("_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
+                    propertyBlock.SetVector("_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
 
-                    command.DrawProcedural(Matrix4x4.identity, material, 1, MeshTopology.Triangles, 3);
+                    command.SetRenderTarget(i == 0 ? input : bloomIds[i - 1]);
+                    command.DrawProcedural(Matrix4x4.identity, material, 1, MeshTopology.Triangles, 3, 1, propertyBlock);
                 }
 
                 ListPool<RTHandle>.Release(bloomIds);

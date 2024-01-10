@@ -46,34 +46,41 @@ namespace Arycama.CustomRenderPipeline
 
             renderGraph.AddRenderPass((command, context) =>
             {
-                command.SetGlobalVector("ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
+                using (var propertyBlock = renderGraph.GetScopedPropertyBlock())
+                {
+                    propertyBlock.SetVector("ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
 
-                command.SetRenderTarget(new RenderTargetBinding(
-                    new[] { new RenderTargetIdentifier(normals), new RenderTargetIdentifier(viewDepth) },
-                    new[] { RenderBufferLoadAction.DontCare, RenderBufferLoadAction.DontCare },
-                    new[] { RenderBufferStoreAction.Store, RenderBufferStoreAction.Store },
-                    depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare)
-                { flags = RenderTargetFlags.ReadOnlyDepthStencil });
+                    command.SetRenderTarget(new RenderTargetBinding(
+                        new[] { new RenderTargetIdentifier(normals), new RenderTargetIdentifier(viewDepth) },
+                        new[] { RenderBufferLoadAction.DontCare, RenderBufferLoadAction.DontCare },
+                        new[] { RenderBufferStoreAction.Store, RenderBufferStoreAction.Store },
+                        depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare)
+                    { flags = RenderTargetFlags.ReadOnlyDepthStencil });
 
-                command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3);
+                    command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
+                }
 
-                var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
-                var tanHalfFovX = tanHalfFovY * camera.aspect;
-                command.SetGlobalVector("_UvToView", new Vector4(tanHalfFovX * 2f, tanHalfFovY * 2f, -tanHalfFovX, -tanHalfFovY));
+                using (var propertyBlock = renderGraph.GetScopedPropertyBlock())
+                {
+                    var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+                    var tanHalfFovX = tanHalfFovY * camera.aspect;
 
-                command.SetGlobalVector("_Tint", settings.Tint.linear);
-                command.SetGlobalFloat("_Radius", settings.Radius * scaledHeight / tanHalfFovY * 0.5f);
-                command.SetGlobalFloat("_AoStrength", settings.Strength);
-                command.SetGlobalFloat("_FalloffScale", settings.Falloff == 1f ? 0f : 1f / (settings.Radius * settings.Falloff - settings.Radius));
-                command.SetGlobalFloat("_FalloffBias", settings.Falloff == 1f ? 1f : 1f / (1f - settings.Falloff));
-                command.SetGlobalInt("_DirectionCount", settings.DirectionCount);
-                command.SetGlobalInt("_SampleCount", settings.SampleCount);
+                    propertyBlock.SetVector("_UvToView", new Vector4(tanHalfFovX * 2f, tanHalfFovY * 2f, -tanHalfFovX, -tanHalfFovY));
+                    propertyBlock.SetVector("_Tint", settings.Tint.linear);
+                    propertyBlock.SetFloat("_Radius", settings.Radius * scaledHeight / tanHalfFovY * 0.5f);
+                    propertyBlock.SetFloat("_AoStrength", settings.Strength);
+                    propertyBlock.SetFloat("_FalloffScale", settings.Falloff == 1f ? 0f : 1f / (settings.Radius * settings.Falloff - settings.Radius));
+                    propertyBlock.SetFloat("_FalloffBias", settings.Falloff == 1f ? 1f : 1f / (1f - settings.Falloff));
+                    propertyBlock.SetInt("_DirectionCount", settings.DirectionCount);
+                    propertyBlock.SetInt("_SampleCount", settings.SampleCount);
 
-                command.SetGlobalTexture("_ViewDepth", viewDepth);
-                command.SetGlobalTexture("_ViewNormals", normals);
-                command.SetGlobalTexture("_CameraDepth", depth);
-                command.SetRenderTarget(new RenderTargetBinding(scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare, depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare) { flags = RenderTargetFlags.ReadOnlyDepthStencil });
-                command.DrawProcedural(Matrix4x4.identity, material, 1, MeshTopology.Triangles, 3);
+                    propertyBlock.SetTexture("_ViewDepth", viewDepth);
+                    propertyBlock.SetTexture("_ViewNormals", normals);
+                    propertyBlock.SetTexture("_CameraDepth", depth);
+
+                    command.SetRenderTarget(new RenderTargetBinding(scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare, depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare) { flags = RenderTargetFlags.ReadOnlyDepthStencil });
+                    command.DrawProcedural(Matrix4x4.identity, material, 1, MeshTopology.Triangles, 3, 1, propertyBlock);
+                }
 
                 if (RenderSettings.fog)
                     command.DrawProcedural(Matrix4x4.identity, material, 2, MeshTopology.Triangles, 3);
