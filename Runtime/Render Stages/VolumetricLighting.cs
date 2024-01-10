@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -19,8 +20,6 @@ namespace Arycama.CustomRenderPipeline
             public float BlurSigma => blurSigma;
             public bool NonLinearDepth => nonLinearDepth;
         }
-
-        private static readonly int volumetricLightingId = Shader.PropertyToID("_VolumetricLighting");
 
         private Settings settings;
         private CameraTextureCache volumetricLightingTextureCache = new();
@@ -53,6 +52,7 @@ namespace Arycama.CustomRenderPipeline
             volumetricLightingTextureCache.GetTexture(camera, volumetricLightingDescriptor, out var volumetricLightingCurrent, out var volumetricLightingHistory);
 
             var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
+            var volumetricLightingId = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
 
             renderGraph.AddRenderPass((command, context) =>
             {
@@ -69,7 +69,6 @@ namespace Arycama.CustomRenderPipeline
                 command.SetComputeTextureParam(computeShader, 0, "_Input", volumetricLightingHistory);
                 command.SetComputeTextureParam(computeShader, 0, "_Result", volumetricLightingCurrent);
                 command.DispatchNormalized(computeShader, 0, width, height, depth);
-                command.GetTemporaryRT(volumetricLightingId, volumetricLightingDescriptor);
 
                 // Filter X
                 command.SetComputeTextureParam(computeShader, 1, "_Input", volumetricLightingCurrent);

@@ -42,7 +42,7 @@ namespace Arycama.CustomRenderPipeline
             tonemappingMaterial = new Material(Shader.Find("Hidden/Tonemapping")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public void Render(RenderTargetIdentifier input, RenderTargetIdentifier bloom, bool isSceneView, int width, int height)
+        public void Render(RTHandle input, RTHandle bloom, bool isSceneView, int width, int height)
         {
             renderGraph.AddRenderPass((command, context) =>
             {

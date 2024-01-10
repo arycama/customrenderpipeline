@@ -58,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.Apply(false, false);
         }
 
-        public void Render(RenderTargetIdentifier input, int width, int height)
+        public void Render(RTHandle input, int width, int height)
         {
             exposurePixels = new float[settings.ExposureResolution];
             for (var i = 0; i < settings.ExposureResolution; i++)

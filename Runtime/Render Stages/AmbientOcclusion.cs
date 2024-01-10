@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -33,22 +34,18 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public void Render(Camera camera, RenderTargetIdentifier depth, RenderTargetIdentifier scene, float scale)
+        public void Render(Camera camera, RTHandle depth, RTHandle scene, float scale)
         {
+            if (settings.Strength == 0.0f)
+                return;
+
+            var scaledWidth = (int)(camera.pixelWidth * scale);
+            var scaledHeight = (int)(camera.pixelHeight * scale);
+            var normals = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.A2B10G10R10_UNormPack32);
+            var viewDepth = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.R16_SFloat);
+
             renderGraph.AddRenderPass((command, context) =>
             {
-                if (settings.Strength == 0.0f)
-                    return;
-
-                var scaledWidth = (int)(camera.pixelWidth * scale);
-                var scaledHeight = (int)(camera.pixelHeight * scale);
-
-                var normals = Shader.PropertyToID("_ViewNormals");
-                command.GetTemporaryRT(normals, new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.ARGB2101010) { enableRandomWrite = true });
-
-                var viewDepth = Shader.PropertyToID("_ViewDepth");
-                command.GetTemporaryRT(viewDepth, new RenderTextureDescriptor(scaledWidth, scaledHeight, RenderTextureFormat.RHalf) { enableRandomWrite = true });
-
                 command.SetGlobalVector("ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
 
                 command.SetRenderTarget(new RenderTargetBinding(
@@ -58,11 +55,7 @@ namespace Arycama.CustomRenderPipeline
                     depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare)
                 { flags = RenderTargetFlags.ReadOnlyDepthStencil });
 
-                //command.BeginSample(sampler);
                 command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3);
-                // command.EndSample(sampler);
-
-                // Debug.Log($"{csSampler.GetRecorder().gpuElapsedNanoseconds}, {sampler.GetRecorder().gpuElapsedNanoseconds}");
 
                 var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
                 var tanHalfFovX = tanHalfFovY * camera.aspect;

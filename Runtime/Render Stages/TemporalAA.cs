@@ -66,7 +66,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.AddRenderPass((command, context) => command.SetGlobalVector("_Jitter", jitter));
         }
 
-        public RenderTargetIdentifier Render(Camera camera, RenderTargetIdentifier input, RenderTargetIdentifier motion, float scale)
+        public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
         {
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
             var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);

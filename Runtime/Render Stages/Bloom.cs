@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -16,8 +19,6 @@ namespace Arycama.CustomRenderPipeline
             public int MaxMips => maxMips;
         }
 
-        private static readonly IndexedShaderPropertyId bloomIds = new("Bloom");
-
         private Settings settings;
         private Material material;
 
@@ -27,13 +28,24 @@ namespace Arycama.CustomRenderPipeline
             material = new(Shader.Find("Hidden/Bloom")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public RenderTargetIdentifier Render(Camera camera, RenderTargetIdentifier input)
+        public RTHandle Render(Camera camera, RTHandle input)
         {
+            var bloomIds = ListPool<RTHandle>.Get();
+
+            // Need to queue up all the textures first
+            var mipCount = Mathf.Min(settings.MaxMips, (int)Mathf.Log(Mathf.Max(camera.pixelWidth, camera.pixelHeight), 2));
+            for (var i = 0; i < mipCount; i++)
+            {
+                var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
+                var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
+
+                var resultId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32);
+                bloomIds.Add(resultId);
+            }
+
             renderGraph.AddRenderPass((command, context) =>
             {
                 using var profilerScope = command.BeginScopedSample("Bloom");
-
-                var mipCount = Mathf.Min(settings.MaxMips, (int)Mathf.Log(Mathf.Max(camera.pixelWidth, camera.pixelHeight), 2));
 
                 // Downsample
                 for (var i = 0; i < mipCount; i++)
@@ -44,16 +56,13 @@ namespace Arycama.CustomRenderPipeline
                     }
                     else
                     {
-                        var inputId = bloomIds.GetProperty(i - 1);
+                        var inputId = bloomIds[i - 1];
                         command.SetGlobalTexture("_MainTex", inputId);
                     }
 
                     var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
                     var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
-                    var desc = new RenderTextureDescriptor(width, height, RenderTextureFormat.RGB111110Float) { enableRandomWrite = true };
-
-                    var resultId = bloomIds.GetProperty(i);
-                    command.GetTemporaryRT(resultId, desc);
+                    var resultId = bloomIds[i];
 
                     command.SetRenderTarget(resultId);
                     command.SetGlobalVector("_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
@@ -63,13 +72,13 @@ namespace Arycama.CustomRenderPipeline
                 // Upsample
                 for (var i = mipCount - 1; i > 0; i--)
                 {
-                    var inputId = bloomIds.GetProperty(i);
+                    var inputId = bloomIds[i];
                     command.SetGlobalFloat("_Strength", settings.Strength);
                     command.SetGlobalTexture("_MainTex", inputId);
 
                     if (i > 0)
                     {
-                        var resultId = bloomIds.GetProperty(i - 1);
+                        var resultId = bloomIds[i - 1];
                         command.SetRenderTarget(resultId);
                     }
                     else
@@ -82,14 +91,13 @@ namespace Arycama.CustomRenderPipeline
                     command.SetGlobalVector("_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
 
                     command.DrawProcedural(Matrix4x4.identity, material, 1, MeshTopology.Triangles, 3);
-
-                    // Don't release the final result as we pass it to the next pass
-                    if (i > 1)
-                        command.ReleaseTemporaryRT(inputId);
                 }
+
+                ListPool<RTHandle>.Release(bloomIds);
             });
 
-            return bloomIds.GetProperty(1);
+            var result = bloomIds[1];
+            return result;
         }
     }
 }

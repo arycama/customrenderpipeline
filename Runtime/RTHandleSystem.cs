@@ -34,7 +34,7 @@ public class RTHandleSystem
         {
             foreach(var handle in list)
             {
-                handle.Reset(maxWidth, maxHeight);
+                //handle.Reset(maxWidth, maxHeight);
             }
         }
     }
@@ -57,7 +57,7 @@ public class RTHandleSystem
             return rtHandle;
         }
 
-        return new RTHandle(width, height, format);
+        return new RTHandle(width, height, format, false, 0, TextureDimension.Tex2D);
     }
 
     public void ReleaseHandle(RTHandle handle)

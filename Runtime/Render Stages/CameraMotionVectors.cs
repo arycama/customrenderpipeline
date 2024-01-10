@@ -12,7 +12,7 @@ namespace Arycama.CustomRenderPipeline
             motionVectorsMaterial = new Material(Shader.Find("Hidden/Camera Motion Vectors")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public void Render(RenderTargetIdentifier motionVectors, RenderTargetIdentifier cameraDepth)
+        public void Render(RTHandle motionVectors, RTHandle cameraDepth)
         {
             renderGraph.AddRenderPass((command, context) =>
             {

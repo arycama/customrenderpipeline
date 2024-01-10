@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -25,24 +26,21 @@ namespace Arycama.CustomRenderPipeline
             this.lensSettings = lensSettings ?? throw new ArgumentNullException(nameof(lensSettings));
         }
 
-        public RenderTargetIdentifier Render(int width, int height, float fieldOfView, RenderTargetIdentifier color, RenderTargetIdentifier depth)
+        public RTHandle Render(int width, int height, float fieldOfView, RTHandle color, RTHandle depth)
         {
-            var tempId = Shader.PropertyToID("_DepthOfFieldResult");
+            var tempId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, true);
 
             renderGraph.AddRenderPass((command, context) =>
             {
                 var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
 
-                var desc = new RenderTextureDescriptor(width, height, RenderTextureFormat.RGB111110Float) { enableRandomWrite = true };
-                command.GetTemporaryRT(tempId, desc);
-
-                float sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
+                var sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
                 var focalLength = 0.5f * sensorSize / Mathf.Tan(fieldOfView * Mathf.Deg2Rad / 2.0f);
 
-                float F = focalLength;
-                float A = focalLength / lensSettings.Aperture;
-                float P = lensSettings.FocalDistance;
-                float maxCoC = (A * F) / Mathf.Max((P - F), 1e-6f);
+                var F = focalLength;
+                var A = focalLength / lensSettings.Aperture;
+                var P = lensSettings.FocalDistance;
+                var maxCoC = (A * F) / Mathf.Max((P - F), 1e-6f);
 
                 command.SetComputeFloatParam(computeShader, "_FocalDistance", lensSettings.FocalDistance);
                 command.SetComputeFloatParam(computeShader, "_FocalLength", focalLength);
