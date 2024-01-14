@@ -9,8 +9,8 @@ namespace Arycama.CustomRenderPipeline
     {
         public RenderGraphPass pass;
 
-        private List<Action<CommandBuffer>> preRender = new();
-        private List<Action<CommandBuffer>> postRender = new();
+        private readonly List<Action<CommandBuffer>> preRender = new();
+        private readonly List<Action<CommandBuffer>> postRender = new();
 
         public abstract void SetTexture(CommandBuffer command, string propertyName, Texture texture);
         public abstract void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer);
@@ -22,6 +22,16 @@ namespace Arycama.CustomRenderPipeline
         public void ReadTexture(string propertyName, RTHandle texture)
         {
             preRender.Add(cmd => SetTexture(cmd, propertyName, texture));
+        }
+
+        public void ReadBuffer(string propertyName, GraphicsBuffer buffer)
+        {
+            preRender.Add(cmd => SetBuffer(cmd, propertyName, buffer));
+        }
+
+        public void WriteBuffer(string propertyName, GraphicsBuffer buffer)
+        {
+            preRender.Add(cmd => SetBuffer(cmd, propertyName, buffer));
         }
 
         public void Run(CommandBuffer command, ScriptableRenderContext context)

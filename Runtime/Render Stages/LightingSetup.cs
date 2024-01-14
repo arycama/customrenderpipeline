@@ -11,23 +11,11 @@ namespace Arycama.CustomRenderPipeline
         private static readonly Plane[] frustumPlanes = new Plane[6];
 
         private readonly ShadowSettings settings;
-
-        private ComputeBuffer directionalLightBuffer; // Can't be readonly as we resize if needed.
-        private ComputeBuffer pointLightBuffer; // Can't be readonly as we resize if needed.
-        private ComputeBuffer directionalMatrixBuffer;
-        private ComputeBuffer directionalTexelSizeBuffer;
-        private ComputeBuffer pointTexelSizeBuffer;
-
-        private RenderTexture emptyArray, emptyCubemapArray;
+        private readonly RenderTexture emptyArray, emptyCubemapArray;
 
         public LightingSetup(ShadowSettings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
-            directionalLightBuffer = new ComputeBuffer(1, UnsafeUtility.SizeOf<DirectionalLightData>());
-            pointLightBuffer = new ComputeBuffer(1, UnsafeUtility.SizeOf<PointLightData>());
-            directionalMatrixBuffer = new ComputeBuffer(1, UnsafeUtility.SizeOf<Matrix4x4>());
-            directionalTexelSizeBuffer = new ComputeBuffer(1, UnsafeUtility.SizeOf<Vector4>());
-            pointTexelSizeBuffer = new ComputeBuffer(1, UnsafeUtility.SizeOf<Vector4>());
 
             emptyArray = new RenderTexture(1, 1, 0, RenderTextureFormat.Shadowmap)
             {
@@ -46,13 +34,8 @@ namespace Arycama.CustomRenderPipeline
 
         public void Release()
         {
-            directionalLightBuffer.Release();
-            pointLightBuffer.Release();
-            directionalMatrixBuffer.Release();
             emptyArray.Release();
             emptyCubemapArray.Release();
-            directionalTexelSizeBuffer.Release();
-            pointTexelSizeBuffer.Release();
         }
 
         public void Render(CullingResults cullingResults, Camera camera)
@@ -63,7 +46,6 @@ namespace Arycama.CustomRenderPipeline
             var directionalShadowTexelSizes = ListPool<Vector4>.Get();
             var pointLightList = ListPool<PointLightData>.Get();
             var pointShadowRequests = ListPool<ShadowRequest>.Get();
-            var pointShadowTexelSizes = ListPool<Vector4>.Get();
 
             var cameraProjectionMatrix = camera.projectionMatrix;
             camera.ResetProjectionMatrix();
@@ -217,20 +199,71 @@ namespace Arycama.CustomRenderPipeline
                     pointLightList.Add(pointLightData);
                 }
             }
-
             camera.projectionMatrix = cameraProjectionMatrix;
 
-            var directionalShadowsId = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D32_SFloat, false, directionalShadowRequests.Count, TextureDimension.Tex2DArray);
-            var pointShadowsId = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D32_SFloat, false, pointShadowRequests.Count * 6, TextureDimension.CubeArray);
+            // Directional lights
+            BufferHandle directionalLightBuffer = null;
+            if (directionalLightList.Count > 0)
+                directionalLightBuffer = renderGraph.GetBuffer(directionalLightList.Count, UnsafeUtility.SizeOf<DirectionalLightData>());
 
-            var pass = renderGraph.AddRenderPass<GenericRenderPass>();
-            pass.SetRenderFunction((command, context) =>
+            var pass0 = renderGraph.AddRenderPass<GlobalRenderPass>();
+            pass0.SetRenderFunction((command, context) =>
             {
-                // Render Shadows
-                command.SetGlobalDepthBias(settings.ShadowBias, settings.ShadowSlopeBias);
+                if (directionalLightList.Count > 0)
+                {
+                    command.SetBufferData(directionalLightBuffer, directionalLightList);
+                    command.SetGlobalBuffer("_DirectionalLights", directionalLightBuffer);
+                    command.SetGlobalInt("_DirectionalLightCount", directionalLightList.Count);
+                }
+                else
+                {
+                    command.SetGlobalInt("_DirectionalLightCount", 0);
+                }
 
+                ListPool<DirectionalLightData>.Release(directionalLightList);
+            });
+
+            // Point lights
+            BufferHandle pointLightBuffer;
+            if (pointLightList.Count > 0)
+                pointLightBuffer = renderGraph.GetBuffer(pointLightList.Count, UnsafeUtility.SizeOf<PointLightData>());
+            else 
+                pointLightBuffer = renderGraph.GetEmptyBuffer();
+
+            var pass1 = renderGraph.AddRenderPass<GlobalRenderPass>();
+            pass1.SetRenderFunction((command, context) =>
+            {
+                if (pointLightList.Count > 0)
+                    command.SetBufferData(pointLightBuffer, pointLightList);
+
+                command.SetGlobalBuffer("_PointLights", pointLightBuffer);
+                command.SetGlobalInt("_PointLightCount", pointLightList.Count);
+
+                ListPool<PointLightData>.Release(pointLightList);
+            });
+
+            RTHandle directionalShadowsId = null;
+            BufferHandle directionalMatrixBuffer, directionalTexelSizeBuffer;
+            if (directionalShadowRequests.Count > 0)
+            {
+                directionalShadowsId = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D32_SFloat, false, directionalShadowRequests.Count, TextureDimension.Tex2DArray);
+                directionalMatrixBuffer = renderGraph.GetBuffer(directionalShadowMatrices.Count, UnsafeUtility.SizeOf<Matrix4x4>());
+                directionalTexelSizeBuffer = renderGraph.GetBuffer(directionalShadowTexelSizes.Count, UnsafeUtility.SizeOf<Vector4>());
+            }
+            else
+            {
+                directionalMatrixBuffer = renderGraph.GetEmptyBuffer();
+                directionalTexelSizeBuffer = renderGraph.GetEmptyBuffer();
+            }
+
+            var pass2 = renderGraph.AddRenderPass<GlobalRenderPass>();
+            pass2.SetRenderFunction((command, context) =>
+            {
                 if (directionalShadowRequests.Count > 0)
                 {
+                    // Render Shadows
+                    command.SetGlobalDepthBias(settings.ShadowBias, settings.ShadowSlopeBias);
+
                     command.SetGlobalFloat("_ZClip", 0);
                     command.SetRenderTarget(directionalShadowsId, 0, CubemapFace.Unknown, -1);
                     command.ClearRenderTarget(true, false, Color.clear);
@@ -249,29 +282,39 @@ namespace Arycama.CustomRenderPipeline
                     }
 
                     command.SetGlobalFloat("_ZClip", 1);
+
+                    // Set directional light data
+                    command.SetGlobalTexture("_DirectionalShadows", directionalShadowsId);
+
+                    // Update directional shadow matrices
+                    command.SetBufferData(directionalMatrixBuffer, directionalShadowMatrices);
+
+                    // Update directional shadow texel sizes
+                    command.SetBufferData(directionalTexelSizeBuffer, directionalShadowTexelSizes);
+                }
+                else
+                {
+                    command.SetGlobalTexture("_DirectionalShadows", emptyArray);
                 }
 
-                // Set directional light data
-                command.ExpandAndSetComputeBufferData(ref directionalLightBuffer, directionalLightList);
-                command.SetGlobalBuffer("_DirectionalLights", directionalLightBuffer);
-                command.SetGlobalInt("_DirectionalLightCount", directionalLightList.Count);
-                ListPool<DirectionalLightData>.Release(directionalLightList);
-
-                command.SetGlobalTexture("_DirectionalShadows", directionalShadowRequests.Count > 0 ? directionalShadowsId : emptyArray);
-                ListPool<ShadowRequest>.Release(directionalShadowRequests);
-
-                // Update directional shadow matrices
-                command.ExpandAndSetComputeBufferData(ref directionalMatrixBuffer, directionalShadowMatrices);
                 command.SetGlobalBuffer("_DirectionalMatrices", directionalMatrixBuffer);
-                ListPool<Matrix4x4>.Release(directionalShadowMatrices);
-
-                // Update directional shadow texel sizes
-                command.ExpandAndSetComputeBufferData(ref directionalTexelSizeBuffer, directionalShadowTexelSizes);
-                command.SetBufferData(directionalTexelSizeBuffer, directionalShadowTexelSizes);
                 command.SetGlobalBuffer("_DirectionalShadowTexelSizes", directionalTexelSizeBuffer);
-                ListPool<Vector4>.Release(directionalShadowTexelSizes);
 
-                // Process point shadows 
+                ListPool<ShadowRequest>.Release(directionalShadowRequests);
+                ListPool<Vector4>.Release(directionalShadowTexelSizes);
+                ListPool<Matrix4x4>.Release(directionalShadowMatrices);
+            });
+
+            // Process point shadows 
+            RTHandle pointShadowsId = null;
+            if (pointShadowRequests.Count > 0)
+            {
+                pointShadowsId = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D32_SFloat, false, pointShadowRequests.Count * 6, TextureDimension.CubeArray);
+            }
+
+            var pass3 = renderGraph.AddRenderPass<GlobalRenderPass>();
+            pass3.SetRenderFunction((command, context) =>
+            {
                 if (pointShadowRequests.Count > 0)
                 {
                     command.SetRenderTarget(pointShadowsId, 0, CubemapFace.Unknown, -1);
@@ -292,30 +335,26 @@ namespace Arycama.CustomRenderPipeline
                         var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, shadowRequest.VisibleLightIndex) { splitData = shadowRequest.ShadowSplitData };
                         context.DrawShadows(ref shadowDrawingSettings);
                     }
+
+                    command.SetGlobalTexture("_PointShadows", pointShadowsId);
+
+                }
+                else
+                {
+                    command.SetGlobalTexture("_PointShadows", emptyCubemapArray);
                 }
 
                 command.SetGlobalDepthBias(0f, 0f);
-
-                // Set point light data
-                command.ExpandAndSetComputeBufferData(ref pointLightBuffer, pointLightList);
-                command.SetGlobalBuffer("_PointLights", pointLightBuffer);
-                command.SetGlobalInt("_PointLightCount", pointLightList.Count);
-                ListPool<PointLightData>.Release(pointLightList);
-
-                command.SetGlobalTexture("_PointShadows", pointShadowRequests.Count > 0 ? pointShadowsId : emptyCubemapArray);
-                ListPool<ShadowRequest>.Release(pointShadowRequests);
-
-                command.ExpandAndSetComputeBufferData(ref pointTexelSizeBuffer, pointShadowTexelSizes);
-                command.SetGlobalBuffer("_PointShadowTexelSizes", pointTexelSizeBuffer);
-
-                ListPool<Vector4>.Release(pointShadowTexelSizes);
 
                 command.SetGlobalInt("_PcfSamples", settings.PcfSamples);
                 command.SetGlobalFloat("_PcfRadius", settings.PcfRadius);
                 command.SetGlobalInt("_BlockerSamples", settings.BlockerSamples);
                 command.SetGlobalFloat("_BlockerRadius", settings.BlockerRadius);
                 command.SetGlobalFloat("_PcssSoftness", settings.PcssSoftness);
+
+                ListPool<ShadowRequest>.Release(pointShadowRequests);
             });
+
         }
     }
 }

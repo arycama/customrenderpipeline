@@ -5,8 +5,8 @@ namespace Arycama.CustomRenderPipeline
 {
     public class IndexedString
     {
-        private List<string> strings = new();
-        private string id;
+        private readonly List<string> strings = new();
+        private readonly string id;
 
         public IndexedString(string id)
         {

@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class GenericRenderPass : RenderPass
+    public class GlobalRenderPass : RenderPass
     {
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
         {

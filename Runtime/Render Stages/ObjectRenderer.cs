@@ -7,10 +7,10 @@ namespace Arycama.CustomRenderPipeline
     public class ObjectRenderer : RenderFeature
     {
         private RenderQueueRange renderQueueRange;
-        private SortingCriteria sortingCriteria;
-        private bool excludeObjectMotionVectors;
-        private PerObjectData perObjectData;
-        private string passName, profilerTag;
+        private readonly SortingCriteria sortingCriteria;
+        private readonly bool excludeObjectMotionVectors;
+        private readonly PerObjectData perObjectData;
+        private readonly string passName, profilerTag;
 
         public ObjectRenderer(RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria, bool excludeObjectMotionVectors, PerObjectData perObjectData, string passName, RenderGraph renderGraph) : base(renderGraph)
         {
@@ -25,7 +25,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(CullingResults cullingResults, Camera camera)
         {
-            var pass = renderGraph.AddRenderPass<GenericRenderPass>();
+            var pass = renderGraph.AddRenderPass<GlobalRenderPass>();
             pass.SetRenderFunction((command, context) =>
             {
                 using var profilerScope = command.BeginScopedSample(profilerTag);

@@ -6,8 +6,8 @@ namespace Arycama.CustomRenderPipeline
 {
     public class ComputeRenderPass : RenderPass
     {
-        private ComputeShader computeShader;
-        private int kernelIndex, xThreads, yThreads, zThreads;
+        private readonly ComputeShader computeShader;
+        private readonly int kernelIndex, xThreads, yThreads, zThreads;
 
         public ComputeRenderPass(ComputeShader computeShader, int kernelIndex, int xThreads, int yThreads = 1, int zThreads = 1)
         {
@@ -25,7 +25,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
         {
-            throw new NotImplementedException();
+            command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, buffer);
         }
 
         public override void SetVector(CommandBuffer command, string propertyName, Vector4 value)

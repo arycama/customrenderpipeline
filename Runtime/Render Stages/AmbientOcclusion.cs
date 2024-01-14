@@ -25,8 +25,8 @@ namespace Arycama.CustomRenderPipeline
             public int SampleCount => sampleCount;
         }
 
-        private Settings settings;
-        private Material material;
+        private readonly Settings settings;
+        private readonly Material material;
 
         public AmbientOcclusion(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {

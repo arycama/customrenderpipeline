@@ -17,8 +17,8 @@ namespace Arycama.CustomRenderPipeline
             public int SampleCount => sampleCount;
         }
 
-        private Settings settings;
-        private LensSettings lensSettings;
+        private readonly Settings settings;
+        private readonly LensSettings lensSettings;
 
         public DepthOfField(Settings settings, LensSettings lensSettings, RenderGraph renderGraph) : base(renderGraph)
         {

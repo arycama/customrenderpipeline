@@ -19,7 +19,7 @@ namespace Arycama.CustomRenderPipeline
             public float Damping => damping;
         }
 
-        private Settings settings;
+        private readonly Settings settings;
 
         public DynamicResolution(Settings settings)
         {

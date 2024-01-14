@@ -44,7 +44,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(RTHandle input, RTHandle bloom, bool isSceneView, int width, int height)
         {
-            var pass = renderGraph.AddRenderPass<FullscreenRenderPass>(new FullscreenRenderPass(material));
+            var pass = renderGraph.AddRenderPass(new FullscreenRenderPass(material));
 
             pass.ReadTexture("_MainTex", input);
             pass.ReadTexture("_Bloom", bloom);

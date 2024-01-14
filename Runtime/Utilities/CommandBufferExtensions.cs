@@ -18,22 +18,6 @@ namespace Arycama.CustomRenderPipeline
             commandBuffer.DispatchCompute(computeShader, kernelIndex, threadGroupsX, threadGroupsY, threadGroupsZ);
         }
 
-        public static void ExpandAndSetComputeBufferData<T>(this CommandBuffer command, ref ComputeBuffer computeBuffer, List<T> data, ComputeBufferType type = ComputeBufferType.Default) where T : struct
-        {
-            var size = Mathf.Max(data.Count, 1);
-
-            if (computeBuffer == null || computeBuffer.count < size)
-            {
-                if (computeBuffer != null)
-                    computeBuffer.Release();
-
-                var stride = UnsafeUtility.SizeOf<T>();
-                computeBuffer = new ComputeBuffer(size, stride, type);
-            }
-
-            command.SetBufferData(computeBuffer, data);
-        }
-
         public static CommandBufferProfilerScope BeginScopedSample(this CommandBuffer command, string name)
         {
             return new CommandBufferProfilerScope(command, name);

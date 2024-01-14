@@ -2,7 +2,6 @@
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -11,23 +10,23 @@ namespace Arycama.CustomRenderPipeline
 
     public class RenderGraph
     {
-        private List<RenderPass> actions = new();
-        private List<RTHandle> handlesToCreate = new();
-        private List<RTHandle> availableHandles = new();
-        private List<RTHandle> usedHandles = new();
+        private readonly List<RenderPass> actions = new();
 
-        readonly ObjectPool<MaterialPropertyBlock> propertyBlockPool = new(() => new MaterialPropertyBlock(), x => x.Clear());
+        // Maybe encapsulate these in a thing so it can also be used for buffers
+        private readonly List<RTHandle> rtHandlesToCreate = new();
+        private readonly List<RTHandle> availableRtHandles = new();
+        private readonly List<RTHandle> usedRtHandles = new();
+
+        private readonly List<BufferHandle> bufferHandlesToCreate = new();
+        private readonly List<BufferHandle> availableBufferHandles = new();
+        private readonly List<BufferHandle> usedBufferHandles = new();
 
         private bool isExecuting;
+        private GraphicsBuffer emptyBuffer;
 
-        public MaterialPropertyBlock GetPropertyBlock()
+        public RenderGraph()
         {
-            return propertyBlockPool.Get();
-        }
-
-        public void ReleasePropertyBlock(MaterialPropertyBlock propertyBlock)
-        {
-            propertyBlockPool.Release(propertyBlock);
+            emptyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int));
         }
 
         public T AddRenderPass<T>() where T : RenderPass, new()
@@ -46,12 +45,13 @@ namespace Arycama.CustomRenderPipeline
         public void Execute(CommandBuffer command, ScriptableRenderContext context)
         {
             // Create all RTs.
-            foreach (var handle in handlesToCreate)
-            {
-                handle.Create();
-            }
+            foreach (var rtHandle in rtHandlesToCreate)
+                rtHandle.Create();
+            rtHandlesToCreate.Clear();
 
-            handlesToCreate.Clear();
+            foreach (var bufferHandle in bufferHandlesToCreate)
+                bufferHandle.Create();
+            bufferHandlesToCreate.Clear();
 
             isExecuting = true;
             try
@@ -75,45 +75,90 @@ namespace Arycama.CustomRenderPipeline
             Assert.IsFalse(isExecuting);
 
             // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
-            for (var i = 0; i < availableHandles.Count; i++)
+            for (var i = 0; i < availableRtHandles.Count; i++)
             {
-                var handle = availableHandles[i];
+                var handle = availableRtHandles[i];
                 if (handle.Width == width && handle.Height == height && handle.Format == format && handle.EnableRandomWrite == enableRandomWrite && handle.VolumeDepth == volumeDepth && handle.Dimension == dimension)
                 {
-                    availableHandles.RemoveAt(i);
-                    usedHandles.Add(handle);
+                    availableRtHandles.RemoveAt(i);
+                    usedRtHandles.Add(handle);
                     return handle;
                 }
             }
 
             // If no handle was found, create a new one, and assign it as one to be created. 
             var result = new RTHandle(width, height, format, enableRandomWrite, volumeDepth, dimension);
-            handlesToCreate.Add(result);
-            usedHandles.Add(result);
+            rtHandlesToCreate.Add(result);
+            usedRtHandles.Add(result);
             return result;
         }
 
-        public void ReleaseRTHandles()
+        public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured)
+        {
+            Assert.IsTrue(count > 0);
+            Assert.IsTrue(stride > 0);
+
+            // Ensure we're not getting a texture during execution, this must be done in the setup
+            Assert.IsFalse(isExecuting);
+
+            // Find first matching buffer (TODO: Allow returning buffer smaller than required)
+            for (var i = 0; i < availableBufferHandles.Count; i++)
+            {
+                var handle = availableBufferHandles[i];
+                if (handle.Target == target && handle.Stride == stride && handle.Count >= count)
+                {
+                    handle.Size = count;
+                    availableBufferHandles.RemoveAt(i);
+                    usedBufferHandles.Add(handle);
+                    return handle;
+                }
+            }
+
+            // If no handle was found, create a new one, and assign it as one to be created. 
+            var result = new BufferHandle(target, count, stride);
+            result.Size = count;
+            bufferHandlesToCreate.Add(result);
+            usedBufferHandles.Add(result);
+            return result;
+        }
+
+        public GraphicsBuffer GetEmptyBuffer()
+        {
+            return emptyBuffer;
+        }
+
+        public void ReleaseHandles()
         {
             // Any handles that were not used this frame can be removed
-            foreach (var handle in availableHandles)
+            foreach (var handle in availableRtHandles)
                 handle.Release();
+            availableRtHandles.Clear();
 
-            availableHandles.Clear();
+            foreach (var bufferHandle in availableBufferHandles)
+                bufferHandle.Release();
+            availableBufferHandles.Clear();
 
-            // Mark all RTHandles as available for use again
-            foreach (var handle in usedHandles)
-                availableHandles.Add(handle);
+            // Mark all handles as available for use again
+            foreach (var handle in usedRtHandles)
+                availableRtHandles.Add(handle);
+            usedRtHandles.Clear();
 
-            usedHandles.Clear();
+            foreach (var handle in usedBufferHandles)
+                availableBufferHandles.Add(handle);
+            usedBufferHandles.Clear();
         }
 
         public void Release()
         {
-            foreach (var handle in availableHandles)
+            foreach (var handle in availableRtHandles)
                 handle.Release();
+            availableRtHandles.Clear();
 
-            availableHandles.Clear();
+            foreach(var bufferHandle in availableBufferHandles) 
+                bufferHandle.Release();
+            availableBufferHandles.Clear();
+
+            emptyBuffer.Release();
         }
     }
 }

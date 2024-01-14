@@ -37,7 +37,7 @@ public class RTHandle
         var isDepth = GraphicsFormatUtility.IsDepthFormat(Format);
         renderTexture = new RenderTexture(Width, Height, isDepth ? GraphicsFormat.None : Format, isDepth ? Format : GraphicsFormat.None) { enableRandomWrite = EnableRandomWrite };
 
-        if(VolumeDepth > 0)
+        if (VolumeDepth > 0)
         {
             renderTexture.dimension = Dimension;
             renderTexture.volumeDepth = VolumeDepth;
@@ -65,8 +65,9 @@ public class RTHandle
 
     public static implicit operator RTHandle(RenderTexture renderTexture)
     {
-        var result = new RTHandle(renderTexture.width, renderTexture.height, renderTexture.graphicsFormat, renderTexture.enableRandomWrite, renderTexture.volumeDepth, renderTexture.dimension);
-        result.renderTexture = renderTexture;
-        return result;
+        return new RTHandle(renderTexture.width, renderTexture.height, renderTexture.graphicsFormat, renderTexture.enableRandomWrite, renderTexture.volumeDepth, renderTexture.dimension)
+        {
+            renderTexture = renderTexture
+        };
     }
 }

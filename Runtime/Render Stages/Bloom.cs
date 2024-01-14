@@ -17,8 +17,8 @@ namespace Arycama.CustomRenderPipeline
             public int MaxMips => maxMips;
         }
 
-        private Settings settings;
-        private Material material;
+        private readonly Settings settings;
+        private readonly Material material;
 
         public Bloom(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {

@@ -5,9 +5,9 @@ namespace Arycama.CustomRenderPipeline
 {
     public class FullscreenRenderPass : RenderPass
     {
-        private MaterialPropertyBlock propertyBlock;
-        private Material material;
-        private int passIndex;
+        private readonly MaterialPropertyBlock propertyBlock;
+        private readonly Material material;
+        private readonly int passIndex;
 
         public FullscreenRenderPass(Material material, int passIndex = 0)
         {

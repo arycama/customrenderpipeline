@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 
 public class RTHandleSystem
 {
-    private Dictionary<GraphicsFormat, List<RTHandle>> formatHandles = new();
+    private readonly Dictionary<GraphicsFormat, List<RTHandle>> formatHandles = new();
 
     private int maxWidth, maxHeight;
 

@@ -24,9 +24,9 @@ namespace Arycama.CustomRenderPipeline
             public float MotionWeight => motionWeight;
         }
 
-        private Settings settings;
-        private CameraTextureCache textureCache = new();
-        private Material material;
+        private readonly Settings settings;
+        private readonly CameraTextureCache textureCache = new();
+        private readonly Material material;
 
         public TemporalAA(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
@@ -71,7 +71,7 @@ namespace Arycama.CustomRenderPipeline
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
             var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);
 
-            var pass = renderGraph.AddRenderPass<FullscreenRenderPass>(new FullscreenRenderPass(material));
+            var pass = renderGraph.AddRenderPass(new FullscreenRenderPass(material));
             pass.ReadTexture("_Input", input);
             pass.ReadTexture("_Motion", motion);
 

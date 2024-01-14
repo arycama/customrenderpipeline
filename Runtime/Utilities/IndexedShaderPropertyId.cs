@@ -6,8 +6,8 @@ namespace Arycama.CustomRenderPipeline
 {
     public class IndexedShaderPropertyId
     {
-        private List<int> properties = new();
-        private string id;
+        private readonly List<int> properties = new();
+        private readonly string id;
 
         public IndexedShaderPropertyId(string id)
         {
