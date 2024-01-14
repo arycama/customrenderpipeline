@@ -27,14 +27,14 @@ namespace Arycama.CustomRenderPipeline
         private Settings settings;
         private CameraTextureCache textureCache = new();
         private Material material;
-        private MaterialPropertyBlock propertyBlock;
 
         public TemporalAA(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Temporal AA")) { hideFlags = HideFlags.HideAndDontSave };
-            propertyBlock = new();
         }
+
+        public Vector2 Jitter { get; private set; }
 
         public void Release()
         {
@@ -63,7 +63,7 @@ namespace Arycama.CustomRenderPipeline
             matrix[1, 2] = 2.0f * jitter.y / scaledHeight;
             camera.projectionMatrix = matrix;
 
-            renderGraph.AddRenderPass((command, context) => command.SetGlobalVector("_Jitter", jitter));
+            Jitter = jitter;
         }
 
         public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
@@ -71,24 +71,23 @@ namespace Arycama.CustomRenderPipeline
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
             var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);
 
-            renderGraph.AddRenderPass((command, context) =>
+            var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            pass.ReadTexture("_Input", input);
+            pass.ReadTexture("_Motion", motion);
+
+            pass.SetRenderFunction((command, context) =>
             {
-                using var profilerScope = command.BeginScopedSample("Temporal AA");
+                pass.SetTexture(command, "_History", previous);
 
-                propertyBlock.SetFloat("_Sharpness", settings.Sharpness);
-                propertyBlock.SetFloat("_HasHistory", wasCreated ? 0f : 1f);
-
-                propertyBlock.SetFloat("_StationaryBlending", settings.StationaryBlending);
-                propertyBlock.SetFloat("_MotionBlending", settings.MotionBlending);
-                propertyBlock.SetFloat("_MotionWeight", settings.MotionWeight);
-                propertyBlock.SetFloat("_Scale", scale);
-
-                propertyBlock.SetTexture("_History", previous);
-                propertyBlock.SetTexture("_Input", input);
-                propertyBlock.SetTexture("_Motion", motion);
+                pass.SetFloat(command, "_Sharpness", settings.Sharpness);
+                pass.SetFloat(command, "_HasHistory", wasCreated ? 0f : 1f);
+                pass.SetFloat(command, "_StationaryBlending", settings.StationaryBlending);
+                pass.SetFloat(command, "_MotionBlending", settings.MotionBlending);
+                pass.SetFloat(command, "_MotionWeight", settings.MotionWeight);
+                pass.SetFloat(command, "_Scale", scale);
 
                 command.SetRenderTarget(current);
-                command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
+                command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, pass.GetPropertyBlock());
             });
 
             return current;

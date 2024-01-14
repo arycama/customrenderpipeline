@@ -71,7 +71,8 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.SetPixelData(exposurePixels, 0);
             exposureTexture.Apply(false, false);
 
-            renderGraph.AddRenderPass((command, context) =>
+            var builder = renderGraph.AddRenderPass<ComputeRenderPass>(new ComputeRenderPass(computeShader, 0));
+            builder.SetRenderFunction((command, context) =>
             {
                 command.SetComputeFloatParam(computeShader, "MinEv", settings.MinEv);
                 command.SetComputeFloatParam(computeShader, "MaxEv", settings.MaxEv);
@@ -90,7 +91,11 @@ namespace Arycama.CustomRenderPipeline
                 command.SetComputeVectorParam(computeShader, "_ExposureCompensationRemap", GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1));
 
                 command.DispatchNormalized(computeShader, 0, width, height, 1);
+            });
 
+            var builder1 = renderGraph.AddRenderPass<ComputeRenderPass>(new ComputeRenderPass(computeShader, 1));
+            builder1.SetRenderFunction((command, context) => 
+            {
                 command.SetComputeBufferParam(computeShader, 1, "LuminanceHistogram", histogram);
                 command.SetComputeBufferParam(computeShader, 1, "LuminanceOutput", output);
                 command.SetComputeTextureParam(computeShader, 1, "ExposureTexture", exposureTexture);

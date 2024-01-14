@@ -23,9 +23,10 @@ namespace Arycama.CustomRenderPipeline
             profilerTag = $"Render Objects ({passName})";
         }
 
-        public void Render(CullingResultsHandle cullingResults, Camera camera)
+        public void Render(CullingResults cullingResults, Camera camera)
         {
-            renderGraph.AddRenderPass((command, context) =>
+            var pass = renderGraph.AddRenderPass<GenericRenderPass>();
+            pass.SetRenderFunction((command, context) =>
             {
                 using var profilerScope = command.BeginScopedSample(profilerTag);
 

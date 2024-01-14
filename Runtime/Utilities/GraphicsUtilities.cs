@@ -17,6 +17,19 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
+        public static void SafeExpand(ref GraphicsBuffer computeBuffer, int size = 1, int stride = sizeof(int), GraphicsBuffer.Target type = GraphicsBuffer.Target.Structured)
+        {
+            size = Mathf.Max(size, 1);
+
+            if (computeBuffer == null || computeBuffer.count < size)
+            {
+                if (computeBuffer != null)
+                    computeBuffer.Release();
+
+                computeBuffer = new GraphicsBuffer(type, size, stride);
+            }
+        }
+
         public static Vector4 ThreadIdScaleOffset(int width, int height)
         {
             return new Vector4((float)(1.0 / width), (float)(1.0 / height), (float)(0.5 / width), (float)(0.5 / height));

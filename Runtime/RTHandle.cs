@@ -26,24 +26,24 @@ public class RTHandle
         EnableRandomWrite = enableRandomWrite;
         VolumeDepth = volumeDepth;
         Dimension = dimension;
+
+        renderTexture = null;
     }
 
     public void Create()
     {
         Assert.IsNull(renderTexture);
 
-        if (GraphicsFormatUtility.IsDepthFormat(Format))
-            renderTexture = new RenderTexture(Width, Height, GraphicsFormat.None, Format);
-        else
-        {
-            renderTexture = new RenderTexture(Width, Height, Format, GraphicsFormat.None) { enableRandomWrite = EnableRandomWrite };
+        var isDepth = GraphicsFormatUtility.IsDepthFormat(Format);
+        renderTexture = new RenderTexture(Width, Height, isDepth ? GraphicsFormat.None : Format, isDepth ? Format : GraphicsFormat.None) { enableRandomWrite = EnableRandomWrite };
 
-            if(VolumeDepth > 0)
-            {
-                renderTexture.dimension = Dimension;
-                renderTexture.volumeDepth = VolumeDepth;
-            }
+        if(VolumeDepth > 0)
+        {
+            renderTexture.dimension = Dimension;
+            renderTexture.volumeDepth = VolumeDepth;
         }
+
+        renderTexture.name = $"RTHandle {Dimension} {Format} {Width}x{Height} ";
 
         renderTexture.Create();
     }

@@ -28,12 +28,17 @@ namespace Arycama.CustomRenderPipeline
 
         public RTHandle Render(int width, int height, float fieldOfView, RTHandle color, RTHandle depth)
         {
+            var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
+
             var tempId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, true);
 
-            renderGraph.AddRenderPass((command, context) =>
-            {
-                var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
+            var pass = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 0));
+            pass.ReadTexture("_Input", color);
+            pass.ReadTexture("_Depth", depth);
+            pass.ReadTexture("_Result", tempId);
 
+            pass.SetRenderFunction((command, context) =>
+            {
                 var sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
                 var focalLength = 0.5f * sensorSize / Mathf.Tan(fieldOfView * Mathf.Deg2Rad / 2.0f);
 
@@ -42,19 +47,14 @@ namespace Arycama.CustomRenderPipeline
                 var P = lensSettings.FocalDistance;
                 var maxCoC = (A * F) / Mathf.Max((P - F), 1e-6f);
 
-                command.SetComputeFloatParam(computeShader, "_FocalDistance", lensSettings.FocalDistance);
-                command.SetComputeFloatParam(computeShader, "_FocalLength", focalLength);
-                command.SetComputeFloatParam(computeShader, "_ApertureSize", lensSettings.Aperture);
-                command.SetComputeFloatParam(computeShader, "_MaxCoC", maxCoC);
-                command.SetComputeFloatParam(computeShader, "_SensorHeight", lensSettings.SensorHeight / 1000f);
+                pass.SetFloat(command, "_FocalDistance", lensSettings.FocalDistance);
+                pass.SetFloat(command, "_FocalLength", focalLength);
+                pass.SetFloat(command, "_ApertureSize", lensSettings.Aperture);
+                pass.SetFloat(command, "_MaxCoC", maxCoC);
+                pass.SetFloat(command, "_SensorHeight", lensSettings.SensorHeight / 1000f);
 
-                command.SetComputeFloatParam(computeShader, "_SampleRadius", settings.SampleRadius);
-                command.SetComputeIntParam(computeShader, "_SampleCount", settings.SampleCount);
-
-                command.SetComputeTextureParam(computeShader, 0, "_Input", color);
-                command.SetComputeTextureParam(computeShader, 0, "_Depth", depth);
-                command.SetComputeTextureParam(computeShader, 0, "_Result", tempId);
-
+                pass.SetFloat(command, "_SampleRadius", settings.SampleRadius);
+                pass.SetInt(command, "_SampleCount", settings.SampleCount);
                 command.DispatchNormalized(computeShader, 0, width, height, 1);
             });
 

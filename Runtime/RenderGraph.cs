@@ -11,7 +11,7 @@ namespace Arycama.CustomRenderPipeline
 
     public class RenderGraph
     {
-        private List<RenderGraphPass> actions = new();
+        private List<RenderPass> actions = new();
         private List<RTHandle> handlesToCreate = new();
         private List<RTHandle> availableHandles = new();
         private List<RTHandle> usedHandles = new();
@@ -30,15 +30,17 @@ namespace Arycama.CustomRenderPipeline
             propertyBlockPool.Release(propertyBlock);
         }
 
-
-        public ScopedPropertyBlock GetScopedPropertyBlock()
+        public T AddRenderPass<T>() where T : RenderPass, new()
         {
-            return new ScopedPropertyBlock(this);
+            var builder = new T();
+            actions.Add(builder);
+            return builder;
         }
 
-        public void AddRenderPass(RenderGraphPass pass)
+        public T AddRenderPass<T>(T renderPass) where T : RenderPass
         {
-            actions.Add(pass);
+            actions.Add(renderPass);
+            return renderPass;
         }
 
         public void Execute(CommandBuffer command, ScriptableRenderContext context)
@@ -56,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 foreach (var action in actions)
                 {
-                    action(command, context);
+                    action.Execute(command, context);
                 }
             }
             finally
@@ -115,3 +117,4 @@ namespace Arycama.CustomRenderPipeline
         }
     }
 }
+

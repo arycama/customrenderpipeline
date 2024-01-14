@@ -54,7 +54,8 @@ namespace Arycama.CustomRenderPipeline
             var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
             var volumetricLightingId = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
 
-            renderGraph.AddRenderPass((command, context) =>
+            var builder = renderGraph.AddRenderPass<ComputeRenderPass>(new ComputeRenderPass(computeShader, 0));
+            builder.SetRenderFunction((command, context) =>
             {
                 using var profilerScope = command.BeginScopedSample("Volumetric Lighting");
 

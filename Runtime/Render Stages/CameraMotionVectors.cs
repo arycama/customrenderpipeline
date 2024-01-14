@@ -14,15 +14,15 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(RTHandle motionVectors, RTHandle cameraDepth)
         {
-            renderGraph.AddRenderPass((command, context) =>
-            {
-                using var propertyBlock = renderGraph.GetScopedPropertyBlock();
-                propertyBlock.SetTexture("_CameraDepth", cameraDepth);
+            var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            pass.ReadTexture("_CameraDepth", cameraDepth);
 
+            pass.SetRenderFunction((command, context) =>
+            {
                 using var profilerScope = command.BeginScopedSample("Camera Motion Vectors");
 
                 command.SetRenderTarget(new RenderTargetBinding(motionVectors, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, cameraDepth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store) { flags = RenderTargetFlags.ReadOnlyDepthStencil });
-                command.DrawProcedural(Matrix4x4.identity, motionVectorsMaterial, 0, MeshTopology.Triangles, 3, 1, propertyBlock);
+                command.DrawProcedural(Matrix4x4.identity, motionVectorsMaterial, 0, MeshTopology.Triangles, 3, 1, pass.GetPropertyBlock());
             });
         }
     }

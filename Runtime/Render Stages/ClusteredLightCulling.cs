@@ -20,8 +20,8 @@ namespace Arycama.CustomRenderPipeline
         }
 
         private Settings settings;
-        private ComputeBuffer counterBuffer;
-        private ComputeBuffer lightList;
+        private GraphicsBuffer counterBuffer;
+        private GraphicsBuffer lightList;
 
         private static readonly uint[] zeroArray = new uint[1] { 0 };
 
@@ -30,7 +30,7 @@ namespace Arycama.CustomRenderPipeline
         public ClusteredLightCulling(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
-            counterBuffer = new ComputeBuffer(1, sizeof(uint)) { name = nameof(counterBuffer) };
+            counterBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(uint)) { name = nameof(counterBuffer) };
         }
 
         public void Release()
@@ -48,7 +48,7 @@ namespace Arycama.CustomRenderPipeline
             var clusterHeight = DivRoundUp(scaledHeight, settings.TileSize);
             var clusterCount = clusterWidth * clusterHeight * settings.ClusterDepth;
 
-            GraphicsUtilities.SafeExpand(ref lightList, clusterCount * settings.MaxLightsPerTile, sizeof(int), ComputeBufferType.Default);
+            GraphicsUtilities.SafeExpand(ref lightList, clusterCount * settings.MaxLightsPerTile);
 
             var clusterScale = settings.ClusterDepth / Mathf.Log(camera.farClipPlane / camera.nearClipPlane, 2f);
             var clusterBias = -(settings.ClusterDepth * Mathf.Log(camera.nearClipPlane, 2f) / Mathf.Log(camera.farClipPlane / camera.nearClipPlane, 2f));
@@ -56,18 +56,16 @@ namespace Arycama.CustomRenderPipeline
             var computeShader = Resources.Load<ComputeShader>("ClusteredLightCulling");
             var lightClusterIndicesId = renderGraph.GetTexture(clusterWidth, clusterHeight, GraphicsFormat.R32G32_SInt, true, settings.ClusterDepth, TextureDimension.Tex3D);
 
-            renderGraph.AddRenderPass((command, context) =>
-            {
-                using var profilerScope = command.BeginScopedSample("Clustered Light Culling");
+            var pass = renderGraph.AddRenderPass<ComputeRenderPass>(new (computeShader, 0));
+            pass.ReadTexture("_LightClusterIndicesWrite", lightClusterIndicesId);
 
+            pass.SetRenderFunction((command, context) =>
+            {
                 command.SetBufferData(counterBuffer, zeroArray);
-                //command.SetComputeBufferParam(computeShader, 0, "_LightData", lightData);
                 command.SetComputeBufferParam(computeShader, 0, "_LightCounter", counterBuffer);
                 command.SetComputeBufferParam(computeShader, 0, "_LightClusterListWrite", lightList);
-                command.SetComputeTextureParam(computeShader, 0, "_LightClusterIndicesWrite", lightClusterIndicesId);
-                //command.SetComputeIntParam(computeShader, "_LightCount", lightData.Count);
-                command.SetComputeIntParam(computeShader, "_TileSize", settings.TileSize);
-                command.SetComputeFloatParam(computeShader, "_RcpClusterDepth", 1f / settings.ClusterDepth);
+                pass.SetInt(command, "_TileSize", settings.TileSize);
+                pass.SetFloat(command, "_RcpClusterDepth", 1f / settings.ClusterDepth);
                 command.DispatchNormalized(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
 
                 command.SetGlobalTexture("_LightClusterIndices", lightClusterIndicesId);
