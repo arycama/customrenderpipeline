@@ -32,7 +32,7 @@ namespace Arycama.CustomRenderPipeline
 
             var tempId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, true);
 
-            var pass = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 0));
+            var pass = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 0, width, height));
             pass.ReadTexture("_Input", color);
             pass.ReadTexture("_Depth", depth);
             pass.ReadTexture("_Result", tempId);
@@ -55,7 +55,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetFloat(command, "_SampleRadius", settings.SampleRadius);
                 pass.SetInt(command, "_SampleCount", settings.SampleCount);
-                command.DispatchNormalized(computeShader, 0, width, height, 1);
+                pass.Execute(command);
             });
 
             return tempId;

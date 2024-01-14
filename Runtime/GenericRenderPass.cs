@@ -11,12 +11,6 @@ namespace Arycama.CustomRenderPipeline
             command.SetGlobalTexture(propertyName, texture);
         }
 
-        public override void SetTexture(CommandBuffer command, string propertyName, RTHandle texture)
-        {
-            // Should also clean up on post render.. but 
-            command.SetGlobalTexture(propertyName, texture);
-        }
-
         public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
         {
             command.SetGlobalBuffer(propertyName, buffer);
@@ -35,6 +29,11 @@ namespace Arycama.CustomRenderPipeline
         public override void SetInt(CommandBuffer command, string propertyName, int value)
         {
             command.SetGlobalInt(propertyName, value);
+        }
+
+        public override void Execute(CommandBuffer command)
+        {
+            // Does nothing (Eventually could do a command.setglobalbuffer or something?)
         }
     }
 }

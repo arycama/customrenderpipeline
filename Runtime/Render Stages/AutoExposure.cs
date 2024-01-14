@@ -71,8 +71,8 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.SetPixelData(exposurePixels, 0);
             exposureTexture.Apply(false, false);
 
-            var builder = renderGraph.AddRenderPass<ComputeRenderPass>(new ComputeRenderPass(computeShader, 0));
-            builder.SetRenderFunction((command, context) =>
+            var pass0 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 0, width, height));
+            pass0.SetRenderFunction((command, context) =>
             {
                 command.SetComputeFloatParam(computeShader, "MinEv", settings.MinEv);
                 command.SetComputeFloatParam(computeShader, "MaxEv", settings.MaxEv);
@@ -90,16 +90,17 @@ namespace Arycama.CustomRenderPipeline
                 command.SetComputeTextureParam(computeShader, 0, "Input", input);
                 command.SetComputeVectorParam(computeShader, "_ExposureCompensationRemap", GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1));
 
-                command.DispatchNormalized(computeShader, 0, width, height, 1);
+                pass0.Execute(command);
             });
 
-            var builder1 = renderGraph.AddRenderPass<ComputeRenderPass>(new ComputeRenderPass(computeShader, 1));
-            builder1.SetRenderFunction((command, context) => 
+            var pass1 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 1, 1));
+            pass1.SetRenderFunction((command, context) => 
             {
                 command.SetComputeBufferParam(computeShader, 1, "LuminanceHistogram", histogram);
                 command.SetComputeBufferParam(computeShader, 1, "LuminanceOutput", output);
                 command.SetComputeTextureParam(computeShader, 1, "ExposureTexture", exposureTexture);
-                command.DispatchCompute(computeShader, 1, 1, 1, 1);
+
+                pass1.Execute(command);
 
                 command.CopyBuffer(output, exposureBuffer);
                 command.SetGlobalConstantBuffer(exposureBuffer, "Exposure", 0, sizeof(float) * 4);

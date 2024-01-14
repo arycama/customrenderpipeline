@@ -12,20 +12,19 @@ namespace Arycama.CustomRenderPipeline
         private List<Action<CommandBuffer>> preRender = new();
         private List<Action<CommandBuffer>> postRender = new();
 
-        // TODO: MIght be able to remove the 2nd texture thing?
         public abstract void SetTexture(CommandBuffer command, string propertyName, Texture texture);
-        public abstract void SetTexture(CommandBuffer command, string propertyName, RTHandle texture);
         public abstract void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer);
         public abstract void SetVector(CommandBuffer command, string propertyName, Vector4 value);
         public abstract void SetFloat(CommandBuffer command, string propertyName, float value);
         public abstract void SetInt(CommandBuffer command, string propertyName, int value);
+        public abstract void Execute(CommandBuffer command);
 
         public void ReadTexture(string propertyName, RTHandle texture)
         {
             preRender.Add(cmd => SetTexture(cmd, propertyName, texture));
         }
 
-        public void Execute(CommandBuffer command, ScriptableRenderContext context)
+        public void Run(CommandBuffer command, ScriptableRenderContext context)
         {
             foreach (var cmd in preRender)
                 cmd(command);

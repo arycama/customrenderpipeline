@@ -54,8 +54,8 @@ namespace Arycama.CustomRenderPipeline
             var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
             var volumetricLightingId = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
 
-            var builder = renderGraph.AddRenderPass<ComputeRenderPass>(new ComputeRenderPass(computeShader, 0));
-            builder.SetRenderFunction((command, context) =>
+            var pass0 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 0, width, height, depth));
+            pass0.SetRenderFunction((command, context) =>
             {
                 using var profilerScope = command.BeginScopedSample("Volumetric Lighting");
 
@@ -69,21 +69,33 @@ namespace Arycama.CustomRenderPipeline
 
                 command.SetComputeTextureParam(computeShader, 0, "_Input", volumetricLightingHistory);
                 command.SetComputeTextureParam(computeShader, 0, "_Result", volumetricLightingCurrent);
-                command.DispatchNormalized(computeShader, 0, width, height, depth);
+                pass0.Execute(command);
+            });
 
+            var pass1 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 1, width, height, depth));
+            pass1.SetRenderFunction((command, context) =>
+            {
                 // Filter X
                 command.SetComputeTextureParam(computeShader, 1, "_Input", volumetricLightingCurrent);
                 command.SetComputeTextureParam(computeShader, 1, "_Result", volumetricLightingId);
-                command.DispatchNormalized(computeShader, 1, width, height, depth);
+                pass1.Execute(command);
+            });
 
+            var pass2 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 2, width, height, depth));
+            pass2.SetRenderFunction((command, context) =>
+            {
                 // Filter Y
                 command.SetComputeTextureParam(computeShader, 2, "_Input", volumetricLightingId);
                 command.SetComputeTextureParam(computeShader, 2, "_Result", volumetricLightingHistory);
-                command.DispatchNormalized(computeShader, 2, width, height, depth);
+                pass2.Execute(command);
+            });
 
+            var pass3 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 3, width, height, depth));
+            pass3.SetRenderFunction((command, context) =>
+            {
                 command.SetComputeTextureParam(computeShader, 3, "_Input", volumetricLightingHistory);
                 command.SetComputeTextureParam(computeShader, 3, "_Result", volumetricLightingId);
-                command.DispatchNormalized(computeShader, 3, width, height, 1);
+                pass3.Execute(command);
                 command.SetGlobalTexture("_VolumetricLighting", volumetricLightingId);
             });
         }

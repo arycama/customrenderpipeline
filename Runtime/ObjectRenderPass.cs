@@ -11,12 +11,6 @@ namespace Arycama.CustomRenderPipeline
             //postRender.Add(cmd => cmd.SetGlobalTexture(propertyName, BuiltinRenderTextureType.None));
         }
 
-        public override void SetTexture(CommandBuffer command, string propertyName, RTHandle texture)
-        {
-            command.SetGlobalTexture(propertyName, texture);
-            //postRender.Add(cmd => cmd.SetGlobalTexture(propertyName, BuiltinRenderTextureType.None));
-        }
-
         public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
         {
             command.SetGlobalBuffer(propertyName, buffer);
@@ -39,6 +33,11 @@ namespace Arycama.CustomRenderPipeline
         {
             command.SetGlobalInt(propertyName, value);
             //postRender.Add(cmd => cmd.SetGlobalInt(propertyName, 0));
+        }
+
+        public override void Execute(CommandBuffer command)
+        {
+            // Do nothing for now, but maybe move ObjectRenderer.cs logic here
         }
     }
 }

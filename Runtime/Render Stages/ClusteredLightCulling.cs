@@ -56,7 +56,7 @@ namespace Arycama.CustomRenderPipeline
             var computeShader = Resources.Load<ComputeShader>("ClusteredLightCulling");
             var lightClusterIndicesId = renderGraph.GetTexture(clusterWidth, clusterHeight, GraphicsFormat.R32G32_SInt, true, settings.ClusterDepth, TextureDimension.Tex3D);
 
-            var pass = renderGraph.AddRenderPass<ComputeRenderPass>(new (computeShader, 0));
+            var pass = renderGraph.AddRenderPass<ComputeRenderPass>(new ComputeRenderPass(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth));
             pass.ReadTexture("_LightClusterIndicesWrite", lightClusterIndicesId);
 
             pass.SetRenderFunction((command, context) =>
@@ -66,8 +66,9 @@ namespace Arycama.CustomRenderPipeline
                 command.SetComputeBufferParam(computeShader, 0, "_LightClusterListWrite", lightList);
                 pass.SetInt(command, "_TileSize", settings.TileSize);
                 pass.SetFloat(command, "_RcpClusterDepth", 1f / settings.ClusterDepth);
-                command.DispatchNormalized(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
+                pass.Execute(command);
 
+                // TODO: Handle this with proper pass inputs/outputs
                 command.SetGlobalTexture("_LightClusterIndices", lightClusterIndicesId);
                 command.SetGlobalBuffer("_LightClusterList", lightList);
                 command.SetGlobalFloat("_ClusterScale", clusterScale);

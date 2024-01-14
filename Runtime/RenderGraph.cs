@@ -58,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 foreach (var action in actions)
                 {
-                    action.Execute(command, context);
+                    action.Run(command, context);
                 }
             }
             finally

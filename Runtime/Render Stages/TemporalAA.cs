@@ -71,14 +71,13 @@ namespace Arycama.CustomRenderPipeline
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
             var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);
 
-            var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            var pass = renderGraph.AddRenderPass<FullscreenRenderPass>(new FullscreenRenderPass(material));
             pass.ReadTexture("_Input", input);
             pass.ReadTexture("_Motion", motion);
 
             pass.SetRenderFunction((command, context) =>
             {
                 pass.SetTexture(command, "_History", previous);
-
                 pass.SetFloat(command, "_Sharpness", settings.Sharpness);
                 pass.SetFloat(command, "_HasHistory", wasCreated ? 0f : 1f);
                 pass.SetFloat(command, "_StationaryBlending", settings.StationaryBlending);
@@ -87,7 +86,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "_Scale", scale);
 
                 command.SetRenderTarget(current);
-                command.DrawProcedural(Matrix4x4.identity, material, 0, MeshTopology.Triangles, 3, 1, pass.GetPropertyBlock());
+                pass.Execute(command);
             });
 
             return current;

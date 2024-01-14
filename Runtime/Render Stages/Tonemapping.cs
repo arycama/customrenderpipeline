@@ -10,7 +10,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly Settings settings;
         private readonly Bloom.Settings bloomSettings;
         private readonly LensSettings lensSettings;
-        private readonly Material tonemappingMaterial;
+        private readonly Material material;
 
         [Serializable]
         public class Settings
@@ -39,12 +39,12 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
             this.bloomSettings = bloomSettings;
             this.lensSettings = lensSettings;
-            tonemappingMaterial = new Material(Shader.Find("Hidden/Tonemapping")) { hideFlags = HideFlags.HideAndDontSave };
+            material = new Material(Shader.Find("Hidden/Tonemapping")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
         public void Render(RTHandle input, RTHandle bloom, bool isSceneView, int width, int height)
         {
-            var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            var pass = renderGraph.AddRenderPass<FullscreenRenderPass>(new FullscreenRenderPass(material));
 
             pass.ReadTexture("_MainTex", input);
             pass.ReadTexture("_Bloom", bloom);
@@ -72,9 +72,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
                 pass.SetFloat(command, "Aperture", lensSettings.Aperture);
 
-                using var profilerScope = command.BeginScopedSample("Tonemapping");
                 command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
-                command.DrawProcedural(Matrix4x4.identity, tonemappingMaterial, 0, MeshTopology.Triangles, 3, 1, pass.GetPropertyBlock());
+                pass.Execute(command);
             });
         }
     }
