@@ -47,17 +47,13 @@ namespace Arycama.CustomRenderPipeline
             var pass0 = renderGraph.AddRenderPass(new FullscreenRenderPass(material, 0));
             pass0.ReadTexture("_CameraDepth", depth);
 
+            pass0.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass0.WriteTexture("", normals, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+            pass0.WriteTexture("", viewDepth, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+
             pass0.SetRenderFunction((command, context) =>
             {
                 pass0.SetVector(command, "ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
-
-                command.SetRenderTarget(new RenderTargetBinding(
-                    new[] { new RenderTargetIdentifier(normals), new RenderTargetIdentifier(viewDepth) },
-                    new[] { RenderBufferLoadAction.DontCare, RenderBufferLoadAction.DontCare },
-                    new[] { RenderBufferStoreAction.Store, RenderBufferStoreAction.Store },
-                    depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare)
-                { flags = RenderTargetFlags.ReadOnlyDepthStencil });
-
                 pass0.Execute(command);
             });
 
@@ -65,6 +61,8 @@ namespace Arycama.CustomRenderPipeline
             pass1.ReadTexture("_ViewDepth", viewDepth);
             pass1.ReadTexture("_ViewNormals", normals);
             pass1.ReadTexture("_CameraDepth", depth);
+            pass1.WriteTexture("", scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
+            pass1.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
 
             pass1.SetRenderFunction((command, context) =>
             {
@@ -80,8 +78,6 @@ namespace Arycama.CustomRenderPipeline
                 pass1.SetFloat(command, "_FalloffBias", settings.Falloff == 1f ? 1f : 1f / (1f - settings.Falloff));
                 pass1.SetInt(command, "_DirectionCount", settings.DirectionCount);
                 pass1.SetInt(command, "_SampleCount", settings.SampleCount);
-
-                command.SetRenderTarget(new RenderTargetBinding(scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare, depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.DontCare) { flags = RenderTargetFlags.ReadOnlyDepthStencil });
                 pass1.Execute(command);
             });
 

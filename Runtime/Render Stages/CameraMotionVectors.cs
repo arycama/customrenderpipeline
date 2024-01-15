@@ -17,12 +17,11 @@ namespace Arycama.CustomRenderPipeline
             var pass = renderGraph.AddRenderPass(new FullscreenRenderPass(material));
             pass.ReadTexture("_CameraDepth", cameraDepth);
 
+            pass.WriteTexture("", motionVectors, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
+            pass.WriteDepth("", cameraDepth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
+
             pass.SetRenderFunction((command, context) =>
             {
-                using var profilerScope = command.BeginScopedSample("Camera Motion Vectors");
-
-                command.SetRenderTarget(new RenderTargetBinding(motionVectors, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, cameraDepth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store) { flags = RenderTargetFlags.ReadOnlyDepthStencil });
-
                 pass.Execute(command);
             });
         }
