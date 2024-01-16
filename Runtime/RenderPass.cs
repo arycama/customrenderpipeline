@@ -5,29 +5,9 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public readonly struct RTHandleBindingData
-    {
-        public RTHandle Handle { get; }
-        public RenderBufferLoadAction LoadAction { get; }
-        public RenderBufferStoreAction StoreAction { get; }
-        public Color ClearColor { get; }
-        public float ClearDepth { get; }
-        public RenderTargetFlags Flags { get; }
-
-        public RTHandleBindingData(RTHandle handle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.DontCare, RenderBufferStoreAction storeAction = RenderBufferStoreAction.DontCare, Color clearColor = default, float clearDepth = 1.0f, RenderTargetFlags flags = RenderTargetFlags.None)
-        {
-            Handle = handle ?? throw new ArgumentNullException(nameof(handle));
-            LoadAction = loadAction;
-            StoreAction = storeAction;
-            ClearColor = clearColor;
-            ClearDepth = clearDepth;
-            Flags = flags;
-        }
-    }
-
     public abstract class RenderPass
     {
-        public RenderGraphPass pass;
+        protected RenderGraphBuilder renderGraphBuilder;
 
         private RTHandleBindingData depthBinding;
         private readonly List<RTHandleBindingData> colorBindings = new();
@@ -35,16 +15,14 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<(string, BufferHandle)> readBuffers = new();
         private readonly List<(string, BufferHandle)> writeBuffers = new();
 
+        public RenderGraph RenderGraph { get; set; }
+
         public abstract void SetTexture(CommandBuffer command, string propertyName, Texture texture);
         public abstract void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer);
         public abstract void SetVector(CommandBuffer command, string propertyName, Vector4 value);
         public abstract void SetFloat(CommandBuffer command, string propertyName, float value);
         public abstract void SetInt(CommandBuffer command, string propertyName, int value);
         public abstract void Execute(CommandBuffer command);
-
-        public void Clear()
-        {
-        }
 
         public void ReadTexture(string propertyName, RTHandle texture)
         {
@@ -143,15 +121,38 @@ namespace Arycama.CustomRenderPipeline
             depthBinding = default;
             colorBindings.Clear();
 
-            // For some things like a pass which simply sets/clears a texture this could be null
-            // TODO: Remove after object pass stuff is merged/tidied?
-            if (pass != null)
-                pass(command, context);
+            renderGraphBuilder.Execute(command, context);
+            RenderGraph.ReleaseRenderGraphBuilder(renderGraphBuilder);
+            renderGraphBuilder = null;
         }
 
-        public void SetRenderFunction(RenderGraphPass pass)
+        public T SetRenderFunction<T>(Action<CommandBuffer, ScriptableRenderContext, T> pass) where T : class, new()
         {
-            this.pass = pass;
+            var result = RenderGraph.GetRenderGraphBuilder<T>();
+            result.SetRenderFunction(pass);
+            renderGraphBuilder = result;
+            return result.Data;
         }
+    }
+}
+
+public abstract class RenderGraphBuilder
+{ 
+    public abstract void Execute(CommandBuffer command, ScriptableRenderContext context);
+}
+
+public class RenderGraphBuilder<T> : RenderGraphBuilder where T : class, new()
+{
+    public T Data { get; } = new();
+    private Action<CommandBuffer, ScriptableRenderContext, T> pass;
+
+    public void SetRenderFunction(Action<CommandBuffer, ScriptableRenderContext, T> pass)
+    {
+        this.pass = pass;
+    }
+
+    public override void Execute(CommandBuffer command, ScriptableRenderContext context)
+    {
+        pass.Invoke(command, context, Data);
     }
 }

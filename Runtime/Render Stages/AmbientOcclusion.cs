@@ -34,6 +34,10 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
+        class Pass0Data { }
+        class Pass1Data { }
+        class Pass2Data { }
+
         public void Render(Camera camera, RTHandle depth, RTHandle scene, float scale)
         {
             if (settings.Strength == 0.0f)
@@ -52,7 +56,7 @@ namespace Arycama.CustomRenderPipeline
             pass0.WriteTexture("", normals, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
             pass0.WriteTexture("", viewDepth, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
 
-            pass0.SetRenderFunction((command, context) =>
+            var data0 = pass0.SetRenderFunction<Pass0Data>((command, context, data) =>
             {
                 pass0.SetVector(command, "ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
                 pass0.Execute(command);
@@ -66,7 +70,7 @@ namespace Arycama.CustomRenderPipeline
             pass1.WriteTexture("", scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
             pass1.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
 
-            pass1.SetRenderFunction((command, context) =>
+            var data1 = pass1.SetRenderFunction<Pass1Data>((command, context, data) =>
             {
                 pass1.SetVector(command, "ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
                 var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
@@ -87,7 +91,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 var pass2 = renderGraph.AddRenderPass<FullscreenRenderPass>();
                 pass2.Initialize(material, 2);
-                pass2.SetRenderFunction((command, context) =>
+                var data2 = pass2.SetRenderFunction<Pass2Data>((command, context, data) =>
                 {
                     pass2.Execute(command);
                 });

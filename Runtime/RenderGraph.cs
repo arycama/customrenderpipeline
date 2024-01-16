@@ -7,11 +7,10 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public delegate void RenderGraphPass(CommandBuffer command, ScriptableRenderContext context);
-
     public class RenderGraph
     {
         private Dictionary<Type, Queue<RenderPass>> renderPassPool = new();
+        private Dictionary<Type, Queue<RenderGraphBuilder>> builderPool = new();
 
         private readonly List<RenderPass> renderPasses = new();
 
@@ -41,10 +40,34 @@ namespace Arycama.CustomRenderPipeline
             }
 
             if (!pool.TryDequeue(out var pass))
+            {
                 pass = new T();
+                pass.RenderGraph = this;
+            }
 
             renderPasses.Add(pass);
             return pass as T;
+        }
+
+        public RenderGraphBuilder<T> GetRenderGraphBuilder<T>() where T : class, new()
+        {
+            if (!builderPool.TryGetValue(typeof(RenderGraphBuilder<T>), out var pool))
+            {
+                pool = new Queue<RenderGraphBuilder>();
+                builderPool.Add(typeof(RenderGraphBuilder<T>), pool);
+            }
+
+            if (!pool.TryDequeue(out var pass))
+                pass = new RenderGraphBuilder<T>();
+
+            return pass as RenderGraphBuilder<T>;
+        }
+
+        public void ReleaseRenderGraphBuilder(RenderGraphBuilder builder)
+        {
+            var hasPool = builderPool.TryGetValue(builder.GetType(), out var pool);
+            Assert.IsTrue(hasPool, "Attempting to release a renderPass that was not created through GetPool");
+            pool.Enqueue(builder);
         }
 
         public void Execute(CommandBuffer command, ScriptableRenderContext context)
@@ -76,8 +99,6 @@ namespace Arycama.CustomRenderPipeline
             {
                 var hasPool = renderPassPool.TryGetValue(pass.GetType(), out var pool);
                 Assert.IsTrue(hasPool, "Attempting to release a renderPass that was not created through GetPool");
-
-                pass.Clear();
                 pool.Enqueue(pass);
             }
 

@@ -26,6 +26,10 @@ namespace Arycama.CustomRenderPipeline
             this.lensSettings = lensSettings ?? throw new ArgumentNullException(nameof(lensSettings));
         }
 
+        class PassData
+        {
+        }
+
         public RTHandle Render(int width, int height, float fieldOfView, RTHandle color, RTHandle depth)
         {
             var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
@@ -38,7 +42,7 @@ namespace Arycama.CustomRenderPipeline
             pass.ReadTexture("_Depth", depth);
             pass.ReadTexture("_Result", tempId);
 
-            pass.SetRenderFunction((command, context) =>
+            var data = pass.SetRenderFunction<PassData>((command, context, data) =>
             {
                 var sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
                 var focalLength = 0.5f * sensorSize / Mathf.Tan(fieldOfView * Mathf.Deg2Rad / 2.0f);

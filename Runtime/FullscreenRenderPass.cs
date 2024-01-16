@@ -22,6 +22,11 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
         {
+            if(texture == null)
+            {
+                Debug.Log(propertyName);
+            }
+
             propertyBlock.SetTexture(propertyName, texture);
         }
 

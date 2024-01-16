@@ -38,6 +38,11 @@ namespace Arycama.CustomRenderPipeline
             emptyCubemapArray.Release();
         }
 
+        class Pass0Data { }
+        class Pass1Data { }
+        class Pass2Data { }
+        class Pass3Data { }
+
         public void Render(CullingResults cullingResults, Camera camera)
         {
             var directionalLightList = ListPool<DirectionalLightData>.Get();
@@ -207,7 +212,7 @@ namespace Arycama.CustomRenderPipeline
                 directionalLightBuffer = renderGraph.GetBuffer(directionalLightList.Count, UnsafeUtility.SizeOf<DirectionalLightData>());
 
             var pass0 = renderGraph.AddRenderPass<GlobalRenderPass>();
-            pass0.SetRenderFunction((command, context) =>
+            var data0 = pass0.SetRenderFunction<Pass0Data>((command, context, data) =>
             {
                 if (directionalLightList.Count > 0)
                 {
@@ -227,11 +232,11 @@ namespace Arycama.CustomRenderPipeline
             BufferHandle pointLightBuffer;
             if (pointLightList.Count > 0)
                 pointLightBuffer = renderGraph.GetBuffer(pointLightList.Count, UnsafeUtility.SizeOf<PointLightData>());
-            else 
+            else
                 pointLightBuffer = renderGraph.GetEmptyBuffer();
 
             var pass1 = renderGraph.AddRenderPass<GlobalRenderPass>();
-            pass1.SetRenderFunction((command, context) =>
+            var data1 = pass1.SetRenderFunction<Pass1Data>((command, context, data) =>
             {
                 if (pointLightList.Count > 0)
                     command.SetBufferData(pointLightBuffer, pointLightList);
@@ -257,7 +262,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var pass2 = renderGraph.AddRenderPass<GlobalRenderPass>();
-            pass2.SetRenderFunction((command, context) =>
+            var data2 = pass2.SetRenderFunction<Pass2Data>((command, context, data) =>
             {
                 if (directionalShadowRequests.Count > 0)
                 {
@@ -313,7 +318,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var pass3 = renderGraph.AddRenderPass<GlobalRenderPass>();
-            pass3.SetRenderFunction((command, context) =>
+            var data3 = pass3.SetRenderFunction<Pass3Data>((command, context, data) =>
             {
                 if (pointShadowRequests.Count > 0)
                 {

@@ -32,7 +32,6 @@ namespace Arycama.CustomRenderPipeline
         private readonly GraphicsBuffer exposureBuffer;
 
         private readonly Texture2D exposureTexture;
-        private float[] exposurePixels;
 
         public AutoExposure(Settings settings, LensSettings lensSettings, RenderGraph renderGraph) : base(renderGraph)
         {
@@ -42,7 +41,7 @@ namespace Arycama.CustomRenderPipeline
 
             exposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 4, sizeof(float));
 
-            exposurePixels = new float[settings.ExposureResolution];
+            var exposurePixels = ArrayPool<float>.Get(settings.ExposureResolution);
             for (var i = 0; i < settings.ExposureResolution; i++)
             {
                 var uv = i / (settings.ExposureResolution - 1f);
@@ -53,12 +52,21 @@ namespace Arycama.CustomRenderPipeline
 
             exposureTexture = new Texture2D(settings.ExposureResolution, 1, TextureFormat.RFloat, false) { hideFlags = HideFlags.HideAndDontSave };
             exposureTexture.SetPixelData(exposurePixels, 0);
+            ArrayPool<float>.Release(exposurePixels);
             exposureTexture.Apply(false, false);
+        }
+
+        class Pass0Data
+        {
+        }
+
+        class Pass1Data
+        {
         }
 
         public void Render(RTHandle input, int width, int height)
         {
-            exposurePixels = new float[settings.ExposureResolution];
+            var exposurePixels = ArrayPool<float>.Get(settings.ExposureResolution);
             for (var i = 0; i < settings.ExposureResolution; i++)
             {
                 var uv = i / (settings.ExposureResolution - 1f);
@@ -67,6 +75,7 @@ namespace Arycama.CustomRenderPipeline
                 exposurePixels[i] = exposure;
             }
             exposureTexture.SetPixelData(exposurePixels, 0);
+            ArrayPool<float>.Release(exposurePixels);
             exposureTexture.Apply(false, false);
 
             var pass0 = renderGraph.AddRenderPass<ComputeRenderPass>();
@@ -76,7 +85,7 @@ namespace Arycama.CustomRenderPipeline
             var histogram = renderGraph.GetBuffer(256);
             pass0.WriteBuffer("LuminanceHistogram", histogram);
 
-            pass0.SetRenderFunction((command, context) =>
+            var data0 = pass0.SetRenderFunction<Pass0Data>((command, context, data) =>
             {
                 pass0.SetFloat(command, "MinEv", settings.MinEv);
                 pass0.SetFloat(command, "MaxEv", settings.MaxEv);
@@ -98,7 +107,7 @@ namespace Arycama.CustomRenderPipeline
             var output = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
             pass1.WriteBuffer("LuminanceOutput", output);
 
-            pass1.SetRenderFunction((command, context) =>
+            var data1 = pass1.SetRenderFunction<Pass1Data>((command, context, data) =>
             {
                 pass1.SetTexture(command, "ExposureTexture", exposureTexture);
                 pass1.Execute(command);

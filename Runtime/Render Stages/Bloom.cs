@@ -26,6 +26,9 @@ namespace Arycama.CustomRenderPipeline
             material = new(Shader.Find("Hidden/Bloom")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
+        class Pass0Data { }
+        class Pass1Data { }
+
         public RTHandle Render(Camera camera, RTHandle input)
         {
             var bloomIds = ListPool<RTHandle>.Get();
@@ -43,7 +46,7 @@ namespace Arycama.CustomRenderPipeline
 
             var pass0 = renderGraph.AddRenderPass<FullscreenRenderPass>();
             pass0.Initialize(material, 0);
-            pass0.SetRenderFunction((command, context) =>
+            var data0 = pass0.SetRenderFunction<Pass0Data>((command, context, data) =>
             {
                 // Downsample
                 for (var i = 0; i < mipCount; i++)
@@ -69,7 +72,7 @@ namespace Arycama.CustomRenderPipeline
 
             var pass1 = renderGraph.AddRenderPass<FullscreenRenderPass>();
             pass1.Initialize(material, 1);
-            pass1.SetRenderFunction((command, context) =>
+            var data1 = pass1.SetRenderFunction<Pass1Data>((command, context, data) =>
             {
                 // Upsample
                 for (var i = mipCount - 1; i > 0; i--)

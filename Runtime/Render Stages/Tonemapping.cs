@@ -42,6 +42,10 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Tonemapping")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
+        public class PassData
+        {
+        }
+
         public void Render(RTHandle input, RTHandle bloom, bool isSceneView, int width, int height)
         {
             var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
@@ -50,7 +54,7 @@ namespace Arycama.CustomRenderPipeline
             pass.ReadTexture("_MainTex", input);
             pass.ReadTexture("_Bloom", bloom);
 
-            pass.SetRenderFunction((command, context) =>
+            var data = pass.SetRenderFunction<PassData>((command, context, data) =>
             {
                 pass.SetTexture(command, "_GrainTexture", settings.FilmGrainTexture);
 

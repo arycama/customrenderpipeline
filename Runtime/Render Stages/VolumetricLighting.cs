@@ -34,6 +34,11 @@ namespace Arycama.CustomRenderPipeline
             volumetricLightingTextureCache.Dispose();
         }
 
+        class Pass0Data { }
+        class Pass1Data { }
+        class Pass2Data { }
+        class Pass3Data { }
+
         public void Render(int pixelWidth, int pixelHeight, float farClipPlane, Camera camera)
         {
             var scaledWidth = pixelWidth;
@@ -56,7 +61,7 @@ namespace Arycama.CustomRenderPipeline
 
             var pass0 = renderGraph.AddRenderPass<ComputeRenderPass>();
             pass0.Initialize(computeShader, 0, width, height, depth);
-            pass0.SetRenderFunction((command, context) =>
+            var data0 = pass0.SetRenderFunction<Pass0Data>((command, context, data) =>
             {
                 using var profilerScope = command.BeginScopedSample("Volumetric Lighting");
 
@@ -76,7 +81,7 @@ namespace Arycama.CustomRenderPipeline
             // Filter X
             var pass1 = renderGraph.AddRenderPass<ComputeRenderPass>();
             pass1.Initialize(computeShader, 1, width, height, depth);
-            pass1.SetRenderFunction((command, context) =>
+            var data1 = pass1.SetRenderFunction<Pass1Data>((command, context, data) =>
             {
                 pass1.SetTexture(command, "_Input", volumetricLightingCurrent);
                 pass1.SetTexture(command, "_Result", volumetricLightingId);
@@ -86,7 +91,7 @@ namespace Arycama.CustomRenderPipeline
             // Filter Y
             var pass2 = renderGraph.AddRenderPass<ComputeRenderPass>();
             pass2.Initialize(computeShader, 2, width, height, depth);
-            pass2.SetRenderFunction((command, context) =>
+            var data2 = pass2.SetRenderFunction<Pass2Data>((command, context, data) =>
             {
                 pass2.SetTexture(command, "_Input", volumetricLightingId);
                 pass2.SetTexture(command, "_Result", volumetricLightingHistory);
@@ -96,7 +101,7 @@ namespace Arycama.CustomRenderPipeline
             // Accumulate
             var pass3 = renderGraph.AddRenderPass<ComputeRenderPass>();
             pass3.Initialize(computeShader, 3, width, height, depth);
-            pass3.SetRenderFunction((command, context) =>
+            var data3 = pass3.SetRenderFunction<Pass3Data>((command, context, data) =>
             {
                 pass3.SetTexture(command, "_Input", volumetricLightingHistory);
                 pass3.SetTexture(command, "_Result", volumetricLightingId);
