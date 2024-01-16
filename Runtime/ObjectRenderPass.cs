@@ -1,10 +1,26 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.RendererUtils;
 
 namespace Arycama.CustomRenderPipeline
 {
     public class ObjectRenderPass : RenderPass
     {
+        private RendererList rendererList;
+
+        public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false)
+        {
+            var rendererListDesc = new RendererListDesc(new ShaderTagId(tag), cullingResults, camera)
+            {
+                renderQueueRange = renderQueueRange,
+                sortingCriteria = sortingCriteria,
+                excludeObjectMotionVectors = excludeMotionVectors,
+                rendererConfiguration = perObjectData
+            };
+
+            rendererList = context.CreateRendererList(rendererListDesc);
+        }
+
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
         {
             command.SetGlobalTexture(propertyName, texture);
@@ -37,7 +53,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void Execute(CommandBuffer command)
         {
-            // Do nothing for now, but maybe move ObjectRenderer.cs logic here
+            command.DrawRendererList(rendererList);
         }
     }
 }

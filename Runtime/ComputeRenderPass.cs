@@ -6,10 +6,10 @@ namespace Arycama.CustomRenderPipeline
 {
     public class ComputeRenderPass : RenderPass
     {
-        private readonly ComputeShader computeShader;
-        private readonly int kernelIndex, xThreads, yThreads, zThreads;
+        private ComputeShader computeShader;
+        private int kernelIndex, xThreads, yThreads, zThreads;
 
-        public ComputeRenderPass(ComputeShader computeShader, int kernelIndex, int xThreads, int yThreads = 1, int zThreads = 1)
+        public void Initialize(ComputeShader computeShader, int kernelIndex, int xThreads, int yThreads = 1, int zThreads = 1)
         {
             this.computeShader = computeShader ?? throw new ArgumentNullException(nameof(computeShader));
             this.kernelIndex = kernelIndex;

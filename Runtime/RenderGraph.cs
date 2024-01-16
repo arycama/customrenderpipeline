@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
@@ -10,7 +11,9 @@ namespace Arycama.CustomRenderPipeline
 
     public class RenderGraph
     {
-        private readonly List<RenderPass> actions = new();
+        private Dictionary<Type, Queue<RenderPass>> renderPassPool = new();
+
+        private readonly List<RenderPass> renderPasses = new();
 
         // Maybe encapsulate these in a thing so it can also be used for buffers
         private readonly List<RTHandle> rtHandlesToCreate = new();
@@ -31,15 +34,17 @@ namespace Arycama.CustomRenderPipeline
 
         public T AddRenderPass<T>() where T : RenderPass, new()
         {
-            var builder = new T();
-            actions.Add(builder);
-            return builder;
-        }
+            if (!renderPassPool.TryGetValue(typeof(T), out var pool))
+            {
+                pool = new Queue<RenderPass>();
+                renderPassPool.Add(typeof(T), pool);
+            }
 
-        public T AddRenderPass<T>(T renderPass) where T : RenderPass
-        {
-            actions.Add(renderPass);
-            return renderPass;
+            if (!pool.TryDequeue(out var pass))
+                pass = new T();
+
+            renderPasses.Add(pass);
+            return pass as T;
         }
 
         public void Execute(CommandBuffer command, ScriptableRenderContext context)
@@ -56,9 +61,9 @@ namespace Arycama.CustomRenderPipeline
             isExecuting = true;
             try
             {
-                foreach (var action in actions)
+                foreach (var renderPass in renderPasses)
                 {
-                    action.Run(command, context);
+                    renderPass.Run(command, context);
                 }
             }
             finally
@@ -66,7 +71,17 @@ namespace Arycama.CustomRenderPipeline
                 isExecuting = false;
             }
 
-            actions.Clear();
+            // Release all pooled passes
+            foreach(var pass in renderPasses)
+            {
+                var hasPool = renderPassPool.TryGetValue(pass.GetType(), out var pool);
+                Assert.IsTrue(hasPool, "Attempting to release a renderPass that was not created through GetPool");
+
+                pass.Clear();
+                pool.Enqueue(pass);
+            }
+
+            renderPasses.Clear();
         }
 
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D)
@@ -162,4 +177,3 @@ namespace Arycama.CustomRenderPipeline
         }
     }
 }
-

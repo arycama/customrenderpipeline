@@ -69,7 +69,8 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.SetPixelData(exposurePixels, 0);
             exposureTexture.Apply(false, false);
 
-            var pass0 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 0, width, height));
+            var pass0 = renderGraph.AddRenderPass<ComputeRenderPass>();
+            pass0.Initialize(computeShader, 0, width, height);
             pass0.ReadTexture("Input", input);
 
             var histogram = renderGraph.GetBuffer(256);
@@ -90,13 +91,14 @@ namespace Arycama.CustomRenderPipeline
                 pass0.Execute(command);
             });
 
-            var pass1 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 1, 1));
+            var pass1 = renderGraph.AddRenderPass<ComputeRenderPass>();
+            pass1.Initialize(computeShader, 1, 1);
             pass1.ReadBuffer("LuminanceHistogram", histogram);
 
             var output = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
             pass1.WriteBuffer("LuminanceOutput", output);
 
-            pass1.SetRenderFunction((command, context) => 
+            pass1.SetRenderFunction((command, context) =>
             {
                 pass1.SetTexture(command, "ExposureTexture", exposureTexture);
                 pass1.Execute(command);

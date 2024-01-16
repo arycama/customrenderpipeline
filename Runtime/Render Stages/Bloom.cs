@@ -41,7 +41,8 @@ namespace Arycama.CustomRenderPipeline
                 bloomIds.Add(resultId);
             }
 
-            var pass0 = renderGraph.AddRenderPass(new FullscreenRenderPass(material));
+            var pass0 = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            pass0.Initialize(material, 0);
             pass0.SetRenderFunction((command, context) =>
             {
                 // Downsample
@@ -66,7 +67,8 @@ namespace Arycama.CustomRenderPipeline
                 }
             });
 
-            var pass1 = renderGraph.AddRenderPass(new FullscreenRenderPass(material, 1));
+            var pass1 = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            pass1.Initialize(material, 1);
             pass1.SetRenderFunction((command, context) =>
             {
                 // Upsample

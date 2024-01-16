@@ -30,22 +30,20 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
         }
 
-        public void Render(Camera camera, float scale)
+        public void Render(int width, int height, float near, float far)
         {
-            var scaledWidth = (int)(camera.pixelWidth * scale);
-            var scaledHeight = (int)(camera.pixelHeight * scale);
-
-            var clusterWidth = DivRoundUp(scaledWidth, settings.TileSize);
-            var clusterHeight = DivRoundUp(scaledHeight, settings.TileSize);
+            var clusterWidth = DivRoundUp(width, settings.TileSize);
+            var clusterHeight = DivRoundUp(height, settings.TileSize);
             var clusterCount = clusterWidth * clusterHeight * settings.ClusterDepth;
 
-            var clusterScale = settings.ClusterDepth / Mathf.Log(camera.farClipPlane / camera.nearClipPlane, 2f);
-            var clusterBias = -(settings.ClusterDepth * Mathf.Log(camera.nearClipPlane, 2f) / Mathf.Log(camera.farClipPlane / camera.nearClipPlane, 2f));
+            var clusterScale = settings.ClusterDepth / Mathf.Log(far / near, 2f);
+            var clusterBias = -(settings.ClusterDepth * Mathf.Log(near, 2f) / Mathf.Log(far / near, 2f));
 
             var computeShader = Resources.Load<ComputeShader>("ClusteredLightCulling");
             var lightClusterIndicesId = renderGraph.GetTexture(clusterWidth, clusterHeight, GraphicsFormat.R32G32_SInt, true, settings.ClusterDepth, TextureDimension.Tex3D);
 
-            var pass = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth));
+            var pass = renderGraph.AddRenderPass<ComputeRenderPass>();
+            pass.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
             pass.ReadTexture("_LightClusterIndicesWrite", lightClusterIndicesId);
 
             var lightList = renderGraph.GetBuffer(clusterCount * settings.MaxLightsPerTile);

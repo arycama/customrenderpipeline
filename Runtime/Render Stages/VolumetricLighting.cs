@@ -34,10 +34,10 @@ namespace Arycama.CustomRenderPipeline
             volumetricLightingTextureCache.Dispose();
         }
 
-        public void Render(Camera camera, float scale)
+        public void Render(int pixelWidth, int pixelHeight, float farClipPlane, Camera camera)
         {
-            var scaledWidth = (int)(camera.pixelWidth * scale);
-            var scaledHeight = (int)(camera.pixelHeight * scale);
+            var scaledWidth = pixelWidth;
+            var scaledHeight = pixelHeight;
 
             var width = Mathf.CeilToInt(scaledWidth / (float)settings.TileSize);
             var height = Mathf.CeilToInt(scaledHeight / (float)settings.TileSize);
@@ -54,7 +54,8 @@ namespace Arycama.CustomRenderPipeline
             var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
             var volumetricLightingId = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
 
-            var pass0 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 0, width, height, depth));
+            var pass0 = renderGraph.AddRenderPass<ComputeRenderPass>();
+            pass0.Initialize(computeShader, 0, width, height, depth);
             pass0.SetRenderFunction((command, context) =>
             {
                 using var profilerScope = command.BeginScopedSample("Volumetric Lighting");
@@ -62,7 +63,7 @@ namespace Arycama.CustomRenderPipeline
                 command.SetGlobalFloat("_VolumeWidth", width);
                 command.SetGlobalFloat("_VolumeHeight", height);
                 command.SetGlobalFloat("_VolumeSlices", depth);
-                command.SetGlobalFloat("_VolumeDepth", camera.farClipPlane);
+                command.SetGlobalFloat("_VolumeDepth", farClipPlane);
                 command.SetGlobalFloat("_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
                 pass0.SetFloat(command, "_BlurSigma", settings.BlurSigma);
                 pass0.SetFloat(command, "_VolumeTileSize", settings.TileSize);
@@ -73,7 +74,8 @@ namespace Arycama.CustomRenderPipeline
             });
 
             // Filter X
-            var pass1 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 1, width, height, depth));
+            var pass1 = renderGraph.AddRenderPass<ComputeRenderPass>();
+            pass1.Initialize(computeShader, 1, width, height, depth);
             pass1.SetRenderFunction((command, context) =>
             {
                 pass1.SetTexture(command, "_Input", volumetricLightingCurrent);
@@ -82,7 +84,8 @@ namespace Arycama.CustomRenderPipeline
             });
 
             // Filter Y
-            var pass2 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 2, width, height, depth));
+            var pass2 = renderGraph.AddRenderPass<ComputeRenderPass>();
+            pass2.Initialize(computeShader, 2, width, height, depth);
             pass2.SetRenderFunction((command, context) =>
             {
                 pass2.SetTexture(command, "_Input", volumetricLightingId);
@@ -91,7 +94,8 @@ namespace Arycama.CustomRenderPipeline
             });
 
             // Accumulate
-            var pass3 = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 3, width, height, depth));
+            var pass3 = renderGraph.AddRenderPass<ComputeRenderPass>();
+            pass3.Initialize(computeShader, 3, width, height, depth);
             pass3.SetRenderFunction((command, context) =>
             {
                 pass3.SetTexture(command, "_Input", volumetricLightingHistory);

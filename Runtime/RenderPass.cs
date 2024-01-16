@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class RTHandleBindingData
+    public readonly struct RTHandleBindingData
     {
         public RTHandle Handle { get; }
         public RenderBufferLoadAction LoadAction { get; }
@@ -31,9 +31,9 @@ namespace Arycama.CustomRenderPipeline
 
         private RTHandleBindingData depthBinding;
         private readonly List<RTHandleBindingData> colorBindings = new();
-
-        private readonly List<Action<CommandBuffer>> preRender = new();
-        private readonly List<Action<CommandBuffer>> postRender = new();
+        private readonly List<(string, RTHandle)> readTextures = new();
+        private readonly List<(string, BufferHandle)> readBuffers = new();
+        private readonly List<(string, BufferHandle)> writeBuffers = new();
 
         public abstract void SetTexture(CommandBuffer command, string propertyName, Texture texture);
         public abstract void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer);
@@ -42,9 +42,13 @@ namespace Arycama.CustomRenderPipeline
         public abstract void SetInt(CommandBuffer command, string propertyName, int value);
         public abstract void Execute(CommandBuffer command);
 
+        public void Clear()
+        {
+        }
+
         public void ReadTexture(string propertyName, RTHandle texture)
         {
-            preRender.Add(cmd => SetTexture(cmd, propertyName, texture));
+            readTextures.Add((propertyName, texture));
         }
 
         public void WriteTexture(string propertyName, RTHandle handle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.DontCare, RenderBufferStoreAction storeAction = RenderBufferStoreAction.DontCare, Color clearColor = default)
@@ -57,29 +61,36 @@ namespace Arycama.CustomRenderPipeline
             depthBinding = new(handle, loadAction, storeAction, default, clearDepth, flags);
         }
 
-        public void ReadBuffer(string propertyName, GraphicsBuffer buffer)
+        public void ReadBuffer(string propertyName, BufferHandle buffer)
         {
-            preRender.Add(cmd => SetBuffer(cmd, propertyName, buffer));
+            readBuffers.Add((propertyName, buffer));
         }
 
-        public void WriteBuffer(string propertyName, GraphicsBuffer buffer)
+        public void WriteBuffer(string propertyName, BufferHandle buffer)
         {
-            preRender.Add(cmd => SetBuffer(cmd, propertyName, buffer));
+            writeBuffers.Add((propertyName, buffer));
         }
 
         public void Run(CommandBuffer command, ScriptableRenderContext context)
         {
-            foreach (var cmd in preRender)
-                cmd(command);
+            foreach (var texture in readTextures)
+                SetTexture(command, texture.Item1, texture.Item2);
+            readTextures.Clear();
 
-            preRender.Clear();
+            foreach (var buffer in readBuffers)
+                SetBuffer(command, buffer.Item1, buffer.Item2);
+            readBuffers.Clear();
+
+            foreach (var buffer in writeBuffers)
+                SetBuffer(command, buffer.Item1, buffer.Item2);
+            writeBuffers.Clear();
 
             // TODO: Can clear a depth and color target together
             var binding = new RenderTargetBinding();
-            if(depthBinding != null)
+            if (depthBinding.Handle != null)
             {
                 // Load action not supported outside of renderpass API, so emulate it here
-                if(depthBinding.LoadAction == RenderBufferLoadAction.Clear)
+                if (depthBinding.LoadAction == RenderBufferLoadAction.Clear)
                 {
                     command.SetRenderTarget(BuiltinRenderTextureType.None, depthBinding.Handle);
                     command.ClearRenderTarget(true, false, default, depthBinding.ClearDepth);
@@ -95,13 +106,13 @@ namespace Arycama.CustomRenderPipeline
                 binding.flags = depthBinding.Flags;
             }
 
-            if(colorBindings.Count > 0)
+            if (colorBindings.Count > 0)
             {
-                var targets =  new RenderTargetIdentifier[colorBindings.Count];
+                var targets = new RenderTargetIdentifier[colorBindings.Count];
                 var loadActions = new RenderBufferLoadAction[colorBindings.Count];
                 var storeActions = new RenderBufferStoreAction[colorBindings.Count];
 
-                for(var i = 0; i < colorBindings.Count; i++)
+                for (var i = 0; i < colorBindings.Count; i++)
                 {
                     var target = colorBindings[i];
 
@@ -126,22 +137,16 @@ namespace Arycama.CustomRenderPipeline
                 binding.colorStoreActions = storeActions;
             }
 
-            if(depthBinding != null || colorBindings.Count > 0)
-            {
+            if (depthBinding.Handle != null || colorBindings.Count > 0)
                 command.SetRenderTarget(binding);
-                depthBinding = null;
-                colorBindings.Clear();
-            }
+
+            depthBinding = default;
+            colorBindings.Clear();
 
             // For some things like a pass which simply sets/clears a texture this could be null
             // TODO: Remove after object pass stuff is merged/tidied?
-            if(pass != null)
+            if (pass != null)
                 pass(command, context);
-
-            foreach (var cmd in postRender)
-                cmd(command);
-
-            postRender.Clear();
         }
 
         public void SetRenderFunction(RenderGraphPass pass)

@@ -44,7 +44,8 @@ namespace Arycama.CustomRenderPipeline
             var normals = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.A2B10G10R10_UNormPack32);
             var viewDepth = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.R16_SFloat);
 
-            var pass0 = renderGraph.AddRenderPass(new FullscreenRenderPass(material, 0));
+            var pass0 = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            pass0.Initialize(material, 0);
             pass0.ReadTexture("_CameraDepth", depth);
 
             pass0.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
@@ -57,7 +58,8 @@ namespace Arycama.CustomRenderPipeline
                 pass0.Execute(command);
             });
 
-            var pass1 = renderGraph.AddRenderPass(new FullscreenRenderPass(material, 1));
+            var pass1 = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            pass1.Initialize(material, 1);
             pass1.ReadTexture("_ViewDepth", viewDepth);
             pass1.ReadTexture("_ViewNormals", normals);
             pass1.ReadTexture("_CameraDepth", depth);
@@ -83,7 +85,8 @@ namespace Arycama.CustomRenderPipeline
 
             if (RenderSettings.fog)
             {
-                var pass2 = renderGraph.AddRenderPass(new FullscreenRenderPass(material, 2));
+                var pass2 = renderGraph.AddRenderPass<FullscreenRenderPass>();
+                pass2.Initialize(material, 2);
                 pass2.SetRenderFunction((command, context) =>
                 {
                     pass2.Execute(command);

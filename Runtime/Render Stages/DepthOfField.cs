@@ -32,7 +32,8 @@ namespace Arycama.CustomRenderPipeline
 
             var tempId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, true);
 
-            var pass = renderGraph.AddRenderPass(new ComputeRenderPass(computeShader, 0, width, height));
+            var pass = renderGraph.AddRenderPass<ComputeRenderPass>();
+            pass.Initialize(computeShader, 0, width, height);
             pass.ReadTexture("_Input", color);
             pass.ReadTexture("_Depth", depth);
             pass.ReadTexture("_Result", tempId);
