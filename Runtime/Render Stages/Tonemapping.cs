@@ -42,41 +42,38 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Tonemapping")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public class PassData
-        {
-        }
-
         public void Render(RTHandle input, RTHandle bloom, bool isSceneView, int width, int height)
         {
-            var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
-            pass.Initialize(material);
+            using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            pass.RenderPass.Material = material;
+            pass.RenderPass.Index = 0;
 
-            pass.ReadTexture("_MainTex", input);
-            pass.ReadTexture("_Bloom", bloom);
-            pass.WriteScreen();
+            pass.RenderPass.ReadTexture("_MainTex", input);
+            pass.RenderPass.ReadTexture("_Bloom", bloom);
+            pass.RenderPass.WriteScreen();
 
-            var data = pass.SetRenderFunction<PassData>((command, context, data) =>
+            pass.RenderPass.SetRenderFunction((command, context) =>
             {
-                pass.SetTexture(command, "_GrainTexture", settings.FilmGrainTexture);
+                pass.RenderPass.SetTexture(command, "_GrainTexture", settings.FilmGrainTexture);
 
-                pass.SetFloat(command, "_BloomStrength", bloomSettings.Strength);
-                pass.SetFloat(command, "_IsSceneView", isSceneView ? 1f : 0f);
-                pass.SetFloat(command, "ToeStrength", settings.ToeStrength);
-                pass.SetFloat(command, "ToeLength", settings.ToeLength);
-                pass.SetFloat(command, "ShoulderStrength", settings.ShoulderStrength);
-                pass.SetFloat(command, "ShoulderLength", settings.ShoulderLength);
-                pass.SetFloat(command, "ShoulderAngle", settings.ShoulderAngle);
-                pass.SetFloat(command, "NoiseIntensity", settings.NoiseIntensity);
-                pass.SetFloat(command, "NoiseResponse", settings.NoiseResponse);
+                pass.RenderPass.SetFloat(command, "_BloomStrength", bloomSettings.Strength);
+                pass.RenderPass.SetFloat(command, "_IsSceneView", isSceneView ? 1f : 0f);
+                pass.RenderPass.SetFloat(command, "ToeStrength", settings.ToeStrength);
+                pass.RenderPass.SetFloat(command, "ToeLength", settings.ToeLength);
+                pass.RenderPass.SetFloat(command, "ShoulderStrength", settings.ShoulderStrength);
+                pass.RenderPass.SetFloat(command, "ShoulderLength", settings.ShoulderLength);
+                pass.RenderPass.SetFloat(command, "ShoulderAngle", settings.ShoulderAngle);
+                pass.RenderPass.SetFloat(command, "NoiseIntensity", settings.NoiseIntensity);
+                pass.RenderPass.SetFloat(command, "NoiseResponse", settings.NoiseResponse);
 
                 var offsetX = Random.value;
                 var offsetY = Random.value;
                 var uvScaleX = settings.FilmGrainTexture ? width / (float)settings.FilmGrainTexture.width : 1.0f;
                 var uvScaleY = settings.FilmGrainTexture ? height / (float)settings.FilmGrainTexture.height : 1.0f;
 
-                pass.SetVector(command, "_GrainTextureParams", new Vector4(uvScaleX, uvScaleY, offsetX, offsetY));
-                pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
-                pass.SetFloat(command, "Aperture", lensSettings.Aperture);
+                pass.RenderPass.SetVector(command, "_GrainTextureParams", new Vector4(uvScaleX, uvScaleY, offsetX, offsetY));
+                pass.RenderPass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
+                pass.RenderPass.SetFloat(command, "Aperture", lensSettings.Aperture);
             });
         }
     }

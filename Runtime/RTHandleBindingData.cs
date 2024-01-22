@@ -12,8 +12,9 @@ namespace Arycama.CustomRenderPipeline
         public Color ClearColor { get; }
         public float ClearDepth { get; }
         public RenderTargetFlags Flags { get; }
+        public int NameId { get; }
 
-        public RTHandleBindingData(RTHandle handle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.DontCare, RenderBufferStoreAction storeAction = RenderBufferStoreAction.DontCare, Color clearColor = default, float clearDepth = 1.0f, RenderTargetFlags flags = RenderTargetFlags.None)
+        public RTHandleBindingData(RTHandle handle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.DontCare, RenderBufferStoreAction storeAction = RenderBufferStoreAction.DontCare, Color clearColor = default, float clearDepth = 1.0f, RenderTargetFlags flags = RenderTargetFlags.None, int nameId = 0)
         {
             Handle = handle ?? throw new ArgumentNullException(nameof(handle));
             LoadAction = loadAction;
@@ -21,6 +22,7 @@ namespace Arycama.CustomRenderPipeline
             ClearColor = clearColor;
             ClearDepth = clearDepth;
             Flags = flags;
+            NameId = nameId;
         }
     }
 }

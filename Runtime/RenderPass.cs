@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Arycama.CustomRenderPipeline;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -9,9 +10,9 @@ namespace Arycama.CustomRenderPipeline
     {
         protected RenderGraphBuilder renderGraphBuilder;
 
-        private bool screenWrite;
-        private RTHandleBindingData depthBinding;
-        private readonly List<RTHandleBindingData> colorBindings = new();
+        protected bool screenWrite;
+        protected RTHandleBindingData depthBinding;
+        protected readonly List<RTHandleBindingData> colorBindings = new();
         private readonly List<(string, RTHandle)> readTextures = new();
         private readonly List<(string, BufferHandle)> readBuffers = new();
         private readonly List<(string, BufferHandle)> writeBuffers = new();
@@ -37,7 +38,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void WriteTexture(string propertyName, RTHandle handle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.DontCare, RenderBufferStoreAction storeAction = RenderBufferStoreAction.DontCare, Color clearColor = default)
         {
-            colorBindings.Add(new RTHandleBindingData(handle, loadAction, storeAction, clearColor));
+            colorBindings.Add(new RTHandleBindingData(handle, loadAction, storeAction, clearColor, nameId: Shader.PropertyToID(propertyName)));
         }
 
         public void WriteDepth(string propertyName, RTHandle handle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.DontCare, RenderBufferStoreAction storeAction = RenderBufferStoreAction.DontCare, float clearDepth = 1.0f, RenderTargetFlags flags = RenderTargetFlags.None)
@@ -69,6 +70,25 @@ namespace Arycama.CustomRenderPipeline
                 SetBuffer(command, buffer.Item1, buffer.Item2);
             writeBuffers.Clear();
 
+            SetupTargets(command);
+
+            if (renderGraphBuilder != null)
+            {
+                renderGraphBuilder.Execute(command, context);
+                renderGraphBuilder.ClearRenderFunction();
+            }
+
+            Execute(command);
+
+            if (renderGraphBuilder != null)
+            {
+                RenderGraph.ReleaseRenderGraphBuilder(renderGraphBuilder);
+                renderGraphBuilder = null;
+            }
+        }
+
+        protected virtual void SetupTargets(CommandBuffer command)
+        {
             // TODO: Can clear a depth and color target together
             var binding = new RenderTargetBinding();
             if (depthBinding.Handle != null)
@@ -88,6 +108,12 @@ namespace Arycama.CustomRenderPipeline
                 binding.depthRenderTarget = depthBinding.Handle;
                 binding.depthStoreAction = depthBinding.StoreAction;
                 binding.flags = depthBinding.Flags;
+            }
+            else
+            {
+                // Need to set binding.depthRenderTarget to BuiltinRenderTextureType.None or the pass won't work
+                binding.depthRenderTarget = BuiltinRenderTextureType.None;
+                binding.depthLoadAction = RenderBufferLoadAction.DontCare;
             }
 
             if (colorBindings.Count > 0)
@@ -128,28 +154,6 @@ namespace Arycama.CustomRenderPipeline
 
             depthBinding = default;
             colorBindings.Clear();
-
-            if (renderGraphBuilder != null)
-            {
-                renderGraphBuilder.Execute(command, context);
-                renderGraphBuilder.ClearRenderFunction();
-            }
-
-            Execute(command);
-
-            if (renderGraphBuilder != null)
-            {
-                RenderGraph.ReleaseRenderGraphBuilder(renderGraphBuilder);
-                renderGraphBuilder = null;
-            }
-        }
-
-        public T SetRenderFunction<T>(Action<CommandBuffer, ScriptableRenderContext, T> pass) where T : class, new()
-        {
-            var result = RenderGraph.GetRenderGraphBuilder<T>();
-            result.SetRenderFunction(pass);
-            renderGraphBuilder = result;
-            return result.Data;
         }
 
         public void SetRenderFunction(Action<CommandBuffer, ScriptableRenderContext> pass)
@@ -162,7 +166,7 @@ namespace Arycama.CustomRenderPipeline
 }
 
 public class RenderGraphBuilder
-{ 
+{
     private Action<CommandBuffer, ScriptableRenderContext> pass;
 
     public void SetRenderFunction(Action<CommandBuffer, ScriptableRenderContext> pass)
@@ -175,7 +179,7 @@ public class RenderGraphBuilder
         pass = null;
     }
 
-    public virtual void Execute(CommandBuffer command, ScriptableRenderContext context) 
+    public virtual void Execute(CommandBuffer command, ScriptableRenderContext context)
     {
         pass?.Invoke(command, context);
     }
@@ -199,5 +203,23 @@ public class RenderGraphBuilder<T> : RenderGraphBuilder where T : class, new()
     public override void Execute(CommandBuffer command, ScriptableRenderContext context)
     {
         pass?.Invoke(command, context, Data);
+    }
+}
+
+public struct ScopedRenderPass<T> : IDisposable where T : RenderPass, new()
+{
+    private readonly RenderGraph renderGraph;
+
+    public ScopedRenderPass(RenderGraph renderGraph, T renderPass)
+    {
+        this.renderGraph = renderGraph;
+        RenderPass = renderPass;
+    }
+
+    public T RenderPass { get; }
+
+    void IDisposable.Dispose()
+    {
+        renderGraph.AddRenderPassInternal(RenderPass);
     }
 }

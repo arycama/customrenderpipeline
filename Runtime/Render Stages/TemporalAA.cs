@@ -67,50 +67,29 @@ namespace Arycama.CustomRenderPipeline
             Jitter = jitter;
         }
 
-        public class PassData
-        {
-            public RenderTexture previous;
-            public float sharpness;
-            public float hasHistory;
-            public float stationaryBlending;
-            public float motionBlending;
-            public float motionWeight;
-            public float scale;
-            public RenderTexture current;
-            public FullscreenRenderPass pass;
-        }
-
         public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
         {
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
             var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);
 
-            var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
-            pass.Initialize(material);
-            pass.ReadTexture("_Input", input);
-            pass.ReadTexture("_Motion", motion);
+            using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            pass.RenderPass.Material = material;
+            pass.RenderPass.Index = 0;
 
-            var data = pass.SetRenderFunction<PassData>((command, context, data) =>
+            pass.RenderPass.ReadTexture("_Input", input);
+            pass.RenderPass.ReadTexture("_Motion", motion);
+            pass.RenderPass.ReadTexture("_History", previous);
+            pass.RenderPass.WriteTexture("", current, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
+
+            pass.RenderPass.SetRenderFunction((command, context) =>
             {
-                data.pass.SetTexture(command, "_History", data.previous);
-                data.pass.SetFloat(command, "_Sharpness", data.sharpness);
-                data.pass.SetFloat(command, "_HasHistory", data.hasHistory);
-                data.pass.SetFloat(command, "_StationaryBlending", data.stationaryBlending);
-                data.pass.SetFloat(command, "_MotionBlending", data.motionBlending);
-                data.pass.SetFloat(command, "_MotionWeight", data.motionWeight);
-                data.pass.SetFloat(command, "_Scale", data.scale);
-                command.SetRenderTarget(data.current);
+                pass.RenderPass.SetFloat(command, "_Sharpness", settings.Sharpness);
+                pass.RenderPass.SetFloat(command, "_HasHistory", wasCreated ? 0.0f : 1.0f);
+                pass.RenderPass.SetFloat(command, "_StationaryBlending", settings.StationaryBlending);
+                pass.RenderPass.SetFloat(command, "_MotionBlending", settings.MotionBlending);
+                pass.RenderPass.SetFloat(command, "_MotionWeight", settings.MotionWeight);
+                pass.RenderPass.SetFloat(command, "_Scale", scale);
             });
-
-            data.previous = previous;
-            data.sharpness = settings.Sharpness;
-            data.hasHistory = wasCreated ? 0.0f : 1.0f;
-            data.stationaryBlending = settings.StationaryBlending;
-            data.motionBlending = settings.MotionBlending;
-            data.motionWeight = settings.MotionWeight;
-            data.scale = scale;
-            data.current = current;
-            data.pass = pass;
 
             return current;
         }

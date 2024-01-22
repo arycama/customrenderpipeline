@@ -30,23 +30,6 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
         }
 
-        class PassData0
-        {
-            public ComputeRenderPass pass;
-            public BufferHandle counterBuffer;
-            public int tileSize;
-            public float rcpClusterDepth;
-        }
-
-        class PassData1
-        {
-            public int tileSize;
-            public RTHandle lightClusterIndices;
-            public BufferHandle lightList;
-            public float clusterScale;
-            public float clusterBias;
-        }
-
         public void Render(int width, int height, float near, float far)
         {
             var clusterWidth = DivRoundUp(width, settings.TileSize);
@@ -59,44 +42,37 @@ namespace Arycama.CustomRenderPipeline
             var computeShader = Resources.Load<ComputeShader>("ClusteredLightCulling");
             var lightClusterIndices = renderGraph.GetTexture(clusterWidth, clusterHeight, GraphicsFormat.R32G32_SInt, true, settings.ClusterDepth, TextureDimension.Tex3D);
 
-            var pass0 = renderGraph.AddRenderPass<ComputeRenderPass>();
-            pass0.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
-            pass0.ReadTexture("_LightClusterIndicesWrite", lightClusterIndices);
-
             var lightList = renderGraph.GetBuffer(clusterCount * settings.MaxLightsPerTile);
-            pass0.WriteBuffer("_LightClusterListWrite", lightList);
 
-            var counterBuffer = renderGraph.GetBuffer();
-            pass0.WriteBuffer("_LightCounter", counterBuffer);
-
-            var data0 = pass0.SetRenderFunction<PassData0>((command, context, data) =>
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                command.SetBufferData(data.counterBuffer, zeroArray);
-                data.pass.SetInt(command, "_TileSize", data.tileSize);
-                data.pass.SetFloat(command, "_RcpClusterDepth", data.rcpClusterDepth);
-            });
+                pass.RenderPass.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
+                pass.RenderPass.ReadTexture("_LightClusterIndicesWrite", lightClusterIndices);
+                pass.RenderPass.WriteBuffer("_LightClusterListWrite", lightList);
 
-            data0.pass = pass0;
-            data0.counterBuffer = counterBuffer;
-            data0.tileSize = settings.TileSize;
-            data0.rcpClusterDepth = 1.0f / settings.ClusterDepth;
-            
-            var pass1 = renderGraph.AddRenderPass<GlobalRenderPass>();
-            var data1 = pass1.SetRenderFunction<PassData1>((command, context, data) =>
+                var counterBuffer = renderGraph.GetBuffer();
+                pass.RenderPass.WriteBuffer("_LightCounter", counterBuffer);
+
+                pass.RenderPass.SetRenderFunction((command, context) =>
+                {
+                    command.SetBufferData(counterBuffer, zeroArray);
+                    pass.RenderPass.SetInt(command, "_TileSize", settings.TileSize);
+                    pass.RenderPass.SetFloat(command, "_RcpClusterDepth", 1.0f / settings.ClusterDepth);
+                });
+            }
+
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
             {
-                // TODO: Handle this with proper pass inputs/outputs
-                command.SetGlobalTexture("_LightClusterIndices", data.lightClusterIndices);
-                command.SetGlobalBuffer("_LightClusterList", data.lightList);
-                command.SetGlobalFloat("_ClusterScale", data.clusterScale);
-                command.SetGlobalFloat("_ClusterBias", data.clusterBias);
-                command.SetGlobalInt("_TileSize", data.tileSize);
-            });
-
-            data1.lightClusterIndices = lightClusterIndices;
-            data1.lightList = lightList;
-            data1.clusterScale = clusterScale;
-            data1.clusterBias = clusterBias;
-            data1.tileSize = settings.TileSize;
+                pass.RenderPass.SetRenderFunction((command, context) =>
+                {
+                    // TODO: Handle this with proper pass inputs/outputs
+                    command.SetGlobalTexture("_LightClusterIndices", lightClusterIndices);
+                    command.SetGlobalBuffer("_LightClusterList", lightList);
+                    command.SetGlobalFloat("_ClusterScale", clusterScale);
+                    command.SetGlobalFloat("_ClusterBias", clusterBias);
+                    command.SetGlobalInt("_TileSize", settings.TileSize);
+                });
+            }
         }
     }
 }

@@ -47,5 +47,13 @@ namespace Arycama.CustomRenderPipeline
         {
             command.DispatchNormalized(computeShader, kernelIndex, xThreads, yThreads, zThreads);
         }
+
+        protected override void SetupTargets(CommandBuffer command)
+        {
+            for (var i = 0; i < colorBindings.Count; i++)
+            {
+                command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].NameId, colorBindings[i].Handle);
+            }
+        }
     }
 }

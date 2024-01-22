@@ -35,12 +35,7 @@ namespace Arycama.CustomRenderPipeline
             volumetricLightingTextureCache.Dispose();
         }
 
-        class Pass0Data { }
-        class Pass1Data { }
-        class Pass2Data { }
-        class Pass3Data { }
-
-        public void Render(int pixelWidth, int pixelHeight, float farClipPlane, Camera camera)
+        public RTHandle Render(int pixelWidth, int pixelHeight, float farClipPlane, Camera camera)
         {
             var scaledWidth = pixelWidth;
             var scaledHeight = pixelHeight;
@@ -58,56 +53,63 @@ namespace Arycama.CustomRenderPipeline
             volumetricLightingTextureCache.GetTexture(camera, volumetricLightingDescriptor, out var volumetricLightingCurrent, out var volumetricLightingHistory);
 
             var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
-            var volumetricLightingId = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
+            var volumetricLighting = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
 
-            var pass0 = renderGraph.AddRenderPass<ComputeRenderPass>();
-            pass0.Initialize(computeShader, 0, width, height, depth);
-            var data0 = pass0.SetRenderFunction<Pass0Data>((command, context, data) =>
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                command.SetGlobalFloat("_VolumeWidth", width);
-                command.SetGlobalFloat("_VolumeHeight", height);
-                command.SetGlobalFloat("_VolumeSlices", depth);
-                command.SetGlobalFloat("_VolumeDepth", farClipPlane);
-                command.SetGlobalFloat("_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
-                pass0.SetFloat(command, "_BlurSigma", settings.BlurSigma);
-                pass0.SetFloat(command, "_VolumeTileSize", settings.TileSize);
+                pass.RenderPass.Initialize(computeShader, 0, width, height, depth);
+                pass.RenderPass.ReadTexture("_Input", volumetricLightingHistory);
+                pass.RenderPass.WriteTexture("_Result", volumetricLightingCurrent);
 
-                pass0.SetTexture(command, "_Input", volumetricLightingHistory);
-                pass0.SetTexture(command, "_Result", volumetricLightingCurrent);
-            });
+                pass.RenderPass.SetRenderFunction((command, context) =>
+                {
+                    pass.RenderPass.SetFloat(command, "_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
+                    pass.RenderPass.SetFloat(command, "_VolumeWidth", width);
+                    pass.RenderPass.SetFloat(command, "_VolumeHeight", height);
+                    pass.RenderPass.SetFloat(command, "_VolumeSlices", depth);
+                    pass.RenderPass.SetFloat(command, "_VolumeDepth", farClipPlane);
+                    pass.RenderPass.SetFloat(command, "_BlurSigma", settings.BlurSigma);
+                    pass.RenderPass.SetFloat(command, "_VolumeTileSize", settings.TileSize);
+                });
+            }
 
             // Filter X
-            var pass1 = renderGraph.AddRenderPass<ComputeRenderPass>();
-            pass1.Initialize(computeShader, 1, width, height, depth);
-            var data1 = pass1.SetRenderFunction<Pass1Data>((command, context, data) =>
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                pass1.SetTexture(command, "_Input", volumetricLightingCurrent);
-                pass1.SetTexture(command, "_Result", volumetricLightingId);
-            });
+                pass.RenderPass.Initialize(computeShader, 1, width, height, depth);
+                pass.RenderPass.ReadTexture("_Input", volumetricLightingCurrent);
+                pass.RenderPass.WriteTexture("_Result", volumetricLighting);
+            }
 
             // Filter Y
-            var pass2 = renderGraph.AddRenderPass<ComputeRenderPass>();
-            pass2.Initialize(computeShader, 2, width, height, depth);
-            var data2 = pass2.SetRenderFunction<Pass2Data>((command, context, data) =>
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                pass2.SetTexture(command, "_Input", volumetricLightingId);
-                pass2.SetTexture(command, "_Result", volumetricLightingHistory);
-            });
+                pass.RenderPass.Initialize(computeShader, 2, width, height, depth);
+                pass.RenderPass.ReadTexture("_Input", volumetricLighting);
+                pass.RenderPass.WriteTexture("_Result", volumetricLightingHistory);
+            }
 
             // Accumulate
-            var pass3 = renderGraph.AddRenderPass<ComputeRenderPass>();
-            pass3.Initialize(computeShader, 3, width, height, depth);
-            var data3 = pass3.SetRenderFunction<Pass3Data>((command, context, data) =>
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                pass3.SetTexture(command, "_Input", volumetricLightingHistory);
-                pass3.SetTexture(command, "_Result", volumetricLightingId);
-            });
+                pass.RenderPass.Initialize(computeShader, 3, width, height, depth);
+                pass.RenderPass.ReadTexture("_Input", volumetricLightingHistory);
+                pass.RenderPass.WriteTexture("_Result", volumetricLighting);
+            }
 
-            var pass4 = renderGraph.AddRenderPass<GlobalRenderPass>();
-            pass4.SetRenderFunction((command, context) =>
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
             {
-                command.SetGlobalTexture("_VolumetricLighting", volumetricLightingId);
-            });
+                pass.RenderPass.SetRenderFunction((command, context) =>
+                {
+                    command.SetGlobalFloat("_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
+                    command.SetGlobalFloat("_VolumeWidth", width);
+                    command.SetGlobalFloat("_VolumeHeight", height);
+                    command.SetGlobalFloat("_VolumeSlices", depth);
+                    command.SetGlobalFloat("_VolumeDepth", farClipPlane);
+                });
+            }
+
+            return volumetricLighting;
         }
     }
 }

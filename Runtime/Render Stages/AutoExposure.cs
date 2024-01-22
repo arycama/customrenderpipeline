@@ -56,14 +56,6 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.Apply(false, false);
         }
 
-        class Pass0Data
-        {
-        }
-
-        class Pass1Data
-        {
-        }
-
         public void Render(RTHandle input, int width, int height)
         {
             var exposurePixels = ArrayPool<float>.Get(settings.ExposureResolution);
@@ -78,45 +70,51 @@ namespace Arycama.CustomRenderPipeline
             ArrayPool<float>.Release(exposurePixels);
             exposureTexture.Apply(false, false);
 
-            var pass0 = renderGraph.AddRenderPass<ComputeRenderPass>();
-            pass0.Initialize(computeShader, 0, width, height);
-            pass0.ReadTexture("Input", input);
-
             var histogram = renderGraph.GetBuffer(256);
-            pass0.WriteBuffer("LuminanceHistogram", histogram);
 
-            var data0 = pass0.SetRenderFunction<Pass0Data>((command, context, data) =>
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                pass0.SetFloat(command, "MinEv", settings.MinEv);
-                pass0.SetFloat(command, "MaxEv", settings.MaxEv);
-                pass0.SetFloat(command, "AdaptationSpeed", settings.AdaptationSpeed);
-                pass0.SetFloat(command, "ExposureCompensation", settings.ExposureCompensation);
-                pass0.SetFloat(command, "Iso", lensSettings.Iso);
-                pass0.SetFloat(command, "Aperture", lensSettings.Aperture);
-                pass0.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
-                pass0.SetFloat(command, "HistogramMin", settings.HistogramPercentages.x);
-                pass0.SetFloat(command, "HistogramMax", settings.HistogramPercentages.y);
-                pass0.SetVector(command, "_ExposureCompensationRemap", GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1));
-            });
+                pass.RenderPass.Initialize(computeShader, 0, width, height);
+                pass.RenderPass.ReadTexture("Input", input);
+                pass.RenderPass.WriteBuffer("LuminanceHistogram", histogram);
 
-            var pass1 = renderGraph.AddRenderPass<ComputeRenderPass>();
-            pass1.Initialize(computeShader, 1, 1);
-            pass1.ReadBuffer("LuminanceHistogram", histogram);
+                pass.RenderPass.SetRenderFunction((command, context) =>
+                {
+                    pass.RenderPass.SetFloat(command, "MinEv", settings.MinEv);
+                    pass.RenderPass.SetFloat(command, "MaxEv", settings.MaxEv);
+                    pass.RenderPass.SetFloat(command, "AdaptationSpeed", settings.AdaptationSpeed);
+                    pass.RenderPass.SetFloat(command, "ExposureCompensation", settings.ExposureCompensation);
+                    pass.RenderPass.SetFloat(command, "Iso", lensSettings.Iso);
+                    pass.RenderPass.SetFloat(command, "Aperture", lensSettings.Aperture);
+                    pass.RenderPass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
+                    pass.RenderPass.SetFloat(command, "HistogramMin", settings.HistogramPercentages.x);
+                    pass.RenderPass.SetFloat(command, "HistogramMax", settings.HistogramPercentages.y);
+                    pass.RenderPass.SetVector(command, "_ExposureCompensationRemap", GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1));
+                });
+            }
 
             var output = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
-            pass1.WriteBuffer("LuminanceOutput", output);
 
-            var data1 = pass1.SetRenderFunction<Pass1Data>((command, context, data) =>
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                pass1.SetTexture(command, "ExposureTexture", exposureTexture);
-            });
+                pass.RenderPass.Initialize(computeShader, 1, 1);
+                pass.RenderPass.ReadBuffer("LuminanceHistogram", histogram);
+                pass.RenderPass.WriteBuffer("LuminanceOutput", output);
 
-            var pass2 = renderGraph.AddRenderPass<GlobalRenderPass>();
-            pass2.SetRenderFunction((command, context) =>
+                pass.RenderPass.SetRenderFunction((command, context) =>
+                {
+                    pass.RenderPass.SetTexture(command, "ExposureTexture", exposureTexture);
+                });
+            }
+
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
             {
-                command.CopyBuffer(output, exposureBuffer);
-                command.SetGlobalConstantBuffer(exposureBuffer, "Exposure", 0, sizeof(float) * 4);
-            });
+                pass.RenderPass.SetRenderFunction((command, context) =>
+                {
+                    command.CopyBuffer(output, exposureBuffer);
+                    command.SetGlobalConstantBuffer(exposureBuffer, "Exposure", 0, sizeof(float) * 4);
+                });
+            }
         }
     }
 }

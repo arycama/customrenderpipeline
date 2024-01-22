@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
+using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -26,9 +27,6 @@ namespace Arycama.CustomRenderPipeline
             material = new(Shader.Find("Hidden/Bloom")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        class Pass0Data { }
-        class Pass1Data { }
-
         public RTHandle Render(Camera camera, RTHandle input)
         {
             var bloomIds = ListPool<RTHandle>.Get();
@@ -44,52 +42,48 @@ namespace Arycama.CustomRenderPipeline
                 bloomIds.Add(resultId);
             }
 
-            var pass0 = renderGraph.AddRenderPass<FullscreenRenderPass>();
-            pass0.Initialize(material, 0);
-            var data0 = pass0.SetRenderFunction<Pass0Data>((command, context, data) =>
+            // Downsample
+            for (var i = 0; i < mipCount; i++)
             {
-                // Downsample
-                for (var i = 0; i < mipCount; i++)
+                using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+
+                pass.RenderPass.Material = material;
+                pass.RenderPass.Index = 0;
+                pass.RenderPass.WriteTexture("", bloomIds[i], RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+                pass.RenderPass.ReadTexture("_MainTex", i == 0 ? input : bloomIds[i - 1]);
+
+                var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
+                var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
+
+                pass.RenderPass.SetRenderFunction((command, context) =>
                 {
-                    if (i == 0)
-                    {
-                        pass0.SetTexture(command, "_MainTex", input);
-                    }
-                    else
-                    {
-                        var inputId = bloomIds[i - 1];
-                        pass0.SetTexture(command, "_MainTex", inputId);
-                    }
+                    pass.RenderPass.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
+                });
+            }
 
-                    var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
-                    var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
-                    pass0.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
-
-                    command.SetRenderTarget(bloomIds[i]);
-                }
-            });
-
-            var pass1 = renderGraph.AddRenderPass<FullscreenRenderPass>();
-            pass1.Initialize(material, 1);
-            var data1 = pass1.SetRenderFunction<Pass1Data>((command, context, data) =>
+            // Upsample
+            for (var i = mipCount - 1; i > 0; i--)
             {
-                // Upsample
-                for (var i = mipCount - 1; i > 0; i--)
+                using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+
+                pass.RenderPass.Material = material;
+                pass.RenderPass.Index = 1;
+                pass.RenderPass.WriteTexture("", bloomIds[i - 1], RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
+                pass.RenderPass.ReadTexture("_MainTex", bloomIds[i]);
+
+                var width = Mathf.Max(1, camera.pixelWidth >> i);
+                var height = Mathf.Max(1, camera.pixelHeight >> i);
+
+                pass.RenderPass.SetRenderFunction((command, context) =>
                 {
-                    pass1.SetFloat(command, "_Strength", settings.Strength);
-                    pass1.SetTexture(command, "_MainTex", bloomIds[i]);
+                    pass.RenderPass.SetFloat(command, "_Strength", settings.Strength);
+                    pass.RenderPass.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
+                });
+            }
 
-                    var width = Mathf.Max(1, camera.pixelWidth >> i);
-                    var height = Mathf.Max(1, camera.pixelHeight >> i);
-                    pass1.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
-
-                    command.SetRenderTarget(i == 0 ? input : bloomIds[i - 1]);
-                }
-
-                ListPool<RTHandle>.Release(bloomIds);
-            });
-
-            return bloomIds[1];
+            var result = bloomIds[0];
+            ListPool<RTHandle>.Release(bloomIds);
+            return result;
         }
     }
 }

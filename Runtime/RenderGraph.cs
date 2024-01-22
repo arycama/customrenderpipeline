@@ -9,9 +9,9 @@ namespace Arycama.CustomRenderPipeline
 {
     public class RenderGraph
     {
-        private Dictionary<Type, Queue<RenderPass>> renderPassPool = new();
-        private Dictionary<Type, Queue<RenderGraphBuilder>> builderPool = new();
-        private Dictionary<RenderTexture, RTHandle> importedTextures = new();
+        private readonly Dictionary<Type, Queue<RenderPass>> renderPassPool = new();
+        private readonly Dictionary<Type, Queue<RenderGraphBuilder>> builderPool = new();
+        private readonly Dictionary<RenderTexture, RTHandle> importedTextures = new();
 
         private readonly List<RenderPass> renderPasses = new();
 
@@ -25,14 +25,14 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<BufferHandle> usedBufferHandles = new();
 
         private bool isExecuting;
-        private GraphicsBuffer emptyBuffer;
+        private readonly GraphicsBuffer emptyBuffer;
 
         public RenderGraph()
         {
             emptyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int));
         }
 
-        public T AddRenderPass<T>() where T : RenderPass, new()
+        public ScopedRenderPass<T> AddRenderPass<T>() where T : RenderPass, new()
         {
             if (!renderPassPool.TryGetValue(typeof(T), out var pool))
             {
@@ -46,22 +46,12 @@ namespace Arycama.CustomRenderPipeline
                 pass.RenderGraph = this;
             }
 
-            renderPasses.Add(pass);
-            return pass as T;
+            return new ScopedRenderPass<T>(this, pass as T);
         }
 
-        public RenderGraphBuilder<T> GetRenderGraphBuilder<T>() where T : class, new()
+        public void AddRenderPassInternal<T>(T renderPass) where T : RenderPass, new()
         {
-            if (!builderPool.TryGetValue(typeof(RenderGraphBuilder<T>), out var pool))
-            {
-                pool = new Queue<RenderGraphBuilder>();
-                builderPool.Add(typeof(RenderGraphBuilder<T>), pool);
-            }
-
-            if (!pool.TryDequeue(out var pass))
-                pass = new RenderGraphBuilder<T>();
-
-            return pass as RenderGraphBuilder<T>;
+            renderPasses.Add(renderPass);
         }
 
         public RenderGraphBuilder GetRenderGraphBuilder()
