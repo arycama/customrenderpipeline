@@ -6,8 +6,8 @@ namespace Arycama.CustomRenderPipeline
     public class FullscreenRenderPass : RenderPass
     {
         private MaterialPropertyBlock propertyBlock;
-        private Material material;
-        private int passIndex;
+        public Material Material { get; set; }
+        public int PassIndex { get; set; }
 
         public FullscreenRenderPass()
         {
@@ -16,8 +16,8 @@ namespace Arycama.CustomRenderPipeline
 
         public void Initialize(Material material, int passIndex = 0)
         {
-            this.material = material;
-            this.passIndex = passIndex;
+            Material = material;
+            PassIndex = passIndex;
         }
 
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
@@ -50,9 +50,9 @@ namespace Arycama.CustomRenderPipeline
             propertyBlock.SetInt(propertyName, value);
         }
 
-        public override void Execute(CommandBuffer command)
+        protected override void Execute(CommandBuffer command)
         {
-            command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3, 1, propertyBlock);
+            command.DrawProcedural(Matrix4x4.identity, Material, PassIndex, MeshTopology.Triangles, 3, 1, propertyBlock);
         }
     }
 }

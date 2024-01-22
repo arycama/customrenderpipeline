@@ -66,7 +66,6 @@ namespace Arycama.CustomRenderPipeline
                     pass0.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
 
                     command.SetRenderTarget(bloomIds[i]);
-                    pass0.Execute(command);
                 }
             });
 
@@ -85,7 +84,6 @@ namespace Arycama.CustomRenderPipeline
                     pass1.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
 
                     command.SetRenderTarget(i == 0 ? input : bloomIds[i - 1]);
-                    pass1.Execute(command);
                 }
 
                 ListPool<RTHandle>.Release(bloomIds);

@@ -25,13 +25,14 @@ namespace Arycama.CustomRenderPipeline
         }
 
         private readonly Settings settings;
-        private readonly CameraTextureCache textureCache = new();
+        private readonly CameraTextureCache textureCache;
         private readonly Material material;
 
         public TemporalAA(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Temporal AA")) { hideFlags = HideFlags.HideAndDontSave };
+            textureCache = new(renderGraph, "Temporal AA");
         }
 
         public Vector2 Jitter { get; private set; }
@@ -98,9 +99,7 @@ namespace Arycama.CustomRenderPipeline
                 data.pass.SetFloat(command, "_MotionBlending", data.motionBlending);
                 data.pass.SetFloat(command, "_MotionWeight", data.motionWeight);
                 data.pass.SetFloat(command, "_Scale", data.scale);
-
                 command.SetRenderTarget(data.current);
-                data.pass.Execute(command);
             });
 
             data.previous = previous;

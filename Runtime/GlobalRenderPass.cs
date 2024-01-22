@@ -31,7 +31,7 @@ namespace Arycama.CustomRenderPipeline
             command.SetGlobalInt(propertyName, value);
         }
 
-        public override void Execute(CommandBuffer command)
+        protected override void Execute(CommandBuffer command)
         {
             // Does nothing (Eventually could do a command.setglobalbuffer or something?)
         }

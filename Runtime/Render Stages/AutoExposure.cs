@@ -97,7 +97,6 @@ namespace Arycama.CustomRenderPipeline
                 pass0.SetFloat(command, "HistogramMin", settings.HistogramPercentages.x);
                 pass0.SetFloat(command, "HistogramMax", settings.HistogramPercentages.y);
                 pass0.SetVector(command, "_ExposureCompensationRemap", GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1));
-                pass0.Execute(command);
             });
 
             var pass1 = renderGraph.AddRenderPass<ComputeRenderPass>();
@@ -110,8 +109,11 @@ namespace Arycama.CustomRenderPipeline
             var data1 = pass1.SetRenderFunction<Pass1Data>((command, context, data) =>
             {
                 pass1.SetTexture(command, "ExposureTexture", exposureTexture);
-                pass1.Execute(command);
+            });
 
+            var pass2 = renderGraph.AddRenderPass<GlobalRenderPass>();
+            pass2.SetRenderFunction((command, context) =>
+            {
                 command.CopyBuffer(output, exposureBuffer);
                 command.SetGlobalConstantBuffer(exposureBuffer, "Exposure", 0, sizeof(float) * 4);
             });

@@ -53,6 +53,7 @@ namespace Arycama.CustomRenderPipeline
 
             pass.ReadTexture("_MainTex", input);
             pass.ReadTexture("_Bloom", bloom);
+            pass.WriteScreen();
 
             var data = pass.SetRenderFunction<PassData>((command, context, data) =>
             {
@@ -76,9 +77,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetVector(command, "_GrainTextureParams", new Vector4(uvScaleX, uvScaleY, offsetX, offsetY));
                 pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
                 pass.SetFloat(command, "Aperture", lensSettings.Aperture);
-
-                command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
-                pass.Execute(command);
             });
         }
     }

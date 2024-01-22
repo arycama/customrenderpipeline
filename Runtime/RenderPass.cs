@@ -9,6 +9,7 @@ namespace Arycama.CustomRenderPipeline
     {
         protected RenderGraphBuilder renderGraphBuilder;
 
+        private bool screenWrite;
         private RTHandleBindingData depthBinding;
         private readonly List<RTHandleBindingData> colorBindings = new();
         private readonly List<(string, RTHandle)> readTextures = new();
@@ -22,11 +23,16 @@ namespace Arycama.CustomRenderPipeline
         public abstract void SetVector(CommandBuffer command, string propertyName, Vector4 value);
         public abstract void SetFloat(CommandBuffer command, string propertyName, float value);
         public abstract void SetInt(CommandBuffer command, string propertyName, int value);
-        public abstract void Execute(CommandBuffer command);
+        protected abstract void Execute(CommandBuffer command);
 
         public void ReadTexture(string propertyName, RTHandle texture)
         {
             readTextures.Add((propertyName, texture));
+        }
+
+        public void WriteScreen()
+        {
+            screenWrite = true;
         }
 
         public void WriteTexture(string propertyName, RTHandle handle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.DontCare, RenderBufferStoreAction storeAction = RenderBufferStoreAction.DontCare, Color clearColor = default)
@@ -115,15 +121,27 @@ namespace Arycama.CustomRenderPipeline
                 binding.colorStoreActions = storeActions;
             }
 
-            if (depthBinding.Handle != null || colorBindings.Count > 0)
+            if (screenWrite)
+                command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
+            else if (depthBinding.Handle != null || colorBindings.Count > 0)
                 command.SetRenderTarget(binding);
 
             depthBinding = default;
             colorBindings.Clear();
 
-            renderGraphBuilder.Execute(command, context);
-            RenderGraph.ReleaseRenderGraphBuilder(renderGraphBuilder);
-            renderGraphBuilder = null;
+            if (renderGraphBuilder != null)
+            {
+                renderGraphBuilder.Execute(command, context);
+                renderGraphBuilder.ClearRenderFunction();
+            }
+
+            Execute(command);
+
+            if (renderGraphBuilder != null)
+            {
+                RenderGraph.ReleaseRenderGraphBuilder(renderGraphBuilder);
+                renderGraphBuilder = null;
+            }
         }
 
         public T SetRenderFunction<T>(Action<CommandBuffer, ScriptableRenderContext, T> pass) where T : class, new()
@@ -133,12 +151,34 @@ namespace Arycama.CustomRenderPipeline
             renderGraphBuilder = result;
             return result.Data;
         }
+
+        public void SetRenderFunction(Action<CommandBuffer, ScriptableRenderContext> pass)
+        {
+            var result = RenderGraph.GetRenderGraphBuilder();
+            result.SetRenderFunction(pass);
+            renderGraphBuilder = result;
+        }
     }
 }
 
-public abstract class RenderGraphBuilder
+public class RenderGraphBuilder
 { 
-    public abstract void Execute(CommandBuffer command, ScriptableRenderContext context);
+    private Action<CommandBuffer, ScriptableRenderContext> pass;
+
+    public void SetRenderFunction(Action<CommandBuffer, ScriptableRenderContext> pass)
+    {
+        this.pass = pass;
+    }
+
+    public virtual void ClearRenderFunction()
+    {
+        pass = null;
+    }
+
+    public virtual void Execute(CommandBuffer command, ScriptableRenderContext context) 
+    {
+        pass?.Invoke(command, context);
+    }
 }
 
 public class RenderGraphBuilder<T> : RenderGraphBuilder where T : class, new()
@@ -151,8 +191,13 @@ public class RenderGraphBuilder<T> : RenderGraphBuilder where T : class, new()
         this.pass = pass;
     }
 
+    public override void ClearRenderFunction()
+    {
+        pass = null;
+    }
+
     public override void Execute(CommandBuffer command, ScriptableRenderContext context)
     {
-        pass.Invoke(command, context, Data);
+        pass?.Invoke(command, context, Data);
     }
 }

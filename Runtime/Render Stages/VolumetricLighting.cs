@@ -22,11 +22,12 @@ namespace Arycama.CustomRenderPipeline
         }
 
         private readonly Settings settings;
-        private readonly CameraTextureCache volumetricLightingTextureCache = new();
+        private readonly CameraTextureCache volumetricLightingTextureCache;
 
         public VolumetricLighting(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
+            volumetricLightingTextureCache = new(renderGraph, "Volumetric Lighting");
         }
 
         public void Release()
@@ -63,8 +64,6 @@ namespace Arycama.CustomRenderPipeline
             pass0.Initialize(computeShader, 0, width, height, depth);
             var data0 = pass0.SetRenderFunction<Pass0Data>((command, context, data) =>
             {
-                using var profilerScope = command.BeginScopedSample("Volumetric Lighting");
-
                 command.SetGlobalFloat("_VolumeWidth", width);
                 command.SetGlobalFloat("_VolumeHeight", height);
                 command.SetGlobalFloat("_VolumeSlices", depth);
@@ -75,7 +74,6 @@ namespace Arycama.CustomRenderPipeline
 
                 pass0.SetTexture(command, "_Input", volumetricLightingHistory);
                 pass0.SetTexture(command, "_Result", volumetricLightingCurrent);
-                pass0.Execute(command);
             });
 
             // Filter X
@@ -85,7 +83,6 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass1.SetTexture(command, "_Input", volumetricLightingCurrent);
                 pass1.SetTexture(command, "_Result", volumetricLightingId);
-                pass1.Execute(command);
             });
 
             // Filter Y
@@ -95,7 +92,6 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass2.SetTexture(command, "_Input", volumetricLightingId);
                 pass2.SetTexture(command, "_Result", volumetricLightingHistory);
-                pass2.Execute(command);
             });
 
             // Accumulate
@@ -105,7 +101,11 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass3.SetTexture(command, "_Input", volumetricLightingHistory);
                 pass3.SetTexture(command, "_Result", volumetricLightingId);
-                pass3.Execute(command);
+            });
+
+            var pass4 = renderGraph.AddRenderPass<GlobalRenderPass>();
+            pass4.SetRenderFunction((command, context) =>
+            {
                 command.SetGlobalTexture("_VolumetricLighting", volumetricLightingId);
             });
         }

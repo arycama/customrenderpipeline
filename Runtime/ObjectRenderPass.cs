@@ -51,7 +51,7 @@ namespace Arycama.CustomRenderPipeline
             //postRender.Add(cmd => cmd.SetGlobalInt(propertyName, 0));
         }
 
-        public override void Execute(CommandBuffer command)
+        protected override void Execute(CommandBuffer command)
         {
             command.DrawRendererList(rendererList);
         }

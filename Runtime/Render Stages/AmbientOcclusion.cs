@@ -59,7 +59,6 @@ namespace Arycama.CustomRenderPipeline
             var data0 = pass0.SetRenderFunction<Pass0Data>((command, context, data) =>
             {
                 pass0.SetVector(command, "ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
-                pass0.Execute(command);
             });
 
             var pass1 = renderGraph.AddRenderPass<FullscreenRenderPass>();
@@ -84,17 +83,13 @@ namespace Arycama.CustomRenderPipeline
                 pass1.SetFloat(command, "_FalloffBias", settings.Falloff == 1f ? 1f : 1f / (1f - settings.Falloff));
                 pass1.SetInt(command, "_DirectionCount", settings.DirectionCount);
                 pass1.SetInt(command, "_SampleCount", settings.SampleCount);
-                pass1.Execute(command);
             });
 
             if (RenderSettings.fog)
             {
                 var pass2 = renderGraph.AddRenderPass<FullscreenRenderPass>();
-                pass2.Initialize(material, 2);
-                var data2 = pass2.SetRenderFunction<Pass2Data>((command, context, data) =>
-                {
-                    pass2.Execute(command);
-                });
+                pass2.Material = material;
+                pass2.PassIndex = 2;
             }
         }
     }

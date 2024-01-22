@@ -43,7 +43,7 @@ namespace Arycama.CustomRenderPipeline
             command.SetComputeIntParam(computeShader, propertyName, value);
         }
 
-        public override void Execute(CommandBuffer command)
+        protected override void Execute(CommandBuffer command)
         {
             command.DispatchNormalized(computeShader, kernelIndex, xThreads, yThreads, zThreads);
         }

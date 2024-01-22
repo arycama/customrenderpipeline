@@ -60,7 +60,6 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetFloat(command, "_SampleRadius", settings.SampleRadius);
                 pass.SetInt(command, "_SampleCount", settings.SampleCount);
-                pass.Execute(command);
             });
 
             return tempId;

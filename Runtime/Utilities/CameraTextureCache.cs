@@ -7,16 +7,18 @@ namespace Arycama.CustomRenderPipeline
 {
     public class CameraTextureCache : IDisposable
     {
+        private readonly RenderGraph renderGraph;
         private readonly string name;
         private readonly Dictionary<Camera, (RenderTexture, RenderTexture)> cameraTextureCache = new();
         private bool disposedValue;
 
-        public CameraTextureCache(string name = null)
+        public CameraTextureCache(RenderGraph renderGraph, string name = null)
         {
+            this.renderGraph = renderGraph;
             this.name = name;
         }
 
-        public bool GetTexture(Camera camera, RenderTextureDescriptor descriptor, out RenderTexture texture0, out RenderTexture texture1)
+        public bool GetTexture(Camera camera, RenderTextureDescriptor descriptor, out RTHandle texture0, out RTHandle texture1)
         {
             bool wasCreated;
             if (!cameraTextureCache.TryGetValue(camera, out var textures))
@@ -57,8 +59,8 @@ namespace Arycama.CustomRenderPipeline
             if (!textures.Item2.IsCreated())
                 textures.Item2.Create();
 
-            texture0 = textures.Item1;
-            texture1 = textures.Item2;
+            texture0 = renderGraph.ImportRenderTexture(textures.Item1);
+            texture1 = renderGraph.ImportRenderTexture(textures.Item2);
 
             return wasCreated;
         }
@@ -67,6 +69,8 @@ namespace Arycama.CustomRenderPipeline
         {
             foreach (var data in cameraTextureCache)
             {
+                renderGraph.ReleaseImportedTexture(data.Value.Item1);
+                renderGraph.ReleaseImportedTexture(data.Value.Item2);
                 Object.DestroyImmediate(data.Value.Item1);
                 Object.DestroyImmediate(data.Value.Item2);
             }

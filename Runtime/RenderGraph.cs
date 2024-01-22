@@ -11,6 +11,7 @@ namespace Arycama.CustomRenderPipeline
     {
         private Dictionary<Type, Queue<RenderPass>> renderPassPool = new();
         private Dictionary<Type, Queue<RenderGraphBuilder>> builderPool = new();
+        private Dictionary<RenderTexture, RTHandle> importedTextures = new();
 
         private readonly List<RenderPass> renderPasses = new();
 
@@ -61,6 +62,20 @@ namespace Arycama.CustomRenderPipeline
                 pass = new RenderGraphBuilder<T>();
 
             return pass as RenderGraphBuilder<T>;
+        }
+
+        public RenderGraphBuilder GetRenderGraphBuilder()
+        {
+            if (!builderPool.TryGetValue(typeof(RenderGraphBuilder), out var pool))
+            {
+                pool = new Queue<RenderGraphBuilder>();
+                builderPool.Add(typeof(RenderGraphBuilder), pool);
+            }
+
+            if (!pool.TryDequeue(out var pass))
+                pass = new RenderGraphBuilder();
+
+            return pass;
         }
 
         public void ReleaseRenderGraphBuilder(RenderGraphBuilder builder)
@@ -161,6 +176,23 @@ namespace Arycama.CustomRenderPipeline
         public GraphicsBuffer GetEmptyBuffer()
         {
             return emptyBuffer;
+        }
+
+        public RTHandle ImportRenderTexture(RenderTexture texture)
+        {
+            if(!importedTextures.TryGetValue(texture, out var result))
+            {
+                result = (RTHandle)texture;
+                importedTextures.Add(texture, result);
+            }
+
+            return result;
+        }
+
+        public void ReleaseImportedTexture(RenderTexture texture)
+        {
+            Assert.IsTrue(importedTextures.ContainsKey(texture), "Trying to release a non-imported texture");
+            importedTextures.Remove(texture);
         }
 
         public void ReleaseHandles()
