@@ -32,7 +32,7 @@ namespace Arycama.CustomRenderPipeline
             emptyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int));
         }
 
-        public ScopedRenderPass<T> AddRenderPass<T>() where T : RenderPass, new()
+        public T AddRenderPass<T>() where T : RenderPass, new()
         {
             if (!renderPassPool.TryGetValue(typeof(T), out var pool))
             {
@@ -46,10 +46,10 @@ namespace Arycama.CustomRenderPipeline
                 pass.RenderGraph = this;
             }
 
-            return new ScopedRenderPass<T>(this, pass as T);
+            return pass as T;
         }
 
-        public void AddRenderPassInternal<T>(T renderPass) where T : RenderPass, new()
+        public void AddRenderPassInternal(RenderPass renderPass)
         {
             renderPasses.Add(renderPass);
         }

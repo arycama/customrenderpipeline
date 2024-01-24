@@ -73,22 +73,22 @@ namespace Arycama.CustomRenderPipeline
             var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);
 
             using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
-            pass.RenderPass.Material = material;
-            pass.RenderPass.Index = 0;
+            pass.Material = material;
+            pass.Index = 0;
 
-            pass.RenderPass.ReadTexture("_Input", input);
-            pass.RenderPass.ReadTexture("_Motion", motion);
-            pass.RenderPass.ReadTexture("_History", previous);
-            pass.RenderPass.WriteTexture("", current, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
+            pass.ReadTexture("_Input", input);
+            pass.ReadTexture("_Motion", motion);
+            pass.ReadTexture("_History", previous);
+            pass.WriteTexture("", current, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
 
-            pass.RenderPass.SetRenderFunction((command, context) =>
+            pass.SetRenderFunction((command, context) =>
             {
-                pass.RenderPass.SetFloat(command, "_Sharpness", settings.Sharpness);
-                pass.RenderPass.SetFloat(command, "_HasHistory", wasCreated ? 0.0f : 1.0f);
-                pass.RenderPass.SetFloat(command, "_StationaryBlending", settings.StationaryBlending);
-                pass.RenderPass.SetFloat(command, "_MotionBlending", settings.MotionBlending);
-                pass.RenderPass.SetFloat(command, "_MotionWeight", settings.MotionWeight);
-                pass.RenderPass.SetFloat(command, "_Scale", scale);
+                pass.SetFloat(command, "_Sharpness", settings.Sharpness);
+                pass.SetFloat(command, "_HasHistory", wasCreated ? 0.0f : 1.0f);
+                pass.SetFloat(command, "_StationaryBlending", settings.StationaryBlending);
+                pass.SetFloat(command, "_MotionBlending", settings.MotionBlending);
+                pass.SetFloat(command, "_MotionWeight", settings.MotionWeight);
+                pass.SetFloat(command, "_Scale", scale);
             });
 
             return current;

@@ -208,7 +208,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
             {
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
                     if (directionalLightList.Count > 0)
                     {
@@ -234,7 +234,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
             {
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
                     if (pointLightList.Count > 0)
                         command.SetBufferData(pointLightBuffer, pointLightList);
@@ -262,7 +262,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
             {
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
                     if (directionalShadowRequests.Count > 0)
                     {
@@ -320,7 +320,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
             {
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
                     if (pointShadowRequests.Count > 0)
                     {

@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public abstract class RenderPass
+    public abstract class RenderPass : IDisposable
     {
         protected RenderGraphBuilder renderGraphBuilder;
 
@@ -156,6 +156,11 @@ namespace Arycama.CustomRenderPipeline
             colorBindings.Clear();
         }
 
+        void IDisposable.Dispose()
+        {
+            RenderGraph.AddRenderPassInternal(this);
+        }
+
         public void SetRenderFunction(Action<CommandBuffer, ScriptableRenderContext> pass)
         {
             var result = RenderGraph.GetRenderGraphBuilder();
@@ -203,23 +208,5 @@ public class RenderGraphBuilder<T> : RenderGraphBuilder where T : class, new()
     public override void Execute(CommandBuffer command, ScriptableRenderContext context)
     {
         pass?.Invoke(command, context, Data);
-    }
-}
-
-public struct ScopedRenderPass<T> : IDisposable where T : RenderPass, new()
-{
-    private readonly RenderGraph renderGraph;
-
-    public ScopedRenderPass(RenderGraph renderGraph, T renderPass)
-    {
-        this.renderGraph = renderGraph;
-        RenderPass = renderPass;
-    }
-
-    public T RenderPass { get; }
-
-    void IDisposable.Dispose()
-    {
-        renderGraph.AddRenderPassInternal(RenderPass);
     }
 }

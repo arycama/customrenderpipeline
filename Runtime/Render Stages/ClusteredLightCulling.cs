@@ -46,24 +46,24 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                pass.RenderPass.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
-                pass.RenderPass.ReadTexture("_LightClusterIndicesWrite", lightClusterIndices);
-                pass.RenderPass.WriteBuffer("_LightClusterListWrite", lightList);
+                pass.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
+                pass.ReadTexture("_LightClusterIndicesWrite", lightClusterIndices);
+                pass.WriteBuffer("_LightClusterListWrite", lightList);
 
                 var counterBuffer = renderGraph.GetBuffer();
-                pass.RenderPass.WriteBuffer("_LightCounter", counterBuffer);
+                pass.WriteBuffer("_LightCounter", counterBuffer);
 
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
                     command.SetBufferData(counterBuffer, zeroArray);
-                    pass.RenderPass.SetInt(command, "_TileSize", settings.TileSize);
-                    pass.RenderPass.SetFloat(command, "_RcpClusterDepth", 1.0f / settings.ClusterDepth);
+                    pass.SetInt(command, "_TileSize", settings.TileSize);
+                    pass.SetFloat(command, "_RcpClusterDepth", 1.0f / settings.ClusterDepth);
                 });
             }
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
             {
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
                     // TODO: Handle this with proper pass inputs/outputs
                     command.SetGlobalTexture("_LightClusterIndices", lightClusterIndices);

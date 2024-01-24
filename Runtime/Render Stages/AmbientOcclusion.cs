@@ -47,55 +47,55 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>())
             {
-                pass.RenderPass.Material = material;
-                pass.RenderPass.Index = 0;
+                pass.Material = material;
+                pass.Index = 0;
 
-                pass.RenderPass.ReadTexture("_CameraDepth", depth);
+                pass.ReadTexture("_CameraDepth", depth);
 
-                pass.RenderPass.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
-                pass.RenderPass.WriteTexture("", normals, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-                pass.RenderPass.WriteTexture("", viewDepth, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+                pass.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture("", normals, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+                pass.WriteTexture("", viewDepth, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
 
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
-                    pass.RenderPass.SetVector(command, "ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
+                    pass.SetVector(command, "ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
                 });
             }
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>())
             {
-                pass.RenderPass.Material = material;
-                pass.RenderPass.Index = 1;
+                pass.Material = material;
+                pass.Index = 1;
 
-                pass.RenderPass.ReadTexture("_ViewDepth", viewDepth);
-                pass.RenderPass.ReadTexture("_ViewNormals", normals);
-                pass.RenderPass.ReadTexture("_CameraDepth", depth);
-                pass.RenderPass.WriteTexture("", scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
-                pass.RenderPass.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.ReadTexture("_ViewDepth", viewDepth);
+                pass.ReadTexture("_ViewNormals", normals);
+                pass.ReadTexture("_CameraDepth", depth);
+                pass.WriteTexture("", scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
+                pass.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
 
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
-                    pass.RenderPass.SetVector(command, "ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
+                    pass.SetVector(command, "ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
                     var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
                     var tanHalfFovX = tanHalfFovY * camera.aspect;
 
-                    pass.RenderPass.SetVector(command, "_UvToView", new Vector4(tanHalfFovX * 2f, tanHalfFovY * 2f, -tanHalfFovX, -tanHalfFovY));
-                    pass.RenderPass.SetVector(command, "_Tint", settings.Tint.linear);
-                    pass.RenderPass.SetFloat(command, "_Radius", settings.Radius * scaledHeight / tanHalfFovY * 0.5f);
-                    pass.RenderPass.SetFloat(command, "_AoStrength", settings.Strength);
-                    pass.RenderPass.SetFloat(command, "_FalloffScale", settings.Falloff == 1f ? 0f : 1f / (settings.Radius * settings.Falloff - settings.Radius));
-                    pass.RenderPass.SetFloat(command, "_FalloffBias", settings.Falloff == 1f ? 1f : 1f / (1f - settings.Falloff));
-                    pass.RenderPass.SetInt(command, "_DirectionCount", settings.DirectionCount);
-                    pass.RenderPass.SetInt(command, "_SampleCount", settings.SampleCount);
+                    pass.SetVector(command, "_UvToView", new Vector4(tanHalfFovX * 2f, tanHalfFovY * 2f, -tanHalfFovX, -tanHalfFovY));
+                    pass.SetVector(command, "_Tint", settings.Tint.linear);
+                    pass.SetFloat(command, "_Radius", settings.Radius * scaledHeight / tanHalfFovY * 0.5f);
+                    pass.SetFloat(command, "_AoStrength", settings.Strength);
+                    pass.SetFloat(command, "_FalloffScale", settings.Falloff == 1f ? 0f : 1f / (settings.Radius * settings.Falloff - settings.Radius));
+                    pass.SetFloat(command, "_FalloffBias", settings.Falloff == 1f ? 1f : 1f / (1f - settings.Falloff));
+                    pass.SetInt(command, "_DirectionCount", settings.DirectionCount);
+                    pass.SetInt(command, "_SampleCount", settings.SampleCount);
                 });
             }
 
             if (RenderSettings.fog)
             {
                 using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
-                pass.RenderPass.Material = material;
-                pass.RenderPass.Index = 2;
-                pass.RenderPass.ReadTexture("_VolumetricLighting", volumetricLighting);
+                pass.Material = material;
+                pass.Index = 2;
+                pass.ReadTexture("_VolumetricLighting", volumetricLighting);
             }
         }
     }

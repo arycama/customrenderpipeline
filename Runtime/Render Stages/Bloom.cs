@@ -47,17 +47,17 @@ namespace Arycama.CustomRenderPipeline
             {
                 using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
 
-                pass.RenderPass.Material = material;
-                pass.RenderPass.Index = 0;
-                pass.RenderPass.WriteTexture("", bloomIds[i], RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-                pass.RenderPass.ReadTexture("_MainTex", i == 0 ? input : bloomIds[i - 1]);
+                pass.Material = material;
+                pass.Index = 0;
+                pass.WriteTexture("", bloomIds[i], RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+                pass.ReadTexture("_MainTex", i == 0 ? input : bloomIds[i - 1]);
 
                 var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
                 var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
 
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
-                    pass.RenderPass.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
+                    pass.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
                 });
             }
 
@@ -66,18 +66,18 @@ namespace Arycama.CustomRenderPipeline
             {
                 using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
 
-                pass.RenderPass.Material = material;
-                pass.RenderPass.Index = 1;
-                pass.RenderPass.WriteTexture("", bloomIds[i - 1], RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
-                pass.RenderPass.ReadTexture("_MainTex", bloomIds[i]);
+                pass.Material = material;
+                pass.Index = 1;
+                pass.WriteTexture("", bloomIds[i - 1], RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
+                pass.ReadTexture("_MainTex", bloomIds[i]);
 
                 var width = Mathf.Max(1, camera.pixelWidth >> i);
                 var height = Mathf.Max(1, camera.pixelHeight >> i);
 
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
-                    pass.RenderPass.SetFloat(command, "_Strength", settings.Strength);
-                    pass.RenderPass.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
+                    pass.SetFloat(command, "_Strength", settings.Strength);
+                    pass.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
                 });
             }
 

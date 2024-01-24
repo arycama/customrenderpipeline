@@ -57,49 +57,49 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                pass.RenderPass.Initialize(computeShader, 0, width, height, depth);
-                pass.RenderPass.ReadTexture("_Input", volumetricLightingHistory);
-                pass.RenderPass.WriteTexture("_Result", volumetricLightingCurrent);
+                pass.Initialize(computeShader, 0, width, height, depth);
+                pass.ReadTexture("_Input", volumetricLightingHistory);
+                pass.WriteTexture("_Result", volumetricLightingCurrent);
 
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
-                    pass.RenderPass.SetFloat(command, "_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
-                    pass.RenderPass.SetFloat(command, "_VolumeWidth", width);
-                    pass.RenderPass.SetFloat(command, "_VolumeHeight", height);
-                    pass.RenderPass.SetFloat(command, "_VolumeSlices", depth);
-                    pass.RenderPass.SetFloat(command, "_VolumeDepth", farClipPlane);
-                    pass.RenderPass.SetFloat(command, "_BlurSigma", settings.BlurSigma);
-                    pass.RenderPass.SetFloat(command, "_VolumeTileSize", settings.TileSize);
+                    pass.SetFloat(command, "_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
+                    pass.SetFloat(command, "_VolumeWidth", width);
+                    pass.SetFloat(command, "_VolumeHeight", height);
+                    pass.SetFloat(command, "_VolumeSlices", depth);
+                    pass.SetFloat(command, "_VolumeDepth", farClipPlane);
+                    pass.SetFloat(command, "_BlurSigma", settings.BlurSigma);
+                    pass.SetFloat(command, "_VolumeTileSize", settings.TileSize);
                 });
             }
 
             // Filter X
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                pass.RenderPass.Initialize(computeShader, 1, width, height, depth);
-                pass.RenderPass.ReadTexture("_Input", volumetricLightingCurrent);
-                pass.RenderPass.WriteTexture("_Result", volumetricLighting);
+                pass.Initialize(computeShader, 1, width, height, depth);
+                pass.ReadTexture("_Input", volumetricLightingCurrent);
+                pass.WriteTexture("_Result", volumetricLighting);
             }
 
             // Filter Y
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                pass.RenderPass.Initialize(computeShader, 2, width, height, depth);
-                pass.RenderPass.ReadTexture("_Input", volumetricLighting);
-                pass.RenderPass.WriteTexture("_Result", volumetricLightingHistory);
+                pass.Initialize(computeShader, 2, width, height, depth);
+                pass.ReadTexture("_Input", volumetricLighting);
+                pass.WriteTexture("_Result", volumetricLightingHistory);
             }
 
             // Accumulate
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
             {
-                pass.RenderPass.Initialize(computeShader, 3, width, height, depth);
-                pass.RenderPass.ReadTexture("_Input", volumetricLightingHistory);
-                pass.RenderPass.WriteTexture("_Result", volumetricLighting);
+                pass.Initialize(computeShader, 3, width, height, depth);
+                pass.ReadTexture("_Input", volumetricLightingHistory);
+                pass.WriteTexture("_Result", volumetricLighting);
             }
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
             {
-                pass.RenderPass.SetRenderFunction((command, context) =>
+                pass.SetRenderFunction((command, context) =>
                 {
                     command.SetGlobalFloat("_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
                     command.SetGlobalFloat("_VolumeWidth", width);
