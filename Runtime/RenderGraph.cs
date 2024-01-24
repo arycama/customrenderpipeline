@@ -54,6 +54,20 @@ namespace Arycama.CustomRenderPipeline
             renderPasses.Add(renderPass);
         }
 
+        public RenderGraphBuilder<T> GetRenderGraphBuilder<T>() where T : class, new()
+        {
+            if (!builderPool.TryGetValue(typeof(RenderGraphBuilder<T>), out var pool))
+            {
+                pool = new Queue<RenderGraphBuilder>();
+                builderPool.Add(typeof(RenderGraphBuilder<T>), pool);
+            }
+
+            if (!pool.TryDequeue(out var pass))
+                pass = new RenderGraphBuilder<T>();
+
+            return pass as RenderGraphBuilder<T>;
+        }
+
         public RenderGraphBuilder GetRenderGraphBuilder()
         {
             if (!builderPool.TryGetValue(typeof(RenderGraphBuilder), out var pool))

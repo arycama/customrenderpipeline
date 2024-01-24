@@ -67,6 +67,16 @@ namespace Arycama.CustomRenderPipeline
             Jitter = jitter;
         }
 
+        class PassData
+        {
+            public float sharpness;
+            public float wasCreated;
+            public float stationaryBlending;
+            public float motionBlending;
+            public float motionWeight;
+            public float scale;
+        }
+
         public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
         {
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
@@ -81,15 +91,22 @@ namespace Arycama.CustomRenderPipeline
             pass.ReadTexture("_History", previous);
             pass.WriteTexture("", current, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
 
-            pass.SetRenderFunction((command, context) =>
+            var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
             {
-                pass.SetFloat(command, "_Sharpness", settings.Sharpness);
-                pass.SetFloat(command, "_HasHistory", wasCreated ? 0.0f : 1.0f);
-                pass.SetFloat(command, "_StationaryBlending", settings.StationaryBlending);
-                pass.SetFloat(command, "_MotionBlending", settings.MotionBlending);
-                pass.SetFloat(command, "_MotionWeight", settings.MotionWeight);
-                pass.SetFloat(command, "_Scale", scale);
+                pass.SetFloat(command, "_Sharpness", data.sharpness);
+                pass.SetFloat(command, "_HasHistory", data.wasCreated);
+                pass.SetFloat(command, "_StationaryBlending", data.stationaryBlending);
+                pass.SetFloat(command, "_MotionBlending", data.motionBlending);
+                pass.SetFloat(command, "_MotionWeight", data.motionWeight);
+                pass.SetFloat(command, "_Scale", data.scale);
             });
+
+            data.sharpness = settings.Sharpness;
+            data.wasCreated = wasCreated ? 0.0f : 1.0f;
+            data.stationaryBlending = settings.StationaryBlending;
+            data.motionBlending = settings.MotionBlending;
+            data.motionWeight = settings.MotionWeight;
+            data.scale = scale;
 
             return current;
         }

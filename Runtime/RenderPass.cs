@@ -74,7 +74,7 @@ namespace Arycama.CustomRenderPipeline
 
             if (renderGraphBuilder != null)
             {
-                renderGraphBuilder.Execute(command, context);
+                renderGraphBuilder.Execute(command, context, this);
                 renderGraphBuilder.ClearRenderFunction();
             }
 
@@ -167,6 +167,14 @@ namespace Arycama.CustomRenderPipeline
             result.SetRenderFunction(pass);
             renderGraphBuilder = result;
         }
+
+        public T SetRenderFunction<T>(Action<CommandBuffer, ScriptableRenderContext, RenderPass, T> pass) where T : class, new()
+        {
+            var result = RenderGraph.GetRenderGraphBuilder<T>();
+            result.SetRenderFunction(pass);
+            renderGraphBuilder = result;
+            return result.Data;
+        }
     }
 }
 
@@ -184,18 +192,18 @@ public class RenderGraphBuilder
         pass = null;
     }
 
-    public virtual void Execute(CommandBuffer command, ScriptableRenderContext context)
+    public virtual void Execute(CommandBuffer command, ScriptableRenderContext context, RenderPass pass)
     {
-        pass?.Invoke(command, context);
+        this.pass?.Invoke(command, context);
     }
 }
 
 public class RenderGraphBuilder<T> : RenderGraphBuilder where T : class, new()
 {
     public T Data { get; } = new();
-    private Action<CommandBuffer, ScriptableRenderContext, T> pass;
+    private Action<CommandBuffer, ScriptableRenderContext, RenderPass, T> pass;
 
-    public void SetRenderFunction(Action<CommandBuffer, ScriptableRenderContext, T> pass)
+    public void SetRenderFunction(Action<CommandBuffer, ScriptableRenderContext, RenderPass, T> pass)
     {
         this.pass = pass;
     }
@@ -205,8 +213,8 @@ public class RenderGraphBuilder<T> : RenderGraphBuilder where T : class, new()
         pass = null;
     }
 
-    public override void Execute(CommandBuffer command, ScriptableRenderContext context)
+    public override void Execute(CommandBuffer command, ScriptableRenderContext context, RenderPass pass)
     {
-        pass?.Invoke(command, context, Data);
+        this.pass?.Invoke(command, context, pass, Data);
     }
 }
