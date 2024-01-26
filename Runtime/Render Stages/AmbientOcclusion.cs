@@ -56,10 +56,12 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture("", normals, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
                 pass.WriteTexture("", viewDepth, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
 
-                pass.SetRenderFunction((command, context) =>
+                var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
-                    pass.SetVector(command, "ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
+                    pass.SetVector(command, "ScaleOffset", data.scaleOffset);
                 });
+
+                data.scaleOffset = new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight);
             }
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>())
@@ -73,21 +75,31 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture("", scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
                 pass.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
 
-                pass.SetRenderFunction((command, context) =>
+                var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
                 {
-                    pass.SetVector(command, "ScaleOffset", new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight));
-                    var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
-                    var tanHalfFovX = tanHalfFovY * camera.aspect;
-
-                    pass.SetVector(command, "_UvToView", new Vector4(tanHalfFovX * 2f, tanHalfFovY * 2f, -tanHalfFovX, -tanHalfFovY));
-                    pass.SetVector(command, "_Tint", settings.Tint.linear);
-                    pass.SetFloat(command, "_Radius", settings.Radius * scaledHeight / tanHalfFovY * 0.5f);
-                    pass.SetFloat(command, "_AoStrength", settings.Strength);
-                    pass.SetFloat(command, "_FalloffScale", settings.Falloff == 1f ? 0f : 1f / (settings.Radius * settings.Falloff - settings.Radius));
-                    pass.SetFloat(command, "_FalloffBias", settings.Falloff == 1f ? 1f : 1f / (1f - settings.Falloff));
-                    pass.SetInt(command, "_DirectionCount", settings.DirectionCount);
-                    pass.SetInt(command, "_SampleCount", settings.SampleCount);
+                    pass.SetVector(command, "ScaleOffset", data.scaleOffset);
+                    pass.SetVector(command, "_UvToView", data.uvToView);
+                    pass.SetVector(command, "_Tint", data.tint);
+                    pass.SetFloat(command, "_Radius", data.radius);
+                    pass.SetFloat(command, "_AoStrength", data.aoStrength);
+                    pass.SetFloat(command, "_FalloffScale", data.falloffScale);
+                    pass.SetFloat(command, "_FalloffBias", data.falloffBias);
+                    pass.SetInt(command, "_DirectionCount", data.directionCount);
+                    pass.SetInt(command, "_SampleCount", data.sampleCount);
                 });
+
+                var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+                var tanHalfFovX = tanHalfFovY * camera.aspect;
+
+                data.scaleOffset = new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight);
+                data.uvToView = new Vector4(tanHalfFovX * 2.0f, tanHalfFovY * 2.0f, -tanHalfFovX, -tanHalfFovY);
+                data.tint = settings.Tint.linear;
+                data.radius = settings.Radius * scaledHeight / tanHalfFovY * 0.5f;
+                data.aoStrength = settings.Strength;
+                data.falloffScale = settings.Falloff == 1.0f ? 0.0f : 1.0f / (settings.Radius * settings.Falloff - settings.Radius);
+                data.falloffBias = settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff);
+                data.directionCount = settings.DirectionCount;
+                data.sampleCount = settings.SampleCount;
             }
 
             if (RenderSettings.fog)
@@ -97,6 +109,24 @@ namespace Arycama.CustomRenderPipeline
                 pass.Index = 2;
                 pass.ReadTexture("_VolumetricLighting", volumetricLighting);
             }
+        }
+
+        private class Pass0Data
+        {
+            internal Vector2 scaleOffset;
+        }
+
+        private class Pass1Data
+        {
+            internal Vector2 scaleOffset;
+            internal Vector4 uvToView;
+            internal Color tint;
+            internal float radius;
+            internal float aoStrength;
+            internal float falloffScale;
+            internal float falloffBias;
+            internal int directionCount;
+            internal int sampleCount;
         }
     }
 }

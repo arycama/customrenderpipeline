@@ -56,9 +56,27 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.Apply(false, false);
         }
 
+        class Pass0Data
+        {
+            internal float minEv, maxEv, adaptationSpeed, exposureCompensation, iso, aperture, shutterSpeed, histogramMin, histogramMax;
+            internal Vector4 exposureCompensationRemap;
+        }
+
+        class Pass1Data
+        {
+            internal Texture2D exposureTexture;
+        }
+
+        class Pass2Data
+        {
+            internal GraphicsBuffer exposureBuffer;
+            internal BufferHandle output;
+        }
+
         public void Render(RTHandle input, int width, int height)
         {
-            var exposurePixels = ArrayPool<float>.Get(settings.ExposureResolution);
+            var exposurePixels = exposureTexture.GetRawTextureData<float>();
+
             for (var i = 0; i < settings.ExposureResolution; i++)
             {
                 var uv = i / (settings.ExposureResolution - 1f);
@@ -67,7 +85,6 @@ namespace Arycama.CustomRenderPipeline
                 exposurePixels[i] = exposure;
             }
             exposureTexture.SetPixelData(exposurePixels, 0);
-            ArrayPool<float>.Release(exposurePixels);
             exposureTexture.Apply(false, false);
 
             var histogram = renderGraph.GetBuffer(256);
@@ -78,19 +95,30 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("Input", input);
                 pass.WriteBuffer("LuminanceHistogram", histogram);
 
-                pass.SetRenderFunction((command, context) =>
+                var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
-                    pass.SetFloat(command, "MinEv", settings.MinEv);
-                    pass.SetFloat(command, "MaxEv", settings.MaxEv);
-                    pass.SetFloat(command, "AdaptationSpeed", settings.AdaptationSpeed);
-                    pass.SetFloat(command, "ExposureCompensation", settings.ExposureCompensation);
-                    pass.SetFloat(command, "Iso", lensSettings.Iso);
-                    pass.SetFloat(command, "Aperture", lensSettings.Aperture);
-                    pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
-                    pass.SetFloat(command, "HistogramMin", settings.HistogramPercentages.x);
-                    pass.SetFloat(command, "HistogramMax", settings.HistogramPercentages.y);
-                    pass.SetVector(command, "_ExposureCompensationRemap", GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1));
+                    pass.SetFloat(command, "MinEv", data.minEv);
+                    pass.SetFloat(command, "MaxEv", data.maxEv);
+                    pass.SetFloat(command, "AdaptationSpeed", data.adaptationSpeed);
+                    pass.SetFloat(command, "ExposureCompensation", data.exposureCompensation);
+                    pass.SetFloat(command, "Iso", data.iso);
+                    pass.SetFloat(command, "Aperture", data.aperture);
+                    pass.SetFloat(command, "ShutterSpeed", data.shutterSpeed);
+                    pass.SetFloat(command, "HistogramMin", data.histogramMin);
+                    pass.SetFloat(command, "HistogramMax", data.histogramMax);
+                    pass.SetVector(command, "_ExposureCompensationRemap", data.exposureCompensationRemap);
                 });
+
+                data.minEv = settings.MinEv;
+                data.maxEv = settings.MaxEv;
+                data.adaptationSpeed = settings.AdaptationSpeed;
+                data.exposureCompensation = settings.ExposureCompensation;
+                data.iso = lensSettings.Iso;
+                data.aperture = lensSettings.Aperture;
+                data.shutterSpeed = lensSettings.ShutterSpeed;
+                data.histogramMin = settings.HistogramPercentages.x;
+                data.histogramMax = settings.HistogramPercentages.y;
+                data.exposureCompensationRemap = GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1);
             }
 
             var output = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
@@ -101,19 +129,24 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadBuffer("LuminanceHistogram", histogram);
                 pass.WriteBuffer("LuminanceOutput", output);
 
-                pass.SetRenderFunction((command, context) =>
+                var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
                 {
-                    pass.SetTexture(command, "ExposureTexture", exposureTexture);
+                    pass.SetTexture(command, "ExposureTexture", data.exposureTexture);
                 });
+
+                data.exposureTexture = exposureTexture;
             }
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
             {
-                pass.SetRenderFunction((command, context) =>
+                var data = pass.SetRenderFunction<Pass2Data>((command, context, pass, data) =>
                 {
-                    command.CopyBuffer(output, exposureBuffer);
-                    command.SetGlobalConstantBuffer(exposureBuffer, "Exposure", 0, sizeof(float) * 4);
+                    command.CopyBuffer(data.output, data.exposureBuffer);
+                    command.SetGlobalConstantBuffer(data.exposureBuffer, "Exposure", 0, sizeof(float) * 4);
                 });
+
+                data.output = output;
+                data.exposureBuffer = exposureBuffer;
             }
         }
     }

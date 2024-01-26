@@ -27,6 +27,17 @@ namespace Arycama.CustomRenderPipeline
             material = new(Shader.Find("Hidden/Bloom")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
+        class Pass0Data
+        {
+            public Vector2 rcpResolution;
+        }
+
+        class Pass1Data
+        {
+            public float strength;
+            public Vector2 rcpResolution;
+        }
+
         public RTHandle Render(Camera camera, RTHandle input)
         {
             var bloomIds = ListPool<RTHandle>.Get();
@@ -55,10 +66,12 @@ namespace Arycama.CustomRenderPipeline
                 var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
                 var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
 
-                pass.SetRenderFunction((command, context) =>
+                var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
-                    pass.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
+                    pass.SetVector(command, "_RcpResolution", data.rcpResolution);
                 });
+
+                data.rcpResolution = new Vector2(1.0f / width, 1.0f / height);
             }
 
             // Upsample
@@ -74,11 +87,13 @@ namespace Arycama.CustomRenderPipeline
                 var width = Mathf.Max(1, camera.pixelWidth >> i);
                 var height = Mathf.Max(1, camera.pixelHeight >> i);
 
-                pass.SetRenderFunction((command, context) =>
+                var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
                 {
-                    pass.SetFloat(command, "_Strength", settings.Strength);
-                    pass.SetVector(command, "_RcpResolution", new Vector2(1.0f / width, 1.0f / height));
+                    pass.SetFloat(command, "_Strength", data.strength);
+                    pass.SetVector(command, "_RcpResolution", data.rcpResolution);
                 });
+
+                data.rcpResolution = new Vector2(1.0f / width, 1.0f / height);
             }
 
             var result = bloomIds[0];

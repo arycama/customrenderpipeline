@@ -27,9 +27,26 @@ namespace Arycama.CustomRenderPipeline
         private bool isExecuting;
         private readonly GraphicsBuffer emptyBuffer;
 
+        public RTHandle EmptyTextureArray { get; }
+        public RTHandle EmptyCubemapArray { get; }
+
         public RenderGraph()
         {
             emptyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int));
+
+            EmptyTextureArray = new RenderTexture(1, 1, 0, RenderTextureFormat.Shadowmap)
+            {
+                dimension = TextureDimension.Tex2DArray,
+                hideFlags = HideFlags.HideAndDontSave,
+                volumeDepth = 1,
+            };
+
+            EmptyCubemapArray = new RenderTexture(1, 1, 0, RenderTextureFormat.Shadowmap)
+            {
+                dimension = TextureDimension.CubeArray,
+                hideFlags = HideFlags.HideAndDontSave,
+                volumeDepth = 6,
+            };
         }
 
         public T AddRenderPass<T>() where T : RenderPass, new()
@@ -66,20 +83,6 @@ namespace Arycama.CustomRenderPipeline
                 pass = new RenderGraphBuilder<T>();
 
             return pass as RenderGraphBuilder<T>;
-        }
-
-        public RenderGraphBuilder GetRenderGraphBuilder()
-        {
-            if (!builderPool.TryGetValue(typeof(RenderGraphBuilder), out var pool))
-            {
-                pool = new Queue<RenderGraphBuilder>();
-                builderPool.Add(typeof(RenderGraphBuilder), pool);
-            }
-
-            if (!pool.TryDequeue(out var pass))
-                pass = new RenderGraphBuilder();
-
-            return pass;
         }
 
         public void ReleaseRenderGraphBuilder(RenderGraphBuilder builder)

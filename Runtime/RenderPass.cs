@@ -161,13 +161,6 @@ namespace Arycama.CustomRenderPipeline
             RenderGraph.AddRenderPassInternal(this);
         }
 
-        public void SetRenderFunction(Action<CommandBuffer, ScriptableRenderContext> pass)
-        {
-            var result = RenderGraph.GetRenderGraphBuilder();
-            result.SetRenderFunction(pass);
-            renderGraphBuilder = result;
-        }
-
         public T SetRenderFunction<T>(Action<CommandBuffer, ScriptableRenderContext, RenderPass, T> pass) where T : class, new()
         {
             var result = RenderGraph.GetRenderGraphBuilder<T>();

@@ -35,6 +35,17 @@ namespace Arycama.CustomRenderPipeline
             volumetricLightingTextureCache.Dispose();
         }
 
+        private class Pass0Data
+        {
+            internal float nonLinearDepth;
+            internal float volumeWidth;
+            internal float volumeHeight;
+            internal float volumeSlices;
+            internal float volumeDepth;
+            internal float blurSigma;
+            internal float volumeTileSize;
+        }
+
         public RTHandle Render(int pixelWidth, int pixelHeight, float farClipPlane, Camera camera)
         {
             var scaledWidth = pixelWidth;
@@ -61,16 +72,24 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Input", volumetricLightingHistory);
                 pass.WriteTexture("_Result", volumetricLightingCurrent);
 
-                pass.SetRenderFunction((command, context) =>
+                var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
-                    pass.SetFloat(command, "_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
-                    pass.SetFloat(command, "_VolumeWidth", width);
-                    pass.SetFloat(command, "_VolumeHeight", height);
-                    pass.SetFloat(command, "_VolumeSlices", depth);
-                    pass.SetFloat(command, "_VolumeDepth", farClipPlane);
-                    pass.SetFloat(command, "_BlurSigma", settings.BlurSigma);
-                    pass.SetFloat(command, "_VolumeTileSize", settings.TileSize);
+                    pass.SetFloat(command, "_NonLinearDepth", data.nonLinearDepth);
+                    pass.SetFloat(command, "_VolumeWidth", data.volumeWidth);
+                    pass.SetFloat(command, "_VolumeHeight", data.volumeHeight);
+                    pass.SetFloat(command, "_VolumeSlices", data.volumeSlices);
+                    pass.SetFloat(command, "_VolumeDepth", data.volumeDepth);
+                    pass.SetFloat(command, "_BlurSigma", data.blurSigma);
+                    pass.SetFloat(command, "_VolumeTileSize", data.volumeTileSize);
                 });
+
+                data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;
+                data.volumeWidth = width;
+                data.volumeHeight = height;
+                data.volumeSlices = depth;
+                data.volumeDepth = farClipPlane;
+                data.blurSigma = settings.BlurSigma;
+                data.volumeTileSize = settings.TileSize;
             }
 
             // Filter X
@@ -99,17 +118,32 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
             {
-                pass.SetRenderFunction((command, context) =>
+                var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
                 {
-                    command.SetGlobalFloat("_NonLinearDepth", settings.NonLinearDepth ? 1.0f : 0.0f);
-                    command.SetGlobalFloat("_VolumeWidth", width);
-                    command.SetGlobalFloat("_VolumeHeight", height);
-                    command.SetGlobalFloat("_VolumeSlices", depth);
-                    command.SetGlobalFloat("_VolumeDepth", farClipPlane);
+                    command.SetGlobalFloat("_NonLinearDepth", data.nonLinearDepth);
+                    command.SetGlobalFloat("_VolumeWidth", data.volumeWidth);
+                    command.SetGlobalFloat("_VolumeHeight", data.volumeHeight);
+                    command.SetGlobalFloat("_VolumeSlices", data.volumeSlices);
+                    command.SetGlobalFloat("_VolumeDepth", data.volumeDepth);
                 });
+
+                data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;
+                data.volumeWidth = width;
+                data.volumeHeight = height;
+                data.volumeSlices = depth;
+                data.volumeDepth = farClipPlane;
             }
 
             return volumetricLighting;
+        }
+
+        private class Pass1Data
+        {
+            internal float nonLinearDepth;
+            internal float volumeWidth;
+            internal float volumeHeight;
+            internal float volumeSlices;
+            internal float volumeDepth;
         }
     }
 }

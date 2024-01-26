@@ -1,4 +1,5 @@
 ﻿using System;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Random = UnityEngine.Random;
@@ -42,6 +43,13 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Tonemapping")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
+        class PassData
+        {
+            public Texture2D grainTexture;
+            public float bloomStrength, isSceneView, toeStrength, toeLength, shoulderStrength, shoulderLength, shoulderAngle, noiseIntensity, noiseResponse, shutterSpeed, aperture;
+            public Vector4 grainTextureParams;
+        }
+
         public void Render(RTHandle input, RTHandle bloom, bool isSceneView, int width, int height)
         {
             using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
@@ -52,29 +60,43 @@ namespace Arycama.CustomRenderPipeline
             pass.ReadTexture("_Bloom", bloom);
             pass.WriteScreen();
 
-            pass.SetRenderFunction((command, context) =>
+            var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
             {
-                pass.SetTexture(command, "_GrainTexture", settings.FilmGrainTexture);
+                pass.SetTexture(command, "_GrainTexture", data.grainTexture);
 
-                pass.SetFloat(command, "_BloomStrength", bloomSettings.Strength);
-                pass.SetFloat(command, "_IsSceneView", isSceneView ? 1f : 0f);
-                pass.SetFloat(command, "ToeStrength", settings.ToeStrength);
-                pass.SetFloat(command, "ToeLength", settings.ToeLength);
-                pass.SetFloat(command, "ShoulderStrength", settings.ShoulderStrength);
-                pass.SetFloat(command, "ShoulderLength", settings.ShoulderLength);
-                pass.SetFloat(command, "ShoulderAngle", settings.ShoulderAngle);
-                pass.SetFloat(command, "NoiseIntensity", settings.NoiseIntensity);
-                pass.SetFloat(command, "NoiseResponse", settings.NoiseResponse);
+                pass.SetFloat(command, "_BloomStrength", data.bloomStrength);
+                pass.SetFloat(command, "_IsSceneView", data.isSceneView);
+                pass.SetFloat(command, "ToeStrength", data.toeStrength);
+                pass.SetFloat(command, "ToeLength", data.toeLength);
+                pass.SetFloat(command, "ShoulderStrength", data.shoulderStrength);
+                pass.SetFloat(command, "ShoulderLength", data.shoulderLength);
+                pass.SetFloat(command, "ShoulderAngle", data.shoulderAngle);
+                pass.SetFloat(command, "NoiseIntensity", data.noiseIntensity);
+                pass.SetFloat(command, "NoiseResponse", data.noiseResponse);
 
-                var offsetX = Random.value;
-                var offsetY = Random.value;
-                var uvScaleX = settings.FilmGrainTexture ? width / (float)settings.FilmGrainTexture.width : 1.0f;
-                var uvScaleY = settings.FilmGrainTexture ? height / (float)settings.FilmGrainTexture.height : 1.0f;
-
-                pass.SetVector(command, "_GrainTextureParams", new Vector4(uvScaleX, uvScaleY, offsetX, offsetY));
-                pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
-                pass.SetFloat(command, "Aperture", lensSettings.Aperture);
+                pass.SetFloat(command, "ShutterSpeed", data.shutterSpeed);
+                pass.SetFloat(command, "Aperture", data.aperture);
+                pass.SetVector(command, "_GrainTextureParams", data.grainTextureParams);
             });
+
+            var offsetX = Random.value;
+            var offsetY = Random.value;
+            var uvScaleX = settings.FilmGrainTexture ? width / (float)settings.FilmGrainTexture.width : 1.0f;
+            var uvScaleY = settings.FilmGrainTexture ? height / (float)settings.FilmGrainTexture.height : 1.0f;
+
+            data.grainTexture = settings.FilmGrainTexture;
+            data.bloomStrength = bloomSettings.Strength;
+            data.isSceneView = isSceneView ? 1.0f : 0.0f;
+            data.toeStrength = settings.ToeStrength;
+            data.toeLength = settings.ToeLength;
+            data.shoulderStrength = settings.ShoulderStrength;
+            data.shoulderLength = settings.ShoulderLength;
+            data.shoulderAngle = settings.ShoulderAngle;
+            data.noiseIntensity = settings.NoiseIntensity;
+            data.noiseResponse = settings.NoiseResponse;
+            data.shutterSpeed = lensSettings.ShutterSpeed;
+            data.aperture = lensSettings.Aperture;
+            data.grainTextureParams = new Vector4(uvScaleX, uvScaleY, offsetX, offsetY);
         }
     }
 }

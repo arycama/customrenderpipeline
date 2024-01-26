@@ -26,6 +26,12 @@ namespace Arycama.CustomRenderPipeline
             this.lensSettings = lensSettings ?? throw new ArgumentNullException(nameof(lensSettings));
         }
 
+        class PassData
+        {
+            public float focalDistance, focalLength, apertureSize, maxCoc, sensorHeight, sampleRadius;
+            public int sampleCount;
+        }
+
         public RTHandle Render(int width, int height, float fieldOfView, RTHandle color, RTHandle depth)
         {
             var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
@@ -38,25 +44,33 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_Result", tempId);
 
-                pass.SetRenderFunction((command, context) =>
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    var sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
-                    var focalLength = 0.5f * sensorSize / Mathf.Tan(fieldOfView * Mathf.Deg2Rad / 2.0f);
+                    pass.SetFloat(command, "_FocalDistance", data.focalDistance);
+                    pass.SetFloat(command, "_FocalLength", data.focalLength);
+                    pass.SetFloat(command, "_ApertureSize", data.apertureSize);
+                    pass.SetFloat(command, "_MaxCoC", data.maxCoc);
+                    pass.SetFloat(command, "_SensorHeight", data.sensorHeight);
 
-                    var F = focalLength;
-                    var A = focalLength / lensSettings.Aperture;
-                    var P = lensSettings.FocalDistance;
-                    var maxCoC = (A * F) / Mathf.Max((P - F), 1e-6f);
-
-                    pass.SetFloat(command, "_FocalDistance", lensSettings.FocalDistance);
-                    pass.SetFloat(command, "_FocalLength", focalLength);
-                    pass.SetFloat(command, "_ApertureSize", lensSettings.Aperture);
-                    pass.SetFloat(command, "_MaxCoC", maxCoC);
-                    pass.SetFloat(command, "_SensorHeight", lensSettings.SensorHeight / 1000f);
-
-                    pass.SetFloat(command, "_SampleRadius", settings.SampleRadius);
-                    pass.SetInt(command, "_SampleCount", settings.SampleCount);
+                    pass.SetFloat(command, "_SampleRadius", data.sampleRadius);
+                    pass.SetInt(command, "_SampleCount", data.sampleCount);
                 });
+
+                var sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
+                var focalLength = 0.5f * sensorSize / Mathf.Tan(fieldOfView * Mathf.Deg2Rad / 2.0f);
+
+                var F = focalLength;
+                var A = focalLength / lensSettings.Aperture;
+                var P = lensSettings.FocalDistance;
+                var maxCoC = (A * F) / Mathf.Max((P - F), 1e-6f);
+
+                data.focalDistance = lensSettings.FocalDistance;
+                data.focalLength = focalLength;
+                data.apertureSize = lensSettings.Aperture;
+                data.maxCoc = maxCoC;
+                data.sensorHeight = sensorSize;
+                data.sampleRadius = settings.SampleRadius;
+                data.sampleCount = settings.SampleCount;
             }
 
             return tempId;
