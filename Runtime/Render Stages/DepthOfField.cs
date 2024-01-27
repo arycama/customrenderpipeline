@@ -19,27 +19,32 @@ namespace Arycama.CustomRenderPipeline
 
         private readonly Settings settings;
         private readonly LensSettings lensSettings;
+        private readonly Material material;
 
         public DepthOfField(Settings settings, LensSettings lensSettings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             this.lensSettings = lensSettings ?? throw new ArgumentNullException(nameof(lensSettings));
+            material = new Material(Shader.Find("Hidden/Depth of Field"));
         }
 
         class PassData
         {
-            public float focalDistance, focalLength, apertureSize, maxCoc, sensorHeight, sampleRadius;
-            public int sampleCount;
+            internal float focalDistance, focalLength, apertureSize, maxCoc, sensorHeight, sampleRadius;
+            internal int sampleCount;
         }
 
         public RTHandle Render(int width, int height, float fieldOfView, RTHandle color, RTHandle depth)
         {
             var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
-            var tempId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, true);
+            var tempId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32);
 
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Depth of Field"))
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Depth of Field"))
             {
-                pass.Initialize(computeShader, 0, width, height);
+                pass.Material = material;
+                pass.Index = 0;
+
+                pass.WriteTexture("", tempId, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
                 pass.ReadTexture("_Input", color);
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_Result", tempId);

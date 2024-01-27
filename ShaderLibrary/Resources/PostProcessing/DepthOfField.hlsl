@@ -1,8 +1,5 @@
-#pragma kernel CSMain
-
 #include "../../Common.hlsl"
 
-RWTexture2D<float3> _Result;
 Texture2D<float3> _Input;
 Texture2D<float> _Depth;
 
@@ -14,14 +11,15 @@ float CalculateCoC(float depth)
 	return abs(1.0 - _FocalDistance / depth) * _MaxCoC * _SampleRadius;
 }
 
-[numthreads(8, 8, 1)]
-void CSMain(uint2 id : SV_DispatchThreadID)
+float4 Vertex(uint id : SV_VertexID) : SV_Position { return float3(((id << uint2(1, 0)) & 2) * 2.0 - 1.0, 1.0).xyzz; }
+
+float3 Fragment(float4 position : SV_Position) : SV_Target
 {
 	//_FocalDistance = LinearEyeDepth(_Depth[_ScreenParams.xy / 2]);
 
 	float GoldenAngle = Pi * (3.0 - sqrt(5.0));
 	float2 resolution = floor(_ScreenParams.xy * _Scale);
-	float2 uv = (id + 0.5) / resolution;
+	float2 uv = position.xy / resolution;
 	
 	float centerDepth = LinearEyeDepth(_Depth.SampleLevel(_PointClampSampler, uv, 0.0));
 	float centerSize = CalculateCoC(centerDepth);
@@ -39,7 +37,7 @@ void CSMain(uint2 id : SV_DispatchThreadID)
 		float sampleDepth = LinearEyeDepth(_Depth.SampleLevel(_PointClampSampler, tc, 0.0));
 		
 		float sampleSize = CalculateCoC(sampleDepth);
-		if(sampleDepth > centerDepth)
+		if (sampleDepth > centerDepth)
 			sampleSize = clamp(sampleSize, 0.0, centerSize * 2.0);
 			
 		color += sampleSize > radius ? sampleColor : color / weightSum;
@@ -48,5 +46,5 @@ void CSMain(uint2 id : SV_DispatchThreadID)
 		radius += _SampleRadius / radius;
 	}
 
-	_Result[id] = color * rcp(weightSum);
+	return color * rcp(weightSum);
 }
