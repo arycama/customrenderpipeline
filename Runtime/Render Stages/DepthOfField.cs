@@ -37,7 +37,7 @@ namespace Arycama.CustomRenderPipeline
             var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
             var tempId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, true);
 
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Depth of Field"))
             {
                 pass.Initialize(computeShader, 0, width, height);
                 pass.ReadTexture("_Input", color);

@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Object = UnityEngine.Object;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -16,9 +17,11 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<RenderPass> renderPasses = new();
 
         // Maybe encapsulate these in a thing so it can also be used for buffers
-        private readonly List<RTHandle> rtHandlesToCreate = new();
-        private readonly List<RTHandle> availableRtHandles = new();
-        private readonly List<RTHandle> usedRtHandles = new();
+        private readonly Queue<RTHandle> rtHandlePool = new();
+        private readonly List<RTHandle> unavailableRtHandles = new();
+
+        private readonly List<RenderTexture> availableRenderTextures = new();
+        private readonly List<RenderTexture> usedRenderTextures = new();
 
         private readonly List<BufferHandle> bufferHandlesToCreate = new();
         private readonly List<BufferHandle> availableBufferHandles = new();
@@ -49,7 +52,7 @@ namespace Arycama.CustomRenderPipeline
             };
         }
 
-        public T AddRenderPass<T>() where T : RenderPass, new()
+        public T AddRenderPass<T>(string name) where T : RenderPass, new()
         {
             if (!renderPassPool.TryGetValue(typeof(T), out var pool))
             {
@@ -62,6 +65,8 @@ namespace Arycama.CustomRenderPipeline
                 pass = new T();
                 pass.RenderGraph = this;
             }
+
+            pass.Name = name;
 
             return pass as T;
         }
@@ -95,9 +100,39 @@ namespace Arycama.CustomRenderPipeline
         public void Execute(CommandBuffer command, ScriptableRenderContext context)
         {
             // Create all RTs.
-            foreach (var rtHandle in rtHandlesToCreate)
-                rtHandle.Create();
-            rtHandlesToCreate.Clear();
+            foreach (var handle in unavailableRtHandles)
+            {
+                // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
+                RenderTexture result = null;
+                for (var i = 0; i < availableRenderTextures.Count; i++)
+                {
+                    var rt = availableRenderTextures[i];
+                    if (rt.width == handle.Width && rt.height == handle.Height && rt.graphicsFormat == handle.Format && rt.enableRandomWrite == handle.EnableRandomWrite && rt.volumeDepth == handle.VolumeDepth && rt.dimension == handle.Dimension)
+                    {
+                        result = rt;
+                        availableRenderTextures.RemoveAt(i);
+                        break;
+                    }
+                }
+
+                if (result == null)
+                {
+                    var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
+                    result = new RenderTexture(handle.Width, handle.Height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite };
+
+                    if (handle.VolumeDepth > 0)
+                    {
+                        result.dimension = handle.Dimension;
+                        result.volumeDepth = handle.VolumeDepth;
+                    }
+
+                    result.name = $"RTHandle {handle.Dimension} {handle.Format} {handle.Width}x{handle.Height} ";
+                    result.Create();
+                }
+
+                usedRenderTextures.Add(result);
+                handle.RenderTexture = result;
+            }
 
             foreach (var bufferHandle in bufferHandlesToCreate)
                 bufferHandle.Create();
@@ -132,22 +167,17 @@ namespace Arycama.CustomRenderPipeline
             // Ensure we're not getting a texture during execution, this must be done in the setup
             Assert.IsFalse(isExecuting);
 
-            // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
-            for (var i = 0; i < availableRtHandles.Count; i++)
-            {
-                var handle = availableRtHandles[i];
-                if (handle.Width == width && handle.Height == height && handle.Format == format && handle.EnableRandomWrite == enableRandomWrite && handle.VolumeDepth == volumeDepth && handle.Dimension == dimension)
-                {
-                    availableRtHandles.RemoveAt(i);
-                    usedRtHandles.Add(handle);
-                    return handle;
-                }
-            }
+            if (!rtHandlePool.TryDequeue(out var result))
+                result = new RTHandle();
 
-            // If no handle was found, create a new one, and assign it as one to be created. 
-            var result = new RTHandle(width, height, format, enableRandomWrite, volumeDepth, dimension);
-            rtHandlesToCreate.Add(result);
-            usedRtHandles.Add(result);
+            result.Width = width; 
+            result.Height = height;
+            result.Format = format;
+            result.EnableRandomWrite = enableRandomWrite;
+            result.VolumeDepth = volumeDepth;
+            result.Dimension = dimension;
+
+            unavailableRtHandles.Add(result);
             return result;
         }
 
@@ -204,19 +234,24 @@ namespace Arycama.CustomRenderPipeline
 
         public void ReleaseHandles()
         {
-            // Any handles that were not used this frame can be removed
-            foreach (var handle in availableRtHandles)
-                handle.Release();
-            availableRtHandles.Clear();
+            // Any RTs that were not used this frame can be removed
+            foreach (var rt in availableRenderTextures)
+                Object.DestroyImmediate(rt);
+            availableRenderTextures.Clear();
 
+            foreach (var rt in usedRenderTextures)
+                availableRenderTextures.Add(rt);
+            usedRenderTextures.Clear();
+
+            // Any handles that were not used this frame can be removed
             foreach (var bufferHandle in availableBufferHandles)
                 bufferHandle.Release();
             availableBufferHandles.Clear();
 
             // Mark all handles as available for use again
-            foreach (var handle in usedRtHandles)
-                availableRtHandles.Add(handle);
-            usedRtHandles.Clear();
+            foreach (var handle in unavailableRtHandles)
+                rtHandlePool.Enqueue(handle);
+            unavailableRtHandles.Clear();
 
             foreach (var handle in usedBufferHandles)
                 availableBufferHandles.Add(handle);
@@ -225,11 +260,15 @@ namespace Arycama.CustomRenderPipeline
 
         public void Release()
         {
-            foreach (var handle in availableRtHandles)
-                handle.Release();
-            availableRtHandles.Clear();
+            foreach (var rt in availableRenderTextures)
+                Object.DestroyImmediate(rt);
+            availableRenderTextures.Clear();
 
-            foreach(var bufferHandle in availableBufferHandles) 
+            foreach(var rt in usedRenderTextures)
+                Object.DestroyImmediate(rt);
+            usedRenderTextures.Clear();
+
+            foreach (var bufferHandle in availableBufferHandles) 
                 bufferHandle.Release();
             availableBufferHandles.Clear();
 

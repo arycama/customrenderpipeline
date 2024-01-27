@@ -14,7 +14,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(RTHandle motionVectors, RTHandle cameraDepth)
         {
-            using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Camera Motion Vectors");
             pass.Material = material;
             pass.Index = 0;
 

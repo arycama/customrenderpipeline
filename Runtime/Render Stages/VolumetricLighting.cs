@@ -66,7 +66,7 @@ namespace Arycama.CustomRenderPipeline
             var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
             var volumetricLighting = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
 
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
             {
                 pass.Initialize(computeShader, 0, width, height, depth);
                 pass.ReadTexture("_Input", volumetricLightingHistory);
@@ -93,7 +93,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Filter X
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
             {
                 pass.Initialize(computeShader, 1, width, height, depth);
                 pass.ReadTexture("_Input", volumetricLightingCurrent);
@@ -101,7 +101,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Filter Y
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
             {
                 pass.Initialize(computeShader, 2, width, height, depth);
                 pass.ReadTexture("_Input", volumetricLighting);
@@ -109,14 +109,14 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Accumulate
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
             {
                 pass.Initialize(computeShader, 3, width, height, depth);
                 pass.ReadTexture("_Input", volumetricLightingHistory);
                 pass.WriteTexture("_Result", volumetricLighting);
             }
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Volumetric Lighting"))
             {
                 var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
                 {

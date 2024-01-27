@@ -5,69 +5,36 @@ using UnityEngine.Rendering;
 
 public class RTHandle
 {
-    public int Width { get; }
-    public int Height { get; }
-    public GraphicsFormat Format { get; }
-    public bool EnableRandomWrite { get; }
-    public int VolumeDepth { get; }
-    public TextureDimension Dimension { get; }
+    public int Width { get; set; }
+    public int Height { get; set; }
+    public GraphicsFormat Format { get; set; }
+    public bool EnableRandomWrite { get; set; }
+    public int VolumeDepth { get; set; }
+    public TextureDimension Dimension { get; set; }
 
-    private RenderTexture renderTexture;
-
-    public RTHandle(int width, int height, GraphicsFormat format, bool enableRandomWrite, int volumeDepth, TextureDimension dimension)
-    {
-        // Depth formats can not be random write
-        Assert.IsFalse(enableRandomWrite && GraphicsFormatUtility.IsDepthFormat(format));
-        Assert.IsTrue(volumeDepth == 1 || dimension != TextureDimension.Tex2D);
-
-        Width = width;
-        Height = height;
-        Format = format;
-        EnableRandomWrite = enableRandomWrite;
-        VolumeDepth = volumeDepth;
-        Dimension = dimension;
-
-        renderTexture = null;
-    }
-
-    public void Create()
-    {
-        Assert.IsNull(renderTexture);
-
-        var isDepth = GraphicsFormatUtility.IsDepthFormat(Format);
-        renderTexture = new RenderTexture(Width, Height, isDepth ? GraphicsFormat.None : Format, isDepth ? Format : GraphicsFormat.None) { enableRandomWrite = EnableRandomWrite };
-
-        if (VolumeDepth > 0)
-        {
-            renderTexture.dimension = Dimension;
-            renderTexture.volumeDepth = VolumeDepth;
-        }
-
-        renderTexture.name = $"RTHandle {Dimension} {Format} {Width}x{Height} ";
-
-        renderTexture.Create();
-    }
-
-    public void Release()
-    {
-        Object.DestroyImmediate(renderTexture);
-    }
+    public RenderTexture RenderTexture { get; set; }
 
     public static implicit operator RenderTexture(RTHandle rtHandle)
     {
-        return rtHandle.renderTexture;
+        return rtHandle.RenderTexture;
     }
 
     public static implicit operator RenderTargetIdentifier(RTHandle rtHandle)
     {
-        return rtHandle.renderTexture;
+        return rtHandle.RenderTexture;
     }
 
     public static implicit operator RTHandle(RenderTexture renderTexture)
     {
-        return new RTHandle(renderTexture.width, renderTexture.height, renderTexture.graphicsFormat, renderTexture.enableRandomWrite, renderTexture.volumeDepth, renderTexture.dimension)
+        return new RTHandle()
         {
-            renderTexture = renderTexture
+            Width = renderTexture.width,
+            Height = renderTexture.height,
+            Format = renderTexture.graphicsFormat,
+            EnableRandomWrite = renderTexture.enableRandomWrite,
+            VolumeDepth = renderTexture.volumeDepth,
+            Dimension = renderTexture.dimension,
+            RenderTexture = renderTexture
         };
     }
 }

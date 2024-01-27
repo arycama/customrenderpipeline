@@ -56,7 +56,7 @@ namespace Arycama.CustomRenderPipeline
             // Downsample
             for (var i = 0; i < mipCount; i++)
             {
-                using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+                using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Bloom");
 
                 pass.Material = material;
                 pass.Index = 0;
@@ -77,7 +77,7 @@ namespace Arycama.CustomRenderPipeline
             // Upsample
             for (var i = mipCount - 1; i > 0; i--)
             {
-                using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+                using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Bloom");
 
                 pass.Material = material;
                 pass.Index = 1;
@@ -93,6 +93,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_RcpResolution", data.rcpResolution);
                 });
 
+                data.strength = settings.Strength;
                 data.rcpResolution = new Vector2(1.0f / width, 1.0f / height);
             }
 

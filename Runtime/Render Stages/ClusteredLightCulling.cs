@@ -59,7 +59,7 @@ namespace Arycama.CustomRenderPipeline
 
             var lightList = renderGraph.GetBuffer(clusterCount * settings.MaxLightsPerTile);
 
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Clustered Light Culling"))
             {
                 pass.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
                 pass.ReadTexture("_LightClusterIndicesWrite", lightClusterIndices);
@@ -80,7 +80,7 @@ namespace Arycama.CustomRenderPipeline
                 data.counterBuffer = counterBuffer;
             }
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Clustered Light Set Globals"))
             {
                 var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
                 {

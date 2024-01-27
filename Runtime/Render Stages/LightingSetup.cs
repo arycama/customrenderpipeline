@@ -186,7 +186,7 @@ namespace Arycama.CustomRenderPipeline
             if (directionalLightList.Count > 0)
                 directionalLightBuffer = renderGraph.GetBuffer(directionalLightList.Count, UnsafeUtility.SizeOf<DirectionalLightData>());
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Set Directional Light Data"))
             {
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
@@ -215,7 +215,7 @@ namespace Arycama.CustomRenderPipeline
             else
                 pointLightBuffer = renderGraph.GetEmptyBuffer();
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Set Point Light Data"))
             {
                 var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
                 {
@@ -246,7 +246,7 @@ namespace Arycama.CustomRenderPipeline
                 directionalTexelSizeBuffer = renderGraph.GetEmptyBuffer();
             }
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Render Directional Light Shadows"))
             {
                 var data = pass.SetRenderFunction<Pass2Data>((command, context, pass, data) =>
                 {
@@ -265,11 +265,17 @@ namespace Arycama.CustomRenderPipeline
                             command.SetRenderTarget(data.directionalShadowsId, 0, CubemapFace.Unknown, i);
 
                             command.SetViewProjectionMatrices(shadowRequest.ViewMatrix, shadowRequest.ProjectionMatrix);
+                            command.BeginSample("Directional Shadows");
+
                             context.ExecuteCommandBuffer(command);
                             command.Clear();
 
                             var shadowDrawingSettings = new ShadowDrawingSettings(data.cullingResults, shadowRequest.VisibleLightIndex) { splitData = shadowRequest.ShadowSplitData };
                             context.DrawShadows(ref shadowDrawingSettings);
+
+                            command.EndSample("Directional Shadows");
+                            context.ExecuteCommandBuffer(command);
+                            command.Clear();
                         }
 
                         command.SetGlobalFloat("_ZClip", 1);
@@ -314,7 +320,7 @@ namespace Arycama.CustomRenderPipeline
                 pointShadowsId = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D32_SFloat, false, pointShadowRequests.Count * 6, TextureDimension.CubeArray);
             }
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Render Point Light Shadows"))
             {
                 var data = pass.SetRenderFunction<Pass3Data>((command, context, pass, data) =>
                 {
@@ -332,11 +338,16 @@ namespace Arycama.CustomRenderPipeline
                             command.SetRenderTarget(data.pointShadowsId, 0, CubemapFace.Unknown, i);
 
                             command.SetViewProjectionMatrices(shadowRequest.ViewMatrix, shadowRequest.ProjectionMatrix);
+                            command.BeginSample("Point Shadows");
                             context.ExecuteCommandBuffer(command);
                             command.Clear();
 
                             var shadowDrawingSettings = new ShadowDrawingSettings(data.cullingResults, shadowRequest.VisibleLightIndex) { splitData = shadowRequest.ShadowSplitData };
                             context.DrawShadows(ref shadowDrawingSettings);
+
+                            command.EndSample("Point Shadows");
+                            context.ExecuteCommandBuffer(command);
+                            command.Clear();
                         }
 
                         command.SetGlobalTexture("_PointShadows", data.pointShadowsId);

@@ -82,7 +82,7 @@ namespace Arycama.CustomRenderPipeline
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
             var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);
 
-            using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA");
             pass.Material = material;
             pass.Index = 0;
 

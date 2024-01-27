@@ -45,7 +45,7 @@ namespace Arycama.CustomRenderPipeline
             var normals = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.A2B10G10R10_UNormPack32);
             var viewDepth = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.R16_SFloat);
 
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Motion Vectors"))
             {
                 pass.Material = material;
                 pass.Index = 0;
@@ -64,7 +64,7 @@ namespace Arycama.CustomRenderPipeline
                 data.scaleOffset = new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight);
             }
 
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>())
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Compute"))
             {
                 pass.Material = material;
                 pass.Index = 1;
@@ -104,10 +104,13 @@ namespace Arycama.CustomRenderPipeline
 
             if (RenderSettings.fog)
             {
-                using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+                using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Combine");
                 pass.Material = material;
                 pass.Index = 2;
+                pass.ReadTexture("_CameraDepth", depth);
                 pass.ReadTexture("_VolumetricLighting", volumetricLighting);
+                pass.WriteTexture("", scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
+                pass.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
             }
         }
 

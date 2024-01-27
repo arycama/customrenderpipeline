@@ -52,7 +52,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(RTHandle input, RTHandle bloom, bool isSceneView, int width, int height)
         {
-            using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>();
+            using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Tonemapping");
             pass.Material = material;
             pass.Index = 0;
 

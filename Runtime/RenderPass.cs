@@ -18,6 +18,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<(string, BufferHandle)> writeBuffers = new();
 
         public RenderGraph RenderGraph { get; set; }
+        internal string Name { get; set; }
 
         public abstract void SetTexture(CommandBuffer command, string propertyName, Texture texture);
         public abstract void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer);
@@ -58,6 +59,8 @@ namespace Arycama.CustomRenderPipeline
 
         public void Run(CommandBuffer command, ScriptableRenderContext context)
         {
+            command.BeginSample(Name);
+
             foreach (var texture in readTextures)
                 SetTexture(command, texture.Item1, texture.Item2);
             readTextures.Clear();
@@ -85,6 +88,8 @@ namespace Arycama.CustomRenderPipeline
                 RenderGraph.ReleaseRenderGraphBuilder(renderGraphBuilder);
                 renderGraphBuilder = null;
             }
+
+            command.EndSample(Name);
         }
 
         protected virtual void SetupTargets(CommandBuffer command)
