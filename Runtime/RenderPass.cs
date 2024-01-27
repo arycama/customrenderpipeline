@@ -118,9 +118,9 @@ namespace Arycama.CustomRenderPipeline
 
             if (colorBindings.Count > 0)
             {
-                var targets = new RenderTargetIdentifier[colorBindings.Count];
-                var loadActions = new RenderBufferLoadAction[colorBindings.Count];
-                var storeActions = new RenderBufferStoreAction[colorBindings.Count];
+                var targets = ArrayPool<RenderTargetIdentifier>.Get(colorBindings.Count);
+                var loadActions = ArrayPool<RenderBufferLoadAction>.Get(colorBindings.Count);
+                var storeActions = ArrayPool<RenderBufferStoreAction>.Get(colorBindings.Count);
 
                 for (var i = 0; i < colorBindings.Count; i++)
                 {
@@ -145,6 +145,10 @@ namespace Arycama.CustomRenderPipeline
                 binding.colorRenderTargets = targets;
                 binding.colorLoadActions = loadActions;
                 binding.colorStoreActions = storeActions;
+
+                ArrayPool<RenderTargetIdentifier>.Release(targets);
+                ArrayPool<RenderBufferLoadAction>.Release(loadActions);
+                ArrayPool<RenderBufferStoreAction>.Release(storeActions);
             }
 
             if (screenWrite)
