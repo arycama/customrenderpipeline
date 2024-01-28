@@ -44,7 +44,8 @@ public class BufferHandle
     {
         return new BufferHandle(graphicsBuffer.target, graphicsBuffer.count, graphicsBuffer.stride)
         {
-            buffer = graphicsBuffer
+            buffer = graphicsBuffer,
+            Size = graphicsBuffer.count * graphicsBuffer.stride
         };
     }
 }

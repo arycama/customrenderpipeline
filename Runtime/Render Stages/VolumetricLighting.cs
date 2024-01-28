@@ -48,9 +48,10 @@ namespace Arycama.CustomRenderPipeline
             internal int pointLightCount;
             internal int directionalLightCount;
             internal LightingSetup.Result lightingSetupResult;
+            internal BufferHandle exposureBuffer;
         }
 
-        public RTHandle Render(int pixelWidth, int pixelHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult)
+        public Result Render(int pixelWidth, int pixelHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer)
         {
             var width = Mathf.CeilToInt(pixelWidth / (float)settings.TileSize);
             var height = Mathf.CeilToInt(pixelHeight / (float)settings.TileSize);
@@ -88,7 +89,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_VolumeWidth", data.volumeWidth);
                     pass.SetFloat(command, "_VolumeHeight", data.volumeHeight);
                     pass.SetFloat(command, "_VolumeSlices", data.volumeSlices);
-                    pass.SetFloat(command, "_VolumeDepth", data.volumeDepth);
                     pass.SetFloat(command, "_BlurSigma", data.blurSigma);
                     pass.SetFloat(command, "_VolumeTileSize", data.volumeTileSize);
 
@@ -98,6 +98,8 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetInt(command, "_DirectionalLightCount", data.lightingSetupResult.directionalLightCount);
                     pass.SetInt(command, "_PointLightCount", data.lightingSetupResult.pointLightCount);
+
+                    pass.SetConstantBuffer(command, "Exposure", data.exposureBuffer);
                 });
 
                 data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;
@@ -109,10 +111,11 @@ namespace Arycama.CustomRenderPipeline
                 data.volumeTileSize = settings.TileSize;
                 data.clusteredLightCullingResult = clusteredLightCullingResult;
                 data.lightingSetupResult = lightingSetupResult;
+                data.exposureBuffer = exposureBuffer;
             }
 
             // Filter X
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Filter X"))
             {
                 pass.Initialize(computeShader, 1, width, height, depth);
                 pass.ReadTexture("_Input", volumetricLightingCurrent);
@@ -120,7 +123,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Filter Y
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Filter Y"))
             {
                 pass.Initialize(computeShader, 2, width, height, depth);
                 pass.ReadTexture("_Input", volumetricLighting);
@@ -128,41 +131,30 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Accumulate
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Accumulate"))
             {
                 pass.Initialize(computeShader, 3, width, height, depth);
                 pass.ReadTexture("_Input", volumetricLightingHistory);
                 pass.WriteTexture("_Result", volumetricLighting);
             }
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Volumetric Lighting"))
-            {
-                var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
-                {
-                    command.SetGlobalFloat("_NonLinearDepth", data.nonLinearDepth);
-                    command.SetGlobalFloat("_VolumeWidth", data.volumeWidth);
-                    command.SetGlobalFloat("_VolumeHeight", data.volumeHeight);
-                    command.SetGlobalFloat("_VolumeSlices", data.volumeSlices);
-                    command.SetGlobalFloat("_VolumeDepth", data.volumeDepth);
-                });
-
-                data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;
-                data.volumeWidth = width;
-                data.volumeHeight = height;
-                data.volumeSlices = depth;
-                data.volumeDepth = farClipPlane;
-            }
-
-            return volumetricLighting;
+            return new Result(volumetricLighting, settings.NonLinearDepth ? 1.0f : 0.0f, width, height, depth, farClipPlane);
         }
 
-        private class Pass1Data
+        public struct Result
         {
-            internal float nonLinearDepth;
-            internal float volumeWidth;
-            internal float volumeHeight;
-            internal float volumeSlices;
-            internal float volumeDepth;
+            public RTHandle volumetricLighting;
+            public float nonLinearDepth, volumeWidth, volumeHeight, volumeSlices, volumeDepth;
+
+            public Result(RTHandle volumetricLighting, float nonLinearDepth, float volumeWidth, float volumeHeight, float volumeSlices, float volumeDepth)
+            {
+                this.volumetricLighting = volumetricLighting ?? throw new ArgumentNullException(nameof(volumetricLighting));
+                this.nonLinearDepth = nonLinearDepth;
+                this.volumeWidth = volumeWidth;
+                this.volumeHeight = volumeHeight;
+                this.volumeSlices = volumeSlices;
+                this.volumeDepth = volumeDepth;
+            }
         }
     }
 }

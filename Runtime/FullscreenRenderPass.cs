@@ -24,7 +24,7 @@ namespace Arycama.CustomRenderPipeline
             propertyBlock.SetTexture(propertyName, texture);
         }
 
-        public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
+        public override void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer)
         {
             propertyBlock.SetBuffer(propertyName, buffer);
         }
@@ -47,6 +47,16 @@ namespace Arycama.CustomRenderPipeline
         protected override void Execute(CommandBuffer command)
         {
             command.DrawProcedural(Matrix4x4.identity, Material, Index, MeshTopology.Triangles, 3, 1, propertyBlock);
+        }
+
+        public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)
+        {
+            propertyBlock.SetMatrix(propertyName, value);
+        }
+
+        public override void SetConstantBuffer(CommandBuffer command, string propertyName, BufferHandle value)
+        {
+            propertyBlock.SetConstantBuffer(propertyName, value, 0, value.Size);
         }
     }
 }

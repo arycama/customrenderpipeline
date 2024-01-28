@@ -27,7 +27,7 @@ namespace Arycama.CustomRenderPipeline
             //postRender.Add(cmd => cmd.SetGlobalTexture(propertyName, BuiltinRenderTextureType.None));
         }
 
-        public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
+        public override void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer)
         {
             command.SetGlobalBuffer(propertyName, buffer);
             //postRender.Add(cmd => cmd.SetGlobalBuffer(propertyName, (GraphicsBuffer)null));
@@ -54,6 +54,16 @@ namespace Arycama.CustomRenderPipeline
         protected override void Execute(CommandBuffer command)
         {
             command.DrawRendererList(rendererList);
+        }
+
+        public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)
+        {
+            command.SetGlobalMatrix(propertyName, value);
+        }
+
+        public override void SetConstantBuffer(CommandBuffer command, string propertyName, BufferHandle value)
+        {
+            command.SetGlobalConstantBuffer(value, propertyName, 0, value.Size);
         }
     }
 }

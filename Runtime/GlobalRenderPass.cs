@@ -11,7 +11,7 @@ namespace Arycama.CustomRenderPipeline
             command.SetGlobalTexture(propertyName, texture);
         }
 
-        public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
+        public override void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer)
         {
             command.SetGlobalBuffer(propertyName, buffer);
         }
@@ -34,6 +34,16 @@ namespace Arycama.CustomRenderPipeline
         protected override void Execute(CommandBuffer command)
         {
             // Does nothing (Eventually could do a command.setglobalbuffer or something?)
+        }
+
+        public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)
+        {
+            command.SetGlobalMatrix(propertyName, value);
+        }
+
+        public override void SetConstantBuffer(CommandBuffer command, string propertyName, BufferHandle value)
+        {
+            command.SetGlobalConstantBuffer(value, propertyName, 0, value.Size);
         }
     }
 }

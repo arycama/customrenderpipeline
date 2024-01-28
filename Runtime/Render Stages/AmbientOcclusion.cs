@@ -35,7 +35,7 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public void Render(Camera camera, RTHandle depth, RTHandle scene, float scale, RTHandle volumetricLighting)
+        public void Render(Camera camera, RTHandle depth, RTHandle scene, float scale, VolumetricLighting.Result volumetricLightingResult)
         {
             if (settings.Strength == 0.0f)
                 return;
@@ -108,9 +108,19 @@ namespace Arycama.CustomRenderPipeline
                 pass.Material = material;
                 pass.Index = 2;
                 pass.ReadTexture("_CameraDepth", depth);
-                pass.ReadTexture("_VolumetricLighting", volumetricLighting);
+                pass.ReadTexture("_VolumetricLighting", volumetricLightingResult.volumetricLighting);
                 pass.WriteTexture("", scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
                 pass.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
+
+                var data = pass.SetRenderFunction<Pass2Data>((command, context, pass, data) =>
+                {
+                    pass.SetFloat(command, "_NonLinearDepth", data.volumetricLightingResult.nonLinearDepth);
+                    pass.SetFloat(command, "_VolumeWidth", data.volumetricLightingResult.volumeWidth);
+                    pass.SetFloat(command, "_VolumeHeight", data.volumetricLightingResult.volumeHeight);
+                    pass.SetFloat(command, "_VolumeSlices", data.volumetricLightingResult.volumeSlices);
+                });
+
+                data.volumetricLightingResult = volumetricLightingResult;
             }
         }
 
@@ -130,6 +140,11 @@ namespace Arycama.CustomRenderPipeline
             internal float falloffBias;
             internal int directionCount;
             internal int sampleCount;
+        }
+
+        private class Pass2Data
+        {
+            internal VolumetricLighting.Result volumetricLightingResult;
         }
     }
 }

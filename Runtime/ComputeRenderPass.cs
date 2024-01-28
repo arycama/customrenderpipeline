@@ -23,7 +23,7 @@ namespace Arycama.CustomRenderPipeline
             command.SetComputeTextureParam(computeShader, kernelIndex, propertyName, texture);
         }
 
-        public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
+        public override void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer)
         {
             command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, buffer);
         }
@@ -54,6 +54,16 @@ namespace Arycama.CustomRenderPipeline
             {
                 command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].NameId, colorBindings[i].Handle);
             }
+        }
+
+        public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)
+        {
+            command.SetComputeMatrixParam(computeShader, propertyName, value);
+        }
+
+        public override void SetConstantBuffer(CommandBuffer command, string propertyName, BufferHandle value)
+        {
+            command.SetComputeConstantBufferParam(computeShader, propertyName, value, 0, value.Size);
         }
     }
 }
