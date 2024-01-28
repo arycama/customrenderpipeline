@@ -28,28 +28,16 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<BufferHandle> usedBufferHandles = new();
 
         private bool isExecuting;
-        private readonly GraphicsBuffer emptyBuffer;
 
+        public BufferHandle EmptyBuffer { get; }
         public RTHandle EmptyTextureArray { get; }
         public RTHandle EmptyCubemapArray { get; }
 
         public RenderGraph()
         {
-            emptyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int));
-
-            EmptyTextureArray = new RenderTexture(1, 1, 0, RenderTextureFormat.Shadowmap)
-            {
-                dimension = TextureDimension.Tex2DArray,
-                hideFlags = HideFlags.HideAndDontSave,
-                volumeDepth = 1,
-            };
-
-            EmptyCubemapArray = new RenderTexture(1, 1, 0, RenderTextureFormat.Shadowmap)
-            {
-                dimension = TextureDimension.CubeArray,
-                hideFlags = HideFlags.HideAndDontSave,
-                volumeDepth = 6,
-            };
+            EmptyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int));
+            EmptyTextureArray = new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1 };
+            EmptyCubemapArray = new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6 };
         }
 
         public T AddRenderPass<T>(string name) where T : RenderPass, new()
@@ -210,11 +198,6 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        public GraphicsBuffer GetEmptyBuffer()
-        {
-            return emptyBuffer;
-        }
-
         public RTHandle ImportRenderTexture(RenderTexture texture)
         {
             if(!importedTextures.TryGetValue(texture, out var result))
@@ -272,7 +255,7 @@ namespace Arycama.CustomRenderPipeline
                 bufferHandle.Release();
             availableBufferHandles.Clear();
 
-            emptyBuffer.Release();
+            EmptyBuffer.Release();
         }
     }
 }

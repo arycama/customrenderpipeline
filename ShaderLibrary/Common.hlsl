@@ -300,7 +300,7 @@ uint GetShadowCascade(uint lightIndex, float3 lightPosition, out float3 position
 	return ~0u;
 }
 
-float GetShadow(float3 worldPosition, uint lightIndex)
+float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 {
 	DirectionalLight light = _DirectionalLights[lightIndex];
 	if (light.shadowIndex == ~0u)
@@ -311,6 +311,16 @@ float GetShadow(float3 worldPosition, uint lightIndex)
 	
 	float2 jitter = _BlueNoise2D[uint2(positionCS.xy) % 128];
 	float3 lightPosition = MultiplyPoint3x4(light.worldToLight, worldPosition);
+	
+	if (!softShadow)
+	{
+		float3 shadowPosition;
+		uint cascade = GetShadowCascade(lightIndex, lightPosition, shadowPosition);
+		if (cascade == ~0u)
+			return 1.0;
+			
+		return _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z);
+	}
 
 	// PCS filtering
 	float occluderDepth = 0.0, occluderWeightSum = 0.0;
@@ -463,7 +473,7 @@ float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, fl
 	float3 lighting = 0.0;
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
-		float attenuation = GetShadow(worldPosition, i);
+		float attenuation = GetShadow(worldPosition, i, !isVolumetric);
 		if(!attenuation)
 			continue;
 		

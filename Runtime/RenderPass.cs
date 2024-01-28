@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Arycama.CustomRenderPipeline;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -29,6 +30,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void ReadTexture(string propertyName, RTHandle texture)
         {
+            Assert.IsNotNull(texture, propertyName);
             readTextures.Add((propertyName, texture));
         }
 
@@ -119,6 +121,7 @@ namespace Arycama.CustomRenderPipeline
                 // Need to set binding.depthRenderTarget to BuiltinRenderTextureType.None or the pass won't work
                 binding.depthRenderTarget = BuiltinRenderTextureType.None;
                 binding.depthLoadAction = RenderBufferLoadAction.DontCare;
+                binding.depthStoreAction = RenderBufferStoreAction.DontCare;
             }
 
             if (colorBindings.Count > 0)
@@ -163,6 +166,7 @@ namespace Arycama.CustomRenderPipeline
 
             depthBinding = default;
             colorBindings.Clear();
+            screenWrite = false;
         }
 
         void IDisposable.Dispose()

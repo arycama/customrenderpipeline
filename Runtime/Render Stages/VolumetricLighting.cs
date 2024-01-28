@@ -44,15 +44,16 @@ namespace Arycama.CustomRenderPipeline
             internal float volumeDepth;
             internal float blurSigma;
             internal float volumeTileSize;
+            internal ClusteredLightCulling.Result clusteredLightCullingResult;
+            internal int pointLightCount;
+            internal int directionalLightCount;
+            internal LightingSetup.Result lightingSetupResult;
         }
 
-        public RTHandle Render(int pixelWidth, int pixelHeight, float farClipPlane, Camera camera)
+        public RTHandle Render(int pixelWidth, int pixelHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult)
         {
-            var scaledWidth = pixelWidth;
-            var scaledHeight = pixelHeight;
-
-            var width = Mathf.CeilToInt(scaledWidth / (float)settings.TileSize);
-            var height = Mathf.CeilToInt(scaledHeight / (float)settings.TileSize);
+            var width = Mathf.CeilToInt(pixelWidth / (float)settings.TileSize);
+            var height = Mathf.CeilToInt(pixelHeight / (float)settings.TileSize);
             var depth = settings.DepthSlices;
             var volumetricLightingDescriptor = new RenderTextureDescriptor(width, height, RenderTextureFormat.ARGBHalf)
             {
@@ -69,8 +70,17 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
             {
                 pass.Initialize(computeShader, 0, width, height, depth);
-                pass.ReadTexture("_Input", volumetricLightingHistory);
                 pass.WriteTexture("_Result", volumetricLightingCurrent);
+
+                pass.ReadTexture("_Input", volumetricLightingHistory);
+                pass.ReadTexture("_LightClusterIndices", clusteredLightCullingResult.lightClusterIndices);
+                pass.ReadTexture("_DirectionalShadows", lightingSetupResult.directionalShadows);
+                pass.ReadTexture("_PointShadows", lightingSetupResult.pointShadows);
+
+                pass.ReadBuffer("_LightClusterList", clusteredLightCullingResult.lightList);
+                pass.ReadBuffer("_DirectionalMatrices", lightingSetupResult.directionalMatrices);
+                pass.ReadBuffer("_DirectionalLights", lightingSetupResult.directionalLights);
+                pass.ReadBuffer("_PointLights", lightingSetupResult.pointLights);
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
@@ -81,6 +91,13 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_VolumeDepth", data.volumeDepth);
                     pass.SetFloat(command, "_BlurSigma", data.blurSigma);
                     pass.SetFloat(command, "_VolumeTileSize", data.volumeTileSize);
+
+                    pass.SetFloat(command, "_ClusterScale", data.clusteredLightCullingResult.clusterScale);
+                    pass.SetFloat(command, "_ClusterBias", data.clusteredLightCullingResult.clusterBias);
+                    pass.SetInt(command, "_TileSize", data.clusteredLightCullingResult.tileSize);
+
+                    pass.SetInt(command, "_DirectionalLightCount", data.lightingSetupResult.directionalLightCount);
+                    pass.SetInt(command, "_PointLightCount", data.lightingSetupResult.pointLightCount);
                 });
 
                 data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;
@@ -90,6 +107,8 @@ namespace Arycama.CustomRenderPipeline
                 data.volumeDepth = farClipPlane;
                 data.blurSigma = settings.BlurSigma;
                 data.volumeTileSize = settings.TileSize;
+                data.clusteredLightCullingResult = clusteredLightCullingResult;
+                data.lightingSetupResult = lightingSetupResult;
             }
 
             // Filter X

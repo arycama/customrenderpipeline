@@ -35,17 +35,27 @@ namespace Arycama.CustomRenderPipeline
             public int tileSize;
             public float rcpClusterDepth;
             public BufferHandle counterBuffer;
+            internal int pointLightCount;
         }
 
-        class Pass1Data
+        public readonly struct Result
         {
-            public RTHandle lightClusterIndices;
-            public BufferHandle lightList;
-            public float clusterScale, clusterBias;
-            public int tileSize;
+            public readonly RTHandle lightClusterIndices;
+            public readonly BufferHandle lightList;
+            public readonly float clusterScale, clusterBias;
+            public readonly int tileSize;
+
+            public Result(RTHandle lightClusterIndices, BufferHandle lightList, float clusterScale, float clusterBias, int tileSize)
+            {
+                this.lightClusterIndices = lightClusterIndices ?? throw new ArgumentNullException(nameof(lightClusterIndices));
+                this.lightList = lightList ?? throw new ArgumentNullException(nameof(lightList));
+                this.clusterScale = clusterScale;
+                this.clusterBias = clusterBias;
+                this.tileSize = tileSize;
+            }
         }
 
-        public void Render(int width, int height, float near, float far)
+        public Result Render(int width, int height, float near, float far, LightingSetup.Result lightingSetupResult)
         {
             var clusterWidth = DivRoundUp(width, settings.TileSize);
             var clusterHeight = DivRoundUp(height, settings.TileSize);
@@ -62,42 +72,28 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Clustered Light Culling"))
             {
                 pass.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
-                pass.ReadTexture("_LightClusterIndicesWrite", lightClusterIndices);
-                pass.WriteBuffer("_LightClusterListWrite", lightList);
-
                 var counterBuffer = renderGraph.GetBuffer();
+
+                pass.WriteBuffer("_LightClusterListWrite", lightList);
                 pass.WriteBuffer("_LightCounter", counterBuffer);
+                pass.ReadTexture("_LightClusterIndicesWrite", lightClusterIndices);
+                pass.ReadBuffer("_PointLights", lightingSetupResult.pointLights);
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
                     command.SetBufferData(data.counterBuffer, zeroArray);
                     pass.SetInt(command, "_TileSize", data.tileSize);
                     pass.SetFloat(command, "_RcpClusterDepth", data.rcpClusterDepth);
+                    pass.SetInt(command, "_PointLightCount", data.pointLightCount);
                 });
 
                 data.tileSize = settings.TileSize;
                 data.rcpClusterDepth = 1.0f / settings.ClusterDepth;
                 data.counterBuffer = counterBuffer;
+                data.pointLightCount = lightingSetupResult.pointLightCount;
             }
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Clustered Light Set Globals"))
-            {
-                var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
-                {
-                    // TODO: Handle this with proper pass inputs/outputs
-                    command.SetGlobalTexture("_LightClusterIndices", data.lightClusterIndices);
-                    command.SetGlobalBuffer("_LightClusterList", data.lightList);
-                    command.SetGlobalFloat("_ClusterScale", data.clusterScale);
-                    command.SetGlobalFloat("_ClusterBias", data.clusterBias);
-                    command.SetGlobalInt("_TileSize", data.tileSize);
-                });
-
-                data.lightClusterIndices = lightClusterIndices;
-                data.lightList = lightList;
-                data.clusterScale = clusterScale;
-                data.clusterBias = clusterBias;
-                data.tileSize = settings.TileSize;
-            }
+            return new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize);
         }
     }
 }
