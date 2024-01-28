@@ -61,6 +61,7 @@ namespace Arycama.CustomRenderPipeline
             internal float minEv, maxEv, adaptationSpeed, exposureCompensation, iso, aperture, shutterSpeed, histogramMin, histogramMax;
             internal Vector4 exposureCompensationRemap;
             internal BufferHandle exposureBuffer;
+            internal Vector4 scaledResolution;
         }
 
         class Pass1Data
@@ -141,7 +142,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "HistogramMin", data.histogramMin);
                     pass.SetFloat(command, "HistogramMax", data.histogramMax);
                     pass.SetVector(command, "_ExposureCompensationRemap", data.exposureCompensationRemap);
-
+                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                     pass.SetConstantBuffer(command, "Exposure", data.exposureBuffer);
                 });
 
@@ -156,6 +157,7 @@ namespace Arycama.CustomRenderPipeline
                 data.histogramMax = settings.HistogramPercentages.y;
                 data.exposureCompensationRemap = GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1);
                 data.exposureBuffer = exposureBuffer;
+                data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
             }
 
             var output = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);

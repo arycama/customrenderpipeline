@@ -16,7 +16,7 @@ float CalculateLightFalloff(float rcpLightDist, float sqrLightDist, float rcpSqL
 RWTexture3D<float4> _Result;
 Texture3D<float4> _Input;
 uint _VolumeTileSize;
-float _BlurSigma;
+float _BlurSigma, _FogMode;
 
 [numthreads(8, 8, 8)]
 void Compute(uint3 id : SV_DispatchThreadID)
@@ -25,7 +25,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	//jitter = InterleavedGradientNoise(id.xy, 0);
 	
 	float2 positionNDC = (id.xy + 0.5) / float2(_VolumeWidth, _VolumeHeight);
-	float2 pixelPosition = positionNDC * floor(_ScreenParams.xy * _Scale);
+	float2 pixelPosition = positionNDC * _ScaledResolution.xy;
 	
 	float normalizedDepth = (id.z + jitter) / _VolumeSlices;
 	
@@ -47,7 +47,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	float viewDistance = distance(positionWS, _WorldSpaceCameraPos);
 	lighting += GetLighting(0.0, positionWS, pixelPosition, positionCS.w, 1.0, 0.0, 1.0, true);
 	
-	float extinction = viewDistance > _FogStartDistance && viewDistance < _FogEndDistance ? rcp(_FogEndDistance - viewDistance) : 0.0;
+	float extinction = _FogMode ? (viewDistance > _FogStartDistance && viewDistance < _FogEndDistance ? rcp(_FogEndDistance - viewDistance) : 0.0) : 0.0;
 	float4 luminanceExtinction = float4(albedo * lighting, extinction);
 	
 	// Reproject previous frame. Needs to use unjittered world position

@@ -36,6 +36,8 @@ namespace Arycama.CustomRenderPipeline
             public float rcpClusterDepth;
             public BufferHandle counterBuffer;
             internal int pointLightCount;
+            internal Vector4 scaledResolution;
+            internal Matrix4x4 invVpMatrix;
         }
 
         public readonly struct Result
@@ -55,7 +57,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public Result Render(int width, int height, float near, float far, LightingSetup.Result lightingSetupResult)
+        public Result Render(int width, int height, float near, float far, LightingSetup.Result lightingSetupResult, Matrix4x4 invVpMatrix)
         {
             var clusterWidth = DivRoundUp(width, settings.TileSize);
             var clusterHeight = DivRoundUp(height, settings.TileSize);
@@ -85,12 +87,16 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_TileSize", data.tileSize);
                     pass.SetFloat(command, "_RcpClusterDepth", data.rcpClusterDepth);
                     pass.SetInt(command, "_PointLightCount", data.pointLightCount);
+                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
+                    pass.SetMatrix(command, "_InvVPMatrix", data.invVpMatrix);
                 });
 
                 data.tileSize = settings.TileSize;
                 data.rcpClusterDepth = 1.0f / settings.ClusterDepth;
                 data.counterBuffer = counterBuffer;
                 data.pointLightCount = lightingSetupResult.pointLightCount;
+                data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
+                data.invVpMatrix = invVpMatrix;
             }
 
             return new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize);

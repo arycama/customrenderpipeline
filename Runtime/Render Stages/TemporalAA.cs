@@ -67,14 +67,17 @@ namespace Arycama.CustomRenderPipeline
             Jitter = jitter;
         }
 
-        class PassData
+        private class PassData
         {
-            public float sharpness;
-            public float wasCreated;
-            public float stationaryBlending;
-            public float motionBlending;
-            public float motionWeight;
-            public float scale;
+            internal float sharpness;
+            internal float wasCreated;
+            internal float stationaryBlending;
+            internal float motionBlending;
+            internal float motionWeight;
+            internal float scale;
+            internal Vector2 jitter;
+            internal Vector4 scaledResolution;
+            internal Vector4 resolution;
         }
 
         public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
@@ -99,6 +102,10 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "_MotionBlending", data.motionBlending);
                 pass.SetFloat(command, "_MotionWeight", data.motionWeight);
                 pass.SetFloat(command, "_Scale", data.scale);
+
+                pass.SetVector(command, "_Jitter", data.jitter);
+                pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
+                pass.SetVector(command, "_Resolution", data.resolution);
             });
 
             data.sharpness = settings.Sharpness;
@@ -107,6 +114,9 @@ namespace Arycama.CustomRenderPipeline
             data.motionBlending = settings.MotionBlending;
             data.motionWeight = settings.MotionWeight;
             data.scale = scale;
+            data.jitter = Jitter;
+            data.scaledResolution = new Vector4(camera.pixelWidth * scale, camera.pixelHeight * scale, 1.0f / (camera.pixelWidth * scale), 1.0f / (camera.pixelHeight * scale));
+            data.resolution = new Vector4(camera.pixelWidth, camera.pixelHeight, 1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight);
 
             return current;
         }

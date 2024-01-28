@@ -48,6 +48,7 @@ namespace Arycama.CustomRenderPipeline
             public Texture2D grainTexture;
             public float bloomStrength, isSceneView, toeStrength, toeLength, shoulderStrength, shoulderLength, shoulderAngle, noiseIntensity, noiseResponse, shutterSpeed, aperture;
             public Vector4 grainTextureParams;
+            internal Vector4 resolution;
         }
 
         public void Render(RTHandle input, RTHandle bloom, bool isSceneView, int width, int height)
@@ -77,6 +78,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "ShutterSpeed", data.shutterSpeed);
                 pass.SetFloat(command, "Aperture", data.aperture);
                 pass.SetVector(command, "_GrainTextureParams", data.grainTextureParams);
+                pass.SetVector(command, "_Resolution", data.resolution);
             });
 
             var offsetX = Random.value;
@@ -97,6 +99,7 @@ namespace Arycama.CustomRenderPipeline
             data.shutterSpeed = lensSettings.ShutterSpeed;
             data.aperture = lensSettings.Aperture;
             data.grainTextureParams = new Vector4(uvScaleX, uvScaleY, offsetX, offsetY);
+            data.resolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
         }
     }
 }

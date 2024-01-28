@@ -2,7 +2,7 @@
 
 Texture2D<float3> _MainTex, _Bloom;
 Texture2D<float> _GrainTexture;
-float4 _GrainTextureParams;
+float4 _GrainTextureParams, _Resolution;
 float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, ShutterSpeed;
 
 float4 Vertex(uint id : SV_VertexID) : SV_Position
@@ -97,10 +97,10 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 {
 	// Need to flip for game view
 	if (!_IsSceneView)
-		position.y = _ScreenParams.y - position.y;
+		position.y = _Resolution.y - position.y;
 	
 	float3 input = _MainTex[position.xy];
-	float2 uv = position.xy / _ScreenParams.xy;
+	float2 uv = position.xy * _Resolution.zw;
 	
 	// Take 9 samples around current texel:
     // a - b - c
@@ -146,8 +146,10 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float iso = ComputeISO(Aperture, ShutterSpeed, ev100);
 	
 	
-	float grain = _GrainTexture.Sample(_LinearRepeatSampler, position.xy / _ScreenParams.xy * _GrainTextureParams.xy + _GrainTextureParams.zw);
-	input = max(0.0, input * (1.0 + (grain * 2.0 - 1.0) * (NoiseIntensity / 1000) * iso));
+	float grain = _GrainTexture.Sample(_LinearRepeatSampler, position.xy * _Resolution.zw * _GrainTextureParams.xy + _GrainTextureParams.zw);
+	//input = max(0.0, input * (1.0 + (grain * 2.0 - 1.0) * (NoiseIntensity / 1000) * iso));
+	
+	//input += (grain - 0.5) * NoiseIntensity;
 	
 	
 	return input;

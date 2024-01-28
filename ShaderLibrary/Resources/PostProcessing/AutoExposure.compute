@@ -1,6 +1,5 @@
 #include "../../Common.hlsl"
 
-#pragma enable_d3d11_debug_symbols
 #pragma kernel LuminanceBuildHistogram
 #pragma kernel LuminanceHistogramAverage
 
@@ -15,7 +14,6 @@ float MinEv, MaxEv;
 float AdaptationSpeed;
 float ExposureCompensation;
 float Aperture, Iso, ShutterSpeed;
-
 float4 unity_DeltaTime;
 
 groupshared uint HistogramShared[NUM_HISTOGRAM_BINS];
@@ -27,7 +25,7 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
     
     GroupMemoryBarrierWithGroupSync();
     
-	if (all(threadId < floor(_ScreenParams.xy * _Scale)))
+	if (all(threadId < _ScaledResolution.xy))
 	{
 		float3 color = Input[threadId];
 		float luminance = Luminance(color) / _Exposure;
@@ -69,7 +67,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
     
 	if (groupIndex == 0)
 	{
-		float pixelCount = floor(_ScreenParams.x * _Scale) * floor(_ScreenParams.y * _Scale);
+		float pixelCount = _ScaledResolution.x * _ScaledResolution.y;
 	
 		float weightedLogAverage = HistogramShared[0] / pixelCount;
 		float averageEv = Remap(HistogramShared[0] / pixelCount, 0.0, 255.0, MinEv, MaxEv);

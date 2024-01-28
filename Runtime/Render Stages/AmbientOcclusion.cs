@@ -1,5 +1,4 @@
 using System;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -8,24 +7,6 @@ namespace Arycama.CustomRenderPipeline
 {
     public class AmbientOcclusion : RenderFeature
     {
-        [Serializable]
-        public class Settings
-        {
-            [SerializeField, Range(0.0f, 8.0f)] private float strength = 1.0f;
-            [SerializeField] private Color tint = Color.black;
-            [SerializeField] private float radius = 5.0f;
-            [SerializeField, Range(0f, 1f)] private float falloff = 0.75f;
-            [SerializeField, Range(1, 8)] private int directionCount = 1;
-            [SerializeField, Range(1, 32)] private int sampleCount = 8;
-
-            public float Strength => strength;
-            public Color Tint => tint;
-            public float Radius => radius;
-            public float Falloff => falloff;
-            public int DirectionCount => directionCount;
-            public int SampleCount => sampleCount;
-        }
-
         private readonly Settings settings;
         private readonly Material material;
 
@@ -35,7 +16,7 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public void Render(Camera camera, RTHandle depth, RTHandle scene, float scale, VolumetricLighting.Result volumetricLightingResult)
+        public void Render(Camera camera, RTHandle depth, RTHandle scene, float scale, VolumetricLighting.Result volumetricLightingResult, Texture2D blueNoise2D, Matrix4x4 invVpMatrix)
         {
             if (settings.Strength == 0.0f)
                 return;
@@ -59,9 +40,13 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
                     pass.SetVector(command, "ScaleOffset", data.scaleOffset);
+                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
+                    pass.SetMatrix(command, "_InvVPMatrix", data.invVpMatrix);
                 });
 
                 data.scaleOffset = new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight);
+                data.scaledResolution = new Vector4(scaledWidth, scaledHeight, 1.0f / scaledWidth, 1.0f / scaledHeight);
+                data.invVpMatrix = invVpMatrix;
             }
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Compute"))
@@ -86,6 +71,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_FalloffBias", data.falloffBias);
                     pass.SetInt(command, "_DirectionCount", data.directionCount);
                     pass.SetInt(command, "_SampleCount", data.sampleCount);
+                    pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2d);
+                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
+                    pass.SetMatrix(command, "_InvVPMatrix", data.invVpMatrix);
                 });
 
                 var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
@@ -100,6 +88,9 @@ namespace Arycama.CustomRenderPipeline
                 data.falloffBias = settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff);
                 data.directionCount = settings.DirectionCount;
                 data.sampleCount = settings.SampleCount;
+                data.blueNoise2d = blueNoise2D;
+                data.scaledResolution = new Vector4(scaledWidth, scaledHeight, 1.0f / scaledWidth, 1.0f / scaledHeight);
+                data.invVpMatrix = invVpMatrix;
             }
 
             if (RenderSettings.fog)
@@ -118,15 +109,37 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_VolumeWidth", data.volumetricLightingResult.volumeWidth);
                     pass.SetFloat(command, "_VolumeHeight", data.volumetricLightingResult.volumeHeight);
                     pass.SetFloat(command, "_VolumeSlices", data.volumetricLightingResult.volumeSlices);
+                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                 });
 
                 data.volumetricLightingResult = volumetricLightingResult;
+                data.scaledResolution = new Vector4(scaledWidth, scaledHeight, 1.0f / scaledWidth, 1.0f / scaledHeight);
             }
+        }
+
+        [Serializable]
+        public class Settings
+        {
+            [SerializeField, Range(0.0f, 8.0f)] private float strength = 1.0f;
+            [SerializeField] private Color tint = Color.black;
+            [SerializeField] private float radius = 5.0f;
+            [SerializeField, Range(0f, 1f)] private float falloff = 0.75f;
+            [SerializeField, Range(1, 8)] private int directionCount = 1;
+            [SerializeField, Range(1, 32)] private int sampleCount = 8;
+
+            public float Strength => strength;
+            public Color Tint => tint;
+            public float Radius => radius;
+            public float Falloff => falloff;
+            public int DirectionCount => directionCount;
+            public int SampleCount => sampleCount;
         }
 
         private class Pass0Data
         {
             internal Vector2 scaleOffset;
+            internal Vector4 scaledResolution;
+            internal Matrix4x4 invVpMatrix;
         }
 
         private class Pass1Data
@@ -140,11 +153,15 @@ namespace Arycama.CustomRenderPipeline
             internal float falloffBias;
             internal int directionCount;
             internal int sampleCount;
+            internal Texture2D blueNoise2d;
+            internal Vector4 scaledResolution;
+            internal Matrix4x4 invVpMatrix;
         }
 
         private class Pass2Data
         {
             internal VolumetricLighting.Result volumetricLightingResult;
+            internal Vector4 scaledResolution;
         }
     }
 }

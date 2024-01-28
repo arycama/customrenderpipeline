@@ -27,9 +27,9 @@ cbuffer Exposure
 	float _Exposure;
 };
 
-Buffer<float4> _DirectionalShadowTexelSizes, _PointShadowTexelSizes;
+Buffer<float4> _DirectionalShadowTexelSizes;
 Buffer<uint> _LightClusterList;
-SamplerComparisonState _PointClampCompareSampler, _LinearClampCompareSampler;
+SamplerComparisonState _LinearClampCompareSampler;
 SamplerState _LinearClampSampler, _LinearRepeatSampler, _PointClampSampler, _TrilinearRepeatAniso16Sampler;
 StructuredBuffer<DirectionalLight> _DirectionalLights;
 StructuredBuffer<matrix> _DirectionalMatrices;
@@ -41,12 +41,12 @@ Texture3D<float4> _VolumetricLighting;
 Texture3D<uint2> _LightClusterIndices;
 TextureCubeArray<float> _PointShadows;
 
-float4 _Time, _ProjectionParams, _ZBufferParams, _ScreenParams;
-float3 _AmbientLightColor, _WorldSpaceCameraPos, _FogColor, _WaterAlbedo, _WaterExtinction;
+float4 _Time, _ProjectionParams, _ZBufferParams, _ScaledResolution;
+float3 _AmbientLightColor, _WorldSpaceCameraPos, _FogColor;
 float2 _Jitter;
-float _BlockerRadius, _ClusterBias, _ClusterScale, _FogStartDistance, _FogEndDistance, _FogEnabled, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _NonLinearDepth, _AoEnabled, _Scale;
+float _BlockerRadius, _ClusterBias, _ClusterScale, _FogStartDistance, _FogEndDistance, _FogEnabled, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _NonLinearDepth, _AoEnabled;
 matrix _InvVPMatrix, _PreviousVPMatrix, unity_MatrixVP, _NonJitteredVPMatrix, unity_MatrixV;
-uint _BlockerSamples, _DirectionalLightCount, _FrameCount, _PcfSamples, _PointLightCount, _TileSize, unity_BaseInstanceID;
+uint _BlockerSamples, _DirectionalLightCount, _PcfSamples, _PointLightCount, _TileSize, unity_BaseInstanceID;
 
 const static float Pi = radians(180.0);
 const static float HalfPi = Pi * 0.5;
@@ -229,7 +229,7 @@ float3 ClipToWorld(float3 position)
 
 float3 PixelToWorld(float3 position)
 {
-	return ClipToWorld(float3(position.xy / floor(_ScreenParams.xy * _Scale) * 2 - 1, position.z));
+	return ClipToWorld(float3(position.xy * _ScaledResolution.zw * 2 - 1, position.z));
 }
 
 float4 WorldToClipNonJittered(float3 position) { return MultiplyPoint(_NonJitteredVPMatrix, position); }
@@ -305,13 +305,9 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 	DirectionalLight light = _DirectionalLights[lightIndex];
 	if (light.shadowIndex == ~0u)
 		return 1.0;
-	
-	float4 positionCS = PerspectiveDivide(WorldToClip(worldPosition));
-	positionCS.xy = (positionCS.xy * 0.5 + 0.5) * floor(_ScreenParams.xy * _Scale);
-	
-	float2 jitter = _BlueNoise2D[uint2(positionCS.xy) % 128];
+		
 	float3 lightPosition = MultiplyPoint3x4(light.worldToLight, worldPosition);
-	
+		
 	if (!softShadow)
 	{
 		float3 shadowPosition;
@@ -321,6 +317,11 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 			
 		return _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z);
 	}
+	
+	float4 positionCS = PerspectiveDivide(WorldToClip(worldPosition));
+	positionCS.xy = (positionCS.xy * 0.5 + 0.5) * _ScaledResolution.xy;
+	
+	float2 jitter = _BlueNoise2D[uint2(positionCS.xy) % 128];
 
 	// PCS filtering
 	float occluderDepth = 0.0, occluderWeightSum = 0.0;
@@ -553,11 +554,8 @@ float GetVolumetricUv(float linearDepth)
 
 float4 SampleVolumetricLighting(float2 pixelPosition, float eyeDepth)
 {
-	if (!_FogEnabled)
-		return float4(0.0, 0.0, 0.0, 1.0);
-		
 	float normalizedDepth = GetVolumetricUv(eyeDepth);
-	float3 volumeUv = float3(pixelPosition / floor(_ScreenParams.xy * _Scale), normalizedDepth);
+	float3 volumeUv = float3(pixelPosition * _ScaledResolution.zw, normalizedDepth);
 	return _VolumetricLighting.Sample(_LinearClampSampler, volumeUv);
 }
 

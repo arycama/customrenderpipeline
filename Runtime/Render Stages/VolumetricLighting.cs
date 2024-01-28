@@ -7,19 +7,6 @@ namespace Arycama.CustomRenderPipeline
 {
     public class VolumetricLighting : RenderFeature
     {
-        [Serializable]
-        public class Settings
-        {
-            [SerializeField] private int tileSize = 8;
-            [SerializeField] private int depthSlices = 128;
-            [SerializeField, Range(0.0f, 2.0f)] private float blurSigma = 1.0f;
-            [SerializeField] private bool nonLinearDepth = true;
-
-            public int TileSize => tileSize;
-            public int DepthSlices => depthSlices;
-            public float BlurSigma => blurSigma;
-            public bool NonLinearDepth => nonLinearDepth;
-        }
 
         private readonly Settings settings;
         private readonly CameraTextureCache volumetricLightingTextureCache;
@@ -35,26 +22,10 @@ namespace Arycama.CustomRenderPipeline
             volumetricLightingTextureCache.Dispose();
         }
 
-        private class Pass0Data
+        public Result Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, Texture2D blueNoise1D, Texture2D blueNoise2D, Color ambientLightColor, Color fogColor, float fogStartDistance, float fogEndDistance, float fogDensity, float fogMode, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix)
         {
-            internal float nonLinearDepth;
-            internal float volumeWidth;
-            internal float volumeHeight;
-            internal float volumeSlices;
-            internal float volumeDepth;
-            internal float blurSigma;
-            internal float volumeTileSize;
-            internal ClusteredLightCulling.Result clusteredLightCullingResult;
-            internal int pointLightCount;
-            internal int directionalLightCount;
-            internal LightingSetup.Result lightingSetupResult;
-            internal BufferHandle exposureBuffer;
-        }
-
-        public Result Render(int pixelWidth, int pixelHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer)
-        {
-            var width = Mathf.CeilToInt(pixelWidth / (float)settings.TileSize);
-            var height = Mathf.CeilToInt(pixelHeight / (float)settings.TileSize);
+            var width = Mathf.CeilToInt(screenWidth / (float)settings.TileSize);
+            var height = Mathf.CeilToInt(screenHeight / (float)settings.TileSize);
             var depth = settings.DepthSlices;
             var volumetricLightingDescriptor = new RenderTextureDescriptor(width, height, RenderTextureFormat.ARGBHalf)
             {
@@ -99,7 +70,21 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_DirectionalLightCount", data.lightingSetupResult.directionalLightCount);
                     pass.SetInt(command, "_PointLightCount", data.lightingSetupResult.pointLightCount);
 
+                    pass.SetTexture(command, "_BlueNoise1D", data.blueNoise1D);
+                    pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2D);
+
                     pass.SetConstantBuffer(command, "Exposure", data.exposureBuffer);
+
+                    pass.SetVector(command, "_AmbientLightColor", data.ambientLightColor);
+                    pass.SetVector(command, "_FogColor", data.fogColor);
+                    pass.SetFloat(command, "_FogStartDistance", data.fogStartDistance);
+                    pass.SetFloat(command, "_FogEndDistance", data.fogEndDistance);
+                    pass.SetFloat(command, "_FogDensity", data.fogDensity);
+                    pass.SetFloat(command, "_FogMode", data.fogMode);
+
+                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
+                    pass.SetMatrix(command, "_PreviousVPMatrix", data.previousVpMatrix);
+                    pass.SetMatrix(command, "_InvVPMatrix", data.invVpMatrix);
                 });
 
                 data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;
@@ -112,6 +97,17 @@ namespace Arycama.CustomRenderPipeline
                 data.clusteredLightCullingResult = clusteredLightCullingResult;
                 data.lightingSetupResult = lightingSetupResult;
                 data.exposureBuffer = exposureBuffer;
+                data.blueNoise1D = blueNoise1D;
+                data.blueNoise2D = blueNoise2D;
+                data.ambientLightColor = ambientLightColor;
+                data.fogColor = fogColor;
+                data.fogStartDistance = fogStartDistance;
+                data.fogEndDistance = fogEndDistance;
+                data.fogDensity = fogDensity;
+                data.fogMode = fogMode;
+                data.scaledResolution = new Vector4(screenWidth, screenHeight, 1.0f / screenWidth, 1.0f / screenHeight);
+                data.previousVpMatrix = previousVpMatrix;
+                data.invVpMatrix = invVpMatrix;
             }
 
             // Filter X
@@ -139,6 +135,47 @@ namespace Arycama.CustomRenderPipeline
             }
 
             return new Result(volumetricLighting, settings.NonLinearDepth ? 1.0f : 0.0f, width, height, depth, farClipPlane);
+        }
+
+        [Serializable]
+        public class Settings
+        {
+            [SerializeField] private int tileSize = 8;
+            [SerializeField] private int depthSlices = 128;
+            [SerializeField, Range(0.0f, 2.0f)] private float blurSigma = 1.0f;
+            [SerializeField] private bool nonLinearDepth = true;
+
+            public int TileSize => tileSize;
+            public int DepthSlices => depthSlices;
+            public float BlurSigma => blurSigma;
+            public bool NonLinearDepth => nonLinearDepth;
+        }
+
+        private class Pass0Data
+        {
+            internal float nonLinearDepth;
+            internal float volumeWidth;
+            internal float volumeHeight;
+            internal float volumeSlices;
+            internal float volumeDepth;
+            internal float blurSigma;
+            internal float volumeTileSize;
+            internal ClusteredLightCulling.Result clusteredLightCullingResult;
+            internal int pointLightCount;
+            internal int directionalLightCount;
+            internal LightingSetup.Result lightingSetupResult;
+            internal BufferHandle exposureBuffer;
+            internal Texture2D blueNoise1D;
+            internal Texture2D blueNoise2D;
+            internal Color ambientLightColor;
+            internal Color fogColor;
+            internal float fogStartDistance;
+            internal float fogEndDistance;
+            internal float fogDensity;
+            internal float fogMode;
+            internal Vector4 scaledResolution;
+            internal Matrix4x4 previousVpMatrix;
+            internal Matrix4x4 invVpMatrix;
         }
 
         public struct Result

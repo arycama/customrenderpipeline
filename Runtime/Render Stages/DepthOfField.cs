@@ -32,6 +32,7 @@ namespace Arycama.CustomRenderPipeline
         {
             internal float focalDistance, focalLength, apertureSize, maxCoc, sensorHeight, sampleRadius;
             internal int sampleCount;
+            internal Vector4 scaledResolution;
         }
 
         public RTHandle Render(int width, int height, float fieldOfView, RTHandle color, RTHandle depth)
@@ -59,6 +60,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetFloat(command, "_SampleRadius", data.sampleRadius);
                     pass.SetInt(command, "_SampleCount", data.sampleCount);
+                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                 });
 
                 var sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
@@ -76,6 +78,7 @@ namespace Arycama.CustomRenderPipeline
                 data.sensorHeight = sensorSize;
                 data.sampleRadius = settings.SampleRadius;
                 data.sampleCount = settings.SampleCount;
+                data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
             }
 
             return tempId;
