@@ -13,6 +13,7 @@ public class RTHandle
     public int VolumeDepth { get; set; }
     public TextureDimension Dimension { get; set; }
     public bool IsImported { get; set; }
+    public Vector2 Scale { get; set; }
 
     public RenderTexture RenderTexture { get; set; }
 
@@ -36,7 +37,8 @@ public class RTHandle
             EnableRandomWrite = renderTexture.enableRandomWrite,
             VolumeDepth = renderTexture.volumeDepth,
             Dimension = renderTexture.dimension,
-            RenderTexture = renderTexture
+            RenderTexture = renderTexture,
+            Scale = Vector2.one
         };
     }
 

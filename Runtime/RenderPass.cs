@@ -71,7 +71,11 @@ namespace Arycama.CustomRenderPipeline
             command.BeginSample(Name);
 
             foreach (var texture in readTextures)
-                SetTexture(command, texture.Item1, texture.Item2);
+            {
+                var handle = texture.Item2;
+                SetTexture(command, texture.Item1, handle);
+                SetVector(command, $"{texture.Item1}_Scale", new Vector4(handle.Scale.x, handle.Scale.y, 1.0f / handle.Scale.x, 1.0f / handle.Scale.y));
+            }
             readTextures.Clear();
 
             foreach (var buffer in readBuffers)
@@ -104,9 +108,15 @@ namespace Arycama.CustomRenderPipeline
         protected virtual void SetupTargets(CommandBuffer command)
         {
             // TODO: Can clear a depth and color target together
+            var maxWidth = 0;
+            var maxHeight = 0;
+
             var binding = new RenderTargetBinding();
             if (depthBinding.Handle != null)
             {
+                maxWidth = Mathf.Max(maxWidth, depthBinding.Handle.Width);
+                maxHeight = Mathf.Max(maxHeight, depthBinding.Handle.Height);
+
                 // Load action not supported outside of renderpass API, so emulate it here
                 if (depthBinding.LoadAction == RenderBufferLoadAction.Clear)
                 {
@@ -155,6 +165,9 @@ namespace Arycama.CustomRenderPipeline
 
                     targets[i] = target.Handle;
                     storeActions[i] = target.StoreAction;
+
+                    maxWidth = Mathf.Max(maxWidth, target.Handle.Width);
+                    maxHeight = Mathf.Max(maxHeight, target.Handle.Height);
                 }
 
                 binding.colorRenderTargets = targets;
@@ -170,6 +183,9 @@ namespace Arycama.CustomRenderPipeline
                 command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
             else if (depthBinding.Handle != null || colorBindings.Count > 0)
                 command.SetRenderTarget(binding);
+
+            if(!screenWrite)
+                command.SetViewport(new Rect(0, 0, maxWidth, maxHeight));
 
             depthBinding = default;
             colorBindings.Clear();

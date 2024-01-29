@@ -2,7 +2,7 @@
 
 Texture2D<float3> _MainTex, _Bloom;
 Texture2D<float> _GrainTexture;
-float4 _GrainTextureParams, _Resolution;
+float4 _GrainTextureParams, _Resolution, _Bloom_Scale, _Bloom_TexelSize;
 float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, ShutterSpeed;
 
 float4 Vertex(uint id : SV_VertexID) : SV_Position
@@ -107,17 +107,17 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
     // d - e - f
     // g - h - i
     // === ('e' is the current texel) ===
-	float3 a = _Bloom.SampleLevel(_LinearClampSampler, uv, 0.0, int2(-1, 1));
-	float3 b = _Bloom.SampleLevel(_LinearClampSampler, uv, 0.0, int2(0, 1));
-	float3 c = _Bloom.SampleLevel(_LinearClampSampler, uv, 0.0, int2(1, 1));
+	float3 a = _Bloom.Sample(_LinearClampSampler, (uv + float2(-1, 1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
+	float3 b = _Bloom.Sample(_LinearClampSampler, (uv + float2(0, 1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
+	float3 c = _Bloom.Sample(_LinearClampSampler, (uv + float2(1, 1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
 
-	float3 d = _Bloom.SampleLevel(_LinearClampSampler, uv, 0.0, int2(-1, 0));
-	float3 e = _Bloom.SampleLevel(_LinearClampSampler, uv, 0.0, int2(0, 0));
-	float3 f = _Bloom.SampleLevel(_LinearClampSampler, uv, 0.0, int2(1, 0));
+	float3 d = _Bloom.Sample(_LinearClampSampler, (uv + float2(-1, 0) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
+	float3 e = _Bloom.Sample(_LinearClampSampler, (uv + float2(0, 0) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
+	float3 f = _Bloom.Sample(_LinearClampSampler, (uv + float2(1, 0) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
 
-	float3 g = _Bloom.SampleLevel(_LinearClampSampler, uv, 0.0, int2(-1, -1));
-	float3 h = _Bloom.SampleLevel(_LinearClampSampler, uv, 0.0, int2(0, -1));
-	float3 i = _Bloom.SampleLevel(_LinearClampSampler, uv, 0.0, int2(1, -1));
+	float3 g = _Bloom.Sample(_LinearClampSampler, (uv + float2(-1, -1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
+	float3 h = _Bloom.Sample(_LinearClampSampler, (uv + float2(0, -1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
+	float3 i = _Bloom.Sample(_LinearClampSampler, (uv + float2(1, -1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
 	
 	// Apply weighted distribution, by using a 3x3 tent filter:
     //  1   | 1 2 1 |

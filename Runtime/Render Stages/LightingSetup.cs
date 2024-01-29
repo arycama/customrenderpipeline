@@ -250,7 +250,7 @@ namespace Arycama.CustomRenderPipeline
             }
             else
             {
-                result.pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D32_SFloat, false, pointShadowRequests.Count * 6, TextureDimension.CubeArray);
+                result.pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D32_SFloat, false, pointShadowRequests.Count, TextureDimension.CubeArray);
 
                 for (var i = 0; i < pointShadowRequests.Count; i++)
                 {

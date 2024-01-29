@@ -148,13 +148,15 @@ namespace Arycama.CustomRenderPipeline
                                 if ((isDepth && handle.Format != rt.depthStencilFormat) || (!isDepth && handle.Format != rt.graphicsFormat))
                                     continue;
 
-                                if (rt.width == handle.Width && rt.height == handle.Height && rt.enableRandomWrite == handle.EnableRandomWrite && rt.dimension == handle.Dimension)
+                                if (rt.width >= handle.Width && rt.height >= handle.Height && rt.enableRandomWrite == handle.EnableRandomWrite && rt.dimension == handle.Dimension)
                                 {
-                                    if (handle.Dimension != TextureDimension.Tex2D && rt.volumeDepth != handle.VolumeDepth)
+                                    if (handle.Dimension != TextureDimension.Tex2D && rt.volumeDepth < handle.VolumeDepth)
                                         continue;
 
                                     result = rt;
                                     availableRenderTextures.RemoveAt(j);
+
+                                    handle.Scale = new Vector2((float)handle.Width / rt.width, (float)handle.Height / rt.height);
                                     break;
                                 }
                             }
@@ -172,6 +174,8 @@ namespace Arycama.CustomRenderPipeline
 
                                 result.name = $"RTHandle {rtCount++} {handle.Dimension} {handle.Format} {handle.Width}x{handle.Height} ";
                                 result.Create();
+
+                                handle.Scale = Vector2.one;
                             }
 
                             handle.RenderTexture = result;
@@ -250,6 +254,7 @@ namespace Arycama.CustomRenderPipeline
             result.EnableRandomWrite = enableRandomWrite;
             result.VolumeDepth = volumeDepth;
             result.Dimension = dimension;
+            result.Scale = Vector2.one;
 
             unavailableRtHandles.Add(result);
             return result;
@@ -292,6 +297,7 @@ namespace Arycama.CustomRenderPipeline
                 result.Id = rtHandleCount++;
                 importedTextures.Add(texture, result);
                 result.IsImported = true;
+                result.Scale = Vector2.one;
             }
 
             return result;

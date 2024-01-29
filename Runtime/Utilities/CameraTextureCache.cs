@@ -62,6 +62,11 @@ namespace Arycama.CustomRenderPipeline
             texture0 = renderGraph.ImportRenderTexture(textures.Item1);
             texture1 = renderGraph.ImportRenderTexture(textures.Item2);
 
+            texture0.Width = descriptor.width;
+            texture0.Height = descriptor.height;
+            texture1.Width = descriptor.width;
+            texture1.Height = descriptor.height;
+
             return wasCreated;
         }
 

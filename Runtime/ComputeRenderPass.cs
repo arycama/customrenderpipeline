@@ -51,9 +51,11 @@ namespace Arycama.CustomRenderPipeline
         protected override void SetupTargets(CommandBuffer command)
         {
             for (var i = 0; i < colorBindings.Count; i++)
-            {
                 command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].NameId, colorBindings[i].Handle);
-            }
+
+            depthBinding = default;
+            colorBindings.Clear();
+            screenWrite = false;
         }
 
         public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)
