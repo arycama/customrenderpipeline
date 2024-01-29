@@ -200,6 +200,8 @@ namespace Arycama.CustomRenderPipeline
                 {
                     using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Render Directional Light Shadows"))
                     {
+                        pass.WriteTexture("", result.directionalShadows);
+
                         var data = pass.SetRenderFunction<Pass2Data>((command, context, pass, data) =>
                         {
                             command.SetGlobalDepthBias(data.shadowBias, data.shadowSlopeBias);
@@ -258,6 +260,8 @@ namespace Arycama.CustomRenderPipeline
 
                     using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Render Point Light Shadows"))
                     {
+                        pass.WriteTexture("", result.pointShadows);
+
                         var data = pass.SetRenderFunction<Pass3Data>((command, context, pass, data) =>
                         {
                             command.SetGlobalDepthBias(data.shadowBias, data.shadowSlopeBias);

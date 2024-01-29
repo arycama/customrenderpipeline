@@ -22,26 +22,32 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<RTHandle> unavailableRtHandles = new();
 
         private readonly List<RenderTexture> availableRenderTextures = new();
-        private readonly List<RenderTexture> usedRenderTextures = new();
 
         private readonly List<BufferHandle> bufferHandlesToCreate = new();
         private readonly List<BufferHandle> availableBufferHandles = new();
         private readonly List<BufferHandle> usedBufferHandles = new();
 
+        private readonly Dictionary<RTHandle, int> checkSet = new();
+        private readonly Dictionary<int, List<RTHandle>> lastPassOutputs = new();
+
         private bool isExecuting;
 
         private Dictionary<RTHandle, int> lastRtHandleRead = new();
         private Dictionary<int, List<RTHandle>> passRTHandleOutputs = new();
+        private HashSet<RTHandle> writtenRTHandles = new();
 
         public BufferHandle EmptyBuffer { get; }
         public RTHandle EmptyTextureArray { get; }
         public RTHandle EmptyCubemapArray { get; }
 
+        private int rtHandleCount;
+        private int rtCount;
+
         public RenderGraph()
         {
-            EmptyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int));
-            EmptyTextureArray = new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1 };
-            EmptyCubemapArray = new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6 };
+            EmptyBuffer = ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)));
+            EmptyTextureArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
+            EmptyCubemapArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
         }
 
         public T AddRenderPass<T>(string name) where T : RenderPass, new()
@@ -97,11 +103,15 @@ namespace Arycama.CustomRenderPipeline
             bufferHandlesToCreate.Clear();
 
             // Build mapping from pass index to rt handles that can be freed
-            var lastPassOutputs = new Dictionary<int, List<RTHandle>>();
-
-            foreach(var input in lastRtHandleRead)
+            foreach (var input in lastRtHandleRead)
             {
-                if(!lastPassOutputs.TryGetValue(input.Value, out var list))
+                if (checkSet.ContainsKey(input.Key))
+                {
+                    Debug.LogError($"Trying to release rt handle in pass {input.Value} but it is already released in {checkSet[input.Key]}");
+                    continue;
+                }
+
+                if (!lastPassOutputs.TryGetValue(input.Value, out var list))
                 {
                     list = new();
                     lastPassOutputs.Add(input.Value, list);
@@ -118,10 +128,14 @@ namespace Arycama.CustomRenderPipeline
                     var renderPass = renderPasses[i];
 
                     // Assign or create any RTHandles that are written to by this pass
-                    if(passRTHandleOutputs.TryGetValue(i, out var outputs))
+                    if (passRTHandleOutputs.TryGetValue(i, out var outputs))
                     {
-                        foreach(var handle in outputs)
+                        foreach (var handle in outputs)
                         {
+                            // Ignore imported textures
+                            if (handle.IsImported)
+                                continue;
+
                             // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
                             RenderTexture result = null;
                             for (var j = 0; j < availableRenderTextures.Count; j++)
@@ -130,8 +144,15 @@ namespace Arycama.CustomRenderPipeline
 
                                 Assert.IsNotNull(rt);
 
-                                if (rt.width == handle.Width && rt.height == handle.Height && rt.graphicsFormat == handle.Format && rt.enableRandomWrite == handle.EnableRandomWrite && rt.volumeDepth == handle.VolumeDepth && rt.dimension == handle.Dimension)
+                                var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
+                                if ((isDepth && handle.Format != rt.depthStencilFormat) || (!isDepth && handle.Format != rt.graphicsFormat))
+                                    continue;
+
+                                if (rt.width == handle.Width && rt.height == handle.Height && rt.enableRandomWrite == handle.EnableRandomWrite && rt.dimension == handle.Dimension)
                                 {
+                                    if (handle.Dimension != TextureDimension.Tex2D && rt.volumeDepth != handle.VolumeDepth)
+                                        continue;
+
                                     result = rt;
                                     availableRenderTextures.RemoveAt(j);
                                     break;
@@ -141,7 +162,7 @@ namespace Arycama.CustomRenderPipeline
                             if (result == null)
                             {
                                 var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-                                result = new RenderTexture(handle.Width, handle.Height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite };
+                                result = new RenderTexture(handle.Width, handle.Height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite, hideFlags = HideFlags.HideAndDontSave };
 
                                 if (handle.VolumeDepth > 0)
                                 {
@@ -149,30 +170,36 @@ namespace Arycama.CustomRenderPipeline
                                     result.volumeDepth = handle.VolumeDepth;
                                 }
 
-                                result.name = $"RTHandle {handle.Dimension} {handle.Format} {handle.Width}x{handle.Height} ";
+                                result.name = $"RTHandle {rtCount++} {handle.Dimension} {handle.Format} {handle.Width}x{handle.Height} ";
                                 result.Create();
                             }
 
-                            usedRenderTextures.Add(result);
                             handle.RenderTexture = result;
+
+                            Assert.IsNotNull(result);
                         }
                     }
 
                     renderPass.Run(command, context);
 
                     // Release any textures if this was their final read
-                    if(lastPassOutputs.TryGetValue(i, out var outputsToFree))
+                    if (lastPassOutputs.TryGetValue(i, out var outputsToFree))
                     {
-                        foreach(var output in outputsToFree)
+                        for (var i1 = 0; i1 < outputsToFree.Count; i1++)
                         {
-                            usedRenderTextures.Remove(output.RenderTexture);
+                            var output = outputsToFree[i1];
 
-                            if(output.RenderTexture == null)
+                            if (output.IsImported)
+                                continue;
+
+                            if (output.RenderTexture == null)
                             {
                                 Debug.Log("null");
+                                continue;
                             }
 
                             availableRenderTextures.Add(output.RenderTexture);
+                            output.RenderTexture = null;
                         }
                     }
                 }
@@ -191,10 +218,19 @@ namespace Arycama.CustomRenderPipeline
 
                 renderPasses.Clear();
                 lastRtHandleRead.Clear();
-                passRTHandleOutputs.Clear();
-            }
+                writtenRTHandles.Clear();
 
-            
+                foreach(var list in passRTHandleOutputs)
+                {
+                    list.Value.Clear();
+                }
+
+                checkSet.Clear();
+                foreach(var output in lastPassOutputs)
+                {
+                    output.Value.Clear();
+                }
+            }
         }
 
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D)
@@ -203,9 +239,12 @@ namespace Arycama.CustomRenderPipeline
             Assert.IsFalse(isExecuting);
 
             if (!rtHandlePool.TryDequeue(out var result))
+            {
                 result = new RTHandle();
+                result.Id = rtHandleCount++;
+            }
 
-            result.Width = width; 
+            result.Width = width;
             result.Height = height;
             result.Format = format;
             result.EnableRandomWrite = enableRandomWrite;
@@ -247,10 +286,12 @@ namespace Arycama.CustomRenderPipeline
 
         public RTHandle ImportRenderTexture(RenderTexture texture)
         {
-            if(!importedTextures.TryGetValue(texture, out var result))
+            if (!importedTextures.TryGetValue(texture, out var result))
             {
                 result = (RTHandle)texture;
+                result.Id = rtHandleCount++;
                 importedTextures.Add(texture, result);
+                result.IsImported = true;
             }
 
             return result;
@@ -281,15 +322,6 @@ namespace Arycama.CustomRenderPipeline
 
         public void ReleaseHandles()
         {
-            // Any RTs that were not used this frame can be removed
-            foreach (var rt in availableRenderTextures)
-                Object.DestroyImmediate(rt);
-            availableRenderTextures.Clear();
-
-            foreach (var rt in usedRenderTextures)
-                availableRenderTextures.Add(rt);
-            usedRenderTextures.Clear();
-
             // Any handles that were not used this frame can be removed
             foreach (var bufferHandle in availableBufferHandles)
                 bufferHandle.Release();
@@ -311,11 +343,7 @@ namespace Arycama.CustomRenderPipeline
                 Object.DestroyImmediate(rt);
             availableRenderTextures.Clear();
 
-            foreach(var rt in usedRenderTextures)
-                Object.DestroyImmediate(rt);
-            usedRenderTextures.Clear();
-
-            foreach (var bufferHandle in availableBufferHandles) 
+            foreach (var bufferHandle in availableBufferHandles)
                 bufferHandle.Release();
             availableBufferHandles.Clear();
 
@@ -324,7 +352,10 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetRTHandleWrite(RTHandle handle, int passIndex)
         {
-            if(!passRTHandleOutputs.TryGetValue(passIndex, out var outputs))
+            if (!writtenRTHandles.Add(handle))
+                return;
+
+            if (!passRTHandleOutputs.TryGetValue(passIndex, out var outputs))
             {
                 outputs = new List<RTHandle>();
                 passRTHandleOutputs.Add(passIndex, outputs);

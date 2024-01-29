@@ -5,12 +5,14 @@ using UnityEngine.Rendering;
 
 public class RTHandle
 {
+    public int Id { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
     public GraphicsFormat Format { get; set; }
     public bool EnableRandomWrite { get; set; }
     public int VolumeDepth { get; set; }
     public TextureDimension Dimension { get; set; }
+    public bool IsImported { get; set; }
 
     public RenderTexture RenderTexture { get; set; }
 
@@ -36,5 +38,10 @@ public class RTHandle
             Dimension = renderTexture.dimension,
             RenderTexture = renderTexture
         };
+    }
+
+    public override string ToString()
+    {
+        return $"RTHandle {Id} {Dimension} {Format} {Width}x{Height} ";
     }
 }
