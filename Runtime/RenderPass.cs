@@ -20,6 +20,7 @@ namespace Arycama.CustomRenderPipeline
 
         public RenderGraph RenderGraph { get; set; }
         internal string Name { get; set; }
+        internal int Index { get; set; }
 
         public abstract void SetTexture(CommandBuffer command, string propertyName, Texture texture);
         public abstract void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer);
@@ -35,6 +36,7 @@ namespace Arycama.CustomRenderPipeline
         {
             Assert.IsNotNull(texture, propertyName);
             readTextures.Add((propertyName, texture));
+            RenderGraph.SetLastRTHandleRead(texture, Index);
         }
 
         public void WriteScreen()
@@ -45,11 +47,13 @@ namespace Arycama.CustomRenderPipeline
         public void WriteTexture(string propertyName, RTHandle handle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.DontCare, RenderBufferStoreAction storeAction = RenderBufferStoreAction.DontCare, Color clearColor = default)
         {
             colorBindings.Add(new RTHandleBindingData(handle, loadAction, storeAction, clearColor, nameId: Shader.PropertyToID(propertyName)));
+            RenderGraph.SetRTHandleWrite(handle, Index);
         }
 
         public void WriteDepth(string propertyName, RTHandle handle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.DontCare, RenderBufferStoreAction storeAction = RenderBufferStoreAction.DontCare, float clearDepth = 1.0f, RenderTargetFlags flags = RenderTargetFlags.None)
         {
             depthBinding = new(handle, loadAction, storeAction, default, clearDepth, flags);
+            RenderGraph.SetRTHandleWrite(handle, Index);
         }
 
         public void ReadBuffer(string propertyName, BufferHandle buffer)

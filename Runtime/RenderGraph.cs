@@ -30,6 +30,9 @@ namespace Arycama.CustomRenderPipeline
 
         private bool isExecuting;
 
+        private Dictionary<RTHandle, int> lastRtHandleRead = new();
+        private Dictionary<int, List<RTHandle>> passRTHandleOutputs = new();
+
         public BufferHandle EmptyBuffer { get; }
         public RTHandle EmptyTextureArray { get; }
         public RTHandle EmptyCubemapArray { get; }
@@ -56,6 +59,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             pass.Name = name;
+            pass.Index = renderPasses.Count;
 
             return pass as T;
         }
@@ -88,67 +92,109 @@ namespace Arycama.CustomRenderPipeline
 
         public void Execute(CommandBuffer command, ScriptableRenderContext context)
         {
-            // Create all RTs.
-            foreach (var handle in unavailableRtHandles)
-            {
-                // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
-                RenderTexture result = null;
-                for (var i = 0; i < availableRenderTextures.Count; i++)
-                {
-                    var rt = availableRenderTextures[i];
-                    if (rt.width == handle.Width && rt.height == handle.Height && rt.graphicsFormat == handle.Format && rt.enableRandomWrite == handle.EnableRandomWrite && rt.volumeDepth == handle.VolumeDepth && rt.dimension == handle.Dimension)
-                    {
-                        result = rt;
-                        availableRenderTextures.RemoveAt(i);
-                        break;
-                    }
-                }
-
-                if (result == null)
-                {
-                    var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-                    result = new RenderTexture(handle.Width, handle.Height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite };
-
-                    if (handle.VolumeDepth > 0)
-                    {
-                        result.dimension = handle.Dimension;
-                        result.volumeDepth = handle.VolumeDepth;
-                    }
-
-                    result.name = $"RTHandle {handle.Dimension} {handle.Format} {handle.Width}x{handle.Height} ";
-                    result.Create();
-                }
-
-                usedRenderTextures.Add(result);
-                handle.RenderTexture = result;
-            }
-
             foreach (var bufferHandle in bufferHandlesToCreate)
                 bufferHandle.Create();
             bufferHandlesToCreate.Clear();
 
+            // Build mapping from pass index to rt handles that can be freed
+            var lastPassOutputs = new Dictionary<int, List<RTHandle>>();
+
+            foreach(var input in lastRtHandleRead)
+            {
+                if(!lastPassOutputs.TryGetValue(input.Value, out var list))
+                {
+                    list = new();
+                    lastPassOutputs.Add(input.Value, list);
+                }
+
+                list.Add(input.Key);
+            }
+
             isExecuting = true;
             try
             {
-                foreach (var renderPass in renderPasses)
+                for (var i = 0; i < renderPasses.Count; i++)
                 {
+                    var renderPass = renderPasses[i];
+
+                    // Assign or create any RTHandles that are written to by this pass
+                    if(passRTHandleOutputs.TryGetValue(i, out var outputs))
+                    {
+                        foreach(var handle in outputs)
+                        {
+                            // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
+                            RenderTexture result = null;
+                            for (var j = 0; j < availableRenderTextures.Count; j++)
+                            {
+                                var rt = availableRenderTextures[j];
+
+                                Assert.IsNotNull(rt);
+
+                                if (rt.width == handle.Width && rt.height == handle.Height && rt.graphicsFormat == handle.Format && rt.enableRandomWrite == handle.EnableRandomWrite && rt.volumeDepth == handle.VolumeDepth && rt.dimension == handle.Dimension)
+                                {
+                                    result = rt;
+                                    availableRenderTextures.RemoveAt(j);
+                                    break;
+                                }
+                            }
+
+                            if (result == null)
+                            {
+                                var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
+                                result = new RenderTexture(handle.Width, handle.Height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite };
+
+                                if (handle.VolumeDepth > 0)
+                                {
+                                    result.dimension = handle.Dimension;
+                                    result.volumeDepth = handle.VolumeDepth;
+                                }
+
+                                result.name = $"RTHandle {handle.Dimension} {handle.Format} {handle.Width}x{handle.Height} ";
+                                result.Create();
+                            }
+
+                            usedRenderTextures.Add(result);
+                            handle.RenderTexture = result;
+                        }
+                    }
+
                     renderPass.Run(command, context);
+
+                    // Release any textures if this was their final read
+                    if(lastPassOutputs.TryGetValue(i, out var outputsToFree))
+                    {
+                        foreach(var output in outputsToFree)
+                        {
+                            usedRenderTextures.Remove(output.RenderTexture);
+
+                            if(output.RenderTexture == null)
+                            {
+                                Debug.Log("null");
+                            }
+
+                            availableRenderTextures.Add(output.RenderTexture);
+                        }
+                    }
                 }
             }
             finally
             {
                 isExecuting = false;
+
+                // Release all pooled passes
+                foreach (var pass in renderPasses)
+                {
+                    var hasPool = renderPassPool.TryGetValue(pass.GetType(), out var pool);
+                    Assert.IsTrue(hasPool, "Attempting to release a renderPass that was not created through GetPool");
+                    pool.Enqueue(pass);
+                }
+
+                renderPasses.Clear();
+                lastRtHandleRead.Clear();
+                passRTHandleOutputs.Clear();
             }
 
-            // Release all pooled passes
-            foreach(var pass in renderPasses)
-            {
-                var hasPool = renderPassPool.TryGetValue(pass.GetType(), out var pool);
-                Assert.IsTrue(hasPool, "Attempting to release a renderPass that was not created through GetPool");
-                pool.Enqueue(pass);
-            }
-
-            renderPasses.Clear();
+            
         }
 
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D)
@@ -274,6 +320,22 @@ namespace Arycama.CustomRenderPipeline
             availableBufferHandles.Clear();
 
             EmptyBuffer.Release();
+        }
+
+        public void SetRTHandleWrite(RTHandle handle, int passIndex)
+        {
+            if(!passRTHandleOutputs.TryGetValue(passIndex, out var outputs))
+            {
+                outputs = new List<RTHandle>();
+                passRTHandleOutputs.Add(passIndex, outputs);
+            }
+
+            outputs.Add(handle);
+        }
+
+        public void SetLastRTHandleRead(RTHandle handle, int passIndex)
+        {
+            lastRtHandleRead[handle] = passIndex;
         }
     }
 }
