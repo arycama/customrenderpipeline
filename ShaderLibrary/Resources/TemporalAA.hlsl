@@ -4,8 +4,11 @@ Texture2D<float3> _Input, _History;
 Texture2D<float2> _Motion;
 Texture2D<float> _Depth;
 
-float4  _Resolution;
-float _HasHistory, _MotionBlending, _MotionWeight, _Sharpness, _StationaryBlending, _Scale;
+cbuffer Properties
+{
+	float4  _Resolution, _Input_Scale, _Motion_Scale;
+	float _HasHistory, _MotionBlending, _MotionWeight, _Sharpness, _StationaryBlending, _Scale;
+};
 
 float4 Vertex(uint id : SV_VertexID) : SV_Position
 {
@@ -31,8 +34,8 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 			float2 sampleTexel = floor(scaledUv) + float2(x, y);
 			float2 sampleUv = (sampleTexel + 0.5) * _ScaledResolution.zw;
 			
-			float3 color = _Input.Sample(_PointClampSampler, sampleUv);
-			float2 motion = _Motion.Sample(_PointClampSampler, sampleUv);
+			float3 color = _Input.Sample(_PointClampSampler, sampleUv * _Input_Scale.xy);
+			float2 motion = _Motion.Sample(_PointClampSampler, sampleUv * _Motion_Scale.xy);
 			
 			float2 weights = saturate(1.0 - abs(scaledUv - sampleTexel) / _Scale);
 			float weight = weights.x * weights.y;

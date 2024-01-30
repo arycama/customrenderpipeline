@@ -3,6 +3,7 @@
 Texture2D<float3> _Input;
 Texture2D<float> _Depth;
 
+float4 _Depth_Scale, _Input_Scale;
 float _ApertureSize, _FocalDistance, _FocalLength, _SampleRadius, _MaxCoC, _SensorHeight;
 uint _SampleCount;
 
@@ -20,10 +21,10 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float GoldenAngle = Pi * (3.0 - sqrt(5.0));
 	float2 uv = position.xy * _ScaledResolution.zw;
 	
-	float centerDepth = LinearEyeDepth(_Depth.SampleLevel(_PointClampSampler, uv, 0.0));
+	float centerDepth = LinearEyeDepth(_Depth.Sample(_PointClampSampler, uv * _Depth_Scale.xy));
 	float centerSize = CalculateCoC(centerDepth);
 	
-	float3 color = _Input.SampleLevel(_PointClampSampler, uv, 0.0);
+	float3 color = _Input.Sample(_PointClampSampler, uv * _Input_Scale.xy);
 	float weightSum = 1.0;
 	
 	float radius = _SampleRadius;
@@ -32,8 +33,8 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	{
 		float2 tc = uv + float2(cos(ang), sin(ang)) * _ScaledResolution.zw * radius;
 		
-		float3 sampleColor = _Input.SampleLevel(_PointClampSampler, tc, 0.0);
-		float sampleDepth = LinearEyeDepth(_Depth.SampleLevel(_PointClampSampler, tc, 0.0));
+		float3 sampleColor = _Input.Sample(_PointClampSampler, tc * _Input_Scale.xy);
+		float sampleDepth = LinearEyeDepth(_Depth.Sample(_PointClampSampler, tc * _Depth_Scale.xy));
 		
 		float sampleSize = CalculateCoC(sampleDepth);
 		if (sampleDepth > centerDepth)

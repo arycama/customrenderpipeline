@@ -42,12 +42,23 @@ namespace Arycama.CustomRenderPipeline
 
         private int rtHandleCount;
         private int rtCount;
+        private int screenWidth, screenHeight;
 
         public RenderGraph()
         {
             EmptyBuffer = ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)));
             EmptyTextureArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
             EmptyCubemapArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
+        }
+
+        public void SetScreenWidth(int width)
+        {
+            screenWidth = Mathf.Max(width, screenWidth);
+        }
+
+        public void SetScreenHeight(int height)
+        {
+            screenHeight = Mathf.Max(height, screenHeight);
         }
 
         public T AddRenderPass<T>(string name) where T : RenderPass, new()
@@ -148,7 +159,16 @@ namespace Arycama.CustomRenderPipeline
                                 if ((isDepth && handle.Format != rt.depthStencilFormat) || (!isDepth && handle.Format != rt.graphicsFormat))
                                     continue;
 
-                                if (rt.width >= handle.Width && rt.height >= handle.Height && rt.enableRandomWrite == handle.EnableRandomWrite && rt.dimension == handle.Dimension)
+                                // For screen textures, ensure we get a rendertexture that is the actual screen width/height
+                                if (handle.IsScreenTexture)
+                                {
+                                    if (rt.width != screenWidth || rt.height != screenHeight)
+                                        continue;
+                                }
+                                else if (rt.width < handle.Width || rt.height < handle.Height)
+                                    continue;
+
+                                if (rt.enableRandomWrite == handle.EnableRandomWrite && rt.dimension == handle.Dimension)
                                 {
                                     if (handle.Dimension != TextureDimension.Tex2D && rt.volumeDepth < handle.VolumeDepth)
                                         continue;
@@ -156,7 +176,6 @@ namespace Arycama.CustomRenderPipeline
                                     result = rt;
                                     availableRenderTextures.RemoveAt(j);
 
-                                    handle.Scale = new Vector2((float)handle.Width / rt.width, (float)handle.Height / rt.height);
                                     break;
                                 }
                             }
@@ -164,7 +183,11 @@ namespace Arycama.CustomRenderPipeline
                             if (result == null)
                             {
                                 var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-                                result = new RenderTexture(handle.Width, handle.Height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite, hideFlags = HideFlags.HideAndDontSave };
+
+                                var width = handle.IsScreenTexture ? screenWidth : handle.Width;
+                                var height = handle.IsScreenTexture ? screenHeight : handle.Height;
+
+                                result = new RenderTexture(width, height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite, hideFlags = HideFlags.HideAndDontSave };
 
                                 if (handle.VolumeDepth > 0)
                                 {
@@ -172,10 +195,8 @@ namespace Arycama.CustomRenderPipeline
                                     result.volumeDepth = handle.VolumeDepth;
                                 }
 
-                                result.name = $"RTHandle {rtCount++} {handle.Dimension} {handle.Format} {handle.Width}x{handle.Height} ";
+                                result.name = $"RTHandle {rtCount++} {result.dimension} {result.graphicsFormat} {width}x{height} ";
                                 result.Create();
-
-                                handle.Scale = Vector2.one;
                             }
 
                             handle.RenderTexture = result;
@@ -237,7 +258,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D)
+        public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false)
         {
             // Ensure we're not getting a texture during execution, this must be done in the setup
             Assert.IsFalse(isExecuting);
@@ -254,7 +275,7 @@ namespace Arycama.CustomRenderPipeline
             result.EnableRandomWrite = enableRandomWrite;
             result.VolumeDepth = volumeDepth;
             result.Dimension = dimension;
-            result.Scale = Vector2.one;
+            result.IsScreenTexture = isScreenTexture;
 
             unavailableRtHandles.Add(result);
             return result;
@@ -297,7 +318,7 @@ namespace Arycama.CustomRenderPipeline
                 result.Id = rtHandleCount++;
                 importedTextures.Add(texture, result);
                 result.IsImported = true;
-                result.Scale = Vector2.one;
+                result.IsScreenTexture = false;
             }
 
             return result;

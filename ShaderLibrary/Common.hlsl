@@ -41,10 +41,10 @@ Texture3D<float4> _VolumetricLighting;
 Texture3D<uint2> _LightClusterIndices;
 TextureCubeArray<float> _PointShadows;
 
-float4 _Time, _ProjectionParams, _ZBufferParams, _ScaledResolution;
+float4 _Time, _ProjectionParams, _ZBufferParams, _ScaledResolution, _VolumetricLighting_Scale;
 float3 _AmbientLightColor, _WorldSpaceCameraPos, _FogColor;
 float2 _Jitter;
-float _BlockerRadius, _ClusterBias, _ClusterScale, _FogStartDistance, _FogEndDistance, _FogEnabled, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _NonLinearDepth, _AoEnabled;
+float _BlockerRadius, _ClusterBias, _ClusterScale, _FogStartDistance, _FogEndDistance, _FogEnabled, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _NonLinearDepth, _AoEnabled, _MipBias;
 matrix _InvVPMatrix, _PreviousVPMatrix, unity_MatrixVP, _NonJitteredVPMatrix, unity_MatrixV;
 uint _BlockerSamples, _DirectionalLightCount, _PcfSamples, _PointLightCount, _TileSize, unity_BaseInstanceID;
 
@@ -556,7 +556,7 @@ float4 SampleVolumetricLighting(float2 pixelPosition, float eyeDepth)
 {
 	float normalizedDepth = GetVolumetricUv(eyeDepth);
 	float3 volumeUv = float3(pixelPosition * _ScaledResolution.zw, normalizedDepth);
-	return _VolumetricLighting.Sample(_LinearClampSampler, volumeUv);
+	return _VolumetricLighting.Sample(_LinearClampSampler, volumeUv * float3(_VolumetricLighting_Scale.xy, 1.0));
 }
 
 bool1 IsInfOrNaN(float1 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }

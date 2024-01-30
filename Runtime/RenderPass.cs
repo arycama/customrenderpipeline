@@ -108,14 +108,15 @@ namespace Arycama.CustomRenderPipeline
         protected virtual void SetupTargets(CommandBuffer command)
         {
             // TODO: Can clear a depth and color target together
-            var maxWidth = 0;
-            var maxHeight = 0;
+            int width = 0, height = 0, targetWidth = 0, targetHeight = 0;
 
             var binding = new RenderTargetBinding();
             if (depthBinding.Handle != null)
             {
-                maxWidth = Mathf.Max(maxWidth, depthBinding.Handle.Width);
-                maxHeight = Mathf.Max(maxHeight, depthBinding.Handle.Height);
+                width = depthBinding.Handle.Width;
+                height = depthBinding.Handle.Height;
+                targetWidth = depthBinding.Handle.RenderTexture.width;
+                targetHeight = depthBinding.Handle.RenderTexture.height;
 
                 // Load action not supported outside of renderpass API, so emulate it here
                 if (depthBinding.LoadAction == RenderBufferLoadAction.Clear)
@@ -151,6 +152,12 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var target = colorBindings[i];
 
+                    Assert.IsTrue(targetWidth == 0 || targetWidth == target.Handle.RenderTexture.width, Name);
+                    Assert.IsTrue(targetHeight == 0 || targetHeight == target.Handle.RenderTexture.height, Name);
+
+                    width = target.Handle.Width;
+                    height = target.Handle.Height;
+
                     // Load action not supported outside of renderpass API, so emulate it here
                     if (target.LoadAction == RenderBufferLoadAction.Clear)
                     {
@@ -165,9 +172,6 @@ namespace Arycama.CustomRenderPipeline
 
                     targets[i] = target.Handle;
                     storeActions[i] = target.StoreAction;
-
-                    maxWidth = Mathf.Max(maxWidth, target.Handle.Width);
-                    maxHeight = Mathf.Max(maxHeight, target.Handle.Height);
                 }
 
                 binding.colorRenderTargets = targets;
@@ -182,10 +186,19 @@ namespace Arycama.CustomRenderPipeline
             if (screenWrite)
                 command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
             else if (depthBinding.Handle != null || colorBindings.Count > 0)
-                command.SetRenderTarget(binding);
+            {
+                if(depthBinding.Handle == null && colorBindings.Count == 1)
+                {
+                    command.SetRenderTarget(binding.colorRenderTargets[0], binding.colorLoadActions[0], binding.colorStoreActions[0]);
+                }
+                else
+                {
+                    command.SetRenderTarget(binding);
+                }
+            }
 
-            if(!screenWrite)
-                command.SetViewport(new Rect(0, 0, maxWidth, maxHeight));
+            if (!screenWrite)
+                command.SetViewport(new Rect(0, 0, width, height));
 
             depthBinding = default;
             colorBindings.Clear();
