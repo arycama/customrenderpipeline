@@ -42,10 +42,10 @@ namespace Arycama.CustomRenderPipeline
 
         public readonly struct Result
         {
-            public readonly RTHandle lightClusterIndices;
-            public readonly BufferHandle lightList;
-            public readonly float clusterScale, clusterBias;
-            public readonly int tileSize;
+            private readonly RTHandle lightClusterIndices;
+            private readonly BufferHandle lightList;
+            private readonly float clusterScale, clusterBias;
+            private readonly int tileSize;
 
             public Result(RTHandle lightClusterIndices, BufferHandle lightList, float clusterScale, float clusterBias, int tileSize)
             {
@@ -54,6 +54,19 @@ namespace Arycama.CustomRenderPipeline
                 this.clusterScale = clusterScale;
                 this.clusterBias = clusterBias;
                 this.tileSize = tileSize;
+            }
+
+            public void SetInputs(RenderPass pass)
+            {
+                pass.ReadTexture("_LightClusterIndices", lightClusterIndices);
+                pass.ReadBuffer("_LightClusterList", lightList);
+            }
+
+            public void SetProperties(RenderPass pass, CommandBuffer command)
+            {
+                pass.SetFloat(command, "_ClusterScale", clusterScale);
+                pass.SetFloat(command, "_ClusterBias", clusterBias);
+                pass.SetInt(command, "_TileSize", tileSize);
             }
         }
 

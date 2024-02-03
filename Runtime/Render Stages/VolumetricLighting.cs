@@ -45,14 +45,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture("_Result", volumetricLightingCurrent);
 
                 pass.ReadTexture("_Input", volumetricLightingHistory);
-                pass.ReadTexture("_LightClusterIndices", clusteredLightCullingResult.lightClusterIndices);
-                pass.ReadTexture("_DirectionalShadows", lightingSetupResult.directionalShadows);
-                pass.ReadTexture("_PointShadows", lightingSetupResult.pointShadows);
 
-                pass.ReadBuffer("_LightClusterList", clusteredLightCullingResult.lightList);
-                pass.ReadBuffer("_DirectionalMatrices", lightingSetupResult.directionalMatrices);
-                pass.ReadBuffer("_DirectionalLights", lightingSetupResult.directionalLights);
-                pass.ReadBuffer("_PointLights", lightingSetupResult.pointLights);
+                clusteredLightCullingResult.SetInputs(pass);
+                lightingSetupResult.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
@@ -63,9 +58,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_BlurSigma", data.blurSigma);
                     pass.SetFloat(command, "_VolumeTileSize", data.volumeTileSize);
 
-                    pass.SetFloat(command, "_ClusterScale", data.clusteredLightCullingResult.clusterScale);
-                    pass.SetFloat(command, "_ClusterBias", data.clusteredLightCullingResult.clusterBias);
-                    pass.SetInt(command, "_TileSize", data.clusteredLightCullingResult.tileSize);
+                    data.clusteredLightCullingResult.SetProperties(pass, command);
 
                     pass.SetInt(command, "_DirectionalLightCount", data.lightingSetupResult.directionalLightCount);
                     pass.SetInt(command, "_PointLightCount", data.lightingSetupResult.pointLightCount);
@@ -180,8 +173,8 @@ namespace Arycama.CustomRenderPipeline
 
         public struct Result
         {
-            public RTHandle volumetricLighting;
-            public float nonLinearDepth, volumeWidth, volumeHeight, volumeSlices, volumeDepth;
+            private RTHandle volumetricLighting;
+            private float nonLinearDepth, volumeWidth, volumeHeight, volumeSlices, volumeDepth;
 
             public Result(RTHandle volumetricLighting, float nonLinearDepth, float volumeWidth, float volumeHeight, float volumeSlices, float volumeDepth)
             {
@@ -191,6 +184,20 @@ namespace Arycama.CustomRenderPipeline
                 this.volumeHeight = volumeHeight;
                 this.volumeSlices = volumeSlices;
                 this.volumeDepth = volumeDepth;
+            }
+
+            public void SetInputs(RenderPass pass)
+            {
+                pass.ReadTexture("_VolumetricLighting", volumetricLighting);
+            }
+
+            public void SetProperties(RenderPass pass, CommandBuffer command)
+            {
+                pass.SetFloat(command, "_NonLinearDepth", nonLinearDepth);
+                pass.SetFloat(command, "_VolumeWidth", volumeWidth);
+                pass.SetFloat(command, "_VolumeHeight", volumeHeight);
+                pass.SetFloat(command, "_VolumeSlices", volumeSlices);
+                pass.SetFloat(command, "_VolumeDepth", volumeDepth);
             }
         }
     }

@@ -99,16 +99,14 @@ namespace Arycama.CustomRenderPipeline
                 pass.Material = material;
                 pass.Index = 2;
                 pass.ReadTexture("_CameraDepth", depth);
-                pass.ReadTexture("_VolumetricLighting", volumetricLightingResult.volumetricLighting);
                 pass.WriteTexture("", scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
                 pass.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
 
+                volumetricLightingResult.SetInputs(pass);
+
                 var data = pass.SetRenderFunction<Pass2Data>((command, context, pass, data) =>
                 {
-                    pass.SetFloat(command, "_NonLinearDepth", data.volumetricLightingResult.nonLinearDepth);
-                    pass.SetFloat(command, "_VolumeWidth", data.volumetricLightingResult.volumeWidth);
-                    pass.SetFloat(command, "_VolumeHeight", data.volumetricLightingResult.volumeHeight);
-                    pass.SetFloat(command, "_VolumeSlices", data.volumetricLightingResult.volumeSlices);
+                    data.volumetricLightingResult.SetProperties(pass, command);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                 });
 

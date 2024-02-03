@@ -131,103 +131,95 @@ namespace Arycama.CustomRenderPipeline
                 list.Add(input.Key);
             }
 
+            for (var i = 0; i < renderPasses.Count; i++)
+            {
+                var renderPass = renderPasses[i];
+
+                // Assign or create any RTHandles that are written to by this pass
+                if (passRTHandleOutputs.TryGetValue(i, out var outputs))
+                {
+                    foreach (var handle in outputs)
+                    {
+                        // Ignore imported textures
+                        if (handle.IsImported)
+                            continue;
+
+                        // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
+                        RenderTexture result = null;
+                        for (var j = 0; j < availableRenderTextures.Count; j++)
+                        {
+                            var rt = availableRenderTextures[j];
+
+                            Assert.IsNotNull(rt);
+
+                            var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
+                            if ((isDepth && handle.Format != rt.depthStencilFormat) || (!isDepth && handle.Format != rt.graphicsFormat))
+                                continue;
+
+                            // For screen textures, ensure we get a rendertexture that is the actual screen width/height
+                            if (handle.IsScreenTexture)
+                            {
+                                if (rt.width != screenWidth || rt.height != screenHeight)
+                                    continue;
+                            }
+                            else if (rt.width < handle.Width || rt.height < handle.Height)
+                                continue;
+
+                            if (rt.enableRandomWrite == handle.EnableRandomWrite && rt.dimension == handle.Dimension)
+                            {
+                                if (handle.Dimension != TextureDimension.Tex2D && rt.volumeDepth < handle.VolumeDepth)
+                                    continue;
+
+                                result = rt;
+                                availableRenderTextures.RemoveAt(j);
+                                break;
+                            }
+                        }
+
+                        if (result == null)
+                        {
+                            var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
+
+                            var width = handle.IsScreenTexture ? screenWidth : handle.Width;
+                            var height = handle.IsScreenTexture ? screenHeight : handle.Height;
+
+                            result = new RenderTexture(width, height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite, hideFlags = HideFlags.HideAndDontSave };
+
+                            if (handle.VolumeDepth > 0)
+                            {
+                                result.dimension = handle.Dimension;
+                                result.volumeDepth = handle.VolumeDepth;
+                            }
+
+                            result.name = $"RTHandle {rtCount++} {result.dimension} {result.graphicsFormat} {width}x{height} ";
+                            result.Create();
+                        }
+
+                        handle.RenderTexture = result;
+                        Assert.IsNotNull(result);
+                    }
+                }
+
+                // Release any textures if this was their final read
+                if (lastPassOutputs.TryGetValue(i, out var outputsToFree))
+                {
+                    for (var i1 = 0; i1 < outputsToFree.Count; i1++)
+                    {
+                        var output = outputsToFree[i1];
+
+                        if (output.IsImported)
+                            continue;
+
+                        availableRenderTextures.Add(output.RenderTexture);
+                    }
+                }
+            }
+
             isExecuting = true;
             try
             {
-                for (var i = 0; i < renderPasses.Count; i++)
-                {
-                    var renderPass = renderPasses[i];
-
-                    // Assign or create any RTHandles that are written to by this pass
-                    if (passRTHandleOutputs.TryGetValue(i, out var outputs))
-                    {
-                        foreach (var handle in outputs)
-                        {
-                            // Ignore imported textures
-                            if (handle.IsImported)
-                                continue;
-
-                            // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
-                            RenderTexture result = null;
-                            for (var j = 0; j < availableRenderTextures.Count; j++)
-                            {
-                                var rt = availableRenderTextures[j];
-
-                                Assert.IsNotNull(rt);
-
-                                var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-                                if ((isDepth && handle.Format != rt.depthStencilFormat) || (!isDepth && handle.Format != rt.graphicsFormat))
-                                    continue;
-
-                                // For screen textures, ensure we get a rendertexture that is the actual screen width/height
-                                if (handle.IsScreenTexture)
-                                {
-                                    if (rt.width != screenWidth || rt.height != screenHeight)
-                                        continue;
-                                }
-                                else if (rt.width < handle.Width || rt.height < handle.Height)
-                                    continue;
-
-                                if (rt.enableRandomWrite == handle.EnableRandomWrite && rt.dimension == handle.Dimension)
-                                {
-                                    if (handle.Dimension != TextureDimension.Tex2D && rt.volumeDepth < handle.VolumeDepth)
-                                        continue;
-
-                                    result = rt;
-                                    availableRenderTextures.RemoveAt(j);
-
-                                    break;
-                                }
-                            }
-
-                            if (result == null)
-                            {
-                                var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-
-                                var width = handle.IsScreenTexture ? screenWidth : handle.Width;
-                                var height = handle.IsScreenTexture ? screenHeight : handle.Height;
-
-                                result = new RenderTexture(width, height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite, hideFlags = HideFlags.HideAndDontSave };
-
-                                if (handle.VolumeDepth > 0)
-                                {
-                                    result.dimension = handle.Dimension;
-                                    result.volumeDepth = handle.VolumeDepth;
-                                }
-
-                                result.name = $"RTHandle {rtCount++} {result.dimension} {result.graphicsFormat} {width}x{height} ";
-                                result.Create();
-                            }
-
-                            handle.RenderTexture = result;
-
-                            Assert.IsNotNull(result);
-                        }
-                    }
-
+                foreach(var renderPass in renderPasses)
                     renderPass.Run(command, context);
-
-                    // Release any textures if this was their final read
-                    if (lastPassOutputs.TryGetValue(i, out var outputsToFree))
-                    {
-                        for (var i1 = 0; i1 < outputsToFree.Count; i1++)
-                        {
-                            var output = outputsToFree[i1];
-
-                            if (output.IsImported)
-                                continue;
-
-                            if (output.RenderTexture == null)
-                            {
-                                Debug.Log("null");
-                                continue;
-                            }
-
-                            availableRenderTextures.Add(output.RenderTexture);
-                            output.RenderTexture = null;
-                        }
-                    }
-                }
             }
             finally
             {

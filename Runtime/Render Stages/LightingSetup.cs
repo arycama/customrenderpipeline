@@ -371,18 +371,41 @@ namespace Arycama.CustomRenderPipeline
         public struct Result
         {
             public RTHandle directionalShadows;
+            public RTHandle pointShadows;
             public BufferHandle directionalMatrices;
             public BufferHandle directionalShadowTexelSizes;
-            public RTHandle pointShadows;
+            public BufferHandle directionalLights;
+            public BufferHandle pointLights;
             public int pcfSamples;
             public float pcfRadius;
             public int blockerSamples;
             public float blockerRadius;
             public float pcssSoftness;
-            public BufferHandle directionalLights;
             public int directionalLightCount;
-            public BufferHandle pointLights;
             public int pointLightCount;
+
+            public void SetInputs(RenderPass pass)
+            {
+                pass.ReadTexture("_DirectionalShadows", directionalShadows);
+                pass.ReadTexture("_PointShadows", pointShadows);
+                pass.ReadBuffer("_DirectionalMatrices", directionalMatrices);
+                pass.ReadBuffer("_DirectionalLights", directionalLights);
+                pass.ReadBuffer("_PointLights", pointLights);
+                pass.ReadBuffer("_DirectionalShadowTexelSizes", directionalShadowTexelSizes);
+            }
+
+            public void SetProperties(RenderPass pass, CommandBuffer command)
+            {
+                pass.SetInt(command, "_DirectionalLightCount", directionalLightCount);
+                pass.SetInt(command, "_PointLightCount", pointLightCount);
+
+                pass.SetInt(command, "_PcfSamples", pcfSamples);
+                pass.SetFloat(command, "_PcfRadius", pcfRadius);
+                pass.SetInt(command, "_BlockerSamples", blockerSamples);
+                pass.SetFloat(command, "_BlockerRadius", blockerRadius);
+                pass.SetFloat(command, "_PcssSoftness", pcssSoftness);
+
+            }
         }
     }
 }
