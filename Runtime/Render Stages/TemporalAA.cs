@@ -42,27 +42,14 @@ namespace Arycama.CustomRenderPipeline
             textureCache.Dispose();
         }
 
-        public void OnPreRender(Camera camera, float scale, out Matrix4x4 previousMatrix)
+        public void OnPreRender()
         {
-            var scaledWidth = (int)(camera.pixelWidth * scale);
-            var scaledHeight = (int)(camera.pixelHeight * scale);
-
-            previousMatrix = camera.nonJitteredProjectionMatrix;
-
-            camera.ResetProjectionMatrix();
-            camera.nonJitteredProjectionMatrix = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * camera.worldToCameraMatrix;
-
             var sampleIndex = Time.renderedFrameCount % settings.SampleCount;
 
             Vector2 jitter;
             jitter.x = Halton(sampleIndex + 1, 2) - 0.5f;
             jitter.y = Halton(sampleIndex + 1, 3) - 0.5f;
             jitter *= settings.JitterSpread;
-
-            var matrix = camera.projectionMatrix;
-            matrix[0, 2] = 2.0f * jitter.x / scaledWidth;
-            matrix[1, 2] = 2.0f * jitter.y / scaledHeight;
-            camera.projectionMatrix = matrix;
 
             Jitter = jitter;
         }

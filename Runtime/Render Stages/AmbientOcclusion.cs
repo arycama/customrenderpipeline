@@ -41,7 +41,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.SetVector(command, "ScaleOffset", data.scaleOffset);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                    pass.SetMatrix(command, "_InvVPMatrix", data.invVpMatrix);
+                    pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
                 });
 
                 data.scaleOffset = new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight);
@@ -73,7 +73,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_SampleCount", data.sampleCount);
                     pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2d);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                    pass.SetMatrix(command, "_InvVPMatrix", data.invVpMatrix);
+                    pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
                 });
 
                 var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);

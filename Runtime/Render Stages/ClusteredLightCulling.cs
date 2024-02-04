@@ -101,7 +101,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_RcpClusterDepth", data.rcpClusterDepth);
                     pass.SetInt(command, "_PointLightCount", data.pointLightCount);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                    pass.SetMatrix(command, "_InvVPMatrix", data.invVpMatrix);
+                    pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
                 });
 
                 data.tileSize = settings.TileSize;

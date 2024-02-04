@@ -29,9 +29,6 @@ namespace Arycama.CustomRenderPipeline
             var pointLightList = ListPool<PointLightData>.Get();
             var pointShadowRequests = ListPool<ShadowRequest>.Get();
 
-            var cameraProjectionMatrix = camera.projectionMatrix;
-            camera.ResetProjectionMatrix();
-
             // Setup lights/shadows
             for (var i = 0; i < cullingResults.visibleLights.Length; i++)
             {
@@ -181,7 +178,6 @@ namespace Arycama.CustomRenderPipeline
                     pointLightList.Add(pointLightData);
                 }
             }
-            camera.projectionMatrix = cameraProjectionMatrix;
 
             // Directional lights
             var directionalLightBuffer = directionalLightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(directionalLightList.Count, UnsafeUtility.SizeOf<DirectionalLightData>());
@@ -210,8 +206,8 @@ namespace Arycama.CustomRenderPipeline
                             command.SetRenderTarget(data.directionalShadows, 0, CubemapFace.Unknown, data.cascade);
                             command.ClearRenderTarget(true, false, Color.clear);
 
-                            command.SetGlobalMatrix("unity_MatrixV", data.shadowRequest.ViewMatrix);
-                            command.SetGlobalMatrix("unity_MatrixVP", GL.GetGPUProjectionMatrix(data.shadowRequest.ProjectionMatrix, true) * data.shadowRequest.ViewMatrix);
+                            command.SetGlobalMatrix("_WorldToView", data.shadowRequest.ViewMatrix);
+                            command.SetGlobalMatrix("_WorldToClip", GL.GetGPUProjectionMatrix(data.shadowRequest.ProjectionMatrix, true) * data.shadowRequest.ViewMatrix);
 
                             command.BeginSample("Directional Shadows");
                             context.ExecuteCommandBuffer(command);
@@ -269,8 +265,8 @@ namespace Arycama.CustomRenderPipeline
                             command.SetRenderTarget(data.pointShadows, 0, CubemapFace.Unknown, data.faceIndex);
                             command.ClearRenderTarget(true, false, Color.clear);
 
-                            pass.SetMatrix(command, "unity_MatrixV", data.shadowRequest.ViewMatrix);
-                            pass.SetMatrix(command, "unity_MatrixVP", GL.GetGPUProjectionMatrix(data.shadowRequest.ProjectionMatrix, true) * data.shadowRequest.ViewMatrix);
+                            pass.SetMatrix(command, "_WorldToView", data.shadowRequest.ViewMatrix);
+                            pass.SetMatrix(command, "_WorldToClip", GL.GetGPUProjectionMatrix(data.shadowRequest.ProjectionMatrix, true) * data.shadowRequest.ViewMatrix);
 
                             command.BeginSample("Point Shadows");
                             context.ExecuteCommandBuffer(command);

@@ -32,7 +32,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	float4 positionCS;
 	positionCS.xy = positionNDC * 2.0 - 1.0;
 	positionCS.z = GetDeviceDepth(normalizedDepth);
-	positionCS.w = Remap(normalizedDepth, 0.0, 1.0, _ProjectionParams.y, _ProjectionParams.z);
+	positionCS.w = Remap(normalizedDepth, 0.0, 1.0, _Near, _Far);
 	
 	float3 positionWS = ClipToWorld(positionCS.xyz);
 	float3 lighting = _AmbientLightColor * _Exposure;
@@ -56,7 +56,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	float4 unjitteredPositionCS;
 	unjitteredPositionCS.xy = positionNDC * 2.0 - 1.0;
 	unjitteredPositionCS.z = GetDeviceDepth(unjitteredNormalizedDepth);
-	unjitteredPositionCS.w = Remap(unjitteredNormalizedDepth, 0.0, 1.0, _ProjectionParams.y, _ProjectionParams.z);
+	unjitteredPositionCS.w = Remap(unjitteredNormalizedDepth, 0.0, 1.0, _Near, _Far);
 	
 	float3 unjitteredPositionWS = ClipToWorld(unjitteredPositionCS.xyz);
 	

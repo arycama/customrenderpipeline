@@ -25,9 +25,9 @@ namespace Arycama.CustomRenderPipeline
             var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
             {
                 pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                pass.SetMatrix(command, "_NonJitteredVPMatrix", data.nonJitteredVpMatrix);
-                pass.SetMatrix(command, "_PreviousVPMatrix", data.previousVpMatrix);
-                pass.SetMatrix(command, "_InvVPMatrix", data.invVpMatrix);
+                pass.SetMatrix(command, "_WorldToNonJitteredClip", data.nonJitteredVpMatrix);
+                pass.SetMatrix(command, "_ClipToWorldPrevious", data.previousVpMatrix);
+                pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
             });
 
             data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);

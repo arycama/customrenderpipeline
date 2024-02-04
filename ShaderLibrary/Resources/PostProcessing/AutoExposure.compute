@@ -10,11 +10,14 @@ Texture2D<float> ExposureTexture;
 RWStructuredBuffer<uint> LuminanceHistogram;
 RWStructuredBuffer<float> LuminanceOutput;
 
-float MinEv, MaxEv;
-float AdaptationSpeed;
-float ExposureCompensation;
-float Aperture, Iso, ShutterSpeed;
-float4 unity_DeltaTime;
+cbuffer Properties
+{
+	float MinEv, MaxEv;
+	float AdaptationSpeed;
+	float ExposureCompensation;
+	float Aperture, Iso, ShutterSpeed;
+	float DeltaTime;
+};
 
 groupshared uint HistogramShared[NUM_HISTOGRAM_BINS];
 
@@ -76,7 +79,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 		averageEv -= ExposureTexture.SampleLevel(_LinearClampSampler, float2(uv.x, 0.5), 0.0);
 		
 		float evLastFrame = ExposureToEV100(_Exposure);
-		float adaptedEv = lerp(averageEv, evLastFrame, exp(-unity_DeltaTime.x * AdaptationSpeed));
+		float adaptedEv = lerp(averageEv, evLastFrame, exp(-DeltaTime * AdaptationSpeed));
 		
 		if (IsInfOrNaN(evLastFrame))
 			adaptedEv = averageEv;
