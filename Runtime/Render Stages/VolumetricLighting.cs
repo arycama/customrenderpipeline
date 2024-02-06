@@ -76,7 +76,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_FogMode", data.fogMode);
 
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                    pass.SetMatrix(command, "_ClipToWorldPrevious", data.previousVpMatrix);
+                    pass.SetMatrix(command, "_PreviousVPMatrix", data.previousVpMatrix);
                     pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
                 });
 

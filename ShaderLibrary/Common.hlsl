@@ -41,67 +41,12 @@ Texture3D<float4> _VolumetricLighting;
 Texture3D<uint2> _LightClusterIndices;
 TextureCubeArray<float> _PointShadows;
 
-cbuffer FrameData
-{
-	float3 _AmbientLightColor;
-	float _MipBias;
-	
-	float3 _FogColor;
-	float _Time;
-	
-	float _FogStartDistance;
-	float _FogEndDistance;
-	float _FogEnabled;
-	
-	float _BlockerRadius, _ClusterBias, _ClusterScale, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _NonLinearDepth, _AoEnabled;
-	uint _BlockerSamples, _DirectionalLightCount, _PcfSamples, _PointLightCount, _TileSize;
-};
-
-cbuffer CameraData
-{
-	matrix _WorldToView;
-	matrix _WorldToClip;
-	matrix _WorldToScreen;
-	matrix _WorldToPixel;
-	
-	matrix _ViewToWorld;
-	matrix _ViewToClip;
-	matrix _ViewToScreen;
-	matrix _ViewToPixel;
-
-	matrix _ClipToWorld;
-	matrix _ClipToView;
-	matrix _ClipToScreen;
-	matrix _ClipToPixel;
-	
-	matrix _ScreenToWorld;
-	matrix _ScreenToView;
-	matrix _ScreenToClip;
-	matrix _ScreenToPixel;
-	
-	matrix _PixelToWorld;
-	matrix _PixelToView;
-	matrix _PixelToClip;
-	matrix _PixelToScreen;
-	
-	matrix _ClipToWorldPrevious;
-	matrix _WorldToNonJitteredClip;
-
-	float3 _WorldSpaceCameraPos;
-	float _Near;
-	
-	float2 _Jitter;
-	float _Far;
-	float _CameraDataPadding0;
-	
-	float4 _ScaledResolution;
-	float4 _VolumetricLighting_Scale;
-};
-
-cbuffer DrawData
-{
-	uint unity_BaseInstanceID;
-};
+float4 _Time, _ProjectionParams, _ZBufferParams, _ScaledResolution, _VolumetricLighting_Scale;
+float3 _AmbientLightColor, _WorldSpaceCameraPos, _FogColor;
+float2 _Jitter;
+float _BlockerRadius, _ClusterBias, _ClusterScale, _FogStartDistance, _FogEndDistance, _FogEnabled, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _NonLinearDepth, _AoEnabled, _MipBias;
+matrix _ClipToWorld, _PreviousVPMatrix, _WorldToClip, _NonJitteredVPMatrix, _WorldToView;
+uint _BlockerSamples, _DirectionalLightCount, _PcfSamples, _PointLightCount, _TileSize, unity_BaseInstanceID;
 
 const static float Pi = radians(180.0);
 const static float HalfPi = Pi * 0.5;
@@ -184,12 +129,17 @@ float2 ApplyScaleOffset(float2 uv, float4 scaleOffset)
 
 float Linear01Depth(float depth)
 {
-	return rcp((-1.0 + _Far / _Near) * depth + 1.0);
+	return 1.0 / (_ZBufferParams.x * depth + _ZBufferParams.y);
 }
 
 float LinearEyeDepth(float depth)
 {
-	return rcp((-1.0 / _Far + 1.0 / _Near) * depth + 1.0 / _Far);
+	return 1.0 / (_ZBufferParams.z * depth + _ZBufferParams.w);
+}
+
+float4 LinearEyeDepth(float4 depth, float4 zBufferParam)
+{
+	return 1.0 / (zBufferParam.z * depth + zBufferParam.w);
 }
 
 float Max2(float2 x) { return max(x.x, x.y); }
@@ -269,7 +219,7 @@ float3 ObjectToWorldNormal(float3 normal, uint instanceID, bool doNormalize = fa
 
 float EyeToDeviceDepth(float eyeDepth)
 {
-	return (1.0 - eyeDepth * (1.0 / _Far)) * rcp(eyeDepth * (-1.0 / _Far + 1.0 / _Near));
+	return (1.0 - eyeDepth * _ZBufferParams.w) * rcp(eyeDepth * _ZBufferParams.z);
 }
 
 float3 ClipToWorld(float3 position)
@@ -282,8 +232,8 @@ float3 PixelToWorld(float3 position)
 	return ClipToWorld(float3(position.xy * _ScaledResolution.zw * 2 - 1, position.z));
 }
 
-float4 WorldToClipNonJittered(float3 position) { return MultiplyPoint(_WorldToNonJitteredClip, position); }
-float4 WorldToClipPrevious(float3 position) { return MultiplyPoint(_ClipToWorldPrevious, position); }
+float4 WorldToClipNonJittered(float3 position) { return MultiplyPoint(_NonJitteredVPMatrix, position); }
+float4 WorldToClipPrevious(float3 position) { return MultiplyPoint(_PreviousVPMatrix, position); }
 
 float2 MotionVectorFragment(float4 nonJitteredPositionCS, float4 previousPositionCS)
 {
@@ -314,7 +264,9 @@ float3 Remap01ToHalfTexelCoord(float3 coord, float3 size)
 // Converts a value between 0 and 1 to a device depth value where 0 is far and 1 is near in both cases.
 float Linear01ToDeviceDepth(float z)
 {
-	return _Near * (1.0 - z) / (_Near + z * (_Far - _Near));
+	float n = _ProjectionParams.y;
+	float f = _ProjectionParams.z;
+	return n * (1.0 - z) / (n + z * (f - n));
 }
 
 float GetDeviceDepth(float normalizedDepth)
@@ -322,7 +274,8 @@ float GetDeviceDepth(float normalizedDepth)
 	if (_NonLinearDepth)
 	{
 		// Non-linear depth distribution
-		float linearDepth = _Near * pow(_Far / _Near, normalizedDepth);
+		float near = _ProjectionParams.y, far = _ProjectionParams.z;
+		float linearDepth = near * pow(far / near, normalizedDepth);
 		return EyeToDeviceDepth(linearDepth);
 	}
 	else
@@ -587,13 +540,15 @@ float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, fl
 
 float GetVolumetricUv(float linearDepth)
 {
+	float near = _ProjectionParams.y, far = _ProjectionParams.z;
+	
 	if (_NonLinearDepth)
 	{
-		return (log2(linearDepth) * (_VolumeSlices / log2(_Far / _Near)) - _VolumeSlices * log2(_Near) / log2(_Far / _Near)) / _VolumeSlices;
+		return (log(linearDepth) * (_VolumeSlices / log(far / near)) - _VolumeSlices * log(near) / log(far / near)) / _VolumeSlices;
 	}
 	else
 	{
-		return Remap(linearDepth, _Near, _Far);
+		return Remap(linearDepth, near, far);
 	}
 }
 

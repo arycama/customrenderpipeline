@@ -29,6 +29,9 @@ namespace Arycama.CustomRenderPipeline
             var pointLightList = ListPool<PointLightData>.Get();
             var pointShadowRequests = ListPool<ShadowRequest>.Get();
 
+            var cameraProjectionMatrix = camera.projectionMatrix;
+            camera.ResetProjectionMatrix();
+
             // Setup lights/shadows
             for (var i = 0; i < cullingResults.visibleLights.Length; i++)
             {
@@ -178,6 +181,7 @@ namespace Arycama.CustomRenderPipeline
                     pointLightList.Add(pointLightData);
                 }
             }
+            camera.projectionMatrix = cameraProjectionMatrix;
 
             // Directional lights
             var directionalLightBuffer = directionalLightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(directionalLightList.Count, UnsafeUtility.SizeOf<DirectionalLightData>());

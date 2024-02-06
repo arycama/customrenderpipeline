@@ -2,6 +2,8 @@
 
 #include "../Common.hlsl"
 
+const static float _NearClipPlane = _ProjectionParams.y, _FarClipPlane = _ProjectionParams.z;
+
 RWStructuredBuffer<uint> _LightCounter, _LightClusterListWrite;
 RWTexture3D<uint2> _LightClusterIndicesWrite;
 
@@ -31,12 +33,12 @@ void ClusteredLighting(uint3 id : SV_DispatchThreadId, uint groupIndex : SV_Grou
 			[unroll]
 			for (uint x = 0; x < 2; x++)
 			{
-				float eyeDepth = _Near * pow(_Far / _Near, (id.z + z) * _RcpClusterDepth);
+				float eyeDepth = _NearClipPlane * pow(_FarClipPlane / _NearClipPlane, (id.z + z) * _RcpClusterDepth);
                 
 				float3 positionSS;
 				positionSS.x = (id.x + x) * _TileSize;
 				positionSS.y = (id.y + y) * _TileSize;
-				positionSS.z = EyeToDeviceDepth(eyeDepth);
+				positionSS.z = (1.0 - eyeDepth * _ZBufferParams.w) / (eyeDepth * _ZBufferParams.z);
                 
 				float3 positionWS = PixelToWorld(positionSS);
                 
