@@ -61,7 +61,7 @@ void ClusteredLighting(uint3 id : SV_DispatchThreadId, uint groupIndex : SV_Grou
 
         // For spotlights, modify their culling sphere
 		float radius = lightData.range;
-		float3 centerWS = lightData.position;
+		float3 centerWS = lightData.position - _ViewPosition;
 
 		if (!IntersectSphereAABB(centerWS, radius, minBounds, maxBounds))
 			continue;

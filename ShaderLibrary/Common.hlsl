@@ -99,6 +99,12 @@ cbuffer CameraData
 	
 	float4 _ScaledResolution;
 	float4 _VolumetricLighting_Scale;
+	
+	float3 _CameraForward;
+	float _CameraDataPadding1;
+	
+	float3 _PreviousViewPosition;
+	float _CameraDataPadding2;
 };
 
 cbuffer DrawData
@@ -237,7 +243,15 @@ float3 ObjectToWorld(float3 position, uint instanceID)
 	float3x4 objectToWorld = unity_ObjectToWorld;
 #endif
 	
+	objectToWorld._m03_m13_m23 -= _ViewPosition;
 	return MultiplyPoint3x4(objectToWorld, position);
+}
+
+float3 PreviousObjectToWorld(float3 position)
+{
+	float3x4 previousObjectToWorld = unity_MatrixPreviousM;
+	previousObjectToWorld._m03_m13_m23 -= _ViewPosition;
+	return MultiplyPoint3x4(previousObjectToWorld, position);
 }
 
 float4 WorldToClip(float3 position)
@@ -253,7 +267,7 @@ float4 ObjectToClip(float3 position, uint instanceID)
 float3 ObjectToWorldDirection(float3 direction, uint instanceID, bool doNormalize = false)
 {
 #ifdef INSTANCING_ON
-	float3x3 objectToWorld = (float3x3)unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_ObjectToWorldArray;
+	float3x3 objectToWorld = (float3x3) unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_ObjectToWorldArray;
 #else
 	float3x3 objectToWorld = (float3x3) unity_ObjectToWorld;
 #endif
@@ -264,12 +278,12 @@ float3 ObjectToWorldDirection(float3 direction, uint instanceID, bool doNormaliz
 float3 ObjectToWorldNormal(float3 normal, uint instanceID, bool doNormalize = false)
 {
 #ifdef INSTANCING_ON
-	float3x4 worldToObject = (float3x4)unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_WorldToObjectArray;
+	float3x3 worldToObject = (float3x3) unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_WorldToObjectArray;
 #else
-	float3x4 worldToObject = unity_WorldToObject;
+	float3x3 worldToObject = (float3x3) unity_WorldToObject;
 #endif
 	
-	return MultiplyVector(normal, (float3x3) worldToObject, doNormalize);
+	return MultiplyVector(normal, worldToObject, doNormalize);
 }
 
 float3 ClipToWorld(float3 position)
@@ -354,10 +368,10 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 		
 	float3 lightPosition = MultiplyPoint3x4(light.worldToLight, worldPosition);
 		
-	if (!softShadow)
+	//if (!softShadow)
 	{
 		float3 shadowPosition;
-		uint cascade = GetShadowCascade(lightIndex, lightPosition, shadowPosition);
+		uint cascade = GetShadowCascade(lightIndex, worldPosition, shadowPosition);
 		if (cascade == ~0u)
 			return 1.0;
 			
@@ -514,23 +528,27 @@ float3 CalculateLighting(float3 albedo, float3 f0, float roughness, float3 L, fl
 
 float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, float eyeDepth, float3 albedo, float3 f0, float roughness, bool isVolumetric = false)
 {
-	float3 V = normalize(_ViewPosition - worldPosition);
+	float3 V = normalize(-worldPosition);
 
 	// Directional lights
 	float3 lighting = 0.0;
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
+		DirectionalLight light = _DirectionalLights[i];
+		
+		// Skip expensive shadow lookup if NdotL is negative
+		float NdotL = dot(normal, light.direction);
+		if (NdotL <= 0.0)
+			continue;
+			
 		float attenuation = GetShadow(worldPosition, i, !isVolumetric);
 		if(!attenuation)
 			continue;
 		
-		DirectionalLight light = _DirectionalLights[i];
-		float NdotL = dot(normal, light.direction);
-		
 		if (isVolumetric)
-			lighting += light.color * _Exposure * attenuation;
+			lighting += light.color * (_Exposure * attenuation);
 		else if(NdotL > 0.0)
-			lighting += saturate(NdotL) * CalculateLighting(albedo, f0, roughness, light.direction, V, normal) * light.color * _Exposure * attenuation;
+			lighting += (CalculateLighting(albedo, f0, roughness, light.direction, V, normal) * light.color) * (saturate(NdotL) * _Exposure * attenuation);
 	}
 	
 	uint3 clusterIndex;
@@ -547,27 +565,26 @@ float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, fl
 		int index = _LightClusterList[startOffset + i];
 		PointLight light = _PointLights[index];
 		
-		float3 lightVector = light.position - worldPosition;
+		float3 lightVector = light.position - (worldPosition + _ViewPosition);
 		float sqrLightDist = dot(lightVector, lightVector);
 		if (sqrLightDist > Sq(light.range))
 			continue;
 		
-		float attenuation = 1.0;
+		sqrLightDist = max(Sq(0.01), sqrLightDist);
+		float rcpLightDist = rsqrt(sqrLightDist);
+		float attenuation = CalculateLightFalloff(rcpLightDist, sqrLightDist, rcp(Sq(light.range)));
+		if (!attenuation)
+			continue;
+			
 		if (light.shadowIndex != ~0u)
 		{
 			uint visibleFaces = light.visibleFaces;
 			float dominantAxis = Max3(abs(lightVector));
 			float depth = rcp(dominantAxis) * light.far + light.near;
-			attenuation = _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), light.shadowIndex), depth);
-			
+			attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), light.shadowIndex), depth);
 			if (!attenuation)
 				continue;
 		}
-		
-		sqrLightDist = max(Sq(0.01), sqrLightDist);
-		float rcpLightDist = rsqrt(sqrLightDist);
-		
-		attenuation *= CalculateLightFalloff(rcpLightDist, sqrLightDist, rcp(Sq(light.range)));
 		
 		float3 L = lightVector * rcpLightDist;
 		

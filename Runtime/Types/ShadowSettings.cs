@@ -7,7 +7,6 @@ namespace Arycama.CustomRenderPipeline
     public class ShadowSettings
     {
         [Header("Directional Shadows")]
-        [SerializeField] private bool closeFit = true;
         [SerializeField, Range(1, 4)] private int shadowCascades = 1;
         [SerializeField] private Vector3 shadowCascadeSplits = new Vector3(0.25f, 0.5f, 0.75f);
         [SerializeField] private float shadowDistance = 4096;
@@ -27,7 +26,6 @@ namespace Arycama.CustomRenderPipeline
         [SerializeField, Min(0f)] private float blockerRadius = 1f;
         [SerializeField, Min(0f)] private float pcssSoftness = 1f;
 
-        public bool CloseFit => closeFit;
         public int ShadowCascades => shadowCascades;
         public Vector3 ShadowCascadeSplits => shadowCascadeSplits;
         public float ShadowDistance => shadowDistance;

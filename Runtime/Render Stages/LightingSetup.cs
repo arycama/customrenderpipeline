@@ -40,97 +40,99 @@ namespace Arycama.CustomRenderPipeline
                 if (visibleLight.lightType == LightType.Directional)
                 {
                     var lightRotation = visibleLight.localToWorldMatrix.rotation;
-                    var lightToWorld = Matrix4x4.Rotate(lightRotation);
+                    var worldToLight = Matrix4x4.Rotate(Quaternion.Inverse(lightRotation));
 
                     if (light.shadows != LightShadows.None && cullingResults.GetShadowCasterBounds(i, out var bounds))
                     {
-                        Matrix4x4 viewMatrix, projectionMatrix;
-                        ShadowSplitData shadowSplitData;
                         for (var j = 0; j < settings.ShadowCascades; j++)
                         {
-                            if (settings.CloseFit)
+                            var cascadeStart = j == 0 ? near : (settings.ShadowDistance - near) * settings.ShadowCascadeSplits[j - 1];
+                            var cascadeEnd = (j == settings.ShadowCascades - 1) ? settings.ShadowDistance : (settings.ShadowDistance - near) * settings.ShadowCascadeSplits[j];
+
+                            // Transform camera bounds to light space
+                            var minValue = Vector3.positiveInfinity;
+                            var maxValue = Vector3.negativeInfinity;
+                            for (var z = 0; z < 2; z++)
                             {
-                                viewMatrix = lightToWorld.inverse;
-
-                                var cascadeStart = j == 0 ? near : (settings.ShadowDistance - near) * settings.ShadowCascadeSplits[j - 1];
-                                var cascadeEnd = (j == settings.ShadowCascades - 1) ? settings.ShadowDistance : (settings.ShadowDistance - near) * settings.ShadowCascadeSplits[j];
-
-                                // Transform camera bounds to light space
-                                var minValue = Vector3.positiveInfinity;
-                                var maxValue = Vector3.negativeInfinity;
-                                for (var z = 0; z < 2; z++)
+                                for (var y = 0; y < 2; y++)
                                 {
-                                    for (var y = 0; y < 2; y++)
+                                    for (var x = 0; x < 2; x++)
                                     {
-                                        for (var x = 0; x < 2; x++)
-                                        {
-                                            var depth = z == 0 ? cascadeStart : cascadeEnd;
-                                            var clipDepth = (1.0f - depth / far) / (depth * (1.0f / near - 1.0f / far));
+                                        var depth = z == 0 ? cascadeStart : cascadeEnd;
+                                        var clipDepth = (1.0f - depth / far) / (depth * (1.0f / near - 1.0f / far));
 
-                                            var clipPoint = new Vector4
-                                            (
-                                                x * 2.0f - 1.0f,
-                                                y * 2.0f - 1.0f,
-                                                clipDepth,
-                                                1.0f
-                                            );
+                                        var clipPoint = new Vector4
+                                        (
+                                            x * 2.0f - 1.0f,
+                                            y * 2.0f - 1.0f,
+                                            clipDepth,
+                                            1.0f
+                                        );
 
-                                            var worldPoint = clipToWorld * clipPoint;
-                                            var localPoint = viewMatrix.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w);
+                                        var worldPoint = clipToWorld * clipPoint;
+                                        var localPoint = worldToLight.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w);
 
-                                            minValue = Vector3.Min(minValue, localPoint);
-                                            maxValue = Vector3.Max(maxValue, localPoint);
-                                        }
+                                        minValue = Vector3.Min(minValue, localPoint);
+                                        maxValue = Vector3.Max(maxValue, localPoint);
                                     }
                                 }
-
-                                projectionMatrix = Matrix4x4.Ortho(minValue.x, maxValue.x, minValue.y, maxValue.y, minValue.z, maxValue.z);
-                                viewMatrix.SetRow(2, -viewMatrix.GetRow(2));
-
-                                // Calculate culling planes
-                                var cullingPlanes = ListPool<Plane>.Get();
-
-                                // First get the planes from the view projection matrix
-                                var viewProjectionMatrix = projectionMatrix * viewMatrix;
-                                GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrix, frustumPlanes);
-                                for (var k = 0; k < 6; k++)
-                                {
-                                    // Skip near plane
-                                    if (k != 4)
-                                        cullingPlanes.Add(frustumPlanes[k]);
-                                }
-
-                                // Now also add any main camera-frustum planes that are not facing away from the light
-                                var lightDirection = -visibleLight.localToWorldMatrix.Forward();
-                                GeometryUtility.CalculateFrustumPlanes(camera, frustumPlanes);
-                                for (var k = 0; k < 6; k++)
-                                {
-                                    var plane = frustumPlanes[k];
-                                    if (Vector3.Dot(plane.normal, lightDirection) > 0.0f)
-                                        cullingPlanes.Add(plane);
-                                }
-
-                                shadowSplitData = new ShadowSplitData()
-                                {
-                                    cullingPlaneCount = cullingPlanes.Count,
-                                    shadowCascadeBlendCullingFactor = 1
-                                };
-
-                                for (var k = 0; k < cullingPlanes.Count; k++)
-                                {
-                                    shadowSplitData.SetCullingPlane(k, cullingPlanes[k]);
-                                }
-
-                                ListPool<Plane>.Release(cullingPlanes);
                             }
-                            else if (!cullingResults.ComputeDirectionalShadowMatricesAndCullingPrimitives(i, j, settings.ShadowCascades, settings.ShadowCascadeSplits, settings.DirectionalShadowResolution, light.shadowNearPlane, out viewMatrix, out projectionMatrix, out shadowSplitData))
-                                continue;
+
+                            var localView = new Vector3(0.5f * (maxValue.x + minValue.x), 0.5f * (maxValue.y + minValue.y), minValue.z);
+                            var viewMatrix = Matrix4x4Extensions.WorldToLocal(lightRotation * localView, lightRotation);
+
+                            var projectionMatrix = new Matrix4x4
+                            {
+                                m00 = 2.0f / (maxValue.x - minValue.x),
+                                m11 = 2.0f / (maxValue.y - minValue.y),
+                                m22 = 2.0f / (maxValue.z - minValue.z),
+                                m23 = -1.0f,
+                                m33 = 1.0f
+                            };
+
+                            // Calculate culling planes
+                            var cullingPlanes = ListPool<Plane>.Get();
+
+                            // First get the planes from the view projection matrix
+                            var viewProjectionMatrix = projectionMatrix * viewMatrix;
+                            GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrix, frustumPlanes);
+                            for (var k = 0; k < 6; k++)
+                            {
+                                // Skip near plane
+                                if (k != 4)
+                                    cullingPlanes.Add(frustumPlanes[k]);
+                            }
+
+                            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(lightRotation * localView - camera.transform.position, lightRotation);
+
+                            // Now also add any main camera-frustum planes that are not facing away from the light
+                            var lightDirection = -visibleLight.localToWorldMatrix.Forward();
+                            GeometryUtility.CalculateFrustumPlanes(camera, frustumPlanes);
+                            for (var k = 0; k < 6; k++)
+                            {
+                                var plane = frustumPlanes[k];
+                                if (Vector3.Dot(plane.normal, lightDirection) > 0.0f)
+                                    cullingPlanes.Add(plane);
+                            }
+
+                            var shadowSplitData = new ShadowSplitData()
+                            {
+                                cullingPlaneCount = cullingPlanes.Count,
+                                shadowCascadeBlendCullingFactor = 1
+                            };
+
+                            for (var k = 0; k < cullingPlanes.Count; k++)
+                            {
+                                shadowSplitData.SetCullingPlane(k, cullingPlanes[k]);
+                            }
+
+                            ListPool<Plane>.Release(cullingPlanes);
 
                             cascadeCount++;
-                            var directionalShadowRequest = new ShadowRequest(true, i, viewMatrix, projectionMatrix, shadowSplitData, 0);
+                            var directionalShadowRequest = new ShadowRequest(true, i, viewMatrixRWS, projectionMatrix, shadowSplitData, 0);
                             directionalShadowRequests.Add(directionalShadowRequest);
 
-                            var shadowMatrix = (projectionMatrix * viewMatrix * lightToWorld).ConvertToAtlasMatrix();
+                            var shadowMatrix = (projectionMatrix * viewMatrixRWS).ConvertToAtlasMatrix();
                             directionalShadowMatrices.Add(shadowMatrix);
 
                             var width = projectionMatrix.OrthoWidth();
@@ -142,7 +144,7 @@ namespace Arycama.CustomRenderPipeline
                             shadowIndex = directionalShadowRequests.Count - cascadeCount;
                     }
 
-                    var directionalLightData = new DirectionalLightData((Vector4)light.color.linear * light.intensity, shadowIndex, -light.transform.forward, cascadeCount, lightToWorld.inverse);
+                    var directionalLightData = new DirectionalLightData((Vector4)light.color.linear * light.intensity, shadowIndex, -light.transform.forward, cascadeCount, worldToLight);
                     directionalLightList.Add(directionalLightData);
                 }
                 else if (visibleLight.lightType == LightType.Point)
