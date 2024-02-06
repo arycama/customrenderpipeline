@@ -62,6 +62,7 @@ namespace Arycama.CustomRenderPipeline
             internal Vector4 exposureCompensationRemap;
             internal BufferHandle exposureBuffer;
             internal Vector4 scaledResolution;
+            internal float deltaTime;
         }
 
         class Pass1Data
@@ -132,6 +133,7 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
+                    pass.SetFloat(command, "DeltaTime", data.deltaTime);
                     pass.SetFloat(command, "MinEv", data.minEv);
                     pass.SetFloat(command, "MaxEv", data.maxEv);
                     pass.SetFloat(command, "AdaptationSpeed", data.adaptationSpeed);
@@ -146,6 +148,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetConstantBuffer(command, "Exposure", data.exposureBuffer);
                 });
 
+                data.deltaTime = Time.deltaTime;
                 data.minEv = settings.MinEv;
                 data.maxEv = settings.MaxEv;
                 data.adaptationSpeed = settings.AdaptationSpeed;
