@@ -61,7 +61,7 @@ ViewNormalsOutput FragmentViewNormals(float4 position : SV_Position)
 	}
 		
 	float3 worldNormal = cross(vDeriv, hDeriv);
-	float3 normalV = normalize(mul((float3x3) _WorldToView, worldNormal) * float3(1, 1, -1));
+	float3 normalV = normalize(mul((float3x3) _WorldToView, worldNormal));
 
 	ViewNormalsOutput output;
 	output.viewNormal = float4(normalV * 0.5 + 0.5, 1.0);
@@ -72,7 +72,7 @@ ViewNormalsOutput FragmentViewNormals(float4 position : SV_Position)
 // Inputs are screen XY and viewspace depth, output is viewspace position
 float3 ComputeViewspacePosition(float2 screenPos)
 {
-	return MultiplyPoint3x4(_WorldToView, PixelToWorld(float3(screenPos, _CameraDepth[screenPos]))) * float3(1, 1, -1);
+	return MultiplyPoint3x4(_WorldToView, PixelToWorld(float3(screenPos, _CameraDepth[screenPos])));
 }
 
 float3 Fragment(float4 position : SV_Position) : SV_Target

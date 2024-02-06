@@ -18,7 +18,7 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
         }
 
-        public Result Render(CullingResults cullingResults, Camera camera)
+        public Result Render(CullingResults cullingResults, Matrix4x4 clipToWorld, float near, float far, Camera camera)
         {
             var result = new Result();
 
@@ -28,11 +28,6 @@ namespace Arycama.CustomRenderPipeline
             var directionalShadowTexelSizes = ListPool<Vector4>.Get();
             var pointLightList = ListPool<PointLightData>.Get();
             var pointShadowRequests = ListPool<ShadowRequest>.Get();
-
-            var cameraProjectionMatrix = camera.projectionMatrix;
-            camera.ResetProjectionMatrix();
-
-            var clipToWorld = (camera.projectionMatrix * camera.worldToCameraMatrix).inverse;
 
             // Setup lights/shadows
             for (var i = 0; i < cullingResults.visibleLights.Length; i++)
@@ -55,9 +50,6 @@ namespace Arycama.CustomRenderPipeline
                         {
                             if (settings.CloseFit)
                             {
-                                var near = camera.nearClipPlane;
-                                var far = camera.farClipPlane;
-
                                 viewMatrix = lightToWorld.inverse;
 
                                 var cascadeStart = j == 0 ? near : (settings.ShadowDistance - near) * settings.ShadowCascadeSplits[j - 1];
@@ -72,29 +64,19 @@ namespace Arycama.CustomRenderPipeline
                                     {
                                         for (var x = 0; x < 2; x++)
                                         {
-                                            var linearDepth = z == 0 ? cascadeStart : cascadeEnd;
-                                            var clipDepthPoint = (camera.projectionMatrix * new Vector4(0.0f, 0.0f, linearDepth, 1.0f));
-                                            var clipDepth = (clipDepthPoint.z) / clipDepthPoint.w;
+                                            var depth = z == 0 ? cascadeStart : cascadeEnd;
+                                            var clipDepth = (1.0f - depth / far) / (depth * (1.0f / near - 1.0f / far));
 
                                             var clipPoint = new Vector4
                                             (
                                                 x * 2.0f - 1.0f,
                                                 y * 2.0f - 1.0f,
                                                 clipDepth,
-                                                clipDepthPoint.w
+                                                1.0f
                                             );
 
-                                            Vector3 localPoint;
-                                            //if ((Mathf.FloorToInt(Time.time) & 1) == 0)
-                                            {
-                                                //var worldPoint = clipToWorld * clipPoint;
-                                                //localPoint = viewMatrix.MultiplyPoint3x4((Vector3)worldPoint * worldPoint.w);
-                                            }
-                                            //else
-                                            {
-                                                var worldPoint = camera.ViewportToWorldPoint(new Vector3(x, y, linearDepth));
-                                                localPoint = viewMatrix.MultiplyPoint3x4(worldPoint);
-                                            }
+                                            var worldPoint = clipToWorld * clipPoint;
+                                            var localPoint = viewMatrix.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w);
 
                                             minValue = Vector3.Min(minValue, localPoint);
                                             maxValue = Vector3.Max(maxValue, localPoint);
@@ -165,8 +147,8 @@ namespace Arycama.CustomRenderPipeline
                 }
                 else if (visibleLight.lightType == LightType.Point)
                 {
-                    var near = light.shadowNearPlane;
-                    var far = light.range;
+                    var nearPlane = light.shadowNearPlane;
+                    var farPlane = light.range;
 
                     var visibleFaceMask = 0;
                     var visibleFaceCount = 0;
@@ -194,19 +176,18 @@ namespace Arycama.CustomRenderPipeline
                             var shadowRequest = new ShadowRequest(isValid, i, viewMatrix, projectionMatrix, shadowSplitData, index);
                             pointShadowRequests.Add(shadowRequest);
 
-                            near = projectionMatrix[2, 3] / (projectionMatrix[2, 2] - 1f);
-                            far = projectionMatrix[2, 3] / (projectionMatrix[2, 2] + 1f);
+                            nearPlane = projectionMatrix[2, 3] / (projectionMatrix[2, 2] - 1f);
+                            farPlane = projectionMatrix[2, 3] / (projectionMatrix[2, 2] + 1f);
                         }
 
                         if (visibleFaceCount > 0)
                             shadowIndex = (pointShadowRequests.Count - visibleFaceCount) / 6;
                     }
 
-                    var pointLightData = new PointLightData(light.transform.position, light.range, (Vector4)light.color.linear * light.intensity, shadowIndex, visibleFaceMask, near, far);
+                    var pointLightData = new PointLightData(light.transform.position, light.range, (Vector4)light.color.linear * light.intensity, shadowIndex, visibleFaceMask, nearPlane, farPlane);
                     pointLightList.Add(pointLightData);
                 }
             }
-            camera.projectionMatrix = cameraProjectionMatrix;
 
             // Directional lights
             var directionalLightBuffer = directionalLightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(directionalLightList.Count, UnsafeUtility.SizeOf<DirectionalLightData>());

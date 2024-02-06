@@ -184,12 +184,17 @@ float2 ApplyScaleOffset(float2 uv, float4 scaleOffset)
 
 float Linear01Depth(float depth)
 {
-	return rcp((-1.0 + _Far / _Near) * depth + 1.0);
+	return rcp((_Far * rcp(_Near) - 1.0) * depth + 1.0);
 }
 
 float LinearEyeDepth(float depth)
 {
-	return rcp((-1.0 / _Far + 1.0 / _Near) * depth + 1.0 / _Far);
+	return rcp((rcp(_Near) - rcp(_Far)) * depth + rcp(_Far));
+}
+
+float EyeToDeviceDepth(float eyeDepth)
+{
+	return (1.0 - eyeDepth * rcp(_Far)) * rcp(eyeDepth * (rcp(_Near) - rcp(_Far)));
 }
 
 float Max2(float2 x) { return max(x.x, x.y); }
@@ -265,11 +270,6 @@ float3 ObjectToWorldNormal(float3 normal, uint instanceID, bool doNormalize = fa
 #endif
 	
 	return MultiplyVector(normal, (float3x3) worldToObject, doNormalize);
-}
-
-float EyeToDeviceDepth(float eyeDepth)
-{
-	return (1.0 - eyeDepth * (1.0 / _Far)) * rcp(eyeDepth * (-1.0 / _Far + 1.0 / _Near));
 }
 
 float3 ClipToWorld(float3 position)
