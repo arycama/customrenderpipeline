@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
@@ -171,6 +172,8 @@ namespace Arycama.CustomRenderPipeline
                                 isValid = true;
                             }
 
+                            viewMatrix = Matrix4x4.TRS(light.transform.position - camera.transform.position, viewMatrix.inverse.rotation, Vector3.one).inverse;
+
                             // To undo unity's builtin inverted culling for point shadows, flip the y axis.
                             // Y also needs to be done in the shader
                             viewMatrix.SetRow(1, -viewMatrix.GetRow(1));
@@ -186,7 +189,7 @@ namespace Arycama.CustomRenderPipeline
                             shadowIndex = (pointShadowRequests.Count - visibleFaceCount) / 6;
                     }
 
-                    var pointLightData = new PointLightData(light.transform.position, light.range, (Vector4)light.color.linear * light.intensity, shadowIndex, visibleFaceMask, nearPlane, farPlane);
+                    var pointLightData = new PointLightData(light.transform.position - camera.transform.position, light.range, (Vector4)light.color.linear * light.intensity, shadowIndex, visibleFaceMask, nearPlane, farPlane);
                     pointLightList.Add(pointLightData);
                 }
             }
@@ -220,6 +223,7 @@ namespace Arycama.CustomRenderPipeline
 
                             command.SetGlobalMatrix("_WorldToView", data.shadowRequest.ViewMatrix);
                             command.SetGlobalMatrix("_WorldToClip", GL.GetGPUProjectionMatrix(data.shadowRequest.ProjectionMatrix, true) * data.shadowRequest.ViewMatrix);
+                            command.SetGlobalVector("_ViewPosition", data.viewPosition);
 
                             command.BeginSample("Directional Shadows");
                             context.ExecuteCommandBuffer(command);
@@ -239,6 +243,7 @@ namespace Arycama.CustomRenderPipeline
                         data.cullingResults = cullingResults;
                         data.cascade = i;
                         data.shadowRequest = directionalShadowRequests[i];
+                        data.viewPosition = camera.transform.position;
                     }
                 }
             }
@@ -279,6 +284,7 @@ namespace Arycama.CustomRenderPipeline
 
                             pass.SetMatrix(command, "_WorldToView", data.shadowRequest.ViewMatrix);
                             pass.SetMatrix(command, "_WorldToClip", GL.GetGPUProjectionMatrix(data.shadowRequest.ProjectionMatrix, true) * data.shadowRequest.ViewMatrix);
+                            command.SetGlobalVector("_ViewPosition", data.viewPosition);
 
                             command.BeginSample("Point Shadows");
                             context.ExecuteCommandBuffer(command);
@@ -297,6 +303,7 @@ namespace Arycama.CustomRenderPipeline
                         data.shadowSlopeBias = settings.PointShadowSlopeBias;
                         data.shadowRequest = shadowRequest;
                         data.faceIndex = i;
+                        data.viewPosition = camera.transform.position;
                     }
                 }
             }
@@ -364,6 +371,7 @@ namespace Arycama.CustomRenderPipeline
             internal CullingResults cullingResults;
             internal int cascade;
             internal ShadowRequest shadowRequest;
+            internal Vector3 viewPosition;
         }
 
         private class Pass3Data
@@ -374,6 +382,7 @@ namespace Arycama.CustomRenderPipeline
             internal float shadowBias;
             internal ShadowRequest shadowRequest;
             internal int faceIndex;
+            internal Vector3 viewPosition;
         }
 
         public struct Result

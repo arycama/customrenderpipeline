@@ -538,7 +538,7 @@ float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, fl
 		
 		// Skip expensive shadow lookup if NdotL is negative
 		float NdotL = dot(normal, light.direction);
-		if (NdotL <= 0.0)
+		if (!isVolumetric && NdotL <= 0.0)
 			continue;
 			
 		float attenuation = GetShadow(worldPosition, i, !isVolumetric);
@@ -565,13 +565,19 @@ float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, fl
 		int index = _LightClusterList[startOffset + i];
 		PointLight light = _PointLights[index];
 		
-		float3 lightVector = light.position - (worldPosition + _ViewPosition);
+		float3 lightVector = light.position - worldPosition;
 		float sqrLightDist = dot(lightVector, lightVector);
 		if (sqrLightDist > Sq(light.range))
 			continue;
 		
 		sqrLightDist = max(Sq(0.01), sqrLightDist);
 		float rcpLightDist = rsqrt(sqrLightDist);
+		
+		float3 L = lightVector * rcpLightDist;
+		float NdotL = dot(normal, L);
+		if(!isVolumetric && NdotL <= 0.0)
+			continue;
+
 		float attenuation = CalculateLightFalloff(rcpLightDist, sqrLightDist, rcp(Sq(light.range)));
 		if (!attenuation)
 			continue;
@@ -586,13 +592,10 @@ float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, fl
 				continue;
 		}
 		
-		float3 L = lightVector * rcpLightDist;
-		
 		if (isVolumetric)
 			lighting += light.color * _Exposure * attenuation;
 		else
 		{
-			float NdotL = dot(normal, L);
 			if (NdotL > 0.0)
 				lighting += CalculateLighting(albedo, f0, roughness, L, V, normal) * NdotL * attenuation * light.color * _Exposure;
 		}

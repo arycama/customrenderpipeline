@@ -57,11 +57,13 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_VolumeSlices", data.volumeSlices);
                     pass.SetFloat(command, "_BlurSigma", data.blurSigma);
                     pass.SetFloat(command, "_VolumeTileSize", data.volumeTileSize);
+                    pass.SetFloat(command, "_VolumeTileSize", data.volumeTileSize);
+
+                    pass.SetFloat(command, "_Near", data.near);
+                    pass.SetFloat(command, "_Far", data.far);
 
                     data.clusteredLightCullingResult.SetProperties(pass, command);
-
-                    pass.SetInt(command, "_DirectionalLightCount", data.lightingSetupResult.directionalLightCount);
-                    pass.SetInt(command, "_PointLightCount", data.lightingSetupResult.pointLightCount);
+                    data.lightingSetupResult.SetProperties(pass, command);
 
                     pass.SetTexture(command, "_BlueNoise1D", data.blueNoise1D);
                     pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2D);
@@ -101,6 +103,8 @@ namespace Arycama.CustomRenderPipeline
                 data.scaledResolution = new Vector4(screenWidth, screenHeight, 1.0f / screenWidth, 1.0f / screenHeight);
                 data.previousVpMatrix = previousVpMatrix;
                 data.invVpMatrix = invVpMatrix;
+                data.near = camera.nearClipPlane;
+                data.far = camera.farClipPlane;
             }
 
             // Filter X
@@ -169,6 +173,8 @@ namespace Arycama.CustomRenderPipeline
             internal Vector4 scaledResolution;
             internal Matrix4x4 previousVpMatrix;
             internal Matrix4x4 invVpMatrix;
+            internal float near;
+            internal float far;
         }
 
         public struct Result

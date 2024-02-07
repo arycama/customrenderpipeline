@@ -38,6 +38,8 @@ namespace Arycama.CustomRenderPipeline
             internal int pointLightCount;
             internal Vector4 scaledResolution;
             internal Matrix4x4 invVpMatrix;
+            internal float near;
+            internal float far;
         }
 
         public readonly struct Result
@@ -102,6 +104,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_PointLightCount", data.pointLightCount);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                     pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
+                    pass.SetFloat(command, "_Near", data.near);
+                    pass.SetFloat(command, "_Far", data.far);
                 });
 
                 data.tileSize = settings.TileSize;
@@ -110,6 +114,8 @@ namespace Arycama.CustomRenderPipeline
                 data.pointLightCount = lightingSetupResult.pointLightCount;
                 data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
                 data.invVpMatrix = invVpMatrix;
+                data.near = near;
+                data.far = far;
             }
 
             return new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize);
