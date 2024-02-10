@@ -16,7 +16,7 @@ namespace Arycama.CustomRenderPipeline
             [SerializeField] private float exposureCompensation = 0.0f;
             [SerializeField] private Vector2 histogramPercentages = new(40f, 90f);
             [SerializeField] private int exposureResolution = 128;
-            [SerializeField] private AnimationCurve exposureCurve = AnimationCurve.Linear(-10f, -10f, 20f, 20f);
+            [SerializeField] private AnimationCurve exposureCurve = AnimationCurve.Linear(0.0f, 1.0f, 1.0f, 1.0f);
 
             public float MinEv => minEv;
             public float MaxEv => maxEv;

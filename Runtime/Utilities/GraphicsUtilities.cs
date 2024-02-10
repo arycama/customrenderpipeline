@@ -18,5 +18,21 @@ namespace Arycama.CustomRenderPipeline
             var invHeight = 1f / height;
             return new Vector4(1f - invWidth, 1f - invHeight, 0.5f * invWidth, 0.5f * invHeight);
         }
+
+        /// <summary>
+        /// Calculates ScaleOffset to Remap a CS thread to UV coordinate that stretches from 0:1. (No half-texel offset)
+        /// </summary>
+        public static Vector3 ThreadIdScaleOffset01(int width, int height, int depth)
+        {
+            return new Vector3(1f / (width - 1), 1f / (height - 1), 1f / (depth - 1));
+        }
+
+        /// <summary>
+        /// Calculates ScaleOffset to Remap a CS thread to UV coordinate that stretches from 0:1. (No half-texel offset)
+        /// </summary>
+        public static Vector2 ThreadIdScaleOffset01(int width, int height)
+        {
+            return new Vector2(1f / (width - 1), 1f / (height - 1));
+        }
     }
 }

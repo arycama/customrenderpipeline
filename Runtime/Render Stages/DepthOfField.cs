@@ -25,7 +25,7 @@ namespace Arycama.CustomRenderPipeline
         {
             this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
             this.lensSettings = lensSettings ?? throw new ArgumentNullException(nameof(lensSettings));
-            material = new Material(Shader.Find("Hidden/Depth of Field"));
+            material = new Material(Shader.Find("Hidden/Depth of Field")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
         class PassData
