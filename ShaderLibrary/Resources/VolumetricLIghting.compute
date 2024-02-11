@@ -1,6 +1,7 @@
 #define CUSTOM_LIGHTING_FALLOFF
 
 #include "../Common.hlsl"
+#include "../Lighting.hlsl"
 
 float CalculateLightFalloff(float rcpLightDist, float sqrLightDist, float rcpSqLightRange)
 {

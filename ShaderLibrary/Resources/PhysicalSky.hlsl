@@ -1,6 +1,11 @@
-#include "../Common.hlsl"
+﻿#include "../Common.hlsl"
+#include "../Atmosphere.hlsl"
 
 matrix _PixelCoordToViewDirWS;
+uint _Samples;
+float4 _ScaleOffset;
+float4 _MultiScatterRemap, _MultiScatter_Scale;
+Texture2D<float3> _MultiScatter;
 
 float4 Vertex(uint id : SV_VertexID) : SV_Position
 {
@@ -8,148 +13,78 @@ float4 Vertex(uint id : SV_VertexID) : SV_Position
 	return float4(uv * 2.0 - 1.0, 1.0, 1.0);
 }
 
-const static float _PlanetRadius = 6360000.0;
-const static float _TopRadius = 6460000.0;
-
-const static float _RayleighHeight = 8000.0;
-const static float _MieHeight = 1200.0;
-const static float _OzoneWidth = 15000.0;
-const static float _OzoneHeight = 25000.0;
-
-const static float3 _RayleighScatter = float3(5.802, 13.558, 33.1) * 1e-6;
-const static float _MieScatter = 3.996e-6;
-const static float _MieAbsorption = 4.4e-6;
-const static float3 _OzoneAbsorption = float3(0.650, 1.811, 0.085) * 1e-6;
-const static float _MiePhase = 0.8;
-
-const static float3 _PlanetOffset = float3(0.0, _PlanetRadius + _ViewPosition.y, 0.0);
-
-float IntersectRaySphereSimple(float3 start, float3 dir, float radius)
+float3 FragmentTransmittanceLut(float4 position : SV_Position) : SV_Target
 {
-	float b = dot(dir, start) * 2.0;
-	float c = dot(start, start) - radius * radius;
-	float discriminant = b * b - 4.0 * c;
+	float2 uv = position.xy * _ScaleOffset.xy + _ScaleOffset.zw;
+	
+	// Distance to top atmosphere boundary for a horizontal ray at ground level.
+	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
+	
+	// Distance to the horizon, from which we can compute r:
+	float rho = H * uv.y;
+	float viewHeight = sqrt(Sq(rho) + Sq(_PlanetRadius));
+	
+	// Distance to the top atmosphere boundary for the ray (r,mu), and its minimum
+	// and maximum values over all mu - obtained for (r,1) and (r,mu_horizon) -
+	// from which we can recover mu:
+	float dMin = _TopRadius - viewHeight;
+	float dMax = rho + H;
+	float d = lerp(dMin, dMax, uv.x);
+	float cosAngle = d ? (Sq(H) - Sq(rho) - Sq(d)) / (2.0 * viewHeight * d) : 1.0;
+	float dx = d / _Samples;
 
-	return abs(sqrt(discriminant) - b) * 0.5;
-}
-
-float DistanceToTopAtmosphereBoundary(float height, float cosAngle)
-{
-	float discriminant = Sq(height) * (Sq(cosAngle) - 1.0) + Sq(_TopRadius);
-	return max(0.0, -height * cosAngle + sqrt(max(0.0, discriminant)));
-}
-
-float DistanceToBottomAtmosphereBoundary(float height, float cosAngle)
-{
-	float discriminant = Sq(height) * (Sq(cosAngle) - 1.0) + Sq(_PlanetRadius);
-	return max(0.0, -height * cosAngle - sqrt(max(0.0, discriminant)));
-}
-
-float DistanceToNearestAtmosphereBoundary(float height, float cosAngle, bool ray_r_mu_intersects_ground)
-{
-	if (ray_r_mu_intersects_ground)
-	{
-		return DistanceToBottomAtmosphereBoundary(height, cosAngle);
-	}
-	else
-	{
-		return DistanceToTopAtmosphereBoundary(height, cosAngle);
-	}
-}
-
-bool RayIntersectsGround(float viewHeight, float cosAngle)
-{
-	return (cosAngle < 0.0) && ((Sq(viewHeight) * (Sq(cosAngle) - 1.0) + Sq(_PlanetRadius)) >= 0.0);
-}
-
-float DistanceToNearestAtmosphereBoundary(float height, float cosAngle)
-{
-	if (RayIntersectsGround(height, cosAngle))
-	{
-		return DistanceToBottomAtmosphereBoundary(height, cosAngle);
-	}
-	else
-	{
-		return DistanceToTopAtmosphereBoundary(height, cosAngle);
-	}
-}
-
-// Calculates the height above the atmosphere based on the current view height, angle and distance
-float HeightAtDistance(float viewHeight, float cosAngle, float distance)
-{
-	return sqrt(Sq(distance) + 2.0 * viewHeight * cosAngle * distance + Sq(viewHeight));
-}
-
-float CosAngleAtDistance(float viewHeight, float cosAngle, float distance, float heightAtDistance)
-{
-	return (viewHeight * cosAngle + distance) / heightAtDistance;
-}
-
-float CosAngleAtDistance(float viewHeight, float cosAngle, float distance)
-{
-	float heightAtDistance = HeightAtDistance(viewHeight, cosAngle, distance);
-	return CosAngleAtDistance(viewHeight, cosAngle, distance, heightAtDistance);
-}
-
-float RayleighPhase(float cosAngle)
-{
-	return 3.0 * (1.0 + Sq(cosAngle)) / (16.0 * Pi);
-}
-
-float MiePhase(float cosAngle, float anisotropy)
-{
-	float g = anisotropy;
-	return (3.0 / (8.0 * Pi)) * ((((1.0 - Sq(g)) * (1.0 + Sq(cosAngle))) / ((2.0 + Sq(g)) * pow(1.0 + Sq(g) - 2.0 * g * cosAngle, 3.0 / 2.0))));
-}
-
-float3 AtmosphereOpticalDepth(float height, float cosAngle, float rayLength)
-{
 	float3 opticalDepth = 0.0;
-	const float samples = 64.0;
-	for (float i = 0.5; i < samples; i++)
+	for (float i = 0.5; i < _Samples; i++)
 	{
-		float heightAtDistance = HeightAtDistance(height, cosAngle, (i / samples) * rayLength);
-		float height = max(0.0, heightAtDistance - _PlanetRadius);
-			
-		opticalDepth += exp(-height / _RayleighHeight) * _RayleighScatter;
-		opticalDepth += exp(-height / _MieHeight) * (_MieScatter + _MieAbsorption);
-		opticalDepth += max(0.0, 1.0 - abs(height - _OzoneHeight) / _OzoneWidth) * _OzoneAbsorption;
+		float currentDistance = i * dx;
+		float height = HeightAtDistance(viewHeight, cosAngle, currentDistance);
+		opticalDepth += AtmosphereOpticalDepth(height);
 	}
 	
-	return opticalDepth * (rayLength / samples);
+	return exp(-opticalDepth * dx);
 }
 
-float3 Fragment(float4 position : SV_Position) : SV_Target
+float3 FragmentRender(float4 position : SV_Position) : SV_Target
 {
-	DirectionalLight light = _DirectionalLights[0];
-	float3 L = light.direction;
-	float3 V = -MultiplyVector(_PixelCoordToViewDirWS, float3(position.xy, 1.0), true);
+	//float2 uv = position.xy / _ScaledResolution.xy;
+	//return _MultiScatter.Sample(_LinearClampSampler, uv * _MultiScatter_Scale.xy);
+
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
-	
+
+	float3 V = -MultiplyVector(_PixelCoordToViewDirWS, float3(position.xy, 1.0), true);
 	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, V.y);
+	
+	const float samples = 64.0;
+	float dt = rayLength / samples;
 		
 	float3 luminance = 0.0;
-	const float samples = 8.0;
 	for (float i = 0.5; i < samples; i++)
 	{
-		float viewDistance = (i / samples) * rayLength;
-		float heightAtDistance = HeightAtDistance(viewHeight, V.y, viewDistance);
-
-		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, L.y, viewDistance * dot(V, L), heightAtDistance);
-		if (RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
-			continue;
-
-		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, V.y, viewDistance);
-		float3 opticalDepth = AtmosphereOpticalDepth(heightAtDistance, -viewCosAngleAtDistance, viewDistance);
+		float currentDistance = i * dt;
+		float heightAtDistance = HeightAtDistance(viewHeight, V.y, currentDistance);
+		float4 scatter = AtmosphereScatter(heightAtDistance);
 		
-		float lightRayLength = DistanceToTopAtmosphereBoundary(heightAtDistance, lightCosAngleAtDistance);
-		opticalDepth += AtmosphereOpticalDepth(heightAtDistance, lightCosAngleAtDistance, lightRayLength);
+		float3 lighting = 0.0;
+		for (uint j = 0; j < _DirectionalLightCount; j++)
+		{
+			DirectionalLight light = _DirectionalLights[j];
 		
-		float height = max(0.0, heightAtDistance - _PlanetRadius);
-		float3 scatter = exp(-height / _RayleighHeight) * _RayleighScatter * RayleighPhase(dot(V, L));
-		scatter += exp(-height / _MieHeight) * _MieScatter * MiePhase(dot(V, L), _MiePhase);
-		luminance += exp(-opticalDepth) * scatter;
+			float LdotV = dot(light.direction, V);
+			float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, light.direction.y, currentDistance * LdotV, heightAtDistance);
+			
+			if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
+				lighting += AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color;
+				
+			float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
+			float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv * _MultiScatter_Scale.xy, 0.0);
+			lighting += ms * (scatter.xyz + scatter.w) * light.color;
+		}
+		
+		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, V.y, currentDistance, heightAtDistance);
+		float3 transmittance = TransmittanceToPoint(viewHeight, V.y, heightAtDistance, viewCosAngleAtDistance);
+		float3 extinction = AtmosphereOpticalDepth(viewHeight);
+		luminance += transmittance * lighting * (1.0 - exp(-extinction * dt)) / extinction;
 	}
 	
-	return luminance * (rayLength / samples) * light.color * _Exposure;
+	return luminance * _Exposure;
 }

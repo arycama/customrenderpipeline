@@ -1,6 +1,8 @@
 ﻿#ifndef COMMON_INCLUDED
 #define COMMON_INCLUDED
 
+#include "Utility.hlsl"
+
 struct DirectionalLight
 {
 	float3 color;
@@ -40,9 +42,6 @@ Texture2DArray<float> _DirectionalShadows;
 Texture3D<float4> _VolumetricLighting;
 Texture3D<uint2> _LightClusterIndices;
 TextureCubeArray<float> _PointShadows;
-
-const static float Pi = radians(180.0);
-const static float HalfPi = Pi * 0.5;
 
 cbuffer FrameData
 {
@@ -137,17 +136,6 @@ cbuffer UnityInstancing_PerDraw0
 	
 	unity_Builtins0Array[2];
 };
-
-float1 Sq(float1 x) { return x * x; }
-float2 Sq(float2 x) { return x * x; }
-float3 Sq(float3 x) { return x * x; }
-float4 Sq(float4 x) { return x * x; }
-
-// Remaps a value from one range to another
-float1 Remap(float1 v, float1 pMin, float1 pMax = 1.0, float1 nMin = 0.0, float1 nMax = 1.0) { return nMin + (v - pMin) * rcp(pMax - pMin) * (nMax - nMin); }
-float2 Remap(float2 v, float2 pMin, float2 pMax = 1.0, float2 nMin = 0.0, float2 nMax = 1.0) { return nMin + (v - pMin) * rcp(pMax - pMin) * (nMax - nMin); }
-float3 Remap(float3 v, float3 pMin, float3 pMax = 1.0, float3 nMin = 0.0, float3 nMax = 1.0) { return nMin + (v - pMin) * rcp(pMax - pMin) * (nMax - nMin); }
-float4 Remap(float4 v, float4 pMin, float4 pMax = 1.0, float4 nMin = 0.0, float4 nMax = 1.0) { return nMin + (v - pMin) * rcp(pMax - pMin) * (nMax - nMin); }
 
 const static float FloatMin = 1.175494351e-38; // Minimum normalized positive floating-point number
 
@@ -525,84 +513,6 @@ float3 CalculateLighting(float3 albedo, float3 f0, float roughness, float3 L, fl
 	return lighting;
 }
 #endif
-
-float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, float eyeDepth, float3 albedo, float3 f0, float roughness, bool isVolumetric = false)
-{
-	float3 V = normalize(-worldPosition);
-
-	// Directional lights
-	float3 lighting = 0.0;
-	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
-	{
-		DirectionalLight light = _DirectionalLights[i];
-		
-		// Skip expensive shadow lookup if NdotL is negative
-		float NdotL = dot(normal, light.direction);
-		if (!isVolumetric && NdotL <= 0.0)
-			continue;
-			
-		float attenuation = GetShadow(worldPosition, i, !isVolumetric);
-		if(!attenuation)
-			continue;
-		
-		if (isVolumetric)
-			lighting += light.color * (_Exposure * attenuation);
-		else if(NdotL > 0.0)
-			lighting += (CalculateLighting(albedo, f0, roughness, light.direction, V, normal) * light.color) * (saturate(NdotL) * _Exposure * attenuation);
-	}
-	
-	uint3 clusterIndex;
-	clusterIndex.xy = floor(pixelPosition) / _TileSize;
-	clusterIndex.z = log2(eyeDepth) * _ClusterScale + _ClusterBias;
-	
-	uint2 lightOffsetAndCount = _LightClusterIndices[clusterIndex];
-	uint startOffset = lightOffsetAndCount.x;
-	uint lightCount = lightOffsetAndCount.y;
-	
-	// Point lights
-	for (i = 0; i < min(128, lightCount); i++)
-	{
-		int index = _LightClusterList[startOffset + i];
-		PointLight light = _PointLights[index];
-		
-		float3 lightVector = light.position - worldPosition;
-		float sqrLightDist = dot(lightVector, lightVector);
-		if (sqrLightDist > Sq(light.range))
-			continue;
-		
-		sqrLightDist = max(Sq(0.01), sqrLightDist);
-		float rcpLightDist = rsqrt(sqrLightDist);
-		
-		float3 L = lightVector * rcpLightDist;
-		float NdotL = dot(normal, L);
-		if(!isVolumetric && NdotL <= 0.0)
-			continue;
-
-		float attenuation = CalculateLightFalloff(rcpLightDist, sqrLightDist, rcp(Sq(light.range)));
-		if (!attenuation)
-			continue;
-			
-		if (light.shadowIndex != ~0u)
-		{
-			uint visibleFaces = light.visibleFaces;
-			float dominantAxis = Max3(abs(lightVector));
-			float depth = rcp(dominantAxis) * light.far + light.near;
-			attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), light.shadowIndex), depth);
-			if (!attenuation)
-				continue;
-		}
-		
-		if (isVolumetric)
-			lighting += light.color * _Exposure * attenuation;
-		else
-		{
-			if (NdotL > 0.0)
-				lighting += CalculateLighting(albedo, f0, roughness, L, V, normal) * NdotL * attenuation * light.color * _Exposure;
-		}
-	}
-	
-	return lighting;
-}
 
 float GetVolumetricUv(float linearDepth)
 {

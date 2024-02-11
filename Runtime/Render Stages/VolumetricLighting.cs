@@ -22,7 +22,7 @@ namespace Arycama.CustomRenderPipeline
             volumetricLightingTextureCache.Dispose();
         }
 
-        public Result Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, Texture2D blueNoise1D, Texture2D blueNoise2D, Color ambientLightColor, Color fogColor, float fogStartDistance, float fogEndDistance, float fogDensity, float fogMode, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix)
+        public Result Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, Texture2D blueNoise1D, Texture2D blueNoise2D, Color ambientLightColor, Color fogColor, float fogStartDistance, float fogEndDistance, float fogDensity, float fogMode, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, IRenderPassData commonData)
         {
             var width = Mathf.CeilToInt(screenWidth / (float)settings.TileSize);
             var height = Mathf.CeilToInt(screenHeight / (float)settings.TileSize);
@@ -48,6 +48,7 @@ namespace Arycama.CustomRenderPipeline
 
                 clusteredLightCullingResult.SetInputs(pass);
                 lightingSetupResult.SetInputs(pass);
+                commonData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
@@ -80,6 +81,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                     pass.SetMatrix(command, "_WorldToPreviousClip", data.previousVpMatrix);
                     pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
+
+                    commonData.SetProperties(pass, command);
                 });
 
                 data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;

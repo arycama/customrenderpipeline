@@ -1,0 +1,86 @@
+#include "../Common.hlsl"
+#include "../Atmosphere.hlsl"
+
+#pragma kernel MultiScatter
+#pragma kernel Ambient
+
+static const uint _ThreadCount = 64;
+groupshared float3 MultiScatterShared[_ThreadCount], ScatterShared[_ThreadCount];
+
+RWTexture2D<float3> _MultiScatterResult;
+float3 _GroundColor;
+float2 _ScaleOffset;
+uint _Samples;
+
+[numthreads(8, 8, 1)]
+void MultiScatter(uint2 id : SV_DispatchThreadID, uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
+{
+	float2 uv = groupId * _ScaleOffset;
+	float viewHeight = uv.y * _AtmosphereHeight + _PlanetRadius;
+	float lightCosAngle = 2.0 * uv.x - 1.0;
+	
+	float3 L = float3(SinFromCos(lightCosAngle), lightCosAngle, 0.0);
+	float2 u = Hammersley2dSeq(groupIndex, _ThreadCount);
+	float3 V = SampleSphereUniform(u.x, u.y);
+	float viewCosAngle = V.y;
+	
+	bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
+	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
+	float dt = rayLength / _Samples;
+		
+	float3 luminance = 0.0, multiScatter = 0.0;
+	for (float i = 0.5; i < _Samples; i++)
+	{
+		float currentDistance = i * dt;
+		float heightAtDistance = HeightAtDistance(viewHeight, V.y, currentDistance);
+		float4 scatter = AtmosphereScatter(heightAtDistance);
+		
+		float3 lighting = 0.0;
+		float LdotV = dot(L, V);
+		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, L.y, currentDistance * LdotV, heightAtDistance);
+		
+		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
+			lighting = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase));
+		
+		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, V.y, currentDistance, heightAtDistance);
+		float3 transmittance = TransmittanceToPoint(viewHeight, V.y, heightAtDistance, viewCosAngleAtDistance);
+		float3 extinction = AtmosphereOpticalDepth(viewHeight);
+		
+		luminance += transmittance * lighting * (1.0 - exp(-extinction * dt)) / extinction;
+		multiScatter += transmittance * (scatter.xyz + scatter.w) * (1.0 - exp(-extinction * dt)) / extinction;
+	}
+	
+	// Account for bounced light off the earth
+	if (rayIntersectsGround)
+	{
+		float cosLightAngle = CosAngleAtDistance(viewHeight, L.y, rayLength * dot(L, V), _PlanetRadius);
+		float3 sunTransmittance = AtmosphereTransmittance(_PlanetRadius, cosLightAngle);
+		float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, _PlanetRadius, cosLightAngle);
+		luminance += sunTransmittance * transmittance * saturate(cosLightAngle) * _GroundColor * RcpPi;
+	}
+	
+	ScatterShared[groupIndex] = luminance;
+	MultiScatterShared[groupIndex] = multiScatter;
+
+	[unroll]
+	for (uint s = _ThreadCount >> 1; s > 0; s >>= 1)
+	{
+		GroupMemoryBarrierWithGroupSync();
+		
+		if (groupIndex >= s)
+			continue;
+		
+		ScatterShared[groupIndex] = (ScatterShared[groupIndex] + ScatterShared[groupIndex + s]) * 0.5;
+		MultiScatterShared[groupIndex] = (MultiScatterShared[groupIndex] + MultiScatterShared[groupIndex + s]) * 0.5;
+	}
+	
+	if (groupIndex > 0)
+		return;
+	
+	_MultiScatterResult[groupId] = ScatterShared[0] / (1.0 - MultiScatterShared[0]);
+}
+
+[numthreads(8, 8, 1)]
+void Ambient(uint3 id : SV_DispatchThreadID)
+{
+}

@@ -8,14 +8,16 @@ namespace Arycama.CustomRenderPipeline
     {
         private ComputeShader computeShader;
         private int kernelIndex, xThreads, yThreads, zThreads;
+        private bool normalizedDispatch;
 
-        public void Initialize(ComputeShader computeShader, int kernelIndex, int xThreads, int yThreads = 1, int zThreads = 1)
+        public void Initialize(ComputeShader computeShader, int kernelIndex, int xThreads, int yThreads = 1, int zThreads = 1, bool normalizedDispatch = true)
         {
             this.computeShader = computeShader ?? throw new ArgumentNullException(nameof(computeShader));
             this.kernelIndex = kernelIndex;
             this.xThreads = xThreads;
             this.yThreads = yThreads;
             this.zThreads = zThreads;
+            this.normalizedDispatch = normalizedDispatch;
         }
 
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
@@ -45,7 +47,10 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Execute(CommandBuffer command)
         {
-            command.DispatchNormalized(computeShader, kernelIndex, xThreads, yThreads, zThreads);
+            if (normalizedDispatch)
+                command.DispatchNormalized(computeShader, kernelIndex, xThreads, yThreads, zThreads);
+            else
+                command.DispatchCompute(computeShader, kernelIndex, xThreads, yThreads, zThreads);
         }
 
         protected override void SetupTargets(CommandBuffer command)

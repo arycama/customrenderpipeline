@@ -1,4 +1,5 @@
 #include "Common.hlsl"
+#include "Lighting.hlsl"
 
 struct VertexInput
 {

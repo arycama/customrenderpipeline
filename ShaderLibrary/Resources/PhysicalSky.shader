@@ -2,11 +2,24 @@ Shader "Hidden/Physical Sky"
 {
     SubShader
     {
+        Cull Off
+        ZWrite Off
+        ZTest Always
+
         Pass
         {
-            Cull Off
-            ZWrite Off
-            ZTest Always
+            Name "Transmittance Lut"
+
+            HLSLPROGRAM
+            #pragma vertex Vertex
+            #pragma fragment FragmentTransmittanceLut
+            #include "PhysicalSky.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "Render"
 
             Stencil
             {
@@ -16,10 +29,9 @@ Shader "Hidden/Physical Sky"
 
             HLSLPROGRAM
             #pragma vertex Vertex
-            #pragma fragment Fragment
+            #pragma fragment FragmentRender
             #include "PhysicalSky.hlsl"
             ENDHLSL
-          
         }
     }
 }
