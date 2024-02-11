@@ -3,15 +3,21 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class FullscreenRenderPass : RenderPass
+    public class FullscreenRenderPass : GraphicsRenderPass
     {
         private readonly MaterialPropertyBlock propertyBlock;
-        public Material Material { get; set; }
-        public int Index { get; set; }
+        public Material Material { get; private set; }
+        public int PassIndex { get; private set; }
 
         public FullscreenRenderPass()
         {
             propertyBlock = new MaterialPropertyBlock();
+        }
+
+        public void Initialize(Material material, int passIndex = 0)
+        {
+            Material = material;
+            PassIndex = passIndex;
         }
 
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
@@ -46,7 +52,7 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Execute(CommandBuffer command)
         {
-            command.DrawProcedural(Matrix4x4.identity, Material, Index, MeshTopology.Triangles, 3, 1, propertyBlock);
+            command.DrawProcedural(Matrix4x4.identity, Material, PassIndex, MeshTopology.Triangles, 3, 1, propertyBlock);
         }
 
         public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)
@@ -57,6 +63,11 @@ namespace Arycama.CustomRenderPipeline
         public override void SetConstantBuffer(CommandBuffer command, string propertyName, BufferHandle value)
         {
             propertyBlock.SetConstantBuffer(propertyName, value, 0, value.Size);
+        }
+
+        public override void SetMatrixArray(CommandBuffer command, string propertyName, Matrix4x4[] value)
+        {
+            propertyBlock.SetMatrixArray(propertyName, value);
         }
     }
 }

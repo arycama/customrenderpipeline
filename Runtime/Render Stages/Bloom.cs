@@ -57,10 +57,8 @@ namespace Arycama.CustomRenderPipeline
             for (var i = 0; i < mipCount; i++)
             {
                 using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Bloom");
-
-                pass.Material = material;
-                pass.Index = 0;
-                pass.WriteTexture("", bloomIds[i], RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+                pass.Initialize(material);
+                pass.WriteTexture(bloomIds[i]);
                 pass.ReadTexture("_MainTex", i == 0 ? input : bloomIds[i - 1]);
 
                 var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
@@ -78,10 +76,8 @@ namespace Arycama.CustomRenderPipeline
             for (var i = mipCount - 1; i > 0; i--)
             {
                 using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Bloom");
-
-                pass.Material = material;
-                pass.Index = 1;
-                pass.WriteTexture("", bloomIds[i - 1], RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
+                pass.Initialize(material, 1);
+                pass.WriteTexture(bloomIds[i - 1]);
                 pass.ReadTexture("_MainTex", bloomIds[i]);
 
                 var width = Mathf.Max(1, camera.pixelWidth >> i);

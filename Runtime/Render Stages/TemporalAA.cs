@@ -73,13 +73,11 @@ namespace Arycama.CustomRenderPipeline
             var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);
 
             using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA");
-            pass.Material = material;
-            pass.Index = 0;
-
+            pass.Initialize(material);
             pass.ReadTexture("_Input", input);
             pass.ReadTexture("_Motion", motion);
             pass.ReadTexture("_History", previous);
-            pass.WriteTexture("", current, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
+            pass.WriteTexture(current);
 
             var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
             {

@@ -28,14 +28,12 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Motion Vectors"))
             {
-                pass.Material = material;
-                pass.Index = 0;
-
+                pass.Initialize(material);
                 pass.ReadTexture("_CameraDepth", depth);
 
-                pass.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
-                pass.WriteTexture("", normals, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
-                pass.WriteTexture("", viewDepth, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(normals);
+                pass.WriteTexture(viewDepth);
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
@@ -51,14 +49,12 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Compute"))
             {
-                pass.Material = material;
-                pass.Index = 1;
-
+                pass.Initialize(material, 1);
                 pass.ReadTexture("_ViewDepth", viewDepth);
                 pass.ReadTexture("_ViewNormals", normals);
                 pass.ReadTexture("_CameraDepth", depth);
-                pass.WriteTexture("", scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
-                pass.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(scene);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
 
                 var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
                 {
@@ -96,11 +92,10 @@ namespace Arycama.CustomRenderPipeline
             if (RenderSettings.fog)
             {
                 using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Combine");
-                pass.Material = material;
-                pass.Index = 2;
+                pass.Initialize(material, 2);
                 pass.ReadTexture("_CameraDepth", depth);
-                pass.WriteTexture("", scene, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
-                pass.WriteDepth("", depth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(scene);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
 
                 volumetricLightingResult.SetInputs(pass);
 

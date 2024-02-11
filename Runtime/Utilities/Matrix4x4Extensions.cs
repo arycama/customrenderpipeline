@@ -46,7 +46,7 @@ namespace Arycama.CustomRenderPipeline
             return WorldToLocal(rotation.Right(), rotation.Up(), rotation.Forward(), position);
         }
 
-        public static Matrix4x4 ComputePixelCoordToWorldSpaceViewDirectionMatrix(int width, int height, float fov, float aspect, Matrix4x4 viewToWorld)
+        public static Matrix4x4 ComputePixelCoordToWorldSpaceViewDirectionMatrix(int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, bool flip = false)
         {
             Matrix4x4 viewSpaceRasterTransform;
             var verticalFoV = fov * Mathf.Deg2Rad;
@@ -63,6 +63,13 @@ namespace Arycama.CustomRenderPipeline
 
             float m20 = tanHalfVertFoV * aspect;
             float m00 = -2f / width * tanHalfVertFoV * aspect;
+
+            if (flip)
+            {
+                // Flip Y.
+                m11 = -m11;
+                m21 = -m21;
+            }
 
             viewSpaceRasterTransform = new Matrix4x4(new Vector4(m00, 0.0f, 0.0f, 0.0f),
                 new Vector4(0.0f, m11, 0.0f, 0.0f),

@@ -5,6 +5,11 @@ namespace Arycama.CustomRenderPipeline
 {
     public class GlobalRenderPass : RenderPass
     {
+        public void WriteTexture(RTHandle texture)
+        {
+            RenderGraph.SetRTHandleWrite(texture, Index);
+        }
+
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
         {
             // Should also clean up on post render.. but 
@@ -44,6 +49,15 @@ namespace Arycama.CustomRenderPipeline
         public override void SetConstantBuffer(CommandBuffer command, string propertyName, BufferHandle value)
         {
             command.SetGlobalConstantBuffer(value, propertyName, 0, value.Size);
+        }
+
+        public override void SetMatrixArray(CommandBuffer command, string propertyName, Matrix4x4[] value)
+        {
+            command.SetGlobalMatrixArray(propertyName, value);
+        }
+
+        protected override void SetupTargets(CommandBuffer command)
+        {
         }
     }
 }

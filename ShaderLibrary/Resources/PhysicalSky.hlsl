@@ -1,16 +1,44 @@
 ﻿#include "../Common.hlsl"
 #include "../Atmosphere.hlsl"
 
-matrix _PixelCoordToViewDirWS;
+matrix _PixelToWorldViewDir, _PixelToWorldViewDirs[6];
 uint _Samples;
 float4 _ScaleOffset;
 float4 _MultiScatterRemap, _MultiScatter_Scale;
 Texture2D<float3> _MultiScatter;
+TextureCube<float3> _SkyReflection;
 
 float4 Vertex(uint id : SV_VertexID) : SV_Position
 {
 	float2 uv = float2((id << 1) & 2, id & 2);
 	return float4(uv * 2.0 - 1.0, 1.0, 1.0);
+}
+
+uint VertexReflectionProbe(uint id : SV_VertexID) : TEXCOORD
+{
+	return id;
+}
+
+struct GeometryOutput
+{
+	float4 position : SV_Position;
+	uint index : SV_RenderTargetArrayIndex;
+};
+
+[instance(6)]
+[maxvertexcount(3)]
+void GeometryReflectionProbe(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryOutput> stream, uint instanceId : SV_GSInstanceID)
+{
+	[unroll]
+	for (uint i = 0; i < 3; i++)
+	{
+		float2 uv = float2((id[i] << 1) & 2, id[i] & 2);
+		
+		GeometryOutput output;
+		output.position = float4(uv * 2.0 - 1.0, 1.0, 1.0);
+		output.index = instanceId;
+		stream.Append(output);
+	}
 }
 
 float3 FragmentTransmittanceLut(float4 position : SV_Position) : SV_Target
@@ -44,14 +72,16 @@ float3 FragmentTransmittanceLut(float4 position : SV_Position) : SV_Target
 	return exp(-opticalDepth * dx);
 }
 
-float3 FragmentRender(float4 position : SV_Position) : SV_Target
+float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
-	//float2 uv = position.xy / _ScaledResolution.xy;
-	//return _MultiScatter.Sample(_LinearClampSampler, uv * _MultiScatter_Scale.xy);
-
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
+	
+	#ifdef REFLECTION_PROBE
+		float3 V = -MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
+	#else
+		float3 V = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+	#endif
 
-	float3 V = -MultiplyVector(_PixelCoordToViewDirWS, float3(position.xy, 1.0), true);
 	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, V.y);
 	
 	const float samples = 64.0;

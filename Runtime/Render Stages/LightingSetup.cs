@@ -211,7 +211,8 @@ namespace Arycama.CustomRenderPipeline
                 {
                     using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Render Directional Light Shadows"))
                     {
-                        pass.WriteTexture("", result.directionalShadows);
+                        // Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
+                        pass.WriteTexture(result.directionalShadows);
 
                         var data = pass.SetRenderFunction<Pass2Data>((command, context, pass, data) =>
                         {
@@ -273,7 +274,8 @@ namespace Arycama.CustomRenderPipeline
 
                     using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Render Point Light Shadows"))
                     {
-                        pass.WriteTexture("", result.pointShadows);
+                        // Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
+                        pass.WriteTexture(result.pointShadows);
 
                         var data = pass.SetRenderFunction<Pass3Data>((command, context, pass, data) =>
                         {

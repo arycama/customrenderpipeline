@@ -19,6 +19,22 @@ Shader "Hidden/Physical Sky"
 
         Pass
         {
+            Name "Reflection Probe"
+
+            HLSLPROGRAM
+            #pragma target 5.0
+            #pragma vertex VertexReflectionProbe
+            #pragma geometry GeometryReflectionProbe
+            #pragma fragment FragmentRender
+
+            #define REFLECTION_PROBE
+
+            #include "PhysicalSky.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
             Name "Render"
 
             Stencil

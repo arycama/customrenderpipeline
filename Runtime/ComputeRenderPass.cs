@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -10,6 +11,8 @@ namespace Arycama.CustomRenderPipeline
         private int kernelIndex, xThreads, yThreads, zThreads;
         private bool normalizedDispatch;
 
+        protected readonly List<(RTHandle, string)> colorBindings = new();
+
         public void Initialize(ComputeShader computeShader, int kernelIndex, int xThreads, int yThreads = 1, int zThreads = 1, bool normalizedDispatch = true)
         {
             this.computeShader = computeShader ?? throw new ArgumentNullException(nameof(computeShader));
@@ -18,6 +21,12 @@ namespace Arycama.CustomRenderPipeline
             this.yThreads = yThreads;
             this.zThreads = zThreads;
             this.normalizedDispatch = normalizedDispatch;
+        }
+
+        public void WriteTexture(string propertyName, RTHandle handle)
+        {
+            colorBindings.Add(new(handle, propertyName));
+            RenderGraph.SetRTHandleWrite(handle, Index);
         }
 
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
@@ -56,9 +65,8 @@ namespace Arycama.CustomRenderPipeline
         protected override void SetupTargets(CommandBuffer command)
         {
             for (var i = 0; i < colorBindings.Count; i++)
-                command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].NameId, colorBindings[i].Handle);
+                command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].Item2, colorBindings[i].Item1);
 
-            depthBinding = default;
             colorBindings.Clear();
             screenWrite = false;
         }
@@ -71,6 +79,11 @@ namespace Arycama.CustomRenderPipeline
         public override void SetConstantBuffer(CommandBuffer command, string propertyName, BufferHandle value)
         {
             command.SetComputeConstantBufferParam(computeShader, propertyName, value, 0, value.Size);
+        }
+
+        public override void SetMatrixArray(CommandBuffer command, string propertyName, Matrix4x4[] value)
+        {
+            command.SetComputeMatrixArrayParam(computeShader, propertyName, value);
         }
     }
 }

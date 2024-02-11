@@ -42,10 +42,8 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Depth of Field"))
             {
-                pass.Material = material;
-                pass.Index = 0;
-
-                pass.WriteTexture("", tempId, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store);
+                pass.Initialize(material);
+                pass.WriteTexture(tempId);
                 pass.ReadTexture("_Input", color);
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_Result", tempId);

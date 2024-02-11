@@ -13,8 +13,10 @@ namespace Arycama.CustomRenderPipeline
         public float ClearDepth { get; }
         public RenderTargetFlags Flags { get; }
         public int NameId { get; }
+        public CubemapFace CubemapFace { get; }
+        public int DepthSlice { get; }
 
-        public RTHandleBindingData(RTHandle handle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.DontCare, RenderBufferStoreAction storeAction = RenderBufferStoreAction.DontCare, Color clearColor = default, float clearDepth = 1.0f, RenderTargetFlags flags = RenderTargetFlags.None, int nameId = 0)
+        public RTHandleBindingData(RTHandle handle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.DontCare, RenderBufferStoreAction storeAction = RenderBufferStoreAction.DontCare, Color clearColor = default, float clearDepth = 1.0f, RenderTargetFlags flags = RenderTargetFlags.None, int nameId = 0, CubemapFace cubemapFace = CubemapFace.Unknown, int depthSlice = 0)
         {
             Handle = handle ?? throw new ArgumentNullException(nameof(handle));
             LoadAction = loadAction;
@@ -23,6 +25,8 @@ namespace Arycama.CustomRenderPipeline
             ClearDepth = clearDepth;
             Flags = flags;
             NameId = nameId;
+            CubemapFace = cubemapFace;
+            DepthSlice = depthSlice;
         }
     }
 }

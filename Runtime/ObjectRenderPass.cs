@@ -4,7 +4,7 @@ using UnityEngine.Rendering.RendererUtils;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class ObjectRenderPass : RenderPass
+    public class ObjectRenderPass : GraphicsRenderPass
     {
         private RendererList rendererList;
 
@@ -64,6 +64,11 @@ namespace Arycama.CustomRenderPipeline
         public override void SetConstantBuffer(CommandBuffer command, string propertyName, BufferHandle value)
         {
             command.SetGlobalConstantBuffer(value, propertyName, 0, value.Size);
+        }
+
+        public override void SetMatrixArray(CommandBuffer command, string propertyName, Matrix4x4[] value)
+        {
+            command.SetGlobalMatrixArray(propertyName, value);
         }
     }
 }

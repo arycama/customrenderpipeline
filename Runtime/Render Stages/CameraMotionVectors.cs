@@ -15,12 +15,10 @@ namespace Arycama.CustomRenderPipeline
         public void Render(RTHandle motionVectors, RTHandle cameraDepth, int width, int height, Matrix4x4 nonJitteredVpMatrix, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix)
         {
             using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Camera Motion Vectors");
-            pass.Material = material;
-            pass.Index = 0;
-
+            pass.Initialize(material);
             pass.ReadTexture("_CameraDepth", cameraDepth);
-            pass.WriteTexture("", motionVectors, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store);
-            pass.WriteDepth("", cameraDepth, RenderBufferLoadAction.Load, RenderBufferStoreAction.Store, 1.0f, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteTexture(motionVectors);
+            pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
 
             var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
             {
