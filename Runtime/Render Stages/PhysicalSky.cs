@@ -38,75 +38,45 @@ namespace Arycama.CustomRenderPipeline
         [Serializable]
         public class Settings
         {
-            [field: SerializeField] public Vector3 TestScatter { get; } = new Vector3(5.802e-6f, 13.558e-6f, 33.1e-6f);
+            [field: Header("Atmosphere Properties")]
+            [field: SerializeField] public Vector3 RayleighScatter { get; private set; } = new Vector3(5.802e-6f, 13.558e-6f, 33.1e-6f);
+            [field: SerializeField] public float RayleighHeight { get; private set; } = 8000.0f;
+            [field: SerializeField] public float MieScatter { get; private set; } = 3.996e-6f;
+            [field: SerializeField] public float MieAbsorption { get; private set; } = 4.4e-6f;
+            [field: SerializeField] public float MieHeight { get; private set; } = 1200.0f;
+            [field: SerializeField, Range(-1.0f, 1.0f)] public float MiePhase { get; private set; } = 0.8f;
+            [field: SerializeField] public Vector3 OzoneAbsorption { get; private set; } = new Vector3(0.65e-6f, 1.881e-6f, 0.085e-6f);
+            [field: SerializeField] public float OzoneWidth { get; private set; } = 15000.0f;
+            [field: SerializeField] public float OzoneHeight { get; private set; } = 25000.0f;
+            [field: SerializeField] public float PlanetRadius { get; private set; } = 6360000.0f;
+            [field: SerializeField] public float AtmosphereThickness { get; private set; } = 100000.0f;
+            [field: SerializeField] public Color GroundColor { get; private set; } = Color.grey;
 
-            [Header("Atmosphere Properties")]
-            [SerializeField] public Vector3 rayleighScatter = new Vector3(5.802e-6f, 13.558e-6f, 33.1e-6f);
-            [SerializeField] private float rayleighHeight = 8000.0f;
-            [SerializeField] private float mieScatter = 3.996e-6f;
-            [SerializeField] private float mieAbsorption = 4.4e-6f;
-            [SerializeField] private float mieHeight = 1200.0f;
-            [SerializeField, Range(-1.0f, 1.0f)] private float miePhase = 0.8f;
-            [SerializeField] private Vector3 ozoneAbsorption = new Vector3(0.65e-6f, 1.881e-6f, 0.085e-6f);
-            [SerializeField] private float ozoneWidth = 15000.0f;
-            [SerializeField] private float ozoneHeight = 25000.0f;
-            [SerializeField] private float planetRadius = 6360000.0f;
-            [SerializeField] private float atmosphereThickness = 100000.0f;
-            [SerializeField] private Color groundColor = Color.grey;
+            [field: Header("Transmittance Lookup")]
+            [field: SerializeField] public int TransmittanceWidth { get; private set; } = 128;
+            [field: SerializeField] public int TransmittanceHeight { get; private set; } = 64;
+            [field: SerializeField] public int TransmittanceSamples { get; private set; } = 64;
 
-            [Header("Transmittance Lookup")]
-            [SerializeField] private int transmittanceWidth = 128;
-            [SerializeField] private int transmittanceHeight = 64;
-            [SerializeField] private int transmittanceSamples = 64;
+            [field: Header("Multi Scatter Lookup")]
+            [field: SerializeField] public int MultiScatterWidth { get; private set; } = 32;
+            [field: SerializeField] public int MultiScatterHeight { get; private set; } = 32;
+            [field: SerializeField] public int MultiScatterSamples { get; private set; } = 64;
 
-            [Header("Multi Scatter Lookup")]
-            [SerializeField] private int multiScatterWidth = 32;
-            [SerializeField] private int multiScatterHeight = 32;
-            [SerializeField] private int multiScatterSamples = 64;
+            [field: Header("Reflection Probe")]
+            [field: SerializeField] public int ReflectionResolution { get; private set; } = 128;
+            [field: SerializeField] public int ReflectionSamples { get; private set; } = 16;
 
-            [Header("Reflection Probe")]
-            [SerializeField] private int reflectionResolution = 128;
-            [SerializeField] private int reflectionSamples = 16;
+            [field: Header("Rendering")]
+            [field: SerializeField] public int RenderSamples { get; private set; } = 32;
 
-            [Header("Rendering")]
-            [SerializeField] private int renderSamples = 32;
-
-            [Header("Convolution")]
-            [SerializeField] private int convolutionSamples = 64;
-
-            public Vector3 RayleighScatter => rayleighScatter;
-            public float RayleighHeight => rayleighHeight;
-            public float MieScatter => mieScatter;
-            public float MieAbsorption => mieAbsorption;
-            public float MieHeight => mieHeight;
-            public float MiePhase => miePhase;
-            public Vector3 OzoneAbsorption => ozoneAbsorption;
-            public float OzoneWidth => ozoneWidth;
-            public float OzoneHeight => ozoneHeight;
-            public float PlanetRadius => planetRadius;
-            public float AtmosphereThickness => atmosphereThickness;
-            public Color GroundColor => groundColor;
-
-            public int TransmittanceWidth => transmittanceWidth;
-            public int TransmittanceHeight => transmittanceHeight;
-            public int TransmittanceSamples => transmittanceSamples;
-
-            public int MultiScatterWidth => multiScatterWidth;
-            public int MultiScatterHeight => multiScatterHeight;
-            public int MultiScatterSamples => multiScatterSamples;
-
-            public int ReflectionResolution => reflectionResolution;
-            public int ReflectionSamples => reflectionSamples;
-
-            public int RenderSamples => renderSamples;
-
-            public int ConvolutionSamples => convolutionSamples;
+            [field: Header("Convolution")]
+            [field: SerializeField] public int ConvolutionSamples { get; private set; } = 64;
         }
 
-        private RenderGraph renderGraph;
-        private Settings settings;
-        private Material skyMaterial;
-        private Material ggxConvolutionMaterial;
+        public RenderGraph renderGraph;
+        public Settings settings;
+        public Material skyMaterial;
+        public Material ggxConvolutionMaterial;
 
         public PhysicalSky(RenderGraph renderGraph, Settings settings)
         {
@@ -223,7 +193,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Copy ambient
-            var ambientBuffer= renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
+            var ambientBuffer = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Atmosphere Ambient Probe Copy"))
             {
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
@@ -320,7 +290,7 @@ namespace Arycama.CustomRenderPipeline
         {
         }
 
-        private class PassData
+        public class PassData
         {
         }
 

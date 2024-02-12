@@ -136,8 +136,6 @@ cbuffer UnityInstancing_PerDraw0
 	unity_Builtins0Array[2];
 };
 
-const static float FloatMin = 1.175494351e-38; // Minimum normalized positive floating-point number
-
 bool IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal, out float t)
 {
 	bool res = false;

@@ -1,9 +1,27 @@
+#ifndef UTILITY_INCLUDED
+#define UTILITY_INCLUDED
+
+const static float HalfEps = 4.8828125e-4;
+const static float HalfMin = 6.103515625e-5; // 2^-14, the same value for 10, 11 and 16-bit: https://www.khronos.org/opengl/wiki/Small_Float_Formats
+const static float HalfMinSqrt = 0.0078125; // 2^-7 == sqrt(HALF_MIN), useful for ensuring HALF_MIN after x^2
+const static float HalfMax = 65504.0;
+
+const static float FloatEps = 5.960464478e-8; // 2^-24, machine epsilon: 1 + EPS = 1 (half of the ULP for 1.0f)
+const static float FloatMin = 1.175494351e-38; // Minimum normalized positive floating-point number
+const static float FloatMax = 3.402823466e+38; // Maximum representable floating-point number
+const static float FloatInf = asfloat(0x7F800000);
+
+const static uint UintMax = 0xFFFFFFFFu;
+const static int IntMax = 0x7FFFFFFF;
+
 const static float Pi = radians(180.0);
 const static float TwoPi = 2.0 * Pi;
 const static float FourPi = 4.0 * Pi;
-const static float HalfPi = 0.5 * Pi;
+const static float HalfPi = Pi / 2.0;
 const static float RcpPi = rcp(Pi);
+const static float RcpTwoPi = rcp(HalfPi);
 const static float RcpFourPi = rcp(FourPi);
+const static float RcpHalfPi = rcp(HalfPi);
 const static float SqrtPi = sqrt(Pi);
 
 float1 Sq(float1 x) { return x * x; }
@@ -139,3 +157,5 @@ float3x3 GetLocalFrame(float3 localZ)
     // s.t. if localZ = {0, 0, 1}, then localX = {-1, 0, 0} and localY = {0, -1, 0}.
 	return float3x3(localX, localY, localZ);
 }
+
+#endif
