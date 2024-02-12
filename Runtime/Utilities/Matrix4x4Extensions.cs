@@ -56,13 +56,7 @@ namespace Arycama.CustomRenderPipeline
 
             // Compose the matrix.
             var m11 = -2f / height * tanHalfVertFoV;
-            var m21 = (1f + jitter.y * 0f) * tanHalfVertFoV;
-
-            // Compose the matrix.
-            //float m00 = -2f / width * tanHalfVertFoV * aspect;
-            //float m11 = -2f / height * tanHalfVertFoV;
-            //float m20 = tanHalfVertFoV * aspect;
-            //float m21 = tanHalfVertFoV;
+            var m21 = (1f + jitter.y) * tanHalfVertFoV;
 
             if (flip)
             {
@@ -75,7 +69,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 m00 = -2f / width * tanHalfVertFoV * aspect,
                 m11 = m11,
-                m02 = (1f + jitter.x * 0f) * tanHalfVertFoV * aspect,
+                m02 = (1f + jitter.x) * tanHalfVertFoV * aspect,
                 m12 = m21,
                 m22 = -1.0f,
                 m33 = 1.0f

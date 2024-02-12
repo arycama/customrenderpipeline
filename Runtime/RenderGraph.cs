@@ -190,6 +190,7 @@ namespace Arycama.CustomRenderPipeline
                                 result.dimension = handle.Dimension;
                                 result.volumeDepth = handle.VolumeDepth;
                                 result.useMipMap = handle.HasMips;
+                                result.autoGenerateMips = false;
                             }
 
                             result.name = $"RTHandle {rtCount++} {result.dimension} {result.graphicsFormat} {width}x{height} ";

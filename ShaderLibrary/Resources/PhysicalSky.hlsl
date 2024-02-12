@@ -5,6 +5,7 @@
 matrix _PixelToWorldViewDir, _PixelToWorldViewDirs[6];
 uint _Samples;
 float4 _ScaleOffset;
+float3 _GroundColor;
 float4 _MultiScatterRemap, _MultiScatter_Scale;
 Texture2D<float3> _MultiScatter;
 TextureCube<float3> _SkyReflection;
@@ -33,10 +34,8 @@ void GeometryReflectionProbe(triangle uint id[3] : TEXCOORD, inout TriangleStrea
 	[unroll]
 	for (uint i = 0; i < 3; i++)
 	{
-		float2 uv = float2((id[i] << 1) & 2, id[i] & 2);
-		
 		GeometryOutput output;
-		output.position = float4(uv * 2.0 - 1.0, 1.0, 1.0);
+		output.position = float3(float2((id[i] << 1) & 2, id[i] & 2) * 2.0 - 1.0, 1.0).xyzz;
 		output.index = instanceId;
 		stream.Append(output);
 	}
@@ -80,19 +79,20 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 	#ifdef REFLECTION_PROBE
 		float3 V = -MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
 	#else
-		float3 V = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy + _Jitter, 1.0), true);
+		float3 V = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+		return _SkyReflection.SampleLevel(_TrilinearClampSampler, V, 3.0);
 	#endif
 
-	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, V.y);
+	float viewCosAngle = V.y;
+	bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
+	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
 	
-	const float samples = 64.0;
-	float dt = rayLength / samples;
-		
+	float dt = rayLength / _Samples;
 	float3 luminance = 0.0;
-	for (float i = 0.5; i < samples; i++)
+	for (float i = 0.5; i < _Samples; i++)
 	{
 		float currentDistance = i * dt;
-		float heightAtDistance = HeightAtDistance(viewHeight, V.y, currentDistance);
+		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, currentDistance);
 		float4 scatter = AtmosphereScatter(heightAtDistance);
 		
 		float3 lighting = 0.0;
@@ -111,10 +111,28 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			lighting += ms * (scatter.xyz + scatter.w) * light.color;
 		}
 		
-		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, V.y, currentDistance, heightAtDistance);
-		float3 transmittance = TransmittanceToPoint(viewHeight, V.y, heightAtDistance, viewCosAngleAtDistance);
+		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, currentDistance, heightAtDistance);
+		float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
 		float3 extinction = AtmosphereOpticalDepth(viewHeight);
 		luminance += transmittance * lighting * (1.0 - exp(-extinction * dt)) / extinction;
+	}
+	
+	// Account for bounced light off the earth
+	if (rayIntersectsGround)
+	{
+		for (uint j = 0; j < _DirectionalLightCount; j++)
+		{
+			DirectionalLight light = _DirectionalLights[j];
+			
+			float LdotV = dot(light.direction, V);
+			float lightCosAngle = light.direction.y;
+			
+			float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, _PlanetRadius);
+			float3 sunTransmittance = AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance);
+			float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, rayLength, _PlanetRadius);
+			float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, _PlanetRadius, viewCosAngleAtDistance);
+			luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color;
+		}
 	}
 	
 	return luminance * _Exposure;

@@ -17,6 +17,7 @@ namespace Arycama.CustomRenderPipeline
         private RenderTargetFlags renderTargetFlags;
 
         public int DepthSlice { get; set; }
+        public int MipLevel { get; set; }
 
         public void ConfigureClear(RTClearFlags clearFlags, Color clearColor = default, float clearDepth = 1.0f, int clearStencil = 0)
         {
@@ -61,7 +62,7 @@ namespace Arycama.CustomRenderPipeline
                         width = colorTargets[0].Item1.Width;
                         height = colorTargets[0].Item1.Height;
 
-                        command.SetRenderTarget(colorTargets[0].Item1, 0, CubemapFace.Unknown, DepthSlice);
+                        command.SetRenderTarget(colorTargets[0].Item1, MipLevel, CubemapFace.Unknown, DepthSlice);
                     }
                     else
                     {
@@ -129,6 +130,7 @@ namespace Arycama.CustomRenderPipeline
                 depthBuffer = default;
                 colorTargets.Clear();
                 DepthSlice = 0;
+                MipLevel = 0;
             }
         }
     }

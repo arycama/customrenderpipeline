@@ -38,8 +38,10 @@ namespace Arycama.CustomRenderPipeline
         [Serializable]
         public class Settings
         {
+            [field: SerializeField] public Vector3 TestScatter { get; } = new Vector3(5.802e-6f, 13.558e-6f, 33.1e-6f);
+
             [Header("Atmosphere Properties")]
-            [SerializeField] private Vector3 rayleighScatter = new Vector3(5.802e-6f, 13.558e-6f, 33.1e-6f);
+            [SerializeField] public Vector3 rayleighScatter = new Vector3(5.802e-6f, 13.558e-6f, 33.1e-6f);
             [SerializeField] private float rayleighHeight = 8000.0f;
             [SerializeField] private float mieScatter = 3.996e-6f;
             [SerializeField] private float mieAbsorption = 4.4e-6f;
@@ -69,6 +71,9 @@ namespace Arycama.CustomRenderPipeline
             [Header("Rendering")]
             [SerializeField] private int renderSamples = 32;
 
+            [Header("Convolution")]
+            [SerializeField] private int convolutionSamples = 64;
+
             public Vector3 RayleighScatter => rayleighScatter;
             public float RayleighHeight => rayleighHeight;
             public float MieScatter => mieScatter;
@@ -94,18 +99,22 @@ namespace Arycama.CustomRenderPipeline
             public int ReflectionSamples => reflectionSamples;
 
             public int RenderSamples => renderSamples;
+
+            public int ConvolutionSamples => convolutionSamples;
         }
 
         private RenderGraph renderGraph;
         private Settings settings;
-        private Material material;
+        private Material skyMaterial;
+        private Material ggxConvolutionMaterial;
 
         public PhysicalSky(RenderGraph renderGraph, Settings settings)
         {
             this.renderGraph = renderGraph;
             this.settings = settings;
 
-            material = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
+            skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
+            ggxConvolutionMaterial = new Material(Shader.Find("Hidden/Ggx Convolve")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
         public IRenderPassData GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer)
@@ -114,7 +123,7 @@ namespace Arycama.CustomRenderPipeline
             var transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere Transmittance"))
             {
-                pass.Initialize(material);
+                pass.Initialize(skyMaterial);
                 pass.WriteTexture(transmittance);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
@@ -149,7 +158,7 @@ namespace Arycama.CustomRenderPipeline
             var skyReflection = renderGraph.GetTexture(settings.ReflectionResolution, settings.ReflectionResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, hasMips: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Reflection"))
             {
-                pass.Initialize(material, 1);
+                pass.Initialize(skyMaterial, 1);
                 pass.WriteTexture(skyReflection);
                 pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
 
@@ -175,11 +184,12 @@ namespace Arycama.CustomRenderPipeline
                         array[i] = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(settings.ReflectionResolution, settings.ReflectionResolution, Vector2.zero, 90.0f, 1.0f, viewToWorld, true);
                     }
 
+                    pass.SetMatrixArray(command, "_PixelToWorldViewDirs", array);
                     ArrayPool<Matrix4x4>.Release(array);
 
-                    pass.SetMatrixArray(command, "_PixelToWorldViewDirs", array);
                     pass.SetVector(command, "_AtmosphereTransmittanceRemap", transmittanceRemap);
                     pass.SetVector(command, "_MultiScatterRemap", multiScatterRemap);
+                    pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
                 });
             }
 
@@ -207,6 +217,7 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
+                    command.GenerateMips(skyReflection);
                     pass.SetFloat(command, "_MipLevel", mipLevel);
                 });
             }
@@ -221,15 +232,70 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
+            // Generate Reflection probe
+            var reflectionProbe = renderGraph.GetTexture(settings.ReflectionResolution, settings.ReflectionResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, hasMips: true);
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Sky Reflection Copy"))
+            {
+                pass.WriteTexture(reflectionProbe);
+                pass.ReadTexture("_SkyReflection", skyReflection);
+
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    command.CopyTexture(skyReflection, reflectionProbe);
+                });
+            }
+
+            var invOmegaP = 6.0f * settings.ReflectionResolution * settings.ReflectionResolution / (4.0f * Mathf.PI);
+
+            const int mipLevels = 6;
+            for (var i = 1; i < 7; i++)
+            {
+                using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Reflection Convolution"))
+                {
+                    pass.Initialize(ggxConvolutionMaterial, 0);
+                    pass.WriteTexture(reflectionProbe);
+                    pass.ReadTexture("_SkyReflection", skyReflection);
+                    pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
+                    pass.MipLevel = i;
+                    var index = i;
+
+                    var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                    {
+                        pass.SetInt(command, "_Samples", settings.ConvolutionSamples);
+
+                        var array = ArrayPool<Matrix4x4>.Get(6);
+
+                        for (var j = 0; j < 6; j++)
+                        {
+                            var resolution = settings.ReflectionResolution >> index;
+                            var rotation = Quaternion.LookRotation(lookAtList[j], upVectorList[j]);
+                            var viewToWorld = Matrix4x4.TRS(viewPosition, rotation, Vector3.one);
+                            array[j] = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(resolution, resolution, Vector2.zero, 90.0f, 1.0f, viewToWorld, true);
+                        }
+
+                        pass.SetMatrixArray(command, "_PixelToWorldViewDirs", array);
+                        ArrayPool<Matrix4x4>.Release(array);
+
+                        pass.SetFloat(command, "_Level", index);
+                        pass.SetFloat(command, "_InvOmegaP", invOmegaP);
+
+                        var perceptualRoughness = Mathf.Clamp01(index / (float)mipLevels);
+                        var mipPerceptualRoughness = Mathf.Clamp01(1.7f / 1.4f - Mathf.Sqrt(2.89f / 1.96f - (2.8f / 1.96f) * perceptualRoughness));
+                        var mipRoughness = mipPerceptualRoughness * mipPerceptualRoughness;
+                        pass.SetFloat(command, "_Roughness", mipRoughness);
+                    });
+                }
+            }
+
             // Specular convolution
-            return new Result(transmittance, multiScatter, ambientBuffer, skyReflection, transmittanceRemap, multiScatterRemap);
+            return new Result(transmittance, multiScatter, ambientBuffer, reflectionProbe, transmittanceRemap, multiScatterRemap);
         }
 
         public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, IRenderPassData atmosphereData, Vector2 jitter)
         {
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
             {
-                pass.Initialize(material, 2);
+                pass.Initialize(skyMaterial, 2);
                 pass.WriteTexture(target);
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
 
@@ -241,6 +307,7 @@ namespace Arycama.CustomRenderPipeline
                     lightingSetupResult.SetProperties(pass, command);
                     atmosphereData.SetProperties(pass, command);
 
+                    pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
                     pass.SetInt(command, "_Samples", settings.RenderSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
                     pass.SetConstantBuffer(command, "Exposure", exposureBuffer);

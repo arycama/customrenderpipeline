@@ -102,3 +102,40 @@ float PerceptualSmoothnessToPerceptualRoughness(float smoothness)
 {
 	return 1.0 - smoothness;
 }
+
+// This is actuall the last mip index, we generate 7 mips of convolution
+const static float UNITY_SPECCUBE_LOD_STEPS = 6.0;
+
+// The inverse of the *approximated* version of perceptualRoughnessToMipmapLevel().
+float MipmapLevelToPerceptualRoughness(float mipmapLevel)
+{
+	float perceptualRoughness = saturate(mipmapLevel / UNITY_SPECCUBE_LOD_STEPS);
+	return saturate(1.7 / 1.4 - sqrt(2.89 / 1.96 - (2.8 / 1.96) * perceptualRoughness));
+}
+
+float PerceptualRoughnessToRoughness(float perceptualRoughness)
+{
+	return Sq(perceptualRoughness);
+}
+
+// Generates an orthonormal (row-major) basis from a unit vector. TODO: make it column-major.
+// The resulting rotation matrix has the determinant of +1.
+// Ref: 'ortho_basis_pixar_r2' from http://marc-b-reynolds.github.io/quaternions/2016/07/06/Orthonormal.html
+float3x3 GetLocalFrame(float3 localZ)
+{
+	float x = localZ.x;
+	float y = localZ.y;
+	float z = localZ.z;
+	float sz = sign(z);
+	float a = 1 / (sz + z);
+	float ya = y * a;
+	float b = x * ya;
+	float c = x * sz;
+
+	float3 localX = float3(c * x * a - 1, sz * b, c);
+	float3 localY = float3(b, y * ya - sz, y);
+
+    // Note: due to the quaternion formulation, the generated frame is rotated by 180 degrees,
+    // s.t. if localZ = {0, 0, 1}, then localX = {-1, 0, 0} and localY = {0, -1, 0}.
+	return float3x3(localX, localY, localZ);
+}

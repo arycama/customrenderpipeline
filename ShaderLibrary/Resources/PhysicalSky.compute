@@ -49,11 +49,11 @@ void MultiScatter(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	// Account for bounced light off the earth
 	if (rayIntersectsGround)
 	{
-		float cosLightAngle = CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, _PlanetRadius);
-		float3 sunTransmittance = AtmosphereTransmittance(_PlanetRadius, cosLightAngle);
+		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, _PlanetRadius);
+		float3 sunTransmittance = AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance);
 		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, rayLength, _PlanetRadius);
 		float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, _PlanetRadius, viewCosAngleAtDistance);
-		luminance += sunTransmittance * transmittance * saturate(cosLightAngle) * _GroundColor * RcpPi;
+		luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi;
 	}
 	
 	ScatterShared[groupIndex] = luminance;
