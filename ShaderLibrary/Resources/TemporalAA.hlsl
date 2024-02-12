@@ -41,10 +41,10 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	
 	float3 result = 0.0;
 	[unroll]
-	for (uint y = 0; y < 2; y++)
+	for (int y = -1; y < 2; y++)
 	{
 		[unroll]
-		for (uint x = 0; x < 2; x++)
+		for (int x = -1; x < 2; x++)
 		{
 			float2 sampleTexel = floor(scaledUv) + float2(x, y);
 			float2 sampleUv = (sampleTexel + 0.5) * _ScaledResolution.zw;
@@ -60,7 +60,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 			weightSum += weight;
 			maxWeight = max(maxWeight, weight);
 			
-			if(all(uint2(x, y) == 0))
+			if(all(int2(x, y) == -1))
 			{
 				minValue = maxValue = color;
 				maxMotion = motion;
@@ -86,35 +86,37 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	
 	float3 history = RGBToYCoCg(_History.Sample(_LinearClampSampler, uv - maxMotion));
 	
-	float3 colorC = RGBToYCoCg(_Input.Sample(_PointClampSampler, uv * _Input_Scale.xy, int2(0, 0)));
-	float3 colorU = RGBToYCoCg(_Input.Sample(_PointClampSampler, uv * _Input_Scale.xy, int2(0, 1)));
-	float3 colorD = RGBToYCoCg(_Input.Sample(_PointClampSampler, uv * _Input_Scale.xy, int2(0, -1)));
-	float3 colorL = RGBToYCoCg(_Input.Sample(_PointClampSampler, uv * _Input_Scale.xy, int2(-1, 0)));
-	float3 colorR = RGBToYCoCg(_Input.Sample(_PointClampSampler, uv * _Input_Scale.xy, int2(1, 0)));
+	//float3 colorC = RGBToYCoCg(_Input.Sample(_PointClampSampler, uv * _Input_Scale.xy, int2(0, 0)));
+	//float3 colorU = RGBToYCoCg(_Input.Sample(_PointClampSampler, uv * _Input_Scale.xy, int2(0, 1)));
+	//float3 colorD = RGBToYCoCg(_Input.Sample(_PointClampSampler, uv * _Input_Scale.xy, int2(0, -1)));
+	//float3 colorL = RGBToYCoCg(_Input.Sample(_PointClampSampler, uv * _Input_Scale.xy, int2(-1, 0)));
+	//float3 colorR = RGBToYCoCg(_Input.Sample(_PointClampSampler, uv * _Input_Scale.xy, int2(1, 0)));
 	
-	float2 pos = unjitteredTexel * _ScaledResolution.xy;
-	float2 f = frac(pos - 0.5);
-	float c = 0.8 * _Sharpness;
-	float2 w = c * (f * f - f);
+	//float2 pos = unjitteredTexel * _ScaledResolution.xy;
+	//float2 f = frac(pos - 0.5);
+	//float c = 0.8 * _Sharpness;
+	//float2 w = c * (f * f - f);
 	
-	float4 color = float4(lerp(colorL, colorR, f.x), 1.0) * w.x + float4(lerp(colorU, colorD, f.y), 1.0) * w.y;
-	color += float4((1.0 + color.a) * history - color.a * colorC, 1.0);
+	//float4 color = float4(lerp(colorL, colorR, f.x), 1.0) * w.x + float4(lerp(colorU, colorD, f.y), 1.0) * w.y;
+	//color += float4((1.0 + color.a) * history - color.a * colorC, 1.0);
 	//history = color.rgb * rcp(color.a);
 	history *= rcp(1.0 + history.r);
 	
 	// Simple clamp
-	history = clamp(history, minValue, maxValue);
+	//history = clamp(history, minValue, maxValue);
 	
 	// Clip to AABB
 	float3 invDir = rcp(result - history);
 	float3 t0 = (minValue - history) * invDir;
 	float3 t1 = (maxValue - history) * invDir;
 	float t = saturate(Max3(min(t0, t1)));
-	//history = lerp(history, result, t);
+	history = lerp(history, result, t);
 	
 	result = lerp(history, result, maxWeight * 0.05);
 	result *= rcp(1.0 - result.r);
 	result = YCoCgToRGB(result);
+	
+	result = IsInfOrNaN(result) ? 0.0 : result;
 	
 	return result;
 }

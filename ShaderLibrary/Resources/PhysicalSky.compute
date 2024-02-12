@@ -27,7 +27,7 @@ void MultiScatter(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
 	float dt = rayLength / _Samples;
 	float LdotV = lightCosAngle * viewCosAngle;
-		
+	
 	float3 luminance = 0.0, multiScatter = 0.0;
 	for (float i = 0.5; i < _Samples; i++)
 	{
@@ -35,17 +35,14 @@ void MultiScatter(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, currentDistance);
 		float4 scatter = AtmosphereScatter(heightAtDistance);
 		
-		float3 lighting = 0.0;
 		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, currentDistance * LdotV, heightAtDistance);
-		
-		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
-			lighting = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase));
-		
 		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, currentDistance, heightAtDistance);
 		float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
 		float3 extinction = AtmosphereOpticalDepth(viewHeight);
 		
-		luminance += transmittance * lighting * (1.0 - exp(-extinction * dt)) / extinction;
+		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
+			luminance += AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * (scatter.xyz + scatter.w) / (4.0 * Pi) * transmittance * (1.0 - exp(-extinction * dt)) / extinction;
+			
 		multiScatter += transmittance * (scatter.xyz + scatter.w) * (1.0 - exp(-extinction * dt)) / extinction;
 	}
 	
@@ -80,7 +77,75 @@ void MultiScatter(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	_MultiScatterResult[groupId] = ScatterShared[0] / (1.0 - MultiScatterShared[0]);
 }
 
-[numthreads(8, 8, 1)]
-void Ambient(uint3 id : SV_DispatchThreadID)
+float _MipLevel;
+static const uint _SampleCount = 256;
+groupshared float3 OutputSHCoeffs[_SampleCount][9];
+TextureCube<float3> _AmbientProbeInputCubemap;
+RWBuffer<float4> _AmbientProbeOutputBuffer;
+
+[numthreads(_SampleCount, 1, 1)]
+void Ambient(uint groupIndex : SV_GroupIndex)
 {
+	float2 u = Hammersley2dSeq(groupIndex, _SampleCount);
+	float3 n = SampleSphereUniform(u.x, u.y);
+
+    // Sample once per thread
+	float weight = 4.0 * Pi / _SampleCount;
+	float3 value = _AmbientProbeInputCubemap.SampleLevel(_TrilinearClampSampler, n, _MipLevel) * weight;
+	
+	  // Clamped cosine convolution coefs
+	float A0 = sqrt(FourPi / 1.0) * sqrt(1.0 * Pi) / 2.0;
+	float A1 = sqrt(FourPi / 3.0) * sqrt(3.0 * Pi) / 3.0;
+	float A2 = sqrt(FourPi / 5.0) * sqrt(5.0 * Pi) / 16.0 * 2.0;
+    
+	float Y[9] =
+	{
+		1.0 / (2.0 * SqrtPi), // 0  0
+        sqrt(3.0) / (2.0 * SqrtPi), // 1 -1
+        sqrt(3.0) / (2.0 * SqrtPi), // 1  0
+        sqrt(3.0) / (2.0 * SqrtPi), // 1  1
+        sqrt(15.0) / (2.0 * SqrtPi), // 2 -2
+        sqrt(15.0) / (2.0 * SqrtPi), // 2 -1
+        sqrt(5.0) / (4.0 * SqrtPi), // 2  0
+        sqrt(15.0) / (2.0 * SqrtPi), // 2  1
+        sqrt(15.0) / (4.0 * SqrtPi) // 2  2
+	};
+	
+    // Sum the values
+	OutputSHCoeffs[groupIndex][0] = Y[0] * Y[0] * A0 * RcpPi * value;
+	OutputSHCoeffs[groupIndex][1] = Y[1] * Y[1] * A1 * RcpPi * value * n.y;
+	OutputSHCoeffs[groupIndex][2] = Y[2] * Y[2] * A1 * RcpPi * value * n.z;
+	OutputSHCoeffs[groupIndex][3] = Y[3] * Y[3] * A1 * RcpPi * value * n.x;
+	OutputSHCoeffs[groupIndex][4] = Y[4] * Y[4] * A2 * RcpPi * value * n.y * n.x;
+	OutputSHCoeffs[groupIndex][5] = Y[5] * Y[5] * A2 * RcpPi * value * n.y * n.z;
+	OutputSHCoeffs[groupIndex][6] = Y[6] * Y[6] * A2 * RcpPi * value * (3.0 * n.z * n.z - 1.0);
+	OutputSHCoeffs[groupIndex][7] = Y[7] * Y[7] * A2 * RcpPi * value * n.x * n.z;
+	OutputSHCoeffs[groupIndex][8] = Y[8] * Y[8] * A2 * RcpPi * value * (n.x * n.x - n.y * n.y);
+	
+	[unroll]
+	for (uint s = _SampleCount >> 1; s > 0; s >>= 1)
+	{
+		GroupMemoryBarrierWithGroupSync();
+		
+		if (groupIndex >= s)
+			continue;
+			
+		[unroll]
+		for (uint i = 0; i < 9; i++)
+		{
+			OutputSHCoeffs[groupIndex][i] += OutputSHCoeffs[groupIndex + s][i];
+		}
+	}
+
+    // Write to memory
+	if (groupIndex == 0)
+	{
+		_AmbientProbeOutputBuffer[0] = float4(OutputSHCoeffs[0][3].r, OutputSHCoeffs[0][1].r, OutputSHCoeffs[0][2].r, OutputSHCoeffs[0][0].r - OutputSHCoeffs[0][6].r);
+		_AmbientProbeOutputBuffer[1] = float4(OutputSHCoeffs[0][3].g, OutputSHCoeffs[0][1].g, OutputSHCoeffs[0][2].g, OutputSHCoeffs[0][0].g - OutputSHCoeffs[0][6].g);
+		_AmbientProbeOutputBuffer[2] = float4(OutputSHCoeffs[0][3].b, OutputSHCoeffs[0][1].b, OutputSHCoeffs[0][2].b, OutputSHCoeffs[0][0].b - OutputSHCoeffs[0][6].b);
+		_AmbientProbeOutputBuffer[3] = float4(OutputSHCoeffs[0][4].r, OutputSHCoeffs[0][5].r, OutputSHCoeffs[0][6].r * 3.0, OutputSHCoeffs[0][7].r);
+		_AmbientProbeOutputBuffer[4] = float4(OutputSHCoeffs[0][4].g, OutputSHCoeffs[0][5].g, OutputSHCoeffs[0][6].g * 3.0, OutputSHCoeffs[0][7].g);
+		_AmbientProbeOutputBuffer[5] = float4(OutputSHCoeffs[0][4].b, OutputSHCoeffs[0][5].b, OutputSHCoeffs[0][6].b * 3.0, OutputSHCoeffs[0][7].b);
+		_AmbientProbeOutputBuffer[6] = float4(OutputSHCoeffs[0][8].r, OutputSHCoeffs[0][8].g, OutputSHCoeffs[0][8].b, 1.0);
+	}
 }

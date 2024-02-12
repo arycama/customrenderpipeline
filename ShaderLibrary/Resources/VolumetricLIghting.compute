@@ -23,7 +23,6 @@ float _BlurSigma, _FogMode;
 void Compute(uint3 id : SV_DispatchThreadID)
 {
 	float jitter = _BlueNoise1D[id.xy % 128];
-	//jitter = InterleavedGradientNoise(id.xy, 0);
 	
 	float2 positionNDC = (id.xy + 0.5) / float2(_VolumeWidth, _VolumeHeight);
 	float2 pixelPosition = positionNDC * _ScaledResolution.xy;
@@ -36,14 +35,9 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	positionCS.w = Remap(normalizedDepth, 0.0, 1.0, _Near, _Far);
 	
 	float3 positionWS = ClipToWorld(positionCS.xyz);
-	float3 lighting = _AmbientLightColor * _Exposure;
+	float3 lighting = 0.0;
 	
-	// Todo: compute on CPU
-	float3 sunColor = 0.0;
-	for (uint i = 0; i < _DirectionalLightCount; i++)
-		sunColor += _DirectionalLights[i].color;
-	
-	float3 albedo = _FogColor / (_AmbientLightColor + sunColor);
+	float3 albedo = _FogColor;
 	
 	float viewDistance = length(positionWS);
 	lighting += GetLighting(0.0, positionWS, pixelPosition, positionCS.w, 1.0, 0.0, 1.0, true);

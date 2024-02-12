@@ -32,7 +32,7 @@ cbuffer Exposure
 Buffer<float4> _DirectionalShadowTexelSizes;
 Buffer<uint> _LightClusterList;
 SamplerComparisonState _LinearClampCompareSampler;
-SamplerState _LinearClampSampler, _LinearRepeatSampler, _PointClampSampler, _TrilinearRepeatAniso16Sampler;
+SamplerState _LinearClampSampler, _LinearRepeatSampler, _PointClampSampler, _TrilinearRepeatAniso16Sampler, _TrilinearClampSampler;
 StructuredBuffer<DirectionalLight> _DirectionalLights;
 StructuredBuffer<matrix> _DirectionalMatrices;
 StructuredBuffer<PointLight> _PointLights;
@@ -45,7 +45,6 @@ TextureCubeArray<float> _PointShadows;
 
 cbuffer FrameData
 {
-	float3 _AmbientLightColor;
 	float _MipBias;
 	
 	float3 _FogColor;

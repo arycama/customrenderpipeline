@@ -146,7 +146,7 @@ namespace Arycama.CustomRenderPipeline
             var multiScatterRemap = GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight);
 
             // Generate Reflection probe
-            var skyReflection = renderGraph.GetTexture(settings.ReflectionResolution, settings.ReflectionResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube);
+            var skyReflection = renderGraph.GetTexture(settings.ReflectionResolution, settings.ReflectionResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, hasMips: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Reflection"))
             {
                 pass.Initialize(material, 1);
@@ -172,7 +172,7 @@ namespace Arycama.CustomRenderPipeline
                     {
                         var rotation = Quaternion.LookRotation(lookAtList[i], upVectorList[i]);
                         var viewToWorld = Matrix4x4.TRS(viewPosition, rotation, Vector3.one);
-                        array[i] = Matrix4x4Extensions.ComputePixelCoordToWorldSpaceViewDirectionMatrix(settings.ReflectionResolution, settings.ReflectionResolution, 90.0f, 1.0f, viewToWorld, true);
+                        array[i] = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(settings.ReflectionResolution, settings.ReflectionResolution, Vector2.zero, 90.0f, 1.0f, viewToWorld, true);
                     }
 
                     ArrayPool<Matrix4x4>.Release(array);
@@ -183,16 +183,49 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            // Generate mips
-
             // Generate ambient probe
+            var ambientBufferTemp = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Atmosphere Ambient Probe"))
+            {
+                pass.Initialize(Resources.Load<ComputeShader>("PhysicalSky"), 1, 1, 1, 1, false);
+
+                // Prefiltered importance sampling
+                // Use lower MIP-map levels for fetching samples with low probabilities
+                // in order to reduce the variance.
+                // Ref: http://http.developer.nvidia.com/GPUGems3/gpugems3_ch20.html
+                //
+                // - OmegaS: Solid angle associated with the sample
+                // - OmegaP: Solid angle associated with the texel of the cubemap
+                var sampleCount = 256; // Must match PhysicalSky.compute
+                var rcpOmegaP = 6.0f * settings.ReflectionResolution * settings.ReflectionResolution / (4.0f * Mathf.PI);
+                var pdf = 1.0f / (4.0f * Mathf.PI);
+                var omegaS = 1.0f / sampleCount / pdf;
+                var mipLevel = 0.5f * Mathf.Log(omegaS * rcpOmegaP, 2.0f);
+
+                pass.ReadTexture("_AmbientProbeInputCubemap", skyReflection);
+                pass.WriteBuffer("_AmbientProbeOutputBuffer", ambientBufferTemp);
+
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    pass.SetFloat(command, "_MipLevel", mipLevel);
+                });
+            }
+
+            // Copy ambient
+            var ambientBuffer= renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Atmosphere Ambient Probe Copy"))
+            {
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    command.CopyBuffer(ambientBufferTemp, ambientBuffer);
+                });
+            }
 
             // Specular convolution
-
-            return new Result(transmittance, multiScatter, skyReflection, transmittanceRemap, multiScatterRemap);
+            return new Result(transmittance, multiScatter, ambientBuffer, skyReflection, transmittanceRemap, multiScatterRemap);
         }
 
-        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, IRenderPassData atmosphereData)
+        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, IRenderPassData atmosphereData, Vector2 jitter)
         {
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
             {
@@ -211,7 +244,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_Samples", settings.RenderSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
                     pass.SetConstantBuffer(command, "Exposure", exposureBuffer);
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.ComputePixelCoordToWorldSpaceViewDirectionMatrix(width, height, fov, aspect, viewToWorld));
+                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
                 });
             }
         }
@@ -229,15 +262,16 @@ namespace Arycama.CustomRenderPipeline
             public RTHandle Transmittance { get; }
             public RTHandle MultiScatter { get; }
             public RTHandle ReflectionProbe { get; }
-            //public BufferHandle AmbientBuffer { get; }
+            public BufferHandle AmbientBuffer { get; }
 
             public Vector4 TransmittanceRemap { get; }
             public Vector4 MultiScatterRemap { get; }
 
-            public Result(RTHandle transmittance, RTHandle multiScatter, RTHandle reflectionProbe, Vector4 transmittanceRemap, Vector4 multiScatterRemap)
+            public Result(RTHandle transmittance, RTHandle multiScatter, BufferHandle ambientBuffer, RTHandle reflectionProbe, Vector4 transmittanceRemap, Vector4 multiScatterRemap)
             {
                 Transmittance = transmittance;
                 MultiScatter = multiScatter;
+                AmbientBuffer = ambientBuffer;
                 ReflectionProbe = reflectionProbe;
                 TransmittanceRemap = transmittanceRemap;
                 MultiScatterRemap = multiScatterRemap;
@@ -248,6 +282,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Transmittance", Transmittance);
                 pass.ReadTexture("_MultiScatter", MultiScatter);
                 pass.ReadTexture("_SkyReflection", ReflectionProbe);
+                pass.ReadBuffer("AmbientSh", AmbientBuffer);
             }
 
             void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)

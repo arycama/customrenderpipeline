@@ -4,12 +4,77 @@
 #include "Common.hlsl"
 #include "Atmosphere.hlsl"
 
-float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, float eyeDepth, float3 albedo, float3 f0, float roughness, bool isVolumetric = false)
+cbuffer AmbientSh
+{
+	float4 _AmbientSh[7];
+};
+
+float3 EvaluateSH(float3 N, float3 occlusion, float4 sh[7])
+{
+	// Calculate the zonal harmonics expansion for V(x, ωi)*(n.l)
+	float3 t = FastACosPos(sqrt(saturate(1.0 - occlusion)));
+	float3 a = sin(t);
+	float3 b = cos(t);
+	
+	// Calculate the zonal harmonics expansion for V(x, ωi)*(n.l)
+	float3 A0 = a * a;
+	float3 A1 = 1.0 - b * b * b;
+	float3 A2 = a * a * (1.0 + 3.0 * b * b);
+	 
+	float4 shAr = sh[0];
+	float4 shAg = sh[1];
+	float4 shAb = sh[2];
+	float4 shBr = sh[3];
+	float4 shBg = sh[4];
+	float4 shBb = sh[5];
+	float4 shC = sh[6];
+	
+	float3 irradiance = 0.0;
+	irradiance.r = dot(shAr.xyz * A1.r, N) + shAr.w * A0.r;
+	irradiance.g = dot(shAg.xyz * A1.g, N) + shAg.w * A0.g;
+	irradiance.b = dot(shAb.xyz * A1.b, N) + shAb.w * A0.b;
+	
+    // 4 of the quadratic (L2) polynomials
+	float4 vB = N.xyzz * N.yzzx;
+	irradiance.r += dot(shBr * A2.r, vB) + shBr.z / 3.0 * (A0.r - A2.r);
+	irradiance.g += dot(shBg * A2.g, vB) + shBg.z / 3.0 * (A0.g - A2.g);
+	irradiance.b += dot(shBb * A2.b, vB) + shBb.z / 3.0 * (A0.b - A2.b);
+
+    // Final (5th) quadratic (L2) polynomial
+	float vC = N.x * N.x - N.y * N.y;
+	irradiance += shC.rgb * A2 * vC;
+	
+	return irradiance;
+}
+
+// ref: Practical Realtime Strategies for Accurate Indirect Occlusion
+// Update ambient occlusion to colored ambient occlusion based on statitics of how light is bouncing in an object and with the albedo of the object
+float3 GTAOMultiBounce(float visibility, float3 albedo)
+{
+	float3 a = 2.0404 * albedo - 0.3324;
+	float3 b = -4.7951 * albedo + 0.6417;
+	float3 c = 2.7552 * albedo + 0.6903;
+
+	float x = visibility;
+	return max(x, ((x * a + b) * x + c) * x);
+}
+
+float3 AmbientLight(float3 N, float occlusion, float3 albedo, float4 sh[7])
+{
+	return EvaluateSH(N, GTAOMultiBounce(occlusion, albedo), sh);
+}
+
+float3 AmbientLight(float3 N, float occlusion = 1.0, float3 albedo = 1.0)
+{
+	return AmbientLight(N, occlusion, albedo, _AmbientSh);
+}
+
+float3 GetLighting(float3 normal, float3 worldPosition, float2 pixelPosition, float eyeDepth, float3 albedo, float3 f0, float roughness, float occlusion, bool isVolumetric = false)
 {
 	float3 V = normalize(-worldPosition);
 
 	// Directional lights
-	float3 lighting = 0.0;
+	float3 lighting = AmbientLight(normal, occlusion, albedo) * albedo;
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
 		DirectionalLight light = _DirectionalLights[i];

@@ -66,7 +66,12 @@ namespace Arycama.CustomRenderPipeline
             readTextures.Clear();
 
             foreach (var buffer in readBuffers)
-                SetBuffer(command, buffer.Item1, buffer.Item2);
+            {
+                if (buffer.Item2.Target.HasFlag(GraphicsBuffer.Target.Constant))
+                    SetConstantBuffer(command, buffer.Item1, buffer.Item2);
+                else
+                    SetBuffer(command, buffer.Item1, buffer.Item2);
+            }
             readBuffers.Clear();
 
             foreach (var buffer in writeBuffers)

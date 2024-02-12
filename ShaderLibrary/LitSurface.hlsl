@@ -124,7 +124,7 @@ FragmentOutput Fragment(FragmentInput input)
 		#endif
 		
 		float3 f0 = lerp(0.04, color, _Metallic);
-		float3 lighting = GetLighting(normal, input.worldPosition, input.position.xy, input.position.w, albedo, f0, roughness) + _AmbientLightColor * _Exposure * albedo * rcp(Pi);
+		float3 lighting = GetLighting(normal, input.worldPosition, input.position.xy, input.position.w, albedo, f0, roughness, 1.0);
 
 		lighting.rgb += _EmissionColor * _Exposure;
 		lighting.rgb = ApplyFog(lighting.rgb, input.position.xy, input.position.w);

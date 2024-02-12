@@ -22,7 +22,7 @@ namespace Arycama.CustomRenderPipeline
             volumetricLightingTextureCache.Dispose();
         }
 
-        public Result Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, Texture2D blueNoise1D, Texture2D blueNoise2D, Color ambientLightColor, Color fogColor, float fogStartDistance, float fogEndDistance, float fogDensity, float fogMode, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, IRenderPassData commonData)
+        public Result Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, Texture2D blueNoise1D, Texture2D blueNoise2D, Color fogColor, float fogStartDistance, float fogEndDistance, float fogDensity, float fogMode, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, IRenderPassData commonData)
         {
             var width = Mathf.CeilToInt(screenWidth / (float)settings.TileSize);
             var height = Mathf.CeilToInt(screenHeight / (float)settings.TileSize);
@@ -71,7 +71,6 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetConstantBuffer(command, "Exposure", data.exposureBuffer);
 
-                    pass.SetVector(command, "_AmbientLightColor", data.ambientLightColor);
                     pass.SetVector(command, "_FogColor", data.fogColor);
                     pass.SetFloat(command, "_FogStartDistance", data.fogStartDistance);
                     pass.SetFloat(command, "_FogEndDistance", data.fogEndDistance);
@@ -97,7 +96,6 @@ namespace Arycama.CustomRenderPipeline
                 data.exposureBuffer = exposureBuffer;
                 data.blueNoise1D = blueNoise1D;
                 data.blueNoise2D = blueNoise2D;
-                data.ambientLightColor = ambientLightColor;
                 data.fogColor = fogColor;
                 data.fogStartDistance = fogStartDistance;
                 data.fogEndDistance = fogEndDistance;
@@ -167,7 +165,6 @@ namespace Arycama.CustomRenderPipeline
             internal BufferHandle exposureBuffer;
             internal Texture2D blueNoise1D;
             internal Texture2D blueNoise2D;
-            internal Color ambientLightColor;
             internal Color fogColor;
             internal float fogStartDistance;
             internal float fogEndDistance;

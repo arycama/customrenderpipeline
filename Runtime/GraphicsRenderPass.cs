@@ -114,11 +114,11 @@ namespace Arycama.CustomRenderPipeline
                     }
                 }
 
-                if(!isScreen)
-                    command.SetViewport(new Rect(0, 0, width, height));
-
                 if (clearFlags != RTClearFlags.None)
                     command.ClearRenderTarget(clearFlags, clearColor, clearDepth, (uint)clearStencil);
+
+                if (!isScreen)
+                    command.SetViewport(new Rect(0, 0, width, height));
 
                 ArrayPool<RenderTargetIdentifier>.Release(targets);
                 ArrayPool<RenderBufferLoadAction>.Release(loads);

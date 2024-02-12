@@ -15,6 +15,7 @@ public class RTHandle
     public bool IsImported { get; set; }
     public Vector2 Scale => new Vector2((float)Width / RenderTexture.width, (float)Height / RenderTexture.height);
     public bool IsScreenTexture { get; set; }
+    public bool HasMips { get; set; }
 
     public RenderTexture RenderTexture { get; set; }
 
@@ -38,7 +39,8 @@ public class RTHandle
             EnableRandomWrite = renderTexture.enableRandomWrite,
             VolumeDepth = renderTexture.volumeDepth,
             Dimension = renderTexture.dimension,
-            RenderTexture = renderTexture
+            RenderTexture = renderTexture,
+            HasMips = renderTexture.useMipMap
         };
     }
 

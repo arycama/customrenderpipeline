@@ -1,5 +1,6 @@
 ﻿#include "../Common.hlsl"
 #include "../Atmosphere.hlsl"
+#include "../Lighting.hlsl"
 
 matrix _PixelToWorldViewDir, _PixelToWorldViewDirs[6];
 uint _Samples;
@@ -79,7 +80,7 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 	#ifdef REFLECTION_PROBE
 		float3 V = -MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
 	#else
-		float3 V = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+		float3 V = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy + _Jitter, 1.0), true);
 	#endif
 
 	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, V.y);

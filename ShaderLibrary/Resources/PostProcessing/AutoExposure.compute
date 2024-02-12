@@ -86,6 +86,9 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 
 		//adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
 		
+		if (IsInfOrNaN(adaptedEv))
+			adaptedEv = 1.0;
+		
 		LuminanceOutput[0] = EV100ToExposure(adaptedEv);
 	}
 }

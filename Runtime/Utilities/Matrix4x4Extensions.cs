@@ -46,23 +46,23 @@ namespace Arycama.CustomRenderPipeline
             return WorldToLocal(rotation.Right(), rotation.Up(), rotation.Forward(), position);
         }
 
-        public static Matrix4x4 ComputePixelCoordToWorldSpaceViewDirectionMatrix(int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, bool flip = false)
+        public static Matrix4x4 PixelToWorldViewDirectionMatrix(int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, bool flip = false)
         {
-            Matrix4x4 viewSpaceRasterTransform;
-            var verticalFoV = fov * Mathf.Deg2Rad;
-
             // Compose the view space version first.
             // V = -(X, Y, Z), s.t. Z = 1,
             // X = (2x / resX - 1) * tan(vFoV / 2) * ar = x * [(2 / resX) * tan(vFoV / 2) * ar] + [-tan(vFoV / 2) * ar] = x * [-m00] + [-m20]
             // Y = (2y / resY - 1) * tan(vFoV / 2)      = y * [(2 / resY) * tan(vFoV / 2)]      + [-tan(vFoV / 2)]      = y * [-m11] + [-m21]
-            float tanHalfVertFoV = Mathf.Tan(0.5f * verticalFoV);
+            var tanHalfVertFoV = Mathf.Tan(0.5f * fov * Mathf.Deg2Rad);
 
             // Compose the matrix.
-            float m21 = tanHalfVertFoV;
-            float m11 = -2f / height * tanHalfVertFoV;
+            var m11 = -2f / height * tanHalfVertFoV;
+            var m21 = (1f + jitter.y * 0f) * tanHalfVertFoV;
 
-            float m20 = tanHalfVertFoV * aspect;
-            float m00 = -2f / width * tanHalfVertFoV * aspect;
+            // Compose the matrix.
+            //float m00 = -2f / width * tanHalfVertFoV * aspect;
+            //float m11 = -2f / height * tanHalfVertFoV;
+            //float m20 = tanHalfVertFoV * aspect;
+            //float m21 = tanHalfVertFoV;
 
             if (flip)
             {
@@ -71,10 +71,15 @@ namespace Arycama.CustomRenderPipeline
                 m21 = -m21;
             }
 
-            viewSpaceRasterTransform = new Matrix4x4(new Vector4(m00, 0.0f, 0.0f, 0.0f),
-                new Vector4(0.0f, m11, 0.0f, 0.0f),
-                new Vector4(m20, m21, -1.0f, 0.0f),
-                new Vector4(0.0f, 0.0f, 0.0f, 1.0f));
+            var viewSpaceRasterTransform = new Matrix4x4
+            {
+                m00 = -2f / width * tanHalfVertFoV * aspect,
+                m11 = m11,
+                m02 = (1f + jitter.x * 0f) * tanHalfVertFoV * aspect,
+                m12 = m21,
+                m22 = -1.0f,
+                m33 = 1.0f
+            };
 
             return viewToWorld * viewSpaceRasterTransform;
         }

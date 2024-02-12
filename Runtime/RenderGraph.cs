@@ -189,6 +189,7 @@ namespace Arycama.CustomRenderPipeline
                             {
                                 result.dimension = handle.Dimension;
                                 result.volumeDepth = handle.VolumeDepth;
+                                result.useMipMap = handle.HasMips;
                             }
 
                             result.name = $"RTHandle {rtCount++} {result.dimension} {result.graphicsFormat} {width}x{height} ";
@@ -250,7 +251,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false)
+        public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false)
         {
             // Ensure we're not getting a texture during execution, this must be done in the setup
             Assert.IsFalse(isExecuting);
@@ -268,6 +269,7 @@ namespace Arycama.CustomRenderPipeline
             result.VolumeDepth = volumeDepth;
             result.Dimension = dimension;
             result.IsScreenTexture = isScreenTexture;
+            result.HasMips = hasMips;
 
             unavailableRtHandles.Add(result);
             return result;
@@ -285,18 +287,31 @@ namespace Arycama.CustomRenderPipeline
             for (var i = 0; i < availableBufferHandles.Count; i++)
             {
                 var handle = availableBufferHandles[i];
-                if (handle.Target == target && handle.Stride == stride && handle.Count >= count)
+
+                if (handle.Target != target)
+                    continue;
+
+                if (handle.Stride != stride)
+                    continue;
+
+                if (handle.Target.HasFlag(GraphicsBuffer.Target.Constant))
                 {
-                    handle.Size = count;
-                    availableBufferHandles.RemoveAt(i);
-                    usedBufferHandles.Add(handle);
-                    return handle;
+                    // Constant buffers must have exact size
+                    if (handle.Count != count)
+                        continue;
                 }
+                else if (handle.Count < count)
+                    continue;
+
+                handle.Size = count * stride;
+                availableBufferHandles.RemoveAt(i);
+                usedBufferHandles.Add(handle);
+                return handle;
             }
 
             // If no handle was found, create a new one, and assign it as one to be created. 
             var result = new BufferHandle(target, count, stride);
-            result.Size = count;
+            result.Size = count * stride;
             bufferHandlesToCreate.Add(result);
             usedBufferHandles.Add(result);
             return result;

@@ -1,3 +1,5 @@
+#ifndef ATMOSPHERE_INCLUDED
+#define ATMOSPHERE_INCLUDED
 
 const static float _PlanetRadius = 6360000.0;
 const static float _AtmosphereHeight = 100000.0;
@@ -143,3 +145,5 @@ float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float
 		
 	return highTransmittance == 0.0 ? 0.0 : lowTransmittance * rcp(highTransmittance);
 }
+
+#endif
