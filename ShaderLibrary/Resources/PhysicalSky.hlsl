@@ -80,7 +80,6 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		float3 V = -MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
 	#else
 		float3 V = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
-		return _SkyReflection.SampleLevel(_TrilinearClampSampler, V, 3.0);
 	#endif
 
 	float viewCosAngle = V.y;

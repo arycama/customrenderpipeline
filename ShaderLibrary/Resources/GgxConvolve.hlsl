@@ -120,9 +120,7 @@ float3 Fragment(float4 position : SV_Position, uint index : SV_RenderTargetArray
 	
 	float NdotV = 1; // N == V
 
-	float3 lightInt = float3(0.0, 0.0, 0.0);
-	float cbsdfInt = 0.0;
-
+	float4 result = 0.0;
 	for (uint i = 0; i < _Samples; ++i)
 	{
 		float3 L;
@@ -173,9 +171,8 @@ float3 Fragment(float4 position : SV_Position, uint index : SV_RenderTargetArray
 		float F = 1; // F_Schlick(F0, LdotH);
 		float G = V_SmithJointGGX(NdotL, NdotV, roughness) * NdotL * NdotV; // 4 cancels out
 
-		lightInt += F * G * val;
-		cbsdfInt += F * G;
+		result += float4(val, 1.0) * F * G;
 	}
 
-	return lightInt / cbsdfInt;
+	return result.rgb * rcp(result.a);
 }
