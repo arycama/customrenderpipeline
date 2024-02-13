@@ -40,7 +40,13 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	float3 albedo = _FogColor;
 	
 	float viewDistance = length(positionWS);
-	lighting += GetLighting(0.0, positionWS, pixelPosition, positionCS.w, 1.0, 0.0, 1.0, true);
+	
+	LightingInput lightingInput = (LightingInput)0;
+	lightingInput.worldPosition = positionWS;
+	lightingInput.pixelPosition = pixelPosition;
+	lightingInput.eyeDepth = positionCS.w;
+	
+	lighting += GetLighting(lightingInput, true);
 	
 	float extinction = _FogMode ? (viewDistance > _FogStartDistance && viewDistance < _FogEndDistance ? rcp(_FogEndDistance - viewDistance) : 0.0) : 0.0;
 	float4 luminanceExtinction = float4(albedo * lighting, extinction);

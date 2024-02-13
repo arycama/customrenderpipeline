@@ -423,94 +423,10 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 	return weightSum ? shadow / weightSum : 1.0;
 }
 
-#ifdef CUSTOM_LIGHTING_FALLOFF
-float CalculateLightFalloff(float rcpLightDist, float sqrLightDist, float rcpSqLightRange);
-#else
-float CalculateLightFalloff(float rcpLightDist, float sqrLightDist, float rcpSqLightRange)
-{
-	return rcpLightDist * Sq(saturate(1.0 - Sq(sqrLightDist * rcpSqLightRange)));
-}
-#endif
-
-float Lambda(float3 x, float3 N, float roughness)
-{
-	return (sqrt(1.0 + Sq(roughness) * (rcp(Sq(dot(x, N))) - 1.0)) - 1.0) * rcp(2.0);
-}
-
-float3 AverageFresnel(float3 f0)
-{
-	return rcp(21.0) + 20 * rcp(21.0) * f0;
-}
-
-float DirectionalAlbedo(float NdotV, float roughness)
-{
-	return 1.0 - 1.4594 * roughness * NdotV * 
-	(-0.20277 + roughness * (2.772 + roughness * (-2.6175 + 0.73343 * roughness))) * 
-	(3.09507 + NdotV * (-9.11369 + NdotV * (15.8884 + NdotV * (-13.70343 + 4.51786 * NdotV))));
-}
-
-float AverageAlbedo(float roughness)
-{
-	return 1.0 + roughness * (-0.113 + roughness * (-1.8695 + roughness * (2.2268 - 0.83397 * roughness)));
-}
-
-float3 DirectionalAlbedoMs(float NdotV, float roughness, float3 f0)
-{
-	return pow(1.0 - roughness, 5.0) * (f0 + (1.0 - f0) * pow(1.0 - NdotV, 5.0)) +
-	(1.0 - pow(1.0 - roughness, 5.0)) * (0.04762 + 0.95238 * f0);
-}
-
-float3 AverageAlbedoMs(float roughness, float3 f0)
-{
-	return f0 + (-0.33263 * roughness - 0.072359) * (1 - f0) * f0;
-}
-
 float SafeDiv(float numer, float denom)
 {
 	return (numer != denom) ? numer * rcp(denom) : 1.0;
 }
-
-#ifdef CUSTOM_LIGHTING
-float3 CalculateLighting(float3 albedo, float3 f0, float roughness, float3 L, float3 V, float3 N);
-#else
-float3 CalculateLighting(float3 albedo, float3 f0, float roughness, float3 L, float3 V, float3 N)
-{
-	float NdotL = dot(N, L);
-	float NdotV = max(0.0, dot(N, V));
-	
-	float3 lighting = albedo * (1.0 - DirectionalAlbedoMs(NdotV, roughness, f0)) * (1.0 - DirectionalAlbedoMs(NdotL, roughness, f0)) * rcp(Pi * (1.0 - AverageAlbedoMs(roughness, f0)));
-	
-    // Optimized math. Ref: PBR Diffuse Lighting for GGX + Smith Microsurfaces (slide 114), assuming |L|=1 and |V|=1
-	float LdotV = dot(L, V);
-	float invLenLV = rsqrt(2.0 * LdotV + 2.0);
-	float NdotH = (NdotL + NdotV) * invLenLV;
-	float LdotH = invLenLV * LdotV + invLenLV;
-		
-	float a2 = Sq(roughness);
-	float s = (NdotH * a2 - NdotH) * NdotH + 1.0;
-
-	float lambdaV = NdotL * sqrt((-NdotV * a2 + NdotV) * NdotV + a2);
-	float lambdaL = NdotV * sqrt((-NdotL * a2 + NdotL) * NdotL + a2);
-
-	// This function is only used for direct lighting.
-	// If roughness is 0, the probability of hitting a punctual or directional light is also 0.
-	// Therefore, we return 0. The most efficient way to do it is with a max().
-	float DV = rcp(Pi) * 0.5 * a2 * rcp(max(Sq(s) * (lambdaV + lambdaL), FloatMin));
-	float3 F = lerp(f0, 1.0, pow(1.0 - LdotH, 5.0));
-
-	lighting += DV * F;
-	
-	// Multi scatter
-	float Ewi = DirectionalAlbedo(NdotV, roughness);
-	float Ewo = DirectionalAlbedo(NdotL, roughness);
-	float Eavg = AverageAlbedo(roughness);
-	float3 FAvg = AverageFresnel(f0);
-	lighting += roughness ? (1.0 - Ewi) * (1.0 - Ewo) * rcp(Pi * (1.0 - Eavg)) * Sq(FAvg) * Eavg * rcp(1.0 - FAvg * (1.0 - Eavg)) : 0.0;
-	
-	return lighting;
-}
-#endif
-
 float GetVolumetricUv(float linearDepth)
 {
 	if (_NonLinearDepth)

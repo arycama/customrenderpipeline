@@ -35,9 +35,8 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
 		
 		float minLuminance = EV100ToLuminance(MinEv);
 		float maxLuminance = EV100ToLuminance(MaxEv);
-		luminance = clamp(luminance, minLuminance, maxLuminance);
 		
-		uint binIndex = Remap(LuminanceToEV100(luminance), MinEv, MaxEv, 0.0, 255.0);
+		uint binIndex = luminance ? Remap(LuminanceToEV100(luminance), MinEv, MaxEv, 1.0, 255.0) : 0;
 		InterlockedAdd(HistogramShared[binIndex], 1);
 	}
     
@@ -68,27 +67,31 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 		GroupMemoryBarrierWithGroupSync();
 	}
     
-	if (groupIndex == 0)
-	{
-		float pixelCount = _ScaledResolution.x * _ScaledResolution.y;
+	if (groupIndex)
+		return;
 	
-		float weightedLogAverage = HistogramShared[0] / pixelCount;
-		float averageEv = Remap(HistogramShared[0] / pixelCount, 0.0, 255.0, MinEv, MaxEv);
+	float pixelCount = _ScaledResolution.x * _ScaledResolution.y;
+	
+	// Here we take our weighted sum and divide it by the number of pixels
+    // that had luminance greater than zero (since the index == 0, we can
+    // use countForThisBin to find the number of black pixels)
+	float weightedLogAverage = (HistogramShared[0] / max(pixelCount - float(countForThisBin), 1.0)) - 1.0;
+	
+	float averageEv = Remap(weightedLogAverage, 1.0, 255.0, MinEv, MaxEv);
 
-		float2 uv = Remap(averageEv, MinEv, MaxEv);
-		averageEv -= ExposureTexture.SampleLevel(_LinearClampSampler, float2(uv.x, 0.5), 0.0);
+	float2 uv = Remap(averageEv, MinEv, MaxEv);
+	averageEv -= ExposureTexture.SampleLevel(_LinearClampSampler, float2(uv.x, 0.5), 0.0);
 		
-		float evLastFrame = ExposureToEV100(_Exposure);
-		float adaptedEv = lerp(averageEv, evLastFrame, exp(-DeltaTime * AdaptationSpeed));
+	float evLastFrame = ExposureToEV100(_Exposure);
+	float adaptedEv = lerp(averageEv, evLastFrame, exp(-DeltaTime * AdaptationSpeed));
 		
-		if (IsInfOrNaN(evLastFrame))
-			adaptedEv = averageEv;
+	if (IsInfOrNaN(evLastFrame))
+		adaptedEv = averageEv;
 
-		//adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
+	//adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
 		
-		if (IsInfOrNaN(adaptedEv))
-			adaptedEv = 1.0;
+	if (IsInfOrNaN(adaptedEv))
+		adaptedEv = 1.0;
 		
-		LuminanceOutput[0] = EV100ToExposure(adaptedEv);
-	}
+	LuminanceOutput[0] = EV100ToExposure(adaptedEv);
 }

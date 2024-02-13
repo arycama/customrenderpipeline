@@ -16,57 +16,61 @@ public class LitData
         [field: SerializeField] public uint DirectionalAlbedoMSamples { get; private set; } = 4096;
         [field: SerializeField] public int AverageAlbedoMsResolution { get; private set; } = 16;
         [field: SerializeField] public uint AverageAlbedoMsSamples { get; private set; } = 4096;
+
+        public int Version { get; private set; }
     }
 
     private Settings settings;
     private RenderGraph renderGraph;
 
-    private RenderTexture directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
+    private RTHandle directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
     private Texture2D ltcData;
+
+    private int version = -1;
 
     public LitData(Settings settings, RenderGraph renderGraph)
     {
         this.settings = settings;
         this.renderGraph = renderGraph;
 
-        directionalAlbedo = new RenderTexture(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution, 0, RenderTextureFormat.RG32, RenderTextureReadWrite.Linear)
+        directionalAlbedo = renderGraph.ImportRenderTexture(new RenderTexture(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution, 0, RenderTextureFormat.RG32, RenderTextureReadWrite.Linear)
         {
             enableRandomWrite = true,
             hideFlags = HideFlags.HideAndDontSave,
             name = "GGX Directional Albedo"
-        }.Created();
+        }.Created());
 
-        averageAlbedo = new RenderTexture(settings.AverageAlbedoResolution, 1, 0, RenderTextureFormat.R16, RenderTextureReadWrite.Linear)
+        averageAlbedo = renderGraph.ImportRenderTexture(new RenderTexture(settings.AverageAlbedoResolution, 1, 0, RenderTextureFormat.R16, RenderTextureReadWrite.Linear)
         {
             enableRandomWrite = true,
             hideFlags = HideFlags.HideAndDontSave,
             name = "GGX Average Albedo"
-        }.Created();
+        }.Created());
 
-        directionalAlbedoMs = new RenderTexture(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, 0, RenderTextureFormat.R16, RenderTextureReadWrite.Linear)
+        directionalAlbedoMs = renderGraph.ImportRenderTexture(new RenderTexture(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, 0, RenderTextureFormat.R16, RenderTextureReadWrite.Linear)
         {
             dimension = TextureDimension.Tex3D,
             enableRandomWrite = true,
             hideFlags = HideFlags.HideAndDontSave,
             name = "GGX Directional Albedo MS",
             volumeDepth = settings.DirectionalAlbedoMsResolution
-        }.Created();
+        }.Created());
 
-        averageAlbedoMs = new RenderTexture(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution, 0, RenderTextureFormat.R16, RenderTextureReadWrite.Linear)
+        averageAlbedoMs = renderGraph.ImportRenderTexture(new RenderTexture(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution, 0, RenderTextureFormat.R16, RenderTextureReadWrite.Linear)
         {
             enableRandomWrite = true,
             hideFlags = HideFlags.HideAndDontSave,
             name = "GGX Average Albedo MS"
-        }.Created();
+        }.Created());
 
-        specularOcclusion = new RenderTexture(32, 32, 0, RenderTextureFormat.R16)
+        specularOcclusion = renderGraph.ImportRenderTexture(new RenderTexture(32, 32, 0, RenderTextureFormat.R16)
         {
             dimension = TextureDimension.Tex3D,
             enableRandomWrite = true,
             hideFlags = HideFlags.HideAndDontSave,
             name = "GGX Specular Occlusion",
             volumeDepth = 32 * 32
-        }.Created();
+        }.Created());
 
         ltcData = new Texture2D(k_LtcLUTResolution, k_LtcLUTResolution, TextureFormat.RGBAHalf, false /*mipmap*/, true /* linear */)
         {
@@ -94,68 +98,144 @@ public class LitData
         ltcData.Apply();
     }
 
-    public void Render()
+    public IRenderPassData Render()
     {
         var computeShader = Resources.Load<ComputeShader>("LitData");
-        using (var renderPass = renderGraph.AddRenderPass<GlobalRenderPass>("Lit Data"))
+
+        var ggxDirectionalAlbedoRemap = GraphicsUtilities.HalfTexelRemap(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution);
+        var ggxAverageAlbedoRemap = GraphicsUtilities.HalfTexelRemap(settings.AverageAlbedoResolution);
+        var ggxDirectionalAlbedoMSScaleOffset = GraphicsUtilities.HalfTexelRemap(settings.DirectionalAlbedoMsResolution);
+        var ggxAverageAlbedoMSRemap = GraphicsUtilities.HalfTexelRemap(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution);
+
+        var result = new Result
+        (
+            directionalAlbedo: directionalAlbedo,
+            averageAlbedo: averageAlbedo,
+            directionalAlbedoMs: directionalAlbedoMs,
+            averageAlbedoMs: averageAlbedoMs,
+            specularOcclusion: specularOcclusion,
+            ggxDirectionalAlbedoRemap: ggxDirectionalAlbedoRemap,
+            ggxAverageAlbedoRemap: ggxAverageAlbedoRemap,
+            ggxDirectionalAlbedoMSScaleOffset: ggxDirectionalAlbedoMSScaleOffset,
+            ggxAverageAlbedoMSRemap: ggxAverageAlbedoMSRemap
+        );
+
+        if (version == settings.Version)
+            return result;
+
+        version = settings.Version;
+
+        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Directional Albedo"))
         {
-            var data = renderPass.SetRenderFunction<PassData>((command, context, renderPass, data) =>
+            pass.Initialize(computeShader, 0, settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution);
+            pass.WriteTexture("_DirectionalAlbedoResult", directionalAlbedo);
+
+            var data = pass.SetRenderFunction<PassData>((command, context, renderPass, data) =>
             {
-                var directionalAlbedoScaleOffset = GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution);
-                var directionalAlbedoSamples = settings.DirectionalAlbedoSamples;
-                var directionalAlbedoSamplesRcp = 1f / settings.DirectionalAlbedoSamples;
-                var directionalAlbedoRemap = GraphicsUtilities.HalfTexelRemap(settings.AverageAlbedoResolution, settings.AverageAlbedoResolution);
-                var averageAlbedoRemap  = GraphicsUtilities.HalfTexelRemap(settings.AverageAlbedoResolution);
-                var averageAlbedoScaleOffset = 1f / settings.AverageAlbedoResolution;
-                var averageAlbedoSamples = settings.AverageAlbedoSamples;
-                var averageAlbedoSamplesRcp = 1f / settings.AverageAlbedoSamples;
-                var averageAlbedoSamplesMinusOneRcp = 1f / (settings.AverageAlbedoSamples - 1);
-                var directionalAlbedoMsSamples = settings.DirectionalAlbedoMSamples;
-                var directionalAlbedoMsSamplesRcp  = 1f / settings.DirectionalAlbedoMSamples;
-                var directionalAlbedoMsScaleOffset = GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution);
-                var averageAlbedoMsSamples = settings.AverageAlbedoMsSamples;
-                var averageAlbedoMsSamplesRcp = 1f / settings.AverageAlbedoMsSamples;
-                var averageAlbedoMsScaleOffset = GraphicsUtilities.ThreadIdScaleOffset01(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution);
-                var averageAlbedoMsSamplesMinusOneRcp= 1f / (settings.AverageAlbedoMsSamples - 1);
-
-                var ggxDirectionalAlbedoRemap = GraphicsUtilities.HalfTexelRemap(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution);
-                var ggxAverageAlbedoRemap = GraphicsUtilities.HalfTexelRemap(settings.AverageAlbedoResolution);
-                var ggxDirectionalAlbedoMSScaleOffset = GraphicsUtilities.HalfTexelRemap(settings.DirectionalAlbedoMsResolution);
-                var ggxAverageAlbedoMSRemap = GraphicsUtilities.HalfTexelRemap(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution);
-
-                command.SetComputeTextureParam(computeShader, 0, "_DirectionalAlbedoResult", directionalAlbedo);
-                command.DispatchNormalized(computeShader, 0, settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution, 1);
-                command.SetGlobalTexture("_GGXDirectionalAlbedo", directionalAlbedo);
-
-                command.SetComputeTextureParam(computeShader, 1, "_AverageAlbedoResult", averageAlbedo);
-                command.DispatchNormalized(computeShader, 1, settings.AverageAlbedoResolution, 1, 1);
-                command.SetGlobalTexture("_GGXAverageAlbedo", averageAlbedo);
-
-                command.SetComputeTextureParam(computeShader, 2, "_DirectionalAlbedoMsResult", directionalAlbedoMs);
-                command.DispatchNormalized(computeShader, 2, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution);
-                command.SetGlobalTexture("_GGXDirectionalAlbedoMS", directionalAlbedoMs);
-
-                command.SetComputeTextureParam(computeShader, 3, "_AverageAlbedoMsResult", averageAlbedoMs);
-                command.DispatchNormalized(computeShader, 3, settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution, 1);
-                command.SetGlobalTexture("_GGXAverageAlbedoMS", averageAlbedoMs);
-
-                // Specular occlusion
-                command.SetComputeTextureParam(computeShader, 4, "_SpecularOcclusionResult", specularOcclusion);
-                command.SetComputeIntParam(computeShader, "_SpecularOcclusionResolution", 32);
-                command.DispatchNormalized(computeShader, 4, 32, 32, 32 * 32);
-                command.SetGlobalTexture("_GGXSpecularOcclusion", specularOcclusion);
+                pass.SetVector(command, "_DirectionalAlbedoScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution));
+                pass.SetInt(command, "_DirectionalAlbedoSamples", (int)settings.DirectionalAlbedoSamples);
+                pass.SetFloat(command, "_DirectionalAlbedoSamplesRcp", 1f / settings.DirectionalAlbedoSamples);
             });
         }
+
+        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Average Albedo"))
+        {
+            pass.Initialize(computeShader, 1, settings.AverageAlbedoResolution);
+            pass.WriteTexture("_AverageAlbedoResult", averageAlbedo);
+            result.SetInputs(pass);
+
+            var data = pass.SetRenderFunction<PassData>((command, context, renderPass, data) =>
+            {
+                pass.SetFloat(command, "_AverageAlbedoScaleOffset", 1f / settings.AverageAlbedoResolution);
+                pass.SetInt(command, "_AverageAlbedoSamples", (int)settings.AverageAlbedoSamples);
+                pass.SetFloat(command, "_AverageAlbedoSamplesRcp", 1f / settings.AverageAlbedoSamples);
+                pass.SetFloat(command, "_AverageAlbedoSamplesMinusOneRcp", 1f / (settings.AverageAlbedoSamples - 1));
+                result.SetProperties(pass, command);
+            });
+        }
+
+        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Directional Albedo Ms"))
+        {
+            pass.Initialize(computeShader, 2, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution);
+            pass.WriteTexture("_DirectionalAlbedoMsResult", directionalAlbedoMs);
+            result.SetInputs(pass);
+
+            var data = pass.SetRenderFunction<PassData>((command, context, renderPass, data) =>
+            {
+                pass.SetVector(command, "_DirectionalAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution));
+                pass.SetInt(command, "_DirectionalAlbedoMsSamples", (int)settings.DirectionalAlbedoMSamples);
+                pass.SetFloat(command, "_DirectionalAlbedoMsSamplesRcp", 1f / settings.DirectionalAlbedoMSamples);
+                result.SetProperties(pass, command);
+            });
+        }
+
+        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Average Albedo Ms"))
+        {
+            pass.Initialize(computeShader, 3, settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution);
+            pass.WriteTexture("_AverageAlbedoMsResult", averageAlbedoMs);
+            result.SetInputs(pass);
+
+            var data = pass.SetRenderFunction<PassData>((command, context, renderPass, data) =>
+            {
+                pass.SetVector(command, "_AverageAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution));
+                pass.SetInt(command, "_AverageAlbedoMsSamples", (int)settings.AverageAlbedoMsSamples);
+                pass.SetFloat(command, "_AverageAlbedoMsSamplesRcp", 1f / settings.AverageAlbedoMsSamples);
+                pass.SetFloat(command, "_AverageAlbedoMsSamplesMinusOneRcp", 1f / (settings.AverageAlbedoMsSamples - 1));
+                result.SetProperties(pass, command);
+            });
+        }
+
+        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Specular Occlusion"))
+        {
+            pass.Initialize(computeShader, 4, 32, 32, 32 * 32);
+            pass.WriteTexture("_SpecularOcclusionResult", specularOcclusion);
+            result.SetInputs(pass);
+
+            var data = pass.SetRenderFunction<PassData>((command, context, renderPass, data) =>
+            {
+                // Specular occlusion
+                pass.SetInt(command, "_SpecularOcclusionResolution", 32);
+                result.SetProperties(pass, command);
+            });
+        }
+
+        return result;
     }
 
     public struct Result : IRenderPassData
     {
+        private RTHandle directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
+        private Vector4 ggxDirectionalAlbedoRemap, ggxAverageAlbedoMSRemap;
+        private Vector2 ggxAverageAlbedoRemap, ggxDirectionalAlbedoMSScaleOffset;
+
+        public Result(RTHandle directionalAlbedo, RTHandle averageAlbedo, RTHandle directionalAlbedoMs, RTHandle averageAlbedoMs, RTHandle specularOcclusion, Vector4 ggxDirectionalAlbedoRemap, Vector4 ggxAverageAlbedoMSRemap, Vector2 ggxAverageAlbedoRemap, Vector2 ggxDirectionalAlbedoMSScaleOffset)
+        {
+            this.directionalAlbedo = directionalAlbedo;
+            this.averageAlbedo = averageAlbedo;
+            this.directionalAlbedoMs = directionalAlbedoMs;
+            this.averageAlbedoMs = averageAlbedoMs;
+            this.specularOcclusion = specularOcclusion;
+            this.ggxDirectionalAlbedoRemap = ggxDirectionalAlbedoRemap;
+            this.ggxAverageAlbedoMSRemap = ggxAverageAlbedoMSRemap;
+            this.ggxAverageAlbedoRemap = ggxAverageAlbedoRemap;
+            this.ggxDirectionalAlbedoMSScaleOffset = ggxDirectionalAlbedoMSScaleOffset;
+        }
+
         public void SetInputs(RenderPass pass)
         {
+            pass.ReadTexture("_GGXDirectionalAlbedo", directionalAlbedo);
+            pass.ReadTexture("_GGXAverageAlbedo", averageAlbedo);
+            pass.ReadTexture("_GGXDirectionalAlbedoMS", directionalAlbedoMs);
+            pass.ReadTexture("_GGXAverageAlbedoMS", averageAlbedoMs);
+            pass.ReadTexture("_GGXSpecularOcclusion", specularOcclusion);
         }
 
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
+            pass.SetVector(command, "_GGXDirectionalAlbedoRemap", ggxDirectionalAlbedoRemap);
+            pass.SetVector(command, "_GGXAverageAlbedoRemap", ggxAverageAlbedoRemap);
+            pass.SetVector(command, "_GGXDirectionalAlbedoMSScaleOffset", ggxDirectionalAlbedoMSScaleOffset);
+            pass.SetVector(command, "_GGXAverageAlbedoMSRemap", ggxAverageAlbedoMSRemap);
         }
     }
 

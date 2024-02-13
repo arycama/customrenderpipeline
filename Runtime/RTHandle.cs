@@ -29,21 +29,6 @@ public class RTHandle
         return rtHandle.RenderTexture;
     }
 
-    public static implicit operator RTHandle(RenderTexture renderTexture)
-    {
-        return new RTHandle()
-        {
-            Width = renderTexture.width,
-            Height = renderTexture.height,
-            Format = renderTexture.graphicsFormat,
-            EnableRandomWrite = renderTexture.enableRandomWrite,
-            VolumeDepth = renderTexture.volumeDepth,
-            Dimension = renderTexture.dimension,
-            RenderTexture = renderTexture,
-            HasMips = renderTexture.useMipMap
-        };
-    }
-
     public override string ToString()
     {
         return $"RTHandle {Id} {Dimension} {Format} {Width}x{Height} ";

@@ -318,13 +318,24 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        public RTHandle ImportRenderTexture(RenderTexture texture)
+        public RTHandle ImportRenderTexture(RenderTexture renderTexture)
         {
-            if (!importedTextures.TryGetValue(texture, out var result))
+            if (!importedTextures.TryGetValue(renderTexture, out var result))
             {
-                result = (RTHandle)texture;
+                result = new RTHandle()
+                {
+                    Width = renderTexture.width,
+                    Height = renderTexture.height,
+                    Format = renderTexture.graphicsFormat,
+                    EnableRandomWrite = renderTexture.enableRandomWrite,
+                    VolumeDepth = renderTexture.volumeDepth,
+                    Dimension = renderTexture.dimension,
+                    RenderTexture = renderTexture,
+                    HasMips = renderTexture.useMipMap
+                };
+
                 result.Id = rtHandleCount++;
-                importedTextures.Add(texture, result);
+                importedTextures.Add(renderTexture, result);
                 result.IsImported = true;
                 result.IsScreenTexture = false;
             }

@@ -1,4 +1,4 @@
-#include "../Common.hlsl"
+#include "../Lighting.hlsl"
 
 #pragma kernel DirectionalAlbedo
 #pragma kernel AverageAlbedo
@@ -29,124 +29,6 @@ uint _AverageAlbedoMsSamples;
 float _AverageAlbedoMsSamplesRcp;
 float2 _AverageAlbedoMsScaleOffset;
 float _AverageAlbedoMsSamplesMinusOneRcp;
-
-Texture3D<float> _GGXDirectionalAlbedoMS;
-Texture2D<float2> _GGXDirectionalAlbedo;
-Texture2D<float> _GGXAverageAlbedo, _GGXAverageAlbedoMS;
-
-cbuffer GGXLookupConstants
-{
-	float4 _GGXDirectionalAlbedoRemap;
-	float2 _GGXAverageAlbedoRemap;
-	float2 _GGXDirectionalAlbedoMSScaleOffset;
-	float4 _GGXAverageAlbedoMSRemap;
-};
-
-float2 GGXDirectionalAlbedo(float NdotV, float perceptualRoughness)
-{
-	float2 uv = float2(sqrt(NdotV), perceptualRoughness) * _GGXDirectionalAlbedoRemap.xy + _GGXDirectionalAlbedoRemap.zw;
-	return _GGXDirectionalAlbedo.SampleLevel(_LinearClampSampler, uv, 0);
-}
-
-float GGXAverageAlbedo(float perceptualRoughness)
-{
-	float2 averageUv = float2(perceptualRoughness * _GGXAverageAlbedoRemap.x + _GGXAverageAlbedoRemap.y, 0.0);
-	return _GGXAverageAlbedo.SampleLevel(_LinearClampSampler, averageUv, 0.0);
-}
-
-float GGXDirectionalAlbedoMS(float NdotV, float perceptualRoughness, float f0)
-{
-	float3 uv = float3(sqrt(NdotV), perceptualRoughness, f0) * _GGXDirectionalAlbedoMSScaleOffset.x + _GGXDirectionalAlbedoMSScaleOffset.y;
-	return _GGXDirectionalAlbedoMS.SampleLevel(_LinearClampSampler, uv, 0.0);
-}
-
-float GGXAverageAlbedoMS(float perceptualRoughness, float f0)
-{
-	float2 uv = float2(perceptualRoughness, f0) * _GGXAverageAlbedoMSRemap.xy + _GGXAverageAlbedoMSRemap.zw;
-	return _GGXAverageAlbedoMS.SampleLevel(_LinearClampSampler, uv, 0.0);
-}
-
-void SampleGGXDir(float2 u, float3 V, float3x3 localToWorld, float roughness, out float3 L, out float NdotL, out float NdotH, out float VdotH, bool VeqN = false)
-{
-    // GGX NDF sampling
-	float cosTheta = sqrt(SafeDiv(1.0 - u.x, 1.0 + (roughness * roughness - 1.0) * u.x));
-	float phi = TwoPi * u.y;
-
-	float3 localH = SphericalToCartesian(phi, cosTheta);
-
-	NdotH = cosTheta;
-
-	float3 localV;
-
-	if (VeqN)
-	{
-        // localV == localN
-		localV = float3(0.0, 0.0, 1.0);
-		VdotH = NdotH;
-	}
-	else
-	{
-		localV = mul(V, transpose(localToWorld));
-		VdotH = saturate(dot(localV, localH));
-	}
-
-    // Compute { localL = reflect(-localV, localH) }
-	float3 localL = -localV + 2.0 * VdotH * localH;
-	NdotL = localL.z;
-
-	L = mul(localL, localToWorld);
-}
-
-// Note: V = G / (4 * NdotL * NdotV)
-// Ref: http://jcgt.org/published/0003/02/03/paper.pdf
-float V_SmithJointGGX(float NdotL, float NdotV, float roughness, float partLambdaV)
-{
-	float a2 = Sq(roughness);
-
-    // Original formulation:
-    // lambda_v = (-1 + sqrt(a2 * (1 - NdotL2) / NdotL2 + 1)) * 0.5
-    // lambda_l = (-1 + sqrt(a2 * (1 - NdotV2) / NdotV2 + 1)) * 0.5
-    // G        = 1 / (1 + lambda_v + lambda_l);
-
-    // Reorder code to be more optimal:
-	float lambdaV = NdotL * partLambdaV;
-	float lambdaL = NdotV * sqrt((-NdotL * a2 + NdotL) * NdotL + a2);
-
-    // Simplify visibility term: (2.0 * NdotL * NdotV) /  ((4.0 * NdotL * NdotV) * (lambda_v + lambda_l))
-	return 0.5 / max(lambdaV + lambdaL, FloatMin);
-}
-
-// Precompute part of lambdaV
-float GetSmithJointGGXPartLambdaV(float NdotV, float roughness)
-{
-	float a2 = Sq(roughness);
-	return sqrt((-NdotV * a2 + NdotV) * NdotV + a2);
-}
-
-float V_SmithJointGGX(float NdotL, float NdotV, float roughness)
-{
-	float partLambdaV = GetSmithJointGGXPartLambdaV(NdotV, roughness);
-	return V_SmithJointGGX(NdotL, NdotV, roughness, partLambdaV);
-}
-
-// weightOverPdf return the weight (without the Fresnel term) over pdf. Fresnel term must be apply by the caller.
-void ImportanceSampleGGX(float2 u, float3 V, float3x3 localToWorld, float roughness, float NdotV, out float3 L, out float VdotH, out float NdotL, out float weightOverPdf)
-{
-	float NdotH;
-	SampleGGXDir(u, V, localToWorld, roughness, L, NdotL, NdotH, VdotH);
-
-    // Importance sampling weight for each sample
-    // pdf = D(H) * (N.H) / (4 * (L.H))
-    // weight = fr * (N.L) with fr = F(H) * G(V, L) * D(H) / (4 * (N.L) * (N.V))
-    // weight over pdf is:
-    // weightOverPdf = F(H) * G(V, L) * (L.H) / ((N.H) * (N.V))
-    // weightOverPdf = F(H) * 4 * (N.L) * V(V, L) * (L.H) / (N.H) with V(V, L) = G(V, L) / (4 * (N.L) * (N.V))
-    // Remind (L.H) == (V.H)
-    // F is apply outside the function
-
-	float Vis = V_SmithJointGGX(NdotL, NdotV, roughness);
-	weightOverPdf = 4.0 * Vis * NdotL * VdotH / NdotH;
-}
 
 [numthreads(8, 8, 1)]
 void DirectionalAlbedo(uint2 id : SV_DispatchThreadID)
@@ -185,47 +67,10 @@ void AverageAlbedo(uint2 id : SV_DispatchThreadID)
 	for (uint i = 0.0; i < _AverageAlbedoSamples; i++)
 	{
 		float NdotV = i * _AverageAlbedoSamplesMinusOneRcp;
-		result += GGXDirectionalAlbedo(NdotV, perceptualRoughness).g * NdotV;
+		result += DirectionalAlbedo(NdotV, perceptualRoughness).g * NdotV;
 	}
 
 	_AverageAlbedoResult[id] = 2.0 * result * _AverageAlbedoSamplesRcp;
-}
-
-// Variant with float3 for f90
-float3 F_Schlick(float3 f0, float u)
-{
-	float x = 1.0 - u;
-	float x2 = x * x;
-	float x5 = x * x2 * x2;
-	return f0 * (1.0 - x5) + (1.0 * x5); // sub mul mul mul sub mul mad*3
-}
-
-float D_GGXNoPI(float NdotH, float roughness)
-{
-	float a2 = Sq(roughness);
-	float s = (NdotH * a2 - NdotH) * NdotH + 1.0;
-
-    // If roughness is 0, returns (NdotH == 1 ? 1 : 0).
-    // That is, it returns 1 for perfect mirror reflection, and 0 otherwise.
-	return SafeDiv(a2, s * s);
-}
-
-float D_GGX(float NdotH, float roughness)
-{
-	return RcpPi * D_GGXNoPI(NdotH, roughness);
-}
-
-float3 GGXMultiScatter(float NdotV, float NdotL, float perceptualRoughness, float3 f0)
-{
-	float Ewi = GGXDirectionalAlbedo(NdotV, perceptualRoughness).g;
-	float Ewo = GGXDirectionalAlbedo(NdotL, perceptualRoughness).g;
-	float Eavg = GGXAverageAlbedo(perceptualRoughness);
-
-	float ms = RcpPi * (1.0 - Ewi) * (1.0 - Ewo) * rcp(max(HalfEps, 1.0 - Eavg));
-
-	float3 FAvg = AverageFresnel(f0);
-	float3 f = Sq(FAvg) * Eavg * rcp(max(HalfEps, 1.0 - FAvg * (1.0 - Eavg)));
-	return ms * f;
 }
 
 [numthreads(8, 8, 8)]
@@ -277,7 +122,7 @@ void AverageAlbedoMs(uint2 id : SV_DispatchThreadID)
 	for (uint i = 0.0; i < _AverageAlbedoMsSamples; i++)
 	{
 		float NdotV = i * _AverageAlbedoMsSamplesMinusOneRcp;
-		result += GGXDirectionalAlbedoMS(NdotV, perceptualRoughness, f0) * NdotV;
+		result += DirectionalAlbedoMs(NdotV, perceptualRoughness, f0) * NdotV;
 	}
 
 	_AverageAlbedoMsResult[id] = 2.0 * result * _AverageAlbedoMsSamplesRcp;

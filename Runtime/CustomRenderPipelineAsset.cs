@@ -38,5 +38,10 @@ namespace Arycama.CustomRenderPipeline
         {
             //base.OnValidate();
         }
+
+        public void ReloadRenderPipeline()
+        {
+            base.OnValidate();
+        }
     }
 }

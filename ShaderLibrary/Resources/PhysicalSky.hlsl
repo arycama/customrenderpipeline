@@ -8,7 +8,6 @@ float4 _ScaleOffset;
 float3 _GroundColor;
 float4 _MultiScatterRemap, _MultiScatter_Scale;
 Texture2D<float3> _MultiScatter;
-TextureCube<float3> _SkyReflection;
 
 float4 Vertex(uint id : SV_VertexID) : SV_Position
 {

@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEditor;
+using UnityEngine.Rendering;
+using Arycama.CustomRenderPipeline;
 
 public class UpdatePipelineMaterials
 {
@@ -30,5 +32,12 @@ public class UpdatePipelineMaterials
 
         EditorUtility.ClearProgressBar();
         Debug.Log($"Updated {count} materials");
+    }
+
+    [MenuItem("Tools/Reload Render Pipeline")]
+    public static void OnReloadRenderPipelineSelected()
+    {
+        if (GraphicsSettings.defaultRenderPipeline is CustomRenderPipelineAsset customRenderPipelineAsset)
+            customRenderPipelineAsset.ReloadRenderPipeline();
     }
 }
