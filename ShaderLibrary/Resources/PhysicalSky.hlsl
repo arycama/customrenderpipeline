@@ -8,6 +8,7 @@ float4 _ScaleOffset;
 float3 _GroundColor;
 float4 _MultiScatterRemap, _MultiScatter_Scale;
 Texture2D<float3> _MultiScatter;
+Texture2D<float> _Depth;
 
 float4 Vertex(uint id : SV_VertexID) : SV_Position
 {
@@ -76,18 +77,25 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
 	
 	#ifdef REFLECTION_PROBE
-		float3 V = -MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
+		float3 V = MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
 	#else
-		float3 V = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+		float3 V = MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
 	#endif
-
-	float viewCosAngle = V.y;
+	
+	float viewCosAngle = -V.y;
 	bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
 	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
 	
+	#ifdef SCENE_RENDER
+		float depth = _Depth[position.xy];
+		rayIntersectsGround = false;
+		rayLength = LinearEyeDepth(depth) * rcp(dot(V, -_CameraForward));
+	#endif
+	
+	float offset = _BlueNoise1D[position.xy % 128];
 	float dt = rayLength / _Samples;
 	float3 luminance = 0.0;
-	for (float i = 0.5; i < _Samples; i++)
+	for (float i = offset; i < _Samples; i++)
 	{
 		float currentDistance = i * dt;
 		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, currentDistance);
@@ -98,11 +106,19 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		{
 			DirectionalLight light = _DirectionalLights[j];
 		
-			float LdotV = dot(light.direction, V);
+			float LdotV = dot(light.direction, -V);
 			float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, light.direction.y, currentDistance * LdotV, heightAtDistance);
 			
 			if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
-				lighting += AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color;
+			{
+				float3 transmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
+				if(any(transmittance))
+				{
+					float shadow = GetShadow(-V * currentDistance, j, false);
+					if (shadow)
+						lighting += transmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * shadow;
+				}
+			}
 				
 			float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
 			float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv * _MultiScatter_Scale.xy, 0.0);
@@ -122,7 +138,7 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		{
 			DirectionalLight light = _DirectionalLights[j];
 			
-			float LdotV = dot(light.direction, V);
+			float LdotV = dot(light.direction, -V);
 			float lightCosAngle = light.direction.y;
 			
 			float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, _PlanetRadius);

@@ -1,19 +1,21 @@
 #ifndef ATMOSPHERE_INCLUDED
 #define ATMOSPHERE_INCLUDED
 
-const static float _PlanetRadius = 6360000.0;
-const static float _AtmosphereHeight = 100000.0;
+const static float _EarthScale = 0.1;
+
+const static float _PlanetRadius = 6360000.0 * _EarthScale;
+const static float _AtmosphereHeight = 100000.0 * _EarthScale;
 const static float _TopRadius = _PlanetRadius + _AtmosphereHeight;
 
-const static float _RayleighHeight = 8000.0;
-const static float _MieHeight = 1200.0;
-const static float _OzoneWidth = 15000.0;
-const static float _OzoneHeight = 25000.0;
+const static float _RayleighHeight = 8000.0 * _EarthScale;
+const static float _MieHeight = 1200.0 * _EarthScale;
+const static float _OzoneWidth = 15000.0 * _EarthScale;
+const static float _OzoneHeight = 25000.0 * _EarthScale;
 
-const static float3 _RayleighScatter = float3(5.802, 13.558, 33.1) * 1e-6;
-const static float _MieScatter = 3.996e-6;
-const static float _MieAbsorption = 4.4e-6;
-const static float3 _OzoneAbsorption = float3(0.650, 1.811, 0.085) * 1e-6;
+const static float3 _RayleighScatter = float3(5.802, 13.558, 33.1) * 1e-6 * rcp(_EarthScale);
+const static float _MieScatter = 3.996e-6 * rcp(_EarthScale);
+const static float _MieAbsorption = 4.4e-6 * rcp(_EarthScale);
+const static float3 _OzoneAbsorption = float3(0.650, 1.811, 0.085) * 1e-6 * rcp(_EarthScale);
 const static float _MiePhase = 0.8;
 
 Texture2D<float3> _Transmittance;

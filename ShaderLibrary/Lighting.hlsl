@@ -565,4 +565,20 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	return luminance;
 }
 
+float3 ApplyFog(float3 color, float2 pixelPosition, float eyeDepth, float3 worldPosition)
+{
+	float3 V = normalize(-worldPosition);
+	float viewHeight = _ViewPosition.y + _PlanetRadius;
+	float viewCosAngle = -V.y;
+	float currentDistance = length(worldPosition);
+	float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, currentDistance);
+	float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, currentDistance, heightAtDistance);
+	float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
+	color *= transmittance;
+	
+	// Also apply atmospheric transmittance here
+	float4 volumetricLighting = SampleVolumetricLighting(pixelPosition, eyeDepth);
+	return color * volumetricLighting.a + volumetricLighting.rgb;
+}
+
 #endif

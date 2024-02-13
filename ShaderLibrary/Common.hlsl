@@ -56,6 +56,8 @@ cbuffer FrameData
 	
 	float _BlockerRadius, _ClusterBias, _ClusterScale, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _NonLinearDepth, _AoEnabled;
 	uint _BlockerSamples, _DirectionalLightCount, _PcfSamples, _PointLightCount, _TileSize;
+	
+	float _InPlayMode;
 };
 
 cbuffer CameraData
@@ -234,7 +236,7 @@ float3 ObjectToWorld(float3 position, uint instanceID)
 
 float3 PreviousObjectToWorld(float3 position)
 {
-	float3x4 previousObjectToWorld = unity_MatrixPreviousM;
+	float3x4 previousObjectToWorld = _InPlayMode ? unity_MatrixPreviousM : unity_ObjectToWorld;
 	previousObjectToWorld._m03_m13_m23 -= _ViewPosition;
 	return MultiplyPoint3x4(previousObjectToWorld, position);
 }
@@ -448,12 +450,6 @@ float4 SampleVolumetricLighting(float2 pixelPosition, float eyeDepth)
 
 bool1 IsInfOrNaN(float1 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
 bool3 IsInfOrNaN(float3 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
-
-float3 ApplyFog(float3 color, float2 pixelPosition, float eyeDepth)
-{
-	float4 volumetricLighting = SampleVolumetricLighting(pixelPosition, eyeDepth);
-	return color * volumetricLighting.a + volumetricLighting.rgb;
-}
 
 float2 UnjitterTextureUV(float2 uv)
 {

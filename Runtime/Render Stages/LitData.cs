@@ -2,8 +2,9 @@
 using System;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Object = UnityEngine.Object;
 
-public class LitData
+public class LitData : IDisposable
 {
     [Serializable]
     public class Settings
@@ -4347,8 +4348,46 @@ public class LitData
         {0.623254, 0, -0.074271, 0, 0.630556, 0, 0.058888, 0, 1},
         {0.609037, 0, -0.053470, 0, 0.607151, 0, 0.031450, 0, 1}
     };
+    private bool disposedValue;
 
     private class PassData
     {
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (!disposedValue)
+        {
+            if (disposing)
+            {
+                // TODO: dispose managed state (managed objects)
+            }
+
+            // TODO: free unmanaged resources (unmanaged objects) and override finalizer
+            // TODO: set large fields to null
+            disposedValue = true;
+        }
+    }
+
+    // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
+    ~LitData()
+    {
+        renderGraph.ReleaseImportedTexture(directionalAlbedo);
+        renderGraph.ReleaseImportedTexture(averageAlbedo);
+        renderGraph.ReleaseImportedTexture(directionalAlbedoMs);
+        renderGraph.ReleaseImportedTexture(averageAlbedoMs);
+        renderGraph.ReleaseImportedTexture(specularOcclusion);
+
+        Object.DestroyImmediate(ltcData);
+
+        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        Dispose(disposing: false);
+    }
+
+    public void Dispose()
+    {
+        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+        Dispose(disposing: true);
+        GC.SuppressFinalize(this);
     }
 }

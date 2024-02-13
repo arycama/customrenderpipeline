@@ -56,7 +56,7 @@ namespace Arycama.CustomRenderPipeline
 
             // Compose the matrix.
             var m11 = -2f / height * tanHalfVertFoV;
-            var m21 = (1f + jitter.y) * tanHalfVertFoV;
+            var m21 = (1f - jitter.y) * tanHalfVertFoV;
 
             if (flip)
             {

@@ -1,6 +1,5 @@
 using System;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -9,19 +8,15 @@ namespace Arycama.CustomRenderPipeline
         [Serializable]
         public class Settings
         {
-            [SerializeField, Range(1, 32)] private int sampleCount = 8;
-            [SerializeField, Range(0.0f, 1f)] private float jitterSpread = 0.75f;
-            [SerializeField, Range(0f, 1f)] private float sharpness = 0.5f;
-            [SerializeField, Range(0f, 0.99f)] private float stationaryBlending = 0.95f;
-            [SerializeField, Range(0f, 0.99f)] private float motionBlending = 0.85f;
-            [SerializeField] private float motionWeight = 6000f;
+            [field: SerializeField, Range(1, 32)] public int SampleCount { get; private set; } = 8;
+            [field: SerializeField, Range(0.0f, 1f)] public float JitterSpread { get; private set; } = 1.0f;
+            [field: SerializeField, Range(0f, 1f)] public float Sharpness { get; private set; } = 0.5f;
+            [field: SerializeField, Range(0f, 0.99f)] public float StationaryBlending { get; private set; } = 0.95f;
+            [field: SerializeField, Range(0f, 0.99f)] public float MotionBlending { get; private set; } = 0.85f;
+            [field: SerializeField] public float MotionWeight { get; private set; } = 6000f;
 
-            public int SampleCount => sampleCount;
-            public float JitterSpread => jitterSpread;
-            public float Sharpness => sharpness;
-            public float StationaryBlending => stationaryBlending;
-            public float MotionBlending => motionBlending;
-            public float MotionWeight => motionWeight;
+            [field: SerializeField] public bool JitterOverride { get; private set; } = false;
+            [field: SerializeField] public Vector2 JitterOverrideValue { get; private set; } = Vector2.zero;
         }
 
         private readonly Settings settings;
@@ -50,6 +45,9 @@ namespace Arycama.CustomRenderPipeline
             jitter.x = Halton(sampleIndex + 1, 2) - 0.5f;
             jitter.y = Halton(sampleIndex + 1, 3) - 0.5f;
             jitter *= settings.JitterSpread;
+
+            if(settings.JitterOverride)
+                jitter = settings.JitterOverrideValue;
 
             Jitter = jitter;
         }
