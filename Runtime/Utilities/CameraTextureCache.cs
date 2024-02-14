@@ -46,7 +46,7 @@ namespace Arycama.CustomRenderPipeline
                 textures.Item2.Resize(descriptor.width, descriptor.height, descriptor.volumeDepth);
 
                 // If already exists, swap textures
-                if ((Time.renderedFrameCount & 1) == 0)
+                if ((renderGraph.FrameCount & 1) == 0)
                     textures = (textures.Item2, textures.Item1);
 
                 wasCreated = false;

@@ -39,7 +39,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void OnPreRender()
         {
-            var sampleIndex = Time.renderedFrameCount % settings.SampleCount;
+            var sampleIndex = renderGraph.FrameCount % settings.SampleCount;
 
             Vector2 jitter;
             jitter.x = Halton(sampleIndex + 1, 2) - 0.5f;

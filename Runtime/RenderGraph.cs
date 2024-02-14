@@ -40,6 +40,9 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle EmptyTextureArray { get; }
         public RTHandle EmptyCubemapArray { get; }
 
+        public int FrameCount { get; set; }
+
+
         private int rtHandleCount;
         private int rtCount;
         private int screenWidth, screenHeight;
