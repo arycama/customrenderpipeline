@@ -11,9 +11,9 @@ namespace Arycama.CustomRenderPipeline
         {
             computeShader.GetKernelThreadGroupSizes(kernelIndex, out var x, out var y, out var z);
 
-            var threadGroupsX = (int)((threadsX - 1) / x) + 1;
-            var threadGroupsY = (int)((threadsY - 1) / y) + 1;
-            var threadGroupsZ = (int)((threadsZ - 1) / z) + 1;
+            var threadGroupsX = MathUtils.DivRoundUp(threadsX, (int)x);
+            var threadGroupsY = MathUtils.DivRoundUp(threadsY, (int)y);
+            var threadGroupsZ = MathUtils.DivRoundUp(threadsZ, (int)z);
 
             commandBuffer.DispatchCompute(computeShader, kernelIndex, threadGroupsX, threadGroupsY, threadGroupsZ);
         }

@@ -5,10 +5,8 @@
 matrix _PixelToWorldViewDir, _PixelToWorldViewDirs[6];
 uint _Samples;
 float4 _ScaleOffset;
-float3 _GroundColor;
-float4 _MultiScatterRemap, _MultiScatter_Scale;
-Texture2D<float3> _MultiScatter;
-Texture2D<float> _Depth;
+Texture2D<float> _Depth, _CloudDepth;
+Texture2D<float4> _Clouds;
 
 float4 Vertex(uint id : SV_VertexID) : SV_Position
 {
@@ -66,13 +64,13 @@ float3 FragmentTransmittanceLut(float4 position : SV_Position) : SV_Target
 	{
 		float currentDistance = i * dx;
 		float height = HeightAtDistance(viewHeight, cosAngle, currentDistance);
-		opticalDepth += AtmosphereOpticalDepth(height);
+		opticalDepth += AtmosphereExtinction(height);
 	}
 	
 	return exp(-opticalDepth * dx);
 }
 
-float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
 	
@@ -86,15 +84,31 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 	bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
 	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
 	
-	#ifdef SCENE_RENDER
+	float3 luminance = 0.0;
+	
+	#ifndef REFLECTION_PROBE
 		float depth = _Depth[position.xy];
-		rayIntersectsGround = false;
-		rayLength = LinearEyeDepth(depth) * rcp(dot(V, -_CameraForward));
+		float sceneDistance = CameraDepthToDistance(depth, V);
+	
+		if(depth != 0.0 && (rayIntersectsGround || sceneDistance < rayLength))
+		{
+			rayIntersectsGround = false;
+			rayLength = sceneDistance;
+		}
+	
+		float cloudDepth = _CloudDepth[position.xy];
+		float cloudDistance = CameraDepthToDistance(cloudDepth, V);
+		float4 clouds = _Clouds[position.xy];
+	
+		// Add cloud luminance
+		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, cloudDistance);
+		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, cloudDistance, heightAtDistance);
+		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
+		luminance += clouds.rgb * viewTransmittance;
 	#endif
 	
 	float offset = _BlueNoise1D[position.xy % 128];
 	float dt = rayLength / _Samples;
-	float3 luminance = 0.0;
 	for (float i = offset; i < _Samples; i++)
 	{
 		float currentDistance = i * dt;
@@ -111,24 +125,34 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			
 			if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 			{
-				float3 transmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
-				if(any(transmittance))
+				float3 lightTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
+				if (any(lightTransmittance))
 				{
 					float shadow = GetShadow(-V * currentDistance, j, false);
 					if (shadow)
-						lighting += transmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * shadow;
+						lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * _Exposure * shadow;
 				}
 			}
 				
 			float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
 			float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv * _MultiScatter_Scale.xy, 0.0);
-			lighting += ms * (scatter.xyz + scatter.w) * light.color;
+			lighting += ms * (scatter.xyz + scatter.w) * light.color * _Exposure;
 		}
-		
+			
 		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, currentDistance, heightAtDistance);
-		float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
-		float3 extinction = AtmosphereOpticalDepth(viewHeight);
-		luminance += transmittance * lighting * (1.0 - exp(-extinction * dt)) / extinction;
+		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
+		lighting *= viewTransmittance;
+		
+		float3 extinction = AtmosphereExtinction(viewHeight);
+		float3 transmittance = exp(-extinction * dt);
+		
+		#ifndef REFLECTION_PROBE
+			// Blend clouds if needed
+			if(currentDistance >= cloudDistance)
+				lighting *= clouds.a;
+		#endif
+		
+		luminance += lighting * (1.0 - transmittance) / extinction;
 	}
 	
 	// Account for bounced light off the earth
@@ -145,9 +169,13 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			float3 sunTransmittance = AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance);
 			float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, rayLength, _PlanetRadius);
 			float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, _PlanetRadius, viewCosAngleAtDistance);
-			luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color;
+			luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color * _Exposure;
 		}
 	}
 	
-	return luminance * _Exposure;
+	#ifdef REFLECTION_PROBE
+		return float4(luminance, 1.0);
+	#else
+		return float4(luminance, (depth != 0.0) * clouds.a);
+	#endif
 }

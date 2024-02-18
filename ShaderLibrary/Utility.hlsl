@@ -1,46 +1,7 @@
 #ifndef UTILITY_INCLUDED
 #define UTILITY_INCLUDED
 
-const static float HalfEps = 4.8828125e-4;
-const static float HalfMin = 6.103515625e-5; // 2^-14, the same value for 10, 11 and 16-bit: https://www.khronos.org/opengl/wiki/Small_Float_Formats
-const static float HalfMinSqrt = 0.0078125; // 2^-7 == sqrt(HALF_MIN), useful for ensuring HALF_MIN after x^2
-const static float HalfMax = 65504.0;
-
-const static float FloatEps = 5.960464478e-8; // 2^-24, machine epsilon: 1 + EPS = 1 (half of the ULP for 1.0f)
-const static float FloatMin = 1.175494351e-38; // Minimum normalized positive floating-point number
-const static float FloatMax = 3.402823466e+38; // Maximum representable floating-point number
-const static float FloatInf = asfloat(0x7F800000);
-
-const static uint UintMax = 0xFFFFFFFFu;
-const static int IntMax = 0x7FFFFFFF;
-
-const static float Pi = radians(180.0);
-const static float TwoPi = 2.0 * Pi;
-const static float FourPi = 4.0 * Pi;
-const static float HalfPi = Pi / 2.0;
-const static float RcpPi = rcp(Pi);
-const static float RcpTwoPi = rcp(HalfPi);
-const static float RcpFourPi = rcp(FourPi);
-const static float RcpHalfPi = rcp(HalfPi);
-const static float SqrtPi = sqrt(Pi);
-
-float1 Sq(float1 x) { return x * x; }
-float2 Sq(float2 x) { return x * x; }
-float3 Sq(float3 x) { return x * x; }
-float4 Sq(float4 x) { return x * x; }
-
-// Remaps a value from one range to another
-float1 Remap(float1 v, float1 pMin, float1 pMax = 1.0, float1 nMin = 0.0, float1 nMax = 1.0) { return nMin + (v - pMin) * rcp(pMax - pMin) * (nMax - nMin); }
-float2 Remap(float2 v, float2 pMin, float2 pMax = 1.0, float2 nMin = 0.0, float2 nMax = 1.0) { return nMin + (v - pMin) * rcp(pMax - pMin) * (nMax - nMin); }
-float3 Remap(float3 v, float3 pMin, float3 pMax = 1.0, float3 nMin = 0.0, float3 nMax = 1.0) { return nMin + (v - pMin) * rcp(pMax - pMin) * (nMax - nMin); }
-float4 Remap(float4 v, float4 pMin, float4 pMax = 1.0, float4 nMin = 0.0, float4 nMax = 1.0) { return nMin + (v - pMin) * rcp(pMax - pMin) * (nMax - nMin); }
-
-float SqrLength(float1 x) { return dot(x, x); }
-float SqrLength(float2 x) { return dot(x, x); }
-float SqrLength(float3 x) { return dot(x, x); }
-float SqrLength(float4 x) { return dot(x, x); }
-
-float SinFromCos(float x) { return sqrt(saturate(1.0 - Sq(x))); }
+#include "Math.hlsl"
 
 // Ref: http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
 float VanDerCorputBase2(uint i)
@@ -74,22 +35,6 @@ float3 SampleSphereUniform(float u1, float u2)
 	float cosTheta = 1.0 - 2.0 * u1;
 
 	return SphericalToCartesian(phi, cosTheta);
-}
-
-// Input [0, 1] and output [0, PI/2], 9 VALU
-float FastACosPos(float inX)
-{
-	float x = abs(inX);
-	float res = (0.0468878 * x + -0.203471) * x + HalfPi; // p(x)
-	return res * sqrt(max(0.0, 1.0 - x));
-}
-
-// Input [0, 1] and output [0, PI/2], 9 VALU
-float3 FastACosPos(float3 inX)
-{
-	float3 x = abs(inX);
-	float3 res = (0.0468878 * x + -0.203471) * x + HalfPi; // p(x)
-	return res * sqrt(max(0.0, 1.0 - x));
 }
 
 float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
@@ -156,6 +101,30 @@ float3x3 GetLocalFrame(float3 localZ)
     // Note: due to the quaternion formulation, the generated frame is rotated by 180 degrees,
     // s.t. if localZ = {0, 0, 1}, then localX = {-1, 0, 0} and localY = {0, -1, 0}.
 	return float3x3(localX, localY, localZ);
+}
+
+float2 QuadOffset(uint2 screenPos)
+{
+	return float2(screenPos & 1) * 2.0 - 1.0;
+}
+
+float1 QuadReadAcrossX(float1 value, uint2 screenPos) { return value - ddx(value) * QuadOffset(screenPos).x; }
+float2 QuadReadAcrossX(float2 value, uint2 screenPos) { return value - ddx(value) * QuadOffset(screenPos).x; }
+float3 QuadReadAcrossX(float3 value, uint2 screenPos) { return value - ddx(value) * QuadOffset(screenPos).x; }
+float4 QuadReadAcrossX(float4 value, uint2 screenPos) { return value - ddx(value) * QuadOffset(screenPos).x; }
+
+float1 QuadReadAcrossY(float1 value, uint2 screenPos) { return value - ddy(value) * QuadOffset(screenPos).y; }
+float2 QuadReadAcrossY(float2 value, uint2 screenPos) { return value - ddy(value) * QuadOffset(screenPos).y; }
+float3 QuadReadAcrossY(float3 value, uint2 screenPos) { return value - ddy(value) * QuadOffset(screenPos).y; }
+float4 QuadReadAcrossY(float4 value, uint2 screenPos) { return value - ddy(value) * QuadOffset(screenPos).y; }
+
+float QuadReadAcrossDiagonal(float value, uint2 screenPos)
+{
+	float dX = ddx_fine(value);
+	float dY = ddy_fine(value);
+	float2 quadDir = QuadOffset(screenPos);
+	float X = value - (dX * quadDir.x);
+	return X - (ddy_fine(value) * quadDir.y);
 }
 
 #endif

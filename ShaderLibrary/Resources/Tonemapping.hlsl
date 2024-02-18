@@ -25,7 +25,7 @@ float3 Uncharted2ToneMapping(float3 color)
 	color = ((color * (A * color + C * B) + D * E) / (color * (A * color + B) + D * F)) - E / F;
 	float white = ((W * (A * W + C * B) + D * E) / (W * (A * W + B) + D * F)) - E / F;
 	color /= white;
-	//color = pow(color, vec3(1. / gamma));
+	//color = pow(color, float3(1. / gamma));
 	return color;
 }
 
@@ -93,6 +93,49 @@ half3 LinearToSRGB(half3 c)
     return sRGB;
 }
 
+// https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.40.9608&rep=rep1&type=pdf
+// https://www.ncbi.nlm.nih.gov/pmc/articles/PMC2630540/pdf/nihms80286.pdf
+float3 apply_purkinje_shift(float3 c)
+{
+	// https://advances.realtimerendering.com/s2021/jpatry_advances2021/index.html
+	float4x3 matLmsrFromRgb = float4x3(
+        0.31670331, 0.70299344, 0.08120592,
+        0.10129085, 0.72118661, 0.12041039,
+        0.01451538, 0.05643031, 0.53416779,
+        0.01724063, 0.60147464, 0.40056206);
+	
+	float3x3 matRgbFromLmsGain = float3x3(
+         4.57829597, -4.48749114, 0.31554848,
+        -0.63342362, 2.03236026, -0.36183302,
+        -0.05749394, -0.09275939, 1.90172089);
+	
+	float3 m = float3(0.63721, 0.39242, 1.6064);
+	float3 k = float3(0.2, 0.2, 0.29);
+	float K = 45.0;
+	float S = 10.0;
+	float k3 = 0.6;
+	float k5 = 0.2;
+	float k6 = 0.29;
+	float rw = 0.139;
+	float p = 0.6189;
+	
+	float4 q = mul(matLmsrFromRgb, c / _Exposure);
+	float3 g = pow(1.0 + (0.33 / m) * (q.xyz + k * q.w), -0.5);
+	
+	float3x3 o = float3x3(rw - k3, 1.0 + k3 * rw, 0.0, p * k3, (1.0 - p) * k3, 1.0, p * S, (1.0 - p) * S, 0.0);
+	
+	float rc_gr = (K / S) * ((1.0 + rw * k3) * g.y / m.y - (k3 + rw) * g.x / m.x) * k5 * q.w;
+	float rc_by = (K / S) * (k6 * g.z / m.z - k3 * (p * k5 * g.x / m.x + (1.0 - p) * k5 * g.y / m.y)) * q.w;
+	float rc_lm = K * (p * g.x / m.x + (1.0 - p) * g.y / m.y) * k5 * q.w;
+    
+	float3 lmsGain = float3(-0.5 * rc_gr + 0.5 * rc_lm, 0.5 * rc_gr + 0.5 * rc_lm, rc_by + rc_lm);
+	
+	lmsGain = rsqrt(1.0 + q.xyz);
+	
+	return c + mul(matRgbFromLmsGain, lmsGain) * q.w * _Exposure;
+}
+
+
 float3 Fragment(float4 position : SV_Position) : SV_Target
 {
 	// Need to flip for game view
@@ -129,6 +172,8 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	upsample *= 1.0 / 16.0;
 	
 	input = lerp(input, upsample, _BloomStrength);
+	
+	//input = apply_purkinje_shift(input);
 	
 	//input *= 0.18;// * _Exposure;
 	

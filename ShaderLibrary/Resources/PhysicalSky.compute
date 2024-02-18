@@ -8,7 +8,6 @@ static const uint _ThreadCount = 64;
 groupshared float3 MultiScatterShared[_ThreadCount], ScatterShared[_ThreadCount];
 
 RWTexture2D<float3> _MultiScatterResult;
-float3 _GroundColor;
 float2 _ScaleOffset;
 uint _Samples;
 
@@ -38,7 +37,7 @@ void MultiScatter(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, currentDistance * LdotV, heightAtDistance);
 		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, currentDistance, heightAtDistance);
 		float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
-		float3 extinction = AtmosphereOpticalDepth(viewHeight);
+		float3 extinction = AtmosphereExtinction(viewHeight);
 		
 		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 			luminance += AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * (scatter.xyz + scatter.w) / (4.0 * Pi) * transmittance * (1.0 - exp(-extinction * dt)) / extinction;

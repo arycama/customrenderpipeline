@@ -1,7 +1,9 @@
 #ifndef ATMOSPHERE_INCLUDED
 #define ATMOSPHERE_INCLUDED
 
-const static float _EarthScale = 0.1;
+#include "Geometry.hlsl"
+
+const static float _EarthScale = 0.25;
 
 const static float _PlanetRadius = 6360000.0 * _EarthScale;
 const static float _AtmosphereHeight = 100000.0 * _EarthScale;
@@ -18,19 +20,18 @@ const static float _MieAbsorption = 4.4e-6 * rcp(_EarthScale);
 const static float3 _OzoneAbsorption = float3(0.650, 1.811, 0.085) * 1e-6 * rcp(_EarthScale);
 const static float _MiePhase = 0.8;
 
-Texture2D<float3> _Transmittance;
-float4 _AtmosphereTransmittanceRemap, _Transmittance_Scale;
+Texture2D<float3> _Transmittance, _MultiScatter;
+float4 _AtmosphereTransmittanceRemap, _Transmittance_Scale, _MultiScatter_Scale, _MultiScatterRemap;
+float3 _GroundColor;
 
 float DistanceToTopAtmosphereBoundary(float height, float cosAngle)
 {
-	float discriminant = Sq(height) * (Sq(cosAngle) - 1.0) + Sq(_TopRadius);
-	return max(0.0, -height * cosAngle + sqrt(max(0.0, discriminant)));
+	return DistanceToSphereInside(height, cosAngle, _TopRadius);
 }
 
 float DistanceToBottomAtmosphereBoundary(float height, float cosAngle)
 {
-	float discriminant = Sq(height) * (Sq(cosAngle) - 1.0) + Sq(_PlanetRadius);
-	return max(0.0, -height * cosAngle - sqrt(max(0.0, discriminant)));
+	return DistanceToSphereOutside(height, cosAngle, _PlanetRadius);
 }
 
 bool RayIntersectsGround(float height, float cosAngle)
@@ -77,7 +78,7 @@ float MiePhase(float cosAngle, float anisotropy)
 	return (3.0 / (8.0 * Pi)) * ((((1.0 - Sq(g)) * (1.0 + Sq(cosAngle))) / ((2.0 + Sq(g)) * pow(1.0 + Sq(g) - 2.0 * g * cosAngle, 3.0 / 2.0))));
 }
 
-float3 AtmosphereOpticalDepth(float height)
+float3 AtmosphereExtinction(float height)
 {
 	float clampedHeight = max(0.0, height - _PlanetRadius);
 
@@ -101,14 +102,14 @@ float3 AtmosphereScatter(float height, float LdotV)
 	return scatter;
 }
 
-float3 AtmosphereOpticalDepthToPoint(float height, float cosAngle, float rayLength)
+float3 AtmosphereExtinctionToPoint(float height, float cosAngle, float rayLength)
 {
 	float3 opticalDepth = 0.0;
 	const float samples = 64.0;
 	for (float i = 0.5; i < samples; i++)
 	{
 		float heightAtDistance = HeightAtDistance(height, cosAngle, (i / samples) * rayLength);
-		opticalDepth += AtmosphereOpticalDepth(heightAtDistance);
+		opticalDepth += AtmosphereExtinction(heightAtDistance);
 	}
 	
 	return opticalDepth * (rayLength / samples);

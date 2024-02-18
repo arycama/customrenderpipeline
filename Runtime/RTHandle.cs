@@ -13,7 +13,7 @@ public class RTHandle
     public int VolumeDepth { get; set; }
     public TextureDimension Dimension { get; set; }
     public bool IsImported { get; set; }
-    public Vector2 Scale => new Vector2((float)Width / RenderTexture.width, (float)Height / RenderTexture.height);
+    public Vector3 Scale => new Vector3((float)Width / RenderTexture.width, (float)Height / RenderTexture.height, (float)VolumeDepth / RenderTexture.volumeDepth);
     public bool IsScreenTexture { get; set; }
     public bool HasMips { get; set; }
 

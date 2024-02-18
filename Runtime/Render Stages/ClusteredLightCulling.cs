@@ -23,8 +23,6 @@ namespace Arycama.CustomRenderPipeline
 
         private static readonly uint[] zeroArray = new uint[1] { 0 };
 
-        private int DivRoundUp(int x, int y) => (x + y - 1) / y;
-
         public ClusteredLightCulling(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
@@ -74,8 +72,8 @@ namespace Arycama.CustomRenderPipeline
 
         public Result Render(int width, int height, float near, float far, LightingSetup.Result lightingSetupResult, Matrix4x4 invVpMatrix)
         {
-            var clusterWidth = DivRoundUp(width, settings.TileSize);
-            var clusterHeight = DivRoundUp(height, settings.TileSize);
+            var clusterWidth = MathUtils.DivRoundUp(width, settings.TileSize);
+            var clusterHeight = MathUtils.DivRoundUp(height, settings.TileSize);
             var clusterCount = clusterWidth * clusterHeight * settings.ClusterDepth;
 
             var clusterScale = settings.ClusterDepth / Mathf.Log(far / near, 2f);

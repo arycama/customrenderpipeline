@@ -261,7 +261,7 @@ namespace Arycama.CustomRenderPipeline
             return new Result(transmittance, multiScatter, ambientBuffer, reflectionProbe, transmittanceRemap, multiScatterRemap);
         }
 
-        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, IRenderPassData atmosphereData, Vector2 jitter, IRenderPassData commonPassData)
+        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, IRenderPassData atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth)
         {
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
             {
@@ -269,31 +269,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(target);
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.ReadTexture("_Depth", depth);
-
-                lightingSetupResult.SetInputs(pass);
-                atmosphereData.SetInputs(pass);
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
-                {
-                    lightingSetupResult.SetProperties(pass, command);
-                    atmosphereData.SetProperties(pass, command);
-
-                    pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
-                    pass.SetInt(command, "_Samples", settings.RenderSamples);
-                    pass.SetVector(command, "_ViewPosition", viewPosition);
-                    pass.SetConstantBuffer(command, "Exposure", exposureBuffer);
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
-                    commonPassData.SetProperties(pass, command);
-                });
-            }
-
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
-            {
-                pass.Initialize(skyMaterial, 3);
-                pass.WriteTexture(target);
-                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
-                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_Clouds", clouds);
+                pass.ReadTexture("_CloudDepth", cloudDepth);
 
                 lightingSetupResult.SetInputs(pass);
                 atmosphereData.SetInputs(pass);

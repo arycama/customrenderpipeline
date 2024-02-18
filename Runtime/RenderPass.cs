@@ -61,7 +61,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 var handle = texture.Item2;
                 SetTexture(command, texture.Item1, handle);
-                SetVector(command, $"{texture.Item1}_Scale", new Vector4(handle.Scale.x, handle.Scale.y, 1.0f / handle.Scale.x, 1.0f / handle.Scale.y));
+                SetVector(command, $"{texture.Item1}_Scale", new Vector3(handle.Scale.x, handle.Scale.y, handle.Scale.z));
             }
             readTextures.Clear();
 

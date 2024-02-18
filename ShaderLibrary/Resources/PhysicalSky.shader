@@ -32,37 +32,11 @@ Shader "Hidden/Physical Sky"
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }
-
-        Pass
-        {
-            Name "Render Scene"
-
-            Blend One One
-
-            Stencil
-            {
-                Ref 0
-                Comp NotEqual
-            }
-
-            HLSLPROGRAM
-            #pragma target 5.0
-            #pragma vertex Vertex
-            #pragma fragment FragmentRender
-            #define SCENE_RENDER
-            #include "PhysicalSky.hlsl"
-            ENDHLSL
-        }
-
         Pass
         {
             Name "Render Sky"
 
-            Stencil
-            {
-                Ref 0
-                Comp Equal
-            }
+            Blend One SrcAlpha
 
             HLSLPROGRAM
             #pragma target 5.0

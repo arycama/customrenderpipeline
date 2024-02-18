@@ -32,7 +32,7 @@ cbuffer Exposure
 Buffer<float4> _DirectionalShadowTexelSizes;
 Buffer<uint> _LightClusterList;
 SamplerComparisonState _LinearClampCompareSampler;
-SamplerState _LinearClampSampler, _LinearRepeatSampler, _PointClampSampler, _TrilinearRepeatAniso16Sampler, _TrilinearClampSampler;
+SamplerState _LinearClampSampler, _LinearRepeatSampler, _PointClampSampler, _TrilinearRepeatAniso16Sampler, _TrilinearRepeatSampler, _TrilinearClampSampler;
 StructuredBuffer<DirectionalLight> _DirectionalLights;
 StructuredBuffer<matrix> _DirectionalMatrices;
 StructuredBuffer<PointLight> _PointLights;
@@ -494,6 +494,16 @@ float EV100ToLuminance(float ev)
 float EV100ToExposure(float ev100)
 {
 	return rcp(LensImperfectionExposureScale) * exp2(-ev100);
+}
+
+float CameraDepthToDistance(float depth, float3 V)
+{
+	return LinearEyeDepth(depth) * rcp(dot(V, -_CameraForward));
+}
+
+float CameraDistanceToDepth(float distance, float3 V)
+{
+	return distance * dot(V, -_CameraForward);
 }
 
 #endif
