@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -75,7 +76,7 @@ namespace Arycama.CustomRenderPipeline
             pass.ReadTexture("_Input", input);
             pass.ReadTexture("_Motion", motion);
             pass.ReadTexture("_History", previous);
-            pass.WriteTexture(current);
+            pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 
             var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
             {

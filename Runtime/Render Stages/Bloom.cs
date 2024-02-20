@@ -38,7 +38,7 @@ namespace Arycama.CustomRenderPipeline
             public Vector2 rcpResolution;
         }
 
-        public RTHandle Render(Camera camera, RTHandle input)
+        public RTHandle Render(Camera camera, RTHandle target)
         {
             var bloomIds = ListPool<RTHandle>.Get();
 
@@ -56,10 +56,12 @@ namespace Arycama.CustomRenderPipeline
             // Downsample
             for (var i = 0; i < mipCount; i++)
             {
+                var input = i == 0 ? target : bloomIds[i - 1];
+
                 using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Bloom");
                 pass.Initialize(material);
-                pass.WriteTexture(bloomIds[i]);
-                pass.ReadTexture("_MainTex", i == 0 ? input : bloomIds[i - 1]);
+                pass.WriteTexture(bloomIds[i], RenderBufferLoadAction.DontCare);
+                pass.ReadTexture("_Input", input);
 
                 var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
                 var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
@@ -67,6 +69,7 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
                     pass.SetVector(command, "_RcpResolution", data.rcpResolution);
+                    pass.SetVector(command, "_InputScaleLimit", new Vector4(input.Scale.x, input.Scale.y, input.Limit.x, input.Limit.y));
                 });
 
                 data.rcpResolution = new Vector2(1.0f / width, 1.0f / height);
@@ -75,10 +78,12 @@ namespace Arycama.CustomRenderPipeline
             // Upsample
             for (var i = mipCount - 1; i > 0; i--)
             {
+                var input = bloomIds[i];
+
                 using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Bloom");
                 pass.Initialize(material, 1);
                 pass.WriteTexture(bloomIds[i - 1]);
-                pass.ReadTexture("_MainTex", bloomIds[i]);
+                pass.ReadTexture("_Input", input);
 
                 var width = Mathf.Max(1, camera.pixelWidth >> i);
                 var height = Mathf.Max(1, camera.pixelHeight >> i);
@@ -87,6 +92,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.SetFloat(command, "_Strength", data.strength);
                     pass.SetVector(command, "_RcpResolution", data.rcpResolution);
+                    pass.SetVector(command, "_InputScaleLimit", new Vector4(input.Scale.x, input.Scale.y, input.Limit.x, input.Limit.y));
                 });
 
                 data.strength = settings.Strength;

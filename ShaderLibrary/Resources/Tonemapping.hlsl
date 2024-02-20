@@ -2,7 +2,7 @@
 
 Texture2D<float3> _MainTex, _Bloom;
 Texture2D<float> _GrainTexture;
-float4 _GrainTextureParams, _Resolution, _Bloom_Scale, _Bloom_TexelSize;
+float4 _GrainTextureParams, _Resolution, _BloomScaleLimit, _Bloom_TexelSize;
 float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, ShutterSpeed;
 
 float4 Vertex(uint id : SV_VertexID) : SV_Position
@@ -145,33 +145,19 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float3 input = _MainTex[position.xy];
 	float2 uv = position.xy * _Resolution.zw;
 	
-	// Take 9 samples around current texel:
-    // a - b - c
-    // d - e - f
-    // g - h - i
-    // === ('e' is the current texel) ===
-	float3 a = _Bloom.Sample(_LinearClampSampler, (uv + float2(-1, 1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
-	float3 b = _Bloom.Sample(_LinearClampSampler, (uv + float2(0, 1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
-	float3 c = _Bloom.Sample(_LinearClampSampler, (uv + float2(1, 1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
+	float3 bloom = _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(-1, 1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.0625;
+	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(0, 1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.125;
+	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(1, 1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.0625;
 
-	float3 d = _Bloom.Sample(_LinearClampSampler, (uv + float2(-1, 0) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
-	float3 e = _Bloom.Sample(_LinearClampSampler, (uv + float2(0, 0) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
-	float3 f = _Bloom.Sample(_LinearClampSampler, (uv + float2(1, 0) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
+	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(-1, 0)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.125;
+	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(0, 0)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.25;
+	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(1, 0)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.125;
 
-	float3 g = _Bloom.Sample(_LinearClampSampler, (uv + float2(-1, -1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
-	float3 h = _Bloom.Sample(_LinearClampSampler, (uv + float2(0, -1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
-	float3 i = _Bloom.Sample(_LinearClampSampler, (uv + float2(1, -1) * _Bloom_TexelSize.xy) * _Bloom_Scale.xy);
+	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(-1, -1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.0625;
+	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(0, -1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.125;
+	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(1, -1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.0625;
 	
-	// Apply weighted distribution, by using a 3x3 tent filter:
-    //  1   | 1 2 1 |
-    // -- * | 2 4 2 |
-    // 16   | 1 2 1 |
-	float3 upsample = e * 4.0;
-	upsample += (b + d + f + h) * 2.0;
-	upsample += (a + c + g + i);
-	upsample *= 1.0 / 16.0;
-	
-	input = lerp(input, upsample, _BloomStrength);
+	input = lerp(input, bloom, _BloomStrength);
 	
 	//input = apply_purkinje_shift(input);
 	

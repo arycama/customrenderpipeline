@@ -77,6 +77,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "Aperture", data.aperture);
                 pass.SetVector(command, "_GrainTextureParams", data.grainTextureParams);
                 pass.SetVector(command, "_Resolution", data.resolution);
+
+                pass.SetVector(command, "_BloomScaleLimit", new Vector4(bloom.Scale.x, bloom.Scale.y, bloom.Limit.x, bloom.Limit.y));
             });
 
             var offsetX = Random.value;

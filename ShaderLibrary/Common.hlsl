@@ -185,6 +185,16 @@ float LinearEyeDepth(float depth)
 	return rcp((rcp(_Near) - rcp(_Far)) * depth + rcp(_Far));
 }
 
+float EyeTo01Depth(float depth)
+{
+	return Remap(depth, _Near, _Far, 0.0, 1.0);
+}
+
+float NormalizedToEyeDepth(float depth)
+{
+	return lerp(_Near, _Far, depth);
+}
+
 float EyeToDeviceDepth(float eyeDepth)
 {
 	return (1.0 - eyeDepth * rcp(_Far)) * rcp(eyeDepth * (rcp(_Near) - rcp(_Far)));
@@ -504,6 +514,11 @@ float CameraDepthToDistance(float depth, float3 V)
 float CameraDistanceToDepth(float distance, float3 V)
 {
 	return distance * dot(V, -_CameraForward);
+}
+
+float LinearEyeDepthToDistance(float depth, float3 V)
+{
+	return depth * rcp(dot(V, -_CameraForward));
 }
 
 #endif

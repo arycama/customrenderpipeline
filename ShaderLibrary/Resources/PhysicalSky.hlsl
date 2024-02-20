@@ -5,8 +5,9 @@
 matrix _PixelToWorldViewDir, _PixelToWorldViewDirs[6];
 uint _Samples;
 float4 _ScaleOffset;
-Texture2D<float> _Depth, _CloudDepth;
 Texture2D<float4> _Clouds;
+Texture2D<float3> _CloudShadow;
+Texture2D<float> _Depth, _CloudDepth;
 
 float4 Vertex(uint id : SV_VertexID) : SV_Position
 {
@@ -72,6 +73,9 @@ float3 FragmentTransmittanceLut(float4 position : SV_Position) : SV_Target
 
 float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
+	//float3 cloudShadow = _CloudShadow.Sample(_LinearClampSampler, position.xy * _ScaledResolution.zw);
+	//return float4(cloudShadow, 0.0);
+	
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
 	
 	#ifdef REFLECTION_PROBE
@@ -96,8 +100,7 @@ float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			rayLength = sceneDistance;
 		}
 	
-		float cloudDepth = _CloudDepth[position.xy];
-		float cloudDistance = CameraDepthToDistance(cloudDepth, V);
+		float cloudDistance = _CloudDepth[position.xy];
 		float4 clouds = _Clouds[position.xy];
 	
 		// Add cloud luminance
@@ -169,7 +172,12 @@ float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			float3 sunTransmittance = AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance);
 			float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, rayLength, _PlanetRadius);
 			float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, _PlanetRadius, viewCosAngleAtDistance);
-			luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color * _Exposure;
+			
+			#ifdef REFLECTION_PROBE
+				luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color * _Exposure;
+			#else
+				luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color * _Exposure * clouds.a;
+			#endif
 		}
 	}
 	

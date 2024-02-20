@@ -94,7 +94,7 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere Transmittance"))
             {
                 pass.Initialize(skyMaterial);
-                pass.WriteTexture(transmittance);
+                pass.WriteTexture(transmittance, RenderBufferLoadAction.DontCare);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -129,7 +129,7 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Reflection"))
             {
                 pass.Initialize(skyMaterial, 1);
-                pass.WriteTexture(skyReflection);
+                pass.WriteTexture(skyReflection, RenderBufferLoadAction.DontCare);
                 pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
 
                 lightingSetupResult.SetInputs(pass);
@@ -223,7 +223,7 @@ namespace Arycama.CustomRenderPipeline
                 using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Reflection Convolution"))
                 {
                     pass.Initialize(ggxConvolutionMaterial, 0);
-                    pass.WriteTexture(reflectionProbe);
+                    pass.WriteTexture(reflectionProbe, RenderBufferLoadAction.DontCare);
                     pass.ReadTexture("_SkyReflection", skyReflection);
                     pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
                     pass.MipLevel = i;
@@ -261,7 +261,7 @@ namespace Arycama.CustomRenderPipeline
             return new Result(transmittance, multiScatter, ambientBuffer, reflectionProbe, transmittanceRemap, multiScatterRemap);
         }
 
-        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, IRenderPassData atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth)
+        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, IRenderPassData atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, IRenderPassData cloudShadowData)
         {
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
             {
@@ -275,6 +275,7 @@ namespace Arycama.CustomRenderPipeline
                 lightingSetupResult.SetInputs(pass);
                 atmosphereData.SetInputs(pass);
                 commonPassData.SetInputs(pass);
+                cloudShadowData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -286,7 +287,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_ViewPosition", viewPosition);
                     pass.SetConstantBuffer(command, "Exposure", exposureBuffer);
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
+
                     commonPassData.SetProperties(pass, command);
+                    cloudShadowData.SetProperties(pass, command);
                 });
             }
         }

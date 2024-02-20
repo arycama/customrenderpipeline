@@ -35,8 +35,6 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float2 unjitteredTexel = uv - (_Jitter * _ScaledResolution.zw);
 	float2 scaledUv = unjitteredTexel * _ScaledResolution.xy - 0.5 + rcp(512.0);
 	
-	//return _Input.Sample(_LinearClampSampler, uv * _Input_Scale.xy);
-	
 	float3 minValue = 0.0, maxValue = 0.0;
 	float2 maxMotion = 0.0;
 	float maxWeight = 0.0, weightSum = 0.0, maxMotionLenSqr = 0.0;

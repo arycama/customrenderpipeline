@@ -32,8 +32,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_CameraDepth", depth);
 
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
-                pass.WriteTexture(normals);
-                pass.WriteTexture(viewDepth);
+                pass.WriteTexture(normals, RenderBufferLoadAction.DontCare);
+                pass.WriteTexture(viewDepth, RenderBufferLoadAction.DontCare);
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {

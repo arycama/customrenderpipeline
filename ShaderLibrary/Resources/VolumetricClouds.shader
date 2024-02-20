@@ -45,6 +45,18 @@ Shader "Hidden/Volumetric Clouds"
 
         Pass
         {
+            Name "Shadow"
+
+            HLSLPROGRAM
+            #pragma target 5.0
+            #pragma vertex Vertex
+            #pragma fragment FragmentShadow
+            #include "VolumetricClouds.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
             Name "Render"
 
             HLSLPROGRAM

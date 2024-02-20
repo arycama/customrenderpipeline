@@ -14,6 +14,8 @@ public class RTHandle
     public TextureDimension Dimension { get; set; }
     public bool IsImported { get; set; }
     public Vector3 Scale => new Vector3((float)Width / RenderTexture.width, (float)Height / RenderTexture.height, (float)VolumeDepth / RenderTexture.volumeDepth);
+    public Vector3 Limit => new Vector3((Mathf.Floor(RenderTexture.width * Scale.x) - 0.5f) / RenderTexture.width, (Mathf.Floor(RenderTexture.height * Scale.y) - 0.5f) / RenderTexture.height, (Mathf.Floor(RenderTexture.depth * Scale.z) - 0.5f) / RenderTexture.volumeDepth);
+
     public bool IsScreenTexture { get; set; }
     public bool HasMips { get; set; }
 
