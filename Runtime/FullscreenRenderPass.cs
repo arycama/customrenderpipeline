@@ -9,17 +9,19 @@ namespace Arycama.CustomRenderPipeline
         private Material material;
         private int passIndex;
         private int primitiveCount;
+        public string Keyword { get; set; }
 
         public FullscreenRenderPass()
         {
             propertyBlock = new MaterialPropertyBlock();
         }
 
-        public void Initialize(Material material, int passIndex = 0, int primitiveCount = 1)
+        public void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, string keyword = null)
         {
             this.material = material;
             this.passIndex = passIndex;
             this.primitiveCount = primitiveCount;
+            this.Keyword = keyword;
         }
 
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
@@ -54,7 +56,20 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Execute(CommandBuffer command)
         {
+            LocalKeyword keyword = default;
+            if (!string.IsNullOrEmpty(Keyword))
+            {
+                //keyword = new LocalKeyword(material.shader, Keyword);
+                command.EnableShaderKeyword(Keyword);
+            }
+
             command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount, 1, propertyBlock);
+
+            if(!string.IsNullOrEmpty(Keyword))
+            {
+                command.DisableShaderKeyword(Keyword);
+                Keyword = null;
+            }
         }
 
         public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)

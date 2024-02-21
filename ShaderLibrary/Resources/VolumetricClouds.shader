@@ -63,6 +63,7 @@ Shader "Hidden/Volumetric Clouds"
             #pragma target 5.0
             #pragma vertex Vertex
             #pragma fragment FragmentRender
+            #pragma multi_compile _ BELOW_CLOUD_LAYER ABOVE_CLOUD_LAYER
             #include "VolumetricClouds.hlsl"
             ENDHLSL
         }
