@@ -69,6 +69,24 @@ float3 AmbientLight(float3 N, float occlusion = 1.0, float3 albedo = 1.0)
 	return AmbientLight(N, occlusion, albedo, _AmbientSh);
 }
 
+matrix _WorldToCloudShadow;
+float _CloudDepthInvScale;
+float2 _CloudShadow_Scale;
+Texture2D<float3> _CloudShadow;
+
+float CloudTransmittanceLevelZero(float3 positionWS)
+{
+	float3 coords = MultiplyPoint3x4(_WorldToCloudShadow, positionWS);
+	if (any(saturate(coords.xy) != coords.xy) || coords.z < 0.0)
+		return 1.0;
+
+	float3 shadowData = _CloudShadow.SampleLevel(_LinearClampSampler, coords.xy * _CloudShadow_Scale.xy, 0.0);
+	float depth = max(0.0, coords.z - shadowData.r) * _CloudDepthInvScale;
+	float opticalDepth = depth * shadowData.g;
+	float transmittance = exp(-opticalDepth);
+	return max(transmittance, shadowData.b);
+}
+
 float4 _GGXDirectionalAlbedoRemap;
 float2 _GGXAverageAlbedoRemap;
 float2 _GGXDirectionalAlbedoMSScaleOffset;
@@ -501,8 +519,12 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		float3 atmosphereTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
 		if(all(!atmosphereTransmittance))
 			continue;
+		
+		float attenuation = 1.0;
+		if(i == 0)
+			attenuation = CloudTransmittanceLevelZero(input.worldPosition);
 			
-		float attenuation = GetShadow(input.worldPosition, i, !isVolumetric);
+		attenuation *= GetShadow(input.worldPosition, i, !isVolumetric);
 		if (!attenuation)
 			continue;
 		

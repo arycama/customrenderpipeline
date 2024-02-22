@@ -13,7 +13,7 @@ public class DeferredLighting
         material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public void Render(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData)
+    public void Render(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, IRenderPassData cloudShadowData)
     {
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting"))
         {
@@ -28,10 +28,12 @@ public class DeferredLighting
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
             commonPassData.SetInputs(pass);
+            cloudShadowData.SetInputs(pass);
 
             var data = pass.SetRenderFunction<Data>((command, context, pass, data) =>
             {
                 commonPassData.SetProperties(pass, command);
+                cloudShadowData.SetProperties(pass, command);
             });
         }
     }

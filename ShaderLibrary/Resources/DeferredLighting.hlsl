@@ -27,7 +27,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	lightingInput.occlusion = bentNormalOcclusion.a;
 	lightingInput.translucency = 0.0;
 	lightingInput.bentNormal = normalize(2.0 * bentNormalOcclusion.rgb - 1.0);
-		
+	
 	float3 result = GetLighting(lightingInput);
 	return ApplyFog(result, position.xy, LinearEyeDepth(depth), lightingInput.worldPosition);
 }

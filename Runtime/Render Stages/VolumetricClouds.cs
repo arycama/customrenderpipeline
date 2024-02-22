@@ -188,13 +188,22 @@ namespace Arycama.CustomRenderPipeline
             var resolution = settings.ShadowResolution;
             var res = new Vector4(resolution, resolution, 1f / resolution, 1f / resolution);
 
-            var viewPosition = lightDirection * (settings.StartHeight + settings.LayerThickness - camera.transform.position.y);
+            var planetCenter = new Vector3(0.0f, -planetRadius - camera.transform.position.y, 0.0f);
+            var rayOrigin = new Vector3(0.0f, -camera.transform.position.y, 0.0f);
+
+            var distance = GeometryUtilities.IntersectRaySphereSimple(rayOrigin - planetCenter, lightDirection, planetRadius + settings.StartHeight + settings.LayerThickness);
+
+            var viewPosition = rayOrigin + lightDirection * distance;
             var viewMatrix = Matrix4x4.TRS(viewPosition, lightRotation, new Vector3(1f, 1f, -1f)).inverse;
-            var projectionMatrix = Matrix4x4.Ortho(-radius, radius, -radius, radius, -radius, radius);
-            var projectionMatrix2 = Matrix4x4.Ortho(-radius, radius, -radius, radius, 0, radius);
+            var projectionMatrix = Matrix4x4.Ortho(-radius, radius, -radius, radius, -distance, distance);
+            var projectionMatrix2 = Matrix4x4.Ortho(-radius, radius, -radius, radius, 0, distance);
 
             var viewProjection = projectionMatrix * viewMatrix;
-            var worldToShadow = (projectionMatrix2 * viewMatrix).ConvertToAtlasMatrix();
+
+            var worldToShadow = projectionMatrix2 * viewMatrix;
+            worldToShadow.SetRow(0, 0.5f * (worldToShadow.GetRow(0) + worldToShadow.GetRow(3)));
+            worldToShadow.SetRow(1, 0.5f * (worldToShadow.GetRow(1) + worldToShadow.GetRow(3)));
+            worldToShadow.SetRow(2, 0.5f * (worldToShadow.GetRow(2) + worldToShadow.GetRow(3)));
 
             var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32);
             using(var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Cloud Shadow"))
@@ -207,17 +216,17 @@ namespace Arycama.CustomRenderPipeline
                 {
                     settings.SetCloudPassData(command, pass);
 
-                    pass.SetFloat(command, "_CloudDepthScale", 1f / planetRadius);
+                    pass.SetFloat(command, "_CloudDepthScale", 1f / distance);
                     pass.SetVector(command, "_ScreenSizeCloudShadow", res);
                     pass.SetMatrix(command, "_InvViewProjMatrixCloudShadow", viewProjection.inverse);
                     pass.SetMatrix(command, "_WorldToCloudShadow", worldToShadow);
-                    pass.SetFloat(command, "_CloudDepthInvScale", radius);
+                    pass.SetFloat(command, "_CloudDepthInvScale", distance);
                     pass.SetVector(command, "_LightDirection0", -lightDirection);
                     pass.SetFloat(command, "_ShadowSamples", settings.ShadowSamples);
                 });
             }
 
-            return new CloudShadowData(cloudShadow, radius, worldToShadow);
+            return new CloudShadowData(cloudShadow, distance, worldToShadow);
         }
 
         struct CloudShadowData : IRenderPassData
@@ -341,6 +350,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_StationaryBlend", settings.StationaryBlend);
                     pass.SetFloat(command, "_MotionBlend", settings.MotionBlend);
                     pass.SetFloat(command, "_MotionFactor", settings.MotionFactor);
+
+                    pass.SetInt(command, "_MaxWidth", width - 1);
+                    pass.SetInt(command, "_MaxHeight", height - 1);
 
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
                 });
