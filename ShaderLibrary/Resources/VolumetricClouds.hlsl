@@ -159,27 +159,26 @@ float3 SmoothUv(float3 p, float3 texelSize)
 	return p;
 }
 
-float CloudExtinction0(float3 worldPosition, float height, float3 dx, float3 dy, bool useDetail)
+float ComputeMipLevel(float2 dx, float2 dy, float2 scale, float2 resolution)
 {
-	float altitude = height - _PlanetRadius;
-	
-	float fraction = saturate((altitude - _StartHeight) / _LayerThickness);
-	float gradient = 4.0 * fraction * (1.0 - fraction);
-	
-	float3 position = worldPosition + _ViewPosition;
-	float2 weatherPosition = position.xz * _WeatherMapScale + _WeatherMapOffset;
-	float density = _WeatherMap.Sample(_TrilinearRepeatAniso16Sampler, weatherPosition);
-	density = Remap(density * gradient, 1.0 - _WeatherMapStrength);
-	float baseNoise = _CloudNoise.Sample(_TrilinearRepeatAniso16Sampler, position * _NoiseScale);
-	density = Remap(density, (1.0 - baseNoise) * _NoiseStrength);
-	float detailNoise = _CloudDetailNoise.Sample(_LinearRepeatSampler, position * _DetailNoiseScale);
-	density = Remap(density, detailNoise * _DetailNoiseStrength);
-	
-	return max(0.0, density * _Density);
+	dx *= scale * resolution;
+	dy *= scale * resolution;
+	float deltaMaxSq = max(dot(dx, dx), dot(dy, dy));
+	return 0.5 * log2(deltaMaxSq);
+}
+
+float ComputeMipLevel(float3 dx, float3 dy, float3 scale, float3 resolution)
+{
+	dx *= scale * resolution;
+	dy *= scale * resolution;
+	float deltaMaxSq = max(dot(dx, dx), dot(dy, dy));
+	return 0.5 * log2(deltaMaxSq);
 }
 
 float CloudExtinction(float3 worldPosition, float height, float3 dx, float3 dy, bool useDetail)
 {
+	//dx = dy = 0;
+	
 	float altitude = height - _PlanetRadius;
 	
 	float fraction = saturate((altitude - _StartHeight) / _LayerThickness);
@@ -187,19 +186,21 @@ float CloudExtinction(float3 worldPosition, float height, float3 dx, float3 dy, 
 	
 	float3 position = worldPosition + _ViewPosition;
 	float2 weatherPosition = position.xz * _WeatherMapScale + _WeatherMapOffset;
-	float density = _WeatherMap.SampleGrad(_TrilinearRepeatAniso16Sampler, weatherPosition, dx.xz * _WeatherMapScale, dy.xz * _WeatherMapScale);
+	
+	float density = _WeatherMap.SampleLevel(_LinearRepeatSampler, weatherPosition, ComputeMipLevel(dx.xz, dy.xz, _WeatherMapScale, _WeatherMapResolution));
+	//density = _WeatherMap.SampleGrad(_LinearRepeatSampler, weatherPosition, dx.xz * _WeatherMapScale, dy.xz * _WeatherMapScale);
 	density = Remap(density * gradient, 1.0 - _WeatherMapStrength);
 	if (density <= 0.0)
 		return 0.0;
 	
-	float baseNoise = _CloudNoise.SampleGrad(_TrilinearRepeatAniso16Sampler, position * _NoiseScale, dx * _NoiseScale, dy * _NoiseScale);
+	float baseNoise = _CloudNoise.SampleLevel(_LinearRepeatSampler, position * _NoiseScale, ComputeMipLevel(dx, dy, _NoiseScale, _NoiseResolution));
+	//baseNoise = _CloudNoise.SampleGrad(_LinearRepeatSampler, position * _NoiseScale, dx * _NoiseScale, dy * _NoiseScale);
 	density = Remap(density, (1.0 - baseNoise) * _NoiseStrength);
 	//if (density <= 0.0)
 	//	return 0.0;
 	
-	float detailNoise = _CloudDetailNoise.SampleGrad(_TrilinearRepeatAniso16Sampler, position * _DetailNoiseScale, dx * _DetailNoiseScale, dy * _DetailNoiseScale);
-	//if (!useDetail)
-	//	detailNoise = 0.5;
+	float detailNoise = _CloudDetailNoise.SampleLevel(_LinearRepeatSampler, position * _DetailNoiseScale, ComputeMipLevel(dx, dy, _DetailNoiseScale, _DetailNoiseResolution));
+	//detailNoise = _CloudDetailNoise.SampleGrad(_LinearRepeatSampler, position * _DetailNoiseScale, dx * _DetailNoiseScale, dy * _DetailNoiseScale);
 	
 	density = Remap(density, detailNoise * _DetailNoiseStrength);
 	
@@ -240,8 +241,10 @@ float3 FragmentShadow(float4 position : SV_Position) : SV_Target0
 	float3 dxScale = ddx(rd * dt);
 	float3 dyScale = ddy(rd * dt);
 	
-	float3 dxOffset = ddx(rd * (rayStart + dt * offset) + P);
-	float3 dyOffset = ddy(rd * (rayStart + dt * offset) + P);
+	dxScale = dt * ddx(rd) + rd * ddx(dt);
+	
+	float3 dxOffset = ddx(rd * rayStart + P);
+	float3 dyOffset = ddy(rd * rayStart + P);
 	
 	for (float i = offset; i < _ShadowSamples; i++)
 	{
@@ -323,17 +326,15 @@ float4 FragmentRender(float4 position : SV_Position, out float cloudDistance : S
 	float transmittance = 1.0;
 	float light0 = 0.0, light1 = 0.0;
 	
-	float3 ddxDt = dtX - dt;
-	float3 dxScale = dt * ddx(rd) + rd * ddx(dt);
-	float3 dxOffset = rd * ddx(rayStart) + rayStart * ddx(rd);
+	float3 dxScale = dt * ddx(rd) + rd * (dtX - dt);
+	float3 dyScale = dt * ddy(rd) + rd * (dtY - dt);
 	
-	float3 ddyDt = dtY - dt;
-	float3 dyScale = dt * ddy(rd) + rd * ddy(dt);
-	float3 dyOffset = rd * ddy(rayStart) + rayStart * ddy(rd);
+	float3 dxOffset = ddx(rd * rayStart);
+	float3 dyOffset = ddy(rd * rayStart);
 	
 	float lightDs = _LightDistance / _LightSamples;
-	float3 lxScale = (lightDs * ddx(L) + L * ddx(lightDs));
-	float3 lyScale = lightDs * ddy(L) + L * ddy(lightDs);
+	float3 lxScale =  ddx(L * lightDs);
+	float3 lyScale = ddy(L * lightDs);
 	
 	for (float i = offsets.x; i < _RaySamples; i++)
 	{
