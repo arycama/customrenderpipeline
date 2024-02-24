@@ -338,7 +338,7 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     command.EndSample(sampler);
-                    //Debug.Log(sampler.GetRecorder().gpuElapsedNanoseconds / 1000000.0f);
+                    Debug.Log(sampler.GetRecorder().gpuElapsedNanoseconds / 1000000.0f);
 
                     pass.SetFloat(command, "_IsFirst", isFirst ? 1.0f : 0.0f);
                     pass.SetFloat(command, "_StationaryBlend", settings.StationaryBlend);

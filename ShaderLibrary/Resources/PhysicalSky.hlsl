@@ -103,7 +103,7 @@ float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, cloudDistance);
 		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, cloudDistance, heightAtDistance);
 		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
-		luminance += clouds.rgb * viewTransmittance;
+		luminance += clouds.rgb; //* viewTransmittance;
 	#endif
 	
 	float offset = _BlueNoise1D[position.xy % 128];
@@ -154,11 +154,11 @@ float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		
 #ifndef REFLECTION_PROBE
 			// Blend clouds if needed
-			if(currentDistance >= cloudDistance)
-				lighting *= clouds.a;
+			//if(currentDistance >= cloudDistance)
+			//	lighting *= clouds.a;
 		#endif
 		
-		luminance += lighting * (1.0 - transmittance) / extinction;
+		//luminance += lighting * (1.0 - transmittance) / extinction;
 	}
 	
 	// Account for bounced light off the earth
