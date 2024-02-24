@@ -31,6 +31,8 @@ namespace Arycama.CustomRenderPipeline
 
         protected abstract void Execute(CommandBuffer command);
 
+        protected virtual void PostExecute(CommandBuffer command) { }
+
         public void ReadTexture(string propertyName, RTHandle texture)
         {
             Assert.IsNotNull(texture, propertyName);
@@ -88,6 +90,8 @@ namespace Arycama.CustomRenderPipeline
 
             Execute(command);
 
+            PostExecute(command);
+
             if (renderGraphBuilder != null)
             {
                 RenderGraph.ReleaseRenderGraphBuilder(renderGraphBuilder);
@@ -98,106 +102,7 @@ namespace Arycama.CustomRenderPipeline
         }
 
         protected abstract void SetupTargets(CommandBuffer command);
-        //{
-        //    // TODO: Can clear a depth and color target together
-        //    int width = 0, height = 0, targetWidth = 0, targetHeight = 0;
-
-        //    var binding = new RenderTargetBinding();
-        //    if (depthBinding.Handle != null)
-        //    {
-        //        width = depthBinding.Handle.Width;
-        //        height = depthBinding.Handle.Height;
-        //        targetWidth = depthBinding.Handle.RenderTexture.width;
-        //        targetHeight = depthBinding.Handle.RenderTexture.height;
-
-        //        // Load action not supported outside of renderpass API, so emulate it here
-        //        if (depthBinding.LoadAction == RenderBufferLoadAction.Clear)
-        //        {
-        //            command.SetRenderTarget(BuiltinRenderTextureType.None, depthBinding.Handle);
-        //            command.ClearRenderTarget(true, false, default, depthBinding.ClearDepth);
-        //            binding.depthLoadAction = RenderBufferLoadAction.Load;
-        //        }
-        //        else
-        //        {
-        //            binding.depthLoadAction = depthBinding.LoadAction;
-        //        }
-
-        //        binding.depthRenderTarget = depthBinding.Handle;
-        //        binding.depthStoreAction = depthBinding.StoreAction;
-        //        binding.flags = depthBinding.Flags;
-        //    }
-        //    else
-        //    {
-        //        // Need to set binding.depthRenderTarget to BuiltinRenderTextureType.None or the pass won't work
-        //        binding.depthRenderTarget = BuiltinRenderTextureType.None;
-        //        binding.depthLoadAction = RenderBufferLoadAction.DontCare;
-        //        binding.depthStoreAction = RenderBufferStoreAction.DontCare;
-        //    }
-
-        //    if (colorBindings.Count > 0)
-        //    {
-        //        var targets = ArrayPool<RenderTargetIdentifier>.Get(colorBindings.Count);
-        //        var loadActions = ArrayPool<RenderBufferLoadAction>.Get(colorBindings.Count);
-        //        var storeActions = ArrayPool<RenderBufferStoreAction>.Get(colorBindings.Count);
-
-        //        for (var i = 0; i < colorBindings.Count; i++)
-        //        {
-        //            var target = colorBindings[i];
-
-        //            Assert.IsTrue(targetWidth == 0 || targetWidth == target.Handle.RenderTexture.width, Name);
-        //            Assert.IsTrue(targetHeight == 0 || targetHeight == target.Handle.RenderTexture.height, Name);
-
-        //            width = target.Handle.Width;
-        //            height = target.Handle.Height;
-
-        //            // Load action not supported outside of renderpass API, so emulate it here
-        //            if (target.LoadAction == RenderBufferLoadAction.Clear)
-        //            {
-        //                command.SetRenderTarget(target.Handle);
-        //                command.ClearRenderTarget(false, true, target.ClearColor);
-        //                loadActions[i] = RenderBufferLoadAction.Load;
-        //            }
-        //            else
-        //            {
-        //                loadActions[i] = target.LoadAction;
-        //            }
-
-        //            targets[i] = new RenderTargetIdentifier(target.Handle, 0, target.CubemapFace, target.DepthSlice);
-        //            storeActions[i] = target.StoreAction;
-        //        }
-
-        //        binding.colorRenderTargets = targets;
-        //        binding.colorLoadActions = loadActions;
-        //        binding.colorStoreActions = storeActions;
-
-        //        ArrayPool<RenderTargetIdentifier>.Release(targets);
-        //        ArrayPool<RenderBufferLoadAction>.Release(loadActions);
-        //        ArrayPool<RenderBufferStoreAction>.Release(storeActions);
-        //    }
-
-        //    if (screenWrite)
-        //        command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
-        //    else if (depthBinding.Handle != null || colorBindings.Count > 0)
-        //    {
-        //        if(depthBinding.Handle == null && colorBindings.Count == 1)
-        //        {
-        //            command.SetRenderTarget(binding.colorRenderTargets[0]);
-        //            //command.SetRenderTarget(binding.colorRenderTargets[0], binding.colorLoadActions[0], binding.colorStoreActions[0]);
-        //        }
-        //        else
-        //        {
-        //            command.SetRenderTarget(binding);
-        //        }
-        //    }
-
-        //    if (!screenWrite)
-        //        command.SetViewport(new Rect(0, 0, width, height));
-
-        //    depthBinding = default;
-        //    colorBindings.Clear();
-        //    screenWrite = false;
-        //}
-
+       
         void IDisposable.Dispose()
         {
             RenderGraph.AddRenderPassInternal(this);

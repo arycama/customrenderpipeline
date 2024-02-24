@@ -46,7 +46,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	lightingInput.pixelPosition = pixelPosition;
 	lightingInput.eyeDepth = positionCS.w;
 	
-	lighting += GetLighting(lightingInput, true);
+	//lighting += GetLighting(lightingInput, true);
 	
 	float extinction = _FogMode ? (viewDistance > _FogStartDistance && viewDistance < _FogEndDistance ? rcp(_FogEndDistance - viewDistance) : 0.0) : 0.0;
 	float4 luminanceExtinction = float4(albedo * lighting, extinction);

@@ -44,94 +44,98 @@ namespace Arycama.CustomRenderPipeline
             int width = 0, height = 0, targetWidth = 0, targetHeight = 0;
             var isScreen = false;
 
-            try
+            var targets = ArrayPool<RenderTargetIdentifier>.Get(colorTargets.Count);
+            var loads = ArrayPool<RenderBufferLoadAction>.Get(colorTargets.Count);
+            var stores = ArrayPool<RenderBufferStoreAction>.Get(colorTargets.Count);
+
+            if (depthBuffer.Item1 == null)
             {
-                var targets = ArrayPool<RenderTargetIdentifier>.Get(colorTargets.Count);
-                var loads = ArrayPool<RenderBufferLoadAction>.Get(colorTargets.Count);
-                var stores = ArrayPool<RenderBufferStoreAction>.Get(colorTargets.Count);
-
-                if (depthBuffer.Item1 == null)
+                if (colorTargets.Count == 0)
                 {
-                    if(colorTargets.Count == 0)
-                    {
-                        isScreen = true;
-                        command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
-                    }
-                    else if (colorTargets.Count == 1)
-                    {
-                        width = colorTargets[0].Item1.Width;
-                        height = colorTargets[0].Item1.Height;
+                    isScreen = true;
+                    command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
+                }
+                else if (colorTargets.Count == 1)
+                {
+                    width = colorTargets[0].Item1.Width;
+                    height = colorTargets[0].Item1.Height;
 
-                        command.SetRenderTarget(colorTargets[0].Item1, MipLevel, CubemapFace.Unknown, DepthSlice);
-                    }
-                    else
-                    {
-                        for (var i = 0; i < colorTargets.Count; i++)
-                        {
-                            Assert.IsTrue(targetWidth == 0 || targetWidth == colorTargets[i].Item1.RenderTexture.width, Name);
-                            Assert.IsTrue(targetHeight == 0 || targetHeight == colorTargets[i].Item1.RenderTexture.height, Name);
-
-                            width = colorTargets[i].Item1.Width;
-                            height = colorTargets[i].Item1.Height;
-
-                            targets[i] = colorTargets[i].Item1;
-                            loads[i] = colorTargets[i].Item2;
-                            stores[i] = colorTargets[i].Item3;
-                        }
-
-                        command.SetRenderTarget(targets, BuiltinRenderTextureType.None);
-                    }
+                    command.SetRenderTarget(colorTargets[0].Item1, MipLevel, CubemapFace.Unknown, DepthSlice);
                 }
                 else
                 {
-                    width = depthBuffer.Item1.Width;
-                    height = depthBuffer.Item1.Height;
-                    targetWidth = depthBuffer.Item1.RenderTexture.width;
-                    targetHeight = depthBuffer.Item1.RenderTexture.height;
-
-                    if (colorTargets.Count == 0)
+                    for (var i = 0; i < colorTargets.Count; i++)
                     {
-                        var binding = new RenderTargetBinding(targets, loads, stores, depthBuffer.Item1, depthBuffer.Item2, depthBuffer.Item3) { flags = renderTargetFlags };
-                        command.SetRenderTarget(binding);
+                        Assert.IsTrue(targetWidth == 0 || targetWidth == colorTargets[i].Item1.RenderTexture.width, Name);
+                        Assert.IsTrue(targetHeight == 0 || targetHeight == colorTargets[i].Item1.RenderTexture.height, Name);
+
+                        width = colorTargets[i].Item1.Width;
+                        height = colorTargets[i].Item1.Height;
+
+                        targets[i] = colorTargets[i].Item1;
+                        loads[i] = colorTargets[i].Item2;
+                        stores[i] = colorTargets[i].Item3;
                     }
-                    else
-                    {
-                        for (var i = 0; i < colorTargets.Count; i++)
-                        {
-                            Assert.IsTrue(targetWidth == 0 || targetWidth == colorTargets[i].Item1.RenderTexture.width, Name);
-                            Assert.IsTrue(targetHeight == 0 || targetHeight == colorTargets[i].Item1.RenderTexture.height, Name);
 
-                            width = colorTargets[i].Item1.Width;
-                            height = colorTargets[i].Item1.Height;
-
-                            targets[i] = colorTargets[i].Item1;
-                            loads[i] = colorTargets[i].Item2;
-                            stores[i] = colorTargets[i].Item3;
-                        }
-
-                        var binding = new RenderTargetBinding(targets, loads, stores, depthBuffer.Item1, depthBuffer.Item2, depthBuffer.Item3) { flags = renderTargetFlags };
-                        command.SetRenderTarget(binding);
-
-                    }
+                    command.SetRenderTarget(targets, BuiltinRenderTextureType.None);
                 }
-
-                if (clearFlags != RTClearFlags.None)
-                    command.ClearRenderTarget(clearFlags, clearColor, clearDepth, (uint)clearStencil);
-
-                if (!isScreen)
-                    command.SetViewport(new Rect(0, 0, width, height));
-
-                ArrayPool<RenderTargetIdentifier>.Release(targets);
-                ArrayPool<RenderBufferLoadAction>.Release(loads);
-                ArrayPool<RenderBufferStoreAction>.Release(stores);
             }
-            finally
+            else
             {
-                depthBuffer = default;
-                colorTargets.Clear();
-                DepthSlice = 0;
-                MipLevel = 0;
+                width = depthBuffer.Item1.Width;
+                height = depthBuffer.Item1.Height;
+                targetWidth = depthBuffer.Item1.RenderTexture.width;
+                targetHeight = depthBuffer.Item1.RenderTexture.height;
+
+                if (colorTargets.Count == 0)
+                {
+                    var binding = new RenderTargetBinding(targets, loads, stores, depthBuffer.Item1, depthBuffer.Item2, depthBuffer.Item3) { flags = renderTargetFlags };
+                    command.SetRenderTarget(binding);
+                }
+                else
+                {
+                    for (var i = 0; i < colorTargets.Count; i++)
+                    {
+                        Assert.IsTrue(targetWidth == 0 || targetWidth == colorTargets[i].Item1.RenderTexture.width, Name);
+                        Assert.IsTrue(targetHeight == 0 || targetHeight == colorTargets[i].Item1.RenderTexture.height, Name);
+
+                        width = colorTargets[i].Item1.Width;
+                        height = colorTargets[i].Item1.Height;
+
+                        targets[i] = colorTargets[i].Item1;
+                        loads[i] = colorTargets[i].Item2;
+                        stores[i] = colorTargets[i].Item3;
+                    }
+
+                    var binding = new RenderTargetBinding(targets, loads, stores, depthBuffer.Item1, depthBuffer.Item2, depthBuffer.Item3) { flags = renderTargetFlags };
+                    command.SetRenderTarget(binding);
+
+                }
             }
+
+            if (clearFlags != RTClearFlags.None)
+                command.ClearRenderTarget(clearFlags, clearColor, clearDepth, (uint)clearStencil);
+
+            if (!isScreen)
+                command.SetViewport(new Rect(0, 0, width, height));
+
+            ArrayPool<RenderTargetIdentifier>.Release(targets);
+            ArrayPool<RenderBufferLoadAction>.Release(loads);
+            ArrayPool<RenderBufferStoreAction>.Release(stores);
+        }
+
+        protected sealed override void PostExecute(CommandBuffer command)
+        {
+            foreach (var colorTarget in colorTargets)
+            {
+                if (colorTarget.Item1.AutoGenerateMips)
+                    command.GenerateMips(colorTarget.Item1);
+            }
+
+            depthBuffer = default;
+            colorTargets.Clear();
+            DepthSlice = 0;
+            MipLevel = 0;
         }
     }
 }

@@ -133,7 +133,7 @@ float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 						#ifdef REFLECTION_PROBE
 							lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * _Exposure * shadow;
 						#else
-							float cloudShadow = CloudTransmittanceLevelZero(-V * currentDistance);
+							float cloudShadow = CloudTransmittance(-V * currentDistance);
 							lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * _Exposure * shadow * cloudShadow;
 						#endif	
 					}
@@ -176,7 +176,7 @@ float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, rayLength, _PlanetRadius);
 			float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, _PlanetRadius, viewCosAngleAtDistance);
 			
-			float cloudShadow = CloudTransmittanceLevelZero(-V * rayLength);
+			float cloudShadow = CloudTransmittance(-V * rayLength);
 			
 			#ifdef REFLECTION_PROBE
 				luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color * _Exposure;

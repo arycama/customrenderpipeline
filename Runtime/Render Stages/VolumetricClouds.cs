@@ -70,8 +70,8 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetFloat(command, "_TransmittanceThreshold", TransmittanceThreshold);
 
-                pass.SetInt(command, "_RaySamples", RaySamples);
-                pass.SetInt(command, "_LightSamples", LightSamples);
+                pass.SetFloat(command, "_RaySamples", RaySamples);
+                pass.SetFloat(command, "_LightSamples", LightSamples);
 
                 pass.SetVector(command, "_NoiseResolution", (Vector3)NoiseResolution);
                 pass.SetVector(command, "_DetailNoiseResolution", (Vector3)DetailNoiseResolution);
@@ -94,7 +94,7 @@ namespace Arycama.CustomRenderPipeline
 
         public IRenderPassData SetupData()
         {
-            var weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, GraphicsFormat.R8_UNorm, hasMips: true);
+            var weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, GraphicsFormat.R8_UNorm, hasMips: true, autoGenerateMips: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Weather Map"))
             {
                 pass.Initialize(material, 0);
@@ -112,7 +112,7 @@ namespace Arycama.CustomRenderPipeline
 
             // Noise
             var maxInstanceCount = 32;
-            var noiseTexture = renderGraph.GetTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, GraphicsFormat.R8_UNorm, false, settings.NoiseResolution.z, TextureDimension.Tex3D, false, true);
+            var noiseTexture = renderGraph.GetTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, GraphicsFormat.R8_UNorm, false, settings.NoiseResolution.z, TextureDimension.Tex3D, false, true, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Noise Texture"))
             {
                 var primitiveCount = MathUtils.DivRoundUp(settings.NoiseResolution.z, maxInstanceCount);
@@ -122,7 +122,6 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    command.GenerateMips(weatherMap);
                     pass.SetFloat(command, "_NoiseFrequency", settings.NoiseParams.Frequency);
                     pass.SetFloat(command, "_NoiseH", settings.NoiseParams.H);
                     pass.SetFloat(command, "_NoiseOctaves", settings.NoiseParams.Octaves);
@@ -136,7 +135,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Detail
-            var detailNoiseTexture = renderGraph.GetTexture(settings.DetailNoiseResolution.x, settings.DetailNoiseResolution.y, GraphicsFormat.R8_UNorm, false, settings.DetailNoiseResolution.z, TextureDimension.Tex3D, false, true);
+            var detailNoiseTexture = renderGraph.GetTexture(settings.DetailNoiseResolution.x, settings.DetailNoiseResolution.y, GraphicsFormat.R8_UNorm, false, settings.DetailNoiseResolution.z, TextureDimension.Tex3D, false, true, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Detail Noise Texture"))
             {
                 var primitiveCount = MathUtils.DivRoundUp(settings.DetailNoiseResolution.z, maxInstanceCount);
@@ -146,20 +145,11 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    command.GenerateMips(noiseTexture);
                     pass.SetFloat(command, "_DetailNoiseFrequency", settings.DetailNoiseParams.Frequency);
                     pass.SetFloat(command, "_DetailNoiseH", settings.DetailNoiseParams.H);
                     pass.SetFloat(command, "_DetailNoiseOctaves", settings.DetailNoiseParams.Octaves);
                     pass.SetFloat(command, "_DetailNoiseFactor", settings.DetailNoiseParams.FractalBound);
                     pass.SetVector(command, "_DetailNoiseResolution", (Vector3)settings.DetailNoiseResolution);
-                });
-            }
-
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Volumetric Clouds Detail Noise Texture"))
-            {
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
-                {
-                    command.GenerateMips(detailNoiseTexture);
                 });
             }
 
@@ -188,9 +178,13 @@ namespace Arycama.CustomRenderPipeline
             var resolution = settings.ShadowResolution;
             var res = new Vector4(resolution, resolution, 1f / resolution, 1f / resolution);
 
-            var planetCenter = new Vector3(0.0f, -planetRadius - camera.transform.position.y, 0.0f);
-            var rayOrigin = new Vector3(0.0f, -camera.transform.position.y, 0.0f);
+            var cameraPosition = camera.transform.position;
+            var texelSize = radius * 2.0f / resolution;
+            var snappedCameraPosition = new Vector3(Mathf.Floor(cameraPosition.x / texelSize) * texelSize, Mathf.Floor(cameraPosition.y / texelSize) * texelSize, Mathf.Floor(cameraPosition.z / texelSize) * texelSize);
 
+
+            var planetCenter = new Vector3(0.0f, -planetRadius - cameraPosition.y, 0.0f);
+            var rayOrigin = new Vector3(snappedCameraPosition.x, 0.0f, snappedCameraPosition.z) - cameraPosition;
             var distance = GeometryUtilities.IntersectRaySphereSimple(rayOrigin - planetCenter, lightDirection, planetRadius + settings.StartHeight + settings.LayerThickness);
 
             var viewPosition = rayOrigin + lightDirection * distance;
@@ -205,7 +199,7 @@ namespace Arycama.CustomRenderPipeline
             worldToShadow.SetRow(1, 0.5f * (worldToShadow.GetRow(1) + worldToShadow.GetRow(3)));
             worldToShadow.SetRow(2, 0.5f * (worldToShadow.GetRow(2) + worldToShadow.GetRow(3)));
 
-            var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32);
+            var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true);
             using(var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Cloud Shadow"))
             {
                 pass.Initialize(material, 3);

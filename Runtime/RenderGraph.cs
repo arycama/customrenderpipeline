@@ -168,7 +168,7 @@ namespace Arycama.CustomRenderPipeline
                             else if (rt.width < handle.Width || rt.height < handle.Height)
                                 continue;
 
-                            if (rt.enableRandomWrite == handle.EnableRandomWrite && rt.dimension == handle.Dimension)
+                            if (rt.enableRandomWrite == handle.EnableRandomWrite && rt.dimension == handle.Dimension && rt.useMipMap == handle.HasMips)
                             {
                                 if (handle.Dimension != TextureDimension.Tex2D && rt.volumeDepth < handle.VolumeDepth)
                                     continue;
@@ -193,7 +193,7 @@ namespace Arycama.CustomRenderPipeline
                                 result.dimension = handle.Dimension;
                                 result.volumeDepth = handle.VolumeDepth;
                                 result.useMipMap = handle.HasMips;
-                                result.autoGenerateMips = false;
+                                result.autoGenerateMips = false; // Always false, we manually handle mip generation if needed
                             }
 
                             result.name = $"RTHandle {rtCount++} {result.dimension} {result.graphicsFormat} {width}x{height} ";
@@ -255,7 +255,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false)
+        public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false)
         {
             // Ensure we're not getting a texture during execution, this must be done in the setup
             Assert.IsFalse(isExecuting);
@@ -274,6 +274,7 @@ namespace Arycama.CustomRenderPipeline
             result.Dimension = dimension;
             result.IsScreenTexture = isScreenTexture;
             result.HasMips = hasMips;
+            result.AutoGenerateMips = autoGenerateMips;
 
             unavailableRtHandles.Add(result);
             return result;
@@ -321,7 +322,7 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        public RTHandle ImportRenderTexture(RenderTexture renderTexture)
+        public RTHandle ImportRenderTexture(RenderTexture renderTexture, bool autoGenerateMips = false)
         {
             if (!importedTextures.TryGetValue(renderTexture, out var result))
             {
@@ -334,7 +335,8 @@ namespace Arycama.CustomRenderPipeline
                     VolumeDepth = renderTexture.volumeDepth,
                     Dimension = renderTexture.dimension,
                     RenderTexture = renderTexture,
-                    HasMips = renderTexture.useMipMap
+                    HasMips = renderTexture.useMipMap,
+                    AutoGenerateMips = autoGenerateMips
                 };
 
                 result.Id = rtHandleCount++;

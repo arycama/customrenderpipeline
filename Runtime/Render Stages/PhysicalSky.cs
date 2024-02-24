@@ -125,7 +125,7 @@ namespace Arycama.CustomRenderPipeline
             var multiScatterRemap = GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight);
 
             // Generate Reflection probe
-            var skyReflection = renderGraph.GetTexture(settings.ReflectionResolution, settings.ReflectionResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, hasMips: true);
+            var skyReflection = renderGraph.GetTexture(settings.ReflectionResolution, settings.ReflectionResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, hasMips: true, autoGenerateMips: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Reflection"))
             {
                 pass.Initialize(skyMaterial, 1);
@@ -187,7 +187,6 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    command.GenerateMips(skyReflection);
                     pass.SetFloat(command, "_MipLevel", mipLevel);
                 });
             }
