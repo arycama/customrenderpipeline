@@ -45,6 +45,12 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public float LightDistance { get; private set; } = 512.0f;
             [field: SerializeField, Range(0.0f, 1.0f)] public float TransmittanceThreshold { get; private set; } = 0.05f;
 
+            [field: SerializeField, Range(-1.0f, 1.0f)] public float BackScatterPhase { get; private set; } = -0.15f;
+            [field: SerializeField, Range(0.0f, 4.0f)] public float BackScatterScale { get; private set; } = 2.16f;
+
+            [field: SerializeField, Range(-1.0f, 1.0f)] public float ForwardScatterPhase { get; private set; } = 0.8f;
+            [field: SerializeField, Range(0.0f, 4.0f)] public float ForwardScatterScale { get; private set; } = 1.0f;
+
             [field: Header("Temporal")]
             [field: SerializeField, Range(0.0f, 1.0f)] public float StationaryBlend { get; private set; } = 0.95f;
             [field: SerializeField, Range(0.0f, 1.0f)] public float MotionBlend { get; private set; } = 0.0f;
@@ -76,6 +82,11 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetVector(command, "_NoiseResolution", (Vector3)NoiseResolution);
                 pass.SetVector(command, "_DetailNoiseResolution", (Vector3)DetailNoiseResolution);
                 pass.SetVector(command, "_WeatherMapResolution", (Vector2)WeatherMapResolution);
+
+                pass.SetFloat(command, "_BackScatterPhase", BackScatterPhase);
+                pass.SetFloat(command, "_ForwardScatterPhase", ForwardScatterPhase);
+                pass.SetFloat(command, "_BackScatterScale", BackScatterScale);
+                pass.SetFloat(command, "_ForwardScatterScale", ForwardScatterScale);
             }
         }
 
@@ -183,14 +194,43 @@ namespace Arycama.CustomRenderPipeline
             var snappedCameraPosition = new Vector3(Mathf.Floor(cameraPosition.x / texelSize) * texelSize, Mathf.Floor(cameraPosition.y / texelSize) * texelSize, Mathf.Floor(cameraPosition.z / texelSize) * texelSize);
 
 
-            var planetCenter = new Vector3(0.0f, -planetRadius - cameraPosition.y, 0.0f);
+           // var planetCenter = new Vector3(0.0f, -planetRadius - cameraPosition.y, 0.0f);
             var rayOrigin = new Vector3(snappedCameraPosition.x, 0.0f, snappedCameraPosition.z) - cameraPosition;
-            var distance = GeometryUtilities.IntersectRaySphereSimple(rayOrigin - planetCenter, lightDirection, planetRadius + settings.StartHeight + settings.LayerThickness);
+            //var rayOrigin = new Vector3(0.0f, -cameraPosition.y, 0.0f);
+            //var distance = GeometryUtilities.IntersectRaySphereSimple(rayOrigin - planetCenter, lightDirection, planetRadius + settings.StartHeight + settings.LayerThickness);
+            var distance = settings.StartHeight + settings.LayerThickness;
 
-            var viewPosition = rayOrigin + lightDirection * distance;
-            var viewMatrix = Matrix4x4.TRS(viewPosition, lightRotation, new Vector3(1f, 1f, -1f)).inverse;
-            var projectionMatrix = Matrix4x4.Ortho(-radius, radius, -radius, radius, -distance, distance);
-            var projectionMatrix2 = Matrix4x4.Ortho(-radius, radius, -radius, radius, 0, distance);
+            // Transform camera bounds to light space
+            var boundsMin = new Vector3(-radius, 0.0f, -radius) - rayOrigin;
+            var boundsSize = new Vector3(radius * 2f, distance, radius * 2f);
+            var worldToLight = Quaternion.Inverse(lightRotation);
+            var minValue = Vector3.positiveInfinity;
+            var maxValue = Vector3.negativeInfinity;
+            for (var z = 0; z < 2; z++)
+            {
+                for (var y = 0; y < 2; y++)
+                {
+                    for (var x = 0; x < 2; x++)
+                    {
+                        var worldPoint = boundsMin + Vector3.Scale(boundsSize, new Vector3(x, y, z));
+                        var localPoint = worldToLight * worldPoint;
+                        minValue = Vector3.Min(minValue, localPoint);
+                        maxValue = Vector3.Max(maxValue, localPoint);
+                    }
+                }
+            }
+
+            var localView = new Vector3(0.5f * (maxValue.x + minValue.x), 0.5f * (maxValue.y + minValue.y), minValue.z);
+            // var viewMatrix = Matrix4x4Extensions.WorldToLocal(lightRotation * localView, lightRotation);
+            //var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(lightRotation * localView - camera.transform.position, lightRotation);
+
+            var depth = maxValue.z - minValue.z;
+
+            //var viewPosition = rayOrigin + lightDirection * distance;
+            //var viewMatrix = Matrix4x4.TRS(viewPosition, lightRotation, new Vector3(1f, 1f, -1f)).inverse;
+            var viewMatrix = Matrix4x4.TRS(lightRotation * localView, lightRotation, new Vector3(1f, 1f, -1f)).inverse;
+            var projectionMatrix = Matrix4x4.Ortho(minValue.x, maxValue.x, minValue.y, maxValue.y, -depth, depth);
+            var projectionMatrix2 = Matrix4x4.Ortho(minValue.x, maxValue.x, minValue.y, maxValue.y, 0.0f, depth);
 
             var viewProjection = projectionMatrix * viewMatrix;
 
@@ -210,17 +250,29 @@ namespace Arycama.CustomRenderPipeline
                 {
                     settings.SetCloudPassData(command, pass);
 
-                    pass.SetFloat(command, "_CloudDepthScale", 1f / distance);
+                    pass.SetFloat(command, "_CloudDepthScale", 1f / depth);
                     pass.SetVector(command, "_ScreenSizeCloudShadow", res);
                     pass.SetMatrix(command, "_InvViewProjMatrixCloudShadow", viewProjection.inverse);
                     pass.SetMatrix(command, "_WorldToCloudShadow", worldToShadow);
-                    pass.SetFloat(command, "_CloudDepthInvScale", distance);
+                    pass.SetFloat(command, "_CloudDepthInvScale", depth);
                     pass.SetVector(command, "_LightDirection0", -lightDirection);
                     pass.SetFloat(command, "_ShadowSamples", settings.ShadowSamples);
+                    pass.SetVector(command, "_ViewPosition", cameraPosition);
+
+                    //command.BeginSample(sampler);
                 });
             }
 
-            return new CloudShadowData(cloudShadow, distance, worldToShadow);
+            //using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Volumetric Cloud Shadow"))
+            //{
+            //    var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+            //    {
+            //        command.EndSample(sampler);
+            //        Debug.Log(sampler.GetRecorder().gpuElapsedNanoseconds / 1000000.0f);
+            //    });
+            //}
+
+            return new CloudShadowData(cloudShadow, depth, worldToShadow);
         }
 
         struct CloudShadowData : IRenderPassData
@@ -281,7 +333,7 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    command.BeginSample(sampler);
+                    //command.BeginSample(sampler);
                     settings.SetCloudPassData(command, pass);
 
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
@@ -337,8 +389,8 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    command.EndSample(sampler);
-                    Debug.Log(sampler.GetRecorder().gpuElapsedNanoseconds / 1000000.0f);
+                    //command.EndSample(sampler);
+                    //Debug.Log(sampler.GetRecorder().gpuElapsedNanoseconds / 1000000.0f);
 
                     pass.SetFloat(command, "_IsFirst", isFirst ? 1.0f : 0.0f);
                     pass.SetFloat(command, "_StationaryBlend", settings.StationaryBlend);

@@ -112,7 +112,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float t = saturate(Max3(min(t0, t1)));
 	history = lerp(history, result, t);
 	
-	result = lerp(history, result, maxWeight * 0.05);
+	//result = lerp(history, result, maxWeight * 0.05);
 	result *= rcp(1.0 - result.r);
 	result = YCoCgToRGB(result);
 	

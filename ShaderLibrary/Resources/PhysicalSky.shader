@@ -32,16 +32,30 @@ Shader "Hidden/Physical Sky"
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }
+
         Pass
         {
-            Name "Render Sky"
-
-            Blend One SrcAlpha
+            Name "Render"
 
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex Vertex
             #pragma fragment FragmentRender
+            #include "PhysicalSky.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "Temporal"
+
+            Blend 0 One SrcAlpha
+            Blend 1 Off
+
+            HLSLPROGRAM
+            #pragma target 5.0
+            #pragma vertex Vertex
+            #pragma fragment FragmentTemporal
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }

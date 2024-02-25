@@ -73,10 +73,11 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public int ConvolutionSamples { get; private set; } = 64;
         }
 
-        public RenderGraph renderGraph;
-        public Settings settings;
-        public Material skyMaterial;
-        public Material ggxConvolutionMaterial;
+        private RenderGraph renderGraph;
+        private Settings settings;
+        private Material skyMaterial;
+        private Material ggxConvolutionMaterial;
+        private readonly CameraTextureCache textureCache;
 
         public PhysicalSky(RenderGraph renderGraph, Settings settings)
         {
@@ -85,6 +86,7 @@ namespace Arycama.CustomRenderPipeline
 
             skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
             ggxConvolutionMaterial = new Material(Shader.Find("Hidden/Ggx Convolve")) { hideFlags = HideFlags.HideAndDontSave };
+            textureCache = new(renderGraph, "Physical Sky");
         }
 
         public IRenderPassData GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer)
@@ -260,13 +262,16 @@ namespace Arycama.CustomRenderPipeline
             return new Result(transmittance, multiScatter, ambientBuffer, reflectionProbe, transmittanceRemap, multiScatterRemap);
         }
 
-        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, IRenderPassData atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, IRenderPassData cloudShadowData)
+        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, IRenderPassData atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, IRenderPassData cloudShadowData, Camera camera)
         {
+            var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            var skyDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R32_SFloat, isScreenTexture: true);
+
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
             {
                 pass.Initialize(skyMaterial, 2);
-                pass.WriteTexture(target);
-                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(skyTemp);
+                pass.WriteTexture(skyDepth);
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_Clouds", clouds);
                 pass.ReadTexture("_CloudDepth", cloudDepth);
@@ -289,6 +294,37 @@ namespace Arycama.CustomRenderPipeline
 
                     commonPassData.SetProperties(pass, command);
                     cloudShadowData.SetProperties(pass, command);
+                });
+            }
+
+            // Reprojection
+            var isFirst = textureCache.GetTexture(camera, new RenderTextureDescriptor(width, height, GraphicsFormat.R16G16B16A16_SFloat, 0), out var current, out var previous);
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Temporal"))
+            {
+                pass.Initialize(skyMaterial, 3);
+                pass.WriteTexture(target, RenderBufferLoadAction.Load);
+                pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
+                pass.ReadTexture("_SkyInput", skyTemp);
+                pass.ReadTexture("_SkyHistory", previous);
+                pass.ReadTexture("_SkyDepth", skyDepth);
+                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_Clouds", clouds);
+                pass.ReadTexture("_CloudDepth", cloudDepth);
+
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    //command.EndSample(sampler);
+                    //Debug.Log(sampler.GetRecorder().gpuElapsedNanoseconds / 1000000.0f);
+
+                    pass.SetFloat(command, "_IsFirst", isFirst ? 1.0f : 0.0f);
+                    //pass.SetFloat(command, "_StationaryBlend", settings.StationaryBlend);
+                    //pass.SetFloat(command, "_MotionBlend", settings.MotionBlend);
+                    //pass.SetFloat(command, "_MotionFactor", settings.MotionFactor);
+
+                    pass.SetInt(command, "_MaxWidth", width - 1);
+                    pass.SetInt(command, "_MaxHeight", height - 1);
+
+                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
                 });
             }
         }

@@ -70,7 +70,7 @@ float3 FragmentTransmittanceLut(float4 position : SV_Position) : SV_Target
 	return exp(-opticalDepth * dx);
 }
 
-float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
 	
@@ -98,12 +98,6 @@ float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 	
 		float cloudDistance = _CloudDepth[position.xy];
 		float4 clouds = _Clouds[position.xy];
-	
-		// Add cloud luminance
-		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, cloudDistance);
-		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, cloudDistance, heightAtDistance);
-		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
-		luminance += clouds.rgb; //* viewTransmittance;
 	#endif
 	
 	float offset = _BlueNoise1D[position.xy % 128];
@@ -152,16 +146,17 @@ float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		float3 extinction = AtmosphereExtinction(viewHeight);
 		float3 transmittance = exp(-extinction * dt);
 		
-#ifndef REFLECTION_PROBE
+		#ifndef REFLECTION_PROBE
 			// Blend clouds if needed
-			//if(currentDistance >= cloudDistance)
-			//	lighting *= clouds.a;
+			if(currentDistance >= cloudDistance)
+				lighting *= 1.0 - clouds.a;
 		#endif
 		
-		//luminance += lighting * (1.0 - transmittance) / extinction;
+		luminance += lighting * (1.0 - transmittance) / extinction;
 	}
 	
 	// Account for bounced light off the earth
+	#ifdef REFLECTION_PROBE
 	if (rayIntersectsGround)
 	{
 		for (uint j = 0; j < _DirectionalLightCount; j++)
@@ -178,17 +173,119 @@ float4 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			
 			float cloudShadow = CloudTransmittance(-V * rayLength);
 			
-			#ifdef REFLECTION_PROBE
-				luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color * _Exposure;
-			#else
-				luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color * _Exposure * clouds.a * cloudShadow;
-			#endif
+			luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color * _Exposure;
+		}
+	}
+	#endif
+	
+	return luminance;
+}
+
+float4 _SkyInput_Scale, _SkyDepth_Scale, _SkyHistory_Scale;
+Texture2D<float> _SkyDepth;
+Texture2D<float3> _SkyInput, _SkyHistory;
+uint _MaxWidth, _MaxHeight;
+float _IsFirst;
+
+float4 FragmentTemporal(float4 position : SV_Position, out float3 skyResult : SV_Target1) : SV_Target0
+{
+	float3 result = _SkyInput[position.xy];
+	
+	//if (_IsFirst)
+	//	return result;
+	
+	float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+	float skyDistance = _CloudDepth[position.xy];
+
+	float3 worldPosition = rd * skyDistance;
+	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
+		
+	//if (any(saturate(historyUv) != historyUv))
+	//	return result;
+	
+	// Neighborhood clamp
+	float3 mean = 0.0, stdDev = 0.0;
+	float3 minValue = 0.0, maxValue = 0.0;
+	[unroll]
+	for (int y = -1; y <= 1; y++)
+	{
+		[unroll]
+		for (int x = -1; x <= 1; x++)
+		{
+			float3 sample = _SkyInput[min(uint2(position.xy + float2(x, y)), uint2(_MaxWidth, _MaxHeight))];
+			mean += sample;
+			stdDev += sample * sample;
+					
+			if (x == -1 && y == -1)
+			{
+				minValue = maxValue = sample;
+			}
+			else
+			{
+				minValue = min(minValue, sample);
+				maxValue = max(maxValue, sample);
+			}
+		}
+	}
+			
+	mean /= 9.0;
+	stdDev = sqrt(abs(stdDev / 9.0 - mean * mean));
+			
+	//minValue = mean - stdDev;
+	//maxValue = mean + stdDev;
+			
+	float3 history = _SkyHistory.Sample(_LinearClampSampler, historyUv * _SkyHistory_Scale.xy);
+	//history = _SkyHistory[position.xy];
+	
+	history = clamp(history, minValue, maxValue);
+			
+	float2 uv = position.xy * _ScaledResolution.zw;
+	//float motionLength = saturate(distance(historyUv, uv) * _MotionFactor);
+	//float blend = lerp(_StationaryBlend, _MotionBlend, motionLength);
+	
+	result = lerp(history, result, 0.05);
+	skyResult = result;
+	
+	float depth = _Depth[position.xy];
+	//float sceneDistance = CameraDepthToDistance(depth, V);
+	
+	float cloudDistance = _CloudDepth[position.xy];
+	float4 clouds = _Clouds[position.xy];
+	clouds.rgb *= clouds.a;
+	
+	float3 ambient = float3(_AmbientSh[0].w, _AmbientSh[1].w, _AmbientSh[2].w);
+	clouds.rgb += ambient * clouds.a;
+	
+	// Add cloud luminance
+	float viewHeight = _ViewPosition.y + _PlanetRadius;
+	float viewCosAngle = -rd.y;
+	
+	float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, cloudDistance);
+	float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, cloudDistance, heightAtDistance);
+	float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
+	result += clouds.rgb * viewTransmittance;
+	
+	// Account for bounced light off the earth
+	bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
+	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
+	if (rayIntersectsGround)
+	{
+		for (uint j = 0; j < _DirectionalLightCount; j++)
+		{
+			DirectionalLight light = _DirectionalLights[j];
+			
+			float LdotV = dot(light.direction, rd);
+			float lightCosAngle = light.direction.y;
+			
+			float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, _PlanetRadius);
+			float3 sunTransmittance = AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance);
+			float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, rayLength, _PlanetRadius);
+			float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, _PlanetRadius, viewCosAngleAtDistance);
+			
+			float cloudShadow = CloudTransmittance(rd * rayLength);
+			result += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color * _Exposure * (1.0 - clouds.a) * cloudShadow;
 		}
 	}
 	
-	#ifdef REFLECTION_PROBE
-		return float4(luminance, 1.0);
-	#else
-		return float4(luminance, (depth != 0.0) * clouds.a);
-	#endif
+	return float4(result, (depth != 0.0) * (1.0 - clouds.a));
 }

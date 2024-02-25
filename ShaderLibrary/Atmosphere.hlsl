@@ -15,7 +15,7 @@ const static float _OzoneWidth = 15000.0 * _EarthScale;
 const static float _OzoneHeight = 25000.0 * _EarthScale;
 
 const static float3 _RayleighScatter = float3(5.802, 13.558, 33.1) * 1e-6 * rcp(_EarthScale);
-const static float _MieScatter = 3.996e-6 * rcp(_EarthScale);
+const static float _MieScatter = 3.996e-5 * rcp(_EarthScale);
 const static float _MieAbsorption = 4.4e-6 * rcp(_EarthScale);
 const static float3 _OzoneAbsorption = float3(0.650, 1.811, 0.085) * 1e-6 * rcp(_EarthScale);
 const static float _MiePhase = 0.8;
