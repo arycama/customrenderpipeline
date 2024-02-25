@@ -72,7 +72,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "_StartHeight", StartHeight);
                 pass.SetFloat(command, "_LayerThickness", LayerThickness);
                 pass.SetFloat(command, "_LightDistance", LightDistance);
-                pass.SetFloat(command, "_Density", Density);
+                pass.SetFloat(command, "_Density", Density * MathUtils.Log2e);
 
                 pass.SetFloat(command, "_TransmittanceThreshold", TransmittanceThreshold);
 
@@ -300,8 +300,36 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public RTHandle Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, out RTHandle cloudDepth, CullingResults cullingResults, IRenderPassData cloudRenderData, IRenderPassData cloudShadow)
+        public RTHandle Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, out RTHandle cloudDepth, CullingResults cullingResults, IRenderPassData cloudRenderData, IRenderPassData cloudShadow, RTHandle cameraTarget)
         {
+            Color lightColor0 = Color.clear, lightColor1 = Color.clear;
+            Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
+
+            // Find first 2 directional lights
+            var dirLightCount = 0;
+            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
+            {
+                var light = cullingResults.visibleLights[i];
+                if (light.lightType != LightType.Directional)
+                    continue;
+
+                dirLightCount++;
+
+                if (dirLightCount == 1)
+                {
+                    lightDirection0 = -light.localToWorldMatrix.Forward();
+                    lightColor0 = light.finalColor;
+                }
+                else if (dirLightCount == 2)
+                {
+                    lightDirection1 = -light.localToWorldMatrix.Forward();
+                    lightColor1 = light.finalColor;
+
+                    // Only 2 lights supported
+                    break;
+                }
+            }
+
             var cloudTemp = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
             cloudDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R32_SFloat, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Render"))
@@ -338,34 +366,6 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
 
-                    Color lightColor0 = Color.clear, lightColor1 = Color.clear;
-                    Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
-
-                    // Find first 2 directional lights
-                    var dirLightCount = 0;
-                    for (var i = 0; i < cullingResults.visibleLights.Length; i++)
-                    {
-                        var light = cullingResults.visibleLights[i];
-                        if (light.lightType != LightType.Directional)
-                            continue;
-
-                        dirLightCount++;
-
-                        if (dirLightCount == 1)
-                        {
-                            lightDirection0 = -light.localToWorldMatrix.Forward();
-                            lightColor0 = light.finalColor;
-                        }
-                        else if (dirLightCount == 2)
-                        {
-                            lightDirection1 = -light.localToWorldMatrix.Forward();
-                            lightColor1 = light.finalColor;
-
-                            // Only 2 lights supported
-                            break;
-                        }
-                    }
-
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
                     pass.SetVector(command, "_LightColor0", lightColor0);
                     pass.SetVector(command, "_LightDirection1", lightDirection1);
@@ -382,10 +382,12 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Temporal"))
             {
                 pass.Initialize(material, 5);
+                pass.WriteTexture(cameraTarget, RenderBufferLoadAction.Load);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_Input", cloudTemp);
                 pass.ReadTexture("_History", previous);
                 pass.ReadTexture("_CloudDepth", cloudDepth);
+                pass.ReadTexture("_Depth", cameraDepth);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -397,10 +399,16 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_MotionBlend", settings.MotionBlend);
                     pass.SetFloat(command, "_MotionFactor", settings.MotionFactor);
 
+                    pass.SetVector(command, "_LightDirection0", lightDirection0);
+                    pass.SetVector(command, "_LightColor0", lightColor0);
+                    pass.SetVector(command, "_LightDirection1", lightDirection1);
+                    pass.SetVector(command, "_LightColor1", lightColor1);
+
                     pass.SetInt(command, "_MaxWidth", width - 1);
                     pass.SetInt(command, "_MaxHeight", height - 1);
 
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
+                    settings.SetCloudPassData(command, pass);
                 });
             }
 

@@ -72,6 +72,9 @@ Shader "Hidden/Volumetric Clouds"
         {
             Name "Temporal"
 
+            Blend 0 One SrcAlpha
+            Blend 1 Off
+
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex Vertex

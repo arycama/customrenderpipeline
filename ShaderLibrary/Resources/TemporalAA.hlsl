@@ -1,8 +1,9 @@
 #include "../Common.hlsl"
+#include "../Utility.hlsl"
 
 Texture2D<float3> _Input, _History;
 Texture2D<float2> _Motion;
-Texture2D<float> _Depth;
+Texture2D<float> _Depth, _CloudDepth;
 
 cbuffer Properties
 {
@@ -14,19 +15,6 @@ float4 Vertex(uint id : SV_VertexID) : SV_Position
 {
 	float2 uv = float2((id << 1) & 2, id & 2);
 	return float4(uv * 2.0 - 1.0, 1.0, 1.0);
-}
-
-float3 RGBToYCoCg(float3 RGB)
-{
-	const float3x3 mat = float3x3(0.25, 0.5, 0.25, 0.5, 0, -0.5, -0.25, 0.5, -0.25);
-	float3 col = mul(mat, RGB);
-	return col;
-}
-    
-float3 YCoCgToRGB(float3 YCoCg)
-{
-	const float3x3 mat = float3x3(1, 1, -1, 1, 0, 1, 1, -1, -1);
-	return mul(mat, YCoCg);
 }
 
 float3 Fragment(float4 position : SV_Position) : SV_Target
@@ -59,6 +47,15 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 			
 			weightSum += weight;
 			maxWeight = max(maxWeight, weight);
+			
+			if(_Depth[position.xy] == 0.0)
+			{
+				float cloudDistance = _CloudDepth[position.xy];
+
+				float3 worldPosition = normalize(PixelToWorld(float3(position.xy, 1.0))) * cloudDistance;
+				float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
+				motion = uv - historyUv;
+			}
 			
 			if(all(int2(x, y) == -1))
 			{
@@ -112,7 +109,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float t = saturate(Max3(min(t0, t1)));
 	history = lerp(history, result, t);
 	
-	//result = lerp(history, result, maxWeight * 0.05);
+	result = lerp(history, result, maxWeight * 0.05);
 	result *= rcp(1.0 - result.r);
 	result = YCoCgToRGB(result);
 	

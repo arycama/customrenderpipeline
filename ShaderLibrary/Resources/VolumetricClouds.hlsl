@@ -234,8 +234,7 @@ float3 FragmentShadow(float4 position : SV_Position) : SV_Target0
 	float dtY = (rayEndY - rayStartY) / _ShadowSamples;
 	
 	float offset = InterleavedGradientNoise(position.xy, 0); // _BlueNoise1D[uint2(position.xy) % 128];
-	float transmittanceSum = 0.0, weightedTransmittanceSum = 0.0;
-	float extinctionSum = 0.0;
+	float weightSum = 0.0, weightedDepthSum = 0.0;
 	
 	float3 dxScale = rd * (dt - dtX);
 	float3 dyScale = rd * (dt - dtY);
@@ -243,6 +242,7 @@ float3 FragmentShadow(float4 position : SV_Position) : SV_Target0
 	float3 dxOffset = rd * (rayStart - rayStartX) + (P - Px);
 	float3 dyOffset = rd * (rayStart - rayStartY) + (P - Py);
 	
+	float transmittance = 1.0;
 	for (float i = offset; i < _ShadowSamples; i++)
 	{
 		float t = rayStart + i * dt;
@@ -252,20 +252,19 @@ float3 FragmentShadow(float4 position : SV_Position) : SV_Target0
 		float3 dx = i * dxScale + dxOffset;
 		float3 dy = i * dyScale + dyOffset;
 		
-		float extinction = CloudExtinction(worldPosition, heightAtDistance, dx, dy, true);
-		extinctionSum += extinction * dt;
-		
-		transmittanceSum += exp(-extinctionSum);
-		weightedTransmittanceSum += t * exp(-extinctionSum);
+		transmittance *= exp2(-CloudExtinction(worldPosition, heightAtDistance, dx, dy, true) * dt);
+		weightSum += transmittance;
+		weightedDepthSum += t * transmittance;
 	}
 
-	float cloudDepth = transmittanceSum ? weightedTransmittanceSum * rcp(transmittanceSum) : rayEnd;
+	float cloudDepth = weightSum ? weightedDepthSum * rcp(weightSum) : rayEnd;
 	float totalRayLength = rayEnd - cloudDepth;
-	return float3(cloudDepth * _CloudDepthScale, totalRayLength ? extinctionSum * rcp(totalRayLength) : 0.0, exp(-extinctionSum));
+	return float3(cloudDepth * _CloudDepthScale, totalRayLength ? -log2(transmittance) * rcp(totalRayLength) : 0.0, transmittance);
 }
 
 float4 FragmentRender(float4 position : SV_Position, out float cloudDistance : SV_Target1) : SV_Target0
 {
+	float lightDs = _LightDistance / _LightSamples;
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
 	
 	float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
@@ -322,15 +321,6 @@ float4 FragmentRender(float4 position : SV_Position, out float cloudDistance : S
 	float dt = (rayEnd - rayStart) / _RaySamples;
 	float dtX = (rayEndX - rayStartX) / _RaySamples;
 	float dtY = (rayEndY - rayStartY) / _RaySamples;
-
-	float3 L = _LightDirection0;
-	float LdotV = dot(L, rd);
-	float phaseBack = MiePhase(LdotV, _BackScatterPhase) * _BackScatterScale;
-	float phaseFront = MiePhase(LdotV, _ForwardScatterPhase) * _ForwardScatterScale;
-	
-	float transmittanceSum = 0.0, weightedTransmittanceSum = 0.0;
-	float transmittance = 1.0;
-	float light0 = 0.0, light1 = 0.0;
 	
 	float3 dxScale = dt * (rd - rdx) + rd * (dt - dtX);
 	float3 dyScale = dt * (rd - rdy) + rd * (dt - dtY);
@@ -338,7 +328,9 @@ float4 FragmentRender(float4 position : SV_Position, out float cloudDistance : S
 	float3 dxOffset = rayStart * (rd - rdx) + rd * (rayStart - rayStartX);
 	float3 dyOffset = rayStart * (rd - rdy) + rd * -(rayStart - rayStartY); // Last component needs to be negative for some reason
 	
-	float lightDs = _LightDistance / _LightSamples;
+	float weightSum = 0.0, weightedDepthSum = 0.0;
+	float transmittance = 1.0;
+	float light0 = 0.0, light1 = 0.0;
 	for (float i = offsets.x; i < _RaySamples; i++)
 	{
 		float t = dt * i + rayStart;
@@ -351,9 +343,8 @@ float4 FragmentRender(float4 position : SV_Position, out float cloudDistance : S
 		float extinction = CloudExtinction(worldPosition, heightAtDistance, dx, dy, true);
 		if (extinction)
 		{
-			float LdotV = dot(L, rd);
-			float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, L.y, t * LdotV, heightAtDistance);
-			
+			float LdotV = dot(_LightDirection0, rd);
+			float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, _LightDirection0.y, t * LdotV, heightAtDistance);
 			float lightTransmittance = 1.0;
 			
 			for (float k = offsets.y; k < _LightSamples; k++)
@@ -361,50 +352,55 @@ float4 FragmentRender(float4 position : SV_Position, out float cloudDistance : S
 				float dist = k * lightDs;
 				float lightHeightAtDistance = HeightAtDistance(heightAtDistance, lightCosAngleAtDistance, dist);
 						
-				float3 samplePos = worldPosition + L * dist;
-				lightTransmittance *= exp(-CloudExtinction(samplePos, lightHeightAtDistance, dx, dy, false) * lightDs);
+				float3 samplePos = worldPosition + _LightDirection0 * dist;
+				lightTransmittance *= exp2(-CloudExtinction(samplePos, lightHeightAtDistance, dx, dy, false) * lightDs);
 			}
 			
 			float3 dx1 = MultiplyVector((float3x3) _WorldToCloudShadow, dx, false);
 			float3 dy1 = MultiplyVector((float3x3) _WorldToCloudShadow, dy, false);
 			
-			//if(position.x < _ScaledResolution.x / 2)
-				//lightTransmittance = CloudTransmittance(worldPosition, dx1, dy1);
+			//lightTransmittance = CloudTransmittance(worldPosition, dx1, dy1);
 			
-			float asymmetry = lightTransmittance * transmittance;
-			light0 += transmittance * lightTransmittance * (1.0 - exp(-extinction * dt)) * lerp(phaseBack, phaseFront, asymmetry);
-			transmittance *= exp(-extinction * dt);
+			float sampleTransmittance = exp2(-extinction * dt);
+			light0 += transmittance * lightTransmittance * (1.0 - sampleTransmittance);
+			transmittance *= sampleTransmittance;
 		}
 		
-		transmittanceSum += transmittance;
-		weightedTransmittanceSum += t * transmittance;
-		//if (transmittance < _TransmittanceThreshold)
-		//	break;
+		weightedDepthSum += t * transmittance;
+		weightSum += transmittance;
+		
+		if (transmittance < _TransmittanceThreshold)
+			break;
 	}
 
-	cloudDistance = transmittanceSum ? weightedTransmittanceSum * rcp(transmittanceSum) : rayEnd;
+	transmittance = saturate(Remap(transmittance, _TransmittanceThreshold));
 	
-	//transmittance = saturate(Remap(transmittance, _TransmittanceThreshold));
-
+	float3 ambient = float3(_AmbientSh[0].w, _AmbientSh[1].w, _AmbientSh[2].w);
+	float3 result = ambient * (1.0 - transmittance);
+	
+	cloudDistance = weightSum ? weightedDepthSum * rcp(weightSum) : rayEnd;
+	
+	// Final lighting
+	float LdotV = dot(_LightDirection0, rd);
+	float phase = lerp(MiePhase(LdotV, _BackScatterPhase) * _BackScatterScale, MiePhase(LdotV, _ForwardScatterPhase) * _ForwardScatterScale, 0.5);
 	
 	float heightAtDistance = HeightAtDistance(viewHeight, rd.y, cloudDistance);
-	float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, L.y, cloudDistance * LdotV, heightAtDistance);
+	float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, _LightDirection0.y, cloudDistance * LdotV, heightAtDistance);
 	
-	float3 result = 0.0;
 	if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 	{
 		float3 atmosphereTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
 		if (any(atmosphereTransmittance))
 		{
-			result += light0 * atmosphereTransmittance * _LightColor0 * _Exposure;
+			result += light0 * atmosphereTransmittance * _LightColor0 * _Exposure * phase;
 		}
 	}
 	
-	float opacity = 1.0 - transmittance;
-	if (opacity)
-		result /= opacity;
+	float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, rd.y, cloudDistance, heightAtDistance);
+	float3 viewTransmittance = TransmittanceToPoint(viewHeight, rd.y, heightAtDistance, viewCosAngleAtDistance);
+	result *= viewTransmittance;
 	
-	return float4(result, opacity);
+	return float4(result, transmittance);
 }
 
 float4 _Input_Scale, _CloudDepth_Scale, _History_Scale;
@@ -412,27 +408,27 @@ Texture2D<float> _CloudDepth;
 uint _MaxWidth, _MaxHeight;
 float _IsFirst;
 
-float4 FragmentTemporal(float4 position : SV_Position) : SV_Target0
+struct TemporalOutput
+{
+	float4 result : SV_Target0;
+	float4 history : SV_Target1;
+};
+
+TemporalOutput FragmentTemporal(float4 position : SV_Position)
 {
 	float4 result = _Input[position.xy];
+	result.rgb = RGBToYCoCg(result.rgb);
+	result.rgb *= rcp(1.0 + result.r);
 	
-	//if(result.a < 1.0)
-	//	result.rgb /= 1.0 - result.a;
-	
-	//if (_IsFirst)
-	//	return result;
+	float depth = _Depth[position.xy];
 	
 	float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
 	float cloudDistance = _CloudDepth[position.xy];
 
 	float3 worldPosition = rd * cloudDistance;
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
-		
-	//if (any(saturate(historyUv) != historyUv))
-	//	return result;
 	
 	// Neighborhood clamp
-	float4 mean = 0.0, stdDev = 0.0;
 	float4 minValue = 0.0, maxValue = 0.0;
 	[unroll]
 	for (int y = -1; y <= 1; y++)
@@ -441,13 +437,9 @@ float4 FragmentTemporal(float4 position : SV_Position) : SV_Target0
 		for (int x = -1; x <= 1; x++)
 		{
 			float4 sample = _Input[min(uint2(position.xy + float2(x, y)), uint2(_MaxWidth, _MaxHeight))];
+			sample.rgb = RGBToYCoCg(sample.rgb);
+			sample.rgb *= rcp(1.0 + sample.r);
 			
-			///if(sample.a)
-			//	sample /= sample.a;
-			
-			mean += sample;
-			stdDev += sample * sample;
-					
 			if (x == -1 && y == -1)
 			{
 				minValue = maxValue = sample;
@@ -460,43 +452,25 @@ float4 FragmentTemporal(float4 position : SV_Position) : SV_Target0
 		}
 	}
 			
-	mean /= 9.0;
-	stdDev = sqrt(abs(stdDev / 9.0 - mean * mean));
-			
-	minValue = max(minValue, mean - stdDev);
-	maxValue = min(maxValue, mean + stdDev);
-			
 	float4 history = _History.Sample(_LinearClampSampler, historyUv * _History_Scale.xy);
-	//if (history.a < 1.0)
-	//	history.rgb /= 1.0 - history.a;
+	history.rgb = RGBToYCoCg(history.rgb);
+	history.rgb *= rcp(1.0 + history.r);
+	
+	float2 uv = position.xy * _ScaledResolution.zw;
+	float motionLength = saturate(distance(historyUv, uv) * _MotionFactor);
+	float blend = lerp(_StationaryBlend, _MotionBlend, motionLength);
 	history = clamp(history, minValue, maxValue);
 	
-	//float4 invDir = rcp(result - history);
-	//float4 t0 = (minValue - history) * invDir;
-	//float4 t1 = (maxValue - history) * invDir;
-	//float t = saturate(Max4(min(t0, t1)));
-	//history = lerp(history, result, t);
-	//history.rgb = lerp(history.rgb, result.rgb, t);
-	//history.a = clamp(history.a, minValue.a, maxValue.a);
-			
-	//float2 uv = position.xy * _ScaledResolution.zw;
-	//float motionLength = saturate(distance(historyUv, uv) * _MotionFactor);
-	//float blend = lerp(_StationaryBlend, _MotionBlend, motionLength);
+	if (!_IsFirst && all(saturate(historyUv) == historyUv))
+		result = lerp(result, history, blend);
 	
-	//if(result.a)
-	//	result.a = -log(result.a);
+	result.rgb *= rcp(1.0 - result.r);
+	result.rgb = YCoCgToRGB(result.rgb);
 	
-	//if(history.a)
-	//	history.a = -log(history.a);
+	TemporalOutput output;
+	output.history = result;
+	output.result.rgb = result;
+	output.result.a = (depth != 0.0) * result.a;
 	
-	// weigh by transmittance
-	
-	result = lerp(history, result, 0.05);
-	
-	//result.a = exp(-result.a);
-	
-	//if(result.a < 1.0)
-	//	result.rgb *= 1.0 - result.a;
-	
-	return result;
+	return output;
 }
