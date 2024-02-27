@@ -3,12 +3,6 @@
 Texture2D<float> _Depth;
 Texture2D<float4> _AlbedoMetallic, _NormalRoughness, _BentNormalOcclusion;
 
-float4 Vertex(uint id : SV_VertexID) : SV_Position
-{
-	float2 uv = float2((id << 1) & 2, id & 2);
-	return float4(uv * 2.0 - 1.0, 1.0, 1.0);
-}
-
 float3 Fragment(float4 position : SV_Position) : SV_Target
 {
 	float depth = _Depth[position.xy];
@@ -21,7 +15,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	lightingInput.worldPosition = PixelToWorld(float3(position.xy, depth));
 	lightingInput.pixelPosition = position.xy;
 	lightingInput.eyeDepth = LinearEyeDepth(depth);
-	lightingInput.albedo = albedoMetallic.rgb;
+	lightingInput.albedo = lerp(albedoMetallic.rgb, 0.0, albedoMetallic.a);
 	lightingInput.f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
 	lightingInput.perceptualRoughness = normalRoughness.a;
 	lightingInput.occlusion = bentNormalOcclusion.a;

@@ -15,7 +15,7 @@ Shader "Hidden/Camera Motion Vectors"
             }
 
             HLSLPROGRAM
-            #pragma vertex Vertex
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #include "CameraMotionVectors.hlsl"
             ENDHLSL

@@ -9,7 +9,7 @@ Shader"Hidden/Tonemapping"
             ZTest Always
 
             HLSLPROGRAM
-            #pragma vertex Vertex
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #include "Tonemapping.hlsl"
             ENDHLSL

@@ -7,12 +7,6 @@ float2 ScaleOffset;
 float _Radius, _AoStrength, _FalloffScale, _FalloffBias;
 uint _DirectionCount, _SampleCount;
 
-float4 Vertex(uint id : SV_VertexID) : SV_Position
-{
-	float2 uv = float2((id << 1) & 2, id & 2);
-	return float4(uv * 2.0 - 1.0, 1.0, 1.0);
-}
-
 struct ViewNormalsOutput
 {
 	float4 viewNormal : SV_Target0;

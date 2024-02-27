@@ -11,11 +11,6 @@ matrix _PixelToWorldViewDirs[6];
 TextureCube<float3> _SkyReflection;
 uint _Samples;
 
-uint Vertex(uint id : SV_VertexID) : TEXCOORD
-{
-	return id;
-}
-
 [instance(6)]
 [maxvertexcount(3)]
 void Geometry(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryOutput> stream, uint instanceId : SV_GSInstanceID)

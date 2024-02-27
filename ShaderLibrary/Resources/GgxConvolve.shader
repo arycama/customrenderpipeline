@@ -10,7 +10,7 @@ Shader "Hidden/Ggx Convolve"
 
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex Vertex
+            #pragma vertex VertexIdPassthrough
             #pragma geometry Geometry
             #pragma fragment Fragment
             #include "GgxConvolve.hlsl"

@@ -9,9 +9,8 @@ Shader"Hidden/Temporal AA"
             ZTest Always
 
             HLSLPROGRAM
-            #pragma vertex Vertex
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
-            #pragma enable_d3d11_debug_symbols
             #include "TemporalAA.hlsl"
             ENDHLSL
         }

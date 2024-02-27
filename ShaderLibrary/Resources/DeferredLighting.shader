@@ -19,7 +19,7 @@ Shader "Hidden/Deferred Lighting"
 
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex Vertex
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #include "DeferredLighting.hlsl"
             ENDHLSL

@@ -521,4 +521,59 @@ float LinearEyeDepthToDistance(float depth, float3 V)
 	return depth * rcp(dot(V, -_CameraForward));
 }
 
+float2 SmoothUv(float2 p, float2 texelSize)
+{
+	p = p * texelSize + 0.5;
+
+	float2 i = floor(p);
+	float2 f = p - i;
+	f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+	p = i + f;
+
+	p = (p - 0.5) / texelSize;
+	return p;
+}
+
+float3 SmoothUv(float3 p, float3 texelSize)
+{
+	p = p * texelSize + 0.5;
+
+	float3 i = floor(p);
+	float3 f = p - i;
+	f = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+	p = i + f;
+
+	p = (p - 0.5) / texelSize;
+	return p;
+}
+
+
+float4 VertexFullscreenTriangle(uint id : SV_VertexID) : SV_Position
+{
+	float2 uv = (id << uint2(1, 0)) & 2;
+	return float3(uv * 2.0 - 1.0, 1.0).xyzz;
+}
+
+uint VertexIdPassthrough(uint id : SV_VertexID) : TEXCOORD
+{
+	return id;
+}
+
+float ComputeMipLevel(float3 dx, float3 dy, float3 scale, float3 resolution)
+{
+	dx *= scale * resolution;
+	dy *= scale * resolution;
+	float deltaMaxSq = max(dot(dx, dx), dot(dy, dy));
+	return 0.5 * log2(deltaMaxSq);
+}
+
+float ComputeMipLevel(float2 dx, float2 dy, float2 scale, float2 resolution)
+{
+	dx *= scale * resolution;
+	dy *= scale * resolution;
+	float deltaMaxSq = max(dot(dx, dx), dot(dy, dy));
+	return 0.5 * log2(deltaMaxSq);
+}
+
+
 #endif

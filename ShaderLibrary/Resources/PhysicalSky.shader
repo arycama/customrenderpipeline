@@ -11,7 +11,7 @@ Shader "Hidden/Physical Sky"
             Name "Transmittance Lut"
 
             HLSLPROGRAM
-            #pragma vertex Vertex
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTransmittanceLut
             #include "PhysicalSky.hlsl"
             ENDHLSL
@@ -23,7 +23,7 @@ Shader "Hidden/Physical Sky"
 
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex VertexReflectionProbe
+            #pragma vertex VertexIdPassthrough
             #pragma geometry GeometryReflectionProbe
             #pragma fragment FragmentRender
 
@@ -39,7 +39,7 @@ Shader "Hidden/Physical Sky"
 
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex Vertex
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentRender
             #include "PhysicalSky.hlsl"
             ENDHLSL
@@ -54,7 +54,7 @@ Shader "Hidden/Physical Sky"
 
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex Vertex
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
             #include "PhysicalSky.hlsl"
             ENDHLSL

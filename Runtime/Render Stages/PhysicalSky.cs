@@ -71,13 +71,17 @@ namespace Arycama.CustomRenderPipeline
 
             [field: Header("Convolution")]
             [field: SerializeField] public int ConvolutionSamples { get; private set; } = 64;
+
+            public int Version { get; private set; }
         }
 
         private RenderGraph renderGraph;
         private Settings settings;
         private Material skyMaterial;
         private Material ggxConvolutionMaterial;
+        private RTHandle transmittance, multiScatter;
         private readonly CameraTextureCache textureCache;
+        private int version = -1;
 
         public PhysicalSky(RenderGraph renderGraph, Settings settings)
         {
@@ -87,12 +91,19 @@ namespace Arycama.CustomRenderPipeline
             skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
             ggxConvolutionMaterial = new Material(Shader.Find("Hidden/Ggx Convolve")) { hideFlags = HideFlags.HideAndDontSave };
             textureCache = new(renderGraph, "Physical Sky");
+
+            transmittance = renderGraph.ImportRenderTexture(new RenderTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, 0, GraphicsFormat.B10G11R11_UFloatPack32));
+            multiScatter = renderGraph.ImportRenderTexture(new RenderTexture(settings.MultiScatterWidth, settings.MultiScatterHeight, 0, GraphicsFormat.B10G11R11_UFloatPack32) { enableRandomWrite = true });
         }
 
-        public IRenderPassData GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer)
+        public void GenerateLookupTables()
         {
+            if (version >= settings.Version)
+                return;
+
+            version = settings.Version;
+
             // Generate transmittance LUT
-            var transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere Transmittance"))
             {
                 pass.Initialize(skyMaterial);
@@ -106,7 +117,6 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Generate multi-scatter LUT
-            var multiScatter = renderGraph.GetTexture(settings.MultiScatterWidth, settings.MultiScatterHeight, GraphicsFormat.B10G11R11_UFloatPack32, true);
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Atmosphere Multi Scatter"))
             {
                 pass.Initialize(Resources.Load<ComputeShader>("PhysicalSky"), 0, settings.MultiScatterWidth, settings.MultiScatterHeight, 1, false);
@@ -122,7 +132,10 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.MultiScatterWidth, settings.MultiScatterHeight));
                 });
             }
+        }
 
+        public IRenderPassData GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer)
+        {
             var transmittanceRemap = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
             var multiScatterRemap = GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight);
 
@@ -298,7 +311,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Reprojection
-            var isFirst = textureCache.GetTexture(camera, new RenderTextureDescriptor(width, height, GraphicsFormat.R16G16B16A16_SFloat, 0), out var current, out var previous);
+            var isFirst = textureCache.GetTexture(camera, new RenderTextureDescriptor(width, height, GraphicsFormat.B10G11R11_UFloatPack32, 0), out var current, out var previous);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Temporal"))
             {
                 pass.Initialize(skyMaterial, 3);

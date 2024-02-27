@@ -11,9 +11,9 @@ Shader "Hidden/Volumetric Clouds"
             Name "Weather Map"
 
             HLSLPROGRAM
-            #pragma vertex Vertex
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentWeatherMap
-            #include "VolumetricClouds.hlsl"
+            #include "VolumetricCloudsTextures.hlsl"
             ENDHLSL
         }
 
@@ -23,10 +23,10 @@ Shader "Hidden/Volumetric Clouds"
 
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex Vertex3D
+            #pragma vertex VertexIdPassthrough
             #pragma geometry Geometry
             #pragma fragment FragmentNoise
-            #include "VolumetricClouds.hlsl"
+            #include "VolumetricCloudsTextures.hlsl"
             ENDHLSL
         }
 
@@ -36,10 +36,10 @@ Shader "Hidden/Volumetric Clouds"
 
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex Vertex3D
+            #pragma vertex VertexIdPassthrough
             #pragma geometry Geometry
             #pragma fragment FragmentDetailNoise
-            #include "VolumetricClouds.hlsl"
+            #include "VolumetricCloudsTextures.hlsl"
             ENDHLSL
         }
 
@@ -49,8 +49,9 @@ Shader "Hidden/Volumetric Clouds"
 
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex Vertex
-            #pragma fragment FragmentShadow
+            #pragma vertex VertexFullscreenTriangle
+            #pragma fragment Fragment
+            #define CLOUD_SHADOW
             #include "VolumetricClouds.hlsl"
             ENDHLSL
         }
@@ -61,8 +62,8 @@ Shader "Hidden/Volumetric Clouds"
 
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex Vertex
-            #pragma fragment FragmentRender
+            #pragma vertex VertexFullscreenTriangle
+            #pragma fragment Fragment
             #pragma multi_compile _ BELOW_CLOUD_LAYER ABOVE_CLOUD_LAYER
             #include "VolumetricClouds.hlsl"
             ENDHLSL
@@ -77,7 +78,7 @@ Shader "Hidden/Volumetric Clouds"
 
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex Vertex
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
             #include "VolumetricClouds.hlsl"
             ENDHLSL

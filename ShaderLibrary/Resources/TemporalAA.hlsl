@@ -11,12 +11,6 @@ cbuffer Properties
 	float _HasHistory, _MotionBlending, _MotionWeight, _Sharpness, _StationaryBlending, _Scale;
 };
 
-float4 Vertex(uint id : SV_VertexID) : SV_Position
-{
-	float2 uv = float2((id << 1) & 2, id & 2);
-	return float4(uv * 2.0 - 1.0, 1.0, 1.0);
-}
-
 float3 Fragment(float4 position : SV_Position) : SV_Target
 {
 	float2 uv = position.xy * _Resolution.zw;

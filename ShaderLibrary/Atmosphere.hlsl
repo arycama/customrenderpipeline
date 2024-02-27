@@ -21,7 +21,7 @@ const static float3 _OzoneAbsorption = float3(0.650, 1.811, 0.085) * 1e-6 * rcp(
 const static float _MiePhase = 0.8;
 
 Texture2D<float3> _Transmittance, _MultiScatter;
-float4 _AtmosphereTransmittanceRemap, _Transmittance_Scale, _MultiScatter_Scale, _MultiScatterRemap;
+float4 _AtmosphereTransmittanceRemap, _MultiScatterRemap;
 float3 _GroundColor;
 
 float DistanceToTopAtmosphereBoundary(float height, float cosAngle)
@@ -129,7 +129,7 @@ float3 AtmosphereTransmittance(float height, float cosAngle)
 	float dMin = max(0.0, _TopRadius - height);
 	float dMax = rho + H;
 	float2 uv = float2(Remap(d, dMin, dMax), rho / H) * _AtmosphereTransmittanceRemap.xy + _AtmosphereTransmittanceRemap.zw;
-	return _Transmittance.SampleLevel(_LinearClampSampler, uv * _Transmittance_Scale.xy, 0.0);
+	return _Transmittance.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
 float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float cosAngle1)

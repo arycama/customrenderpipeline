@@ -9,7 +9,7 @@ Shader "Hidden/Depth of Field"
         Pass
         {
             HLSLPROGRAM
-            #pragma vertex Vertex
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #include "DepthOfField.hlsl"
             ENDHLSL

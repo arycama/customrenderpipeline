@@ -5,12 +5,6 @@ Texture2D<float> _GrainTexture;
 float4 _GrainTextureParams, _Resolution, _BloomScaleLimit, _Bloom_TexelSize;
 float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, ShutterSpeed;
 
-float4 Vertex(uint id : SV_VertexID) : SV_Position
-{
-	float2 uv = float2((id << 1) & 2, id & 2);
-	return float4(uv * 2.0 - 1.0, 1.0, 1.0);
-}
-
 float3 Uncharted2ToneMapping(float3 color)
 {
 	float A = 0.15;

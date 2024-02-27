@@ -6,12 +6,6 @@ float4 _Input_TexelSize;
 float2 _RcpResolution;
 float _Strength;
 
-float4 Vertex(uint id : SV_VertexID) : SV_Position
-{
-	float2 uv = float2((id << 1) & 2, id & 2);
-	return float4(uv * 2.0 - 1.0, 1.0, 1.0);
-}
-
 float3 FragmentDownsample(float4 position : SV_Position) : SV_Target
 {
 	float2 uv = position.xy * _RcpResolution;

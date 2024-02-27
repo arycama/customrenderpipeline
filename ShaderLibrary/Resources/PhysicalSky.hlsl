@@ -8,17 +8,6 @@ float4 _ScaleOffset;
 Texture2D<float4> _Clouds;
 Texture2D<float> _Depth, _CloudDepth;
 
-float4 Vertex(uint id : SV_VertexID) : SV_Position
-{
-	float2 uv = float2((id << 1) & 2, id & 2);
-	return float4(uv * 2.0 - 1.0, 1.0, 1.0);
-}
-
-uint VertexReflectionProbe(uint id : SV_VertexID) : TEXCOORD
-{
-	return id;
-}
-
 struct GeometryOutput
 {
 	float4 position : SV_Position;
@@ -98,6 +87,9 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 	
 		float cloudDistance = _CloudDepth[position.xy];
 		float4 clouds = _Clouds[position.xy];
+	
+		// Lerp max distance between cloud depth and max, as we don't need to raymarch as long for mostly opaque clouds
+		//rayLength = lerp(cloudDistance, rayLength, clouds.a);
 	#endif
 	
 	float offset = _BlueNoise1D[position.xy % 128];
@@ -135,7 +127,7 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			}
 				
 			float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
-			float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv * _MultiScatter_Scale.xy, 0.0);
+			float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
 			lighting += ms * (scatter.xyz + scatter.w) * light.color * _Exposure;
 		}
 			

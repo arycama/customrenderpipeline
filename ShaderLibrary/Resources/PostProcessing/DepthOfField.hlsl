@@ -12,8 +12,6 @@ float CalculateCoC(float depth)
 	return abs(1.0 - _FocalDistance / depth) * _MaxCoC * _SampleRadius;
 }
 
-float4 Vertex(uint id : SV_VertexID) : SV_Position { return float3(((id << uint2(1, 0)) & 2) * 2.0 - 1.0, 1.0).xyzz; }
-
 float3 Fragment(float4 position : SV_Position) : SV_Target
 {
 	//_FocalDistance = LinearEyeDepth(_Depth[_ScaledResolution.xy / 2]);

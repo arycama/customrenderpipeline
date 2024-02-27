@@ -76,7 +76,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetFloat(command, "_TransmittanceThreshold", TransmittanceThreshold);
 
-                pass.SetFloat(command, "_RaySamples", RaySamples);
+                pass.SetFloat(command, "_Samples", RaySamples);
                 pass.SetFloat(command, "_LightSamples", LightSamples);
 
                 pass.SetVector(command, "_NoiseResolution", (Vector3)NoiseResolution);
@@ -256,7 +256,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetMatrix(command, "_WorldToCloudShadow", worldToShadow);
                     pass.SetFloat(command, "_CloudDepthInvScale", depth);
                     pass.SetVector(command, "_LightDirection0", -lightDirection);
-                    pass.SetFloat(command, "_ShadowSamples", settings.ShadowSamples);
+                    pass.SetFloat(command, "_Samples", settings.ShadowSamples);
                     pass.SetVector(command, "_ViewPosition", cameraPosition);
 
                     //command.BeginSample(sampler);
@@ -392,7 +392,7 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     //command.EndSample(sampler);
-                    //Debug.Log(sampler.GetRecorder().gpuElapsedNanoseconds / 1000000.0f);
+                   //Debug.Log(sampler.GetRecorder().gpuElapsedNanoseconds / 1000000.0f);
 
                     pass.SetFloat(command, "_IsFirst", isFirst ? 1.0f : 0.0f);
                     pass.SetFloat(command, "_StationaryBlend", settings.StationaryBlend);
