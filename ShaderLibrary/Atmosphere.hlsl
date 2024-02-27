@@ -15,7 +15,7 @@ const static float _OzoneWidth = 15000.0 * _EarthScale;
 const static float _OzoneHeight = 25000.0 * _EarthScale;
 
 const static float3 _RayleighScatter = float3(5.802, 13.558, 33.1) * 1e-6 * rcp(_EarthScale);
-const static float _MieScatter = 3.996e-5 * rcp(_EarthScale);
+const static float _MieScatter = 3.996e-6 * rcp(_EarthScale);
 const static float _MieAbsorption = 4.4e-6 * rcp(_EarthScale);
 const static float3 _OzoneAbsorption = float3(0.650, 1.811, 0.085) * 1e-6 * rcp(_EarthScale);
 const static float _MiePhase = 0.8;
@@ -23,6 +23,12 @@ const static float _MiePhase = 0.8;
 Texture2D<float3> _Transmittance, _MultiScatter;
 float4 _AtmosphereTransmittanceRemap, _MultiScatterRemap;
 float3 _GroundColor;
+
+float2 _GroundAmbientRemap;
+Texture2D<float3> _GroundAmbient;
+
+Texture2D<float3> _SkyAmbient;
+float4 _SkyAmbientRemap;
 
 float DistanceToTopAtmosphereBoundary(float height, float cosAngle)
 {
@@ -80,7 +86,7 @@ float MiePhase(float cosAngle, float anisotropy)
 
 float3 AtmosphereExtinction(float height)
 {
-	float clampedHeight = max(0.0, height - _PlanetRadius);
+	float clampedHeight = height - _PlanetRadius;
 
 	float3 opticalDepth = exp(-clampedHeight / _RayleighHeight) * _RayleighScatter;
 	opticalDepth += exp(-clampedHeight / _MieHeight) * (_MieScatter + _MieAbsorption);
@@ -147,6 +153,18 @@ float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float
 	}
 		
 	return highTransmittance == 0.0 ? 0.0 : lowTransmittance * rcp(highTransmittance);
+}
+
+float3 GetGroundAmbient(float lightCosAngle)
+{
+	float2 ambientUv = float2((lightCosAngle * 0.5 + 0.5) * _GroundAmbientRemap.x + _GroundAmbientRemap.y, 0.5);
+	return _GroundAmbient.SampleLevel(_LinearClampSampler, ambientUv, 0.0);
+}
+
+float3 GetSkyAmbient(float lightCosAngle, float height)
+{
+	float2 ambientUv = float2(lightCosAngle * 0.5 + 0.5, (height - _PlanetRadius) / _AtmosphereHeight) * _SkyAmbientRemap.xy + _SkyAmbientRemap.zw;
+	return _SkyAmbient.SampleLevel(_LinearClampSampler, ambientUv, 0.0);
 }
 
 #endif

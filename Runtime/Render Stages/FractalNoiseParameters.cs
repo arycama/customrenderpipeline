@@ -6,7 +6,7 @@ namespace Arycama.CustomRenderPipeline
     [Serializable]
     public class FractalNoiseParameters
     {
-        [field: SerializeField] public int Frequency { get; private set; } = 4;
+        [field: SerializeField, Range(1, 16)] public int Frequency { get; private set; } = 4;
         [field: SerializeField, Range(0.0f, 1.0f)] public float H { get; private set; } = 1.0f;
         [field: SerializeField, Range(1, 9)] public int Octaves { get; private set; } = 1;
 

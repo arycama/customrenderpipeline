@@ -1,29 +1,80 @@
 #include "../Common.hlsl"
 #include "../Atmosphere.hlsl"
 
-#pragma kernel MultiScatter
-#pragma kernel Ambient
+#pragma kernel MultiScatter KERNEL=MultiScatter MULTI_SCATTER
+#pragma kernel AmbientGroundLookup KERNEL=AmbientGroundLookup AMBIENT_GROUND
+#pragma kernel AmbientSkyLookup KERNEL=AmbientSkyLookup AMBIENT_SKY
+#pragma kernel AmbientProbe
+
+#ifdef __INTELLISENSE__
+	#define AMBIENT_GROUND
+#endif
 
 static const uint _ThreadCount = 64;
 groupshared float3 MultiScatterShared[_ThreadCount], ScatterShared[_ThreadCount];
 
-RWTexture2D<float3> _MultiScatterResult;
+RWTexture2D<float3> _MultiScatterResult, _AmbientGroundResult, _AmbientSkyResult;
 float2 _ScaleOffset;
 uint _Samples;
 
+// Reference : http://www.cs.virginia.edu/~jdl/bib/globillum/mis/shirley96.pdf + PBRT
+
+// Performs uniform sampling of the unit disk.
+// Ref: PBRT v3, p. 777.
+float2 SampleDiskUniform(float u1, float u2)
+{
+	float r = sqrt(u1);
+	float phi = TwoPi * u2;
+
+	float sinPhi, cosPhi;
+	sincos(phi, sinPhi, cosPhi);
+
+	return r * float2(cosPhi, sinPhi);
+}
+
+// Performs cosine-weighted sampling of the hemisphere.
+// Ref: PBRT v3, p. 780.
+float3 SampleHemisphereCosine(float u1, float u2)
+{
+	float3 localL;
+
+    // Since we don't really care about the area distortion,
+    // we substitute uniform disk sampling for the concentric one.
+	localL.xy = SampleDiskUniform(u1, u2);
+
+    // Project the point from the disk onto the hemisphere.
+	localL.z = sqrt(1.0 - u1);
+
+	return localL;
+}
+
+float3 SampleHemisphereUniform(float u1, float u2)
+{
+	float phi = TwoPi * u2;
+	float cosTheta = 1.0 - u1;
+
+	return SphericalToCartesian(phi, cosTheta);
+}
+
 [numthreads(_ThreadCount, 1, 1)]
-void MultiScatter(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
+void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 {
 	float2 uv = groupId * _ScaleOffset;
-	float viewHeight = uv.y * _AtmosphereHeight + _PlanetRadius;
 	float lightCosAngle = 2.0 * uv.x - 1.0;
-	
 	float2 u = Hammersley2dSeq(groupIndex, _ThreadCount);
-	float3 V = SampleSphereUniform(u.x, u.y);
-	float viewCosAngle = V.y;
 	
-	bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
-	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
+	#ifdef AMBIENT_GROUND
+		float viewHeight = _PlanetRadius;
+		float3 V = SampleHemisphereCosine(u.x, u.y).xzy;
+	#else
+		float viewHeight = uv.y * _AtmosphereHeight + _PlanetRadius;
+		float3 V = SampleSphereUniform(u.x, u.y);
+	#endif
+	
+	bool rayIntersectsGround = RayIntersectsGround(viewHeight, V.y);
+	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, V.y, rayIntersectsGround);
+	
+	float viewCosAngle = V.y;
 	float dt = rayLength / _Samples;
 	float LdotV = lightCosAngle * viewCosAngle;
 	
@@ -39,10 +90,18 @@ void MultiScatter(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
 		float3 extinction = AtmosphereExtinction(viewHeight);
 		
+		float3 inscatter = (scatter.xyz + scatter.w) * transmittance * (1.0 - exp(-extinction * dt)) / extinction;
+		
 		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
-			luminance += AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * (scatter.xyz + scatter.w) / (4.0 * Pi) * transmittance * (1.0 - exp(-extinction * dt)) / extinction;
-			
-		multiScatter += transmittance * (scatter.xyz + scatter.w) * (1.0 - exp(-extinction * dt)) / extinction;
+			luminance += AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * inscatter;
+		
+		multiScatter += inscatter;
+		
+		#if defined(AMBIENT_GROUND) || defined(AMBIENT_SKY)
+			float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
+			float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
+			luminance += ms * (scatter.xyz + scatter.w);
+		#endif
 	}
 	
 	// Account for bounced light off the earth
@@ -52,12 +111,18 @@ void MultiScatter(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		float3 sunTransmittance = AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance);
 		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, rayLength, _PlanetRadius);
 		float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, _PlanetRadius, viewCosAngleAtDistance);
+
 		luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi;
+		
+		// Sky can also take into account ambient light that has bounced off the surface
+		#ifdef AMBIENT_SKY
+			luminance += GetGroundAmbient(lightCosAngleAtDistance) * _GroundColor;
+		#endif
 	}
 	
-	ScatterShared[groupIndex] = luminance;
-	MultiScatterShared[groupIndex] = multiScatter;
-
+	ScatterShared[groupIndex] = luminance * RcpFourPi;
+	MultiScatterShared[groupIndex] = multiScatter * RcpFourPi;
+	
 	[unroll]
 	for (uint s = _ThreadCount >> 1; s > 0; s >>= 1)
 	{
@@ -73,7 +138,13 @@ void MultiScatter(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	if (groupIndex > 0)
 		return;
 	
-	_MultiScatterResult[groupId] = ScatterShared[0] / (1.0 - MultiScatterShared[0]);
+	#ifdef AMBIENT_GROUND
+		_AmbientGroundResult[groupId] = ScatterShared[0];
+	#elif defined(AMBIENT_SKY)
+		_AmbientSkyResult[groupId] = ScatterShared[0];
+	#else
+		_MultiScatterResult[groupId] = ScatterShared[0] / (1.0 - MultiScatterShared[0]);
+#endif
 }
 
 float _MipLevel;
@@ -83,7 +154,7 @@ TextureCube<float3> _AmbientProbeInputCubemap;
 RWBuffer<float4> _AmbientProbeOutputBuffer;
 
 [numthreads(_SampleCount, 1, 1)]
-void Ambient(uint groupIndex : SV_GroupIndex)
+void AmbientProbe(uint groupIndex : SV_GroupIndex)
 {
 	float2 u = Hammersley2dSeq(groupIndex, _SampleCount);
 	float3 n = SampleSphereUniform(u.x, u.y);

@@ -8,7 +8,18 @@ Shader "Hidden/Physical Sky"
 
         Pass
         {
-            Name "Transmittance Lut"
+            Name "Transmittance Lookup"
+
+            HLSLPROGRAM
+            #pragma vertex VertexFullscreenTriangle
+            #pragma fragment FragmentTransmittanceLut
+            #include "PhysicalSky.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "CDF Lookup"
 
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle

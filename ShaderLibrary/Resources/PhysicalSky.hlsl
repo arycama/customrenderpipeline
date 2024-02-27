@@ -49,7 +49,7 @@ float3 FragmentTransmittanceLut(float4 position : SV_Position) : SV_Target
 	float dx = d / _Samples;
 
 	float3 opticalDepth = 0.0;
-	for (float i = 0.5; i < _Samples; i++)
+	for (float i = 0.5; i <= _Samples; i++)
 	{
 		float currentDistance = i * dx;
 		float height = HeightAtDistance(viewHeight, cosAngle, currentDistance);
@@ -89,7 +89,7 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		float4 clouds = _Clouds[position.xy];
 	
 		// Lerp max distance between cloud depth and max, as we don't need to raymarch as long for mostly opaque clouds
-		//rayLength = lerp(cloudDistance, rayLength, clouds.a);
+		rayLength = lerp(cloudDistance, rayLength, clouds.a);
 	#endif
 	
 	float offset = _BlueNoise1D[position.xy % 128];
@@ -163,8 +163,15 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, _PlanetRadius, viewCosAngleAtDistance);
 			
 			float cloudShadow = CloudTransmittance(-V * rayLength);
+			float3 ambient = GetGroundAmbient(lightCosAngleAtDistance);
+			float3 surface = (ambient + sunTransmittance * cloudShadow * saturate(lightCosAngleAtDistance) * RcpPi) * light.color * _Exposure * _GroundColor * transmittance;
 			
-			luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi * light.color * _Exposure;
+			#ifndef REFLECTION_PROBE
+				// Clouds block out surface
+				surface *= clouds.a;
+			#endif
+			
+			luminance += surface;
 		}
 	}
 	

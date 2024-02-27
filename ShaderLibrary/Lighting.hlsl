@@ -21,28 +21,20 @@ float3 EvaluateSH(float3 N, float3 occlusion, float4 sh[7])
 	float3 A1 = 1.0 - b * b * b;
 	float3 A2 = a * a * (1.0 + 3.0 * b * b);
 	 
-	float4 shAr = sh[0];
-	float4 shAg = sh[1];
-	float4 shAb = sh[2];
-	float4 shBr = sh[3];
-	float4 shBg = sh[4];
-	float4 shBb = sh[5];
-	float4 shC = sh[6];
-	
 	float3 irradiance = 0.0;
-	irradiance.r = dot(shAr.xyz * A1.r, N) + shAr.w * A0.r;
-	irradiance.g = dot(shAg.xyz * A1.g, N) + shAg.w * A0.g;
-	irradiance.b = dot(shAb.xyz * A1.b, N) + shAb.w * A0.b;
+	irradiance.r = dot(sh[0].xyz * A1.r, N) + sh[0].w * A0.r;
+	irradiance.g = dot(sh[1].xyz * A1.g, N) + sh[1].w * A0.g;
+	irradiance.b = dot(sh[2].xyz * A1.b, N) + sh[2].w * A0.b;
 	
     // 4 of the quadratic (L2) polynomials
 	float4 vB = N.xyzz * N.yzzx;
-	irradiance.r += dot(shBr * A2.r, vB) + shBr.z / 3.0 * (A0.r - A2.r);
-	irradiance.g += dot(shBg * A2.g, vB) + shBg.z / 3.0 * (A0.g - A2.g);
-	irradiance.b += dot(shBb * A2.b, vB) + shBb.z / 3.0 * (A0.b - A2.b);
+	irradiance.r += dot(sh[3] * A2.r, vB) + sh[3].z / 3.0 * (A0.r - A2.r);
+	irradiance.g += dot(sh[4] * A2.g, vB) + sh[4].z / 3.0 * (A0.g - A2.g);
+	irradiance.b += dot(sh[5] * A2.b, vB) + sh[5].z / 3.0 * (A0.b - A2.b);
 
     // Final (5th) quadratic (L2) polynomial
 	float vC = N.x * N.x - N.y * N.y;
-	irradiance += shC.rgb * A2 * vC;
+	irradiance += sh[6].rgb * A2 * vC;
 	
 	return irradiance;
 }

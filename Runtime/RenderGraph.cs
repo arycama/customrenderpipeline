@@ -326,6 +326,10 @@ namespace Arycama.CustomRenderPipeline
         {
             if (!importedTextures.TryGetValue(renderTexture, out var result))
             {
+                // Ensure its created (Can happen with some RenderTextures that are imported as soon as created
+                if (!renderTexture.IsCreated())
+                    renderTexture.Create();
+
                 result = new RTHandle()
                 {
                     Width = renderTexture.width,

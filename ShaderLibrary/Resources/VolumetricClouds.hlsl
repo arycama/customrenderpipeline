@@ -6,7 +6,6 @@
 float2 _WeatherMapResolution;
 float3 _NoiseResolution, _DetailNoiseResolution;
 float _WeatherMapFactor, _NoiseFactor, _DetailNoiseFactor;
-float _CellularNoiseH, _CellularNoiseFrequency, _CellularNoiseOctaves;
 
 Texture2D<float4> _Input, _History;
 Texture3D<float> _CloudNoise, _CloudDetailNoise;
@@ -35,7 +34,6 @@ struct TemporalOutput
 	float4 history : SV_Target1;
 };
 
-
 const static float3 _PlanetCenter = float3(0.0, -_PlanetRadius - _ViewPosition.y, 0.0);
 const static float3 _PlanetOffset = float3(0.0, _PlanetRadius + _ViewPosition.y, 0.0);
 
@@ -50,14 +48,14 @@ float CloudExtinction(float3 worldPosition, float height, bool useDetail)
 	float2 weatherPosition = position.xz * _WeatherMapScale + _WeatherMapOffset;
 	
 	float density = _WeatherMap.SampleLevel(_LinearRepeatSampler, weatherPosition, 0.0);
-	density = Remap(density * gradient, 1.0 - _WeatherMapStrength);
-	//if (density <= 0.0)
-	//	return 0.0;
+	density = Remap(density * gradient, 1.0 - _WeatherMapStrength) * density;
+	if (density <= 0.0)
+		return 0.0;
 	
 	float baseNoise = _CloudNoise.SampleLevel(_LinearRepeatSampler, position * _NoiseScale, 0.0);
 	density = Remap(density, (1.0 - baseNoise) * _NoiseStrength);
-	//if (density <= 0.0)
-	//	return 0.0;
+	if (density <= 0.0)
+		return 0.0;
 	
 	float detailNoise = useDetail ? _CloudDetailNoise.SampleLevel(_LinearRepeatSampler, position * _DetailNoiseScale, 0.0) : 0.5;
 	density = Remap(density, (detailNoise) * _DetailNoiseStrength);
@@ -183,16 +181,15 @@ FragmentOutput Fragment(float4 position : SV_Position)
 	#else
 		transmittance = saturate(Remap(transmittance, _TransmittanceThreshold));
 	
-		float3 ambient = float3(_AmbientSh[0].w, _AmbientSh[1].w, _AmbientSh[2].w);
-		float3 result = ambient * (1.0 - transmittance);
-	
 		// Final lighting
 		float LdotV = dot(_LightDirection0, rd);
-		float phase = lerp(MiePhase(LdotV, _BackScatterPhase) * _BackScatterScale, MiePhase(LdotV, _ForwardScatterPhase) * _ForwardScatterScale, 0.5);
-	
 		float heightAtDistance = HeightAtDistance(viewHeight, cosViewAngle, cloudDepth);
 		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, _LightDirection0.y, cloudDepth * LdotV, heightAtDistance);
 	
+		float3 ambient = GetSkyAmbient(lightCosAngleAtDistance, heightAtDistance) * _LightColor0 * _Exposure;
+		float3 result = ambient * (1.0 - transmittance);
+	
+		float phase = lerp(MiePhase(LdotV, _BackScatterPhase) * _BackScatterScale, MiePhase(LdotV, _ForwardScatterPhase) * _ForwardScatterScale, 0.5);
 		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 		{
 			float3 atmosphereTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
