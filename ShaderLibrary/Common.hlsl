@@ -559,6 +559,44 @@ uint VertexIdPassthrough(uint id : SV_VertexID) : TEXCOORD
 	return id;
 }
 
+struct GeometryVolumeRenderOutput
+{
+	float4 position : SV_Position;
+	uint index : SV_RenderTargetArrayIndex;
+};
+
+[instance(32)]
+[maxvertexcount(3)]
+void GeometryVolumeRender(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryVolumeRenderOutput> stream, uint instanceId : SV_GSInstanceID)
+{
+	[unroll]
+	for (uint i = 0; i < 3; i++)
+	{
+		uint localId = id[i] % 3;
+		
+		GeometryVolumeRenderOutput output;
+		output.position = float3(((localId << uint2(1, 0)) & 2) * 2.0 - 1.0, 1.0).xyzz;
+		output.index = id[i] / 3 * 32 + instanceId;
+		stream.Append(output);
+	}
+}
+
+[instance(6)]
+[maxvertexcount(3)]
+void GeometryCubemapRender(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryVolumeRenderOutput> stream, uint instanceId : SV_GSInstanceID)
+{
+	[unroll]
+	for (uint i = 0; i < 3; i++)
+	{
+		uint localId = id[i] % 3;
+		
+		GeometryVolumeRenderOutput output;
+		output.position = float3(((localId << uint2(1, 0)) & 2) * 2.0 - 1.0, 1.0).xyzz;
+		output.index = id[i] / 3 * 32 + instanceId;
+		stream.Append(output);
+	}
+}
+
 float ComputeMipLevel(float3 dx, float3 dy, float3 scale, float3 resolution)
 {
 	dx *= scale * resolution;

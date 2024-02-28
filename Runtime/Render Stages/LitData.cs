@@ -99,7 +99,7 @@ public class LitData : IDisposable
         ltcData.Apply();
     }
 
-    public IRenderPassData Render()
+    public Result Render()
     {
         var computeShader = Resources.Load<ComputeShader>("LitData");
 

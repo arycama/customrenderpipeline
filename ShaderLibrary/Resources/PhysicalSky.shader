@@ -22,8 +22,10 @@ Shader "Hidden/Physical Sky"
             Name "CDF Lookup"
 
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
-            #pragma fragment FragmentTransmittanceLut
+            #pragma target 5.0
+            #pragma vertex VertexIdPassthrough
+            #pragma geometry GeometryVolumeRender
+            #pragma fragment FragmentCdfLookup
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }

@@ -11,20 +11,6 @@ matrix _PixelToWorldViewDirs[6];
 TextureCube<float3> _SkyReflection;
 uint _Samples;
 
-[instance(6)]
-[maxvertexcount(3)]
-void Geometry(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryOutput> stream, uint instanceId : SV_GSInstanceID)
-{
-	[unroll]
-	for (uint i = 0; i < 3; i++)
-	{
-		GeometryOutput output;
-		output.position = float3(float2((id[i] << 1) & 2, id[i] & 2) * 2.0 - 1.0, 1.0).xyzz;
-		output.index = instanceId;
-		stream.Append(output);
-	}
-}
-
 void SampleGGXDir(float2 u, float3 V, float3x3 localToWorld, float roughness, out float3 L, out float NdotL, out float NdotH, out float VdotH, bool VeqN = false)
 {
     // GGX NDF sampling

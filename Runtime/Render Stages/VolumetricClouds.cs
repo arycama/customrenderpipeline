@@ -103,7 +103,7 @@ namespace Arycama.CustomRenderPipeline
             sampler = CustomSampler.Create("Volumetric Clouds", true);
         }
 
-        public IRenderPassData SetupData()
+        public CloudData SetupData()
         {
             var weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, GraphicsFormat.R8_UNorm, hasMips: true, autoGenerateMips: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Weather Map"))
@@ -167,7 +167,7 @@ namespace Arycama.CustomRenderPipeline
             return new CloudData(weatherMap, noiseTexture, detailNoiseTexture);
         }
 
-        public IRenderPassData RenderShadow(CullingResults cullingResults, Camera camera, IRenderPassData cloudRenderData, float planetRadius)
+        public CloudShadowData RenderShadow(CullingResults cullingResults, Camera camera, CloudData cloudRenderData, float planetRadius)
         {
             var lightDirection = Vector3.up;
             var lightRotation = Quaternion.LookRotation(Vector3.down);
@@ -275,7 +275,7 @@ namespace Arycama.CustomRenderPipeline
             return new CloudShadowData(cloudShadow, depth, worldToShadow);
         }
 
-        struct CloudShadowData : IRenderPassData
+        public struct CloudShadowData : IRenderPassData
         {
             private RTHandle cloudShadow;
             private float cloudDepthInvScale;
@@ -300,7 +300,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public RTHandle Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, out RTHandle cloudDepth, CullingResults cullingResults, IRenderPassData cloudRenderData, IRenderPassData cloudShadow, RTHandle cameraTarget)
+        public RTHandle Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, out RTHandle cloudDepth, CullingResults cullingResults, VolumetricClouds.CloudData cloudRenderData, VolumetricClouds.CloudShadowData cloudShadow, RTHandle cameraTarget)
         {
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;

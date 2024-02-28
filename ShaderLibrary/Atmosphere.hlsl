@@ -30,6 +30,10 @@ Texture2D<float3> _GroundAmbient;
 Texture2D<float3> _SkyAmbient;
 float4 _SkyAmbientRemap;
 
+Texture3D<float> _SkyCdf;
+float3 _SkyCdfScale;
+float3 _SkyCdfOffset;
+
 float DistanceToTopAtmosphereBoundary(float height, float cosAngle)
 {
 	return DistanceToSphereInside(height, cosAngle, _TopRadius);
@@ -165,6 +169,45 @@ float3 GetSkyAmbient(float lightCosAngle, float height)
 {
 	float2 ambientUv = float2(lightCosAngle * 0.5 + 0.5, (height - _PlanetRadius) / _AtmosphereHeight) * _SkyAmbientRemap.xy + _SkyAmbientRemap.zw;
 	return _SkyAmbient.SampleLevel(_LinearClampSampler, ambientUv, 0.0);
+}
+
+float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGround, float3 colorMask)
+{
+	// Distance to top atmosphere boundary for a horizontal ray at ground level.
+	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
+	
+	// Distance to the horizon.
+	float rho = sqrt(Sq(viewHeight) - Sq(_PlanetRadius));
+	float u_r = rho / H;
+
+	// Discriminant of the quadratic equation for the intersections of the ray
+	// (r,mu) with the ground (see RayIntersectsGround).
+	float r_mu = viewHeight * cosAngle;
+	float discriminant = Sq(r_mu) - Sq(viewHeight) + Sq(_PlanetRadius);
+	float u_mu;
+	if (rayIntersectsGround)
+	{
+		// Distance to the ground for the ray (r,mu), and its minimum and maximum
+		// values over all mu - obtained for (r,-1) and (r,mu_horizon).
+		float d = -r_mu - sqrt(discriminant);
+		float d_min = viewHeight - _PlanetRadius;
+		float d_max = rho;
+		u_mu = Remap(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), 0.5 - _SkyCdfOffset.y, 0.0 + _SkyCdfOffset.y);
+	}
+	else
+	{
+		// Distance to the top atmosphere boundary for the ray (r,mu), and its
+		// minimum and maximum values over all mu - obtained for (r,1) and
+		// (r,mu_horizon).
+		float d = -r_mu + sqrt(discriminant + H * H);
+		float d_min = _TopRadius - viewHeight;
+		float d_max = rho + H;
+		u_mu = Remap((d - d_min) / (d_max - d_min), 0.5 + _SkyCdfOffset.y, 1.0 - _SkyCdfOffset.y);
+	}
+	
+	float3 uv = float3(r_mu, u_mu, xi + dot(colorMask, float3(0.0, 1.0, 2.0)) / 3.0);
+	uv.xz = uv.xz * _SkyCdfScale.xz + _SkyCdfOffset.xz;
+	return _SkyCdf.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
 #endif

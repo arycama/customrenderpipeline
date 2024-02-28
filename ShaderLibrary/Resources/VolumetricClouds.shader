@@ -24,7 +24,7 @@ Shader "Hidden/Volumetric Clouds"
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex VertexIdPassthrough
-            #pragma geometry Geometry
+            #pragma geometry GeometryVolumeRender
             #pragma fragment FragmentNoise
             #include "VolumetricCloudsTextures.hlsl"
             ENDHLSL
@@ -37,7 +37,7 @@ Shader "Hidden/Volumetric Clouds"
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex VertexIdPassthrough
-            #pragma geometry Geometry
+            #pragma geometry GeometryVolumeRender
             #pragma fragment FragmentDetailNoise
             #include "VolumetricCloudsTextures.hlsl"
             ENDHLSL

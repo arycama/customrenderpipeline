@@ -28,6 +28,16 @@ namespace Arycama.CustomRenderPipeline
             return new Vector4(1f - invWidth, 1f - invHeight, 0.5f * invWidth, 0.5f * invHeight);
         }
 
+        public static void HalfTexelRemap(float width, float height, float depth, out Vector3 scale, out Vector3 offset)
+        {
+            var invWidth = 1f / width;
+            var invHeight = 1f / height;
+            var invDepth = 1f / depth;
+            scale = new Vector3(1f - invWidth, 1f - invHeight, 1f - invDepth);
+            offset = new Vector3(0.5f * invWidth, 0.5f * invHeight, 0.5f * invDepth);
+        }
+
+
         /// <summary>
         /// Calculates ScaleOffset to Remap a CS thread to UV coordinate that stretches from 0:1. (No half-texel offset)
         /// </summary>
