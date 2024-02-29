@@ -10,26 +10,6 @@ float _ColorChannelScale;
 Texture2D<float4> _Clouds;
 Texture2D<float> _Depth, _CloudDepth;
 
-struct GeometryOutput
-{
-	float4 position : SV_Position;
-	uint index : SV_RenderTargetArrayIndex;
-};
-
-[instance(6)]
-[maxvertexcount(3)]
-void GeometryReflectionProbe(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryOutput> stream, uint instanceId : SV_GSInstanceID)
-{
-	[unroll]
-	for (uint i = 0; i < 3; i++)
-	{
-		GeometryOutput output;
-		output.position = float3(float2((id[i] << 1) & 2, id[i] & 2) * 2.0 - 1.0, 1.0).xyzz;
-		output.index = instanceId;
-		stream.Append(output);
-	}
-}
-
 float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	float3 uv = float3(position.xy, index + 0.5) * _Scale + _Offset;
@@ -38,7 +18,7 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
 	
 	// Distance to the horizon.
-	float rho = H * (uv.x / 3.0);
+	float rho = H * frac(uv.x * 3.0);
 	float viewHeight = sqrt(Sq(rho) + Sq(_PlanetRadius));
 
 	float cosAngle;
@@ -47,18 +27,78 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 	{
 		float d_min = viewHeight - _PlanetRadius;
 		float d_max = rho;
-		float d = lerp(d_max, d_min, uv.y);
+		float d = lerp(d_min, d_max, 1.0 - 2.0 * uv.y);
 		cosAngle = d == 0.0 ? -1.0 : clamp(-(Sq(rho) + Sq(d)) / (2.0 * viewHeight * d), -1.0, 1.0);
 	}
 	else
 	{
 		float d_min = _TopRadius - viewHeight;
 		float d_max = rho + H;
-		float d = lerp(d_min, d_max, uv.y);
+		float d = lerp(d_min, d_max, 2.0 * uv.y - 1.0);
 		cosAngle = d == 0.0 ? 1.0 : clamp((Sq(H) - Sq(rho) - Sq(d)) / (2.0 * viewHeight * d), -1.0, 1.0);
 	}
 	
+	
+	//if (uvwz.z < 0.5)
+	//{
+	//	float d_min = r - atmosphere.bottom_radius;
+	//	float d_max = rho;
+	//	float d = d_min + (d_max - d_min) * GetUnitRangeFromTextureCoord(1.0 - 2.0 * uvwz.z, SCATTERING_TEXTURE_MU_SIZE / 2);
+	//	mu = d == 0.0 * m ? Number(-1.0) : ClampCosine(-(rho * rho + d * d) / (2.0 * r * d));
+	//	ray_r_mu_intersects_ground = true;
+	//}
+	//else
+	//{
+	//	float d_min = atmosphere.top_radius - r;
+	//	float d_max = rho + H;
+	//	float d = d_min + (d_max - d_min) * GetUnitRangeFromTextureCoord(2.0 * uvwz.z - 1.0, SCATTERING_TEXTURE_MU_SIZE / 2);
+	//	mu = d == 0.0 * m ? Number(1.0) : ClampCosine((H * H - rho * rho - d * d) / (2.0 * r * d));
+	//	ray_r_mu_intersects_ground = false;
+	//}
+	
 	float3 colorMask = floor(uv.x * _ColorChannelScale) == float3(0.0, 1.0, 2.0);
+	float xi = uv.z;
+	
+	//return float3((viewHeight - _PlanetRadius) / _AtmosphereHeight, cosAngle, xi);
+	
+	//{
+	//	// Distance to top atmosphere boundary for a horizontal ray at ground level.
+	//	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
+	
+	//// Distance to the horizon.
+	//	float rho = sqrt(Sq(viewHeight) - Sq(_PlanetRadius));
+	//	float u_r = rho / H;
+
+	//// Discriminant of the quadratic equation for the intersections of the ray
+	//// (r,mu) with the ground (see RayIntersectsGround).
+	//	float r_mu = viewHeight * cosAngle;
+	//	float discriminant = Sq(r_mu) - Sq(viewHeight) + Sq(_PlanetRadius);
+	//	float u_mu;
+	//	if (rayIntersectsGround)
+	//	{
+	//	// Distance to the ground for the ray (r,mu), and its minimum and maximum
+	//	// values over all mu - obtained for (r,-1) and (r,mu_horizon).
+	//		float d = -r_mu - sqrt(discriminant);
+	//		float d_min = viewHeight - _PlanetRadius;
+	//		float d_max = rho;
+	//		u_mu = Remap(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), 0.0, 1.0, 0.5 - _SkyCdfOffset.y, 0.0 + _SkyCdfOffset.y);
+	//	}
+	//	else
+	//	{
+	//	// Distance to the top atmosphere boundary for the ray (r,mu), and its
+	//	// minimum and maximum values over all mu - obtained for (r,1) and
+	//	// (r,mu_horizon).
+	//		float d = -r_mu + sqrt(discriminant + H * H);
+	//		float d_min = _TopRadius - viewHeight;
+	//		float d_max = rho + H;
+	//		u_mu = Remap((d - d_min) / (d_max - d_min), 0.0, 1.0, 0.5 + _SkyCdfOffset.y, 1.0 - _SkyCdfOffset.y);
+	//	}
+	
+	//	float3 uv = float3((u_r + dot(colorMask, float3(0.0, 1.0, 2.0))) / 3.0, u_mu, xi);
+	//	uv.xz = uv.xz * _SkyCdfScale.xz + _SkyCdfOffset.xz;
+	//	return uv;
+	//}
+	
 	float maxDist = DistanceToNearestAtmosphereBoundary(viewHeight, cosAngle, rayIntersectsGround);
 
 	float3 transmittance = AtmosphereTransmittance(viewHeight, rayIntersectsGround ? -cosAngle : cosAngle);
@@ -70,7 +110,6 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 		transmittance = groundTransmittance / transmittance;
 	}
 	
-	float xi = uv.z;
 	float3 opacity = xi * (1.0 - transmittance);
 	
 	// Brute force linear search
@@ -189,7 +228,7 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, currentDistance);
 		
 		float xi = i / _Samples;
-		//currentDistance = GetSkyCdf(heightAtDistance, viewCosAngle, xi, rayIntersectsGround, colorMask);
+		currentDistance = GetSkyCdf(heightAtDistance, viewCosAngle, xi, rayIntersectsGround, colorMask);
 		
 		float4 scatter = AtmosphereScatter(heightAtDistance);
 		
@@ -228,7 +267,7 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
 		
 		float3 extinction = AtmosphereExtinction(viewHeight);
-		float3 weight = viewTransmittance / dot(rcp(3.0), viewTransmittance * extinction / (1.0 - transmittanceAtMaxDistance));
+		float3 weight = viewTransmittance / dot(rcp(3.0), viewTransmittance * extinction / (1.0 - transmittanceAtMaxDistance)) / _Samples;
 		
 		float3 transmittance = exp(-extinction * dt);
 		
@@ -238,8 +277,8 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 				lighting *= clouds.a;
 		#endif
 		
-		luminance += lighting * viewTransmittance * (1.0 - transmittance) / extinction;
-		//luminance += lighting * weight;
+		//luminance += lighting * viewTransmittance * (1.0 - transmittance) / extinction;
+		luminance += lighting * weight;
 	}
 	
 	// Account for bounced light off the earth

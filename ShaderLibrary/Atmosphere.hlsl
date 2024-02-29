@@ -192,7 +192,7 @@ float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGr
 		float d = -r_mu - sqrt(discriminant);
 		float d_min = viewHeight - _PlanetRadius;
 		float d_max = rho;
-		u_mu = Remap(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), 0.5 - _SkyCdfOffset.y, 0.0 + _SkyCdfOffset.y);
+		u_mu = Remap(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), 0.0, 1.0, 0.5 - _SkyCdfOffset.y, 0.0 + _SkyCdfOffset.y);
 	}
 	else
 	{
@@ -202,10 +202,10 @@ float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGr
 		float d = -r_mu + sqrt(discriminant + H * H);
 		float d_min = _TopRadius - viewHeight;
 		float d_max = rho + H;
-		u_mu = Remap((d - d_min) / (d_max - d_min), 0.5 + _SkyCdfOffset.y, 1.0 - _SkyCdfOffset.y);
+		u_mu = Remap((d - d_min) / (d_max - d_min), 0.0, 1.0, 0.5 + _SkyCdfOffset.y, 1.0 - _SkyCdfOffset.y);
 	}
 	
-	float3 uv = float3(r_mu, u_mu, xi + dot(colorMask, float3(0.0, 1.0, 2.0)) / 3.0);
+	float3 uv = float3((u_r + dot(colorMask, float3(0.0, 1.0, 2.0))) / 3.0, u_mu, xi);
 	uv.xz = uv.xz * _SkyCdfScale.xz + _SkyCdfOffset.xz;
 	return _SkyCdf.SampleLevel(_LinearClampSampler, uv, 0.0);
 }

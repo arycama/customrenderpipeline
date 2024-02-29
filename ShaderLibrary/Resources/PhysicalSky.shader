@@ -37,7 +37,7 @@ Shader "Hidden/Physical Sky"
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex VertexIdPassthrough
-            #pragma geometry GeometryReflectionProbe
+            #pragma geometry GeometryCubemapRender
             #pragma fragment FragmentRender
 
             #define REFLECTION_PROBE
