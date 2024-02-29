@@ -142,10 +142,10 @@ float3 AtmosphereTransmittance(float height, float cosAngle)
 	return _Transmittance.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
-float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float cosAngle1)
+float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float cosAngle1, bool rayIntersectsGround)
 {
 	float3 lowTransmittance, highTransmittance;
-	if (radius0 > radius1)
+	if (rayIntersectsGround)
 	{
 		lowTransmittance = AtmosphereTransmittance(radius1, -cosAngle1);
 		highTransmittance = AtmosphereTransmittance(radius0, -cosAngle0);
@@ -157,6 +157,11 @@ float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float
 	}
 		
 	return highTransmittance == 0.0 ? 0.0 : lowTransmittance * rcp(highTransmittance);
+}
+
+float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float cosAngle1)
+{
+	return TransmittanceToPoint(radius0, cosAngle0, radius1, cosAngle1, radius0 > radius1);
 }
 
 float3 GetGroundAmbient(float lightCosAngle)

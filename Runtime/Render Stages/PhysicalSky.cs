@@ -108,7 +108,7 @@ namespace Arycama.CustomRenderPipeline
             textureCache = new(renderGraph, "Physical Sky");
 
             transmittance = renderGraph.ImportRenderTexture(new RenderTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, 0, GraphicsFormat.B10G11R11_UFloatPack32));
-            cdf = renderGraph.ImportRenderTexture(new RenderTexture(settings.CdfWidth, settings.CdfHeight, 0, GraphicsFormat.R32_SFloat) { dimension = TextureDimension.Tex3D, volumeDepth = settings.CdfDepth });
+            cdf = renderGraph.ImportRenderTexture(new RenderTexture(settings.CdfWidth * 3, settings.CdfHeight, 0, GraphicsFormat.R32_SFloat) { dimension = TextureDimension.Tex3D, volumeDepth = settings.CdfDepth });
             multiScatter = renderGraph.ImportRenderTexture(new RenderTexture(settings.MultiScatterWidth, settings.MultiScatterHeight, 0, GraphicsFormat.B10G11R11_UFloatPack32) { enableRandomWrite = true });
             groundAmbient = renderGraph.ImportRenderTexture(new RenderTexture(settings.AmbientGroundWidth, 1, 0, GraphicsFormat.B10G11R11_UFloatPack32) { enableRandomWrite = true });
             skyAmbient = renderGraph.ImportRenderTexture(new RenderTexture(settings.AmbientSkyWidth, settings.AmbientSkyHeight, 0, GraphicsFormat.B10G11R11_UFloatPack32) { enableRandomWrite = true });
@@ -116,7 +116,7 @@ namespace Arycama.CustomRenderPipeline
 
         public LookupTableResult GenerateLookupTables()
         {
-            GraphicsUtilities.HalfTexelRemap(settings.CdfWidth, settings.CdfHeight, settings.CdfDepth, out var cdfScale, out var cdfOffset);
+            GraphicsUtilities.HalfTexelRemap(settings.CdfWidth * 3, settings.CdfHeight, settings.CdfDepth, out var cdfScale, out var cdfOffset);
             var transmittanceRemap = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
             var multiScatterRemap = GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight);
             var groundAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientGroundWidth);
@@ -162,6 +162,11 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_ColorChannelScale", (settings.CdfWidth - 1.0f) / (settings.CdfWidth / 3.0f));
                     pass.SetVector(command, "_Scale", new Vector3(MathUtils.Rcp(settings.CdfWidth - 1.0f), MathUtils.Rcp(settings.CdfHeight - 1.0f), MathUtils.Rcp(settings.CdfDepth - 1.0f)));
                     pass.SetVector(command, "_Offset", new Vector3(MathUtils.Rcp(-2.0f * settings.CdfWidth + 2.0f), MathUtils.Rcp(-2.0f * settings.CdfHeight + 2.0f), MathUtils.Rcp(-2.0f * settings.CdfDepth + 2.0f)));
+
+                    pass.SetFloat(command, "_Width", settings.CdfWidth);
+                    pass.SetFloat(command, "_Height", settings.CdfHeight);
+                    pass.SetFloat(command, "_CdfDepth", settings.CdfDepth);
+
                 });
             }
 

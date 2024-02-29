@@ -10,24 +10,38 @@ float _ColorChannelScale;
 Texture2D<float4> _Clouds;
 Texture2D<float> _Depth, _CloudDepth;
 
-struct GeometryOutput
-{
-	float4 position : SV_Position;
-	uint index : SV_RenderTargetArrayIndex;
-};
+float _Width, _Height, _CdfDepth;
 
-[instance(6)]
-[maxvertexcount(3)]
-void GeometryReflectionProbe(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryOutput> stream, uint instanceId : SV_GSInstanceID)
+float3 GetSkyParams(float3 uv, out bool rayIntersectsGround)
 {
-	[unroll]
-	for (uint i = 0; i < 3; i++)
+	float height = uv.z * _AtmosphereHeight;
+	float viewHeight = height + _PlanetRadius;
+	
+	float cosHorizon = -sqrt(height * (height + 2.0 * _PlanetRadius)) / viewHeight;
+	
+	// Todo: remove?
+	uv.y = Remap01ToHalfTexelCoord(uv.y, _Height);
+	
+	float cosAngle;
+	rayIntersectsGround = uv.y < 0.5;
+	if (rayIntersectsGround)
 	{
-		GeometryOutput output;
-		output.position = float3(float2((id[i] << 1) & 2, id[i] & 2) * 2.0 - 1.0, 1.0).xyzz;
-		output.index = instanceId;
-		stream.Append(output);
+		//cosAngle = Remap(uv.y, 0.0, 0.5, -1.0, cosHorizon);
+		uv.y = (uv.y - 0.5 / _Height) * _Height / (_Height / 2.0 - 1.0);
+		uv.y = pow(uv.y, 5.0);
+		cosAngle = cosHorizon - uv.y * (1 + cosHorizon);
 	}
+	else
+	{
+		//cosAngle = Remap(uv.y, 0.5, 1.0, cosHorizon, 1.0);
+		uv.y = (uv.y - (0.5 + 0.5 / _Height)) * _Height / (_Height / 2.0 - 1.0);
+		uv.y = pow(uv.y, 5.0);
+		cosAngle = cosHorizon + uv.y * (1 - cosHorizon);
+	}
+	
+	//cosAngle = 2.0 * uv.y - 1.0;
+	
+	return float3(uv.x, cosAngle, viewHeight);
 }
 
 float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
@@ -35,32 +49,40 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 	float3 uv = float3(position.xy, index + 0.5) * _Scale + _Offset;
 	
 	// Distance to top atmosphere boundary for a horizontal ray at ground level.
-	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
+	//float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
 	
-	// Distance to the horizon.
-	float rho = H * (uv.x / 3.0);
-	float viewHeight = sqrt(Sq(rho) + Sq(_PlanetRadius));
+	//// Distance to the horizon.
+	//float rho = H * (uv.x / 3.0);
+	//float viewHeight = sqrt(Sq(rho) + Sq(_PlanetRadius));
 
-	float cosAngle;
-	bool rayIntersectsGround = uv.y < 0.5;
-	if (rayIntersectsGround)
-	{
-		float d_min = viewHeight - _PlanetRadius;
-		float d_max = rho;
-		float d = lerp(d_max, d_min, uv.y);
-		cosAngle = d == 0.0 ? -1.0 : clamp(-(Sq(rho) + Sq(d)) / (2.0 * viewHeight * d), -1.0, 1.0);
-	}
-	else
-	{
-		float d_min = _TopRadius - viewHeight;
-		float d_max = rho + H;
-		float d = lerp(d_min, d_max, uv.y);
-		cosAngle = d == 0.0 ? 1.0 : clamp((Sq(H) - Sq(rho) - Sq(d)) / (2.0 * viewHeight * d), -1.0, 1.0);
-	}
+	//float cosAngle, maxDist;
+	//bool rayIntersectsGround = uv.y < 0.5;
+	//if (rayIntersectsGround)
+	//{
+	//	float d_min = viewHeight - _PlanetRadius;
+	//	float d_max = rho;
+	//	maxDist = lerp(d_max, d_min, uv.y);
+	//	cosAngle = maxDist == 0.0 ? -1.0 : clamp(-(Sq(rho) + Sq(maxDist)) / (2.0 * viewHeight * maxDist), -1.0, 1.0);
+	//}
+	//else
+	//{
+	//	float d_min = _TopRadius - viewHeight;
+	//	float d_max = rho + H;
+	//	maxDist = lerp(d_min, d_max, uv.y);
+	//	cosAngle = maxDist == 0.0 ? 1.0 : clamp((Sq(H) - Sq(rho) - Sq(maxDist)) / (2.0 * viewHeight * maxDist), -1.0, 1.0);
+	//}
 	
-	float3 colorMask = floor(uv.x * _ColorChannelScale) == float3(0.0, 1.0, 2.0);
+	bool rayIntersectsGround;
+	float3 skyParams = GetSkyParams(uv, rayIntersectsGround);
+	
+	float xi = skyParams.x;
+	float cosAngle = skyParams.y;
+	float viewHeight = skyParams.z;
+	
 	float maxDist = DistanceToNearestAtmosphereBoundary(viewHeight, cosAngle, rayIntersectsGround);
+	float3 colorMask = floor(uv.x * _ColorChannelScale) == float3(0.0, 1.0, 2.0);
 
+	// Get transmittance at max distance
 	float3 transmittance = AtmosphereTransmittance(viewHeight, rayIntersectsGround ? -cosAngle : cosAngle);
 	if (rayIntersectsGround)
 	{
@@ -70,7 +92,8 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 		transmittance = groundTransmittance / transmittance;
 	}
 	
-	float xi = uv.z;
+	// Find the opacity that corresponds to a certain percentage
+	//float xi = uv.z;
 	float3 opacity = xi * (1.0 - transmittance);
 	
 	// Brute force linear search
@@ -81,7 +104,7 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 	float dx = maxDist / sampleCount;
 	
 	float opticalDepth = 0.0;
-	for (float i = 0.0; i <= sampleCount; i++)
+	for (float i = 0.5; i < sampleCount; i++)
 	{
 		float distance = i / sampleCount * maxDist;
 		float radius = HeightAtDistance(viewHeight, cosAngle, distance);
@@ -186,11 +209,11 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 	for (float i = offsets.x; i < _Samples; i++)
 	{
 		float currentDistance = i * dt;
-		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, currentDistance);
 		
 		float xi = i / _Samples;
-		//currentDistance = GetSkyCdf(heightAtDistance, viewCosAngle, xi, rayIntersectsGround, colorMask);
+		//currentDistance = GetSkyCdf(viewHeight, viewCosAngle, xi, rayIntersectsGround, colorMask);
 		
+		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, currentDistance);
 		float4 scatter = AtmosphereScatter(heightAtDistance);
 		
 		float3 lighting = 0.0;
