@@ -3,7 +3,7 @@
 
 #include "Geometry.hlsl"
 
-const static float _EarthScale = 0.25;
+const static float _EarthScale = 1.0;
 
 const static float _PlanetRadius = 6360000.0 * _EarthScale;
 const static float _AtmosphereHeight = 100000.0 * _EarthScale;
@@ -31,8 +31,17 @@ Texture2D<float3> _SkyAmbient;
 float4 _SkyAmbientRemap;
 
 Texture3D<float> _SkyCdf;
-float3 _SkyCdfScale;
-float3 _SkyCdfOffset;
+float3 _SkyCdfSize;
+
+float GetTextureCoordFromUnitRange(float x, float texture_size)
+{
+	return 0.5 / texture_size + x * (1.0 - 1.0 / texture_size);
+}
+
+float GetUnitRangeFromTextureCoord(float u, float texture_size)
+{
+	return (u - 0.5 / texture_size) / (1.0 - 1.0 / texture_size);
+}
 
 float DistanceToTopAtmosphereBoundary(float height, float cosAngle)
 {
@@ -173,40 +182,38 @@ float3 GetSkyAmbient(float lightCosAngle, float height)
 
 float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGround, float3 colorMask)
 {
-	// Distance to top atmosphere boundary for a horizontal ray at ground level.
-	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
-	
-	// Distance to the horizon.
-	float rho = sqrt(Sq(viewHeight) - Sq(_PlanetRadius));
-	float u_r = rho / H;
+	float H = sqrt(_TopRadius * _TopRadius - _PlanetRadius * _PlanetRadius);
+		// Distance to the horizon.
+	float rho = sqrt(max(0.0, viewHeight * viewHeight - _PlanetRadius * _PlanetRadius));
+	float u_r = GetTextureCoordFromUnitRange(rho / H, _SkyCdfSize.x);
 
 	// Discriminant of the quadratic equation for the intersections of the ray
-	// (r,mu) with the ground (see RayIntersectsGround).
+	// (viewHeight,cosAngle) with the ground (see RayIntersectsGround).
 	float r_mu = viewHeight * cosAngle;
-	float discriminant = Sq(r_mu) - Sq(viewHeight) + Sq(_PlanetRadius);
+	float discriminant = r_mu * r_mu - viewHeight * viewHeight + _PlanetRadius * _PlanetRadius;
 	float u_mu;
 	if (rayIntersectsGround)
 	{
-		// Distance to the ground for the ray (r,mu), and its minimum and maximum
-		// values over all mu - obtained for (r,-1) and (r,mu_horizon).
-		float d = -r_mu - sqrt(discriminant);
+			// Distance to the ground for the ray (viewHeight,cosAngle), and its minimum and maximum
+			// values over all cosAngle - obtained for (viewHeight,-1) and (viewHeight,mu_horizon).
+		float d = -r_mu - sqrt(max(0.0, discriminant));
 		float d_min = viewHeight - _PlanetRadius;
 		float d_max = rho;
-		u_mu = Remap(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), 0.0, 1.0, 0.5 - _SkyCdfOffset.y, 0.0 + _SkyCdfOffset.y);
+		u_mu = 0.5 - 0.5 * GetTextureCoordFromUnitRange(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
 	}
 	else
 	{
-		// Distance to the top atmosphere boundary for the ray (r,mu), and its
-		// minimum and maximum values over all mu - obtained for (r,1) and
-		// (r,mu_horizon).
-		float d = -r_mu + sqrt(discriminant + H * H);
+			// Distance to the top atmosphere boundary for the ray (viewHeight,cosAngle), and its
+			// minimum and maximum values over all cosAngle - obtained for (viewHeight,1) and
+			// (viewHeight,mu_horizon).
+		float d = -r_mu + sqrt(max(0.0, discriminant + H * H));
 		float d_min = _TopRadius - viewHeight;
 		float d_max = rho + H;
-		u_mu = Remap((d - d_min) / (d_max - d_min), 0.0, 1.0, 0.5 + _SkyCdfOffset.y, 1.0 - _SkyCdfOffset.y);
+		u_mu = 0.5 + 0.5 * GetTextureCoordFromUnitRange((d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
 	}
 	
-	float3 uv = float3((u_r + dot(colorMask, float3(0.0, 1.0, 2.0))) / 3.0, u_mu, xi);
-	uv.xz = uv.xz * _SkyCdfScale.xz + _SkyCdfOffset.xz;
+	float3 uv = (u_r, u_mu, GetTextureCoordFromUnitRange(xi, _SkyCdfSize.z));
+	
 	return _SkyCdf.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 

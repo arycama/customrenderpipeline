@@ -28,6 +28,9 @@ namespace Arycama.CustomRenderPipeline
             return new Vector4(1f - invWidth, 1f - invHeight, 0.5f * invWidth, 0.5f * invHeight);
         }
 
+        /// <summary>
+        /// Calculates a scale and offset for remapping a UV from a 0-1 range to a halfTexel to (1-halfTexel) range
+        /// </summary>
         public static void HalfTexelRemap(float width, float height, float depth, out Vector3 scale, out Vector3 offset)
         {
             var invWidth = 1f / width;

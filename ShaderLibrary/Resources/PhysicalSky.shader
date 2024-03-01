@@ -62,8 +62,8 @@ Shader "Hidden/Physical Sky"
         {
             Name "Temporal"
 
-            Blend 0 One One
-            Blend 1 Off
+            //Blend 0 One One
+            //Blend 1 Off
 
             HLSLPROGRAM
             #pragma target 5.0

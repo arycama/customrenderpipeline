@@ -108,7 +108,7 @@ namespace Arycama.CustomRenderPipeline
             textureCache = new(renderGraph, "Physical Sky");
 
             transmittance = renderGraph.ImportRenderTexture(new RenderTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, 0, GraphicsFormat.B10G11R11_UFloatPack32));
-            cdf = renderGraph.ImportRenderTexture(new RenderTexture(settings.CdfWidth, settings.CdfHeight, 0, GraphicsFormat.R32G32B32A32_SFloat) { dimension = TextureDimension.Tex3D, volumeDepth = settings.CdfDepth });
+            cdf = renderGraph.ImportRenderTexture(new RenderTexture(settings.CdfWidth, settings.CdfHeight, 0, GraphicsFormat.R32_SFloat) { dimension = TextureDimension.Tex3D, volumeDepth = settings.CdfDepth });
             multiScatter = renderGraph.ImportRenderTexture(new RenderTexture(settings.MultiScatterWidth, settings.MultiScatterHeight, 0, GraphicsFormat.B10G11R11_UFloatPack32) { enableRandomWrite = true });
             groundAmbient = renderGraph.ImportRenderTexture(new RenderTexture(settings.AmbientGroundWidth, 1, 0, GraphicsFormat.B10G11R11_UFloatPack32) { enableRandomWrite = true });
             skyAmbient = renderGraph.ImportRenderTexture(new RenderTexture(settings.AmbientSkyWidth, settings.AmbientSkyHeight, 0, GraphicsFormat.B10G11R11_UFloatPack32) { enableRandomWrite = true });
@@ -116,20 +116,19 @@ namespace Arycama.CustomRenderPipeline
 
         public LookupTableResult GenerateLookupTables()
         {
-            GraphicsUtilities.HalfTexelRemap(settings.CdfWidth, settings.CdfHeight, settings.CdfDepth, out var cdfScale, out var cdfOffset);
             var transmittanceRemap = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
             var multiScatterRemap = GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight);
             var groundAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientGroundWidth);
             var skyAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientSkyWidth, settings.AmbientSkyHeight);
 
-            var result = new LookupTableResult(transmittance, multiScatter, groundAmbient, cdf, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap, cdfScale, cdfOffset);
+            var result = new LookupTableResult(transmittance, multiScatter, groundAmbient, cdf, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap, new Vector3(settings.CdfWidth, settings.CdfHeight, settings.CdfDepth));
 
-            if (version >= settings.Version)
-            {
-                return result;
-            }
+            //if (version >= settings.Version)
+            //{
+            //    return result;
+            //}
 
-            version = settings.Version;
+            //version = settings.Version;
 
             // Generate transmittance LUT
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere Transmittance"))
@@ -160,8 +159,10 @@ namespace Arycama.CustomRenderPipeline
                     result.SetProperties(pass, command);
                     pass.SetInt(command, "_Samples", settings.CdfSamples);
                     pass.SetFloat(command, "_ColorChannelScale", (settings.CdfWidth - 1.0f) / (settings.CdfWidth / 3.0f));
-                    pass.SetVector(command, "_Scale", new Vector3(MathUtils.Rcp(settings.CdfWidth - 1.0f), MathUtils.Rcp(settings.CdfHeight - 1.0f), MathUtils.Rcp(settings.CdfDepth - 1.0f)));
-                    pass.SetVector(command, "_Offset", new Vector3(MathUtils.Rcp(-2.0f * settings.CdfWidth + 2.0f), MathUtils.Rcp(-2.0f * settings.CdfHeight + 2.0f), MathUtils.Rcp(-2.0f * settings.CdfDepth + 2.0f)));
+                    //pass.SetVector(command, "_Scale", new Vector3(MathUtils.Rcp(settings.CdfWidth - 1.0f), MathUtils.Rcp(settings.CdfHeight - 1.0f), MathUtils.Rcp(settings.CdfDepth - 1.0f)));
+                    //pass.SetVector(command, "_Offset", new Vector3(MathUtils.Rcp(-2.0f * settings.CdfWidth + 2.0f), MathUtils.Rcp(-2.0f * settings.CdfHeight + 2.0f), MathUtils.Rcp(-2.0f * settings.CdfDepth + 2.0f)));
+
+                    pass.SetVector(command, "_CdfSize", new Vector3(settings.CdfWidth, settings.CdfHeight, settings.CdfDepth));
                 });
             }
 
@@ -438,10 +439,9 @@ namespace Arycama.CustomRenderPipeline
             public Vector4 MultiScatterRemap { get; }
             public Vector4 SkyAmbientRemap { get; }
             public Vector2 GroundAmbientRemap { get; }
-            public Vector3 CdfLookupScale { get; }
-            public Vector3 CdfLookupOffset { get; }
+            public Vector3 CdfLookupSize { get; }
 
-            public LookupTableResult(RTHandle transmittance, RTHandle multiScatter, RTHandle groundAmbient, RTHandle cdfLookup, RTHandle skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector3 cdfLookupScale, Vector3 cdfLookupOffset)
+            public LookupTableResult(RTHandle transmittance, RTHandle multiScatter, RTHandle groundAmbient, RTHandle cdfLookup, RTHandle skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector3 cdfLookupSize)
             {
                 Transmittance = transmittance ?? throw new ArgumentNullException(nameof(transmittance));
                 MultiScatter = multiScatter ?? throw new ArgumentNullException(nameof(multiScatter));
@@ -452,8 +452,7 @@ namespace Arycama.CustomRenderPipeline
                 MultiScatterRemap = multiScatterRemap;
                 SkyAmbientRemap = skyAmbientRemap;
                 GroundAmbientRemap = groundAmbientRemap;
-                CdfLookupScale = cdfLookupScale;
-                CdfLookupOffset = cdfLookupOffset;
+                CdfLookupSize = cdfLookupSize;
             }
 
             public void SetInputs(RenderPass pass)
@@ -471,8 +470,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetVector(command, "_MultiScatterRemap", MultiScatterRemap);
                 pass.SetVector(command, "_SkyAmbientRemap", SkyAmbientRemap);
                 pass.SetVector(command, "_GroundAmbientRemap", GroundAmbientRemap);
-                pass.SetVector(command, "_SkyCdfScale", CdfLookupScale);
-                pass.SetVector(command, "_SkyCdfOffset", CdfLookupOffset);
+                pass.SetVector(command, "_SkyCdfSize", CdfLookupSize);
             }
         }
 
