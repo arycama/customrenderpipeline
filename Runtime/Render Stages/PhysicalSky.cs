@@ -140,7 +140,7 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     result.SetProperties(pass, command);
-                    pass.SetInt(command, "_Samples", settings.TransmittanceSamples);
+                    pass.SetFloat(command, "_Samples", settings.TransmittanceSamples);
                     pass.SetVector(command, "_ScaleOffset", new Vector4(1.0f / (settings.TransmittanceWidth - 1.0f), 1.0f / (settings.TransmittanceHeight - 1.0f), -0.5f / (settings.TransmittanceWidth - 1.0f), -0.5f / (settings.TransmittanceHeight - 1.0f)));
                 });
             }
@@ -157,7 +157,7 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     result.SetProperties(pass, command);
-                    pass.SetInt(command, "_Samples", settings.CdfSamples);
+                    pass.SetFloat(command, "_Samples", settings.CdfSamples);
                     pass.SetFloat(command, "_ColorChannelScale", (settings.CdfWidth - 1.0f) / (settings.CdfWidth / 3.0f));
                     //pass.SetVector(command, "_Scale", new Vector3(MathUtils.Rcp(settings.CdfWidth - 1.0f), MathUtils.Rcp(settings.CdfHeight - 1.0f), MathUtils.Rcp(settings.CdfDepth - 1.0f)));
                     //pass.SetVector(command, "_Offset", new Vector3(MathUtils.Rcp(-2.0f * settings.CdfWidth + 2.0f), MathUtils.Rcp(-2.0f * settings.CdfHeight + 2.0f), MathUtils.Rcp(-2.0f * settings.CdfDepth + 2.0f)));
@@ -180,7 +180,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     result.SetProperties(pass, command);
                     pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
-                    pass.SetInt(command, "_Samples", settings.MultiScatterSamples);
+                    pass.SetFloat(command, "_Samples", settings.MultiScatterSamples);
                     pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.MultiScatterWidth, settings.MultiScatterHeight));
                 });
             }
@@ -196,7 +196,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     result.SetProperties(pass, command);
                     pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
-                    pass.SetInt(command, "_Samples", settings.AmbientGroundSamples);
+                    pass.SetFloat(command, "_Samples", settings.AmbientGroundSamples);
                     pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AmbientGroundWidth, 1));
                 });
             }
@@ -212,7 +212,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     result.SetProperties(pass, command);
                     pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
-                    pass.SetInt(command, "_Samples", settings.AmbientSkySamples);
+                    pass.SetFloat(command, "_Samples", settings.AmbientSkySamples);
                     pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AmbientSkyWidth, settings.AmbientSkyHeight));
                 });
             }
@@ -237,7 +237,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     lightingSetupResult.SetProperties(pass, command);
 
-                    pass.SetInt(command, "_Samples", settings.ReflectionSamples);
+                    pass.SetFloat(command, "_Samples", settings.ReflectionSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
                     pass.SetConstantBuffer(command, "Exposure", exposureBuffer);
 
@@ -324,7 +324,7 @@ namespace Arycama.CustomRenderPipeline
 
                     var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                     {
-                        pass.SetInt(command, "_Samples", settings.ConvolutionSamples);
+                        pass.SetFloat(command, "_Samples", settings.ConvolutionSamples);
 
                         var array = ArrayPool<Matrix4x4>.Get(6);
 
@@ -379,7 +379,7 @@ namespace Arycama.CustomRenderPipeline
                     atmosphereData.SetProperties(pass, command);
 
                     pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
-                    pass.SetInt(command, "_Samples", settings.RenderSamples);
+                    pass.SetFloat(command, "_Samples", settings.RenderSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
                     pass.SetConstantBuffer(command, "Exposure", exposureBuffer);
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));

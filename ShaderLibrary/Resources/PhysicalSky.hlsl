@@ -3,7 +3,7 @@
 #include "../Lighting.hlsl"
 
 matrix _PixelToWorldViewDir, _PixelToWorldViewDirs[6];
-uint _Samples;
+float _Samples;
 float4 _ScaleOffset;
 float3 _Scale, _Offset;
 float _ColorChannelScale;
@@ -81,10 +81,6 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 	float3 colorMask = floor(uv.x * 3.0) == float3(0.0, 1.0, 2.0);
 	float xi = GetUnitRangeFromTextureCoord(uv.z, _CdfSize.z);
 	
-	//float3 cdfUv = GetSkyCdfUv1(viewHeight, cosAngle, xi, rayIntersectsGround, colorMask);
-	//return cdfUv;
-	//return float3(viewHeight, cosAngle, xi);
-	
 	// First, get the max transmittance. This tells us the max opacity we can achieve, then we can build a LUT that maps from an 0:1 number a distance corresponding to opacity
 	float3 maxTransmittance = AtmosphereTransmittance(viewHeight, rayIntersectsGround ? -cosAngle : cosAngle);
 	
@@ -105,7 +101,7 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 	float sampleCount = 4096;
 	float dx = maxDist / sampleCount;
 	
-	float transmittance = 1.0;
+	float3 transmittance = 1.0;
 	for (float i = 0.5; i < sampleCount; i++)
 	{
 		float distance = i / sampleCount * maxDist;
