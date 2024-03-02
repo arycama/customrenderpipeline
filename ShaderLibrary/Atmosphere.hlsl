@@ -180,12 +180,13 @@ float3 GetSkyAmbient(float lightCosAngle, float height)
 	return _SkyAmbient.SampleLevel(_LinearClampSampler, ambientUv, 0.0);
 }
 
-float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGround, float3 colorMask)
+float3 GetSkyCdfUv(float viewHeight, float cosAngle, float xi, bool rayIntersectsGround, float3 colorMask)
 {
 	float H = sqrt(_TopRadius * _TopRadius - _PlanetRadius * _PlanetRadius);
-		// Distance to the horizon.
+	
+	// Distance to the horizon.
 	float rho = sqrt(max(0.0, viewHeight * viewHeight - _PlanetRadius * _PlanetRadius));
-	float u_r = GetTextureCoordFromUnitRange(rho / H, _SkyCdfSize.x);
+	float u_r = GetTextureCoordFromUnitRange(rho / H, _SkyCdfSize.x / 3.0);
 
 	// Discriminant of the quadratic equation for the intersections of the ray
 	// (viewHeight,cosAngle) with the ground (see RayIntersectsGround).
@@ -194,8 +195,8 @@ float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGr
 	float u_mu;
 	if (rayIntersectsGround)
 	{
-			// Distance to the ground for the ray (viewHeight,cosAngle), and its minimum and maximum
-			// values over all cosAngle - obtained for (viewHeight,-1) and (viewHeight,mu_horizon).
+		// Distance to the ground for the ray (viewHeight,cosAngle), and its minimum and maximum
+		// values over all cosAngle - obtained for (viewHeight,-1) and (viewHeight,mu_horizon).
 		float d = -r_mu - sqrt(max(0.0, discriminant));
 		float d_min = viewHeight - _PlanetRadius;
 		float d_max = rho;
@@ -203,17 +204,24 @@ float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGr
 	}
 	else
 	{
-			// Distance to the top atmosphere boundary for the ray (viewHeight,cosAngle), and its
-			// minimum and maximum values over all cosAngle - obtained for (viewHeight,1) and
-			// (viewHeight,mu_horizon).
+		// Distance to the top atmosphere boundary for the ray (viewHeight,cosAngle), and its
+		// minimum and maximum values over all cosAngle - obtained for (viewHeight,1) and
+		// (viewHeight,mu_horizon).
 		float d = -r_mu + sqrt(max(0.0, discriminant + H * H));
 		float d_min = _TopRadius - viewHeight;
 		float d_max = rho + H;
 		u_mu = 0.5 + 0.5 * GetTextureCoordFromUnitRange((d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
 	}
 	
-	float3 uv = (u_r, u_mu, GetTextureCoordFromUnitRange(xi, _SkyCdfSize.z));
+	// Remap x uv depending on color mask
+	u_r = (u_r + dot(colorMask, float3(0.0, 1.0, 2.0))) / 3.0;
 	
+	return float3(u_r, u_mu, GetTextureCoordFromUnitRange(xi, _SkyCdfSize.z));
+}
+
+float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGround, float3 colorMask)
+{
+	float3 uv = GetSkyCdfUv(viewHeight, cosAngle, xi, rayIntersectsGround, colorMask);
 	return _SkyCdf.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 

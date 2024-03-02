@@ -62,7 +62,7 @@ Shader "Hidden/Physical Sky"
         {
             Name "Temporal"
 
-            //Blend 0 One One
+           // Blend 0 One One
             //Blend 1 Off
 
             HLSLPROGRAM

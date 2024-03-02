@@ -162,6 +162,8 @@ namespace Arycama.CustomRenderPipeline
                     //pass.SetVector(command, "_Scale", new Vector3(MathUtils.Rcp(settings.CdfWidth - 1.0f), MathUtils.Rcp(settings.CdfHeight - 1.0f), MathUtils.Rcp(settings.CdfDepth - 1.0f)));
                     //pass.SetVector(command, "_Offset", new Vector3(MathUtils.Rcp(-2.0f * settings.CdfWidth + 2.0f), MathUtils.Rcp(-2.0f * settings.CdfHeight + 2.0f), MathUtils.Rcp(-2.0f * settings.CdfDepth + 2.0f)));
 
+                    pass.SetVector(command, "_SkyCdfSize", new Vector3(settings.CdfWidth, settings.CdfHeight, settings.CdfDepth));
+
                     pass.SetVector(command, "_CdfSize", new Vector3(settings.CdfWidth, settings.CdfHeight, settings.CdfDepth));
                 });
             }
