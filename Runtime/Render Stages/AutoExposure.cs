@@ -5,11 +5,18 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
+    public enum ExposureMode
+    {
+        Automatic,
+        Manual
+    }
+
     public class AutoExposure : RenderFeature
     {
         [Serializable]
         public class Settings
         {
+            [SerializeField] private ExposureMode exposureMode = ExposureMode.Automatic;
             [SerializeField] private float minEv = -10f;
             [SerializeField] private float maxEv = 18f;
             [SerializeField] private float adaptationSpeed = 1.1f;
@@ -18,6 +25,7 @@ namespace Arycama.CustomRenderPipeline
             [SerializeField] private int exposureResolution = 128;
             [SerializeField] private AnimationCurve exposureCurve = AnimationCurve.Linear(0.0f, 1.0f, 1.0f, 1.0f);
 
+            public ExposureMode ExposureMode => exposureMode;
             public float MinEv => minEv;
             public float MaxEv => maxEv;
             public float AdaptationSpeed => adaptationSpeed;
@@ -69,6 +77,8 @@ namespace Arycama.CustomRenderPipeline
         {
             internal Texture2D exposureTexture;
             internal BufferHandle exposureBuffer;
+            internal ExposureMode mode;
+            internal bool isFirst;
         }
 
         class Pass2Data
@@ -77,7 +87,7 @@ namespace Arycama.CustomRenderPipeline
             internal BufferHandle output;
         }
 
-        public BufferHandle OnPreRender(Camera camera)
+        public AutoExposureData OnPreRender(Camera camera)
         {
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Auto Exposure"))
             {
@@ -104,11 +114,11 @@ namespace Arycama.CustomRenderPipeline
                     data.bufferHandle = bufferHandle;
                 }
 
-                return bufferHandle;
+                return new (bufferHandle, isFirst);
             }
         }
 
-        public void Render(RTHandle input, int width, int height, Camera camera)
+        public void Render(RTHandle input, int width, int height, Camera camera, AutoExposureData exposureData)
         {
             var exposurePixels = exposureTexture.GetRawTextureData<float>();
 
@@ -122,7 +132,6 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.SetPixelData(exposurePixels, 0);
             exposureTexture.Apply(false, false);
 
-            var exposureBuffer = renderGraph.ImportBuffer(exposureBuffers[camera]);
             var histogram = renderGraph.GetBuffer(256);
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Auto Exposure"))
@@ -159,7 +168,7 @@ namespace Arycama.CustomRenderPipeline
                 data.histogramMin = settings.HistogramPercentages.x;
                 data.histogramMax = settings.HistogramPercentages.y;
                 data.exposureCompensationRemap = GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1);
-                data.exposureBuffer = exposureBuffer;
+                data.exposureBuffer = exposureData.exposureBuffer;
                 data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
             }
 
@@ -173,12 +182,16 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
                 {
+                    pass.SetFloat(command, "Mode", (float)data.mode);
+                    pass.SetFloat(command, "IsFirst", data.isFirst ? 1.0f : 0.0f);
                     pass.SetTexture(command, "ExposureTexture", data.exposureTexture);
                     pass.SetConstantBuffer(command, "Exposure", data.exposureBuffer);
                 });
 
                 data.exposureTexture = exposureTexture;
-                data.exposureBuffer = exposureBuffer;
+                data.exposureBuffer = exposureData.exposureBuffer;
+                data.mode = settings.ExposureMode;
+                data.isFirst = exposureData.IsFirst;
             }
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Auto Exposure"))
@@ -189,7 +202,7 @@ namespace Arycama.CustomRenderPipeline
                 });
 
                 data.output = output;
-                data.exposureBuffer = exposureBuffer;
+                data.exposureBuffer = exposureData.exposureBuffer;
             }
         }
 
@@ -197,6 +210,18 @@ namespace Arycama.CustomRenderPipeline
         {
             internal bool isFirst;
             internal BufferHandle bufferHandle;
+        }
+
+        public struct AutoExposureData
+        {
+            public BufferHandle exposureBuffer { get; }
+            public bool IsFirst { get; }
+
+            public AutoExposureData(BufferHandle exposureBuffer, bool isFirst)
+            {
+                this.exposureBuffer = exposureBuffer ?? throw new ArgumentNullException(nameof(exposureBuffer));
+                IsFirst = isFirst;
+            }
         }
     }
 }

@@ -17,6 +17,7 @@ cbuffer Properties
 	float ExposureCompensation;
 	float Aperture, Iso, ShutterSpeed;
 	float DeltaTime;
+	float IsFirst, Mode;
 };
 
 groupshared uint HistogramShared[NUM_HISTOGRAM_BINS];
@@ -85,10 +86,11 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	float evLastFrame = ExposureToEV100(_Exposure);
 	float adaptedEv = lerp(averageEv, evLastFrame, exp(-DeltaTime * AdaptationSpeed));
 		
-	if (IsInfOrNaN(evLastFrame))
+	if (IsFirst || IsInfOrNaN(adaptedEv))
 		adaptedEv = averageEv;
 
-	//adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
+	if(Mode == 1.0)
+		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
 		
 	if (IsInfOrNaN(adaptedEv))
 		adaptedEv = 1.0;

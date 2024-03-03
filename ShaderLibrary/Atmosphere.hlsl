@@ -3,7 +3,7 @@
 
 #include "Geometry.hlsl"
 
-const static float _EarthScale = 1.0;
+const static float _EarthScale = 0.25;
 
 const static float _PlanetRadius = 6360000.0 * _EarthScale;
 const static float _AtmosphereHeight = 100000.0 * _EarthScale;
@@ -180,7 +180,7 @@ float3 GetSkyAmbient(float lightCosAngle, float height)
 	return _SkyAmbient.SampleLevel(_LinearClampSampler, ambientUv, 0.0);
 }
 
-float3 GetSkyCdfUv(float viewHeight, float cosAngle, float xi, bool rayIntersectsGround, float3 colorMask)
+float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGround, float3 colorMask)
 {
 	float H = sqrt(_TopRadius * _TopRadius - _PlanetRadius * _PlanetRadius);
 	
@@ -216,12 +216,8 @@ float3 GetSkyCdfUv(float viewHeight, float cosAngle, float xi, bool rayIntersect
 	// Remap x uv depending on color mask
 	u_r = (u_r + dot(colorMask, float3(0.0, 1.0, 2.0))) / 3.0;
 	
-	return float3(u_r, u_mu, GetTextureCoordFromUnitRange(xi, _SkyCdfSize.z));
-}
+	float3 uv = float3(u_r, u_mu, GetTextureCoordFromUnitRange(xi, _SkyCdfSize.z));
 
-float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGround, float3 colorMask)
-{
-	float3 uv = GetSkyCdfUv(viewHeight, cosAngle, xi, rayIntersectsGround, colorMask);
 	return _SkyCdf.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 

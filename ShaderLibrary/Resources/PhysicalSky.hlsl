@@ -11,45 +11,6 @@ Texture2D<float4> _Clouds;
 Texture2D<float> _Depth, _CloudDepth;
 float3 _CdfSize;
 
-float3 GetSkyCdfUv1(float viewHeight, float cosAngle, float xi, bool rayIntersectsGround, float3 colorMask)
-{
-	float H = sqrt(_TopRadius * _TopRadius - _PlanetRadius * _PlanetRadius);
-	
-	// Distance to the horizon.
-	float rho = sqrt(max(0.0, viewHeight * viewHeight - _PlanetRadius * _PlanetRadius));
-	float u_r = GetTextureCoordFromUnitRange(rho / H, _SkyCdfSize.x / 3.0);
-
-	// Discriminant of the quadratic equation for the intersections of the ray
-	// (viewHeight,cosAngle) with the ground (see RayIntersectsGround).
-	float r_mu = viewHeight * cosAngle;
-	float discriminant = r_mu * r_mu - viewHeight * viewHeight + _PlanetRadius * _PlanetRadius;
-	float u_mu;
-	if (rayIntersectsGround)
-	{
-		// Distance to the ground for the ray (viewHeight,cosAngle), and its minimum and maximum
-		// values over all cosAngle - obtained for (viewHeight,-1) and (viewHeight,mu_horizon).
-		float d = -r_mu - sqrt(max(0.0, discriminant));
-		float d_min = viewHeight - _PlanetRadius;
-		float d_max = rho;
-		u_mu = 0.5 - 0.5 * GetTextureCoordFromUnitRange(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
-	}
-	else
-	{
-		// Distance to the top atmosphere boundary for the ray (viewHeight,cosAngle), and its
-		// minimum and maximum values over all cosAngle - obtained for (viewHeight,1) and
-		// (viewHeight,mu_horizon).
-		float d = -r_mu + sqrt(max(0.0, discriminant + H * H));
-		float d_min = _TopRadius - viewHeight;
-		float d_max = rho + H;
-		u_mu = 0.5 + 0.5 * GetTextureCoordFromUnitRange((d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
-	}
-	
-	// Remap x uv depending on color mask
-	u_r = (u_r + dot(colorMask, float3(0.0, 1.0, 2.0))) / 3.0;
-	
-	return float3(u_r, u_mu, GetTextureCoordFromUnitRange(xi, _SkyCdfSize.z));
-}
-
 float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	float3 uv = float3(position.xy, index + 0.5) / _CdfSize; // * _Scale + _Offset;
@@ -98,13 +59,12 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 	float t = 0; //xi;
 	float minDist = FloatMax;
 	
-	float sampleCount = 4096;
-	float dx = maxDist / sampleCount;
+	float dx = maxDist / _Samples;
 	
 	float3 transmittance = 1.0;
-	for (float i = 0.5; i < sampleCount; i++)
+	for (float i = 0.5; i < _Samples; i++)
 	{
-		float distance = i / sampleCount * maxDist;
+		float distance = i / _Samples * maxDist;
 		float radius = HeightAtDistance(viewHeight, cosAngle, distance);
 		
 		float3 extinction = AtmosphereExtinction(radius);
@@ -117,15 +77,6 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 			minDist = delta;
 		}
 	}
-	
-	// Normalize (For rays at height of 0, maxDist may be 0 as it will be on the ground, so check for this case)
-	//t = maxDist == 0.0 ? xi : t * rcp(maxDist);
-	
-	// We always want the range to start at 0 and end at 1
-	//if (uv.x == 0.0)
-	//	t = 0.0;
-	//else if (uv.x == 1.0)
-	//	t = maxDist;
 	
 	return t;
 }
@@ -165,71 +116,98 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 {
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
 	
-#ifdef REFLECTION_PROBE
-	float3 V = MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
-#else
-	float3 V = MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
-#endif
+	#ifdef REFLECTION_PROBE
+		float3 rd = -MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
+	#else
+		float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+	#endif
 	
-	float viewCosAngle = -V.y;
-	bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
-	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
-	
-	float3 luminance = 0.0;
-	
-#ifndef REFLECTION_PROBE
-	float depth = _Depth[position.xy];
-	float sceneDistance = CameraDepthToDistance(depth, V);
-	
-	if (depth != 0.0 && (rayIntersectsGround || sceneDistance < rayLength))
-	{
-		//rayIntersectsGround = false;
-		//rayLength = sceneDistance;
-	}
-	
-	float cloudDistance = _CloudDepth[position.xy];
-	//float4 clouds = _Clouds[position.xy];
-	
-	// Lerp max distance between cloud depth and max, as we don't need to raymarch as long for mostly opaque clouds
-	//rayLength = lerp(cloudDistance, rayLength, clouds.a);
-#endif
+	bool rayIntersectsGround = RayIntersectsGround(viewHeight, rd.y);
+	float maxRayLength = DistanceToNearestAtmosphereBoundary(viewHeight, rd.y, rayIntersectsGround);
+	float rayLength = maxRayLength;
 	
 	float heightAtMaxDistance = rayIntersectsGround ? _PlanetRadius : _TopRadius;
-	float viewCosAngleAtMaxDistance = CosAngleAtDistance(viewHeight, viewCosAngle, rayLength, heightAtMaxDistance);
-	float3 transmittanceAtMaxDistance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtMaxDistance, viewCosAngleAtMaxDistance);
+	float viewCosAngleAtMaxDistance = CosAngleAtDistance(viewHeight, rd.y, rayLength, heightAtMaxDistance);
+	float3 transmittanceAtMaxDistance = TransmittanceToPoint(viewHeight, rd.y, heightAtMaxDistance, viewCosAngleAtMaxDistance);
+	
+	// First, get the max transmittance. This tells us the max opacity we can achieve, then we can build a LUT that maps from an 0:1 number a distance corresponding to opacity
+	float3 maxTransmittance = AtmosphereTransmittance(viewHeight, rayIntersectsGround ? -rd.y : rd.y);
+	
+	// If ray intersects the ground, we need to get the max transmittance from the ground to the view
+	if (rayIntersectsGround)
+	{
+		float groundCosAngle = CosAngleAtDistance(viewHeight, rd.y, maxRayLength, _PlanetRadius);
+		float3 groundTransmittance = AtmosphereTransmittance(_PlanetRadius, -groundCosAngle);
+		maxTransmittance = groundTransmittance * rcp(maxTransmittance);
+	}
+	
+	//maxTransmittance = TransmittanceToPoint(viewHeight, rd.y, heightAtMaxDistance, viewCosAngleAtMaxDistance);
+	
+	float3 transmittanceAtDistance = maxTransmittance;
 	
 	float2 offsets = _BlueNoise2D[position.xy % 128];
 	float3 colorMask = floor(offsets.y * 3.0) == float3(0.0, 1.0, 2.0);
 	
+	float scale = 1.0;
+	#ifndef REFLECTION_PROBE
+		float depth = _Depth[position.xy];
+		float sceneDistance = CameraDepthToDistance(depth, rd);
+	
+		if (depth != 0.0 && (rayIntersectsGround || sceneDistance < rayLength))
+		{
+			rayIntersectsGround = false;
+			rayLength = sceneDistance;
+		}
+	
+		float cloudDistance = _CloudDepth[position.xy];
+		float4 clouds = _Clouds[position.xy];
+	
+		// Lerp max distance between cloud depth and max, as we don't need to raymarch as long for mostly opaque clouds
+		//rayLength = lerp(cloudDistance, rayLength, clouds.a);
+	
+		float heightAtDistance = HeightAtDistance(viewHeight, rd.y, rayLength);
+		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, rd.y, rayLength, heightAtDistance);
+		//transmittanceAtDistance = TransmittanceToPoint(viewHeight, rd.y, heightAtDistance, viewCosAngleAtDistance);
+	
+		//if(heightAtDistance > viewHeight)
+		//	scale = dot(colorMask, (1.0 - maxTransmittance) / (1.0 - transmittanceAtDistance));
+		//else
+		//	scale = dot(colorMask, (1.0 - transmittanceAtDistance) / (1.0 - maxTransmittance));
+	#endif
+	
+	// The table may be slightly inaccurate, so calculate it's max value and use that to scale the final distance
+	float maxT = GetSkyCdf(viewHeight, rd.y, scale, rayIntersectsGround, colorMask);
+
+	float3 luminance = 0.0;
 	for (float i = offsets.x; i < _Samples; i++)
 	{
-		float xi = i / _Samples;
-		float currentDistance = GetSkyCdf(viewHeight, viewCosAngle, xi, rayIntersectsGround, colorMask);
-		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, currentDistance);
+		float xi = i / _Samples * scale;
+		float currentDistance = GetSkyCdf(viewHeight, rd.y, xi, rayIntersectsGround, colorMask);// * saturate(rayLength / maxT);
+		float heightAtDistance = HeightAtDistance(viewHeight, rd.y, currentDistance);
 		
 		float4 scatter = AtmosphereScatter(heightAtDistance);
+		float3 extinction = AtmosphereExtinction(heightAtDistance);
 		
 		float3 lighting = 0.0;
 		for (uint j = 0; j < _DirectionalLightCount; j++)
 		{
 			DirectionalLight light = _DirectionalLights[j];
 		
-			float LdotV = dot(light.direction, -V);
+			float LdotV = dot(light.direction, rd);
 			float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, light.direction.y, currentDistance * LdotV, heightAtDistance);
 			
-			//if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
+			if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 			{
 				float3 lightTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
 				if (any(lightTransmittance))
 				{
-					float shadow = GetShadow(-V * currentDistance, j, false);
-					shadow = 1;
+					float shadow = GetShadow(rd * currentDistance, j, false);
 					if (shadow)
 					{
 						#ifdef REFLECTION_PROBE
 							lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * _Exposure * shadow;
 						#else
-							float cloudShadow = 1;//CloudTransmittance(-V * currentDistance);
+							float cloudShadow = CloudTransmittance(rd * currentDistance);
 							lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * _Exposure * shadow * cloudShadow;
 						#endif	
 					}
@@ -240,21 +218,22 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
 			lighting += ms * (scatter.xyz + scatter.w) * light.color * _Exposure;
 		}
-			
-		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, currentDistance, heightAtDistance);
-		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
 		
-		float3 extinction = AtmosphereExtinction(viewHeight);
-		float3 weight = viewTransmittance / dot(rcp(3.0), viewTransmittance * extinction / (1.0 - transmittanceAtMaxDistance)) / _Samples;
+		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, rd.y, currentDistance, heightAtDistance);
+		float3 viewTransmittance = TransmittanceToPoint(viewHeight, rd.y, heightAtDistance, viewCosAngleAtDistance);
+		lighting *= viewTransmittance;
 		
 		#ifndef REFLECTION_PROBE
 			// Blend clouds if needed
-			//if (currentDistance >= cloudDistance)
-			//	lighting *= clouds.a;
+			if (currentDistance >= cloudDistance)
+				lighting *= clouds.a;
 		#endif
 		
-		luminance += lighting * weight;
+		float3 pdf = viewTransmittance * extinction / (1.0 - transmittanceAtDistance);
+		luminance += lighting * 3.0 * rcp(dot(pdf, 1.0));
 	}
+	
+	luminance /= _Samples;
 	
 	// Account for bounced light off the earth
 	if (rayIntersectsGround)
@@ -263,22 +242,22 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		{
 			DirectionalLight light = _DirectionalLights[j];
 			
-			float LdotV = dot(light.direction, -V);
+			float LdotV = dot(light.direction, rd);
 			float lightCosAngle = light.direction.y;
 			
 			float lightCosAngleAtMaxDistance = CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, heightAtMaxDistance);
 			float3 sunTransmittanceAtMaxDistance = AtmosphereTransmittance(heightAtMaxDistance, lightCosAngleAtMaxDistance);
 			
-			float cloudShadow = CloudTransmittance(-V * rayLength);
+			float cloudShadow = CloudTransmittance(rd * rayLength);
 			float3 ambient = GetGroundAmbient(lightCosAngleAtMaxDistance);
 			float3 surface = (ambient + sunTransmittanceAtMaxDistance * cloudShadow * saturate(lightCosAngleAtMaxDistance) * RcpPi) * light.color * _Exposure * _GroundColor * transmittanceAtMaxDistance;
 			
 			#ifndef REFLECTION_PROBE
 				// Clouds block out surface
-				//surface *= clouds.a;
+				surface *= clouds.a;
 			#endif
 			
-			//luminance += surface;
+			luminance += surface;
 		}
 	}
 	
@@ -307,7 +286,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
 	
 	TemporalOutput output;
-	//if(_IsFirst || any(saturate(historyUv != historyUv)))
+	if(_IsFirst || any(saturate(historyUv) != historyUv))
 	{	
 		output.history = result;
 		output.result = result;
