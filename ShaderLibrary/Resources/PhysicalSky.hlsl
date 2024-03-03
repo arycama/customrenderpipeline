@@ -130,7 +130,7 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		if(depth)
 		{
 			hasSceneHit = true;
-			float sceneDistance = CameraDepthToDistance(depth, rd);
+			float sceneDistance = CameraDepthToDistance(depth, -rd);
 			if(sceneDistance < rayLength)
 				rayLength = sceneDistance;
 		}
@@ -143,7 +143,8 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 	
 	// The table may be slightly inaccurate, so calculate it's max value and use that to scale the final distance
 	float maxT = GetSkyCdf(viewHeight, rd.y, scale, colorMask);
-
+	float ds = rayLength / _Samples;
+	
 	float3 luminance = 0.0;
 	for (float i = offsets.x; i < _Samples; i++)
 	{
@@ -195,10 +196,8 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		#endif
 		
 		float3 pdf = viewTransmittance * extinction * rcp(1.0 - maxTransmittance);
-		luminance += lighting * rcp(dot(pdf, rcp(3.0)));
+		luminance += lighting * rcp(dot(pdf, rcp(3.0))) / _Samples;
 	}
-	
-	luminance /= _Samples;
 	
 	// Account for bounced light off the earth
 	bool rayIntersectsGround = RayIntersectsGround(viewHeight, rd.y);
