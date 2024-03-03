@@ -3,7 +3,7 @@
 
 #include "Geometry.hlsl"
 
-const static float _EarthScale = 0.25;
+const static float _EarthScale = 0.1;
 
 const static float _PlanetRadius = 6360000.0 * _EarthScale;
 const static float _AtmosphereHeight = 100000.0 * _EarthScale;
@@ -86,6 +86,12 @@ float CosAngleAtDistance(float viewHeight, float cosAngle, float distance, float
 	return (viewHeight * cosAngle + distance) / heightAtDistance;
 }
 
+float CosAngleAtDistance(float viewHeight, float cosAngle, float distance)
+{
+	float heightAtDistance = HeightAtDistance(viewHeight, cosAngle, distance);
+	return CosAngleAtDistance(viewHeight, cosAngle, distance, heightAtDistance);
+}
+
 float RayleighPhase(float cosAngle)
 {
 	return 3.0 * (1.0 + Sq(cosAngle)) / (16.0 * Pi);
@@ -151,6 +157,42 @@ float3 AtmosphereTransmittance(float height, float cosAngle)
 	return _Transmittance.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
+float3 TransmittanceToBottomAtmosphereBoundary(float height, float cosAngle, float maxDist)
+{
+	float3 maxTransmittance = AtmosphereTransmittance(height, -cosAngle);
+	float groundCosAngle = CosAngleAtDistance(height, cosAngle, maxDist, _PlanetRadius);
+	float3 groundTransmittance = AtmosphereTransmittance(_PlanetRadius, -groundCosAngle);
+	return groundTransmittance * rcp(maxTransmittance);
+} 
+
+float3 TransmittanceToNearestAtmosphereBoundary(float height, float cosAngle, float maxDist, bool rayIntersectsGround)
+{
+	// First, get the max transmittance. This tells us the max opacity we can achieve, then we can build a LUT that maps from an 0:1 number a distance corresponding to opacity
+	float3 maxTransmittance = AtmosphereTransmittance(height, rayIntersectsGround ? -cosAngle : cosAngle);
+	
+	// If ray intersects the ground, we need to get the max transmittance from the ground to the view
+	if (rayIntersectsGround)
+	{
+		float groundCosAngle = CosAngleAtDistance(height, cosAngle, maxDist, _PlanetRadius);
+		float3 groundTransmittance = AtmosphereTransmittance(_PlanetRadius, -groundCosAngle);
+		maxTransmittance = groundTransmittance * rcp(maxTransmittance);
+	}
+	
+	return maxTransmittance;
+}
+
+float3 TransmittanceToNearestAtmosphereBoundary(float height, float cosAngle, bool rayIntersectsGround)
+{
+	float maxDist = DistanceToBottomAtmosphereBoundary(height, cosAngle);
+	return TransmittanceToNearestAtmosphereBoundary(height, cosAngle, maxDist, rayIntersectsGround);
+}
+
+float3 TransmittanceToNearestAtmosphereBoundary(float height, float cosAngle)
+{
+	bool rayIntersectsGround = RayIntersectsGround(height, cosAngle);
+	return TransmittanceToNearestAtmosphereBoundary(height, cosAngle, rayIntersectsGround);
+}
+
 float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float cosAngle1)
 {
 	float3 lowTransmittance, highTransmittance;
@@ -168,6 +210,13 @@ float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float
 	return highTransmittance == 0.0 ? 0.0 : lowTransmittance * rcp(highTransmittance);
 }
 
+float3 TransmittanceToPoint(float viewHeight, float cosAngle, float distance)
+{
+	float heightAtDistance = HeightAtDistance(viewHeight, cosAngle, distance);
+	float cosAngleAtDistance = CosAngleAtDistance(viewHeight, cosAngle, distance, heightAtDistance);
+	return TransmittanceToPoint(viewHeight, cosAngle, heightAtDistance, cosAngleAtDistance);
+}
+
 float3 GetGroundAmbient(float lightCosAngle)
 {
 	float2 ambientUv = float2((lightCosAngle * 0.5 + 0.5) * _GroundAmbientRemap.x + _GroundAmbientRemap.y, 0.5);
@@ -180,7 +229,7 @@ float3 GetSkyAmbient(float lightCosAngle, float height)
 	return _SkyAmbient.SampleLevel(_LinearClampSampler, ambientUv, 0.0);
 }
 
-float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGround, float3 colorMask)
+float GetSkyCdf(float viewHeight, float cosAngle, float xi, float3 colorMask, bool rayIntersectsGround)
 {
 	float H = sqrt(_TopRadius * _TopRadius - _PlanetRadius * _PlanetRadius);
 	
@@ -219,6 +268,12 @@ float GetSkyCdf(float viewHeight, float cosAngle, float xi, bool rayIntersectsGr
 	float3 uv = float3(u_r, u_mu, GetTextureCoordFromUnitRange(xi, _SkyCdfSize.z));
 
 	return _SkyCdf.SampleLevel(_LinearClampSampler, uv, 0.0);
+}
+
+float GetSkyCdf(float viewHeight, float cosAngle, float xi, float3 colorMask)
+{
+	bool rayIntersectsGround = RayIntersectsGround(viewHeight, cosAngle);
+	return GetSkyCdf(viewHeight, cosAngle, xi, colorMask, rayIntersectsGround);
 }
 
 #endif

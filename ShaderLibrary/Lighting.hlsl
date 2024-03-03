@@ -590,9 +590,7 @@ float3 ApplyFog(float3 color, float2 pixelPosition, float eyeDepth, float3 world
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
 	float viewCosAngle = -V.y;
 	float currentDistance = length(worldPosition);
-	float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, currentDistance);
-	float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, currentDistance, heightAtDistance);
-	float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, heightAtDistance, viewCosAngleAtDistance);
+	float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, currentDistance);
 	color *= transmittance;
 	
 	// Also apply atmospheric transmittance here
