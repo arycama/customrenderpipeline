@@ -66,13 +66,13 @@ float _CloudDepthInvScale;
 float2 _CloudShadow_Scale;
 Texture2D<float3> _CloudShadow;
 
-float CloudTransmittance(float3 positionWS, float3 dx = 0.0, float3 dy = 0.0)
+float CloudTransmittance(float3 positionWS)
 {
 	float3 coords = MultiplyPoint3x4(_WorldToCloudShadow, positionWS);
 	if (any(saturate(coords.xy) != coords.xy) || coords.z < 0.0)
 		return 1.0;
 	
-	float3 shadowData = _CloudShadow.SampleGrad(_LinearClampSampler, coords.xy * _CloudShadow_Scale.xy, dx.xy * _CloudShadow_Scale.xy, dy.xy * _CloudShadow_Scale.xy);
+	float3 shadowData = _CloudShadow.SampleLevel(_LinearClampSampler, coords.xy * _CloudShadow_Scale.xy, 0.0);
 	float depth = max(0.0, coords.z - shadowData.r) * _CloudDepthInvScale;
 	float opticalDepth = depth * shadowData.g;
 	float transmittance = exp(-opticalDepth);
@@ -493,11 +493,6 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		luminance = 0.0;
 	#endif
 	
-	float3 coords = MultiplyPoint3x4(_WorldToCloudShadow, input.worldPosition);
-	
-	float3 dxP = ddx(coords);
-	float3 dyP = ddy(coords);
-	
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
 		DirectionalLight light = _DirectionalLights[i];
@@ -519,7 +514,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		
 		float attenuation = 1.0;
 		if(i == 0)
-			attenuation = CloudTransmittance(input.worldPosition, dxP, dyP);
+			attenuation = CloudTransmittance(input.worldPosition);
 			
 		attenuation *= GetShadow(input.worldPosition, i, !isVolumetric);
 		if (!attenuation)

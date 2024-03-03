@@ -70,6 +70,10 @@ namespace Arycama.CustomRenderPipeline
                 command.DisableShaderKeyword(Keyword);
                 Keyword = null;
             }
+
+            material = null;
+            passIndex = 0;
+            primitiveCount = 1;
         }
 
         public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)

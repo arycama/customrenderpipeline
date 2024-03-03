@@ -407,6 +407,9 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetRTHandleWrite(RTHandle handle, int passIndex)
         {
+            if(handle.IsImported)
+                return;
+
             if (!writtenRTHandles.Add(handle))
                 return;
 

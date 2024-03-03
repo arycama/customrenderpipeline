@@ -123,12 +123,10 @@ namespace Arycama.CustomRenderPipeline
 
             var result = new LookupTableResult(transmittance, multiScatter, groundAmbient, cdf, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap, new Vector3(settings.CdfWidth, settings.CdfHeight, settings.CdfDepth));
 
-            //if (version >= settings.Version)
-            //{
-            //    return result;
-            //}
+            if (version >= settings.Version)
+                return result;
 
-            //version = settings.Version;
+            version = settings.Version;
 
             // Generate transmittance LUT
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere Transmittance"))
@@ -354,10 +352,38 @@ namespace Arycama.CustomRenderPipeline
             return new Result(ambientBuffer, reflectionProbe);
         }
 
-        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, PhysicalSky.Result atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, VolumetricClouds.CloudShadowData cloudShadowData, Camera camera)
+        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, PhysicalSky.Result atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, VolumetricClouds.CloudShadowData cloudShadowData, Camera camera, CullingResults cullingResults)
         {
             var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             var skyDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R32_SFloat, isScreenTexture: true);
+
+            Color lightColor0 = Color.clear, lightColor1 = Color.clear;
+            Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
+
+            // Find first 2 directional lights
+            var dirLightCount = 0;
+            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
+            {
+                var light = cullingResults.visibleLights[i];
+                if (light.lightType != LightType.Directional)
+                    continue;
+
+                dirLightCount++;
+
+                if (dirLightCount == 1)
+                {
+                    lightDirection0 = -light.localToWorldMatrix.Forward();
+                    lightColor0 = light.finalColor;
+                }
+                else if (dirLightCount == 2)
+                {
+                    lightDirection1 = -light.localToWorldMatrix.Forward();
+                    lightColor1 = light.finalColor;
+
+                    // Only 2 lights supported
+                    break;
+                }
+            }
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
             {
@@ -384,6 +410,12 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetConstantBuffer(command, "Exposure", exposureBuffer);
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
 
+                    pass.SetVector(command, "_LightDirection0", lightDirection0);
+                    pass.SetVector(command, "_LightColor0", lightColor0);
+                    pass.SetVector(command, "_LightDirection1", lightDirection1);
+                    pass.SetVector(command, "_LightColor1", lightColor1);
+
+
                     commonPassData.SetProperties(pass, command);
                     cloudShadowData.SetProperties(pass, command);
                 });
@@ -402,6 +434,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_Clouds", clouds);
                 pass.ReadTexture("_CloudDepth", cloudDepth);
+                commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -417,6 +450,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_MaxHeight", height - 1);
 
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
+
+                    commonPassData.SetProperties(pass, command);
                 });
             }
         }

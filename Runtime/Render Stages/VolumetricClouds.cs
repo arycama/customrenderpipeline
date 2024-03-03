@@ -56,6 +56,8 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Range(0.0f, 1.0f)] public float MotionBlend { get; private set; } = 0.0f;
             [field: SerializeField, Min(0.0f)] public float MotionFactor { get; private set; } = 6000.0f;
 
+            [field: NonSerialized] public int Version { get; private set; }
+
             public void SetCloudPassData(CommandBuffer command, RenderPass pass)
             {
                 pass.SetFloat(command, "_WeatherMapStrength", WeatherMapStrength);
@@ -94,6 +96,8 @@ namespace Arycama.CustomRenderPipeline
         private readonly Settings settings;
         private readonly CameraTextureCache textureCache;
         private CustomSampler sampler;
+        private int version = -1;
+        private RTHandle weatherMap, noiseTexture, detailNoiseTexture;
 
         public VolumetricClouds(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
@@ -101,11 +105,21 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };
             textureCache = new(renderGraph, "Volumetric Clouds");
             sampler = CustomSampler.Create("Volumetric Clouds", true);
+
+            weatherMap = renderGraph.ImportRenderTexture(new RenderTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, 0, GraphicsFormat.R8_UNorm));
+            noiseTexture = renderGraph.ImportRenderTexture(new RenderTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, 0, GraphicsFormat.R8_UNorm) { dimension = TextureDimension.Tex3D, volumeDepth = settings.NoiseResolution.z });
+            detailNoiseTexture = renderGraph.ImportRenderTexture(new RenderTexture(settings.DetailNoiseResolution.x, settings.DetailNoiseResolution.y, 0, GraphicsFormat.R8_UNorm) { dimension = TextureDimension.Tex3D, volumeDepth = settings.DetailNoiseResolution.z });
         }
 
         public CloudData SetupData()
         {
-            var weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, GraphicsFormat.R8_UNorm, hasMips: true, autoGenerateMips: true);
+            var result = new CloudData(weatherMap, noiseTexture, detailNoiseTexture);
+
+            if (version >= settings.Version)
+                return result;
+
+            version = settings.Version;
+
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Weather Map"))
             {
                 pass.Initialize(material, 0);
@@ -123,7 +137,6 @@ namespace Arycama.CustomRenderPipeline
 
             // Noise
             var maxInstanceCount = 32;
-            var noiseTexture = renderGraph.GetTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, GraphicsFormat.R8_UNorm, false, settings.NoiseResolution.z, TextureDimension.Tex3D, false, true, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Noise Texture"))
             {
                 var primitiveCount = MathUtils.DivRoundUp(settings.NoiseResolution.z, maxInstanceCount);
@@ -146,7 +159,6 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Detail
-            var detailNoiseTexture = renderGraph.GetTexture(settings.DetailNoiseResolution.x, settings.DetailNoiseResolution.y, GraphicsFormat.R8_UNorm, false, settings.DetailNoiseResolution.z, TextureDimension.Tex3D, false, true, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Detail Noise Texture"))
             {
                 var primitiveCount = MathUtils.DivRoundUp(settings.DetailNoiseResolution.z, maxInstanceCount);
@@ -164,10 +176,10 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            return new CloudData(weatherMap, noiseTexture, detailNoiseTexture);
+            return result;
         }
 
-        public CloudShadowData RenderShadow(CullingResults cullingResults, Camera camera, CloudData cloudRenderData, float planetRadius)
+        public CloudShadowData RenderShadow(CullingResults cullingResults, Camera camera, CloudData cloudRenderData, IRenderPassData commonPassData)
         {
             var lightDirection = Vector3.up;
             var lightRotation = Quaternion.LookRotation(Vector3.down);
@@ -245,6 +257,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(material, 3);
                 pass.WriteTexture(cloudShadow, RenderBufferLoadAction.DontCare);
                 cloudRenderData.SetInputs(pass);
+                commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -258,19 +271,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightDirection0", -lightDirection);
                     pass.SetFloat(command, "_Samples", settings.ShadowSamples);
                     pass.SetVector(command, "_ViewPosition", cameraPosition);
-
-                    //command.BeginSample(sampler);
+                    commonPassData.SetProperties(pass, command);
                 });
             }
-
-            //using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Volumetric Cloud Shadow"))
-            //{
-            //    var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
-            //    {
-            //        command.EndSample(sampler);
-            //        Debug.Log(sampler.GetRecorder().gpuElapsedNanoseconds / 1000000.0f);
-            //    });
-            //}
 
             return new CloudShadowData(cloudShadow, depth, worldToShadow);
         }
@@ -388,6 +391,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_History", previous);
                 pass.ReadTexture("_CloudDepth", cloudDepth);
                 pass.ReadTexture("_Depth", cameraDepth);
+                commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -409,6 +413,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
                     settings.SetCloudPassData(command, pass);
+                    commonPassData.SetProperties(pass, command);
                 });
             }
 

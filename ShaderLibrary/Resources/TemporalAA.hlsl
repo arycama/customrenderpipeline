@@ -42,7 +42,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 			weightSum += weight;
 			maxWeight = max(maxWeight, weight);
 			
-			if(_Depth[position.xy] == 0.0)
+			if (_Depth[position.xy] == 0.0)
 			{
 				float cloudDistance = _CloudDepth[position.xy];
 				if (cloudDistance)
