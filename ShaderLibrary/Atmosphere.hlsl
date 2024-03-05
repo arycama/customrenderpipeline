@@ -3,26 +3,52 @@
 
 #include "Geometry.hlsl"
 
-const static float _EarthScale = 0.1;
+//const static float _EarthScale = 0.1;
 
-const static float _PlanetRadius = 6360000.0 * _EarthScale;
-const static float _AtmosphereHeight = 100000.0 * _EarthScale;
-const static float _TopRadius = _PlanetRadius + _AtmosphereHeight;
 
-const static float _RayleighHeight = 8000.0 * _EarthScale;
-const static float _MieHeight = 1200.0 * _EarthScale;
-const static float _OzoneWidth = 15000.0 * _EarthScale;
-const static float _OzoneHeight = 25000.0 * _EarthScale;
+//const static float3 _RayleighScatter = float3(5.802, 13.558, 33.1) * 1e-6 * rcp(_EarthScale);
+//const static float _MieScatter = 3.996e-6 * rcp(_EarthScale);
 
-const static float3 _RayleighScatter = float3(5.802, 13.558, 33.1) * 1e-6 * rcp(_EarthScale);
-const static float _MieScatter = 3.996e-6 * rcp(_EarthScale);
-const static float _MieAbsorption = 4.4e-6 * rcp(_EarthScale);
-const static float3 _OzoneAbsorption = float3(0.650, 1.811, 0.085) * 1e-6 * rcp(_EarthScale);
-const static float _MiePhase = 0.8;
+//const static float3 _OzoneAbsorption = float3(0.650, 1.811, 0.085) * 1e-6 * rcp(_EarthScale);
+//const static float _MieAbsorption = 4.4e-6 * rcp(_EarthScale);
+
+//float3 _GroundColor;
+//const static float _MiePhase = 0.8;
+
+//const static float _RayleighHeight = 8000.0 * _EarthScale;
+//const static float _MieHeight = 1200.0 * _EarthScale;
+//const static float _OzoneWidth = 15000.0 * _EarthScale;
+//const static float _OzoneHeight = 25000.0 * _EarthScale;
+
+//const static float _PlanetRadius = 6360000.0 * _EarthScale;
+//const static float _AtmosphereHeight = 100000.0 * _EarthScale;
+//const static float _TopRadius = _PlanetRadius + _AtmosphereHeight;
+//float _AtmospherePadding0;
+
+cbuffer AtmosphereProperties
+{
+	float3 _RayleighScatter;
+	float _MieScatter;
+
+	float3 _OzoneAbsorption;
+	float _MieAbsorption;
+
+	float3 _GroundColor;
+	float _MiePhase;
+
+	float _RayleighHeight;
+	float _MieHeight;
+	float _OzoneWidth;
+	float _OzoneHeight;
+
+	float _PlanetRadius;
+	float _AtmosphereHeight;
+	float _TopRadius;
+	float _AtmospherePadding0;
+};
 
 Texture2D<float3> _Transmittance, _MultiScatter;
 float4 _AtmosphereTransmittanceRemap, _MultiScatterRemap;
-float3 _GroundColor;
 
 float2 _GroundAmbientRemap;
 Texture2D<float3> _GroundAmbient;

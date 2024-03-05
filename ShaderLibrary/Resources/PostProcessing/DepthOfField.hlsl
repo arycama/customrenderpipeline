@@ -14,6 +14,7 @@ float CalculateCoC(float depth)
 
 float3 Fragment(float4 position : SV_Position) : SV_Target
 {
+	return _Input[position.xy];
 	//_FocalDistance = LinearEyeDepth(_Depth[_ScaledResolution.xy / 2]);
 
 	float GoldenAngle = Pi * (3.0 - sqrt(5.0));

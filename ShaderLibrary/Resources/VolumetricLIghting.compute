@@ -108,6 +108,8 @@ void KERNEL(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void Accumulate(uint2 id : SV_DispatchThreadID)
 {
+	return;
+	
 	float3 positionCS;
 	positionCS.xy = (id + 0.5) / float2(_VolumeWidth, _VolumeHeight) * 2.0 - 1.0;
 	positionCS.z = GetDeviceDepth(0.0);

@@ -1,4 +1,5 @@
 using System;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -49,7 +50,7 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public float OzoneWidth { get; private set; } = 15000.0f;
             [field: SerializeField] public float OzoneHeight { get; private set; } = 25000.0f;
             [field: SerializeField] public float PlanetRadius { get; private set; } = 6360000.0f;
-            [field: SerializeField] public float AtmosphereThickness { get; private set; } = 100000.0f;
+            [field: SerializeField] public float AtmosphereHeight { get; private set; } = 100000.0f;
             [field: SerializeField] public Color GroundColor { get; private set; } = Color.grey;
 
             [field: Header("Transmittance Lookup")]
@@ -116,12 +117,26 @@ namespace Arycama.CustomRenderPipeline
 
         public LookupTableResult GenerateLookupTables()
         {
+
+            var atmospherePropertiesBuffer = renderGraph.GetBuffer(1, UnsafeUtility.SizeOf<AtmosphereProperties>());
+
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Set Atmosphere Properties"))
+            {
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    var bufferData = ArrayPool<AtmosphereProperties>.Get(1);
+                    bufferData[0] = new AtmosphereProperties(settings);
+                    command.SetBufferData(atmospherePropertiesBuffer, bufferData);
+                    ArrayPool<AtmosphereProperties>.Release(bufferData);
+                });
+            }
+
             var transmittanceRemap = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
             var multiScatterRemap = GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight);
             var groundAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientGroundWidth);
             var skyAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientSkyWidth, settings.AmbientSkyHeight);
 
-            var result = new LookupTableResult(transmittance, multiScatter, groundAmbient, cdf, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap, new Vector3(settings.CdfWidth, settings.CdfHeight, settings.CdfDepth));
+            var result = new LookupTableResult(atmospherePropertiesBuffer, transmittance, multiScatter, groundAmbient, cdf, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap, new Vector3(settings.CdfWidth, settings.CdfHeight, settings.CdfDepth));
 
             if (version >= settings.Version)
                 return result;
@@ -177,7 +192,6 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     result.SetProperties(pass, command);
-                    pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
                     pass.SetFloat(command, "_Samples", settings.MultiScatterSamples);
                     pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.MultiScatterWidth, settings.MultiScatterHeight));
                 });
@@ -193,7 +207,6 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     result.SetProperties(pass, command);
-                    pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
                     pass.SetFloat(command, "_Samples", settings.AmbientGroundSamples);
                     pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AmbientGroundWidth, 1));
                 });
@@ -209,7 +222,6 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     result.SetProperties(pass, command);
-                    pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
                     pass.SetFloat(command, "_Samples", settings.AmbientSkySamples);
                     pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AmbientSkyWidth, settings.AmbientSkyHeight));
                 });
@@ -250,8 +262,6 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetMatrixArray(command, "_PixelToWorldViewDirs", array);
                     ArrayPool<Matrix4x4>.Release(array);
-
-                    pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
                 });
             }
 
@@ -466,6 +476,7 @@ namespace Arycama.CustomRenderPipeline
 
         public struct LookupTableResult : IRenderPassData
         {
+            public BufferHandle AtmospherePropertiesBuffer { get; }
             public RTHandle Transmittance { get; }
             public RTHandle MultiScatter { get; }
             public RTHandle GroundAmbient { get; }
@@ -478,8 +489,9 @@ namespace Arycama.CustomRenderPipeline
             public Vector2 GroundAmbientRemap { get; }
             public Vector3 CdfLookupSize { get; }
 
-            public LookupTableResult(RTHandle transmittance, RTHandle multiScatter, RTHandle groundAmbient, RTHandle cdfLookup, RTHandle skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector3 cdfLookupSize)
+            public LookupTableResult(BufferHandle atmospherePropertiesBuffer, RTHandle transmittance, RTHandle multiScatter, RTHandle groundAmbient, RTHandle cdfLookup, RTHandle skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector3 cdfLookupSize)
             {
+                AtmospherePropertiesBuffer = atmospherePropertiesBuffer ?? throw new ArgumentNullException(nameof(atmospherePropertiesBuffer));
                 Transmittance = transmittance ?? throw new ArgumentNullException(nameof(transmittance));
                 MultiScatter = multiScatter ?? throw new ArgumentNullException(nameof(multiScatter));
                 GroundAmbient = groundAmbient ?? throw new ArgumentNullException(nameof(groundAmbient));
@@ -494,6 +506,7 @@ namespace Arycama.CustomRenderPipeline
 
             public void SetInputs(RenderPass pass)
             {
+                pass.ReadBuffer("AtmosphereProperties", AtmospherePropertiesBuffer);
                 pass.ReadTexture("_Transmittance", Transmittance);
                 pass.ReadTexture("_MultiScatter", MultiScatter);
                 pass.ReadTexture("_SkyAmbient", SkyAmbient);
@@ -531,6 +544,50 @@ namespace Arycama.CustomRenderPipeline
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
             }
+        }
+    }
+
+    public struct AtmosphereProperties
+    {
+        private Vector3 rayleighScatter;
+        private float mieScatter;
+
+        private Vector3 ozoneAbsorption;
+        private float mieAbsorption;
+
+        private Vector3 groundColor;
+        private float miePhase;
+
+        private float rayleighHeight;
+        private float mieHeight;
+        private float ozoneWidth;
+        private float ozoneHeight;
+
+        private float planetRadius;
+        private float atmosphereHeight;
+        private float topRadius;
+        private float padding;
+
+        public AtmosphereProperties(PhysicalSky.Settings settings)
+        {
+            rayleighScatter = settings.RayleighScatter;
+            mieScatter = settings.MieScatter;
+
+            ozoneAbsorption = settings.OzoneAbsorption;
+            mieAbsorption = settings.MieAbsorption;
+
+            groundColor = (Vector4)settings.GroundColor.linear;
+            miePhase = settings.MiePhase;
+
+            rayleighHeight = settings.RayleighHeight;
+            mieHeight = settings.MieHeight;
+            ozoneWidth = settings.OzoneWidth;
+            ozoneHeight = settings.OzoneHeight;
+
+            planetRadius = settings.PlanetRadius;
+            atmosphereHeight = settings.AtmosphereHeight;
+            topRadius = settings.PlanetRadius + settings.AtmosphereHeight;
+            padding = 0f;
         }
     }
 }
