@@ -40,6 +40,7 @@ namespace Arycama.CustomRenderPipeline
         public class Settings
         {
             [field: Header("Atmosphere Properties")]
+            [field: SerializeField, Range(0.0f, 1.0f)] public float EarthScale { get; private set; } = 1.0f;
             [field: SerializeField] public Vector3 RayleighScatter { get; private set; } = new Vector3(5.802e-6f, 13.558e-6f, 33.1e-6f);
             [field: SerializeField] public float RayleighHeight { get; private set; } = 8000.0f;
             [field: SerializeField] public float MieScatter { get; private set; } = 3.996e-6f;
@@ -117,8 +118,7 @@ namespace Arycama.CustomRenderPipeline
 
         public LookupTableResult GenerateLookupTables()
         {
-
-            var atmospherePropertiesBuffer = renderGraph.GetBuffer(1, UnsafeUtility.SizeOf<AtmosphereProperties>());
+            var atmospherePropertiesBuffer = renderGraph.GetBuffer(1, UnsafeUtility.SizeOf<AtmosphereProperties>(), GraphicsBuffer.Target.Constant);
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Set Atmosphere Properties"))
             {
@@ -230,7 +230,7 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        public Result GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, LookupTableResult passData)
+        public Result GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, LookupTableResult lookupTableResult)
         {
             // Generate Reflection probe
             var skyReflection = renderGraph.GetTexture(settings.ReflectionResolution, settings.ReflectionResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, hasMips: true, autoGenerateMips: true);
@@ -241,7 +241,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
 
                 lightingSetupResult.SetInputs(pass);
-                passData.SetInputs(pass);
+                lookupTableResult.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -250,6 +250,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_Samples", settings.ReflectionSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
                     pass.SetConstantBuffer(command, "Exposure", exposureBuffer);
+                    lookupTableResult.SetProperties(pass, command);
 
                     var array = ArrayPool<Matrix4x4>.Get(6);
 
@@ -359,10 +360,10 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Specular convolution
-            return new Result(ambientBuffer, reflectionProbe);
+            return new Result(ambientBuffer, reflectionProbe, lookupTableResult);
         }
 
-        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, PhysicalSky.Result atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, VolumetricClouds.CloudShadowData cloudShadowData, Camera camera, CullingResults cullingResults)
+        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector3 viewPosition, LightingSetup.Result lightingSetupResult, PhysicalSky.Result atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, VolumetricClouds.CloudShadowData cloudShadowData, Camera camera, CullingResults cullingResults, PhysicalSky.LookupTableResult lookupData)
         {
             var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             var skyDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R32_SFloat, isScreenTexture: true);
@@ -408,13 +409,13 @@ namespace Arycama.CustomRenderPipeline
                 atmosphereData.SetInputs(pass);
                 commonPassData.SetInputs(pass);
                 cloudShadowData.SetInputs(pass);
+                lookupData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     lightingSetupResult.SetProperties(pass, command);
                     atmosphereData.SetProperties(pass, command);
 
-                    pass.SetVector(command, "_GroundColor", settings.GroundColor.linear);
                     pass.SetFloat(command, "_Samples", settings.RenderSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
                     pass.SetConstantBuffer(command, "Exposure", exposureBuffer);
@@ -425,7 +426,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightDirection1", lightDirection1);
                     pass.SetVector(command, "_LightColor1", lightColor1);
 
-
+                    lookupData.SetProperties(pass, command);
                     commonPassData.SetProperties(pass, command);
                     cloudShadowData.SetProperties(pass, command);
                 });
@@ -526,23 +527,27 @@ namespace Arycama.CustomRenderPipeline
 
         public struct Result : IRenderPassData
         {
-            public RTHandle ReflectionProbe { get; }
-            public BufferHandle AmbientBuffer { get; }
+            private RTHandle reflectionProbe;
+            private BufferHandle ambientBuffer;
+            private LookupTableResult lookTableResult;
 
-            public Result(BufferHandle ambientBuffer, RTHandle reflectionProbe)
+            public Result(BufferHandle ambientBuffer, RTHandle reflectionProbe, LookupTableResult lookupTableResult)
             {
-                AmbientBuffer = ambientBuffer;
-                ReflectionProbe = reflectionProbe;
+                this.ambientBuffer = ambientBuffer;
+                this.reflectionProbe = reflectionProbe;
+                this.lookTableResult = lookupTableResult;
             }
 
             public void SetInputs(RenderPass pass)
             {
-                pass.ReadTexture("_SkyReflection", ReflectionProbe);
-                pass.ReadBuffer("AmbientSh", AmbientBuffer);
+                pass.ReadTexture("_SkyReflection", reflectionProbe);
+                pass.ReadBuffer("AmbientSh", ambientBuffer);
+                lookTableResult.SetInputs(pass);
             }
 
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
+                lookTableResult.SetProperties(pass, command);
             }
         }
     }
@@ -570,23 +575,23 @@ namespace Arycama.CustomRenderPipeline
 
         public AtmosphereProperties(PhysicalSky.Settings settings)
         {
-            rayleighScatter = settings.RayleighScatter;
-            mieScatter = settings.MieScatter;
+            rayleighScatter = settings.RayleighScatter / settings.EarthScale;
+            mieScatter = settings.MieScatter / settings.EarthScale;
 
-            ozoneAbsorption = settings.OzoneAbsorption;
-            mieAbsorption = settings.MieAbsorption;
+            ozoneAbsorption = settings.OzoneAbsorption / settings.EarthScale;
+            mieAbsorption = settings.MieAbsorption / settings.EarthScale;
 
             groundColor = (Vector4)settings.GroundColor.linear;
             miePhase = settings.MiePhase;
 
-            rayleighHeight = settings.RayleighHeight;
-            mieHeight = settings.MieHeight;
-            ozoneWidth = settings.OzoneWidth;
-            ozoneHeight = settings.OzoneHeight;
+            rayleighHeight = settings.RayleighHeight * settings.EarthScale;
+            mieHeight = settings.MieHeight * settings.EarthScale;
+            ozoneWidth = settings.OzoneWidth * settings.EarthScale;
+            ozoneHeight = settings.OzoneHeight * settings.EarthScale;
 
-            planetRadius = settings.PlanetRadius;
-            atmosphereHeight = settings.AtmosphereHeight;
-            topRadius = settings.PlanetRadius + settings.AtmosphereHeight;
+            planetRadius = settings.PlanetRadius * settings.EarthScale;
+            atmosphereHeight = settings.AtmosphereHeight * settings.EarthScale;
+            topRadius = (settings.PlanetRadius + settings.AtmosphereHeight) * settings.EarthScale;
             padding = 0f;
         }
     }

@@ -590,7 +590,7 @@ float3 ApplyFog(float3 color, float2 pixelPosition, float eyeDepth, float3 world
 	
 	// Also apply atmospheric transmittance here
 	float4 volumetricLighting = SampleVolumetricLighting(pixelPosition, eyeDepth);
-	return color * volumetricLighting.a + volumetricLighting.rgb;
+	return color;// * volumetricLighting.a + volumetricLighting.rgb;
 }
 
 #endif
