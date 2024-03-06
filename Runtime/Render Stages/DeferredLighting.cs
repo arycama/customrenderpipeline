@@ -4,8 +4,8 @@ using UnityEngine.Rendering;
 
 public class DeferredLighting
 {
-    private RenderGraph renderGraph;
-    private Material material;
+    private readonly RenderGraph renderGraph;
+    private readonly Material material;
 
     public DeferredLighting(RenderGraph renderGraph)
     {

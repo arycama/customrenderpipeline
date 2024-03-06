@@ -32,9 +32,9 @@ namespace Arycama.CustomRenderPipeline
 
         private bool isExecuting;
 
-        private Dictionary<RTHandle, int> lastRtHandleRead = new();
-        private Dictionary<int, List<RTHandle>> passRTHandleOutputs = new();
-        private HashSet<RTHandle> writtenRTHandles = new();
+        private readonly Dictionary<RTHandle, int> lastRtHandleRead = new();
+        private readonly Dictionary<int, List<RTHandle>> passRTHandleOutputs = new();
+        private readonly HashSet<RTHandle> writtenRTHandles = new();
 
         public BufferHandle EmptyBuffer { get; }
         public RTHandle EmptyTextureArray { get; }

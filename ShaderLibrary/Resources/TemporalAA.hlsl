@@ -3,7 +3,6 @@
 
 Texture2D<float3> _Input, _History;
 Texture2D<float2> _Motion;
-Texture2D<float> _Depth, _CloudDepth;
 
 cbuffer Properties
 {
@@ -41,17 +40,6 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 			
 			weightSum += weight;
 			maxWeight = max(maxWeight, weight);
-			
-			if (_Depth[position.xy] == 0.0)
-			{
-				float cloudDistance = _CloudDepth[position.xy];
-				if (cloudDistance)
-				{
-					float3 worldPosition = normalize(PixelToWorld(float3(position.xy, 1.0))) * cloudDistance;
-					float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
-					motion = uv - historyUv;
-				}
-			}
 			
 			if(all(int2(x, y) == -1))
 			{

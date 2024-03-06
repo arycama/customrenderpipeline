@@ -95,9 +95,9 @@ namespace Arycama.CustomRenderPipeline
         private readonly Material material;
         private readonly Settings settings;
         private readonly CameraTextureCache textureCache;
-        private CustomSampler sampler;
+        private readonly CustomSampler sampler;
         private int version = -1;
-        private RTHandle weatherMap, noiseTexture, detailNoiseTexture;
+        private readonly RTHandle weatherMap, noiseTexture, detailNoiseTexture;
 
         public VolumetricClouds(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
@@ -280,8 +280,8 @@ namespace Arycama.CustomRenderPipeline
 
         public struct CloudShadowData : IRenderPassData
         {
-            private RTHandle cloudShadow;
-            private float cloudDepthInvScale;
+            private readonly RTHandle cloudShadow;
+            private readonly float cloudDepthInvScale;
             private Matrix4x4 worldToCloudShadow;
 
             public CloudShadowData(RTHandle cloudShadow, float cloudDepthInvScale, Matrix4x4 worldToCloudShadow)
@@ -426,7 +426,7 @@ namespace Arycama.CustomRenderPipeline
 
         public struct CloudData : IRenderPassData
         {
-            private RTHandle weatherMap, noiseTexture, detailNoiseTexture;
+            private readonly RTHandle weatherMap, noiseTexture, detailNoiseTexture;
 
             public CloudData(RTHandle weatherMap, RTHandle noiseTexture, RTHandle detailNoiseTexture)
             {

@@ -72,7 +72,13 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 	return t;
 }
 
-float3 FragmentTransmittanceLut(float4 position : SV_Position) : SV_Target
+struct FragmentTransmittanceOutput
+{
+	float3 transmittance : SV_Target0;
+	float weightedDepth : SV_Target1;
+};
+
+FragmentTransmittanceOutput FragmentTransmittanceLut(float4 position : SV_Position)
 {
 	float2 uv = position.xy * _ScaleOffset.xy + _ScaleOffset.zw;
 	
@@ -92,15 +98,25 @@ float3 FragmentTransmittanceLut(float4 position : SV_Position) : SV_Target
 	float cosAngle = d ? (Sq(H) - Sq(rho) - Sq(d)) / (2.0 * viewHeight * d) : 1.0;
 	float dx = d / _Samples;
 
-	float3 opticalDepth = 0.0;
-	for (float i = 0.5; i <= _Samples; i++)
+	float3 transmittance = 1.0, transmittanceSum = 0.0;
+	float3 weightedDepthSum = 0.0;
+	for (float i = 0.5; i < _Samples; i++)
 	{
 		float currentDistance = i * dx;
 		float height = HeightAtDistance(viewHeight, cosAngle, currentDistance);
-		opticalDepth += AtmosphereExtinction(height);
+		transmittance *= exp(-AtmosphereExtinction(height) * dx);
+		transmittanceSum += transmittance;
+		weightedDepthSum += currentDistance * transmittance;
 	}
 	
-	return exp(-opticalDepth * dx);
+	weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
+	
+	FragmentTransmittanceOutput output;
+	output.transmittance = transmittance;
+	
+	// Store greyscale depth, weighted by transmittance
+	output.weightedDepth = dot(weightedDepthSum / d, transmittance) / dot(transmittance, 1.0);
+	return output;
 }
 
 float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
@@ -249,22 +265,43 @@ struct TemporalOutput
 {
 	float3 result : SV_Target0;
 	float3 history : SV_Target1;
+	float4 motion : SV_Target2;
 };
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position)
 {
-	float cloudDistance = _CloudDepth[position.xy];
 	float3 result = _SkyInput[position.xy];
 	
+	float4 cloud = _Clouds[position.xy];
+	float depth = _Depth[position.xy];
+	float cloudDistance = _CloudDepth[position.xy];
 	float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
-	float3 worldPosition = rd * _Far;// cloudDistance;
-	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
+	float sceneDistance = CameraDepthToDistance(depth, -rd);
+	float viewHeight = _ViewPosition.y + _PlanetRadius;
+	
+	if (depth == 0.0)
+	{
+		if(RayIntersectsGround(viewHeight, rd.y))
+			sceneDistance = DistanceToBottomAtmosphereBoundary(viewHeight, rd.y);
+		else
+			sceneDistance = AtmosphereDepth(viewHeight, rd.y) * DistanceToTopAtmosphereBoundary(viewHeight, rd.y);
+	}
+	
+	sceneDistance = lerp(cloudDistance, sceneDistance, cloud.a);
+	
+	float3 worldPosition = rd * sceneDistance;
+	float4 previousClip = WorldToClipPrevious(worldPosition);
+	float2 historyUv = PerspectiveDivide(previousClip).xy * 0.5 + 0.5;
+	
+	float4 nonJitteredClip = WorldToClipNonJittered(worldPosition);
+	float2 motion = MotionVectorFragment(nonJitteredClip, previousClip);
 	
 	TemporalOutput output;
-	if(_IsFirst || any(saturate(historyUv) != historyUv))
-	{	
+	if (_IsFirst || any(saturate(historyUv) != historyUv))
+	{
 		output.history = result;
 		output.result = result;
+		output.motion = float4(motion, 0.0, depth == 0.0);
 		return output;
 	}
 	
@@ -307,5 +344,6 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 	
 	output.history = result;
 	output.result = result;
+	output.motion = float4(motion, 0.0, depth == 0.0);
 	return output;
 }

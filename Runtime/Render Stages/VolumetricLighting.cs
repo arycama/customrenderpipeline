@@ -179,8 +179,8 @@ namespace Arycama.CustomRenderPipeline
 
         public struct Result
         {
-            private RTHandle volumetricLighting;
-            private float nonLinearDepth, volumeWidth, volumeHeight, volumeSlices, volumeDepth;
+            private readonly RTHandle volumetricLighting;
+            private readonly float nonLinearDepth, volumeWidth, volumeHeight, volumeSlices, volumeDepth;
 
             public Result(RTHandle volumetricLighting, float nonLinearDepth, float volumeWidth, float volumeHeight, float volumeSlices, float volumeDepth)
             {

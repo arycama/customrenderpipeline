@@ -37,6 +37,8 @@ float4 _SkyAmbientRemap;
 Texture3D<float> _SkyCdf;
 float3 _SkyCdfSize;
 
+Texture2D<float3> _AtmosphereDepth;
+
 float GetTextureCoordFromUnitRange(float x, float texture_size)
 {
 	return 0.5 / texture_size + x * (1.0 - 1.0 / texture_size);
@@ -144,7 +146,7 @@ float3 AtmosphereExtinctionToPoint(float height, float cosAngle, float rayLength
 	return opticalDepth * (rayLength / samples);
 }
 
-float3 AtmosphereTransmittance(float height, float cosAngle)
+float2 AtmosphereTransmittanceUv(float height, float cosAngle)
 {
 	// Distance to top atmosphere boundary for a horizontal ray at ground level.
 	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
@@ -157,8 +159,19 @@ float3 AtmosphereTransmittance(float height, float cosAngle)
 	float d = DistanceToTopAtmosphereBoundary(height, cosAngle);
 	float dMin = max(0.0, _TopRadius - height);
 	float dMax = rho + H;
-	float2 uv = float2(Remap(d, dMin, dMax), rho / H) * _AtmosphereTransmittanceRemap.xy + _AtmosphereTransmittanceRemap.zw;
+	return float2(Remap(d, dMin, dMax), rho / H) * _AtmosphereTransmittanceRemap.xy + _AtmosphereTransmittanceRemap.zw;
+}
+
+float3 AtmosphereTransmittance(float height, float cosAngle)
+{
+	float2 uv = AtmosphereTransmittanceUv(height, cosAngle);
 	return _Transmittance.SampleLevel(_LinearClampSampler, uv, 0.0);
+}
+
+float3 AtmosphereDepth(float height, float cosAngle)
+{
+	float2 uv = AtmosphereTransmittanceUv(height, cosAngle);
+	return _AtmosphereDepth.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
 float3 TransmittanceToBottomAtmosphereBoundary(float height, float cosAngle, float maxDist)

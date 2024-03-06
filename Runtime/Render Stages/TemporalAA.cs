@@ -66,7 +66,7 @@ namespace Arycama.CustomRenderPipeline
             internal Vector4 resolution;
         }
 
-        public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale, RTHandle cloudDepth, RTHandle depth)
+        public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
         {
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
             var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);
@@ -76,8 +76,6 @@ namespace Arycama.CustomRenderPipeline
             pass.ReadTexture("_Input", input);
             pass.ReadTexture("_Motion", motion);
             pass.ReadTexture("_History", previous);
-            pass.ReadTexture("_CloudDepth", cloudDepth);
-            pass.ReadTexture("_Depth", depth);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 
             var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>

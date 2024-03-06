@@ -64,6 +64,7 @@ Shader "Hidden/Physical Sky"
 
             Blend 0 One One
             Blend 1 Off
+			Blend 2 SrcAlpha OneMinusSrcAlpha
 
             HLSLPROGRAM
             #pragma target 5.0

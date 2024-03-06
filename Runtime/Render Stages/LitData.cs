@@ -21,11 +21,11 @@ public class LitData : IDisposable
         public int Version { get; private set; }
     }
 
-    private Settings settings;
-    private RenderGraph renderGraph;
+    private readonly Settings settings;
+    private readonly RenderGraph renderGraph;
 
-    private RTHandle directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
-    private Texture2D ltcData;
+    private readonly RTHandle directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
+    private readonly Texture2D ltcData;
 
     private int version = -1;
 
@@ -205,7 +205,7 @@ public class LitData : IDisposable
 
     public struct Result : IRenderPassData
     {
-        private RTHandle directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
+        private readonly RTHandle directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
         private Vector4 ggxDirectionalAlbedoRemap, ggxAverageAlbedoMSRemap;
         private Vector2 ggxAverageAlbedoRemap, ggxDirectionalAlbedoMSScaleOffset;
 
