@@ -27,6 +27,9 @@ struct PointLight
 cbuffer Exposure
 {
 	float _Exposure;
+	float _RcpExposure;
+	float _PreviousExposure;
+	float _RcpPreviousExposure;
 };
 
 Buffer<float4> _DirectionalShadowTexelSizes;

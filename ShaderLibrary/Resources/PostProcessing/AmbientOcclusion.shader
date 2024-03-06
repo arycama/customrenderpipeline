@@ -4,7 +4,7 @@ Shader "Hidden/Ambient Occlusion"
     {
         Cull Off
         ZWrite Off
-        ZTest Always
+        ZTest Off
 
         Pass
         {

@@ -4,7 +4,7 @@ Shader "Hidden/Depth of Field"
     {
         Cull Off
         ZWrite Off
-        ZTest Always
+        ZTest Off
 
         Pass
         {

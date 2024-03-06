@@ -4,7 +4,7 @@ Shader "Hidden/Bloom"
     {
         Cull Off
         ZWrite Off
-        ZTest Always
+        ZTest Off
         
         Pass
         {

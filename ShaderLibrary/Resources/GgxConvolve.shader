@@ -6,7 +6,7 @@ Shader "Hidden/Ggx Convolve"
         {
             Cull Off
             ZWrite Off
-            ZTest Always
+            ZTest Off
 
             HLSLPROGRAM
             #pragma target 5.0

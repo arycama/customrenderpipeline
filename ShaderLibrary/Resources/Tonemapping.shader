@@ -6,7 +6,7 @@ Shader"Hidden/Tonemapping"
         {
             Cull Off
             ZWrite Off
-            ZTest Always
+            ZTest Off
 
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle

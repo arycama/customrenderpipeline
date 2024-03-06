@@ -6,7 +6,7 @@ Shader "Hidden/Camera Motion Vectors"
         {
             Cull Off
             ZWrite Off
-            ZTest Always
+            ZTest Off
 
             Stencil
             {

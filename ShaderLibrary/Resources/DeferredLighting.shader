@@ -9,7 +9,7 @@ Shader "Hidden/Deferred Lighting"
 
             Cull Off
             ZWrite Off
-            ZTest Always
+            ZTest Off
 
             Stencil
             {

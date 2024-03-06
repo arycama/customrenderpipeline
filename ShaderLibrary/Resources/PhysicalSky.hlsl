@@ -119,6 +119,35 @@ FragmentTransmittanceOutput FragmentTransmittanceLut(float4 position : SV_Positi
 	return output;
 }
 
+//vec4 iCylinder( in vec3 ro, in vec3 rd, in vec3 pa, in vec3 pb, float ra ) 
+//{
+//    vec3  ba = pb - pa;
+//    vec3  oc = ro - pa;
+
+//    float baba = dot(ba,ba);
+//    float bard = dot(ba,rd);
+//    float baoc = dot(ba,oc);
+    
+//    float k2 = baba            - bard*bard;
+//    float k1 = baba*dot(oc,rd) - baoc*bard;
+//    float k0 = baba*dot(oc,oc) - baoc*baoc - ra*ra*baba;
+    
+//    float h = k1*k1 - k2*k0;
+//    if( h<0.0 ) return vec4(-1.0);
+//    h = sqrt(h);
+//    float t = (-k1-h)/k2;
+
+//    // body
+//    float y = baoc + t*bard;
+//    if( y>0.0 && y<baba ) return vec4( t, (oc+t*rd - ba*y/baba)/ra );
+    
+//    // caps
+//    t = ( ((y<0.0) ? 0.0 : baba) - baoc)/bard;
+//    if( abs(k1+k2*t)<h ) return vec4( t, ba*sign(y)/sqrt(baba) );
+
+//    return vec4(-1.0);
+//}
+
 float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	#ifdef REFLECTION_PROBE
@@ -256,25 +285,29 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 }
 
 float4 _SkyInput_Scale, _SkyDepth_Scale;
-Texture2D<float> _SkyDepth;
+Texture2D<float> _SkyDepth, _PreviousDepth, _FrameCount;
 Texture2D<float3> _SkyInput, _SkyHistory;
 uint _MaxWidth, _MaxHeight;
 float _IsFirst;
+float _StationaryBlend, _MotionBlend, _MotionFactor, _DepthFactor, _ClampWindow, _MaxFrameCount, _SpatialBlurFrames;
 
 struct TemporalOutput
 {
 	float3 result : SV_Target0;
-	float3 history : SV_Target1;
-	float4 motion : SV_Target2;
+	float4 motion : SV_Target1;
+	float depth : SV_Target2;
+	float frameCount : SV_Target3;
 };
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position)
 {
-	float3 result = _SkyInput[position.xy];
+	int2 pixelId = (int2) position.xy;
 	
-	float4 cloud = _Clouds[position.xy];
-	float depth = _Depth[position.xy];
-	float cloudDistance = _CloudDepth[position.xy];
+	float3 result = _SkyInput[pixelId];
+	float4 cloud = _Clouds[pixelId];
+	float depth = _Depth[pixelId];
+	float cloudDistance = _CloudDepth[pixelId];
+	
 	float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
 	float sceneDistance = CameraDepthToDistance(depth, -rd);
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
@@ -288,20 +321,23 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 	}
 	
 	sceneDistance = lerp(cloudDistance, sceneDistance, cloud.a);
+	float sceneDepth = CameraDistanceToDepth(sceneDistance, -rd);
 	
 	float3 worldPosition = rd * sceneDistance;
 	float4 previousClip = WorldToClipPrevious(worldPosition);
-	float2 historyUv = PerspectiveDivide(previousClip).xy * 0.5 + 0.5;
-	
 	float4 nonJitteredClip = WorldToClipNonJittered(worldPosition);
 	float2 motion = MotionVectorFragment(nonJitteredClip, previousClip);
+	
+	float2 uv = position.xy * _ScaledResolution.zw;
+	float2 historyUv = uv - motion;
 	
 	TemporalOutput output;
 	if (_IsFirst || any(saturate(historyUv) != historyUv))
 	{
-		output.history = result;
 		output.result = result;
 		output.motion = float4(motion, 0.0, depth == 0.0);
+		output.depth = sceneDepth;
+		output.frameCount = 0.0;
 		return output;
 	}
 	
@@ -316,8 +352,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 		[unroll]
 		for (int x = -1; x <= 1; x++)
 		{
-			uint2 coord = position.xy + float2(x, y);
-			if(any(coord < 0 || coord > uint2(_MaxWidth, _MaxHeight)))
+			int2 coord = pixelId + int2(x, y);
+			if(any(coord < 0 || coord > int2(_MaxWidth, _MaxHeight)))
 				continue;
 			
 			float3 sample = _SkyInput[coord];
@@ -329,21 +365,95 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 		}
 	}
 	
-	float3 history = _SkyHistory.Sample(_LinearClampSampler, historyUv);
+	float previousDepth = _PreviousDepth.Sample(_LinearClampSampler, historyUv);
+	float frameCount = _FrameCount.Sample(_LinearClampSampler, historyUv);
+	float depthFactor = saturate(1.0 - _DepthFactor * (sceneDepth - previousDepth) / sceneDepth);
+	
+	float3 history = _SkyHistory.Sample(_LinearClampSampler, historyUv) * (_RcpPreviousExposure * _Exposure);
 	history = RGBToYCoCg(history);
 	history *= rcp(1.0 + history.r);
 	
-	float2 uv = position.xy * _ScaledResolution.zw;
-	float motionLength = saturate(distance(historyUv, uv) * 256);
-	float blend = lerp(0.95, 0.85, motionLength);
+	float3 window = (maxValue - minValue) * _ClampWindow;
+	
+	minValue -= window;
+	maxValue += window;
+	
+	//history = clamp(history, minValue - window, maxValue + window);
 	history = clamp(history, minValue, maxValue);
 	
-	result = lerp(history, result, 0.05);
+	// Clip to AABB
+	float3 invDir = rcp(result - history);
+	float3 t0 = (minValue - history) * invDir;
+	float3 t1 = (maxValue - history) * invDir;
+	float t = saturate(Max3(min(t0, t1)));
+	//history = lerp(history, result, t);
+	
+	float motionLength = saturate(1.0 - length(motion) * _MotionFactor);
+	//float blend = lerp(_StationaryBlend, _MotionBlend, motionLength * depthFactor);
+	float blend = lerp(_StationaryBlend, _MotionBlend, depthFactor);
+	
+	frameCount = lerp(0.0, frameCount, depthFactor * motionLength);
+	
+	float speed = 1.0 / (1.0 + frameCount * _MaxFrameCount);
+	
+	result = lerp(history, result, speed);
+	
+	// Increment frame count
+	frameCount += rcp(_MaxFrameCount);
+	
 	result *= rcp(1.0 - result.r);
 	result = YCoCgToRGB(result);
 	
-	output.history = result;
 	output.result = result;
 	output.motion = float4(motion, 0.0, depth == 0.0);
+	output.depth = sceneDepth;
+	output.frameCount = frameCount;
+	return output;
+}
+
+struct SpatialOutput
+{
+	float3 result : SV_Target0;
+	float3 history : SV_Target1;
+};
+
+float _SpatialSamples, _SpatialDepthFactor, _BlurSigma;
+
+SpatialOutput FragmentSpatial(float4 position : SV_Position)
+{
+	float centerDepth = _SkyDepth[position.xy];
+	float frameCount = _FrameCount[position.xy] * _MaxFrameCount;
+	
+	float3 result = 0.0;
+	float weightSum = 0.0;
+	
+	
+	float radius = floor(lerp(_SpatialSamples, 1.0, saturate(frameCount / _SpatialBlurFrames)));
+	
+	for(float y = -radius; y <= radius; y++)
+	{
+		for(float x = -radius; x <= radius; x++)
+		{
+			float2 coord = position.xy + float2(x, y);
+			if(any(coord < 0.0 || coord >= _ScaledResolution.xy))
+				continue;
+			
+			float depth = _SkyDepth[coord];
+			float3 color = _SkyInput[coord];
+		
+			float weight = saturate(1.0 - abs(centerDepth - depth) * _SpatialDepthFactor / centerDepth);
+			weight *= saturate(saturate(1.0 - abs(x / max(1.0, radius))) * saturate(1.0 - abs(y / max(1.0, radius))) * _BlurSigma);
+			
+			result += color * weight;
+			weightSum += weight;
+		}
+	}
+	
+	if(weightSum)
+		result *= rcp(weightSum);
+	
+	SpatialOutput output;
+	output.result = result;
+	output.history = result;
 	return output;
 }

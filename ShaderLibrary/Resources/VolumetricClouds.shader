@@ -4,7 +4,7 @@ Shader "Hidden/Volumetric Clouds"
     {
         Cull Off
         ZWrite Off
-        ZTest Always
+        ZTest Off
 
         Pass
         {
@@ -75,6 +75,7 @@ Shader "Hidden/Volumetric Clouds"
 
             Blend 0 One SrcAlpha
             Blend 1 Off
+			Blend 2 OneMinusSrcAlpha SrcAlpha
 
             HLSLPROGRAM
             #pragma target 5.0

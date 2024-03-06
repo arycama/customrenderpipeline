@@ -4,7 +4,7 @@ Shader "Hidden/Physical Sky"
     {
         Cull Off
         ZWrite Off
-        ZTest Always
+        ZTest Off
 
         Pass
         {
@@ -62,14 +62,30 @@ Shader "Hidden/Physical Sky"
         {
             Name "Temporal"
 
-            Blend 0 One One
-            Blend 1 Off
-			Blend 2 SrcAlpha OneMinusSrcAlpha
+			Blend 0 Off
+			Blend 1 SrcAlpha OneMinusSrcAlpha
+			Blend 2 Off
+			Blend 3 Off
 
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
+            #include "PhysicalSky.hlsl"
+            ENDHLSL
+        }
+
+		Pass
+        {
+            Name "Spatial"
+
+            Blend 0 One One
+            Blend 1 Off
+
+            HLSLPROGRAM
+            #pragma target 5.0
+            #pragma vertex VertexFullscreenTriangle
+            #pragma fragment FragmentSpatial
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }

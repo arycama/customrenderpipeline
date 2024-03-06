@@ -32,6 +32,7 @@ struct TemporalOutput
 {
 	float4 result : SV_Target0;
 	float4 history : SV_Target1;
+	float4 velocity : SV_Target2;
 };
 
 const static float3 _PlanetCenter = float3(0.0, -_PlanetRadius - _ViewPosition.y, 0.0);
@@ -212,61 +213,72 @@ FragmentOutput Fragment(float4 position : SV_Position)
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position)
 {
-	float4 result = _Input[position.xy];
+	int2 pixelId = (int2) position.xy;
+	float4 result = _Input[pixelId];
+	float depth = _Depth[pixelId];
+	
+	float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+	float cloudDistance = _CloudDepth[pixelId];
+
+	float3 worldPosition = rd * cloudDistance;
+	float4 previousClip = WorldToClipPrevious(worldPosition);
+	
+	float4 nonJitteredClip = WorldToClipNonJittered(worldPosition);
+	float2 motion = MotionVectorFragment(nonJitteredClip, previousClip);
+	
+	float2 uv = position.xy * _ScaledResolution.zw;
+	float2 historyUv = uv - motion;
+	
+	TemporalOutput output;
+	if (_IsFirst || any(saturate(historyUv) != historyUv))
+	{
+		output.history = result;
+		output.result.rgb = result;
+		output.result.a = (depth != 0.0) * result.a;
+		output.velocity = cloudDistance == 0.0 ? 1.0 : float4(motion, 0.0, depth == 0.0 ? 0.0 : result.a);
+		return output;
+	}
+	
 	result.rgb = RGBToYCoCg(result.rgb);
 	result.rgb *= rcp(1.0 + result.r);
 	
-	float depth = _Depth[position.xy];
-	
-	float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
-	float cloudDistance = _CloudDepth[position.xy];
-
-	float3 worldPosition = rd * cloudDistance;
-	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
-	
 	// Neighborhood clamp
-	float4 minValue = 0.0, maxValue = 0.0;
+	float4 minValue = FloatMax, maxValue = FloatMin;
 	[unroll]
 	for (int y = -1; y <= 1; y++)
 	{
 		[unroll]
 		for (int x = -1; x <= 1; x++)
 		{
-			float4 sample = _Input[min(uint2(position.xy + float2(x, y)), uint2(_MaxWidth, _MaxHeight))];
+			int2 coord = pixelId + int2(x, y);
+			if(any(coord < 0 || coord > int2(_MaxWidth, _MaxHeight)))
+				continue;
+			
+			float4 sample = _Input[coord];
 			sample.rgb = RGBToYCoCg(sample.rgb);
 			sample.rgb *= rcp(1.0 + sample.r);
 			
-			if (x == -1 && y == -1)
-			{
-				minValue = maxValue = sample;
-			}
-			else
-			{
-				minValue = min(minValue, sample);
-				maxValue = max(maxValue, sample);
-			}
+			minValue = min(minValue, sample);
+			maxValue = max(maxValue, sample);
 		}
 	}
-			
-	float4 history = _History.Sample(_LinearClampSampler, historyUv * _History_Scale.xy);
+
+	float4 history = _History.Sample(_LinearClampSampler, historyUv) * (_RcpPreviousExposure * _Exposure);
 	history.rgb = RGBToYCoCg(history.rgb);
 	history.rgb *= rcp(1.0 + history.r);
+	//history = clamp(history, minValue, maxValue);
 	
-	float2 uv = position.xy * _ScaledResolution.zw;
-	float motionLength = saturate(distance(historyUv, uv) * _MotionFactor);
+	float motionLength = saturate(length(motion) * _MotionFactor);
 	float blend = lerp(_StationaryBlend, _MotionBlend, motionLength);
-	history = clamp(history, minValue, maxValue);
-	
-	if (!_IsFirst && all(saturate(historyUv) == historyUv))
-		result = lerp(result, history, blend);
+	result = lerp(result, history, blend);
 	
 	result.rgb *= rcp(1.0 - result.r);
 	result.rgb = YCoCgToRGB(result.rgb);
 	
-	TemporalOutput output;
 	output.history = result;
 	output.result.rgb = result;
 	output.result.a = (depth != 0.0) * result.a;
+	output.velocity = cloudDistance == 0.0 ? 1.0 : float4(motion, 0.0, depth == 0.0 ? 0.0 : result.a);
 	
 	return output;
 }

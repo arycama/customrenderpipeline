@@ -95,7 +95,6 @@ namespace Arycama.CustomRenderPipeline
         private readonly Material material;
         private readonly Settings settings;
         private readonly CameraTextureCache textureCache;
-        private readonly CustomSampler sampler;
         private int version = -1;
         private readonly RTHandle weatherMap, noiseTexture, detailNoiseTexture;
 
@@ -104,7 +103,6 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };
             textureCache = new(renderGraph, "Volumetric Clouds");
-            sampler = CustomSampler.Create("Volumetric Clouds", true);
 
             weatherMap = renderGraph.ImportRenderTexture(new RenderTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, 0, GraphicsFormat.R8_UNorm));
             noiseTexture = renderGraph.ImportRenderTexture(new RenderTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, 0, GraphicsFormat.R8_UNorm) { dimension = TextureDimension.Tex3D, volumeDepth = settings.NoiseResolution.z });
@@ -251,7 +249,7 @@ namespace Arycama.CustomRenderPipeline
             worldToShadow.SetRow(1, 0.5f * (worldToShadow.GetRow(1) + worldToShadow.GetRow(3)));
             worldToShadow.SetRow(2, 0.5f * (worldToShadow.GetRow(2) + worldToShadow.GetRow(3)));
 
-            var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true);
+            var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32);
             using(var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Cloud Shadow"))
             {
                 pass.Initialize(material, 3);
@@ -303,7 +301,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public RTHandle Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, out RTHandle cloudDepth, CullingResults cullingResults, VolumetricClouds.CloudData cloudRenderData, VolumetricClouds.CloudShadowData cloudShadow, RTHandle cameraTarget)
+        public RTHandle Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, out RTHandle cloudDepth, CullingResults cullingResults, VolumetricClouds.CloudData cloudRenderData, VolumetricClouds.CloudShadowData cloudShadow, RTHandle cameraTarget, RTHandle velocity)
         {
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -387,6 +385,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(material, 5);
                 pass.WriteTexture(cameraTarget, RenderBufferLoadAction.Load);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
+                pass.WriteTexture(velocity, RenderBufferLoadAction.Load);
                 pass.ReadTexture("_Input", cloudTemp);
                 pass.ReadTexture("_History", previous);
                 pass.ReadTexture("_CloudDepth", cloudDepth);
