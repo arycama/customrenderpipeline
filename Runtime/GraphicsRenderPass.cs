@@ -77,7 +77,7 @@ namespace Arycama.CustomRenderPipeline
                         stores[i] = colorTargets[i].Item3;
                     }
 
-                    command.SetRenderTarget(targets, BuiltinRenderTextureType.None);
+                    command.SetRenderTarget(targets, targets[0]);
                 }
             }
             else
