@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -21,22 +22,17 @@ namespace Arycama.CustomRenderPipeline
         }
 
         private readonly Settings settings;
-        private readonly CameraTextureCache textureCache;
+        private readonly PersistentRTHandleCache textureCache;
         private readonly Material material;
 
         public TemporalAA(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Temporal AA")) { hideFlags = HideFlags.HideAndDontSave };
-            textureCache = new(renderGraph, "Temporal AA");
+            textureCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Temporal AA");
         }
 
         public Vector2 Jitter { get; private set; }
-
-        public void Release()
-        {
-            textureCache.Dispose();
-        }
 
         public void OnPreRender()
         {
@@ -69,13 +65,13 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
         {
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
-            var wasCreated = textureCache.GetTexture(camera, descriptor, out var current, out var previous);
+            var (current, history, wasCreated) = textureCache.GetTextures(camera.pixelWidth, camera.pixelHeight, true, camera);
 
             using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA");
             pass.Initialize(material);
             pass.ReadTexture("_Input", input);
             pass.ReadTexture("_Motion", motion);
-            pass.ReadTexture("_History", previous);
+            pass.ReadTexture("_History", history);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 
             var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
@@ -93,7 +89,7 @@ namespace Arycama.CustomRenderPipeline
             });
 
             data.sharpness = settings.Sharpness;
-            data.wasCreated = wasCreated ? 0.0f : 1.0f;
+            data.wasCreated = wasCreated ? 1.0f : 0.0f;
             data.stationaryBlending = settings.StationaryBlending;
             data.motionBlending = settings.MotionBlending;
             data.motionWeight = settings.MotionWeight;

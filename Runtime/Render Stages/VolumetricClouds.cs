@@ -94,7 +94,7 @@ namespace Arycama.CustomRenderPipeline
 
         private readonly Material material;
         private readonly Settings settings;
-        private readonly CameraTextureCache textureCache;
+        private readonly PersistentRTHandleCache textureCache;
         private int version = -1;
         private readonly RTHandle weatherMap, noiseTexture, detailNoiseTexture;
 
@@ -102,7 +102,7 @@ namespace Arycama.CustomRenderPipeline
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };
-            textureCache = new(renderGraph, "Volumetric Clouds");
+            textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Clouds");
 
             weatherMap = renderGraph.ImportRenderTexture(new RenderTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, 0, GraphicsFormat.R8_UNorm));
             noiseTexture = renderGraph.ImportRenderTexture(new RenderTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, 0, GraphicsFormat.R8_UNorm) { dimension = TextureDimension.Tex3D, volumeDepth = settings.NoiseResolution.z });
@@ -379,7 +379,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Reprojection
-            var isFirst = textureCache.GetTexture(camera, new RenderTextureDescriptor(width, height, GraphicsFormat.R16G16B16A16_SFloat, 0), out var current, out var previous);
+            var (current, history, wasCreated) = textureCache.GetTextures(width, height, true, camera);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Temporal"))
             {
                 pass.Initialize(material, 5);
@@ -387,17 +387,14 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(velocity, RenderBufferLoadAction.Load);
                 pass.ReadTexture("_Input", cloudTemp);
-                pass.ReadTexture("_History", previous);
+                pass.ReadTexture("_History", history);
                 pass.ReadTexture("_CloudDepth", cloudDepth);
                 pass.ReadTexture("_Depth", cameraDepth);
                 commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    //command.EndSample(sampler);
-                   //Debug.Log(sampler.GetRecorder().gpuElapsedNanoseconds / 1000000.0f);
-
-                    pass.SetFloat(command, "_IsFirst", isFirst ? 1.0f : 0.0f);
+                    pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
                     pass.SetFloat(command, "_StationaryBlend", settings.StationaryBlend);
                     pass.SetFloat(command, "_MotionBlend", settings.MotionBlend);
                     pass.SetFloat(command, "_MotionFactor", settings.MotionFactor);

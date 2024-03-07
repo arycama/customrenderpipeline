@@ -18,10 +18,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<RenderPass> renderPasses = new();
 
         // Maybe encapsulate these in a thing so it can also be used for buffers
-        private readonly Queue<RTHandle> rtHandlePool = new();
-        private readonly List<RTHandle> unavailableRtHandles = new();
-        private readonly List<RTHandle> persistentRtHandles = new();
-
+        private readonly Queue<RTHandle> availableRtHandles = new();
         private readonly List<RenderTexture> availableRenderTextures = new();
 
         private readonly List<BufferHandle> bufferHandlesToCreate = new();
@@ -38,11 +35,11 @@ namespace Arycama.CustomRenderPipeline
         private readonly HashSet<RTHandle> writtenRTHandles = new();
 
         public BufferHandle EmptyBuffer { get; }
+        public RTHandle EmptyTexture { get; }
         public RTHandle EmptyTextureArray { get; }
         public RTHandle EmptyCubemapArray { get; }
 
         public int FrameCount { get; set; }
-
 
         private int rtHandleCount;
         private int rtCount;
@@ -51,6 +48,7 @@ namespace Arycama.CustomRenderPipeline
         public RenderGraph()
         {
             EmptyBuffer = ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)));
+            EmptyTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
             EmptyTextureArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
             EmptyCubemapArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
         }
@@ -217,17 +215,7 @@ namespace Arycama.CustomRenderPipeline
                             continue;
 
                         availableRenderTextures.Add(output.RenderTexture);
-
-                        if(output.IsPersistent)
-                        {
-                            persistentRtHandles.Remove(output);
-                        }
-                        else
-                        {
-                            unavailableRtHandles.Remove(output);
-                        }
-
-                        rtHandlePool.Enqueue(output);
+                        availableRtHandles.Enqueue(output);
                     }
                 }
             }
@@ -272,7 +260,7 @@ namespace Arycama.CustomRenderPipeline
             // Ensure we're not getting a texture during execution, this must be done in the setup
             Assert.IsFalse(isExecuting);
 
-            if (!rtHandlePool.TryDequeue(out var result))
+            if (!availableRtHandles.TryDequeue(out var result))
             {
                 result = new RTHandle();
                 result.Id = rtHandleCount++;
@@ -289,17 +277,7 @@ namespace Arycama.CustomRenderPipeline
             result.AutoGenerateMips = autoGenerateMips;
             result.IsPersistent = isPersistent;
 
-            if(isPersistent)
-                persistentRtHandles.Add(result);
-            else
-                unavailableRtHandles.Add(result);
-
             return result;
-        }
-
-        public void ReleasePersistentTexture(RTHandle handle, int passIndex)
-        {
-            lastRtHandleRead[handle] = passIndex;
         }
 
         public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured)
@@ -403,11 +381,6 @@ namespace Arycama.CustomRenderPipeline
             foreach (var bufferHandle in availableBufferHandles)
                 bufferHandle.Release();
             availableBufferHandles.Clear();
-
-            // Mark all handles as available for use again
-            foreach (var handle in unavailableRtHandles)
-                rtHandlePool.Enqueue(handle);
-            unavailableRtHandles.Clear();
 
             foreach (var handle in usedBufferHandles)
                 availableBufferHandles.Add(handle);
