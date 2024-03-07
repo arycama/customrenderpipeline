@@ -12,7 +12,8 @@ public class RTHandle
     public bool EnableRandomWrite { get; set; }
     public int VolumeDepth { get; set; }
     public TextureDimension Dimension { get; set; }
-    public bool IsImported { get; set; }
+    internal bool IsImported { get; set; }
+    internal bool IsPersistent { get; set; }
     public Vector3 Scale => new Vector3((float)Width / RenderTexture.width, (float)Height / RenderTexture.height, (float)VolumeDepth / RenderTexture.volumeDepth);
     public Vector3 Limit => new Vector3((Mathf.Floor(RenderTexture.width * Scale.x) - 0.5f) / RenderTexture.width, (Mathf.Floor(RenderTexture.height * Scale.y) - 0.5f) / RenderTexture.height, (Mathf.Floor(RenderTexture.depth * Scale.z) - 0.5f) / RenderTexture.volumeDepth);
 

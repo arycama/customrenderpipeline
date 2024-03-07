@@ -275,9 +275,22 @@ namespace Arycama.CustomRenderPipeline
             result.IsScreenTexture = isScreenTexture;
             result.HasMips = hasMips;
             result.AutoGenerateMips = autoGenerateMips;
+            result.IsPersistent = false;
 
             unavailableRtHandles.Add(result);
             return result;
+        }
+
+        public RTHandle GetPersistentTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false)
+        {
+            var result = GetTexture(width, height, format, enableRandomWrite, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips);
+            result.IsPersistent = true;
+            return result;
+        }
+
+        public void ReleasePersistentTexture(RTHandle handle, int passIndex)
+        {
+            lastRtHandleRead[handle] = passIndex;
         }
 
         public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured)
@@ -384,7 +397,11 @@ namespace Arycama.CustomRenderPipeline
 
             // Mark all handles as available for use again
             foreach (var handle in unavailableRtHandles)
+            {
+
+
                 rtHandlePool.Enqueue(handle);
+            }
             unavailableRtHandles.Clear();
 
             foreach (var handle in usedBufferHandles)
@@ -424,6 +441,10 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetLastRTHandleRead(RTHandle handle, int passIndex)
         {
+            // Persistent handles must be freed using release persistent texture
+            if (handle.IsPersistent)
+                return;
+
             lastRtHandleRead[handle] = passIndex;
         }
     }

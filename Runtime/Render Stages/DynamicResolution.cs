@@ -30,9 +30,16 @@ namespace Arycama.CustomRenderPipeline
 
         public void Update(float timing)
         {
-            var desiredFrameTime = 1000.0 / settings.TargetFrameRate;
-            var gpuTimeMs = timing / 1000.0 / 1000.0;
-            var newFactor = (float)(ScaleFactor * (desiredFrameTime / gpuTimeMs));
+            var desiredFrameTime = 1000.0f / settings.TargetFrameRate;
+            var gpuTimeMs = timing / 1000.0f / 1000.0f;
+
+            // Calculate how long the current frame would have taken at full res, based on scale factor
+            // Since a factor of half means 1/4 the amount of pixels, it needs to be squared
+            var currentFrameFullResTime = gpuTimeMs / (ScaleFactor * ScaleFactor);
+
+            // Desired time by this gives us our squared factor, since halving resolution quarters number of pixels
+            var newFactor = Mathf.Sqrt(desiredFrameTime / currentFrameFullResTime);
+
             var newScale = Mathf.Lerp(ScaleFactor, newFactor, settings.Damping);
             ScaleFactor = Mathf.Clamp(newScale, settings.MinScaleFactor, settings.MaxScaleFactor);
         }
