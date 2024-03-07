@@ -450,9 +450,9 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Reprojection
-            var skyColor = textureCache.GetTextures(width, height, true, camera);
-            var skyDepth = depthCache.GetTextures(width, height, true, camera);
-            var frameCount = frameCountCache.GetTextures(width, height, true, camera);
+            var skyColor = textureCache.GetTextures(width, height, camera, true);
+            var skyDepth = depthCache.GetTextures(width, height, camera, true);
+            var frameCount = frameCountCache.GetTextures(width, height, camera, true);
 
             var skyTemp2 = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Temporal"))

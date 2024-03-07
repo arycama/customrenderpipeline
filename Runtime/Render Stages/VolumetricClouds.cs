@@ -379,7 +379,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Reprojection
-            var (current, history, wasCreated) = textureCache.GetTextures(width, height, true, camera);
+            var (current, history, wasCreated) = textureCache.GetTextures(width, height, camera, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Temporal"))
             {
                 pass.Initialize(material, 5);

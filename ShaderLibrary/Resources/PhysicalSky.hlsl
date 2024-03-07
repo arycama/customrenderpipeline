@@ -284,7 +284,7 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 	return luminance;
 }
 
-float4 _SkyInput_Scale, _SkyDepth_Scale;
+float4 _SkyInput_Scale, _SkyDepth_Scale, _PreviousDepth_Scale, _FrameCount_Scale, _SkyHistory_Scale;
 Texture2D<float> _SkyDepth, _PreviousDepth, _FrameCount;
 Texture2D<float3> _SkyInput, _SkyHistory;
 uint _MaxWidth, _MaxHeight;
@@ -365,11 +365,11 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 		}
 	}
 	
-	float previousDepth = _PreviousDepth.Sample(_LinearClampSampler, historyUv);
-	float frameCount = _FrameCount.Sample(_LinearClampSampler, historyUv);
+	float previousDepth = _PreviousDepth.Sample(_LinearClampSampler, historyUv * _PreviousDepth_Scale.xy);
+	float frameCount = _FrameCount.Sample(_LinearClampSampler, historyUv * _FrameCount_Scale.xy);
 	float depthFactor = saturate(1.0 - _DepthFactor * (sceneDepth - previousDepth) / sceneDepth);
 	
-	float3 history = _SkyHistory.Sample(_LinearClampSampler, historyUv) * (_RcpPreviousExposure * _Exposure);
+	float3 history = _SkyHistory.Sample(_LinearClampSampler, historyUv * _SkyHistory_Scale.xy) * (_RcpPreviousExposure * _Exposure);
 	history = RGBToYCoCg(history);
 	history *= rcp(1.0 + history.r);
 	

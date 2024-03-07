@@ -7,19 +7,13 @@ namespace Arycama.CustomRenderPipeline
 {
     public class VolumetricLighting : RenderFeature
     {
-
         private readonly Settings settings;
-        private readonly CameraTextureCache volumetricLightingTextureCache;
+        private readonly PersistentRTHandleCache colorHistory;
 
         public VolumetricLighting(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
-            volumetricLightingTextureCache = new(renderGraph, "Volumetric Lighting");
-        }
-
-        public void Release()
-        {
-            volumetricLightingTextureCache.Dispose();
+            colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", true, TextureDimension.Tex3D);
         }
 
         public Result Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, Texture2D blueNoise1D, Texture2D blueNoise2D, Color fogColor, float fogStartDistance, float fogEndDistance, float fogDensity, float fogMode, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, IRenderPassData commonData)
@@ -27,24 +21,16 @@ namespace Arycama.CustomRenderPipeline
             var width = Mathf.CeilToInt(screenWidth / (float)settings.TileSize);
             var height = Mathf.CeilToInt(screenHeight / (float)settings.TileSize);
             var depth = settings.DepthSlices;
-            var volumetricLightingDescriptor = new RenderTextureDescriptor(width, height, RenderTextureFormat.ARGBHalf)
-            {
-                dimension = TextureDimension.Tex3D,
-                enableRandomWrite = true,
-                volumeDepth = depth,
-            };
-
-            volumetricLightingTextureCache.GetTexture(camera, volumetricLightingDescriptor, out var volumetricLightingCurrent, out var volumetricLightingHistory);
+            var textures = colorHistory.GetTextures(width, height, camera, false, depth);
 
             var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
-            var volumetricLighting = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
             {
                 pass.Initialize(computeShader, 0, width, height, depth);
-                pass.WriteTexture("_Result", volumetricLightingCurrent);
+                pass.WriteTexture("_Result", textures.current);
 
-                pass.ReadTexture("_Input", volumetricLightingHistory);
+                pass.ReadTexture("_Input", textures.history);
 
                 clusteredLightCullingResult.SetInputs(pass);
                 lightingSetupResult.SetInputs(pass);
@@ -109,30 +95,33 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Filter X
+            var filterX = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Filter X"))
             {
                 pass.Initialize(computeShader, 1, width, height, depth);
-                pass.ReadTexture("_Input", volumetricLightingCurrent);
-                pass.WriteTexture("_Result", volumetricLighting);
+                pass.ReadTexture("_Input", textures.current);
+                pass.WriteTexture("_Result", filterX);
             }
 
             // Filter Y
+            var filterY = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Filter Y"))
             {
                 pass.Initialize(computeShader, 2, width, height, depth);
-                pass.ReadTexture("_Input", volumetricLighting);
-                pass.WriteTexture("_Result", volumetricLightingHistory);
+                pass.ReadTexture("_Input", filterX);
+                pass.WriteTexture("_Result", filterY);
             }
 
             // Accumulate
+            var result = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Accumulate"))
             {
                 pass.Initialize(computeShader, 3, width, height, depth);
-                pass.ReadTexture("_Input", volumetricLightingHistory);
-                pass.WriteTexture("_Result", volumetricLighting);
+                pass.ReadTexture("_Input", filterY);
+                pass.WriteTexture("_Result", result);
             }
 
-            return new Result(volumetricLighting, settings.NonLinearDepth ? 1.0f : 0.0f, width, height, depth, farClipPlane);
+            return new Result(result, settings.NonLinearDepth ? 1.0f : 0.0f, width, height, depth, farClipPlane);
         }
 
         [Serializable]

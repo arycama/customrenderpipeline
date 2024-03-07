@@ -65,7 +65,7 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
         {
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
-            var (current, history, wasCreated) = textureCache.GetTextures(camera.pixelWidth, camera.pixelHeight, true, camera);
+            var (current, history, wasCreated) = textureCache.GetTextures(camera.pixelWidth, camera.pixelHeight, camera);
 
             using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA");
             pass.Initialize(material);

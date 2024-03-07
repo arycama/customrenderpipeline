@@ -37,6 +37,8 @@ namespace Arycama.CustomRenderPipeline
         public BufferHandle EmptyBuffer { get; }
         public RTHandle EmptyTexture { get; }
         public RTHandle EmptyTextureArray { get; }
+        public RTHandle Empty3DTexture { get; }
+        public RTHandle EmptyCubemap { get; }
         public RTHandle EmptyCubemapArray { get; }
 
         public int FrameCount { get; set; }
@@ -50,6 +52,8 @@ namespace Arycama.CustomRenderPipeline
             EmptyBuffer = ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)));
             EmptyTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
             EmptyTextureArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
+            Empty3DTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
+            EmptyCubemap = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave });
             EmptyCubemapArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
         }
 
