@@ -20,6 +20,7 @@ namespace Arycama.CustomRenderPipeline
         // Maybe encapsulate these in a thing so it can also be used for buffers
         private readonly Queue<RTHandle> rtHandlePool = new();
         private readonly List<RTHandle> unavailableRtHandles = new();
+        private readonly List<RTHandle> persistentRtHandles = new();
 
         private readonly List<RenderTexture> availableRenderTextures = new();
 
@@ -216,6 +217,17 @@ namespace Arycama.CustomRenderPipeline
                             continue;
 
                         availableRenderTextures.Add(output.RenderTexture);
+
+                        if(output.IsPersistent)
+                        {
+                            persistentRtHandles.Remove(output);
+                        }
+                        else
+                        {
+                            unavailableRtHandles.Remove(output);
+                        }
+
+                        rtHandlePool.Enqueue(output);
                     }
                 }
             }
@@ -255,7 +267,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false)
+        public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
         {
             // Ensure we're not getting a texture during execution, this must be done in the setup
             Assert.IsFalse(isExecuting);
@@ -275,16 +287,13 @@ namespace Arycama.CustomRenderPipeline
             result.IsScreenTexture = isScreenTexture;
             result.HasMips = hasMips;
             result.AutoGenerateMips = autoGenerateMips;
-            result.IsPersistent = false;
+            result.IsPersistent = isPersistent;
 
-            unavailableRtHandles.Add(result);
-            return result;
-        }
+            if(isPersistent)
+                persistentRtHandles.Add(result);
+            else
+                unavailableRtHandles.Add(result);
 
-        public RTHandle GetPersistentTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false)
-        {
-            var result = GetTexture(width, height, format, enableRandomWrite, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips);
-            result.IsPersistent = true;
             return result;
         }
 
@@ -397,11 +406,7 @@ namespace Arycama.CustomRenderPipeline
 
             // Mark all handles as available for use again
             foreach (var handle in unavailableRtHandles)
-            {
-
-
                 rtHandlePool.Enqueue(handle);
-            }
             unavailableRtHandles.Clear();
 
             foreach (var handle in usedBufferHandles)
