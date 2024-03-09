@@ -39,4 +39,9 @@ bool IntersectRaySphere(float3 start, float3 dir, float radius, out float2 inter
 	return SolveQuadraticEquation(a, b, c, intersections);
 }
 
+bool RayIntersectsSphere(float height, float cosAngle, float radius)
+{
+	return (cosAngle < 0.0) && ((Sq(height) * (Sq(cosAngle) - 1.0) + Sq(radius)) >= 0.0);
+}
+
 #endif

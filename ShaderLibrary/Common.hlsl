@@ -163,16 +163,6 @@ bool IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePositi
 	return IntersectRayPlane(rayOrigin, rayDirection, planePosition, planeNormal, t);
 }
 
-//From  Next Generation Post Processing in Call of Duty: Advanced Warfare [Jimenez 2014]
-// http://advances.floattimerendering.com/s2014/index.html
-float InterleavedGradientNoise(float2 pixCoord, int frameCount)
-{
-	const float3 magic = float3(0.06711056, 0.00583715, 52.9829189);
-	float2 frameMagicScale = float2(2.083, 4.867);
-	pixCoord += frameCount * frameMagicScale;
-	return frac(magic.z * frac(dot(pixCoord, magic.xy)));
-}
-
 float2 ApplyScaleOffset(float2 uv, float4 scaleOffset)
 {
 	return uv * scaleOffset.xy + scaleOffset.zw;

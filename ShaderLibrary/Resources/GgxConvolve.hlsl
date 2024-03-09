@@ -1,4 +1,5 @@
 #include "../Common.hlsl"
+#include "../Random.hlsl"
 
 struct GeometryOutput
 {

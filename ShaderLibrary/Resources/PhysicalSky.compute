@@ -1,5 +1,6 @@
 #include "../Common.hlsl"
 #include "../Atmosphere.hlsl"
+#include "../Random.hlsl"
 
 #pragma kernel MultiScatter KERNEL=MultiScatter MULTI_SCATTER
 #pragma kernel AmbientGroundLookup KERNEL=AmbientGroundLookup AMBIENT_GROUND

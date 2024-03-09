@@ -3,17 +3,6 @@
 
 #include "Math.hlsl"
 
-// Ref: http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
-float VanDerCorputBase2(uint i)
-{
-	return reversebits(i) * rcp(4294967296.0); // 2^-32
-}
-
-float2 Hammersley2dSeq(uint i, uint sequenceLength)
-{
-	return float2(float(i) / float(sequenceLength), VanDerCorputBase2(i));
-}
-
 float3 SphericalToCartesian(float cosPhi, float sinPhi, float cosTheta)
 {
 	float sinTheta = SinFromCos(cosTheta);

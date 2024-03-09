@@ -1,5 +1,6 @@
 #include "../Lighting.hlsl"
 #include "../Geometry.hlsl"
+#include "../Random.hlsl"
 
 #include "Packages/com.arycama.webglnoiseunity/Noise.hlsl"
 
@@ -18,6 +19,7 @@ matrix _PixelToWorldViewDir;
 float _StationaryBlend, _MotionBlend, _MotionFactor, _TransmittanceThreshold;
 float3 _LightColor0, _LightColor1, _LightDirection0, _LightDirection1;
 float _BackScatterPhase, _ForwardScatterPhase, _BackScatterScale, _ForwardScatterScale;
+float _Phase, _MultiSamples;
 
 matrix _InvViewProjMatrixCloudShadow;
 float4 _ScreenSizeCloudShadow;
@@ -74,6 +76,32 @@ struct FragmentOutput
 	#endif
 };
 
+//float GetCloudRayEnd()
+//{
+//	#ifdef BELOW_CLOUD_LAYER
+//		return DistanceToSphereInside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+//	#elif defined(ABOVE_CLOUD_LAYER) || defined(CLOUD_SHADOW)
+//		return DistanceToSphereOutside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
+//	#else
+//		return cosViewAngle >= 0.0 ? DistanceToSphereInside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness) : DistanceToSphereOutside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
+//	#endif
+//}
+
+
+float MiePhase1(float cosAngle, float g)
+{
+	return 0.5 * (1.0 - Sq(g)) / pow(1.0 + Sq(g) - 2.0 * g * cosAngle, 1.5);
+	
+	//return (3.0 / (8.0 * Pi)) * ((((1.0 - Sq(g)) * (1.0 + Sq(cosAngle))) / ((2.0 + Sq(g)) * pow(1.0 + Sq(g) - 2.0 * g * cosAngle, 3.0 / 2.0))));
+}
+
+float3 MieImportanceSample(float g, float2 u)
+{
+	float cosTheta = rcp(2.0 * g) * (1.0 + Sq(g) - Sq((1.0 - Sq(g)) / (1.0 - g +  2 * g * u.x)));
+	float phi = TwoPi * u.y;
+	return SphericalToCartesian(phi, cosTheta);
+}
+
 FragmentOutput Fragment(float4 position : SV_Position)
 {
 	#ifdef CLOUD_SHADOW
@@ -82,7 +110,7 @@ FragmentOutput Fragment(float4 position : SV_Position)
 		float viewHeight = distance(_PlanetCenter, P);
 		float3 N = normalize(P - _PlanetCenter);
 		float cosViewAngle = dot(N, rd);
-		float offsets = InterleavedGradientNoise(position.xy, 0); // _BlueNoise1D[uint2(position.xy) % 128];
+		float2 offsets = InterleavedGradientNoise(position.xy, 0); // _BlueNoise1D[uint2(position.xy) % 128];
 	#else
 		float3 P = 0.0;
 		float viewHeight = _ViewPosition.y + _PlanetRadius;
@@ -109,7 +137,10 @@ FragmentOutput Fragment(float4 position : SV_Position)
 		float rayEnd = DistanceToSphereOutside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
 	#else
 		float rayStart = 0.0;
-		float rayEnd = cosViewAngle >= 0.0 ? DistanceToSphereInside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness) : DistanceToSphereOutside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
+	
+		bool rayIntersectsLowerCloud = RayIntersectsSphere(viewHeight, cosViewAngle,_PlanetRadius + _StartHeight);
+	
+		float rayEnd = rayIntersectsLowerCloud ? DistanceToSphereOutside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight) : DistanceToSphereInside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness);
 	#endif
 	
 	#ifndef CLOUD_SHADOW
@@ -134,6 +165,9 @@ FragmentOutput Fragment(float4 position : SV_Position)
 	float weightSum = 0.0, weightedDepthSum = 0.0;
 	float transmittance = 1.0;
 	float light0 = 0.0, light1 = 0.0;
+	
+	uint random = PcgHash(asuint(offsets.y));
+	
 	for (float i = offsets.x; i < _Samples; i++)
 	{
 		float t = dt * i + rayStart;
@@ -146,19 +180,46 @@ FragmentOutput Fragment(float4 position : SV_Position)
 			float sampleTransmittance = exp2(-extinction * dt);
 			
 			#ifndef CLOUD_SHADOW
-				float LdotV = dot(_LightDirection0, rd);
-				float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, _LightDirection0.y, t * LdotV, heightAtDistance);
 				float lightTransmittance = 1.0;
 			
-				for (float k = offsets.y; k < _LightSamples; k++)
-				{
-					float dist = k * lightDs;
-					float lightHeightAtDistance = HeightAtDistance(heightAtDistance, lightCosAngleAtDistance, dist);
-						
-					float3 samplePos = worldPosition + _LightDirection0 * dist;
-					lightTransmittance *= exp2(-CloudExtinction(samplePos, lightHeightAtDistance, false) * lightDs);
-				}
+				#if 0
+					lightTransmittance = 0.0;
+					for(float j = 0; j < _MultiSamples; j++)
+					{
+						float2 u;
+						u.x = ConstructFloat(random);
+						random = PermuteState(random);
+						u.y = ConstructFloat(random);
+						random = PermuteState(random);
+				
+						float3 direction = SampleSphereUniform(u.x, u.y);
+						float LdotV = dot(direction, rd);
 			
+						float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, direction.y, t * LdotV, heightAtDistance);
+						float transmittance1 = 1.0;
+						for (float k = 0.5; k < _LightSamples; k++)
+						{
+							float dist = k * lightDs;
+							float lightHeightAtDistance = HeightAtDistance(heightAtDistance, lightCosAngleAtDistance, dist);
+						
+							float3 samplePos = worldPosition + direction * dist;
+							transmittance1 *= exp2(-CloudExtinction(samplePos, lightHeightAtDistance, false) * lightDs);
+						}
+			
+						lightTransmittance += transmittance1 * MiePhase(LdotV, _Phase) * MiePhase(dot(rd, _LightDirection0), _Phase) / _Samples;
+					}
+				#else
+					float LdotV = dot(_LightDirection0, rd);
+					float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, _LightDirection0.y, t * LdotV, heightAtDistance);
+					for (float k = offsets.y; k < _LightSamples; k++)
+					{
+						float dist = k * lightDs;
+						float lightHeightAtDistance = HeightAtDistance(heightAtDistance, lightCosAngleAtDistance, dist);
+						
+						float3 samplePos = worldPosition + _LightDirection0 * dist;
+						lightTransmittance *= exp2(-CloudExtinction(samplePos, lightHeightAtDistance, false) * lightDs);
+					}
+				#endif
 				//lightTransmittance = CloudTransmittance(worldPosition);
 			
 				light0 += transmittance * lightTransmittance * (1.0 - sampleTransmittance);
@@ -190,7 +251,14 @@ FragmentOutput Fragment(float4 position : SV_Position)
 		float3 ambient = GetSkyAmbient(lightCosAngleAtDistance, heightAtDistance) * _LightColor0 * _Exposure;
 		float3 result = ambient * (1.0 - transmittance);
 	
-		float phase = lerp(MiePhase(LdotV, _BackScatterPhase) * _BackScatterScale, MiePhase(LdotV, _ForwardScatterPhase) * _ForwardScatterScale, 0.5);
+		#if 0
+			float phase = 1;
+		#elif 1
+			float phase = lerp(MiePhase(LdotV, _BackScatterPhase) * _BackScatterScale, MiePhase(LdotV, _ForwardScatterPhase) * _ForwardScatterScale, 0.5);
+		#else
+			float phase = MiePhase(LdotV, _Phase);
+		#endif
+	
 		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 		{
 			float3 atmosphereTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
@@ -266,7 +334,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 	float4 history = _History.Sample(_LinearClampSampler, historyUv * _History_Scale.xy) * (_RcpPreviousExposure * _Exposure);
 	history.rgb = RGBToYCoCg(history.rgb);
 	history.rgb *= rcp(1.0 + history.r);
-	//history = clamp(history, minValue, maxValue);
+	history = clamp(history, minValue, maxValue);
 	
 	float motionLength = saturate(length(motion) * _MotionFactor);
 	float blend = lerp(_StationaryBlend, _MotionBlend, motionLength);

@@ -109,6 +109,34 @@ float MiePhase(float cosAngle, float anisotropy)
 	return (3.0 / (8.0 * Pi)) * ((((1.0 - Sq(g)) * (1.0 + Sq(cosAngle))) / ((2.0 + Sq(g)) * pow(1.0 + Sq(g) - 2.0 * g * cosAngle, 3.0 / 2.0))));
 }
 
+float CornetteShanksPhasePartConstant(float anisotropy)
+{
+	float g = anisotropy;
+
+	return (3 / (8 * Pi)) * (1 - g * g) / (2 + g * g);
+}
+
+// Similar to the RayleighPhaseFunction.
+float CornetteShanksPhasePartSymmetrical(float cosTheta)
+{
+	float h = 1 + cosTheta * cosTheta;
+	return h;
+}
+
+float CornetteShanksPhasePartAsymmetrical(float anisotropy, float cosTheta)
+{
+	float g = anisotropy;
+	float x = 1 + g * g - 2 * g * cosTheta;
+	float f = rsqrt(max(x, HalfEps)); // x^(-1/2)
+	return f * f * f; // x^(-3/2)
+}
+
+float CornetteShanksPhasePartVarying(float anisotropy, float cosTheta)
+{
+	return CornetteShanksPhasePartSymmetrical(cosTheta) *
+           CornetteShanksPhasePartAsymmetrical(anisotropy, cosTheta); // h * x^(-3/2)
+}
+
 float3 AtmosphereExtinction(float height)
 {
 	float clampedHeight = height - _PlanetRadius;
