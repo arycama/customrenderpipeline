@@ -8,7 +8,7 @@ using Object = UnityEngine.Object;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class RenderGraph
+    public class RenderGraph : IDisposable
     {
         private readonly Dictionary<Type, Queue<RenderPass>> renderPassPool = new();
         private readonly Dictionary<Type, Queue<RenderGraphBuilder>> builderPool = new();
@@ -19,7 +19,8 @@ namespace Arycama.CustomRenderPipeline
 
         // Maybe encapsulate these in a thing so it can also be used for buffers
         private readonly Queue<RTHandle> availableRtHandles = new();
-        private readonly List<(RenderTexture renderTexture, int lastFrameUsed, bool isAvailable)> availableRenderTextures = new();
+        private readonly Queue<int> availableRtSlots = new();
+        private readonly List<(RenderTexture renderTexture, int lastFrameUsed, bool isAvailable, bool isPersistent)> availableRenderTextures = new();
 
         private readonly List<BufferHandle> bufferHandlesToCreate = new();
         private readonly List<BufferHandle> availableBufferHandles = new();
@@ -40,11 +41,12 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle EmptyCubemap { get; }
         public RTHandle EmptyCubemapArray { get; }
 
-        public int FrameIndex { get; set; }
+        public int FrameIndex { get; private set; }
 
         private int rtHandleCount;
         private int rtCount;
         private int screenWidth, screenHeight;
+        private bool disposedValue;
 
         public RenderGraph()
         {
@@ -129,7 +131,7 @@ namespace Arycama.CustomRenderPipeline
                         RenderTexture result = null;
                         for (var j = 0; j < availableRenderTextures.Count; j++)
                         {
-                            var (renderTexture, lastFrameUsed, isAvailable) = availableRenderTextures[j];
+                            var (renderTexture, lastFrameUsed, isAvailable, isPersistent) = availableRenderTextures[j];
                             if (!isAvailable)
                                 continue;
 
@@ -152,7 +154,7 @@ namespace Arycama.CustomRenderPipeline
                                     continue;
 
                                 result = renderTexture;
-                                availableRenderTextures[j] = (renderTexture, lastFrameUsed, false);
+                                availableRenderTextures[j] = (renderTexture, lastFrameUsed, false, handle.IsPersistent);
                                 handle.RenderTextureIndex = j;
                                 break;
                             }
@@ -178,8 +180,20 @@ namespace Arycama.CustomRenderPipeline
                             result.name = $"{result.dimension} {(isDepth ? result.depthStencilFormat : result.graphicsFormat)} {width}x{height} {rtCount++}";
                             result.Create();
 
-                            availableRenderTextures.Add((result, FrameIndex, false));
-                            handle.RenderTextureIndex = availableRenderTextures.Count - 1;
+                            Debug.Log($"Allocating {result.name}");
+
+                            // Get a slot for this render texture if possible
+                            if (!availableRtSlots.TryDequeue(out var slot))
+                            {
+                                slot = availableRenderTextures.Count;
+                                availableRenderTextures.Add((result, FrameIndex, false, handle.IsPersistent));
+                            }
+                            else
+                            {
+                                availableRenderTextures[slot] = (result, FrameIndex, false, handle.IsPersistent);
+                            }
+
+                            handle.RenderTextureIndex = slot;
                         }
 
                         handle.RenderTexture = result;
@@ -195,7 +209,7 @@ namespace Arycama.CustomRenderPipeline
                     if (output.IsImported)
                         continue;
 
-                    availableRenderTextures[output.RenderTextureIndex] = (output.RenderTexture, FrameIndex, true);
+                    availableRenderTextures[output.RenderTextureIndex] = (output.RenderTexture, FrameIndex, true, false);
                     availableRtHandles.Enqueue(output);
                 }
             }
@@ -348,28 +362,31 @@ namespace Arycama.CustomRenderPipeline
             usedBufferHandles.Clear();
 
             // Release any render textures that have not been used for at least a frame
-            //for (var i = availableRenderTextures.Count - 1; i >= 0; i--)
-            //{
-            //    var renderTexture = availableRenderTextures[i];
-            //    if (renderTexture.lastFrameUsed == FrameIndex)
-            //        continue;
+            for (var i = 0; i < availableRenderTextures.Count; i++)
+            {
+                var renderTexture = availableRenderTextures[i];
 
-            //    Object.DestroyImmediate(renderTexture.renderTexture);
-            //    availableRenderTextures.RemoveAt(i);
-            //}
-        }
+                // This indicates it is empty
+                if (renderTexture.renderTexture == null)
+                    continue;
 
-        public void Release()
-        {
-            foreach (var rt in availableRenderTextures)
-                Object.DestroyImmediate(rt.renderTexture);
-            availableRenderTextures.Clear();
+                if (renderTexture.isPersistent)
+                    continue;
 
-            foreach (var bufferHandle in availableBufferHandles)
-                bufferHandle.Release();
-            availableBufferHandles.Clear();
+                // Don't free textures that were used in the last frame
+                // TODO: Make this a configurable number of frames to avoid rapid re-allocations
+                if (renderTexture.lastFrameUsed == FrameIndex)
+                    continue;
 
-            EmptyBuffer.Release();
+                Debug.Log($"Releasing {renderTexture.renderTexture.name}");
+                Object.DestroyImmediate(renderTexture.renderTexture);
+
+                // Fill this with a null, unavailable RT and add the index to a list
+                availableRenderTextures[i] = (null, renderTexture.lastFrameUsed, false, false);
+                availableRtSlots.Enqueue(i);
+            }
+
+            FrameIndex++;
         }
 
         public void SetRTHandleWrite(RTHandle handle, int passIndex)
@@ -391,6 +408,44 @@ namespace Arycama.CustomRenderPipeline
                 return;
 
             lastRtHandleRead[handle] = passIndex;
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposedValue)
+            {
+                if (disposing)
+                {
+                    // TODO: dispose managed state (managed objects)
+                }
+
+                foreach (var rt in availableRenderTextures)
+                {
+                    // Since we don't remove null entries, but rather leave them as "empty", they could be null
+                    if (rt.renderTexture != null)
+                        Object.DestroyImmediate(rt.renderTexture);
+                }
+
+                foreach (var bufferHandle in availableBufferHandles)
+                    bufferHandle.Release();
+
+                foreach (var importedRT in importedTextures)
+                    Object.DestroyImmediate(importedRT.Key);
+
+                disposedValue = true;
+            }
+        }
+
+        ~RenderGraph()
+        {
+            Dispose(disposing: false);
+        }
+
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
         }
     }
 }

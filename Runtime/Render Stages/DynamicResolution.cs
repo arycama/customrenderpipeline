@@ -48,10 +48,5 @@ namespace Arycama.CustomRenderPipeline
         {
             ScaleFactor = 1.0f;
         }
-
-        public void Release()
-        {
-            ResetScale();
-        }
     }
 }

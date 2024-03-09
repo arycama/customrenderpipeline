@@ -33,6 +33,11 @@ namespace Arycama.CustomRenderPipeline
 
         protected virtual void PostExecute(CommandBuffer command) { }
 
+        public override string ToString()
+        {
+            return Name;
+        }
+
         public void ReadTexture(string propertyName, RTHandle texture)
         {
             Assert.IsNotNull(texture, propertyName);

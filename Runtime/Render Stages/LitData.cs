@@ -1,6 +1,7 @@
 ﻿using Arycama.CustomRenderPipeline;
 using System;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
@@ -34,44 +35,11 @@ public class LitData : IDisposable
         this.settings = settings;
         this.renderGraph = renderGraph;
 
-        directionalAlbedo = renderGraph.ImportRenderTexture(new RenderTexture(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution, 0, RenderTextureFormat.RG32, RenderTextureReadWrite.Linear)
-        {
-            enableRandomWrite = true,
-            hideFlags = HideFlags.HideAndDontSave,
-            name = "GGX Directional Albedo"
-        }.Created());
-
-        averageAlbedo = renderGraph.ImportRenderTexture(new RenderTexture(settings.AverageAlbedoResolution, 1, 0, RenderTextureFormat.R16, RenderTextureReadWrite.Linear)
-        {
-            enableRandomWrite = true,
-            hideFlags = HideFlags.HideAndDontSave,
-            name = "GGX Average Albedo"
-        }.Created());
-
-        directionalAlbedoMs = renderGraph.ImportRenderTexture(new RenderTexture(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, 0, RenderTextureFormat.R16, RenderTextureReadWrite.Linear)
-        {
-            dimension = TextureDimension.Tex3D,
-            enableRandomWrite = true,
-            hideFlags = HideFlags.HideAndDontSave,
-            name = "GGX Directional Albedo MS",
-            volumeDepth = settings.DirectionalAlbedoMsResolution
-        }.Created());
-
-        averageAlbedoMs = renderGraph.ImportRenderTexture(new RenderTexture(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution, 0, RenderTextureFormat.R16, RenderTextureReadWrite.Linear)
-        {
-            enableRandomWrite = true,
-            hideFlags = HideFlags.HideAndDontSave,
-            name = "GGX Average Albedo MS"
-        }.Created());
-
-        specularOcclusion = renderGraph.ImportRenderTexture(new RenderTexture(32, 32, 0, RenderTextureFormat.R16)
-        {
-            dimension = TextureDimension.Tex3D,
-            enableRandomWrite = true,
-            hideFlags = HideFlags.HideAndDontSave,
-            name = "GGX Specular Occlusion",
-            volumeDepth = 32 * 32
-        }.Created());
+        directionalAlbedo = renderGraph.GetTexture(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution, GraphicsFormat.R16G16_UNorm, true, isPersistent: true);
+        averageAlbedo = renderGraph.GetTexture(settings.AverageAlbedoResolution, 1, GraphicsFormat.R16_UNorm, true, isPersistent: true);
+        directionalAlbedoMs = renderGraph.GetTexture(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, GraphicsFormat.R16_UNorm, true, settings.DirectionalAlbedoMsResolution, TextureDimension.Tex3D, isPersistent: true);
+        averageAlbedoMs = renderGraph.GetTexture(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution, GraphicsFormat.R16_UNorm, true, isPersistent: true);
+        specularOcclusion = renderGraph.GetTexture(32, 32, GraphicsFormat.R16_UNorm, true, 32 * 32, TextureDimension.Tex3D, isPersistent: true);
 
         ltcData = new Texture2D(k_LtcLUTResolution, k_LtcLUTResolution, TextureFormat.RGBAHalf, false /*mipmap*/, true /* linear */)
         {
@@ -4372,12 +4340,6 @@ public class LitData : IDisposable
     // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
     ~LitData()
     {
-        renderGraph.ReleaseImportedTexture(directionalAlbedo);
-        renderGraph.ReleaseImportedTexture(averageAlbedo);
-        renderGraph.ReleaseImportedTexture(directionalAlbedoMs);
-        renderGraph.ReleaseImportedTexture(averageAlbedoMs);
-        renderGraph.ReleaseImportedTexture(specularOcclusion);
-
         Object.DestroyImmediate(ltcData);
 
         // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method

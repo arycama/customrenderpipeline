@@ -104,9 +104,9 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };
             textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Clouds");
 
-            weatherMap = renderGraph.ImportRenderTexture(new RenderTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, 0, GraphicsFormat.R8_UNorm));
-            noiseTexture = renderGraph.ImportRenderTexture(new RenderTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, 0, GraphicsFormat.R8_UNorm) { dimension = TextureDimension.Tex3D, volumeDepth = settings.NoiseResolution.z });
-            detailNoiseTexture = renderGraph.ImportRenderTexture(new RenderTexture(settings.DetailNoiseResolution.x, settings.DetailNoiseResolution.y, 0, GraphicsFormat.R8_UNorm) { dimension = TextureDimension.Tex3D, volumeDepth = settings.DetailNoiseResolution.z });
+            weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, GraphicsFormat.R8_UNorm, isPersistent: true);
+            noiseTexture = renderGraph.GetTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, GraphicsFormat.R8_UNorm, false, settings.NoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
+            detailNoiseTexture = renderGraph.GetTexture(settings.DetailNoiseResolution.x, settings.DetailNoiseResolution.y, GraphicsFormat.R8_UNorm, false, settings.DetailNoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
         }
 
         public CloudData SetupData()

@@ -16,6 +16,11 @@ namespace Arycama.CustomRenderPipeline
             propertyBlock = new MaterialPropertyBlock();
         }
 
+        public override string ToString()
+        {
+            return $"{Name} {material} {passIndex}";
+        }
+
         public void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, string keyword = null)
         {
             this.material = material;
@@ -26,11 +31,6 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
         {
-            if(texture == null)
-            {
-                Debug.Log(propertyName);
-            }
-
             propertyBlock.SetTexture(propertyName, texture);
         }
 
