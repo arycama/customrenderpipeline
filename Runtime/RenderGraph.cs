@@ -19,13 +19,12 @@ namespace Arycama.CustomRenderPipeline
 
         // Maybe encapsulate these in a thing so it can also be used for buffers
         private readonly Queue<RTHandle> availableRtHandles = new();
-        private readonly List<RenderTexture> availableRenderTextures = new();
+        private readonly List<(RenderTexture renderTexture, int lastFrameUsed, bool isAvailable)> availableRenderTextures = new();
 
         private readonly List<BufferHandle> bufferHandlesToCreate = new();
         private readonly List<BufferHandle> availableBufferHandles = new();
         private readonly List<BufferHandle> usedBufferHandles = new();
 
-        private readonly Dictionary<RTHandle, int> checkSet = new();
         private readonly Dictionary<int, List<RTHandle>> lastPassOutputs = new();
 
         private bool isExecuting;
@@ -41,7 +40,7 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle EmptyCubemap { get; }
         public RTHandle EmptyCubemapArray { get; }
 
-        public int FrameCount { get; set; }
+        public int FrameIndex { get; set; }
 
         private int rtHandleCount;
         private int rtCount;
@@ -69,16 +68,14 @@ namespace Arycama.CustomRenderPipeline
 
         public T AddRenderPass<T>(string name) where T : RenderPass, new()
         {
-            if (!renderPassPool.TryGetValue(typeof(T), out var pool))
-            {
-                pool = new Queue<RenderPass>();
-                renderPassPool.Add(typeof(T), pool);
-            }
+            var pool = renderPassPool.GetOrAdd(typeof(T));
 
             if (!pool.TryDequeue(out var pass))
             {
-                pass = new T();
-                pass.RenderGraph = this;
+                pass = new T
+                {
+                    RenderGraph = this
+                };
             }
 
             pass.Name = name;
@@ -94,23 +91,14 @@ namespace Arycama.CustomRenderPipeline
 
         public RenderGraphBuilder<T> GetRenderGraphBuilder<T>() where T : class, new()
         {
-            if (!builderPool.TryGetValue(typeof(RenderGraphBuilder<T>), out var pool))
-            {
-                pool = new Queue<RenderGraphBuilder>();
-                builderPool.Add(typeof(RenderGraphBuilder<T>), pool);
-            }
-
-            if (!pool.TryDequeue(out var pass))
-                pass = new RenderGraphBuilder<T>();
-
+            var pool = builderPool.GetOrAdd(typeof(RenderGraphBuilder<T>));
+            var pass = pool.DequeueOrCreate(() => new RenderGraphBuilder<T>());
             return pass as RenderGraphBuilder<T>;
         }
 
         public void ReleaseRenderGraphBuilder(RenderGraphBuilder builder)
         {
-            var hasPool = builderPool.TryGetValue(builder.GetType(), out var pool);
-            Assert.IsTrue(hasPool, "Attempting to release a renderPass that was not created through GetPool");
-            pool.Enqueue(builder);
+            builderPool[builder.GetType()].Enqueue(builder);
         }
 
         public void Execute(CommandBuffer command, ScriptableRenderContext context)
@@ -122,25 +110,12 @@ namespace Arycama.CustomRenderPipeline
             // Build mapping from pass index to rt handles that can be freed
             foreach (var input in lastRtHandleRead)
             {
-                if (checkSet.ContainsKey(input.Key))
-                {
-                    Debug.LogError($"Trying to release rt handle in pass {input.Value} but it is already released in {checkSet[input.Key]}");
-                    continue;
-                }
-
-                if (!lastPassOutputs.TryGetValue(input.Value, out var list))
-                {
-                    list = new();
-                    lastPassOutputs.Add(input.Value, list);
-                }
-
+                var list = lastPassOutputs.GetOrAdd(input.Value);
                 list.Add(input.Key);
             }
 
             for (var i = 0; i < renderPasses.Count; i++)
             {
-                var renderPass = renderPasses[i];
-
                 // Assign or create any RTHandles that are written to by this pass
                 if (passRTHandleOutputs.TryGetValue(i, out var outputs))
                 {
@@ -154,30 +129,31 @@ namespace Arycama.CustomRenderPipeline
                         RenderTexture result = null;
                         for (var j = 0; j < availableRenderTextures.Count; j++)
                         {
-                            var rt = availableRenderTextures[j];
-
-                            Assert.IsNotNull(rt);
+                            var (renderTexture, lastFrameUsed, isAvailable) = availableRenderTextures[j];
+                            if (!isAvailable)
+                                continue;
 
                             var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-                            if ((isDepth && handle.Format != rt.depthStencilFormat) || (!isDepth && handle.Format != rt.graphicsFormat))
+                            if ((isDepth && handle.Format != renderTexture.depthStencilFormat) || (!isDepth && handle.Format != renderTexture.graphicsFormat))
                                 continue;
 
                             // For screen textures, ensure we get a rendertexture that is the actual screen width/height
                             if (handle.IsScreenTexture)
                             {
-                                if (rt.width != screenWidth || rt.height != screenHeight)
+                                if (renderTexture.width != screenWidth || renderTexture.height != screenHeight)
                                     continue;
                             }
-                            else if (rt.width < handle.Width || rt.height < handle.Height)
+                            else if (renderTexture.width < handle.Width || renderTexture.height < handle.Height)
                                 continue;
 
-                            if (rt.enableRandomWrite == handle.EnableRandomWrite && rt.dimension == handle.Dimension && rt.useMipMap == handle.HasMips)
+                            if (renderTexture.enableRandomWrite == handle.EnableRandomWrite && renderTexture.dimension == handle.Dimension && renderTexture.useMipMap == handle.HasMips)
                             {
-                                if (handle.Dimension != TextureDimension.Tex2D && rt.volumeDepth < handle.VolumeDepth)
+                                if (handle.Dimension != TextureDimension.Tex2D && renderTexture.volumeDepth < handle.VolumeDepth)
                                     continue;
 
-                                result = rt;
-                                availableRenderTextures.RemoveAt(j);
+                                result = renderTexture;
+                                availableRenderTextures[j] = (renderTexture, lastFrameUsed, false);
+                                handle.RenderTextureIndex = j;
                                 break;
                             }
                         }
@@ -199,64 +175,51 @@ namespace Arycama.CustomRenderPipeline
                                 result.autoGenerateMips = false; // Always false, we manually handle mip generation if needed
                             }
 
-                            result.name = $"RTHandle {rtCount++} {result.dimension} {result.graphicsFormat} {width}x{height} ";
+                            result.name = $"{result.dimension} {(isDepth ? result.depthStencilFormat : result.graphicsFormat)} {width}x{height} {rtCount++}";
                             result.Create();
+
+                            availableRenderTextures.Add((result, FrameIndex, false));
+                            handle.RenderTextureIndex = availableRenderTextures.Count - 1;
                         }
 
                         handle.RenderTexture = result;
-                        Assert.IsNotNull(result);
                     }
                 }
 
                 // Release any textures if this was their final read
-                if (lastPassOutputs.TryGetValue(i, out var outputsToFree))
+                if (!lastPassOutputs.TryGetValue(i, out var outputsToFree))
+                    continue;
+
+                foreach (var output in outputsToFree)
                 {
-                    for (var i1 = 0; i1 < outputsToFree.Count; i1++)
-                    {
-                        var output = outputsToFree[i1];
+                    if (output.IsImported)
+                        continue;
 
-                        if (output.IsImported)
-                            continue;
-
-                        availableRenderTextures.Add(output.RenderTexture);
-                        availableRtHandles.Enqueue(output);
-                    }
+                    availableRenderTextures[output.RenderTextureIndex] = (output.RenderTexture, FrameIndex, true);
+                    availableRtHandles.Enqueue(output);
                 }
             }
 
             isExecuting = true;
-            try
-            {
-                foreach(var renderPass in renderPasses)
-                    renderPass.Run(command, context);
-            }
-            finally
-            {
-                isExecuting = false;
 
-                // Release all pooled passes
-                foreach (var pass in renderPasses)
-                {
-                    var hasPool = renderPassPool.TryGetValue(pass.GetType(), out var pool);
-                    Assert.IsTrue(hasPool, "Attempting to release a renderPass that was not created through GetPool");
-                    pool.Enqueue(pass);
-                }
+            foreach (var renderPass in renderPasses)
+                renderPass.Run(command, context);
 
-                renderPasses.Clear();
-                lastRtHandleRead.Clear();
-                writtenRTHandles.Clear();
+            isExecuting = false;
 
-                foreach(var list in passRTHandleOutputs)
-                {
-                    list.Value.Clear();
-                }
+            // Release all pooled passes
+            foreach (var pass in renderPasses)
+                renderPassPool[pass.GetType()].Enqueue(pass);
 
-                checkSet.Clear();
-                foreach(var output in lastPassOutputs)
-                {
-                    output.Value.Clear();
-                }
-            }
+            renderPasses.Clear();
+            lastRtHandleRead.Clear();
+            writtenRTHandles.Clear();
+
+            foreach (var list in passRTHandleOutputs)
+                list.Value.Clear();
+
+            foreach (var output in lastPassOutputs)
+                output.Value.Clear();
         }
 
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
@@ -328,30 +291,30 @@ namespace Arycama.CustomRenderPipeline
 
         public RTHandle ImportRenderTexture(RenderTexture renderTexture, bool autoGenerateMips = false)
         {
-            if (!importedTextures.TryGetValue(renderTexture, out var result))
+            if (importedTextures.TryGetValue(renderTexture, out var result))
+                return result;
+
+            // Ensure its created (Can happen with some RenderTextures that are imported as soon as created
+            if (!renderTexture.IsCreated())
+                renderTexture.Create();
+
+            result = new RTHandle()
             {
-                // Ensure its created (Can happen with some RenderTextures that are imported as soon as created
-                if (!renderTexture.IsCreated())
-                    renderTexture.Create();
+                Width = renderTexture.width,
+                Height = renderTexture.height,
+                Format = renderTexture.graphicsFormat,
+                EnableRandomWrite = renderTexture.enableRandomWrite,
+                VolumeDepth = renderTexture.volumeDepth,
+                Dimension = renderTexture.dimension,
+                RenderTexture = renderTexture,
+                HasMips = renderTexture.useMipMap,
+                AutoGenerateMips = autoGenerateMips
+            };
 
-                result = new RTHandle()
-                {
-                    Width = renderTexture.width,
-                    Height = renderTexture.height,
-                    Format = renderTexture.graphicsFormat,
-                    EnableRandomWrite = renderTexture.enableRandomWrite,
-                    VolumeDepth = renderTexture.volumeDepth,
-                    Dimension = renderTexture.dimension,
-                    RenderTexture = renderTexture,
-                    HasMips = renderTexture.useMipMap,
-                    AutoGenerateMips = autoGenerateMips
-                };
-
-                result.Id = rtHandleCount++;
-                importedTextures.Add(renderTexture, result);
-                result.IsImported = true;
-                result.IsScreenTexture = false;
-            }
+            result.Id = rtHandleCount++;
+            importedTextures.Add(renderTexture, result);
+            result.IsImported = true;
+            result.IsScreenTexture = false;
 
             return result;
         }
@@ -364,13 +327,7 @@ namespace Arycama.CustomRenderPipeline
 
         public BufferHandle ImportBuffer(GraphicsBuffer buffer)
         {
-            if (!importedBuffers.TryGetValue(buffer, out var result))
-            {
-                result = (BufferHandle)buffer;
-                importedBuffers.Add(buffer, result);
-            }
-
-            return result;
+            return importedBuffers.GetOrAdd(buffer, () => new BufferHandle(buffer));
         }
 
         public void ReleaseImportedBuffer(GraphicsBuffer buffer)
@@ -389,12 +346,23 @@ namespace Arycama.CustomRenderPipeline
             foreach (var handle in usedBufferHandles)
                 availableBufferHandles.Add(handle);
             usedBufferHandles.Clear();
+
+            // Release any render textures that have not been used for at least a frame
+            //for (var i = availableRenderTextures.Count - 1; i >= 0; i--)
+            //{
+            //    var renderTexture = availableRenderTextures[i];
+            //    if (renderTexture.lastFrameUsed == FrameIndex)
+            //        continue;
+
+            //    Object.DestroyImmediate(renderTexture.renderTexture);
+            //    availableRenderTextures.RemoveAt(i);
+            //}
         }
 
         public void Release()
         {
             foreach (var rt in availableRenderTextures)
-                Object.DestroyImmediate(rt);
+                Object.DestroyImmediate(rt.renderTexture);
             availableRenderTextures.Clear();
 
             foreach (var bufferHandle in availableBufferHandles)
@@ -406,18 +374,13 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetRTHandleWrite(RTHandle handle, int passIndex)
         {
-            if(handle.IsImported)
+            if (handle.IsImported)
                 return;
 
             if (!writtenRTHandles.Add(handle))
                 return;
 
-            if (!passRTHandleOutputs.TryGetValue(passIndex, out var outputs))
-            {
-                outputs = new List<RTHandle>();
-                passRTHandleOutputs.Add(passIndex, outputs);
-            }
-
+            var outputs = passRTHandleOutputs.GetOrAdd(passIndex);
             outputs.Add(handle);
         }
 

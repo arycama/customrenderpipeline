@@ -36,7 +36,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void OnPreRender()
         {
-            var sampleIndex = renderGraph.FrameCount % settings.SampleCount;
+            var sampleIndex = renderGraph.FrameIndex % settings.SampleCount;
 
             Vector2 jitter;
             jitter.x = Halton(sampleIndex + 1, 2) - 0.5f;
@@ -52,7 +52,7 @@ namespace Arycama.CustomRenderPipeline
         private class PassData
         {
             internal float sharpness;
-            internal float wasCreated;
+            internal float hasHistory;
             internal float stationaryBlending;
             internal float motionBlending;
             internal float motionWeight;
@@ -77,7 +77,7 @@ namespace Arycama.CustomRenderPipeline
             var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
             {
                 pass.SetFloat(command, "_Sharpness", data.sharpness);
-                pass.SetFloat(command, "_HasHistory", data.wasCreated);
+                pass.SetFloat(command, "_HasHistory", data.hasHistory);
                 pass.SetFloat(command, "_StationaryBlending", data.stationaryBlending);
                 pass.SetFloat(command, "_MotionBlending", data.motionBlending);
                 pass.SetFloat(command, "_MotionWeight", data.motionWeight);
@@ -89,7 +89,7 @@ namespace Arycama.CustomRenderPipeline
             });
 
             data.sharpness = settings.Sharpness;
-            data.wasCreated = wasCreated ? 1.0f : 0.0f;
+            data.hasHistory = wasCreated ? 0.0f : 1.0f;
             data.stationaryBlending = settings.StationaryBlending;
             data.motionBlending = settings.MotionBlending;
             data.motionWeight = settings.MotionWeight;

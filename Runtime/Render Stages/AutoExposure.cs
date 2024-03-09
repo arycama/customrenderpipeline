@@ -91,6 +91,8 @@ namespace Arycama.CustomRenderPipeline
         {
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Auto Exposure"))
             {
+
+
                 var isFirst = !exposureBuffers.TryGetValue(camera, out var exposureBuffer);
                 if(isFirst)
                 {

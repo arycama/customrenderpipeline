@@ -21,6 +21,15 @@ public class BufferHandle
         buffer = null;
     }
 
+    public BufferHandle(GraphicsBuffer graphicsBuffer) 
+    {
+        Target = graphicsBuffer.target;
+        Count = graphicsBuffer.count;
+        Stride = graphicsBuffer.stride;
+        buffer = graphicsBuffer;
+        Size = graphicsBuffer.count * graphicsBuffer.stride;
+    }
+
     public void Create()
     {
         Assert.IsNull(buffer);
@@ -38,14 +47,5 @@ public class BufferHandle
     public static implicit operator GraphicsBuffer(BufferHandle bufferHandle)
     {
         return bufferHandle.buffer;
-    }
-
-    public static implicit operator BufferHandle(GraphicsBuffer graphicsBuffer)
-    {
-        return new BufferHandle(graphicsBuffer.target, graphicsBuffer.count, graphicsBuffer.stride)
-        {
-            buffer = graphicsBuffer,
-            Size = graphicsBuffer.count * graphicsBuffer.stride
-        };
     }
 }

@@ -20,6 +20,7 @@ public class RTHandle
     public bool IsScreenTexture { get; set; }
     public bool HasMips { get; set; }
     public bool AutoGenerateMips { get; set; }
+    public int RenderTextureIndex { get; set; }
 
     public RenderTexture RenderTexture { get; set; }
 
