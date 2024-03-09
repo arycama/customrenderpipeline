@@ -196,17 +196,22 @@ FragmentOutput Fragment(float4 position : SV_Position)
 						float LdotV = dot(direction, rd);
 			
 						float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, direction.y, t * LdotV, heightAtDistance);
-						float transmittance1 = 1.0;
+						float transmittance1 = 1.0, luminance = 0.0;;
 						for (float k = 0.5; k < _LightSamples; k++)
 						{
 							float dist = k * lightDs;
 							float lightHeightAtDistance = HeightAtDistance(heightAtDistance, lightCosAngleAtDistance, dist);
 						
 							float3 samplePos = worldPosition + direction * dist;
-							transmittance1 *= exp2(-CloudExtinction(samplePos, lightHeightAtDistance, false) * lightDs);
+							float sampleTransmittance = exp2(-CloudExtinction(samplePos, lightHeightAtDistance, false) * lightDs);
+
+							float lightTransmittance1 = CloudTransmittance(samplePos);
+					
+							luminance += transmittance1 * lightTransmittance1 * (1.0 - sampleTransmittance);
+							transmittance1 *= sampleTransmittance;
 						}
 			
-						lightTransmittance += transmittance1 * MiePhase(LdotV, _Phase) * MiePhase(dot(rd, _LightDirection0), _Phase) / _Samples;
+						lightTransmittance += luminance * MiePhase(dot(direction, _LightDirection0), _Phase) * MiePhase(dot(rd, direction), _Phase) / _Samples;
 					}
 				#else
 					float LdotV = dot(_LightDirection0, rd);
@@ -220,7 +225,7 @@ FragmentOutput Fragment(float4 position : SV_Position)
 						lightTransmittance *= exp2(-CloudExtinction(samplePos, lightHeightAtDistance, false) * lightDs);
 					}
 				#endif
-				//lightTransmittance = CloudTransmittance(worldPosition);
+				lightTransmittance = CloudTransmittance(worldPosition);
 			
 				light0 += transmittance * lightTransmittance * (1.0 - sampleTransmittance);
 			#endif
@@ -238,8 +243,9 @@ FragmentOutput Fragment(float4 position : SV_Position)
 	float cloudDepth = weightSum ? weightedDepthSum * rcp(weightSum) : rayEnd;
 	
 	#ifdef CLOUD_SHADOW
-		float totalRayLength = rayEnd - cloudDepth;
-		output.result = float3(cloudDepth * _CloudDepthScale,  totalRayLength ? -log2(transmittance) * rcp(totalRayLength) : 0.0, transmittance);
+		float totalRayLength = rayEnd - rayStart;
+		output.result = float3(rayStart * _CloudDepthScale,  totalRayLength ? -log2(transmittance) * rcp(totalRayLength) : 0.0, transmittance);
+		//output.result = float3(rayStart * _CloudDepthScale, -log2(transmittance) * rcp(rayEnd - rayStart), transmittance);
 	#else
 		transmittance = saturate(Remap(transmittance, _TransmittanceThreshold));
 	
@@ -253,7 +259,7 @@ FragmentOutput Fragment(float4 position : SV_Position)
 	
 		#if 0
 			float phase = 1;
-		#elif 1
+		#elif 0
 			float phase = lerp(MiePhase(LdotV, _BackScatterPhase) * _BackScatterScale, MiePhase(LdotV, _ForwardScatterPhase) * _ForwardScatterScale, 0.5);
 		#else
 			float phase = MiePhase(LdotV, _Phase);
@@ -264,6 +270,21 @@ FragmentOutput Fragment(float4 position : SV_Position)
 			float3 atmosphereTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
 			if (any(atmosphereTransmittance))
 			{
+				float LdotV = dot(_LightDirection0, rd);
+				float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, _LightDirection0.y, cloudDepth * LdotV, heightAtDistance);
+				float3 worldPosition = rd * cloudDepth;
+				
+				float lightTransmittance = 1.0;
+				for (float k = offsets.y; k < _LightSamples; k++)
+				{
+					float dist = k * lightDs;
+					float lightHeightAtDistance = HeightAtDistance(heightAtDistance, lightCosAngleAtDistance, dist);
+						
+					float3 samplePos = worldPosition + _LightDirection0 * dist;
+					lightTransmittance *= exp2(-CloudExtinction(samplePos, lightHeightAtDistance, false) * lightDs);
+				}
+			
+				//light0 = lightTransmittance * (1.0 - transmittance);
 				result += light0 * atmosphereTransmittance * _LightColor0 * _Exposure * phase;
 			}
 		}
