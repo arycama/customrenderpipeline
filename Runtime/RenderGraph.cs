@@ -180,7 +180,7 @@ namespace Arycama.CustomRenderPipeline
                             result.name = $"{result.dimension} {(isDepth ? result.depthStencilFormat : result.graphicsFormat)} {width}x{height} {rtCount++}";
                             result.Create();
 
-                            Debug.Log($"Allocating {result.name}");
+                            //Debug.Log($"Allocating {result.name}");
 
                             // Get a slot for this render texture if possible
                             if (!availableRtSlots.TryDequeue(out var slot))

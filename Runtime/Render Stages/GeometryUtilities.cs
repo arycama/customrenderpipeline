@@ -38,5 +38,17 @@ namespace Arycama.CustomRenderPipeline
 
             return SolveQuadraticEquation(a, b, c, out intersections);
         }
+
+        public static float IntersectRayPlane(Vector3 rayOrigin, Vector3 rayDirection, Vector3 planeOrigin, Vector3 planeNormal, out bool isValid)
+        {
+            var denom = Vector3.Dot(planeNormal, rayDirection);
+            isValid = Mathf.Abs(denom) > 1e-6f;
+            return Vector3.Dot(planeNormal, planeOrigin - rayOrigin) / denom;
+        }
+
+        public static float IntersectRayPlane(Vector3 rayOrigin, Vector3 rayDirection, Vector3 planeOrigin, Vector3 planeNormal)
+        {
+            return IntersectRayPlane(rayOrigin, rayDirection, planeOrigin, planeNormal, out _);
+        }
     }
 }

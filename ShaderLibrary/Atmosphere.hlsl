@@ -103,10 +103,11 @@ float RayleighPhase(float cosAngle)
 	return 3.0 * (1.0 + Sq(cosAngle)) / (16.0 * Pi);
 }
 
-float MiePhase(float cosAngle, float anisotropy)
+float MiePhase(float cosTheta, float g)
 {
-	float g = anisotropy;
-	return (3.0 / (8.0 * Pi)) * ((((1.0 - Sq(g)) * (1.0 + Sq(cosAngle))) / ((2.0 + Sq(g)) * pow(1.0 + Sq(g) - 2.0 * g * cosAngle, 3.0 / 2.0))));
+	float denom = 1.0 + g * g + 2.0 * g * -cosTheta;
+	return RcpFourPi * (1.0 - g * g) / (denom * sqrt(denom));
+	//return (3.0 / (8.0 * Pi)) * ((((1.0 - Sq(g)) * (1.0 + Sq(cosTheta))) / ((2.0 + Sq(g)) * pow(1.0 + Sq(g) - 2.0 * g * cosTheta, 3.0 / 2.0))));
 }
 
 float CornetteShanksPhasePartConstant(float anisotropy)

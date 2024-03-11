@@ -21,9 +21,9 @@ namespace Arycama.CustomRenderPipeline
 
         public static Vector3 Position(this Matrix4x4 matrix) => matrix.GetColumn(3);
 
-        public static Matrix4x4 ConvertToAtlasMatrix(this Matrix4x4 m)
+        public static Matrix4x4 ConvertToAtlasMatrix(this Matrix4x4 m, bool reverseZ = true)
         {
-            if (SystemInfo.usesReversedZBuffer)
+            if (reverseZ && SystemInfo.usesReversedZBuffer)
                 m.SetRow(2, -m.GetRow(2));
 
             m.SetRow(0, 0.5f * (m.GetRow(0) + m.GetRow(3)));
@@ -77,5 +77,79 @@ namespace Arycama.CustomRenderPipeline
 
             return viewToWorld * viewSpaceRasterTransform;
         }
+
+        // Returns an ortho matrix where the view is centered in the XY, and at 0 in the Z
+        public static Matrix4x4 OrthoCentered(float width, float height, float depth)
+        {
+            return new Matrix4x4
+            {
+                m00 = 2.0f / width,
+                m11 = 2.0f / height,
+                m22 = 1.0f / depth,
+                m23 = -1.0f,
+                m33 = 1.0f
+            };
+        }
+
+        public static Matrix4x4 OrthoOffCenter(float left, float right, float bottom, float top, float near, float far) => new ()
+        {
+            m00 = 2.0f / (right - left),
+            m03 = (right + left) / (left - right),
+            m11 = 2.0f / (top - bottom),
+            m13 = (top + bottom) / (bottom - top),
+            m22 = 1.0f / (far - near),
+            m23 = near / (near - far),
+            m33 = 1.0f
+        };
+
+        // Similar to above, but maps X and Y between 0 and 1 instead of -1 to 1
+        public static Matrix4x4 OrthoOffCenterNormalized(float left, float right, float bottom, float top, float near, float far) => new()
+        {
+            m00 = 1.0f / (right - left),
+            m03 = left / (left - right),
+            m11 = 1.0f / (top - bottom),
+            m13 = bottom / (bottom - top),
+            m22 = 1.0f / (far - near),
+            m23 = near / (near - far),
+            m33 = 1.0f
+        };
+
+        public static Matrix4x4 OrthoOffCenterInverse(float left, float right, float bottom, float top, float near, float far) => new()
+        {
+            m00 = (right - left) * 0.5f,
+            m03 = (right + left) * 0.5f,
+            m11 = (top - bottom) * 0.5f,
+            m13 = (top + bottom) * 0.5f,
+            m22 = far - near,
+            m23 = near,
+            m33 = 1.0f
+        };
+
+        //public static float4x4 PerspectiveFov(float verticalFov, float aspect, float near, float far)
+        //{
+        //    float cotangent = 1.0f / tan(verticalFov * 0.5f);
+        //    float rcpdz = 1.0f / (near - far);
+
+        //    return float4x4(
+        //        cotangent / aspect, 0.0f, 0.0f, 0.0f,
+        //        0.0f, cotangent, 0.0f, 0.0f,
+        //        0.0f, 0.0f, (far + near) * rcpdz, 2.0f * near * far * rcpdz,
+        //        0.0f, 0.0f, -1.0f, 0.0f
+        //        );
+        //}
+
+        //public static float4x4 PerspectiveOffCenter(float left, float right, float bottom, float top, float near, float far)
+        //{
+        //    float rcpdz = 1.0f / (near - far);
+        //    float rcpWidth = 1.0f / (right - left);
+        //    float rcpHeight = 1.0f / (top - bottom);
+
+        //    return float4x4(
+        //        2.0f * near * rcpWidth, 0.0f, (left + right) * rcpWidth, 0.0f,
+        //        0.0f, 2.0f * near * rcpHeight, (bottom + top) * rcpHeight, 0.0f,
+        //        0.0f, 0.0f, (far + near) * rcpdz, 2.0f * near * far * rcpdz,
+        //        0.0f, 0.0f, -1.0f, 0.0f
+        //        );
+        //}
     }
 }
