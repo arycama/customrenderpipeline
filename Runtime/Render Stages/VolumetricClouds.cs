@@ -80,7 +80,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "_StartHeight", StartHeight);
                 pass.SetFloat(command, "_LayerThickness", LayerThickness);
                 pass.SetFloat(command, "_LightDistance", LightDistance);
-                pass.SetFloat(command, "_Density", Density /** MathUtils.Log2e*/);
+                pass.SetFloat(command, "_Density", Density * MathUtils.Log2e);
 
                 pass.SetFloat(command, "_TransmittanceThreshold", TransmittanceThreshold);
 
@@ -212,8 +212,8 @@ namespace Arycama.CustomRenderPipeline
             var texelSize = radius * 2.0f / resolution;
             var snappedCameraPosition = new Vector3(Mathf.Floor(cameraPosition.x / texelSize) * texelSize, Mathf.Floor(cameraPosition.y / texelSize) * texelSize, Mathf.Floor(cameraPosition.z / texelSize) * texelSize);
 
+            var planetCenter = new Vector3(0.0f, -cameraPosition.y - planetRadius, 0.0f);
             var rayOrigin = new Vector3(snappedCameraPosition.x, 0.0f, snappedCameraPosition.z) - cameraPosition;
-           // var rayOrigin = new Vector3(0.0f, -cameraPosition.y, 0.0f);
 
             // Transform camera bounds to light space
             var boundsMin = rayOrigin + new Vector3(-radius, 0.0f, -radius);
@@ -231,6 +231,15 @@ namespace Arycama.CustomRenderPipeline
                         var localPoint = worldToLight * worldPoint;
                         minValue = Vector3.Min(minValue, localPoint);
                         maxValue = Vector3.Max(maxValue, localPoint);
+
+                        // Also raycast each point against the outer planet sphere in the light direction
+                        if(GeometryUtilities.IntersectRaySphere(worldPoint - planetCenter, lightDirection, planetRadius + settings.StartHeight + settings.LayerThickness, out var hits) && hits.y > 0.0f)
+                        {
+                            var worldPoint1 = worldPoint + lightDirection * hits.y;
+                            var localPoint1 = worldToLight * worldPoint1;
+                            minValue = Vector3.Min(minValue, localPoint1);
+                            maxValue = Vector3.Max(maxValue, localPoint1);
+                        }
                     }
                 }
             }
@@ -241,12 +250,20 @@ namespace Arycama.CustomRenderPipeline
             var invViewMatrix = Matrix4x4.Rotate(lightRotation);
 
             var projectionMatrix = Matrix4x4Extensions.OrthoOffCenterNormalized(minValue.x, maxValue.x, minValue.y, maxValue.y, minValue.z, maxValue.z);
-            var inverseProjectionMatrix = Matrix4x4Extensions.OrthoOffCenterInverse(minValue.x, maxValue.x, minValue.y, maxValue.y, minValue.z, maxValue.z);
+            var inverseProjectionMatrix = new Matrix4x4
+            {
+                m00 = 1.0f / settings.ShadowResolution * (maxValue.x - minValue.x),
+                m03 = minValue.x,
+                m11 = 1.0f / settings.ShadowResolution * (maxValue.y - minValue.y),
+                m13 = minValue.y,
+                m23 = minValue.z,
+                m33 = 1.0f
+            };
 
             var invViewProjection = invViewMatrix * inverseProjectionMatrix;
             var worldToShadow = projectionMatrix * viewMatrix;
 
-            var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.R32G32B32A32_SFloat);
+            var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32);
             using(var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Cloud Shadow"))
             {
                 pass.Initialize(material, 3);
@@ -259,8 +276,7 @@ namespace Arycama.CustomRenderPipeline
                     settings.SetCloudPassData(command, pass);
 
                     pass.SetFloat(command, "_CloudDepthScale", 1f / depth);
-                    pass.SetVector(command, "_ScreenSizeCloudShadow", res);
-                    pass.SetMatrix(command, "_InvViewProjMatrixCloudShadow", invViewProjection);
+                    pass.SetMatrix(command, "_CloudShadowToWorld", invViewProjection);
                     pass.SetMatrix(command, "_WorldToCloudShadow", worldToShadow);
                     pass.SetFloat(command, "_CloudDepthInvScale", depth);
                     pass.SetVector(command, "_LightDirection0", -lightDirection);
