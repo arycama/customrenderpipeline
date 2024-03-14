@@ -43,6 +43,8 @@ namespace Arycama.CustomRenderPipeline
 
         public int FrameIndex { get; private set; }
 
+        public RenderResourceMap ResourceMap { get; } = new();
+
         private int rtHandleCount;
         private int rtCount;
         private int screenWidth, screenHeight;

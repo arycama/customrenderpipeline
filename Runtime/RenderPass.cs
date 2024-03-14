@@ -12,9 +12,15 @@ namespace Arycama.CustomRenderPipeline
         protected RenderGraphBuilder renderGraphBuilder;
 
         protected bool screenWrite;
+
+        // TODO: Convert to handles and remove
         private readonly List<(string, RTHandle)> readTextures = new();
         private readonly List<(string, BufferHandle)> readBuffers = new();
         private readonly List<(string, BufferHandle)> writeBuffers = new();
+
+        private readonly List<(string, RenderResourceHandle)> readTextureHandles = new();
+        private readonly List<(string, RenderResourceHandle)> readBufferHandles = new();
+        private readonly List<(string, RenderResourceHandle)> writeBufferHandles = new();
 
         public RenderGraph RenderGraph { get; set; }
         internal string Name { get; set; }
@@ -64,11 +70,13 @@ namespace Arycama.CustomRenderPipeline
         {
             command.BeginSample(Name);
 
+            // Move into some OnPreRender thing in buffer/RTHandles? 
             foreach (var texture in readTextures)
             {
                 var handle = texture.Item2;
                 SetTexture(command, texture.Item1, handle);
-                SetVector(command, $"{texture.Item1}_Scale", new Vector3(handle.Scale.x, handle.Scale.y, handle.Scale.z));
+                // TODO: Remove/replace with some utility function as this allocates
+                SetVector(command, $"{texture.Item1}_Scale", new Vector3(handle.Scale.x, handle.Scale.y, handle.Scale.z)); 
             }
             readTextures.Clear();
 
