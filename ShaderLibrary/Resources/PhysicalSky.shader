@@ -40,6 +40,8 @@ Shader "Hidden/Physical Sky"
             #pragma geometry GeometryCubemapRender
             #pragma fragment FragmentRender
 
+            #pragma multi_compile _ BELOW_CLOUD_LAYER ABOVE_CLOUD_LAYER
+
             #define REFLECTION_PROBE
 
             #include "PhysicalSky.hlsl"

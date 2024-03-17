@@ -179,7 +179,7 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        public CloudShadowDataResult RenderShadow(CullingResults cullingResults, Camera camera, CloudData cloudRenderData, IRenderPassData commonPassData, float planetRadius)
+        public CloudShadowDataResult RenderShadow(CullingResults cullingResults, Camera camera, CloudData cloudRenderData, float planetRadius)
         {
             var lightDirection = Vector3.up;
             var lightRotation = Quaternion.LookRotation(Vector3.down);
@@ -266,20 +266,11 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(cloudShadow, RenderBufferLoadAction.DontCare);
                 pass.ReadBuffer("CloudShadowData", cloudShadowDataBuffer);
                 cloudRenderData.SetInputs(pass);
-                commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     settings.SetCloudPassData(command, pass);
-
-                    //pass.SetMatrix(command, "_CloudShadowToWorld", invViewProjection);
-                    //pass.SetVector(command, "_CloudShadowViewDirection", -lightDirection);
-
-                    //pass.SetFloat(command, "_CloudShadowDepthScale", 1f / depth);
-                    //pass.SetFloat(command, "_CloudShadowExtinctionScale", 1f / settings.Density);
-                    //pass.SetFloat(command, "_ShadowSamples", settings.ShadowSamples);
-
-                    commonPassData.SetProperties(pass, command);
+                    pass.SetVector(command, "_ViewPosition", camera.transform.position);
                 });
             }
 

@@ -329,6 +329,17 @@ float3 GetSpecularDominantDir(float3 N, float3 R, float perceptualRoughness, flo
     return lerp(N, R, lerpFactor);
 }
 
+// The *approximated* version of the non-linear remapping. It works by
+// approximating the cone of the specular lobe, and then computing the MIP map level
+// which (approximately) covers the footprint of the lobe with a single texel.
+// Improves the perceptual roughness distribution.
+float PerceptualRoughnessToMipmapLevel(float perceptualRoughness)
+{
+	perceptualRoughness = perceptualRoughness * (1.7 - 0.7 * perceptualRoughness);
+
+	return perceptualRoughness * UNITY_SPECCUBE_LOD_STEPS;
+}
+
 // The *accurate* version of the non-linear remapping. It works by
 // approximating the cone of the specular lobe, and then computing the MIP map level
 // which (approximately) covers the footprint of the lobe with a single texel.
@@ -336,6 +347,8 @@ float3 GetSpecularDominantDir(float3 N, float3 R, float perceptualRoughness, flo
 // TODO: optimize!
 float PerceptualRoughnessToMipmapLevel(float perceptualRoughness, float NdotR)
 {
+	return PerceptualRoughnessToMipmapLevel(perceptualRoughness);
+	
 	float m = PerceptualRoughnessToRoughness(perceptualRoughness);
 
     // Remap to spec power. See eq. 21 in --> https://dl.dropboxusercontent.com/u/55891920/papers/mm_brdf.pdf
@@ -350,21 +363,6 @@ float PerceptualRoughnessToMipmapLevel(float perceptualRoughness, float NdotR)
 	return perceptualRoughness * UNITY_SPECCUBE_LOD_STEPS;
 }
 
-// The *approximated* version of the non-linear remapping. It works by
-// approximating the cone of the specular lobe, and then computing the MIP map level
-// which (approximately) covers the footprint of the lobe with a single texel.
-// Improves the perceptual roughness distribution.
-float PerceptualRoughnessToMipmapLevel(float perceptualRoughness, uint maxMipLevel)
-{
-	perceptualRoughness = perceptualRoughness * (1.7 - 0.7 * perceptualRoughness);
-
-	return perceptualRoughness * maxMipLevel;
-}
-
-float PerceptualRoughnessToMipmapLevel(float perceptualRoughness)
-{
-	return PerceptualRoughnessToMipmapLevel(perceptualRoughness, UNITY_SPECCUBE_LOD_STEPS);
-}
 
 #ifdef CUSTOM_LIGHTING_FALLOFF
 float CalculateLightFalloff(float rcpLightDist, float sqrLightDist, float rcpSqLightRange);

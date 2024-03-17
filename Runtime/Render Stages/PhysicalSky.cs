@@ -238,27 +238,81 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        public Result GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, LookupTableResult lookupTableResult)
+        public Result GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, LookupTableResult lookupTableResult, VolumetricClouds.Settings cloudSettings, VolumetricClouds.CloudData cloudRenderData, CullingResults cullingResults, Vector3 cameraPosition, VolumetricClouds.CloudShadowDataResult cloudShadowResult)
         {
+            Color lightColor0 = Color.clear, lightColor1 = Color.clear;
+            Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
+
+            // Find first 2 directional lights
+            var dirLightCount = 0;
+            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
+            {
+                var light = cullingResults.visibleLights[i];
+                if (light.lightType != LightType.Directional)
+                    continue;
+
+                dirLightCount++;
+
+                if (dirLightCount == 1)
+                {
+                    lightDirection0 = -light.localToWorldMatrix.Forward();
+                    lightColor0 = light.finalColor;
+                }
+                else if (dirLightCount == 2)
+                {
+                    lightDirection1 = -light.localToWorldMatrix.Forward();
+                    lightColor1 = light.finalColor;
+
+                    // Only 2 lights supported
+                    break;
+                }
+            }
+
+            string keyword = string.Empty;
+            var viewHeight = cameraPosition.y;
+            if (viewHeight > cloudSettings.StartHeight)
+            {
+                if (viewHeight > cloudSettings.StartHeight + cloudSettings.LayerThickness)
+                {
+                    keyword = "ABOVE_CLOUD_LAYER";
+                }
+            }
+            else
+            {
+                keyword = "BELOW_CLOUD_LAYER";
+            }
+
             // Generate Reflection probe
             var skyReflection = renderGraph.GetTexture(settings.ReflectionResolution, settings.ReflectionResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, hasMips: true, autoGenerateMips: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Reflection"))
             {
-                pass.Initialize(skyMaterial, 2);
+                pass.Initialize(skyMaterial, 2, 1, keyword);
                 pass.WriteTexture(skyReflection, RenderBufferLoadAction.DontCare);
                 pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
 
                 lightingSetupResult.SetInputs(pass);
                 lookupTableResult.SetInputs(pass);
 
+                cloudRenderData.SetInputs(pass);
+                cloudShadowResult.SetInputs(pass);
+
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     lightingSetupResult.SetProperties(pass, command);
+
+                    cloudShadowResult.SetProperties(pass, command);
+                    cloudRenderData.SetProperties(pass, command);
+                    cloudSettings.SetCloudPassData(command, pass);
 
                     pass.SetFloat(command, "_Samples", settings.ReflectionSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
                     pass.SetConstantBuffer(command, "Exposure", exposureBuffer);
                     lookupTableResult.SetProperties(pass, command);
+
+                    pass.SetVector(command, "_LightDirection0", lightDirection0);
+                    pass.SetVector(command, "_LightColor0", lightColor0);
+                    pass.SetVector(command, "_LightDirection1", lightDirection1);
+                    pass.SetVector(command, "_LightColor1", lightColor1);
 
                     var array = ArrayPool<Matrix4x4>.Get(6);
 

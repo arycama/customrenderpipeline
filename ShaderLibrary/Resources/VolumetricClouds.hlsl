@@ -1,29 +1,4 @@
-#include "../Lighting.hlsl"
-#include "../Geometry.hlsl"
-#include "../Random.hlsl"
-
-#include "Packages/com.arycama.webglnoiseunity/Noise.hlsl"
-
-float2 _WeatherMapResolution;
-float3 _NoiseResolution, _DetailNoiseResolution;
-float _WeatherMapFactor, _NoiseFactor, _DetailNoiseFactor;
-
-Texture2D<float4> _Input, _History;
-Texture3D<float> _CloudNoise, _CloudDetailNoise;
-Texture2D<float> _WeatherMap, _Depth;
-float _WeatherMapScale, _WeatherMapStrength, _StartHeight, _LayerThickness, _Density;
-float _NoiseScale, _NoiseStrength, _DetailNoiseStrength, _DetailNoiseScale;
-float2 _WeatherMapSpeed, _WeatherMapOffset;
-float _Samples, _LightSamples, _LightDistance;
-matrix _PixelToWorldViewDir;
-float _StationaryBlend, _MotionBlend, _MotionFactor, _TransmittanceThreshold;
-float3 _LightColor0, _LightColor1, _LightDirection0, _LightDirection1;
-float _BackScatterPhase, _ForwardScatterPhase, _BackScatterScale, _ForwardScatterScale;
-
-float4 _Input_Scale, _CloudDepth_Scale, _History_Scale;
-Texture2D<float> _CloudDepth;
-uint _MaxWidth, _MaxHeight;
-float _IsFirst;
+#include "../CloudCommon.hlsl"
 
 struct TemporalOutput
 {
@@ -31,43 +6,6 @@ struct TemporalOutput
 	float4 history : SV_Target1;
 	float4 velocity : SV_Target2;
 };
-
-const static float3 _PlanetCenter = float3(0.0, -_PlanetRadius - _ViewPosition.y, 0.0);
-const static float3 _PlanetOffset = float3(0.0, _PlanetRadius + _ViewPosition.y, 0.0);
-
-cbuffer CloudShadowData
-{
-	matrix _CloudShadowToWorld;
-	float3 _CloudShadowViewDirection;
-	float _CloudShadowDepthScale;
-	float _CloudShadowExtinctionScale;
-	float _ShadowSamples;
-	float _Padding0, _Padding1;
-};
-
-float CloudExtinction(float3 worldPosition, float height, bool useDetail)
-{
-	float altitude = height - _PlanetRadius;
-	
-	float fraction = saturate((altitude - _StartHeight) / _LayerThickness);
-	float gradient = 4.0 * fraction * (1.0 - fraction);
-	
-	float3 position = worldPosition + _ViewPosition;
-	float2 weatherPosition = position.xz * _WeatherMapScale + _WeatherMapOffset;
-	
-	float density = _WeatherMap.SampleLevel(_LinearRepeatSampler, weatherPosition, 0.0) * gradient;
-	density = Remap(density, 1.0 - _WeatherMapStrength);
-	
-	float baseNoise = _CloudNoise.SampleLevel(_LinearRepeatSampler, position * _NoiseScale, 0.0);
-	density = Remap(density, baseNoise * _NoiseStrength);
-	if (density <= 0.0)
-		return 0.0;
-
-	float detailNoise = _CloudDetailNoise.SampleLevel(_LinearRepeatSampler, position * _DetailNoiseScale, 0.0);
-	density = Remap(density, detailNoise * _DetailNoiseStrength);
-	
-	return max(0.0, density * _Density);
-}
 
 struct FragmentOutput
 {
@@ -135,97 +73,32 @@ FragmentOutput Fragment(float4 position : SV_Position)
 	#endif
 	
 	#ifdef CLOUD_SHADOW
+		bool isShadow = true;
 		float sampleCount = _ShadowSamples;
 	#else
+		bool isShadow = false;
 		float sampleCount = _Samples;
 	#endif
 	
-	float dt = (rayEnd - rayStart) / sampleCount;
-	float LdotV = dot(_LightDirection0, rd);
-	
-	float weightSum = 0.0, weightedDepthSum = 0.0;
-	float transmittance = 1.0;
-	float light0 = 0.0;
-	for (float i = 0.0; i < sampleCount; i++)
-	{
-		float t = dt * (i + offsets.x) + rayStart;
-		float3 worldPosition = rd * t + P;
-		
-		float heightAtDistance = HeightAtDistance(viewHeight, cosViewAngle, t);
-		float extinction = CloudExtinction(worldPosition, heightAtDistance, true);
-		if (extinction)
-		{
-			float sampleTransmittance = exp2(-extinction * dt);
-			
-			#ifndef CLOUD_SHADOW
-			
-				float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, _LightDirection0.y, t * LdotV, heightAtDistance);
-				float lightTransmittance = 1.0;
-				float lightDs = _LightDistance / _LightSamples;
-			
-				for (float k = 0.0; k < _LightSamples; k++)
-				{
-					float dist = (k + offsets.y) * lightDs;
-					float lightHeightAtDistance = HeightAtDistance(heightAtDistance, lightCosAngleAtDistance, dist);
-						
-					float3 samplePos = worldPosition + _LightDirection0 * dist;
-					lightTransmittance *= exp2(-CloudExtinction(samplePos, lightHeightAtDistance, false) * lightDs);
-				}
-			
-				//float lightTransmittance = CloudTransmittance(worldPosition);
-			
-				float asymmetry = lightTransmittance * transmittance;
-				float phase = MiePhase(LdotV, lerp(_BackScatterPhase, _ForwardScatterPhase, asymmetry)) * lerp(_BackScatterScale, _ForwardScatterScale, asymmetry);
-				light0 += phase * asymmetry * (1.0 - sampleTransmittance);
-			#endif
-			
-			transmittance *= sampleTransmittance;
-		}
-		
-		weightedDepthSum += t * transmittance;
-		weightSum += transmittance;
-		
-		#ifndef CLOUD_SHADOW
-			if (transmittance < _TransmittanceThreshold)
-				break;
-		#endif
-	}
-
-	float cloudDepth = weightedDepthSum * rcp(weightSum);
+	float cloudDepth;
+	float rayLength = rayEnd - rayStart;
+	float4 result = EvaluateCloud(rayStart, rayLength, sampleCount, rd, viewHeight, cosViewAngle, offsets, P, isShadow, cloudDepth);
 	
 	#ifdef CLOUD_SHADOW
 		float totalRayLength = rayEnd - cloudDepth;
-		output.result = float3(cloudDepth * _CloudShadowDepthScale, -log2(transmittance) * rcp(totalRayLength) * _CloudShadowExtinctionScale, transmittance);
+		output.result = float3(cloudDepth * _CloudShadowDepthScale, -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale, result.a);
 	#else
-		float3 result = 0.0;
-		if(transmittance < 1.0)
-		{
-			transmittance = saturate(Remap(transmittance, _TransmittanceThreshold));
-	
-			// Final lighting
-			float heightAtDistance = HeightAtDistance(viewHeight, cosViewAngle, cloudDepth);
-			float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, _LightDirection0.y, cloudDepth * LdotV, heightAtDistance);
-	
-			float3 ambient = GetSkyAmbient(lightCosAngleAtDistance, heightAtDistance) * _LightColor0 * _Exposure;
-			result = ambient * (1.0 - transmittance);
-	
-			if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
-			{
-				float3 atmosphereTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
-				result += light0 * atmosphereTransmittance * _LightColor0 * _Exposure;
-			}
-	
-			float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, cosViewAngle, cloudDepth, heightAtDistance);
-			float3 viewTransmittance = TransmittanceToPoint(viewHeight, cosViewAngle, heightAtDistance, viewCosAngleAtDistance);
-			result *= viewTransmittance;
-		}
-	
-		output.result = float4(result, transmittance);
+		output.result = result;
 		output.depth = cloudDepth;
 	#endif
 	
 	return output;
 }
+
+float4 _Input_Scale, _CloudDepth_Scale, _History_Scale;
+uint _MaxWidth, _MaxHeight;
+float _IsFirst;
+float _StationaryBlend, _MotionBlend, _MotionFactor;
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position)
 {
