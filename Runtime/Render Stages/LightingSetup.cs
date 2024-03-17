@@ -202,7 +202,7 @@ namespace Arycama.CustomRenderPipeline
 
             if (directionalShadowRequests.Count > 0)
             {
-                result.directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D32_SFloat, false, directionalShadowRequests.Count, TextureDimension.Tex2DArray);
+                result.directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D32_SFloat, directionalShadowRequests.Count, TextureDimension.Tex2DArray);
                 result.directionalMatrices = renderGraph.GetBuffer(directionalShadowMatrices.Count, UnsafeUtility.SizeOf<Matrix4x4>());
                 result.directionalShadowTexelSizes = renderGraph.GetBuffer(directionalShadowTexelSizes.Count, UnsafeUtility.SizeOf<Vector4>());
 
@@ -264,7 +264,7 @@ namespace Arycama.CustomRenderPipeline
             }
             else
             {
-                result.pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D32_SFloat, false, pointShadowRequests.Count, TextureDimension.CubeArray);
+                result.pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D32_SFloat, pointShadowRequests.Count, TextureDimension.CubeArray);
 
                 for (var i = 0; i < pointShadowRequests.Count; i++)
                 {

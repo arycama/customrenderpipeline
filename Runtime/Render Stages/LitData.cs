@@ -35,11 +35,11 @@ public class LitData : IDisposable
         this.settings = settings;
         this.renderGraph = renderGraph;
 
-        directionalAlbedo = renderGraph.GetTexture(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution, GraphicsFormat.R16G16_UNorm, true, isPersistent: true);
-        averageAlbedo = renderGraph.GetTexture(settings.AverageAlbedoResolution, 1, GraphicsFormat.R16_UNorm, true, isPersistent: true);
-        directionalAlbedoMs = renderGraph.GetTexture(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, GraphicsFormat.R16_UNorm, true, settings.DirectionalAlbedoMsResolution, TextureDimension.Tex3D, isPersistent: true);
-        averageAlbedoMs = renderGraph.GetTexture(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution, GraphicsFormat.R16_UNorm, true, isPersistent: true);
-        specularOcclusion = renderGraph.GetTexture(32, 32, GraphicsFormat.R16_UNorm, true, 32 * 32, TextureDimension.Tex3D, isPersistent: true);
+        directionalAlbedo = renderGraph.GetTexture(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution, GraphicsFormat.R16G16_UNorm, isPersistent: true);
+        averageAlbedo = renderGraph.GetTexture(settings.AverageAlbedoResolution, 1, GraphicsFormat.R16_UNorm, isPersistent: true);
+        directionalAlbedoMs = renderGraph.GetTexture(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, GraphicsFormat.R16_UNorm, settings.DirectionalAlbedoMsResolution, TextureDimension.Tex3D, isPersistent: true);
+        averageAlbedoMs = renderGraph.GetTexture(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution, GraphicsFormat.R16_UNorm, isPersistent: true);
+        specularOcclusion = renderGraph.GetTexture(32, 32, GraphicsFormat.R16_UNorm, 32 * 32, TextureDimension.Tex3D, isPersistent: true);
 
         ltcData = new Texture2D(k_LtcLUTResolution, k_LtcLUTResolution, TextureFormat.RGBAHalf, false /*mipmap*/, true /* linear */)
         {

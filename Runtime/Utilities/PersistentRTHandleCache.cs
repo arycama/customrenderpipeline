@@ -12,17 +12,15 @@ namespace Arycama.CustomRenderPipeline
 
         private GraphicsFormat format;
         private TextureDimension dimension;
-        private bool enableRandomWrite;
 
         private string name;
 
         public RenderGraph renderGraph;
 
-        public PersistentRTHandleCache(GraphicsFormat format, RenderGraph renderGraph, string name = "", bool enableRandomWrite = false, TextureDimension dimension = TextureDimension.Tex2D)
+        public PersistentRTHandleCache(GraphicsFormat format, RenderGraph renderGraph, string name = "", TextureDimension dimension = TextureDimension.Tex2D)
         {
             this.format = format;
             this.dimension = dimension;
-            this.enableRandomWrite = enableRandomWrite;
             this.renderGraph = renderGraph;
             this.name = name;
         }
@@ -57,7 +55,7 @@ namespace Arycama.CustomRenderPipeline
             else
                 history.IsPersistent = false;
 
-            var current = renderGraph.GetTexture(width, height, format, enableRandomWrite, depth, dimension, isScreenTexture, isPersistent: true);
+            var current = renderGraph.GetTexture(width, height, format, depth, dimension, isScreenTexture, isPersistent: true);
             textureCache[camera] = current;
 
             return (current, history, wasCreated);

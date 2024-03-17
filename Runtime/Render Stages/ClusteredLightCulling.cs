@@ -80,7 +80,7 @@ namespace Arycama.CustomRenderPipeline
             var clusterBias = -(settings.ClusterDepth * Mathf.Log(near, 2f) / Mathf.Log(far / near, 2f));
 
             var computeShader = Resources.Load<ComputeShader>("ClusteredLightCulling");
-            var lightClusterIndices = renderGraph.GetTexture(clusterWidth, clusterHeight, GraphicsFormat.R32G32_SInt, true, settings.ClusterDepth, TextureDimension.Tex3D);
+            var lightClusterIndices = renderGraph.GetTexture(clusterWidth, clusterHeight, GraphicsFormat.R32G32_SInt, settings.ClusterDepth, TextureDimension.Tex3D);
 
             var lightList = renderGraph.GetBuffer(clusterCount * settings.MaxLightsPerTile);
 

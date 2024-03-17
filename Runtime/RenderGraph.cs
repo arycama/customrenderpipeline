@@ -239,7 +239,7 @@ namespace Arycama.CustomRenderPipeline
                 output.Value.Clear();
         }
 
-        public RTHandle GetTexture(int width, int height, GraphicsFormat format, bool enableRandomWrite = false, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
+        public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
         {
             // Ensure we're not getting a texture during execution, this must be done in the setup
             Assert.IsFalse(isExecuting);
@@ -253,13 +253,15 @@ namespace Arycama.CustomRenderPipeline
             result.Width = width;
             result.Height = height;
             result.Format = format;
-            result.EnableRandomWrite = enableRandomWrite;
             result.VolumeDepth = volumeDepth;
             result.Dimension = dimension;
             result.IsScreenTexture = isScreenTexture;
             result.HasMips = hasMips;
             result.AutoGenerateMips = autoGenerateMips;
             result.IsPersistent = isPersistent;
+
+            // This gets set automatically if a texture is written to by a compute shader
+            result.EnableRandomWrite = false;
 
             return result;
         }

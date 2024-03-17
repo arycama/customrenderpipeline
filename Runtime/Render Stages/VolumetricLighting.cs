@@ -13,7 +13,7 @@ namespace Arycama.CustomRenderPipeline
         public VolumetricLighting(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
-            colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", true, TextureDimension.Tex3D);
+            colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", TextureDimension.Tex3D);
         }
 
         public Result Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, Texture2D blueNoise1D, Texture2D blueNoise2D, Color fogColor, float fogStartDistance, float fogEndDistance, float fogDensity, float fogMode, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, IRenderPassData commonData)
@@ -95,7 +95,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Filter X
-            var filterX = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
+            var filterX = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, depth, TextureDimension.Tex3D);
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Filter X"))
             {
                 pass.Initialize(computeShader, 1, width, height, depth);
@@ -104,7 +104,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Filter Y
-            var filterY = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
+            var filterY = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, depth, TextureDimension.Tex3D);
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Filter Y"))
             {
                 pass.Initialize(computeShader, 2, width, height, depth);
@@ -113,7 +113,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Accumulate
-            var result = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, true, depth, TextureDimension.Tex3D);
+            var result = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, depth, TextureDimension.Tex3D);
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Accumulate"))
             {
                 pass.Initialize(computeShader, 3, width, height, depth);

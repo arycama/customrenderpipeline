@@ -107,8 +107,8 @@ namespace Arycama.CustomRenderPipeline
             textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Clouds");
 
             weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, GraphicsFormat.R8_UNorm, isPersistent: true);
-            noiseTexture = renderGraph.GetTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, GraphicsFormat.R8_UNorm, false, settings.NoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
-            detailNoiseTexture = renderGraph.GetTexture(settings.DetailNoiseResolution.x, settings.DetailNoiseResolution.y, GraphicsFormat.R8_UNorm, false, settings.DetailNoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
+            noiseTexture = renderGraph.GetTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, GraphicsFormat.R8_UNorm, settings.NoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
+            detailNoiseTexture = renderGraph.GetTexture(settings.DetailNoiseResolution.x, settings.DetailNoiseResolution.y, GraphicsFormat.R8_UNorm, settings.DetailNoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
         }
 
         public CloudData SetupData()
