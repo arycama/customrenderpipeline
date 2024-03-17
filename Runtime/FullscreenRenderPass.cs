@@ -5,7 +5,7 @@ namespace Arycama.CustomRenderPipeline
 {
     public class FullscreenRenderPass : GraphicsRenderPass
     {
-        private readonly MaterialPropertyBlock propertyBlock;
+        public readonly MaterialPropertyBlock propertyBlock;
         private Material material;
         private int passIndex;
         private int primitiveCount;
@@ -56,7 +56,6 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Execute(CommandBuffer command)
         {
-            LocalKeyword keyword = default;
             if (!string.IsNullOrEmpty(Keyword))
             {
                 //keyword = new LocalKeyword(material.shader, Keyword);
@@ -74,6 +73,7 @@ namespace Arycama.CustomRenderPipeline
             material = null;
             passIndex = 0;
             primitiveCount = 1;
+            propertyBlock.Clear();
         }
 
         public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)

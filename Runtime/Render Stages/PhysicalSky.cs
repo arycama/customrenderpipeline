@@ -137,19 +137,7 @@ namespace Arycama.CustomRenderPipeline
 
         public LookupTableResult GenerateLookupTables()
         {
-            var atmospherePropertiesBuffer = renderGraph.GetBuffer(1, UnsafeUtility.SizeOf<AtmosphereProperties>(), GraphicsBuffer.Target.Constant);
-
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Set Atmosphere Properties"))
-            {
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
-                {
-                    var bufferData = ArrayPool<AtmosphereProperties>.Get(1);
-                    bufferData[0] = new AtmosphereProperties(settings);
-                    command.SetBufferData(atmospherePropertiesBuffer, bufferData);
-                    ArrayPool<AtmosphereProperties>.Release(bufferData);
-                });
-            }
-
+            var atmospherePropertiesBuffer = renderGraph.SetConstantBuffer(new AtmosphereProperties(settings));
             var transmittanceRemap = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
             var multiScatterRemap = GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight);
             var groundAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientGroundWidth);
@@ -383,7 +371,7 @@ namespace Arycama.CustomRenderPipeline
             return new Result(ambientBuffer, reflectionProbe, lookupTableResult);
         }
 
-        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, LightingSetup.Result lightingSetupResult, PhysicalSky.Result atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, VolumetricClouds.CloudShadowData cloudShadowData, Camera camera, CullingResults cullingResults, PhysicalSky.LookupTableResult lookupData, RTHandle velocity)
+        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, LightingSetup.Result lightingSetupResult, PhysicalSky.Result atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, VolumetricClouds.CloudShadowDataResult cloudShadowData, Camera camera, CullingResults cullingResults, PhysicalSky.LookupTableResult lookupData, RTHandle velocity)
         {
             var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 

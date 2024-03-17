@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
@@ -436,6 +437,33 @@ namespace Arycama.CustomRenderPipeline
 
                 disposedValue = true;
             }
+        }
+
+        public BufferHandle SetConstantBuffer<T>(T data) where T : struct
+        {
+            var buffer = GetBuffer(1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant);
+
+            using (var pass = AddRenderPass<GlobalRenderPass>("Set Constant Buffer"))
+            {
+                var passData = pass.SetRenderFunction<ConstantBufferPassData<T>>((command, context, pass, data) =>
+                {
+                    var bufferData = ArrayPool<T>.Get(1);
+                    bufferData[0] = data.data;
+                    command.SetBufferData(data.buffer, bufferData);
+                    ArrayPool<T>.Release(bufferData);
+                });
+
+                passData.data = data;
+                passData.buffer = buffer;
+            }
+
+            return buffer;
+        }
+
+        class ConstantBufferPassData<T>
+        {
+            public T data;
+            public BufferHandle buffer;
         }
 
         ~RenderGraph()

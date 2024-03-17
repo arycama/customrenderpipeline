@@ -52,10 +52,6 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Range(-1.0f, 1.0f)] public float ForwardScatterPhase { get; private set; } = 0.8f;
             [field: SerializeField, Range(0.0f, 10.0f)] public float ForwardScatterScale { get; private set; } = 1.0f;
 
-            [field: SerializeField, Range(0.0f, 1.0f)] public float ScatterBlend { get; private set; } = 0.5f;
-
-            [field: SerializeField, Range(-1.0f, 1.0f)] public float Phase { get; private set; } = 0.8f;
-            [field: SerializeField] public int MultiSamples { get; private set; } = 5;
 
             [field: Header("Temporal")]
             [field: SerializeField, Range(0.0f, 1.0f)] public float StationaryBlend { get; private set; } = 0.95f;
@@ -95,10 +91,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "_ForwardScatterPhase", ForwardScatterPhase);
                 pass.SetFloat(command, "_BackScatterScale", BackScatterScale);
                 pass.SetFloat(command, "_ForwardScatterScale", ForwardScatterScale);
-                pass.SetFloat(command, "_ScatterBlend", ScatterBlend);
-
-                pass.SetFloat(command, "_MultiSamples", MultiSamples);
-                pass.SetFloat(command, "_Phase", Phase);
             }
         }
 
@@ -187,7 +179,7 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        public CloudShadowData RenderShadow(CullingResults cullingResults, Camera camera, CloudData cloudRenderData, IRenderPassData commonPassData, float planetRadius)
+        public CloudShadowDataResult RenderShadow(CullingResults cullingResults, Camera camera, CloudData cloudRenderData, IRenderPassData commonPassData, float planetRadius)
         {
             var lightDirection = Vector3.up;
             var lightRotation = Quaternion.LookRotation(Vector3.down);
@@ -264,10 +256,15 @@ namespace Arycama.CustomRenderPipeline
             var worldToShadow = projectionMatrix * viewMatrix;
 
             var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32);
+
+            var cloudShadowData = new CloudShadowData(invViewProjection, -lightDirection, 1f / depth, 1f / settings.Density, settings.ShadowSamples, 0.0f, 0.0f);
+            var cloudShadowDataBuffer = renderGraph.SetConstantBuffer(cloudShadowData);
+
             using(var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Cloud Shadow"))
             {
                 pass.Initialize(material, 3);
                 pass.WriteTexture(cloudShadow, RenderBufferLoadAction.DontCare);
+                pass.ReadBuffer("CloudShadowData", cloudShadowDataBuffer);
                 cloudRenderData.SetInputs(pass);
                 commonPassData.SetInputs(pass);
 
@@ -275,31 +272,32 @@ namespace Arycama.CustomRenderPipeline
                 {
                     settings.SetCloudPassData(command, pass);
 
-                    pass.SetFloat(command, "_CloudDepthScale", 1f / depth);
-                    pass.SetMatrix(command, "_CloudShadowToWorld", invViewProjection);
-                    pass.SetMatrix(command, "_WorldToCloudShadow", worldToShadow);
-                    pass.SetFloat(command, "_CloudDepthInvScale", depth);
-                    pass.SetVector(command, "_LightDirection0", -lightDirection);
-                    pass.SetFloat(command, "_Samples", settings.ShadowSamples);
-                    pass.SetVector(command, "_ViewPosition", cameraPosition);
+                    //pass.SetMatrix(command, "_CloudShadowToWorld", invViewProjection);
+                    //pass.SetVector(command, "_CloudShadowViewDirection", -lightDirection);
+
+                    //pass.SetFloat(command, "_CloudShadowDepthScale", 1f / depth);
+                    //pass.SetFloat(command, "_CloudShadowExtinctionScale", 1f / settings.Density);
+                    //pass.SetFloat(command, "_ShadowSamples", settings.ShadowSamples);
+
                     commonPassData.SetProperties(pass, command);
                 });
             }
 
-            return new CloudShadowData(cloudShadow, depth, worldToShadow);
+            return new CloudShadowDataResult(cloudShadow, depth, worldToShadow, settings.Density);
         }
 
-        public struct CloudShadowData : IRenderPassData
+        public struct CloudShadowDataResult : IRenderPassData
         {
             private readonly RTHandle cloudShadow;
-            private readonly float cloudDepthInvScale;
+            private readonly float cloudDepthInvScale, cloudShadowExtinctionInvScale;
             private Matrix4x4 worldToCloudShadow;
 
-            public CloudShadowData(RTHandle cloudShadow, float cloudDepthInvScale, Matrix4x4 worldToCloudShadow)
+            public CloudShadowDataResult(RTHandle cloudShadow, float cloudDepthInvScale, Matrix4x4 worldToCloudShadow, float cloudShadowExtinctionInvScale)
             {
                 this.cloudShadow = cloudShadow;
                 this.cloudDepthInvScale = cloudDepthInvScale;
                 this.worldToCloudShadow = worldToCloudShadow;
+                this.cloudShadowExtinctionInvScale = cloudShadowExtinctionInvScale;
             }
 
             public void SetInputs(RenderPass pass)
@@ -309,12 +307,13 @@ namespace Arycama.CustomRenderPipeline
 
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetFloat(command, "_CloudDepthInvScale", cloudDepthInvScale);
+                pass.SetFloat(command, "_CloudShadowDepthInvScale", cloudDepthInvScale);
+                pass.SetFloat(command, "_CloudShadowExtinctionInvScale", cloudShadowExtinctionInvScale);
                 pass.SetMatrix(command, "_WorldToCloudShadow", worldToCloudShadow);
             }
         }
 
-        public RTHandle Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, out RTHandle cloudDepth, CullingResults cullingResults, VolumetricClouds.CloudData cloudRenderData, VolumetricClouds.CloudShadowData cloudShadow, RTHandle cameraTarget, RTHandle velocity)
+        public RTHandle Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, out RTHandle cloudDepth, CullingResults cullingResults, VolumetricClouds.CloudData cloudRenderData, VolumetricClouds.CloudShadowDataResult cloudShadow, RTHandle cameraTarget, RTHandle velocity)
         {
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -455,5 +454,27 @@ namespace Arycama.CustomRenderPipeline
             {
             }
         }
+    }
+}
+
+struct CloudShadowData
+{
+    private Matrix4x4 invViewProjection;
+    private Vector3 vector3;
+    private float v1;
+    private float v2;
+    private float shadowSamples;
+    private float v3;
+    private float v4;
+
+    public CloudShadowData(Matrix4x4 invViewProjection, Vector3 vector3, float v1, float v2, float shadowSamples, float v3, float v4)
+    {
+        this.invViewProjection = invViewProjection;
+        this.vector3 = vector3;
+        this.v1 = v1;
+        this.v2 = v2;
+        this.shadowSamples = shadowSamples;
+        this.v3 = v3;
+        this.v4 = v4;
     }
 }
