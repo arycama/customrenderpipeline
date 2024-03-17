@@ -208,7 +208,7 @@ float3 TransmittanceToBottomAtmosphereBoundary(float height, float cosAngle, flo
 	float3 maxTransmittance = AtmosphereTransmittance(height, -cosAngle);
 	float groundCosAngle = CosAngleAtDistance(height, cosAngle, maxDist, _PlanetRadius);
 	float3 groundTransmittance = AtmosphereTransmittance(_PlanetRadius, -groundCosAngle);
-	return groundTransmittance * rcp(maxTransmittance);
+	return maxTransmittance ? groundTransmittance * rcp(maxTransmittance) : 0.0;
 } 
 
 float3 TransmittanceToNearestAtmosphereBoundary(float height, float cosAngle, float maxDist, bool rayIntersectsGround)

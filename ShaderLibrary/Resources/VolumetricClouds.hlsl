@@ -86,7 +86,7 @@ FragmentOutput Fragment(float4 position : SV_Position)
 	
 	#ifdef CLOUD_SHADOW
 		float totalRayLength = rayEnd - cloudDepth;
-		output.result = float3(cloudDepth * _CloudShadowDepthScale, -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale, result.a);
+		output.result = float3(cloudDepth * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a);
 	#else
 		output.result = result;
 		output.depth = cloudDepth;

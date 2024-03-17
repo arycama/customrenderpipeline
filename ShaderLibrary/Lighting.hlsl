@@ -253,7 +253,7 @@ float GGXDiffuse(float NdotL, float NdotV, float perceptualRoughness, float3 f0)
 	float Ewi = DirectionalAlbedoMs(NdotL, perceptualRoughness, f0);
 	float Ewo = DirectionalAlbedoMs(NdotV, perceptualRoughness, f0);
 	float Eavg = AverageAlbedoMs(perceptualRoughness, f0);
-	return RcpPi * (1.0 - Ewo) * (1.0 - Ewi) * rcp(1.0 - Eavg);
+	return (1.0 - Eavg) ? RcpPi * (1.0 - Ewo) * (1.0 - Ewi) * rcp(1.0 - Eavg) : 0.0;
 }
 
 float3 GGXMultiScatter(float NdotV, float NdotL, float perceptualRoughness, float3 f0)
@@ -347,8 +347,6 @@ float PerceptualRoughnessToMipmapLevel(float perceptualRoughness)
 // TODO: optimize!
 float PerceptualRoughnessToMipmapLevel(float perceptualRoughness, float NdotR)
 {
-	return PerceptualRoughnessToMipmapLevel(perceptualRoughness);
-	
 	float m = PerceptualRoughnessToRoughness(perceptualRoughness);
 
     // Remap to spec power. See eq. 21 in --> https://dl.dropboxusercontent.com/u/55891920/papers/mm_brdf.pdf
@@ -467,7 +465,8 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	
 	float3 R = reflect(-V, input.normal);
 	float3 iblR = GetSpecularDominantDir(input.normal, R, input.perceptualRoughness, NdotV);
-	float iblMipLevel = PerceptualRoughnessToMipmapLevel(input.perceptualRoughness);
+	float NdotR = dot(input.normal, iblR);
+	float iblMipLevel = PerceptualRoughnessToMipmapLevel(input.perceptualRoughness, NdotR);
 	
 	float3 radiance = _SkyReflection.SampleLevel(_TrilinearClampSampler, iblR, iblMipLevel);
 	float3 irradiance = ambient;

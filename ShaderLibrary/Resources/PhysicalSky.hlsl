@@ -161,7 +161,6 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 	
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
 	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, rd.y);
-	float3 maxTransmittance = TransmittanceToNearestAtmosphereBoundary(viewHeight, rd.y);
 	
 	float2 offsets = _BlueNoise2D[position.xy % 128];
 	float3 colorMask = floor(offsets.y * 3.0) == float3(0.0, 1.0, 2.0);
@@ -205,6 +204,8 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 	#endif
 	
 	rayLength = lerp(cloudDistance, rayLength, clouds.a);
+	
+	float3 maxTransmittance = TransmittanceToNearestAtmosphereBoundary(viewHeight, rd.y);
 	float3 transmittanceAtDistance = TransmittanceToPoint(viewHeight, rd.y, rayLength);
 	scale = dot(colorMask, (1.0 - transmittanceAtDistance) / (1.0 - maxTransmittance));
 	maxTransmittance = transmittanceAtDistance;
@@ -234,20 +235,20 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 				float3 lightTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
 				if (any(lightTransmittance))
 				{
-					float cloudShadow = CloudTransmittance(rd * currentDistance);
-					if(cloudShadow)
-					{
-						#ifdef REFLECTION_PROBE
-							lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * _Exposure * cloudShadow;
-						#else
+					#ifdef REFLECTION_PROBE
+						lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * _Exposure;// * cloudShadow;
+					#else
+						float cloudShadow = CloudTransmittance(rd * currentDistance);
+						if(cloudShadow)
+						{
 							float shadow = GetShadow(rd * currentDistance, j, false);
 							if (shadow)
 							{
 								float cloudShadow = CloudTransmittance(rd * currentDistance);
 								lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * _Exposure * shadow * cloudShadow;
 							}
-						#endif
-					}
+						}
+					#endif
 				}
 			}
 				
@@ -285,8 +286,10 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			float3 ambient = GetGroundAmbient(lightCosAngleAtMaxDistance);
 			float3 transmittanceAtMaxDistance = TransmittanceToNearestAtmosphereBoundary(viewHeight, rd.y);
 			
-			float cloudShadow = CloudTransmittance(rd * maxRayLength);
-			sunTransmittanceAtMaxDistance *= cloudShadow;
+			#ifndef REFLECTION_PROBE
+				float cloudShadow = CloudTransmittance(rd * maxRayLength);
+				sunTransmittanceAtMaxDistance *= cloudShadow;
+			#endif
 			
 			float3 surface = (ambient + sunTransmittanceAtMaxDistance * saturate(lightCosAngleAtMaxDistance) * RcpPi) * light.color * _Exposure * _GroundColor * transmittanceAtMaxDistance;
 			
@@ -297,7 +300,7 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		}
 	}
 	
-	return luminance;
+	return IsInfOrNaN(luminance) ? 0.0 : luminance;
 }
 
 float4 _SkyInput_Scale, _SkyDepth_Scale, _PreviousDepth_Scale, _FrameCount_Scale, _SkyHistory_Scale;

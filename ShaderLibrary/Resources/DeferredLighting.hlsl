@@ -11,7 +11,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
 	
 	LightingInput lightingInput;
-	lightingInput.normal = normalize(2.0 * normalRoughness.rgb - 1.0);
+	lightingInput.normal = UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(normalRoughness.xyz) - 1.0);
 	lightingInput.worldPosition = PixelToWorld(float3(position.xy, depth));
 	lightingInput.pixelPosition = position.xy;
 	lightingInput.eyeDepth = LinearEyeDepth(depth);

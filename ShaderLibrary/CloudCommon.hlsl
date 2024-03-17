@@ -116,7 +116,8 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 	float4 result = float2(light0, transmittance).xxxy;
 	if (result.a < 1.0)
 	{
-		result.a = saturate(Remap(result.a, _TransmittanceThreshold));
+		if(!isShadow)
+			result.a = saturate(Remap(result.a, _TransmittanceThreshold));
 	
 			// Final lighting
 		float heightAtDistance = HeightAtDistance(viewHeight, cosViewAngle, cloudDepth);
