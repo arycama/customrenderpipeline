@@ -35,6 +35,7 @@ namespace Arycama.CustomRenderPipeline
                 clusteredLightCullingResult.SetInputs(pass);
                 lightingSetupResult.SetInputs(pass);
                 commonData.SetInputs(pass);
+                pass.ReadBuffer("Exposure", exposureBuffer);
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
@@ -54,8 +55,6 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetTexture(command, "_BlueNoise1D", data.blueNoise1D);
                     pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2D);
-
-                    pass.SetConstantBuffer(command, "Exposure", data.exposureBuffer);
 
                     pass.SetVector(command, "_FogColor", data.fogColor);
                     pass.SetFloat(command, "_FogStartDistance", data.fogStartDistance);

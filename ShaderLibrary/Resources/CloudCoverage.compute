@@ -1,0 +1,40 @@
+#include "../Common.hlsl"
+#include "../Atmosphere.hlsl"
+#include "../Lighting.hlsl"
+#include "../CloudCommon.hlsl"
+
+#pragma kernel CSMain
+
+RWBuffer<float4> _Result;
+
+static const uint _ThreadCount = 1024;
+
+groupshared float4 _SharedLuminanceExtinction[_ThreadCount];
+
+[numthreads(_ThreadCount, 1, 1)]
+void CSMain (uint groupIndex : SV_GroupIndex)
+{
+	float2 u = Hammersley2dSeq(groupIndex, _ThreadCount);
+	float3 V = SampleHemisphereUniform(u.x, u.y).xzy;
+	//float3 V = SampleHemisphereCosine(u.x, u.y).xzy;
+	
+	float rayStart = DistanceToSphereInside(_PlanetRadius, V.y, _PlanetRadius + _StartHeight);
+	float rayEnd = DistanceToSphereInside(_PlanetRadius, V.y, _PlanetRadius + _StartHeight + _LayerThickness);
+	
+	float cloudDistance = 0;
+	float4 clouds = EvaluateCloud(rayStart, rayEnd - rayStart, 8, V, _PlanetRadius, V.y, 0.5, float3(0.0, -_ViewPosition.y, 0.0), false, cloudDistance);
+	
+	_SharedLuminanceExtinction[groupIndex] = clouds;
+	
+	[unroll]
+	for (uint s = _ThreadCount >> 1; s > 0; s >>= 1)
+	{
+		GroupMemoryBarrierWithGroupSync();
+		
+		if (groupIndex < s)
+			_SharedLuminanceExtinction[groupIndex] = _SharedLuminanceExtinction[groupIndex] + _SharedLuminanceExtinction[groupIndex + s];
+	}
+	
+	if (!groupIndex)
+		_Result[0] = _SharedLuminanceExtinction[0] * TwoPi * rcp(_ThreadCount);
+}

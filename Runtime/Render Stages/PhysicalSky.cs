@@ -51,6 +51,7 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public Vector3 OzoneAbsorption { get; private set; } = new Vector3(0.65e-6f, 1.881e-6f, 0.085e-6f);
             [field: SerializeField] public float OzoneWidth { get; private set; } = 15000.0f;
             [field: SerializeField] public float OzoneHeight { get; private set; } = 25000.0f;
+            [field: SerializeField] public float CloudScatter { get; private set; } = 3.996e-6f;
             [field: SerializeField] public float PlanetRadius { get; private set; } = 6360000.0f;
             [field: SerializeField] public float AtmosphereHeight { get; private set; } = 100000.0f;
             [field: SerializeField] public Color GroundColor { get; private set; } = Color.grey;
@@ -103,7 +104,7 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Min(0.0f)] public float SpatialDepthFactor { get; private set; } = 0.1f;
             [field: SerializeField, Min(0.0f)] public float SpatialBlurSigma { get; private set; } = 0.1f;
             [field: SerializeField, Range(0, 32)] public int SpatialBlurFrames { get; private set; } = 8;
-
+            [field: SerializeField] public Texture2D miePhase;
             [field: NonSerialized] public int Version { get; private set; }
         }
 
@@ -127,7 +128,7 @@ namespace Arycama.CustomRenderPipeline
             depthCache = new(GraphicsFormat.R32_SFloat, renderGraph, "Physical Sky Depth");
             frameCountCache = new(GraphicsFormat.R8_UNorm, renderGraph, "Physical Sky Frame Count");
 
-            transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
+            transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.R16G16B16A16_SFloat, isPersistent: true);
             weightedDepth = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.R32_SFloat, isPersistent: true);
             cdf = renderGraph.GetTexture(settings.CdfWidth, settings.CdfHeight, GraphicsFormat.R32_SFloat, dimension: TextureDimension.Tex3D, volumeDepth: settings.CdfDepth, isPersistent: true);
             multiScatter = renderGraph.GetTexture(settings.MultiScatterWidth, settings.MultiScatterHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
@@ -160,6 +161,8 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
+                    command.SetGlobalTexture("_MiePhaseTexture", settings.miePhase);
+
                     result.SetProperties(pass, command);
                     pass.SetFloat(command, "_Samples", settings.TransmittanceSamples);
                     pass.SetVector(command, "_ScaleOffset", new Vector4(1.0f / (settings.TransmittanceWidth - 1.0f), 1.0f / (settings.TransmittanceHeight - 1.0f), -0.5f / (settings.TransmittanceWidth - 1.0f), -0.5f / (settings.TransmittanceHeight - 1.0f)));
@@ -295,6 +298,7 @@ namespace Arycama.CustomRenderPipeline
 
                 cloudRenderData.SetInputs(pass);
                 cloudShadowResult.SetInputs(pass);
+                pass.ReadBuffer("Exposure", exposureBuffer);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -306,7 +310,6 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetFloat(command, "_Samples", settings.ReflectionSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
-                    pass.SetConstantBuffer(command, "Exposure", exposureBuffer);
                     lookupTableResult.SetProperties(pass, command);
 
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
@@ -470,6 +473,7 @@ namespace Arycama.CustomRenderPipeline
                 commonPassData.SetInputs(pass);
                 cloudShadowData.SetInputs(pass);
                 lookupData.SetInputs(pass);
+                pass.ReadBuffer("Exposure", exposureBuffer);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -477,7 +481,6 @@ namespace Arycama.CustomRenderPipeline
                     atmosphereData.SetProperties(pass, command);
 
                     pass.SetFloat(command, "_Samples", settings.RenderSamples);
-                    pass.SetConstantBuffer(command, "Exposure", exposureBuffer);
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
 
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
@@ -676,7 +679,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly float planetRadius;
         private readonly float atmosphereHeight;
         private readonly float topRadius;
-        private readonly float padding;
+        private readonly float cloudScatter;
 
         public AtmosphereProperties(PhysicalSky.Settings settings)
         {
@@ -697,7 +700,7 @@ namespace Arycama.CustomRenderPipeline
             planetRadius = settings.PlanetRadius * settings.EarthScale;
             atmosphereHeight = settings.AtmosphereHeight * settings.EarthScale;
             topRadius = (settings.PlanetRadius + settings.AtmosphereHeight) * settings.EarthScale;
-            padding = 0f;
+            cloudScatter = settings.CloudScatter;
         }
     }
 }

@@ -99,6 +99,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly PersistentRTHandleCache textureCache;
         private int version = -1;
         private readonly RTHandle weatherMap, noiseTexture, detailNoiseTexture;
+        private readonly ComputeShader cloudCoverageComputeShader;
 
         public VolumetricClouds(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
@@ -109,6 +110,8 @@ namespace Arycama.CustomRenderPipeline
             weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, GraphicsFormat.R8_UNorm, isPersistent: true);
             noiseTexture = renderGraph.GetTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, GraphicsFormat.R8_UNorm, settings.NoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
             detailNoiseTexture = renderGraph.GetTexture(settings.DetailNoiseResolution.x, settings.DetailNoiseResolution.y, GraphicsFormat.R8_UNorm, settings.DetailNoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
+
+            cloudCoverageComputeShader = Resources.Load<ComputeShader>("CloudCoverage");
         }
 
         public CloudData SetupData()
@@ -179,7 +182,7 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        public CloudShadowDataResult RenderShadow(CullingResults cullingResults, Camera camera, CloudData cloudRenderData, float planetRadius)
+        public CloudShadowDataResult RenderShadow(CullingResults cullingResults, Camera camera, CloudData cloudRenderData, float planetRadius, PhysicalSky.LookupTableResult physicalSkyTables, BufferHandle exposureBuffer)
         {
             var lightDirection = Vector3.up;
             var lightRotation = Quaternion.LookRotation(Vector3.down);
@@ -274,33 +277,115 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            return new CloudShadowDataResult(cloudShadow, depth, worldToShadow, settings.Density);
+            // Cloud coverage
+            var cloudCoverageBufferTemp = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
+            var cloudCoverageBuffer = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
+
+            var result = new CloudShadowDataResult(cloudShadow, depth, worldToShadow, settings.Density, cloudCoverageBuffer, planetRadius, planetRadius + settings.StartHeight + settings.LayerThickness);
+
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Cloud Coverage"))
+            {
+                Color lightColor0 = Color.clear, lightColor1 = Color.clear;
+                Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
+
+                // Find first 2 directional lights
+                var dirLightCount = 0;
+                for (var i = 0; i < cullingResults.visibleLights.Length; i++)
+                {
+                    var light = cullingResults.visibleLights[i];
+                    if (light.lightType != LightType.Directional)
+                        continue;
+
+                    dirLightCount++;
+
+                    if (dirLightCount == 1)
+                    {
+                        lightDirection0 = -light.localToWorldMatrix.Forward();
+                        lightColor0 = light.finalColor;
+                    }
+                    else if (dirLightCount == 2)
+                    {
+                        lightDirection1 = -light.localToWorldMatrix.Forward();
+                        lightColor1 = light.finalColor;
+
+                        // Only 2 lights supported
+                        break;
+                    }
+                }
+
+                pass.Initialize(cloudCoverageComputeShader, 0, 1);
+
+                cloudRenderData.SetInputs(pass);
+                result.SetInputs(pass);
+                physicalSkyTables.SetInputs(pass);
+                pass.WriteBuffer("_Result", cloudCoverageBufferTemp);
+                pass.ReadBuffer("Exposure", exposureBuffer);
+
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    settings.SetCloudPassData(command, pass);
+
+                    pass.SetVector(command, "_LightDirection0", lightDirection0);
+                    pass.SetVector(command, "_LightColor0", lightColor0);
+                    pass.SetVector(command, "_LightDirection1", lightDirection1);
+                    pass.SetVector(command, "_LightColor1", lightColor1);
+
+                    result.SetProperties(pass, command);
+                    cloudRenderData.SetProperties(pass, command);
+                    physicalSkyTables.SetProperties(pass, command);
+
+                    pass.SetVector(command, "_ViewPosition", camera.transform.position);
+                });
+            }
+
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Atmosphere Ambient Probe Copy"))
+            {
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    command.CopyBuffer(cloudCoverageBufferTemp, cloudCoverageBuffer);
+                });
+            }
+
+            return result;
         }
 
-        public struct CloudShadowDataResult : IRenderPassData
+        public readonly struct CloudShadowDataResult : IRenderPassData
         {
             private readonly RTHandle cloudShadow;
             private readonly float cloudDepthInvScale, cloudShadowExtinctionInvScale;
-            private Matrix4x4 worldToCloudShadow;
+            private readonly Matrix4x4 worldToCloudShadow;
+            private readonly BufferHandle cloudCoverageBuffer;
+            private readonly float startHeight, endHeight;
 
-            public CloudShadowDataResult(RTHandle cloudShadow, float cloudDepthInvScale, Matrix4x4 worldToCloudShadow, float cloudShadowExtinctionInvScale)
+            public CloudShadowDataResult(RTHandle cloudShadow, float cloudDepthInvScale, Matrix4x4 worldToCloudShadow, float cloudShadowExtinctionInvScale, BufferHandle cloudCoverageBuffer, float startHeight, float endHeight)
             {
                 this.cloudShadow = cloudShadow;
                 this.cloudDepthInvScale = cloudDepthInvScale;
                 this.worldToCloudShadow = worldToCloudShadow;
                 this.cloudShadowExtinctionInvScale = cloudShadowExtinctionInvScale;
+                this.cloudCoverageBuffer = cloudCoverageBuffer;
+                this.startHeight = startHeight;
+                this.endHeight = endHeight;
             }
 
             public void SetInputs(RenderPass pass)
             {
                 pass.ReadTexture("_CloudShadow", cloudShadow);
+                pass.ReadBuffer("CloudCoverage", cloudCoverageBuffer);
             }
 
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
+                pass.SetMatrix(command, "_WorldToCloudShadow", worldToCloudShadow);
                 pass.SetFloat(command, "_CloudShadowDepthInvScale", cloudDepthInvScale);
                 pass.SetFloat(command, "_CloudShadowExtinctionInvScale", cloudShadowExtinctionInvScale);
-                pass.SetMatrix(command, "_WorldToCloudShadow", worldToCloudShadow);
+                pass.SetFloat(command, "_CloudCoverageStart", cloudShadowExtinctionInvScale);
+                pass.SetFloat(command, "_CloudShadowExtinctionInvScale", cloudShadowExtinctionInvScale);
+
+                var cloudCoverageScale = 1.0f / (startHeight - endHeight);
+                var cloudCoverageOffset = -endHeight / (startHeight - endHeight);
+                pass.SetFloat(command, "_CloudCoverageScale", cloudCoverageScale);
+                pass.SetFloat(command, "_CloudCoverageOffset", cloudCoverageOffset);
             }
         }
 

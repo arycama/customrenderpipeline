@@ -14,6 +14,16 @@ float _ColorChannelScale;
 Texture2D<float4> _Clouds;
 float3 _CdfSize;
 
+float3 F(float viewHeight, float cosAngle, float distance)
+{
+	float heightAtDistance = HeightAtDistance(viewHeight, cosAngle, distance);
+		
+	float3 extinction = AtmosphereExtinction(heightAtDistance);
+	float3 transmittance = TransmittanceToPoint(viewHeight, cosAngle, distance);
+		
+	return 1.0 - transmittance;
+}
+
 float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	float3 uv = float3(position.xy, index + 0.5) / _CdfSize; // * _Scale + _Offset;
@@ -46,33 +56,36 @@ float3 FragmentCdfLookup(float4 position : SV_Position, uint index : SV_RenderTa
 	float xi = GetUnitRangeFromTextureCoord(uv.z, _CdfSize.z);
 	
 	// Get max transmittance. This tells us the max opacity we can achieve, then we can build a LUT that maps from an 0:1 number a distance corresponding to opacity
-	float3 maxTransmittance = TransmittanceToNearestAtmosphereBoundary(viewHeight, cosAngle);
+	float3 maxTransmittance = TransmittanceToNearestAtmosphereBoundary(viewHeight, cosAngle, maxDist, rayIntersectsGround);
 	float3 opacity = xi * (1.0 - maxTransmittance);
-	
-	// Brute force linear search
-	float t = 0; //xi;
-	float minDist = FloatMax;
 	
 	float dx = maxDist / _Samples;
 	
-	float3 transmittance = 1.0;
-	for (float i = 0.5; i < _Samples; i++)
+	float a = 0.0;
+	float b = maxDist;
+	float c;
+	
+	//for (float i = 0.0; i < _Samples; i++)
+	while((b - a) >= 1.5e-1)
 	{
-		float distance = i / _Samples * maxDist;
-		float heightAtDistance = HeightAtDistance(viewHeight, cosAngle, distance);
+		c = (a + b) * 0.5;
+		float fc = dot(colorMask, F(viewHeight, cosAngle, c)) - opacity;
 		
-		float3 extinction = AtmosphereExtinction(heightAtDistance);
-		transmittance *= exp(-extinction * dx);
+		if(fc == 0.0)
+			break;
 		
-		float delta = dot(colorMask, abs((1.0 - transmittance) - opacity));
-		if (delta < minDist)
+		float fa = dot(colorMask, F(viewHeight, cosAngle, a)) - opacity;
+		if (sign(fc) == sign(fa))
 		{
-			t = distance;
-			minDist = delta;
+			a = c;
+		}
+		else
+		{
+			b = c;
 		}
 	}
 	
-	return t;
+	return c;
 }
 
 struct FragmentTransmittanceOutput
@@ -101,22 +114,44 @@ FragmentTransmittanceOutput FragmentTransmittanceLut(float4 position : SV_Positi
 	float cosAngle = d ? (Sq(H) - Sq(rho) - Sq(d)) / (2.0 * viewHeight * d) : 1.0;
 	float dx = d / _Samples;
 
-	float3 transmittance = 1.0, transmittanceSum = 0.0;
-	float3 weightedDepthSum = 0.0;
-	for (float i = 0.5; i < _Samples; i++)
-	{
-		float currentDistance = i * dx;
-		float height = HeightAtDistance(viewHeight, cosAngle, currentDistance);
-		transmittance *= exp(-AtmosphereExtinction(height) * dx);
-		transmittanceSum += transmittance;
-		weightedDepthSum += currentDistance * transmittance;
-	}
+	#if 1
+		float3 opticalDepth = 0.0, transmittanceSum = 0.0;
+		float3 weightedDepthSum = 0.0;
+		for (float i = 0.0; i <= _Samples; i++)
+		{
+			float currentDistance = i * dx;
+			float height = HeightAtDistance(viewHeight, cosAngle, currentDistance);
+			float weight = (i > 0.0 && i < _Samples) ? 1.0 : 0.5;
+			opticalDepth += AtmosphereExtinction(height) * dx * weight;
+		
+			float3 transmittance = exp(-opticalDepth);
+			transmittanceSum += transmittance;
+			weightedDepthSum += currentDistance * transmittance;
+		}
 	
-	weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
+		weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
+		float3 transmittance = exp(-opticalDepth);
 	
-	FragmentTransmittanceOutput output;
-	output.transmittance = transmittance;
+		FragmentTransmittanceOutput output;
+		output.transmittance = saturate(transmittance) * HalfMax;
+	#else
+		float3 transmittance = 1.0, transmittanceSum = 0.0;
+		float3 weightedDepthSum = 0.0;
+		for (float i = 0.5; i < _Samples; i++)
+		{
+			float currentDistance = i * dx;
+			float height = HeightAtDistance(viewHeight, cosAngle, currentDistance);
+			transmittance *= exp(-AtmosphereExtinction(height) * dx);
+			transmittanceSum += transmittance;
+			weightedDepthSum += currentDistance * transmittance;
+		}
 	
+		weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
+	
+		FragmentTransmittanceOutput output;
+		output.transmittance = transmittance * HalfMax;
+	#endif
+
 	// Store greyscale depth, weighted by transmittance
 	output.weightedDepth = dot(weightedDepthSum / d, transmittance) / dot(transmittance, 1.0);
 	return output;
@@ -186,7 +221,7 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		#endif
 	
 		float cloudDistance = 0;
-		float4 clouds = evaluateCloud ? EvaluateCloud(rayStart, rayEnd - rayStart, 12, rd, viewHeight, rd.y, offsets, 0.0, false, cloudDistance) : float2(0.0, 1.0).xxxy;
+		float4 clouds = evaluateCloud ? EvaluateCloud(rayStart, rayEnd - rayStart, 8, rd, viewHeight, rd.y, offsets, 0.0, false, cloudDistance) : float2(0.0, 1.0).xxxy;
 		luminance += clouds.rgb;
 	#else
 		float4 clouds = _Clouds[position.xy];
@@ -235,26 +270,30 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 				float3 lightTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
 				if (any(lightTransmittance))
 				{
-					#ifdef REFLECTION_PROBE
-						lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * _Exposure;// * cloudShadow;
-					#else
-						float cloudShadow = CloudTransmittance(rd * currentDistance);
-						if(cloudShadow)
-						{
+					float cloudShadow = CloudTransmittance(rd * currentDistance);
+					if(cloudShadow)
+					{
+						#ifdef REFLECTION_PROBE
+							lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * _Exposure * cloudShadow;
+						#else
 							float shadow = GetShadow(rd * currentDistance, j, false);
 							if (shadow)
 							{
-								float cloudShadow = CloudTransmittance(rd * currentDistance);
 								lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * light.color * _Exposure * shadow * cloudShadow;
 							}
-						}
-					#endif
+						#endif
+					}
 				}
 			}
-				
+
 			float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
 			float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
-			lighting += ms * (scatter.xyz + scatter.w) * light.color * _Exposure;
+			ms *= light.color * _Exposure;
+
+			// Apply cloud coverage only to multi scatter, since single scatter is already shadowed by clouds
+			float cloudFactor = saturate(heightAtDistance * _CloudCoverageScale + _CloudCoverageOffset);
+			ms = lerp(ms * _CloudCoverage.a, _CloudCoverage.rgb, cloudFactor);
+			lighting += ms * (scatter.xyz + scatter.w);
 		}
 		
 		float3 viewTransmittance = TransmittanceToPoint(viewHeight, rd.y, currentDistance);
@@ -292,6 +331,12 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 			#endif
 			
 			float3 surface = (ambient + sunTransmittanceAtMaxDistance * saturate(lightCosAngleAtMaxDistance) * RcpPi) * light.color * _Exposure * _GroundColor * transmittanceAtMaxDistance;
+			
+			float3 worldPos = rd * maxRayLength;
+			float3 N = normalize(worldPos - _PlanetCenter);
+			ambient = AmbientLight(N, 1.0, _GroundColor);
+			
+			//surface = (ambient + sunTransmittanceAtMaxDistance * saturate(lightCosAngleAtMaxDistance) * RcpPi * light.color * _Exposure) * _GroundColor * transmittanceAtMaxDistance;
 			
 			// Clouds block out surface
 			surface *= clouds.a;
@@ -388,7 +433,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 	float frameCount = _FrameCount.Sample(_LinearClampSampler, historyUv * _FrameCount_Scale.xy);
 	float depthFactor = saturate(1.0 - _DepthFactor * (sceneDepth - previousDepth) / sceneDepth);
 	
-	float3 history = _SkyHistory.Sample(_LinearClampSampler, historyUv * _SkyHistory_Scale.xy) * (_RcpPreviousExposure * _Exposure);
+	float3 history = _SkyHistory.Sample(_LinearClampSampler, historyUv * _SkyHistory_Scale.xy) * _PreviousToCurrentExposure;
 	history = RGBToYCoCg(history);
 	history *= rcp(1.0 + history.r);
 	

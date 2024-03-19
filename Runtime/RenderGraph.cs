@@ -383,7 +383,6 @@ namespace Arycama.CustomRenderPipeline
                 if (renderTexture.lastFrameUsed == FrameIndex)
                     continue;
 
-                Debug.Log($"Releasing {renderTexture.renderTexture.name}");
                 Object.DestroyImmediate(renderTexture.renderTexture);
 
                 // Fill this with a null, unavailable RT and add the index to a list

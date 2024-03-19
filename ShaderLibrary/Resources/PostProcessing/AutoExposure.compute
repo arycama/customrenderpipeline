@@ -96,9 +96,9 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	if (IsInfOrNaN(adaptedEv))
 		adaptedEv = 1.0;
 		
-	float4 finalExposure = EV100ToExposure(adaptedEv);
-	LuminanceOutput[0] = finalExposure;
-	LuminanceOutput[1] = rcp(finalExposure);
-	LuminanceOutput[2] = previousExposure;
-	LuminanceOutput[3] = rcp(previousExposure);
+	float4 currentExposure = EV100ToExposure(adaptedEv);
+	LuminanceOutput[0] = currentExposure; // Apply exposure
+	LuminanceOutput[1] = rcp(currentExposure); // Remove exposure
+	LuminanceOutput[2] = currentExposure * rcp(previousExposure); // Previous to current
+	LuminanceOutput[3] = previousExposure * rcp(currentExposure); // Current to previous
 }

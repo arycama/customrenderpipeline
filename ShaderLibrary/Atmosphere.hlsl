@@ -22,7 +22,7 @@ cbuffer AtmosphereProperties
 	float _PlanetRadius;
 	float _AtmosphereHeight;
 	float _TopRadius;
-	float _AtmospherePadding0;
+	float _CloudScatter;
 };
 
 Texture2D<float3> _Transmittance, _MultiScatter;
@@ -38,6 +38,7 @@ Texture3D<float> _SkyCdf;
 float3 _SkyCdfSize;
 
 Texture2D<float3> _AtmosphereDepth;
+Texture2D<float3> _MiePhaseTexture;
 
 float GetTextureCoordFromUnitRange(float x, float texture_size)
 {
@@ -103,11 +104,11 @@ float RayleighPhase(float cosAngle)
 	return 3.0 * (1.0 + Sq(cosAngle)) / (16.0 * Pi);
 }
 
-float MiePhase(float cosTheta, float g)
+float3 MiePhase(float cosTheta, float g)
 {
-	float denom = 1.0 + g * g + 2.0 * g * -cosTheta;
-	return RcpFourPi * (1.0 - g * g) / (denom * sqrt(denom));
-	//return (3.0 / (8.0 * Pi)) * ((((1.0 - Sq(g)) * (1.0 + Sq(cosTheta))) / ((2.0 + Sq(g)) * pow(1.0 + Sq(g) - 2.0 * g * cosTheta, 3.0 / 2.0))));
+	//float denom = 1.0 + g * g + 2.0 * g * -cosTheta;
+	//return RcpFourPi * (1.0 - g * g) / (denom * sqrt(denom));
+	return (3.0 / (8.0 * Pi)) * ((((1.0 - Sq(g)) * (1.0 + Sq(cosTheta))) / ((2.0 + Sq(g)) * pow(1.0 + Sq(g) - 2.0 * g * cosTheta, 3.0 / 2.0))));
 }
 
 float CornetteShanksPhasePartConstant(float anisotropy)
@@ -194,7 +195,7 @@ float2 AtmosphereTransmittanceUv(float height, float cosAngle)
 float3 AtmosphereTransmittance(float height, float cosAngle)
 {
 	float2 uv = AtmosphereTransmittanceUv(height, cosAngle);
-	return _Transmittance.SampleLevel(_LinearClampSampler, uv, 0.0);
+	return _Transmittance.SampleLevel(_LinearClampSampler, uv, 0.0) / HalfMax;
 }
 
 float3 AtmosphereDepth(float height, float cosAngle)
@@ -242,7 +243,7 @@ float3 TransmittanceToNearestAtmosphereBoundary(float height, float cosAngle)
 float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float cosAngle1)
 {
 	float3 lowTransmittance, highTransmittance;
-	if (radius0 > radius1)
+	if (cosAngle0 <= 0.0)
 	{
 		lowTransmittance = AtmosphereTransmittance(radius1, -cosAngle1);
 		highTransmittance = AtmosphereTransmittance(radius0, -cosAngle0);

@@ -26,6 +26,46 @@ float3 SampleSphereUniform(float u1, float u2)
 	return SphericalToCartesian(phi, cosTheta);
 }
 
+// Reference : http://www.cs.virginia.edu/~jdl/bib/globillum/mis/shirley96.pdf + PBRT
+
+// Performs uniform sampling of the unit disk.
+// Ref: PBRT v3, p. 777.
+float2 SampleDiskUniform(float u1, float u2)
+{
+	float r = sqrt(u1);
+	float phi = TwoPi * u2;
+
+	float sinPhi, cosPhi;
+	sincos(phi, sinPhi, cosPhi);
+
+	return r * float2(cosPhi, sinPhi);
+}
+
+// Performs cosine-weighted sampling of the hemisphere.
+// Ref: PBRT v3, p. 780.
+float3 SampleHemisphereCosine(float u1, float u2)
+{
+	float3 localL;
+
+    // Since we don't really care about the area distortion,
+    // we substitute uniform disk sampling for the concentric one.
+	localL.xy = SampleDiskUniform(u1, u2);
+
+    // Project the point from the disk onto the hemisphere.
+	localL.z = sqrt(1.0 - u1);
+
+	return localL;
+}
+
+float3 SampleHemisphereUniform(float u1, float u2)
+{
+	float phi = TwoPi * u2;
+	float cosTheta = 1.0 - u1;
+
+	return SphericalToCartesian(phi, cosTheta);
+}
+
+
 float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
 {
 	packedNormal.a *= packedNormal.r;

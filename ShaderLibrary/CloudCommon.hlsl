@@ -38,9 +38,7 @@ cbuffer CloudShadowData
 
 float CloudExtinction(float3 worldPosition, float height, bool useDetail)
 {
-	float altitude = height - _PlanetRadius;
-	
-	float fraction = saturate((altitude - _StartHeight) / _LayerThickness);
+	float fraction = (height - _PlanetRadius - _StartHeight) / _LayerThickness;
 	float gradient = 4.0 * fraction * (1.0 - fraction);
 	
 	float3 position = worldPosition + _ViewPosition;
@@ -50,7 +48,7 @@ float CloudExtinction(float3 worldPosition, float height, bool useDetail)
 	density = Remap(density, 1.0 - _WeatherMapStrength);
 	
 	float baseNoise = _CloudNoise.SampleLevel(_LinearRepeatSampler, position * _NoiseScale, 0.0);
-	density = Remap(density, baseNoise * _NoiseStrength);
+	density = Remap(density, baseNoise * _NoiseStrength * 2.0);
 	if (density <= 0.0)
 		return 0.0;
 
@@ -97,7 +95,8 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 				//float lightTransmittance = CloudTransmittance(worldPosition);
 			
 				float asymmetry = lightTransmittance * transmittance;
-				float phase = MiePhase(LdotV, lerp(_BackScatterPhase, _ForwardScatterPhase, asymmetry)) * lerp(_BackScatterScale, _ForwardScatterScale, asymmetry);
+				//float phase = MiePhase(LdotV, lerp(_BackScatterPhase, _ForwardScatterPhase, asymmetry)) * lerp(_BackScatterScale, _ForwardScatterScale, asymmetry);
+				float phase = lerp(MiePhase(LdotV, _BackScatterPhase) * _BackScatterScale, MiePhase(LdotV, _ForwardScatterPhase) * _ForwardScatterScale, asymmetry);
 				light0 += phase * asymmetry * (1.0 - sampleTransmittance);
 			}
 			
@@ -129,11 +128,16 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 			float3 atmosphereTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
 			result.rgb *= atmosphereTransmittance * _LightColor0 * _Exposure;
 		}
+		else
+		{
+			result.rgb = 0.0;
+		}
 		
 		float3 ambient = GetSkyAmbient(lightCosAngleAtDistance, heightAtDistance) * _LightColor0 * _Exposure;
 		result.rgb += ambient * (1.0 - result.a);
 	
 		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, cosViewAngle, cloudDepth, heightAtDistance);
+		
 		float3 viewTransmittance = TransmittanceToPoint(viewHeight, cosViewAngle, heightAtDistance, viewCosAngleAtDistance);
 		result.rgb *= viewTransmittance;
 	}

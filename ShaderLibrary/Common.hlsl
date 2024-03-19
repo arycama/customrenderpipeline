@@ -28,8 +28,8 @@ cbuffer Exposure
 {
 	float _Exposure;
 	float _RcpExposure;
-	float _PreviousExposure;
-	float _RcpPreviousExposure;
+	float _PreviousToCurrentExposure;
+	float _CurrentToPreviousExposure;
 };
 
 Buffer<float4> _DirectionalShadowTexelSizes;

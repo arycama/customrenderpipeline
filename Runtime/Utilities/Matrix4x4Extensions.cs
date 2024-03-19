@@ -69,7 +69,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 m00 = -2f / width * tanHalfVertFoV * aspect,
                 m11 = m11,
-                m02 = (1f + jitter.x) * tanHalfVertFoV * aspect,
+                m02 = (1f - jitter.x) * tanHalfVertFoV * aspect,
                 m12 = m21,
                 m22 = -1.0f,
                 m33 = 1.0f

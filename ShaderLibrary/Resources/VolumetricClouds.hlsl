@@ -152,7 +152,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 		}
 	}
 
-	float4 history = _History.Sample(_LinearClampSampler, historyUv * _History_Scale.xy) * (_RcpPreviousExposure * _Exposure);
+	float4 history = _History.Sample(_LinearClampSampler, historyUv * _History_Scale.xy) * _PreviousToCurrentExposure;
 	history.rgb = RGBToYCoCg(history.rgb);
 	history.rgb *= rcp(1.0 + history.r);
 	history = clamp(history, minValue, maxValue);

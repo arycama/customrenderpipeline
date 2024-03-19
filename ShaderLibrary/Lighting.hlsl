@@ -9,6 +9,13 @@ cbuffer AmbientSh
 	float4 _AmbientSh[7];
 };
 
+cbuffer CloudCoverage
+{
+	float4 _CloudCoverage;
+};
+
+float _CloudCoverageScale, _CloudCoverageOffset;
+
 float3 EvaluateSH(float3 N, float3 occlusion, float4 sh[7])
 {
 	// Calculate the zonal harmonics expansion for V(x, ωi)*(n.l)

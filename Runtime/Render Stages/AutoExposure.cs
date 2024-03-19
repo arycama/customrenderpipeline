@@ -141,6 +141,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(computeShader, 0, width, height);
                 pass.ReadTexture("Input", input);
                 pass.WriteBuffer("LuminanceHistogram", histogram);
+                pass.ReadBuffer("Exposure", exposureData.exposureBuffer);
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
@@ -156,7 +157,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "HistogramMax", data.histogramMax);
                     pass.SetVector(command, "_ExposureCompensationRemap", data.exposureCompensationRemap);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                    pass.SetConstantBuffer(command, "Exposure", data.exposureBuffer);
                 });
 
                 data.deltaTime = Time.deltaTime;
@@ -181,13 +181,13 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(computeShader, 1, 1);
                 pass.ReadBuffer("LuminanceHistogram", histogram);
                 pass.WriteBuffer("LuminanceOutput", output);
+                pass.ReadBuffer("Exposure", exposureData.exposureBuffer);
 
                 var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
                 {
                     pass.SetFloat(command, "Mode", (float)data.mode);
                     pass.SetFloat(command, "IsFirst", data.isFirst ? 1.0f : 0.0f);
                     pass.SetTexture(command, "ExposureTexture", data.exposureTexture);
-                    pass.SetConstantBuffer(command, "Exposure", data.exposureBuffer);
                 });
 
                 data.exposureTexture = exposureTexture;
@@ -214,7 +214,7 @@ namespace Arycama.CustomRenderPipeline
             internal BufferHandle bufferHandle;
         }
 
-        public struct AutoExposureData
+        public struct AutoExposureData : IRenderPassData
         {
             public BufferHandle exposureBuffer { get; }
             public bool IsFirst { get; }
@@ -223,6 +223,15 @@ namespace Arycama.CustomRenderPipeline
             {
                 this.exposureBuffer = exposureBuffer ?? throw new ArgumentNullException(nameof(exposureBuffer));
                 IsFirst = isFirst;
+            }
+
+            public void SetInputs(RenderPass pass)
+            {
+                pass.ReadBuffer("Exposure", exposureBuffer);
+            }
+
+            public void SetProperties(RenderPass pass, CommandBuffer command)
+            {
             }
         }
     }
