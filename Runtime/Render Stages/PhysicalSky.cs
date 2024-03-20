@@ -241,7 +241,7 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        public Result GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, LookupTableResult lookupTableResult, VolumetricClouds.Settings cloudSettings, VolumetricClouds.CloudData cloudRenderData, CullingResults cullingResults, Vector3 cameraPosition, VolumetricClouds.CloudShadowDataResult cloudShadowResult)
+        public Result GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, LookupTableResult lookupTableResult, VolumetricClouds.Settings cloudSettings, CullingResults cullingResults, Vector3 cameraPosition, VolumetricClouds.CloudShadowDataResult cloudShadowResult)
         {
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -296,7 +296,8 @@ namespace Arycama.CustomRenderPipeline
                 lightingSetupResult.SetInputs(pass);
                 lookupTableResult.SetInputs(pass);
 
-                cloudRenderData.SetInputs(pass);
+                pass.AddRenderPassData<VolumetricClouds.CloudData>();
+
                 cloudShadowResult.SetInputs(pass);
                 pass.ReadBuffer("Exposure", exposureBuffer);
 
@@ -305,7 +306,6 @@ namespace Arycama.CustomRenderPipeline
                     lightingSetupResult.SetProperties(pass, command);
 
                     cloudShadowResult.SetProperties(pass, command);
-                    cloudRenderData.SetProperties(pass, command);
                     cloudSettings.SetCloudPassData(command, pass);
 
                     pass.SetFloat(command, "_Samples", settings.ReflectionSamples);

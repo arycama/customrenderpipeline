@@ -156,17 +156,19 @@ float QuadReadAcrossDiagonal(float value, uint2 screenPos)
 	return X - (ddy_fine(value) * quadDir.y);
 }
 
-float3 RGBToYCoCg(float3 RGB)
+float3 RGBToYCoCg(float3 rgb)
 {
-	const float3x3 mat = float3x3(0.25, 0.5, 0.25, 0.5, 0, -0.5, -0.25, 0.5, -0.25);
-	float3 col = mul(mat, RGB);
-	return col;
+	float3 yCoCg = float3(0.25, 0.5, -0.25) * rgb.r;
+	yCoCg += float3(0.25, -0.5, -0.25) * rgb.b;
+	yCoCg.xz += 0.5 * rgb.g;
+	return yCoCg;
 }
     
-float3 YCoCgToRGB(float3 YCoCg)
+float3 YCoCgToRGB(float3 yCoCg)
 {
-	const float3x3 mat = float3x3(1, 1, -1, 1, 0, 1, 1, -1, -1);
-	return mul(mat, YCoCg);
+	float3 rgb = float2(-1.0, 1.0).xyx * yCoCg.z + yCoCg.x;
+	rgb.rb += float2(1.0, -1.0) * yCoCg.y;
+	return rgb;
 }
 
 #endif

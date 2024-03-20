@@ -1,10 +1,10 @@
 ﻿namespace Arycama.CustomRenderPipeline
 {
-    public struct RenderResourceHandle
+    public struct RenderPassDataHandle
     {
         public int Index { get; }
 
-        public RenderResourceHandle(int index)
+        public RenderPassDataHandle(int index)
         {
             Index = index;
         }

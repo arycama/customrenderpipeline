@@ -2,112 +2,114 @@
 #include "../Utility.hlsl"
 
 Texture2D<float3> _Input, _History;
-Texture2D<float2> _Motion;
+Texture2D<float2> _Velocity;
 
 cbuffer Properties
 {
-	float4  _Resolution, _Input_Scale, _Motion_Scale, _History_Scale;
-	float _HasHistory, _MotionBlending, _MotionWeight, _Sharpness, _StationaryBlending, _Scale;
+	float4 _Resolution, _Input_Scale, _Velocity_Scale, _History_Scale;
+	float _HasHistory, _VelocityBlending, _VelocityWeight, _Sharpness, _StationaryBlending, _Scale;
+	uint _MaxWidth, _MaxHeight;
 };
 
-float DistToAABB(float3 color, float3 history, float3 minimum, float3 maximum)
+float DistToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
 {
-    float3 center = 0.5 * (maximum + minimum);
-    float3 extents = 0.5 * (maximum - minimum);
-
-    float3 rayDir = color - history;
-    float3 rayPos = history - center;
-
-    float3 invDir = rcp(rayDir);
-    float3 t0 = (extents - rayPos)  * invDir;
-    float3 t1 = -(extents + rayPos) * invDir;
-
-   return max(max(min(t0.x, t1.x), min(t0.y, t1.y)), min(t0.z, t1.z));
+	float3 rcpDir = rcp(target - origin);
+	return Max3(min(boxMin * rcpDir, boxMax * rcpDir) - origin * rcpDir);
 }
 
-float3 Fragment(float4 position : SV_Position) : SV_Target
+float3 ProcessColor(float3 color)
 {
-	float3 minValue = 0.0, maxValue = 0.0;
-	float2 maxMotion = 0.0;
-	float maxWeight = 0.0, weightSum = 0.0, maxMotionLenSqr = 0.0;
+	color = RGBToYCoCg(color);
+	color *= rcp(1.0 + color.r);
+	return color;
+}
+
+float GetColorWeight(float2 offset)
+{
+	float2 delta = saturate(1.0 - abs(offset - 1.0 + _Jitter));
+	return delta.x * delta.y;
+}
+
+float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
+{
+	uint2 centerCoord = (uint2)max(0.0, uv * _ScaledResolution.xy + -1.0);
 	
-	float3 result = 0.0;
-	for (int y = -1; y <= 1; y++)
+	uint2 offsets[9] = {uint2(0, 0), uint2(1, 0), uint2(2, 0), uint2(0, 1), uint2(1, 1), uint2(2, 1), uint2(0, 2), uint2(1, 2), uint2(2, 2)};
+	
+	float2 velocity[9];
+	float3 color[9];
+	
+	[unroll]
+	for(uint i = 0; i < 9; i++)
 	{
-		for (int x = -1; x <= 1; x++)
-		{
-			float2 coord = clamp(position.xy + float2(x, y), 0.0, _ScaledResolution.xy - 1.0);
-			float3 color = _Input[coord];
-			color = RGBToYCoCg(color);
-			color *= rcp(1.0 + color.r);
-			
-			float2 motion = _Motion[coord];
-			
-			float2 delta = -float2(x, y) - _Jitter;
-			float weight = saturate(1.0 - abs(delta.x)) * saturate(1.0 - abs(delta.y));
-			result += color * weight;
-			weightSum += weight;
-			
-			if(all(int2(x, y) == -1))
-			{
-				minValue = maxValue = color;
-				maxMotion = motion;
-				maxMotionLenSqr = dot(motion, motion);
-			}
-			else
-			{
-				minValue = min(minValue, color);
-				maxValue = max(maxValue, color);
-				
-				float motionLenSqr = dot(motion, motion);
-				if(motionLenSqr > maxMotionLenSqr)
-				{
-					maxMotionLenSqr = motionLenSqr;
-					maxMotion = motion;
-				}
-			}
-		}
+		uint2 coord = min(centerCoord + offsets[i], uint2(_MaxWidth, _MaxHeight));
+		velocity[i] = _Velocity[coord];
+		color[i] = _Input[coord];
 	}
 	
-	float2 uv = position.xy * _Resolution.zw;
-	float2 historyUv = uv - maxMotion;
+	float2 maxVelocity = velocity[0];
+	float maxVelocityLenSqr = SqrLength(maxVelocity);
+	
+	[unroll]
+	for(i = 1; i < 9; i++)
+	{
+		float2 currentVelocity = velocity[i];
+		float velocityLenSqr = SqrLength(currentVelocity);
+		
+		if(velocityLenSqr <= maxVelocityLenSqr)
+			continue;
+		
+		maxVelocity = currentVelocity;
+		maxVelocityLenSqr = velocityLenSqr;
+	}
+	
+	float2 historyUv = uv - maxVelocity;
+	float3 history = ProcessColor(_History.Sample(_LinearClampSampler, historyUv * _History_Scale.xy) * _PreviousToCurrentExposure);
+	
+	float2 f = frac(historyUv * _ScaledResolution.xy - 0.5);
+	float2 w = _Sharpness * f * (f - 1.0);
+	
+	float historyWeightSum = rcp(w.x + w.y + 1.0);
+	
+	float historyWeights[9] = { 0.0, f.y * w.y, 0.0, (1.0 - f.x) * w.x, -w.x - w.y, f.x * w.x, 0.0, 0.0, (1.0 - f.y) * w.y };
+	
+	float3 result, minValue, maxValue, mean, stdDev;
+	result = minValue = maxValue = mean = stdDev = ProcessColor(color[0]);
+	result *= GetColorWeight(offsets[0]);
+	stdDev *= stdDev;
+	
+	[unroll]
+	for(i = 1; i < 9; i++)
+	{
+		float3 currentColor = ProcessColor(color[i]);
+		minValue = min(minValue, currentColor);
+		maxValue = max(maxValue, currentColor);
+		mean += currentColor;
+		stdDev += currentColor * currentColor;
+		result += currentColor * GetColorWeight(offsets[i]);
+		history += historyWeights[i] * historyWeightSum;
+	}
+	
+	// Variance clipping. Adds ~7 more registers and 20 instructions and causes more aliasing
+	#if 1
+		mean /= 9.0;
+		stdDev = sqrt(abs(stdDev / 9.0 - mean * mean));
+		minValue = max(minValue, mean - stdDev);
+		maxValue = max(maxValue, mean + stdDev);
+		//minValue = mean - stdDev;
+		//maxValue = mean + stdDev;
+	#endif
+	
+	float t = DistToAABB(history, result, minValue, maxValue);
+	history = lerp(history, result, saturate(t));
+	
 	if(_HasHistory && all(saturate(historyUv) == historyUv))
-	{
-		float3 history = _History.Sample(_LinearClampSampler, historyUv * _History_Scale.xy) * _PreviousToCurrentExposure;
-		history = RGBToYCoCg(history);
-		history *= rcp(1.0 + history.r);
-		
-		float3 colorC = RGBToYCoCg(_Input[position.xy + float2(0.0, 0.0)]);
-		float3 colorU = RGBToYCoCg(_Input[position.xy + float2(0.0, 1.0)]);
-		float3 colorD = RGBToYCoCg(_Input[position.xy + float2(0.0, -1.0)]);
-		float3 colorL = RGBToYCoCg(_Input[position.xy + float2(-1.0, 0.0)]);
-		float3 colorR = RGBToYCoCg(_Input[position.xy + float2(1.0, 0.0)]);
-		
-		colorC *= rcp(1.0 + colorC.r);
-		colorU *= rcp(1.0 + colorU.r);
-		colorD *= rcp(1.0 + colorD.r);
-		colorL *= rcp(1.0 + colorL.r);
-		colorR *= rcp(1.0 + colorR.r);
-	
-		float2 f = frac(historyUv * _ScaledResolution.xy - 0.5);
-		float c = 0.8 * _Sharpness;
-		float2 w = c * (f * f - f);
-		float4 color = float4(lerp(colorL, colorR, f.x), 1.0) * w.x + float4(lerp(colorU, colorD, f.y), 1.0) * w.y;
-		color += float4((1.0 + color.a) * history - color.a * colorC, 1.0);
-		history = color.rgb* rcp(color.a);
-	
-		float t = DistToAABB(result, history, minValue, maxValue);
-		
-		if(t > 0.0)
-			history = history + (result - history) * t;
-	
 		result = lerp(history, result, 0.05);
-	}
 	
 	result *= rcp(1.0 - result.r);
 	result = YCoCgToRGB(result);
 	
-	result = IsInfOrNaN(result) ? 0.0 : result;
+	result = isnan(result) ? 0.0 : result;
 
 	return result;
 }

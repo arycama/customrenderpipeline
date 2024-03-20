@@ -18,9 +18,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<(string, BufferHandle)> readBuffers = new();
         private readonly List<(string, BufferHandle)> writeBuffers = new();
 
-        private readonly List<(string, RenderResourceHandle)> readTextureHandles = new();
-        private readonly List<(string, RenderResourceHandle)> readBufferHandles = new();
-        private readonly List<(string, RenderResourceHandle)> writeBufferHandles = new();
+        private readonly List<RenderPassDataHandle> renderPassDataHandles = new(); 
 
         public RenderGraph RenderGraph { get; set; }
         internal string Name { get; set; }
@@ -66,9 +64,27 @@ namespace Arycama.CustomRenderPipeline
             writeBuffers.Add((propertyName, buffer));
         }
 
+        public void AddRenderPassData(RenderPassDataHandle handle)
+        {
+            renderPassDataHandles.Add(handle);
+        }
+
+        public void AddRenderPassData<T>() where T : IRenderPassData
+        {
+            var handle = RenderGraph.ResourceMap.GetResourceHandle<T>();
+            AddRenderPassData(handle);
+        }
+
         public void Run(CommandBuffer command, ScriptableRenderContext context)
         {
             command.BeginSample(Name);
+
+            // Set render pass data
+            foreach(var renderPassDataHandle in renderPassDataHandles)
+            {
+                var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle);
+                data.SetInputs(this);
+            }
 
             // Move into some OnPreRender thing in buffer/RTHandles? 
             foreach (var texture in readTextures)
@@ -97,6 +113,13 @@ namespace Arycama.CustomRenderPipeline
 
             if (renderGraphBuilder != null)
             {
+                // Set any data from each pass
+                foreach (var renderPassDataHandle in renderPassDataHandles)
+                {
+                    var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle);
+                    data.SetProperties(this, command);
+                }
+
                 renderGraphBuilder.Execute(command, context, this);
                 renderGraphBuilder.ClearRenderFunction();
             }
@@ -110,6 +133,8 @@ namespace Arycama.CustomRenderPipeline
                 RenderGraph.ReleaseRenderGraphBuilder(renderGraphBuilder);
                 renderGraphBuilder = null;
             }
+
+            renderPassDataHandles.Clear();
 
             command.EndSample(Name);
         }

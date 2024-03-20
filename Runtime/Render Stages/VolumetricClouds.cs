@@ -114,12 +114,12 @@ namespace Arycama.CustomRenderPipeline
             cloudCoverageComputeShader = Resources.Load<ComputeShader>("CloudCoverage");
         }
 
-        public CloudData SetupData()
+        public void SetupData()
         {
             var result = new CloudData(weatherMap, noiseTexture, detailNoiseTexture);
 
             if (version >= settings.Version)
-                return result;
+                return;
 
             version = settings.Version;
 
@@ -179,10 +179,10 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            return result;
+            renderGraph.ResourceMap.SetRenderPassData(result);
         }
 
-        public CloudShadowDataResult RenderShadow(CullingResults cullingResults, Camera camera, CloudData cloudRenderData, float planetRadius, PhysicalSky.LookupTableResult physicalSkyTables, BufferHandle exposureBuffer)
+        public CloudShadowDataResult RenderShadow(CullingResults cullingResults, Camera camera, float planetRadius, PhysicalSky.LookupTableResult physicalSkyTables, BufferHandle exposureBuffer)
         {
             var lightDirection = Vector3.up;
             var lightRotation = Quaternion.LookRotation(Vector3.down);
@@ -268,7 +268,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(material, 3);
                 pass.WriteTexture(cloudShadow, RenderBufferLoadAction.DontCare);
                 pass.ReadBuffer("CloudShadowData", cloudShadowDataBuffer);
-                cloudRenderData.SetInputs(pass);
+                pass.AddRenderPassData<CloudData>();
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -315,7 +315,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.Initialize(cloudCoverageComputeShader, 0, 1);
 
-                cloudRenderData.SetInputs(pass);
+                pass.AddRenderPassData<CloudData>();
                 result.SetInputs(pass);
                 physicalSkyTables.SetInputs(pass);
                 pass.WriteBuffer("_Result", cloudCoverageBufferTemp);
@@ -331,7 +331,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightColor1", lightColor1);
 
                     result.SetProperties(pass, command);
-                    cloudRenderData.SetProperties(pass, command);
                     physicalSkyTables.SetProperties(pass, command);
 
                     pass.SetVector(command, "_ViewPosition", camera.transform.position);
@@ -389,7 +388,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public RTHandle Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, out RTHandle cloudDepth, CullingResults cullingResults, VolumetricClouds.CloudData cloudRenderData, VolumetricClouds.CloudShadowDataResult cloudShadow, RTHandle cameraTarget, RTHandle velocity)
+        public RTHandle Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, out RTHandle cloudDepth, CullingResults cullingResults, VolumetricClouds.CloudShadowDataResult cloudShadow, RTHandle cameraTarget, RTHandle velocity)
         {
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -443,8 +442,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(cloudDepth, RenderBufferLoadAction.DontCare);
 
                 pass.ReadTexture("_Depth", cameraDepth);
+                pass.AddRenderPassData<CloudData>();
 
-                cloudRenderData.SetInputs(pass);
                 cloudShadow.SetInputs(pass);
                 commonPassData.SetInputs(pass);
 
@@ -461,7 +460,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightColor1", lightColor1);
 
                     cloudShadow.SetProperties(pass, command);
-                    cloudRenderData.SetProperties(pass, command);
                     commonPassData.SetProperties(pass, command);
                 });
             }
@@ -508,7 +506,7 @@ namespace Arycama.CustomRenderPipeline
         {
         }
 
-        public struct CloudData : IRenderPassData
+        public readonly struct CloudData : IRenderPassData
         {
             private readonly RTHandle weatherMap, noiseTexture, detailNoiseTexture;
 

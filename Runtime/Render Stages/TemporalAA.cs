@@ -60,6 +60,9 @@ namespace Arycama.CustomRenderPipeline
             internal Vector2 jitter;
             internal Vector4 scaledResolution;
             internal Vector4 resolution;
+            internal int maxWidth;
+            internal int maxHeight;
+            internal Vector2 maxResolution;
         }
 
         public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
@@ -70,7 +73,7 @@ namespace Arycama.CustomRenderPipeline
             using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA");
             pass.Initialize(material);
             pass.ReadTexture("_Input", input);
-            pass.ReadTexture("_Motion", motion);
+            pass.ReadTexture("_Velocity", motion);
             pass.ReadTexture("_History", history);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 
@@ -79,16 +82,20 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "_Sharpness", data.sharpness);
                 pass.SetFloat(command, "_HasHistory", data.hasHistory);
                 pass.SetFloat(command, "_StationaryBlending", data.stationaryBlending);
-                pass.SetFloat(command, "_MotionBlending", data.motionBlending);
-                pass.SetFloat(command, "_MotionWeight", data.motionWeight);
+                pass.SetFloat(command, "_VelocityBlending", data.motionBlending);
+                pass.SetFloat(command, "_VelocityWeight", data.motionWeight);
                 pass.SetFloat(command, "_Scale", data.scale);
 
                 pass.SetVector(command, "_Jitter", data.jitter);
                 pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                 pass.SetVector(command, "_Resolution", data.resolution);
+                pass.SetVector(command, "_MaxResolution", data.maxResolution);
+
+                pass.SetInt(command, "_MaxWidth", data.maxWidth);
+                pass.SetInt(command, "_MaxHeight", data.maxHeight);
             });
 
-            data.sharpness = settings.Sharpness;
+            data.sharpness = settings.Sharpness * 0.8f;
             data.hasHistory = wasCreated ? 0.0f : 1.0f;
             data.stationaryBlending = settings.StationaryBlending;
             data.motionBlending = settings.MotionBlending;
@@ -97,6 +104,9 @@ namespace Arycama.CustomRenderPipeline
             data.jitter = Jitter;
             data.scaledResolution = new Vector4(camera.pixelWidth * scale, camera.pixelHeight * scale, 1.0f / (camera.pixelWidth * scale), 1.0f / (camera.pixelHeight * scale));
             data.resolution = new Vector4(camera.pixelWidth, camera.pixelHeight, 1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight);
+            data.maxWidth = camera.pixelWidth - 1;
+            data.maxHeight = camera.pixelHeight - 1;
+            data.maxResolution = new Vector2(camera.pixelWidth - 1, camera.pixelHeight - 1);
 
             return current;
         }

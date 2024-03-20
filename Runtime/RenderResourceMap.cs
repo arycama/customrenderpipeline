@@ -1,35 +1,48 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine.Assertions;
 
 namespace Arycama.CustomRenderPipeline
 {
     public class RenderResourceMap
     {
-        private readonly Dictionary<string, RenderResourceHandle> handleIndexMap = new();
-        private readonly List<IRenderResource> handleList = new();
+        private readonly Dictionary<Type, RenderPassDataHandle> handleIndexMap = new();
+        private readonly List<IRenderPassData> handleList = new();
 
-        public RenderResourceHandle GetResourceHandle(string name)
+        public RenderPassDataHandle GetResourceHandle<T>() where T : IRenderPassData
         {
-            if(!handleIndexMap.TryGetValue(name, out var handle))
+            if(!handleIndexMap.TryGetValue(typeof(T), out var handle))
             {
                 handle = new(handleIndexMap.Count);
-                handleIndexMap.Add(name, handle);
+                handleIndexMap.Add(typeof(T), handle);
             }
 
             handleList.Add(null);
             return handle;
         }
 
-        public T GetRenderResourceHandle<T>(RenderResourceHandle handle) where T : IRenderResource
+        public T GetRenderPassData<T>(RenderPassDataHandle handle) where T : IRenderPassData
         {
             var result = handleList[handle.Index];
             Assert.IsTrue(result != null);
             return (T)result;
         }
 
-        public void SetRenderResourceHandle(RenderResourceHandle handle, IRenderResource renderResource)
+        public T GetRenderPassData<T>() where T : IRenderPassData
+        {
+            var handle = GetResourceHandle<T>();
+            return GetRenderPassData<T>(handle);
+        }
+
+        public void SetRenderPassData(RenderPassDataHandle handle, IRenderPassData renderResource)
         {
             handleList[handle.Index] = renderResource;
+        }
+
+        public void SetRenderPassData<T>(T renderResource) where T : IRenderPassData
+        {
+            var handle = GetResourceHandle<T>();
+            SetRenderPassData(handle, renderResource);
         }
     }
 }

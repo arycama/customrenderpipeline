@@ -194,7 +194,16 @@ float EyeToDeviceDepth(float eyeDepth)
 }
 
 float Max2(float2 x) { return max(x.x, x.y); }
-float Max3(float3 x) { return max(x.x, max(x.y, x.z)); }
+
+float Max3(float3 x) 
+{ 
+#ifdef INTRINSIC_MINMAX3
+	return Max3(x.x, x.y, x.z);
+#else
+	return max(x.x, max(x.y, x.z)); 
+#endif
+}
+
 float Max4(float4 x) { return Max2(max(x.xy, x.zw)); }
 
 float Min2(float2 x) { return min(x.x, x.y); }
@@ -541,10 +550,12 @@ float3 SmoothUv(float3 p, float3 texelSize)
 }
 
 
-float4 VertexFullscreenTriangle(uint id : SV_VertexID) : SV_Position
+float4 VertexFullscreenTriangle(uint id : SV_VertexID, out float2 uv : TEXCOORD) : SV_Position
 {
-	float2 uv = (id << uint2(1, 0)) & 2;
-	return float3(uv * 2.0 - 1.0, 1.0).xyzz;
+	uv = (id << uint2(1, 0)) & 2;
+	float4 result = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+	uv.y = 1.0 - uv.y;
+	return result;
 }
 
 uint VertexIdPassthrough(uint id : SV_VertexID) : TEXCOORD
