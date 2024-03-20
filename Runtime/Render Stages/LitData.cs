@@ -67,7 +67,7 @@ public class LitData : IDisposable
         ltcData.Apply();
     }
 
-    public Result Render()
+    public void Render()
     {
         var computeShader = Resources.Load<ComputeShader>("LitData");
 
@@ -90,7 +90,7 @@ public class LitData : IDisposable
         );
 
         if (version == settings.Version)
-            return result;
+            return;
 
         version = settings.Version;
 
@@ -168,7 +168,7 @@ public class LitData : IDisposable
             });
         }
 
-        return result;
+        renderGraph.ResourceMap.SetRenderPassData(result);
     }
 
     public struct Result : IRenderPassData

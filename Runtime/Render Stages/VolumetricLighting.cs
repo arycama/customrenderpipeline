@@ -16,7 +16,7 @@ namespace Arycama.CustomRenderPipeline
             colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", TextureDimension.Tex3D);
         }
 
-        public Result Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, Texture2D blueNoise1D, Texture2D blueNoise2D, Color fogColor, float fogStartDistance, float fogEndDistance, float fogDensity, float fogMode, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, IRenderPassData commonData)
+        public Result Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, ClusteredLightCulling.Result clusteredLightCullingResult, LightingSetup.Result lightingSetupResult, Texture2D blueNoise1D, Texture2D blueNoise2D, Color fogColor, float fogStartDistance, float fogEndDistance, float fogDensity, float fogMode, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, IRenderPassData commonData)
         {
             var width = Mathf.CeilToInt(screenWidth / (float)settings.TileSize);
             var height = Mathf.CeilToInt(screenHeight / (float)settings.TileSize);
@@ -35,7 +35,7 @@ namespace Arycama.CustomRenderPipeline
                 clusteredLightCullingResult.SetInputs(pass);
                 lightingSetupResult.SetInputs(pass);
                 commonData.SetInputs(pass);
-                pass.ReadBuffer("Exposure", exposureBuffer);
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
@@ -78,7 +78,6 @@ namespace Arycama.CustomRenderPipeline
                 data.volumeTileSize = settings.TileSize;
                 data.clusteredLightCullingResult = clusteredLightCullingResult;
                 data.lightingSetupResult = lightingSetupResult;
-                data.exposureBuffer = exposureBuffer;
                 data.blueNoise1D = blueNoise1D;
                 data.blueNoise2D = blueNoise2D;
                 data.fogColor = fogColor;
@@ -150,7 +149,6 @@ namespace Arycama.CustomRenderPipeline
             internal int pointLightCount;
             internal int directionalLightCount;
             internal LightingSetup.Result lightingSetupResult;
-            internal BufferHandle exposureBuffer;
             internal Texture2D blueNoise1D;
             internal Texture2D blueNoise2D;
             internal Color fogColor;

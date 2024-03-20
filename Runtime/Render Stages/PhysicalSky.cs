@@ -136,7 +136,7 @@ namespace Arycama.CustomRenderPipeline
             skyAmbient = renderGraph.GetTexture(settings.AmbientSkyWidth, settings.AmbientSkyHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
         }
 
-        public LookupTableResult GenerateLookupTables()
+        public void GenerateLookupTables()
         {
             var atmospherePropertiesBuffer = renderGraph.SetConstantBuffer(new AtmosphereProperties(settings));
             var transmittanceRemap = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
@@ -147,7 +147,7 @@ namespace Arycama.CustomRenderPipeline
             var result = new LookupTableResult(atmospherePropertiesBuffer, transmittance, weightedDepth, multiScatter, groundAmbient, cdf, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap, new Vector3(settings.CdfWidth, settings.CdfHeight, settings.CdfDepth));
 
             if (version >= settings.Version)
-                return result;
+                return;
 
             version = settings.Version;
 
@@ -238,10 +238,10 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            return result;
+            renderGraph.ResourceMap.SetRenderPassData(result);
         }
 
-        public Result GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, BufferHandle exposureBuffer, LookupTableResult lookupTableResult, VolumetricClouds.Settings cloudSettings, CullingResults cullingResults, Vector3 cameraPosition, VolumetricClouds.CloudShadowDataResult cloudShadowResult)
+        public Result GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, VolumetricClouds.Settings cloudSettings, CullingResults cullingResults, Vector3 cameraPosition, VolumetricClouds.CloudShadowDataResult cloudShadowResult)
         {
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -294,12 +294,11 @@ namespace Arycama.CustomRenderPipeline
                 pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
 
                 lightingSetupResult.SetInputs(pass);
-                lookupTableResult.SetInputs(pass);
-
+                pass.AddRenderPassData<LookupTableResult>();
                 pass.AddRenderPassData<VolumetricClouds.CloudData>();
 
                 cloudShadowResult.SetInputs(pass);
-                pass.ReadBuffer("Exposure", exposureBuffer);
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -310,8 +309,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetFloat(command, "_Samples", settings.ReflectionSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
-                    lookupTableResult.SetProperties(pass, command);
-
+                    
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
                     pass.SetVector(command, "_LightColor0", lightColor0);
                     pass.SetVector(command, "_LightDirection1", lightDirection1);
@@ -425,10 +423,10 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Specular convolution
-            return new Result(ambientBuffer, reflectionProbe, lookupTableResult);
+            return new Result(ambientBuffer, reflectionProbe);
         }
 
-        public void Render(RTHandle target, RTHandle depth, BufferHandle exposureBuffer, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, LightingSetup.Result lightingSetupResult, PhysicalSky.Result atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, VolumetricClouds.CloudShadowDataResult cloudShadowData, Camera camera, CullingResults cullingResults, PhysicalSky.LookupTableResult lookupData, RTHandle velocity)
+        public void Render(RTHandle target, RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, LightingSetup.Result lightingSetupResult, PhysicalSky.Result atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, VolumetricClouds.CloudShadowDataResult cloudShadowData, Camera camera, CullingResults cullingResults, RTHandle velocity)
         {
             var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
@@ -472,8 +470,9 @@ namespace Arycama.CustomRenderPipeline
                 atmosphereData.SetInputs(pass);
                 commonPassData.SetInputs(pass);
                 cloudShadowData.SetInputs(pass);
-                lookupData.SetInputs(pass);
-                pass.ReadBuffer("Exposure", exposureBuffer);
+                pass.AddRenderPassData<PhysicalSky.LookupTableResult>();
+
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -488,7 +487,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightDirection1", lightDirection1);
                     pass.SetVector(command, "_LightColor1", lightColor1);
 
-                    lookupData.SetProperties(pass, command);
                     commonPassData.SetProperties(pass, command);
                     cloudShadowData.SetProperties(pass, command);
                 });
@@ -637,25 +635,22 @@ namespace Arycama.CustomRenderPipeline
         {
             private readonly RTHandle reflectionProbe;
             private readonly BufferHandle ambientBuffer;
-            private LookupTableResult lookTableResult;
 
-            public Result(BufferHandle ambientBuffer, RTHandle reflectionProbe, LookupTableResult lookupTableResult)
+            public Result(BufferHandle ambientBuffer, RTHandle reflectionProbe)
             {
                 this.ambientBuffer = ambientBuffer;
                 this.reflectionProbe = reflectionProbe;
-                this.lookTableResult = lookupTableResult;
             }
 
             public void SetInputs(RenderPass pass)
             {
                 pass.ReadTexture("_SkyReflection", reflectionProbe);
                 pass.ReadBuffer("AmbientSh", ambientBuffer);
-                lookTableResult.SetInputs(pass);
+                pass.AddRenderPassData<LookupTableResult>();
             }
 
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                lookTableResult.SetProperties(pass, command);
             }
         }
     }

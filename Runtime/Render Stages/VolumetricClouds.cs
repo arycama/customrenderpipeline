@@ -182,7 +182,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(result);
         }
 
-        public CloudShadowDataResult RenderShadow(CullingResults cullingResults, Camera camera, float planetRadius, PhysicalSky.LookupTableResult physicalSkyTables, BufferHandle exposureBuffer)
+        public CloudShadowDataResult RenderShadow(CullingResults cullingResults, Camera camera, float planetRadius)
         {
             var lightDirection = Vector3.up;
             var lightRotation = Quaternion.LookRotation(Vector3.down);
@@ -317,9 +317,9 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.AddRenderPassData<CloudData>();
                 result.SetInputs(pass);
-                physicalSkyTables.SetInputs(pass);
+                pass.AddRenderPassData<PhysicalSky.LookupTableResult>();
                 pass.WriteBuffer("_Result", cloudCoverageBufferTemp);
-                pass.ReadBuffer("Exposure", exposureBuffer);
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -331,8 +331,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightColor1", lightColor1);
 
                     result.SetProperties(pass, command);
-                    physicalSkyTables.SetProperties(pass, command);
-
                     pass.SetVector(command, "_ViewPosition", camera.transform.position);
                 });
             }

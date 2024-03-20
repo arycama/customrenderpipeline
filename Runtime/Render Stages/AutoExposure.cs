@@ -1,4 +1,5 @@
-﻿using System;
+﻿using GluonGui.Dialog;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -83,18 +84,15 @@ namespace Arycama.CustomRenderPipeline
 
         class Pass2Data
         {
-            internal BufferHandle exposureBuffer;
             internal BufferHandle output;
         }
 
-        public AutoExposureData OnPreRender(Camera camera)
+        public void OnPreRender(Camera camera)
         {
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Auto Exposure"))
             {
-
-
                 var isFirst = !exposureBuffers.TryGetValue(camera, out var exposureBuffer);
-                if(isFirst)
+                if (isFirst)
                 {
                     exposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 4, sizeof(float));
                     exposureBuffers.Add(camera, exposureBuffer);
@@ -116,11 +114,11 @@ namespace Arycama.CustomRenderPipeline
                     data.bufferHandle = bufferHandle;
                 }
 
-                return new (bufferHandle, isFirst);
+                renderGraph.ResourceMap.SetRenderPassData(new AutoExposureData(bufferHandle, isFirst));
             }
         }
 
-        public void Render(RTHandle input, int width, int height, Camera camera, AutoExposureData exposureData)
+        public void Render(RTHandle input, int width, int height)
         {
             var exposurePixels = exposureTexture.GetRawTextureData<float>();
 
@@ -141,7 +139,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(computeShader, 0, width, height);
                 pass.ReadTexture("Input", input);
                 pass.WriteBuffer("LuminanceHistogram", histogram);
-                pass.ReadBuffer("Exposure", exposureData.exposureBuffer);
+                pass.AddRenderPassData<AutoExposureData>();
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
@@ -170,7 +168,6 @@ namespace Arycama.CustomRenderPipeline
                 data.histogramMin = settings.HistogramPercentages.x;
                 data.histogramMax = settings.HistogramPercentages.y;
                 data.exposureCompensationRemap = GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1);
-                data.exposureBuffer = exposureData.exposureBuffer;
                 data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
             }
 
@@ -181,7 +178,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(computeShader, 1, 1);
                 pass.ReadBuffer("LuminanceHistogram", histogram);
                 pass.WriteBuffer("LuminanceOutput", output);
-                pass.ReadBuffer("Exposure", exposureData.exposureBuffer);
+                pass.AddRenderPassData<AutoExposureData>();
 
                 var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
                 {
@@ -191,20 +188,18 @@ namespace Arycama.CustomRenderPipeline
                 });
 
                 data.exposureTexture = exposureTexture;
-                data.exposureBuffer = exposureData.exposureBuffer;
                 data.mode = settings.ExposureMode;
-                data.isFirst = exposureData.IsFirst;
             }
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Auto Exposure"))
             {
                 var data = pass.SetRenderFunction<Pass2Data>((command, context, pass, data) =>
                 {
-                    command.CopyBuffer(data.output, data.exposureBuffer);
+                    var exposureData = pass.RenderGraph.ResourceMap.GetRenderPassData<AutoExposureData>();
+                    command.CopyBuffer(data.output, exposureData.exposureBuffer);
                 });
 
                 data.output = output;
-                data.exposureBuffer = exposureData.exposureBuffer;
             }
         }
 
