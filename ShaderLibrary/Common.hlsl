@@ -61,6 +61,8 @@ cbuffer FrameData
 	uint _BlockerSamples, _DirectionalLightCount, _PcfSamples, _PointLightCount, _TileSize;
 	
 	float _InPlayMode;
+	float _SpecularAAScreenSpaceVariance;
+	float _SpecularAAThreshold;
 };
 
 cbuffer CameraData

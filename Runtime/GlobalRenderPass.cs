@@ -31,6 +31,11 @@ namespace Arycama.CustomRenderPipeline
             command.SetGlobalFloat(propertyName, value);
         }
 
+        public override void SetFloatArray(CommandBuffer command, string propertyName, float[] value)
+        {
+            command.SetGlobalFloatArray(propertyName, value);
+        }
+
         public override void SetInt(CommandBuffer command, string propertyName, int value)
         {
             command.SetGlobalInt(propertyName, value);

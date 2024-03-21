@@ -49,6 +49,11 @@ namespace Arycama.CustomRenderPipeline
             propertyBlock.SetFloat(propertyName, value);
         }
 
+        public override void SetFloatArray(CommandBuffer command, string propertyName, float[] value)
+        {
+            propertyBlock.SetFloatArray(propertyName, value);
+        }
+
         public override void SetInt(CommandBuffer command, string propertyName, int value)
         {
             propertyBlock.SetInt(propertyName, value);

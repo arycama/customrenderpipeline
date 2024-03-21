@@ -190,14 +190,15 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 {
 	#ifdef REFLECTION_PROBE
 		float3 rd = -MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
+		float2 offsets = InterleavedGradientNoise(position.xy, 0);
 	#else
 		float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+		float2 offsets = _BlueNoise2D[position.xy % 128];
 	#endif
 	
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
 	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, rd.y);
 	
-	float2 offsets = _BlueNoise2D[position.xy % 128];
 	float3 colorMask = floor(offsets.y * 3.0) == float3(0.0, 1.0, 2.0);
 	
 	float cosViewAngle = rd.y;

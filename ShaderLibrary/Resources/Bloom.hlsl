@@ -14,7 +14,7 @@ float3 FragmentDownsample(float4 position : SV_Position) : SV_Target
 	
 	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-1, -1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
 	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(1, -1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-1, 1)) * _InputScaleLimit.x, _InputScaleLimit.zw)) * 0.125;
+	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-1, 1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
 	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(1, 1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
 	
 	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-2, 0)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.0625;
