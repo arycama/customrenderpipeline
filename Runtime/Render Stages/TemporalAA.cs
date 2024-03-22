@@ -20,8 +20,6 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Range(0.0f, 4.0f)] public float FilterSize { get; private set; } = 1.5f;
             [field: SerializeField] public bool JitterOverride { get; private set; } = false;
             [field: SerializeField] public Vector2 JitterOverrideValue { get; private set; } = Vector2.zero;
-            [field: SerializeField] public bool SeperateMotionPass { get; private set; } = true;
-            [field: SerializeField] public bool SeperateColorPass { get; private set; } = true;
 
             /// <summary>Larger is this value, more likely history will be rejected when current and reprojected history motion vector differ by a substantial amount.
             /// Larger values can decrease ghosting but will also reintroduce aliasing on the aforementioned cases.</summary>
@@ -104,37 +102,9 @@ namespace Arycama.CustomRenderPipeline
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
             var (current, history, wasCreated) = textureCache.GetTextures(camera.pixelWidth, camera.pixelHeight, camera);
 
-            if (settings.SeperateMotionPass)
-            {
-                var tempVelocity = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, motion.Format);
-                using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA"))
-                {
-                    pass.Initialize(material, 0);
-                    pass.ReadTexture("_Velocity", motion);
-                    pass.WriteTexture(tempVelocity);
-                }
-
-                motion = tempVelocity;
-            }
-
-            if (settings.SeperateColorPass)
-            {
-                var tempColor = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32);
-                using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA"))
-                {
-                    pass.Initialize(material, 1);
-                    pass.ReadTexture("_Input", input);
-                    pass.WriteTexture(tempColor);
-                }
-
-                input = tempColor;
-            }
-
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA"))
             {
-                var keyword = (settings.SeperateMotionPass && settings.SeperateColorPass) ? "NO_VELOCITY_OR_COLOR" : (settings.SeperateMotionPass ? "NO_VELOCITY" : (settings.SeperateColorPass ? "NO_COLOR" : ""));
-
-                pass.Initialize(material, 2, 1, keyword);
+                pass.Initialize(material);
                 pass.ReadTexture("_Input", input);
                 pass.ReadTexture("_Velocity", motion);
                 pass.ReadTexture("_History", history);
@@ -157,6 +127,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                     pass.SetVector(command, "_Resolution", data.resolution);
                     pass.SetVector(command, "_MaxResolution", data.maxResolution);
+                    pass.SetVector(command, "_Jitter", data.jitter);
 
                     pass.SetInt(command, "_MaxWidth", data.maxWidth);
                     pass.SetInt(command, "_MaxHeight", data.maxHeight);
@@ -174,8 +145,8 @@ namespace Arycama.CustomRenderPipeline
                 data.jitter = Jitter;
                 data.scaledResolution = new Vector4(camera.pixelWidth * scale, camera.pixelHeight * scale, 1.0f / (camera.pixelWidth * scale), 1.0f / (camera.pixelHeight * scale));
                 data.resolution = new Vector4(camera.pixelWidth, camera.pixelHeight, 1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight);
-                data.maxWidth = camera.pixelWidth - 1;
-                data.maxHeight = camera.pixelHeight - 1;
+                data.maxWidth = Mathf.FloorToInt(camera.pixelWidth * scale) - 1;
+                data.maxHeight = Mathf.FloorToInt(camera.pixelHeight) - 1;
                 data.maxResolution = new Vector2(camera.pixelWidth - 1, camera.pixelHeight - 1);
 
                 float minAntiflicker = 0.0f;
@@ -204,7 +175,7 @@ namespace Arycama.CustomRenderPipeline
 
                 var colorWeights = ArrayPool<float>.Get(12); // Only need 9, but need 12 for alignment rules
                 var weightSum = 0.0f;
-                var size = settings.FilterSize;
+                var size = settings.FilterSize * scale;
                 //var alpha = settings.FilterAlpha;
 
                 data.antiFlickerIntensity = antiFlicker;
@@ -225,8 +196,8 @@ namespace Arycama.CustomRenderPipeline
                 {
                     for (var x = -1; x <= 1; x++, i++)
                     {
-                        var xCoord = x + data.jitter.x;
-                        var yCoord = y + data.jitter.y;
+                        var xCoord = (x + data.jitter.x) / scale;
+                        var yCoord = (y + data.jitter.y) / scale;
                         var d = (xCoord * xCoord + yCoord * yCoord);
 
                         float weight;

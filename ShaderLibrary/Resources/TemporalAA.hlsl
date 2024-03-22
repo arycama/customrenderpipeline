@@ -38,31 +38,6 @@ float GetColorWeight(float2 offset)
 	return delta.x * delta.y;
 }
 
-float2 FragmentMaxVelocity(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
-{
-	int2 offsets[9] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(0, 0), int2(1, 0), int2(1, -1), int2(1, 0), int2(1, 1)};
-	int2 centerCoord = (int2)(position.xy);
-	
-	float3 maxVelocity;
-	for(uint i = 0; i < 9; i++)
-	{
-		float2 currentVelocity = _Velocity[centerCoord + offsets[i]];
-		float velLenSqr = SqrLength(currentVelocity);
-		maxVelocity = (i == 0 || (velLenSqr > maxVelocity.z)) ? float3(currentVelocity, velLenSqr) : maxVelocity;
-	}
-	
-	return maxVelocity.xy;
-}
-
-float3 FragmentProcessColor(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
-{
-	float3 color = _Input[position.xy];
-	color = RGBToYCoCg(color);
-	color *= rcp(1.0 + color.r);
-	color.gb += 0.5;
-	return color;
-}
-
 //float ModifyBlendWithMotionVectorRejection(float mvLen, float2 prevUV, float blendFactor, float speedRejectionFactor, float2 rtHandleScale)
 //{
 //    // TODO: This needs some refinement, it can lead to some annoying flickering coming back on strong camera movement.
@@ -124,25 +99,26 @@ float GetUpsampleConfidence(float2 inputToOutputVec, float confidenceThreshold, 
 
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 {
-	int2 centerCoord = (int2)(position.xy);
+	float2 unjitteredTexel = uv - (_Jitter * _ScaledResolution.zw);
+	float2 scaledUv = unjitteredTexel * _ScaledResolution.xy - 0.5 + rcp(512.0);
 	
-	//uint2 offsets[9] = {uint2(0, 0), uint2(1, 0), uint2(2, 0), uint2(0, 1), uint2(1, 1), uint2(2, 1), uint2(0, 2), uint2(1, 2), uint2(2, 2)};
+	int2 centerCoord = (int2) (scaledUv.xy);
+	
 	int2 offsets[9] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(0, 0), int2(1, 0), int2(1, -1), int2(1, 0), int2(1, 1)};
 	
 	uint i;
-	#if defined(NO_VELOCITY) || defined(NO_VELOCITY_OR_COLOR)
-		float2 maxVelocity = _Velocity[centerCoord];
-	#else
-		float3 maxVelocity;
-		for(i = 0; i < 9; i++)
-		{
-			float2 currentVelocity = _Velocity[centerCoord + offsets[i]];
-			float velLenSqr = SqrLength(currentVelocity);
-			maxVelocity = (i == 0 || (velLenSqr > maxVelocity.z)) ? float3(currentVelocity, velLenSqr) : maxVelocity;
-		}
-	#endif
+	float3 maxVelocity;
+	for(i = 0; i < 9; i++)
+	{
+		float2 sampleTexel = floor(scaledUv) + offsets[i];
+		float2 sampleUv = (sampleTexel + 0.5) * _ScaledResolution.zw;
+		
+		float2 currentVelocity = _Velocity[sampleUv];
+		float velLenSqr = SqrLength(currentVelocity);
+		maxVelocity = (i == 0 || (velLenSqr > maxVelocity.z)) ? float3(currentVelocity, velLenSqr) : maxVelocity;
+	}
 	
-	float2 historyUv = uv - maxVelocity.xy;
+	float2 historyUv = uv - maxVelocity.xy * 0;
 	float3 historySample = _History.Sample(_LinearClampSampler, historyUv * _History_Scale.xy);
 	
 	float2 f = frac(historyUv * _ScaledResolution.xy - 0.5);
@@ -150,29 +126,39 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	
 	float historyWeights[9] = { 0.0, f.y * w.y, 0.0, (1.0 - f.x) * w.x, -w.x - w.y, f.x * w.x, 0.0, 0.0, (1.0 - f.y) * w.y };
 	
+	float maxWeight = 0.0, weightSum = 0.0;
 	float3 result = 0.0, history= 0.0, minValue, maxValue, mean = 0.0, stdDev= 0.0;
 	for(i = 0; i < 9; i++)
 	{
-		float3 color = _Input[clamp(centerCoord + offsets[i], 0, uint2(_MaxWidth, _MaxHeight))];
+		float2 sampleTexel = floor(scaledUv) + offsets[i];
+		float2 sampleUv = (sampleTexel + 0.5) * _ScaledResolution.zw;
 		
-		#if !defined(NO_COLOR) && !defined(NO_VELOCITY_OR_COLOR)
-			color = RGBToYCoCg(color);
-			color *= rcp(1.0 + color.r);
-		#else
-			color.gb -= 0.5;
-		#endif
+		float2 weights = saturate(1.0 - abs(scaledUv - sampleTexel) / _Scale);
+		
+		//float3 color = _Input[clamp(sampleUv, 0, uint2(_MaxWidth, _MaxHeight))];
+		float3 color = _Input.Sample(_PointClampSampler, sampleUv * _Input_Scale.xy);
+		color = RGBToYCoCg(color);
+		color *= rcp(1.0 + color.r);
 		
 		minValue = i == 0 ? color : min(minValue, color);
 		maxValue = i == 0 ? color : max(maxValue, color);
 		mean += color;
 		stdDev += color * color;
-		result += color * _FilterWeights[i];
-		history += historyWeights[i];
+		result += color * weights.x * weights.y;// _FilterWeights[i];
+		//history += historyWeights[i];
+	
+		maxWeight = max(maxWeight, weights.x * weights.y);
+		weightSum += weights.x * weights.y;
 	}
 	
-	history *=  rcp(w.x + w.y + 1.0);
+	if (weightSum)
+		result /= weightSum;
+	
+	
+	//history *=  rcp(w.x + w.y + 1.0);
 	history += ProcessColor(historySample * _PreviousToCurrentExposure);
 
+	#if 0
 	mean /= 9.0;
 	stdDev = sqrt(abs(stdDev / 9.0 - mean * mean));
 
@@ -229,12 +215,16 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	
 	float t = DistToAABB(history, result, mean - stdDev, mean + stdDev);
 	blendFactor = clamp(blendFactor, 0.03f, 0.98f);
+	#else
+		float blendFactor = 0.05 * maxWeight;
+	#endif
 	
+	float t = DistToAABB(history, result, minValue, maxValue);
 	history = lerp(history, result, saturate(t));
 	
 	[flatten]
 	if(_HasHistory && all(saturate(historyUv) == historyUv))
-		result = lerp(result, history, blendFactor);
+		result = lerp(history, result, blendFactor);
 	
 	result *= rcp(1.0 - result.r);
 	result = YCoCgToRGB(result);
