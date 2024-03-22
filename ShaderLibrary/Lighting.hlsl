@@ -490,7 +490,6 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	// Ambient
 	//illuminance = irradiance;
 	float3 luminance = FssEss * radiance + Fms * Ems * irradiance + (kD * irradiance + bkD * backIrradiance);
-	return irradiance;
 	
 	#ifdef REFLECTION_PROBE_RENDERING
 		luminance = kD * irradiance;

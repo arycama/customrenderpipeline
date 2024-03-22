@@ -21,6 +21,9 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public bool JitterOverride { get; private set; } = false;
             [field: SerializeField] public Vector2 JitterOverrideValue { get; private set; } = Vector2.zero;
 
+            [Range(0, 2)]
+            public float taaSharpenStrength = 0.5f;
+
             /// <summary>Larger is this value, more likely history will be rejected when current and reprojected history motion vector differ by a substantial amount.
             /// Larger values can decrease ghosting but will also reintroduce aliasing on the aforementioned cases.</summary>
             [Range(0.0f, 1.0f)]
@@ -95,6 +98,7 @@ namespace Arycama.CustomRenderPipeline
             internal float contrastForMaxAntiFlicker;
             internal float baseBlendFactor;
             internal float historyContrastBlendLerp;
+            internal float motionRejectionMultiplier;
         }
 
         public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
@@ -123,6 +127,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_ContrastForMaxAntiFlicker", data.contrastForMaxAntiFlicker);
                     pass.SetFloat(command, "_BaseBlendFactor", data.baseBlendFactor);
                     pass.SetFloat(command, "_HistoryContrastBlendLerp", data.historyContrastBlendLerp);
+                    pass.SetFloat(command, "_SharpenStrength", settings.taaSharpenStrength);
+                    pass.SetFloat(command, "_SpeedRejectionIntensity", data.motionRejectionMultiplier);
 
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                     pass.SetVector(command, "_Resolution", data.resolution);
@@ -151,46 +157,27 @@ namespace Arycama.CustomRenderPipeline
 
                 float minAntiflicker = 0.0f;
                 float maxAntiflicker = 3.5f;
-                float motionRejectionMultiplier = Mathf.Lerp(0.0f, 250.0f, settings.taaMotionVectorRejection * settings.taaMotionVectorRejection * settings.taaMotionVectorRejection);
+                data.motionRejectionMultiplier = Mathf.Lerp(0.0f, 250.0f, settings.taaMotionVectorRejection * settings.taaMotionVectorRejection * settings.taaMotionVectorRejection);
 
                 // The anti flicker becomes much more aggressive on higher values
                 float temporalContrastForMaxAntiFlicker = 0.7f - Mathf.Lerp(0.0f, 0.3f, Mathf.SmoothStep(0.5f, 1.0f, settings.taaAntiFlicker));
 
-                var postDoF = false;
-                bool TAAU = false;//camera.IsTAAUEnabled();
-                bool runsAfterUpscale = true;// (resGroup == ResolutionGroup.AfterDynamicResUpscale);
-
-                float antiFlickerLerpFactor = settings.taaAntiFlicker;
                 //float historySharpening = TAAU && postDoF ? 0.25f : settings.taaHistorySharpening;
 
-                //if (camera.camera.cameraType == CameraType.SceneView)
-                //{
-                //    // Force settings for scene view.
-                //    historySharpening = 0.25f;
-                //    antiFlickerLerpFactor = 0.7f;
-                //}
-                float antiFlicker = postDoF ? maxAntiflicker : Mathf.Lerp(minAntiflicker, maxAntiflicker, antiFlickerLerpFactor);
+                float antiFlicker = Mathf.Lerp(minAntiflicker, maxAntiflicker, settings.taaAntiFlicker);
                 const float historyContrastBlendStart = 0.51f;
-                float historyContrastLerp = Mathf.Clamp01((antiFlickerLerpFactor - historyContrastBlendStart) / (1.0f - historyContrastBlendStart));
+                data.historyContrastBlendLerp = Mathf.Clamp01((settings.taaAntiFlicker - historyContrastBlendStart) / (1.0f - historyContrastBlendStart));
 
                 var colorWeights = ArrayPool<float>.Get(12); // Only need 9, but need 12 for alignment rules
                 var weightSum = 0.0f;
                 var size = settings.FilterSize * scale;
-                //var alpha = settings.FilterAlpha;
 
                 data.antiFlickerIntensity = antiFlicker;
                 data.contrastForMaxAntiFlicker = temporalContrastForMaxAntiFlicker;
 
                 // For post dof we can be a bit more agressive with the taa base blend factor, since most aliasing has already been taken care of in the first TAA pass.
                 // The following MAD operation expands the range to a new minimum (and keeps max the same).
-                const float postDofMin = 0.4f;
-                const float TAABaseBlendFactorMin = 0.6f;
-                const float TAABaseBlendFactorMax = 0.95f;
-                const float scale1 = (TAABaseBlendFactorMax - postDofMin) / (TAABaseBlendFactorMax - TAABaseBlendFactorMin);
-                const float offset1 = postDofMin - TAABaseBlendFactorMin * scale1;
-                float taaBaseBlendFactor = postDoF ? settings.taaBaseBlendFactor * scale1 + offset1 : settings.taaBaseBlendFactor;
-                data.baseBlendFactor = taaBaseBlendFactor;
-                data.historyContrastBlendLerp = historyContrastLerp;
+                data.baseBlendFactor = settings.taaBaseBlendFactor;
 
                 for (int y = -1, i = 0; y <= 1; y++)
                 {
