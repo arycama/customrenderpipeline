@@ -32,6 +32,8 @@ FragmentOutput Fragment(float4 position : SV_Position)
 		float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
 		float cosViewAngle = rd.y;
 		float2 offsets = _BlueNoise2D[uint2(position.xy) % 128];
+		offsets.x = PlusNoise(position.xy);
+		offsets.y = 0.5;//PlusNoise(position.xy);
 	#endif
 	
 	FragmentOutput output;
@@ -128,32 +130,27 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 		return output;
 	}
 	
-	result.rgb = RGBToYCoCg(result.rgb);
+	result.rgb = RgbToYCoCg(result.rgb);
 	result.rgb *= rcp(1.0 + result.r);
 	
 	// Neighborhood clamp
-	float4 minValue = FloatMax, maxValue = FloatMin;
+	float4 minValue = result;
+	float4 maxValue = result;
+	int2 offsets[4] = {int2(0, -1), int2(-1, 0), int2(1, 0), int2(0, 1)};
+	
 	[unroll]
-	for (int y = -1; y <= 1; y++)
+	for (int i = 0; i < 4; i++)
 	{
-		[unroll]
-		for (int x = -1; x <= 1; x++)
-		{
-			int2 coord = pixelId + int2(x, y);
-			if(any(coord < 0 || coord > int2(_MaxWidth, _MaxHeight)))
-				continue;
+		float4 sample = _Input[pixelId + offsets[i]];
+		sample.rgb = RgbToYCoCg(sample.rgb);
+		sample.rgb *= rcp(1.0 + sample.r);
 			
-			float4 sample = _Input[coord];
-			sample.rgb = RGBToYCoCg(sample.rgb);
-			sample.rgb *= rcp(1.0 + sample.r);
-			
-			minValue = min(minValue, sample);
-			maxValue = max(maxValue, sample);
-		}
+		minValue = min(minValue, sample);
+		maxValue = max(maxValue, sample);
 	}
 
 	float4 history = _History.Sample(_LinearClampSampler, historyUv * _History_Scale.xy) * _PreviousToCurrentExposure;
-	history.rgb = RGBToYCoCg(history.rgb);
+	history.rgb = RgbToYCoCg(history.rgb);
 	history.rgb *= rcp(1.0 + history.r);
 	history = clamp(history, minValue, maxValue);
 	
@@ -162,7 +159,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 	result = lerp(result, history, blend);
 	
 	result.rgb *= rcp(1.0 - result.r);
-	result.rgb = YCoCgToRGB(result.rgb);
+	result.rgb = YCoCgToRgb(result.rgb);
 	
 	output.history = result;
 	output.result.rgb = result;

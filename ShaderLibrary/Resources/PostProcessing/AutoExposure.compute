@@ -32,7 +32,7 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
 	if (all(threadId < _ScaledResolution.xy))
 	{
 		float3 color = Input[threadId];
-		float luminance = Luminance(color) / _Exposure;
+		float luminance = Luminance(color) / (_Exposure + ExposureCompensation);
 		
 		float minLuminance = EV100ToLuminance(MinEv);
 		float maxLuminance = EV100ToLuminance(MaxEv);
@@ -84,7 +84,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	averageEv -= ExposureTexture.SampleLevel(_LinearClampSampler, float2(uv.x, 0.5), 0.0);
 		
 	float previousExposure = _Exposure;
-	float evLastFrame = ExposureToEV100(previousExposure);
+	float evLastFrame = ExposureToEV100(previousExposure) + ExposureCompensation;
 	float adaptedEv = lerp(averageEv, evLastFrame, exp(-DeltaTime * AdaptationSpeed));
 		
 	if (IsFirst || IsInfOrNaN(adaptedEv))
@@ -95,6 +95,8 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 		
 	if (IsInfOrNaN(adaptedEv))
 		adaptedEv = 1.0;
+	
+	adaptedEv -= ExposureCompensation;
 		
 	float4 currentExposure = EV100ToExposure(adaptedEv);
 	LuminanceOutput[0] = currentExposure; // Apply exposure

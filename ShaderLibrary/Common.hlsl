@@ -63,6 +63,7 @@ cbuffer FrameData
 	float _InPlayMode;
 	float _SpecularAAScreenSpaceVariance;
 	float _SpecularAAThreshold;
+	float _FrameIndex;
 };
 
 cbuffer CameraData

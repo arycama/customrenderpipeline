@@ -190,10 +190,11 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 {
 	#ifdef REFLECTION_PROBE
 		float3 rd = -MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
-		float2 offsets = InterleavedGradientNoise(position.xy, 0);
+		float2 offsets = float2(PlusNoise(position.xy), 0.5);
 	#else
 		float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
 		float2 offsets = _BlueNoise2D[position.xy % 128];
+		offsets = float2(PlusNoise(position.xy), 0.5);
 	#endif
 	
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
@@ -346,7 +347,9 @@ float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTarge
 		}
 	}
 	
-	return IsInfOrNaN(luminance) ? 0.0 : luminance;
+	luminance = isnan(luminance) ? 0.0 : luminance;
+	
+	return luminance;
 }
 
 float4 _SkyInput_Scale, _SkyDepth_Scale, _PreviousDepth_Scale, _FrameCount_Scale, _SkyHistory_Scale;
@@ -406,7 +409,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 		return output;
 	}
 	
-	result = RGBToYCoCg(result);
+	result = RgbToYCoCg(result);
 	result *= rcp(1.0 + result.r);
 	
 	// Neighborhood clamp
@@ -422,7 +425,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 				continue;
 			
 			float3 sample = _SkyInput[coord];
-			sample = RGBToYCoCg(sample);
+			sample = RgbToYCoCg(sample);
 			sample *= rcp(1.0 + sample.r);
 			
 			minValue = min(minValue, sample);
@@ -435,7 +438,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 	float depthFactor = saturate(1.0 - _DepthFactor * (sceneDepth - previousDepth) / sceneDepth);
 	
 	float3 history = _SkyHistory.Sample(_LinearClampSampler, historyUv * _SkyHistory_Scale.xy) * _PreviousToCurrentExposure;
-	history = RGBToYCoCg(history);
+	history = RgbToYCoCg(history);
 	history *= rcp(1.0 + history.r);
 	
 	float3 window = (maxValue - minValue) * _ClampWindow;
@@ -467,7 +470,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 	frameCount += rcp(_MaxFrameCount);
 	
 	result *= rcp(1.0 - result.r);
-	result = YCoCgToRGB(result);
+	result = YCoCgToRgb(result);
 	
 	output.result = result;
 	output.motion = float4(motion, 0.0, depth == 0.0);

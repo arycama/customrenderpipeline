@@ -66,11 +66,15 @@ namespace Arycama.CustomRenderPipeline
 
         public void OnPreRender()
         {
-            var sampleIndex = renderGraph.FrameIndex % settings.SampleCount;
+            var sampleIndex = renderGraph.FrameIndex % settings.SampleCount + 1;
 
             Vector2 jitter;
-            jitter.x = Halton(sampleIndex + 1, 2) - 0.5f;
-            jitter.y = Halton(sampleIndex + 1, 3) - 0.5f;
+            jitter.x = Halton(sampleIndex, 2) - 0.5f;
+            jitter.y = Halton(sampleIndex, 3) - 0.5f;
+
+            // R2
+            //jitter = GetR2(sampleIndex) - new Vector2(0.5f, 0.5f);
+
             jitter *= settings.JitterSpread;
 
             if (settings.JitterOverride)
@@ -122,6 +126,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_VelocityBlending", data.motionBlending);
                     pass.SetFloat(command, "_VelocityWeight", data.motionWeight);
                     pass.SetFloat(command, "_Scale", data.scale);
+                    pass.SetFloat(command, "_FilterSize", settings.FilterSize);
 
                     pass.SetFloat(command, "_AntiFlickerIntensity", data.antiFlickerIntensity);
                     pass.SetFloat(command, "_ContrastForMaxAntiFlicker", data.contrastForMaxAntiFlicker);
@@ -129,6 +134,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_HistoryContrastBlendLerp", data.historyContrastBlendLerp);
                     pass.SetFloat(command, "_SharpenStrength", settings.taaSharpenStrength);
                     pass.SetFloat(command, "_SpeedRejectionIntensity", data.motionRejectionMultiplier);
+                    pass.SetVector(command, "_HistoryScaleLimit", new Vector4(history.Scale.x, history.Scale.y, history.Limit.x, history.Limit.y));
 
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                     pass.SetVector(command, "_Resolution", data.resolution);
@@ -152,7 +158,7 @@ namespace Arycama.CustomRenderPipeline
                 data.scaledResolution = new Vector4(camera.pixelWidth * scale, camera.pixelHeight * scale, 1.0f / (camera.pixelWidth * scale), 1.0f / (camera.pixelHeight * scale));
                 data.resolution = new Vector4(camera.pixelWidth, camera.pixelHeight, 1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight);
                 data.maxWidth = Mathf.FloorToInt(camera.pixelWidth * scale) - 1;
-                data.maxHeight = Mathf.FloorToInt(camera.pixelHeight) - 1;
+                data.maxHeight = Mathf.FloorToInt(camera.pixelHeight * scale) - 1;
                 data.maxResolution = new Vector2(camera.pixelWidth - 1, camera.pixelHeight - 1);
 
                 float minAntiflicker = 0.0f;
@@ -179,12 +185,14 @@ namespace Arycama.CustomRenderPipeline
                 // The following MAD operation expands the range to a new minimum (and keeps max the same).
                 data.baseBlendFactor = settings.taaBaseBlendFactor;
 
+
+
                 for (int y = -1, i = 0; y <= 1; y++)
                 {
                     for (var x = -1; x <= 1; x++, i++)
                     {
-                        var xCoord = (x + data.jitter.x) / scale;
-                        var yCoord = (y + data.jitter.y) / scale;
+                        var xCoord = (x + 0.1749999997f * 0.5f) / scale;
+                        var yCoord = (y + -0.3888888896f * 0.5f) / scale;
                         var d = (xCoord * xCoord + yCoord * yCoord);
 
                         float weight;
@@ -246,6 +254,22 @@ namespace Arycama.CustomRenderPipeline
             return current;
         }
 
+        Vector2 GetR2(float i)
+        {
+            // Plastic constant, https://en.wikipedia.org/wiki/Plastic_number
+            float phi2 = Mathf.Pow((9.0f + Mathf.Sqrt(69.0f)) / 18.0f, 1.0f / 3.0f) + Mathf.Pow((9.0f - Mathf.Sqrt(69.0f)) / 18.0f, 1.0f / 3.0f);
+
+            // We're using 1 - 1/phi instead of 1/phi for higher precision,
+            // as explained here: https://www.shadertoy.com/view/mts3zN
+            float c1 = i * (1.0f - 1.0f / phi2);
+            float c2 = i * (1.0f - 1.0f / (phi2 * phi2));
+
+            Vector2 result;
+            result.x = c1 - Mathf.Floor(c1);
+            result.y = c2 - Mathf.Floor(c2);
+            return result;
+        }
+
         public static float Halton(int index, int radix)
         {
             float result = 0f;
@@ -264,7 +288,7 @@ namespace Arycama.CustomRenderPipeline
 
         float Mitchell1D(float x, float B, float C)
         {
-            x = Mathf.Abs(2 * x);
+            x = Mathf.Abs(x);
 
             if (x <= 1.0f)
                 return ((12 - 9 * B - 6 * C) * x * x * x + (-18 + 12 * B + 6 * C) * x * x + (6 - 2 * B)) * (1.0f / 6.0f);

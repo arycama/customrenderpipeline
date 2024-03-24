@@ -390,7 +390,8 @@ namespace Arycama.CustomRenderPipeline
                 availableRtSlots.Enqueue(i);
             }
 
-            FrameIndex++;
+            if(!FrameDebugger.enabled)
+                FrameIndex++;
         }
 
         public void SetRTHandleWrite(RTHandle handle, int passIndex)

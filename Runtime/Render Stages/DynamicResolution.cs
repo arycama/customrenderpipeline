@@ -9,8 +9,8 @@ namespace Arycama.CustomRenderPipeline
         public class Settings
         {
             [SerializeField] private int targetFrameRate = 60;
-            [SerializeField] private float minScaleFactor = 0.5f;
-            [SerializeField] private float maxScaleFactor = 1.0f;
+            [SerializeField, Range(0.25f, 1.0f)] private float minScaleFactor = 0.5f;
+            [SerializeField, Range(0.25f, 1.0f)] private float maxScaleFactor = 1.0f;
             [SerializeField] private float damping = 0.05f;
 
             public int TargetFrameRate => targetFrameRate;
