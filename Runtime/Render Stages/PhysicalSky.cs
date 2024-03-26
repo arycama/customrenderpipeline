@@ -428,7 +428,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(RTHandle target, RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, LightingSetup.Result lightingSetupResult, PhysicalSky.Result atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, VolumetricClouds.CloudShadowDataResult cloudShadowData, Camera camera, CullingResults cullingResults, RTHandle velocity)
         {
-            var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
