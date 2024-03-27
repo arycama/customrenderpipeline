@@ -134,6 +134,5 @@ float PlusNoise(float2 p)
 	// https://blog.demofox.org/2022/02/01/two-low-discrepancy-grids-plus-shaped-sampling-ldg-and-r2-ldg/
 	// With added golden ratio noise
 	float goldenRatio = (1.0 + sqrt(5.0)) * rcp(2.0);
-	float u = frac(0.2 * floor(p.x) + (0.6 * floor(p.y) + 0.1)); // Unbiased,
-	return frac((u + _FrameIndex * goldenRatio));
+	return frac(0.2 * floor(p.x) + (0.6 * floor(p.y))+ _FrameIndex * goldenRatio); // Unbiased,
 }

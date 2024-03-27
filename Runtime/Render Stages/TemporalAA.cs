@@ -16,8 +16,6 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Range(0f, 0.99f)] public float StationaryBlending { get; private set; } = 0.95f;
             [field: SerializeField, Range(0f, 0.99f)] public float MotionBlending { get; private set; } = 0.85f;
             [field: SerializeField] public float MotionWeight { get; private set; } = 6000f;
-            [field: SerializeField] public FilterMode Filter { get; private set; } = FilterMode.Mitchell;
-            [field: SerializeField, Range(0.0f, 4.0f)] public float FilterSize { get; private set; } = 1.5f;
             [field: SerializeField] public bool JitterOverride { get; private set; } = false;
             [field: SerializeField] public Vector2 JitterOverrideValue { get; private set; } = Vector2.zero;
 
@@ -36,19 +34,6 @@ namespace Arycama.CustomRenderPipeline
             /// <summary> Determines how much the history buffer is blended together with current frame result. Higher values means more history contribution. </summary>
             [Range(0.6f, 0.95f)]
             public float taaBaseBlendFactor = 0.875f;
-
-            public enum FilterMode
-            {
-                None,
-                //Box,
-                Triangle,
-                //Gaussian,
-                BlackmanHarris,
-                Mitchell,
-                CatmullRom,
-                BSpline,
-                //Lanczos
-            }
         }
 
         private readonly Settings settings;
@@ -62,9 +47,49 @@ namespace Arycama.CustomRenderPipeline
             textureCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Temporal AA");
         }
 
-        public Vector2 Jitter { get; private set; }
+        public struct TemporalAAData : IRenderPassData
+        {
+            private readonly Vector4 jitter;
+            private readonly float maxCrossWeight;
+            private readonly float maxBoxWeight;
+            private readonly float centerCrossFilterWeight;
+            private readonly float centerBoxFilterWeight;
+            private readonly Vector4 crossFilterWeights;
+            private readonly Vector4 boxFilterWeights0;
+            private readonly Vector4 boxFilterWeights1;
 
-        public void OnPreRender()
+            public readonly Vector4 Jitter => jitter;
+
+            public TemporalAAData(Vector4 jitter, float maxCrossWeight, float maxBoxWeight, float centerCrossFilterWeight, float centerBoxFilterWeight, Vector4 crossFilterWeights, Vector4 boxFilterWeights0, Vector4 boxFilterWeights1)
+            {
+                this.jitter = jitter;
+                this.maxCrossWeight = maxCrossWeight;
+                this.maxBoxWeight = maxBoxWeight;
+                this.centerCrossFilterWeight = centerCrossFilterWeight;
+                this.centerBoxFilterWeight = centerBoxFilterWeight;
+                this.crossFilterWeights = crossFilterWeights;
+                this.boxFilterWeights0 = boxFilterWeights0;
+                this.boxFilterWeights1 = boxFilterWeights1;
+            }
+
+            public void SetInputs(RenderPass pass)
+            {
+            }
+
+            public void SetProperties(RenderPass pass, CommandBuffer command)
+            {
+                pass.SetVector(command, "_Jitter", jitter);
+                pass.SetFloat(command, "_MaxCrossWeight", maxCrossWeight);
+                pass.SetFloat(command, "_MaxBoxWeight", maxBoxWeight);
+                pass.SetFloat(command, "_CenterCrossFilterWeight", centerCrossFilterWeight);
+                pass.SetFloat(command, "_CenterBoxFilterWeight", centerBoxFilterWeight);
+                pass.SetVector(command, "_CrossFilterWeights", crossFilterWeights);
+                pass.SetVector(command, "_BoxFilterWeights0", boxFilterWeights0);
+                pass.SetVector(command, "_BoxFilterWeights1", boxFilterWeights1);
+            }
+        }
+
+        public void OnPreRender(int scaledWidth, int scaledHeight)
         {
             var sampleIndex = renderGraph.FrameIndex % settings.SampleCount + 1;
 
@@ -72,15 +97,55 @@ namespace Arycama.CustomRenderPipeline
             jitter.x = Halton(sampleIndex, 2) - 0.5f;
             jitter.y = Halton(sampleIndex, 3) - 0.5f;
 
-            // R2
-            //jitter = GetR2(sampleIndex) - new Vector2(0.5f, 0.5f);
-
             jitter *= settings.JitterSpread;
 
             if (settings.JitterOverride)
                 jitter = settings.JitterOverrideValue;
 
-            Jitter = jitter;
+
+            var weights = ArrayPool<float>.Get(9);
+            float boxWeightSum = 0.0f, crossWeightSum = 0.0f;
+            float maxCrossWeight = 0.0f, maxBoxWeight = 0.0f;
+            for (int y = -1, i = 0; y <= 1; y++)
+            {
+                for (var x = -1; x <= 1; x++, i++)
+                {
+                    var weight = Mitchell(x + jitter.x, y + jitter.y);
+
+                    weight = Mathf.Clamp01(1.0f - Mathf.Abs(x + jitter.x));
+                    weight *= Mathf.Clamp01(1.0f - Mathf.Abs(y + jitter.y));
+
+                    weights[i] = weight;
+                    boxWeightSum += weight;
+                    maxBoxWeight = Mathf.Max(maxBoxWeight, weight);
+
+                    if (x == 0 || y == 0)
+                    {
+                        crossWeightSum += weight;
+                        maxCrossWeight = Mathf.Max(maxCrossWeight, weight);
+                    }
+                }
+            }
+
+            // Normalize weights
+            var rcpCrossWeightSum = 1.0f / crossWeightSum;
+            var rcpBoxWeightSum = 1.0f / boxWeightSum;
+
+            var result = new TemporalAAData
+            (
+                jitter: new Vector4(jitter.x, jitter.y, jitter.x / scaledWidth, jitter.y / scaledHeight),
+                maxCrossWeight: maxCrossWeight,
+                maxBoxWeight: maxBoxWeight,
+                centerCrossFilterWeight: weights[4] * rcpCrossWeightSum,
+                centerBoxFilterWeight: weights[4] * rcpBoxWeightSum,
+                crossFilterWeights: new Vector4(weights[1], weights[3], weights[5], weights[7]) * rcpCrossWeightSum,
+                boxFilterWeights0: new Vector4(weights[0], weights[1], weights[2], weights[3]) * rcpBoxWeightSum,
+                boxFilterWeights1: new Vector4(weights[5], weights[6], weights[7], weights[8]) * rcpBoxWeightSum
+            );
+
+            ArrayPool<float>.Release(weights);
+
+            renderGraph.ResourceMap.SetRenderPassData<TemporalAAData>(result);
         }
 
         private class PassData
@@ -91,13 +156,11 @@ namespace Arycama.CustomRenderPipeline
             internal float motionBlending;
             internal float motionWeight;
             internal float scale;
-            internal Vector2 jitter;
             internal Vector4 scaledResolution;
             internal Vector4 resolution;
             internal int maxWidth;
             internal int maxHeight;
             internal Vector2 maxResolution;
-            internal float[] colorWeights;
             internal float antiFlickerIntensity;
             internal float contrastForMaxAntiFlicker;
             internal float baseBlendFactor;
@@ -117,6 +180,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Velocity", motion);
                 pass.ReadTexture("_History", history);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
+                pass.AddRenderPassData<TemporalAAData>();
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -126,7 +190,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_VelocityBlending", data.motionBlending);
                     pass.SetFloat(command, "_VelocityWeight", data.motionWeight);
                     pass.SetFloat(command, "_Scale", data.scale);
-                    pass.SetFloat(command, "_FilterSize", settings.FilterSize);
 
                     pass.SetFloat(command, "_AntiFlickerIntensity", data.antiFlickerIntensity);
                     pass.SetFloat(command, "_ContrastForMaxAntiFlicker", data.contrastForMaxAntiFlicker);
@@ -139,13 +202,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                     pass.SetVector(command, "_Resolution", data.resolution);
                     pass.SetVector(command, "_MaxResolution", data.maxResolution);
-                    pass.SetVector(command, "_Jitter", data.jitter);
 
                     pass.SetInt(command, "_MaxWidth", data.maxWidth);
                     pass.SetInt(command, "_MaxHeight", data.maxHeight);
-
-                    pass.SetFloatArray(command, "_FilterWeights", data.colorWeights);
-                    ArrayPool<float>.Release(data.colorWeights);
                 });
 
                 data.sharpness = settings.Sharpness * 0.8f;
@@ -154,7 +213,6 @@ namespace Arycama.CustomRenderPipeline
                 data.motionBlending = settings.MotionBlending;
                 data.motionWeight = settings.MotionWeight;
                 data.scale = scale;
-                data.jitter = Jitter;
                 data.scaledResolution = new Vector4(camera.pixelWidth * scale, camera.pixelHeight * scale, 1.0f / (camera.pixelWidth * scale), 1.0f / (camera.pixelHeight * scale));
                 data.resolution = new Vector4(camera.pixelWidth, camera.pixelHeight, 1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight);
                 data.maxWidth = Mathf.FloorToInt(camera.pixelWidth * scale) - 1;
@@ -174,100 +232,15 @@ namespace Arycama.CustomRenderPipeline
                 const float historyContrastBlendStart = 0.51f;
                 data.historyContrastBlendLerp = Mathf.Clamp01((settings.taaAntiFlicker - historyContrastBlendStart) / (1.0f - historyContrastBlendStart));
 
-                var colorWeights = ArrayPool<float>.Get(12); // Only need 9, but need 12 for alignment rules
-                var weightSum = 0.0f;
-                var size = settings.FilterSize * scale;
-
                 data.antiFlickerIntensity = antiFlicker;
                 data.contrastForMaxAntiFlicker = temporalContrastForMaxAntiFlicker;
 
                 // For post dof we can be a bit more agressive with the taa base blend factor, since most aliasing has already been taken care of in the first TAA pass.
                 // The following MAD operation expands the range to a new minimum (and keeps max the same).
                 data.baseBlendFactor = settings.taaBaseBlendFactor;
-
-
-
-                for (int y = -1, i = 0; y <= 1; y++)
-                {
-                    for (var x = -1; x <= 1; x++, i++)
-                    {
-                        var xCoord = (x + 0.1749999997f * 0.5f) / scale;
-                        var yCoord = (y + -0.3888888896f * 0.5f) / scale;
-                        var d = (xCoord * xCoord + yCoord * yCoord);
-
-                        float weight;
-                        switch (settings.Filter)
-                        {
-                            case Settings.FilterMode.None:
-                                weight = (x == 0 && y == 0) ? 1.0f : 0.0f;
-                                break;
-                            //case Settings.FilterMode.Box:
-                            //    weight = 1.0f;
-                            //    break;
-                            case Settings.FilterMode.Triangle:
-                                var deltaX = Mathf.Clamp01(1.0f - Mathf.Abs(xCoord));
-                                var deltaY = Mathf.Clamp01(1.0f - Mathf.Abs(yCoord));
-                                weight = deltaX * deltaY;
-                                break;
-                            //case Settings.FilterMode.Gaussian:
-                            //    {
-                            //        var expV = Mathf.Exp(-alpha * size * size);
-                            //        weight = Mathf.Max(0.0f, Mathf.Exp(-alpha * xCoord * xCoord) - expV);
-                            //        weight *= Mathf.Max(0.0f, Mathf.Exp(-alpha * yCoord * yCoord) - expV);
-                            //    }
-                            //    break;
-                            case Settings.FilterMode.BlackmanHarris:
-                                //weight = 0.35875f - 0.48829f*Mathf.Cos * (Mathf.PI*x/w + pi) + 0.14128*cos(2.*pi*x/w) - 0.01168*cos(3.*pi*x/w + pi*3.);
-                                weight = Mathf.Exp(-0.5f / 0.22f * d);
-                                break;
-                            case Settings.FilterMode.Mitchell:
-                                weight = Mitchell1D(xCoord / size, 1.0f / 3.0f, 1.0f / 3.0f) * Mitchell1D(yCoord / size, 1.0f / 3.0f, 1.0f / 3.0f);
-                                break;
-                            case Settings.FilterMode.CatmullRom:
-                                weight = Mitchell1D(xCoord / size, 0.0f, 0.5f) * Mitchell1D(yCoord / size, 0.0f, 0.5f);
-                                break;
-                            case Settings.FilterMode.BSpline:
-                                weight = Mitchell1D(xCoord / size, 1.0f, 0.0f) * Mitchell1D(yCoord / size, 1.0f, 0.0f);
-                                break;
-                            //case Settings.FilterMode.Lanczos:
-                            //    weight = WindowedSinc(xCoord, size, alpha) * WindowedSinc(yCoord, size, alpha);
-                            //    break;
-                            default:
-                                throw new ArgumentException(settings.Filter.ToString());
-                        }
-
-                        colorWeights[i] = weight;
-                        weightSum += weight;
-                    }
-                }
-
-                // Normalize weights
-                var rcpWeightSum = 1.0f / weightSum;
-                for (var i = 0; i < 9; i++)
-                {
-                    colorWeights[i] *= rcpWeightSum;
-                }
-
-                data.colorWeights = colorWeights;
             }
 
             return current;
-        }
-
-        Vector2 GetR2(float i)
-        {
-            // Plastic constant, https://en.wikipedia.org/wiki/Plastic_number
-            float phi2 = Mathf.Pow((9.0f + Mathf.Sqrt(69.0f)) / 18.0f, 1.0f / 3.0f) + Mathf.Pow((9.0f - Mathf.Sqrt(69.0f)) / 18.0f, 1.0f / 3.0f);
-
-            // We're using 1 - 1/phi instead of 1/phi for higher precision,
-            // as explained here: https://www.shadertoy.com/view/mts3zN
-            float c1 = i * (1.0f - 1.0f / phi2);
-            float c2 = i * (1.0f - 1.0f / (phi2 * phi2));
-
-            Vector2 result;
-            result.x = c1 - Mathf.Floor(c1);
-            result.y = c2 - Mathf.Floor(c2);
-            return result;
         }
 
         public static float Halton(int index, int radix)
@@ -286,8 +259,10 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        float Mitchell1D(float x, float B, float C)
+        float Mitchell1D(float x)
         {
+            var B = 1.0f / 3.0f;
+            var C = 1.0f / 3.0f;
             x = Mathf.Abs(x);
 
             if (x <= 1.0f)
@@ -298,16 +273,9 @@ namespace Arycama.CustomRenderPipeline
                 return 0.0f;
         }
 
-        float Sinc(float x)
+        private float Mitchell(float x, float y)
         {
-            return x == 0.0f ? 1.0f : Mathf.Sin(Mathf.PI * x) / (Mathf.PI * x);
-        }
-
-        float WindowedSinc(float x, float radius, float tau)
-        {
-            if (x > radius) return 0.0f;
-            var lanczos = Sinc(x / tau);
-            return Sinc(x) / lanczos;
+            return Mitchell1D(x) * Mitchell1D(y);
         }
     }
 }

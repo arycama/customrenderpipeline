@@ -1,11 +1,8 @@
 #include "../CloudCommon.hlsl"
+#include "../Color.hlsl"
+#include "../Temporal.hlsl"
 
-struct TemporalOutput
-{
-	float4 result : SV_Target0;
-	float4 history : SV_Target1;
-	float4 velocity : SV_Target2;
-};
+
 
 struct FragmentOutput
 {
@@ -32,8 +29,8 @@ FragmentOutput Fragment(float4 position : SV_Position)
 		float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
 		float cosViewAngle = rd.y;
 		float2 offsets = _BlueNoise2D[uint2(position.xy) % 128];
-		offsets.x = PlusNoise(position.xy);
-		offsets.y = 0.5;//PlusNoise(position.xy);
+		//offsets.x = PlusNoise(position.xy);
+		//offsets.y = 0.5;//PlusNoise(position.xy);
 	#endif
 	
 	FragmentOutput output;
@@ -90,6 +87,7 @@ FragmentOutput Fragment(float4 position : SV_Position)
 		float totalRayLength = rayEnd - cloudDepth;
 		output.result = float3(cloudDepth * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a);
 	#else
+		//result.rgb = RemoveNaN(RgbToXyy(result.rgb));
 		output.result = result;
 		output.depth = cloudDepth;
 	#endif
@@ -97,17 +95,20 @@ FragmentOutput Fragment(float4 position : SV_Position)
 	return output;
 }
 
-float4 _Input_Scale, _CloudDepth_Scale, _History_Scale;
+float4 _Input_Scale, _CloudDepth_Scale, _HistoryScaleLimit;
 uint _MaxWidth, _MaxHeight;
 float _IsFirst;
 float _StationaryBlend, _MotionBlend, _MotionFactor;
 
-TemporalOutput FragmentTemporal(float4 position : SV_Position)
+struct TemporalOutput
+{
+	float4 history : SV_Target0;
+	float4 velocity : SV_Target1;
+};
+
+TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD)
 {
 	int2 pixelId = (int2) position.xy;
-	float4 result = _Input[pixelId];
-	float depth = _Depth[pixelId];
-	
 	float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
 	float cloudDistance = _CloudDepth[pixelId];
 
@@ -117,54 +118,67 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 	float4 nonJitteredClip = WorldToClipNonJittered(worldPosition);
 	float2 motion = MotionVectorFragment(nonJitteredClip, previousClip);
 	
-	float2 uv = position.xy * _ScaledResolution.zw;
 	float2 historyUv = uv - motion;
 	
-	TemporalOutput output;
-	if (_IsFirst || any(saturate(historyUv) != historyUv))
-	{
-		output.history = result;
-		output.result.rgb = result;
-		output.result.a = (depth != 0.0) * result.a;
-		output.velocity = cloudDistance == 0.0 ? 1.0 : float4(motion, 0.0, depth == 0.0 ? 0.0 : result.a);
-		return output;
-	}
-	
-	result.rgb = RgbToYCoCg(result.rgb);
-	result.rgb *= rcp(1.0 + result.r);
-	
 	// Neighborhood clamp
-	float4 minValue = result;
-	float4 maxValue = result;
-	int2 offsets[4] = {int2(0, -1), int2(-1, 0), int2(1, 0), int2(0, 1)};
+	int2 offsets[8] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(1, 0), int2(-1, 1), int2(0, 1), int2(1, 1)};
+	float4 minValue, maxValue, result;
+	result = _Input[pixelId];
+	minValue = maxValue = float4(RgbToYCoCgFastTonemap(result.rgb), result.a);
+	result *= _CenterBoxFilterWeight;
 	
 	[unroll]
 	for (int i = 0; i < 4; i++)
 	{
-		float4 sample = _Input[pixelId + offsets[i]];
-		sample.rgb = RgbToYCoCg(sample.rgb);
-		sample.rgb *= rcp(1.0 + sample.r);
-			
-		minValue = min(minValue, sample);
-		maxValue = max(maxValue, sample);
+		float4 color = _Input[pixelId + offsets[i]];
+		result += color * _BoxFilterWeights0[i];
+		color.rgb = RgbToYCoCgFastTonemap(color.rgb);
+		minValue = min(minValue, color);
+		maxValue = max(maxValue, color);
 	}
+	
+	[unroll]
+	for (int i = 0; i < 4; i++)
+	{
+		float4 color = _Input[pixelId + offsets[i + 4]];
+		result += color * _BoxFilterWeights1[i];
+		color.rgb = RgbToYCoCgFastTonemap(color.rgb);
+		minValue = min(minValue, color);
+		maxValue = max(maxValue, color);
+	}
+	
+	result.rgb = RgbToYCoCgFastTonemap(result.rgb);
 
-	float4 history = _History.Sample(_LinearClampSampler, historyUv * _History_Scale.xy) * _PreviousToCurrentExposure;
-	history.rgb = RgbToYCoCg(history.rgb);
-	history.rgb *= rcp(1.0 + history.r);
-	history = clamp(history, minValue, maxValue);
+	float4 history = _History.Sample(_PointClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
+	history.rgb = RgbToYCoCgFastTonemap(history.rgb);
+	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
+	
+	// Not sure what best way to handle is, not clamping reduces flicker which is the main issue
+	//history.a = clamp(history.a, minValue.a, maxValue.a);
 	
 	float motionLength = saturate(length(motion) * _MotionFactor);
 	float blend = lerp(_StationaryBlend, _MotionBlend, motionLength);
-	result = lerp(result, history, blend);
 	
-	result.rgb *= rcp(1.0 - result.r);
-	result.rgb = YCoCgToRgb(result.rgb);
+	if (!_IsFirst && all(saturate(historyUv) == historyUv))
+		result = lerp(history, result, (1.0 - blend) * _MaxBoxWeight);
 	
+	float depth = _Depth[pixelId];
+	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
+	
+	TemporalOutput output;
 	output.history = result;
-	output.result.rgb = result;
-	output.result.a = (depth != 0.0) * result.a;
 	output.velocity = cloudDistance == 0.0 ? 1.0 : float4(motion, 0.0, depth == 0.0 ? 0.0 : result.a);
-	
 	return output;
+}
+
+float4 _InputScaleLimit;
+
+float4 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
+{
+	// Stencil? 
+	float depth = _Depth[position.xy];
+	
+	// Sample the clouds at the re-jittered coordinate, so that the final TAA resolve will not add further jitter. 
+	float4 result = _Input.Sample(_LinearClampSampler, min((uv + _Jitter.zw) * _InputScaleLimit.xy, _InputScaleLimit.zw));
+	return float4(result.rgb, (depth != 0.0) * result.a);
 }

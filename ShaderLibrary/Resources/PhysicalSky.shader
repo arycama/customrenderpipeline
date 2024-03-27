@@ -81,13 +81,24 @@ Shader "Hidden/Physical Sky"
         {
             Name "Spatial"
 
-            Blend 0 One One
-            Blend 1 Off
-
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSpatial
+            #include "PhysicalSky.hlsl"
+            ENDHLSL
+        }
+
+		Pass
+        {
+            Name "Combine"
+
+            Blend One One
+
+            HLSLPROGRAM
+            #pragma target 5.0
+            #pragma vertex VertexFullscreenTriangle
+            #pragma fragment FragmentCombine
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }

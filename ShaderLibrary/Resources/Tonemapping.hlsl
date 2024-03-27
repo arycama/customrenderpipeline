@@ -1,4 +1,5 @@
 #include "../Common.hlsl"
+#include "../Color.hlsl"
 
 Texture2D<float3> _MainTex, _Bloom;
 Texture2D<float> _GrainTexture;

@@ -1,8 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Profiling;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -467,7 +465,6 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Temporal"))
             {
                 pass.Initialize(material, 5);
-                pass.WriteTexture(cameraTarget, RenderBufferLoadAction.Load);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(velocity, RenderBufferLoadAction.Load);
                 pass.ReadTexture("_Input", cloudTemp);
@@ -475,6 +472,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_CloudDepth", cloudDepth);
                 pass.ReadTexture("_Depth", cameraDepth);
                 commonPassData.SetInputs(pass);
+                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -488,12 +486,29 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightDirection1", lightDirection1);
                     pass.SetVector(command, "_LightColor1", lightColor1);
 
+                    pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
+
                     pass.SetInt(command, "_MaxWidth", width - 1);
                     pass.SetInt(command, "_MaxHeight", height - 1);
 
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
                     settings.SetCloudPassData(command, pass);
                     commonPassData.SetProperties(pass, command);
+                });
+            }
+
+            // Final output
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Output"))
+            {
+                pass.Initialize(material, 6);
+                pass.WriteTexture(cameraTarget, RenderBufferLoadAction.Load);
+                pass.ReadTexture("_Input", current);
+                pass.ReadTexture("_Depth", cameraDepth);
+                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    pass.SetVector(command, "_InputScaleLimit", current.ScaleLimit2D);
                 });
             }
 

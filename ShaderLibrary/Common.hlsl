@@ -99,15 +99,11 @@ cbuffer CameraData
 	float3 _ViewPosition;
 	float _Near;
 	
-	float2 _Jitter;
-	float _Far;
-	float _CameraDataPadding0;
-	
 	float4 _ScaledResolution;
 	float4 _VolumetricLighting_Scale;
 	
 	float3 _CameraForward;
-	float _CameraDataPadding1;
+	float _Far;
 	
 	float3 _PreviousViewPosition;
 	float _CameraDataPadding2;
@@ -196,23 +192,6 @@ float EyeToDeviceDepth(float eyeDepth)
 	return (1.0 - eyeDepth * rcp(_Far)) * rcp(eyeDepth * (rcp(_Near) - rcp(_Far)));
 }
 
-float Max2(float2 x) { return max(x.x, x.y); }
-
-float Max3(float3 x) 
-{ 
-#ifdef INTRINSIC_MINMAX3
-	return Max3(x.x, x.y, x.z);
-#else
-	return max(x.x, max(x.y, x.z)); 
-#endif
-}
-
-float Max4(float4 x) { return Max2(max(x.xy, x.zw)); }
-
-float Min2(float2 x) { return min(x.x, x.y); }
-float Min3(float3 x) { return min(x.x, min(x.y, x.z)); }
-float Min4(float4 x) { return Min2(min(x.xy, x.zw)); }
-
 // Normalize if bool is set to true
 float3 ConditionalNormalize(float3 input, bool doNormalize) { return doNormalize ? normalize(input) : input; }
 
@@ -252,7 +231,7 @@ float3 ObjectToWorld(float3 position, uint instanceID)
 float3 PreviousObjectToWorld(float3 position)
 {
 	float3x4 previousObjectToWorld = _InPlayMode ? unity_MatrixPreviousM : unity_ObjectToWorld;
-	previousObjectToWorld._m03_m13_m23 -= _ViewPosition;
+	previousObjectToWorld._m03_m13_m23 -= (_ViewPosition);
 	return MultiplyPoint3x4(previousObjectToWorld, position);
 }
 
@@ -465,16 +444,6 @@ float4 SampleVolumetricLighting(float2 pixelPosition, float eyeDepth)
 
 bool1 IsInfOrNaN(float1 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
 bool3 IsInfOrNaN(float3 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
-
-float2 UnjitterTextureUV(float2 uv)
-{
-	return uv - ddx_fine(uv) * _Jitter.x - ddy_fine(uv) * _Jitter.y;
-}
-
-float Luminance(float3 color)
-{
-	return dot(color, float3(0.2126729, 0.7151522, 0.0721750));
-}
 
 const static float Sensitivity = 100.0;
 const static float LensAttenuation = 0.65; // q

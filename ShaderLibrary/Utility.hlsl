@@ -156,19 +156,33 @@ float QuadReadAcrossDiagonal(float value, uint2 screenPos)
 	return X - (ddy_fine(value) * quadDir.y);
 }
 
-float3 RgbToYCoCg(float3 rgb)
-{
-	float3 yCoCg = float3(0.25, 0.5, -0.25) * rgb.r;
-	yCoCg += float3(0.25, -0.5, -0.25) * rgb.b;
-	yCoCg.xz += 0.5 * rgb.g;
-	return yCoCg;
+float Max2(float2 x) { return max(x.x, x.y); }
+
+float Max3(float3 x) 
+{ 
+#ifdef INTRINSIC_MINMAX3
+	return Max3(x.x, x.y, x.z);
+#else
+	return max(x.x, max(x.y, x.z)); 
+#endif
 }
-    
-float3 YCoCgToRgb(float3 yCoCg)
+
+float Max4(float4 x) { return Max2(max(x.xy, x.zw)); }
+
+float Min2(float2 x) { return min(x.x, x.y); }
+float Min3(float3 x) { return min(x.x, min(x.y, x.z)); }
+float Min4(float4 x) { return Min2(min(x.xy, x.zw)); }
+
+float DistToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
 {
-	float3 rgb = float2(-1.0, 1.0).xyx * yCoCg.z + yCoCg.x;
-	rgb.rb += float2(1.0, -1.0) * yCoCg.y;
-	return rgb;
+	float3 rcpDir = rcp(target - origin);
+	return Max3(min(boxMin * rcpDir, boxMax * rcpDir) - origin * rcpDir);
+}
+
+float3 ClipToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
+{
+	float t = DistToAABB(origin, target, boxMin, boxMax);
+	return lerp(origin, target, saturate(t));
 }
 
 #endif

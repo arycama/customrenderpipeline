@@ -1,5 +1,7 @@
 #include "../Common.hlsl"
 #include "../Utility.hlsl"
+#include "../Color.hlsl"
+#include "../Temporal.hlsl"
 
 Texture2D<float3> _Input, _History;
 Texture2D<float2> _Velocity;
@@ -17,25 +19,10 @@ cbuffer Properties
 	float _ContrastForMaxAntiFlicker; // _TaaPostParameters.w
 	float _BaseBlendFactor; // _TaaPostParameters1.x
 	float _HistoryContrastBlendLerp; // _TaaPostParameters1.w
-	
-	float _FilterWeights[12];
 };
 
 float _SharpenStrength;
 float _SpeedRejectionIntensity;
-
-float DistToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
-{
-	float3 rcpDir = rcp(target - origin);
-	return Max3(min(boxMin * rcpDir, boxMax * rcpDir) - origin * rcpDir);
-}
-
-float3 ProcessColor(float3 color)
-{
-	color = RgbToYCoCg(color);
-	color *= rcp(1.0 + color.r);
-	return color;
-}
 
 float ModifyBlendWithMotionVectorRejection(float mvLen, float2 prevUV, float blendFactor, float speedRejectionFactor)
 {
@@ -47,23 +34,6 @@ float ModifyBlendWithMotionVectorRejection(float mvLen, float2 prevUV, float ble
 	diff -= 0.015935382;
 	float val = saturate(diff * speedRejectionFactor);
 	return lerp(blendFactor, 0.97f, val * val);
-}
-
-// TODO: This is not great and sub optimal since it really needs to be in linear and the data is already in perceptive space
-float3 SharpenColor(float3 avgNeighbour, float3 color, float sharpenStrength)
-{
-	float3 linearC = color * rcp(1.0 - color.r);
-	float3 linearAvg = avgNeighbour * rcp(1.0 - avgNeighbour.r);
-
-    // Rotating back to RGB it leads to better behaviour when sharpening, a better approach needs definitively to be investigated in the future.
-
-	linearC = YCoCgToRgb(linearC);
-	linearAvg = YCoCgToRgb(linearAvg);
-	linearC = linearC + max(0, (linearC - linearAvg)) * sharpenStrength * 3;
-
-	linearC = RgbToYCoCg(linearC);
-
-	return linearC * rcp(1.0 + linearC.r);
 }
 
  float Mitchell1D(float x)
@@ -81,31 +51,14 @@ float3 SharpenColor(float3 avgNeighbour, float3 color, float sharpenStrength)
         return 0.0f;
 }
 
-float Sinc(float x)
-{
-	return x ? sin(Pi * x) / (Pi * x) : 1.0;
-}
-
-float Lanczos(float x, float t)
-{
-	return Sinc(x) / Sinc(x / t);
-}
-
-// FSR1 lanczos approximation. Input is x*x and must be <= 4.
-float Lanczos2ApproxSqNoClamp(float x2)
-{
-	if(x2 >= 2.0)
-		return 0.0;
-		
-	float a = (2.0 / 5.0) * x2 - 1.0;
-	float b = (1.0 / 4.0) * x2 - 1.0;
-	return ((25.0 / 16.0) * a * a - (25.0 / 16.0 - 1.0)) * (b * b);
-}
-
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target0
 {
-	float2 centerCoord = floor(position.xy * _Scale - _Jitter);
-
+	#ifdef UPSCALE
+		uint2 centerCoord = (uint2)(position.xy * _Scale - _Jitter.xy);
+	#else
+		uint2 centerCoord = (uint2)position.xy;
+	#endif
+	
 	float2 maxVelocity = 0.0;
 	for(int y = -1; y <= 1; y++)
 	{
@@ -118,61 +71,56 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	
 	float2 historyUv = uv - maxVelocity;
 	float2 f = frac(historyUv * _ScaledResolution.xy - 0.5);
-	float2 w = _Sharpness * f * (f - 1.0);
+	float2 w = _Sharpness * (f * f - f);
 	float historyWeights[9] = { 0.0, f.y * w.y, 0.0, (1.0 - f.x) * w.x, -w.x - w.y, f.x * w.x, 0.0, 0.0, (1.0 - f.y) * w.y };
 	
+	float _FilterWeights[9] = { _BoxFilterWeights0[0], _BoxFilterWeights0[1],_BoxFilterWeights0[2],_BoxFilterWeights0[3], _CenterBoxFilterWeight, _BoxFilterWeights1[0], _BoxFilterWeights1[1], _BoxFilterWeights1[2], _BoxFilterWeights1[3]};
+	
 	float3 result = 0.0, history = 0.0, mean = 0.0, stdDev = 0.0, averageNeighbour = 0.0;
-	float totalWeight = 0.0, maxWeight = 0.0;
+	
+	#ifdef UPSCALE
+		float totalWeight = 0.0, maxWeight = 0.0;
+	#else
+		float totalWeight = 1.0, maxWeight = _MaxBoxWeight;
+	#endif
 	
 	for(int y = -1, i = 0; y <= 1; y++)
 	{
 		for(int x = -1; x <= 1; x++, i++)
 		{
-			float3 color = ProcessColor(_Input[min(centerCoord + int2(x, y), int2(_MaxWidth, _MaxHeight))]);
+			float3 color = (_Input[min(centerCoord + int2(x, y), int2(_MaxWidth, _MaxHeight))]);
 			
-			float2 srcCoord = (floor(position.xy * _Scale - _Jitter) + 0.5 + float2(x, y) + _Jitter) / _Scale;
-			
-			float2 delta = srcCoord - position.xy;
-			
-			// Spiky gaussian (See for honor presentation)
-			float weight = exp2(-0.5f * dot(delta, delta) / Sq(0.4));
-			
-			//weight = saturate(1.0 - abs(delta.x)) * saturate(1.0 - abs(delta.y));
-			
-			//weight = Lanczos2ApproxSqNoClamp(SqrLength(delta));
-			//weight = Lanczos2ApproxSqNoClamp(Sq(delta.x)) * Lanczos2ApproxSqNoClamp(Sq(delta.y));
-			
-			//weight = Mitchell1D(delta.x) * Mitchell1D(delta.y);
-			
-			//weight = all(abs(delta < 1e-6));
-			
-			//weight = Lanczos(delta.x, _FilterSize * 8) * Lanczos(delta.y, _FilterSize * 8);
-			
-			weight = _FilterWeights[i];
-			
-			maxWeight = max(maxWeight, weight);
-			result += color * weight;
-			totalWeight += weight;
-		
-			mean += color;
-			stdDev += color * color;
+			#ifdef UPSCALE
+				float2 delta = (floor(position.xy * _Scale - _Jitter.xy) + 0.5 + float2(x, y) + _Jitter.xy) / _Scale - position.xy;
+				float weight = Mitchell1D(delta.x) * Mitchell1D(delta.y);
+				maxWeight = max(maxWeight, weight);
+				totalWeight += weight;
+			#else
+				float weight = _FilterWeights[i];
+			#endif
 			
 			history += color * historyWeights[i];
+			result += color * weight;
 			
-			if(!(x == 0 && y == 0))
-				averageNeighbour += color;
+			color = RgbToYCoCgFastTonemap(color);
+			mean += color;
+			stdDev += color * color;
 		}
 	}
 	
-	//maxWeight *= totalWeight ? rcp(totalWeight) : 1.0;
+	// Only needed for upscale, since full res weights are normalized
+	#ifdef UPSCALE
+		result *= totalWeight ? rcp(totalWeight) : 1.0;
+	#endif
 	
-	averageNeighbour /= 9.0;
-	result *= totalWeight ? rcp(totalWeight) : 1.0;
 	mean /= 9.0;
 	stdDev = sqrt(abs(stdDev / 9.0 - mean * mean));
+
+	result = RgbToYCoCgFastTonemap(result);
 	
-	//history *= rcp(w.x + w.y + 1.0);
-	history = ProcessColor(_History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw)));
+	history *= rcp(w.x + w.y + 1.0);
+	history += (_History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw)));
+	history = RgbToYCoCgFastTonemap(history);
 	if(any(saturate(historyUv) != historyUv))
 		history = result;
 	
@@ -208,8 +156,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 	// For some taau (eg bilinear) the totalWeight can be 0 in some cases, so lerping towards will fail, in this case, lerp to mean
 	float historyBlend = DistToAABB(history, totalWeight ? result : mean, minNeighbour, maxNeighbour);
-	//history = lerp(history, totalWeight ? result : mean, saturate(historyBlend));
-	//result = SharpenColor(mean, result, _SharpenStrength);
+	history = lerp(history, totalWeight ? result : mean, saturate(historyBlend));
 	
 	// Compute blend factor for history
     // TODO: Need more careful placement here. For now lerping with anti-flicker based parameter, but we'll def. need to look into this.
@@ -225,14 +172,9 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	float lengthMV = length(maxVelocity) * 10;
 	//blendFactor = ModifyBlendWithMotionVectorRejection(lengthMV, historyUv, blendFactor, _SpeedRejectionIntensity);
 	
-	float2 outputPixInInput = uv * _ScaledResolution.xy - _Jitter;
-	float2 inputToOutputVec = outputPixInInput - (centerCoord + 0.5f);
-	
 	result = lerp(history, result, blendFactor * maxWeight);
-	result *= rcp(1.0 - result.r);
-
-	result = YCoCgToRgb(result);
-	result = isnan(result) ? 0.0 : result;
+	result = YCoCgToRgbFastTonemapInverse(result);
+	result = RemoveNaN(result);
 	
 	return result;
 }

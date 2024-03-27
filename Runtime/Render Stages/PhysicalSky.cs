@@ -428,7 +428,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(RTHandle target, RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, LightingSetup.Result lightingSetupResult, PhysicalSky.Result atmosphereData, Vector2 jitter, IRenderPassData commonPassData, RTHandle clouds, RTHandle cloudDepth, VolumetricClouds.CloudShadowDataResult cloudShadowData, Camera camera, CullingResults cullingResults, RTHandle velocity)
         {
-            var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -514,9 +514,12 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_FrameCount", frameCount.history);
                 commonPassData.SetInputs(pass);
                 atmosphereData.SetInputs(pass);
+                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
+                    pass.SetVector(command, "_HistoryScaleLimit", skyColor.history.ScaleLimit2D);
+
                     pass.SetFloat(command, "_IsFirst", skyColor.wasCreated ? 1.0f : 0.0f);
                     pass.SetFloat(command, "_StationaryBlend", settings.StationaryBlend);
                     pass.SetFloat(command, "_MotionBlend", settings.MotionBlend);
@@ -540,7 +543,6 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Spatial"))
             {
                 pass.Initialize(skyMaterial, 5);
-                pass.WriteTexture(target, RenderBufferLoadAction.Load);
                 pass.WriteTexture(skyColor.current, RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_SkyInput", skyTemp2);
                 pass.ReadTexture("_Depth", depth);
@@ -568,6 +570,22 @@ namespace Arycama.CustomRenderPipeline
                     atmosphereData.SetProperties(pass, command);
                 });
             }
+
+            // Final output
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Output"))
+            {
+                pass.Initialize(skyMaterial, 6);
+                pass.WriteTexture(target, RenderBufferLoadAction.Load);
+                pass.ReadTexture("_Input", skyColor.current);
+                pass.ReadTexture("_Depth", depth);
+                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    pass.SetVector(command, "_InputScaleLimit", skyColor.current.ScaleLimit2D);
+                });
+            }
+
         }
 
         public void Cleanup()
