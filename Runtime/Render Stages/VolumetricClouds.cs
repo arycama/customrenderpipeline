@@ -315,7 +315,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.AddRenderPassData<CloudData>();
                 result.SetInputs(pass);
-                pass.AddRenderPassData<PhysicalSky.LookupTableResult>();
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.WriteBuffer("_Result", cloudCoverageBufferTemp);
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
@@ -384,7 +384,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public RTHandle Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, out RTHandle cloudDepth, CullingResults cullingResults, VolumetricClouds.CloudShadowDataResult cloudShadow, RTHandle cameraTarget, RTHandle velocity)
+        public void Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, CullingResults cullingResults, VolumetricClouds.CloudShadowDataResult cloudShadow, RTHandle cameraTarget, RTHandle velocity)
         {
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -415,7 +415,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var cloudTemp = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-            cloudDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R32_SFloat, isScreenTexture: true);
+            var cloudDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R32_SFloat, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Render"))
             {
                 // Determine pass
@@ -439,6 +439,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.ReadTexture("_Depth", cameraDepth);
                 pass.AddRenderPassData<CloudData>();
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
 
                 cloudShadow.SetInputs(pass);
                 commonPassData.SetInputs(pass);
@@ -512,7 +513,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            return current;
+            renderGraph.ResourceMap.SetRenderPassData(new CloudRenderResult(current, cloudDepth));
         }
 
         private class PassData
@@ -535,6 +536,27 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_WeatherMap", weatherMap);
                 pass.ReadTexture("_CloudNoise", noiseTexture);
                 pass.ReadTexture("_CloudDetailNoise", detailNoiseTexture);
+            }
+
+            public void SetProperties(RenderPass pass, CommandBuffer command)
+            {
+            }
+        }
+
+        public readonly struct CloudRenderResult : IRenderPassData
+        {
+            private readonly RTHandle cloudTexture, cloudDepth;
+
+            public CloudRenderResult(RTHandle cloudTexture, RTHandle cloudDepth)
+            {
+                this.cloudTexture = cloudTexture ?? throw new ArgumentNullException(nameof(cloudTexture));
+                this.cloudDepth = cloudDepth ?? throw new ArgumentNullException(nameof(cloudDepth));
+            }
+
+            public void SetInputs(RenderPass pass)
+            {
+                pass.ReadTexture("_Clouds", cloudTexture);
+                pass.ReadTexture("_CloudDepth", cloudDepth);
             }
 
             public void SetProperties(RenderPass pass, CommandBuffer command)

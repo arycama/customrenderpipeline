@@ -41,24 +41,5 @@ Shader "Hidden/Ambient Occlusion"
             #include "AmbientOcclusion.hlsl"
             ENDHLSL
         }
-        
-        Pass
-        {
-            Name "Apply Fog"
-            
-            Stencil
-            {
-                Ref 0
-                Comp NotEqual
-            }
-        
-            Blend One SrcAlpha
-            
-            HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
-            #pragma fragment FragmentFog
-            #include "AmbientOcclusion.hlsl"
-            ENDHLSL
-        }
     }
 }

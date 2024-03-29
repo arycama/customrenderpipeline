@@ -1,4 +1,5 @@
 #include "../../Common.hlsl"
+#include "../../Samplers.hlsl"
 
 Texture2D<float3> _ViewNormals;
 float3 _Tint;
@@ -134,8 +135,3 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	return lerp(_Tint, 1.0, visibility);
 }
 
-float4 FragmentFog(float4 position : SV_Position) : SV_Target
-{
-	float depth = _CameraDepth[position.xy];
-	return SampleVolumetricLighting(position.xy, LinearEyeDepth(depth));
-}

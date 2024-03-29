@@ -29,7 +29,7 @@ namespace Arycama.CustomRenderPipeline
 
         private readonly Dictionary<int, List<RTHandle>> lastPassOutputs = new();
 
-        private bool isExecuting;
+        public bool IsExecuting { get; private set; }
 
         private readonly Dictionary<RTHandle, int> lastRtHandleRead = new();
         private readonly Dictionary<int, List<RTHandle>> passRTHandleOutputs = new();
@@ -111,6 +111,15 @@ namespace Arycama.CustomRenderPipeline
             foreach (var bufferHandle in bufferHandlesToCreate)
                 bufferHandle.Create();
             bufferHandlesToCreate.Clear();
+
+            foreach (var renderPass in renderPasses)
+            {
+                foreach (var renderPassDataHandle in renderPass.RenderPassDataHandles)
+                {
+                    var data = ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle);
+                    data.SetInputs(renderPass);
+                }
+            }
 
             // Build mapping from pass index to rt handles that can be freed
             foreach (var input in lastRtHandleRead)
@@ -217,12 +226,12 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            isExecuting = true;
+            IsExecuting = true;
 
             foreach (var renderPass in renderPasses)
                 renderPass.Run(command, context);
 
-            isExecuting = false;
+            IsExecuting = false;
 
             // Release all pooled passes
             foreach (var pass in renderPasses)
@@ -242,7 +251,7 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
         {
             // Ensure we're not getting a texture during execution, this must be done in the setup
-            Assert.IsFalse(isExecuting);
+            Assert.IsFalse(IsExecuting);
 
             if (!availableRtHandles.TryDequeue(out var result))
             {
@@ -272,7 +281,7 @@ namespace Arycama.CustomRenderPipeline
             Assert.IsTrue(stride > 0);
 
             // Ensure we're not getting a texture during execution, this must be done in the setup
-            Assert.IsFalse(isExecuting);
+            Assert.IsFalse(IsExecuting);
 
             // Find first matching buffer (TODO: Allow returning buffer smaller than required)
             for (var i = 0; i < availableBufferHandles.Count; i++)

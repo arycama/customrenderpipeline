@@ -40,7 +40,7 @@ namespace Arycama.CustomRenderPipeline
             internal float far;
         }
 
-        public readonly struct Result
+        public readonly struct Result : IRenderPassData
         {
             private readonly RTHandle lightClusterIndices;
             private readonly BufferHandle lightList;
@@ -70,7 +70,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public Result Render(int width, int height, float near, float far, LightingSetup.Result lightingSetupResult, Matrix4x4 invVpMatrix)
+        public void Render(int width, int height, float near, float far, LightingSetup.Result lightingSetupResult, Matrix4x4 invVpMatrix)
         {
             var clusterWidth = MathUtils.DivRoundUp(width, settings.TileSize);
             var clusterHeight = MathUtils.DivRoundUp(height, settings.TileSize);
@@ -116,7 +116,7 @@ namespace Arycama.CustomRenderPipeline
                 data.far = far;
             }
 
-            return new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize);
+            renderGraph.ResourceMap.SetRenderPassData(new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize));
         }
     }
 }

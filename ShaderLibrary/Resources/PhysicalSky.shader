@@ -82,6 +82,7 @@ Shader "Hidden/Physical Sky"
             Name "Spatial"
 
             HLSLPROGRAM
+			#pragma enable_d3d11_debug_symbols
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSpatial

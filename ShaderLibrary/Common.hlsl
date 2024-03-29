@@ -34,30 +34,21 @@ cbuffer Exposure
 
 Buffer<float4> _DirectionalShadowTexelSizes;
 Buffer<uint> _LightClusterList;
-SamplerComparisonState _LinearClampCompareSampler;
-SamplerState _LinearClampSampler, _LinearRepeatSampler, _PointClampSampler, _TrilinearRepeatAniso16Sampler, _TrilinearRepeatSampler, _TrilinearClampSampler;
 StructuredBuffer<DirectionalLight> _DirectionalLights;
 StructuredBuffer<matrix> _DirectionalMatrices;
 StructuredBuffer<PointLight> _PointLights;
 Texture2D<float> _BlueNoise1D, _CameraDepth;
 Texture2D<float2> _BlueNoise2D;
 Texture2DArray<float> _DirectionalShadows;
-Texture3D<float4> _VolumetricLighting;
 Texture3D<uint2> _LightClusterIndices;
 TextureCubeArray<float> _PointShadows;
 
 cbuffer FrameData
 {
 	float _MipBias;
-	
-	float3 _FogColor;
 	float _Time;
 	
-	float _FogStartDistance;
-	float _FogEndDistance;
-	float _FogEnabled;
-	
-	float _BlockerRadius, _ClusterBias, _ClusterScale, _PcfRadius, _PcssSoftness, _VolumeWidth, _VolumeHeight, _VolumeSlices, _NonLinearDepth, _AoEnabled;
+	float _BlockerRadius, _ClusterBias, _ClusterScale, _PcfRadius, _PcssSoftness;
 	uint _BlockerSamples, _DirectionalLightCount, _PcfSamples, _PointLightCount, _TileSize;
 	
 	float _InPlayMode;
@@ -100,7 +91,6 @@ cbuffer CameraData
 	float _Near;
 	
 	float4 _ScaledResolution;
-	float4 _VolumetricLighting_Scale;
 	
 	float3 _CameraForward;
 	float _Far;
@@ -311,135 +301,9 @@ float Linear01ToDeviceDepth(float z)
 	return _Near * (1.0 - z) / (_Near + z * (_Far - _Near));
 }
 
-float GetDeviceDepth(float normalizedDepth)
-{
-	if (_NonLinearDepth)
-	{
-		// Non-linear depth distribution
-		float linearDepth = _Near * pow(_Far / _Near, normalizedDepth);
-		return EyeToDeviceDepth(linearDepth);
-	}
-	else
-	{
-		return Linear01ToDeviceDepth(normalizedDepth);
-	}
-}
-
-uint GetShadowCascade(uint lightIndex, float3 lightPosition, out float3 positionLS)
-{
-	DirectionalLight light = _DirectionalLights[lightIndex];
-	
-	for (uint j = 0; j < light.cascadeCount; j++)
-	{
-		// find the first cascade which is not out of bounds
-		matrix shadowMatrix = _DirectionalMatrices[light.shadowIndex + j];
-		positionLS = MultiplyPoint3x4(shadowMatrix, lightPosition);
-		if (all(saturate(positionLS) == positionLS))
-			return j;
-	}
-	
-	return ~0u;
-}
-
-float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
-{
-	DirectionalLight light = _DirectionalLights[lightIndex];
-	if (light.shadowIndex == ~0u)
-		return 1.0;
-		
-	float3 lightPosition = MultiplyPoint3x4(light.worldToLight, worldPosition);
-		
-	//if (!softShadow)
-	{
-		float3 shadowPosition;
-		uint cascade = GetShadowCascade(lightIndex, worldPosition, shadowPosition);
-		if (cascade == ~0u)
-			return 1.0;
-			
-		return _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z);
-	}
-	
-	float4 positionCS = PerspectiveDivide(WorldToClip(worldPosition));
-	positionCS.xy = (positionCS.xy * 0.5 + 0.5) * _ScaledResolution.xy;
-	
-	float2 jitter = _BlueNoise2D[uint2(positionCS.xy) % 128];
-
-	// PCS filtering
-	float occluderDepth = 0.0, occluderWeightSum = 0.0;
-	float goldenAngle = Pi * (3.0 - sqrt(5.0));
-	for (uint k = 0; k < _BlockerSamples; k++)
-	{
-		float r = sqrt(k + 0.5) / sqrt(_BlockerSamples);
-		float theta = k * goldenAngle + (1.0 - jitter.x) * 2.0 * Pi;
-		float3 offset = float3(r * cos(theta), r * sin(theta), 0.0) * _BlockerRadius;
-		
-		float3 shadowPosition;
-		uint cascade = GetShadowCascade(lightIndex, lightPosition + offset, shadowPosition);
-		if (cascade == ~0u)
-			continue;
-		
-		float4 texelAndDepthSizes = _DirectionalShadowTexelSizes[light.shadowIndex + cascade];
-		float shadowZ = _DirectionalShadows.SampleLevel(_LinearClampSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), 0);
-		float occluderZ = Remap(1.0 - shadowZ, 0.0, 1.0, texelAndDepthSizes.z, texelAndDepthSizes.w);
-		if (occluderZ >= lightPosition.z)
-			continue;
-		
-		float weight = 1.0 - r * 0;
-		occluderDepth += occluderZ * weight;
-		occluderWeightSum += weight;
-	}
-
-	// There are no occluders so early out (this saves filtering)
-	if (!occluderWeightSum)
-		return 1.0;
-	
-	occluderDepth /= occluderWeightSum;
-	
-	float radius = max(0.0, lightPosition.z - occluderDepth) / _PcssSoftness;
-	
-	// PCF filtering
-	float shadow = 0.0;
-	float weightSum = 0.0;
-	for (k = 0; k < _PcfSamples; k++)
-	{
-		float r = sqrt(k + 0.5) / sqrt(_PcfSamples);
-		float theta = k * goldenAngle + jitter.y * 2.0 * Pi;
-		float3 offset = float3(r * cos(theta), r * sin(theta), 0.0) * radius;
-		
-		float3 shadowPosition;
-		uint cascade = GetShadowCascade(lightIndex, lightPosition + offset, shadowPosition);
-		if (cascade == ~0u)
-			continue;
-		
-		float weight = 1.0 - r;
-		shadow += _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z) * weight;
-		weightSum += weight;
-	}
-	
-	return weightSum ? shadow / weightSum : 1.0;
-}
-
 float SafeDiv(float numer, float denom)
 {
 	return (numer != denom) ? numer * rcp(denom) : 1.0;
-}
-float GetVolumetricUv(float linearDepth)
-{
-	if (_NonLinearDepth)
-	{
-		return (log2(linearDepth) * (_VolumeSlices / log2(_Far / _Near)) - _VolumeSlices * log2(_Near) / log2(_Far / _Near)) / _VolumeSlices;
-	}
-	else
-	{
-		return Remap(linearDepth, _Near, _Far);
-	}
-}
-
-float4 SampleVolumetricLighting(float2 pixelPosition, float eyeDepth)
-{
-	float normalizedDepth = GetVolumetricUv(eyeDepth);
-	float3 volumeUv = float3(pixelPosition * _ScaledResolution.zw, normalizedDepth);
-	return _VolumetricLighting.Sample(_LinearClampSampler, volumeUv * float3(_VolumetricLighting_Scale.xy, 1.0));
 }
 
 bool1 IsInfOrNaN(float1 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
@@ -482,12 +346,12 @@ float EV100ToExposure(float ev100)
 
 float CameraDepthToDistance(float depth, float3 V)
 {
-	return LinearEyeDepth(depth) * rcp(dot(V, -_CameraForward));
+	return LinearEyeDepth(depth) * rcp(dot(-V, _CameraForward));
 }
 
 float CameraDistanceToDepth(float distance, float3 V)
 {
-	return distance * dot(V, -_CameraForward);
+	return distance * dot(-V, _CameraForward);
 }
 
 float LinearEyeDepthToDistance(float depth, float3 V)

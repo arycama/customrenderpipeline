@@ -1,5 +1,6 @@
 #include "../../Common.hlsl"
 #include "../../Color.hlsl"
+#include "../../Samplers.hlsl"
 
 Texture2D<float3> _Input;
 Texture2D<float> _Depth;

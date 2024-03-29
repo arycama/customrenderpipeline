@@ -1,0 +1,7 @@
+#ifndef SAMPLER_STATES_INCLUDED
+#define SAMPLER_STATES_INCLUDED
+
+SamplerState _LinearClampSampler, _LinearRepeatSampler, _PointClampSampler, _TrilinearRepeatAniso16Sampler, _TrilinearRepeatSampler, _TrilinearClampSampler;
+SamplerComparisonState _LinearClampCompareSampler;
+
+#endif

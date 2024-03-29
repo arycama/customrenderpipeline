@@ -2,6 +2,7 @@
 #include "../Utility.hlsl"
 #include "../Color.hlsl"
 #include "../Temporal.hlsl"
+#include "../Samplers.hlsl"
 
 Texture2D<float3> _Input, _History;
 Texture2D<float2> _Velocity;

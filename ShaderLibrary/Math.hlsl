@@ -29,6 +29,11 @@ float2 Sq(float2 x) { return x * x; }
 float3 Sq(float3 x) { return x * x; }
 float4 Sq(float4 x) { return x * x; }
 
+float1 InvLerp(float1 t, float1 x, float1 y) { return (t - x) * rcp(y - x); }
+float2 InvLerp(float2 t, float2 x, float2 y) { return (t - x) * rcp(y - x); }
+float3 InvLerp(float3 t, float3 x, float3 y) { return (t - x) * rcp(y - x); }
+float4 InvLerp(float4 t, float4 x, float4 y) { return (t - x) * rcp(y - x); }
+
 // Remaps a value from one range to another
 float1 Remap(float1 v, float1 pMin, float1 pMax = 1.0, float1 nMin = 0.0, float1 nMax = 1.0) { return nMin + (v - pMin) * rcp(pMax - pMin) * (nMax - nMin); }
 float2 Remap(float2 v, float2 pMin, float2 pMax = 1.0, float2 nMin = 0.0, float2 nMax = 1.0) { return nMin + (v - pMin) * rcp(pMax - pMin) * (nMax - nMin); }

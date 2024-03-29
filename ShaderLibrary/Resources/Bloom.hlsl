@@ -1,4 +1,5 @@
 #include "../Common.hlsl"
+#include "../Samplers.hlsl"
 
 Texture2D<float3> _Input;
 float4 _InputScaleLimit;

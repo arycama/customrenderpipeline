@@ -16,7 +16,7 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public void Render(Camera camera, RTHandle depth, RTHandle scene, float scale, VolumetricLighting.Result volumetricLightingResult, Texture2D blueNoise2D, Matrix4x4 invVpMatrix)
+        public void Render(Camera camera, RTHandle depth, RTHandle scene, float scale, Texture2D blueNoise2D, Matrix4x4 invVpMatrix)
         {
             if (settings.Strength == 0.0f)
                 return;
@@ -87,26 +87,6 @@ namespace Arycama.CustomRenderPipeline
                 data.blueNoise2d = blueNoise2D;
                 data.scaledResolution = new Vector4(scaledWidth, scaledHeight, 1.0f / scaledWidth, 1.0f / scaledHeight);
                 data.invVpMatrix = invVpMatrix;
-            }
-
-            if (RenderSettings.fog)
-            {
-                using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Combine");
-                pass.Initialize(material, 2);
-                pass.ReadTexture("_CameraDepth", depth);
-                pass.WriteTexture(scene);
-                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
-
-                volumetricLightingResult.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<Pass2Data>((command, context, pass, data) =>
-                {
-                    data.volumetricLightingResult.SetProperties(pass, command);
-                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                });
-
-                data.volumetricLightingResult = volumetricLightingResult;
-                data.scaledResolution = new Vector4(scaledWidth, scaledHeight, 1.0f / scaledWidth, 1.0f / scaledHeight);
             }
         }
 

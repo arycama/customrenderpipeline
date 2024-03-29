@@ -1,13 +1,7 @@
-#define CUSTOM_LIGHTING_FALLOFF
-
+#include "../Atmosphere.hlsl"
 #include "../Common.hlsl"
 #include "../Lighting.hlsl"
-
-float CalculateLightFalloff(float rcpLightDist, float sqrLightDist, float rcpSqLightRange)
-{
-	float lightRange = rcp(sqrt(rcpSqLightRange));
-	return Remap(lightRange * rcp(3.0) * rcpLightDist, rcp(3.0));
-}
+#include "../VolumetricLight.hlsl"
 
 #pragma kernel Compute
 #pragma kernel FilterX KERNEL=FilterX HORIZONTAL
@@ -16,8 +10,12 @@ float CalculateLightFalloff(float rcpLightDist, float sqrLightDist, float rcpSqL
 
 RWTexture3D<float4> _Result;
 Texture3D<float4> _Input;
+
+float4x4 _PixelToWorldViewDir;
 uint _VolumeTileSize;
-float _BlurSigma, _FogMode;
+float _BlurSigma;
+float _VolumeWidth;
+float _VolumeHeight;
 
 [numthreads(8, 8, 8)]
 void Compute(uint3 id : SV_DispatchThreadID)
@@ -28,35 +26,74 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	float2 pixelPosition = positionNDC * _ScaledResolution.xy;
 	
 	float normalizedDepth = (id.z + jitter) / _VolumeSlices;
+	float eyeDepth = lerp(_VolumetricLightNear, _VolumetricLightFar, normalizedDepth);
 	
-	float4 positionCS;
+	float3 positionCS;
 	positionCS.xy = positionNDC * 2.0 - 1.0;
-	positionCS.z = GetDeviceDepth(normalizedDepth);
-	positionCS.w = Remap(normalizedDepth, 0.0, 1.0, _Near, _Far);
+	positionCS.z = Linear01ToDeviceDepth(Remap(eyeDepth, _Near, _Far));
 	
-	float3 positionWS = ClipToWorld(positionCS.xyz);
+	float3 worldPosition = ClipToWorld(positionCS.xyz);
 	float3 lighting = 0.0;
 	
-	float3 albedo = _FogColor;
+	float3 V = -normalize(worldPosition);
+	float viewDistance = length(worldPosition);
 	
-	float viewDistance = length(positionWS);
+	float viewHeight = _ViewPosition.y + _PlanetRadius;
+	float height = HeightAtDistance(viewHeight, -V.y, viewDistance);
 	
-	LightingInput lightingInput = (LightingInput)0;
-	lightingInput.worldPosition = positionWS;
-	lightingInput.pixelPosition = pixelPosition;
-	lightingInput.eyeDepth = positionCS.w;
+	uint3 clusterIndex;
+	clusterIndex.xy = floor(pixelPosition) / _TileSize;
+	clusterIndex.z = log2(eyeDepth) * _ClusterScale + _ClusterBias;
 	
-	//lighting += GetLighting(lightingInput, true);
+	uint2 lightOffsetAndCount = _LightClusterIndices[clusterIndex];
+	uint startOffset = lightOffsetAndCount.x;
+	uint lightCount = lightOffsetAndCount.y;
 	
-	float extinction = _FogMode ? (viewDistance > _FogStartDistance && viewDistance < _FogEndDistance ? rcp(_FogEndDistance - viewDistance) : 0.0) : 0.0;
-	float4 luminanceExtinction = float4(albedo * lighting, extinction);
+	// Point lights
+	for (uint i = 0; i < min(128, lightCount); i++)
+	{
+		int index = _LightClusterList[startOffset + i];
+		PointLight light = _PointLights[index];
+		
+		float3 lightVector = light.position - worldPosition;
+		float sqrLightDist = dot(lightVector, lightVector);
+		if(sqrLightDist > Sq(light.range))
+			continue;
+		
+		sqrLightDist = max(Sq(0.01), sqrLightDist);
+		float rcpLightDist = rsqrt(sqrLightDist);
+		
+		float3 L = lightVector * rcpLightDist;
+
+		float attenuation = CalculateLightFalloff(rcpLightDist, sqrLightDist, rcp(Sq(light.range)));
+		if(!attenuation)
+			continue;
+		
+		float3 intensity = AtmosphereScatter(height, dot(L, -V));
+		if(all(!intensity))
+			continue;
+			
+		if(light.shadowIndex != ~0u)
+		{
+			uint visibleFaces = light.visibleFaces;
+			float dominantAxis = Max3(abs(lightVector));
+			float depth = rcp(dominantAxis) * light.far + light.near;
+			attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), light.shadowIndex), depth);
+			if(!attenuation)
+				continue;
+		}
+		
+		lighting += (intensity * attenuation * _Exposure) * light.color;
+	}
+	
+	float4 luminanceExtinction = float4(lighting, 0.0);
 	
 	// Reproject previous frame. Needs to use unjittered world position
 	float unjitteredNormalizedDepth = (id.z + 0.5) / _VolumeSlices;
 	
 	float4 unjitteredPositionCS;
 	unjitteredPositionCS.xy = positionNDC * 2.0 - 1.0;
-	unjitteredPositionCS.z = GetDeviceDepth(unjitteredNormalizedDepth);
+	unjitteredPositionCS.z = Linear01ToDeviceDepth(unjitteredNormalizedDepth);
 	unjitteredPositionCS.w = Remap(unjitteredNormalizedDepth, 0.0, 1.0, _Near, _Far);
 	
 	float3 unjitteredPositionWS = ClipToWorld(unjitteredPositionCS.xyz);
@@ -69,7 +106,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	if (all(saturate(volumeUv) == volumeUv))
 	{
 		float4 previousLuminanceExtinction = _Input.SampleLevel(_LinearClampSampler, volumeUv, 0.0);
-		luminanceExtinction = lerp(previousLuminanceExtinction, luminanceExtinction, 0.05);
+		//luminanceExtinction = lerp(previousLuminanceExtinction, luminanceExtinction, 0.05);
 	}
 	
 	_Result[id] = luminanceExtinction;
@@ -84,11 +121,11 @@ void KERNEL(uint3 id : SV_DispatchThreadID)
 	int radius = 2;
 	for (int i = -radius; i <= radius; i++)
 	{
-#ifdef HORIZONTAL
+		#ifdef HORIZONTAL
 			int3 coord = id + int3(i, 0, 0);
-#else
-		int3 coord = id + int3(0, i, 0);
-#endif
+		#else
+			int3 coord = id + int3(0, i, 0);
+		#endif
 		
 		if (any(coord < 0 || coord >= int3(_VolumeWidth, _VolumeHeight, _VolumeSlices)))
 			continue;
@@ -108,26 +145,23 @@ void KERNEL(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void Accumulate(uint2 id : SV_DispatchThreadID)
 {
-	return;
+	float2 pixelPosition = (id + 0.5) / float2(_VolumeWidth, _VolumeHeight) * _ScaledResolution.xy;
+	float3 V = MultiplyVector(_PixelToWorldViewDir, float3(pixelPosition, 1.0), true);
 	
-	float3 positionCS;
-	positionCS.xy = (id + 0.5) / float2(_VolumeWidth, _VolumeHeight) * 2.0 - 1.0;
-	positionCS.z = GetDeviceDepth(0.0);
-	float3 positionWS = ClipToWorld(positionCS);
+	float startT = CameraDepthToDistance(_VolumetricLightNear, V);
+	float endT = CameraDepthToDistance(_VolumetricLightFar, V);
+	
+	float rayLength = endT - startT;
+	
+	float ds = rayLength / _VolumeSlices;
 	
 	float4 result = float2(0.0, 1.0).xxxy;
 	for (uint i = 0; i < uint(_VolumeSlices); i++)
 	{
-		positionCS.z = GetDeviceDepth((i + 1.0) / _VolumeSlices);
-		float3 nextPositionWS = ClipToWorld(positionCS);
-		float ds = distance(nextPositionWS, positionWS);
-		positionWS = nextPositionWS;
-		
 		float4 luminanceExtinction = _Input[uint3(id.xy, i)];
 		float transmittance = exp(-luminanceExtinction.a * ds);
-		float3 integScatt = luminanceExtinction.rgb * (1.0 - transmittance);
 		
-		result.rgb += result.a * integScatt;
+		result.rgb += result.a * luminanceExtinction.rgb;
 		result.a *= transmittance;
 		_Result[uint3(id, i)] = result;
 	}

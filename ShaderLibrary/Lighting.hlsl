@@ -368,21 +368,15 @@ float PerceptualRoughnessToMipmapLevel(float perceptualRoughness, float NdotR)
 	return perceptualRoughness * UNITY_SPECCUBE_LOD_STEPS;
 }
 
-
-#ifdef CUSTOM_LIGHTING_FALLOFF
-float CalculateLightFalloff(float rcpLightDist, float sqrLightDist, float rcpSqLightRange);
-#else
 float CalculateLightFalloff(float rcpLightDist, float sqrLightDist, float rcpSqLightRange)
 {
 	return rcpLightDist * Sq(saturate(1.0 - Sq(sqrLightDist * rcpSqLightRange)));
 }
-#endif
 
 float Lambda(float3 x, float3 N, float roughness)
 {
 	return (sqrt(1.0 + Sq(roughness) * (rcp(Sq(dot(x, N))) - 1.0)) - 1.0) * rcp(2.0);
 }
-
 
 float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, float3 L, float3 V, float3 N, float3 bentNormal, float occlusion)
 {
@@ -442,6 +436,100 @@ float3 GetViewReflectedNormal(float3 N, float3 V, out float NdotV)
 float3 Orthonormalize(float3 tangent, float3 normal)
 {
 	return normalize(tangent - dot(tangent, normal) * normal);
+}
+
+uint GetShadowCascade(uint lightIndex, float3 lightPosition, out float3 positionLS)
+{
+	DirectionalLight light = _DirectionalLights[lightIndex];
+	
+	for (uint j = 0; j < light.cascadeCount; j++)
+	{
+		// find the first cascade which is not out of bounds
+		matrix shadowMatrix = _DirectionalMatrices[light.shadowIndex + j];
+		positionLS = MultiplyPoint3x4(shadowMatrix, lightPosition);
+		if (all(saturate(positionLS) == positionLS))
+			return j;
+	}
+	
+	return ~0u;
+}
+
+float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
+{
+	DirectionalLight light = _DirectionalLights[lightIndex];
+	if (light.shadowIndex == ~0u)
+		return 1.0;
+		
+	float3 lightPosition = MultiplyPoint3x4(light.worldToLight, worldPosition);
+		
+	//if (!softShadow)
+	{
+		float3 shadowPosition;
+		uint cascade = GetShadowCascade(lightIndex, worldPosition, shadowPosition);
+		if (cascade == ~0u)
+			return 1.0;
+			
+		return _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z);
+	}
+	
+	float4 positionCS = PerspectiveDivide(WorldToClip(worldPosition));
+	positionCS.xy = (positionCS.xy * 0.5 + 0.5) * _ScaledResolution.xy;
+	
+	float2 jitter = _BlueNoise2D[uint2(positionCS.xy) % 128];
+
+	// PCS filtering
+	float occluderDepth = 0.0, occluderWeightSum = 0.0;
+	float goldenAngle = Pi * (3.0 - sqrt(5.0));
+	for (uint k = 0; k < _BlockerSamples; k++)
+	{
+		float r = sqrt(k + 0.5) / sqrt(_BlockerSamples);
+		float theta = k * goldenAngle + (1.0 - jitter.x) * 2.0 * Pi;
+		float3 offset = float3(r * cos(theta), r * sin(theta), 0.0) * _BlockerRadius;
+		
+		float3 shadowPosition;
+		uint cascade = GetShadowCascade(lightIndex, lightPosition + offset, shadowPosition);
+		if (cascade == ~0u)
+			continue;
+		
+		float4 texelAndDepthSizes = _DirectionalShadowTexelSizes[light.shadowIndex + cascade];
+		float shadowZ = _DirectionalShadows.SampleLevel(_LinearClampSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), 0);
+		float occluderZ = Remap(1.0 - shadowZ, 0.0, 1.0, texelAndDepthSizes.z, texelAndDepthSizes.w);
+		if (occluderZ >= lightPosition.z)
+			continue;
+		
+		float weight = 1.0 - r * 0;
+		occluderDepth += occluderZ * weight;
+		occluderWeightSum += weight;
+	}
+
+	// There are no occluders so early out (this saves filtering)
+	if (!occluderWeightSum)
+		return 1.0;
+	
+	occluderDepth /= occluderWeightSum;
+	
+	float radius = max(0.0, lightPosition.z - occluderDepth) / _PcssSoftness;
+	
+	// PCF filtering
+	float shadow = 0.0;
+	float weightSum = 0.0;
+	for (k = 0; k < _PcfSamples; k++)
+	{
+		float r = sqrt(k + 0.5) / sqrt(_PcfSamples);
+		float theta = k * goldenAngle + jitter.y * 2.0 * Pi;
+		float3 offset = float3(r * cos(theta), r * sin(theta), 0.0) * radius;
+		
+		float3 shadowPosition;
+		uint cascade = GetShadowCascade(lightIndex, lightPosition + offset, shadowPosition);
+		if (cascade == ~0u)
+			continue;
+		
+		float weight = 1.0 - r;
+		shadow += _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z) * weight;
+		weightSum += weight;
+	}
+	
+	return weightSum ? shadow / weightSum : 1.0;
 }
 
 float3 GetLighting(LightingInput input, bool isVolumetric = false)
@@ -580,79 +668,6 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	}
 	
 	return luminance;
-}
-
-float3 ApplyFog(float3 color, float2 pixelPosition, float eyeDepth, float3 worldPosition)
-{
-	float3 V = normalize(-worldPosition);
-	float viewHeight = _ViewPosition.y + _PlanetRadius;
-	float viewCosAngle = -V.y;
-	float currentDistance = length(worldPosition);
-	float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, currentDistance);
-	color *= transmittance;
-	
-	// Also apply atmospheric transmittance here
-	float4 volumetricLighting = SampleVolumetricLighting(pixelPosition, eyeDepth);
-	return color;// * volumetricLighting.a + volumetricLighting.rgb;
-}
-
-float PerceptualSmoothnessToRoughness(float perceptualSmoothness)
-{
-    return (1.0 - perceptualSmoothness) * (1.0 - perceptualSmoothness);
-}
-
-float RoughnessToPerceptualSmoothness(float roughness)
-{
-    return 1.0 - sqrt(roughness);
-}
-
-// Move into material? 
-// Return modified perceptualSmoothness based on provided variance (get from GeometricNormalVariance + TextureNormalVariance)
-float NormalFiltering(float perceptualSmoothness, float variance, float threshold)
-{
-    float roughness = PerceptualSmoothnessToRoughness(perceptualSmoothness);
-    // Ref: Geometry into Shading - http://graphics.pixar.com/library/BumpRoughness/paper.pdf - equation (3)
-    float squaredRoughness = saturate(roughness * roughness + min(2.0 * variance, threshold * threshold)); // threshold can be really low, square the value for easier control
-
-    return RoughnessToPerceptualSmoothness(sqrt(squaredRoughness));
-}
-
-float ProjectedSpaceNormalFiltering(float perceptualSmoothness, float variance, float threshold)
-{
-    float roughness = PerceptualSmoothnessToRoughness(perceptualSmoothness);
-    // Ref: Stable Geometric Specular Antialiasing with Projected-Space NDF Filtering - https://yusuketokuyoshi.com/papers/2021/Tokuyoshi2021SAA.pdf
-    float squaredRoughness = roughness * roughness;
-    float projRoughness2 = squaredRoughness / (1.0 - squaredRoughness);
-    float filteredProjRoughness2 = saturate(projRoughness2 + min(2.0 * variance, threshold * threshold));
-    squaredRoughness = filteredProjRoughness2 / (filteredProjRoughness2 + 1.0f);
-
-    return RoughnessToPerceptualSmoothness(sqrt(squaredRoughness));
-}
-
-// Reference: Error Reduction and Simplification for Shading Anti-Aliasing
-// Specular antialiasing for geometry-induced normal (and NDF) variations: Tokuyoshi / Kaplanyan et al.'s method.
-// This is the deferred approximation, which works reasonably well so we keep it for forward too for now.
-// screenSpaceVariance should be at most 0.5^2 = 0.25, as that corresponds to considering
-// a gaussian pixel reconstruction kernel with a standard deviation of 0.5 of a pixel, thus 2 sigma covering the whole pixel.
-float GeometricNormalVariance(float3 geometricNormalWS, float screenSpaceVariance)
-{
-    float3 deltaU = ddx(geometricNormalWS);
-    float3 deltaV = ddy(geometricNormalWS);
-
-    return screenSpaceVariance * (dot(deltaU, deltaU) + dot(deltaV, deltaV));
-}
-
-// Return modified perceptualSmoothness
-float GeometricNormalFiltering(float perceptualSmoothness, float3 geometricNormalWS, float screenSpaceVariance, float threshold)
-{
-    float variance = GeometricNormalVariance(geometricNormalWS, screenSpaceVariance);
-    return NormalFiltering(perceptualSmoothness, variance, threshold);
-}
-
-float ProjectedSpaceGeometricNormalFiltering(float perceptualSmoothness, float3 geometricNormalWS, float screenSpaceVariance, float threshold)
-{
-    float variance = GeometricNormalVariance(geometricNormalWS, screenSpaceVariance);
-    return ProjectedSpaceNormalFiltering(perceptualSmoothness, variance, threshold);
 }
 
 #endif

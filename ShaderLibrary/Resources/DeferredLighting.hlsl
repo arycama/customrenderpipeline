@@ -1,4 +1,6 @@
+#include "../Atmosphere.hlsl"
 #include "../Lighting.hlsl"
+#include "../VolumetricLight.hlsl"
 
 Texture2D<float> _Depth;
 Texture2D<float4> _AlbedoMetallic, _NormalRoughness, _BentNormalOcclusion;
@@ -23,5 +25,10 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	lightingInput.bentNormal = normalize(2.0 * bentNormalOcclusion.rgb - 1.0);
 	
 	float3 result = GetLighting(lightingInput);
-	return ApplyFog(result, position.xy, LinearEyeDepth(depth), lightingInput.worldPosition);
+	
+	// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
+	float3 V = normalize(-PixelToWorld(float3(position.xy, depth)));
+	result *= TransmittanceToPoint(_ViewPosition.y + _PlanetRadius, -V.y, CameraDepthToDistance(depth, V));
+	
+	return ApplyVolumetricLight(result, position.xy, LinearEyeDepth(depth));
 }

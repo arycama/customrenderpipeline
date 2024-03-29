@@ -15,7 +15,7 @@ public class RTHandle
     internal bool IsImported { get; set; }
     internal bool IsPersistent { get; set; }
     public Vector3 Scale => new Vector3((float)Width / RenderTexture.width, (float)Height / RenderTexture.height, (float)VolumeDepth / RenderTexture.volumeDepth);
-    public Vector3 Limit => new Vector3((Mathf.Floor(RenderTexture.width * Scale.x) - 0.5f) / RenderTexture.width, (Mathf.Floor(RenderTexture.height * Scale.y) - 0.5f) / RenderTexture.height, (Mathf.Floor(RenderTexture.depth * Scale.z) - 0.5f) / RenderTexture.volumeDepth);
+    public Vector3 Limit => new Vector3((Mathf.Floor(RenderTexture.width * Scale.x) - 0.5f) / RenderTexture.width, (Mathf.Floor(RenderTexture.height * Scale.y) - 0.5f) / RenderTexture.height, (Mathf.Floor(RenderTexture.volumeDepth * Scale.z) - 0.5f) / RenderTexture.volumeDepth);
 
     public Vector4 ScaleLimit2D => new Vector4(Scale.x, Scale.y, Limit.x, Limit.y);
 

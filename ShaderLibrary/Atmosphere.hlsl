@@ -2,6 +2,7 @@
 #define ATMOSPHERE_INCLUDED
 
 #include "Geometry.hlsl"
+#include "Samplers.hlsl" 
 
 cbuffer AtmosphereProperties
 {

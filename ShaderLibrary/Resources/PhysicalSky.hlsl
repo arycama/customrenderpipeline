@@ -8,6 +8,7 @@
 #include "../CloudCommon.hlsl"
 #include "../Color.hlsl"
 #include "../Temporal.hlsl"
+#include "../VolumetricLight.hlsl"
 
 matrix _PixelToWorldViewDirs[6];
 float4 _ScaleOffset;
@@ -520,5 +521,5 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD) : SV
 	// Sample the clouds at the re-jittered coordinate, so that the final TAA resolve will not add further jitter. 
 	float3 result = _Input.Sample(_LinearClampSampler, min((uv + _Jitter.zw) * _InputScaleLimit.xy, _InputScaleLimit.zw)).rgb;
 	//result = RemoveNaN(XyyToRgb(result));
-	return result;
+	return result + ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
 }

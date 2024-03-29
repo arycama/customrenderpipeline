@@ -18,7 +18,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<(string, BufferHandle)> readBuffers = new();
         private readonly List<(string, BufferHandle)> writeBuffers = new();
 
-        private readonly List<RenderPassDataHandle> renderPassDataHandles = new(); 
+        public List<RenderPassDataHandle> RenderPassDataHandles { get; private set; } = new(); 
 
         public RenderGraph RenderGraph { get; set; }
         internal string Name { get; set; }
@@ -45,6 +45,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void ReadTexture(string propertyName, RTHandle texture)
         {
+            Assert.IsFalse(RenderGraph.IsExecuting);
             Assert.IsNotNull(texture, propertyName);
             readTextures.Add((propertyName, texture));
             RenderGraph.SetLastRTHandleRead(texture, Index);
@@ -67,11 +68,12 @@ namespace Arycama.CustomRenderPipeline
 
         public void AddRenderPassData(RenderPassDataHandle handle)
         {
-            renderPassDataHandles.Add(handle);
+            RenderPassDataHandles.Add(handle);
         }
 
         public void AddRenderPassData<T>() where T : IRenderPassData
         {
+            Assert.IsFalse(RenderGraph.IsExecuting);
             var handle = RenderGraph.ResourceMap.GetResourceHandle<T>();
             AddRenderPassData(handle);
         }
@@ -81,11 +83,11 @@ namespace Arycama.CustomRenderPipeline
             command.BeginSample(Name);
 
             // Set render pass data
-            foreach(var renderPassDataHandle in renderPassDataHandles)
-            {
-                var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle);
-                data.SetInputs(this);
-            }
+            //foreach(var renderPassDataHandle in renderPassDataHandles)
+            //{
+            //    var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle);
+            //    data.SetInputs(this);
+            //}
 
             // Move into some OnPreRender thing in buffer/RTHandles? 
             foreach (var texture in readTextures)
@@ -115,7 +117,7 @@ namespace Arycama.CustomRenderPipeline
             if (renderGraphBuilder != null)
             {
                 // Set any data from each pass
-                foreach (var renderPassDataHandle in renderPassDataHandles)
+                foreach (var renderPassDataHandle in RenderPassDataHandles)
                 {
                     var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle);
                     data.SetProperties(this, command);
@@ -135,7 +137,7 @@ namespace Arycama.CustomRenderPipeline
                 renderGraphBuilder = null;
             }
 
-            renderPassDataHandles.Clear();
+            RenderPassDataHandles.Clear();
 
             command.EndSample(Name);
         }
