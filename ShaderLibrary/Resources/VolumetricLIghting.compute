@@ -11,33 +11,27 @@
 RWTexture3D<float4> _Result;
 Texture3D<float4> _Input;
 
-float4x4 _PixelToWorldViewDir, _PixelToWorldViewDir1;
+float4x4 _PixelToWorldViewDir;
 uint _VolumeTileSize;
 float _BlurSigma;
 float _VolumeWidth;
 float _VolumeHeight;
+float3 _InputScale, _InputMax;
 
 [numthreads(8, 8, 8)]
 void Compute(uint3 id : SV_DispatchThreadID)
 {
 	float2 positionNDC = (id.xy + 0.5) / float2(_VolumeWidth, _VolumeHeight);
 	float2 pixelPosition = positionNDC * _ScaledResolution.xy;
-	float3 V = -MultiplyVector(_PixelToWorldViewDir, float3(pixelPosition, 1.0), true);
+	float3 V = -MultiplyVector(_PixelToWorldViewDir, float3(id.xy + 0.5, 1.0), true);
 	
-	float jitter = 0.5;//_BlueNoise1D[id.xy % 128];
+	float jitter = _BlueNoise1D[id.xy % 128];
 	
 	float normalizedDepth = (id.z + jitter) / _VolumeSlices;
 	float eyeDepth = lerp(_VolumetricLightNear, _VolumetricLightFar, normalizedDepth);
 	
-	float3 positionCS;
-	positionCS.xy = positionNDC * 2.0 - 1.0;
-	positionCS.z = Linear01ToDeviceDepth(Remap(eyeDepth, _Near, _Far));
-	
-	float3 worldPosition = ClipToWorld(positionCS.xyz);
-	float3 lighting = 0.0;
-	
-	//float3 V = -normalize(worldPosition);
-	float viewDistance = length(worldPosition);
+	float viewDistance = eyeDepth * rcp(dot(-V, _CameraForward));
+	float3 worldPosition = -V * viewDistance;
 	
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
 	float height = HeightAtDistance(viewHeight, -V.y, viewDistance);
@@ -51,6 +45,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	uint lightCount = lightOffsetAndCount.y;
 	
 	// Point lights
+	float3 lighting = 0.0;
 	for (uint i = 0; i < min(128, lightCount); i++)
 	{
 		int index = _LightClusterList[startOffset + i];
@@ -66,7 +61,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 		
 		float3 L = lightVector * rcpLightDist;
 
-		float attenuation = 1;// CalculateLightFalloff(rcpLightDist, sqrLightDist, rcp(Sq(light.range)));
+		float attenuation = CalculateLightFalloff(rcpLightDist, sqrLightDist, rcp(Sq(light.range)));
 		if(!attenuation)
 			continue;
 		
@@ -79,9 +74,9 @@ void Compute(uint3 id : SV_DispatchThreadID)
 			uint visibleFaces = light.visibleFaces;
 			float dominantAxis = Max3(abs(lightVector));
 			float depth = rcp(dominantAxis) * light.far + light.near;
-			//attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), light.shadowIndex), depth);
-			//if(!attenuation)
-			//	continue;
+			attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), light.shadowIndex), depth);
+			if(!attenuation)
+				continue;
 		}
 		
 		lighting += (attenuation * _Exposure) * (intensity * light.color);
@@ -92,12 +87,10 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	// Reproject previous frame. Needs to use unjittered world position
 	float unjitteredNormalizedDepth = (id.z + 0.5) / _VolumeSlices;
 	
-	float4 unjitteredPositionCS;
+	float3 unjitteredPositionCS;
 	unjitteredPositionCS.xy = positionNDC * 2.0 - 1.0;
-	unjitteredPositionCS.z = Linear01ToDeviceDepth(unjitteredNormalizedDepth);
-	unjitteredPositionCS.w = Remap(unjitteredNormalizedDepth, 0.0, 1.0, _Near, _Far);
-	
-	float3 unjitteredPositionWS = ClipToWorld(unjitteredPositionCS.xyz);
+	unjitteredPositionCS.z = EyeToDeviceDepth(lerp(_VolumetricLightNear, _VolumetricLightFar, unjitteredNormalizedDepth));
+	float3 unjitteredPositionWS = ClipToWorld(unjitteredPositionCS);
 	
 	float4 prevPositionCS = PerspectiveDivide(WorldToClipPrevious(unjitteredPositionWS));
 	prevPositionCS.xy = 0.5 * prevPositionCS.xy + 0.5;
@@ -106,8 +99,8 @@ void Compute(uint3 id : SV_DispatchThreadID)
 
 	if (all(saturate(volumeUv) == volumeUv))
 	{
-		float4 previousLuminanceExtinction = _Input.SampleLevel(_LinearClampSampler, volumeUv, 0.0);
-		//luminanceExtinction = lerp(previousLuminanceExtinction, luminanceExtinction, 0.05);
+		float4 previousLuminanceExtinction = _Input.SampleLevel(_LinearClampSampler, min(volumeUv * _InputScale, _InputMax), 0.0);
+		luminanceExtinction = lerp(previousLuminanceExtinction, luminanceExtinction, 0.05);
 	}
 	
 	_Result[id] = luminanceExtinction;

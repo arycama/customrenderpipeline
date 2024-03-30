@@ -48,40 +48,7 @@ namespace Arycama.CustomRenderPipeline
 
         public static Matrix4x4 PixelToWorldViewDirectionMatrix(int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, bool flip = false)
         {
-            //var near = 0.0f;
-            //var far = 1.0f;
             var tanHalfFov = Mathf.Tan(0.5f * fov * Mathf.Deg2Rad);
-
-            // So this goes from -1:1 to view space.. 
-            //var jitteredClipToView = new Matrix4x4
-            //{
-            //    m00 = aspect * tanHalfFov,
-            //    m03 = aspect * jitter.x * tanHalfFov,
-            //    m11 = tanHalfFov,
-            //    m13 = jitter.y * tanHalfFov,
-            //    m23 = 1.0f,
-            //    m32 = (far - near) / (near * far),
-            //    m33 = 1.0f / far
-            //};
-
-
-            //// Compose the view space version first.
-            //// V = -(X, Y, Z), s.t. Z = 1,
-            //// X = (2x / resX - 1) * tan(vFoV / 2) * ar = x * [(2 / resX) * tan(vFoV / 2) * ar] + [-tan(vFoV / 2) * ar] = x * [-m00] + [-m20]
-            //// Y = (2y / resY - 1) * tan(vFoV / 2)      = y * [(2 / resY) * tan(vFoV / 2)]      + [-tan(vFoV / 2)]      = y * [-m11] + [-m21]
-
-            //var m11 = -tanHalfFov * 2.0f / height;
-            //var m21 = (1.0f - jitter.y) * tanHalfFov;
-
-            //var viewSpaceRasterTransform = new Matrix4x4
-            //{
-            //    m00 = -aspect * tanHalfFov * 2.0f / width,
-            //    m11 = flip ? -m11 : m11,
-            //    m02 = tanHalfFov * aspect * (1.0f - jitter.x),
-            //    m12 = flip ? -m21 : m21,
-            //    m22 = -1.0f,
-            //    m33 = 1.0f
-            //};
 
             var m11 = tanHalfFov * 2.0f / height;
             var m12 = -(tanHalfFov + tanHalfFov * jitter.y);
@@ -90,7 +57,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 m00 = aspect * tanHalfFov * 2.0f / width,
                 m11 = flip ? -m11 : m11,
-                m02 = -(tanHalfFov * aspect + tanHalfFov * aspect * jitter.x),
+                m02 = -(aspect * tanHalfFov + tanHalfFov * aspect * jitter.x),
                 m12 = flip ? -m12 : m12,
                 m22 = 1.0f,
                 m33 = 1.0f

@@ -55,6 +55,7 @@ cbuffer FrameData
 	float _SpecularAAScreenSpaceVariance;
 	float _SpecularAAThreshold;
 	float _FrameIndex;
+	float _ViewHeight;
 };
 
 cbuffer CameraData

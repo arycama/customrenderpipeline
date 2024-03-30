@@ -53,7 +53,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_VolumeSlices", data.volumeSlices);
                     pass.SetFloat(command, "_BlurSigma", data.blurSigma);
                     pass.SetFloat(command, "_VolumeTileSize", data.volumeTileSize);
-                    pass.SetFloat(command, "_VolumeTileSize", data.volumeTileSize);
 
                     pass.SetFloat(command, "_Near", data.near);
                     pass.SetFloat(command, "_Far", data.far);
@@ -65,11 +64,15 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetVector(command, "_ViewPosition", camera.transform.position);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
+                    pass.SetVector(command, "_CameraForward", camera.transform.forward);
+
+                    pass.SetVector(command, "_InputScale", textures.history.Scale);
+                    pass.SetVector(command, "_InputMax", textures.history.Limit);
+
                     pass.SetMatrix(command, "_WorldToPreviousClip", data.previousVpMatrix);
                     pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
 
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(camera.pixelWidth, camera.pixelHeight, jitter, camera.fieldOfView, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation)));
-                    pass.SetMatrix(command, "_PixelToWorldViewDir1", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, camera.fieldOfView, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation)));
+                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, camera.fieldOfView, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation)));
                 });
 
                 data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;

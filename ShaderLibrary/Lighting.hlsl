@@ -594,8 +594,8 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 			continue;
 			
 		// Atmospheric transmittance
-		float heightAtDistance = HeightAtDistance(_ViewPosition.y + _PlanetRadius, -V.y, length(input.worldPosition));
-		float lightCosAngleAtDistance = CosAngleAtDistance(_ViewPosition.y + _PlanetRadius, light.direction.y, length(input.worldPosition) * dot(light.direction, -V), heightAtDistance);
+		float heightAtDistance = HeightAtDistance(_ViewHeight, -V.y, length(input.worldPosition));
+		float lightCosAngleAtDistance = CosAngleAtDistance(_ViewHeight, light.direction.y, length(input.worldPosition) * dot(light.direction, -V), heightAtDistance);
 		if (RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 			continue;
 		

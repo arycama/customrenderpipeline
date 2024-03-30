@@ -307,6 +307,7 @@ namespace Arycama.CustomRenderPipeline
                     cloudShadowResult.SetProperties(pass, command);
                     cloudSettings.SetCloudPassData(command, pass);
 
+                    pass.SetFloat(command, "_ViewHeight", cameraPosition.y + settings.PlanetRadius);
                     pass.SetFloat(command, "_Samples", settings.ReflectionSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
                     
@@ -475,6 +476,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     lightingSetupResult.SetProperties(pass, command);
 
+                    pass.SetFloat(command, "_ViewHeight", camera.transform.position.y + settings.PlanetRadius);
                     pass.SetFloat(command, "_Samples", settings.RenderSamples);
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
 
@@ -515,6 +517,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.SetVector(command, "_HistoryScaleLimit", skyColor.history.ScaleLimit2D);
 
+                    pass.SetFloat(command, "_ViewHeight", camera.transform.position.y + settings.PlanetRadius);
                     pass.SetFloat(command, "_IsFirst", skyColor.wasCreated ? 1.0f : 0.0f);
                     pass.SetFloat(command, "_StationaryBlend", settings.StationaryBlend);
                     pass.SetFloat(command, "_MotionBlend", settings.MotionBlend);
