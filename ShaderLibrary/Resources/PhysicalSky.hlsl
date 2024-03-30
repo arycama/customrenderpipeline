@@ -192,10 +192,10 @@ FragmentTransmittanceOutput FragmentTransmittanceLut(float4 position : SV_Positi
 float3 FragmentRender(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	#ifdef REFLECTION_PROBE
-		float3 rd = -MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
+		float3 rd = MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
 		float2 offsets = 0.5;//float2(PlusNoise(position.xy), 0.5);
 	#else
-		float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+		float3 rd = MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
 		float2 offsets = _BlueNoise2D[position.xy % 128];
 		//offsets = float2(PlusNoise(position.xy), 0.5);
 	#endif
@@ -380,7 +380,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position)
 	float depth = _Depth[pixelId];
 	float cloudDistance = _CloudDepth[pixelId];
 	
-	float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+	float3 rd = MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
 	float sceneDistance = CameraDepthToDistance(depth, -rd);
 	float viewHeight = _ViewPosition.y + _PlanetRadius;
 	

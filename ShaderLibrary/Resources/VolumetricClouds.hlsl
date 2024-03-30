@@ -26,7 +26,7 @@ FragmentOutput Fragment(float4 position : SV_Position)
 	#else
 		float3 P = 0.0;
 		float viewHeight = _ViewPosition.y + _PlanetRadius;
-		float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+		float3 rd = MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
 		float cosViewAngle = rd.y;
 		float2 offsets = _BlueNoise2D[uint2(position.xy) % 128];
 		//offsets.x = PlusNoise(position.xy);
@@ -109,7 +109,7 @@ struct TemporalOutput
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD)
 {
 	int2 pixelId = (int2) position.xy;
-	float3 rd = -MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+	float3 rd = MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
 	float cloudDistance = _CloudDepth[pixelId];
 
 	float3 worldPosition = rd * cloudDistance;

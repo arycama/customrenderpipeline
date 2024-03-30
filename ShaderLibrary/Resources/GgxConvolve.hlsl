@@ -93,7 +93,7 @@ float V_SmithJointGGX(float NdotL, float NdotV, float roughness)
 
 float3 Fragment(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
-	float3 V = -MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
+	float3 V = MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
 	
 	float3 N = V;
 	float perceptualRoughness = MipmapLevelToPerceptualRoughness(_Level);
