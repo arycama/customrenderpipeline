@@ -241,7 +241,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(result);
         }
 
-        public void GenerateData(Vector3 viewPosition, LightingSetup.Result lightingSetupResult, VolumetricClouds.Settings cloudSettings, CullingResults cullingResults, Vector3 cameraPosition, VolumetricClouds.CloudShadowDataResult cloudShadowResult)
+        public void GenerateData(Vector3 viewPosition, VolumetricClouds.Settings cloudSettings, CullingResults cullingResults, Vector3 cameraPosition)
         {
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -293,18 +293,14 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(skyReflection, RenderBufferLoadAction.DontCare);
                 pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
 
-                lightingSetupResult.SetInputs(pass);
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<VolumetricClouds.CloudData>();
-
-                cloudShadowResult.SetInputs(pass);
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<VolumetricClouds.CloudData>();
+                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<LightingSetup.Result>();
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    lightingSetupResult.SetProperties(pass, command);
-
-                    cloudShadowResult.SetProperties(pass, command);
                     cloudSettings.SetCloudPassData(command, pass);
 
                     pass.SetFloat(command, "_ViewHeight", cameraPosition.y + settings.PlanetRadius);
@@ -427,7 +423,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(new ReflectionAmbientData(ambientBuffer, reflectionProbe));
         }
 
-        public void Render(RTHandle target, RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, LightingSetup.Result lightingSetupResult, Vector2 jitter, IRenderPassData commonPassData, VolumetricClouds.CloudShadowDataResult cloudShadowData, Camera camera, CullingResults cullingResults, RTHandle velocity)
+        public void Render(RTHandle target, RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector2 jitter, IRenderPassData commonPassData, Camera camera, CullingResults cullingResults, RTHandle velocity)
         {
             var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
@@ -465,17 +461,15 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(skyTemp);
                 pass.ReadTexture("_Depth", depth);
 
-                lightingSetupResult.SetInputs(pass);
                 commonPassData.SetInputs(pass);
-                cloudShadowData.SetInputs(pass);
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
+                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<LightingSetup.Result>();
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    lightingSetupResult.SetProperties(pass, command);
-
                     pass.SetFloat(command, "_ViewHeight", camera.transform.position.y + settings.PlanetRadius);
                     pass.SetFloat(command, "_Samples", settings.RenderSamples);
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
@@ -486,7 +480,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightColor1", lightColor1);
 
                     commonPassData.SetProperties(pass, command);
-                    cloudShadowData.SetProperties(pass, command);
                 });
             }
 

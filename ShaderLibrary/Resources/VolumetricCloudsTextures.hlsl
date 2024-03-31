@@ -76,7 +76,7 @@ float3 FragmentNoise(float4 position : SV_Position, uint index : SV_RenderTarget
 	
 	// Cellular noise
 	float cellularResult = 0.0, cellularSum = 0.0;
-	for (float i = 0; i < _CellularNoiseOctaves; i++)
+	for (i = 0; i < _CellularNoiseOctaves; i++)
 	{
 		float freq = _CellularNoiseFrequency * exp2(i);
 		float amp = pow(freq, -_CellularNoiseH);// * smoothstep(1.0, 0.5, w * freq);

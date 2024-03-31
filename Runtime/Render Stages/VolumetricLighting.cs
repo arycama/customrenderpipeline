@@ -17,7 +17,7 @@ namespace Arycama.CustomRenderPipeline
             colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", TextureDimension.Tex3D);
         }
 
-        public void Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, LightingSetup.Result lightingSetupResult, Texture2D blueNoise1D, Texture2D blueNoise2D, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, Vector2 jitter)
+        public void Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, Texture2D blueNoise1D, Texture2D blueNoise2D, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, Vector2 jitter, float viewHeight)
         {
             var volumeWidth = Mathf.CeilToInt(screenWidth / (float)settings.TileSize);
             var volumeHeight = Mathf.CeilToInt(screenHeight / (float)settings.TileSize);
@@ -39,11 +39,12 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.ReadTexture("_Input", textures.history);
 
-                lightingSetupResult.SetInputs(pass);
                 pass.AddRenderPassData<ClusteredLightCulling.Result>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<Result>();
+                pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
@@ -56,6 +57,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetFloat(command, "_Near", data.near);
                     pass.SetFloat(command, "_Far", data.far);
+                    pass.SetFloat(command, "_ViewHeight", viewHeight);
 
                     data.lightingSetupResult.SetProperties(pass, command);
 
@@ -82,7 +84,6 @@ namespace Arycama.CustomRenderPipeline
                 data.volumeDepth = farClipPlane;
                 data.blurSigma = settings.BlurSigma;
                 data.volumeTileSize = settings.TileSize;
-                data.lightingSetupResult = lightingSetupResult;
                 data.blueNoise1D = blueNoise1D;
                 data.blueNoise2D = blueNoise2D;
                 data.scaledResolution = new Vector4(screenWidth, screenHeight, 1.0f / screenWidth, 1.0f / screenHeight);
@@ -139,7 +140,6 @@ namespace Arycama.CustomRenderPipeline
                 data.volumeDepth = farClipPlane;
                 data.blurSigma = settings.BlurSigma;
                 data.volumeTileSize = settings.TileSize;
-                data.lightingSetupResult = lightingSetupResult;
                 data.blueNoise1D = blueNoise1D;
                 data.blueNoise2D = blueNoise2D;
                 data.scaledResolution = new Vector4(screenWidth, screenHeight, 1.0f / screenWidth, 1.0f / screenHeight);

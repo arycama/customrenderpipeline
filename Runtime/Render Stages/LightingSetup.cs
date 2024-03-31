@@ -19,7 +19,7 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
         }
 
-        public Result Render(CullingResults cullingResults, Matrix4x4 clipToWorld, float near, float far, Camera camera)
+        public void Render(CullingResults cullingResults, Matrix4x4 clipToWorld, float near, float far, Camera camera)
         {
             var result = new Result();
 
@@ -350,7 +350,7 @@ namespace Arycama.CustomRenderPipeline
                 result.pointLightCount = pointLightList.Count;
             }
 
-            return result;
+            renderGraph.ResourceMap.SetRenderPassData(result);
         }
 
         private class Pass0Data
@@ -387,7 +387,7 @@ namespace Arycama.CustomRenderPipeline
             internal Vector3 viewPosition;
         }
 
-        public struct Result
+        public struct Result : IRenderPassData
         {
             public RTHandle directionalShadows;
             public RTHandle pointShadows;

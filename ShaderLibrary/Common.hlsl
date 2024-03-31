@@ -393,7 +393,7 @@ float4 VertexFullscreenTriangle(uint id : SV_VertexID, out float2 uv : TEXCOORD0
 	uv = (id << uint2(1, 0)) & 2;
 	float4 result = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
-	worldDirection = _FrustumCorners[id];
+	worldDirection = _FrustumCorners[id].xyz;
 	return result;
 }
 

@@ -21,35 +21,31 @@ float3 _InputScale, _InputMax;
 [numthreads(8, 8, 8)]
 void Compute(uint3 id : SV_DispatchThreadID)
 {
+	float jitter = _BlueNoise1D[id.xy % 128];
+	float3 worldDir = MultiplyVector(_PixelToWorldViewDir, float3(id.xy + 0.5, 1.0), false);
+	float rcpWorldDirLength = rsqrt(dot(worldDir, worldDir));
+	worldDir *= rcpWorldDirLength;
+	
+	float eyeDepth = lerp(_VolumetricLightNear, _VolumetricLightFar, (id.z + jitter) / _VolumeSlices);
+	float viewDistance = eyeDepth * rcp(rcpWorldDirLength);
+	float3 worldPosition = worldDir * viewDistance;
+	
+	float height = HeightAtDistance(_ViewHeight, worldDir.y, viewDistance);
+	
 	float2 positionNDC = (id.xy + 0.5) / float2(_VolumeWidth, _VolumeHeight);
 	float2 pixelPosition = positionNDC * _ScaledResolution.xy;
-	float3 V = -MultiplyVector(_PixelToWorldViewDir, float3(id.xy + 0.5, 1.0), true);
-	
-	float jitter = _BlueNoise1D[id.xy % 128];
-	
-	float normalizedDepth = (id.z + jitter) / _VolumeSlices;
-	float eyeDepth = lerp(_VolumetricLightNear, _VolumetricLightFar, normalizedDepth);
-	
-	float viewDistance = eyeDepth * rcp(dot(-V, _CameraForward));
-	float3 worldPosition = -V * viewDistance;
-	
-	float viewHeight = _ViewPosition.y + _PlanetRadius;
-	float height = HeightAtDistance(viewHeight, -V.y, viewDistance);
 	
 	uint3 clusterIndex;
 	clusterIndex.xy = floor(pixelPosition) / _TileSize;
 	clusterIndex.z = log2(eyeDepth) * _ClusterScale + _ClusterBias;
 	
 	uint2 lightOffsetAndCount = _LightClusterIndices[clusterIndex];
-	uint startOffset = lightOffsetAndCount.x;
-	uint lightCount = lightOffsetAndCount.y;
 	
 	// Point lights
 	float3 lighting = 0.0;
-	for (uint i = 0; i < min(128, lightCount); i++)
+	for (uint i = 0; i < min(128, lightOffsetAndCount.y); i++)
 	{
-		int index = _LightClusterList[startOffset + i];
-		PointLight light = _PointLights[index];
+		PointLight light = _PointLights[_LightClusterList[lightOffsetAndCount.x + i]];
 		
 		float3 lightVector = light.position - worldPosition;
 		float sqrLightDist = dot(lightVector, lightVector);
@@ -65,7 +61,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 		if(!attenuation)
 			continue;
 		
-		float3 intensity = AtmosphereScatter(height, dot(L, -V));
+		float3 intensity = AtmosphereScatter(height, dot(L, worldDir));
 		if(all(!intensity))
 			continue;
 			
@@ -85,14 +81,11 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	float4 luminanceExtinction = float4(lighting, 0.0);
 	
 	// Reproject previous frame. Needs to use unjittered world position
-	float unjitteredNormalizedDepth = (id.z + 0.5) / _VolumeSlices;
-	
 	float3 unjitteredPositionCS;
 	unjitteredPositionCS.xy = positionNDC * 2.0 - 1.0;
-	unjitteredPositionCS.z = EyeToDeviceDepth(lerp(_VolumetricLightNear, _VolumetricLightFar, unjitteredNormalizedDepth));
-	float3 unjitteredPositionWS = ClipToWorld(unjitteredPositionCS);
+	unjitteredPositionCS.z = EyeToDeviceDepth(lerp(_VolumetricLightNear, _VolumetricLightFar, (id.z + 0.5) / _VolumeSlices));
 	
-	float4 prevPositionCS = PerspectiveDivide(WorldToClipPrevious(unjitteredPositionWS));
+	float4 prevPositionCS = PerspectiveDivide(WorldToClipPrevious(ClipToWorld(unjitteredPositionCS)));
 	prevPositionCS.xy = 0.5 * prevPositionCS.xy + 0.5;
 	
 	float3 volumeUv = float3(prevPositionCS.xy, GetVolumetricUv(prevPositionCS.w));
@@ -139,12 +132,8 @@ void KERNEL(uint3 id : SV_DispatchThreadID)
 [numthreads(8, 8, 1)]
 void Accumulate(uint2 id : SV_DispatchThreadID)
 {
-	float3 V = MultiplyVector(_PixelToWorldViewDir, float3(id + 0.5, 1.0), true);
-	
-	float startT = CameraDepthToDistance(_VolumetricLightNear, V);
-	float endT = CameraDepthToDistance(_VolumetricLightFar, V);
-	
-	float rayLength = endT - startT;
+	float3 worldDir = MultiplyVector(_PixelToWorldViewDir, float3(id.xy + 0.5, 1.0), false);
+	float rayLength = (_VolumetricLightFar - _VolumetricLightNear) * length(worldDir);
 	
 	float ds = rayLength / _VolumeSlices;
 	

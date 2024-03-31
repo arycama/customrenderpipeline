@@ -13,7 +13,7 @@ public class DeferredLighting
         material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public void Render(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, VolumetricClouds.CloudShadowDataResult cloudShadowData, LightingSetup.Result lightingSetupResult)
+    public void Render(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData)
     {
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting"))
         {
@@ -28,17 +28,15 @@ public class DeferredLighting
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
             commonPassData.SetInputs(pass);
-            cloudShadowData.SetInputs(pass);
-            lightingSetupResult.SetInputs(pass);
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<VolumetricLighting.Result>();
+            pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+            pass.AddRenderPassData<LightingSetup.Result>();
 
             var data = pass.SetRenderFunction<Data>((command, context, pass, data) =>
             {
                 commonPassData.SetProperties(pass, command);
-                cloudShadowData.SetProperties(pass, command);
-                lightingSetupResult.SetProperties(pass, command);
             });
         }
     }

@@ -105,7 +105,7 @@ float RayleighPhase(float cosAngle)
 	return 3.0 * (1.0 + Sq(cosAngle)) / (16.0 * Pi);
 }
 
-float3 MiePhase(float cosTheta, float g)
+float MiePhase(float cosTheta, float g)
 {
 	//float denom = 1.0 + g * g + 2.0 * g * -cosTheta;
 	//return RcpFourPi * (1.0 - g * g) / (denom * sqrt(denom));

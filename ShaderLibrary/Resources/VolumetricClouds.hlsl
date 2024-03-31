@@ -17,16 +17,14 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	#ifdef CLOUD_SHADOW
 		float3 P = position.x * _CloudShadowToWorld._m00_m10_m20 + position.y * _CloudShadowToWorld._m01_m11_m21 + _CloudShadowToWorld._m03_m13_m23;
 		float3 rd = _CloudShadowViewDirection;
-		float viewHeight = distance(_PlanetCenter, P);
+		float _ViewHeight = distance(_PlanetCenter, P);
 		float3 N = normalize(P - _PlanetCenter);
 		float cosViewAngle = dot(N, rd);
 		float2 offsets = 0.5;//InterleavedGradientNoise(position.xy, 0); // _BlueNoise1D[uint2(position.xy) % 128];
 	#else
 		float3 P = 0.0;
-		float viewHeight = _ViewPosition.y + _PlanetRadius;
-		float3 rd = worldDir;// MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), false);
-		float3 rdz = rd;
-		float rcpRdLength = rcp(dot(rd, rd));
+		float3 rd = worldDir;
+		float rcpRdLength = rsqrt(dot(rd, rd));
 		rd *= rcpRdLength;
 		float cosViewAngle = rd.y;
 		float2 offsets = _BlueNoise2D[uint2(position.xy) % 128];
@@ -35,29 +33,29 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	FragmentOutput output;
 	
 	#ifdef BELOW_CLOUD_LAYER
-		float rayStart = DistanceToSphereInside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
-		float rayEnd = DistanceToSphereInside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+		float rayStart = DistanceToSphereInside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
+		float rayEnd = DistanceToSphereInside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness);
 	
-		if (RayIntersectsGround(viewHeight, cosViewAngle))
+		if (RayIntersectsGround(_ViewHeight, cosViewAngle))
 		{
 			output.result = float2(0.0, 1.0).xxxy;
 			output.depth = 0.0;
 			return output;
 		}
 	#elif defined(ABOVE_CLOUD_LAYER) || defined(CLOUD_SHADOW)
-		float rayStart = DistanceToSphereOutside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness);
-		float rayEnd = DistanceToSphereOutside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
+		float rayStart = DistanceToSphereOutside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+		float rayEnd = DistanceToSphereOutside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
 	#else
 		float rayStart = 0.0;
-		bool rayIntersectsLowerCloud = RayIntersectsSphere(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
-		float rayEnd = rayIntersectsLowerCloud ? DistanceToSphereOutside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight) : DistanceToSphereInside(viewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+		bool rayIntersectsLowerCloud = RayIntersectsSphere(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
+		float rayEnd = rayIntersectsLowerCloud ? DistanceToSphereOutside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight) : DistanceToSphereInside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness);
 	#endif
 	
 	#ifndef CLOUD_SHADOW
 		float sceneDepth = _Depth[position.xy];
 		if (sceneDepth != 0.0)
 		{
-			float sceneDistance = length(LinearEyeDepth(sceneDepth) * rdz);// * rcp(rcpRdLength);
+			float sceneDistance = LinearEyeDepth(sceneDepth) * rcp(rcpRdLength);
 			if (sceneDistance < rayStart)
 			{
 				output.result = float2(0.0, 1.0).xxxy;
@@ -79,7 +77,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	float cloudDepth;
 	float rayLength = rayEnd - rayStart;
-	float4 result = EvaluateCloud(rayStart, rayLength, sampleCount, rd, viewHeight, cosViewAngle, offsets, P, isShadow, cloudDepth);
+	float4 result = EvaluateCloud(rayStart, rayLength, sampleCount, rd, _ViewHeight, cosViewAngle, offsets, P, isShadow, cloudDepth, false);
 	
 	#ifdef CLOUD_SHADOW
 		float totalRayLength = rayEnd - cloudDepth;
@@ -136,7 +134,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	}
 	
 	[unroll]
-	for (int i = 0; i < 4; i++)
+	for (i = 0; i < 4; i++)
 	{
 		float4 color = _Input[pixelId + offsets[i + 4]];
 		result += color * _BoxFilterWeights1[i];

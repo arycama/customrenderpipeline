@@ -33,7 +33,6 @@ namespace Arycama.CustomRenderPipeline
             public int tileSize;
             public float rcpClusterDepth;
             public BufferHandle counterBuffer;
-            internal int pointLightCount;
             internal Vector4 scaledResolution;
             internal Matrix4x4 invVpMatrix;
             internal float near;
@@ -70,7 +69,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void Render(int width, int height, float near, float far, LightingSetup.Result lightingSetupResult, Matrix4x4 invVpMatrix)
+        public void Render(int width, int height, float near, float far, Matrix4x4 invVpMatrix)
         {
             var clusterWidth = MathUtils.DivRoundUp(width, settings.TileSize);
             var clusterHeight = MathUtils.DivRoundUp(height, settings.TileSize);
@@ -87,19 +86,18 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Clustered Light Culling"))
             {
                 pass.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
+                pass.AddRenderPassData<LightingSetup.Result>();
                 var counterBuffer = renderGraph.GetBuffer();
 
                 pass.WriteBuffer("_LightClusterListWrite", lightList);
                 pass.WriteBuffer("_LightCounter", counterBuffer);
                 pass.WriteTexture("_LightClusterIndicesWrite", lightClusterIndices);
-                pass.ReadBuffer("_PointLights", lightingSetupResult.pointLights);
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
                     command.SetBufferData(data.counterBuffer, zeroArray);
                     pass.SetInt(command, "_TileSize", data.tileSize);
                     pass.SetFloat(command, "_RcpClusterDepth", data.rcpClusterDepth);
-                    pass.SetInt(command, "_PointLightCount", data.pointLightCount);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                     pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
                     pass.SetFloat(command, "_Near", data.near);
@@ -109,7 +107,6 @@ namespace Arycama.CustomRenderPipeline
                 data.tileSize = settings.TileSize;
                 data.rcpClusterDepth = 1.0f / settings.ClusterDepth;
                 data.counterBuffer = counterBuffer;
-                data.pointLightCount = lightingSetupResult.pointLightCount;
                 data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
                 data.invVpMatrix = invVpMatrix;
                 data.near = near;
