@@ -2,8 +2,6 @@
 #include "../Color.hlsl"
 #include "../Temporal.hlsl"
 
-
-
 struct FragmentOutput
 {
 	#ifdef CLOUD_SHADOW
@@ -14,7 +12,7 @@ struct FragmentOutput
 	#endif
 };
 
-FragmentOutput Fragment(float4 position : SV_Position)
+FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	#ifdef CLOUD_SHADOW
 		float3 P = position.x * _CloudShadowToWorld._m00_m10_m20 + position.y * _CloudShadowToWorld._m01_m11_m21 + _CloudShadowToWorld._m03_m13_m23;
@@ -26,11 +24,12 @@ FragmentOutput Fragment(float4 position : SV_Position)
 	#else
 		float3 P = 0.0;
 		float viewHeight = _ViewPosition.y + _PlanetRadius;
-		float3 rd = MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+		float3 rd = worldDir;// MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), false);
+		float3 rdz = rd;
+		float rcpRdLength = rcp(dot(rd, rd));
+		rd *= rcpRdLength;
 		float cosViewAngle = rd.y;
 		float2 offsets = _BlueNoise2D[uint2(position.xy) % 128];
-		//offsets.x = PlusNoise(position.xy);
-		//offsets.y = 0.5;//PlusNoise(position.xy);
 	#endif
 	
 	FragmentOutput output;
@@ -58,8 +57,7 @@ FragmentOutput Fragment(float4 position : SV_Position)
 		float sceneDepth = _Depth[position.xy];
 		if (sceneDepth != 0.0)
 		{
-			float sceneDistance = CameraDepthToDistance(sceneDepth, -rd);
-	
+			float sceneDistance = length(LinearEyeDepth(sceneDepth) * rdz);// * rcp(rcpRdLength);
 			if (sceneDistance < rayStart)
 			{
 				output.result = float2(0.0, 1.0).xxxy;

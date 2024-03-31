@@ -433,7 +433,7 @@ namespace Arycama.CustomRenderPipeline
                     keyword = "BELOW_CLOUD_LAYER";
                 }
 
-                pass.Initialize(material, 4, 1, keyword);
+                pass.Initialize(material, 4, 1, keyword, camera);
                 pass.WriteTexture(cloudTemp, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(cloudDepth, RenderBufferLoadAction.DontCare);
 

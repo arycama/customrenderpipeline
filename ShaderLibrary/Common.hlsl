@@ -386,12 +386,14 @@ float3 SmoothUv(float3 p, float3 texelSize)
 	return p;
 }
 
+float4 _FrustumCorners[3];
 
-float4 VertexFullscreenTriangle(uint id : SV_VertexID, out float2 uv : TEXCOORD) : SV_Position
+float4 VertexFullscreenTriangle(uint id : SV_VertexID, out float2 uv : TEXCOORD0, out float3 worldDirection : TEXCOORD1) : SV_Position
 {
 	uv = (id << uint2(1, 0)) & 2;
 	float4 result = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
+	worldDirection = _FrustumCorners[id];
 	return result;
 }
 
