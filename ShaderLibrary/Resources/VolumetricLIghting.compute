@@ -22,15 +22,13 @@ float3 _InputScale, _InputMax;
 void Compute(uint3 id : SV_DispatchThreadID)
 {
 	float jitter = _BlueNoise1D[id.xy % 128];
-	float3 worldDir = MultiplyVector(_PixelToWorldViewDir, float3(id.xy + 0.5, 1.0), false);
+	float3 worldDir = MultiplyVector(_PixelToWorldViewDir, float3(id.xy, 1.0), false);
 	float rcpWorldDirLength = rsqrt(dot(worldDir, worldDir));
 	worldDir *= rcpWorldDirLength;
 	
 	float eyeDepth = lerp(_VolumetricLightNear, _VolumetricLightFar, (id.z + jitter) / _VolumeSlices);
 	float viewDistance = eyeDepth * rcp(rcpWorldDirLength);
 	float3 worldPosition = worldDir * viewDistance;
-	
-	float height = HeightAtDistance(_ViewHeight, worldDir.y, viewDistance);
 	
 	float2 positionNDC = (id.xy + 0.5) / float2(_VolumeWidth, _VolumeHeight);
 	float2 pixelPosition = positionNDC * _ScaledResolution.xy;
@@ -61,6 +59,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 		if(!attenuation)
 			continue;
 		
+		float height = HeightAtDistance(_ViewHeight, worldDir.y, viewDistance);
 		float3 intensity = AtmosphereScatter(height, dot(L, worldDir));
 		if(all(!intensity))
 			continue;
@@ -78,6 +77,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 		lighting += (attenuation * _Exposure) * (intensity * light.color);
 	}
 	
+	// TODO: Ensure extinction is premultiplied by log2e
 	float4 luminanceExtinction = float4(lighting, 0.0);
 	
 	// Reproject previous frame. Needs to use unjittered world position
@@ -129,22 +129,34 @@ void KERNEL(uint3 id : SV_DispatchThreadID)
 	_Result[id] = result;
 }
 
+float _VolumeDistancePerSlice;
+uint _VolumeSlicesInt;
+
 [numthreads(8, 8, 1)]
 void Accumulate(uint2 id : SV_DispatchThreadID)
 {
-	float3 worldDir = MultiplyVector(_PixelToWorldViewDir, float3(id.xy + 0.5, 1.0), false);
-	float rayLength = (_VolumetricLightFar - _VolumetricLightNear) * length(worldDir);
+	float3 worldDir = MultiplyVector(_PixelToWorldViewDir, float3(id.xy, 1.0), false);
+	float rcpWorldDirLength = rsqrt(dot(worldDir, worldDir));
+	worldDir *= rcpWorldDirLength;
 	
-	float ds = rayLength / _VolumeSlices;
+	float ds = _VolumeDistancePerSlice * rcp(rcpWorldDirLength);
 	
+	float t = 0.5 * ds;
+	float3 intTransmittance = 1.0;
 	float4 result = float2(0.0, 1.0).xxxy;
-	for (uint i = 0; i < uint(_VolumeSlices); i++)
+	for (uint i = 0; i < _VolumeSlicesInt; i++, t+= ds)
 	{
 		float4 luminanceExtinction = _Input[uint3(id.xy, i)];
-		float transmittance = exp(-luminanceExtinction.a * ds);
 		
-		result.rgb += result.a * luminanceExtinction.rgb;
-		result.a *= transmittance;
+		// Attenuate due to atmosphere and local extinction
+		float atmosphereHeight = HeightAtDistance(_ViewHeight, worldDir.y, t);
+		float3 extinction = AtmosphereExtinction(atmosphereHeight) + luminanceExtinction.a;
+		float3 transmittance = exp(-extinction * ds);
+		float3 integScatt = (luminanceExtinction.rgb - luminanceExtinction.rgb * transmittance) / max(1e-7, extinction);
+		
+		result.rgb += intTransmittance * integScatt.rgb;
+		intTransmittance *= transmittance;
+		result.a *= exp(-luminanceExtinction.a * ds); // Accumulate result.a seperately as we don't want to apply atmospheric transmittance twice
 		_Result[uint3(id, i)] = result;
 	}
 }

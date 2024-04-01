@@ -1,15 +1,13 @@
-#include "../Common.hlsl"
-#include "../Atmosphere.hlsl"
-#include "../Random.hlsl"
+#pragma use_dxc
 
 #pragma kernel MultiScatter KERNEL=MultiScatter MULTI_SCATTER
 #pragma kernel AmbientGroundLookup KERNEL=AmbientGroundLookup AMBIENT_GROUND
 #pragma kernel AmbientSkyLookup KERNEL=AmbientSkyLookup AMBIENT_SKY
 #pragma kernel AmbientProbe
 
-#ifdef __INTELLISENSE__
-	#define AMBIENT_GROUND
-#endif
+#include "../Common.hlsl"
+#include "../Atmosphere.hlsl"
+#include "../Random.hlsl"
 
 static const uint _ThreadCount = 64;
 groupshared float3 MultiScatterShared[_ThreadCount], ScatterShared[_ThreadCount];

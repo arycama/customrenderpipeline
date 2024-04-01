@@ -27,7 +27,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float rcpRdLength = rsqrt(dot(rd, rd));
 		rd *= rcpRdLength;
 		float cosViewAngle = rd.y;
-		float2 offsets = _BlueNoise2D[uint2(position.xy) % 128];
+		float2 offsets = InterleavedGradientNoise(position.xy, _FrameIndex);//_BlueNoise2D[uint2(position.xy) % 128];
 	#endif
 	
 	FragmentOutput output;
@@ -102,10 +102,13 @@ struct TemporalOutput
 	float4 velocity : SV_Target1;
 };
 
-TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD)
+TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	int2 pixelId = (int2) position.xy;
-	float3 rd = MultiplyVector(_PixelToWorldViewDir, float3(position.xy, 1.0), true);
+	float3 rd = worldDir;
+	float rcpRdLength = rsqrt(dot(rd, rd));
+	rd *= rcpRdLength;
+	
 	float cloudDistance = _CloudDepth[pixelId];
 
 	float3 worldPosition = rd * cloudDistance;
@@ -145,7 +148,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	result.rgb = RgbToYCoCgFastTonemap(result.rgb);
 
-	float4 history = _History.Sample(_PointClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
+	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history.rgb = RgbToYCoCgFastTonemap(history.rgb);
 	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
 	

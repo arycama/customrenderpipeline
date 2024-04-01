@@ -46,24 +46,28 @@ namespace Arycama.CustomRenderPipeline
             return WorldToLocal(rotation.Right(), rotation.Up(), rotation.Forward(), position);
         }
 
-        public static Matrix4x4 PixelToWorldViewDirectionMatrix(int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, bool flip = false)
+        public static Matrix4x4 PixelToNearClip(int width, int height, Vector2 jitter, float fov, float aspect, bool flip = false, bool halfTexel = false)
         {
             var tanHalfFov = Mathf.Tan(0.5f * fov * Mathf.Deg2Rad);
 
+            var m00 = aspect * tanHalfFov * 2.0f / width;
             var m11 = tanHalfFov * 2.0f / height;
             var m12 = -(tanHalfFov + tanHalfFov * jitter.y);
 
-            var viewSpaceRasterTransform = new Matrix4x4
+            return new Matrix4x4
             {
-                m00 = aspect * tanHalfFov * 2.0f / width,
+                m00 = m00,
                 m11 = flip ? -m11 : m11,
-                m02 = -(aspect * tanHalfFov + tanHalfFov * aspect * jitter.x),
-                m12 = flip ? -m12 : m12,
+                m02 = -(aspect * tanHalfFov + tanHalfFov * aspect * jitter.x) + (halfTexel ? (0.5f * m00) : 0.0f),
+                m12 = (flip ? -m12 : m12) + (halfTexel ? 0.5f * (flip ? -m11 : m11) : 0.0f),
                 m22 = 1.0f,
                 m33 = 1.0f
             };
+        }
 
-            return viewToWorld * viewSpaceRasterTransform;
+        public static Matrix4x4 PixelToWorldViewDirectionMatrix(int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, bool flip = false, bool halfTexel = false)
+        {
+            return viewToWorld * PixelToNearClip(width, height, jitter, fov, aspect, flip, halfTexel);
         }
 
         // Returns an ortho matrix where the view is centered in the XY, and at 0 in the Z

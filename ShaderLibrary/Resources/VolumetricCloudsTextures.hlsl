@@ -15,25 +15,7 @@ struct GeometryOutput
 	uint index : SV_RenderTargetArrayIndex;
 };
 
-const static uint _InstanceCount = 32;
-
-[instance(_InstanceCount)]
-[maxvertexcount(3)]
-void Geometry(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryOutput> stream, uint instanceId : SV_GSInstanceID)
-{
-	[unroll]
-	for (uint i = 0; i < 3; i++)
-	{
-		uint localId = id[i] % 3;
-		
-		GeometryOutput output;
-		output.position = float3(float2((localId << 1) & 2, localId & 2) * 2.0 - 1.0, 1.0).xyzz;
-		output.index = id[i] / 3 * _InstanceCount + instanceId;
-		stream.Append(output);
-	}
-}
-
-float3 FragmentWeatherMap(float4 position : SV_Position) : SV_Target
+float3 FragmentWeatherMap(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float result = 0.0;
 	float2 samplePosition = position.xy / _WeatherMapResolution;
@@ -55,7 +37,7 @@ float3 FragmentWeatherMap(float4 position : SV_Position) : SV_Target
 	return result;
 }
 
-float3 FragmentNoise(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float3 FragmentNoise(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	float3 samplePosition = float3(position.xy, index + 0.5) / _NoiseResolution;
 
@@ -92,7 +74,7 @@ float3 FragmentNoise(float4 position : SV_Position, uint index : SV_RenderTarget
 	return result;
 }
 
-float3 FragmentDetailNoise(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float3 FragmentDetailNoise(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	float result = 0.0;
 	float3 samplePosition = float3(position.xy, index + 0.5) / _DetailNoiseResolution;

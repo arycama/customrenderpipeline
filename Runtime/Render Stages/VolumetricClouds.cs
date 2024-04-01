@@ -449,39 +449,6 @@ namespace Arycama.CustomRenderPipeline
                 {
                     //command.BeginSample(sampler);
                     settings.SetCloudPassData(command, pass);
-
-                    var near = camera.nearClipPlane;
-                    var far = camera.farClipPlane;
-                    var tanHalfFov = Mathf.Tan(0.5f * fov * Mathf.Deg2Rad);
-
-                    // So this goes from -1:1 to view space.. 
-                    var jitteredClipToView = new Matrix4x4
-                    {
-                        m00 = aspect * tanHalfFov,
-                        m03 = aspect * jitter.x * tanHalfFov,
-                        m11 = tanHalfFov,
-                        m13 = jitter.y * tanHalfFov,
-                        m23 = 1.0f,
-                        m32 = (far - near) / (near * far),
-                        m33 = 1.0f / far
-                    };
-
-                    // Basically divide by width, then transofrm to clip (*2-1) 
-                    var viewSpaceRasterTransform = new Matrix4x4
-                    {
-                        m00 = aspect * tanHalfFov * 2.0f / width,
-                        m11 = tanHalfFov * 2.0f / height,
-                        m02 = -(tanHalfFov * aspect + tanHalfFov * aspect * jitter.x),
-                        m12 = -(tanHalfFov + tanHalfFov * jitter.y),
-                        m22 = 1.0f,
-                        m33 = 1.0f
-                    };
-
-                    var mat = viewToWorld * (viewSpaceRasterTransform);
-                    mat = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld);
-
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", mat);
-
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
                     pass.SetVector(command, "_LightColor0", lightColor0);
                     pass.SetVector(command, "_LightDirection1", lightDirection1);

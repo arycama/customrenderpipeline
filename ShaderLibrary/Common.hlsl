@@ -357,7 +357,7 @@ float CameraDistanceToDepth(float distance, float3 V)
 
 float LinearEyeDepthToDistance(float depth, float3 V)
 {
-	return depth * rcp(dot(V, -_CameraForward));
+	return depth * rcp(dot(-V, _CameraForward));
 }
 
 float2 SmoothUv(float2 p, float2 texelSize)
@@ -405,6 +405,8 @@ uint VertexIdPassthrough(uint id : SV_VertexID) : TEXCOORD
 struct GeometryVolumeRenderOutput
 {
 	float4 position : SV_Position;
+	float2 uv : TEXCOORD0;
+	float3 worldDir : TEXCOORD1;
 	uint index : SV_RenderTargetArrayIndex;
 };
 
@@ -416,9 +418,13 @@ void GeometryVolumeRender(triangle uint id[3] : TEXCOORD, inout TriangleStream<G
 	for (uint i = 0; i < 3; i++)
 	{
 		uint localId = id[i] % 3;
+		float2 uv = (localId << uint2(1, 0)) & 2;
 		
 		GeometryVolumeRenderOutput output;
-		output.position = float3(((localId << uint2(1, 0)) & 2) * 2.0 - 1.0, 1.0).xyzz;
+		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+		uv.y = 1.0 - uv.y;
+		output.uv = uv;
+		output.worldDir = _FrustumCorners[localId].xyz;
 		output.index = id[i] / 3 * 32 + instanceId;
 		stream.Append(output);
 	}
@@ -432,9 +438,14 @@ void GeometryCubemapRender(triangle uint id[3] : TEXCOORD, inout TriangleStream<
 	for (uint i = 0; i < 3; i++)
 	{
 		uint localId = id[i] % 3;
+		float2 uv = (localId << uint2(1, 0)) & 2;
 		
 		GeometryVolumeRenderOutput output;
-		output.position = float3(((localId << uint2(1, 0)) & 2) * 2.0 - 1.0, 1.0).xyzz;
+		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+		uv.y = 1.0 - uv.y;
+		output.uv = uv;
+		output.worldDir = _FrustumCorners[localId].xyz;
+		
 		output.index = id[i] / 3 * 32 + instanceId;
 		stream.Append(output);
 	}

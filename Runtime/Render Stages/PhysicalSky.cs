@@ -303,7 +303,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     cloudSettings.SetCloudPassData(command, pass);
 
-                    pass.SetFloat(command, "_ViewHeight", cameraPosition.y + settings.PlanetRadius);
+                    pass.SetFloat(command, "_ViewHeight", cameraPosition.y + settings.PlanetRadius * settings.EarthScale);
                     pass.SetFloat(command, "_Samples", settings.ReflectionSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
                     
@@ -457,7 +457,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
             {
-                pass.Initialize(skyMaterial, 3);
+                pass.Initialize(skyMaterial, 3, camera: camera);
                 pass.WriteTexture(skyTemp);
                 pass.ReadTexture("_Depth", depth);
 
@@ -491,7 +491,7 @@ namespace Arycama.CustomRenderPipeline
             var skyTemp2 = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Temporal"))
             {
-                pass.Initialize(skyMaterial, 4);
+                pass.Initialize(skyMaterial, 4, camera: camera);
                 pass.WriteTexture(skyTemp2, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(velocity, RenderBufferLoadAction.Load);
                 pass.WriteTexture(skyDepth.current, RenderBufferLoadAction.DontCare);

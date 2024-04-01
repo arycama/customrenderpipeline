@@ -6,6 +6,10 @@ Shader "Hidden/Physical Sky"
         ZWrite Off
         ZTest Off
 
+		HLSLINCLUDE
+		#pragma use_dxc
+		ENDHLSL
+
         Pass
         {
             Name "Transmittance Lookup"
@@ -22,7 +26,6 @@ Shader "Hidden/Physical Sky"
             Name "CDF Lookup"
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexIdPassthrough
             #pragma geometry GeometryVolumeRender
             #pragma fragment FragmentCdfLookup
@@ -35,7 +38,6 @@ Shader "Hidden/Physical Sky"
             Name "Reflection Probe"
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexIdPassthrough
             #pragma geometry GeometryCubemapRender
             #pragma fragment FragmentRender
@@ -53,7 +55,6 @@ Shader "Hidden/Physical Sky"
             Name "Render"
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentRender
             #include "PhysicalSky.hlsl"
@@ -70,7 +71,6 @@ Shader "Hidden/Physical Sky"
 			Blend 3 Off
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
             #include "PhysicalSky.hlsl"
@@ -82,8 +82,6 @@ Shader "Hidden/Physical Sky"
             Name "Spatial"
 
             HLSLPROGRAM
-			#pragma enable_d3d11_debug_symbols
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSpatial
             #include "PhysicalSky.hlsl"
@@ -97,7 +95,6 @@ Shader "Hidden/Physical Sky"
             Blend One One
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentCombine
             #include "PhysicalSky.hlsl"

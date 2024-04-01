@@ -74,7 +74,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetMatrix(command, "_WorldToPreviousClip", data.previousVpMatrix);
                     pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
 
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, camera.fieldOfView, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation)));
+                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, camera.fieldOfView, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation), false, true));
                 });
 
                 data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;
@@ -118,6 +118,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Input", filterY);
                 pass.WriteTexture("_Result", volumetricLight);
                 pass.AddRenderPassData<Result>();
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
                 {
@@ -127,10 +128,14 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_VolumeSlices", data.volumeSlices);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
 
+                    pass.SetFloat(command, "_ViewHeight", viewHeight);
                     pass.SetFloat(command, "_Near", data.near);
                     pass.SetFloat(command, "_Far", data.far);
 
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, camera.fieldOfView, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation)));
+                    pass.SetFloat(command, "_VolumeDistancePerSlice", settings.MaxDistance / settings.DepthSlices);
+                    pass.SetInt(command, "_VolumeSlicesInt", settings.DepthSlices);
+
+                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, camera.fieldOfView, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation), false, true));
                 });
 
                 data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;
