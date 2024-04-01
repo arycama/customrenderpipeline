@@ -125,10 +125,31 @@ cbuffer UnityInstancing_PerDraw0
 {
 	struct
 	{
-		matrix unity_ObjectToWorldArray, unity_WorldToObjectArray;
+		matrix unity_ObjectToWorldArray;
 	}
 	
 	unity_Builtins0Array[2];
+};
+
+cbuffer UnityInstancing_PerDraw1
+{
+	struct
+	{
+		// float unity_LODFadeArray; // Will need this for lod fade support with instancing
+		matrix unity_WorldToObjectArray;
+	}
+	
+	unity_Builtins1Array[2];
+};
+
+cbuffer UnityInstancing_PerDraw2
+{
+	struct
+	{
+		matrix unity_PrevObjectToWorldArray;//, unity_PrevWorldToObjectArray; // Don't know if we'll need this at all
+	}
+	
+	unity_Builtins3Array[2];
 };
 
 bool IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal, out float t)
@@ -219,10 +240,15 @@ float3 ObjectToWorld(float3 position, uint instanceID)
 	return MultiplyPoint3x4(objectToWorld, position);
 }
 
-float3 PreviousObjectToWorld(float3 position)
+float3 PreviousObjectToWorld(float3 position, uint instanceID)
 {
-	float3x4 previousObjectToWorld = _InPlayMode ? unity_MatrixPreviousM : unity_ObjectToWorld;
-	previousObjectToWorld._m03_m13_m23 -= (_ViewPosition);
+	#ifdef INSTANCING_ON
+		float3x4 previousObjectToWorld = (float3x4)(_InPlayMode ? unity_Builtins3Array[unity_BaseInstanceID + instanceID].unity_PrevObjectToWorldArray : unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_ObjectToWorldArray);
+	#else
+		float3x4 previousObjectToWorld = _InPlayMode ? unity_MatrixPreviousM : unity_ObjectToWorld;
+	#endif
+	
+	previousObjectToWorld._m03_m13_m23 -= _ViewPosition;
 	return MultiplyPoint3x4(previousObjectToWorld, position);
 }
 
@@ -250,7 +276,7 @@ float3 ObjectToWorldDirection(float3 direction, uint instanceID, bool doNormaliz
 float3 ObjectToWorldNormal(float3 normal, uint instanceID, bool doNormalize = false)
 {
 #ifdef INSTANCING_ON
-	float3x3 worldToObject = (float3x3) unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_WorldToObjectArray;
+	float3x3 worldToObject = (float3x3) unity_Builtins1Array[unity_BaseInstanceID + instanceID].unity_WorldToObjectArray;
 #else
 	float3x3 worldToObject = (float3x3) unity_WorldToObject;
 #endif

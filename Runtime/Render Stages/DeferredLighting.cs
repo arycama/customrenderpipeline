@@ -33,6 +33,7 @@ public class DeferredLighting
             pass.AddRenderPassData<VolumetricLighting.Result>();
             pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
             pass.AddRenderPassData<LightingSetup.Result>();
+            pass.AddRenderPassData<ShadowRenderer.Result>();
 
             var data = pass.SetRenderFunction<Data>((command, context, pass, data) =>
             {

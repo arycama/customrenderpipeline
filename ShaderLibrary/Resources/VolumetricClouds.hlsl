@@ -99,7 +99,7 @@ float _StationaryBlend, _MotionBlend, _MotionFactor;
 struct TemporalOutput
 {
 	float4 history : SV_Target0;
-	float4 velocity : SV_Target1;
+	//float4 velocity : SV_Target1;
 };
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
@@ -166,7 +166,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	TemporalOutput output;
 	output.history = result;
-	output.velocity = cloudDistance == 0.0 ? 1.0 : float4(motion, 0.0, depth == 0.0 ? 0.0 : result.a);
+	//output.velocity = cloudDistance == 0.0 ? 1.0 : float4(motion, 0.0, depth == 0.0 ? 0.0 : result.a);
 	return output;
 }
 

@@ -44,6 +44,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<Result>();
                 pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
@@ -58,8 +59,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_Near", data.near);
                     pass.SetFloat(command, "_Far", data.far);
                     pass.SetFloat(command, "_ViewHeight", viewHeight);
-
-                    data.lightingSetupResult.SetProperties(pass, command);
 
                     pass.SetTexture(command, "_BlueNoise1D", data.blueNoise1D);
                     pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2D);
@@ -175,7 +174,6 @@ namespace Arycama.CustomRenderPipeline
             internal float volumeDepth;
             internal float blurSigma;
             internal float volumeTileSize;
-            internal LightingSetup.Result lightingSetupResult;
             internal Texture2D blueNoise1D;
             internal Texture2D blueNoise2D;
             internal Vector4 scaledResolution;

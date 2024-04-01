@@ -110,6 +110,7 @@ namespace Arycama.CustomRenderPipeline
 
         private readonly RenderGraph renderGraph;
         private readonly Settings settings;
+        private readonly VolumetricClouds.Settings cloudSettings;
         private readonly Material skyMaterial;
         private readonly Material ggxConvolutionMaterial;
         private readonly RTHandle transmittance, cdf, multiScatter, groundAmbient, skyAmbient, weightedDepth;
@@ -117,10 +118,11 @@ namespace Arycama.CustomRenderPipeline
 
         private PersistentRTHandleCache textureCache, depthCache, frameCountCache;
 
-        public PhysicalSky(RenderGraph renderGraph, Settings settings)
+        public PhysicalSky(RenderGraph renderGraph, Settings settings, VolumetricClouds.Settings cloudSettings)
         {
             this.renderGraph = renderGraph;
             this.settings = settings;
+            this.cloudSettings = cloudSettings;
 
             skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
             ggxConvolutionMaterial = new Material(Shader.Find("Hidden/Ggx Convolve")) { hideFlags = HideFlags.HideAndDontSave };
@@ -241,7 +243,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(result);
         }
 
-        public void GenerateData(Vector3 viewPosition, VolumetricClouds.Settings cloudSettings, CullingResults cullingResults, Vector3 cameraPosition)
+        public void GenerateData(Vector3 viewPosition, CullingResults cullingResults, Vector3 cameraPosition)
         {
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -467,6 +469,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<ShadowRenderer.Result>();
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {

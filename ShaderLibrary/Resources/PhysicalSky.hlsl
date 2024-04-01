@@ -463,7 +463,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	TemporalOutput output;
 	output.result = result;
-	output.motion = float4(motion, 0.0, depth == 0.0);
+	output.motion = 0;//float4(motion, 0.0, depth == 0.0);
 	output.depth = sceneDepth;
 	output.frameCount = frameCount;
 	return output;

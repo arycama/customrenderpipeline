@@ -89,7 +89,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	{
 		for(int x = -1; x <= 1; x++, i++)
 		{
-			float3 color = (_Input[min(centerCoord + int2(x, y), int2(_MaxWidth, _MaxHeight))]);
+			float3 color = _Input[min(centerCoord + int2(x, y), int2(_MaxWidth, _MaxHeight))];
 			
 			#ifdef UPSCALE
 				float2 delta = (floor(position.xy * _Scale - _Jitter.xy) + 0.5 + float2(x, y) + _Jitter.xy) / _Scale - position.xy;
@@ -101,9 +101,9 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 			#endif
 			
 			history += color * historyWeights[i];
-			result += color * weight;
 			
 			color = RgbToYCoCgFastTonemap(color);
+			result += color * weight;
 			mean += color;
 			stdDev += color * color;
 		}
@@ -117,10 +117,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	mean /= 9.0;
 	stdDev = sqrt(abs(stdDev / 9.0 - mean * mean));
 
-	result = RgbToYCoCgFastTonemap(result);
-	
 	history *= rcp(w.x + w.y + 1.0);
-	history += (_History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw)));
+	history += _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history = RgbToYCoCgFastTonemap(history);
 	if(any(saturate(historyUv) != historyUv))
 		history = result;
