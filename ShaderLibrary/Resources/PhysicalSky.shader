@@ -7,7 +7,7 @@ Shader "Hidden/Physical Sky"
         ZTest Off
 
 		HLSLINCLUDE
-		#pragma use_dxc
+		#pragma target 5.0
 		ENDHLSL
 
         Pass
