@@ -22,5 +22,27 @@ namespace Arycama.CustomRenderPipeline
         {
             return new CommandBufferProfilerScope(command, name);
         }
+
+        public static void EnableShaderKeywordConditional(this CommandBuffer commandBuffer, string keyword, bool enable)
+        {
+            if (enable)
+                commandBuffer.EnableShaderKeyword(keyword);
+        }
+
+        public static void DisableShaderKeywordConditional(this CommandBuffer commandBuffer, string keyword, bool disable)
+        {
+            if (disable)
+                commandBuffer.DisableShaderKeyword(keyword);
+        }
+
+        public static CommandBufferKeywordScope KeywordScope(this CommandBuffer commandBuffer, string keyword)
+        {
+            return new CommandBufferKeywordScope(commandBuffer, keyword);
+        }
+
+        public static CommandBufferConditionalKeywordScope KeywordScope(this CommandBuffer commandBuffer, string keyword, bool isEnabled)
+        {
+            return new CommandBufferConditionalKeywordScope(commandBuffer, keyword, isEnabled);
+        }
     }
 }
