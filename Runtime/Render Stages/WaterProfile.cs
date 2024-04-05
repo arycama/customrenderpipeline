@@ -3,7 +3,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-[CreateAssetMenu(menuName = "Data/Graphics/Water Profile")]
+[CreateAssetMenu(menuName = "Data/Graphics/Water Profile New")]
 public class WaterProfile : ScriptableObject
 {
     [SerializeField, Tooltip("Gravity, affects total size and height of waves")]

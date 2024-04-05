@@ -75,7 +75,6 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	uint2 id = uint2(position.xy);
 
 	float3 normalV = normalize(2.0 * _ViewNormals[id] - 1.0);
-	//return 0.5 * normalV + 0.5;
 	float3 cPosV = ComputeViewspacePosition(position.xy);
 	float3 viewV = normalize(-cPosV);
 	
@@ -111,7 +110,6 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 					continue;
 				
 				float3 sPosV = ComputeViewspacePosition(sTexCoord);
-				
 				float weight = saturate(distance(sPosV, cPosV) * _FalloffScale + _FalloffBias);
 				float3 sHorizonV = normalize(sPosV - cPosV);
 				float sHorizonCos = lerp(lowHorizonCos, dot(sHorizonV, viewV), weight);
@@ -125,13 +123,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		weight += length(projNormalV);
 	}
 	
-	//visibility /= _DirectionCount;
 	visibility /= weight;
-	
 	visibility = saturate(pow(visibility, _AoStrength));
-	if (IsInfOrNaN(visibility))
-		visibility = 1.0;
-		
 	return lerp(_Tint, 1.0, visibility);
 }
-

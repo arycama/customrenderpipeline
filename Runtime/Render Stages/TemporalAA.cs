@@ -112,8 +112,8 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var weight = Mitchell(x + jitter.x, y + jitter.y);
 
-                    weight = Mathf.Clamp01(1.0f - Mathf.Abs(x + jitter.x));
-                    weight *= Mathf.Clamp01(1.0f - Mathf.Abs(y + jitter.y));
+                    //weight = Mathf.Clamp01(1.0f - Mathf.Abs(x + jitter.x));
+                    //weight *= Mathf.Clamp01(1.0f - Mathf.Abs(y + jitter.y));
 
                     weights[i] = weight;
                     boxWeightSum += weight;
@@ -175,7 +175,9 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA"))
             {
-                pass.Initialize(material);
+                var keyword = scale < 1.0f ? "UPSCALE" : null;
+                pass.Initialize(material, 0, 1, keyword);
+
                 pass.ReadTexture("_Input", input);
                 pass.ReadTexture("_Velocity", motion);
                 pass.ReadTexture("_History", history);

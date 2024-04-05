@@ -8,6 +8,7 @@ namespace Arycama.CustomRenderPipeline
 {
     public class OceanSystem
     {
+        [Serializable]
         public class Settings
         {
             [field: SerializeField, Tooltip("The resolution of the simulation, higher numbers give more detail but are more expensive")] public int Resolution { get; private set; } = 128;
@@ -27,9 +28,10 @@ namespace Arycama.CustomRenderPipeline
         private Settings settings;
         private RenderGraph renderGraph;
 
-        public OceanSystem(RenderGraph renderGraph)
+        public OceanSystem(RenderGraph renderGraph, Settings settings)
         {
             this.renderGraph = renderGraph;
+            this.settings = settings;
 
             var resolution = settings.Resolution;
             var anisoLevel = settings.AnisoLevel;
@@ -308,22 +310,23 @@ namespace Arycama.CustomRenderPipeline
 
                         foreach (var waterRenderer in WaterRenderer.WaterRenderers)
                         {
+                            // TODO: Split into seperate cull and render phases?
                             waterRenderer.Cull(command, camera.transform.position, cullingPlanes);
                             waterRenderer.Render(command, "WaterShadow", camera.transform.position);
                         }
 
                         ArrayPool<Vector4>.Release(cullingPlanes);
 
-                        command.SetGlobalMatrix("_WaterShadowMatrix", (projection * viewMatrix).ConvertToAtlasMatrix());
+                        var waterShadowMatrix = (projection * viewMatrix).ConvertToAtlasMatrix();
+                        renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadowId, waterShadowMatrix, 0.0f, localSize.z));
 
                         // Only render 1 light
                         break;
                     }
-
-                    command.SetRenderTarget(BuiltinRenderTextureType.None);
                 });
             }
         }
+
 
         public void CullWater(Camera camera, Vector4[] cullingPlanes)
         {
@@ -337,12 +340,16 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void RenderWater(Camera camera)
+        public void RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight)
         {
             // Depth, rgba8 normalFoam, rgba8 roughness, mask? 
-
+            // Writes depth, stencil, and RGBA8 containing normalRG, roughness and foam
+            var oceanRenderResult = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R8G8B8A8_UNorm);
+            
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Render"))
             {
+                pass.WriteTexture(cameraDepth);
+
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     foreach (var waterRenderer in WaterRenderer.WaterRenderers)
@@ -359,6 +366,33 @@ namespace Arycama.CustomRenderPipeline
         class PassData
         {
 
+        }
+    }
+
+    public struct WaterShadowResult : IRenderPassData
+    {
+        private readonly RTHandle waterShadowTexture;
+        private readonly Matrix4x4 waterShadowMatrix;
+        private readonly float waterShadowNear, waterShadowFar;
+
+        public WaterShadowResult(RTHandle waterShadowTexture, Matrix4x4 waterShadowMatrix, float waterShadowNear, float waterShadowFar)
+        {
+            this.waterShadowTexture = waterShadowTexture ?? throw new ArgumentNullException(nameof(waterShadowTexture));
+            this.waterShadowMatrix = waterShadowMatrix;
+            this.waterShadowNear = waterShadowNear;
+            this.waterShadowFar = waterShadowFar;
+        }
+
+        public void SetInputs(RenderPass pass)
+        {
+            pass.ReadTexture("_WaterShadowTexture", waterShadowTexture);
+        }
+
+        public void SetProperties(RenderPass pass, CommandBuffer command)
+        {
+            pass.SetMatrix(command, "_WaterShadowMatrix", waterShadowMatrix);
+            pass.SetFloat(command, "_WaterShadowNear", waterShadowNear);
+            pass.SetFloat(command, "_WaterShadowFar", waterShadowFar);
         }
     }
 }
