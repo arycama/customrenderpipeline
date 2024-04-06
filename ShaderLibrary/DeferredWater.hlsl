@@ -1,43 +1,46 @@
-#ifndef DEFERRED_WATER_INCLUDED
-#define DEFERRED_WATER_INCLUDED
-
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Lighting.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/GGXExtensions.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Brdf.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Deferred.hlsl"
-
 #ifdef __INTELLISENSE__
 	#define LIGHT_COUNT_ONE 
 	#define LIGHT_COUNT_TWO
 #endif
 
-Texture2D<float4> _WaterNormalFoam, _WaterRoughnessMask;
+#include "Atmosphere.hlsl"
+#include "Common.hlsl"
+#include "Lighting.hlsl"
+
+struct GBufferOutput
+{
+	float4 albedoMetallic : SV_Target0;
+	float4 normalRoughness : SV_Target1;
+	float4 bentNormalOcclusion : SV_Target2;
+	float3 emissive : SV_Target3;
+};
+
+Texture2D<float4> _WaterNormalFoam;
 Texture2D<float3> _WaterEmission, _UnderwaterResult;
 Texture2D<float> _Depth, _UnderwaterDepth;
 
-Texture2D<float> _UnityFBInput0;
-
 float3 _Extinction, _Color, _LightColor0, _LightDirection0, _LightColor1, _LightDirection1;
-float _RefractOffset, _Steps;
+float _RefractOffset, _Steps, _WaterShadowFar;
 
-float4 Vertex(uint id : SV_VertexID) : SV_Position
-{
-	return GetFullScreenTriangleVertexPosition(id);
-}
+float4x4 _WaterShadowMatrix;
+Texture2D<float> _WaterShadows;
 
-GBufferOut Fragment(float4 positionCS : SV_Position)
+GBufferOutput Fragment(float4 positionCS : SV_Position)
 {
-	float waterDepth = _UnityFBInput0[positionCS.xy];
-	float4 waterNormalFoam = _WaterNormalFoam[positionCS.xy];
+	float waterDepth = _Depth[positionCS.xy];
+	float4 waterNormalFoamRoughness = _WaterNormalFoam[positionCS.xy];
 	
-	float3 positionWS = PixelToWorld(positionCS.xy, waterDepth);
+	float3 positionWS = PixelToWorld(float3(positionCS.xy, waterDepth));
 	float linearWaterDepth = LinearEyeDepth(waterDepth);
-	float distortion = _RefractOffset * _ScreenSize.y * abs(CameraAspect) * 0.25 / linearWaterDepth;
+	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25 / linearWaterDepth;
 	
-	float3 N = UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(waterNormalFoam.xyz) - 1.0);
+	float3 N;
+	N.xz = 2.0 * waterNormalFoamRoughness.xy - 1.0;
+	N.y = sqrt(saturate(1.0 - dot(N.xz, N.xz)));
+	
 	float2 uvOffset = N.xz * distortion;
-	float2 refractionUv = uvOffset * _ScreenSize.xy + positionCS.xy;
-	float2 refractedPositionSS = clamp(refractionUv, 0, _ScreenSize.xy - 1);
+	float2 refractionUv = uvOffset * _ScaledResolution.xy + positionCS.xy;
+	float2 refractedPositionSS = clamp(refractionUv, 0, _ScaledResolution.xy - 1);
 	float underwaterDepth = _UnderwaterDepth[refractedPositionSS];
 	float underwaterDistance = LinearEyeDepth(underwaterDepth) - linearWaterDepth;
 
@@ -50,19 +53,27 @@ GBufferOut Fragment(float4 positionCS : SV_Position)
 	}
 	
 	float3 V = normalize(positionWS);
-	underwaterDistance /= dot(V, _InvViewMatrix._m02_m12_m22);
+	underwaterDistance /= dot(V, _CameraForward);
+	
+	float pixelDistance = LinearEyeDepthToDistance(linearWaterDepth, -V);
+	
+	float height = HeightAtDistance(_ViewHeight, V.y, pixelDistance);
 	
 	#if defined(LIGHT_COUNT_ONE) || defined(LIGHT_COUNT_TWO)
 		// Slight optimisation, only calculate atmospheric transmittance at surface
-		float3 lightColor0 = RcpFourPi * ApplyExposure(_LightColor0) * TransmittanceToAtmosphere(positionWS + _PlanetOffset, _LightDirection0);
+		float LdotV0 = dot(_LightDirection0, V);
+		float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, pixelDistance * LdotV0, height);
+		float3 lightColor0 = RcpFourPi * _LightColor0 * _Exposure * AtmosphereTransmittance(height, lightCosAngleAtDistance0);
 	#endif
 	
 	#ifdef LIGHT_COUNT_TWO
 		// Slight optimisation, only calculate atmospheric transmittance at surface
-		float3 lightColor1 = RcpFourPi * ApplyExposure(_LightColor1) * TransmittanceToAtmosphere(positionWS + _PlanetOffset, _LightDirection1);
+		float LdotV1 = dot(_LightDirection1, V);
+		float lightCosAngleAtDistance1 = CosAngleAtDistance(_ViewHeight, _LightDirection1.y, pixelDistance * LdotV1, height);
+		float3 lightColor1 = RcpFourPi * _LightColor1 * _Exposure * AtmosphereTransmittance(height, lightCosAngleAtDistance1);
 	#endif
 
-	float2 noise = BlueNoise2D(positionCS.xy);
+	float2 noise = _BlueNoise2D[positionCS.xy % 128];
 	
 	// Select random channel
 	float3 channelMask = floor(noise.y * 3.0) == float3(0.0, 1.0, 2.0);
@@ -89,10 +100,10 @@ GBufferOut Fragment(float4 positionCS : SV_Position)
 		float3 P = positionWS + V * t;
 
 		#if defined(LIGHT_COUNT_ONE) || defined(LIGHT_COUNT_TWO)
-			float attenuation = DirectionalLightShadow(P, 0, 0.5, false);
+			float attenuation = GetShadow(P, 0, false);
 			if(attenuation > 0.0)
 			{
-				attenuation *= CloudTransmittanceLevelZero(P);
+				attenuation *= CloudTransmittance(P);
 				if(attenuation > 0.0)
 				{
 					float shadowDistance0 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
@@ -127,21 +138,18 @@ GBufferOut Fragment(float4 positionCS : SV_Position)
 	
 	luminance = IsInfOrNaN(luminance) ? 0.0 : luminance;
 
-	if(underwaterDepth != _FarClipValue)
-		luminance += _UnderwaterResult[refractionUv] * exp(-_Extinction * underwaterDistance);
+	// TODO: Stencil? Or hw blend?
+	//if(underwaterDepth != 0.0)
+	//	luminance += _UnderwaterResult[refractionUv] * exp(-_Extinction * underwaterDistance);
 	
 	// Apply roughness to transmission
-	float4 waterRoughnessMask = _WaterRoughnessMask[positionCS.xy];
-	float perceptualRoughness = ConvertAnisotropicPerceptualRoughnessToPerceptualRoughness(waterRoughnessMask.gb);
-	luminance *= (1.0 - waterNormalFoam.a) * GGXDiffuse(1.0, dot(N, -V), perceptualRoughness, 0.04) * Pi;
+	float perceptualRoughness = waterNormalFoamRoughness.a;
+	luminance *= (1.0 - waterNormalFoamRoughness.b) * GGXDiffuse(1.0, dot(N, -V), perceptualRoughness, 0.04) * Pi;
 
-	GBufferOut output;
-	output.gBuffer0 = PackGBufferAlbedoTranslucency(waterNormalFoam.a, 0.0, positionCS.xy);
-	output.gBuffer1 = float4(waterNormalFoam.xyz, 0.0);
-	output.gBuffer2 = waterRoughnessMask;
-	output.gBuffer3 = float4(waterNormalFoam.xyz, 1.0);
-	output.emission = luminance;
+	GBufferOutput output;
+	output.albedoMetallic = float2(waterNormalFoamRoughness.b, 0.0).xxxy;
+	output.normalRoughness = float4(PackFloat2To888(0.5 * PackNormalOctQuadEncode(N) + 0.5), perceptualRoughness);
+	output.bentNormalOcclusion = float4(N * 0.5 + 0.5, 1.0);
+	output.emissive = luminance;
 	return output;
 }
-
-#endif

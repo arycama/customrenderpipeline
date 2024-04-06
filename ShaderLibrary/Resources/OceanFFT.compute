@@ -235,21 +235,21 @@ complex h0(float2 k, float A, complex r, uint3 id, OceanSpectrum spectrum)
 	float dOmegadk = FrequencyDerivative(kl, _OceanGravity, 500);
 	
 	//p = PhillipsSpectrum(omega, spectrum) * pow(windFactor, 6.0);
-	p = JonswapSpectrum(omega, spectrum) * spectrum.scale;
+	//p = JonswapSpectrum(omega, spectrum) * spectrum.scale;
 	
 	//p = PiersonMoskowitzSpectrum(omega, spectrum);
-	p = 2 * p * abs(dOmegadk) / kl * deltaK * deltaK;
+	//p = 2 * p * abs(dOmegadk) / kl * deltaK * deltaK;
 	//p *= philNorm;
 	
 	float wp = 22.0 * pow(Sq(_OceanGravity) / (spectrum.windSpeed * spectrum.fetch * 1000), 1.0 / 3.0);
 	//wp = 0.877 * _OceanGravity / spectrum.windSpeed;
 	
-	p *= DirectionSpectrum(kAngle, omega, spectrum, wp);
+	//p *= DirectionSpectrum(kAngle, omega, spectrum, wp);
 	
 	// Move waves along wind direction
-	//p *= dot(normalize(k), float2(cos(spectrum.windAngle * TwoPi), sin(spectrum.windAngle * TwoPi))) < 0 ? (1 - spectrum.swell) : 1;
+	p *= dot(normalize(k), float2(cos(spectrum.windAngle * TwoPi), sin(spectrum.windAngle * TwoPi))) < 0 ? (1 - spectrum.swell) : 1;
 	
-	p *= exp(-dot(k, k) * Sq(spectrum.shortWavesFade)); // Eq 41: Supress small wavelengths
+	//p *= exp(-dot(k, k) * Sq(spectrum.shortWavesFade)); // Eq 41: Supress small wavelengths
 
 	// Eq 42
 	complex result = cmul(creal(rcp(sqrt(2.0))), r);

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
@@ -129,7 +130,7 @@ namespace Arycama.CustomRenderPipeline
             var texelSizes = patchSizes / resolution;
 
             // Load resources
-            var computeShader = Resources.Load<ComputeShader>("Ocean FFT");
+            var computeShader = Resources.Load<ComputeShader>("OceanFFT");
             var oceanBuffer = profile.SetShaderProperties(renderGraph);
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Fft"))
@@ -154,7 +155,7 @@ namespace Arycama.CustomRenderPipeline
 
                     // Get Textures
                     command.SetComputeFloatParam(computeShader, "Smoothness", settings.Material.GetFloat("_Smoothness"));
-                    command.SetComputeFloatParam(computeShader, "Time", Time.timeSinceLevelLoad);
+                    command.SetComputeFloatParam(computeShader, "Time", EditorApplication.isPlaying ? Time.time : (float)EditorApplication.timeSinceStartup);
                     command.GetTemporaryRTArray(tempBufferID4, resolution, resolution, 4, 0, FilterMode.Point, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear, 1, true);
                     command.GetTemporaryRTArray(fftNormalBufferId, resolution, resolution, 4, 0, FilterMode.Point, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear, 1, true);
                     command.GetTemporaryRTArray(tempBufferID2, resolution, resolution, 4, 0, FilterMode.Point, RenderTextureFormat.RGFloat, RenderTextureReadWrite.Linear, 1, true);
@@ -397,7 +398,7 @@ namespace Arycama.CustomRenderPipeline
             return underwaterResultId;
         }
 
-        public void RenderDeferredWater(CullingResults cullingResults, RTHandle underwaterLighting, RTHandle waterNormalMask, RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive)
+        public void RenderDeferredWater(CullingResults cullingResults, RTHandle underwaterLighting, RTHandle waterNormalMask, RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, IRenderPassData commonPassData)
         {
             // Find first 2 directional lights
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -433,6 +434,7 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water"))
             {
                 pass.Initialize(deferredWaterMaterial, keyword: keyword);
+                pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(albedoMetallic);
                 pass.WriteTexture(normalRoughness);
                 pass.WriteTexture(bentNormalOcclusion);
@@ -441,13 +443,18 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_UnderwaterResult", underwaterLighting);
                 pass.ReadTexture("_WaterNormalFoam", waterNormalMask);
                 pass.ReadTexture("_UnderwaterDepth", underwaterDepth);
+                pass.ReadTexture("_Depth", cameraDepth);
 
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<WaterShadowResult>();
 
+                commonPassData.SetInputs(pass);
+
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
+                    commonPassData.SetProperties(pass, command);
+
                     var material = settings.Material;
                     pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
                     pass.SetVector(command, "_Extinction", material.GetColor("_Extinction").linear);

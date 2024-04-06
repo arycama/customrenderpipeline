@@ -45,6 +45,7 @@
 			{
 				Ref 6
 				Pass Replace
+				WriteMask 6
 			}
 
 			HLSLPROGRAM

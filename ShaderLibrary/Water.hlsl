@@ -1,10 +1,4 @@
-﻿//#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Brdf.hlsl"
-//#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Lighting.hlsl"
-//#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Tessellation.hlsl"
-//#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Deferred.hlsl"
-//#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/MotionVectors.hlsl"
-
-#include "Atmosphere.hlsl"
+﻿#include "Atmosphere.hlsl"
 #include "Common.hlsl"
 #include "Material.hlsl"
 #include "Geometry.hlsl"
