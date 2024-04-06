@@ -148,6 +148,8 @@ namespace Arycama.CustomRenderPipeline
                                 continue;
 
                             var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
+                            Assert.IsNotNull(handle, $"Handle is null in pass {renderPasses[i].GetType()}");
+                            Assert.IsNotNull(renderTexture, $"renderTexture is null in pass {renderPasses[i].Name}, {handle}");
                             if ((isDepth && handle.Format != renderTexture.depthStencilFormat) || (!isDepth && handle.Format != renderTexture.graphicsFormat))
                                 continue;
 
@@ -166,6 +168,7 @@ namespace Arycama.CustomRenderPipeline
                                     continue;
 
                                 result = renderTexture;
+                                Assert.IsNotNull(renderTexture);
                                 availableRenderTextures[j] = (renderTexture, lastFrameUsed, false, handle.IsPersistent);
                                 handle.RenderTextureIndex = j;
                                 break;
@@ -198,10 +201,12 @@ namespace Arycama.CustomRenderPipeline
                             if (!availableRtSlots.TryDequeue(out var slot))
                             {
                                 slot = availableRenderTextures.Count;
+                                Assert.IsNotNull(result);
                                 availableRenderTextures.Add((result, FrameIndex, false, handle.IsPersistent));
                             }
                             else
                             {
+                                Assert.IsNotNull(result);
                                 availableRenderTextures[slot] = (result, FrameIndex, false, handle.IsPersistent);
                             }
 

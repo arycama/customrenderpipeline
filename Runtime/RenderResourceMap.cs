@@ -24,7 +24,7 @@ namespace Arycama.CustomRenderPipeline
         public T GetRenderPassData<T>(RenderPassDataHandle handle) where T : IRenderPassData
         {
             var result = handleList[handle.Index];
-            Assert.IsTrue(result != null);
+            Assert.IsTrue(result != null, $"Unable to get data for type {typeof(T)}");
             return (T)result;
         }
 

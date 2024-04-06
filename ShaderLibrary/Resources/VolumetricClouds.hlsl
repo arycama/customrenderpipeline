@@ -123,15 +123,16 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	int2 offsets[8] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(1, 0), int2(-1, 1), int2(0, 1), int2(1, 1)};
 	float4 minValue, maxValue, result;
 	result = _Input[pixelId];
-	minValue = maxValue = float4(RgbToYCoCgFastTonemap(result.rgb), result.a);
+	result.rgb = RgbToYCoCgFastTonemap(result.rgb);
+	minValue = maxValue = result;
 	result *= _CenterBoxFilterWeight;
 	
 	[unroll]
 	for (int i = 0; i < 4; i++)
 	{
 		float4 color = _Input[pixelId + offsets[i]];
-		result += color * _BoxFilterWeights0[i];
 		color.rgb = RgbToYCoCgFastTonemap(color.rgb);
+		result += color * _BoxFilterWeights0[i];
 		minValue = min(minValue, color);
 		maxValue = max(maxValue, color);
 	}
@@ -140,17 +141,17 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	for (i = 0; i < 4; i++)
 	{
 		float4 color = _Input[pixelId + offsets[i + 4]];
-		result += color * _BoxFilterWeights1[i];
 		color.rgb = RgbToYCoCgFastTonemap(color.rgb);
+		result += color * _BoxFilterWeights1[i];
 		minValue = min(minValue, color);
 		maxValue = max(maxValue, color);
 	}
 	
-	result.rgb = RgbToYCoCgFastTonemap(result.rgb);
+	//result.rgb = RgbToYCoCgFastTonemap(result.rgb);
 
 	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history.rgb = RgbToYCoCgFastTonemap(history.rgb);
-	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
+	//history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
 	
 	// Not sure what best way to handle is, not clamping reduces flicker which is the main issue
 	//history.a = clamp(history.a, minValue.a, maxValue.a);

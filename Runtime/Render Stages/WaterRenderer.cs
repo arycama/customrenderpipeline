@@ -88,7 +88,7 @@ namespace Arycama.CustomRenderPipeline
             indirectArgs.Add(0); // start instance location
             command.SetBufferData(indirectArgsBuffer, indirectArgs);
 
-            var compute = Resources.Load<ComputeShader>("QuadtreeCull");
+            var compute = Resources.Load<ComputeShader>("OceanQuadtreeCull");
 
             command.SetComputeBufferParam(compute, 0, "_IndirectArgs", indirectArgsBuffer);
             command.SetComputeBufferParam(compute, 0, "_PatchDataWrite", patchDataBuffer);

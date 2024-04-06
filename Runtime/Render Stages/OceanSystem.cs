@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -23,10 +24,10 @@ namespace Arycama.CustomRenderPipeline
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
 
         private RenderTexture normalMap, foamSmoothness, DisplacementMap;
-        private readonly Dictionary<Camera, bool> flips = new();
         private RenderTexture lengthToRoughness;
         private Settings settings;
         private RenderGraph renderGraph;
+        private Material underwaterLightingMaterial, deferredWaterMaterial;
 
         public OceanSystem(RenderGraph renderGraph, Settings settings)
         {
@@ -36,6 +37,9 @@ namespace Arycama.CustomRenderPipeline
             var resolution = settings.Resolution;
             var anisoLevel = settings.AnisoLevel;
             var useTrilinear = settings.UseTrilinear;
+
+            underwaterLightingMaterial = new Material(Shader.Find("Hidden/Underwater Lighting 1")) { hideFlags = HideFlags.HideAndDontSave };
+            deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water 1")) { hideFlags = HideFlags.HideAndDontSave };
 
             // Initialize textures
             normalMap = new RenderTexture(resolution, resolution, 0, GraphicsFormat.R8G8_SNorm)
@@ -97,7 +101,7 @@ namespace Arycama.CustomRenderPipeline
             computeShader.DispatchNormalized(generateLengthToSmoothnessKernel, 256, 1, 1);
         }
 
-        public void UpdateFft(Camera camera)
+        public void UpdateFft()
         {
             var resolution = settings.Resolution;
             var anisoLevel = settings.AnisoLevel;
@@ -126,21 +130,6 @@ namespace Arycama.CustomRenderPipeline
 
             // Load resources
             var computeShader = Resources.Load<ComputeShader>("Ocean FFT");
-
-            if (!flips.TryGetValue(camera, out var flip))
-            {
-                flips.Add(camera, false);
-            }
-            else
-            {
-                flip = !flip;
-                flips[camera] = flip;
-            }
-
-            // Set Vectors
-            //using var scope = context.ScopedCommandBuffer("Ocean", true);
-            // GraphicsUtilities.SetupCameraProperties(scope.Command, FrameCount, camera, context, camera.Resolution(), out var viewProjectionMatrix);
-
             var oceanBuffer = profile.SetShaderProperties(renderGraph);
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Fft"))
@@ -155,8 +144,8 @@ namespace Arycama.CustomRenderPipeline
 
                     command.SetGlobalFloat("_OceanGravity", profile.Gravity);
 
-                    command.SetGlobalInt("_OceanTextureSliceOffset", flip ? 4 : 0);
-                    command.SetGlobalInt("_OceanTextureSlicePreviousOffset", flip ? 0 : 4);
+                    command.SetGlobalInt("_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
+                    command.SetGlobalInt("_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
 
                     command.SetComputeVectorParam(computeShader, "SpectrumStart", spectrumStart);
                     command.SetComputeVectorParam(computeShader, "SpectrumEnd", spectrumEnd);
@@ -227,106 +216,111 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void RenderShadow(ScriptableRenderContext context, Camera camera, CullingResults cullingResults)
+        public RTHandle RenderShadow(Camera camera, CullingResults cullingResults)
         {
             var shadowResolution = settings.ShadowResolution;
             var shadowRadius = settings.ShadowRadius;
             var profile = settings.Profile;
 
             // Render
+            Vector3 localSize = Vector3.zero;
+            Matrix4x4 waterShadowMatrix = Matrix4x4.identity, projection = Matrix4x4.identity, viewMatrix = Matrix4x4.identity;
             var waterShadowId = renderGraph.GetTexture(shadowResolution, shadowResolution, GraphicsFormat.D32_SFloat);
+            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
+            {
+                var visibleLight = cullingResults.visibleLights[i];
+                if (visibleLight.lightType != LightType.Directional)
+                    continue;
+
+                var size = new Vector3(shadowRadius * 2, profile.MaxWaterHeight * 2, shadowRadius * 2);
+                var min = new Vector3(camera.transform.position.x - shadowRadius, -profile.MaxWaterHeight, camera.transform.position.z - shadowRadius);
+
+                var localMatrix = Matrix4x4.Rotate(Quaternion.Inverse(visibleLight.light.transform.rotation));
+                Vector3 localMin = Vector3.positiveInfinity, localMax = Vector3.negativeInfinity;
+
+                for (var z = 0; z < 2; z++)
+                {
+                    for (var y = 0; y < 2; y++)
+                    {
+                        for (var x = 0; x < 2; x++)
+                        {
+                            var localPosition = localMatrix.MultiplyPoint(min + Vector3.Scale(size, new Vector3(x, y, z)));
+                            localMin = Vector3.Min(localMin, localPosition);
+                            localMax = Vector3.Max(localMax, localPosition);
+                        }
+                    }
+                }
+
+                // Snap texels
+                localSize = localMax - localMin;
+                var worldUnitsPerTexel = new Vector2(localSize.x, localSize.y) / shadowResolution;
+                localMin.x = Mathf.Floor(localMin.x / worldUnitsPerTexel.x) * worldUnitsPerTexel.x;
+                localMin.y = Mathf.Floor(localMin.y / worldUnitsPerTexel.y) * worldUnitsPerTexel.y;
+                localMax.x = Mathf.Floor(localMax.x / worldUnitsPerTexel.x) * worldUnitsPerTexel.x;
+                localMax.y = Mathf.Floor(localMax.y / worldUnitsPerTexel.y) * worldUnitsPerTexel.y;
+                localSize = localMax - localMin;
+
+                var localCenter = (localMax + localMin) * 0.5f;
+                var worldMatrix = Matrix4x4.Rotate(visibleLight.light.transform.rotation);
+                var position = worldMatrix.MultiplyPoint(new Vector3(localCenter.x, localCenter.y, localMin.z));
+
+                var lookMatrix = Matrix4x4.LookAt(position, position + visibleLight.light.transform.forward, visibleLight.light.transform.up);
+
+                // Matrix that mirrors along Z axis, to match the camera space convention.
+                var scaleMatrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, 1, -1));
+                // Final view matrix is inverse of the LookAt matrix, and then mirrored along Z.
+                viewMatrix = scaleMatrix * lookMatrix.inverse;
+
+                projection = Matrix4x4.Ortho(-localSize.x * 0.5f, localSize.x * 0.5f, -localSize.y * 0.5f, localSize.y * 0.5f, 0, localSize.z);
+                //lhsProj.SetColumn(2, -lhsProj.GetColumn(2));
+
+                // Only render 1 light
+                break;
+            }
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Cull"))
             {
+                pass.WriteTexture(waterShadowId);
+
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    for (var i = 0; i < cullingResults.visibleLights.Length; i++)
+                    command.SetGlobalMatrix("_WaterShadowMatrix", GL.GetGPUProjectionMatrix(projection, true) * viewMatrix);
+                    command.SetGlobalFloat("_WaterShadowNear", 0f);
+                    command.SetGlobalFloat("_WaterShadowFar", localSize.z);
+                    //command.SetGlobalDepthBias(constantBias, slopeBias);
+
+                    command.SetRenderTarget(waterShadowId);
+                    command.ClearRenderTarget(true, false, new Color());
+
+                    var planes = ArrayPool<Plane>.Get(6);
+                    GeometryUtility.CalculateFrustumPlanes(projection * viewMatrix, planes);
+
+                    var cullingPlanes = ArrayPool<Vector4>.Get(6);
+                    for (var j = 0; j < 6; j++)
                     {
-                        var visibleLight = cullingResults.visibleLights[i];
-                        if (visibleLight.lightType != LightType.Directional)
-                            continue;
-
-                        var size = new Vector3(shadowRadius * 2, profile.MaxWaterHeight * 2, shadowRadius * 2);
-                        var min = new Vector3(camera.transform.position.x - shadowRadius, -profile.MaxWaterHeight, camera.transform.position.z - shadowRadius);
-
-                        var localMatrix = Matrix4x4.Rotate(Quaternion.Inverse(visibleLight.light.transform.rotation));
-                        Vector3 localMin = Vector3.positiveInfinity, localMax = Vector3.negativeInfinity;
-
-                        for (var z = 0; z < 2; z++)
-                        {
-                            for (var y = 0; y < 2; y++)
-                            {
-                                for (var x = 0; x < 2; x++)
-                                {
-                                    var localPosition = localMatrix.MultiplyPoint(min + Vector3.Scale(size, new Vector3(x, y, z)));
-                                    localMin = Vector3.Min(localMin, localPosition);
-                                    localMax = Vector3.Max(localMax, localPosition);
-                                }
-                            }
-                        }
-
-                        // Snap texels
-                        var localSize = localMax - localMin;
-                        var worldUnitsPerTexel = new Vector2(localSize.x, localSize.y) / shadowResolution;
-                        localMin.x = Mathf.Floor(localMin.x / worldUnitsPerTexel.x) * worldUnitsPerTexel.x;
-                        localMin.y = Mathf.Floor(localMin.y / worldUnitsPerTexel.y) * worldUnitsPerTexel.y;
-                        localMax.x = Mathf.Floor(localMax.x / worldUnitsPerTexel.x) * worldUnitsPerTexel.x;
-                        localMax.y = Mathf.Floor(localMax.y / worldUnitsPerTexel.y) * worldUnitsPerTexel.y;
-                        localSize = localMax - localMin;
-
-                        var localCenter = (localMax + localMin) * 0.5f;
-                        var worldMatrix = Matrix4x4.Rotate(visibleLight.light.transform.rotation);
-                        var position = worldMatrix.MultiplyPoint(new Vector3(localCenter.x, localCenter.y, localMin.z));
-
-                        var lookMatrix = Matrix4x4.LookAt(position, position + visibleLight.light.transform.forward, visibleLight.light.transform.up);
-
-                        // Matrix that mirrors along Z axis, to match the camera space convention.
-                        var scaleMatrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, 1, -1));
-                        // Final view matrix is inverse of the LookAt matrix, and then mirrored along Z.
-                        var viewMatrix = scaleMatrix * lookMatrix.inverse;
-
-                        var projection = Matrix4x4.Ortho(-localSize.x * 0.5f, localSize.x * 0.5f, -localSize.y * 0.5f, localSize.y * 0.5f, 0, localSize.z);
-                        //lhsProj.SetColumn(2, -lhsProj.GetColumn(2));
-
-                        command.SetGlobalMatrix("_WaterShadowMatrix", GL.GetGPUProjectionMatrix(projection, true) * viewMatrix);
-                        command.SetGlobalFloat("_WaterShadowNear", 0f);
-                        command.SetGlobalFloat("_WaterShadowFar", localSize.z);
-                        //command.SetGlobalDepthBias(constantBias, slopeBias);
-
-                        command.SetRenderTarget(waterShadowId);
-                        command.ClearRenderTarget(true, false, new Color());
-
-                        var planes = ArrayPool<Plane>.Get(6);
-                        GeometryUtility.CalculateFrustumPlanes(projection * viewMatrix, planes);
-
-                        var cullingPlanes = ArrayPool<Vector4>.Get(6);
-                        for (var j = 0; j < 6; j++)
-                        {
-                            var plane = planes[j];
-                            cullingPlanes[j] = new Vector4(plane.normal.x, plane.normal.y, plane.normal.z, plane.distance);
-                        }
-
-                        ArrayPool<Plane>.Release(planes);
-
-                        foreach (var waterRenderer in WaterRenderer.WaterRenderers)
-                        {
-                            // TODO: Split into seperate cull and render phases?
-                            waterRenderer.Cull(command, camera.transform.position, cullingPlanes);
-                            waterRenderer.Render(command, "WaterShadow", camera.transform.position);
-                        }
-
-                        ArrayPool<Vector4>.Release(cullingPlanes);
-
-                        var waterShadowMatrix = (projection * viewMatrix).ConvertToAtlasMatrix();
-                        renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadowId, waterShadowMatrix, 0.0f, localSize.z));
-
-                        // Only render 1 light
-                        break;
+                        var plane = planes[j];
+                        cullingPlanes[j] = new Vector4(plane.normal.x, plane.normal.y, plane.normal.z, plane.distance);
                     }
+
+                    ArrayPool<Plane>.Release(planes);
+
+                    foreach (var waterRenderer in WaterRenderer.WaterRenderers)
+                    {
+                        // TODO: Split into seperate cull and render phases?
+                        waterRenderer.Cull(command, camera.transform.position, cullingPlanes);
+                        waterRenderer.Render(command, "WaterShadow", camera.transform.position);
+                    }
+
+                    ArrayPool<Vector4>.Release(cullingPlanes);
                 });
             }
-        }
 
+            waterShadowMatrix = (projection * viewMatrix).ConvertToAtlasMatrix();
+
+            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadowId, waterShadowMatrix, 0.0f, localSize.z));
+
+            return waterShadowId;
+        }
 
         public void CullWater(Camera camera, Vector4[] cullingPlanes)
         {
@@ -340,27 +334,134 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight)
+        public RTHandle RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity)
         {
             // Depth, rgba8 normalFoam, rgba8 roughness, mask? 
             // Writes depth, stencil, and RGBA8 containing normalRG, roughness and foam
-            var oceanRenderResult = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R8G8B8A8_UNorm);
-            
+            var oceanRenderResult = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
+
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Render"))
             {
                 pass.WriteTexture(cameraDepth);
+                pass.WriteTexture(oceanRenderResult);
+                pass.WriteTexture(velocity);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
+                    var colors = ArrayPool<RenderTargetIdentifier>.Get(2);
+                    colors[0] = oceanRenderResult;
+                    colors[1] = velocity;
+                    command.SetRenderTarget(colors, cameraDepth);
+                    ArrayPool<RenderTargetIdentifier>.Release(colors);
+
                     foreach (var waterRenderer in WaterRenderer.WaterRenderers)
                         waterRenderer.Render(command, "Water", camera.transform.position);
                 });
             }
+
+            return oceanRenderResult;
         }
 
-        public void RenderUnderwaterLighting()
+        public RTHandle RenderUnderwaterLighting(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive)
         {
+            var underwaterResultId = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Underwater Lighting"))
+            {
+                pass.Initialize(underwaterLightingMaterial);
+                pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(underwaterResultId, RenderBufferLoadAction.DontCare);
+
+                pass.ReadTexture("_Depth", cameraDepth);
+                pass.ReadTexture("_UnderwaterDepth", underwaterDepth);
+                pass.ReadTexture("_AlbedoMetallic", albedoMetallic);
+                pass.ReadTexture("_NormalRoughness", normalRoughness);
+                pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
+                pass.ReadTexture("_Emissive", emissive);
+
+                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<VolumetricLighting.Result>();
+                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<ShadowRenderer.Result>();
+                pass.AddRenderPassData<WaterShadowResult>();
+                pass.AddRenderPassData<LitData.Result>();
+
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    pass.SetVector(command, "_WaterExtinction", settings.Material.GetColor("_Extinction"));
+                });
+            }
+
+            return underwaterResultId;
+        }
+
+        public void RenderDeferredWater(CullingResults cullingResults, RTHandle underwaterLighting, RTHandle waterNormalMask, RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive)
+        {
+            // Find first 2 directional lights
+            Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
+            Color lightColor0 = Color.clear, lightColor1 = Color.clear;
+            var dirLightCount = 0;
+            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
+            {
+                var light = cullingResults.visibleLights[i];
+                if (light.lightType != LightType.Directional)
+                    continue;
+
+                dirLightCount++;
+
+                if (dirLightCount == 1)
+                {
+                    lightDirection0 = -light.localToWorldMatrix.Forward();
+                    lightColor0 = light.finalColor;
+                }
+                else if (dirLightCount == 2)
+                {
+                    lightDirection1 = -light.localToWorldMatrix.Forward();
+                    lightColor1 = light.finalColor;
+                }
+                else
+                {
+                    // Only 2 lights supported
+                    break;
+                }
+            }
+
+            var keyword = dirLightCount == 2 ? "LIGHT_COUNT_TWO" : (dirLightCount == 1 ? "LIGHT_COUNT_ONE" : string.Empty);
+
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water"))
+            {
+                pass.Initialize(deferredWaterMaterial, keyword: keyword);
+                pass.WriteTexture(albedoMetallic);
+                pass.WriteTexture(normalRoughness);
+                pass.WriteTexture(bentNormalOcclusion);
+                pass.WriteTexture(emissive);
+
+                pass.ReadTexture("_UnderwaterResult", underwaterLighting);
+                pass.ReadTexture("_WaterNormalFoam", waterNormalMask);
+                pass.ReadTexture("_UnderwaterDepth", underwaterDepth);
+
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<WaterShadowResult>();
+
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    var material = settings.Material;
+                    pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
+                    pass.SetVector(command, "_Extinction", material.GetColor("_Extinction").linear);
+
+                    pass.SetVector(command, "_LightDirection0", lightDirection0);
+                    pass.SetVector(command, "_LightColor0", lightColor0);
+
+                    pass.SetVector(command, "_LightDirection1", lightDirection1);
+                    pass.SetVector(command, "_LightColor1", lightColor1);
+
+                    pass.SetFloat(command, "_RefractOffset", material.GetFloat("_RefractOffset"));
+                    pass.SetFloat(command, "_Steps", material.GetFloat("_Steps"));
+                });
+            }
         }
 
         class PassData

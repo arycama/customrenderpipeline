@@ -324,4 +324,17 @@ float GetSkyCdf(float viewHeight, float cosAngle, float xi, float3 colorMask)
 	return GetSkyCdf(viewHeight, cosAngle, xi, colorMask, rayIntersectsGround);
 }
 
+float3 PlanetCurve(float3 worldPosition)
+{
+	worldPosition.y += sqrt(Sq(_PlanetRadius) - SqrLength(worldPosition.xz)) - _PlanetRadius;
+	return worldPosition;
+}
+
+float3 PlanetCurvePrevious(float3 positionRWS)
+{
+	float dst = length(positionRWS.xz) / _PlanetRadius;
+	positionRWS.y += _PlanetRadius * (sqrt(1 - dst * dst) - 1.0);
+	return positionRWS;
+}
+
 #endif

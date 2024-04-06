@@ -1,7 +1,11 @@
 ﻿#ifndef MATERIAL_INCLUDED
 #define MATERIAL_INCLUDED
 
+#include "Common.hlsl"
 #include "Math.hlsl"
+#include "Samplers.hlsl"
+
+Texture2D<float> _LengthToRoughness;
 
 float PerceptualSmoothnessToRoughness(float perceptualSmoothness)
 {
@@ -67,37 +71,42 @@ float ProjectedSpaceGeometricNormalFiltering(float perceptualSmoothness, float3 
     return ProjectedSpaceNormalFiltering(perceptualSmoothness, variance, threshold);
 }
 
-//float LengthToRoughness(float len)
-//{
-//	len = saturate(Remap(len, 2.0 / 3.0, 1.0));
-//	float2 uv = Remap01ToHalfTexelCoord(float2(len, 0.5), float2(256.0, 1));
-//	return _LengthToRoughness.SampleLevel(_LinearClampSampler, uv, 0.0);
-//}
+float LengthToRoughness(float len)
+{
+	len = saturate(Remap(len, 2.0 / 3.0, 1.0));
+	float2 uv = Remap01ToHalfTexelCoord(float2(len, 0.5), float2(256.0, 1));
+	return _LengthToRoughness.SampleLevel(_LinearClampSampler, uv, 0.0);
+}
 
-//float LengthToPerceptualRoughness(float len)
-//{
-//	return RoughnessToPerceptualRoughness(LengthToRoughness(len));
-//}
+float LengthToPerceptualRoughness(float len)
+{
+	return RoughnessToPerceptualRoughness(LengthToRoughness(len));
+}
 
-//float LengthToSmoothness(float len)
-//{
-//	return RoughnessToPerceptualSmoothness(LengthToRoughness(len));
-//}
+float LengthToSmoothness(float len)
+{
+	return RoughnessToPerceptualSmoothness(LengthToRoughness(len));
+}
 
-//float RoughnessToNormalLength(float roughness)
-//{
-//	if (roughness < 1e-3)
-//		return 1.0;
-//	if (roughness >= 1.0)
-//		return 2.0 / 3.0;
+float RoughnessToNormalLength(float roughness)
+{
+	if(roughness < 1e-3)
+		return 1.0;
+	if(roughness >= 1.0)
+		return 2.0 / 3.0;
 
-//	float a = sqrt(saturate(1.0 - Sq(roughness)));
-//	return (a - (1.0 - a * a) * atanh(a)) / (a * a * a);
-//}
+	float a = sqrt(saturate(1.0 - Sq(roughness)));
+	return (a - (1.0 - a * a) * atanh(a)) / (a * a * a);
+}
 
-//float PerceptualRoughnessToNormalLength(float perceptualRoughness)
-//{
-//	return RoughnessToNormalLength(PerceptualRoughnessToRoughness(perceptualRoughness));
-//}
+float PerceptualRoughnessToNormalLength(float perceptualRoughness)
+{
+	return RoughnessToNormalLength(PerceptualRoughnessToRoughness(perceptualRoughness));
+}
+
+float SmoothnessToNormalLength(float smoothness)
+{
+	return RoughnessToNormalLength(PerceptualSmoothnessToRoughness(smoothness));
+}
 
 #endif

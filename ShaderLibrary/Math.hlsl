@@ -63,4 +63,9 @@ float3 FastACosPos(float3 inX)
 	return res * sqrt(max(0.0, 1.0 - x));
 }
 
+float atanh(float x)
+{
+	return 0.5 * log((1.0 + x) / (1.0 - x));
+}
+
 #endif
