@@ -75,16 +75,18 @@ GBufferOutput Fragment(float4 position : SV_Position)
 	float3 P = positionWS + V * t;
 
 	float height = HeightAtDistance(_ViewHeight, V.y, t);
+	float3 shadowPosition = 0.0;
+	float shadowDistance0 = 0.0;
 	
 	#if defined(LIGHT_COUNT_ONE) || defined(LIGHT_COUNT_TWO)
-		float attenuation = GetShadow(P, 0, false);
+		float attenuation = 1;//GetShadow(P, 0, false);
 		if(attenuation > 0.0)
 		{
-			attenuation *= CloudTransmittance(P);
+			//attenuation *= CloudTransmittance(P);
 			if(attenuation > 0.0)
 			{
-				float shadowDistance0 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
-				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix, P);
+				shadowDistance0 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
+				shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix, P + _ViewPosition);
 				if (all(saturate(shadowPosition) == shadowPosition))
 				{
 					float shadowDepth = _WaterShadows.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);
@@ -99,11 +101,11 @@ GBufferOutput Fragment(float4 position : SV_Position)
 		}
 	
 		#ifdef LIGHT_COUNT_TWO
-			float shadowDistance1 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection1.y));
-			float LdotV1 = dot(_LightDirection1, V);
-			float lightCosAngleAtDistance1 = CosAngleAtDistance(_ViewHeight, _LightDirection1.y, t * LdotV1, height);
-			float3 lightColor1 = RcpFourPi * _LightColor1 * AtmosphereTransmittance(height, lightCosAngleAtDistance1);
-			luminance += lightColor1 * exp(-_Extinction * (shadowDistance1 + t));
+			//float shadowDistance1 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection1.y));
+			//float LdotV1 = dot(_LightDirection1, V);
+			//float lightCosAngleAtDistance1 = CosAngleAtDistance(_ViewHeight, _LightDirection1.y, t * LdotV1, height);
+			//float3 lightColor1 = RcpFourPi * _LightColor1 * AtmosphereTransmittance(height, lightCosAngleAtDistance1);
+			//luminance += lightColor1 * exp(-_Extinction * (shadowDistance1 + t));
 		#endif
 	#endif
 	
@@ -111,23 +113,23 @@ GBufferOutput Fragment(float4 position : SV_Position)
 	
 	// Ambient 
 	float3 finalTransmittance = exp(-underwaterDistance * _Extinction);
-	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
+	//luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
 	luminance *= _Color;
 	
 	luminance = IsInfOrNaN(luminance) ? 0.0 : luminance;
 
 	// TODO: Stencil? Or hw blend?
-	if(underwaterDepth != 0.0)
-		luminance += _UnderwaterResult[refractionUv] * exp(-_Extinction * underwaterDistance);
+	//if(underwaterDepth != 0.0)
+		//luminance += _UnderwaterResult[refractionUv] * exp(-_Extinction * underwaterDistance);
 	
 	// Apply roughness to transmission
 	float perceptualRoughness = waterNormalFoamRoughness.a;
-	luminance *= (1.0 - waterNormalFoamRoughness.b)* GGXDiffuse(1.0, dot(N, -V), perceptualRoughness, 0.04) * Pi;
+	//luminance *= (1.0 - waterNormalFoamRoughness.b)* GGXDiffuse(1.0, dot(N, -V), perceptualRoughness, 0.04) * Pi;
 
 	GBufferOutput output;
 	output.albedoMetallic = float2(waterNormalFoamRoughness.b, 0.0).xxxy;
 	output.normalRoughness = float4(PackFloat2To888(0.5 * PackNormalOctQuadEncode(N) + 0.5), perceptualRoughness);
 	output.bentNormalOcclusion = float4(N * 0.5 + 0.5, 1.0);
-	output.emissive = luminance;
+	output.emissive = shadowDistance0;
 	return output;
 }

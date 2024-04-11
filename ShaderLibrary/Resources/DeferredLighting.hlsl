@@ -30,5 +30,9 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float3 V = normalize(-PixelToWorld(float3(position.xy, depth)));
 	result *= TransmittanceToPoint(_ViewPosition.y + _PlanetRadius, -V.y, CameraDepthToDistance(depth, V));
 	
+	#ifdef WATER_ON
+	return 0.0;
+	#endif
+	
 	return result;
 }

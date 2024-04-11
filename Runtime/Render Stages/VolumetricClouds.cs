@@ -334,7 +334,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Atmosphere Ambient Probe Copy"))
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Cloud Coverage Copy"))
             {
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {

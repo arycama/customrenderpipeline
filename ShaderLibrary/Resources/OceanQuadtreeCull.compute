@@ -64,7 +64,7 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 			{
 				float2 patchSize = _TerrainPositionOffset.xy / (1 << (i + _PassOffset));
 				
-				float3 center = float3((coord + 0.5) * patchSize + _TerrainPositionOffset.zw, 0.0).xzy - _ViewPosition;
+				float3 center = float3((coord + 0.5) * patchSize + _TerrainPositionOffset.zw, -_ViewPosition.y).xzy;
 				float3 extents = float3(patchSize* 0.5, 1).xzy ;
 				
 				if (FrustumCull(center, extents))

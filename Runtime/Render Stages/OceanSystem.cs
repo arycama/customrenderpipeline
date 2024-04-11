@@ -263,15 +263,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void CullShadow(Camera camera, CullingResults cullingResults, ICommonPassData commonPassData)
         {
-            var shadowResolution = settings.ShadowResolution;
-            var shadowRadius = settings.ShadowRadius;
-            var profile = settings.Profile;
-
             var lightRotation = Quaternion.identity;
-
-            // Render
-            Vector3 localSize = Vector3.zero;
-            Matrix4x4 waterShadowMatrix = Matrix4x4.identity, projection = Matrix4x4.identity, viewMatrix = Matrix4x4.identity;
             for (var i = 0; i < cullingResults.visibleLights.Length; i++)
             {
                 var visibleLight = cullingResults.visibleLights[i];
@@ -282,8 +274,8 @@ namespace Arycama.CustomRenderPipeline
                 break;
             }
 
-            var size = new Vector3(shadowRadius * 2, profile.MaxWaterHeight * 2, shadowRadius * 2);
-            var min = new Vector3(camera.transform.position.x - shadowRadius, -profile.MaxWaterHeight, camera.transform.position.z - shadowRadius);
+            var size = new Vector3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
+            var min = new Vector3(camera.transform.position.x - settings.ShadowRadius, -settings.Profile.MaxWaterHeight, camera.transform.position.z - settings.ShadowRadius);
 
             var localMatrix = Matrix4x4.Rotate(Quaternion.Inverse(lightRotation));
             Vector3 localMin = Vector3.positiveInfinity, localMax = Vector3.negativeInfinity;
@@ -302,8 +294,8 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Snap texels
-            localSize = localMax - localMin;
-            var worldUnitsPerTexel = new Vector2(localSize.x, localSize.y) / shadowResolution;
+            var localSize = localMax - localMin;
+            var worldUnitsPerTexel = new Vector2(localSize.x, localSize.y) / settings.ShadowResolution;
             localMin.x = Mathf.Floor(localMin.x / worldUnitsPerTexel.x) * worldUnitsPerTexel.x;
             localMin.y = Mathf.Floor(localMin.y / worldUnitsPerTexel.y) * worldUnitsPerTexel.y;
             localMax.x = Mathf.Floor(localMax.x / worldUnitsPerTexel.x) * worldUnitsPerTexel.x;
@@ -312,17 +304,15 @@ namespace Arycama.CustomRenderPipeline
 
             var localCenter = (localMax + localMin) * 0.5f;
             var worldMatrix = Matrix4x4.Rotate(lightRotation);
-            var position = worldMatrix.MultiplyPoint(new Vector3(localCenter.x, localCenter.y, localMin.z));
+            var position = worldMatrix.MultiplyPoint(new Vector3(localCenter.x, localCenter.y, localMin.z)) - camera.transform.position;
 
             var lookMatrix = Matrix4x4.LookAt(position, position + lightRotation.Forward(), lightRotation.Up());
 
             // Matrix that mirrors along Z axis, to match the camera space convention.
             var scaleMatrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, 1, -1));
             // Final view matrix is inverse of the LookAt matrix, and then mirrored along Z.
-            viewMatrix = scaleMatrix * lookMatrix.inverse;
-
-            projection = Matrix4x4.Ortho(-localSize.x * 0.5f, localSize.x * 0.5f, -localSize.y * 0.5f, localSize.y * 0.5f, 0, localSize.z);
-            //lhsProj.SetColumn(2, -lhsProj.GetColumn(2));
+            var viewMatrix = scaleMatrix * lookMatrix.inverse;
+            var projection = Matrix4x4.Ortho(-localSize.x * 0.5f, localSize.x * 0.5f, -localSize.y * 0.5f, localSize.y * 0.5f, 0, localSize.z);
 
             var planes = ArrayPool<Plane>.Get(6);
             GeometryUtility.CalculateFrustumPlanes(projection * viewMatrix, planes);
@@ -331,18 +321,18 @@ namespace Arycama.CustomRenderPipeline
             for (var j = 0; j < 6; j++)
             {
                 var plane = planes[j];
+                //plane.Translate(-camera.transform.position);
                 cullingPlanes[j] = new Vector4(plane.normal.x, plane.normal.y, plane.normal.z, plane.distance);
             }
             ArrayPool<Plane>.Release(planes);
 
-            var cullResult = Cull( camera.transform.position, cullingPlanes, commonPassData);
+            var cullResult = Cull(camera.transform.position, cullingPlanes, commonPassData);
             renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, localSize.z, viewMatrix, projection));
         }
 
-        public void RenderShadow(Vector3 viewPosition)
+        public void RenderShadow(Vector3 viewPosition, ICommonPassData commonPassData)
         {
-            var shadowResolution = settings.ShadowResolution;
-            var waterShadowId = renderGraph.GetTexture(shadowResolution, shadowResolution, GraphicsFormat.D32_SFloat);
+            var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.D32_SFloat);
 
             var passIndex = settings.Material.FindPass("WaterShadow");
             Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");
@@ -351,16 +341,16 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Shadow"))
             {
                 pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads);
-                pass.WriteDepth(waterShadowId);
+                pass.WriteDepth(waterShadow);
                 pass.ConfigureClear(RTClearFlags.Depth);
+                pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
+                commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    command.SetGlobalMatrix("_WaterShadowMatrix", GL.GetGPUProjectionMatrix(passData.Projection, true) * passData.View);
+                    commonPassData.SetProperties(pass, command);
 
-                    // TODO: use read buffer
-                    command.SetGlobalBuffer("_PatchData", passData.PatchDataBuffer);
-
+                    pass.SetMatrix(command, "_WaterShadowMatrix", GL.GetGPUProjectionMatrix(passData.Projection, true) * passData.View);
                     pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
                     pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
                     pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
@@ -370,11 +360,12 @@ namespace Arycama.CustomRenderPipeline
                     var positionX = MathUtils.Snap(viewPosition.x - settings.Size * 0.5f, texelSize) - viewPosition.x;
                     var positionZ = MathUtils.Snap(viewPosition.z - settings.Size * 0.5f, texelSize) - viewPosition.z;
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
+
                 });
             }
 
             var waterShadowMatrix = (passData.Projection * passData.View).ConvertToAtlasMatrix();
-            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadowId, waterShadowMatrix, passData.Near, passData.Far));
+            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadow, waterShadowMatrix, passData.Near, passData.Far));
         }
 
         public WaterCullResult Cull(Vector3 viewPosition, Vector4[] cullingPlanes, ICommonPassData commonPassData)
@@ -439,11 +430,14 @@ namespace Arycama.CustomRenderPipeline
                     if (!isFinalPass)
                         pass.WriteTexture("_TempResultWrite", tempIds[i]);
 
+                    pass.WriteBuffer("_IndirectArgs", indirectArgsBuffer);
+                    pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
+
                     var index = i;
                     var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                     {
                         // First pass sets the buffer contents
-                        if(isFirstPass)
+                        if (isFirstPass)
                         {
                             var indirectArgs = ListPool<int>.Get();
                             indirectArgs.Add(QuadListIndexCount); // index count per instance
@@ -457,10 +451,6 @@ namespace Arycama.CustomRenderPipeline
 
                         commonPassData.SetProperties(pass, command);
 
-                        // Todo: Buffer handles
-                        command.SetComputeBufferParam(compute, 0, "_IndirectArgs", indirectArgsBuffer);
-                        command.SetComputeBufferParam(compute, 0, "_PatchDataWrite", patchDataBuffer);
-
                         // Do up to 6 passes per dispatch.
                         pass.SetInt(command, "_PassCount", passCount);
                         pass.SetInt(command, "_PassOffset", 6 * index);
@@ -471,8 +461,8 @@ namespace Arycama.CustomRenderPipeline
                         // Snap to quad-sized increments on largest cell
                         var texelSizeX = settings.Size / (float)settings.PatchVertices;
                         var texelSizeZ = settings.Size / (float)settings.PatchVertices;
-                        var positionX = Mathf.Floor((viewPosition.x - settings.Size * 0.5f) / texelSizeX) * texelSizeX;
-                        var positionZ = Mathf.Floor((viewPosition.z - settings.Size * 0.5f) / texelSizeZ) * texelSizeZ;
+                        var positionX = Mathf.Floor((viewPosition.x - settings.Size * 0.5f) / texelSizeX) * texelSizeX - viewPosition.x;
+                        var positionZ = Mathf.Floor((viewPosition.z - settings.Size * 0.5f) / texelSizeZ) * texelSizeZ - viewPosition.z;
                         var positionOffset = new Vector4(settings.Size, settings.Size, positionX, positionZ);
                         pass.SetVector(command, "_TerrainPositionOffset", positionOffset);
 
@@ -491,24 +481,21 @@ namespace Arycama.CustomRenderPipeline
                     pass.Initialize(compute, 1, normalizedDispatch: false);
                     pass.WriteBuffer("_IndirectArgs", lodIndirectArgsBuffer);
 
-                    var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
-                    {
-                        // If more than one pass needed, we need a second pass to write out lod deltas to the patch data
-                        // Copy count from indirect draw args so we only dispatch as many threads as needed
-                        command.SetComputeBufferParam(compute, 1, "_IndirectArgsInput", indirectArgsBuffer);
-                    });
+                    // If more than one pass needed, we need a second pass to write out lod deltas to the patch data
+                    // Copy count from indirect draw args so we only dispatch as many threads as needed
+                    pass.ReadBuffer("_IndirectArgsInput", indirectArgsBuffer);
                 }
 
                 using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Ocean Quadtree Cull"))
                 {
                     pass.Initialize(compute, lodIndirectArgsBuffer, 2);
+                    pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
                     pass.ReadTexture("_LodInput", tempLodId);
+                    pass.ReadBuffer("_IndirectArgs", indirectArgsBuffer);
 
                     var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                     {
                         pass.SetInt(command, "_CellCount", settings.CellCount);
-                        command.SetComputeBufferParam(compute, 2, "_PatchDataWrite", patchDataBuffer);
-                        command.SetComputeBufferParam(compute, 2, "_IndirectArgs", indirectArgsBuffer);
                     });
                 }
             }
@@ -518,67 +505,6 @@ namespace Arycama.CustomRenderPipeline
             return new(indirectArgsBuffer, patchDataBuffer);
         }
 
-        public struct WaterCullResult
-        {
-            public BufferHandle IndirectArgsBuffer { get; }
-            public BufferHandle PatchDataBuffer { get; }
-
-            public WaterCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
-            {
-                IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
-                PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
-            }
-        }
-
-        public struct WaterShadowCullResult : IRenderPassData
-        {
-            public BufferHandle IndirectArgsBuffer { get; }
-            public BufferHandle PatchDataBuffer { get; }
-            public float Near { get; }
-            public float Far { get; }
-            public Matrix4x4 View { get; }
-            public Matrix4x4 Projection { get; }
-
-            public WaterShadowCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer, float near, float far, Matrix4x4 view, Matrix4x4 projection)
-            {
-                IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
-                PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
-                Near = near;
-                Far = far;
-                View = view;
-                Projection = projection;
-            }
-
-            public void SetInputs(RenderPass pass)
-            {
-                pass.ReadBuffer("_PatchData", PatchDataBuffer);
-            }
-
-            public void SetProperties(RenderPass pass, CommandBuffer command)
-            {
-            }
-        }
-
-        public struct WaterRenderCullResult : IRenderPassData
-        {
-            public BufferHandle IndirectArgsBuffer { get; }
-            public BufferHandle PatchDataBuffer { get; }
-
-            public WaterRenderCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
-            {
-                IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
-                PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
-            }
-
-            public void SetInputs(RenderPass pass)
-            {
-                pass.ReadBuffer("_PatchData", PatchDataBuffer);
-            }
-
-            public void SetProperties(RenderPass pass, CommandBuffer command)
-            {
-            }
-        }
 
         public void CullRender(Vector3 viewPosition, Vector4[] cullingPlanes, ICommonPassData commonPassData)
         {
@@ -714,6 +640,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<WaterShadowResult>();
                 pass.AddRenderPassData<LitData.Result>();
+                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
 
                 commonPassData.SetInputs(pass);
 
@@ -723,7 +650,7 @@ namespace Arycama.CustomRenderPipeline
 
                     var material = settings.Material;
                     pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
-                    pass.SetVector(command, "_Extinction", material.GetColor("_Extinction").linear);
+                    pass.SetVector(command, "_Extinction", material.GetColor("_Extinction"));
 
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
                     pass.SetVector(command, "_LightColor0", lightColor0);
@@ -767,6 +694,68 @@ namespace Arycama.CustomRenderPipeline
             pass.SetMatrix(command, "_WaterShadowMatrix", waterShadowMatrix);
             pass.SetFloat(command, "_WaterShadowNear", waterShadowNear);
             pass.SetFloat(command, "_WaterShadowFar", waterShadowFar);
+        }
+    }
+
+    public struct WaterCullResult
+    {
+        public BufferHandle IndirectArgsBuffer { get; }
+        public BufferHandle PatchDataBuffer { get; }
+
+        public WaterCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
+        {
+            IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
+            PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
+        }
+    }
+
+    public struct WaterShadowCullResult : IRenderPassData
+    {
+        public BufferHandle IndirectArgsBuffer { get; }
+        public BufferHandle PatchDataBuffer { get; }
+        public float Near { get; }
+        public float Far { get; }
+        public Matrix4x4 View { get; }
+        public Matrix4x4 Projection { get; }
+
+        public WaterShadowCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer, float near, float far, Matrix4x4 view, Matrix4x4 projection)
+        {
+            IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
+            PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
+            Near = near;
+            Far = far;
+            View = view;
+            Projection = projection;
+        }
+
+        public void SetInputs(RenderPass pass)
+        {
+            pass.ReadBuffer("_PatchData", PatchDataBuffer);
+        }
+
+        public void SetProperties(RenderPass pass, CommandBuffer command)
+        {
+        }
+    }
+
+    public struct WaterRenderCullResult : IRenderPassData
+    {
+        public BufferHandle IndirectArgsBuffer { get; }
+        public BufferHandle PatchDataBuffer { get; }
+
+        public WaterRenderCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
+        {
+            IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
+            PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
+        }
+
+        public void SetInputs(RenderPass pass)
+        {
+            pass.ReadBuffer("_PatchData", PatchDataBuffer);
+        }
+
+        public void SetProperties(RenderPass pass, CommandBuffer command)
+        {
         }
     }
 }

@@ -9,7 +9,8 @@ namespace Arycama.CustomRenderPipeline
         public readonly MaterialPropertyBlock propertyBlock;
         private Material material;
         private int passIndex;
-        private GraphicsBuffer indexBuffer, indirectArgsBuffer;
+        private GraphicsBuffer indexBuffer;
+        private BufferHandle indirectArgsBuffer;
         private MeshTopology topology;
 
         public string Keyword { get; set; }
@@ -24,7 +25,7 @@ namespace Arycama.CustomRenderPipeline
             return $"{Name} {material} {passIndex}";
         }
 
-        public void Initialize(Material material, GraphicsBuffer indexBuffer, GraphicsBuffer indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, string keyword = null)
+        public void Initialize(Material material, GraphicsBuffer indexBuffer, BufferHandle indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, string keyword = null)
         {
             this.material = material;
             this.passIndex = passIndex;
@@ -32,8 +33,6 @@ namespace Arycama.CustomRenderPipeline
             this.indexBuffer = indexBuffer;
             this.indirectArgsBuffer = indirectArgsBuffer;
             this.topology = topology;
-
-            Assert.IsNotNull(indirectArgsBuffer);
         }
 
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
