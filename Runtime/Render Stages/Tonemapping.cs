@@ -68,6 +68,8 @@ namespace Arycama.CustomRenderPipeline
 
             var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
             {
+                pass.SetFloat(command, "HdrEnabled", HDROutputSettings.main.available ? 1.0f : 0.0f);
+
                 pass.SetTexture(command, "_GrainTexture", data.grainTexture);
 
                 pass.SetFloat(command, "_BloomStrength", data.bloomStrength);

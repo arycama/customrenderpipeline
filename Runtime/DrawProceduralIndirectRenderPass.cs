@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -31,6 +32,8 @@ namespace Arycama.CustomRenderPipeline
             this.indexBuffer = indexBuffer;
             this.indirectArgsBuffer = indirectArgsBuffer;
             this.topology = topology;
+
+            Assert.IsNotNull(indirectArgsBuffer);
         }
 
         public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)

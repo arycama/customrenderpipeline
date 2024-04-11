@@ -6,7 +6,7 @@ Texture2D<float3> _MainTex, _Bloom;
 Texture2D<float> _GrainTexture;
 float4 _GrainTextureParams, _Resolution, _BloomScaleLimit, _Bloom_TexelSize;
 float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, ShutterSpeed;
-float HdrMinNits, HdrMaxNits, PaperWhiteNits;
+float HdrMinNits, HdrMaxNits, PaperWhiteNits, HdrEnabled;
 
 float3 Uncharted2ToneMapping(float3 color)
 {
@@ -554,7 +554,9 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	//input *= rcp(1.0 + Luminance(input));
 	
 	//input = (ACESFilm((input)));
-	//input = SRGBToLinear(ACESFilm(LinearToSRGB(input)));
+	
+	if (!HdrEnabled)
+		input = SRGBToLinear(ACESFilm(LinearToSRGB(input)));
 	
 	//input = SRGBToLinear(ACESFitted(LinearToSRGB(input)));
 	//input = Uncharted2ToneMapping(input);
@@ -574,7 +576,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	
 	//if(position.x < _ScaledResolution.x / 2)
 	{
-		if(!_IsSceneView)
+		if(HdrEnabled && !_IsSceneView)
 			input = linear_to_hdr10(input, PaperWhiteNits);
 		
 		//input = HDRMappingFromRec709(input, PaperWhiteNits, HdrMinNits, HdrMaxNits);
