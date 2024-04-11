@@ -408,6 +408,8 @@ FragmentOutput Fragment(FragmentInput input)
 	
 	smoothness = LengthToSmoothness(smoothness);
 	
+	//smoothness = _Smoothness;
+	
 	float3 B = cross(T, N);
 	float3x3 tangentToWorld = float3x3(T, B, N);
 	float3 oceanN = float3(normalData * lerp(1.0, 0.0, shoreFactor * 0.75), 1.0);
@@ -423,19 +425,13 @@ FragmentOutput Fragment(FragmentInput input)
 		float3 foamNormal = UnpackNormalAG(_FoamBump.Sample(_TrilinearRepeatAniso4Sampler, foamUv));
 		float2 foamDerivs = foamNormal.xy / foamNormal.z;
 		oceanN.xy += foamDerivs * _FoamNormalScale * foamFactor;
-		//smoothness = lerp(smoothness, _FoamSmoothness, foamFactor);
+		smoothness = lerp(smoothness, _FoamSmoothness, foamFactor);
 	}
 
 	N = normalize(mul(oceanN, tangentToWorld));
+	smoothness = ProjectedSpaceGeometricNormalFiltering(smoothness, N, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
 	
-	float3x3 frame = GetLocalFrame(N);
-	float sinFrame = dot(T, frame[1]);
-	float cosFrame = dot(T, frame[0]);
-
-	//smoothness = lerp(smoothness, _FoamSmoothness, foamFactor);
 	float perceptualRoughness = 1.0 - smoothness;
-
-	float3 normalOct = PackFloat2To888(0.5 * PackNormalOctQuadEncode(N) + 0.5);
 
 	FragmentOutput output;
 	output.velocity = MotionVectorFragment(input.nonJitteredPositionCS, input.previousPositionCS);

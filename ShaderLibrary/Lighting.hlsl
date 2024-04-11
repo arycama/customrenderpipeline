@@ -254,9 +254,6 @@ float3 AverageFresnel(float3 f0)
 
 float GGXDiffuse(float NdotL, float NdotV, float perceptualRoughness, float3 f0)
 {
-	if (!perceptualRoughness)
-		return 0.0;
-	
 	float Ewi = DirectionalAlbedoMs(NdotL, perceptualRoughness, f0);
 	float Ewo = DirectionalAlbedoMs(NdotV, perceptualRoughness, f0);
 	float Eavg = AverageAlbedoMs(perceptualRoughness, f0);
@@ -532,6 +529,10 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 	return weightSum ? shadow / weightSum : 1.0;
 }
 
+#ifdef __INTELLISENSE__
+	#define WATER_ON
+#endif
+
 float3 GetLighting(LightingInput input, bool isVolumetric = false)
 {
 	float3 V = normalize(-input.worldPosition);
@@ -555,17 +556,28 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	float3 kD = input.albedo * Edss;
 	float3 bkD = input.translucency * Edss;
 	
-	float3 ambient = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
-	float3 backAmbient = AmbientLight(-input.bentNormal, input.occlusion, input.translucency);
-	
 	float3 R = reflect(-V, input.normal);
+	float3 rStrength = 1.0;
 	float3 iblR = GetSpecularDominantDir(input.normal, R, input.perceptualRoughness, NdotV);
+	
+	#ifdef WATER_ON
+		if(iblR.y < 0.0)
+		{
+			float NdotR = dot(float3(0.0, 1.0, 0.0), -iblR);
+			float2 f_ab = DirectionalAlbedo(NdotR, input.perceptualRoughness);
+			rStrength = lerp(f_ab.x, f_ab.y, input.f0);
+			R = reflect(R, float3(0.0, 1.0, 0.0));
+			iblR = GetSpecularDominantDir(float3(0.0, 1.0, 0.0), R, input.perceptualRoughness, NdotR);
+		}
+	#endif
+	
 	float NdotR = dot(input.normal, iblR);
 	float iblMipLevel = PerceptualRoughnessToMipmapLevel(input.perceptualRoughness, NdotR);
 	
-	float3 radiance = _SkyReflection.SampleLevel(_TrilinearClampSampler, iblR, iblMipLevel);
-	float3 irradiance = ambient;
-	float3 backIrradiance = backAmbient;
+	float3 radiance = _SkyReflection.SampleLevel(_TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
+	
+	float3 irradiance =  AmbientLight(input.bentNormal, input.occlusion, input.albedo);
+	float3 backIrradiance = AmbientLight(-input.bentNormal, input.occlusion, input.translucency);
 	
 	float specularOcclusion = SpecularOcclusion(dot(input.normal, R), input.perceptualRoughness, input.occlusion, dot(input.bentNormal, R));
 	radiance *= specularOcclusion;

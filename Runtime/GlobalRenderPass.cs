@@ -25,6 +25,10 @@ namespace Arycama.CustomRenderPipeline
         {
             command.SetGlobalVector(propertyName, value);
         }
+        public override void SetVectorArray(CommandBuffer command, string propertyName, Vector4[] value)
+        {
+            command.SetGlobalVectorArray(propertyName, value);
+        }
 
         public override void SetFloat(CommandBuffer command, string propertyName, float value)
         {

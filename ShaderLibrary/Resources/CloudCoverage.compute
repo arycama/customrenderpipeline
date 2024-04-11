@@ -43,5 +43,7 @@ void CSMain (uint groupIndex : SV_GroupIndex)
 	// Smooth results over time to avoid flickering
 	result = lerp(_CloudCoverage, result, 0.05);
 	
+	result = isnan(result) ? float2(0.0, 1.0).xxxy : result;
+	
 	_Result[0] = result;
 }

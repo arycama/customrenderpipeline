@@ -89,8 +89,7 @@ namespace Arycama.CustomRenderPipeline
 
                 if (colorTargets.Count == 0)
                 {
-                    var binding = new RenderTargetBinding(targets, loads, stores, depthBuffer.Item1, depthBuffer.Item2, depthBuffer.Item3) { flags = renderTargetFlags };
-                    command.SetRenderTarget(binding);
+                    command.SetRenderTarget(depthBuffer.Item1, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare, depthBuffer.Item1, depthBuffer.Item2, depthBuffer.Item3);
                 }
                 else
                 {

@@ -119,6 +119,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 
 	history *= rcp(w.x + w.y + 1.0);
 	history += _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
+	history *=  _PreviousToCurrentExposure;
 	history = RgbToYCoCgFastTonemap(history);
 	if(any(saturate(historyUv) != historyUv))
 		history = result;

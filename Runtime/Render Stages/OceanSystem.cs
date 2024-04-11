@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
@@ -20,6 +21,13 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public WaterProfile Profile { get; private set; }
             [field: SerializeField] public float ShadowRadius { get; private set; } = 8192;
             [field: SerializeField] public int ShadowResolution { get; private set; } = 512;
+
+            [field: Header("Rendering")]
+            [field: SerializeField] public int CellCount { get; private set; } = 32;
+            [field: SerializeField, Tooltip("Size of the Mesh in World Space")] public int Size { get; private set; } = 256;
+            [field: SerializeField] public int PatchVertices { get; private set; } = 32;
+            [field: SerializeField, Range(1, 128)] public float EdgeLength { get; private set; } = 64;
+
         }
 
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
@@ -29,6 +37,10 @@ namespace Arycama.CustomRenderPipeline
         private Settings settings;
         private RenderGraph renderGraph;
         private Material underwaterLightingMaterial, deferredWaterMaterial;
+        private GraphicsBuffer indexBuffer, patchDataBuffer, indirectArgsBuffer, lodIndirectArgsBuffer;
+
+        private int VerticesPerTileEdge => settings.PatchVertices + 1;
+        private int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
 
         public OceanSystem(RenderGraph renderGraph, Settings settings)
         {
@@ -100,6 +112,41 @@ namespace Arycama.CustomRenderPipeline
             computeShader.SetFloat("_Resolution", 256);
             computeShader.SetTexture(generateLengthToSmoothnessKernel, "_LengthToRoughnessResult", lengthToRoughness);
             computeShader.DispatchNormalized(generateLengthToSmoothnessKernel, 256, 1, 1);
+
+            lodIndirectArgsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 3, sizeof(uint)) { name = "Water Indirect Args" };
+            indirectArgsBuffer = new GraphicsBuffer(GraphicsBuffer.Target.IndirectArguments, 5, sizeof(uint)) { name = "Water Draw Args" };
+            patchDataBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, settings.CellCount * settings.CellCount, sizeof(uint)) { name = "Water Patch Data" };
+            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort));
+
+            int index = 0;
+            var pIndices = new ushort[QuadListIndexCount];
+            for (var y = 0; y < settings.PatchVertices; y++)
+            {
+                var rowStart = y * VerticesPerTileEdge;
+
+                for (var x = 0; x < settings.PatchVertices; x++)
+                {
+                    // Can do a checkerboard flip to avoid directioanl artifacts, but will mess with the tessellation code
+                    //var flip = (x & 1) == (y & 1);
+
+                    //if(flip)
+                    //{
+                    pIndices[index++] = (ushort)(rowStart + x);
+                    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge);
+                    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
+                    pIndices[index++] = (ushort)(rowStart + x + 1);
+                    //}
+                    //else
+                    //{
+                    //    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge);
+                    //    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
+                    //    pIndices[index++] = (ushort)(rowStart + x + 1);
+                    //    pIndices[index++] = (ushort)(rowStart + x);
+                    //}
+                }
+            }
+
+            indexBuffer.SetData(pIndices);
         }
 
         public void UpdateFft()
@@ -217,7 +264,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public RTHandle RenderShadow(Camera camera, CullingResults cullingResults)
+        public RTHandle RenderShadow(Camera camera, CullingResults cullingResults, ICommonPassData commonPassData)
         {
             var shadowResolution = settings.ShadowResolution;
             var shadowRadius = settings.ShadowRadius;
@@ -279,40 +326,44 @@ namespace Arycama.CustomRenderPipeline
                 break;
             }
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Cull"))
+            var planes = ArrayPool<Plane>.Get(6);
+            GeometryUtility.CalculateFrustumPlanes(projection * viewMatrix, planes);
+
+            var cullingPlanes = ArrayPool<Vector4>.Get(6);
+            for (var j = 0; j < 6; j++)
             {
-                pass.WriteTexture(waterShadowId);
+                var plane = planes[j];
+                cullingPlanes[j] = new Vector4(plane.normal.x, plane.normal.y, plane.normal.z, plane.distance);
+            }
+            ArrayPool<Plane>.Release(planes);
+
+            Cull( camera.transform.position, cullingPlanes, commonPassData);
+
+            var passIndex = settings.Material.FindPass("WaterShadow");
+            Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");
+
+            using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Shadow"))
+            {
+                pass.Initialize(settings.Material, indexBuffer, indirectArgsBuffer, MeshTopology.Quads);
+                pass.WriteDepth(waterShadowId);
+                pass.ConfigureClear(RTClearFlags.Depth);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     command.SetGlobalMatrix("_WaterShadowMatrix", GL.GetGPUProjectionMatrix(projection, true) * viewMatrix);
-                    command.SetGlobalFloat("_WaterShadowNear", 0f);
-                    command.SetGlobalFloat("_WaterShadowFar", localSize.z);
-                    //command.SetGlobalDepthBias(constantBias, slopeBias);
 
-                    command.SetRenderTarget(waterShadowId);
-                    command.ClearRenderTarget(true, false, new Color());
+                    // TODO: use read buffer
+                    command.SetGlobalBuffer("_PatchData", patchDataBuffer);
 
-                    var planes = ArrayPool<Plane>.Get(6);
-                    GeometryUtility.CalculateFrustumPlanes(projection * viewMatrix, planes);
+                    pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
+                    pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
+                    pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
 
-                    var cullingPlanes = ArrayPool<Vector4>.Get(6);
-                    for (var j = 0; j < 6; j++)
-                    {
-                        var plane = planes[j];
-                        cullingPlanes[j] = new Vector4(plane.normal.x, plane.normal.y, plane.normal.z, plane.distance);
-                    }
-
-                    ArrayPool<Plane>.Release(planes);
-
-                    foreach (var waterRenderer in WaterRenderer.WaterRenderers)
-                    {
-                        // TODO: Split into seperate cull and render phases?
-                        waterRenderer.Cull(command, camera.transform.position, cullingPlanes);
-                        waterRenderer.Render(command, "WaterShadow", camera.transform.position);
-                    }
-
-                    ArrayPool<Vector4>.Release(cullingPlanes);
+                    // Snap to quad-sized increments on largest cell
+                    var texelSize = settings.Size / (float)settings.PatchVertices;
+                    var positionX = MathUtils.Snap(camera.transform.position.x - settings.Size * 0.5f, texelSize) - camera.transform.position.x;
+                    var positionZ = MathUtils.Snap(camera.transform.position.z - settings.Size * 0.5f, texelSize) - camera.transform.position.z;
+                    pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
                 });
             }
 
@@ -323,47 +374,182 @@ namespace Arycama.CustomRenderPipeline
             return waterShadowId;
         }
 
-        public void CullWater(Camera camera, Vector4[] cullingPlanes)
+        public void Cull(Vector3 viewPosition, Vector4[] cullingPlanes, ICommonPassData commonPassData)
         {
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Cull"))
+            var compute = Resources.Load<ComputeShader>("OceanQuadtreeCull");
+
+            // We can do 32x32 cells in a single pass, larger counts need to be broken up into several passes
+            var maxPassesPerDispatch = 6;
+            var totalPassCount = (int)Mathf.Log(settings.CellCount, 2f) + 1;
+            var dispatchCount = Mathf.Ceil(totalPassCount / (float)maxPassesPerDispatch);
+
+            RTHandle tempLodId = null;
+            if (dispatchCount > 1)
             {
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
-                {
-                    foreach (var waterRenderer in WaterRenderer.WaterRenderers)
-                        waterRenderer.Cull(command, camera.transform.position, cullingPlanes);
-                });
+                // If more than one dispatch, we need to write lods out to a temp texture first. Otherwise they are done via shared memory so no texture is needed
+                tempLodId = renderGraph.GetTexture(settings.CellCount, settings.CellCount, GraphicsFormat.R16_UInt);
             }
+
+            var tempIds = ListPool<RTHandle>.Get();
+            for (var i = 0; i < dispatchCount - 1; i++)
+            {
+                var tempResolution = 1 << ((i + 1) * (maxPassesPerDispatch - 1));
+                tempIds.Add(renderGraph.GetTexture(tempResolution, tempResolution, GraphicsFormat.R16_UInt));
+            }
+
+            for (var i = 0; i < dispatchCount; i++)
+            {
+                using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Quadtree Cull"))
+                {
+                    // I don't think this is required.
+                    commonPassData.SetInputs(pass);
+
+                    var isFirstPass = i == 0; // Also indicates whether this is -not- the first pass
+                    if (!isFirstPass)
+                        pass.ReadTexture("_TempResult", tempIds[i - 1]);
+
+                    var isFinalPass = i == dispatchCount - 1; // Also indicates whether this is -not- the final pass
+
+                    var passCount = Mathf.Min(maxPassesPerDispatch, totalPassCount - i * maxPassesPerDispatch);
+                    var threadCount = 1 << (i * 6 + passCount - 1);
+                    pass.Initialize(compute, 0, threadCount, threadCount);
+
+                    if (isFirstPass)
+                        pass.AddKeyword("FIRST");
+
+                    if (isFinalPass)
+                        pass.AddKeyword("FINAL");
+
+                    // pass.AddKeyword("NO_HEIGHTS");
+
+                    if (isFinalPass && !isFirstPass)
+                    {
+                        // Final pass writes out lods to a temp texture if more than one pass was used
+                        pass.WriteTexture("_LodResult", tempLodId);
+                    }
+
+                    if (!isFinalPass)
+                        pass.WriteTexture("_TempResultWrite", tempIds[i]);
+
+                    var index = i;
+                    var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                    {
+                        // First pass sets the buffer contents
+                        if(isFirstPass)
+                        {
+                            var indirectArgs = ListPool<int>.Get();
+                            indirectArgs.Add(QuadListIndexCount); // index count per instance
+                            indirectArgs.Add(0); // instance count (filled in later)
+                            indirectArgs.Add(0); // start index location
+                            indirectArgs.Add(0); // base vertex location
+                            indirectArgs.Add(0); // start instance location
+                            command.SetBufferData(indirectArgsBuffer, indirectArgs);
+                            ListPool<int>.Release(indirectArgs);
+                        }
+
+                        commonPassData.SetProperties(pass, command);
+
+                        // Todo: Buffer handles
+                        command.SetComputeBufferParam(compute, 0, "_IndirectArgs", indirectArgsBuffer);
+                        command.SetComputeBufferParam(compute, 0, "_PatchDataWrite", patchDataBuffer);
+
+                        // Do up to 6 passes per dispatch.
+                        pass.SetInt(command, "_PassCount", passCount);
+                        pass.SetInt(command, "_PassOffset", 6 * index);
+                        pass.SetInt(command, "_TotalPassCount", totalPassCount);
+
+                        pass.SetVectorArray(command, "_CullingPlanes", cullingPlanes);
+
+                        // Snap to quad-sized increments on largest cell
+                        var texelSizeX = settings.Size / (float)settings.PatchVertices;
+                        var texelSizeZ = settings.Size / (float)settings.PatchVertices;
+                        var positionX = Mathf.Floor((viewPosition.x - settings.Size * 0.5f) / texelSizeX) * texelSizeX;
+                        var positionZ = Mathf.Floor((viewPosition.z - settings.Size * 0.5f) / texelSizeZ) * texelSizeZ;
+                        var positionOffset = new Vector4(settings.Size, settings.Size, positionX, positionZ);
+                        pass.SetVector(command, "_TerrainPositionOffset", positionOffset);
+
+                        pass.SetFloat(command, "_EdgeLength", (float)settings.EdgeLength * settings.PatchVertices);
+                        pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Length);
+
+                        ArrayPool<Vector4>.Release(cullingPlanes);
+                    });
+                }
+            }
+
+            if (dispatchCount > 1)
+            {
+                using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Quadtree Cull"))
+                {
+                    pass.Initialize(compute, 1, normalizedDispatch: false);
+
+                    var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                    {
+                        // If more than one pass needed, we need a second pass to write out lod deltas to the patch data
+                        // Copy count from indirect draw args so we only dispatch as many threads as needed
+                        command.SetComputeBufferParam(compute, 1, "_IndirectArgsInput", indirectArgsBuffer);
+                        command.SetComputeBufferParam(compute, 1, "_IndirectArgs", lodIndirectArgsBuffer);
+                    });
+                }
+
+                using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Ocean Quadtree Cull"))
+                {
+                    pass.Initialize(compute, lodIndirectArgsBuffer, 2);
+                    pass.ReadTexture("_LodInput", tempLodId);
+
+                    var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                    {
+                        pass.SetInt(command, "_CellCount", settings.CellCount);
+                        command.SetComputeBufferParam(compute, 2, "_PatchDataWrite", patchDataBuffer);
+                        command.SetComputeBufferParam(compute, 2, "_IndirectArgs", indirectArgsBuffer);
+                    });
+                }
+            }
+
+            ListPool<RTHandle>.Release(tempIds);
         }
 
-        public RTHandle RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity)
+        public RTHandle RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, IRenderPassData commonPassData)
         {
             // Depth, rgba8 normalFoam, rgba8 roughness, mask? 
             // Writes depth, stencil, and RGBA8 containing normalRG, roughness and foam
             var oceanRenderResult = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Render"))
+            var passIndex = settings.Material.FindPass("Water");
+            Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
+
+            using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Render"))
             {
-                pass.WriteTexture(cameraDepth);
-                pass.WriteTexture(oceanRenderResult);
+                pass.Initialize(settings.Material, indexBuffer, indirectArgsBuffer, MeshTopology.Quads, passIndex);
+
+                pass.WriteDepth(cameraDepth);
+                pass.WriteTexture(oceanRenderResult, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(velocity);
+
+                commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    var colors = ArrayPool<RenderTargetIdentifier>.Get(2);
-                    colors[0] = oceanRenderResult;
-                    colors[1] = velocity;
-                    command.SetRenderTarget(colors, cameraDepth);
-                    ArrayPool<RenderTargetIdentifier>.Release(colors);
+                    commonPassData.SetProperties(pass, command);
 
-                    foreach (var waterRenderer in WaterRenderer.WaterRenderers)
-                        waterRenderer.Render(command, "Water", camera.transform.position);
+                    // TODO: use read buffer
+                    command.SetGlobalBuffer("_PatchData", patchDataBuffer);
+
+                    pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
+                    pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
+                    pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
+
+                    // Snap to quad-sized increments on largest cell
+                    var texelSize = settings.Size / (float)settings.PatchVertices;
+                    var positionX = MathUtils.Snap(camera.transform.position.x - settings.Size * 0.5f, texelSize) - camera.transform.position.x;
+                    var positionZ = MathUtils.Snap(camera.transform.position.z - settings.Size * 0.5f, texelSize) - camera.transform.position.z;
+                    pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
                 });
             }
 
             return oceanRenderResult;
         }
 
-        public RTHandle RenderUnderwaterLighting(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive)
+        public RTHandle RenderUnderwaterLighting(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData)
         {
             var underwaterResultId = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
@@ -386,8 +572,10 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
-                pass.AddRenderPassData<WaterShadowResult>();
                 pass.AddRenderPassData<LitData.Result>();
+                pass.AddRenderPassData<WaterShadowResult>();
+
+                commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -448,6 +636,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<WaterShadowResult>();
+                pass.AddRenderPassData<LitData.Result>();
 
                 commonPassData.SetInputs(pass);
 
@@ -493,7 +682,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetInputs(RenderPass pass)
         {
-            pass.ReadTexture("_WaterShadowTexture", waterShadowTexture);
+            pass.ReadTexture("_WaterShadows", waterShadowTexture);
         }
 
         public void SetProperties(RenderPass pass, CommandBuffer command)

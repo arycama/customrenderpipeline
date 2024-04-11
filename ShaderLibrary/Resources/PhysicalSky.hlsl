@@ -198,7 +198,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		float3 rd = worldDir;
 		float rcpRdLength = rsqrt(dot(rd, rd));
 		rd *= rcpRdLength;
-		float2 offsets = InterleavedGradientNoise(position.xy, _FrameIndex);//_BlueNoise2D[position.xy % 128];
+		float2 offsets = _BlueNoise2D[position.xy % 128]; // InterleavedGradientNoise(position.xy, _FrameIndex);
 	#endif
 	
 	float rayLength = DistanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
@@ -400,16 +400,14 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	// Neighborhood clamp
 	int2 offsets[8] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(1, 0), int2(-1, 1), int2(0, 1), int2(1, 1)};
 	float3 minValue, maxValue, result;
-	result = _SkyInput[pixelId];
-	minValue = maxValue = RgbToYCoCgFastTonemap(result.rgb);
+	minValue = maxValue = result = RgbToYCoCgFastTonemap(_SkyInput[pixelId]);
 	result *= _CenterBoxFilterWeight;
 	
 	[unroll]
 	for (int i = 0; i < 4; i++)
 	{
-		float3 color = _SkyInput[pixelId + offsets[i]];
+		float3 color = RgbToYCoCgFastTonemap(_SkyInput[pixelId + offsets[i]]);
 		result += color * _BoxFilterWeights0[i];
-		color.rgb = RgbToYCoCgFastTonemap(color.rgb);
 		minValue = min(minValue, color);
 		maxValue = max(maxValue, color);
 	}
@@ -417,19 +415,11 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	[unroll]
 	for (i = 0; i < 4; i++)
 	{
-		float3 color = _SkyInput[pixelId + offsets[i + 4]];
+		float3 color = RgbToYCoCgFastTonemap(_SkyInput[pixelId + offsets[i + 4]]);
 		result += color * _BoxFilterWeights1[i];
-		color.rgb = RgbToYCoCgFastTonemap(color.rgb);
 		minValue = min(minValue, color);
 		maxValue = max(maxValue, color);
 	}
-	
-	//mean /= 5.0;
-	//stdDev = sqrt(stdDev / 5.0 - mean * mean);
-	//minValue = mean - stdDev * 1.5;
-	//maxValue = mean + stdDev * 1.5;
-	
-	result = RgbToYCoCgFastTonemap(result);
 	
 	float previousDepth = _PreviousDepth.Sample(_LinearClampSampler, historyUv * _PreviousDepth_Scale.xy);
 	float frameCount = _FrameCount.Sample(_LinearClampSampler, historyUv * _FrameCount_Scale.xy);
@@ -437,9 +427,6 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, historyUv * _SkyHistory_Scale.xy) * _PreviousToCurrentExposure);
 	float3 window = (maxValue - minValue) * _ClampWindow;
-	
-	//minValue -= window;
-	//maxValue += window;
 	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	

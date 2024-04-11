@@ -27,7 +27,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float rcpRdLength = rsqrt(dot(rd, rd));
 		rd *= rcpRdLength;
 		float cosViewAngle = rd.y;
-		float2 offsets = InterleavedGradientNoise(position.xy, _FrameIndex);//_BlueNoise2D[uint2(position.xy) % 128];
+		float2 offsets = _BlueNoise2D[uint2(position.xy) % 128];//InterleavedGradientNoise(position.xy, _FrameIndex);//_BlueNoise2D[uint2(position.xy) % 128];
 	#endif
 	
 	FragmentOutput output;
@@ -146,15 +146,14 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 		minValue = min(minValue, color);
 		maxValue = max(maxValue, color);
 	}
-	
-	//result.rgb = RgbToYCoCgFastTonemap(result.rgb);
 
 	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
+	history.rgb *= _PreviousToCurrentExposure;
 	history.rgb = RgbToYCoCgFastTonemap(history.rgb);
-	//history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
+	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
 	
 	// Not sure what best way to handle is, not clamping reduces flicker which is the main issue
-	//history.a = clamp(history.a, minValue.a, maxValue.a);
+	history.a = clamp(history.a, minValue.a, maxValue.a);
 	
 	float motionLength = saturate(length(motion) * _MotionFactor);
 	float blend = lerp(_StationaryBlend, _MotionBlend, motionLength);

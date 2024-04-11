@@ -34,6 +34,34 @@ public class DeferredLighting
             pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
             pass.AddRenderPassData<LightingSetup.Result>();
             pass.AddRenderPassData<ShadowRenderer.Result>();
+            pass.AddRenderPassData<LitData.Result>();
+
+            var data = pass.SetRenderFunction<Data>((command, context, pass, data) =>
+            {
+                commonPassData.SetProperties(pass, command);
+            });
+        }
+
+        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting"))
+        {
+            pass.Initialize(material, 1);
+
+            pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteTexture(emissive);
+
+            pass.ReadTexture("_Depth", depth);
+            pass.ReadTexture("_AlbedoMetallic", albedoMetallic);
+            pass.ReadTexture("_NormalRoughness", normalRoughness);
+            pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
+
+            commonPassData.SetInputs(pass);
+            pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+            pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+            pass.AddRenderPassData<VolumetricLighting.Result>();
+            pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+            pass.AddRenderPassData<LightingSetup.Result>();
+            pass.AddRenderPassData<ShadowRenderer.Result>();
+            pass.AddRenderPassData<LitData.Result>();
 
             var data = pass.SetRenderFunction<Data>((command, context, pass, data) =>
             {

@@ -42,6 +42,9 @@ namespace Arycama.CustomRenderPipeline
 
             var newScale = Mathf.Lerp(ScaleFactor, newFactor, settings.Damping);
             ScaleFactor = Mathf.Clamp(newScale, settings.MinScaleFactor, settings.MaxScaleFactor);
+
+            if (float.IsNaN(ScaleFactor))
+                ScaleFactor = 1.0f;
         }
 
         private void ResetScale()

@@ -18,6 +18,7 @@ Shader "Hidden/Deferred Water 1"
             }
 
             HLSLPROGRAM
+			#pragma enable_d3d11_debug_symbols
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #pragma target 5.0

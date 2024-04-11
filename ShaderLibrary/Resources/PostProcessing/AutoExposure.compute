@@ -82,7 +82,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	
 	float averageEv = Remap(weightedLogAverage, 1.0, 255.0, MinEv, MaxEv);
 
-	float2 uv = Remap(averageEv, MinEv, MaxEv);
+	float2 uv = saturate(Remap(averageEv, MinEv, MaxEv));
 	float exposureCompensation = ExposureTexture.SampleLevel(_LinearClampSampler, float2(uv.x, 0.5), 0.0);
 	
 	float averageLuminance = EV100ToLuminance(averageEv);
@@ -93,19 +93,19 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	float previousExposure = _Exposure;
 	float evLastFrame = ExposureToEV100(previousExposure) + ExposureCompensation;
 	float adaptedEv = lerp(averageEv, evLastFrame, exp(-DeltaTime * AdaptationSpeed));
-		
-	if (IsFirst || IsInfOrNaN(adaptedEv))
-		adaptedEv = averageEv;
 
 	if(Mode == 1.0)
 		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
-		
-	if (IsInfOrNaN(adaptedEv))
-		adaptedEv = 1.0;
 	
 	adaptedEv -= ExposureCompensation;
-		
+	
 	float currentExposure = EV100ToExposure(adaptedEv);
+	if (IsFirst || IsInfOrNaN(currentExposure))
+		currentExposure = 1.0;
+	
+	if (IsInfOrNaN(previousExposure))
+		previousExposure = 1.0;
+	
 	LuminanceOutput[0] = currentExposure; // Apply exposure
 	LuminanceOutput[1] = rcp(currentExposure); // Remove exposure
 	LuminanceOutput[2] = currentExposure * rcp(previousExposure); // Previous to current

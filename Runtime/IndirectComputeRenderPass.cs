@@ -5,23 +5,22 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class ComputeRenderPass : RenderPass
+    public class IndirectComputeRenderPass : RenderPass
     {
         private ComputeShader computeShader;
-        private int kernelIndex, xThreads, yThreads, zThreads;
-        private bool normalizedDispatch;
+        private int kernelIndex;
+        private uint argsOffset;
+        private GraphicsBuffer indirectBuffer;
 
         protected readonly List<(RTHandle, string)> colorBindings = new();
         private readonly List<string> keywords = new();
 
-        public void Initialize(ComputeShader computeShader, int kernelIndex = 0, int xThreads = 1, int yThreads = 1, int zThreads = 1, bool normalizedDispatch = true)
+        public void Initialize(ComputeShader computeShader, GraphicsBuffer indirectBuffer, int kernelIndex = 0, uint argsOffset = 0)
         {
             this.computeShader = computeShader ?? throw new ArgumentNullException(nameof(computeShader));
             this.kernelIndex = kernelIndex;
-            this.xThreads = xThreads;
-            this.yThreads = yThreads;
-            this.zThreads = zThreads;
-            this.normalizedDispatch = normalizedDispatch;
+            this.indirectBuffer = indirectBuffer;
+            this.argsOffset = argsOffset;
         }
 
         public void WriteTexture(string propertyName, RTHandle handle)
@@ -69,13 +68,10 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Execute(CommandBuffer command)
         {
-            foreach(var keyword in keywords)
+            foreach (var keyword in keywords)
                 command.EnableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
 
-            if (normalizedDispatch)
-                command.DispatchNormalized(computeShader, kernelIndex, xThreads, yThreads, zThreads);
-            else
-                command.DispatchCompute(computeShader, kernelIndex, xThreads, yThreads, zThreads);
+            command.DispatchCompute(computeShader, kernelIndex, indirectBuffer, argsOffset);
 
             foreach (var keyword in keywords)
                 command.DisableKeyword(computeShader, new LocalKeyword(computeShader, keyword));

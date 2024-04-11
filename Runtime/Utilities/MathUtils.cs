@@ -19,5 +19,10 @@ namespace Arycama.CustomRenderPipeline
         {
             return (int)Math.Log(Math.Max(width, Math.Max(height, depth)), 2) + 1;
         }
+
+        public static float Snap(float value, float cellSize)
+        {
+            return MathF.Floor(value / cellSize) * cellSize;
+        }
     }
 }
