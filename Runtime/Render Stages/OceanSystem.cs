@@ -261,7 +261,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void CullShadow(Camera camera, CullingResults cullingResults, ICommonPassData commonPassData)
+        public void CullShadow(Vector3 viewPosition, CullingResults cullingResults, ICommonPassData commonPassData)
         {
             var lightRotation = Quaternion.identity;
             for (var i = 0; i < cullingResults.visibleLights.Length; i++)
@@ -275,17 +275,8 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var size = new Vector3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
-
-            // Snap texels
-            Vector3 min;
-            min.x = Mathf.Floor(camera.transform.position.x / (settings.ShadowRadius * 2.0f)) * (settings.ShadowRadius * 2.0f) - settings.ShadowRadius;
-            min.z = Mathf.Floor(camera.transform.position.z / (settings.ShadowRadius * 2.0f)) * (settings.ShadowRadius * 2.0f) - settings.ShadowRadius;
-            min.y = -settings.Profile.MaxWaterHeight;
-
-            min.x = Mathf.Floor(camera.transform.position.x / (settings.ShadowRadius * 2.0f)) * (settings.ShadowRadius * 2.0f) - settings.ShadowRadius;
-            min.z = Mathf.Floor(camera.transform.position.z / (settings.ShadowRadius * 2.0f)) * (settings.ShadowRadius * 2.0f) - settings.ShadowRadius;
-
-
+            var min = new Vector3(viewPosition.x - settings.ShadowRadius, -settings.Profile.MaxWaterHeight, viewPosition.z - settings.ShadowRadius);
+            
             var invLightRotation = Quaternion.Inverse(lightRotation);
             Vector3 minValue = Vector3.positiveInfinity, maxValue = Vector3.negativeInfinity;
 
@@ -304,7 +295,7 @@ namespace Arycama.CustomRenderPipeline
 
             var localView = new Vector3(0.5f * (maxValue.x + minValue.x), 0.5f * (maxValue.y + minValue.y), minValue.z);
             var viewMatrix = Matrix4x4Extensions.WorldToLocal(lightRotation * localView, lightRotation);
-            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(lightRotation * localView - camera.transform.position, lightRotation);
+            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(lightRotation * localView - viewPosition, lightRotation);
 
             var projectionMatrix = new Matrix4x4
             {
@@ -327,7 +318,7 @@ namespace Arycama.CustomRenderPipeline
             }
             ArrayPool<Plane>.Release(planes);
 
-            var cullResult = Cull(camera.transform.position, cullingPlanes, commonPassData);
+            var cullResult = Cull(viewPosition, cullingPlanes, commonPassData);
 
             // TODO: Change to near/far
             renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewMatrixRWS, projectionMatrix));
@@ -360,8 +351,8 @@ namespace Arycama.CustomRenderPipeline
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;
-                    var positionX = MathUtils.Snap(viewPosition.x - settings.Size * 0.5f, texelSize) - viewPosition.x;
-                    var positionZ = MathUtils.Snap(viewPosition.z - settings.Size * 0.5f, texelSize) - viewPosition.z;
+                    var positionX = 0f;// MathUtils.Snap(viewPosition.x - settings.Size * 0.5f, texelSize);
+                    var positionZ = 0f;// MathUtils.Snap(viewPosition.z - settings.Size * 0.5f, texelSize);
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
                 });
