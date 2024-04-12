@@ -275,10 +275,19 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var size = new Vector3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
-            var min = new Vector3(camera.transform.position.x - settings.ShadowRadius, -settings.Profile.MaxWaterHeight, camera.transform.position.z - settings.ShadowRadius);
 
-            var localMatrix = Matrix4x4.Rotate(Quaternion.Inverse(lightRotation));
-            Vector3 localMin = Vector3.positiveInfinity, localMax = Vector3.negativeInfinity;
+            // Snap texels
+            Vector3 min;
+            min.x = Mathf.Floor(camera.transform.position.x / (settings.ShadowRadius * 2.0f)) * (settings.ShadowRadius * 2.0f) - settings.ShadowRadius;
+            min.z = Mathf.Floor(camera.transform.position.z / (settings.ShadowRadius * 2.0f)) * (settings.ShadowRadius * 2.0f) - settings.ShadowRadius;
+            min.y = -settings.Profile.MaxWaterHeight;
+
+            min.x = Mathf.Floor(camera.transform.position.x / (settings.ShadowRadius * 2.0f)) * (settings.ShadowRadius * 2.0f) - settings.ShadowRadius;
+            min.z = Mathf.Floor(camera.transform.position.z / (settings.ShadowRadius * 2.0f)) * (settings.ShadowRadius * 2.0f) - settings.ShadowRadius;
+
+
+            var invLightRotation = Quaternion.Inverse(lightRotation);
+            Vector3 minValue = Vector3.positiveInfinity, maxValue = Vector3.negativeInfinity;
 
             for (var z = 0; z < 2; z++)
             {
@@ -286,36 +295,28 @@ namespace Arycama.CustomRenderPipeline
                 {
                     for (var x = 0; x < 2; x++)
                     {
-                        var localPosition = localMatrix.MultiplyPoint(min + Vector3.Scale(size, new Vector3(x, y, z)));
-                        localMin = Vector3.Min(localMin, localPosition);
-                        localMax = Vector3.Max(localMax, localPosition);
+                        var localPosition = invLightRotation * (min + Vector3.Scale(size, new Vector3(x, y, z)));
+                        minValue = Vector3.Min(minValue, localPosition);
+                        maxValue = Vector3.Max(maxValue, localPosition);
                     }
                 }
             }
 
-            // Snap texels
-            var localSize = localMax - localMin;
-            var worldUnitsPerTexel = new Vector2(localSize.x, localSize.y) / settings.ShadowResolution;
-            localMin.x = Mathf.Floor(localMin.x / worldUnitsPerTexel.x) * worldUnitsPerTexel.x;
-            localMin.y = Mathf.Floor(localMin.y / worldUnitsPerTexel.y) * worldUnitsPerTexel.y;
-            localMax.x = Mathf.Floor(localMax.x / worldUnitsPerTexel.x) * worldUnitsPerTexel.x;
-            localMax.y = Mathf.Floor(localMax.y / worldUnitsPerTexel.y) * worldUnitsPerTexel.y;
-            localSize = localMax - localMin;
+            var localView = new Vector3(0.5f * (maxValue.x + minValue.x), 0.5f * (maxValue.y + minValue.y), minValue.z);
+            var viewMatrix = Matrix4x4Extensions.WorldToLocal(lightRotation * localView, lightRotation);
+            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(lightRotation * localView - camera.transform.position, lightRotation);
 
-            var localCenter = (localMax + localMin) * 0.5f;
-            var worldMatrix = Matrix4x4.Rotate(lightRotation);
-            var position = worldMatrix.MultiplyPoint(new Vector3(localCenter.x, localCenter.y, localMin.z)) - camera.transform.position;
-
-            var lookMatrix = Matrix4x4.LookAt(position, position + lightRotation.Forward(), lightRotation.Up());
-
-            // Matrix that mirrors along Z axis, to match the camera space convention.
-            var scaleMatrix = Matrix4x4.TRS(Vector3.zero, Quaternion.identity, new Vector3(1, 1, -1));
-            // Final view matrix is inverse of the LookAt matrix, and then mirrored along Z.
-            var viewMatrix = scaleMatrix * lookMatrix.inverse;
-            var projection = Matrix4x4.Ortho(-localSize.x * 0.5f, localSize.x * 0.5f, -localSize.y * 0.5f, localSize.y * 0.5f, 0, localSize.z);
+            var projectionMatrix = new Matrix4x4
+            {
+                m00 = 2.0f / (maxValue.x - minValue.x),
+                m11 = 2.0f / (maxValue.y - minValue.y),
+                m22 = 2.0f / (maxValue.z - minValue.z),
+                m23 = -1.0f,
+                m33 = 1.0f
+            };
 
             var planes = ArrayPool<Plane>.Get(6);
-            GeometryUtility.CalculateFrustumPlanes(projection * viewMatrix, planes);
+            GeometryUtility.CalculateFrustumPlanes(projectionMatrix * viewMatrixRWS, planes);
 
             var cullingPlanes = ArrayPool<Vector4>.Get(6);
             for (var j = 0; j < 6; j++)
@@ -327,7 +328,9 @@ namespace Arycama.CustomRenderPipeline
             ArrayPool<Plane>.Release(planes);
 
             var cullResult = Cull(camera.transform.position, cullingPlanes, commonPassData);
-            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, localSize.z, viewMatrix, projection));
+
+            // TODO: Change to near/far
+            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewMatrixRWS, projectionMatrix));
         }
 
         public void RenderShadow(Vector3 viewPosition, ICommonPassData commonPassData)
@@ -350,7 +353,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     commonPassData.SetProperties(pass, command);
 
-                    pass.SetMatrix(command, "_WaterShadowMatrix", GL.GetGPUProjectionMatrix(passData.Projection, true) * passData.View);
+                    pass.SetMatrix(command, "_WaterShadowMatrix", passData.Projection * passData.View);
                     pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
                     pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
                     pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));

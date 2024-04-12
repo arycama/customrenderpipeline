@@ -78,6 +78,7 @@ namespace Arycama.CustomRenderPipeline
 
                             var localView = new Vector3(0.5f * (maxValue.x + minValue.x), 0.5f * (maxValue.y + minValue.y), minValue.z);
                             var viewMatrix = Matrix4x4Extensions.WorldToLocal(lightRotation * localView, lightRotation);
+                            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(lightRotation * localView - camera.transform.position, lightRotation);
 
                             var projectionMatrix = new Matrix4x4
                             {
@@ -102,9 +103,6 @@ namespace Arycama.CustomRenderPipeline
                                     cullingPlanes.Add(frustumPlanes[k]);
                             }
 
-                            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(lightRotation * localView - camera.transform.position, lightRotation);
-
-                            // Now also add any main camera-frustum planes that are not facing away from the light
                             var lightDirection = -visibleLight.localToWorldMatrix.Forward();
                             GeometryUtility.CalculateFrustumPlanes(camera, frustumPlanes);
                             for (var k = 0; k < 6; k++)

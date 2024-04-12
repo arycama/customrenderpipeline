@@ -68,11 +68,11 @@ GBufferOutput Fragment(float4 position : SV_Position)
 	float xi = noise.x;
 		
 	float b = underwaterDistance;
-	float t = dot(-log(1.0 - xi * (1.0 - exp(-c * b))) / c, channelMask);
+	float t = 1;//dot(-log(1.0 - xi * (1.0 - exp(-c * b))) / c, channelMask);
 	float3 pdf = exp(c * t) / c - rcp(c * exp(c * (b - t)));
 		
 	float weight = rcp(dot(rcp(pdf), 1.0 / 3.0));
-	float3 P = positionWS + V * t;
+	float3 P = positionWS + V * t; // Could just be V + (t + rayStart)
 
 	float height = HeightAtDistance(_ViewHeight, V.y, t);
 	float3 shadowPosition = 0.0;
@@ -86,7 +86,7 @@ GBufferOutput Fragment(float4 position : SV_Position)
 			if(attenuation > 0.0)
 			{
 				shadowDistance0 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
-				shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix, P + _ViewPosition);
+				shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix, P	);
 				if (all(saturate(shadowPosition) == shadowPosition))
 				{
 					float shadowDepth = _WaterShadows.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);
@@ -130,6 +130,6 @@ GBufferOutput Fragment(float4 position : SV_Position)
 	output.albedoMetallic = float2(waterNormalFoamRoughness.b, 0.0).xxxy;
 	output.normalRoughness = float4(PackFloat2To888(0.5 * PackNormalOctQuadEncode(N) + 0.5), perceptualRoughness);
 	output.bentNormalOcclusion = float4(N * 0.5 + 0.5, 1.0);
-	output.emissive = shadowDistance0;
+	output.emissive = all(shadowPosition.xy > 0.0 && shadowPosition.xy < 1.0) ? float3(shadowPosition.xy, 0.0) : 0.0;
 	return output;
 }
