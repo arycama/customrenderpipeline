@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
@@ -56,8 +57,8 @@ namespace Arycama.CustomRenderPipeline
                                 {
                                     for (var x = 0; x < 2; x++)
                                     {
-                                        var depth = z == 0 ? cascadeStart : cascadeEnd;
-                                        var clipDepth = (1.0f - depth / far) / (depth * (1.0f / near - 1.0f / far));
+                                        var eyeDepth = z == 0 ? cascadeStart : cascadeEnd;
+                                        var clipDepth = (1.0f - eyeDepth / far) / (eyeDepth * (1.0f / near - 1.0f / far));
 
                                         var clipPoint = new Vector4
                                         (
@@ -76,26 +77,13 @@ namespace Arycama.CustomRenderPipeline
                                 }
                             }
 
-                            var localView = new Vector3(0.5f * (maxValue.x + minValue.x), 0.5f * (maxValue.y + minValue.y), minValue.z);
-                            var viewMatrix = Matrix4x4Extensions.WorldToLocal(lightRotation * localView, lightRotation);
-                            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(lightRotation * localView - camera.transform.position, lightRotation);
-
-                            var projectionMatrix = new Matrix4x4
-                            {
-                                m00 = 2.0f / (maxValue.x - minValue.x),
-                                m11 = 2.0f / (maxValue.y - minValue.y),
-                                m22 = 2.0f / (maxValue.z - minValue.z),
-                                m23 = -1.0f,
-                                m33 = 1.0f
-                            };
-
                             // Calculate culling planes
-                            var cullingPlanes = ListPool<Plane>.Get();
-
                             // First get the planes from the view projection matrix
-                            var viewProjectionMatrix = projectionMatrix * viewMatrix;
+                            var viewProjectionMatrix = Matrix4x4Extensions.OrthoOffCenter(minValue.x, maxValue.x, minValue.y, maxValue.y, minValue.z, maxValue.z) * worldToLight;
                             var frustumPlanes = ArrayPool<Plane>.Get(6);
                             GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrix, frustumPlanes);
+
+                            var cullingPlanes = ListPool<Plane>.Get();
                             for (var k = 0; k < 6; k++)
                             {
                                 // Skip near plane
@@ -103,6 +91,7 @@ namespace Arycama.CustomRenderPipeline
                                     cullingPlanes.Add(frustumPlanes[k]);
                             }
 
+                            // Add any planes that face away from the light direction. This avoids rendering shadowcasters that can never cast a visible shadow
                             var lightDirection = -visibleLight.localToWorldMatrix.Forward();
                             GeometryUtility.CalculateFrustumPlanes(camera, frustumPlanes);
                             for (var k = 0; k < 6; k++)
@@ -126,16 +115,48 @@ namespace Arycama.CustomRenderPipeline
 
                             ListPool<Plane>.Release(cullingPlanes);
 
-                            cascadeCount++;
-                            var directionalShadowRequest = new ShadowRequest(true, i, viewMatrixRWS, projectionMatrix, shadowSplitData, 0);
-                            directionalShadowRequests.Add(directionalShadowRequest);
+                            var gpuProjectionMatrix = new Matrix4x4
+                            {
+                                m00 = 2.0f / (maxValue.x - minValue.x),
+                                m03 = (maxValue.x + minValue.x) / (minValue.x - maxValue.x),
+                                m11 = -2.0f / (maxValue.y - minValue.y),
+                                m13 = -(maxValue.y + minValue.y) / (minValue.y - maxValue.y),
+                                m22 = 1.0f / (minValue.z - maxValue.z),
+                                m23 = maxValue.z / (maxValue.z - minValue.z),
+                                m33 = 1.0f
+                            };
 
-                            var shadowMatrix = (projectionMatrix * viewMatrixRWS).ConvertToAtlasMatrix();
+                            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(-camera.transform.position, lightRotation);
+
+                            var vm = viewMatrixRWS;
+                            var shadowMatrix = new Matrix4x4
+                            {
+                                m00 = vm.m00 / (maxValue.x - minValue.x),
+                                m01 = vm.m01 / (maxValue.x - minValue.x),
+                                m02 = vm.m02 / (maxValue.x - minValue.x),
+                                m03 = (vm.m03 - 0.5f * (maxValue.x + minValue.x)) / (maxValue.x - minValue.x) + 0.5f,
+
+                                m10 = vm.m10 / (maxValue.y - minValue.y),
+                                m11 = vm.m11 / (maxValue.y - minValue.y),
+                                m12 = vm.m12 / (maxValue.y - minValue.y),
+                                m13 = (vm.m13 - 0.5f * (maxValue.y + minValue.y)) / (maxValue.y - minValue.y) + 0.5f,
+
+                                m20 = -vm.m20 / (maxValue.z - minValue.z),
+                                m21 = -vm.m21 / (maxValue.z - minValue.z),
+                                m22 = -vm.m22 / (maxValue.z - minValue.z),
+                                m23 = (-vm.m23 + 0.5f * (maxValue.z + minValue.z)) / (maxValue.z - minValue.z) + 0.5f,
+
+                                m33 = 1.0f
+                            };
+
                             directionalShadowMatrices.Add(shadowMatrix);
 
-                            var width = projectionMatrix.OrthoWidth();
-                            var height = projectionMatrix.OrthoHeight();
-                            directionalShadowTexelSizes.Add(new(width, height, projectionMatrix.OrthoNear(), projectionMatrix.OrthoFar()));
+                            var directionalShadowRequest = new ShadowRequest(true, i, viewMatrixRWS, gpuProjectionMatrix, shadowSplitData, 0);
+                            directionalShadowRequests.Add(directionalShadowRequest);
+                            
+                            directionalShadowTexelSizes.Add(new((maxValue.x - minValue.x), (maxValue.y - minValue.y), 0.0f, maxValue.z));
+
+                            cascadeCount++;
                         }
 
                         if (cascadeCount > 0)

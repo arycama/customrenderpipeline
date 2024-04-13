@@ -51,7 +51,7 @@ namespace Arycama.CustomRenderPipeline
 
                         data.viewPosition = camera.transform.position;
                         data.worldToView = shadowRequest.ViewMatrix;
-                        data.worldToClip = GL.GetGPUProjectionMatrix(shadowRequest.ProjectionMatrix, true) * shadowRequest.ViewMatrix;
+                        data.worldToClip = shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix;
                     }
                 }
             }

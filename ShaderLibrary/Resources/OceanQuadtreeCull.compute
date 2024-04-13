@@ -67,7 +67,7 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 				float3 center = float3((coord + 0.5) * patchSize + _TerrainPositionOffset.zw, -_ViewPosition.y).xzy;
 				float3 extents = float3(patchSize* 0.5, 1).xzy ;
 				
-				if (FrustumCull(center, extents))
+				//if (FrustumCull(center, extents))
 				{
 					float factor = ProjectedSphereRadius(length(extents), center, _CameraAspect) * _ScaledResolution.x * 0.5 / _EdgeLength;
 					if (factor <= 1.0 || i + _PassOffset == _TotalPassCount - 1)

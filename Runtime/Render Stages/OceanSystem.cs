@@ -274,10 +274,11 @@ namespace Arycama.CustomRenderPipeline
                 break;
             }
 
+            // TODO: Should be able to simply just define a box and not even worry about view position since we translate it anyway
             var size = new Vector3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
             var min = new Vector3(viewPosition.x - settings.ShadowRadius, -settings.Profile.MaxWaterHeight, viewPosition.z - settings.ShadowRadius);
-            
-            var invLightRotation = Quaternion.Inverse(lightRotation);
+
+            var worldToLight = Matrix4x4.Rotate(Quaternion.Inverse(lightRotation));
             Vector3 minValue = Vector3.positiveInfinity, maxValue = Vector3.negativeInfinity;
 
             for (var z = 0; z < 2; z++)
@@ -286,42 +287,64 @@ namespace Arycama.CustomRenderPipeline
                 {
                     for (var x = 0; x < 2; x++)
                     {
-                        var localPosition = invLightRotation * (min + Vector3.Scale(size, new Vector3(x, y, z)));
+                        var localPosition = worldToLight.MultiplyPoint3x4(min + Vector3.Scale(size, new Vector3(x, y, z)));
                         minValue = Vector3.Min(minValue, localPosition);
                         maxValue = Vector3.Max(maxValue, localPosition);
                     }
                 }
             }
 
-            var localView = new Vector3(0.5f * (maxValue.x + minValue.x), 0.5f * (maxValue.y + minValue.y), minValue.z);
-            var viewMatrix = Matrix4x4Extensions.WorldToLocal(lightRotation * localView, lightRotation);
-            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(lightRotation * localView - viewPosition, lightRotation);
-
-            var projectionMatrix = new Matrix4x4
-            {
-                m00 = 2.0f / (maxValue.x - minValue.x),
-                m11 = 2.0f / (maxValue.y - minValue.y),
-                m22 = 2.0f / (maxValue.z - minValue.z),
-                m23 = -1.0f,
-                m33 = 1.0f
-            };
-
-            var planes = ArrayPool<Plane>.Get(6);
-            GeometryUtility.CalculateFrustumPlanes(projectionMatrix * viewMatrixRWS, planes);
+            // Calculate culling planes
+            var viewProjectionMatrix = Matrix4x4Extensions.OrthoOffCenter(minValue.x, maxValue.x, minValue.y, maxValue.y, minValue.z, maxValue.z) * worldToLight;
+            var frustumPlanes = ArrayPool<Plane>.Get(6);
+            GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrix, frustumPlanes);
 
             var cullingPlanes = ArrayPool<Vector4>.Get(6);
             for (var j = 0; j < 6; j++)
             {
-                var plane = planes[j];
-                //plane.Translate(-camera.transform.position);
+                var plane = frustumPlanes[j];
                 cullingPlanes[j] = new Vector4(plane.normal.x, plane.normal.y, plane.normal.z, plane.distance);
             }
-            ArrayPool<Plane>.Release(planes);
+            ArrayPool<Plane>.Release(frustumPlanes);
 
             var cullResult = Cull(viewPosition, cullingPlanes, commonPassData);
 
+            var gpuProjectionMatrix = new Matrix4x4
+            {
+                m00 = 2.0f / (maxValue.x - minValue.x),
+                m03 = (maxValue.x + minValue.x) / (minValue.x - maxValue.x),
+                m11 = -2.0f / (maxValue.y - minValue.y),
+                m13 = -(maxValue.y + minValue.y) / (minValue.y - maxValue.y),
+                m22 = 1.0f / (minValue.z - maxValue.z),
+                m23 = maxValue.z / (maxValue.z - minValue.z),
+                m33 = 1.0f
+            };
+
+            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(-viewPosition, lightRotation);
+
+            var vm = viewMatrixRWS;
+            var shadowMatrix = new Matrix4x4
+            {
+                m00 = vm.m00 / (maxValue.x - minValue.x),
+                m01 = vm.m01 / (maxValue.x - minValue.x),
+                m02 = vm.m02 / (maxValue.x - minValue.x),
+                m03 = (vm.m03 - 0.5f * (maxValue.x + minValue.x)) / (maxValue.x - minValue.x) + 0.5f,
+
+                m10 = vm.m10 / (maxValue.y - minValue.y),
+                m11 = vm.m11 / (maxValue.y - minValue.y),
+                m12 = vm.m12 / (maxValue.y - minValue.y),
+                m13 = (vm.m13 - 0.5f * (maxValue.y + minValue.y)) / (maxValue.y - minValue.y) + 0.5f,
+
+                m20 = -vm.m20 / (maxValue.z - minValue.z),
+                m21 = -vm.m21 / (maxValue.z - minValue.z),
+                m22 = -vm.m22 / (maxValue.z - minValue.z),
+                m23 = (-vm.m23 + 0.5f * (maxValue.z + minValue.z)) / (maxValue.z - minValue.z) + 0.5f,
+
+                m33 = 1.0f
+            };
+
             // TODO: Change to near/far
-            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewMatrixRWS, projectionMatrix));
+            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, gpuProjectionMatrix * viewMatrixRWS, shadowMatrix));
         }
 
         public void RenderShadow(Vector3 viewPosition, ICommonPassData commonPassData)
@@ -334,7 +357,7 @@ namespace Arycama.CustomRenderPipeline
             var passData = renderGraph.ResourceMap.GetRenderPassData<WaterShadowCullResult>();
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Shadow"))
             {
-                pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads);
+                pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
                 pass.WriteDepth(waterShadow);
                 pass.ConfigureClear(RTClearFlags.Depth);
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
@@ -344,22 +367,20 @@ namespace Arycama.CustomRenderPipeline
                 {
                     commonPassData.SetProperties(pass, command);
 
-                    pass.SetMatrix(command, "_WaterShadowMatrix", passData.Projection * passData.View);
+                    pass.SetMatrix(command, "_WaterShadowMatrix", passData.WorldToClip);
                     pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
                     pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
                     pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;
-                    var positionX = 0f;// MathUtils.Snap(viewPosition.x - settings.Size * 0.5f, texelSize);
-                    var positionZ = 0f;// MathUtils.Snap(viewPosition.z - settings.Size * 0.5f, texelSize);
+                    var positionX = Mathf.Floor((viewPosition.x - settings.Size * 0.5f) / texelSize) * texelSize - viewPosition.x;
+                    var positionZ = Mathf.Floor((viewPosition.z - settings.Size * 0.5f) / texelSize) * texelSize - viewPosition.z;
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
-
                 });
             }
 
-            var waterShadowMatrix = (passData.Projection * passData.View).ConvertToAtlasMatrix();
-            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadow, waterShadowMatrix, passData.Near, passData.Far));
+            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction")));
         }
 
         public WaterCullResult Cull(Vector3 viewPosition, Vector4[] cullingPlanes, ICommonPassData commonPassData)
@@ -556,8 +577,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(underwaterResultId, RenderBufferLoadAction.DontCare);
 
-                pass.ReadTexture("_Depth", cameraDepth);
-                pass.ReadTexture("_UnderwaterDepth", underwaterDepth);
+                pass.ReadTexture("_Depth", underwaterDepth);
                 pass.ReadTexture("_AlbedoMetallic", albedoMetallic);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
                 pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
@@ -583,7 +603,7 @@ namespace Arycama.CustomRenderPipeline
             return underwaterResultId;
         }
 
-        public void RenderDeferredWater(CullingResults cullingResults, RTHandle underwaterLighting, RTHandle waterNormalMask, RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, IRenderPassData commonPassData)
+        public void RenderDeferredWater(CullingResults cullingResults, RTHandle underwaterLighting, RTHandle waterNormalMask, RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, IRenderPassData commonPassData, Camera camera)
         {
             // Find first 2 directional lights
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -618,7 +638,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water"))
             {
-                pass.Initialize(deferredWaterMaterial, keyword: keyword);
+                pass.Initialize(deferredWaterMaterial, keyword: keyword, camera: camera);
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(albedoMetallic);
                 pass.WriteTexture(normalRoughness);
@@ -633,6 +653,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<WaterShadowResult>();
+                pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<LitData.Result>();
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
 
@@ -669,13 +691,15 @@ namespace Arycama.CustomRenderPipeline
         private readonly RTHandle waterShadowTexture;
         private readonly Matrix4x4 waterShadowMatrix;
         private readonly float waterShadowNear, waterShadowFar;
+        private readonly Vector3 waterShadowExtinction;
 
-        public WaterShadowResult(RTHandle waterShadowTexture, Matrix4x4 waterShadowMatrix, float waterShadowNear, float waterShadowFar)
+        public WaterShadowResult(RTHandle waterShadowTexture, Matrix4x4 waterShadowMatrix, float waterShadowNear, float waterShadowFar, Vector3 waterShadowExtinction)
         {
             this.waterShadowTexture = waterShadowTexture ?? throw new ArgumentNullException(nameof(waterShadowTexture));
             this.waterShadowMatrix = waterShadowMatrix;
             this.waterShadowNear = waterShadowNear;
             this.waterShadowFar = waterShadowFar;
+            this.waterShadowExtinction = waterShadowExtinction;
         }
 
         public void SetInputs(RenderPass pass)
@@ -688,6 +712,7 @@ namespace Arycama.CustomRenderPipeline
             pass.SetMatrix(command, "_WaterShadowMatrix", waterShadowMatrix);
             pass.SetFloat(command, "_WaterShadowNear", waterShadowNear);
             pass.SetFloat(command, "_WaterShadowFar", waterShadowFar);
+            pass.SetVector(command, "_WaterShadowExtinction", waterShadowExtinction);
         }
     }
 
@@ -709,17 +734,17 @@ namespace Arycama.CustomRenderPipeline
         public BufferHandle PatchDataBuffer { get; }
         public float Near { get; }
         public float Far { get; }
-        public Matrix4x4 View { get; }
-        public Matrix4x4 Projection { get; }
+        public Matrix4x4 WorldToClip { get; }
+        public Matrix4x4 ShadowMatrix { get; }
 
-        public WaterShadowCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer, float near, float far, Matrix4x4 view, Matrix4x4 projection)
+        public WaterShadowCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer, float near, float far, Matrix4x4 worldToClip, Matrix4x4 shadowMatrix)
         {
             IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
             PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
             Near = near;
             Far = far;
-            View = view;
-            Projection = projection;
+            WorldToClip = worldToClip;
+            ShadowMatrix = shadowMatrix;
         }
 
         public void SetInputs(RenderPass pass)

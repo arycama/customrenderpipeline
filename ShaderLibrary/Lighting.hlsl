@@ -533,6 +533,24 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 	#define WATER_ON
 #endif
 
+Texture2D<float> _WaterShadows;
+matrix _WaterShadowMatrix;
+float3 _WaterShadowExtinction;
+float _WaterShadowFar;
+
+float3 WaterShadow(float3 position, float3 L)
+{
+	float shadowDistance = max(0.0, 0.0 - position.y) / max(1e-6, saturate(L.y));
+	float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix, position);
+	if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
+	{
+		float shadowDepth = _WaterShadows.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);
+		shadowDistance = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
+	}
+	
+	return exp(-_WaterShadowExtinction * shadowDistance);
+}
+
 float3 GetLighting(LightingInput input, bool isVolumetric = false)
 {
 	float3 V = normalize(-input.worldPosition);
@@ -626,7 +644,14 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		if (isVolumetric)
 			luminance += light.color * atmosphereTransmittance * (_Exposure * attenuation);
 		else if (NdotL > 0.0)
+		{
+			#ifdef WATER_SHADOW_ON
+			if(i == 0)
+				light.color *= WaterShadow(input.worldPosition, light.direction);
+			#endif
+			
 			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, light.direction, V, input.normal, input.bentNormal, input.occlusion) * light.color * atmosphereTransmittance) * (saturate(NdotL) * _Exposure * attenuation);
+		}
 	}
 	
 	uint3 clusterIndex;

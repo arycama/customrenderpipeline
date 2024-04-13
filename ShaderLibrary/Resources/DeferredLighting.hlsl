@@ -31,7 +31,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	result *= TransmittanceToPoint(_ViewPosition.y + _PlanetRadius, -V.y, CameraDepthToDistance(depth, V));
 	
 	#ifdef WATER_ON
-	return 0.0;
+	//return 0.0;
 	#endif
 	
 	return result;

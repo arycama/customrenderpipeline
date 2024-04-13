@@ -4,18 +4,10 @@
 
 Texture2D<float> _Depth;
 Texture2D<float4> _AlbedoMetallic, _NormalRoughness, _BentNormalOcclusion;
+Texture2D<float3> _Emissive;
 
 float3 Fragment(float4 position : SV_Position) : SV_Target
 {
-	//float depth = _UnderwaterDepth[positionCS.xy];
-	//SurfaceData surface = SurfaceDataFromGBuffer(positionCS.xy);
-	//PbrInput pbrInput = SurfaceDataToPbrInput(surface);
-
-	//float linearUnderwaterDepth = LinearEyeDepth(depth);
-	//float3x3 frame1 = GetLocalFrame(surface.Normal);
-	//float3 tangentWS1 = frame1[0] * dot(surface.tangentWS, frame1[0]) + frame1[1] * dot(surface.tangentWS, frame1[1]);
-	//return GetLighting(float4(positionCS.xy, depth, linearUnderwaterDepth), surface.Normal, tangentWS1, pbrInput);
-	
 	float depth = _Depth[position.xy];
 	float4 albedoMetallic = _AlbedoMetallic[position.xy];
 	float4 normalRoughness = _NormalRoughness[position.xy];
@@ -33,5 +25,5 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	lightingInput.translucency = 0.0;
 	lightingInput.bentNormal = normalize(2.0 * bentNormalOcclusion.rgb - 1.0);
 	
-	return GetLighting(lightingInput);
+	return GetLighting(lightingInput) + _Emissive[position.xy];
 }

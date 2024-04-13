@@ -89,8 +89,8 @@ namespace Arycama.CustomRenderPipeline
             m03 = (right + left) / (left - right),
             m11 = 2.0f / (top - bottom),
             m13 = (top + bottom) / (bottom - top),
-            m22 = 1.0f / (far - near),
-            m23 = near / (near - far),
+            m22 = 2.0f / (far - near),
+            m23 = (far + near) / (near - far),
             m33 = 1.0f
         };
 
