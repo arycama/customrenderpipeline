@@ -235,19 +235,19 @@ complex h0(float2 k, float A, complex r, uint3 id, OceanSpectrum spectrum)
 	float dOmegadk = FrequencyDerivative(kl, _OceanGravity, 500);
 	
 	//p = PhillipsSpectrum(omega, spectrum) * pow(windFactor, 6.0);
-	//p = JonswapSpectrum(omega, spectrum) * spectrum.scale;
+	p = JonswapSpectrum(omega, spectrum) * spectrum.scale;
 	
 	//p = PiersonMoskowitzSpectrum(omega, spectrum);
-	//p = 2 * p * abs(dOmegadk) / kl * deltaK * deltaK;
+	p = 2 * p * abs(dOmegadk) / kl * deltaK * deltaK;
 	//p *= philNorm;
 	
 	float wp = 22.0 * pow(Sq(_OceanGravity) / (spectrum.windSpeed * spectrum.fetch * 1000), 1.0 / 3.0);
 	//wp = 0.877 * _OceanGravity / spectrum.windSpeed;
 	
-	//p *= DirectionSpectrum(kAngle, omega, spectrum, wp);
+	p *= DirectionSpectrum(kAngle, omega, spectrum, wp);
 	
 	// Move waves along wind direction
-	p *= dot(normalize(k), float2(cos(spectrum.windAngle * TwoPi), sin(spectrum.windAngle * TwoPi))) < 0 ? (1 - spectrum.swell) : 1;
+	//p *= dot(normalize(k), float2(cos(spectrum.windAngle * TwoPi), sin(spectrum.windAngle * TwoPi))) < 0 ? (1 - spectrum.swell) : 1;
 	
 	p *= exp(-dot(k, k) * Sq(spectrum.shortWavesFade)); // Eq 41: Supress small wavelengths
 
@@ -294,12 +294,12 @@ void InitSpectrum(uint3 id : SV_DispatchThreadID)
 		h = cmul(h0(k, A, rx, id, LocalSpectrum()), cexp(cimg(w * t)));
 		h = cadd(h, cmul(h0(-k, A, rz, id, LocalSpectrum()), cexp(cimg(-w * t))));
 		
-		//OceanSpectrum distantSpectrum = DistantSpectrum();
-		//if(distantSpectrum.scale > 0.0)
-		//{
-		//	h = cadd(h, cmul(h0(k, A, rz, id, distantSpectrum), cexp(cimg(w * t))));
-		//	h = cadd(h, cmul(h0(-k, A, rz, id, distantSpectrum), cexp(cimg(-w * t))));
-		//}
+		OceanSpectrum distantSpectrum = DistantSpectrum();
+		if (distantSpectrum.scale > 0.0)
+		{
+			h = cadd(h, cmul(h0(k, A, rz, id, distantSpectrum), cexp(cimg(w * t))));
+			h = cadd(h, cmul(h0(-k, A, rz, id, distantSpectrum), cexp(cimg(-w * t))));
+		}
 
 		// Eq 37
 		slopeX = cmul(cimg(k.x), h);

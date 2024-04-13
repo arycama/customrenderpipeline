@@ -120,11 +120,11 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 
 	// TODO: Stencil? Or hw blend?
 	if(underwaterDepth != 0.0)
-		luminance += _UnderwaterResult[refractionUv];// * exp(-_Extinction * underwaterDistance);
+		luminance += _UnderwaterResult[refractionUv] * exp(-_Extinction * underwaterDistance);
 	
 	// Apply roughness to transmission
 	float perceptualRoughness = waterNormalFoamRoughness.a;
-	//luminance *= (1.0 - waterNormalFoamRoughness.b) * GGXDiffuse(1.0, dot(N, V), perceptualRoughness, 0.02) * Pi;
+	luminance *= (1.0 - waterNormalFoamRoughness.b) * GGXDiffuse(1.0, dot(N, V), perceptualRoughness, 0.02) * Pi;
 
 	GBufferOutput output;
 	output.albedoMetallic = float2(waterNormalFoamRoughness.b, 0.0).xxxy;
