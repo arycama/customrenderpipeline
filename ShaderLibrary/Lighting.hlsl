@@ -574,21 +574,22 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	float3 kD = input.albedo * Edss;
 	float3 bkD = input.translucency * Edss;
 	
+	float3 iblN = input.normal;
 	float3 R = reflect(-V, input.normal);
 	float3 rStrength = 1.0;
-	float3 iblR = GetSpecularDominantDir(input.normal, R, input.perceptualRoughness, NdotV);
 	
 	#ifdef WATER_ON
-		if(iblR.y < 0.0)
+		if(R.y < 0.0)
 		{
-			float NdotR = dot(float3(0.0, 1.0, 0.0), -iblR);
+			iblN = float3(0.0, 1.0, 0.0);
+			float NdotR = dot(iblN, -R);
 			float2 f_ab = DirectionalAlbedo(NdotR, input.perceptualRoughness);
 			rStrength = lerp(f_ab.x, f_ab.y, input.f0);
-			R = reflect(R, float3(0.0, 1.0, 0.0));
-			iblR = GetSpecularDominantDir(float3(0.0, 1.0, 0.0), R, input.perceptualRoughness, NdotR);
+			R = reflect(R, iblN);
 		}
 	#endif
 	
+	float3 iblR = GetSpecularDominantDir(iblN, R, input.perceptualRoughness, NdotV);
 	float NdotR = dot(input.normal, iblR);
 	float iblMipLevel = PerceptualRoughnessToMipmapLevel(input.perceptualRoughness, NdotR);
 	

@@ -14,13 +14,11 @@ float _OceanGravity;
 
 RWTexture2DArray<float3> DisplacementOutput;
 Texture2DArray<float3> DisplacementInput;
-Texture2DArray<float2> _OceanNormalMap;
-RWTexture2DArray<float4> sourceTexture, targetTexture, sourceTexture2, targetTexture2;
-RWTexture2DArray<float2> sourceTexture1, targetTexture1, NormalOutput;
+RWTexture2DArray<float4> sourceTexture, targetTexture;
+RWTexture2DArray<float2> sourceTexture1, targetTexture1;
 
 RWTexture2DArray<float4> SmoothnessOutput0, SmoothnessOutput1, SmoothnessOutput2, SmoothnessOutput3, SmoothnessOutput4, SmoothnessOutput5, SmoothnessOutput6, SmoothnessOutput7;
 RWTexture2DArray<float4> _NormalFoamSmoothness;
-RWTexture2DArray<float2> _NormalMap;
 
 float Smoothness, Time;
 float _OceanScale0, _OceanWindSpeed0, _OceanWindDirection0, _OceanFetch0, _OceanSpreadBlend0, _OceanSwell0, _OceanPeakEnhancement0, _OceanShortWavesFade0;
@@ -91,17 +89,13 @@ OceanSpectrum DistantSpectrum()
 }
 
 groupshared complex _HShared[2][_Resolution];
-groupshared complex _SxShared[2][_Resolution];
-groupshared complex _SzShared[2][_Resolution];
 groupshared complex _DxShared[2][_Resolution];
 groupshared complex _DzShared[2][_Resolution];
 
-void Fft(uint3 id, inout complex height, inout complex slopeX, inout complex slopeZ, inout complex dispX, inout complex dispZ)
+void Fft(uint3 id, inout complex height, inout complex dispX, inout complex dispZ)
 {
     // Load entire row or column into scratch array
 	_HShared[0][id.x] = height;
-	_SxShared[0][id.x] = slopeX;
-	_SzShared[0][id.x] = slopeZ;
 	_DxShared[0][id.x] = dispX;
 	_DzShared[0][id.x] = dispZ;
 
@@ -129,8 +123,6 @@ void Fft(uint3 id, inout complex height, inout complex slopeX, inout complex slo
 		complex weights = cexp(cimg(2.0 * Pi * sectionOffset / sectionWidth));
 
 		height = _HShared[textureIndices.y][id.x] = cadd(_HShared[textureIndices.x][indices.x], cmul(_HShared[textureIndices.x][indices.y], weights));
-		slopeX = _SxShared[textureIndices.y][id.x] = cadd(_SxShared[textureIndices.x][indices.x], cmul(_SxShared[textureIndices.x][indices.y], weights));
-		slopeZ = _SzShared[textureIndices.y][id.x] = cadd(_SzShared[textureIndices.x][indices.x], cmul(_SzShared[textureIndices.x][indices.y], weights));
 		dispX = _DxShared[textureIndices.y][id.x] = cadd(_DxShared[textureIndices.x][indices.x], cmul(_DxShared[textureIndices.x][indices.y], weights));
 		dispZ = _DzShared[textureIndices.y][id.x] = cadd(_DzShared[textureIndices.x][indices.x], cmul(_DzShared[textureIndices.x][indices.y], weights));
 
@@ -138,9 +130,9 @@ void Fft(uint3 id, inout complex height, inout complex slopeX, inout complex slo
 	}
 }
 
-float AlphaBetaSpectrum(float a, float b, float g, float w, float wm)
+float AlphaBetaSpectrum(float a, float b, float g, float w, float wp)
 {
-	return a * Sq(g) / pow(w, 5.0) * exp(-b * pow(wm / w, 4.0));
+	return a * Sq(g) / pow(w, 5.0) * exp(-b * pow(wp / w, 4.0));
 }
 
 float PhillipsSpectrum(float w, OceanSpectrum spectrum)
@@ -158,9 +150,12 @@ float PiersonMoskowitzSpectrum(float w, OceanSpectrum spectrum)
 
 float JonswapSpectrum(float w, OceanSpectrum spectrum)
 {
-	float a = 0.076 * pow(Sq(spectrum.windSpeed) / (spectrum.fetch * 1000 * _OceanGravity), 0.22);
+	float u10 = spectrum.windSpeed; // Wind speed 10m above sea level
+	float F = spectrum.fetch * 1000.0;
+	
+	float a = 0.076 * pow(Sq(u10) / (F * _OceanGravity), 0.22);
 	float b = 5.0 / 4.0;
-	float wp = 22.0 * pow(Sq(_OceanGravity) / (spectrum.windSpeed * spectrum.fetch * 1000), 1.0 / 3.0);
+	float wp = 22.0 * pow(Sq(_OceanGravity) / (F * 1000), 1.0 / 3.0);
 	float gamma = spectrum.peakEnhancement;
 	float sigma = w <= wp ? 0.07 : 0.09;
 	float r = exp(-Sq(w - wp) / (2.0 * Sq(sigma) * Sq(wp)));
@@ -235,19 +230,19 @@ complex h0(float2 k, float A, complex r, uint3 id, OceanSpectrum spectrum)
 	float dOmegadk = FrequencyDerivative(kl, _OceanGravity, 500);
 	
 	//p = PhillipsSpectrum(omega, spectrum) * pow(windFactor, 6.0);
-	p = JonswapSpectrum(omega, spectrum) * spectrum.scale;
+	//p = JonswapSpectrum(omega, spectrum) * spectrum.scale;
 	
 	//p = PiersonMoskowitzSpectrum(omega, spectrum);
-	p = 2 * p * abs(dOmegadk) / kl * deltaK * deltaK;
+	//p = 2 * p * abs(dOmegadk) / kl * deltaK * deltaK;
 	//p *= philNorm;
 	
 	float wp = 22.0 * pow(Sq(_OceanGravity) / (spectrum.windSpeed * spectrum.fetch * 1000), 1.0 / 3.0);
 	//wp = 0.877 * _OceanGravity / spectrum.windSpeed;
 	
-	p *= DirectionSpectrum(kAngle, omega, spectrum, wp);
+	//p *= DirectionSpectrum(kAngle, omega, spectrum, wp);
 	
 	// Move waves along wind direction
-	//p *= dot(normalize(k), float2(cos(spectrum.windAngle * TwoPi), sin(spectrum.windAngle * TwoPi))) < 0 ? (1 - spectrum.swell) : 1;
+	p *= dot(normalize(k), float2(cos(spectrum.windAngle * TwoPi), sin(spectrum.windAngle * TwoPi))) < 0 ? (1 - spectrum.swell) : 1;
 	
 	p *= exp(-dot(k, k) * Sq(spectrum.shortWavesFade)); // Eq 41: Supress small wavelengths
 
@@ -259,7 +254,7 @@ complex h0(float2 k, float A, complex r, uint3 id, OceanSpectrum spectrum)
 [numthreads(_Resolution, 1, 1)]
 void InitSpectrum(uint3 id : SV_DispatchThreadID)
 {
-	complex h = czero(), dispX = czero(), dispZ = czero(), slopeX = czero(), slopeZ = czero();
+	complex h = czero(), dispX = czero(), dispZ = czero();
 	
 	uint N = _Resolution;
 	uint M = _Resolution;
@@ -288,7 +283,7 @@ void InitSpectrum(uint3 id : SV_DispatchThreadID)
 		
 		float kLen = length(k);
 		float w = sqrt(_OceanGravity * kLen);
-		float t = Time;
+		float t = 25;//Time;
 		
 		// Eq 43
 		h = cmul(h0(k, A, rx, id, LocalSpectrum()), cexp(cimg(w * t)));
@@ -301,21 +296,16 @@ void InitSpectrum(uint3 id : SV_DispatchThreadID)
 			h = cadd(h, cmul(h0(-k, A, rz, id, distantSpectrum), cexp(cimg(-w * t))));
 		}
 
-		// Eq 37
-		slopeX = cmul(cimg(k.x), h);
-		slopeZ = cmul(cimg(k.y), h);
-		
 		// Eq 44
 		dispX = cmul(cimg(-k.x / kLen), h);
 		dispZ = cmul(cimg(-k.y / kLen), h);
 	}
 	
 	// Perform the FFT
-	Fft(id, h, slopeX, slopeZ, dispX, dispZ);
+	Fft(id, h, dispX, dispZ);
 	
 	// Output results to textures
 	targetTexture1[id] = float2(h.r, h.i);
-	targetTexture2[id] = float4(slopeX.r, slopeX.i, slopeZ.r, slopeZ.i);
 	targetTexture[id] = float4(dispX.r, dispX.i, dispZ.r, dispZ.i);
 }
 
@@ -326,20 +316,16 @@ void FftColumns(uint3 id : SV_DispatchThreadID)
 
     // Load entire row or column into scratch array
 	float2 height = sourceTexture1[uint3(texturePos, id.z)];
-	float4 slope = sourceTexture2[uint3(texturePos, id.z)];
 	float4 displacement = sourceTexture[uint3(texturePos, id.z)];
 
 	complex h = { height.x, height.y };
-	complex slopeX = { slope.x, slope.y };
-	complex slopeZ = { slope.z, slope.w };
 	complex dispX = { displacement.x, displacement.y };
 	complex dispZ = { displacement.z, displacement.w };
 	
-	Fft(id, h, slopeX, slopeZ, dispX, dispZ);
+	Fft(id, h, dispX, dispZ);
 	
 	float sign = ((id.x + id.y) & 1) == 0 ? 1.0 : -1.0;
 	DisplacementOutput[uint3(texturePos, id.z + _OceanTextureSliceOffset)] = float3(-dispX.r, h.r, -dispZ.r) * sign;
-	NormalOutput[uint3(texturePos, id.z + _OceanTextureSliceOffset)] = float2(-slopeX.r, -slopeZ.r) * sign;
 }
 
 [numthreads(8, 8, 1)]
@@ -356,7 +342,9 @@ void CreateMesh(uint3 id : SV_DispatchThreadID)
 	float3 dx = (right - left) / (2.0 * delta);
 	float3 dy = (up - down) / (2.0 * delta);
 	
-	//_NormalMap[uint3(id.xy, id.z + _OceanTextureSliceOffset)] = float2(-(right.y - left.y) / (2.0 * delta), -(up.y - down.y) / (2.0 * delta));
+	float2 normalGradients = float2(-(right.y - left.y) / (2.0 * delta), -(up.y - down.y) / (2.0 * delta));
+	
+	float3 normal = normalize(float3(normalGradients, 1.0));
 	
 	// Eq 45
 	float jxx = 1.0 + dx.x;
@@ -365,7 +353,7 @@ void CreateMesh(uint3 id : SV_DispatchThreadID)
 	float jyx = dy.z;
 	
 	float jacobian = jxx * jyy - jxy * jyx;
-	_NormalFoamSmoothness[uint3(id.xy, id.z + _OceanTextureSliceOffset)] = float4(0.0, 0.0, jacobian, Remap(SmoothnessToNormalLength(Smoothness), 7.0 / 8.0));
+	_NormalFoamSmoothness[uint3(id.xy, id.z + _OceanTextureSliceOffset)] = float4(normal.xy * 0.5 + 0.5, jacobian, Remap(SmoothnessToNormalLength(Smoothness), 7.0 / 8.0));
 }
 
 // Thread group size of 32 is required to process  the entire 128x128 texture in shared memory
@@ -398,10 +386,10 @@ void GenerateMaps(uint2 groupThreadID : SV_GroupThreadID, uint2 groupID : SV_Gro
 		{
 			uint2 offset = dispatchThreadID * 4 + 2 * uint2(x, y);
 
-			float3 averageNormal = normalize(float3(_OceanNormalMap[uint3(offset + uint2(0, 0), depth)], 1.0));
-			averageNormal += normalize(float3(_OceanNormalMap[uint3(offset + uint2(1, 0), depth)], 1.0));
-			averageNormal += normalize(float3(_OceanNormalMap[uint3(offset + uint2(0, 1), depth)], 1.0));
-			averageNormal += normalize(float3(_OceanNormalMap[uint3(offset + uint2(1, 1), depth)], 1.0));
+			float3 averageNormal = UnpackNormal(SmoothnessOutput0[uint3(offset + uint2(0, 0), depth)].rg);
+			averageNormal += UnpackNormal(SmoothnessOutput0[uint3(offset + uint2(1, 0), depth)].rg);
+			averageNormal += UnpackNormal(SmoothnessOutput0[uint3(offset + uint2(0, 1), depth)].rg);
+			averageNormal += UnpackNormal(SmoothnessOutput0[uint3(offset + uint2(1, 1), depth)].rg);
 			averageNormal /= 4.0;
 			averageNormal *= smoothnessLength;
 
@@ -462,10 +450,6 @@ void GenerateFoam(uint3 id : SV_DispatchThreadID)
 	float4 current = _NormalFoamSmoothness[uint3(id.xy, id.z + _OceanTextureSliceOffset)];
 	float4 previous = _NormalFoamSmoothness[uint3(id.xy, id.z + (_OceanTextureSliceOffset ? 0 : 4))];
 
-	float result = (1.0 - current.b) * _FoamStrength;
-	result += (1.0 - previous.b) * _FoamDecay;
-	result = 1.0 - result;
-	
-	current.b = result;
+	current.b = 1.0 - lerp(1.0 - previous.b, 1.0 - current.b, _FoamStrength);
 	_NormalFoamSmoothness[uint3(id.xy, id.z + _OceanTextureSliceOffset)] = current;
 }

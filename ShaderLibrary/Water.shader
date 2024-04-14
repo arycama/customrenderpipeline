@@ -14,7 +14,7 @@
 		_Color("Albedo", Color) = (1, 1, 1, 1)
 		[HDR] _Extinction("Extinction", Color) = (0.6313726, 0.2352941, 0.1960784, 1)
 
-		_RefractOffset("Refraction Strength", Range(0, 0.1)) = 0.05
+		_RefractOffset("Refraction Strength", Range(0, 0.05)) = 0.05
 
 		[Header(Foam)]
 		_FoamSmoothness("Foam Smoothness", Range(0, 1)) = 0.2

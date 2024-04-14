@@ -28,7 +28,7 @@ namespace Arycama.CustomRenderPipeline
             rendererList = context.CreateShadowRendererList(ref shadowDrawingSettings);
         }
 
-        public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
+        public override void SetTexture(CommandBuffer command, string propertyName, Texture texture, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
             command.SetGlobalTexture(propertyName, texture);
         }

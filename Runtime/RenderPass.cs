@@ -14,7 +14,7 @@ namespace Arycama.CustomRenderPipeline
         protected bool screenWrite;
 
         // TODO: Convert to handles and remove
-        private readonly List<(string, RTHandle)> readTextures = new();
+        private readonly List<(string, RTHandle, RenderTextureSubElement)> readTextures = new();
         private readonly List<(string, BufferHandle)> readBuffers = new();
         private readonly List<(string, BufferHandle)> writeBuffers = new();
 
@@ -24,7 +24,7 @@ namespace Arycama.CustomRenderPipeline
         internal string Name { get; set; }
         internal int Index { get; set; }
 
-        public abstract void SetTexture(CommandBuffer command, string propertyName, Texture texture);
+        public abstract void SetTexture(CommandBuffer command, string propertyName, Texture texture, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
         public abstract void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer);
         public abstract void SetVector(CommandBuffer command, string propertyName, Vector4 value);
         public abstract void SetVectorArray(CommandBuffer command, string propertyName, Vector4[] value);
@@ -44,11 +44,11 @@ namespace Arycama.CustomRenderPipeline
             return Name;
         }
 
-        public void ReadTexture(string propertyName, RTHandle texture)
+        public void ReadTexture(string propertyName, RTHandle texture, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
             Assert.IsFalse(RenderGraph.IsExecuting);
             Assert.IsNotNull(texture, propertyName);
-            readTextures.Add((propertyName, texture));
+            readTextures.Add((propertyName, texture, subElement));
             RenderGraph.SetLastRTHandleRead(texture, Index);
         }
 
@@ -94,7 +94,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var texture in readTextures)
             {
                 var handle = texture.Item2;
-                SetTexture(command, texture.Item1, handle);
+                SetTexture(command, texture.Item1, handle, texture.Item3);
                 // TODO: Remove/replace with some utility function as this allocates
                 SetVector(command, $"{texture.Item1}_Scale", new Vector3(handle.Scale.x, handle.Scale.y, handle.Scale.z)); 
             }

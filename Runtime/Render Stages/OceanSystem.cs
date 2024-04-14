@@ -32,7 +32,7 @@ namespace Arycama.CustomRenderPipeline
 
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
 
-        private RenderTexture normalMap, foamSmoothness, DisplacementMap;
+        private RenderTexture foamSmoothness, DisplacementMap;
         private RenderTexture lengthToRoughness;
         private Settings settings;
         private RenderGraph renderGraph;
@@ -53,21 +53,6 @@ namespace Arycama.CustomRenderPipeline
 
             underwaterLightingMaterial = new Material(Shader.Find("Hidden/Underwater Lighting 1")) { hideFlags = HideFlags.HideAndDontSave };
             deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water 1")) { hideFlags = HideFlags.HideAndDontSave };
-
-            // Initialize textures
-            normalMap = new RenderTexture(resolution, resolution, 0, GraphicsFormat.R8G8_SNorm)
-            {
-                anisoLevel = anisoLevel,
-                autoGenerateMips = false,
-                dimension = TextureDimension.Tex2DArray,
-                enableRandomWrite = true,
-                filterMode = useTrilinear ? FilterMode.Trilinear : FilterMode.Bilinear,
-                hideFlags = HideFlags.HideAndDontSave,
-                name = "Ocean Normal Map",
-                useMipMap = true,
-                volumeDepth = 8,
-                wrapMode = TextureWrapMode.Repeat,
-            }.Created();
 
             // Initialize textures
             foamSmoothness = new RenderTexture(resolution, resolution, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear)
@@ -146,23 +131,15 @@ namespace Arycama.CustomRenderPipeline
             indexBuffer.SetData(pIndices);
         }
 
+        private float previousTime;
+
+
         public void UpdateFft()
         {
             var resolution = settings.Resolution;
             var anisoLevel = settings.AnisoLevel;
             var useTrilinear = settings.UseTrilinear;
             var profile = settings.Profile;
-
-            //if (anisoLevel != DisplacementMap.anisoLevel)
-            //{
-            //Cleanup();
-            //Initialize();
-            //}
-
-            // Simulate
-            var tempBufferID4 = Shader.PropertyToID("TempFFTBuffer4");
-            var fftNormalBufferId = Shader.PropertyToID("_FFTNormalBuffer");
-            var tempBufferID2 = Shader.PropertyToID("TempFFTBuffer2");
 
             // Calculate constants
             var rcpScales = new Vector4(1f / Mathf.Pow(profile.CascadeScale, 0f), 1f / Mathf.Pow(profile.CascadeScale, 1f), 1f / Mathf.Pow(profile.CascadeScale, 2f), 1f / Mathf.Pow(profile.CascadeScale, 3f));
@@ -177,8 +154,14 @@ namespace Arycama.CustomRenderPipeline
             var computeShader = Resources.Load<ComputeShader>("OceanFFT");
             var oceanBuffer = profile.SetShaderProperties(renderGraph);
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Fft"))
+            var tempBufferID4 = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
+            var tempBufferID2 = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R32G32_SFloat, 4, TextureDimension.Tex2DArray);
+
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Fft Row"))
             {
+                pass.Initialize(computeShader, 0, 1, resolution, 4, false);
+                pass.WriteTexture("targetTexture", tempBufferID4);
+                pass.WriteTexture("targetTexture1", tempBufferID2);
                 pass.ReadBuffer("OceanData", oceanBuffer);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
@@ -197,53 +180,86 @@ namespace Arycama.CustomRenderPipeline
                     command.SetComputeVectorParam(computeShader, "_RcpCascadeScales", rcpScales);
                     command.SetComputeVectorParam(computeShader, "_CascadeTexelSizes", texelSizes);
 
-                    // Get Textures
-                    command.SetComputeFloatParam(computeShader, "Smoothness", settings.Material.GetFloat("_Smoothness"));
                     command.SetComputeFloatParam(computeShader, "Time", EditorApplication.isPlaying ? Time.time : (float)EditorApplication.timeSinceStartup);
-                    command.GetTemporaryRTArray(tempBufferID4, resolution, resolution, 4, 0, FilterMode.Point, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear, 1, true);
-                    command.GetTemporaryRTArray(fftNormalBufferId, resolution, resolution, 4, 0, FilterMode.Point, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear, 1, true);
-                    command.GetTemporaryRTArray(tempBufferID2, resolution, resolution, 4, 0, FilterMode.Point, RenderTextureFormat.RGFloat, RenderTextureReadWrite.Linear, 1, true);
+                });
+            }
 
-                    // FFT Row
-                    command.SetComputeTextureParam(computeShader, 0, "targetTexture", tempBufferID4);
-                    command.SetComputeTextureParam(computeShader, 0, "targetTexture1", tempBufferID2);
-                    command.SetComputeTextureParam(computeShader, 0, "targetTexture2", fftNormalBufferId);
-                    command.DispatchCompute(computeShader, 0, 1, resolution, 4);
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Fft Column"))
+            {
+                pass.Initialize(computeShader, 1, 1, resolution, 4, false);
+                pass.ReadTexture("sourceTexture", tempBufferID4);
+                pass.ReadTexture("sourceTexture1", tempBufferID2);
 
-                    command.SetComputeTextureParam(computeShader, 1, "sourceTexture", tempBufferID4);
-                    command.SetComputeTextureParam(computeShader, 1, "sourceTexture1", tempBufferID2);
-                    command.SetComputeTextureParam(computeShader, 1, "sourceTexture2", fftNormalBufferId);
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    command.SetGlobalVector("_OceanScale", oceanScale);
+                    command.SetGlobalVector("_RcpCascadeScales", rcpScales);
+                    command.SetGlobalVector("_OceanTexelSize", rcpTexelSizes);
+
+                    command.SetGlobalFloat("_OceanGravity", profile.Gravity);
+
+                    command.SetGlobalInt("_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
+                    command.SetGlobalInt("_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
+
+                    command.SetComputeVectorParam(computeShader, "SpectrumStart", spectrumStart);
+                    command.SetComputeVectorParam(computeShader, "SpectrumEnd", spectrumEnd);
+                    command.SetComputeVectorParam(computeShader, "_RcpCascadeScales", rcpScales);
+                    command.SetComputeVectorParam(computeShader, "_CascadeTexelSizes", texelSizes);
+
                     command.SetComputeTextureParam(computeShader, 1, "DisplacementOutput", DisplacementMap);
-                    command.SetComputeTextureParam(computeShader, 1, "NormalOutput", normalMap);
-                    command.DispatchCompute(computeShader, 1, 1, resolution, 4);
+                });
+            }
 
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Calculate Normals"))
+            {
+                pass.Initialize(computeShader, 2, resolution, resolution, 4);
+
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
+                    command.SetGlobalInt("_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
+                    command.SetComputeFloatParam(computeShader, "Smoothness", settings.Material.GetFloat("_Smoothness"));
                     command.SetComputeTextureParam(computeShader, 2, "DisplacementInput", DisplacementMap);
                     command.SetComputeTextureParam(computeShader, 2, "_NormalFoamSmoothness", foamSmoothness);
-                    command.SetComputeTextureParam(computeShader, 2, "_NormalMap", normalMap);
                     command.DispatchNormalized(computeShader, 2, resolution, resolution, 4);
+                });
+            }
 
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Foam Generation"))
+            {
+                pass.Initialize(computeShader, 4, resolution, resolution, 4);
+
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
                     // Foam
+                    var time = EditorApplication.isPlaying ? Time.time : (float)EditorApplication.timeSinceStartup;
+                    var deltaTime = time - previousTime;
+                    previousTime = time;
+
                     command.SetComputeFloatParam(computeShader, "_FoamStrength", profile.FoamStrength);
                     command.SetComputeFloatParam(computeShader, "_FoamDecay", profile.FoamDecay);
                     command.SetComputeFloatParam(computeShader, "_FoamThreshold", profile.FoamThreshold);
+                    command.SetComputeFloatParam(computeShader, "_DeltaTime", deltaTime);
                     command.SetComputeTextureParam(computeShader, 4, "_NormalFoamSmoothness", foamSmoothness);
-                    command.SetComputeTextureParam(computeShader, 4, "_NormalMap", normalMap);
-                    command.DispatchNormalized(computeShader, 4, resolution, resolution, 4);
+                });
+            }
 
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Filtering"))
+            {
+                var generateMapsKernel = computeShader.FindKernel("GenerateMaps");
+                pass.Initialize(computeShader, generateMapsKernel, (resolution * 4) >> 2, (resolution) >> 2, 1);
+
+                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                {
                     // Release resources
-                    command.ReleaseTemporaryRT(tempBufferID4);
-                    command.ReleaseTemporaryRT(tempBufferID2);
-                    command.ReleaseTemporaryRT(fftNormalBufferId);
-                    command.GenerateMips(foamSmoothness);
                     command.GenerateMips(DisplacementMap);
-                    command.GenerateMips(normalMap);
 
-                    var generateMapsKernel = computeShader.FindKernel("GenerateMaps");
-                    var mipCount = normalMap.mipmapCount;
+                    // TODO: Is this redundant since we filter mips anyway?
+                    command.GenerateMips(foamSmoothness);
+
+                    var mipCount = (int)Mathf.Log(settings.Resolution, 2) + 1;
                     command.SetComputeIntParam(computeShader, "Resolution", resolution >> 2);
                     command.SetComputeIntParam(computeShader, "Size", resolution >> 2);
                     command.SetGlobalTexture("_LengthToRoughness", lengthToRoughness);
-                    command.SetComputeTextureParam(computeShader, generateMapsKernel, "_OceanNormalMap", normalMap);
 
                     for (var j = 0; j < mipCount; j++)
                     {
@@ -251,12 +267,9 @@ namespace Arycama.CustomRenderPipeline
                         command.SetComputeTextureParam(computeShader, generateMapsKernel, smoothnessId, foamSmoothness, j);
                     }
 
-                    command.DispatchNormalized(computeShader, generateMapsKernel, (resolution * 4) >> 2, (resolution) >> 2, 1);
-
+                    // TODO: Use read texture
                     command.SetGlobalTexture("_OceanFoamSmoothnessMap", foamSmoothness);
-                    command.SetGlobalTexture("_OceanNormalMap", normalMap);
                     command.SetGlobalTexture("_OceanDisplacementMap", DisplacementMap);
-
                 });
             }
         }
@@ -648,7 +661,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_UnderwaterResult", underwaterLighting);
                 pass.ReadTexture("_WaterNormalFoam", waterNormalMask);
                 pass.ReadTexture("_UnderwaterDepth", underwaterDepth);
-                pass.ReadTexture("_Depth", cameraDepth);
+                pass.ReadTexture("_Depth", cameraDepth, RenderTextureSubElement.Depth);
+                pass.ReadTexture("_Stencil", cameraDepth, RenderTextureSubElement.Stencil);
 
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();

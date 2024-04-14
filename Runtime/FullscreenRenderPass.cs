@@ -48,9 +48,20 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
+        public override void SetTexture(CommandBuffer command, string propertyName, Texture texture, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
-            propertyBlock.SetTexture(propertyName, texture);
+            switch(subElement)
+            {
+                case RenderTextureSubElement.Depth:
+                    propertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Depth);
+                    break;
+                case RenderTextureSubElement.Stencil:
+                    propertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Stencil);
+                    break;
+                default:
+                    propertyBlock.SetTexture(propertyName, texture);
+                    break;
+            }
         }
 
         public override void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer)

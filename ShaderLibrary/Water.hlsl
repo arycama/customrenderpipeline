@@ -6,10 +6,8 @@
 
 float4x4 _WaterShadowMatrix;
 
-SamplerState _TrilinearRepeatAniso4Sampler;
 Texture2DArray<float4> _OceanFoamSmoothnessMap;
 Texture2DArray<float3> _OceanDisplacementMap;
-Texture2DArray<float2> _OceanNormalMap;
 Texture2D<float> _OceanTerrainMask;
 Texture2D<float3> _WaterNormals;
 Texture2D<float4> _FoamBump, _FoamTex, _OceanCausticsMap, _ShoreDistance;
@@ -399,9 +397,10 @@ FragmentOutput Fragment(FragmentInput input)
 	for (uint i = 0; i < 4; i++)
 	{
 		float3 uv = float3(input.uv0.xz * _OceanScale[i], i + _OceanTextureSliceOffset);
-		float4 cascadeData = _OceanFoamSmoothnessMap.Sample(_TrilinearRepeatAniso4Sampler, uv);
-
-		normalData += _OceanNormalMap.Sample(_TrilinearRepeatAniso4Sampler, uv);
+		float4 cascadeData = _OceanFoamSmoothnessMap.Sample(_TrilinearRepeatAniso16Sampler, uv);
+		
+		float3 normal = UnpackNormal(cascadeData.rg);
+		normalData += normal.xy / normal.z;
 		foam += cascadeData.b * _RcpCascadeScales[i];
 		smoothness *= Remap(cascadeData.a, 0.0, 1.0, 7.0 / 8.0);
 	}
@@ -412,17 +411,18 @@ FragmentOutput Fragment(FragmentInput input)
 	
 	float3 B = cross(T, N);
 	float3x3 tangentToWorld = float3x3(T, B, N);
-	float3 oceanN = float3(normalData * lerp(1.0, 0.0, shoreFactor * 0.75), 1.0);
+	float3 oceanN = normalize(float3(normalData * lerp(1.0, 0.0, shoreFactor * 0.75), 1.0));
 	
 	// Foam calculations
-	float foamFactor = saturate(lerp(_WaveFoamStrength * (-foam + _WaveFoamFalloff), breaker + shoreFoam, shoreFactor));
+	//float foamFactor = saturate(lerp(_WaveFoamStrength * (-foam + _WaveFoamFalloff), breaker + shoreFoam, shoreFactor));
+	float foamFactor = saturate(_WaveFoamStrength * (-foam + _WaveFoamFalloff));
 	if (foamFactor > 0)
 	{
 		float2 foamUv = input.uv0.xz * _FoamTex_ST.xy + _FoamTex_ST.zw;
-		foamFactor *= _FoamTex.Sample(_TrilinearRepeatAniso4Sampler, foamUv).r;
+		foamFactor *= _FoamTex.Sample(_TrilinearRepeatAniso16Sampler, foamUv).r;
 		
 		// Sample/unpack normal, reconstruct partial derivatives, scale these by foam factor and normal scale and add.
-		float3 foamNormal = UnpackNormalAG(_FoamBump.Sample(_TrilinearRepeatAniso4Sampler, foamUv));
+		float3 foamNormal = UnpackNormalAG(_FoamBump.Sample(_TrilinearRepeatAniso16Sampler, foamUv));
 		float2 foamDerivs = foamNormal.xy / foamNormal.z;
 		oceanN.xy += foamDerivs * _FoamNormalScale * foamFactor;
 		smoothness = lerp(smoothness, _FoamSmoothness, foamFactor);
@@ -432,9 +432,11 @@ FragmentOutput Fragment(FragmentInput input)
 	smoothness = ProjectedSpaceGeometricNormalFiltering(smoothness, N, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
 	
 	float perceptualRoughness = 1.0 - smoothness;
+	
+	float2 packedNormal = PackNormalHemiOctEncode(N.xzy);
 
 	FragmentOutput output;
 	output.velocity = MotionVectorFragment(input.nonJitteredPositionCS, input.previousPositionCS);
-	output.normalFoamRoughness = float4(N.xz * 0.5 + 0.5, foamFactor, perceptualRoughness);
+	output.normalFoamRoughness = float4(packedNormal * 0.5 + 0.5, foamFactor, perceptualRoughness);
 	return output;
 }

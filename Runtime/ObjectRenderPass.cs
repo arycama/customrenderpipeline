@@ -21,7 +21,7 @@ namespace Arycama.CustomRenderPipeline
             rendererList = context.CreateRendererList(rendererListDesc);
         }
 
-        public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
+        public override void SetTexture(CommandBuffer command, string propertyName, Texture texture, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
             command.SetGlobalTexture(propertyName, texture);
             //postRender.Add(cmd => cmd.SetGlobalTexture(propertyName, BuiltinRenderTextureType.None));

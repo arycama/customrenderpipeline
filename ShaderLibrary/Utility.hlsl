@@ -65,16 +65,19 @@ float3 SampleHemisphereUniform(float u1, float u2)
 	return SphericalToCartesian(phi, cosTheta);
 }
 
+float3 UnpackNormal(float2 packedNormal, float scale = 1.0)
+{
+	float3 normal;
+	normal.xy = 2.0 * packedNormal - 1.0;
+	normal.xy *= scale;
+	normal.z = sqrt(saturate(1.0 - SqrLength(normal.xy)));
+	return normal;
+}
 
 float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
 {
 	packedNormal.a *= packedNormal.r;
-	
-	float3 normal;
-	normal.xy = 2.0 * packedNormal.ag - 1.0;
-	normal.z = sqrt(saturate(1.0 - SqrLength(normal.xy)));
-	normal.xy *= scale;
-	return normal;
+	return UnpackNormal(packedNormal.ga, scale);
 }
 
 // ref http://blog.selfshadow.com/publications/blending-in-detail/

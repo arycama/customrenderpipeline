@@ -178,11 +178,12 @@ namespace Arycama.CustomRenderPipeline
                         if (result == null)
                         {
                             var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
+                            var isStencil = handle.Format == GraphicsFormat.D32_SFloat_S8_UInt || handle.Format == GraphicsFormat.D24_UNorm_S8_UInt;
 
                             var width = handle.IsScreenTexture ? screenWidth : handle.Width;
                             var height = handle.IsScreenTexture ? screenHeight : handle.Height;
 
-                            result = new RenderTexture(width, height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite, hideFlags = HideFlags.HideAndDontSave };
+                            result = new RenderTexture(width, height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite, stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None, hideFlags = HideFlags.HideAndDontSave };
 
                             if (handle.VolumeDepth > 0)
                             {
@@ -341,7 +342,7 @@ namespace Arycama.CustomRenderPipeline
                 Dimension = renderTexture.dimension,
                 RenderTexture = renderTexture,
                 HasMips = renderTexture.useMipMap,
-                AutoGenerateMips = autoGenerateMips
+                AutoGenerateMips = autoGenerateMips,
             };
 
             result.Id = rtHandleCount++;

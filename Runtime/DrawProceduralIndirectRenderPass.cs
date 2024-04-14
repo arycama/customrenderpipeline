@@ -35,7 +35,7 @@ namespace Arycama.CustomRenderPipeline
             this.topology = topology;
         }
 
-        public override void SetTexture(CommandBuffer command, string propertyName, Texture texture)
+        public override void SetTexture(CommandBuffer command, string propertyName, Texture texture, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
             propertyBlock.SetTexture(propertyName, texture);
         }

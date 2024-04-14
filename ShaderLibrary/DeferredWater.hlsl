@@ -19,6 +19,7 @@ Texture2D<float4> _WaterNormalFoam;
 Texture2D<float3> _WaterEmission, _UnderwaterResult;
 Texture2D<float> _Depth, _UnderwaterDepth;
 
+float4 _UnderwaterResult_Scale;
 float3 _Extinction, _Color, _LightColor0, _LightDirection0, _LightColor1, _LightDirection1;
 float _RefractOffset, _Steps;
 
@@ -37,9 +38,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float waterDistance = linearWaterDepth * rcp(rcpLenV);
 	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25 / linearWaterDepth;
 	
-	float3 N;
-	N.xz = 2.0 * waterNormalFoamRoughness.xy - 1.0;
-	N.y = sqrt(saturate(1.0 - dot(N.xz, N.xz)));
+	float3 N = UnpackNormalHemiOctEncode(2.0 * waterNormalFoamRoughness.xy - 1.0).xzy;
 	
 	float2 uvOffset = N.xz * distortion * (1.0 - saturate(dot(N, V)));
 	float2 refractionUv = uvOffset * _ScaledResolution.xy + position.xy;
@@ -50,9 +49,10 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	// Clamp underwater depth if sampling a non-underwater pixel
 	if (underwaterDistance <= 0.0)
 	{
+		uvOffset = 0.0;
 		underwaterDepth = _UnderwaterDepth[position.xy];
-		underwaterDistance = max(0.0, LinearEyeDepth(underwaterDepth) * rcp(rcpLenV) - linearWaterDepth);
-		refractionUv = position.xy;
+		underwaterDistance = max(0.0, LinearEyeDepth(underwaterDepth) * rcp(rcpLenV) - waterDistance);
+		refractedPositionSS = position.xy;
 	}
 	
 	float2 noise = _BlueNoise2D[position.xy % 128];
@@ -113,14 +113,14 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	// Ambient 
 	float3 finalTransmittance = exp(-underwaterDistance * _Extinction);
-	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
+	luminance += AmbientLight(N) * (1.0 - finalTransmittance);
 	luminance *= _Color;
 	
 	luminance = IsInfOrNaN(luminance) ? 0.0 : luminance;
 
 	// TODO: Stencil? Or hw blend?
 	if(underwaterDepth != 0.0)
-		luminance += _UnderwaterResult[refractionUv] * exp(-_Extinction * underwaterDistance);
+		luminance += _UnderwaterResult.Sample(_LinearClampSampler, (uv + uvOffset) * _UnderwaterResult_Scale.xy) * exp(-_Extinction * underwaterDistance);
 	
 	// Apply roughness to transmission
 	float perceptualRoughness = waterNormalFoamRoughness.a;
@@ -130,6 +130,6 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	output.albedoMetallic = float2(waterNormalFoamRoughness.b, 0.0).xxxy;
 	output.normalRoughness = float4(PackFloat2To888(0.5 * PackNormalOctQuadEncode(N) + 0.5), perceptualRoughness);
 	output.bentNormalOcclusion = float4(N * 0.5 + 0.5, 1.0);
-	output.emissive = luminance;
+	output.emissive = luminance * 0;
 	return output;
 }

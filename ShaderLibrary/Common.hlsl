@@ -550,4 +550,20 @@ float3 UnpackNormalOctQuadEncode(float2 f)
 	return normalize(n);
 }
 
+float2 PackNormalHemiOctEncode(float3 n)
+{
+    float l1norm = dot(abs(n), 1.0);
+    float2 res = n.xy * (1.0 / l1norm);
+
+    return float2(res.x + res.y, res.x - res.y);
+}
+
+float3 UnpackNormalHemiOctEncode(float2 f)
+{
+	float2 val = float2(f.x + f.y, f.x - f.y) * 0.5;
+	float3 n = float3(val, 1.0 - dot(abs(val), 1.0));
+
+	return normalize(n);
+}
+
 #endif
