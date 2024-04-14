@@ -54,8 +54,6 @@ float ModifyBlendWithMotionVectorRejection(float mvLen, float2 prevUV, float ble
 
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target0
 {
-	return _Input[position.xy];
-	
 	#ifdef UPSCALE
 		uint2 centerCoord = (uint2)(position.xy * _Scale - _Jitter.xy);
 	#else

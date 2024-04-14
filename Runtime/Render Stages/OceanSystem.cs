@@ -220,7 +220,6 @@ namespace Arycama.CustomRenderPipeline
                     command.SetComputeFloatParam(computeShader, "Smoothness", settings.Material.GetFloat("_Smoothness"));
                     command.SetComputeTextureParam(computeShader, 2, "DisplacementInput", DisplacementMap);
                     command.SetComputeTextureParam(computeShader, 2, "_NormalFoamSmoothness", foamSmoothness);
-                    command.DispatchNormalized(computeShader, 2, resolution, resolution, 4);
                 });
             }
 
