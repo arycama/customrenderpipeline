@@ -534,14 +534,14 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 #endif
 
 Texture2D<float> _WaterShadows;
-matrix _WaterShadowMatrix;
+matrix _WaterShadowMatrix1;
 float3 _WaterShadowExtinction;
 float _WaterShadowFar;
 
 float3 WaterShadow(float3 position, float3 L)
 {
 	float shadowDistance = max(0.0, 0.0 - position.y) / max(1e-6, saturate(L.y));
-	float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix, position);
+	float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, position);
 	if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
 	{
 		float shadowDepth = _WaterShadows.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);

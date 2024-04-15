@@ -6,6 +6,7 @@
 #include "Atmosphere.hlsl"
 #include "Common.hlsl"
 #include "Lighting.hlsl"
+#include "WaterCommon.hlsl"
 
 struct GBufferOutput
 {
@@ -36,9 +37,59 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	float linearWaterDepth = LinearEyeDepth(waterDepth);
 	float waterDistance = linearWaterDepth * rcp(rcpLenV);
-	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25 / linearWaterDepth;
+	float3 positionWS = -V * waterDistance;
 	
-	float3 N = UnpackNormalHemiOctEncode(2.0 * waterNormalFoamRoughness.xy - 1.0).xzy;
+	float2 oceanUv = positionWS.xz - waterNormalFoamRoughness.xy + _ViewPosition.xz;
+	
+	// Gerstner normals + foam
+	float shoreFactor, breaker, shoreFoam;
+	float3 N, displacement, T;
+	GerstnerWaves(float3(oceanUv, 0.0), displacement, N, T, shoreFactor, _Time, breaker, shoreFoam);
+	
+	// Normal + Foam data
+	float2 normalData = 0.0;
+	float foam = 0.0;
+	float smoothness = 1.0;
+
+	[unroll]
+	for (uint i = 0; i < 4; i++)
+	{
+		float3 uv = float3(oceanUv * _OceanScale[i], i + _OceanTextureSliceOffset);
+		float4 cascadeData = _OceanFoamSmoothnessMap.Sample(_TrilinearRepeatAniso16Sampler, uv);
+		
+		float3 normal = UnpackNormal(cascadeData.rg);
+		normalData += normal.xy / normal.z;
+		foam += cascadeData.b * _RcpCascadeScales[i];
+		smoothness *= SmoothnessToNormalLength(cascadeData.a);
+	}
+	
+	smoothness = LengthToSmoothness(smoothness);
+	
+	//smoothness = _Smoothness;
+	
+	float3 B = cross(T, N);
+	float3x3 tangentToWorld = float3x3(T, B, N);
+	float3 oceanN = normalize(float3(normalData * lerp(1.0, 0.0, shoreFactor * 0.75), 1.0));
+	
+	// Foam calculations
+	//float foamFactor = saturate(lerp(_WaveFoamStrength * (-foam + _WaveFoamFalloff), breaker + shoreFoam, shoreFactor));
+	float foamFactor = saturate(_WaveFoamStrength * (-(2.0 * foam - 1.0) + _WaveFoamFalloff));
+	if (foamFactor > 0)
+	{
+		float2 foamUv = oceanUv * _FoamTex_ST.xy + _FoamTex_ST.zw;
+		foamFactor *= _FoamTex.Sample(_TrilinearRepeatAniso16Sampler, foamUv).r;
+		
+		// Sample/unpack normal, reconstruct partial derivatives, scale these by foam factor and normal scale and add.
+		float3 foamNormal = UnpackNormalAG(_FoamBump.Sample(_TrilinearRepeatAniso16Sampler, foamUv));
+		float2 foamDerivs = foamNormal.xy / foamNormal.z;
+		oceanN.xy += foamDerivs * _FoamNormalScale * foamFactor;
+		smoothness = lerp(smoothness, _FoamSmoothness, foamFactor);
+	}
+
+	N = normalize(mul(oceanN, tangentToWorld));
+	smoothness = ProjectedSpaceGeometricNormalFiltering(smoothness, N, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
+	
+	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25 / linearWaterDepth;
 	
 	float2 uvOffset = N.xz * distortion * (1.0 - saturate(dot(N, V)));
 	float2 refractionUv = uvOffset * _ScaledResolution.xy + position.xy;
@@ -68,7 +119,6 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float3 rcpPdf = (exp(c * t) / c) - rcp(c * exp(c * (b - t)));
 	float weight = rcp(dot(rcp(rcpPdf), 1.0 / 3.0));
 
-	float3 positionWS = -V * waterDistance;
 	float3 underwaterPositionWS = PixelToWorld(float3(refractedPositionSS, underwaterDepth));
 	float3 underwaterV = normalize(underwaterPositionWS - positionWS);
 	float3 P = positionWS + underwaterV * t;
@@ -112,7 +162,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	// Ambient 
 	float3 finalTransmittance = exp(-underwaterDistance * _Extinction);
-	luminance += AmbientLight(N) * (1.0 - finalTransmittance);
+	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
 	luminance *= _Color;
 	
 	luminance = IsInfOrNaN(luminance) ? 0.0 : luminance;
@@ -122,7 +172,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		luminance += _UnderwaterResult.Sample(_LinearClampSampler, (uv + uvOffset) * _UnderwaterResult_Scale.xy) * exp(-_Extinction * underwaterDistance);
 	
 	// Apply roughness to transmission
-	float perceptualRoughness = waterNormalFoamRoughness.a;
+	float perceptualRoughness = 1.0 - smoothness;
 	luminance *= (1.0 - waterNormalFoamRoughness.b) * GGXDiffuse(1.0, dot(N, V), perceptualRoughness, 0.02) * Pi;
 
 	GBufferOutput output;

@@ -136,19 +136,14 @@ namespace Arycama.CustomRenderPipeline
 
         public void UpdateFft()
         {
-            var resolution = settings.Resolution;
-            var anisoLevel = settings.AnisoLevel;
-            var useTrilinear = settings.UseTrilinear;
-            var profile = settings.Profile;
-
             // Calculate constants
-            var rcpScales = new Vector4(1f / Mathf.Pow(profile.CascadeScale, 0f), 1f / Mathf.Pow(profile.CascadeScale, 1f), 1f / Mathf.Pow(profile.CascadeScale, 2f), 1f / Mathf.Pow(profile.CascadeScale, 3f));
-            var patchSizes = new Vector4(profile.PatchSize / Mathf.Pow(profile.CascadeScale, 0f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 1f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 2f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 3f));
-            var spectrumStart = new Vector4(0, profile.MaxWaveNumber * patchSizes.y / patchSizes.x, profile.MaxWaveNumber * patchSizes.z / patchSizes.y, profile.MaxWaveNumber * patchSizes.w / patchSizes.z);
-            var spectrumEnd = new Vector4(profile.MaxWaveNumber, profile.MaxWaveNumber, profile.MaxWaveNumber, resolution);
+            var rcpScales = new Vector4(1f / Mathf.Pow(settings.Profile.CascadeScale, 0f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 1f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 2f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 3f));
+            var patchSizes = new Vector4(settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 0f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 1f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 2f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 3f));
+            var spectrumStart = new Vector4(0, settings.Profile.MaxWaveNumber * patchSizes.y / patchSizes.x, settings.Profile.MaxWaveNumber * patchSizes.z / patchSizes.y, settings.Profile.MaxWaveNumber * patchSizes.w / patchSizes.z);
+            var spectrumEnd = new Vector4(settings.Profile.MaxWaveNumber, settings.Profile.MaxWaveNumber, settings.Profile.MaxWaveNumber, settings.Resolution);
             var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
-            var rcpTexelSizes = new Vector4(resolution / patchSizes.x, resolution / patchSizes.y, resolution / patchSizes.z, resolution / patchSizes.w);
-            var texelSizes = patchSizes / resolution;
+            var rcpTexelSizes = new Vector4(settings.Resolution / patchSizes.x, settings.Resolution / patchSizes.y, settings.Resolution / patchSizes.z, settings.Resolution / patchSizes.w);
+            var texelSizes = patchSizes / settings.Resolution;
 
             // TODO: Put this in a common place, eg main pipeline
             var time = EditorApplication.isPlaying ? Time.time : (float)EditorApplication.timeSinceStartup;
@@ -157,14 +152,14 @@ namespace Arycama.CustomRenderPipeline
 
             // Load resources
             var computeShader = Resources.Load<ComputeShader>("OceanFFT");
-            var oceanBuffer = profile.SetShaderProperties(renderGraph);
+            var oceanBuffer = settings.Profile.SetShaderProperties(renderGraph);
 
-            var tempBufferID4 = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
-            var tempBufferID2 = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R32G32_SFloat, 4, TextureDimension.Tex2DArray);
+            var tempBufferID4 = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
+            var tempBufferID2 = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32_SFloat, 4, TextureDimension.Tex2DArray);
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Fft Row"))
             {
-                pass.Initialize(computeShader, 0, 1, resolution, 4, false);
+                pass.Initialize(computeShader, 0, 1, settings.Resolution, 4, false);
                 pass.WriteTexture("targetTexture", tempBufferID4);
                 pass.WriteTexture("targetTexture1", tempBufferID2);
                 pass.ReadBuffer("OceanData", oceanBuffer);
@@ -174,14 +169,14 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_OceanScale", oceanScale);
                     pass.SetVector(command, "SpectrumStart", spectrumStart);
                     pass.SetVector(command, "SpectrumEnd", spectrumEnd);
-                    pass.SetFloat(command, "_OceanGravity", profile.Gravity);
+                    pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
                     pass.SetFloat(command, "Time", time);
                 });
             }
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Fft Column"))
             {
-                pass.Initialize(computeShader, 1, 1, resolution, 4, false);
+                pass.Initialize(computeShader, 1, 1, settings.Resolution, 4, false);
                 pass.ReadTexture("sourceTexture", tempBufferID4);
                 pass.ReadTexture("sourceTexture1", tempBufferID2);
 
@@ -194,7 +189,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Calculate Normals"))
             {
-                pass.Initialize(computeShader, 2, resolution, resolution, 4);
+                pass.Initialize(computeShader, 2, settings.Resolution, settings.Resolution, 4);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -202,9 +197,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
                     pass.SetInt(command, "_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
                     pass.SetFloat(command, "Smoothness", settings.Material.GetFloat("_Smoothness"));
-                    pass.SetFloat(command, "_FoamStrength", profile.FoamStrength);
-                    pass.SetFloat(command, "_FoamDecay", profile.FoamDecay);
-                    pass.SetFloat(command, "_FoamThreshold", profile.FoamThreshold);
+                    pass.SetFloat(command, "_FoamStrength", settings.Profile.FoamStrength);
+                    pass.SetFloat(command, "_FoamDecay", settings.Profile.FoamDecay);
+                    pass.SetFloat(command, "_FoamThreshold", settings.Profile.FoamThreshold);
                     pass.SetFloat(command, "_DeltaTime", deltaTime);
 
                     // TODO: Convert to RTHandles
@@ -215,7 +210,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Generate Filtered Mips"))
             {
-                pass.Initialize(computeShader, 3, (resolution * 4) >> 2, (resolution) >> 2, 1);
+                pass.Initialize(computeShader, 3, (settings.Resolution * 4) >> 2, (settings.Resolution) >> 2, 1);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
@@ -223,7 +218,7 @@ namespace Arycama.CustomRenderPipeline
                     command.GenerateMips(DisplacementMap);
 
                     var mipCount = (int)Mathf.Log(settings.Resolution, 2) + 1;
-                    pass.SetInt(command, "Size", resolution >> 2);
+                    pass.SetInt(command, "Size", settings.Resolution >> 2);
                     pass.SetTexture(command, "_LengthToRoughness", lengthToRoughness);
                     pass.SetFloat(command, "Smoothness", settings.Material.GetFloat("_Smoothness"));
                     pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
@@ -512,7 +507,7 @@ namespace Arycama.CustomRenderPipeline
         {
             // Depth, rgba8 normalFoam, rgba8 roughness, mask? 
             // Writes depth, stencil, and RGBA8 containing normalRG, roughness and foam
-            var oceanRenderResult = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
+            var oceanRenderResult = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R32G32_SFloat, isScreenTexture: true);
 
             var passIndex = settings.Material.FindPass("Water");
             Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
@@ -611,6 +606,15 @@ namespace Arycama.CustomRenderPipeline
 
         public void RenderDeferredWater(CullingResults cullingResults, RTHandle underwaterLighting, RTHandle waterNormalMask, RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, IRenderPassData commonPassData, Camera camera)
         {
+            // Calculate constants
+            var rcpScales = new Vector4(1f / Mathf.Pow(settings.Profile.CascadeScale, 0f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 1f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 2f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 3f));
+            var patchSizes = new Vector4(settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 0f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 1f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 2f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 3f));
+            var spectrumStart = new Vector4(0, settings.Profile.MaxWaveNumber * patchSizes.y / patchSizes.x, settings.Profile.MaxWaveNumber * patchSizes.z / patchSizes.y, settings.Profile.MaxWaveNumber * patchSizes.w / patchSizes.z);
+            var spectrumEnd = new Vector4(settings.Profile.MaxWaveNumber, settings.Profile.MaxWaveNumber, settings.Profile.MaxWaveNumber, settings.Resolution);
+            var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
+            var rcpTexelSizes = new Vector4(settings.Resolution / patchSizes.x, settings.Resolution / patchSizes.y, settings.Resolution / patchSizes.z, settings.Resolution / patchSizes.w);
+            var texelSizes = patchSizes / settings.Resolution;
+
             // Find first 2 directional lights
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
@@ -683,6 +687,25 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetFloat(command, "_RefractOffset", material.GetFloat("_RefractOffset"));
                     pass.SetFloat(command, "_Steps", material.GetFloat("_Steps"));
+
+                    pass.SetVector(command, "_OceanScale", oceanScale);
+                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
+
+                    pass.SetTexture(command, "_OceanFoamSmoothnessMap", foamSmoothness);
+                    pass.SetVector(command, "_RcpCascadeScales", rcpScales);
+
+                    pass.SetFloat(command, "_WaveFoamStrength", settings.Material.GetFloat("_WaveFoamStrength"));
+                    pass.SetFloat(command, "_WaveFoamFalloff", settings.Material.GetFloat("_WaveFoamFalloff"));
+                    pass.SetFloat(command, "_FoamNormalScale", settings.Material.GetFloat("_FoamNormalScale"));
+                    pass.SetFloat(command, "_FoamSmoothness", settings.Material.GetFloat("_FoamSmoothness"));
+
+                    pass.SetVector(command, "_FoamTex_ST", settings.Material.GetVector("_FoamTex_ST"));
+                    pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
+                    pass.SetTexture(command, "_LengthToRoughness", lengthToRoughness);
+
+                    pass.SetTexture(command, "_FoamTex", settings.Material.GetTexture("_FoamTex"));
+                    pass.SetTexture(command, "_FoamBump", settings.Material.GetTexture("_FoamBump"));
+
                 });
             }
         }
@@ -716,7 +739,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetMatrix(command, "_WaterShadowMatrix", waterShadowMatrix);
+            pass.SetMatrix(command, "_WaterShadowMatrix1", waterShadowMatrix);
             pass.SetFloat(command, "_WaterShadowNear", waterShadowNear);
             pass.SetFloat(command, "_WaterShadowFar", waterShadowFar);
             pass.SetVector(command, "_WaterShadowExtinction", waterShadowExtinction);
