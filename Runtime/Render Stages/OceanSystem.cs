@@ -150,6 +150,11 @@ namespace Arycama.CustomRenderPipeline
             var rcpTexelSizes = new Vector4(resolution / patchSizes.x, resolution / patchSizes.y, resolution / patchSizes.z, resolution / patchSizes.w);
             var texelSizes = patchSizes / resolution;
 
+            // TODO: Put this in a common place, eg main pipeline
+            var time = EditorApplication.isPlaying ? Time.time : (float)EditorApplication.timeSinceStartup;
+            var deltaTime = time - previousTime;
+            previousTime = time;
+
             // Load resources
             var computeShader = Resources.Load<ComputeShader>("OceanFFT");
             var oceanBuffer = profile.SetShaderProperties(renderGraph);
@@ -166,21 +171,11 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    command.SetGlobalVector("_OceanScale", oceanScale);
-                    command.SetGlobalVector("_RcpCascadeScales", rcpScales);
-                    command.SetGlobalVector("_OceanTexelSize", rcpTexelSizes);
-
-                    command.SetGlobalFloat("_OceanGravity", profile.Gravity);
-
-                    command.SetGlobalInt("_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
-                    command.SetGlobalInt("_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
-
-                    command.SetComputeVectorParam(computeShader, "SpectrumStart", spectrumStart);
-                    command.SetComputeVectorParam(computeShader, "SpectrumEnd", spectrumEnd);
-                    command.SetComputeVectorParam(computeShader, "_RcpCascadeScales", rcpScales);
-                    command.SetComputeVectorParam(computeShader, "_CascadeTexelSizes", texelSizes);
-
-                    command.SetComputeFloatParam(computeShader, "Time", EditorApplication.isPlaying ? Time.time : (float)EditorApplication.timeSinceStartup);
+                    pass.SetVector(command, "_OceanScale", oceanScale);
+                    pass.SetVector(command, "SpectrumStart", spectrumStart);
+                    pass.SetVector(command, "SpectrumEnd", spectrumEnd);
+                    pass.SetFloat(command, "_OceanGravity", profile.Gravity);
+                    pass.SetFloat(command, "Time", time);
                 });
             }
 
@@ -192,20 +187,7 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    command.SetGlobalVector("_OceanScale", oceanScale);
-                    command.SetGlobalVector("_RcpCascadeScales", rcpScales);
-                    command.SetGlobalVector("_OceanTexelSize", rcpTexelSizes);
-
-                    command.SetGlobalFloat("_OceanGravity", profile.Gravity);
-
-                    command.SetGlobalInt("_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
-                    command.SetGlobalInt("_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
-
-                    command.SetComputeVectorParam(computeShader, "SpectrumStart", spectrumStart);
-                    command.SetComputeVectorParam(computeShader, "SpectrumEnd", spectrumEnd);
-                    command.SetComputeVectorParam(computeShader, "_RcpCascadeScales", rcpScales);
-                    command.SetComputeVectorParam(computeShader, "_CascadeTexelSizes", texelSizes);
-
+                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
                     command.SetComputeTextureParam(computeShader, 1, "DisplacementOutput", DisplacementMap);
                 });
             }
@@ -216,8 +198,11 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
-                    command.SetGlobalInt("_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
-                    command.SetComputeFloatParam(computeShader, "Smoothness", settings.Material.GetFloat("_Smoothness"));
+                    pass.SetVector(command, "_CascadeTexelSizes", texelSizes);
+                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
+                    pass.SetFloat(command, "Smoothness", settings.Material.GetFloat("_Smoothness"));
+
+                    // TODO: Convert to RTHandles
                     command.SetComputeTextureParam(computeShader, 2, "DisplacementInput", DisplacementMap);
                     command.SetComputeTextureParam(computeShader, 2, "_NormalFoamSmoothness", foamSmoothness);
                 });
@@ -230,14 +215,10 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     // Foam
-                    var time = EditorApplication.isPlaying ? Time.time : (float)EditorApplication.timeSinceStartup;
-                    var deltaTime = time - previousTime;
-                    previousTime = time;
-
-                    command.SetComputeFloatParam(computeShader, "_FoamStrength", profile.FoamStrength);
-                    command.SetComputeFloatParam(computeShader, "_FoamDecay", profile.FoamDecay);
-                    command.SetComputeFloatParam(computeShader, "_FoamThreshold", profile.FoamThreshold);
-                    command.SetComputeFloatParam(computeShader, "_DeltaTime", deltaTime);
+                    pass.SetFloat(command, "_FoamStrength", profile.FoamStrength);
+                    pass.SetFloat(command, "_FoamDecay", profile.FoamDecay);
+                    pass.SetFloat(command, "_FoamThreshold", profile.FoamThreshold);
+                    pass.SetFloat(command, "_DeltaTime", deltaTime);
                     command.SetComputeTextureParam(computeShader, 4, "_NormalFoamSmoothness", foamSmoothness);
                 });
             }
@@ -256,19 +237,14 @@ namespace Arycama.CustomRenderPipeline
                     command.GenerateMips(foamSmoothness);
 
                     var mipCount = (int)Mathf.Log(settings.Resolution, 2) + 1;
-                    command.SetComputeIntParam(computeShader, "Resolution", resolution >> 2);
-                    command.SetComputeIntParam(computeShader, "Size", resolution >> 2);
-                    command.SetGlobalTexture("_LengthToRoughness", lengthToRoughness);
+                    pass.SetInt(command, "Size", resolution >> 2);
+                    pass.SetTexture(command, "_LengthToRoughness", lengthToRoughness);
 
                     for (var j = 0; j < mipCount; j++)
                     {
                         var smoothnessId = smoothnessMapIds.GetProperty(j);
                         command.SetComputeTextureParam(computeShader, generateMapsKernel, smoothnessId, foamSmoothness, j);
                     }
-
-                    // TODO: Use read texture
-                    command.SetGlobalTexture("_OceanFoamSmoothnessMap", foamSmoothness);
-                    command.SetGlobalTexture("_OceanDisplacementMap", DisplacementMap);
                 });
             }
         }
@@ -389,6 +365,10 @@ namespace Arycama.CustomRenderPipeline
                     var positionX = Mathf.Floor((viewPosition.x - settings.Size * 0.5f) / texelSize) * texelSize - viewPosition.x;
                     var positionZ = Mathf.Floor((viewPosition.z - settings.Size * 0.5f) / texelSize) * texelSize - viewPosition.z;
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
+
+                    // TODO: Use read texture
+                    pass.SetTexture(command, "_OceanFoamSmoothnessMap", foamSmoothness);
+                    pass.SetTexture(command, "_OceanDisplacementMap", DisplacementMap);
                 });
             }
 
@@ -548,6 +528,19 @@ namespace Arycama.CustomRenderPipeline
             var passIndex = settings.Material.FindPass("Water");
             Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
 
+            var profile = settings.Profile;
+            var resolution = settings.Resolution;
+
+            // Calculate constants
+            var rcpScales = new Vector4(1f / Mathf.Pow(profile.CascadeScale, 0f), 1f / Mathf.Pow(profile.CascadeScale, 1f), 1f / Mathf.Pow(profile.CascadeScale, 2f), 1f / Mathf.Pow(profile.CascadeScale, 3f));
+            var patchSizes = new Vector4(profile.PatchSize / Mathf.Pow(profile.CascadeScale, 0f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 1f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 2f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 3f));
+            var spectrumStart = new Vector4(0, profile.MaxWaveNumber * patchSizes.y / patchSizes.x, profile.MaxWaveNumber * patchSizes.z / patchSizes.y, profile.MaxWaveNumber * patchSizes.w / patchSizes.z);
+            var spectrumEnd = new Vector4(profile.MaxWaveNumber, profile.MaxWaveNumber, profile.MaxWaveNumber, resolution);
+            var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
+            var rcpTexelSizes = new Vector4(resolution / patchSizes.x, resolution / patchSizes.y, resolution / patchSizes.z, resolution / patchSizes.w);
+            var texelSizes = patchSizes / resolution;
+
+
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Render"))
             {
                 var passData = renderGraph.ResourceMap.GetRenderPassData<WaterRenderCullResult>();
@@ -573,6 +566,14 @@ namespace Arycama.CustomRenderPipeline
                     var positionX = MathUtils.Snap(camera.transform.position.x - settings.Size * 0.5f, texelSize) - camera.transform.position.x;
                     var positionZ = MathUtils.Snap(camera.transform.position.z - settings.Size * 0.5f, texelSize) - camera.transform.position.z;
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
+
+                    // TODO: Use read texture
+                    pass.SetTexture(command, "_OceanFoamSmoothnessMap", foamSmoothness);
+                    pass.SetTexture(command, "_OceanDisplacementMap", DisplacementMap);
+
+                    var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
+                    pass.SetVector(command, "_OceanScale", oceanScale);
+
                 });
             }
 

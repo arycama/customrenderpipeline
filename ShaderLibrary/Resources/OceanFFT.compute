@@ -5,27 +5,19 @@
 
 #pragma kernel InitSpectrum
 #pragma kernel FftColumns
-#pragma kernel CreateMesh
+#pragma kernel CalculateNormals
 #pragma kernel GenerateMaps
 #pragma kernel GenerateFoam
 
-float4 SpectrumStart, SpectrumEnd, _OceanScale, _RcpCascadeScales, _OceanTexelSize, _CascadeTexelSizes;
-float _OceanGravity;
+cbuffer InitSpectrumProperties
+{
+	float4 _OceanScale, SpectrumStart, SpectrumEnd;
+	float _OceanGravity, Time;
+};
 
-RWTexture2DArray<float3> DisplacementOutput;
-Texture2DArray<float3> DisplacementInput;
-RWTexture2DArray<float4> sourceTexture, targetTexture;
-RWTexture2DArray<float2> sourceTexture1, targetTexture1;
+RWTexture2DArray<float4> targetTexture;
+RWTexture2DArray<float2> targetTexture1;
 
-RWTexture2DArray<float4> SmoothnessOutput0, SmoothnessOutput1, SmoothnessOutput2, SmoothnessOutput3, SmoothnessOutput4, SmoothnessOutput5, SmoothnessOutput6, SmoothnessOutput7;
-RWTexture2DArray<float4> _NormalFoamSmoothness;
-
-float Smoothness, Time;
-float _OceanScale0, _OceanWindSpeed0, _OceanWindDirection0, _OceanFetch0, _OceanSpreadBlend0, _OceanSwell0, _OceanPeakEnhancement0, _OceanShortWavesFade0;
-float _OceanScale1, _OceanWindSpeed1, _OceanWindDirection1, _OceanFetch1, _OceanSpreadBlend1, _OceanSwell1, _OceanPeakEnhancement1, _OceanShortWavesFade1;
-
-uint _OceanTextureSliceOffset;
-uint Size;
 static const uint _Resolution = 128;
 
 struct OceanSpectrum
@@ -309,6 +301,21 @@ void InitSpectrum(uint3 id : SV_DispatchThreadID)
 	targetTexture[id] = float4(dispX.r, dispX.i, dispZ.r, dispZ.i);
 }
 
+RWTexture2DArray<float3> DisplacementOutput;
+Texture2DArray<float3> DisplacementInput;
+RWTexture2DArray<float4> sourceTexture;
+RWTexture2DArray<float2> sourceTexture1;
+
+RWTexture2DArray<float4> SmoothnessOutput0, SmoothnessOutput1, SmoothnessOutput2, SmoothnessOutput3, SmoothnessOutput4, SmoothnessOutput5, SmoothnessOutput6, SmoothnessOutput7;
+RWTexture2DArray<float4> _NormalFoamSmoothness;
+
+float Smoothness;
+float _OceanScale0, _OceanWindSpeed0, _OceanWindDirection0, _OceanFetch0, _OceanSpreadBlend0, _OceanSwell0, _OceanPeakEnhancement0, _OceanShortWavesFade0;
+float _OceanScale1, _OceanWindSpeed1, _OceanWindDirection1, _OceanFetch1, _OceanSpreadBlend1, _OceanSwell1, _OceanPeakEnhancement1, _OceanShortWavesFade1;
+
+uint _OceanTextureSliceOffset;
+uint Size;
+
 [numthreads(_Resolution, 1, 1)]
 void FftColumns(uint3 id : SV_DispatchThreadID)
 {
@@ -328,8 +335,13 @@ void FftColumns(uint3 id : SV_DispatchThreadID)
 	DisplacementOutput[uint3(texturePos, id.z + _OceanTextureSliceOffset)] = float3(-dispX.r, h.r, -dispZ.r) * sign;
 }
 
+cbuffer CalculateNormalsProperties
+{
+	float4 _CascadeTexelSizes;
+};
+
 [numthreads(8, 8, 1)]
-void CreateMesh(uint3 id : SV_DispatchThreadID)
+void CalculateNormals(uint3 id : SV_DispatchThreadID)
 {
     // Original change in x/y
 	float delta = _CascadeTexelSizes[id.z];

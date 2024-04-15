@@ -15,7 +15,7 @@ Texture2D<float4> _FoamBump, _FoamTex, _OceanCausticsMap, _ShoreDistance;
 float4 _OceanTerrainMask_ST;
 float4 _OceanScale, _OceanTerrainMask_TexelSize, _ShoreDistance_ST;
 float3 _TerrainSize;
-float _WaterShadowNear, _WindSpeed, _OceanGravity;
+float _WindSpeed, _OceanGravity;
 float _MaxOceanDepth, _MaxShoreDistance, CausticsScale, _OceanCascadeScale;
 uint _OceanTextureSliceOffset, _OceanTextureSlicePreviousOffset;
 float4 _RcpCascadeScales;
