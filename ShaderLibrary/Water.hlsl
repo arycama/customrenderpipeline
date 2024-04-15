@@ -402,7 +402,7 @@ FragmentOutput Fragment(FragmentInput input)
 		float3 normal = UnpackNormal(cascadeData.rg);
 		normalData += normal.xy / normal.z;
 		foam += cascadeData.b * _RcpCascadeScales[i];
-		smoothness *= Remap(cascadeData.a, 0.0, 1.0, 7.0 / 8.0);
+		smoothness *= SmoothnessToNormalLength(cascadeData.a);
 	}
 	
 	smoothness = LengthToSmoothness(smoothness);
@@ -415,7 +415,7 @@ FragmentOutput Fragment(FragmentInput input)
 	
 	// Foam calculations
 	//float foamFactor = saturate(lerp(_WaveFoamStrength * (-foam + _WaveFoamFalloff), breaker + shoreFoam, shoreFactor));
-	float foamFactor = saturate(_WaveFoamStrength * (-foam + _WaveFoamFalloff));
+	float foamFactor = saturate(_WaveFoamStrength * (-(2.0 * foam - 1.0) + _WaveFoamFalloff));
 	if (foamFactor > 0)
 	{
 		float2 foamUv = input.uv0.xz * _FoamTex_ST.xy + _FoamTex_ST.zw;

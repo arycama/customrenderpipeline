@@ -200,7 +200,12 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.SetVector(command, "_CascadeTexelSizes", texelSizes);
                     pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
+                    pass.SetInt(command, "_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
                     pass.SetFloat(command, "Smoothness", settings.Material.GetFloat("_Smoothness"));
+                    pass.SetFloat(command, "_FoamStrength", profile.FoamStrength);
+                    pass.SetFloat(command, "_FoamDecay", profile.FoamDecay);
+                    pass.SetFloat(command, "_FoamThreshold", profile.FoamThreshold);
+                    pass.SetFloat(command, "_DeltaTime", deltaTime);
 
                     // TODO: Convert to RTHandles
                     command.SetComputeTextureParam(computeShader, 2, "DisplacementInput", DisplacementMap);
@@ -208,34 +213,14 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Foam Generation"))
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Generate Filtered Mips"))
             {
-                pass.Initialize(computeShader, 4, resolution, resolution, 4);
-
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
-                {
-                    // Foam
-                    pass.SetFloat(command, "_FoamStrength", profile.FoamStrength);
-                    pass.SetFloat(command, "_FoamDecay", profile.FoamDecay);
-                    pass.SetFloat(command, "_FoamThreshold", profile.FoamThreshold);
-                    pass.SetFloat(command, "_DeltaTime", deltaTime);
-                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
-                    command.SetComputeTextureParam(computeShader, 4, "_NormalFoamSmoothness", foamSmoothness);
-                });
-            }
-
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Filtering"))
-            {
-                var generateMapsKernel = computeShader.FindKernel("GenerateMaps");
-                pass.Initialize(computeShader, generateMapsKernel, (resolution * 4) >> 2, (resolution) >> 2, 1);
+                pass.Initialize(computeShader, 3, (resolution * 4) >> 2, (resolution) >> 2, 1);
 
                 var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
                 {
                     // Release resources
                     command.GenerateMips(DisplacementMap);
-
-                    // TODO: Is this redundant since we filter mips anyway?
-                    command.GenerateMips(foamSmoothness);
 
                     var mipCount = (int)Mathf.Log(settings.Resolution, 2) + 1;
                     pass.SetInt(command, "Size", resolution >> 2);

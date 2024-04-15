@@ -6,8 +6,7 @@
 #pragma kernel InitSpectrum
 #pragma kernel FftColumns
 #pragma kernel CalculateNormals
-#pragma kernel GenerateMaps
-#pragma kernel GenerateFoam
+#pragma kernel GenerateFilteredMips
 
 cbuffer InitSpectrumProperties
 {
@@ -338,6 +337,8 @@ cbuffer CalculateNormalsProperties
 {
 	float4 _CascadeTexelSizes;
 	float Smoothness;
+	float _FoamStrength, _FoamDecay, _FoamThreshold;
+	uint _OceanTextureSlicePreviousOffset;
 };
 
 [numthreads(8, 8, 1)]
@@ -357,6 +358,7 @@ void CalculateNormals(uint3 id : SV_DispatchThreadID)
 	float2 normalGradients = float2(-(right.y - left.y) / (2.0 * delta), -(up.y - down.y) / (2.0 * delta));
 	
 	float3 normal = normalize(float3(normalGradients, 1.0));
+	normal *= SmoothnessToNormalLength(Smoothness);
 	
 	// Eq 45
 	float jxx = 1.0 + dx.x;
@@ -365,30 +367,28 @@ void CalculateNormals(uint3 id : SV_DispatchThreadID)
 	float jyx = dy.z;
 	
 	float jacobian = jxx * jyy - jxy * jyx;
-	_NormalFoamSmoothness[uint3(id.xy, id.z + _OceanTextureSliceOffset)] = float4(normal.xy * 0.5 + 0.5, jacobian, Smoothness);
+	_NormalFoamSmoothness[uint3(id.xy, id.z + _OceanTextureSliceOffset)] = float4(0.5 * normal.xy + 0.5, 0.5 * jacobian + 0.5, Smoothness);
 }
 
 // Thread group size of 32 is required to process  the entire 128x128 texture in shared memory
-groupshared float3 averageNormalShared[32][32];
+groupshared float4 mipDataShared[32][32];
 
 static const uint ThreadCount = 32;
 
+float4 UnpackData(float4 data)
+{
+	return float4(UnpackNormal(data.rg), data.b);
+}
+
 [numthreads(32, 32, 1)]
-void GenerateMaps(uint2 groupThreadID : SV_GroupThreadID, uint2 groupID : SV_GroupID,
-                  uint2 dispatchThreadID : SV_DispatchThreadID)
+void GenerateFilteredMips(uint2 groupThreadID : SV_GroupThreadID, uint2 groupID : SV_GroupID, uint2 dispatchThreadID : SV_DispatchThreadID)
 {
 	uint depth = groupID.x + _OceanTextureSliceOffset;
 	groupID = 0;
 	dispatchThreadID.x %= Size;
 
-	RWTexture2DArray<float4> result[8] =
-	{
-		SmoothnessOutput0, SmoothnessOutput1, SmoothnessOutput2, SmoothnessOutput3, SmoothnessOutput4,
-        SmoothnessOutput5, SmoothnessOutput6, SmoothnessOutput7
-	};
-
-	float smoothnessLength = SmoothnessToNormalLength(Smoothness);
-	float3 normalSum = 0.0;
+	RWTexture2DArray<float4> result[8] = { SmoothnessOutput0, SmoothnessOutput1, SmoothnessOutput2, SmoothnessOutput3, SmoothnessOutput4, SmoothnessOutput5, SmoothnessOutput6, SmoothnessOutput7 };
+	float4 mipDataSum = 0.0;
 
     [unroll]
 	for (uint y = 0; y < 2; y++)
@@ -398,48 +398,45 @@ void GenerateMaps(uint2 groupThreadID : SV_GroupThreadID, uint2 groupID : SV_Gro
 		{
 			uint2 offset = dispatchThreadID * 4 + 2 * uint2(x, y);
 
-			float3 averageNormal = UnpackNormal(SmoothnessOutput0[uint3(offset + uint2(0, 0), depth)].rg);
-			averageNormal += UnpackNormal(SmoothnessOutput0[uint3(offset + uint2(1, 0), depth)].rg);
-			averageNormal += UnpackNormal(SmoothnessOutput0[uint3(offset + uint2(0, 1), depth)].rg);
-			averageNormal += UnpackNormal(SmoothnessOutput0[uint3(offset + uint2(1, 1), depth)].rg);
-			averageNormal /= 4.0;
-			averageNormal *= smoothnessLength;
+			// TODO: Gather?
+			float4 mipData = UnpackData(SmoothnessOutput0[uint3(offset + uint2(0, 0), depth)]);
+			mipData += UnpackData(SmoothnessOutput0[uint3(offset + uint2(1, 0), depth)]);
+			mipData += UnpackData(SmoothnessOutput0[uint3(offset + uint2(0, 1), depth)]);
+			mipData += UnpackData(SmoothnessOutput0[uint3(offset + uint2(1, 1), depth)]);
+			mipData *= 0.25;
 
+			float3 averageNormal = normalize(mipData.xyz);
 			uint3 dst = uint3(dispatchThreadID * 2 + uint2(x, y), depth);
-			float normalLength = length(averageNormal);
-			result[1][dst] = float4(result[1][dst].rgb, Remap(normalLength, 7.0 / 8.0));
-			normalSum += averageNormal;
+			result[1][dst] = float4(0.5 * averageNormal.xy + 0.5, mipData.w, LengthToSmoothness(length(mipData.xyz)));
+			mipDataSum += mipData;
 		}
 	}
 
-	normalSum /= 4.0;
-	float normalLength = length(normalSum);
-	float smoothness = Remap(normalLength, 7.0 / 8.0);
-
+	mipDataSum *= 0.25;
+	float3 averageNormal = normalize(mipDataSum.xyz);
 	uint3 dst = uint3(dispatchThreadID, depth);
-	result[2][dst] = float4(result[2][dst].rgb, smoothness);
+	result[2][dst] = float4(0.5 * averageNormal.xy + 0.5, mipDataSum.w, LengthToSmoothness(length(mipDataSum.xyz)));
 
-	averageNormalShared[groupThreadID.x][groupThreadID.y] = normalSum;
-	GroupMemoryBarrierWithGroupSync();
+	mipDataShared[groupThreadID.x][groupThreadID.y] = mipDataSum;
 
     [unroll]
-	for (uint s = ThreadCount / 2, i = 3; s > 0; s >>= 1, i++)
+	for (uint s = ThreadCount >> 1, i = 3; s > 0; s >>= 1, i++)
 	{
-		float3 averageNormal = 0.0;
+		GroupMemoryBarrierWithGroupSync();
+		
+		float4 mipDataSum;
 		if (all(groupThreadID < s))
 		{
             // Load four normals and average
-			averageNormal = averageNormalShared[groupThreadID.x][groupThreadID.y];
-			averageNormal += averageNormalShared[groupThreadID.x + s][groupThreadID.y];
-			averageNormal += averageNormalShared[groupThreadID.x][groupThreadID.y + s];
-			averageNormal += averageNormalShared[groupThreadID.x + s][groupThreadID.y + s];
-			averageNormal /= 4;
+			mipDataSum = mipDataShared[groupThreadID.x][groupThreadID.y];
+			mipDataSum += mipDataShared[groupThreadID.x + s][groupThreadID.y];
+			mipDataSum += mipDataShared[groupThreadID.x][groupThreadID.y + s];
+			mipDataSum += mipDataShared[groupThreadID.x + s][groupThreadID.y + s];
+			mipDataSum *= 0.25;
 
-			float normalLength = length(averageNormal);
-			float smoothness = Remap(normalLength, 7.0 / 8.0);
-
+			float3 averageNormal = normalize(mipDataSum.xyz);
 			uint3 dst = uint3(groupThreadID, depth);
-			result[i][dst] = float4(result[i][dst].rgb, smoothness);
+			result[i][dst] = float4(0.5 * averageNormal.xy + 0.5, mipDataSum.w, LengthToSmoothness(length(mipDataSum.xyz)));
 		}
 		
 		GroupMemoryBarrierWithGroupSync();
@@ -447,21 +444,7 @@ void GenerateMaps(uint2 groupThreadID : SV_GroupThreadID, uint2 groupID : SV_Gro
 		if (all(groupThreadID < s))
 		{
 			uint2 ind = (groupThreadID / 2) + (groupThreadID % 2) * (s / 2);
-			averageNormalShared[ind.x][ind.y] = averageNormal;
+			mipDataShared[ind.x][ind.y] = mipDataSum;
 		}
-
-		GroupMemoryBarrierWithGroupSync();
 	}
-}
-
-float _FoamStrength, _FoamDecay;
-
-[numthreads(8, 8, 1)]
-void GenerateFoam(uint3 id : SV_DispatchThreadID)
-{
-	float4 current = _NormalFoamSmoothness[uint3(id.xy, id.z + _OceanTextureSliceOffset)];
-	float4 previous = _NormalFoamSmoothness[uint3(id.xy, id.z + (_OceanTextureSliceOffset ? 0 : 4))];
-
-	current.b = 1.0 - lerp(1.0 - previous.b, 1.0 - current.b, _FoamStrength);
-	_NormalFoamSmoothness[uint3(id.xy, id.z + _OceanTextureSliceOffset)] = current;
 }

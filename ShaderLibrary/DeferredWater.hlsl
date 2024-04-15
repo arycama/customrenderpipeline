@@ -65,9 +65,8 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	float b = underwaterDistance;
 	float t = dot(-log(1.0 - xi * (1.0 - exp(-c * b))) / c, channelMask);
-	float3 pdf = c * exp(c * (b - t)) / (exp(c * b) - 1.0);
-	float3 rcpPdf = (exp(c * t) / c) - rcp(max(1e-6, c * exp(c * (b - t))));
-	float weight = rcp(max(1e-6, dot(rcp(max(1e-6, rcpPdf)), 1.0 / 3.0)));
+	float3 rcpPdf = (exp(c * t) / c) - rcp(c * exp(c * (b - t)));
+	float weight = rcp(dot(rcp(rcpPdf), 1.0 / 3.0));
 
 	float3 positionWS = -V * waterDistance;
 	float3 underwaterPositionWS = PixelToWorld(float3(refractedPositionSS, underwaterDepth));
@@ -130,6 +129,6 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	output.albedoMetallic = float2(waterNormalFoamRoughness.b, 0.0).xxxy;
 	output.normalRoughness = float4(PackFloat2To888(0.5 * PackNormalOctQuadEncode(N) + 0.5), perceptualRoughness);
 	output.bentNormalOcclusion = float4(N * 0.5 + 0.5, 1.0);
-	output.emissive = luminance * 0;
+	output.emissive = luminance;
 	return output;
 }
