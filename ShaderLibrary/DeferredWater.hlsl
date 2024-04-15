@@ -24,6 +24,14 @@ float4 _UnderwaterResult_Scale;
 float3 _Extinction, _Color, _LightColor0, _LightDirection0, _LightColor1, _LightDirection1;
 float _RefractOffset, _Steps;
 
+// Fragment
+float _FoamNormalScale;
+float _FoamSmoothness;
+float _WaveFoamFalloff;
+float _WaveFoamSharpness;
+float _WaveFoamStrength;
+float4 _FoamTex_ST;
+
 matrix _PixelToWorldDir;
 
 GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
@@ -173,10 +181,10 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	// Apply roughness to transmission
 	float perceptualRoughness = 1.0 - smoothness;
-	luminance *= (1.0 - waterNormalFoamRoughness.b) * GGXDiffuse(1.0, dot(N, V), perceptualRoughness, 0.02) * Pi;
+	luminance *= (1.0 - foamFactor) * GGXDiffuse(1.0, dot(N, V), perceptualRoughness, 0.02) * Pi;
 
 	GBufferOutput output;
-	output.albedoMetallic = float2(waterNormalFoamRoughness.b, 0.0).xxxy;
+	output.albedoMetallic = float2(foamFactor, 0.0).xxxy; // Todo: Multiply by foam albedo?
 	output.normalRoughness = float4(PackFloat2To888(0.5 * PackNormalOctQuadEncode(N) + 0.5), perceptualRoughness);
 	output.bentNormalOcclusion = float4(N * 0.5 + 0.5, 1.0);
 	output.emissive = luminance;

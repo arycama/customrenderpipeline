@@ -24,30 +24,14 @@ float4 _OceanTexelSize;
 float4 _PatchScaleOffset;
 
 float _RcpVerticesPerEdgeMinusOne;
+float _ShoreWaveSteepness;
+float _ShoreWaveHeight;
+float _ShoreWaveLength;
+float _ShoreWindAngle;
 uint _VerticesPerEdge, _VerticesPerEdgeMinusOne;
 
 Buffer<uint> _PatchData;
 
-cbuffer UnityPerMaterial
-{
-	float _Smoothness;
-	float _ShoreWaveHeight;
-	float _ShoreWaveSteepness;
-	float _ShoreWaveLength;
-	float _ShoreWindAngle;
-	
-	// Tessellation
-	float _EdgeLength;
-	float _FrustumThreshold;
-
-	// Fragment
-	float _FoamNormalScale;
-	float _FoamSmoothness;
-	float _WaveFoamFalloff;
-	float _WaveFoamSharpness;
-	float _WaveFoamStrength;
-	float4 _FoamTex_ST;
-};
 
 bool CheckTerrainMask(float3 p0, float3 p1, float3 p2, float3 p3)
 {

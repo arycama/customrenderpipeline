@@ -45,6 +45,27 @@ struct FragmentOutput
 	float2 velocity : SV_Target1;
 };
 
+cbuffer UnityPerMaterial
+{
+	float _Smoothness;
+	//float _ShoreWaveHeight;
+	//float _ShoreWaveSteepness;
+	//float _ShoreWaveLength;
+	//float _ShoreWindAngle;
+	
+	// Tessellation
+	float _EdgeLength;
+	float _FrustumThreshold;
+
+	// Fragment
+	float _FoamNormalScale;
+	float _FoamSmoothness;
+	float _WaveFoamFalloff;
+	float _WaveFoamSharpness;
+	float _WaveFoamStrength;
+	float4 _FoamTex_ST;
+};
+
 HullInput Vertex(VertexInput input)
 {
 	uint col = input.vertexID % _VerticesPerEdge;

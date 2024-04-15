@@ -699,7 +699,10 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_FoamNormalScale", settings.Material.GetFloat("_FoamNormalScale"));
                     pass.SetFloat(command, "_FoamSmoothness", settings.Material.GetFloat("_FoamSmoothness"));
 
-                    pass.SetVector(command, "_FoamTex_ST", settings.Material.GetVector("_FoamTex_ST"));
+                    var foamScale = settings.Material.GetTextureScale("_FoamTex");
+                    var foamOffset = settings.Material.GetTextureOffset("_FoamTex");
+
+                    pass.SetVector(command, "_FoamTex_ST", new Vector4(foamScale.x, foamScale.y, foamOffset.x, foamOffset.y));
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
                     pass.SetTexture(command, "_LengthToRoughness", lengthToRoughness);
 
