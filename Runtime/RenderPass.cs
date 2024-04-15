@@ -24,7 +24,8 @@ namespace Arycama.CustomRenderPipeline
         internal string Name { get; set; }
         internal int Index { get; set; }
 
-        public abstract void SetTexture(CommandBuffer command, string propertyName, Texture texture, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
+        public abstract void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
+
         public abstract void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer);
         public abstract void SetVector(CommandBuffer command, string propertyName, Vector4 value);
         public abstract void SetVectorArray(CommandBuffer command, string propertyName, Vector4[] value);
@@ -42,6 +43,11 @@ namespace Arycama.CustomRenderPipeline
         public override string ToString()
         {
             return Name;
+        }
+
+        public void SetTexture(CommandBuffer command, string propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+        {
+            SetTexture(command, Shader.PropertyToID(propertyName), texture, mip, subElement);
         }
 
         public void ReadTexture(string propertyName, RTHandle texture, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -94,7 +100,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var texture in readTextures)
             {
                 var handle = texture.Item2;
-                SetTexture(command, texture.Item1, handle, texture.Item3);
+                SetTexture(command, texture.Item1, handle, 0, texture.Item3);
                 // TODO: Remove/replace with some utility function as this allocates
                 SetVector(command, $"{texture.Item1}_Scale", new Vector3(handle.Scale.x, handle.Scale.y, handle.Scale.z)); 
             }

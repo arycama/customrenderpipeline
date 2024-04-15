@@ -309,7 +309,6 @@ RWTexture2DArray<float2> sourceTexture1;
 RWTexture2DArray<float4> SmoothnessOutput0, SmoothnessOutput1, SmoothnessOutput2, SmoothnessOutput3, SmoothnessOutput4, SmoothnessOutput5, SmoothnessOutput6, SmoothnessOutput7;
 RWTexture2DArray<float4> _NormalFoamSmoothness;
 
-float Smoothness;
 float _OceanScale0, _OceanWindSpeed0, _OceanWindDirection0, _OceanFetch0, _OceanSpreadBlend0, _OceanSwell0, _OceanPeakEnhancement0, _OceanShortWavesFade0;
 float _OceanScale1, _OceanWindSpeed1, _OceanWindDirection1, _OceanFetch1, _OceanSpreadBlend1, _OceanSwell1, _OceanPeakEnhancement1, _OceanShortWavesFade1;
 
@@ -338,6 +337,7 @@ void FftColumns(uint3 id : SV_DispatchThreadID)
 cbuffer CalculateNormalsProperties
 {
 	float4 _CascadeTexelSizes;
+	float Smoothness;
 };
 
 [numthreads(8, 8, 1)]
@@ -346,10 +346,10 @@ void CalculateNormals(uint3 id : SV_DispatchThreadID)
     // Original change in x/y
 	float delta = _CascadeTexelSizes[id.z];
 
-	float3 left = DisplacementInput[uint3((id.xy + int2(-1, 0)) % _Resolution, id.z + _OceanTextureSliceOffset)];
-	float3 right = DisplacementInput[uint3((id.xy + int2(1, 0)) % _Resolution, id.z + _OceanTextureSliceOffset)];
-	float3 down = DisplacementInput[uint3((id.xy + int2(0, -1)) % _Resolution, id.z + _OceanTextureSliceOffset)];
-	float3 up = DisplacementInput[uint3((id.xy + int2(0, 1)) % _Resolution, id.z + _OceanTextureSliceOffset)];
+	float3 left = DisplacementInput[int3((id.xy + int2(-1, 0)) % _Resolution, id.z + _OceanTextureSliceOffset)];
+	float3 right = DisplacementInput[int3((id.xy + int2(1, 0)) % _Resolution, id.z + _OceanTextureSliceOffset)];
+	float3 down = DisplacementInput[int3((id.xy + int2(0, -1)) % _Resolution, id.z + _OceanTextureSliceOffset)];
+	float3 up = DisplacementInput[int3((id.xy + int2(0, 1)) % _Resolution, id.z + _OceanTextureSliceOffset)];
 
 	float3 dx = (right - left) / (2.0 * delta);
 	float3 dy = (up - down) / (2.0 * delta);
@@ -365,7 +365,7 @@ void CalculateNormals(uint3 id : SV_DispatchThreadID)
 	float jyx = dy.z;
 	
 	float jacobian = jxx * jyy - jxy * jyx;
-	_NormalFoamSmoothness[uint3(id.xy, id.z + _OceanTextureSliceOffset)] = float4(normal.xy * 0.5 + 0.5, jacobian, Remap(SmoothnessToNormalLength(Smoothness), 7.0 / 8.0));
+	_NormalFoamSmoothness[uint3(id.xy, id.z + _OceanTextureSliceOffset)] = float4(normal.xy * 0.5 + 0.5, jacobian, Smoothness);
 }
 
 // Thread group size of 32 is required to process  the entire 128x128 texture in shared memory

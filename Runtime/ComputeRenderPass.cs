@@ -32,9 +32,9 @@ namespace Arycama.CustomRenderPipeline
             RenderGraph.SetRTHandleWrite(handle, Index);
         }
 
-        public override void SetTexture(CommandBuffer command, string propertyName, Texture texture, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+        public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
-            command.SetComputeTextureParam(computeShader, kernelIndex, propertyName, texture, 0, subElement);
+            command.SetComputeTextureParam(computeShader, kernelIndex, propertyName, texture, mip, subElement);
         }
 
         public override void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer)

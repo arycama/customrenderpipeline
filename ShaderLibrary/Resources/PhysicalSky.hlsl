@@ -344,6 +344,8 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		}
 	}
 	
+	luminance = isnan(luminance) ? 0.0 : luminance;
+	
 	#ifndef REFLECTION_PROBE
 		//luminance = RgbToXyy(luminance);
 	#endif

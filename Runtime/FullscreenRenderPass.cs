@@ -48,7 +48,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public override void SetTexture(CommandBuffer command, string propertyName, Texture texture, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+        public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
             switch(subElement)
             {

@@ -219,6 +219,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_FoamDecay", profile.FoamDecay);
                     pass.SetFloat(command, "_FoamThreshold", profile.FoamThreshold);
                     pass.SetFloat(command, "_DeltaTime", deltaTime);
+                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
                     command.SetComputeTextureParam(computeShader, 4, "_NormalFoamSmoothness", foamSmoothness);
                 });
             }
@@ -239,11 +240,13 @@ namespace Arycama.CustomRenderPipeline
                     var mipCount = (int)Mathf.Log(settings.Resolution, 2) + 1;
                     pass.SetInt(command, "Size", resolution >> 2);
                     pass.SetTexture(command, "_LengthToRoughness", lengthToRoughness);
+                    pass.SetFloat(command, "Smoothness", settings.Material.GetFloat("_Smoothness"));
+                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
 
                     for (var j = 0; j < mipCount; j++)
                     {
                         var smoothnessId = smoothnessMapIds.GetProperty(j);
-                        command.SetComputeTextureParam(computeShader, generateMapsKernel, smoothnessId, foamSmoothness, j);
+                        pass.SetTexture(command, smoothnessId, foamSmoothness, j);
                     }
                 });
             }
@@ -369,6 +372,7 @@ namespace Arycama.CustomRenderPipeline
                     // TODO: Use read texture
                     pass.SetTexture(command, "_OceanFoamSmoothnessMap", foamSmoothness);
                     pass.SetTexture(command, "_OceanDisplacementMap", DisplacementMap);
+                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
                 });
             }
 
@@ -540,7 +544,6 @@ namespace Arycama.CustomRenderPipeline
             var rcpTexelSizes = new Vector4(resolution / patchSizes.x, resolution / patchSizes.y, resolution / patchSizes.z, resolution / patchSizes.w);
             var texelSizes = patchSizes / resolution;
 
-
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Render"))
             {
                 var passData = renderGraph.ResourceMap.GetRenderPassData<WaterRenderCullResult>();
@@ -560,6 +563,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
                     pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
                     pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
+                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
+                    pass.SetInt(command, "_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;
@@ -573,7 +578,10 @@ namespace Arycama.CustomRenderPipeline
 
                     var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
                     pass.SetVector(command, "_OceanScale", oceanScale);
+                    pass.SetVector(command, "_RcpCascadeScales", rcpScales);
+                    pass.SetVector(command, "_OceanTexelSize", texelSizes);
 
+                    pass.SetTexture(command, "_LengthToRoughness", lengthToRoughness);
                 });
             }
 
