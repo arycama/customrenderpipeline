@@ -7,8 +7,8 @@
 
 float4x4 _WaterShadowMatrix;
 
-Texture2DArray<float4> _OceanFoamSmoothnessMap;
-Texture2DArray<float3> _OceanDisplacementMap;
+Texture2DArray<float4> OceanNormalFoamSmoothness;
+Texture2DArray<float3> OceanDisplacement, OceanDisplacementHistory;
 Texture2D<float> _OceanTerrainMask;
 Texture2D<float3> _WaterNormals;
 Texture2D<float4> _FoamBump, _FoamTex, _OceanCausticsMap, _ShoreDistance;
@@ -18,7 +18,6 @@ float4 _OceanScale, _OceanTerrainMask_TexelSize, _ShoreDistance_ST;
 float3 _TerrainSize;
 float _WindSpeed, _OceanGravity;
 float _MaxOceanDepth, _MaxShoreDistance, CausticsScale, _OceanCascadeScale;
-uint _OceanTextureSliceOffset, _OceanTextureSlicePreviousOffset;
 float4 _RcpCascadeScales;
 float4 _OceanTexelSize;
 float4 _PatchScaleOffset;
@@ -31,7 +30,6 @@ float _ShoreWindAngle;
 uint _VerticesPerEdge, _VerticesPerEdgeMinusOne;
 
 Buffer<uint> _PatchData;
-
 
 bool CheckTerrainMask(float3 p0, float3 p1, float3 p2, float3 p3)
 {

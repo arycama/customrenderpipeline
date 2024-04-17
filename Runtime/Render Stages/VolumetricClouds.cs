@@ -382,6 +382,8 @@ namespace Arycama.CustomRenderPipeline
                 var cloudCoverageOffset = -endHeight / (startHeight - endHeight);
                 pass.SetFloat(command, "_CloudCoverageScale", cloudCoverageScale);
                 pass.SetFloat(command, "_CloudCoverageOffset", cloudCoverageOffset);
+
+                pass.SetVector(command, "_CloudShadowScaleLimit", cloudShadow.ScaleLimit2D);
             }
         }
 

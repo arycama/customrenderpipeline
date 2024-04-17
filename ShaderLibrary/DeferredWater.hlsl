@@ -20,7 +20,7 @@ Texture2D<float4> _WaterNormalFoam;
 Texture2D<float3> _WaterEmission, _UnderwaterResult;
 Texture2D<float> _Depth, _UnderwaterDepth;
 
-float4 _UnderwaterResult_Scale;
+float4 _UnderwaterResultScaleLimit;
 float3 _Extinction, _Color, _LightColor0, _LightDirection0, _LightColor1, _LightDirection1;
 float _RefractOffset, _Steps;
 
@@ -62,8 +62,8 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	[unroll]
 	for (uint i = 0; i < 4; i++)
 	{
-		float3 uv = float3(oceanUv * _OceanScale[i], i + _OceanTextureSliceOffset);
-		float4 cascadeData = _OceanFoamSmoothnessMap.Sample(_TrilinearRepeatAniso16Sampler, uv);
+		float3 uv = float3(oceanUv * _OceanScale[i], i);
+		float4 cascadeData = OceanNormalFoamSmoothness.Sample(_TrilinearRepeatAniso16Sampler, uv);
 		
 		float3 normal = UnpackNormal(cascadeData.rg);
 		normalData += normal.xy / normal.z;
@@ -177,7 +177,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 
 	// TODO: Stencil? Or hw blend?
 	if(underwaterDepth != 0.0)
-		luminance += _UnderwaterResult.Sample(_LinearClampSampler, (uv + uvOffset) * _UnderwaterResult_Scale.xy) * exp(-_Extinction * underwaterDistance);
+		luminance += _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit)) * exp(-_Extinction * underwaterDistance);
 	
 	// Apply roughness to transmission
 	float perceptualRoughness = 1.0 - smoothness;

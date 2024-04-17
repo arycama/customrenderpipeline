@@ -106,7 +106,7 @@ namespace Arycama.CustomRenderPipeline
             builderPool[builder.GetType()].Enqueue(builder);
         }
 
-        public void Execute(CommandBuffer command, ScriptableRenderContext context)
+        public void Execute(CommandBuffer command)
         {
             foreach (var bufferHandle in bufferHandlesToCreate)
                 bufferHandle.Create();
@@ -235,7 +235,7 @@ namespace Arycama.CustomRenderPipeline
             IsExecuting = true;
 
             foreach (var renderPass in renderPasses)
-                renderPass.Run(command, context);
+                renderPass.Run(command);
 
             IsExecuting = false;
 

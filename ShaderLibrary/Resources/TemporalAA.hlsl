@@ -10,7 +10,7 @@ Texture2D<float> _InputVelocityMagnitudeHistory;
 
 cbuffer Properties
 {
-	float4 _Resolution, _Input_Scale, _Velocity_Scale, _HistoryScaleLimit;
+	float4 _Resolution, _HistoryScaleLimit;
 	float _HasHistory, _VelocityBlending, _VelocityWeight, _Sharpness, _StationaryBlending, _Scale;
 	uint _MaxWidth, _MaxHeight;
 	
@@ -118,7 +118,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	stdDev = sqrt(abs(stdDev / 9.0 - mean * mean));
 
 	history *= rcp(w.x + w.y + 1.0);
-	history += _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
+	history += _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
 	history *=  _PreviousToCurrentExposure;
 	history = RgbToYCoCgFastTonemap(history);
 	if(any(saturate(historyUv) != historyUv))

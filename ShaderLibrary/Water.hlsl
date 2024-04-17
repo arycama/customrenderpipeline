@@ -218,8 +218,8 @@ FragmentInput Domain(HullConstantOutput tessFactors, OutputPatch<DomainInput, 4>
 	[unroll]
 	for (uint i = 0; i < 4; i++)
 	{
-		waveDisplacement += _OceanDisplacementMap.SampleGrad(_TrilinearRepeatSampler, float3(uv * _OceanScale[i], i + _OceanTextureSliceOffset), dx * _OceanScale[i], dy * _OceanScale[i]);
-		previousWaveDisplacement += _OceanDisplacementMap.SampleGrad(_TrilinearRepeatSampler, float3(uv * _OceanScale[i], i + _OceanTextureSlicePreviousOffset), dx * _OceanScale[i], dy * _OceanScale[i]);
+		waveDisplacement += OceanDisplacement.SampleGrad(_TrilinearRepeatSampler, float3(uv * _OceanScale[i], i), dx * _OceanScale[i], dy * _OceanScale[i]);
+		previousWaveDisplacement += OceanDisplacementHistory.SampleGrad(_TrilinearRepeatSampler, float3(uv * _OceanScale[i], i), dx * _OceanScale[i], dy * _OceanScale[i]);
 	}
 
 	// shore waves

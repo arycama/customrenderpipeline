@@ -306,12 +306,10 @@ RWTexture2DArray<float4> sourceTexture;
 RWTexture2DArray<float2> sourceTexture1;
 
 RWTexture2DArray<float4> SmoothnessOutput0, SmoothnessOutput1, SmoothnessOutput2, SmoothnessOutput3, SmoothnessOutput4, SmoothnessOutput5, SmoothnessOutput6, SmoothnessOutput7;
-RWTexture2DArray<float4> _NormalFoamSmoothness;
+RWTexture2DArray<float4> OceanNormalFoamSmoothness;
 
 float _OceanScale0, _OceanWindSpeed0, _OceanWindDirection0, _OceanFetch0, _OceanSpreadBlend0, _OceanSwell0, _OceanPeakEnhancement0, _OceanShortWavesFade0;
 float _OceanScale1, _OceanWindSpeed1, _OceanWindDirection1, _OceanFetch1, _OceanSpreadBlend1, _OceanSwell1, _OceanPeakEnhancement1, _OceanShortWavesFade1;
-
-uint _OceanTextureSliceOffset;
 uint Size;
 
 [numthreads(_Resolution, 1, 1)]
@@ -330,7 +328,7 @@ void FftColumns(uint3 id : SV_DispatchThreadID)
 	Fft(id, h, dispX, dispZ);
 	
 	float sign = ((id.x + id.y) & 1) == 0 ? 1.0 : -1.0;
-	DisplacementOutput[uint3(texturePos, id.z + _OceanTextureSliceOffset)] = float3(-dispX.r, h.r, -dispZ.r) * sign;
+	DisplacementOutput[uint3(texturePos, id.z)] = float3(-dispX.r, h.r, -dispZ.r) * sign;
 }
 
 cbuffer CalculateNormalsProperties
@@ -347,10 +345,10 @@ void CalculateNormals(uint3 id : SV_DispatchThreadID)
     // Original change in x/y
 	float delta = _CascadeTexelSizes[id.z];
 
-	float3 left = DisplacementInput[int3((id.xy + int2(-1, 0)) % _Resolution, id.z + _OceanTextureSliceOffset)];
-	float3 right = DisplacementInput[int3((id.xy + int2(1, 0)) % _Resolution, id.z + _OceanTextureSliceOffset)];
-	float3 down = DisplacementInput[int3((id.xy + int2(0, -1)) % _Resolution, id.z + _OceanTextureSliceOffset)];
-	float3 up = DisplacementInput[int3((id.xy + int2(0, 1)) % _Resolution, id.z + _OceanTextureSliceOffset)];
+	float3 left = DisplacementInput[int3((id.xy + int2(-1, 0)) % _Resolution, id.z)];
+	float3 right = DisplacementInput[int3((id.xy + int2(1, 0)) % _Resolution, id.z)];
+	float3 down = DisplacementInput[int3((id.xy + int2(0, -1)) % _Resolution, id.z)];
+	float3 up = DisplacementInput[int3((id.xy + int2(0, 1)) % _Resolution, id.z)];
 
 	float3 dx = (right - left) / (2.0 * delta);
 	float3 dy = (up - down) / (2.0 * delta);
@@ -367,7 +365,7 @@ void CalculateNormals(uint3 id : SV_DispatchThreadID)
 	float jyx = dy.z;
 	
 	float jacobian = jxx * jyy - jxy * jyx;
-	_NormalFoamSmoothness[uint3(id.xy, id.z + _OceanTextureSliceOffset)] = float4(0.5 * normal.xy + 0.5, 0.5 * jacobian + 0.5, Smoothness);
+	OceanNormalFoamSmoothness[uint3(id.xy, id.z)] = float4(0.5 * normal.xy + 0.5, 0.5 * jacobian + 0.5, Smoothness);
 }
 
 // Thread group size of 32 is required to process  the entire 128x128 texture in shared memory
@@ -383,7 +381,7 @@ float4 UnpackData(float4 data)
 [numthreads(32, 32, 1)]
 void GenerateFilteredMips(uint2 groupThreadID : SV_GroupThreadID, uint2 groupID : SV_GroupID, uint2 dispatchThreadID : SV_DispatchThreadID)
 {
-	uint depth = groupID.x + _OceanTextureSliceOffset;
+	uint depth = groupID.x;
 	groupID = 0;
 	dispatchThreadID.x %= Size;
 

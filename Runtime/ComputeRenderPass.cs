@@ -11,7 +11,7 @@ namespace Arycama.CustomRenderPipeline
         private int kernelIndex, xThreads, yThreads, zThreads;
         private bool normalizedDispatch;
 
-        protected readonly List<(RTHandle, string)> colorBindings = new();
+        protected readonly List<(RTHandle, int, int)> colorBindings = new();
         private readonly List<string> keywords = new();
 
         public void Initialize(ComputeShader computeShader, int kernelIndex = 0, int xThreads = 1, int yThreads = 1, int zThreads = 1, bool normalizedDispatch = true)
@@ -24,12 +24,17 @@ namespace Arycama.CustomRenderPipeline
             this.normalizedDispatch = normalizedDispatch;
         }
 
-        public void WriteTexture(string propertyName, RTHandle handle)
+        public void WriteTexture(int propertyId, RTHandle handle, int mip = 0)
         {
             handle.EnableRandomWrite = true;
 
-            colorBindings.Add(new(handle, propertyName));
+            colorBindings.Add(new(handle, propertyId, mip));
             RenderGraph.SetRTHandleWrite(handle, Index);
+        }
+
+        public void WriteTexture(string propertyName, RTHandle handle, int mip = 0)
+        {
+            WriteTexture(Shader.PropertyToID(propertyName), handle, mip);
         }
 
         public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -86,7 +91,7 @@ namespace Arycama.CustomRenderPipeline
         protected override void SetupTargets(CommandBuffer command)
         {
             for (var i = 0; i < colorBindings.Count; i++)
-                command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].Item2, colorBindings[i].Item1);
+                command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].Item2, colorBindings[i].Item1, colorBindings[i].Item3);
 
             colorBindings.Clear();
             screenWrite = false;

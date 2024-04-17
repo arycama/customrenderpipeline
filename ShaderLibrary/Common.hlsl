@@ -566,4 +566,9 @@ float3 UnpackNormalHemiOctEncode(float2 f)
 	return normalize(n);
 }
 
+float2 ClampScaleTextureUv(float2 uv, float4 scaleLimit)
+{
+	return min(uv * scaleLimit.xy, scaleLimit.zw);
+}
+
 #endif

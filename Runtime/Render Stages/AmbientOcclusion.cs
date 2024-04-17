@@ -70,6 +70,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2d);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                     pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
+                    pass.SetVector(command, "_CameraDepthScaleLimit", depth.ScaleLimit2D);
                 });
 
                 var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);

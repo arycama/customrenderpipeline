@@ -15,7 +15,8 @@ public class WaterProfile : ScriptableObject
     [field: SerializeField] public float MaxWaterHeight { get; private set; } = 32f;
     [field: SerializeField] public OceanSpectrum LocalSpectrum { get; private set; } = new(1f, 12f, 0f, 1e+5f, 1f, 0.2f, 3.3f, 0.01f);
     [field: SerializeField] public OceanSpectrum DistantSpectrum { get; private set; } = new(0f, 12f, 0f, 1e+5f, 1f, 0.2f, 3.3f, 0.01f);
-    public float MaxWaveNumber => CascadeScale * 10f;
+    [field: SerializeField] public float MaxWaveNumberMultiplier { get; private set; } = 10.0f;
+    public float MaxWaveNumber => CascadeScale * MaxWaveNumberMultiplier;
 
     public BufferHandle SetShaderProperties(RenderGraph renderGraph)
     {

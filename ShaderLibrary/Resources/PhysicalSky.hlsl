@@ -353,22 +353,12 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	return luminance;
 }
 
-float4 _SkyInput_Scale, _SkyDepth_Scale, _PreviousDepth_Scale, _FrameCount_Scale, _SkyHistory_Scale;
-Texture2D<float> _SkyDepth, _PreviousDepth, _FrameCount;
+float4 _SkyHistoryScaleLimit;
 Texture2D<float3> _SkyInput, _SkyHistory;
 uint _MaxWidth, _MaxHeight;
 float _IsFirst;
-float _StationaryBlend, _MotionBlend, _MotionFactor, _DepthFactor, _ClampWindow, _MaxFrameCount, _SpatialBlurFrames;
 
-struct TemporalOutput
-{
-	float3 result : SV_Target0;
-	float4 motion : SV_Target1;
-	float depth : SV_Target2;
-	float frameCount : SV_Target3;
-};
-
-TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	int2 pixelId = (int2) position.xy;
 	
@@ -423,76 +413,53 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 		maxValue = max(maxValue, color);
 	}
 	
-	float previousDepth = _PreviousDepth.Sample(_LinearClampSampler, historyUv * _PreviousDepth_Scale.xy);
-	float frameCount = _FrameCount.Sample(_LinearClampSampler, historyUv * _FrameCount_Scale.xy);
-	float depthFactor = saturate(1.0 - _DepthFactor * (sceneDepth - previousDepth) / sceneDepth);
-	
-	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, historyUv * _SkyHistory_Scale.xy) * _PreviousToCurrentExposure);
-	float3 window = (maxValue - minValue) * _ClampWindow;
+	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, min(historyUv * _SkyHistoryScaleLimit.xy, _SkyHistoryScaleLimit.zw)));
 	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
-	float motionLength = saturate(1.0 - length(motion) * _MotionFactor);
-	//float blend = lerp(_StationaryBlend, _MotionBlend, motionLength * depthFactor);
-	float blend = lerp(_StationaryBlend, _MotionBlend, depthFactor);
-	
-	frameCount = lerp(0.0, frameCount, depthFactor * motionLength);
-	
-	float speed = 1.0 / (1.0 + frameCount * _MaxFrameCount);
-	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
-		result = lerp(history, result, speed * _MaxBoxWeight);
+		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
 	result = YCoCgToRgbFastTonemapInverse(result);
-	
 	result = isnan(result) ? 0.0 : result;
 	
-	// Increment frame count
-	frameCount += rcp(_MaxFrameCount);
-	
-	TemporalOutput output;
-	output.result = result;
-	output.motion = 0;//float4(motion, 0.0, depth == 0.0);
-	output.depth = sceneDepth;
-	output.frameCount = frameCount;
-	return output;
+	return result;
 }
 
 float _SpatialSamples, _SpatialDepthFactor, _BlurSigma;
 
 float3 FragmentSpatial(float4 position : SV_Position) : SV_Target
 {
-	float centerDepth = _SkyDepth[position.xy];
-	float frameCount = _FrameCount[position.xy] * _MaxFrameCount;
+	return _SkyInput[position.xy];
 	
-	float3 result = 0.0;
-	float weightSum = 0.0;
+	//float3 result = 0.0;
+	//float weightSum = 0.0;
 	
-	float radius = floor(lerp(_SpatialSamples, 1.0, saturate(frameCount / _SpatialBlurFrames)));
+	//float radius = floor(lerp(_SpatialSamples, 1.0, saturate(frameCount / _SpatialBlurFrames)));
 	
-	for(float y = -radius; y <= radius; y++)
-	{
-		for(float x = -radius; x <= radius; x++)
-		{
-			float2 coord = position.xy + float2(x, y);
-			if(any(coord < 0.0 || coord >= _ScaledResolution.xy))
-				continue;
+	//for(float y = -radius; y <= radius; y++)
+	//{
+	//	for(float x = -radius; x <= radius; x++)
+	//	{
+	//		float2 coord = position.xy + float2(x, y);
+	//		if(any(coord < 0.0 || coord >= _ScaledResolution.xy))
+	//			continue;
 			
-			float depth = _SkyDepth[coord];
-			float3 color = _SkyInput[coord];
+	//		float depth = _SkyDepth[coord];
+	//		float3 color = _SkyInput[coord];
 		
-			float weight = saturate(1.0 - abs(centerDepth - depth) * _SpatialDepthFactor / centerDepth);
-			weight *= saturate(saturate(1.0 - abs(x / max(1.0, radius))) * saturate(1.0 - abs(y / max(1.0, radius))) * _BlurSigma);
+	//		float weight = saturate(1.0 - abs(centerDepth - depth) * _SpatialDepthFactor / centerDepth);
+	//		weight *= saturate(saturate(1.0 - abs(x / max(1.0, radius))) * saturate(1.0 - abs(y / max(1.0, radius))) * _BlurSigma);
 			
-			result += color * weight;
-			weightSum += weight;
-		}
-	}
+	//		result += color * weight;
+	//		weightSum += weight;
+	//	}
+	//}
 	
-	if(weightSum)
-		result *= rcp(weightSum);
+	//if(weightSum)
+	//	result *= rcp(weightSum);
 	
-	return result;
+	//return result;
 }
 
 float4 _InputScaleLimit;

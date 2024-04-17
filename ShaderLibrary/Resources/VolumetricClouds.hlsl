@@ -91,7 +91,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	return output;
 }
 
-float4 _Input_Scale, _CloudDepth_Scale, _HistoryScaleLimit;
+float4 _HistoryScaleLimit;
 uint _MaxWidth, _MaxHeight;
 float _IsFirst;
 float _StationaryBlend, _MotionBlend, _MotionFactor;
@@ -147,7 +147,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 		maxValue = max(maxValue, color);
 	}
 
-	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
+	float4 history = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
 	history.rgb *= _PreviousToCurrentExposure;
 	history.rgb = RgbToYCoCgFastTonemap(history.rgb);
 	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);

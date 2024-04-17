@@ -70,7 +70,7 @@ float3 AmbientLight(float3 N, float occlusion = 1.0, float3 albedo = 1.0)
 
 matrix _WorldToCloudShadow;
 float _CloudShadowDepthInvScale, _CloudShadowExtinctionInvScale;
-float2 _CloudShadow_Scale;
+float4 _CloudShadowScaleLimit;
 Texture2D<float3> _CloudShadow;
 
 float CloudTransmittance(float3 positionWS)
@@ -79,7 +79,7 @@ float CloudTransmittance(float3 positionWS)
 	if (any(saturate(coords.xy) != coords.xy) || coords.z < 0.0)
 		return 1.0;
 	
-	float3 shadowData = _CloudShadow.SampleLevel(_LinearClampSampler, coords.xy * _CloudShadow_Scale.xy, 0.0);
+	float3 shadowData = _CloudShadow.SampleLevel(_LinearClampSampler, ClampScaleTextureUv(coords.xy, _CloudShadowScaleLimit), 0.0);
 	float depth = max(0.0, coords.z - shadowData.r) * _CloudShadowDepthInvScale;
 	float transmittance = exp2(-depth * shadowData.g * _CloudShadowExtinctionInvScale);
 	return max(transmittance, shadowData.b);

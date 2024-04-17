@@ -65,11 +65,6 @@ Shader "Hidden/Physical Sky"
         {
             Name "Temporal"
 
-			Blend 0 Off
-			Blend 1 SrcAlpha OneMinusSrcAlpha
-			Blend 2 Off
-			Blend 3 Off
-
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal

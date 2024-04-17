@@ -27,12 +27,10 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Tooltip("Size of the Mesh in World Space")] public int Size { get; private set; } = 256;
             [field: SerializeField] public int PatchVertices { get; private set; } = 32;
             [field: SerializeField, Range(1, 128)] public float EdgeLength { get; private set; } = 64;
-
         }
 
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
 
-        private RenderTexture foamSmoothness, DisplacementMap;
         private RTHandle lengthToRoughness;
         private Settings settings;
         private RenderGraph renderGraph;
@@ -43,49 +41,17 @@ namespace Arycama.CustomRenderPipeline
         private int VerticesPerTileEdge => settings.PatchVertices + 1;
         private int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
 
+        private RTHandle displacementCurrent;
+
         public OceanSystem(RenderGraph renderGraph, Settings settings)
         {
             this.renderGraph = renderGraph;
             this.settings = settings;
 
-            var resolution = settings.Resolution;
-            var anisoLevel = settings.AnisoLevel;
-            var useTrilinear = settings.UseTrilinear;
-
             underwaterLightingMaterial = new Material(Shader.Find("Hidden/Underwater Lighting 1")) { hideFlags = HideFlags.HideAndDontSave };
             deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water 1")) { hideFlags = HideFlags.HideAndDontSave };
 
-            // Initialize textures
-            foamSmoothness = new RenderTexture(resolution, resolution, 0, RenderTextureFormat.ARGB32, RenderTextureReadWrite.Linear)
-            {
-                anisoLevel = anisoLevel,
-                autoGenerateMips = false,
-                dimension = TextureDimension.Tex2DArray,
-                enableRandomWrite = true,
-                filterMode = useTrilinear ? FilterMode.Trilinear : FilterMode.Bilinear,
-                hideFlags = HideFlags.HideAndDontSave,
-                name = "Ocean Normal Map",
-                useMipMap = true,
-                volumeDepth = 8,
-                wrapMode = TextureWrapMode.Repeat,
-            }.Created();
-
-            DisplacementMap = new RenderTexture(resolution, resolution, 0, RenderTextureFormat.ARGBHalf)
-            {
-                anisoLevel = anisoLevel,
-                autoGenerateMips = false,
-                dimension = TextureDimension.Tex2DArray,
-                enableRandomWrite = true,
-                filterMode = useTrilinear ? FilterMode.Trilinear : FilterMode.Bilinear,
-                hideFlags = HideFlags.HideAndDontSave,
-                name = "Ocean Displacement",
-                useMipMap = true,
-                volumeDepth = 8,
-                wrapMode = TextureWrapMode.Repeat,
-            }.Created();
-
             lengthToRoughness = renderGraph.GetTexture(256, 1, GraphicsFormat.R16G16B16A16_UNorm, isPersistent: true);
-
             indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort));
 
             int index = 0;
@@ -185,37 +151,39 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
+            var displacementHistory = displacementCurrent;
+            var hasDisplacementHistory = displacementHistory != null;
+            displacementCurrent = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R16G16B16A16_SFloat, 4, TextureDimension.Tex2DArray, hasMips: true, isPersistent: true);
+            if (hasDisplacementHistory)
+                displacementHistory.IsPersistent = false;
+            else
+                displacementHistory = displacementCurrent;
+
+            var normalFoamSmoothness = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R8G8B8A8_UNorm, 4, TextureDimension.Tex2DArray, hasMips: true);
+
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Fft Column"))
             {
                 pass.Initialize(computeShader, 1, 1, settings.Resolution, 4, false);
                 pass.ReadTexture("sourceTexture", tempBufferID4);
                 pass.ReadTexture("sourceTexture1", tempBufferID2);
-
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
-                {
-                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
-                    command.SetComputeTextureParam(computeShader, 1, "DisplacementOutput", DisplacementMap);
-                });
+                pass.WriteTexture("DisplacementOutput", displacementCurrent);
             }
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Calculate Normals"))
             {
                 pass.Initialize(computeShader, 2, settings.Resolution, settings.Resolution, 4);
+                pass.WriteTexture("DisplacementInput", displacementCurrent);
+                pass.WriteTexture("OceanNormalFoamSmoothness", normalFoamSmoothness);
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetVector(command, "_CascadeTexelSizes", texelSizes);
-                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
                     pass.SetInt(command, "_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
                     pass.SetFloat(command, "Smoothness", settings.Material.GetFloat("_Smoothness"));
                     pass.SetFloat(command, "_FoamStrength", settings.Profile.FoamStrength);
                     pass.SetFloat(command, "_FoamDecay", settings.Profile.FoamDecay);
                     pass.SetFloat(command, "_FoamThreshold", settings.Profile.FoamThreshold);
                     pass.SetFloat(command, "_DeltaTime", deltaTime);
-
-                    // TODO: Convert to RTHandles
-                    command.SetComputeTextureParam(computeShader, 2, "DisplacementInput", DisplacementMap);
-                    command.SetComputeTextureParam(computeShader, 2, "_NormalFoamSmoothness", foamSmoothness);
                 });
             }
 
@@ -224,23 +192,24 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(computeShader, 3, (settings.Resolution * 4) >> 2, (settings.Resolution) >> 2, 1);
                 pass.ReadTexture("_LengthToRoughness", lengthToRoughness);
 
+                var mipCount = (int)Mathf.Log(settings.Resolution, 2) + 1;
+                for (var j = 0; j < mipCount; j++)
+                {
+                    var smoothnessId = smoothnessMapIds.GetProperty(j);
+                    pass.WriteTexture(smoothnessId, normalFoamSmoothness, j);
+                }
+
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
-                    // Release resources
-                    command.GenerateMips(DisplacementMap);
+                    // TODO: Do this manually? Since this will be compute shader anyway.. could do in same pass
+                    command.GenerateMips(displacementCurrent);
 
-                    var mipCount = (int)Mathf.Log(settings.Resolution, 2) + 1;
                     pass.SetInt(command, "Size", settings.Resolution >> 2);
                     pass.SetFloat(command, "Smoothness", settings.Material.GetFloat("_Smoothness"));
-                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
-
-                    for (var j = 0; j < mipCount; j++)
-                    {
-                        var smoothnessId = smoothnessMapIds.GetProperty(j);
-                        pass.SetTexture(command, smoothnessId, foamSmoothness, j);
-                    }
                 });
             }
+
+            renderGraph.ResourceMap.SetRenderPassData(new OceanFftResult(displacementCurrent, displacementHistory, normalFoamSmoothness));
         }
 
         public void CullShadow(Vector3 viewPosition, CullingResults cullingResults, ICommonPassData commonPassData)
@@ -336,6 +305,7 @@ namespace Arycama.CustomRenderPipeline
             var passIndex = settings.Material.FindPass("WaterShadow");
             Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");
 
+            var fftData = renderGraph.ResourceMap.GetRenderPassData<OceanFftResult>();
             var passData = renderGraph.ResourceMap.GetRenderPassData<WaterShadowCullResult>();
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Shadow"))
             {
@@ -344,6 +314,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.ConfigureClear(RTClearFlags.Depth);
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
                 commonPassData.SetInputs(pass);
+
+                pass.ReadTexture("_OceanDisplacement", displacementCurrent);
+                pass.AddRenderPassData<OceanFftResult>();
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
@@ -359,11 +332,6 @@ namespace Arycama.CustomRenderPipeline
                     var positionX = Mathf.Floor((viewPosition.x - settings.Size * 0.5f) / texelSize) * texelSize - viewPosition.x;
                     var positionZ = Mathf.Floor((viewPosition.z - settings.Size * 0.5f) / texelSize) * texelSize - viewPosition.z;
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
-
-                    // TODO: Use read texture
-                    pass.SetTexture(command, "_OceanFoamSmoothnessMap", foamSmoothness);
-                    pass.SetTexture(command, "_OceanDisplacementMap", DisplacementMap);
-                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
                 });
             }
 
@@ -548,6 +516,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_LengthToRoughness", lengthToRoughness);
 
                 commonPassData.SetInputs(pass);
+                pass.AddRenderPassData<OceanFftResult>();
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
@@ -556,7 +525,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
                     pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
                     pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
-                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
                     pass.SetInt(command, "_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
 
                     // Snap to quad-sized increments on largest cell
@@ -564,10 +532,6 @@ namespace Arycama.CustomRenderPipeline
                     var positionX = MathUtils.Snap(camera.transform.position.x - settings.Size * 0.5f, texelSize) - camera.transform.position.x;
                     var positionZ = MathUtils.Snap(camera.transform.position.z - settings.Size * 0.5f, texelSize) - camera.transform.position.z;
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
-
-                    // TODO: Use read texture
-                    pass.SetTexture(command, "_OceanFoamSmoothnessMap", foamSmoothness);
-                    pass.SetTexture(command, "_OceanDisplacementMap", DisplacementMap);
 
                     var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
                     pass.SetVector(command, "_OceanScale", oceanScale);
@@ -681,6 +645,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
 
                 commonPassData.SetInputs(pass);
+                pass.AddRenderPassData<OceanFftResult>();
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
@@ -689,6 +654,8 @@ namespace Arycama.CustomRenderPipeline
                     var material = settings.Material;
                     pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
                     pass.SetVector(command, "_Extinction", material.GetColor("_Extinction"));
+
+                    pass.SetVector(command, "_UnderwaterResultScaleLimit", underwaterLighting.ScaleLimit2D);
 
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
                     pass.SetVector(command, "_LightColor0", lightColor0);
@@ -700,9 +667,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_Steps", material.GetFloat("_Steps"));
 
                     pass.SetVector(command, "_OceanScale", oceanScale);
-                    pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
 
-                    pass.SetTexture(command, "_OceanFoamSmoothnessMap", foamSmoothness);
                     pass.SetVector(command, "_RcpCascadeScales", rcpScales);
 
                     pass.SetFloat(command, "_WaveFoamStrength", settings.Material.GetFloat("_WaveFoamStrength"));
@@ -815,6 +780,31 @@ namespace Arycama.CustomRenderPipeline
         public void SetInputs(RenderPass pass)
         {
             pass.ReadBuffer("_PatchData", PatchDataBuffer);
+        }
+
+        public void SetProperties(RenderPass pass, CommandBuffer command)
+        {
+        }
+    }
+
+    public struct OceanFftResult : IRenderPassData
+    {
+        public RTHandle OceanDisplacement { get; }
+        public RTHandle OceanDisplacementHistory { get; }
+        public RTHandle OceanNormalFoamSmoothness { get; }
+
+        public OceanFftResult(RTHandle oceanDisplacement, RTHandle oceanDisplacementHistory, RTHandle oceanNormalFoamSmoothness)
+        {
+            OceanDisplacement = oceanDisplacement ?? throw new ArgumentNullException(nameof(oceanDisplacement));
+            OceanDisplacementHistory = oceanDisplacementHistory ?? throw new ArgumentNullException(nameof(oceanDisplacementHistory));
+            OceanNormalFoamSmoothness = oceanNormalFoamSmoothness ?? throw new ArgumentNullException(nameof(oceanNormalFoamSmoothness));
+        }
+
+        public void SetInputs(RenderPass pass)
+        {
+            pass.ReadTexture("OceanDisplacement", OceanDisplacement);
+            pass.ReadTexture("OceanDisplacementHistory", OceanDisplacementHistory);
+            pass.ReadTexture("OceanNormalFoamSmoothness", OceanNormalFoamSmoothness);
         }
 
         public void SetProperties(RenderPass pass, CommandBuffer command)

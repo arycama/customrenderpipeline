@@ -5,7 +5,7 @@
 Texture2D<float3> _Input;
 Texture2D<float> _Depth;
 
-float4 _Depth_Scale, _Input_Scale;
+float4 _Depth_Scale, _Input_Scale; // TODO: These will need fixing
 float _ApertureSize, _FocalDistance, _FocalLength, _SampleRadius, _MaxCoC, _SensorHeight;
 uint _SampleCount;
 

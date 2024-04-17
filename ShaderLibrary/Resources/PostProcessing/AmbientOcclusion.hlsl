@@ -3,7 +3,7 @@
 
 Texture2D<float3> _ViewNormals;
 float3 _Tint;
-float4 _CameraDepth_Scale;
+float4 _CameraDepthScaleLimit;
 float2 ScaleOffset;
 float _Radius, _AoStrength, _FalloffScale, _FalloffBias;
 uint _DirectionCount, _SampleCount;
@@ -17,15 +17,15 @@ struct ViewNormalsOutput
 ViewNormalsOutput FragmentViewNormals(float4 position : SV_Position)
 {
 	float2 uv = position.xy * ScaleOffset;
-	float depth = _CameraDepth.Sample(_PointClampSampler, uv * _CameraDepth_Scale.xy);
+	float depth = _CameraDepth.Sample(_PointClampSampler, ClampScaleTextureUv(uv, _CameraDepthScaleLimit));
 	
 	float3 worldPosition = PixelToWorld(float3(position.xy, depth));
 
 	float4 H;
-	H.x = _CameraDepth.Sample(_PointClampSampler, (uv - float2(1, 0) * ScaleOffset) * _CameraDepth_Scale.xy);
-	H.y = _CameraDepth.Sample(_PointClampSampler, (uv + float2(1, 0) * ScaleOffset) * _CameraDepth_Scale.xy);
-	H.z = _CameraDepth.Sample(_PointClampSampler, (uv - float2(2, 0) * ScaleOffset) * _CameraDepth_Scale.xy);
-	H.w = _CameraDepth.Sample(_PointClampSampler, (uv + float2(2, 0) * ScaleOffset) * _CameraDepth_Scale.xy);
+	H.x = _CameraDepth.Sample(_PointClampSampler, ClampScaleTextureUv(uv - float2(1, 0) * ScaleOffset, _CameraDepthScaleLimit));
+	H.y = _CameraDepth.Sample(_PointClampSampler, ClampScaleTextureUv(uv + float2(1, 0) * ScaleOffset, _CameraDepthScaleLimit));
+	H.z = _CameraDepth.Sample(_PointClampSampler, ClampScaleTextureUv(uv - float2(2, 0) * ScaleOffset, _CameraDepthScaleLimit));
+	H.w = _CameraDepth.Sample(_PointClampSampler, ClampScaleTextureUv(uv + float2(2, 0) * ScaleOffset, _CameraDepthScaleLimit));
 
 	float2 he = abs((2 * H.xy - H.zw) - depth);
 	float3 hDeriv;
@@ -39,10 +39,10 @@ ViewNormalsOutput FragmentViewNormals(float4 position : SV_Position)
 	}
     
 	float4 v;
-	v.x = _CameraDepth.Sample(_PointClampSampler, (uv - float2(0, 1) * ScaleOffset) * _CameraDepth_Scale.xy);
-	v.y = _CameraDepth.Sample(_PointClampSampler, (uv + float2(0, 1) * ScaleOffset) * _CameraDepth_Scale.xy);
-	v.z = _CameraDepth.Sample(_PointClampSampler, (uv - float2(0, 2) * ScaleOffset) * _CameraDepth_Scale.xy);
-	v.w = _CameraDepth.Sample(_PointClampSampler, (uv + float2(0, 2) * ScaleOffset) * _CameraDepth_Scale.xy);
+	v.x = _CameraDepth.Sample(_PointClampSampler, ClampScaleTextureUv(uv - float2(0, 1) * ScaleOffset, _CameraDepthScaleLimit));
+	v.y = _CameraDepth.Sample(_PointClampSampler, ClampScaleTextureUv(uv + float2(0, 1) * ScaleOffset, _CameraDepthScaleLimit));
+	v.z = _CameraDepth.Sample(_PointClampSampler, ClampScaleTextureUv(uv - float2(0, 2) * ScaleOffset, _CameraDepthScaleLimit));
+	v.w = _CameraDepth.Sample(_PointClampSampler, ClampScaleTextureUv(uv + float2(0, 2) * ScaleOffset, _CameraDepthScaleLimit));
 	
 	float2 ve = abs((2 * v.xy - v.zw) - depth);
 	float3 vDeriv;
