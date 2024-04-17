@@ -66,7 +66,7 @@ namespace Arycama.CustomRenderPipeline
                 var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
                 var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
 
-                var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
                 {
                     pass.SetVector(command, "_RcpResolution", data.rcpResolution);
                     pass.SetVector(command, "_InputScaleLimit", new Vector4(input.Scale.x, input.Scale.y, input.Limit.x, input.Limit.y));
@@ -88,7 +88,7 @@ namespace Arycama.CustomRenderPipeline
                 var width = Mathf.Max(1, camera.pixelWidth >> i);
                 var height = Mathf.Max(1, camera.pixelHeight >> i);
 
-                var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<Pass1Data>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_Strength", data.strength);
                     pass.SetVector(command, "_RcpResolution", data.rcpResolution);

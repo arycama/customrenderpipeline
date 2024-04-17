@@ -100,10 +100,10 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	adaptedEv -= ExposureCompensation;
 	
 	float currentExposure = EV100ToExposure(adaptedEv);
-	if (IsFirst || IsInfOrNaN(currentExposure))
+	if (IsFirst || IsInfOrNaN(currentExposure) || currentExposure == 0.0)
 		currentExposure = 1.0;
 	
-	if (IsInfOrNaN(previousExposure))
+	if (previousExposure == 0.0 || IsInfOrNaN(previousExposure))
 		previousExposure = 1.0;
 	
 	LuminanceOutput[0] = currentExposure; // Apply exposure

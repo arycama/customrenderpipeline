@@ -20,7 +20,7 @@ namespace Arycama.CustomRenderPipeline
             pass.WriteTexture(motionVectors);
             pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
 
-            var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
                 pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                 pass.SetMatrix(command, "_WorldToNonJitteredClip", data.nonJitteredVpMatrix);

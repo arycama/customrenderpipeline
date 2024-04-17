@@ -66,7 +66,7 @@ namespace Arycama.CustomRenderPipeline
             pass.ReadTexture("_Bloom", bloom);
             pass.WriteScreen();
 
-            var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
                 pass.SetFloat(command, "HdrEnabled", HDROutputSettings.main.available ? 1.0f : 0.0f);
 

@@ -48,7 +48,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_Result", tempId);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_FocalDistance", data.focalDistance);
                     pass.SetFloat(command, "_FocalLength", data.focalLength);

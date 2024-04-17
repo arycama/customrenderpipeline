@@ -33,11 +33,12 @@ namespace Arycama.CustomRenderPipeline
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
 
         private RenderTexture foamSmoothness, DisplacementMap;
-        private RenderTexture lengthToRoughness;
+        private RTHandle lengthToRoughness;
         private Settings settings;
         private RenderGraph renderGraph;
         private Material underwaterLightingMaterial, deferredWaterMaterial;
         private GraphicsBuffer indexBuffer;
+        private bool isInitialized;
 
         private int VerticesPerTileEdge => settings.PatchVertices + 1;
         private int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
@@ -83,20 +84,7 @@ namespace Arycama.CustomRenderPipeline
                 wrapMode = TextureWrapMode.Repeat,
             }.Created();
 
-            lengthToRoughness = new RenderTexture(256, 1, 0, RenderTextureFormat.R16)
-            {
-                enableRandomWrite = true,
-                hideFlags = HideFlags.HideAndDontSave,
-                name = "Length to Smoothness",
-            }.Created();
-
-            // First pass will shorten normal based on the average normal length from the smoothness
-            var computeShader = Resources.Load<ComputeShader>("Utility/SmoothnessFilter");
-            var generateLengthToSmoothnessKernel = computeShader.FindKernel("GenerateLengthToSmoothness");
-            computeShader.SetFloat("_MaxIterations", 32);
-            computeShader.SetFloat("_Resolution", 256);
-            computeShader.SetTexture(generateLengthToSmoothnessKernel, "_LengthToRoughnessResult", lengthToRoughness);
-            computeShader.DispatchNormalized(generateLengthToSmoothnessKernel, 256, 1, 1);
+            lengthToRoughness = renderGraph.GetTexture(256, 1, GraphicsFormat.R16G16B16A16_UNorm, isPersistent: true);
 
             indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort));
 
@@ -131,8 +119,31 @@ namespace Arycama.CustomRenderPipeline
             indexBuffer.SetData(pIndices);
         }
 
-        private float previousTime;
+        public void Initialize()
+        {
+            if (isInitialized)
+                return;
 
+            isInitialized = true;
+
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Generate Length to Smoothness"))
+            {
+                var computeShader = Resources.Load<ComputeShader>("Utility/SmoothnessFilter");
+
+                var generateLengthToSmoothnessKernel = computeShader.FindKernel("GenerateLengthToSmoothness");
+                pass.Initialize(computeShader, generateLengthToSmoothnessKernel, 256, 1, 1, false);
+
+                pass.WriteTexture("_LengthToRoughnessResult", lengthToRoughness);
+
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                {
+                    pass.SetFloat(command, "_MaxIterations", 32);
+                    pass.SetFloat(command, "_Resolution", 256);
+                });
+            }
+        }
+
+        private float previousTime;
 
         public void UpdateFft()
         {
@@ -164,7 +175,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture("targetTexture1", tempBufferID2);
                 pass.ReadBuffer("OceanData", oceanBuffer);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetVector(command, "_OceanScale", oceanScale);
                     pass.SetVector(command, "SpectrumStart", spectrumStart);
@@ -180,7 +191,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("sourceTexture", tempBufferID4);
                 pass.ReadTexture("sourceTexture1", tempBufferID2);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
                     command.SetComputeTextureParam(computeShader, 1, "DisplacementOutput", DisplacementMap);
@@ -191,7 +202,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.Initialize(computeShader, 2, settings.Resolution, settings.Resolution, 4);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetVector(command, "_CascadeTexelSizes", texelSizes);
                     pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
@@ -211,15 +222,15 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Generate Filtered Mips"))
             {
                 pass.Initialize(computeShader, 3, (settings.Resolution * 4) >> 2, (settings.Resolution) >> 2, 1);
+                pass.ReadTexture("_LengthToRoughness", lengthToRoughness);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     // Release resources
                     command.GenerateMips(DisplacementMap);
 
                     var mipCount = (int)Mathf.Log(settings.Resolution, 2) + 1;
                     pass.SetInt(command, "Size", settings.Resolution >> 2);
-                    pass.SetTexture(command, "_LengthToRoughness", lengthToRoughness);
                     pass.SetFloat(command, "Smoothness", settings.Material.GetFloat("_Smoothness"));
                     pass.SetInt(command, "_OceanTextureSliceOffset", ((renderGraph.FrameIndex & 1) == 0) ? 4 : 0);
 
@@ -334,7 +345,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
                 commonPassData.SetInputs(pass);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     commonPassData.SetProperties(pass, command);
 
@@ -425,7 +436,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
 
                     var index = i;
-                    var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                     {
                         // First pass sets the buffer contents
                         if (isFirstPass)
@@ -484,7 +495,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.ReadTexture("_LodInput", tempLodId);
                     pass.ReadBuffer("_IndirectArgs", indirectArgsBuffer);
 
-                    var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                     {
                         pass.SetInt(command, "_CellCount", settings.CellCount);
                     });
@@ -532,11 +543,13 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteDepth(cameraDepth);
                 pass.WriteTexture(oceanRenderResult, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(velocity);
+
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
+                pass.ReadTexture("_LengthToRoughness", lengthToRoughness);
 
                 commonPassData.SetInputs(pass);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     commonPassData.SetProperties(pass, command);
 
@@ -560,8 +573,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_OceanScale", oceanScale);
                     pass.SetVector(command, "_RcpCascadeScales", rcpScales);
                     pass.SetVector(command, "_OceanTexelSize", texelSizes);
-
-                    pass.SetTexture(command, "_LengthToRoughness", lengthToRoughness);
                 });
             }
 
@@ -595,7 +606,7 @@ namespace Arycama.CustomRenderPipeline
 
                 commonPassData.SetInputs(pass);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetVector(command, "_WaterExtinction", settings.Material.GetColor("_Extinction"));
                 });
@@ -671,7 +682,7 @@ namespace Arycama.CustomRenderPipeline
 
                 commonPassData.SetInputs(pass);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     commonPassData.SetProperties(pass, command);
 

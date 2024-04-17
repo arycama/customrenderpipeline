@@ -93,7 +93,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("_LightCounter", counterBuffer);
                 pass.WriteTexture("_LightClusterIndicesWrite", lightClusterIndices);
 
-                var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
                 {
                     command.SetBufferData(data.counterBuffer, zeroArray);
                     pass.SetInt(command, "_TileSize", data.tileSize);

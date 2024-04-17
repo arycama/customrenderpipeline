@@ -462,7 +462,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = AddRenderPass<GlobalRenderPass>("Set Constant Buffer"))
             {
-                var passData = pass.SetRenderFunction<ConstantBufferPassData<T>>((command, context, pass, data) =>
+                var passData = pass.SetRenderFunction<ConstantBufferPassData<T>>((command, pass, data) =>
                 {
                     var bufferData = ArrayPool<T>.Get(1);
                     bufferData[0] = data.data;

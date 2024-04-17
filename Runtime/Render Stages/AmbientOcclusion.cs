@@ -35,7 +35,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(normals, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(viewDepth, RenderBufferLoadAction.DontCare);
 
-                var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
                 {
                     pass.SetVector(command, "ScaleOffset", data.scaleOffset);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
@@ -56,7 +56,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(scene);
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
 
-                var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<Pass1Data>((command, pass, data) =>
                 {
                     pass.SetVector(command, "ScaleOffset", data.scaleOffset);
                     pass.SetVector(command, "_UvToView", data.uvToView);

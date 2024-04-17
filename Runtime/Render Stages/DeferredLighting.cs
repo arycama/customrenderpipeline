@@ -36,7 +36,7 @@ public class DeferredLighting
             pass.AddRenderPassData<ShadowRenderer.Result>();
             pass.AddRenderPassData<LitData.Result>();
 
-            var data = pass.SetRenderFunction<Data>((command, context, pass, data) =>
+            var data = pass.SetRenderFunction<Data>((command, pass, data) =>
             {
                 commonPassData.SetProperties(pass, command);
             });
@@ -63,7 +63,7 @@ public class DeferredLighting
             pass.AddRenderPassData<ShadowRenderer.Result>();
             pass.AddRenderPassData<LitData.Result>();
 
-            var data = pass.SetRenderFunction<Data>((command, context, pass, data) =>
+            var data = pass.SetRenderFunction<Data>((command, pass, data) =>
             {
                 commonPassData.SetProperties(pass, command);
             });

@@ -47,7 +47,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
 
-                var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_NonLinearDepth", data.nonLinearDepth);
                     pass.SetFloat(command, "_VolumeWidth", data.volumeWidth);
@@ -119,7 +119,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<Result>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
 
-                var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_NonLinearDepth", data.nonLinearDepth);
                     pass.SetFloat(command, "_VolumeWidth", data.volumeWidth);

@@ -130,7 +130,7 @@ namespace Arycama.CustomRenderPipeline
                     data.SetProperties(this, command);
                 }
 
-                renderGraphBuilder.Execute(command, context, this);
+                renderGraphBuilder.Execute(command, this);
                 renderGraphBuilder.ClearRenderFunction();
             }
 
@@ -156,7 +156,7 @@ namespace Arycama.CustomRenderPipeline
             RenderGraph.AddRenderPassInternal(this);
         }
 
-        public T SetRenderFunction<T>(Action<CommandBuffer, ScriptableRenderContext, RenderPass, T> pass) where T : class, new()
+        public T SetRenderFunction<T>(Action<CommandBuffer, RenderPass, T> pass) where T : class, new()
         {
             var result = RenderGraph.GetRenderGraphBuilder<T>();
             result.SetRenderFunction(pass);
@@ -168,9 +168,9 @@ namespace Arycama.CustomRenderPipeline
 
 public class RenderGraphBuilder
 {
-    private Action<CommandBuffer, ScriptableRenderContext> pass;
+    private Action<CommandBuffer> pass;
 
-    public void SetRenderFunction(Action<CommandBuffer, ScriptableRenderContext> pass)
+    public void SetRenderFunction(Action<CommandBuffer> pass)
     {
         this.pass = pass;
     }
@@ -180,18 +180,18 @@ public class RenderGraphBuilder
         pass = null;
     }
 
-    public virtual void Execute(CommandBuffer command, ScriptableRenderContext context, RenderPass pass)
+    public virtual void Execute(CommandBuffer command, RenderPass pass)
     {
-        this.pass?.Invoke(command, context);
+        this.pass?.Invoke(command);
     }
 }
 
 public class RenderGraphBuilder<T> : RenderGraphBuilder where T : class, new()
 {
     public T Data { get; } = new();
-    private Action<CommandBuffer, ScriptableRenderContext, RenderPass, T> pass;
+    private Action<CommandBuffer, RenderPass, T> pass;
 
-    public void SetRenderFunction(Action<CommandBuffer, ScriptableRenderContext, RenderPass, T> pass)
+    public void SetRenderFunction(Action<CommandBuffer, RenderPass, T> pass)
     {
         this.pass = pass;
     }
@@ -201,8 +201,8 @@ public class RenderGraphBuilder<T> : RenderGraphBuilder where T : class, new()
         pass = null;
     }
 
-    public override void Execute(CommandBuffer command, ScriptableRenderContext context, RenderPass pass)
+    public override void Execute(CommandBuffer command, RenderPass pass)
     {
-        this.pass?.Invoke(command, context, pass, Data);
+        this.pass?.Invoke(command, pass, Data);
     }
 }

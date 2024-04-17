@@ -126,7 +126,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(material, 0);
                 pass.WriteTexture(weatherMap, RenderBufferLoadAction.DontCare);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_WeatherMapFrequency", settings.WeatherMapNoiseParams.Frequency);
                     pass.SetFloat(command, "_WeatherMapH", settings.WeatherMapNoiseParams.H);
@@ -145,7 +145,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.DepthSlice = -1;
                 pass.WriteTexture(noiseTexture, RenderBufferLoadAction.DontCare);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_NoiseFrequency", settings.NoiseParams.Frequency);
                     pass.SetFloat(command, "_NoiseH", settings.NoiseParams.H);
@@ -167,7 +167,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.DepthSlice = -1;
                 pass.WriteTexture(detailNoiseTexture, RenderBufferLoadAction.DontCare);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_DetailNoiseFrequency", settings.DetailNoiseParams.Frequency);
                     pass.SetFloat(command, "_DetailNoiseH", settings.DetailNoiseParams.H);
@@ -268,7 +268,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadBuffer("CloudShadowData", cloudShadowDataBuffer);
                 pass.AddRenderPassData<CloudData>();
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     settings.SetCloudPassData(command, pass);
                     pass.SetVector(command, "_ViewPosition", camera.transform.position);
@@ -319,7 +319,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("_Result", cloudCoverageBufferTemp);
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     settings.SetCloudPassData(command, pass);
 
@@ -336,7 +336,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Cloud Coverage Copy"))
             {
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     command.CopyBuffer(cloudCoverageBufferTemp, cloudCoverageBuffer);
                 });
@@ -445,7 +445,7 @@ namespace Arycama.CustomRenderPipeline
 
                 commonPassData.SetInputs(pass);
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     //command.BeginSample(sampler);
                     settings.SetCloudPassData(command, pass);
@@ -474,7 +474,7 @@ namespace Arycama.CustomRenderPipeline
                 commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
                     pass.SetFloat(command, "_StationaryBlend", settings.StationaryBlend);
@@ -507,7 +507,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Depth", cameraDepth);
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetVector(command, "_InputScaleLimit", current.ScaleLimit2D);
                 });

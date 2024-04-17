@@ -39,7 +39,7 @@ namespace Arycama.CustomRenderPipeline
                         pass.WriteTexture(directionalShadows);
 
                         int index = i;
-                        var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                        var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                         {
                             command.SetRenderTarget(directionalShadows, 0, CubemapFace.Unknown, index);
                             command.ClearRenderTarget(true, false, Color.clear);
@@ -82,7 +82,7 @@ namespace Arycama.CustomRenderPipeline
                         pass.WriteTexture(pointShadows);
                         int index = i;
 
-                        var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                        var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                         {
                             command.SetRenderTarget(pointShadows, 0, CubemapFace.Unknown, index);
                             command.ClearRenderTarget(true, false, Color.clear);

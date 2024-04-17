@@ -103,7 +103,7 @@ namespace Arycama.CustomRenderPipeline
                 // For first pass, set to 1.0f 
                 if (isFirst)
                 {
-                    var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                     {
                         var initialData = ArrayPool<Vector4>.Get(1);
                         initialData[0] = new Vector4(1.0f, 0.0f, 0.0f, 0.0f);
@@ -141,7 +141,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("LuminanceHistogram", histogram);
                 pass.AddRenderPassData<AutoExposureData>();
 
-                var data = pass.SetRenderFunction<Pass0Data>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "DeltaTime", data.deltaTime);
                     pass.SetFloat(command, "MinEv", data.minEv);
@@ -180,7 +180,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("LuminanceOutput", output);
                 pass.AddRenderPassData<AutoExposureData>();
 
-                var data = pass.SetRenderFunction<Pass1Data>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<Pass1Data>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "Mode", (float)data.mode);
                     pass.SetFloat(command, "IsFirst", data.isFirst ? 1.0f : 0.0f);
@@ -193,7 +193,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Auto Exposure"))
             {
-                var data = pass.SetRenderFunction<Pass2Data>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<Pass2Data>((command, pass, data) =>
                 {
                     var exposureData = pass.RenderGraph.ResourceMap.GetRenderPassData<AutoExposureData>();
                     command.CopyBuffer(data.output, exposureData.exposureBuffer);

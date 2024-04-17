@@ -164,6 +164,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float depth = _Depth[pixelId];
 	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
 	
+	result.rgb = RemoveNaN(result.rgb);
+	
 	TemporalOutput output;
 	output.history = result;
 	//output.velocity = cloudDistance == 0.0 ? 1.0 : float4(motion, 0.0, depth == 0.0 ? 0.0 : result.a);

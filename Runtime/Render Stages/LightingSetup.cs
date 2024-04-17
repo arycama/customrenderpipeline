@@ -220,7 +220,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Set Light Data"))
             {
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     command.SetBufferData(data.directionalMatrixBuffer, data.directionalShadowMatrices);
                     ListPool<Matrix4x4>.Release(data.directionalShadowMatrices);

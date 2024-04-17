@@ -184,7 +184,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
                 pass.AddRenderPassData<TemporalAAData>();
 
-                var data = pass.SetRenderFunction<PassData>((command, context, pass, data) =>
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_Sharpness", data.sharpness);
                     pass.SetFloat(command, "_HasHistory", data.hasHistory);

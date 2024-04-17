@@ -84,7 +84,7 @@ float3 FragmentCdfLookup(float4 position : SV_Position, float2 uv0 : TEXCOORD0, 
 		}
 	}
 	
-	return c;
+	return (a + b) * 0.5;
 }
 
 struct FragmentTransmittanceOutput
