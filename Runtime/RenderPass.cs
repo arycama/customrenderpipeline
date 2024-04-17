@@ -125,15 +125,15 @@ namespace Arycama.CustomRenderPipeline
 
             SetupTargets(command);
 
+            // Set any data from each pass
+            foreach (var renderPassDataHandle in RenderPassDataHandles)
+            {
+                var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle);
+                data.SetProperties(this, command);
+            }
+
             if (renderGraphBuilder != null)
             {
-                // Set any data from each pass
-                foreach (var renderPassDataHandle in RenderPassDataHandles)
-                {
-                    var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle);
-                    data.SetProperties(this, command);
-                }
-
                 renderGraphBuilder.Execute(command, this);
                 renderGraphBuilder.ClearRenderFunction();
             }

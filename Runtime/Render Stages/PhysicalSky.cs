@@ -1,3 +1,4 @@
+using Arycama.CustomRenderPipeline;
 using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -421,7 +422,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(new ReflectionAmbientData(ambientBuffer, reflectionProbe));
         }
 
-        public void Render(RTHandle target, RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector2 jitter, IRenderPassData commonPassData, Camera camera, CullingResults cullingResults, RTHandle velocity)
+        public void Render(RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector2 jitter, IRenderPassData commonPassData, Camera camera, CullingResults cullingResults)
         {
             var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
@@ -456,7 +457,7 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
             {
                 pass.Initialize(skyMaterial, 3, camera: camera);
-                pass.WriteTexture(skyTemp);
+                pass.WriteTexture(skyTemp, RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_Depth", depth);
 
                 commonPassData.SetInputs(pass);
@@ -490,7 +491,6 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.Initialize(skyMaterial, 4, camera: camera);
                 pass.WriteTexture(skyTemp2, RenderBufferLoadAction.DontCare);
-                pass.WriteTexture(velocity, RenderBufferLoadAction.Load);
                 pass.ReadTexture("_SkyInput", skyTemp);
                 pass.ReadTexture("_SkyHistory", skyColor.history);
                 pass.ReadTexture("_Depth", depth);
@@ -550,22 +550,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            // Final output
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Output"))
-            {
-                pass.Initialize(skyMaterial, 6);
-                pass.WriteTexture(target, RenderBufferLoadAction.Load);
-                pass.ReadTexture("_Input", skyColor.current);
-                pass.ReadTexture("_Depth", depth);
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
-                pass.AddRenderPassData<VolumetricLighting.Result>();
-
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
-                {
-                    pass.SetVector(command, "_InputScaleLimit", skyColor.current.ScaleLimit2D);
-                });
-            }
-
+            renderGraph.ResourceMap.SetRenderPassData(new SkyResultData(skyColor.current));
         }
 
         public void Cleanup()
@@ -694,5 +679,25 @@ namespace Arycama.CustomRenderPipeline
             topRadius = (settings.PlanetRadius + settings.AtmosphereHeight) * settings.EarthScale;
             cloudScatter = settings.CloudScatter;
         }
+    }
+}
+
+public struct SkyResultData : IRenderPassData
+{
+    public RTHandle SkyTexture { get; }
+
+    public SkyResultData(RTHandle skyTexture)
+    {
+        SkyTexture = skyTexture ?? throw new ArgumentNullException(nameof(skyTexture));
+    }
+
+    public void SetInputs(RenderPass pass)
+    {
+        pass.ReadTexture("SkyTexture", SkyTexture);
+    }
+
+    public void SetProperties(RenderPass pass, CommandBuffer command)
+    {
+        pass.SetVector(command, "SkyTextureScaleLimit", SkyTexture.ScaleLimit2D);
     }
 }

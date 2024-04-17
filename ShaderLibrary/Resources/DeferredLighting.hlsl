@@ -1,11 +1,12 @@
 #include "../Atmosphere.hlsl"
 #include "../Lighting.hlsl"
+#include "../Temporal.hlsl"
 #include "../VolumetricLight.hlsl"
 
 Texture2D<float> _Depth;
 Texture2D<float4> _AlbedoMetallic, _NormalRoughness, _BentNormalOcclusion;
 
-float3 Fragment(float4 position : SV_Position) : SV_Target
+float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float depth = _Depth[position.xy];
 	float4 albedoMetallic = _AlbedoMetallic[position.xy];
@@ -30,9 +31,27 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float3 V = normalize(-PixelToWorld(float3(position.xy, depth)));
 	result *= TransmittanceToPoint(_ViewPosition.y + _PlanetRadius, -V.y, CameraDepthToDistance(depth, V));
 	
-	#ifdef WATER_ON
-	//return 0.0;
-	#endif
-	
 	return result;
+}
+
+Texture2D<float4> _Clouds;
+Texture2D<float3> SkyTexture;
+Texture2D<float> _CloudDepth;
+float4 SkyTextureScaleLimit;
+
+float4 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+{
+	float depth = _Depth[position.xy];
+	
+	// Sample the sky and clouds at the re-jittered coordinate, so that the final TAA resolve will not add further jitter. 
+	// (Should we also do this for vol lighting?)
+	float4 result = _Clouds.Sample(_LinearClampSampler, uv + _Jitter.zw);
+	result.rgb += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
+	result.rgb += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
+	
+	// We only want to blend with background if depth is not zero, eg a filled pixel (Could also use stecil, but we already have to sample depth
+	// Though that would allow us to save a depth sample+blend for non-filled pixels, hrm
+	result.a *= depth != 0.0;
+	
+	return float4(result.rgb, (depth != 0.0) * result.a);
 }

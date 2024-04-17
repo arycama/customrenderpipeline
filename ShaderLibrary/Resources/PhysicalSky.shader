@@ -82,18 +82,5 @@ Shader "Hidden/Physical Sky"
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }
-
-		Pass
-        {
-            Name "Combine"
-
-            Blend One One
-
-            HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
-            #pragma fragment FragmentCombine
-            #include "PhysicalSky.hlsl"
-            ENDHLSL
-        }
     }
 }

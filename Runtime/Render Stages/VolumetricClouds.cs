@@ -387,7 +387,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, CullingResults cullingResults, RTHandle cameraTarget, RTHandle velocity, float viewHeight)
+        public void Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, CullingResults cullingResults, float viewHeight)
         {
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
@@ -468,7 +468,6 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.Initialize(material, 5, camera: camera);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
-                pass.WriteTexture(velocity, RenderBufferLoadAction.Load);
                 pass.ReadTexture("_Input", cloudTemp);
                 pass.ReadTexture("_History", history);
                 pass.ReadTexture("_CloudDepth", cloudDepth);
@@ -497,21 +496,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
                     settings.SetCloudPassData(command, pass);
                     commonPassData.SetProperties(pass, command);
-                });
-            }
-
-            // Final output
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Output"))
-            {
-                pass.Initialize(material, 6);
-                pass.WriteTexture(cameraTarget, RenderBufferLoadAction.Load);
-                pass.ReadTexture("_Input", current);
-                pass.ReadTexture("_Depth", cameraDepth);
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
-
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
-                {
-                    pass.SetVector(command, "_InputScaleLimit", current.ScaleLimit2D);
                 });
             }
 

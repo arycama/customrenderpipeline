@@ -430,6 +430,7 @@ float _SpatialSamples, _SpatialDepthFactor, _BlurSigma;
 
 float3 FragmentSpatial(float4 position : SV_Position) : SV_Target
 {
+	// Todo: Reimplement as pcf or something
 	return _SkyInput[position.xy];
 	
 	//float3 result = 0.0;
@@ -460,17 +461,4 @@ float3 FragmentSpatial(float4 position : SV_Position) : SV_Target
 	//	result *= rcp(weightSum);
 	
 	//return result;
-}
-
-float4 _InputScaleLimit;
-
-float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
-{
-	// Stencil? 
-	float depth = _Depth[position.xy];
-	
-	// Sample the clouds at the re-jittered coordinate, so that the final TAA resolve will not add further jitter. 
-	float3 result = _Input.Sample(_LinearClampSampler, min((uv + _Jitter.zw) * _InputScaleLimit.xy, _InputScaleLimit.zw)).rgb;
-	//result = RemoveNaN(XyyToRgb(result));
-	return result + ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
 }

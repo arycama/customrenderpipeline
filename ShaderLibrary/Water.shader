@@ -43,9 +43,9 @@
 
 			Stencil
 			{
-				Ref 6
+				Ref 7
 				Pass Replace
-				WriteMask 6
+				WriteMask 7
 			}
 
 			HLSLPROGRAM

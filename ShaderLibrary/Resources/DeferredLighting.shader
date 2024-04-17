@@ -17,7 +17,7 @@ Shader "Hidden/Deferred Lighting"
             {
                 Ref 1
                 Comp Equal
-				ReadMask 5
+				ReadMask 1
             }
 
             HLSLPROGRAM
@@ -31,23 +31,16 @@ Shader "Hidden/Deferred Lighting"
 
 		Pass
         {
-			Name "Deferred Lighting Water"
+			Name "Deferred Combine"
 
-            Stencil
-            {
-                Ref 4
-                Comp Equal
-				ReadMask 4
-            }
+			Blend One SrcAlpha
 
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
-            #pragma fragment Fragment
-			#define WATER_ON
+            #pragma fragment FragmentCombine
             #include "DeferredLighting.hlsl"
             ENDHLSL
-          
         }
     }
 }

@@ -83,19 +83,5 @@ Shader "Hidden/Volumetric Clouds"
             #include "VolumetricClouds.hlsl"
             ENDHLSL
         }
-
-		 Pass
-        {
-            Name "Combine"
-
-            Blend One SrcAlpha
-
-            HLSLPROGRAM
-            #pragma target 5.0
-            #pragma vertex VertexFullscreenTriangle
-            #pragma fragment FragmentCombine
-            #include "VolumetricClouds.hlsl"
-            ENDHLSL
-        }
     }
 }

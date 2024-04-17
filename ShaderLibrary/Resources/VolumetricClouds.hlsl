@@ -96,13 +96,7 @@ uint _MaxWidth, _MaxHeight;
 float _IsFirst;
 float _StationaryBlend, _MotionBlend, _MotionFactor;
 
-struct TemporalOutput
-{
-	float4 history : SV_Target0;
-	//float4 velocity : SV_Target1;
-};
-
-TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	int2 pixelId = (int2) position.xy;
 	float3 rd = worldDir;
@@ -166,20 +160,5 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	result.rgb = RemoveNaN(result.rgb);
 	
-	TemporalOutput output;
-	output.history = result;
-	//output.velocity = cloudDistance == 0.0 ? 1.0 : float4(motion, 0.0, depth == 0.0 ? 0.0 : result.a);
-	return output;
-}
-
-float4 _InputScaleLimit;
-
-float4 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
-{
-	// Stencil? 
-	float depth = _Depth[position.xy];
-	
-	// Sample the clouds at the re-jittered coordinate, so that the final TAA resolve will not add further jitter. 
-	float4 result = _Input.Sample(_LinearClampSampler, min((uv + _Jitter.zw) * _InputScaleLimit.xy, _InputScaleLimit.zw));
-	return float4(result.rgb, (depth != 0.0) * result.a);
+	return result;
 }
