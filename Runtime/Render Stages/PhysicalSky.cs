@@ -124,7 +124,7 @@ namespace Arycama.CustomRenderPipeline
             this.cloudSettings = cloudSettings;
 
             skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
-            ggxConvolutionMaterial = new Material(Shader.Find("Hidden/Ggx Convolve")) { hideFlags = HideFlags.HideAndDontSave };
+            ggxConvolutionMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
             textureCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Physical Sky");
 
             transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.R16G16B16A16_SFloat, isPersistent: true);
@@ -525,7 +525,7 @@ namespace Arycama.CustomRenderPipeline
             // Spatial
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Spatial"))
             {
-                pass.Initialize(skyMaterial, 5);
+                pass.Initialize(skyMaterial, 5, camera: camera);
                 pass.WriteTexture(skyColor.current, RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_SkyInput", skyTemp2);
                 pass.ReadTexture("_Depth", depth);

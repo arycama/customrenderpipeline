@@ -2,7 +2,6 @@
 #pragma kernel AmbientGroundLookup KERNEL=AmbientGroundLookup AMBIENT_GROUND
 #pragma kernel AmbientSkyLookup KERNEL=AmbientSkyLookup AMBIENT_SKY
 #pragma kernel AmbientProbe
-#pragma enable_d3d11_debug_symbols
 
 #include "../Common.hlsl"
 #include "../Atmosphere.hlsl"

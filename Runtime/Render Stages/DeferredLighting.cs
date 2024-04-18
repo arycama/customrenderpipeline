@@ -13,11 +13,11 @@ public class DeferredLighting
         material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public void Render(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData)
+    public void Render(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, Camera camera)
     {
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting"))
         {
-            pass.Initialize(material);
+            pass.Initialize(material, camera: camera);
 
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(emissive);
@@ -35,6 +35,7 @@ public class DeferredLighting
             pass.AddRenderPassData<LightingSetup.Result>();
             pass.AddRenderPassData<ShadowRenderer.Result>();
             pass.AddRenderPassData<LitData.Result>();
+            pass.AddRenderPassData<ScreenSpaceReflectionResult>();
 
             var data = pass.SetRenderFunction<Data>((command, pass, data) =>
             {

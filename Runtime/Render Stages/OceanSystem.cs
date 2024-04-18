@@ -51,7 +51,7 @@ namespace Arycama.CustomRenderPipeline
             underwaterLightingMaterial = new Material(Shader.Find("Hidden/Underwater Lighting 1")) { hideFlags = HideFlags.HideAndDontSave };
             deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water 1")) { hideFlags = HideFlags.HideAndDontSave };
 
-            lengthToRoughness = renderGraph.GetTexture(256, 1, GraphicsFormat.R16G16B16A16_UNorm, isPersistent: true);
+            lengthToRoughness = renderGraph.GetTexture(256, 1, GraphicsFormat.R16_UNorm, isPersistent: true);
             indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort));
 
             int index = 0;
@@ -159,7 +159,7 @@ namespace Arycama.CustomRenderPipeline
             else
                 displacementHistory = displacementCurrent;
 
-            var normalFoamSmoothness = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R8G8B8A8_UNorm, 4, TextureDimension.Tex2DArray, hasMips: true);
+            var normalFoamSmoothness = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R8G8B8A8_SNorm, 4, TextureDimension.Tex2DArray, hasMips: true);
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Fft Column"))
             {
@@ -300,7 +300,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void RenderShadow(Vector3 viewPosition, ICommonPassData commonPassData)
         {
-            var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.D32_SFloat);
+            var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.D16_UNorm);
 
             var passIndex = settings.Material.FindPass("WaterShadow");
             Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");
@@ -543,13 +543,13 @@ namespace Arycama.CustomRenderPipeline
             return oceanRenderResult;
         }
 
-        public RTHandle RenderUnderwaterLighting(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData)
+        public RTHandle RenderUnderwaterLighting(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, Camera camera)
         {
             var underwaterResultId = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Underwater Lighting"))
             {
-                pass.Initialize(underwaterLightingMaterial);
+                pass.Initialize(underwaterLightingMaterial, camera: camera);
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(underwaterResultId, RenderBufferLoadAction.DontCare);
 

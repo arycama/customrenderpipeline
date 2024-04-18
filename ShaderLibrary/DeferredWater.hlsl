@@ -65,10 +65,10 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		float3 uv = float3(oceanUv * _OceanScale[i], i);
 		float4 cascadeData = OceanNormalFoamSmoothness.Sample(_TrilinearRepeatAniso16Sampler, uv);
 		
-		float3 normal = UnpackNormal(cascadeData.rg);
+		float3 normal = UnpackNormalSNorm(cascadeData.rg);
 		normalData += normal.xy / normal.z;
 		foam += cascadeData.b * _RcpCascadeScales[i];
-		smoothness *= SmoothnessToNormalLength(cascadeData.a);
+		smoothness *= SmoothnessToNormalLength(0.5 * cascadeData.a + 0.5);
 	}
 	
 	smoothness = LengthToSmoothness(smoothness);
@@ -81,7 +81,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	// Foam calculations
 	//float foamFactor = saturate(lerp(_WaveFoamStrength * (-foam + _WaveFoamFalloff), breaker + shoreFoam, shoreFactor));
-	float foamFactor = saturate(_WaveFoamStrength * (-(2.0 * foam - 1.0) + _WaveFoamFalloff));
+	float foamFactor = saturate(_WaveFoamStrength * (-foam + _WaveFoamFalloff));
 	if (foamFactor > 0)
 	{
 		float2 foamUv = oceanUv * _FoamTex_ST.xy + _FoamTex_ST.zw;

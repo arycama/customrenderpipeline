@@ -365,7 +365,7 @@ void CalculateNormals(uint3 id : SV_DispatchThreadID)
 	float jyx = dy.z;
 	
 	float jacobian = jxx * jyy - jxy * jyx;
-	OceanNormalFoamSmoothness[uint3(id.xy, id.z)] = float4(0.5 * normal.xy + 0.5, 0.5 * jacobian + 0.5, Smoothness);
+	OceanNormalFoamSmoothness[uint3(id.xy, id.z)] = float4(normal.xy, jacobian, 2.0 * Smoothness - 1.0); // Snorm texture, need to put smoothness into -1 to 1 range
 }
 
 // Thread group size of 32 is required to process  the entire 128x128 texture in shared memory
@@ -375,7 +375,7 @@ static const uint ThreadCount = 32;
 
 float4 UnpackData(float4 data)
 {
-	return float4(UnpackNormal(data.rg), data.b);
+	return float4(UnpackNormalSNorm(data.rg), data.b);
 }
 
 [numthreads(32, 32, 1)]
@@ -405,7 +405,7 @@ void GenerateFilteredMips(uint2 groupThreadID : SV_GroupThreadID, uint2 groupID 
 
 			float3 averageNormal = normalize(mipData.xyz);
 			uint3 dst = uint3(dispatchThreadID * 2 + uint2(x, y), depth);
-			result[1][dst] = float4(0.5 * averageNormal.xy + 0.5, mipData.w, LengthToSmoothness(length(mipData.xyz)));
+			result[1][dst] = float4(averageNormal.xy, mipData.w, 2.0 * LengthToSmoothness(length(mipData.xyz)) - 1.0);
 			mipDataSum += mipData;
 		}
 	}
@@ -413,7 +413,7 @@ void GenerateFilteredMips(uint2 groupThreadID : SV_GroupThreadID, uint2 groupID 
 	mipDataSum *= 0.25;
 	float3 averageNormal = normalize(mipDataSum.xyz);
 	uint3 dst = uint3(dispatchThreadID, depth);
-	result[2][dst] = float4(0.5 * averageNormal.xy + 0.5, mipDataSum.w, LengthToSmoothness(length(mipDataSum.xyz)));
+	result[2][dst] = float4(averageNormal.xy, mipDataSum.w, 2.0 * LengthToSmoothness(length(mipDataSum.xyz)) - 1.0);
 
 	mipDataShared[groupThreadID.x][groupThreadID.y] = mipDataSum;
 
@@ -434,7 +434,7 @@ void GenerateFilteredMips(uint2 groupThreadID : SV_GroupThreadID, uint2 groupID 
 
 			float3 averageNormal = normalize(mipDataSum.xyz);
 			uint3 dst = uint3(groupThreadID, depth);
-			result[i][dst] = float4(0.5 * averageNormal.xy + 0.5, mipDataSum.w, LengthToSmoothness(length(mipDataSum.xyz)));
+			result[i][dst] = float4(averageNormal.xy, mipDataSum.w, 2.0 * LengthToSmoothness(length(mipDataSum.xyz)) - 1.0);
 		}
 		
 		GroupMemoryBarrierWithGroupSync();

@@ -11,7 +11,36 @@ struct GeometryOutput
 float _Level, _InvOmegaP;
 matrix _PixelToWorldViewDirs[6];
 TextureCube<float3> _SkyReflection;
-uint _Samples;
+float _Samples;
+
+float3 SampleVndf_GGX(float2 u, float3 wi, float alpha, float3 n)
+{
+    // decompose the vector in parallel and perpendicular components
+    float3 wi_z = n * dot(wi, n);
+    float3 wi_xy = wi - wi_z;
+    // warp to the hemisphere configuration
+    float3 wiStd = normalize(wi_z - alpha * wi_xy);
+    // sample a spherical cap in (-wiStd.z, 1]
+    float wiStd_z = dot(wiStd, n);
+    float phi = (2.0f * u.x - 1.0f) * Pi;
+    float z = (1.0f - u.y) * (1.0f + wiStd_z) - wiStd_z;
+    float sinTheta = sqrt(clamp(1.0f - z * z, 0.0f, 1.0f));
+    float x = sinTheta * cos(phi);
+    float y = sinTheta * sin(phi);
+    float3 cStd = float3(x, y, z);
+    // reflect sample to align with normal
+    float3 up = float3(0, 0, 1);
+    float3 wr = n + up;
+    float3 c = dot(wr, cStd) * wr / wr.z - cStd;
+    // compute halfway direction as standard normal
+    float3 wmStd = c + wiStd;
+    float3 wmStd_z = n * dot(n, wmStd);
+    float3 wmStd_xy = wmStd_z - wmStd;
+    // warp back to the ellipsoid configuration
+    float3 wm = normalize(wmStd_z + alpha * wmStd_xy);
+    // return final normal
+    return wm;
+}
 
 void SampleGGXDir(float2 u, float3 V, float3x3 localToWorld, float roughness, out float3 L, out float NdotL, out float NdotH, out float VdotH, bool VeqN = false)
 {
@@ -91,7 +120,7 @@ float V_SmithJointGGX(float NdotL, float NdotV, float roughness)
 	return V_SmithJointGGX(NdotL, NdotV, roughness, partLambdaV);
 }
 
-float3 Fragment(float4 position : SV_Position, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	float3 V = MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
 	
@@ -113,6 +142,14 @@ float3 Fragment(float4 position : SV_Position, uint index : SV_RenderTargetArray
 
         // Note: if (N == V), all of the microsurface normals are visible.
 		SampleGGXDir(u, V, localToWorld, roughness, L, NdotL, NdotH, LdotH, true);
+		
+		
+		float3 H = SampleVndf_GGX(u, V, roughness, N);
+		L = reflect(-V, H);
+		
+		NdotL = dot(N, L);
+		NdotH = dot(N, H);
+		LdotH = dot(L, H);
 
 		if (NdotL <= 0)
 			continue; // Note that some samples will have 0 contribution

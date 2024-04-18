@@ -12,10 +12,10 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Camera Motion Vectors")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public void Render(RTHandle motionVectors, RTHandle cameraDepth, int width, int height, Matrix4x4 nonJitteredVpMatrix, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix)
+        public void Render(RTHandle motionVectors, RTHandle cameraDepth, int width, int height, Matrix4x4 nonJitteredVpMatrix, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, Camera camera)
         {
             using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Camera Motion Vectors");
-            pass.Initialize(material);
+            pass.Initialize(material, camera: camera);
             pass.ReadTexture("_CameraDepth", cameraDepth);
             pass.WriteTexture(motionVectors);
             pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);

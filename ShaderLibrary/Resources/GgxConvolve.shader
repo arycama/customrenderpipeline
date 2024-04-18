@@ -1,4 +1,4 @@
-Shader "Hidden/Ggx Convolve"
+Shader "Hidden/GgxConvolve"
 {
     SubShader
     {

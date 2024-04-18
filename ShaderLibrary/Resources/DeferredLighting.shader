@@ -13,17 +13,20 @@ Shader "Hidden/Deferred Lighting"
         {
 			Name "Deferred Lighting"
 
+			// Render wherever there is either a non-background pixel (Bit 0 == 1) or a water pixel(bit2 == 1)
+			// There is also motion vector (bit1 == 1) but this should never be set without the 1st pixel
             Stencil
             {
-                Ref 1
-                Comp Equal
-				ReadMask 1
+                Ref 0
+                Comp NotEqual
+				ReadMask 5
             }
 
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+			#define SCREENSPACE_REFLECTIONS_ON
             #include "DeferredLighting.hlsl"
             ENDHLSL
           

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -80,7 +81,13 @@ namespace Arycama.CustomRenderPipeline
             if (normalizedDispatch)
                 command.DispatchNormalized(computeShader, kernelIndex, xThreads, yThreads, zThreads);
             else
+            {
+                Assert.IsTrue(xThreads > 0);
+                Assert.IsTrue(yThreads > 0);
+                Assert.IsTrue(zThreads > 0);
+
                 command.DispatchCompute(computeShader, kernelIndex, xThreads, yThreads, zThreads);
+            }
 
             foreach (var keyword in keywords)
                 command.DisableKeyword(computeShader, new LocalKeyword(computeShader, keyword));

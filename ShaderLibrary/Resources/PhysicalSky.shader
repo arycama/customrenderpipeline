@@ -41,7 +41,6 @@ Shader "Hidden/Physical Sky"
             #pragma vertex VertexIdPassthrough
             #pragma geometry GeometryCubemapRender
             #pragma fragment FragmentRender
-			#pragma enable_d3d11_debug_symbols
             #pragma multi_compile _ BELOW_CLOUD_LAYER ABOVE_CLOUD_LAYER
 
             #define REFLECTION_PROBE

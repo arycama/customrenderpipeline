@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -14,6 +15,10 @@ namespace Arycama.CustomRenderPipeline
             var threadGroupsX = MathUtils.DivRoundUp(threadsX, (int)x);
             var threadGroupsY = MathUtils.DivRoundUp(threadsY, (int)y);
             var threadGroupsZ = MathUtils.DivRoundUp(threadsZ, (int)z);
+
+            Assert.IsTrue(threadGroupsX > 0);
+            Assert.IsTrue(threadGroupsY > 0);
+            Assert.IsTrue(threadGroupsZ > 0);
 
             commandBuffer.DispatchCompute(computeShader, kernelIndex, threadGroupsX, threadGroupsY, threadGroupsZ);
         }

@@ -312,6 +312,7 @@ struct LightingInput
 	float occlusion;
 	float3 translucency;
 	float3 bentNormal;
+	bool isWater;
 };
 
 // Ref: "Moving Frostbite to PBR", p. 69.
@@ -551,6 +552,9 @@ float3 WaterShadow(float3 position, float3 L)
 	return exp(-_WaterShadowExtinction * shadowDistance);
 }
 
+Texture2D<float3> ScreenSpaceReflections;
+float4 ScreenSpaceReflectionsScaleLimit;
+
 float3 GetLighting(LightingInput input, bool isVolumetric = false)
 {
 	float3 V = normalize(-input.worldPosition);
@@ -578,34 +582,25 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	float3 R = reflect(-V, input.normal);
 	float3 rStrength = 1.0;
 	
-	#ifdef WATER_ON
-		if(R.y < 0.0)
-		{
-			iblN = float3(0.0, 1.0, 0.0);
-			float NdotR = dot(iblN, -R);
-			float2 f_ab = DirectionalAlbedo(NdotR, input.perceptualRoughness);
-			rStrength = lerp(f_ab.x, f_ab.y, input.f0);
-			R = reflect(R, iblN);
-		}
-	#endif
+	// Reflection correction for water
+	if(input.isWater && R.y < 0.0)
+	{
+		iblN = float3(0.0, 1.0, 0.0);
+		float NdotR = dot(iblN, -R);
+		float2 f_ab = DirectionalAlbedo(NdotR, input.perceptualRoughness);
+		rStrength = lerp(f_ab.x, f_ab.y, input.f0);
+		R = reflect(R, iblN);
+	}
 	
 	float3 iblR = GetSpecularDominantDir(iblN, R, input.perceptualRoughness, NdotV);
 	float NdotR = dot(input.normal, iblR);
 	float iblMipLevel = PerceptualRoughnessToMipmapLevel(input.perceptualRoughness, NdotR);
 	
-	float3 radiance = _SkyReflection.SampleLevel(_TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
+	float3 radiance = ScreenSpaceReflections[input.pixelPosition];
 	
 	float3 irradiance =  AmbientLight(input.bentNormal, input.occlusion, input.albedo);
 	float3 backIrradiance = AmbientLight(-input.bentNormal, input.occlusion, input.translucency);
-	
-	float specularOcclusion = SpecularOcclusion(dot(input.normal, R), input.perceptualRoughness, input.occlusion, dot(input.bentNormal, R));
-	radiance *= specularOcclusion;
-	
-	#ifdef SCREENSPACE_REFLECTIONS_ON
-		float4 ssr = _ReflectionBuffer[positionCS.xy];
-		radiance = lerp(radiance, ssr.rgb, ssr.a);
-	#endif
-	
+
 	// Ambient
 	//illuminance = irradiance;
 	float3 luminance = FssEss * radiance + Fms * Ems * irradiance + (kD * irradiance + bkD * backIrradiance);
