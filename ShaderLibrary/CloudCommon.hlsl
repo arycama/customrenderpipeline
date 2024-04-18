@@ -9,7 +9,7 @@ float2 _WeatherMapResolution;
 float3 _NoiseResolution, _DetailNoiseResolution;
 float _WeatherMapFactor, _NoiseFactor, _DetailNoiseFactor;
 
-Texture2D<float4> _Input, _History;
+Texture2D<float3> _Input, _History;
 Texture3D<float> _CloudNoise, _CloudDetailNoise;
 Texture2D<float> _WeatherMap, _Depth;
 float _WeatherMapScale, _WeatherMapStrength, _StartHeight, _LayerThickness, _Density;
@@ -21,7 +21,7 @@ float _TransmittanceThreshold;
 float3 _LightColor0, _LightColor1, _LightDirection0, _LightDirection1;
 float _BackScatterPhase, _ForwardScatterPhase, _BackScatterScale, _ForwardScatterScale;
 
-Texture2D<float> _CloudDepth;
+Texture2D<float> CloudDepthTexture;
 
 const static float3 _PlanetCenter = float3(0.0, -_PlanetRadius - _ViewPosition.y, 0.0);
 const static float3 _PlanetOffset = float3(0.0, _PlanetRadius + _ViewPosition.y, 0.0);

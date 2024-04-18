@@ -10,7 +10,9 @@ matrix _PixelToWorldViewDirs[6];
 float4 _ScaleOffset;
 float3 _Scale, _Offset;
 float _ColorChannelScale;
-Texture2D<float4> _Clouds;
+Texture2D<float3> CloudTexture;
+Texture2D<float> CloudTransmittanceTexture;
+float4 CloudTextureScaleLimit, CloudTransmittanceTextureScaleLimit;
 float3 _CdfSize;
 
 float3 F(float _ViewHeight, float cosAngle, float distance)
@@ -227,10 +229,13 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	
 		float cloudDistance = 0;
 		float4 clouds = evaluateCloud ? EvaluateCloud(rayStart, rayEnd - rayStart, 8, rd, _ViewHeight, rd.y, offsets, 0.0, false, cloudDistance) : float2(0.0, 1.0).xxxy;
-		luminance += clouds.rgb;
+		float3 cloudLuminance = clouds.rgb;
+		luminance += cloudLuminance;
+	
+		float cloudTransmittance = clouds.a;
 	#else
-		float4 clouds = _Clouds[position.xy];
-		float cloudDistance = _CloudDepth[position.xy];
+		float cloudTransmittance = CloudTransmittanceTexture[position.xy];
+		float cloudDistance = CloudDepthTexture[position.xy];
 	
 		// TODO: Optimize?
 		float depth = _Depth[position.xy];
@@ -243,7 +248,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		}
 	#endif
 	
-	rayLength = lerp(cloudDistance, rayLength, clouds.a);
+	rayLength = lerp(cloudDistance, rayLength, cloudTransmittance);
 	
 	float3 maxTransmittance = TransmittanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
 	float3 transmittanceAtDistance = TransmittanceToPoint(_ViewHeight, rd.y, rayLength);
@@ -306,7 +311,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		
 		// Blend clouds if needed
 		if (currentDistance >= cloudDistance)
-			lighting *= clouds.a;
+			lighting *= cloudTransmittance;
 		
 		float3 pdf = viewTransmittance * extinction * rcp(1.0 - maxTransmittance);
 		luminance += lighting * rcp(dot(pdf, rcp(3.0))) / _Samples;
@@ -338,7 +343,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 			float3 surface = (ambient + sunTransmittanceAtMaxDistance * saturate(lightCosAngleAtMaxDistance) * RcpPi) * light.color * _Exposure * _GroundColor * transmittanceAtMaxDistance;
 			
 			// Clouds block out surface
-			surface *= clouds.a;
+			surface *= cloudTransmittance;
 			
 			luminance += surface;
 		}
@@ -362,9 +367,9 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 {
 	int2 pixelId = (int2) position.xy;
 	
-	float4 cloud = _Clouds[pixelId];
+	float cloudTransmittance = CloudTransmittanceTexture[pixelId];
 	float depth = _Depth[pixelId];
-	float cloudDistance = _CloudDepth[pixelId];
+	float cloudDistance = CloudDepthTexture[pixelId];
 	
 	float3 rd = worldDir;
 	float rcpRdLength = rsqrt(dot(rd, rd));
@@ -379,7 +384,7 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			sceneDistance = AtmosphereDepth(_ViewHeight, rd.y) * DistanceToTopAtmosphereBoundary(_ViewHeight, rd.y);
 	}
 	
-	sceneDistance = lerp(cloudDistance, sceneDistance, cloud.a);
+	sceneDistance = lerp(cloudDistance, sceneDistance, cloudTransmittance);
 	float sceneDepth = CameraDistanceToDepth(sceneDistance, -rd);
 	
 	float3 worldPosition = rd * sceneDistance;

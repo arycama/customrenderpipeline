@@ -7,8 +7,9 @@ struct FragmentOutput
 	#ifdef CLOUD_SHADOW
 		float3 result : SV_Target0;
 	#else
-		float4 result : SV_Target0;
-		float depth : SV_Target1;
+		float3 luminance : SV_Target0;
+		float transmittance : SV_Target1;
+		float depth : SV_Target2;
 	#endif
 };
 
@@ -58,7 +59,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			float sceneDistance = LinearEyeDepth(sceneDepth) * rcp(rcpRdLength);
 			if (sceneDistance < rayStart)
 			{
-				output.result = float2(0.0, 1.0).xxxy;
+				output.luminance = 0.0;
+				output.transmittance = 1.0;
 				output.depth = 0.0;
 				return output;
 			}
@@ -83,27 +85,34 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float totalRayLength = rayEnd - cloudDepth;
 		output.result = float3(cloudDepth * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a);
 	#else
-		//result.rgb = RemoveNaN(RgbToXyy(result.rgb));
-		output.result = result;
+		output.luminance = result.rgb;
+		output.transmittance = result.a;
 		output.depth = cloudDepth;
 	#endif
 	
 	return output;
 }
 
-float4 _HistoryScaleLimit;
+Texture2D<float> _InputTransmittance, _TransmittanceHistory;
+float4 _HistoryScaleLimit, _TransmittanceHistoryScaleLimit;
 uint _MaxWidth, _MaxHeight;
 float _IsFirst;
 float _StationaryBlend, _MotionBlend, _MotionFactor;
 
-float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+struct TemporalOutput
+{
+	float3 luminance : SV_Target0;
+	float transmittance : SV_Target1;
+};
+
+TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	int2 pixelId = (int2) position.xy;
 	float3 rd = worldDir;
 	float rcpRdLength = rsqrt(dot(rd, rd));
 	rd *= rcpRdLength;
 	
-	float cloudDistance = _CloudDepth[pixelId];
+	float cloudDistance = CloudDepthTexture[pixelId];
 
 	float3 worldPosition = rd * cloudDistance;
 	float4 previousClip = WorldToClipPrevious(worldPosition);
@@ -116,7 +125,7 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	// Neighborhood clamp
 	int2 offsets[8] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(1, 0), int2(-1, 1), int2(0, 1), int2(1, 1)};
 	float4 minValue, maxValue, result;
-	result = _Input[pixelId];
+	result = float4(_Input[pixelId], _InputTransmittance[pixelId]);
 	result.rgb = RgbToYCoCgFastTonemap(result.rgb);
 	minValue = maxValue = result;
 	result *= _CenterBoxFilterWeight;
@@ -124,7 +133,7 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	[unroll]
 	for (int i = 0; i < 4; i++)
 	{
-		float4 color = _Input[pixelId + offsets[i]];
+		float4 color =  float4(_Input[pixelId + offsets[i]], _InputTransmittance[pixelId + offsets[i]]);
 		color.rgb = RgbToYCoCgFastTonemap(color.rgb);
 		result += color * _BoxFilterWeights0[i];
 		minValue = min(minValue, color);
@@ -134,14 +143,14 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	[unroll]
 	for (i = 0; i < 4; i++)
 	{
-		float4 color = _Input[pixelId + offsets[i + 4]];
+		float4 color = float4(_Input[pixelId + offsets[i + 4]], _InputTransmittance[pixelId + offsets[i + 4]]);
 		color.rgb = RgbToYCoCgFastTonemap(color.rgb);
 		result += color * _BoxFilterWeights1[i];
 		minValue = min(minValue, color);
 		maxValue = max(maxValue, color);
 	}
 
-	float4 history = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
+	float4 history = float4(_History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit)), _TransmittanceHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _TransmittanceHistoryScaleLimit)));
 	history.rgb *= _PreviousToCurrentExposure;
 	history.rgb = RgbToYCoCgFastTonemap(history.rgb);
 	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
@@ -160,5 +169,8 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	result.rgb = RemoveNaN(result.rgb);
 	
-	return result;
+	TemporalOutput output;
+	output.luminance = result.rgb;
+	output.transmittance = result.a;
+	return output;
 }

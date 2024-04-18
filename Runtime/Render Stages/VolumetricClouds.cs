@@ -94,7 +94,7 @@ namespace Arycama.CustomRenderPipeline
 
         private readonly Material material;
         private readonly Settings settings;
-        private readonly PersistentRTHandleCache textureCache;
+        private readonly PersistentRTHandleCache cloudLuminanceTextureCache, cloudTransmittanceTextureCache;
         private int version = -1;
         private readonly RTHandle weatherMap, noiseTexture, detailNoiseTexture;
         private readonly ComputeShader cloudCoverageComputeShader;
@@ -103,7 +103,9 @@ namespace Arycama.CustomRenderPipeline
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };
-            textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Clouds");
+
+            cloudLuminanceTextureCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Cloud Luminance");
+            cloudTransmittanceTextureCache = new(GraphicsFormat.R8_UNorm, renderGraph, "Cloud Transmittance");
 
             weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, GraphicsFormat.R8_UNorm, isPersistent: true);
             noiseTexture = renderGraph.GetTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, GraphicsFormat.R8_UNorm, settings.NoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
@@ -417,8 +419,10 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            var cloudTemp = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var cloudLuminanceTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            var cloudTransmittanceTemp = renderGraph.GetTexture(width, height, GraphicsFormat.R8_UNorm, isScreenTexture: true);
             var cloudDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R32_SFloat, isScreenTexture: true);
+
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Render"))
             {
                 // Determine pass
@@ -437,7 +441,8 @@ namespace Arycama.CustomRenderPipeline
                 }
 
                 pass.Initialize(material, 4, 1, keyword, camera);
-                pass.WriteTexture(cloudTemp, RenderBufferLoadAction.DontCare);
+                pass.WriteTexture(cloudLuminanceTemp, RenderBufferLoadAction.DontCare);
+                pass.WriteTexture(cloudTransmittanceTemp, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(cloudDepth, RenderBufferLoadAction.DontCare);
 
                 pass.ReadTexture("_Depth", cameraDepth);
@@ -449,7 +454,6 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
-                    //command.BeginSample(sampler);
                     settings.SetCloudPassData(command, pass);
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
                     pass.SetVector(command, "_LightColor0", lightColor0);
@@ -463,21 +467,25 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Reprojection
-            var (current, history, wasCreated) = textureCache.GetTextures(width, height, camera, true);
+            var (luminanceCurrent, luminanceHistory, luminanceWasCreated) = cloudLuminanceTextureCache.GetTextures(width, height, camera, true);
+            var (transmittanceCurrent, transmittanceHistory, transmittanceWasCreated) = cloudTransmittanceTextureCache.GetTextures(width, height, camera, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Temporal"))
             {
                 pass.Initialize(material, 5, camera: camera);
-                pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
-                pass.ReadTexture("_Input", cloudTemp);
-                pass.ReadTexture("_History", history);
-                pass.ReadTexture("_CloudDepth", cloudDepth);
+                pass.WriteTexture(luminanceCurrent, RenderBufferLoadAction.DontCare);
+                pass.WriteTexture(transmittanceCurrent, RenderBufferLoadAction.DontCare);
+                pass.ReadTexture("_Input", cloudLuminanceTemp);
+                pass.ReadTexture("_InputTransmittance", cloudTransmittanceTemp);
+                pass.ReadTexture("_History", luminanceHistory);
+                pass.ReadTexture("_TransmittanceHistory", transmittanceHistory);
+                pass.ReadTexture("CloudDepthTexture", cloudDepth);
                 pass.ReadTexture("_Depth", cameraDepth);
                 commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
-                    pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
+                    pass.SetFloat(command, "_IsFirst", luminanceWasCreated ? 1.0f : 0.0f);
                     pass.SetFloat(command, "_StationaryBlend", settings.StationaryBlend);
                     pass.SetFloat(command, "_MotionBlend", settings.MotionBlend);
                     pass.SetFloat(command, "_MotionFactor", settings.MotionFactor);
@@ -487,7 +495,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightDirection1", lightDirection1);
                     pass.SetVector(command, "_LightColor1", lightColor1);
 
-                    pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
+                    pass.SetVector(command, "_HistoryScaleLimit", luminanceHistory.ScaleLimit2D);
+                    pass.SetVector(command, "_TransmittanceHistoryScaleLimit", transmittanceHistory.ScaleLimit2D);
 
                     pass.SetInt(command, "_MaxWidth", width - 1);
                     pass.SetInt(command, "_MaxHeight", height - 1);
@@ -499,7 +508,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new CloudRenderResult(current, cloudDepth));
+            renderGraph.ResourceMap.SetRenderPassData(new CloudRenderResult(luminanceCurrent, transmittanceCurrent, cloudDepth));
         }
 
         private class PassData
@@ -531,22 +540,26 @@ namespace Arycama.CustomRenderPipeline
 
         public readonly struct CloudRenderResult : IRenderPassData
         {
-            private readonly RTHandle cloudTexture, cloudDepth;
+            private readonly RTHandle cloudTexture, cloudTransmittanceTexture, cloudDepth;
 
-            public CloudRenderResult(RTHandle cloudTexture, RTHandle cloudDepth)
+            public CloudRenderResult(RTHandle cloudLuminanceTexture, RTHandle cloudTransmittanceTexture, RTHandle cloudDepth)
             {
-                this.cloudTexture = cloudTexture ?? throw new ArgumentNullException(nameof(cloudTexture));
+                this.cloudTexture = cloudLuminanceTexture ?? throw new ArgumentNullException(nameof(cloudLuminanceTexture));
+                this.cloudTransmittanceTexture = cloudTransmittanceTexture;
                 this.cloudDepth = cloudDepth ?? throw new ArgumentNullException(nameof(cloudDepth));
             }
 
             public void SetInputs(RenderPass pass)
             {
-                pass.ReadTexture("_Clouds", cloudTexture);
-                pass.ReadTexture("_CloudDepth", cloudDepth);
+                pass.ReadTexture("CloudTexture", cloudTexture);
+                pass.ReadTexture("CloudTransmittanceTexture", cloudTransmittanceTexture);
+                pass.ReadTexture("CloudDepthTexture", cloudDepth);
             }
 
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
+                pass.SetVector(command, "CloudTextureScaleLimit", cloudTexture.ScaleLimit2D);
+                pass.SetVector(command, "CloudTransmittanceTextureScaleLimit", cloudTransmittanceTexture.ScaleLimit2D);
             }
         }
     }
