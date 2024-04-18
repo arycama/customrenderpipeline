@@ -13,70 +13,6 @@ cbuffer Properties
 	float _MaxSteps, _Thickness, _Intensity;
 };
 
-float3 SampleGGXReflection(float3 i, float2 alpha, float2 rand)
-{
-	float3 i_std = normalize(float3(i.xy * alpha, i.z));
-	// Sample a spherical cap
-	float phi = 2.0 * Pi * rand.x;
-	float a = saturate(min(alpha.x, alpha.y)); // Eq. 6
-	float s = 1.0f + length(float2(i.x, i.y)); // Omit sgn for a <=1
-	float a2 = a * a;
-	float s2 = s * s;
-	float k = (1.0 - a2) * s2 / (s2 + a2 * i.z * i.z); // Eq. 5
-	float b = i.z > 0 ? k * i_std.z : i_std.z;
-	float z = mad(1.0 - rand.y, 1.0 + b, -b);
-	float sinTheta = sqrt(saturate(1.0 - z * z));
-	float3 o_std = { sinTheta * cos(phi), sinTheta * sin(phi), z };
-	// Compute the microfacet normal m
-	float3 m_std = i_std + o_std;
-	float3 m = normalize(float3(m_std.xy * alpha, m_std.z));
-	// Return the reflection vector o
-	return 2.0 * dot(i, m) * m - i;
-}
-
-float3 sampleGGXVNDF(float3 V_, float alpha_x, float alpha_y, float U1, float U2)
-{
-	// stretch view
-	float3 V = normalize(float3(alpha_x * V_.x, alpha_y * V_.y, V_.z));
-	
-	// orthonormal basis
-	float3 T1 = (V.z < 0.9999) ? normalize(cross(V, float3(0, 0, 1))) : float3(1, 0, 0);
-	float3 T2 = cross(T1, V);
-	
-	// sample point with polar coordinates (r, phi)
-	float a = 1.0 / (1.0 + V.z);
-	float r = sqrt(U1);
-	float phi = (U2 < a) ? U2 / a * Pi : Pi + (U2 - a) / (1.0 - a) * Pi;
-	float P1 = r * cos(phi);
-	float P2 = r * sin(phi) * ((U2 < a) ? 1.0 : V.z);
-	
-	// compute normal
-	float3 N = P1 * T1 + P2 * T2 + sqrt(max(0.0, 1.0 - P1 * P1 - P2 * P2)) * V;
-	
-	// unstretch
-	N = normalize(float3(alpha_x * N.x, alpha_y * N.y, max(0.0, N.z)));
-	return reflect(-V_, N);
-}
-
-float3 SampleVndf_GGX(float2 u, float3 wi, float2 alpha)
-{
-    // warp to the hemisphere configuration
-    float3 wiStd = normalize(float3(wi.xy * alpha, wi.z));
-    // sample a spherical cap in (-wi.z, 1]
-    float phi = (2.0f * u.x - 1.0f) * Pi;
-    float z = mad((1.0f - u.y), (1.0f + wiStd.z), -wiStd.z);
-    float sinTheta = sqrt(clamp(1.0f - z * z, 0.0f, 1.0f));
-    float x = sinTheta * cos(phi);
-    float y = sinTheta * sin(phi);
-    float3 c = float3(x, y, z);
-    // compute halfway direction as standard normal
-    float3 wmStd = c + wiStd;
-    // warp back to the ellipsoid configuration
-    float3 wm = normalize(float3(wmStd.xy * alpha, wmStd.z));
-    // return final normal
-    return wm;
-}
-
 float3 SampleVndf_GGX(float2 u, float3 wi, float alpha, float3 n)
 {
     // decompose the vector in parallel and perpendicular components
@@ -106,9 +42,9 @@ float3 SampleVndf_GGX(float2 u, float3 wi, float alpha, float3 n)
     return wm;
 }
 
-#define FFX_SSSR_FLOAT_MAX                          3.402823466e+38
+#define FLOAT_MAX                          3.402823466e+38
 
-void FFX_SSSR_InitialAdvanceRay(float3 origin, float3 direction, float3 inv_direction, float2 current_mip_resolution, float2 current_mip_resolution_inv, float2 floor_offset, float2 uv_offset, out float3 position, out float current_t) {
+void InitialAdvanceRay(float3 origin, float3 direction, float3 inv_direction, float2 current_mip_resolution, float2 current_mip_resolution_inv, float2 floor_offset, float2 uv_offset, out float3 position, out float current_t) {
     float2 current_mip_position = current_mip_resolution * origin.xy;
 
     // Intersect ray with the half box that is pointing away from the ray origin.
@@ -121,7 +57,7 @@ void FFX_SSSR_InitialAdvanceRay(float3 origin, float3 direction, float3 inv_dire
     position = origin + current_t * direction;
 }
 
-bool FFX_SSSR_AdvanceRay(float3 origin, float3 direction, float3 inv_direction, float2 current_mip_position, float2 current_mip_resolution_inv, float2 floor_offset, float2 uv_offset, float surface_z, inout float3 position, inout float current_t) {
+bool AdvanceRay(float3 origin, float3 direction, float3 inv_direction, float2 current_mip_position, float2 current_mip_resolution_inv, float2 floor_offset, float2 uv_offset, float surface_z, inout float3 position, inout float current_t) {
     // Create boundary planes
     float2 xy_plane = floor(current_mip_position) + floor_offset;
     xy_plane = xy_plane * current_mip_resolution_inv + uv_offset;
@@ -132,7 +68,7 @@ bool FFX_SSSR_AdvanceRay(float3 origin, float3 direction, float3 inv_direction, 
     float3 t = boundary_planes * inv_direction - origin * inv_direction;
 
     // Prevent using z plane when shooting out of the depth buffer.
-    t.z = direction.z < 0 ? t.z : FFX_SSSR_FLOAT_MAX;
+    t.z = direction.z < 0 ? t.z : FLOAT_MAX;
 
     // Choose nearest intersection with a boundary.
     float t_min = min(min(t.x, t.y), t.z);
@@ -153,21 +89,21 @@ bool FFX_SSSR_AdvanceRay(float3 origin, float3 direction, float3 inv_direction, 
     return skipped_tile;
 }
 
-float2 FFX_SSSR_GetMipResolution(float2 screen_dimensions, int mip_level) {
+float2 GetMipResolution(float2 screen_dimensions, int mip_level) {
     return screen_dimensions * pow(0.5, mip_level);
 }
 
-float FFX_SSSR_LoadDepth(int2 current_mip_position, int current_mip)
+float LoadDepth(int2 current_mip_position, int current_mip)
 {
 	return _HiZDepth.mips[current_mip][current_mip_position];
 }
 
-float3 FFX_SSSR_LoadWorldSpaceNormal(int2 pixel_coordinate)
+float3 LoadWorldSpaceNormal(int2 pixel_coordinate)
 {
 	return UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(_NormalRoughness[pixel_coordinate].xyz) - 1.0);
 }
 
-float3 FFX_SSSR_ScreenSpaceToViewSpace(float3 screen_space_position)
+float3 ScreenSpaceToViewSpace(float3 screen_space_position)
 {
 	screen_space_position.y = (1 - screen_space_position.y);
 	screen_space_position.xy = 2 * screen_space_position.xy - 1;
@@ -177,14 +113,14 @@ float3 FFX_SSSR_ScreenSpaceToViewSpace(float3 screen_space_position)
 }
 
 // Requires origin and direction of the ray to be in screen space [0, 1] x [0, 1]
-float3 FFX_SSSR_HierarchicalRaymarch(float3 origin, float3 direction, bool is_mirror, float2 screen_size, int most_detailed_mip, uint min_traversal_occupancy, uint max_traversal_intersections, out bool valid_hit) {
-    const float3 inv_direction = direction != 0 ? 1.0 / direction : FFX_SSSR_FLOAT_MAX;
+float3 HierarchicalRaymarch(float3 origin, float3 direction, bool is_mirror, float2 screen_size, int most_detailed_mip, uint min_traversal_occupancy, uint max_traversal_intersections, out bool valid_hit) {
+    const float3 inv_direction = direction != 0 ? 1.0 / direction : FLOAT_MAX;
 
     // Start on mip with highest detail.
     int current_mip = most_detailed_mip;
 
     // Could recompute these every iteration, but it's faster to hoist them out and update them.
-    float2 current_mip_resolution = FFX_SSSR_GetMipResolution(screen_size, current_mip);
+    float2 current_mip_resolution = GetMipResolution(screen_size, current_mip);
     float2 current_mip_resolution_inv = rcp(current_mip_resolution);
 
     // Offset to the bounding boxes uv space to intersect the ray with the center of the next pixel.
@@ -198,15 +134,15 @@ float3 FFX_SSSR_HierarchicalRaymarch(float3 origin, float3 direction, bool is_mi
     // Initially advance ray to avoid immediate self intersections.
     float current_t;
     float3 position;
-    FFX_SSSR_InitialAdvanceRay(origin, direction, inv_direction, current_mip_resolution, current_mip_resolution_inv, floor_offset, uv_offset, position, current_t);
+    InitialAdvanceRay(origin, direction, inv_direction, current_mip_resolution, current_mip_resolution_inv, floor_offset, uv_offset, position, current_t);
 
     bool exit_due_to_low_occupancy = false;
     int i = 0;
     while (i < max_traversal_intersections && current_mip >= most_detailed_mip && !exit_due_to_low_occupancy) {
         float2 current_mip_position = current_mip_resolution * position.xy;
-        float surface_z = FFX_SSSR_LoadDepth(current_mip_position, current_mip);
+        float surface_z = LoadDepth(current_mip_position, current_mip);
         //exit_due_to_low_occupancy = !is_mirror && WaveActiveCountBits(true) <= min_traversal_occupancy;
-        bool skipped_tile = FFX_SSSR_AdvanceRay(origin, direction, inv_direction, current_mip_position, current_mip_resolution_inv, floor_offset, uv_offset, surface_z, position, current_t);
+        bool skipped_tile = AdvanceRay(origin, direction, inv_direction, current_mip_position, current_mip_resolution_inv, floor_offset, uv_offset, surface_z, position, current_t);
         current_mip += skipped_tile ? 1 : -1;
         current_mip_resolution *= skipped_tile ? 0.5 : 2;
         current_mip_resolution_inv *= skipped_tile ? 2 : 0.5;
@@ -218,7 +154,7 @@ float3 FFX_SSSR_HierarchicalRaymarch(float3 origin, float3 direction, bool is_mi
     return position;
 }
 
-float FFX_SSSR_ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float2 screen_size, float depth_buffer_thickness) {
+float ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float2 screen_size, float depth_buffer_thickness) {
     // Reject hits outside the view frustum
     if (any(hit.xy < 0) || any(hit.xy > 1)) {
         return 0;
@@ -232,19 +168,19 @@ float FFX_SSSR_ValidateHit(float3 hit, float2 uv, float3 world_space_ray_directi
 
     // Don't lookup radiance from the background.
     int2 texel_coords = int2(screen_size * hit.xy);
-    float surface_z = FFX_SSSR_LoadDepth(texel_coords / 2, 1);
+    float surface_z = LoadDepth(texel_coords / 2, 1);
     if (surface_z == 0.0) {
         return 0;
     }
 
     // We check if we hit the surface from the back, these should be rejected.
-    float3 hit_normal = FFX_SSSR_LoadWorldSpaceNormal(texel_coords);
-    if (dot(hit_normal, world_space_ray_direction) > 0) {
-        //return 0;
+    float3 hit_normal = LoadWorldSpaceNormal(texel_coords);
+    if (dot(hit_normal, world_space_ray_direction) > 0.0) {
+       // return 0;
     }
 
-    float3 view_space_surface = FFX_SSSR_ScreenSpaceToViewSpace(float3(hit.xy, surface_z));
-    float3 view_space_hit = FFX_SSSR_ScreenSpaceToViewSpace(hit);
+    float3 view_space_surface = ScreenSpaceToViewSpace(float3(hit.xy, surface_z));
+    float3 view_space_hit = ScreenSpaceToViewSpace(hit);
     float distance = length(view_space_surface - view_space_hit);
     
     // Fade out hits near the screen borders
@@ -373,58 +309,29 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	N = GetViewReflectedNormal(N, V, NdotV);
 	
 	float roughness = Sq(normalRoughness.a);
-
-    // Compute the reflection direction
-	float3x3 localToWorld = GetLocalFrame(N);
-	float3 localR = SampleGGXReflection(mul(localToWorld, V), roughness, u);
-	//localR = sampleGGXVNDF(mul(localToWorld, V), roughness, roughness, u.x, u.y);
-	
-	float3 L = mul(localR, localToWorld);
-	
-	L = reflect(-V, SampleVndf_GGX(u, V, roughness, N));
+	float3 L = reflect(-V, SampleVndf_GGX(u, V, roughness, N));
   
     // We start tracing from the center of the current pixel, and do so up to the far plane.
-	float3 positionWS = worldDir * LinearEyeDepth(depth);
+	float3 worldPosition = worldDir * LinearEyeDepth(depth);
 	
 	float3 rayOrigin = float3(position.xy / _ScaledResolution.xy, depth);
-	float3 reflPosSS = PerspectiveDivide(WorldToClip(positionWS + L));
+	float3 reflPosSS = PerspectiveDivide(WorldToClip(worldPosition + L));
 	reflPosSS.xy = 0.5 * reflPosSS.xy + 0.5;
 	reflPosSS.y = 1.0 - reflPosSS.y;
 	
 	float3 rayDir = reflPosSS - rayOrigin;
 
 	bool validHit;
-	float3 hit = FFX_SSSR_HierarchicalRaymarch(rayOrigin, rayDir, false, _ScaledResolution.xy, 0, 0, _MaxSteps, validHit);
+	float3 hit = HierarchicalRaymarch(rayOrigin, rayDir, false, _ScaledResolution.xy, 0, 0, _MaxSteps, validHit);
 	
-	float3 world_space_hit = ClipToWorld(2.0 * hit - 1.0);
-	float3 world_space_ray = world_space_hit - positionWS;
-	
-	float confidence = validHit ? FFX_SSSR_ValidateHit(hit, uv, world_space_ray, _ScaledResolution.xy, _Thickness * 100) * _Intensity : 0.0;
+	float confidence = validHit ? ValidateHit(hit, uv, L, _ScaledResolution.xy, _Thickness * 100) * _Intensity : 0.0;
 
 	float3 result = 0.0;
 	if (confidence > 0.0)
 	{
-		float4 clipPos = PerspectiveDivide(WorldToClip(world_space_hit));
-		clipPos.y = -clipPos.y;
-		clipPos.xy = (0.5 * clipPos.xy + 0.5) * _ScaledResolution.xy;
-		
-		float3 positionWS1 = PixelToWorld(float3(clipPos.xy, clipPos.z));
-		float4 nonJitteredPositionCS = WorldToClipNonJittered(positionWS1);
-		float4 previousPositionCS = WorldToClipPrevious(positionWS1);
-		
-		float2 velocity = MotionVectorFragment(nonJitteredPositionCS, previousPositionCS);
-		
-		
-		//return _PreviousColor[clipPos.xy - velocity * _ScaledResolution.xy];
-		
-		
-		float2 prevPos = hit.xy * _ScaledResolution.xy;
-		//float2 prevPos = (0.5 * PerspectiveDivide(WorldToClip(world_space_hit)).xy * float2(1, -1) + 0.5) * _ScaledResolution.xy;
-		
-		
-		
-		velocity = Velocity[clipPos.xy];
-		result = _PreviousColor[clipPos.xy - velocity * _ScaledResolution.xy];
+		float2 hitPixel = hit.xy * _ScaledResolution.xy;
+		float2 velocity = Velocity[hitPixel];
+		result = _PreviousColor[hitPixel - velocity * _ScaledResolution.xy];
 	}
 	
 	if(confidence >= 1.0)
