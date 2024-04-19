@@ -10,6 +10,7 @@ namespace Arycama.CustomRenderPipeline
         [Serializable]
         public class Settings
         {
+            [field: SerializeField] public bool IsEnabled { get; private set; } = true;
             [field: SerializeField, Range(1, 32)] public int SampleCount { get; private set; } = 8;
             [field: SerializeField, Range(0.0f, 1.0f)] public float JitterSpread { get; private set; } = 1.0f;
             [field: SerializeField, Range(0f, 1f)] public float Sharpness { get; private set; } = 0.5f;
@@ -91,17 +92,24 @@ namespace Arycama.CustomRenderPipeline
 
         public void OnPreRender(int scaledWidth, int scaledHeight)
         {
+
             var sampleIndex = renderGraph.FrameIndex % settings.SampleCount + 1;
 
             Vector2 jitter;
-            jitter.x = Halton(sampleIndex, 2) - 0.5f;
-            jitter.y = Halton(sampleIndex, 3) - 0.5f;
 
-            jitter *= settings.JitterSpread;
+            if (settings.IsEnabled)
+            {
+                jitter.x = Halton(sampleIndex, 2) - 0.5f;
+                jitter.y = Halton(sampleIndex, 3) - 0.5f;
 
-            if (settings.JitterOverride)
-                jitter = settings.JitterOverrideValue;
-
+                jitter *= settings.JitterSpread;
+                if (settings.JitterOverride)
+                    jitter = settings.JitterOverrideValue;
+            }
+            else
+            {
+                jitter = Vector2.zero;
+            }
 
             var weights = ArrayPool<float>.Get(9);
             float boxWeightSum = 0.0f, crossWeightSum = 0.0f;
@@ -170,6 +178,9 @@ namespace Arycama.CustomRenderPipeline
 
         public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
         {
+            if (!settings.IsEnabled)
+                return input;
+
             var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
             var (current, history, wasCreated) = textureCache.GetTextures(camera.pixelWidth, camera.pixelHeight, camera);
 

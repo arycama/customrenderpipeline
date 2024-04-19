@@ -99,7 +99,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25 / linearWaterDepth;
 	
-	float2 uvOffset = N.xz * distortion * (1.0 - saturate(dot(N, V)));
+	float2 uvOffset = N.xz * distortion;// * (1.0 - saturate(dot(N, V)));
 	float2 refractionUv = uvOffset * _ScaledResolution.xy + position.xy;
 	float2 refractedPositionSS = clamp(refractionUv, 0, _ScaledResolution.xy - 1);
 	float underwaterDepth = _UnderwaterDepth[refractedPositionSS];
