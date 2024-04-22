@@ -13,7 +13,7 @@ public class DeferredLighting
         material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public void Render(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, Camera camera)
+    public void RenderMainPass(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, Camera camera)
     {
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting"))
         {
@@ -36,21 +36,24 @@ public class DeferredLighting
             pass.AddRenderPassData<ShadowRenderer.Result>();
             pass.AddRenderPassData<LitData.Result>();
             pass.AddRenderPassData<ScreenSpaceReflectionResult>();
+            pass.AddRenderPassData<TemporalAA.TemporalAAData>();
 
             var data = pass.SetRenderFunction<Data>((command, pass, data) =>
             {
                 commonPassData.SetProperties(pass, command);
             });
         }
+    }
 
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting"))
+    public void RenderCombinePass(RTHandle depth, RTHandle emissive)
+    {
+        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting Combine"))
         {
             pass.Initialize(material, 1);
 
             pass.WriteTexture(emissive);
             pass.ReadTexture("_Depth", depth);
 
-            commonPassData.SetInputs(pass);
             pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<SkyResultData>();

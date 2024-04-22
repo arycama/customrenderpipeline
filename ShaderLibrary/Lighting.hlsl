@@ -1,8 +1,9 @@
 ﻿#ifndef LIGHTING_INCLUDED
 #define LIGHTING_INCLUDED
 
-#include "Common.hlsl"
 #include "Atmosphere.hlsl"
+#include "Common.hlsl"
+#include "Temporal.hlsl"
 
 cbuffer AmbientSh
 {
@@ -313,6 +314,7 @@ struct LightingInput
 	float3 translucency;
 	float3 bentNormal;
 	bool isWater;
+	float2 uv;
 };
 
 // Ref: "Moving Frostbite to PBR", p. 69.
@@ -596,6 +598,8 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	float NdotR = dot(input.normal, iblR);
 	float iblMipLevel = PerceptualRoughnessToMipmapLevel(input.perceptualRoughness, NdotR);
 	
+	// TODO: Need to handle non screenspace reflections, eg for transparent
+	//float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
 	float3 radiance = ScreenSpaceReflections[input.pixelPosition];
 	
 	float3 irradiance =  AmbientLight(input.bentNormal, input.occlusion, input.albedo);

@@ -11,22 +11,22 @@ float3 FragmentDownsample(float4 position : SV_Position) : SV_Target
 {
 	float2 uv = position.xy * _RcpResolution;
 
-	float3 color = _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(0, 0)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
+	float3 color = _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(0, 0), _InputScaleLimit)) * 0.125;
 	
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-1, -1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(1, -1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-1, 1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(1, 1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(-1, -1), _InputScaleLimit)) * 0.125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(1, -1), _InputScaleLimit)) * 0.125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(-1, 1), _InputScaleLimit)) * 0.125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(1, 1), _InputScaleLimit)) * 0.125;
 	
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-2, 0)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.0625;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(2, 0)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.0625;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(0, -2)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.0625;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(0, 2)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.0625;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(-2, 0), _InputScaleLimit)) * 0.0625;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(2, 0), _InputScaleLimit)) * 0.0625;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(0, -2), _InputScaleLimit)) * 0.0625;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(0, 2), _InputScaleLimit)) * 0.0625;
 	
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-2, -2)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.03125;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(2, -2)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.03125;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-2, 2)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.03125;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(2, 2)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.03125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(-2, -2), _InputScaleLimit)) * 0.03125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(2, -2), _InputScaleLimit)) * 0.03125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(-2, 2), _InputScaleLimit)) * 0.03125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(2, 2), _InputScaleLimit)) * 0.03125;
 	
 	return color;
 }
@@ -35,17 +35,17 @@ float4 FragmentUpsample(float4 position : SV_Position) : SV_Target
 {
 	float2 uv = position.xy * _RcpResolution;
 	
-	float3 color = _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-1, 1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.0625;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(0, 1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(1, 1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.0625;
+	float3 color = _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(-1, 1), _InputScaleLimit)) * 0.0625;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(0, 1), _InputScaleLimit)) * 0.125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(1, 1), _InputScaleLimit)) * 0.0625;
 
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-1, 0)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(0, 0)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.25;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(1, 0)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(-1, 0), _InputScaleLimit)) * 0.125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(0, 0), _InputScaleLimit)) * 0.25;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(1, 0), _InputScaleLimit)) * 0.125;
 
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(-1, -1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.0625;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(0, -1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.125;
-	color += _Input.Sample(_LinearClampSampler, min((uv + _Input_TexelSize.xy * float2(1, -1)) * _InputScaleLimit.xy, _InputScaleLimit.zw)) * 0.0625;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(-1, -1), _InputScaleLimit)) * 0.0625;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(0, -1), _InputScaleLimit)) * 0.125;
+	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(1, -1), _InputScaleLimit)) * 0.0625;
 	
 	return float4(color, _Strength);
 }

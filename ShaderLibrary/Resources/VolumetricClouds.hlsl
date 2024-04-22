@@ -13,6 +13,8 @@ struct FragmentOutput
 	#endif
 };
 
+const static float3 _PlanetCenter = float3(0.0, -_PlanetRadius - _ViewPosition.y, 0.0);
+
 FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	#ifdef CLOUD_SHADOW
@@ -28,7 +30,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float rcpRdLength = rsqrt(dot(rd, rd));
 		rd *= rcpRdLength;
 		float cosViewAngle = rd.y;
-		float2 offsets = _BlueNoise2D[uint2(position.xy) % 128];//InterleavedGradientNoise(position.xy, _FrameIndex);//_BlueNoise2D[uint2(position.xy) % 128];
+		float2 offsets = InterleavedGradientNoise(position.xy, _FrameIndex);//_BlueNoise2D[uint2(position.xy) % 128];
 	#endif
 	
 	FragmentOutput output;
@@ -150,7 +152,10 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 		maxValue = max(maxValue, color);
 	}
 
-	float4 history = float4(_History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit)), _TransmittanceHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _TransmittanceHistoryScaleLimit)));
+	float4 history;
+	history.rgb = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
+	history.a = _TransmittanceHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _TransmittanceHistoryScaleLimit));
+	
 	history.rgb *= _PreviousToCurrentExposure;
 	history.rgb = RgbToYCoCgFastTonemap(history.rgb);
 	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
@@ -162,12 +167,10 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float blend = lerp(_StationaryBlend, _MotionBlend, motionLength);
 	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
-		result = lerp(history, result, (1.0 - blend) * _MaxBoxWeight);
+		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
 	float depth = _Depth[pixelId];
 	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
-	
-	result.rgb = RemoveNaN(result.rgb);
 	
 	TemporalOutput output;
 	output.luminance = result.rgb;

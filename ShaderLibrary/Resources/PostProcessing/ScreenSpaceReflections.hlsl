@@ -1,4 +1,5 @@
 #include "../../Common.hlsl"
+#include "../../Color.hlsl"
 #include "../../Temporal.hlsl"
 #include "../../Samplers.hlsl"
 
@@ -10,6 +11,7 @@ Texture2D<uint2> _Stencil;
 
 cbuffer Properties
 {
+	float4 _PreviousColorScaleLimit;
 	float _MaxSteps, _Thickness, _Intensity;
 };
 
@@ -190,7 +192,8 @@ float ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float
 
     // We accept all hits that are within a reasonable minimum distance below the surface.
     // Add constant in linear space to avoid growing of the reflections toward the reflected objects.
-    float confidence = 1 - smoothstep(0, depth_buffer_thickness, distance);
+    //float confidence = 1 - smoothstep(0, depth_buffer_thickness, distance);
+    float confidence = 1 - step(depth_buffer_thickness, distance);
     confidence *= confidence;
 
     return vignette * confidence;
@@ -331,7 +334,10 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	{
 		float2 hitPixel = hit.xy * _ScaledResolution.xy;
 		float2 velocity = Velocity[hitPixel];
-		result = _PreviousColor[hitPixel - velocity * _ScaledResolution.xy];
+		
+		// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
+		// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
+		result = _PreviousColor.Sample(_LinearClampSampler, ClampScaleTextureUv(hit.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit)); 
 	}
 	
 	if(confidence >= 1.0)
@@ -365,4 +371,50 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	radiance *= specularOcclusion;
 	
 	return lerp(radiance, result, confidence);
+}
+
+Texture2D<float3> _Input, _History;
+float4 _HistoryScaleLimit;
+float _IsFirst;
+
+float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+{
+	// Neighborhood clamp
+	int2 offsets[8] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(1, 0), int2(-1, 1), int2(0, 1), int2(1, 1)};
+	float3 minValue, maxValue, result, mean, stdDev;
+	minValue = maxValue = mean = result = RgbToYCoCgFastTonemap(_Input[position.xy]);
+	stdDev = result * result;
+	result *= _CenterBoxFilterWeight;
+	
+	[unroll]
+	for (int i = 0; i < 4; i++)
+	{
+		float3 color = RgbToYCoCgFastTonemap(_Input[position.xy + offsets[i]]);
+		result += color * _BoxFilterWeights0[i];
+		minValue = min(minValue, color);
+		maxValue = max(maxValue, color);
+		mean += color;
+		stdDev += color * color;
+	}
+	
+	[unroll]
+	for (i = 0; i < 4; i++)
+	{
+		float3 color = RgbToYCoCgFastTonemap(_Input[position.xy + offsets[i + 4]]);
+		result += color * _BoxFilterWeights1[i];
+		minValue = min(minValue, color);
+		maxValue = max(maxValue, color);
+		mean += color;
+		stdDev += color * color;
+	}
+	
+	float2 historyUv = uv - Velocity[position.xy];
+	float3 history = RgbToYCoCgFastTonemap(_History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw)) * _PreviousToCurrentExposure);
+	
+	history = ClipToAABB(history, result, minValue, maxValue);
+	
+	if (!_IsFirst && all(saturate(historyUv) == historyUv))
+		result = lerp(history, result, 0.05 * _MaxBoxWeight);
+	
+	return YCoCgToRgbFastTonemapInverse(result);
 }

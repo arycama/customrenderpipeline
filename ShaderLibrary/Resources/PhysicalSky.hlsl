@@ -200,7 +200,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		float3 rd = worldDir;
 		float rcpRdLength = rsqrt(dot(rd, rd));
 		rd *= rcpRdLength;
-		float2 offsets = InterleavedGradientNoise(position.xy, _FrameIndex);
+		float2 offsets = InterleavedGradientNoise(position.xy, _FrameIndex); // _BlueNoise2D[position.xy % 128]
 	#endif
 	
 	float rayLength = DistanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
@@ -228,7 +228,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		#endif
 	
 		float cloudDistance = 0;
-		float4 clouds = evaluateCloud ? EvaluateCloud(rayStart, rayEnd - rayStart, 8, rd, _ViewHeight, rd.y, offsets, 0.0, false, cloudDistance) : float2(0.0, 1.0).xxxy;
+		float4 clouds = evaluateCloud ? EvaluateCloud(rayStart, rayEnd - rayStart, 12, rd, _ViewHeight, rd.y, offsets, 0.0, false, cloudDistance) : float2(0.0, 1.0).xxxy;
 		float3 cloudLuminance = clouds.rgb;
 		luminance += cloudLuminance;
 	
@@ -348,45 +348,54 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 			luminance += surface;
 		}
 	}
-	
-	luminance = isnan(luminance) ? 0.0 : luminance;
-	
-	#ifndef REFLECTION_PROBE
-		//luminance = RgbToXyy(luminance);
-	#endif
-	
+
 	return luminance;
 }
 
 float4 _SkyHistoryScaleLimit;
 Texture2D<float3> _SkyInput, _SkyHistory;
 uint _MaxWidth, _MaxHeight;
-float _IsFirst;
+float _IsFirst, _ClampWindow;
 
 float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	int2 pixelId = (int2) position.xy;
-	
-	float cloudTransmittance = CloudTransmittanceTexture[pixelId];
-	float depth = _Depth[pixelId];
-	float cloudDistance = CloudDepthTexture[pixelId];
+	float cloudTransmittance = CloudTransmittanceTexture[position.xy];
 	
 	float3 rd = worldDir;
 	float rcpRdLength = rsqrt(dot(rd, rd));
-	rd *= rcpRdLength;	
-	float sceneDistance = LinearEyeDepth(depth) * rcp(rcpRdLength);
+	rd *= rcpRdLength;
 	
-	if (depth == 0.0)
+	float cloudDistance;
+	if(cloudTransmittance < 1.0)
 	{
-		if(RayIntersectsGround(_ViewHeight, rd.y))
-			sceneDistance = DistanceToBottomAtmosphereBoundary(_ViewHeight, rd.y);
-		else
-			sceneDistance = AtmosphereDepth(_ViewHeight, rd.y) * DistanceToTopAtmosphereBoundary(_ViewHeight, rd.y);
+		cloudDistance = CloudDepthTexture[position.xy];
 	}
 	
-	sceneDistance = lerp(cloudDistance, sceneDistance, cloudTransmittance);
-	float sceneDepth = CameraDistanceToDepth(sceneDistance, -rd);
+	float sceneDistance;
+	if(cloudTransmittance > 0.0)
+	{
+		float depth = _Depth[position.xy];
+		if (depth == 0.0)
+		{
+			if(RayIntersectsGround(_ViewHeight, rd.y))
+				sceneDistance = DistanceToBottomAtmosphereBoundary(_ViewHeight, rd.y);
+			else
+				sceneDistance = AtmosphereDepth(_ViewHeight, rd.y) * DistanceToTopAtmosphereBoundary(_ViewHeight, rd.y);
+		}
+		else
+		{
+			sceneDistance = LinearEyeDepth(depth) * rcp(rcpRdLength);
+		}
+		
+		if(cloudTransmittance < 1.0)
+			sceneDistance = lerp(cloudDistance, sceneDistance, cloudTransmittance);
+	}
+	else
+	{
+		sceneDistance = cloudDistance;
+	}
 	
+	// TODO: Use velocity for non background pixels as this will account for movement
 	float3 worldPosition = rd * sceneDistance;
 	float4 previousClip = WorldToClipPrevious(worldPosition);
 	float4 nonJitteredClip = WorldToClipNonJittered(worldPosition);
@@ -396,74 +405,84 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 
 	// Neighborhood clamp
 	int2 offsets[8] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(1, 0), int2(-1, 1), int2(0, 1), int2(1, 1)};
-	float3 minValue, maxValue, result;
-	minValue = maxValue = result = RgbToYCoCgFastTonemap(_SkyInput[pixelId]);
+	float3 minValue, maxValue, result, mean, stdDev;
+	minValue = maxValue = mean = result = RgbToYCoCgFastTonemap(_SkyInput[position.xy]);
+	stdDev = result * result;
 	result *= _CenterBoxFilterWeight;
 	
 	[unroll]
 	for (int i = 0; i < 4; i++)
 	{
-		float3 color = RgbToYCoCgFastTonemap(_SkyInput[pixelId + offsets[i]]);
+		float3 color = RgbToYCoCgFastTonemap(_SkyInput[position.xy + offsets[i]]);
 		result += color * _BoxFilterWeights0[i];
 		minValue = min(minValue, color);
 		maxValue = max(maxValue, color);
+		mean += color;
+		stdDev += color * color;
 	}
 	
 	[unroll]
 	for (i = 0; i < 4; i++)
 	{
-		float3 color = RgbToYCoCgFastTonemap(_SkyInput[pixelId + offsets[i + 4]]);
+		float3 color = RgbToYCoCgFastTonemap(_SkyInput[position.xy + offsets[i + 4]]);
 		result += color * _BoxFilterWeights1[i];
 		minValue = min(minValue, color);
 		maxValue = max(maxValue, color);
+		mean += color;
+		stdDev += color * color;
 	}
 	
-	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, min(historyUv * _SkyHistoryScaleLimit.xy, _SkyHistoryScaleLimit.zw)));
+	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, min(historyUv * _SkyHistoryScaleLimit.xy, _SkyHistoryScaleLimit.zw)) * _PreviousToCurrentExposure);
+	
+	mean /= 9.0;
+	stdDev /= 9.0;
+	stdDev = sqrt(abs(stdDev - mean * mean));
+	minValue = max(minValue, mean - stdDev);
+	maxValue = min(maxValue, mean + stdDev);
+	minValue = mean - stdDev * _ClampWindow;
+	maxValue = mean + stdDev * _ClampWindow;
 	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
-	result = YCoCgToRgbFastTonemapInverse(result);
-	result = isnan(result) ? 0.0 : result;
-	
-	return result;
+	return YCoCgToRgbFastTonemapInverse(result);
 }
 
 float _SpatialSamples, _SpatialDepthFactor, _BlurSigma;
 
-float3 FragmentSpatial(float4 position : SV_Position) : SV_Target
+#define s2(a, b)                temp = a; a = min(a, b); b = max(temp, b);
+#define mn3(a, b, c)            s2(a, b); s2(a, c);
+#define mx3(a, b, c)            s2(b, c); s2(a, c);
+#define mnmx3(a, b, c)          mx3(a, b, c); s2(a, b);
+#define mnmx4(a, b, c, d)       s2(a, b); s2(c, d); s2(a, c); s2(b, d);
+#define mnmx5(a, b, c, d, e)    s2(a, b); s2(c, d); mn3(a, c, e); mx3(b, d, e);
+#define mnmx6(a, b, c, d, e, f) s2(a, d); s2(b, e); s2(c, f); mn3(a, b, c); mx3(d, e, f);
+
+float3 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	// Todo: Reimplement as pcf or something
-	return _SkyInput[position.xy];
+   // return _SkyInput[position.xy];
 	
-	//float3 result = 0.0;
-	//float weightSum = 0.0;
-	
-	//float radius = floor(lerp(_SpatialSamples, 1.0, saturate(frameCount / _SpatialBlurFrames)));
-	
-	//for(float y = -radius; y <= radius; y++)
-	//{
-	//	for(float x = -radius; x <= radius; x++)
-	//	{
-	//		float2 coord = position.xy + float2(x, y);
-	//		if(any(coord < 0.0 || coord >= _ScaledResolution.xy))
-	//			continue;
-			
-	//		float depth = _SkyDepth[coord];
-	//		float3 color = _SkyInput[coord];
-		
-	//		float weight = saturate(1.0 - abs(centerDepth - depth) * _SpatialDepthFactor / centerDepth);
-	//		weight *= saturate(saturate(1.0 - abs(x / max(1.0, radius))) * saturate(1.0 - abs(y / max(1.0, radius))) * _BlurSigma);
-			
-	//		result += color * weight;
-	//		weightSum += weight;
-	//	}
-	//}
-	
-	//if(weightSum)
-	//	result *= rcp(weightSum);
-	
-	//return result;
+    float3 v[9];
+    // Add the pixels which make up our window to the pixel array.
+    v[0] = _SkyInput[clamp(position.xy + float2(-1, -1), 0, uint2(_MaxWidth, _MaxHeight))];
+    v[1] = _SkyInput[clamp(position.xy + float2(-1,  0), 0, uint2(_MaxWidth, _MaxHeight))];
+    v[2] = _SkyInput[clamp(position.xy + float2(-1,  1), 0, uint2(_MaxWidth, _MaxHeight))];
+    v[3] = _SkyInput[clamp(position.xy + float2( 0, -1), 0, uint2(_MaxWidth, _MaxHeight))];
+    v[4] = _SkyInput[clamp(position.xy + float2(0, 0), 0, uint2(_MaxWidth, _MaxHeight))];
+    v[5] = _SkyInput[clamp(position.xy + float2( 0,  1), 0, uint2(_MaxWidth, _MaxHeight))];
+    v[6] = _SkyInput[clamp(position.xy + float2( 1, -1), 0, uint2(_MaxWidth, _MaxHeight))];
+    v[7] = _SkyInput[clamp(position.xy + float2( 1,  0), 0, uint2(_MaxWidth, _MaxHeight))];
+    v[8] = _SkyInput[clamp(position.xy + float2( 1,  1), 0, uint2(_MaxWidth, _MaxHeight))];
+
+    float3 temp;
+    // TODO use med3 on GCN architecture.
+    // Starting with a subset of size 6, remove the min and max each time
+    mnmx6(v[0], v[1], v[2], v[3], v[4], v[5]);
+    mnmx5(v[1], v[2], v[3], v[4], v[6]);
+    mnmx4(v[2], v[3], v[4], v[7]);
+    mnmx3(v[3], v[4], v[8]);
+
+    return v[4];
 }

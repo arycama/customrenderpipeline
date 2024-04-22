@@ -50,6 +50,7 @@ namespace Arycama.CustomRenderPipeline
         public struct TemporalAAData : IRenderPassData
         {
             private readonly Vector4 jitter;
+            private readonly Vector4 previousJitter;
             private readonly float maxCrossWeight;
             private readonly float maxBoxWeight;
             private readonly float centerCrossFilterWeight;
@@ -60,9 +61,10 @@ namespace Arycama.CustomRenderPipeline
 
             public readonly Vector4 Jitter => jitter;
 
-            public TemporalAAData(Vector4 jitter, float maxCrossWeight, float maxBoxWeight, float centerCrossFilterWeight, float centerBoxFilterWeight, Vector4 crossFilterWeights, Vector4 boxFilterWeights0, Vector4 boxFilterWeights1)
+            public TemporalAAData(Vector4 jitter, Vector4 previousJitter, float maxCrossWeight, float maxBoxWeight, float centerCrossFilterWeight, float centerBoxFilterWeight, Vector4 crossFilterWeights, Vector4 boxFilterWeights0, Vector4 boxFilterWeights1)
             {
                 this.jitter = jitter;
+                this.previousJitter = previousJitter;
                 this.maxCrossWeight = maxCrossWeight;
                 this.maxBoxWeight = maxBoxWeight;
                 this.centerCrossFilterWeight = centerCrossFilterWeight;
@@ -79,6 +81,7 @@ namespace Arycama.CustomRenderPipeline
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
                 pass.SetVector(command, "_Jitter", jitter);
+                pass.SetVector(command, "_PreviousJitter", previousJitter);
                 pass.SetFloat(command, "_MaxCrossWeight", maxCrossWeight);
                 pass.SetFloat(command, "_MaxBoxWeight", maxBoxWeight);
                 pass.SetFloat(command, "_CenterCrossFilterWeight", centerCrossFilterWeight);
@@ -99,9 +102,16 @@ namespace Arycama.CustomRenderPipeline
 
             jitter *= settings.JitterSpread;
 
+            var previousSampleIndex = Math.Max(0, renderGraph.FrameIndex - 1) % settings.SampleCount + 1;
+
+            Vector2 previousJitter;
+            previousJitter.x = Halton(previousSampleIndex, 2) - 0.5f;
+            previousJitter.y = Halton(previousSampleIndex, 3) - 0.5f;
+
+            previousJitter *= settings.JitterSpread;
+
             if (settings.JitterOverride)
                 jitter = settings.JitterOverrideValue;
-
 
             var weights = ArrayPool<float>.Get(9);
             float boxWeightSum = 0.0f, crossWeightSum = 0.0f;
@@ -134,6 +144,7 @@ namespace Arycama.CustomRenderPipeline
             var result = new TemporalAAData
             (
                 jitter: new Vector4(jitter.x, jitter.y, jitter.x / scaledWidth, jitter.y / scaledHeight),
+                previousJitter: new Vector4(previousJitter.x, previousJitter.y, previousJitter.x / scaledWidth, previousJitter.y / scaledHeight), // TODO: previous width/height?
                 maxCrossWeight: maxCrossWeight,
                 maxBoxWeight: maxBoxWeight,
                 centerCrossFilterWeight: weights[4] * rcpCrossWeightSum,

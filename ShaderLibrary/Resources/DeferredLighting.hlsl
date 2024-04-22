@@ -28,13 +28,14 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.translucency = 0.0;
 	lightingInput.bentNormal = normalize(2.0 * bentNormalOcclusion.rgb - 1.0);
 	lightingInput.isWater = (_Stencil[position.xy].g & 4) != 0;
+	lightingInput.uv = uv;
 	
 	float3 result = GetLighting(lightingInput);
 	
 	// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
 	float rcpVLength = rsqrt(dot(worldDir, worldDir));
 	float3 V = -worldDir * rcpVLength;
-	result *= TransmittanceToPoint(_ViewPosition.y + _PlanetRadius, -V.y, eyeDepth * rcp(rcpVLength));
+	result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
 	
 	return result;
 }
@@ -50,6 +51,8 @@ float4 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	// Sample the sky and clouds at the re-jittered coordinate, so that the final TAA resolve will not add further jitter. 
 	// (Should we also do this for vol lighting?)
+	
+	// TODO: Would be better to use some kind of filter instead of bilinear
 	float3 result = CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit));
 	result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
 	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));

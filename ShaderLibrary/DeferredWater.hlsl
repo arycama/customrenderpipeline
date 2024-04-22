@@ -97,9 +97,12 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	N = normalize(mul(oceanN, tangentToWorld));
 	smoothness = ProjectedSpaceGeometricNormalFiltering(smoothness, N, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
 	
+	float NdotV;
+	N = GetViewReflectedNormal(N, V, NdotV);
+	
 	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25 / linearWaterDepth;
 	
-	float2 uvOffset = N.xz * distortion * (1.0 - saturate(dot(N, V)));
+	float2 uvOffset = N.xz * distortion * (1.0 - saturate(NdotV));
 	float2 refractionUv = uvOffset * _ScaledResolution.xy + position.xy;
 	float2 refractedPositionSS = clamp(refractionUv, 0, _ScaledResolution.xy - 1);
 	float underwaterDepth = _UnderwaterDepth[refractedPositionSS];
@@ -181,8 +184,10 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	// Apply roughness to transmission
 	float perceptualRoughness = 1.0 - smoothness;
-	luminance *= (1.0 - foamFactor) * GGXDiffuse(1.0, dot(N, V), perceptualRoughness, 0.02) * Pi;
-
+	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
+	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.04);
+	luminance *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
+	
 	GBufferOutput output;
 	output.albedoMetallic = float2(foamFactor, 0.0).xxxy; // Todo: Multiply by foam albedo?
 	output.normalRoughness = float4(PackFloat2To888(0.5 * PackNormalOctQuadEncode(N) + 0.5), perceptualRoughness);

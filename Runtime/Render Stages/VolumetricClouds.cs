@@ -490,11 +490,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_MotionBlend", settings.MotionBlend);
                     pass.SetFloat(command, "_MotionFactor", settings.MotionFactor);
 
-                    pass.SetVector(command, "_LightDirection0", lightDirection0);
-                    pass.SetVector(command, "_LightColor0", lightColor0);
-                    pass.SetVector(command, "_LightDirection1", lightDirection1);
-                    pass.SetVector(command, "_LightColor1", lightColor1);
-
                     pass.SetVector(command, "_HistoryScaleLimit", luminanceHistory.ScaleLimit2D);
                     pass.SetVector(command, "_TransmittanceHistoryScaleLimit", transmittanceHistory.ScaleLimit2D);
 
@@ -502,7 +497,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_MaxHeight", height - 1);
                     pass.SetFloat(command, "_ViewHeight", viewHeight);
 
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
                     settings.SetCloudPassData(command, pass);
                     commonPassData.SetProperties(pass, command);
                 });

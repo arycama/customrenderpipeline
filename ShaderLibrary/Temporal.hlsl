@@ -4,6 +4,7 @@
 cbuffer TemporalProperties
 {
 	float4 _Jitter;
+	float4 _PreviousJitter;
 	
 	float _MaxCrossWeight;
 	float _MaxBoxWeight;
@@ -13,7 +14,6 @@ cbuffer TemporalProperties
 	float4 _CrossFilterWeights;
 	float4 _BoxFilterWeights0;
 	float4 _BoxFilterWeights1;
-	
 };
 
 #endif

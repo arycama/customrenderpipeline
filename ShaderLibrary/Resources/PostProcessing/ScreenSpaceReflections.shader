@@ -21,5 +21,14 @@ Shader "Hidden/ScreenSpaceReflections"
             #include "ScreenSpaceReflections.hlsl"
             ENDHLSL
         }
+
+		Pass
+        {
+            HLSLPROGRAM
+            #pragma vertex VertexFullscreenTriangle
+            #pragma fragment FragmentTemporal
+            #include "ScreenSpaceReflections.hlsl"
+            ENDHLSL
+        }
     }
 }

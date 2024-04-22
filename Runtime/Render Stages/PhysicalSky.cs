@@ -472,8 +472,6 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.SetFloat(command, "_ViewHeight", camera.transform.position.y + settings.PlanetRadius);
                     pass.SetFloat(command, "_Samples", settings.RenderSamples);
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
-
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
                     pass.SetVector(command, "_LightColor0", lightColor0);
                     pass.SetVector(command, "_LightDirection1", lightDirection1);
@@ -516,8 +514,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_MaxWidth", width - 1);
                     pass.SetInt(command, "_MaxHeight", height - 1);
 
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
-
                     commonPassData.SetProperties(pass, command);
                 });
             }
@@ -543,8 +539,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_MaxWidth", width - 1);
                     pass.SetInt(command, "_MaxHeight", height - 1);
                     pass.SetVector(command, "_ScaledResolution", new Vector4(width, height, 1.0f / width, 1.0f / height));
-
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(width, height, jitter, fov, aspect, viewToWorld));
 
                     commonPassData.SetProperties(pass, command);
                 });

@@ -20,24 +20,27 @@ public class ScreenSpaceReflections
     private RenderGraph renderGraph;
     private Settings settings;
 
+    private PersistentRTHandleCache temporalCache;
+
     public ScreenSpaceReflections(RenderGraph renderGraph, Settings settings)
     {
         this.renderGraph = renderGraph;
         this.settings = settings;
 
         material = new Material(Shader.Find("Hidden/ScreenSpaceReflections")) { hideFlags = HideFlags.HideAndDontSave };
+        temporalCache = new PersistentRTHandleCache(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Screen Space Reflections");
     }
 
-    public void Render(RTHandle depth, RTHandle hiZDepth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, ICommonPassData commonPassData, int width, int height, RTHandle velocity, Matrix4x4 nonJitteredVpMatrix, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, RTHandle bentNormalOcclusion)
+    public void Render(RTHandle depth, RTHandle hiZDepth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, ICommonPassData commonPassData, int width, int height, RTHandle velocity, RTHandle bentNormalOcclusion)
     {
         // Must be screen texture since we use stencil to skip sky pixels
-        var result = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+        var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections"))
+        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Trace"))
         {
             pass.Initialize(material, camera: camera);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
             pass.ReadTexture("_Stencil", depth, RenderTextureSubElement.Stencil);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
             pass.ReadTexture("_PreviousColor", previousFrameColor);
@@ -47,24 +50,46 @@ public class ScreenSpaceReflections
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
             commonPassData.SetInputs(pass);
-            pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<LitData.Result>();
+            pass.AddRenderPassData<TemporalAA.TemporalAAData>();
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
-                pass.SetMatrix(command, "_WorldToNonJitteredClip", nonJitteredVpMatrix);
-                pass.SetMatrix(command, "_WorldToPreviousClip", previousVpMatrix);
-                pass.SetMatrix(command, "_ClipToWorld", invVpMatrix);
-
                 pass.SetFloat(command, "_Intensity", settings.Intensity);
                 pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
                 pass.SetFloat(command, "_Thickness", settings.Thickness);
+                pass.SetVector(command, "_PreviousColorScaleLimit", previousFrameColor.ScaleLimit2D);
                 commonPassData.SetProperties(pass, command);
             });
         }
 
-        renderGraph.ResourceMap.SetRenderPassData(new ScreenSpaceReflectionResult(result));
+        var textureData = temporalCache.GetTextures(width, height, camera, true);
+
+        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Temporal"))
+        {
+            pass.Initialize(material, 1, camera: camera);
+            pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteTexture(textureData.current, RenderBufferLoadAction.DontCare);
+
+            pass.ReadTexture("_Input", tempResult);
+            pass.ReadTexture("_History", textureData.history);
+            pass.ReadTexture("_Stencil", depth, RenderTextureSubElement.Stencil);
+            pass.ReadTexture("_Depth", depth);
+            pass.ReadTexture("Velocity", velocity);
+
+            commonPassData.SetInputs(pass);
+            pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+
+            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+            {
+                commonPassData.SetProperties(pass, command);
+                pass.SetFloat(command, "_IsFirst", textureData.wasCreated ? 1.0f : 0.0f);
+                pass.SetVector(command, "_HistoryScaleLimit", textureData.history.ScaleLimit2D);
+            });
+        }
+
+        renderGraph.ResourceMap.SetRenderPassData(new ScreenSpaceReflectionResult(textureData.current));
     }
 
     class PassData

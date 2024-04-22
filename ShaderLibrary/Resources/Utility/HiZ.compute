@@ -9,6 +9,7 @@ SamplerState _LinearClampSampler;
 Texture2D<float> _Input;
 RWTexture2D<float> _Result0, _Result1, _Result2, _Result3, _Result4, _Result5;
 uint _Width, _Height, _MaxMip;
+float4 _InputScaleLimit;
 
 static const uint _GroupSize = 32;
 
@@ -35,9 +36,9 @@ void HiZ(uint2 dispatchThreadId : SV_DispatchThreadID, uint2 groupThreadId : SV_
 	// Each thread reads 2x2 values and writes them into shared memory. 
 	#ifdef FIRST
 		uint2 coord = groupId * _GroupSize + groupThreadId * 2;
-		results[0][dispatchThreadId] = _Input[dispatchThreadId];
+		results[0][dispatchThreadId] = _Input[min(dispatchThreadId, uint2(_Width - 1, _Height - 1))];
 	
-		float2 uv = (coord + 0.5) / float2(_Width, _Height);
+		float2 uv = min(((coord + 0.5) / float2(_Width, _Height)) * _InputScaleLimit.xy, _InputScaleLimit.zw);
 	
 		float4 depths = _Input.Gather(_LinearClampSampler, uv);
 		_DepthShared[groupThreadId.y * 2 + 0][groupThreadId.x * 2 + 0] = depths.x;

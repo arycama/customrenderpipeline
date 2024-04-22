@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -36,15 +38,29 @@ namespace Arycama.CustomRenderPipeline
             // Camera frustum rays
             if (camera != null)
             {
-                camera.CalculateFrustumCorners(new Rect(0.0f, 0.0f, 1.0f, 1.0f), 1.0f, camera.stereoActiveEye, frustumCorners);
+                var aspect = camera.aspect;
+                var tanHalfFov = MathF.Tan(0.5f * Mathf.Deg2Rad * (float)camera.fieldOfView);
 
-                var topLeft = camera.transform.TransformVector(frustumCorners[0]);
-                var bottomLeft = camera.transform.TransformVector(frustumCorners[1]);
-                var bottomRight = camera.transform.TransformVector(frustumCorners[2]);
+                var temporalData = RenderGraph.ResourceMap.GetRenderPassData<TemporalAA.TemporalAAData>();
+                var jitterX = 2.0f * temporalData.Jitter.z * tanHalfFov;
+                var jitterY = 2.0f * temporalData.Jitter.w * tanHalfFov;
 
-                corners[0] = bottomLeft;
-                corners[1] = bottomLeft + (bottomRight - bottomLeft) * 2.0f;
-                corners[2] = bottomLeft + (topLeft - bottomLeft) * 2.0f;
+                var corner0 = new Vector3((-tanHalfFov + jitterX) * aspect, tanHalfFov + jitterY, 1.0f);
+
+                Vector3 corner1;
+                corner1.x = aspect * (3.0f * tanHalfFov + jitterX);
+                corner1.y = tanHalfFov + jitterY;
+                corner1.z = 1.0f;
+
+                Vector3 corner2;
+                corner2.x = (-tanHalfFov + jitterX) * aspect;
+                corner2.y = -3.0f * tanHalfFov + jitterY;
+                corner2.z = 1.0f;
+
+                var rotation = camera.transform.rotation;
+                corners[0] = rotation * corner0;
+                corners[1] = rotation * corner1;
+                corners[2] = rotation * corner2;
             }
         }
 

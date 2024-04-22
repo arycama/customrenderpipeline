@@ -22,9 +22,6 @@ float _BackScatterPhase, _ForwardScatterPhase, _BackScatterScale, _ForwardScatte
 
 Texture2D<float> CloudDepthTexture;
 
-const static float3 _PlanetCenter = float3(0.0, -_PlanetRadius - _ViewPosition.y, 0.0);
-const static float3 _PlanetOffset = float3(0.0, _PlanetRadius + _ViewPosition.y, 0.0);
-
 cbuffer CloudShadowData
 {
 	matrix _CloudShadowToWorld;

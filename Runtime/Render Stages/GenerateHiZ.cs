@@ -24,7 +24,8 @@ public class GenerateHiZ
         var maxMipsPerPass = 6;
         var hasSecondPass = mipCount > maxMipsPerPass;
 
-        var result = renderGraph.GetTexture(width, height, GraphicsFormat.R32_SFloat, hasMips: true);
+        // Set is screen to true to get exact fit
+        var result = renderGraph.GetTexture(width, height, GraphicsFormat.R32_SFloat, hasMips: true, isScreenTexture: true);
 
         // First pass
         using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Hi Z First Pass"))
@@ -41,9 +42,10 @@ public class GenerateHiZ
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
-                command.SetComputeIntParam(computeShader, "_Width", width);
-                command.SetComputeIntParam(computeShader, "_Height", height);
-                command.SetComputeIntParam(computeShader, "_MaxMip", hasSecondPass ? maxMipsPerPass : mipCount);
+                pass.SetInt(command, "_Width", width);
+                pass.SetInt(command, "_Height", height);
+                pass.SetInt(command, "_MaxMip", hasSecondPass ? maxMipsPerPass : mipCount);
+                pass.SetVector(command, "_InputScaleLimit", input.ScaleLimit2D);
             });
         }
 
@@ -66,9 +68,9 @@ public class GenerateHiZ
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
-                    command.SetComputeIntParam(computeShader, "_Width", width >> (maxMipsPerPass - 1));
-                    command.SetComputeIntParam(computeShader, "_Height", height >> (maxMipsPerPass - 1));
-                    command.SetComputeIntParam(computeShader, "_MaxMip", mipCount - maxMipsPerPass);
+                    pass.SetInt(command, "_Width", width >> (maxMipsPerPass - 1));
+                    pass.SetInt(command, "_Height", height >> (maxMipsPerPass - 1));
+                    pass.SetInt(command, "_MaxMip", mipCount - maxMipsPerPass);
                 });
             }
         }
