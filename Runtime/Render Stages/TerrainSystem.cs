@@ -110,6 +110,8 @@ public class TerrainSystem
         lodIndirectArgsBuffer = new ComputeBuffer(3, sizeof(uint), ComputeBufferType.IndirectArguments) { name = "Terrain Indirect Args" };
         indirectArgsBuffer = new ComputeBuffer(5, sizeof(uint), ComputeBufferType.IndirectArguments) { name = "Terrain Draw Args" };
         patchDataBuffer = new ComputeBuffer(settings.CellCount * settings.CellCount, sizeof(uint), ComputeBufferType.Structured) { name = "Terrain Patch Data" };
+
+        // Initialize the height and normal maps
     }
 
     private void CleanupTerrain()

@@ -169,7 +169,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		#endif
 	#endif
 	
-	luminance *= _Extinction * weight * _Exposure;
+	luminance *= _Extinction * weight * _Exposure * 4;
 	
 	// Ambient 
 	float3 finalTransmittance = exp(-underwaterDistance * _Extinction);

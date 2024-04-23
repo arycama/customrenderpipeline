@@ -35,7 +35,7 @@ public class GenerateHiZ
 
             for (var i = 0; i < maxMipsPerPass; i++)
             {
-                var texture = i < mipCount ? result : renderGraph.EmptyTexture;
+                var texture = i < mipCount ? result : renderGraph.EmptyUavTexture;
                 var mip = i < mipCount ? i : 0;
                 pass.WriteTexture(resultIds.GetProperty(i), texture, mip);
             }
@@ -59,7 +59,7 @@ public class GenerateHiZ
                 for (var i = 0; i < maxMipsPerPass; i++)
                 {
                     var level = i + maxMipsPerPass - 1;
-                    var texture = level < mipCount ? result : renderGraph.EmptyTexture;
+                    var texture = level < mipCount ? result : renderGraph.EmptyUavTexture;
                     var mip = level < mipCount ? level : 0;
 
                     // Start from maxMips - 1, as we bind the last mip from the last pass as the first input for this pass

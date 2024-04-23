@@ -438,6 +438,7 @@ namespace Arycama.CustomRenderPipeline
 
                         pass.SetFloat(command, "_EdgeLength", (float)settings.EdgeLength * settings.PatchVertices);
                         pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Length);
+                        pass.SetFloat(command, "MaxWaterHeight", settings.Profile.MaxWaterHeight);
 
                         ArrayPool<Vector4>.Release(cullingPlanes);
                     });
