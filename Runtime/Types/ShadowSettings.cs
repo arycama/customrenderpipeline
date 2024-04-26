@@ -19,12 +19,9 @@ namespace Arycama.CustomRenderPipeline
         [SerializeField] private float pointShadowBias = 0.0f;
         [SerializeField] private float pointShadowSlopeBias = 0.0f;
 
-        [Header("Soft Shadows")]
-        [SerializeField, Range(1, 32)] private int pcfSamples = 4;
-        [SerializeField, Min(0f)] private float pcfRadius = 1f;
-        [SerializeField, Range(1, 32)] private int blockerSamples = 4;
-        [SerializeField, Min(0f)] private float blockerRadius = 1f;
-        [SerializeField, Min(0f)] private float pcssSoftness = 1f;
+        [field: Header("Soft Shadows")]
+        [field: SerializeField, Range(0, 8)] public float PcfFilterRadius { get; private set; } = 1f;
+        [field: SerializeField, Min(0f)] public float PcfFilterSigma { get; private set; } = 1f;
 
         public int ShadowCascades => shadowCascades;
         public Vector3 ShadowCascadeSplits => shadowCascadeSplits;
@@ -35,10 +32,5 @@ namespace Arycama.CustomRenderPipeline
         public int PointShadowResolution => pointShadowResolution;
         public float PointShadowBias => pointShadowBias;
         public float PointShadowSlopeBias => pointShadowSlopeBias;
-        public int PcfSamples => pcfSamples;
-        public float PcfRadius => pcfRadius;
-        public int BlockerSamples => blockerSamples;
-        public float BlockerRadius => blockerRadius;
-        public float PcssSoftness => pcssSoftness;
     }
 }

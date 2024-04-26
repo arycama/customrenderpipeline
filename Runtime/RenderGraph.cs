@@ -99,8 +99,10 @@ namespace Arycama.CustomRenderPipeline
         public RenderGraphBuilder<T> GetRenderGraphBuilder<T>() where T : class, new()
         {
             var pool = builderPool.GetOrAdd(typeof(RenderGraphBuilder<T>));
-            var pass = pool.DequeueOrCreate(() => new RenderGraphBuilder<T>());
-            return pass as RenderGraphBuilder<T>;
+            if (!pool.TryDequeue(out var value))
+                value = new RenderGraphBuilder<T>();
+
+            return value as RenderGraphBuilder<T>;
         }
 
         public void ReleaseRenderGraphBuilder(RenderGraphBuilder builder)
@@ -150,8 +152,8 @@ namespace Arycama.CustomRenderPipeline
                                 continue;
 
                             var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-                            Assert.IsNotNull(handle, $"Handle is null in pass {renderPasses[i].GetType()}");
-                            Assert.IsNotNull(renderTexture, $"renderTexture is null in pass {renderPasses[i].Name}, {handle}");
+                            Assert.IsNotNull(handle, "Handle is null in pass");
+                            Assert.IsNotNull(renderTexture, "renderTexture is null in pass");
                             if ((isDepth && handle.Format != renderTexture.depthStencilFormat) || (!isDepth && handle.Format != renderTexture.graphicsFormat))
                                 continue;
 

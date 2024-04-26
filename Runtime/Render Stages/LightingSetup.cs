@@ -115,14 +115,18 @@ namespace Arycama.CustomRenderPipeline
 
                             ListPool<Plane>.Release(cullingPlanes);
 
+                            var width = maxValue.x - minValue.x;
+                            var height = maxValue.y - minValue.y;
+                            var depth = maxValue.z - minValue.z;
+
                             var gpuProjectionMatrix = new Matrix4x4
                             {
-                                m00 = 2.0f / (maxValue.x - minValue.x),
-                                m03 = (maxValue.x + minValue.x) / (minValue.x - maxValue.x),
-                                m11 = -2.0f / (maxValue.y - minValue.y),
-                                m13 = -(maxValue.y + minValue.y) / (minValue.y - maxValue.y),
+                                m00 = 2.0f / width,
+                                m03 = (maxValue.x + minValue.x) / -width,
+                                m11 = -2.0f / height,
+                                m13 = -(maxValue.y + minValue.y) / -height,
                                 m22 = 1.0f / (minValue.z - maxValue.z),
-                                m23 = maxValue.z / (maxValue.z - minValue.z),
+                                m23 = maxValue.z / depth,
                                 m33 = 1.0f
                             };
 
@@ -131,20 +135,20 @@ namespace Arycama.CustomRenderPipeline
                             var vm = viewMatrixRWS;
                             var shadowMatrix = new Matrix4x4
                             {
-                                m00 = vm.m00 / (maxValue.x - minValue.x),
-                                m01 = vm.m01 / (maxValue.x - minValue.x),
-                                m02 = vm.m02 / (maxValue.x - minValue.x),
-                                m03 = (vm.m03 - 0.5f * (maxValue.x + minValue.x)) / (maxValue.x - minValue.x) + 0.5f,
+                                m00 = vm.m00 / width,
+                                m01 = vm.m01 / width,
+                                m02 = vm.m02 / width,
+                                m03 = (vm.m03 - 0.5f * (maxValue.x + minValue.x)) / width + 0.5f,
 
-                                m10 = vm.m10 / (maxValue.y - minValue.y),
-                                m11 = vm.m11 / (maxValue.y - minValue.y),
-                                m12 = vm.m12 / (maxValue.y - minValue.y),
-                                m13 = (vm.m13 - 0.5f * (maxValue.y + minValue.y)) / (maxValue.y - minValue.y) + 0.5f,
+                                m10 = vm.m10 / height,
+                                m11 = vm.m11 / height,
+                                m12 = vm.m12 / height,
+                                m13 = (vm.m13 - 0.5f * (maxValue.y + minValue.y)) / height + 0.5f,
 
-                                m20 = -vm.m20 / (maxValue.z - minValue.z),
-                                m21 = -vm.m21 / (maxValue.z - minValue.z),
-                                m22 = -vm.m22 / (maxValue.z - minValue.z),
-                                m23 = (-vm.m23 + 0.5f * (maxValue.z + minValue.z)) / (maxValue.z - minValue.z) + 0.5f,
+                                m20 = -vm.m20 / depth,
+                                m21 = -vm.m21 / depth,
+                                m22 = -vm.m22 / depth,
+                                m23 = (-vm.m23 + 0.5f * (maxValue.z + minValue.z)) / depth + 0.5f,
 
                                 m33 = 1.0f
                             };
@@ -153,8 +157,10 @@ namespace Arycama.CustomRenderPipeline
 
                             var directionalShadowRequest = new ShadowRequest(true, i, viewMatrixRWS, gpuProjectionMatrix, shadowSplitData, 0);
                             directionalShadowRequests.Add(directionalShadowRequest);
-                            
-                            directionalShadowTexelSizes.Add(new((maxValue.x - minValue.x), (maxValue.y - minValue.y), 0.0f, maxValue.z));
+
+                            directionalShadowTexelSizes.Add(new(width / settings.DirectionalShadowResolution, height / settings.DirectionalShadowResolution, 0.0f, maxValue.z));
+
+                            //Debug.Log($"Width: {width}, Resolution: {settings.DirectionalShadowResolution}, Size: {settings.PcfFilterRadius / (width / settings.DirectionalShadowResolution)}");
 
                             cascadeCount++;
                         }
@@ -245,7 +251,7 @@ namespace Arycama.CustomRenderPipeline
                 data.pointLightBuffer = pointLightBuffer;
             }
 
-            var result = new Result(directionalShadowMatricesBuffer, directionalShadowTexelSizesBuffer, directionalLightBuffer, pointLightBuffer, settings.PcfSamples, settings.PcfRadius, settings.BlockerSamples, settings.BlockerRadius, settings.PcssSoftness, directionalLightList.Count, pointLightList.Count);
+            var result = new Result(directionalShadowMatricesBuffer, directionalShadowTexelSizesBuffer, directionalLightBuffer, pointLightBuffer, directionalLightList.Count, pointLightList.Count);
 
             renderGraph.ResourceMap.SetRenderPassData(result);
         }
@@ -268,25 +274,15 @@ namespace Arycama.CustomRenderPipeline
             private readonly BufferHandle directionalShadowTexelSizes;
             private readonly BufferHandle directionalLights;
             private readonly BufferHandle pointLights;
-            private readonly int pcfSamples;
-            private readonly float pcfRadius;
-            private readonly int blockerSamples;
-            private readonly float blockerRadius;
-            private readonly float pcssSoftness;
             private readonly int directionalLightCount;
             private readonly int pointLightCount;
 
-            public Result(BufferHandle directionalMatrices, BufferHandle directionalShadowTexelSizes, BufferHandle directionalLights, BufferHandle pointLights, int pcfSamples, float pcfRadius, int blockerSamples, float blockerRadius, float pcssSoftness, int directionalLightCount, int pointLightCount)
+            public Result(BufferHandle directionalMatrices, BufferHandle directionalShadowTexelSizes, BufferHandle directionalLights, BufferHandle pointLights, int directionalLightCount, int pointLightCount)
             {
                 this.directionalMatrices = directionalMatrices ?? throw new ArgumentNullException(nameof(directionalMatrices));
                 this.directionalShadowTexelSizes = directionalShadowTexelSizes ?? throw new ArgumentNullException(nameof(directionalShadowTexelSizes));
                 this.directionalLights = directionalLights ?? throw new ArgumentNullException(nameof(directionalLights));
                 this.pointLights = pointLights ?? throw new ArgumentNullException(nameof(pointLights));
-                this.pcfSamples = pcfSamples;
-                this.pcfRadius = pcfRadius;
-                this.blockerSamples = blockerSamples;
-                this.blockerRadius = blockerRadius;
-                this.pcssSoftness = pcssSoftness;
                 this.directionalLightCount = directionalLightCount;
                 this.pointLightCount = pointLightCount;
             }
@@ -303,12 +299,6 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.SetInt(command, "_DirectionalLightCount", directionalLightCount);
                 pass.SetInt(command, "_PointLightCount", pointLightCount);
-
-                pass.SetInt(command, "_PcfSamples", pcfSamples);
-                pass.SetFloat(command, "_PcfRadius", pcfRadius);
-                pass.SetInt(command, "_BlockerSamples", blockerSamples);
-                pass.SetFloat(command, "_BlockerRadius", blockerRadius);
-                pass.SetFloat(command, "_PcssSoftness", pcssSoftness);
             }
         }
     }

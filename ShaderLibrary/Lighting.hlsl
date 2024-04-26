@@ -5,6 +5,10 @@
 #include "Common.hlsl"
 #include "Temporal.hlsl"
 
+// TODO: Move to shadow.hlsl
+StructuredBuffer<float4> _DirectionalShadowTexelSizes;
+float ShadowMapResolution, RcpShadowMapResolution, ShadowFilterRadius, ShadowFilterSigma;
+
 cbuffer AmbientSh
 {
 	float4 _AmbientSh[7];
@@ -461,75 +465,44 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 		return 1.0;
 		
 	float3 lightPosition = MultiplyPoint3x4(light.worldToLight, worldPosition);
-		
-	//if (!softShadow)
-	{
-		float3 shadowPosition;
-		uint cascade = GetShadowCascade(lightIndex, worldPosition, shadowPosition);
-		if (cascade == ~0u)
-			return 1.0;
-			
-		return _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z);
-	}
-	
-	float4 positionCS = PerspectiveDivide(WorldToClip(worldPosition));
-	positionCS.xy = (positionCS.xy * 0.5 + 0.5) * _ScaledResolution.xy;
-	
-	float2 jitter = _BlueNoise2D[uint2(positionCS.xy) % 128];
-
-	// PCS filtering
-	float occluderDepth = 0.0, occluderWeightSum = 0.0;
-	float goldenAngle = Pi * (3.0 - sqrt(5.0));
-	for (uint k = 0; k < _BlockerSamples; k++)
-	{
-		float r = sqrt(k + 0.5) / sqrt(_BlockerSamples);
-		float theta = k * goldenAngle + (1.0 - jitter.x) * 2.0 * Pi;
-		float3 offset = float3(r * cos(theta), r * sin(theta), 0.0) * _BlockerRadius;
-		
-		float3 shadowPosition;
-		uint cascade = GetShadowCascade(lightIndex, lightPosition + offset, shadowPosition);
-		if (cascade == ~0u)
-			continue;
-		
-		float4 texelAndDepthSizes = _DirectionalShadowTexelSizes[light.shadowIndex + cascade];
-		float shadowZ = _DirectionalShadows.SampleLevel(_LinearClampSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), 0);
-		float occluderZ = Remap(1.0 - shadowZ, 0.0, 1.0, texelAndDepthSizes.z, texelAndDepthSizes.w);
-		if (occluderZ >= lightPosition.z)
-			continue;
-		
-		float weight = 1.0 - r * 0;
-		occluderDepth += occluderZ * weight;
-		occluderWeightSum += weight;
-	}
-
-	// There are no occluders so early out (this saves filtering)
-	if (!occluderWeightSum)
+	float3 shadowPosition;
+	uint cascade = GetShadowCascade(lightIndex, worldPosition, shadowPosition);
+	if (cascade == ~0u)
 		return 1.0;
 	
-	occluderDepth /= occluderWeightSum;
+	if (!softShadow)
+		return _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z);
 	
-	float radius = max(0.0, lightPosition.z - occluderDepth) / _PcssSoftness;
+	float2 center = shadowPosition.xy * ShadowMapResolution;
 	
-	// PCF filtering
-	float shadow = 0.0;
-	float weightSum = 0.0;
-	for (k = 0; k < _PcfSamples; k++)
+	float4 data = _DirectionalShadowTexelSizes[light.shadowIndex + cascade];
+	
+	float2 filterSize = (ShadowFilterRadius / data.xy);
+	float2 halfSizeInt = floor(filterSize) + 1;
+	float sum = 0.0, weightSum = 0.0;
+	for(float y = -halfSizeInt.y; y <= halfSizeInt.y; y++)
 	{
-		float r = sqrt(k + 0.5) / sqrt(_PcfSamples);
-		float theta = k * goldenAngle + jitter.y * 2.0 * Pi;
-		float3 offset = float3(r * cos(theta), r * sin(theta), 0.0) * radius;
-		
-		float3 shadowPosition;
-		uint cascade = GetShadowCascade(lightIndex, lightPosition + offset, shadowPosition);
-		if (cascade == ~0u)
-			continue;
-		
-		float weight = 1.0 - r;
-		shadow += _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z) * weight;
-		weightSum += weight;
+		for(float x = -halfSizeInt.x; x <= halfSizeInt.x; x++)
+		{
+			float2 coord = floor(center) + 0.5 + float2(x, y);
+			float shadow = shadowPosition.z >= _DirectionalShadows[float3(coord, light.shadowIndex + cascade)];
+			float2 weights = saturate(1.0 - abs(center - coord) / filterSize);
+			
+			// Parabola
+			weights = saturate(1.0 - (SqrLength(center - coord) / Sq(filterSize)));
+			
+			// Gaussian
+			weights = exp2(-ShadowFilterSigma * Sq((center - coord) * data.xy));
+			
+			float weight = weights.x * weights.y;
+			
+			
+			sum += shadow * weight;
+			weightSum += weight;
+		}
 	}
 	
-	return weightSum ? shadow / weightSum : 1.0;
+	return sum / weightSum;
 }
 
 #ifdef __INTELLISENSE__

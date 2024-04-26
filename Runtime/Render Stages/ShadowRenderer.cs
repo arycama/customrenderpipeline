@@ -101,7 +101,7 @@ namespace Arycama.CustomRenderPipeline
 
             ListPool<ShadowRequest>.Release(pointShadowRequests);
 
-            var result = new Result(directionalShadows, pointShadows);
+            var result = new Result(directionalShadows, pointShadows, settings.DirectionalShadowResolution, 1.0f / settings.DirectionalShadowResolution, settings.PcfFilterRadius, settings.PcfFilterSigma);
             renderGraph.ResourceMap.SetRenderPassData(result);
         }
 
@@ -116,11 +116,19 @@ namespace Arycama.CustomRenderPipeline
         {
             private readonly RTHandle directionalShadows;
             private readonly RTHandle pointShadows;
+            private readonly int shadowMapResolution;
+            private readonly float rcpShadowMapResolution;
+            private readonly float shadowFilterRadius;
+            private readonly float shadowFilterSigma;
 
-            public Result(RTHandle directionalShadows, RTHandle pointShadows)
+            public Result(RTHandle directionalShadows, RTHandle pointShadows, int shadowMapResolution, float rcpShadowMapResolution, float shadowFilterRadius, float shadowFilterSigma)
             {
                 this.directionalShadows = directionalShadows ?? throw new ArgumentNullException(nameof(directionalShadows));
                 this.pointShadows = pointShadows ?? throw new ArgumentNullException(nameof(pointShadows));
+                this.shadowMapResolution = shadowMapResolution;
+                this.rcpShadowMapResolution = rcpShadowMapResolution;
+                this.shadowFilterRadius = shadowFilterRadius;
+                this.shadowFilterSigma = shadowFilterSigma;
             }
 
             public void SetInputs(RenderPass pass)
@@ -131,6 +139,10 @@ namespace Arycama.CustomRenderPipeline
 
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
+                pass.SetFloat(command, "ShadowMapResolution", shadowMapResolution);
+                pass.SetFloat(command, "RcpShadowMapResolution", rcpShadowMapResolution);
+                pass.SetFloat(command, "ShadowFilterRadius", shadowFilterRadius);
+                pass.SetFloat(command, "ShadowFilterSigma", shadowFilterSigma);
             }
         }
     }

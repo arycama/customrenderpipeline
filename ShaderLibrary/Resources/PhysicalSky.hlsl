@@ -455,7 +455,7 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
-	return YCoCgToRgbFastTonemapInverse(result);
+	return RemoveNaN(YCoCgToRgbFastTonemapInverse(result));
 }
 
 float _SpatialSamples, _SpatialDepthFactor, _BlurSigma;

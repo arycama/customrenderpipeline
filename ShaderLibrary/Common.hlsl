@@ -32,7 +32,6 @@ cbuffer Exposure
 	float _CurrentToPreviousExposure;
 };
 
-Buffer<float4> _DirectionalShadowTexelSizes;
 Buffer<uint> _LightClusterList;
 StructuredBuffer<DirectionalLight> _DirectionalLights;
 StructuredBuffer<matrix> _DirectionalMatrices;

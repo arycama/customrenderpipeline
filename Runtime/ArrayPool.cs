@@ -7,7 +7,7 @@ public static class ArrayPool<T>
     public static T[] Get(int length)
     {
         var pool = cache.GetOrAdd(length);
-        return pool.DequeueOrCreate(() => new T[length]);
+        return pool.DequeueOrCreate(length);
     }
 
     public static void Release(T[] array)

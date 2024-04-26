@@ -261,89 +261,58 @@ FragmentInput Domain(HullConstantOutput tessFactors, OutputPatch<DomainInput, 4>
 
 void FragmentShadow() { }
 
+float4 BilinearWeights(float2 uv)
+{
+	float4 weights = uv.xxyy * float4(-1, 1, 1, -1) + float4(1, 0, 0, 1);
+	return weights.zzww * weights.xyyx;
+}
+
+// Gives weights for four texels from a 0-1 input position to match a gather result
+float4 BilinearWeights(float2 uv, float2 textureSize)
+{
+	const float2 offset = 1.0 / 512.0;
+	float2 localUv = frac(uv * textureSize + (-0.5 + offset));
+	return BilinearWeights(localUv);
+}
+
 [earlydepthstencil]
 GBufferOutput Fragment(FragmentInput input)
 {
 	uint4 layers = IdMap.GatherRed(_LinearClampSampler, input.uv);
 	
 	float2 localUv = frac(input.uv * IdMapResolution - 0.5+ rcp(512.0));
-	float checker = frac(dot(floor(input.uv * IdMapResolution - 0.5), 0.5));
-	
-	float triMask = checker ? (localUv.x - localUv.y < 0.0) : (localUv.x + localUv.y > 1);
-
-	float3 weights;
-	float2 offsets[3]; 
-	if(checker)
-	{
-		offsets[0] = triMask ? float2(0, 1) : float2(1, 0);
-		offsets[1] = float2(1, 1);
-		offsets[2] = float2(0, 0);
-		
-		weights.x = abs(localUv.y - localUv.x);
-		weights.y = min(localUv.x, localUv.y);
-		weights.z = min(1 - localUv.x, 1 - localUv.y);
-	}
-	else
-	{
-		offsets[0] = float2(0, 1);
-		offsets[1] = triMask ? float2(1, 1) : float2(0, 0);
-		offsets[2] = float2(1, 0);
-		
-		weights = float3(min(1 - localUv, localUv.yx), abs(localUv.x + localUv.y - 1)).xzy;
-	}
-	
-	// wi = 0 0 1 1
-	uint3 indices;
-	if(checker)
-	{
-		indices.x = triMask ? layers.x : layers.z;
-		indices.y = layers.y;
-		indices.z = layers.w;
-	}
-	else
-	{
-		indices.x = layers.x;
-		indices.y = triMask ? layers.y : layers.w;
-		indices.z = layers.z;
-	}	
+	float4 weights;
+	weights.x = (1.0 - localUv.x) * (localUv.y);
+	weights.y = (localUv.x) * (localUv.y);
+	weights.z = (localUv.x) * (1.0 - localUv.y);
+	weights.w = (1.0 - localUv.x) * (1.0 - localUv.y);
 	
 	float2 dx = ddx_coarse(input.uv);
 	float2 dy = ddy_coarse(input.uv);
 	
-	
-	LayerData data0 = TerrainLayerData[indices.x];
+	LayerData data0 = TerrainLayerData[layers.x];
 	float2 uv0 = input.uv * data0.Scale;
-	float4 albedoSmoothness = AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv0, indices.x), dx * data0.Scale, dy * data0.Scale) * weights.x;
-	float4 normal = Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv0, indices.x), dx * data0.Scale, dy * data0.Scale) * weights.x;
-	float4 mask = Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv0, indices.x), dx * data0.Scale, dy * data0.Scale) * weights.x;
+	float4 albedoSmoothness = AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv0, layers.x), dx * data0.Scale, dy * data0.Scale) * weights.x;
+	float4 normal = Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv0, layers.x), dx * data0.Scale, dy * data0.Scale) * weights.x;
+	float4 mask = Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv0, layers.x), dx * data0.Scale, dy * data0.Scale) * weights.x;
 	
-	LayerData data1 = TerrainLayerData[indices.y];
+	LayerData data1 = TerrainLayerData[layers.y];
 	float2 uv1 = input.uv * data1.Scale;
-	albedoSmoothness += AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv1, indices.y), dx * data1.Scale, dy * data1.Scale) * weights.y;
-	normal += Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv1, indices.y), dx * data1.Scale, dy * data1.Scale) * weights.y;
-	mask += Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv1, indices.y), dx * data1.Scale, dy * data1.Scale) * weights.y;
+	albedoSmoothness += AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv1, layers.y), dx * data1.Scale, dy * data1.Scale) * weights.y;
+	normal += Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv1, layers.y), dx * data1.Scale, dy * data1.Scale) * weights.y;
+	mask += Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv1, layers.y), dx * data1.Scale, dy * data1.Scale) * weights.y;
 	
-	LayerData data2 = TerrainLayerData[indices.z];
+	LayerData data2 = TerrainLayerData[layers.z];
 	float2 uv2 = input.uv * data2.Scale;
-	albedoSmoothness += AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv2, indices.z), dx * data2.Scale, dy * data2.Scale) * weights.z;
-	normal += Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv2, indices.z), dx * data2.Scale, dy * data2.Scale) * weights.z;
-	mask += Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv2, indices.z), dx * data2.Scale, dy * data2.Scale) * weights.z;
-	
-	//float dither = _BlueNoise1D[input.positionCS.xy % 128];
-	
-	//uint index;
-	//if(dither < weights.x)
-	//	index = indices.x;
-	//else if(dither < weights.x + weights.y)
-	//	index = indices.y;
-	//else
-	//	index = indices.z;
-	
-	//LayerData data3 = TerrainLayerData[index];
-	//float2 uv3 = input.uv * data3.Scale;
-	//albedoSmoothness = AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv3, index), dx * data3.Scale, dy * data3.Scale);
-	//normal = Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv3, index), dx * data3.Scale, dy * data3.Scale);
-	//mask = Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv3, index), dx * data3.Scale, dy * data3.Scale);
+	albedoSmoothness += AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv2, layers.z), dx * data2.Scale, dy * data2.Scale) * weights.z;
+	normal += Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv2, layers.z), dx * data2.Scale, dy * data2.Scale) * weights.z;
+	mask += Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv2, layers.z), dx * data2.Scale, dy * data2.Scale) * weights.z;
+
+	LayerData data3 = TerrainLayerData[layers.w];
+	float2 uv3 = input.uv * data3.Scale;
+	albedoSmoothness += AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv3, layers.w), dx * data3.Scale, dy * data3.Scale) * weights.w;
+	normal += Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv3, layers.w), dx * data3.Scale, dy * data3.Scale) * weights.w;
+	mask += Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv3, layers.w), dx * data3.Scale, dy * data3.Scale) * weights.w;
 	
 	float3 t = normalize(float3(_TerrainNormalMap.Sample(_LinearClampSampler, input.uv), 1.0)) + float3(0, 0, 1);
 	float3 u = UnpackNormalAG(normal) * float2(-1,1).xxy;
@@ -446,7 +415,7 @@ void FragmentVoxel(FragmentInputVoxel input)
 	result.z = _VoxelResolution - result.z;
 
 	// As we use toroidal addressing, we need to offset the final coordinates as the volume moves.
-	// This also needs to be wrapped at the end, so that out of bounds pixels will write to the starting indices of the volume
+	// This also needs to be wrapped at the end, so that out of bounds pixels will write to the starting layers of the volume
 	float3 dest = mod(result + _VoxelOffset, _VoxelResolution);
 	_VoxelGIWrite[dest] = 1;
 }

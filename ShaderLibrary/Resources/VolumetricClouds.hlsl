@@ -171,6 +171,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
 	
+	result.rgb = RemoveNaN(result.rgb);
+	
 	TemporalOutput output;
 	output.luminance = result.rgb;
 	output.transmittance = result.a;

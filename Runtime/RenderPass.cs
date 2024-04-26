@@ -53,7 +53,7 @@ namespace Arycama.CustomRenderPipeline
         public void ReadTexture(int propertyId, RTHandle texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
             Assert.IsFalse(RenderGraph.IsExecuting);
-            Assert.IsNotNull(texture, propertyId.ToString());
+            Assert.IsNotNull(texture);
             readTextures.Add((propertyId, texture, mip, subElement));
             RenderGraph.SetLastRTHandleRead(texture, Index);
         }
