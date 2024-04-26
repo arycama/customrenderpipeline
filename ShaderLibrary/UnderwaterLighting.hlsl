@@ -1,6 +1,7 @@
 #define WATER_SHADOW_ON
 
 #include "Lighting.hlsl"
+#include "Packing.hlsl"
 
 Texture2D<float> _Depth;
 Texture2D<float4> _AlbedoMetallic, _NormalRoughness, _BentNormalOcclusion;

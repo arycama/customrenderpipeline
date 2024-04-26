@@ -20,7 +20,7 @@ float _TransmittanceThreshold;
 float3 _LightColor0, _LightColor1, _LightDirection0, _LightDirection1;
 float _BackScatterPhase, _ForwardScatterPhase, _BackScatterScale, _ForwardScatterScale;
 
-Texture2D<float> CloudDepthTexture;
+Texture2D<float2> CloudDepthTexture;
 
 cbuffer CloudShadowData
 {

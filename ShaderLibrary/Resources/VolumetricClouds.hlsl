@@ -9,7 +9,7 @@ struct FragmentOutput
 	#else
 		float3 luminance : SV_Target0;
 		float transmittance : SV_Target1;
-		float depth : SV_Target2;
+		float2 depth : SV_Target2;
 	#endif
 };
 
@@ -30,7 +30,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float rcpRdLength = rsqrt(dot(rd, rd));
 		rd *= rcpRdLength;
 		float cosViewAngle = rd.y;
-		float2 offsets = InterleavedGradientNoise(position.xy, _FrameIndex);//_BlueNoise2D[uint2(position.xy) % 128];
+		float2 offsets = _BlueNoise2D[uint2(position.xy) % 128];
 	#endif
 	
 	FragmentOutput output;
@@ -82,14 +82,14 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float cloudDepth;
 	float rayLength = rayEnd - rayStart;
 	float4 result = EvaluateCloud(rayStart, rayLength, sampleCount, rd, _ViewHeight, cosViewAngle, offsets, P, isShadow, cloudDepth, false);
+	float totalRayLength = rayEnd - cloudDepth;
 	
 	#ifdef CLOUD_SHADOW
-		float totalRayLength = rayEnd - cloudDepth;
 		output.result = float3(cloudDepth * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a);
 	#else
 		output.luminance = result.rgb;
 		output.transmittance = result.a;
-		output.depth = cloudDepth;
+		output.depth = float2(cloudDepth, -(result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) : 0.0);
 	#endif
 	
 	return output;
@@ -114,7 +114,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float rcpRdLength = rsqrt(dot(rd, rd));
 	rd *= rcpRdLength;
 	
-	float cloudDistance = CloudDepthTexture[pixelId];
+	float cloudDistance = CloudDepthTexture[pixelId].r;
 
 	float3 worldPosition = rd * cloudDistance;
 	float4 previousClip = WorldToClipPrevious(worldPosition);
@@ -169,7 +169,6 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
-	float depth = _Depth[pixelId];
 	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
 	
 	TemporalOutput output;

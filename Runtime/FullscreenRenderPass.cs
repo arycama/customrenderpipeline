@@ -1,20 +1,19 @@
 ﻿using System;
 using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
     public class FullscreenRenderPass : GraphicsRenderPass
     {
-        private static Vector3[] frustumCorners = new Vector3[4];
-
+        // Todo: This should be private, only kept for some niche cases that will be fixed
         public readonly MaterialPropertyBlock propertyBlock;
+
         private Material material;
         private int passIndex;
         private int primitiveCount;
 
-        private Vector4[] corners = new Vector4[3];
+        private readonly Vector4[] corners = new Vector4[3];
 
         public string Keyword { get; set; }
 

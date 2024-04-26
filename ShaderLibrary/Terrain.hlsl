@@ -1,13 +1,48 @@
- #define NO_EMISSION
+#include "Atmosphere.hlsl"
+#include "Common.hlsl"
+#include "GBuffer.hlsl"
+#include "Geometry.hlsl"
+#include "Samplers.hlsl"
 
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Deferred.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/IndirectRendering.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Lighting.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Material.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/SpaceTransforms.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Terrain.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Tessellation.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/VirtualTexturing.hlsl"
+Texture2D<float> _TerrainHeightmapTexture, _TerrainHolesTexture;
+Texture2D<float2> _TerrainNormalMap;
+Texture2D<uint> IdMap;
+Texture2DArray<float4> AlbedoSmoothness, Normal, Mask;
+
+float4 _TerrainRemapHalfTexel, _TerrainScaleOffset;
+float _TerrainHeightScale, _TerrainHeightOffset, IdMapResolution;
+
+// TODO: Move to common terrain
+struct LayerData
+{
+	float Scale;
+	float Blending;
+	float Stochastic;
+	float Rotation;
+};
+
+StructuredBuffer<LayerData> TerrainLayerData;
+
+float GetTerrainHeight(float2 uv)
+{
+	return _TerrainHeightmapTexture.SampleLevel(_LinearClampSampler, uv, 0) * _TerrainHeightScale + _TerrainHeightOffset;
+}
+
+float2 WorldToTerrainPositionHalfTexel(float3 positionWS)
+{
+	return positionWS.xz * _TerrainRemapHalfTexel.xy + _TerrainRemapHalfTexel.zw;
+}
+
+float2 WorldToTerrainPosition(float3 positionWS)
+{
+	return positionWS.xz * _TerrainScaleOffset.xy + _TerrainScaleOffset.zw;
+}
+
+float GetTerrainHeight(float3 positionWS)
+{
+	float2 uv = WorldToTerrainPositionHalfTexel(positionWS);
+	return GetTerrainHeight(uv);
+}
 
 struct VertexInput
 {
@@ -73,16 +108,16 @@ HullInput Vertex(VertexInput input)
 	uint lod = (cellData >> 20) & 0xF;
 	int4 diffs = (cellData >> uint4(24, 26, 28, 30)) & 0x3;
 	
-	if (column == _VerticesPerEdgeMinusOne)
+	if(column == _VerticesPerEdgeMinusOne)
 		y = (floor(row * exp2(-diffs.x)) + (frac(row * exp2(-diffs.x)) >= 0.5)) * exp2(diffs.x);
 
-	if (row == _VerticesPerEdgeMinusOne)
+	if(row == _VerticesPerEdgeMinusOne)
 		x = (floor(column * exp2(-diffs.y)) + (frac(column * exp2(-diffs.y)) >= 0.5)) * exp2(diffs.y);
 	
-	if (column == 0)
+	if(column == 0)
 		y = (floor(row * exp2(-diffs.z)) + (frac(row * exp2(-diffs.z)) > 0.5)) * exp2(diffs.z);
 	
-	if (row == 0)
+	if(row == 0)
 		x = (floor(column * exp2(-diffs.w)) + (frac(column * exp2(-diffs.w)) > 0.5)) * exp2(diffs.w);
 	
 	float2 vertex = (uint2(x, y) << lod) * _RcpVerticesPerEdgeMinusOne + (uint2(dataColumn, dataRow) << lod);
@@ -108,7 +143,7 @@ HullConstantOutput HullConstant(InputPatch<HullInput, 4> inputs)
 	{
 		float3 v0 = inputs[(0 - i) % 4].position;
 		float3 v1 = inputs[(1 - i) % 4].position;
-		output.edgeFactors[i] = CalculateSphereEdgeFactor(v0, v1, _EdgeLength);
+		output.edgeFactors[i] = CalculateSphereEdgeFactor(v0, v1, _EdgeLength, _CameraAspect, _ScaledResolution.x);
 	}
 	
 	output.insideFactors[0] = 0.5 * (output.edgeFactors[1] + output.edgeFactors[3]);
@@ -143,25 +178,25 @@ HullConstantOutput HullConstant(InputPatch<HullInput, 4> inputs)
 		// Left
 		float3 pl = pc + float3(-spacing.x, 0.0, 0.0);
 		pl.y = GetTerrainHeight(pl);
-		float dx = spacing.x / CalculateSphereEdgeFactor(pc, pl, _EdgeLength);
+		float dx = spacing.x / CalculateSphereEdgeFactor(pc, pl, _EdgeLength, _CameraAspect, _ScaledResolution.x);
 		
 		// Right
 		float3 pr = pc + float3(spacing.x, 0.0, 0.0);
 		pr.y = GetTerrainHeight(pr);
-		dx += spacing.x / CalculateSphereEdgeFactor(pc, pr, _EdgeLength);
+		dx += spacing.x / CalculateSphereEdgeFactor(pc, pr, _EdgeLength, _CameraAspect, _ScaledResolution.x);
 		
 		// Down
 		float3 pd = pc + float3(0.0, 0.0, -spacing.y);
 		pd.y = GetTerrainHeight(pd);
-		float dy = spacing.y / CalculateSphereEdgeFactor(pc, pd, _EdgeLength);
+		float dy = spacing.y / CalculateSphereEdgeFactor(pc, pd, _EdgeLength, _CameraAspect, _ScaledResolution.x);
 		
 		// Up
 		float3 pu = pc + float3(0.0, 0.0, spacing.y);
 		pu.y = GetTerrainHeight(pu);
-		dy += spacing.y / CalculateSphereEdgeFactor(pc, pu, _EdgeLength);
+		dy += spacing.y / CalculateSphereEdgeFactor(pc, pu, _EdgeLength, _CameraAspect, _ScaledResolution.x);
 		
-		output.dx[i] = dx * 0.5 * _IndirectionTexelSize.x;
-		output.dy[i] = dy * 0.5 * _IndirectionTexelSize.y;
+		output.dx[i] = dx * 0.5;// * _IndirectionTexelSize.x;
+		output.dy[i] = dy * 0.5;// * _IndirectionTexelSize.y;
 	}
 	
 	return output;
@@ -202,14 +237,14 @@ FragmentInput Domain(HullConstantOutput tessFactors, OutputPatch<DomainInput, 4>
 	float2 dx = float2(Bilerp(tessFactors.dx, weights), 0.0);
 	float2 dy = float2(0.0, Bilerp(tessFactors.dy, weights));
     
-#ifndef UNITY_PASS_SHADOWCASTER
-	uint feedbackPosition = CalculateFeedbackBufferPosition(uv * _PatchUvScale, dx, dy);
-	_VirtualFeedbackTexture[feedbackPosition] = 1;
-#endif
+//#ifndef UNITY_PASS_SHADOWCASTER
+//	uint feedbackPosition = CalculateFeedbackBufferPosition(uv * _PatchUvScale, dx, dy);
+//	_VirtualFeedbackTexture[feedbackPosition] = 1;
+//#endif
 	
 	// Displacement
-	float3 virtualUv = CalculateVirtualUv(uv * _PatchUvScale, dx, dy);
-	float displacement = _VirtualHeightTexture.SampleGrad(sampler_VirtualHeightTexture, virtualUv, dx, dy) - 0.5;
+	//float3 virtualUv = CalculateVirtualUv(uv * _PatchUvScale, dx, dy);
+	float displacement = 0;// _VirtualHeightTexture.SampleGrad(sampler_VirtualHeightTexture, virtualUv, dx, dy) - 0.5;
 	float height = GetTerrainHeight(uv * _HeightUvScale + _HeightUvOffset) + displacement * _Displacement;
 	
 	float3 position = float3(data.xy, height).xzy;
@@ -227,40 +262,94 @@ FragmentInput Domain(HullConstantOutput tessFactors, OutputPatch<DomainInput, 4>
 void FragmentShadow() { }
 
 [earlydepthstencil]
-GBufferOut Fragment(FragmentInput input)
+GBufferOutput Fragment(FragmentInput input)
 {
-	input.uv = UnjitterTextureUV(input.uv);
+	uint4 layers = IdMap.GatherRed(_LinearClampSampler, input.uv);
 	
-	// Write to feedback buffer incase we need to request the tile
-	uint feedbackPosition = CalculateFeedbackBufferPosition(input.uv);
-	_VirtualFeedbackTexture[feedbackPosition] = 1;
+	float2 localUv = frac(input.uv * IdMapResolution - 0.5+ rcp(512.0));
+	float checker = frac(dot(floor(input.uv * IdMapResolution - 0.5), 0.5));
+	
+	float triMask = checker ? (localUv.x - localUv.y < 0.0) : (localUv.x + localUv.y > 1);
 
-	float2 dx = ddx(input.uv), dy = ddy(input.uv);
-	float3 virtualUv = CalculateVirtualUv(input.uv, dx, dy);
-	float4 albedoSmoothness = _VirtualTexture.SampleGrad(_TrilinearClampSamplerAniso4, virtualUv, dx, dy);
-	float4 normalMetalOcclusion = _VirtualNormalTexture.SampleGrad(_TrilinearClampSamplerAniso4, virtualUv, dx, dy);
-	
-	SurfaceData surface = DefaultSurface();
-	surface.Albedo = albedoSmoothness.rgb;
-	surface.PerceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(albedoSmoothness.a);
-	surface.Metallic = normalMetalOcclusion.r;
-	surface.Occlusion = normalMetalOcclusion.b;
-	surface.Normal.xz = normalMetalOcclusion.ag * 2 - 1;
-	surface.Normal.y = sqrt(1 - saturate(dot(surface.Normal.xz, surface.Normal.xz)));
-	surface.bentNormal = surface.Normal;
-	
-	float4 aoBentNormal = _TerrainAmbientOcclusion.Sample(_LinearClampSampler, input.uv);
-	aoBentNormal.xyz = normalize(2.0 * aoBentNormal.xyz - 1.0);
-	
-	// TODO: This needs some improvement.. blending bent normals with world normals doesn't quite work well
-	if (TERRAIN_AO_ON)
+	float3 weights;
+	float2 offsets[3]; 
+	if(checker)
 	{
-		float4 visibilityCone = BlendVisibiltyCones(float4(surface.bentNormal, surface.Occlusion), aoBentNormal);
-		surface.bentNormal = visibilityCone.xyz;
-		surface.Occlusion = visibilityCone.a;
+		offsets[0] = triMask ? float2(0, 1) : float2(1, 0);
+		offsets[1] = float2(1, 1);
+		offsets[2] = float2(0, 0);
+		
+		weights.x = abs(localUv.y - localUv.x);
+		weights.y = min(localUv.x, localUv.y);
+		weights.z = min(1 - localUv.x, 1 - localUv.y);
+	}
+	else
+	{
+		offsets[0] = float2(0, 1);
+		offsets[1] = triMask ? float2(1, 1) : float2(0, 0);
+		offsets[2] = float2(1, 0);
+		
+		weights = float3(min(1 - localUv, localUv.yx), abs(localUv.x + localUv.y - 1)).xzy;
 	}
 	
-	return SurfaceToGBuffer(surface, input.positionCS.xy);
+	// wi = 0 0 1 1
+	uint3 indices;
+	if(checker)
+	{
+		indices.x = triMask ? layers.x : layers.z;
+		indices.y = layers.y;
+		indices.z = layers.w;
+	}
+	else
+	{
+		indices.x = layers.x;
+		indices.y = triMask ? layers.y : layers.w;
+		indices.z = layers.z;
+	}	
+	
+	float2 dx = ddx_coarse(input.uv);
+	float2 dy = ddy_coarse(input.uv);
+	
+	
+	LayerData data0 = TerrainLayerData[indices.x];
+	float2 uv0 = input.uv * data0.Scale;
+	float4 albedoSmoothness = AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv0, indices.x), dx * data0.Scale, dy * data0.Scale) * weights.x;
+	float4 normal = Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv0, indices.x), dx * data0.Scale, dy * data0.Scale) * weights.x;
+	float4 mask = Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv0, indices.x), dx * data0.Scale, dy * data0.Scale) * weights.x;
+	
+	LayerData data1 = TerrainLayerData[indices.y];
+	float2 uv1 = input.uv * data1.Scale;
+	albedoSmoothness += AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv1, indices.y), dx * data1.Scale, dy * data1.Scale) * weights.y;
+	normal += Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv1, indices.y), dx * data1.Scale, dy * data1.Scale) * weights.y;
+	mask += Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv1, indices.y), dx * data1.Scale, dy * data1.Scale) * weights.y;
+	
+	LayerData data2 = TerrainLayerData[indices.z];
+	float2 uv2 = input.uv * data2.Scale;
+	albedoSmoothness += AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv2, indices.z), dx * data2.Scale, dy * data2.Scale) * weights.z;
+	normal += Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv2, indices.z), dx * data2.Scale, dy * data2.Scale) * weights.z;
+	mask += Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv2, indices.z), dx * data2.Scale, dy * data2.Scale) * weights.z;
+	
+	//float dither = _BlueNoise1D[input.positionCS.xy % 128];
+	
+	//uint index;
+	//if(dither < weights.x)
+	//	index = indices.x;
+	//else if(dither < weights.x + weights.y)
+	//	index = indices.y;
+	//else
+	//	index = indices.z;
+	
+	//LayerData data3 = TerrainLayerData[index];
+	//float2 uv3 = input.uv * data3.Scale;
+	//albedoSmoothness = AlbedoSmoothness.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv3, index), dx * data3.Scale, dy * data3.Scale);
+	//normal = Normal.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv3, index), dx * data3.Scale, dy * data3.Scale);
+	//mask = Mask.SampleGrad(_TrilinearRepeatAniso16Sampler, float3(uv3, index), dx * data3.Scale, dy * data3.Scale);
+	
+	float3 t = normalize(float3(_TerrainNormalMap.Sample(_LinearClampSampler, input.uv), 1.0)) + float3(0, 0, 1);
+	float3 u = UnpackNormalAG(normal) * float2(-1,1).xxy;
+	float3 normalWS = (t * dot(t, u) / t.z - u).xzy;
+	
+	return OutputGBuffer(albedoSmoothness.rgb, mask.r, normalWS, 1.0 - albedoSmoothness.a, normalWS, mask.g, 0.0);
 }
 
 struct GeometryInput
@@ -341,6 +430,8 @@ float3 mod(float3 x, float3 y)
 {
 	return x - y * floor(x / y);
 }
+
+float _VoxelResolution, _VoxelOffset;
 
 void FragmentVoxel(FragmentInputVoxel input)
 {

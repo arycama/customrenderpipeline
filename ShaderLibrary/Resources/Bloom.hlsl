@@ -4,13 +4,10 @@
 Texture2D<float3> _Input;
 float4 _InputScaleLimit;
 float4 _Input_TexelSize;
-float2 _RcpResolution;
 float _Strength;
 
-float3 FragmentDownsample(float4 position : SV_Position) : SV_Target
+float3 FragmentDownsample(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {
-	float2 uv = position.xy * _RcpResolution;
-
 	float3 color = _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(0, 0), _InputScaleLimit)) * 0.125;
 	
 	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(-1, -1), _InputScaleLimit)) * 0.125;
@@ -31,10 +28,8 @@ float3 FragmentDownsample(float4 position : SV_Position) : SV_Target
 	return color;
 }
 
-float4 FragmentUpsample(float4 position : SV_Position) : SV_Target
+float4 FragmentUpsample(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {
-	float2 uv = position.xy * _RcpResolution;
-	
 	float3 color = _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(-1, 1), _InputScaleLimit)) * 0.0625;
 	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(0, 1), _InputScaleLimit)) * 0.125;
 	color += _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Input_TexelSize.xy * float2(1, 1), _InputScaleLimit)) * 0.0625;

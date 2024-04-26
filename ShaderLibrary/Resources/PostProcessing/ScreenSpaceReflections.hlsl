@@ -1,7 +1,8 @@
 #include "../../Common.hlsl"
 #include "../../Color.hlsl"
-#include "../../Temporal.hlsl"
+#include "../../Packing.hlsl"
 #include "../../Samplers.hlsl"
+#include "../../Temporal.hlsl"
 
 Texture2D<float4> _NormalRoughness, _BentNormalOcclusion;
 Texture2D<float3> _PreviousColor;

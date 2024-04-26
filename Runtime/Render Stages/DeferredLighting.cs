@@ -26,7 +26,7 @@ public class DeferredLighting
             pass.ReadTexture("_AlbedoMetallic", albedoMetallic);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
-            pass.ReadTexture("_Stencil", depth, RenderTextureSubElement.Stencil);
+            pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
 
             commonPassData.SetInputs(pass);
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();

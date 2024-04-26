@@ -16,42 +16,19 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public void Render(Camera camera, RTHandle depth, RTHandle scene, float scale, Texture2D blueNoise2D, Matrix4x4 invVpMatrix)
+        public void Render(Camera camera, RTHandle depth, RTHandle scene, float scale, Texture2D blueNoise2D, Matrix4x4 invVpMatrix, RTHandle normal)
         {
             if (settings.Strength == 0.0f)
                 return;
 
             var scaledWidth = (int)(camera.pixelWidth * scale);
             var scaledHeight = (int)(camera.pixelHeight * scale);
-            var normals = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
-            var viewDepth = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.R16_SFloat, isScreenTexture: true);
-
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Motion Vectors"))
-            {
-                pass.Initialize(material);
-                pass.ReadTexture("_CameraDepth", depth);
-
-                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
-                pass.WriteTexture(normals, RenderBufferLoadAction.DontCare);
-                pass.WriteTexture(viewDepth, RenderBufferLoadAction.DontCare);
-
-                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
-                {
-                    pass.SetVector(command, "ScaleOffset", data.scaleOffset);
-                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                    pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
-                });
-
-                data.scaleOffset = new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight);
-                data.scaledResolution = new Vector4(scaledWidth, scaledHeight, 1.0f / scaledWidth, 1.0f / scaledHeight);
-                data.invVpMatrix = invVpMatrix;
-            }
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Compute"))
             {
                 pass.Initialize(material, 1);
-                pass.ReadTexture("_ViewDepth", viewDepth);
-                pass.ReadTexture("_ViewNormals", normals);
+                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_Normals", normal);
                 pass.ReadTexture("_CameraDepth", depth);
                 pass.WriteTexture(scene);
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);

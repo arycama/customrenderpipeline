@@ -41,7 +41,7 @@ public class ScreenSpaceReflections
             pass.Initialize(material, camera: camera);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
-            pass.ReadTexture("_Stencil", depth, RenderTextureSubElement.Stencil);
+            pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
             pass.ReadTexture("_PreviousColor", previousFrameColor);
             pass.ReadTexture("_Depth", depth);
@@ -74,7 +74,7 @@ public class ScreenSpaceReflections
 
             pass.ReadTexture("_Input", tempResult);
             pass.ReadTexture("_History", textureData.history);
-            pass.ReadTexture("_Stencil", depth, RenderTextureSubElement.Stencil);
+            pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Depth", depth);
             pass.ReadTexture("Velocity", velocity);
 

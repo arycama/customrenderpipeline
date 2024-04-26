@@ -26,7 +26,7 @@ namespace Arycama.CustomRenderPipeline
             }
             else
             {
-                directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D32_SFloat, directionalShadowRequests.Count, TextureDimension.Tex2DArray);
+                directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, directionalShadowRequests.Count, TextureDimension.Tex2DArray);
 
                 for (var i = 0; i < directionalShadowRequests.Count; i++)
                 {

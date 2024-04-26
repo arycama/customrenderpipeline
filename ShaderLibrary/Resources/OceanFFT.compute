@@ -353,7 +353,7 @@ void CalculateNormals(uint3 id : SV_DispatchThreadID)
 	float3 dx = (right - left) / (2.0 * delta);
 	float3 dy = (up - down) / (2.0 * delta);
 	
-	float2 normalGradients = float2(-(right.y - left.y) / (2.0 * delta), -(up.y - down.y) / (2.0 * delta));
+	float2 normalGradients = float2(-dx.y, -dy.y);
 	
 	float3 normal = normalize(float3(normalGradients, 1.0));
 	normal *= SmoothnessToNormalLength(Smoothness);

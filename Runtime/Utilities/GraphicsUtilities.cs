@@ -28,6 +28,16 @@ namespace Arycama.CustomRenderPipeline
             return new Vector4(1f - invWidth, 1f - invHeight, 0.5f * invWidth, 0.5f * invHeight);
         }
 
+        public static Vector4 HalfTexelRemap(Vector2 position, Vector2 size, Vector2 resolution)
+        {
+            Vector4 result;
+            result.x = (resolution.x - 1f) / (size.x * resolution.x);
+            result.y = (resolution.y - 1f) / (size.x * resolution.y);
+            result.z = (0.5f * size.x + position.x - position.x * resolution.x) / (size.x * resolution.x);
+            result.w = (0.5f * size.y + position.y - position.y * resolution.y) / (size.y * resolution.y);
+            return result;
+        }
+
         /// <summary>
         /// Calculates a scale and offset for remapping a UV from a 0-1 range to a halfTexel to (1-halfTexel) range
         /// </summary>

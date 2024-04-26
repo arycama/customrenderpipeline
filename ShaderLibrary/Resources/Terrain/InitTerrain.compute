@@ -10,12 +10,43 @@ float HeightmapMin, HeightmapMax;
 void InitHeightmap(uint2 id : SV_DispatchThreadID)
 {
 	// Remap from Min:Max range to 0:1
-	HeightmapResult[id] = Remap(HeightmapInput[id], HeightmapMin, HeightmapMax, 0, 1.0);
+	HeightmapResult[id] = Remap(HeightmapInput[id], 0.0, 0.5, 0, 1.0);
 }
+
+#pragma kernel InitNormalMap
+
+Texture2D<float> InitNormalMapInput;
+RWTexture2D<float2> InitNormalMapOutput;
+uint MaxWidth, MaxHeight;
+float2 Scale;
+
+[numthreads(8, 8, 1)]
+void InitNormalMap(uint2 id : SV_DIspatchThreadID)
+{
+	float h[3][3];
+	float3x3 values;
+	
+	[unroll]
+	for (int y = -1; y <= 1; y++)
+	{
+		[unroll]
+		for (int x = -1; x <= 1; x++)
+		{
+			h[x + 1][y + 1] = InitNormalMapInput[clamp(id + int2(x, y), 0, uint2(MaxWidth, MaxHeight))];
+		}
+	}
+	
+	float2 d;
+	d.x = h[0][0] + 2.0 * h[0][1] + h[0][2] - h[2][0] - 2.0 * h[2][1] - h[2][2];
+	d.y = h[0][0] + 2.0 * h[1][0] + h[2][0] - h[0][2] - 2.0 * h[1][2] - h[2][2];
+	
+	InitNormalMapOutput[id] = d * Scale;
+}
+
+#pragma kernel DepthCopy
 
 Texture2D<float> DepthCopyInput;
 RWTexture2D<float2> DepthCopyResult;
-
 
 [numthreads(8, 8, 1)]
 void DepthCopy(uint2 id : SV_DispatchThreadID)
@@ -26,8 +57,8 @@ void DepthCopy(uint2 id : SV_DispatchThreadID)
 
 #pragma kernel GenerateMinMaxHeights
 
-Texture2D<float2> GenerateMinMaxHeightsInput;
-RWTexture2D<float2> GenenrateMinMaxHeightsResult;
+RWTexture2D<float2> GenerateMinMaxHeightsInput;
+RWTexture2D<float2> GenerateMinMaxHeightsResult;
 uint _Width, _Height;
 
 float GetMinDepth(uint2 coord)
@@ -103,35 +134,5 @@ void GenerateMinMaxHeights(uint2 id : SV_DispatchThreadID)
 		maxDepth = Max3(float3(maxDepth, extraRowTexelValuesMax.xy));
 	}
 
-	DepthCopyResult[id] = float2(minDepth, maxDepth);
-}
-
-#pragma kernel InitNormalMap
-
-Texture2D<float> InitNormalMapInput;
-RWTexture2D<float2> InitNormalMapOutput;
-uint MaxWidth, MaxHeight;
-float2 Scale;
-
-[numthreads(8, 8, 1)]
-void InitNormalMap(uint2 id : SV_DIspatchThreadID)
-{
-	float h[3][3];
-	float3x3 values;
-	
-	[unroll]
-	for (int y = -1; y <= 1; y++)
-	{
-		[unroll]
-		for (int x = -1; x <= 1; x++)
-		{
-			h[x + 1][y + 1] = InitNormalMapInput[clamp(id + int2(x, y), 0, uint2(MaxWidth, MaxHeight))];
-		}
-	}
-	
-	float2 d;
-	d.x = h[0][0] + 2.0 * h[0][1] + h[0][2] - h[2][0] - 2.0 * h[2][1] - h[2][2];
-	d.y = h[0][0] + 2.0 * h[1][0] + h[2][0] - h[0][2] - 2.0 * h[1][2] - h[2][2];
-	
-	InitNormalMapOutput[id] = d * Scale;
+	GenerateMinMaxHeightsResult[id] = float2(minDepth, maxDepth);
 }

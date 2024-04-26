@@ -1,5 +1,6 @@
 #include "../Atmosphere.hlsl"
 #include "../Lighting.hlsl"
+#include "../Packing.hlsl"
 #include "../Temporal.hlsl"
 #include "../VolumetricLight.hlsl"
 

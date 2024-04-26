@@ -483,7 +483,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer));
         }
 
-        public RTHandle RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, IRenderPassData commonPassData)
+        public RTHandle RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, IRenderPassData commonPassData, Vector4[] cullingPlanes)
         {
             // Depth, rgba8 normalFoam, rgba8 roughness, mask? 
             // Writes depth, stencil, and RGBA8 containing normalRG, roughness and foam
@@ -538,6 +538,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_OceanScale", oceanScale);
                     pass.SetVector(command, "_RcpCascadeScales", rcpScales);
                     pass.SetVector(command, "_OceanTexelSize", texelSizes);
+
+                    pass.SetInt(command, "_CullingPlanesCount", 6);
+                    pass.SetVectorArray(command, "_CullingPlanes", cullingPlanes);
                 });
             }
 
@@ -634,8 +637,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_UnderwaterResult", underwaterLighting);
                 pass.ReadTexture("_WaterNormalFoam", waterNormalMask);
                 pass.ReadTexture("_UnderwaterDepth", underwaterDepth);
-                pass.ReadTexture("_Depth", cameraDepth, RenderTextureSubElement.Depth);
-                pass.ReadTexture("_Stencil", cameraDepth, RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_Depth", cameraDepth, subElement: RenderTextureSubElement.Depth);
+                pass.ReadTexture("_Stencil", cameraDepth, subElement: RenderTextureSubElement.Stencil);
 
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();

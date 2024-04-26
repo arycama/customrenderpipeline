@@ -1,4 +1,4 @@
-Shader "Nature/Terrain/Lit Terrain"
+Shader "Terrain"
 {
     Properties
     {
@@ -33,7 +33,7 @@ Shader "Nature/Terrain/Lit Terrain"
 
             #pragma multi_compile _ REFLECTION_PROBE_RENDERING
 
-            #include "LitTerrain.hlsl"
+            #include "Terrain.hlsl"
             ENDHLSL
         }
 
@@ -53,7 +53,7 @@ Shader "Nature/Terrain/Lit Terrain"
             #pragma domain Domain
             #pragma fragment FragmentShadow
 
-            #include "LitTerrain.hlsl"
+            #include "Terrain.hlsl"
             ENDHLSL
         }
 

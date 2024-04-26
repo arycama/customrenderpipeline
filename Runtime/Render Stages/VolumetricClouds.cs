@@ -380,8 +380,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "_CloudCoverageStart", cloudShadowExtinctionInvScale);
                 pass.SetFloat(command, "_CloudShadowExtinctionInvScale", cloudShadowExtinctionInvScale);
 
-                var cloudCoverageScale = 1.0f / (startHeight - endHeight);
-                var cloudCoverageOffset = -endHeight / (startHeight - endHeight);
+                // This is used to scale a smooth falloff that uses distance^2
+                var cloudCoverageScale = 1.0f / (startHeight * startHeight - endHeight * endHeight);
+                var cloudCoverageOffset = -endHeight * endHeight / (startHeight * startHeight - endHeight * endHeight);
                 pass.SetFloat(command, "_CloudCoverageScale", cloudCoverageScale);
                 pass.SetFloat(command, "_CloudCoverageOffset", cloudCoverageOffset);
 
@@ -421,7 +422,7 @@ namespace Arycama.CustomRenderPipeline
 
             var cloudLuminanceTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             var cloudTransmittanceTemp = renderGraph.GetTexture(width, height, GraphicsFormat.R8_UNorm, isScreenTexture: true);
-            var cloudDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R32_SFloat, isScreenTexture: true);
+            var cloudDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R32G32_SFloat, isScreenTexture: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Render"))
             {

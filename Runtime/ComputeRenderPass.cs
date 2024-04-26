@@ -100,8 +100,7 @@ namespace Arycama.CustomRenderPipeline
             for (var i = 0; i < colorBindings.Count; i++)
                 command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].Item2, colorBindings[i].Item1, colorBindings[i].Item3);
 
-            colorBindings.Clear();
-            screenWrite = false;
+
         }
 
         public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)
@@ -122,6 +121,18 @@ namespace Arycama.CustomRenderPipeline
         public void AddKeyword(string keyword)
         {
             keywords.Add(keyword);
+        }
+
+        protected sealed override void PostExecute(CommandBuffer command)
+        {
+            foreach (var colorTarget in colorBindings)
+            {
+                if (colorTarget.Item1.AutoGenerateMips)
+                    command.GenerateMips(colorTarget.Item1);
+            }
+
+            colorBindings.Clear();
+            screenWrite = false;
         }
     }
 }

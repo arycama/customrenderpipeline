@@ -5,16 +5,9 @@
 
 #include "Atmosphere.hlsl"
 #include "Common.hlsl"
+#include "GBuffer.hlsl"
 #include "Lighting.hlsl"
 #include "WaterCommon.hlsl"
-
-struct GBufferOutput
-{
-	float4 albedoMetallic : SV_Target0;
-	float4 normalRoughness : SV_Target1;
-	float4 bentNormalOcclusion : SV_Target2;
-	float3 emissive : SV_Target3;
-};
 
 Texture2D<float4> _WaterNormalFoam;
 Texture2D<float3> _WaterEmission, _UnderwaterResult;
@@ -188,10 +181,5 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.04);
 	luminance *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
 	
-	GBufferOutput output;
-	output.albedoMetallic = float2(foamFactor, 0.0).xxxy; // Todo: Multiply by foam albedo?
-	output.normalRoughness = float4(PackFloat2To888(0.5 * PackNormalOctQuadEncode(N) + 0.5), perceptualRoughness);
-	output.bentNormalOcclusion = float4(N * 0.5 + 0.5, 1.0);
-	output.emissive = luminance;
-	return output;
+	return OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, luminance);
 }

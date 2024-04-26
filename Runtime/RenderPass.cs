@@ -58,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
             RenderGraph.SetLastRTHandleRead(texture, Index);
         }
 
-        public void ReadTexture(string propertyName, RTHandle texture, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+        public void ReadTexture(string propertyName, RTHandle texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
             ReadTexture(Shader.PropertyToID(propertyName), texture, 0, subElement);
         }

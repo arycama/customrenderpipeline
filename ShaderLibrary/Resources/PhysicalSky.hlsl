@@ -200,7 +200,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		float3 rd = worldDir;
 		float rcpRdLength = rsqrt(dot(rd, rd));
 		rd *= rcpRdLength;
-		float2 offsets = InterleavedGradientNoise(position.xy, _FrameIndex); // _BlueNoise2D[position.xy % 128]
+		float2 offsets = _BlueNoise2D[position.xy % 128];
 	#endif
 	
 	float rayLength = DistanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
@@ -229,13 +229,16 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	
 		float cloudDistance = 0;
 		float4 clouds = evaluateCloud ? EvaluateCloud(rayStart, rayEnd - rayStart, 12, rd, _ViewHeight, rd.y, offsets, 0.0, false, cloudDistance) : float2(0.0, 1.0).xxxy;
+		float cloudOpticalDepth = -log2(clouds.a) * rcp(rayEnd - rayStart);
 		float3 cloudLuminance = clouds.rgb;
 		luminance += cloudLuminance;
 	
 		float cloudTransmittance = clouds.a;
 	#else
 		float cloudTransmittance = CloudTransmittanceTexture[position.xy];
-		float cloudDistance = CloudDepthTexture[position.xy];
+		float2 cloudTexture = CloudDepthTexture[position.xy];
+		float cloudDistance = cloudTexture.r;
+		float cloudOpticalDepth = cloudTexture.g;
 	
 		// TODO: Optimize?
 		float depth = _Depth[position.xy];
@@ -301,7 +304,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 			ms *= light.color * _Exposure;
 
 			// Apply cloud coverage only to multi scatter, since single scatter is already shadowed by clouds
-			float cloudFactor = saturate(heightAtDistance * _CloudCoverageScale + _CloudCoverageOffset);
+			float cloudFactor = saturate(heightAtDistance * heightAtDistance * _CloudCoverageScale + _CloudCoverageOffset);
 			ms = lerp(ms * _CloudCoverage.a, _CloudCoverage.rgb, cloudFactor);
 			lighting += ms * (scatter.xyz + scatter.w);
 		}
@@ -310,8 +313,13 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		lighting *= viewTransmittance;
 		
 		// Blend clouds if needed
-		if (currentDistance >= cloudDistance)
-			lighting *= cloudTransmittance;
+		if (cloudTransmittance && currentDistance >= cloudDistance)
+		{
+			float depth = currentDistance - cloudDistance;
+			float transmittance = exp2(-depth * cloudOpticalDepth);
+			//lighting *= max(exp2(-depth * cloudOpticalDepth), cloudTransmittance);
+			//lighting *= cloudTransmittance;
+		}
 		
 		float3 pdf = viewTransmittance * extinction * rcp(1.0 - maxTransmittance);
 		luminance += lighting * rcp(dot(pdf, rcp(3.0))) / _Samples;
@@ -368,7 +376,7 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float cloudDistance;
 	if(cloudTransmittance < 1.0)
 	{
-		cloudDistance = CloudDepthTexture[position.xy];
+		cloudDistance = CloudDepthTexture[position.xy].r;
 	}
 	
 	float sceneDistance;
@@ -436,11 +444,11 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	mean /= 9.0;
 	stdDev /= 9.0;
-	stdDev = sqrt(abs(stdDev - mean * mean));
-	minValue = max(minValue, mean - stdDev);
-	maxValue = min(maxValue, mean + stdDev);
-	minValue = mean - stdDev * _ClampWindow;
-	maxValue = mean + stdDev * _ClampWindow;
+	//stdDev = sqrt(abs(stdDev - mean * mean));
+	//minValue = max(minValue, mean - stdDev);
+	//maxValue = min(maxValue, mean + stdDev);
+	//minValue = mean - stdDev * _ClampWindow;
+	//maxValue = mean + stdDev * _ClampWindow;
 	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
@@ -462,7 +470,7 @@ float _SpatialSamples, _SpatialDepthFactor, _BlurSigma;
 
 float3 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-   // return _SkyInput[position.xy];
+    return _SkyInput[position.xy];
 	
     float3 v[9];
     // Add the pixels which make up our window to the pixel array.

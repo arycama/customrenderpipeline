@@ -82,7 +82,12 @@ float3 UnpackNormalUNorm(float2 packedNormal, float scale = 1.0)
 float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
 {
 	packedNormal.a *= packedNormal.r;
-	return UnpackNormalUNorm(packedNormal.ga, scale);
+	return UnpackNormalUNorm(packedNormal.ag, scale);
+}
+
+float2 NormalDerivatives(float3 normal)
+{
+	return normal.xy * rcp(normal.z);
 }
 
 // ref http://blog.selfshadow.com/publications/blending-in-detail/
