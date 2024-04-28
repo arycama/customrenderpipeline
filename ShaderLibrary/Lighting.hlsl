@@ -491,8 +491,14 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 			// Parabola
 			weights = saturate(1.0 - (SqrLength(center - coord) / Sq(filterSize)));
 			
+			// Smoothstep
+			weights = smoothstep(filterSize, 0, abs(center - coord));
+			
 			// Gaussian
 			weights = exp2(-ShadowFilterSigma * Sq((center - coord) * data.xy));
+			
+			// cos?
+			//weights = 0.5 * cos(Pi * saturate(abs(center - coord) / filterSize)) + 0.5;
 			
 			float weight = weights.x * weights.y;
 			

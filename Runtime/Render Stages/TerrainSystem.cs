@@ -191,7 +191,7 @@ public class TerrainSystem
 
         // Build id map
         var idMapResolution = terrainData.alphamapResolution;
-        idMap = renderGraph.GetTexture(idMapResolution, idMapResolution, GraphicsFormat.R8_UInt, isPersistent: true);
+        idMap = renderGraph.GetTexture(idMapResolution, idMapResolution, GraphicsFormat.R32_UInt, isPersistent: true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Terrain Layer Data Init"))
         {
             pass.Initialize(generateIdMapMaterial);
@@ -220,6 +220,25 @@ public class TerrainSystem
     {
         if (terrain != Terrain.activeTerrain)
             InitializeTerrain();
+
+        // Set this every frame incase of changes..
+        // TODO: Only do when data changed?
+        using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Layer Data Update"))
+        {
+            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+            {
+                var layers = terrainData.terrainLayers;
+                var layerData = ArrayPool<TerrainLayerData>.Get(layers.Length);
+                for (var i = 0; i < layers.Length; i++)
+                {
+                    var layer = layers[i];
+                    layerData[i] = new TerrainLayerData(terrainData.size.x / layer.tileSize.x, Mathf.Max(1e-3f, layer.smoothness), layer.normalScale, 1.0f - layer.metallic);
+                }
+
+                command.SetBufferData(terrainLayerData, layerData);
+                ArrayPool<TerrainLayerData>.Release(layerData);
+            });
+        }
     }
 
     public void Cull(Vector3 viewPosition, Vector4[] cullingPlanes, ICommonPassData commonPassData)

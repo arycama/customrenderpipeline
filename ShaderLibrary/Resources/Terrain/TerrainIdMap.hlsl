@@ -76,22 +76,22 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	float2 controlCenter = (floor(uv * (_Resolution - 1.0)) + 0.5) / _Resolution;
 	
 	uint rand00 = PcgHash(controlCenter * TerrainLayerData[index0].Scale * 2.0 * sqrt(3.0));
-	float rotation0 = ConstructFloat(rand00) * TerrainLayerData[index0].Rotation;
+	float rotation0 = ConstructFloat(rand00);
 	
 	uint rand01 = PcgHash(rand00);
-	float offsetX0 = ConstructFloat(rand01) * TerrainLayerData[index0].Stochastic;
+	float offsetX0 = ConstructFloat(rand01);
 	
 	uint rand02 = PcgHash(rand01);
-	float offsetY0 = ConstructFloat(rand02) * TerrainLayerData[index0].Stochastic;
+	float offsetY0 = ConstructFloat(rand02);
 	
 	uint rand10 = PcgHash(controlCenter * TerrainLayerData[index1].Scale * 2.0 * sqrt(3.0));
-	float rotation1 = ConstructFloat(rand10) * TerrainLayerData[index1].Rotation;
+	float rotation1 = ConstructFloat(rand10);
 	
 	uint rand11 = PcgHash(rand10);
-	float offsetX1 = ConstructFloat(rand11) * TerrainLayerData[index1].Stochastic;
+	float offsetX1 = ConstructFloat(rand11);
 	
 	uint rand12 = PcgHash(rand11);
-	float offsetY1 = ConstructFloat(rand12) * TerrainLayerData[index1].Stochastic;
+	float offsetY1 = ConstructFloat(rand12);
 	
 	float triplanar = 0.0;
 	
@@ -99,8 +99,8 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	float weightSum = weight0 + weight1;
 	if(weightSum > 0.0)
 	{
-		//weight0 /= weightSum;
-		//weight1 /= weightSum;
+		weight0 /= weightSum;
+		weight1 /= weightSum;
 	}
 	
 	float blend = weight1;
@@ -115,21 +115,21 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	//	index1 = index0;
 	
 	uint result = (index0 & 0xF) << 0;
-	//result |= (uint(round(offsetX0 * 3.0)) & 0x3) << 4;
-	//result |= (uint(round(offsetY0 * 3.0)) & 0x3) << 6;
-	//result |= (uint(round(rotation0 * 31.0)) & 0x1F) << 8;
+	result |= (uint(round(offsetX0 * 3.0)) & 0x3) << 4;
+	result |= (uint(round(offsetY0 * 3.0)) & 0x3) << 6;
+	result |= (uint(round(rotation0 * 31.0)) & 0x1F) << 8;
 	
-	//result |= (index1 & 0xF) << 13;
-	//result |= (uint(round(offsetX1 * 3.0)) & 0x3) << 17;
-	//result |= (uint(round(offsetY1 * 3.0)) & 0x3) << 19;
-	//result |= (uint(round(rotation1 * 31.0)) & 0x1F) << 21;
+	result |= (index1 & 0xF) << 13;
+	result |= (uint(round(offsetX1 * 3.0)) & 0x3) << 17;
+	result |= (uint(round(offsetY1 * 3.0)) & 0x3) << 19;
+	result |= (uint(round(rotation1 * 31.0)) & 0x1F) << 21;
 	
 	//float nrnd0 = 2.0 * nrand(position.xy / _Resolution) - 1.0;
 	//nrnd0 *= 1.0 - abs(2.0 * frac(blend * 15.0) - 1.0);
    
-	//result |= (uint(round(blend * 15.0)) & 0xF) << 26;
-	//result |= (uint((1.0 - weight0) * 16.0) & 0xF) << 26;
-	//result |= (uint(triplanar * 4.0) & 0x3) << 30;
+	result |= (uint(round(blend * 15.0)) & 0xF) << 26;
+	result |= (uint((1.0 - weight0) * 16.0) & 0xF) << 26;
+	result |= (uint(triplanar * 4.0) & 0x3) << 30;
 	
 	return result;
 }
