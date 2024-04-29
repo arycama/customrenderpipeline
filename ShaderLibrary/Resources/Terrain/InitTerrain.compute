@@ -40,7 +40,7 @@ void InitNormalMap(uint2 id : SV_DIspatchThreadID)
 	d.x = h[0][0] + 2.0 * h[0][1] + h[0][2] - h[2][0] - 2.0 * h[2][1] - h[2][2];
 	d.y = h[0][0] + 2.0 * h[1][0] + h[2][0] - h[0][2] - 2.0 * h[1][2] - h[2][2];
 	
-	InitNormalMapOutput[id] = d * Scale;
+	InitNormalMapOutput[id] = normalize(float3(d * Scale, 1.0)).xy;
 }
 
 #pragma kernel DepthCopy

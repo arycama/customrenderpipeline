@@ -1,5 +1,6 @@
 #include "../../Common.hlsl"
 #include "../../Random.hlsl"
+#include "../../Samplers.hlsl"
 
 // TODO: Move to common terrain
 struct LayerData
@@ -13,8 +14,10 @@ struct LayerData
 StructuredBuffer<LayerData> TerrainLayerData;
 
 Texture2D<float4> _Input0, _Input1, _Input2, _Input3, _Input4, _Input5, _Input6, _Input7;
+Texture2D<float2> _TerrainNormalMap;
 uint LayerCount;
 float _Resolution;
+float3 TerrainSize;
 
 float nrand(float2 n)
 {
@@ -72,10 +75,7 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 		}
 	}
 	
-	// Center of texel in control map space
-	float2 controlCenter = (floor(uv * (_Resolution - 1.0)) + 0.5) / _Resolution;
-	
-	uint rand00 = PcgHash(controlCenter * TerrainLayerData[index0].Scale * 2.0 * sqrt(3.0));
+	uint rand00 = PcgHash(uv * TerrainSize.xz / TerrainLayerData[index0].Scale);
 	float rotation0 = ConstructFloat(rand00);
 	
 	uint rand01 = PcgHash(rand00);
@@ -84,7 +84,7 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	uint rand02 = PcgHash(rand01);
 	float offsetY0 = ConstructFloat(rand02);
 	
-	uint rand10 = PcgHash(controlCenter * TerrainLayerData[index1].Scale * 2.0 * sqrt(3.0));
+	uint rand10 = PcgHash(uv * TerrainSize.xz / TerrainLayerData[index1].Scale);
 	float rotation1 = ConstructFloat(rand10);
 	
 	uint rand11 = PcgHash(rand10);
@@ -93,7 +93,22 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	uint rand12 = PcgHash(rand11);
 	float offsetY1 = ConstructFloat(rand12);
 	
-	float triplanar = 0.0;
+	float3 absNormal = abs(UnpackNormalSNorm(_TerrainNormalMap.Sample(_LinearClampSampler, uv)).xzy);
+	
+	uint triplanar;
+	if(absNormal.x > absNormal.y)
+	{
+		if(absNormal.x > absNormal.z)
+			triplanar = 0;
+		else
+			triplanar = 2;
+	}
+	else if(absNormal.y > absNormal.z)
+	{
+		triplanar = 1;
+	}
+	else
+		triplanar = 2;
 	
 	// Normalize weights so they sum to 1
 	float weightSum = weight0 + weight1;
@@ -129,7 +144,7 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
    
 	result |= (uint(round(blend * 15.0)) & 0xF) << 26;
 	result |= (uint((1.0 - weight0) * 16.0) & 0xF) << 26;
-	result |= (uint(triplanar * 4.0) & 0x3) << 30;
+	result |= (triplanar & 0x3) << 30;
 	
 	return result;
 }

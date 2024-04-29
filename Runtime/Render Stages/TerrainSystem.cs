@@ -176,7 +176,7 @@ public class TerrainSystem
                 for (var i = 0; i < layers.Length; i++)
                 {
                     var layer = layers[i];
-                    layerData[i] = new TerrainLayerData(terrainData.size.x / layer.tileSize.x, layer.smoothness, layer.normalScale, 1.0f - layer.metallic);
+                    layerData[i] = new TerrainLayerData(layer.tileSize.x, layer.smoothness, layer.normalScale, 1.0f - layer.metallic);
 
                     // Add to texture array
                     command.CopyTexture(layer.diffuseTexture, 0, diffuseArray, i);
@@ -197,6 +197,7 @@ public class TerrainSystem
             pass.Initialize(generateIdMapMaterial);
 
             pass.WriteTexture(idMap, RenderBufferLoadAction.DontCare);
+            pass.ReadTexture("_TerrainNormalMap", normalmap);
 
             //pass.ReadBuffer("TerrainLayerData", layerDataBuffer);
 
@@ -205,6 +206,7 @@ public class TerrainSystem
                 pass.SetInt(command, "LayerCount", terrainData.alphamapLayers);
                 pass.SetFloat(command, "_Resolution", idMapResolution);
                 (pass as FullscreenRenderPass).propertyBlock.SetBuffer("TerrainLayerData", terrainLayerData);
+                pass.SetVector(command, "TerrainSize", terrain.terrainData.size);
 
                 // Shader supports up to 8 layers. Can easily be increased by modifying shader though
                 for (var i = 0; i < 8; i++)
@@ -232,7 +234,7 @@ public class TerrainSystem
                 for (var i = 0; i < layers.Length; i++)
                 {
                     var layer = layers[i];
-                    layerData[i] = new TerrainLayerData(terrainData.size.x / layer.tileSize.x, Mathf.Max(1e-3f, layer.smoothness), layer.normalScale, 1.0f - layer.metallic);
+                    layerData[i] = new TerrainLayerData(layer.tileSize.x, Mathf.Max(1e-3f, layer.smoothness), layer.normalScale, 1.0f - layer.metallic);
                 }
 
                 command.SetBufferData(terrainLayerData, layerData);
@@ -452,6 +454,8 @@ public class TerrainSystem
                 (pass as DrawProceduralIndirectRenderPass).propertyBlock.SetBuffer("TerrainLayerData", terrainLayerData);
                 pass.SetTexture(command, "IdMap", idMap);
                 pass.SetFloat(command, "IdMapResolution", terrainData.alphamapResolution);
+
+                pass.SetVector(command, "TerrainSize", terrain.terrainData.size);
             });
         }
     }
