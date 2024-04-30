@@ -281,27 +281,16 @@ float4 BilinearWeights(float2 uv, float2 textureSize)
 [earlydepthstencil]
 GBufferOutput Fragment(FragmentInput input)
 {
-	float2 texel = input.uv * IdMapResolution - 0.5;
-	float2 uvCenter = (floor(input.uv * IdMapResolution - 0.5) + 0.5)  / IdMapResolution;
-	
+	float2 uvCenter = (floor(input.uv * IdMapResolution - 0.5) + 0.5) / IdMapResolution;
 	uint4 layerData = IdMap.GatherRed(_LinearClampSampler, uvCenter);
 	
-	uint4 layers0 = (layerData >> 0) & 0xF;
-	float4 offsetsX0 = ((layerData >> 4) & 0x3) / 3.0;
-	float4 offsetsY0 = ((layerData >> 6) & 0x3) / 3.0;
-	float4 rotations0 = ((layerData >> 8) & 0x1F) / 31.0;
-	
-	uint4 layers1 = (layerData >> 13) & 0xF;
-	float4 offsetsX1 = ((layerData >> 17) & 0x3) / 3.0;
-	float4 offsetsY1 = ((layerData >> 19) & 0x3) / 3.0;
-	float4 rotations1 = ((layerData >> 21) & 0x1F) / 31.0;
-	
-	float4 blends = ((layerData >> 26) & 0xF) / 15.0;
+	uint4 layers = (layerData >> 0) & 0xF;
+	float4 offsetsX = ((layerData >> 4) & 0x3) / 3.0;
+	float4 offsetsY = ((layerData >> 6) & 0x3) / 3.0;
+	float4 rotations = ((layerData >> 8) & 0x1F) / 31.0;
 	uint4 triplanars = (layerData >> 30) & 0x3;
 	
 	float2 localUv = frac(input.uv * IdMapResolution - 0.5);
-	
-	float4 albedoSmoothnesses[8], masks[8], normals[8];
 	
 	float2 offsets[4];
 	offsets[0] = float2(0, 1);
@@ -309,148 +298,118 @@ GBufferOutput Fragment(FragmentInput input)
 	offsets[2] = float2(1, 0);
 	offsets[3] = float2(0, 0);
 	
+	// Get the max weight
+	float4 weights;
+	weights.x = (1.0 - localUv.x) * (localUv.y);
+	weights.y = (localUv.x) * (localUv.y);
+	weights.z = (localUv.x) * (1.0 - localUv.y);
+	weights.w = (1.0 - localUv.x) * (1.0 - localUv.y);
+	
+	const uint layerCount = 4;
+
+	float4 albedoSmoothnesses[layerCount], masks[layerCount];
+	float3 normals[layerCount];
+	
 	[unroll]
-	for(uint i = 0; i < 8; i++)
+	for(uint i = 0; i < layerCount; i++)
 	{
-		uint layer = i < 4 ? layers0[i % 4] : layers1[i % 4];
+		uint layer = layers[i];
 		LayerData data = TerrainLayerData[layer];
 		
-		float rotation = i < 4 ? rotations0[i % 4] : rotations1[i % 4];
-		float offsetX = i < 4 ? offsetsX0[i % 4] : offsetsX1[i % 4];
-		float offsetY = i < 4 ? offsetsY0[i % 4] : offsetsY1[i % 4];
-		uint triplanar = triplanars[i % 4];
-		
+		float rotation = rotations[i];
+		float offsetX = offsetsX[i];
+		float offsetY = offsetsY[i];
+		uint triplanar = triplanars[i];
 		float2 triplanarUv = triplanar == 0 ? input.worldPosition.zy : (triplanar == 1 ? input.worldPosition.xz : input.worldPosition.xy);
 		
 		// Center in layer space
 		float2 layerUv = triplanarUv / data.Scale;
-		float2 center = floor((uvCenter + offsets[i % 4] / IdMapResolution) * TerrainSize.xz / data.Scale) + 0.5;
+		float2 center = floor((uvCenter + offsets[i] / IdMapResolution) * TerrainSize.xz / data.Scale) + 0.5;
 		
 		float s, c;
 		sincos(rotation * TwoPi * data.Rotation, s, c);
-		float2x2 rotationMatrix = float2x2(c, -s, s, c);
+		float2x2 rotationMatrix = float2x2(c, s, -s, c);
 		
-		float2 uv = mul(layerUv - center, rotationMatrix) + center + (float2(offsetX, offsetY) - 0.5) * data.Stochastic;
-		
+		float2 uv = mul(rotationMatrix, layerUv - center) + center + (float2(offsetX, offsetY) - 0.5) * data.Stochastic;
 		albedoSmoothnesses[i] = AlbedoSmoothness.Sample(_TrilinearRepeatAniso16Sampler, float3(uv, layer));
-		
-		// Convert normal to partial derivative and rotate
-		normals[i] = Normal.Sample(_TrilinearRepeatAniso16Sampler, float3(uv, layer));
 		masks[i] = Mask.Sample(_TrilinearRepeatAniso16Sampler, float3(uv, layer));
+		
+		float3 normal = UnpackNormalAG(Normal.Sample(_TrilinearRepeatAniso16Sampler, float3(uv, layer)));
+		normal.xy = mul(normal.xy, rotationMatrix);
+		normals[i] = normal;
 	}
 	
-	// Get the max weight
-	float4 weights0, weights1;
-	weights0.x = weights1.x = (1.0 - localUv.x) * (localUv.y);
-	weights0.y = weights1.y = (localUv.x) * (localUv.y);
-	weights0.z = weights1.z = (localUv.x) * (1.0 - localUv.y);
-	weights0.w = weights1.w = (1.0 - localUv.x) * (1.0 - localUv.y);
+	float maxWeights[layerCount];
 	
-	#if 0
-	// Create up to 8 stochastically blended results..
-	float maxWeights[8], weightSums[8];
-
 	[unroll]
-	for(uint i = 0; i < 8; i++)
+	for(uint i = 0; i < layerCount; i++)
 	{
-		float weight = (i < 4 ? weights0[i % 4] : weights1[i % 4]);
-		float baseWeight = masks[i].b + weight;
-		float maxWeight = baseWeight;
-		float weightSum = maxWeight;
+		float maxWeight = 0.0;
 		
-		uint baseLayer = i < 4 ? layers0[i % 4] : layers1[i % 4];
-		
-		bool hasLayerMatch = false;
-		
+		// Get max weight of all layers that match, 
 		[unroll]
-		for(uint j = 0; j < i; j++)
+		for(uint j = 0; j < layerCount; j++)
 		{
-			// For every lower layer if they are equal to current, set their max weight to 0
-			uint layer = j < 4 ? layers0[j % 4] : layers1[j % 4];
-			if(layer != baseLayer)
-				continue;
-			
-			maxWeight = maxWeights[j];
-			weightSum = weightSums[j];
-			hasLayerMatch = true;
-			break;
+			if(layers[j] == layers[i])
+				maxWeight = max(maxWeight, weights[j] + masks[j].b);
 		}
-		
-		if(!hasLayerMatch)
-		{
-			[unroll]
-			for(uint j = i; j < 8; j++)
-			{
-				// For every higher layer, if any of them match, take the max of their value and this layer's value
-				uint layer = j < 4 ? layers0[j % 4] : layers1[j % 4];
-				float weight = masks[j].b + (j < 4 ? weights0[j % 4] : weights1[j % 4]);
-				if(baseLayer != layer)
-					continue;
-			
-				maxWeight = max(maxWeight, weight);
-				weightSum += weight;
-			}
-		}
-		
-		// These are saved for future passes
-		// TODO: Can this be handled better
+			  
 		maxWeights[i] = maxWeight;
-		weightSums[i] = weightSum;
-		
-		if(i < 4)
-		{
-			weights0[i % 4] = max(0.0, baseWeight + 0.2 - maxWeight) / weightSum;
-		}
-		else
-		{
-			weights1[i % 4] = max(0.0, baseWeight + 0.2 - maxWeight) / weightSum;
-		}
 	}
-#endif
 	
-	// Now that we have the weight sums, we can calculate the stochastic blend for each weight
-	weights0 *= 1.0 - blends;
-	weights1 *= blends;
+	float layerWeights[layerCount];
 	
-	// Any layers that share the same weight need to accumulate before height blending to avoid square artifacts
-	// For each layer, add any weights of subsequent layers with equal indices, unless any of the previous layers are also equal, 
-	// in which case their contribution is already accounted for, so the duplicate layer weight should be zero
-	//weights0.x = (dot(layers0.xyzw == layers0.x, weights0.xyzw) + dot(layers1.xyzw == layers0.x, weights1.xyzw));
-	//weights0.y = (dot(layers0.yzw == layers0.y, weights0.yzw) + dot(layers1.xyzw == layers0.y, weights1.xyzw)) * all(layers0.x != layers0.y);
-	//weights0.z = (dot(layers0.zw == layers0.z, weights0.zw) + dot(layers1.xyzw == layers0.z, weights1.xyzw)) * all(layers0.xy != layers0.z);
-	//weights0.w = (dot(layers0.w == layers0.w, weights0.w) + dot(layers1.xyzw == layers0.w, weights1.xyzw)) * all(layers0.xyz != layers0.w);
-	
-	//weights1.x = dot(layers1.xyzw == layers1.x, weights1.xyzw) * all(layers0.xyzw != layers1.x);
-	//weights1.y = dot(layers1.yzw == layers1.y, weights1.yzw) * (all(layers0.xyzw != layers1.y) && all(layers1.x != layers1.y));
-	//weights1.z = dot(layers1.zw == layers1.z, weights1.zw) * (all(layers0.xyzw != layers1.z) && all(layers1.xy != layers1.z));
-	//weights1.w = dot(layers1.w == layers1.w, weights1.w) * (all(layers0.xyzw != layers1.z) && all(layers1.xyz != layers1.w));
+	// Caculate each layer's weight
+	float transition = 0.2;
+	[unroll]
+	for(uint i = 0; i < layerCount; i++)
+	{
+		layerWeights[i] = max(0.0, weights[i] + masks[i].b + transition - maxWeights[i]);
+	}
 	
 	float maxWeight = 0.0;
+	float weightSums[layerCount];
 	
+	// Caculate each layer's contribution
 	[unroll]
-	for(uint i = 0; i < 8; i++)
+	for(uint i = 0; i < layerCount; i++)
 	{
-		float blend = blends[i % 4];
+		float weightSum = 0.0;
 		
-		float4 mask = masks[i];
-		float weight = i < 4 ? weights0[i % 4] : weights1[i % 4];
-		mask.b = mask.b + weight;
-		maxWeight = max(maxWeight, mask.b);
-		
-		mask.b += 0.2;
-		masks[i] = mask;
+		[unroll]
+		for(uint j = 0; j < layerCount; j++)
+		{
+			if(layers[j] == layers[i])
+				weightSum += layerWeights[j];
+		}
+			  
+		maxWeight = max(maxWeight, weightSum);
+		weightSums[i] = weightSum;
 	}
 	
-	// Get the max height
-	float4 albedoSmoothness = 0.0, mask = 0.0, normal = 0.0;
+	// Calculate final weight for each layer
+	
+	float transition1 = 0.2;
+	
+	// Normalize each layer	
+	[unroll]
+	for(uint i = 0; i < layerCount; i++)
+	{
+		layerWeights[i] = max(0.0, layerWeights[i] + transition1 - maxWeight)* weights[i];
+	}
+	
+	// We now have a set of layers normalized by their stochastic blends.. 
+	// Eg adding all these together will give us bilinearly blended stochastic combinations of cells
+	// We now want a final height blend based on this.. 
+	
 	float weightSum = 0.0;
+	float4 albedoSmoothness = 0.0, mask = 0.0;
+	float3 normal = 0.0;
 	
 	[unroll]
-	for(i = 0; i < 8; i++)
+	for(uint i = 0; i < layerCount; i++)
 	{
-		float weight = max(0.0, masks[i].b - maxWeight);
-		//float weight = i < 4 ? weights0[i % 4] : weights1[i % 4];// Uncomment for regular blending
-		//weight = lerp(weight, i < 4 ? weights0[i % 4] : weights1[i % 4], layerBlends[i]); // Lerp between height and non height blended results, seems to give the most range
+		float weight = layerWeights[i];//max(0.0, weights[i] + masks[i].b + transition - maxWeight);
 		albedoSmoothness += albedoSmoothnesses[i] * weight;
 		normal += normals[i] * weight;
 		mask += masks[i] * weight;
@@ -463,7 +422,7 @@ GBufferOutput Fragment(FragmentInput input)
 	mask *= rcpWeightSum;
 	
 	float3 t = UnpackNormalSNorm(_TerrainNormalMap.Sample(_LinearClampSampler, input.uv)) + float3(0, 0, 1);
-	float3 u = UnpackNormalAG(normal) * float2(-1,1).xxy;
+	float3 u = (normal) * float2(-1,1).xxy;
 	float3 normalWS = (t * dot(t, u) / t.z - u).xzy;
 	
 	return OutputGBuffer(albedoSmoothness.rgb, mask.r, normalWS, 1.0 - albedoSmoothness.a, normalWS, mask.g, 0.0);
