@@ -284,11 +284,26 @@ GBufferOutput Fragment(FragmentInput input)
 	float2 uvCenter = (floor(input.uv * IdMapResolution - 0.5) + 0.5) / IdMapResolution;
 	uint4 layerData = IdMap.GatherRed(_LinearClampSampler, uvCenter);
 	
-	uint4 layers = (layerData >> 0) & 0xF;
-	float4 offsetsX = ((layerData >> 4) & 0x3) / 3.0;
-	float4 offsetsY = ((layerData >> 6) & 0x3) / 3.0;
-	float4 rotations = ((layerData >> 8) & 0x1F) / 31.0;
+	uint4 layers0 = (layerData >> 0) & 0xF;
+	float4 offsetsX0 = ((layerData >> 4) & 0x3) / 3.0;
+	float4 offsetsY0 = ((layerData >> 6) & 0x3) / 3.0;
+	float4 rotations0 = ((layerData >> 8) & 0x1F) / 31.0;
+	
+	uint4 layers1 = (layerData >> 13) & 0xF;
+	float4 offsetsX1 = ((layerData >> 17) & 0x3) / 3.0;
+	float4 offsetsY1 = ((layerData >> 19) & 0x3) / 3.0;
+	float4 rotations1 = ((layerData >> 21) & 0x1F) / 31.0;
+	
+	float4 blends = ((layerData >> 26) & 0xF) / 15.0;
 	uint4 triplanars = (layerData >> 30) & 0x3;
+	
+	const uint layerCount = 4;
+	
+	float layers[8];
+	for(uint i = 0; i < 8; i++)
+	{
+		layers[i] = i < 4 ? layers0[i % 4] : layers1[i % 4];
+	}
 	
 	float2 localUv = frac(input.uv * IdMapResolution - 0.5);
 	
@@ -299,14 +314,21 @@ GBufferOutput Fragment(FragmentInput input)
 	offsets[3] = float2(0, 0);
 	
 	// Get the max weight
-	float4 weights;
-	weights.x = (1.0 - localUv.x) * (localUv.y);
-	weights.y = (localUv.x) * (localUv.y);
-	weights.z = (localUv.x) * (1.0 - localUv.y);
-	weights.w = (1.0 - localUv.x) * (1.0 - localUv.y);
+	float weights[8];
+	weights[0] = weights[4] = (1.0 - localUv.x) * (localUv.y);
+	weights[1] = weights[5] = (localUv.x) * (localUv.y);
+	weights[2] = weights[6] = (localUv.x) * (1.0 - localUv.y);
+	weights[3] = weights[7] = (1.0 - localUv.x) * (1.0 - localUv.y);
 	
-	const uint layerCount = 4;
-
+	weights[0] *= 1.0 - blends.x;
+	weights[1] *= 1.0 - blends.y;
+	weights[2] *= 1.0 - blends.z;
+	weights[3] *= 1.0 - blends.w;
+	weights[4] *= blends.x;
+	weights[5] *= blends.y;
+	weights[6] *= blends.z;
+	weights[7] *= blends.w;
+	
 	float4 albedoSmoothnesses[layerCount], masks[layerCount];
 	float3 normals[layerCount];
 	
@@ -318,15 +340,16 @@ GBufferOutput Fragment(FragmentInput input)
 		uint layer = layers[i];
 		LayerData data = TerrainLayerData[layer];
 		
-		float rotation = rotations[i];
-		float offsetX = offsetsX[i];
-		float offsetY = offsetsY[i];
-		uint triplanar = triplanars[i];
+		float rotation = i < 4 ? rotations0[i % 4] : rotations1[i % 4];
+		float offsetX = i < 4 ? offsetsX0[i % 4] : offsetsX1[i % 4];
+		float offsetY = i < 4 ? offsetsY0[i % 4] : offsetsY1[i % 4];
+		uint triplanar = triplanars[i % 4];
+		
 		float2 triplanarUv = triplanar == 0 ? input.worldPosition.zy : (triplanar == 1 ? input.worldPosition.xz : input.worldPosition.xy);
 		
 		// Center in layer space
 		float2 layerUv = triplanarUv / data.Scale;
-		float2 center = floor((uvCenter + offsets[i] / IdMapResolution) * TerrainSize.xz / data.Scale) + 0.5;
+		float2 center = floor((uvCenter + offsets[i % 4] / IdMapResolution) * TerrainSize.xz / data.Scale) + 0.5;
 		
 		float s, c;
 		sincos(rotation * TwoPi * data.Rotation, s, c);
@@ -347,19 +370,16 @@ GBufferOutput Fragment(FragmentInput input)
 	float3 normal = 0.0;
 	
 	float modifiedWeights[layerCount];
-	[unroll]
 	for(uint i = 0; i < layerCount; i++)
 	{
 		float weightSum = 0.0;
 		
-		[unroll]
 		for(uint j = 0; j < layerCount; j++)
 		{
 			if(layers[j] == layers[i])
 				weightSum += weights[j];
 		}
 		
-		[unroll]
 		for(uint j = 0; j < i; j++)
 		{
 			if(layers[j] != layers[i])
@@ -374,7 +394,6 @@ GBufferOutput Fragment(FragmentInput input)
 	
 	// Get the max weight for each layer
 	float maxWeight = 0.0;
-	[unroll]
 	for(uint i = 0; i < layerCount; i++)
 	{
 		maxWeight = max(maxWeight, modifiedWeights[i] + masks[i].b);
@@ -382,20 +401,17 @@ GBufferOutput Fragment(FragmentInput input)
 	
 	// Compute final weights
 	float finalWeights[layerCount];
-	[unroll]
 	for(uint i = 0; i < layerCount; i++)
 	{
-		finalWeights[i] = max(0.0, masks[i].b + modifiedWeights[i] + 0.2 - maxWeight);
+		finalWeights[i] = max(0.0, masks[i].b + modifiedWeights[i] + transitions[i] - maxWeight);
 	}
 	
 	float finalChannelWeights[layerCount];
-	[unroll]
 	for(uint i = 0; i < layerCount; i++)
 	{
 		float finalChannelWeight = 0.0;
 		float sameLayerCount = 0.0;
 		
-		[unroll]
 		for(uint j = 0; j < layerCount; j++)
 		{
 			if(layers[j] != layers[i])
