@@ -30,7 +30,14 @@ namespace Arycama.CustomRenderPipeline
         public void WriteTexture(RTHandle texture, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
         {
             colorTargets.Add((texture, loadAction, storeAction));
-            RenderGraph.SetRTHandleWrite(texture, Index);
+
+            if(!texture.IsPersistent || !texture.IsAssigned)
+            {
+                if (texture.IsPersistent)
+                    texture.IsAssigned = true;
+
+                RenderGraph.SetRTHandleWrite(texture, Index);
+            }
         }
 
         public void WriteDepth(RTHandle depth, RenderTargetFlags renderTargetFlags = RenderTargetFlags.None, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)

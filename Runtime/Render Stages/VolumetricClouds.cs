@@ -282,6 +282,7 @@ namespace Arycama.CustomRenderPipeline
             var cloudCoverageBuffer = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
 
             var result = new CloudShadowDataResult(cloudShadow, depth, worldToShadow, settings.Density, cloudCoverageBuffer, planetRadius, planetRadius + settings.StartHeight + settings.LayerThickness);
+            renderGraph.ResourceMap.SetRenderPassData(result);
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Cloud Coverage"))
             {
@@ -316,10 +317,10 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(cloudCoverageComputeShader, 0, 1);
 
                 pass.AddRenderPassData<CloudData>();
-                result.SetInputs(pass);
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.WriteBuffer("_Result", cloudCoverageBufferTemp);
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<CloudShadowDataResult>();
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
@@ -330,7 +331,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightDirection1", lightDirection1);
                     pass.SetVector(command, "_LightColor1", lightColor1);
 
-                    result.SetProperties(pass, command);
                     pass.SetVector(command, "_ViewPosition", camera.transform.position);
                     pass.SetFloat(command, "_ViewHeight", camera.transform.position.y + planetRadius);
                 });
@@ -343,8 +343,6 @@ namespace Arycama.CustomRenderPipeline
                     command.CopyBuffer(cloudCoverageBufferTemp, cloudCoverageBuffer);
                 });
             }
-
-            renderGraph.ResourceMap.SetRenderPassData(result);
         }
 
         public readonly struct CloudShadowDataResult : IRenderPassData

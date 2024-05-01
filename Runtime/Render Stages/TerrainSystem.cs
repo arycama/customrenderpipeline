@@ -36,6 +36,27 @@ public class TerrainSystem
         this.settings = settings;
 
         generateIdMapMaterial = new Material(Shader.Find("Hidden/Terrain Id Map")) { hideFlags = HideFlags.HideAndDontSave };
+
+        TerrainCallbacks.textureChanged += TerrainCallbacks_textureChanged;
+        TerrainCallbacks.heightmapChanged += TerrainCallbacks_heightmapChanged;
+    }
+
+    ~TerrainSystem()
+    {
+        TerrainCallbacks.textureChanged -= TerrainCallbacks_textureChanged;
+        TerrainCallbacks.heightmapChanged -= TerrainCallbacks_heightmapChanged;
+    }
+
+    private void TerrainCallbacks_heightmapChanged(Terrain terrain, RectInt heightRegion, bool synched)
+    {
+        if (terrain == this.terrain)
+            InitializeHeightmap();
+    }
+
+    private void TerrainCallbacks_textureChanged(Terrain terrain, string textureName, RectInt texelRegion, bool synched)
+    {
+        if (terrain == this.terrain && textureName == TerrainData.AlphamapTextureName)
+            InitializeIdMap();
     }
 
     private void InitializeTerrain()
@@ -78,6 +99,47 @@ public class TerrainSystem
 
         indexBuffer.SetData(pIndices);
 
+        InitializeHeightmap();
+
+         // Initialize terrain layers
+         var layers = terrainData.terrainLayers;
+
+        // Initialize arrays, use the first texture, since everything must be the same resolution
+        // TODO: Add checks/asserts/warnings for incorrect textures
+        var flags = TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate;
+        diffuseArray = new Texture2DArray(layers[0].diffuseTexture.width, layers[0].diffuseTexture.width, layers.Length, layers[0].diffuseTexture.graphicsFormat, flags);
+        normalMapArray = new Texture2DArray(layers[0].normalMapTexture.width, layers[0].normalMapTexture.width, layers.Length, layers[0].normalMapTexture.graphicsFormat, flags);
+        maskMapArray = new Texture2DArray(layers[0].maskMapTexture.width, layers[0].maskMapTexture.width, layers.Length, layers[0].maskMapTexture.graphicsFormat, flags);
+
+        using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Layer Data Init"))
+        {
+            // Add to texture array
+            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+            {
+                for (var i = 0; i < layers.Length; i++)
+                {
+                    var layer = layers[i];
+                    command.CopyTexture(layer.diffuseTexture, 0, diffuseArray, i);
+                    command.CopyTexture(layer.normalMapTexture, 0, normalMapArray, i);
+                    command.CopyTexture(layer.maskMapTexture, 0, maskMapArray, i);
+                }
+            });
+        }
+
+        // Graph doesn't support persistent buffers yet
+        // TODO: Add persistent buffer support 
+        //var layerDataBuffer = renderGraph.GetBuffer(layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>(), GraphicsBuffer.Target.Structured);
+        terrainLayerData = new GraphicsBuffer(GraphicsBuffer.Target.Structured, layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>());
+        FillLayerData();
+
+        var idMapResolution = terrainData.alphamapResolution;
+        idMap = renderGraph.GetTexture(idMapResolution, idMapResolution, GraphicsFormat.R32_UInt, isPersistent: true);
+        InitializeIdMap();
+    }
+
+    private void InitializeHeightmap()
+    {
+        var resolution = terrainData.heightmapResolution;
         var computeShader = Resources.Load<ComputeShader>("Terrain/InitTerrain");
 
         // Initialize the height map
@@ -149,57 +211,37 @@ public class TerrainSystem
                 });
             }
         }
+    }
 
-        // Initialize terrain layers
-        var layers = terrainData.terrainLayers;
-
-        // Initialize arrays, use the first texture, since everything must be the same resolution
-        // TODO: Add checks/asserts/warnings for incorrect textures
-        var flags = TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate;
-        diffuseArray = new Texture2DArray(layers[0].diffuseTexture.width, layers[0].diffuseTexture.width, layers.Length, layers[0].diffuseTexture.graphicsFormat, flags);
-        normalMapArray = new Texture2DArray(layers[0].normalMapTexture.width, layers[0].normalMapTexture.width, layers.Length, layers[0].normalMapTexture.graphicsFormat, flags);
-        maskMapArray = new Texture2DArray(layers[0].maskMapTexture.width, layers[0].maskMapTexture.width, layers.Length, layers[0].maskMapTexture.graphicsFormat, flags);
-
-        // Graph doesn't support persistent buffers yet
-        // TODO: Add persistent buffer support 
-        //var layerDataBuffer = renderGraph.GetBuffer(layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>(), GraphicsBuffer.Target.Structured);
-        terrainLayerData = new GraphicsBuffer(GraphicsBuffer.Target.Structured, layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>());
+    private void FillLayerData()
+    {
         using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Layer Data Init"))
         {
-            // Only required so that the resource gets created.. I think
-            // TODO: Uncomment this one persistent buffer support is added
-            //pass.WriteBuffer("TerrainLayerData", layerDataBuffer);
-
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
+                var layers = terrainData.terrainLayers;
                 var layerData = ArrayPool<TerrainLayerData>.Get(layers.Length);
                 for (var i = 0; i < layers.Length; i++)
                 {
                     var layer = layers[i];
-                    layerData[i] = new TerrainLayerData(layer.tileSize.x, layer.smoothness, layer.normalScale, 1.0f - layer.metallic);
-
-                    // Add to texture array
-                    command.CopyTexture(layer.diffuseTexture, 0, diffuseArray, i);
-                    command.CopyTexture(layer.normalMapTexture, 0, normalMapArray, i);
-                    command.CopyTexture(layer.maskMapTexture, 0, maskMapArray, i);
+                    layerData[i] = new TerrainLayerData(layer.tileSize.x, Mathf.Max(1e-3f, layer.smoothness), layer.normalScale, 1.0f - layer.metallic);
                 }
 
                 command.SetBufferData(terrainLayerData, layerData);
                 ArrayPool<TerrainLayerData>.Release(layerData);
             });
         }
+    }
 
-        // Build id map
+    private void InitializeIdMap()
+    {
         var idMapResolution = terrainData.alphamapResolution;
-        idMap = renderGraph.GetTexture(idMapResolution, idMapResolution, GraphicsFormat.R32_UInt, isPersistent: true);
+
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Terrain Layer Data Init"))
         {
             pass.Initialize(generateIdMapMaterial);
-
             pass.WriteTexture(idMap, RenderBufferLoadAction.DontCare);
             pass.ReadTexture("_TerrainNormalMap", normalmap);
-
-            //pass.ReadBuffer("TerrainLayerData", layerDataBuffer);
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
@@ -225,22 +267,7 @@ public class TerrainSystem
 
         // Set this every frame incase of changes..
         // TODO: Only do when data changed?
-        using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Layer Data Update"))
-        {
-            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
-            {
-                var layers = terrainData.terrainLayers;
-                var layerData = ArrayPool<TerrainLayerData>.Get(layers.Length);
-                for (var i = 0; i < layers.Length; i++)
-                {
-                    var layer = layers[i];
-                    layerData[i] = new TerrainLayerData(layer.tileSize.x, Mathf.Max(1e-3f, layer.smoothness), layer.normalScale, 1.0f - layer.metallic);
-                }
-
-                command.SetBufferData(terrainLayerData, layerData);
-                ArrayPool<TerrainLayerData>.Release(layerData);
-            });
-        }
+        FillLayerData();
     }
 
     public void Cull(Vector3 viewPosition, Vector4[] cullingPlanes, ICommonPassData commonPassData)

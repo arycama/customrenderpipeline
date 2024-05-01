@@ -25,6 +25,10 @@ public class RTHandle
     public bool AutoGenerateMips { get; set; }
     public int RenderTextureIndex { get; set; }
 
+    // For persistent RT handles, they may get written to in some frames but not others, but we want to avoid re-allocating them
+    // So set a flag to indicate they are already assigned
+    public bool IsAssigned { get; set; }
+
     public RenderTexture RenderTexture { get; set; }
 
     public static implicit operator RenderTexture(RTHandle rtHandle)

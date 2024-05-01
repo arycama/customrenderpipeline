@@ -310,6 +310,8 @@ GBufferOutput Fragment(FragmentInput input)
 	float4 albedoSmoothnesses[layerCount], masks[layerCount];
 	float3 normals[layerCount];
 	
+	float transitions[layerCount];
+	
 	[unroll]
 	for(uint i = 0; i < layerCount; i++)
 	{
@@ -337,40 +339,14 @@ GBufferOutput Fragment(FragmentInput input)
 		float3 normal = UnpackNormalAG(Normal.Sample(_TrilinearRepeatAniso16Sampler, float3(uv, layer)));
 		normal.xy = mul(normal.xy, rotationMatrix);
 		normals[i] = normal;
-	}
-	
-	float maxWeights[layerCount];
-	
-	[unroll]
-	for(uint i = 0; i < layerCount; i++)
-	{
-		float maxWeight = 0.0;
 		
-		// Get max weight of all layers that match, 
-		[unroll]
-		for(uint j = 0; j < layerCount; j++)
-		{
-			if(layers[j] == layers[i])
-				maxWeight = max(maxWeight, weights[j] + masks[j].b);
-		}
-			  
-		maxWeights[i] = maxWeight;
+		transitions[i] = data.Blending;
 	}
 	
-	float layerWeights[layerCount];
+	float4 albedoSmoothness = 0.0, mask = 0.0;
+	float3 normal = 0.0;
 	
-	// Caculate each layer's weight
-	float transition = 0.2;
-	[unroll]
-	for(uint i = 0; i < layerCount; i++)
-	{
-		layerWeights[i] = max(0.0, weights[i] + masks[i].b + transition - maxWeights[i]);
-	}
-	
-	float maxWeight = 0.0;
-	float weightSums[layerCount];
-	
-	// Caculate each layer's contribution
+	float modifiedWeights[layerCount];
 	[unroll]
 	for(uint i = 0; i < layerCount; i++)
 	{
@@ -380,36 +356,64 @@ GBufferOutput Fragment(FragmentInput input)
 		for(uint j = 0; j < layerCount; j++)
 		{
 			if(layers[j] == layers[i])
-				weightSum += layerWeights[j];
+				weightSum += weights[j];
 		}
-			  
-		maxWeight = max(maxWeight, weightSum);
-		weightSums[i] = weightSum;
+		
+		[unroll]
+		for(uint j = 0; j < i; j++)
+		{
+			if(layers[j] != layers[i])
+				continue;
+			
+			weightSum = 0.0;
+			break;
+		}
+		
+		modifiedWeights[i] = weightSum;
 	}
 	
-	// Calculate final weight for each layer
-	
-	float transition1 = 0.2;
-	
-	// Normalize each layer	
+	// Get the max weight for each layer
+	float maxWeight = 0.0;
 	[unroll]
 	for(uint i = 0; i < layerCount; i++)
 	{
-		layerWeights[i] = max(0.0, layerWeights[i] + transition1 - maxWeight)* weights[i];
+		maxWeight = max(maxWeight, modifiedWeights[i] + masks[i].b);
 	}
 	
-	// We now have a set of layers normalized by their stochastic blends.. 
-	// Eg adding all these together will give us bilinearly blended stochastic combinations of cells
-	// We now want a final height blend based on this.. 
+	// Compute final weights
+	float finalWeights[layerCount];
+	[unroll]
+	for(uint i = 0; i < layerCount; i++)
+	{
+		finalWeights[i] = max(0.0, masks[i].b + modifiedWeights[i] + 0.2 - maxWeight);
+	}
+	
+	float finalChannelWeights[layerCount];
+	[unroll]
+	for(uint i = 0; i < layerCount; i++)
+	{
+		float finalChannelWeight = 0.0;
+		float sameLayerCount = 0.0;
+		
+		[unroll]
+		for(uint j = 0; j < layerCount; j++)
+		{
+			if(layers[j] != layers[i])
+				continue;
+			
+			finalChannelWeight += finalWeights[j]; // Should only be added once since each weight is only represented once
+			sameLayerCount++;
+		}
+		
+		finalChannelWeights[i] = finalChannelWeight / sameLayerCount;
+	}
 	
 	float weightSum = 0.0;
-	float4 albedoSmoothness = 0.0, mask = 0.0;
-	float3 normal = 0.0;
-	
 	[unroll]
 	for(uint i = 0; i < layerCount; i++)
 	{
-		float weight = layerWeights[i];//max(0.0, weights[i] + masks[i].b + transition - maxWeight);
+		float weight = finalChannelWeights[i] * weights[i];
+		
 		albedoSmoothness += albedoSmoothnesses[i] * weight;
 		normal += normals[i] * weight;
 		mask += masks[i] * weight;

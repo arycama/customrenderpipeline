@@ -278,6 +278,7 @@ namespace Arycama.CustomRenderPipeline
             result.HasMips = hasMips;
             result.AutoGenerateMips = autoGenerateMips;
             result.IsPersistent = isPersistent;
+            result.IsAssigned = isPersistent ? false : true;
 
             // This gets set automatically if a texture is written to by a compute shader
             result.EnableRandomWrite = false;
@@ -353,6 +354,7 @@ namespace Arycama.CustomRenderPipeline
             importedTextures.Add(renderTexture, result);
             result.IsImported = true;
             result.IsScreenTexture = false;
+            result.IsAssigned = true;
 
             return result;
         }
