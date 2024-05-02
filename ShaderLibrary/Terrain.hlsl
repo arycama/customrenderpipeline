@@ -294,15 +294,16 @@ GBufferOutput Fragment(FragmentInput input)
 	float4 offsetsY1 = ((layerData >> 19) & 0x3) / 3.0;
 	float4 rotations1 = ((layerData >> 21) & 0x1F) / 31.0;
 	
-	float4 blends = ((layerData >> 26) & 0xF) / 15.0;
+	float4 blendWeights = Remap(((layerData >> 26) & 0xF) / 15.0, 0.0, 1.0, 0.0, 0.5);
 	uint4 triplanars = (layerData >> 30) & 0x3;
 	
-	const uint layerCount = 4;
+	const uint layerCount = 8;
 	
-	float layers[8];
+	float layers[8], blends[8];
 	for(uint i = 0; i < 8; i++)
 	{
 		layers[i] = i < 4 ? layers0[i % 4] : layers1[i % 4];
+		blends[i] = i < 4 ? (1.0 - blendWeights[i % 4]) : blendWeights[i % 4];
 	}
 	
 	float2 localUv = frac(input.uv * IdMapResolution - 0.5);
@@ -402,8 +403,17 @@ GBufferOutput Fragment(FragmentInput input)
 	float finalWeightSum = 0.0;
 	for(uint i = 0; i < layerCount; i++)
 	{
-		float finalLayerWeight = max(0.0, masks[i].b + layerWeightSums[i] + 0.01 - maxWeight);
-		finalWeightSum += finalLayerWeight;
+		float layerWeightSum = layerWeightSums[i];
+		float finalLayerWeight = 0.0;
+		
+		if(layerWeightSum > 0.0)
+		{
+			finalLayerWeight = max(0.0, masks[i].b + layerWeightSum + transitions[i] - maxWeight);
+			finalWeightSum += finalLayerWeight;
+		}
+		
+		// Final weight is divided by the sum of the original layer weight so that when it is summed by all the channels that use it, it will sum to the same weight
+		//finalWeights[i] = layerWeightSum ? finalLayerWeight / layerWeightSums[i] : 0.0;
 		finalWeights[i] = finalLayerWeight;
 	}
 	
@@ -412,18 +422,17 @@ GBufferOutput Fragment(FragmentInput input)
 	for(uint i = 0; i < layerCount; i++)
 	{
 		float finalChannelWeight = 0.0;
-		float sameLayerCount = 0.0;
 		
 		for(uint j = 0; j < layerCount; j++)
 		{
 			if(layers[j] != layers[i])
 				continue;
 			
-			finalChannelWeight += finalWeights[j]; // Should only be added once since each weight is only represented once
-			sameLayerCount += layerWeightSums[j];
+			finalChannelWeight = layerWeightSums[j] ? finalWeights[j] / layerWeightSums[j] : 0.0;
+			break;
 		}
 		
-		finalChannelWeights[i] = finalChannelWeight / sameLayerCount * weights[i];
+		finalChannelWeights[i] = finalChannelWeight;
 	}
 	
 	float4 albedoSmoothness = 0.0, mask = 0.0;
@@ -432,7 +441,7 @@ GBufferOutput Fragment(FragmentInput input)
 	[unroll]
 	for(uint i = 0; i < layerCount; i++)
 	{
-		float weight = finalChannelWeights[i];
+		float weight = finalChannelWeights[i] * weights[i];
 		
 		albedoSmoothness += albedoSmoothnesses[i] * weight;
 		normalDerivative += normalDerivatives[i] * weight;

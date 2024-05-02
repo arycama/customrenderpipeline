@@ -122,12 +122,14 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	
 	// If indices are equal, keep weight at 0, else we can assume it starts from the lowest value, eg 1.0 / 9.0
 	//if(weight1 > 0.0 && index0 != index1)
-	//	blend = Remap(blend, 1.0 / 15.0, 7.0 / 15.0);
+		//blend = Remap(blend, 1.0 / 15.0, 7.0 / 15.0);
 	//else
-	//	index1 = index0;
+		//index1 = index0;
 	
-	//if(weight1 == 0.0)
-	//	index1 = index0;
+	blend = Remap(blend, 0.0, 0.5);
+	
+	if(weight1 == 0.0)
+		index1 = index0;
 	
 	uint result = (index0 & 0xF) << 0;
 	result |= (uint(round(offsetX0 * 3.0)) & 0x3) << 4;
