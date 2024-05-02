@@ -34,7 +34,7 @@ namespace Arycama.CustomRenderPipeline
                 var visibleLight = cullingResults.visibleLights[i];
                 var light = visibleLight.light;
                 var cascadeCount = 0;
-                var shadowIndex = -1;
+                var shadowIndex = 0;
 
                 if (visibleLight.lightType == LightType.Directional)
                 {

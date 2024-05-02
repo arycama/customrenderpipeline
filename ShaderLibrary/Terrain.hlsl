@@ -320,17 +320,17 @@ GBufferOutput Fragment(FragmentInput input)
 	weights[2] = weights[6] = (localUv.x) * (1.0 - localUv.y);
 	weights[3] = weights[7] = (1.0 - localUv.x) * (1.0 - localUv.y);
 	
-	weights[0] *= 1.0 - blends.x;
-	weights[1] *= 1.0 - blends.y;
-	weights[2] *= 1.0 - blends.z;
-	weights[3] *= 1.0 - blends.w;
-	weights[4] *= blends.x;
-	weights[5] *= blends.y;
-	weights[6] *= blends.z;
-	weights[7] *= blends.w;
+	//weights[0] *= 1.0 - blends.x;
+	//weights[1] *= 1.0 - blends.y;
+	//weights[2] *= 1.0 - blends.z;
+	//weights[3] *= 1.0 - blends.w;
+	//weights[4] *= blends.x;
+	//weights[5] *= blends.y;
+	//weights[6] *= blends.z;
+	//weights[7] *= blends.w;
 	
 	float4 albedoSmoothnesses[layerCount], masks[layerCount];
-	float3 normals[layerCount];
+	float2 normalDerivatives[layerCount];
 	
 	float transitions[layerCount];
 	
@@ -360,20 +360,18 @@ GBufferOutput Fragment(FragmentInput input)
 		masks[i] = Mask.Sample(_TrilinearRepeatAniso16Sampler, float3(uv, layer));
 		
 		float3 normal = UnpackNormalAG(Normal.Sample(_TrilinearRepeatAniso16Sampler, float3(uv, layer)));
-		normal.xy = mul(normal.xy, rotationMatrix);
-		normals[i] = normal;
+		float2 normalDerivative = normal.xy * rcp(normal.z);
+		normalDerivative = mul(normalDerivative, rotationMatrix);
+		normalDerivatives[i] = normalDerivative;
 		
 		transitions[i] = data.Blending;
 	}
 	
-	float4 albedoSmoothness = 0.0, mask = 0.0;
-	float3 normal = 0.0;
-	
-	float modifiedWeights[layerCount];
+	// Sum  weights from each unique layer index
+	float layerWeightSums[layerCount];
 	for(uint i = 0; i < layerCount; i++)
 	{
 		float weightSum = 0.0;
-		
 		for(uint j = 0; j < layerCount; j++)
 		{
 			if(layers[j] == layers[i])
@@ -389,23 +387,27 @@ GBufferOutput Fragment(FragmentInput input)
 			break;
 		}
 		
-		modifiedWeights[i] = weightSum;
+		layerWeightSums[i] = weightSum;
 	}
 	
 	// Get the max weight for each layer
 	float maxWeight = 0.0;
 	for(uint i = 0; i < layerCount; i++)
 	{
-		maxWeight = max(maxWeight, modifiedWeights[i] + masks[i].b);
+		maxWeight = max(maxWeight, layerWeightSums[i] + masks[i].b);
 	}
 	
 	// Compute final weights
 	float finalWeights[layerCount];
+	float finalWeightSum = 0.0;
 	for(uint i = 0; i < layerCount; i++)
 	{
-		finalWeights[i] = max(0.0, masks[i].b + modifiedWeights[i] + transitions[i] - maxWeight);
+		float finalLayerWeight = max(0.0, masks[i].b + layerWeightSums[i] + 0.01 - maxWeight);
+		finalWeightSum += finalLayerWeight;
+		finalWeights[i] = finalLayerWeight;
 	}
 	
+	// Now compute per channel weights again
 	float finalChannelWeights[layerCount];
 	for(uint i = 0; i < layerCount; i++)
 	{
@@ -418,31 +420,32 @@ GBufferOutput Fragment(FragmentInput input)
 				continue;
 			
 			finalChannelWeight += finalWeights[j]; // Should only be added once since each weight is only represented once
-			sameLayerCount++;
+			sameLayerCount += layerWeightSums[j];
 		}
 		
-		finalChannelWeights[i] = finalChannelWeight / sameLayerCount;
+		finalChannelWeights[i] = finalChannelWeight / sameLayerCount * weights[i];
 	}
 	
-	float weightSum = 0.0;
+	float4 albedoSmoothness = 0.0, mask = 0.0;
+	float2 normalDerivative = 0.0;
+	
 	[unroll]
 	for(uint i = 0; i < layerCount; i++)
 	{
-		float weight = finalChannelWeights[i] * weights[i];
+		float weight = finalChannelWeights[i];
 		
 		albedoSmoothness += albedoSmoothnesses[i] * weight;
-		normal += normals[i] * weight;
+		normalDerivative += normalDerivatives[i] * weight;
 		mask += masks[i] * weight;
-		weightSum += weight;
 	}
 	
-	float rcpWeightSum = rcp(weightSum);
+	float rcpWeightSum = rcp(finalWeightSum);
 	albedoSmoothness *= rcpWeightSum;
-	normal *= rcpWeightSum;
+	normalDerivative *= rcpWeightSum;
 	mask *= rcpWeightSum;
 	
 	float3 t = UnpackNormalSNorm(_TerrainNormalMap.Sample(_LinearClampSampler, input.uv)) + float3(0, 0, 1);
-	float3 u = (normal) * float2(-1,1).xxy;
+	float3 u = normalize(float3(normalDerivative, 1.0)) * float2(-1,1).xxy;
 	float3 normalWS = (t * dot(t, u) / t.z - u).xzy;
 	
 	return OutputGBuffer(albedoSmoothness.rgb, mask.r, normalWS, 1.0 - albedoSmoothness.a, normalWS, mask.g, 0.0);

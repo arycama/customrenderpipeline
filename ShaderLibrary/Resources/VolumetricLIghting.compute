@@ -47,16 +47,14 @@ void Compute(uint3 id : SV_DispatchThreadID)
 		
 		float3 lightVector = light.position - worldPosition;
 		float sqrLightDist = dot(lightVector, lightVector);
-		if(sqrLightDist > Sq(light.range))
+		if (sqrLightDist >= light.sqRange)
 			continue;
 		
-		sqrLightDist = max(Sq(0.01), sqrLightDist);
 		float rcpLightDist = rsqrt(sqrLightDist);
-		
 		float3 L = lightVector * rcpLightDist;
 
-		float attenuation = CalculateLightFalloff(rcpLightDist, sqrLightDist, rcp(Sq(light.range)));
-		if(!attenuation)
+		float attenuation = Sq(min(rcp(0.01), rcpLightDist) * saturate(1.0 - Sq(sqrLightDist * light.sqRcpRange)));
+		if (!attenuation)
 			continue;
 		
 		float height = HeightAtDistance(_ViewHeight, worldDir.y, viewDistance);
@@ -64,13 +62,14 @@ void Compute(uint3 id : SV_DispatchThreadID)
 		if(all(!intensity))
 			continue;
 			
-		if(light.shadowIndex != ~0u)
+		if (light.shadowIndexVisibleFaces)
 		{
-			uint visibleFaces = light.visibleFaces;
+			uint shadowIndex = light.shadowIndexVisibleFaces >> 8;
+			uint visibleFaces = light.shadowIndexVisibleFaces & 0xf;
 			float dominantAxis = Max3(abs(lightVector));
-			float depth = rcp(dominantAxis) * light.far + light.near;
-			attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), light.shadowIndex), depth);
-			if(!attenuation)
+			float depth = rcp(dominantAxis) * light.depthRemapScale + light.depthRemapOffset;
+			attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), shadowIndex), depth);
+			if (!attenuation)
 				continue;
 		}
 		

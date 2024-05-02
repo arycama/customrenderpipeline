@@ -4,11 +4,11 @@ using UnityEngine.Assertions;
 public class BufferHandle
 {
     public int Size { get; set; }
+    public GraphicsBuffer Buffer { get; private set; }
 
     public GraphicsBuffer.Target Target { get; }
     public int Count { get; }
     public int Stride { get; }
-    private GraphicsBuffer buffer;
 
     public BufferHandle(GraphicsBuffer.Target target, int count, int stride)
     {
@@ -18,7 +18,7 @@ public class BufferHandle
         Target = target;
         Count = count;
         Stride = stride;
-        buffer = null;
+        Buffer = null;
     }
 
     public BufferHandle(GraphicsBuffer graphicsBuffer) 
@@ -26,14 +26,14 @@ public class BufferHandle
         Target = graphicsBuffer.target;
         Count = graphicsBuffer.count;
         Stride = graphicsBuffer.stride;
-        buffer = graphicsBuffer;
+        Buffer = graphicsBuffer;
         Size = graphicsBuffer.count * graphicsBuffer.stride;
     }
 
     public void Create()
     {
-        Assert.IsNull(buffer);
-        buffer = new GraphicsBuffer(Target, Count, Stride)
+        Assert.IsNull(Buffer);
+        Buffer = new GraphicsBuffer(Target, Count, Stride)
         {
             name = $"BufferHandle {Target} {Count} {Stride}"
         };
@@ -41,11 +41,11 @@ public class BufferHandle
 
     public void Release()
     {
-        buffer.Release();
+        Buffer.Release();
     }
 
     public static implicit operator GraphicsBuffer(BufferHandle bufferHandle)
     {
-        return bufferHandle.buffer;
+        return bufferHandle.Buffer;
     }
 }

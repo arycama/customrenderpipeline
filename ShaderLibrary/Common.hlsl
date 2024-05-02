@@ -15,12 +15,14 @@ struct DirectionalLight
 struct PointLight
 {
 	float3 position;
-	float range;
+	float sqRange;
+	
+	float sqRcpRange;
+	uint shadowIndexVisibleFaces;
+	float depthRemapScale;
+	float depthRemapOffset;
+	
 	float3 color;
-	uint shadowIndex;
-	uint visibleFaces;
-	float near;
-	float far;
 	float padding;
 };
 

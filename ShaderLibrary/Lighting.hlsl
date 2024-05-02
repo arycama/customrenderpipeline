@@ -372,11 +372,6 @@ float PerceptualRoughnessToMipmapLevel(float perceptualRoughness, float NdotR)
 	return perceptualRoughness * UNITY_SPECCUBE_LOD_STEPS;
 }
 
-float CalculateLightFalloff(float rcpLightDist, float sqrLightDist, float rcpSqLightRange)
-{
-	return rcpLightDist * Sq(saturate(1.0 - Sq(sqrLightDist * rcpSqLightRange)));
-}
-
 float Lambda(float3 x, float3 N, float roughness)
 {
 	return (sqrt(1.0 + Sq(roughness) * (rcp(Sq(dot(x, N))) - 1.0)) - 1.0) * rcp(2.0);
@@ -644,32 +639,31 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	// Point lights
 	for (i = 0; i < min(128, lightCount); i++)
 	{
-		int index = _LightClusterList[startOffset + i];
+		uint index = _LightClusterList[startOffset + i];
 		PointLight light = _PointLights[index];
 		
 		float3 lightVector = light.position - input.worldPosition;
 		float sqrLightDist = dot(lightVector, lightVector);
-		if (sqrLightDist > Sq(light.range))
+		if (sqrLightDist >= light.sqRange)
 			continue;
 		
-		sqrLightDist = max(Sq(0.01), sqrLightDist);
 		float rcpLightDist = rsqrt(sqrLightDist);
-		
 		float3 L = lightVector * rcpLightDist;
 		float NdotL = dot(input.normal, L);
 		if (!isVolumetric && NdotL <= 0.0)
 			continue;
-
-		float attenuation = CalculateLightFalloff(rcpLightDist, sqrLightDist, rcp(Sq(light.range)));
+		
+		float attenuation = Sq(min(rcp(0.01), rcpLightDist) * saturate(1.0 - Sq(sqrLightDist * light.sqRcpRange)));
 		if (!attenuation)
 			continue;
 			
-		if (light.shadowIndex != ~0u)
+		if (light.shadowIndexVisibleFaces)
 		{
-			uint visibleFaces = light.visibleFaces;
+			uint shadowIndex = light.shadowIndexVisibleFaces >> 8;
+			uint visibleFaces = light.shadowIndexVisibleFaces & 0xf;
 			float dominantAxis = Max3(abs(lightVector));
-			float depth = rcp(dominantAxis) * light.far + light.near;
-			attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), light.shadowIndex), depth);
+			float depth = rcp(dominantAxis) * light.depthRemapScale + light.depthRemapOffset;
+			attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), shadowIndex), depth);
 			if (!attenuation)
 				continue;
 		}

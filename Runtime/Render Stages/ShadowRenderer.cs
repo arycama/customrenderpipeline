@@ -38,10 +38,9 @@ namespace Arycama.CustomRenderPipeline
                         // Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
                         pass.WriteTexture(directionalShadows);
 
-                        int index = i;
                         var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                         {
-                            command.SetRenderTarget(directionalShadows, 0, CubemapFace.Unknown, index);
+                            command.SetRenderTarget(data.target, 0, CubemapFace.Unknown, data.index);
                             command.ClearRenderTarget(true, false, Color.clear);
 
                             pass.SetMatrix(command, "_WorldToView", data.worldToView);
@@ -52,6 +51,8 @@ namespace Arycama.CustomRenderPipeline
                         data.viewPosition = camera.transform.position;
                         data.worldToView = shadowRequest.ViewMatrix;
                         data.worldToClip = shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix;
+                        data.target = directionalShadows;
+                        data.index = i;
                     }
                 }
             }
@@ -80,11 +81,10 @@ namespace Arycama.CustomRenderPipeline
 
                         // Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
                         pass.WriteTexture(pointShadows);
-                        int index = i;
 
                         var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                         {
-                            command.SetRenderTarget(pointShadows, 0, CubemapFace.Unknown, index);
+                            command.SetRenderTarget(data.target, data.target, 0, CubemapFace.Unknown, data.index);
                             command.ClearRenderTarget(true, false, Color.clear);
 
                             pass.SetVector(command, "_ViewPosition", data.viewPosition);
@@ -95,6 +95,8 @@ namespace Arycama.CustomRenderPipeline
                         data.viewPosition = camera.transform.position;
                         data.worldToView = shadowRequest.ViewMatrix;
                         data.worldToClip = GL.GetGPUProjectionMatrix(shadowRequest.ProjectionMatrix, true) * shadowRequest.ViewMatrix;
+                        data.target = pointShadows;
+                        data.index = i;
                     }
                 }
             }
@@ -110,6 +112,8 @@ namespace Arycama.CustomRenderPipeline
             internal Vector3 viewPosition;
             internal Matrix4x4 worldToView;
             internal Matrix4x4 worldToClip;
+            internal RTHandle target;
+            internal int index;
         }
 
         public struct Result : IRenderPassData
