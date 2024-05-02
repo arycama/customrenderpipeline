@@ -369,14 +369,43 @@ GBufferOutput Fragment(FragmentInput input)
 	}
 	
 	// Sum  weights from each unique layer index
+	float bilinearWeightSums[layerCount];
+	for (uint i = 0; i < layerCount; i++)
+	{
+		float weightSum = 0.0;
+		for (uint j = 0; j < layerCount; j++)
+		{
+			if (layers[j] == layers[i])
+				weightSum += weights[j];
+		}
+		
+		bilinearWeightSums[i] = weightSum;
+	}
+	
+	float blendWeightSums[layerCount];
+	for (uint i = 0; i < layerCount; i++)
+	{
+		float weightSum = 0.0;
+		for (uint j = 0; j < layerCount; j++)
+		{
+			if (layers[j] == layers[i])
+				weightSum += weights[j] * blends[j];
+		}
+		
+		blendWeightSums[i] = weightSum;
+	}
+	
+	float maxWeight = 0.0;
 	float layerWeightSums[layerCount];
 	for(uint i = 0; i < layerCount; i++)
 	{
 		float weightSum = 0.0;
 		for(uint j = 0; j < layerCount; j++)
 		{
-			if(layers[j] == layers[i])
-				weightSum += weights[j];
+			if(layers[j] != layers[i])
+				continue;
+			
+			weightSum += weights[j] * blends[j] + (weights[j] / bilinearWeightSums[j]) * masks[j].b;
 		}
 		
 		for(uint j = 0; j < i; j++)
@@ -388,14 +417,8 @@ GBufferOutput Fragment(FragmentInput input)
 			break;
 		}
 		
+		maxWeight = max(maxWeight, weightSum);
 		layerWeightSums[i] = weightSum;
-	}
-	
-	// Get the max weight for each layer
-	float maxWeight = 0.0;
-	for(uint i = 0; i < layerCount; i++)
-	{
-		maxWeight = max(maxWeight, layerWeightSums[i] + masks[i].b);
 	}
 	
 	// Compute final weights
@@ -408,12 +431,10 @@ GBufferOutput Fragment(FragmentInput input)
 		
 		if(layerWeightSum > 0.0)
 		{
-			finalLayerWeight = max(0.0, masks[i].b + layerWeightSum + transitions[i] - maxWeight);
+			finalLayerWeight = max(0.0, layerWeightSum + transitions[i] - maxWeight);
 			finalWeightSum += finalLayerWeight;
 		}
 		
-		// Final weight is divided by the sum of the original layer weight so that when it is summed by all the channels that use it, it will sum to the same weight
-		//finalWeights[i] = layerWeightSum ? finalLayerWeight / layerWeightSums[i] : 0.0;
 		finalWeights[i] = finalLayerWeight;
 	}
 	
@@ -428,7 +449,7 @@ GBufferOutput Fragment(FragmentInput input)
 			if(layers[j] != layers[i])
 				continue;
 			
-			finalChannelWeight = layerWeightSums[j] ? finalWeights[j] / layerWeightSums[j] : 0.0;
+			finalChannelWeight = finalWeights[j] / bilinearWeightSums[j];
 			break;
 		}
 		
@@ -442,6 +463,7 @@ GBufferOutput Fragment(FragmentInput input)
 	for(uint i = 0; i < layerCount; i++)
 	{
 		float weight = finalChannelWeights[i] * weights[i];
+		//weight = weights[i] * blends[i];
 		
 		albedoSmoothness += albedoSmoothnesses[i] * weight;
 		normalDerivative += normalDerivatives[i] * weight;
