@@ -297,6 +297,11 @@ float3 PixelToWorld(float3 position)
 	return ClipToWorld(float3(position.xy * _ScaledResolution.zw * 2 - 1, position.z));
 }
 
+float3 WorldToView(float3 position)
+{
+	return MultiplyPoint3x4(_WorldToView, position);
+}
+
 float4 WorldToClipNonJittered(float3 position) { return MultiplyPoint(_WorldToNonJitteredClip, position); }
 float4 WorldToClipPrevious(float3 position) { return MultiplyPoint(_WorldToPreviousClip, position); }
 

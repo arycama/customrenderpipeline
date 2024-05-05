@@ -37,6 +37,7 @@ public class DeferredLighting
             pass.AddRenderPassData<LitData.Result>();
             pass.AddRenderPassData<ScreenSpaceReflectionResult>();
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+            pass.AddRenderPassData<WaterShadowResult>();
 
             var data = pass.SetRenderFunction<Data>((command, pass, data) =>
             {

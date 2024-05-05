@@ -41,7 +41,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 		if (RayIntersectsGround(_ViewHeight, cosViewAngle))
 		{
-			output.result = float2(0.0, 1.0).xxxy;
+			output.luminance = 0.0;
+			output.transmittance = 1.0;
 			output.depth = 0.0;
 			return output;
 		}

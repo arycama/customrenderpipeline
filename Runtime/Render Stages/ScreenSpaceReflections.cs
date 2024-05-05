@@ -64,16 +64,15 @@ public class ScreenSpaceReflections
             });
         }
 
-        var textureData = temporalCache.GetTextures(width, height, camera, true);
-
+        var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Temporal"))
         {
             pass.Initialize(material, 1, camera: camera);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(textureData.current, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 
             pass.ReadTexture("_Input", tempResult);
-            pass.ReadTexture("_History", textureData.history);
+            pass.ReadTexture("_History", history);
             pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Depth", depth);
             pass.ReadTexture("Velocity", velocity);
@@ -84,12 +83,12 @@ public class ScreenSpaceReflections
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
                 commonPassData.SetProperties(pass, command);
-                pass.SetFloat(command, "_IsFirst", textureData.wasCreated ? 1.0f : 0.0f);
-                pass.SetVector(command, "_HistoryScaleLimit", textureData.history.ScaleLimit2D);
+                pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
+                pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
             });
         }
 
-        renderGraph.ResourceMap.SetRenderPassData(new ScreenSpaceReflectionResult(textureData.current));
+        renderGraph.ResourceMap.SetRenderPassData(new ScreenSpaceReflectionResult(current));
     }
 
     class PassData

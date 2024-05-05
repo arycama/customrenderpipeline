@@ -30,7 +30,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.bentNormal = normalize(2.0 * bentNormalOcclusion.rgb - 1.0);
 	lightingInput.isWater = (_Stencil[position.xy].g & 4) != 0;
 	lightingInput.uv = uv;
-	
+
 	float3 result = GetLighting(lightingInput);
 	
 	// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)

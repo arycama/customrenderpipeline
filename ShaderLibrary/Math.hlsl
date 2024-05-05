@@ -55,7 +55,13 @@ float FastACosPos(float inX)
 	return res * sqrt(max(0.0, 1.0 - x));
 }
 
-// Input [0, 1] and output [0, PI/2], 9 VALU
+float2 FastACosPos(float2 inX)
+{
+	float2 x = abs(inX);
+	float2 res = (0.0468878 * x + -0.203471) * x + HalfPi; // p(x)
+	return res * sqrt(max(0.0, 1.0 - x));
+}
+
 float3 FastACosPos(float3 inX)
 {
 	float3 x = abs(inX);

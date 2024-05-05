@@ -65,7 +65,8 @@ float3 GTAOMultiBounce(float visibility, float3 albedo)
 
 float3 AmbientLight(float3 N, float occlusion, float3 albedo, float4 sh[7])
 {
-	return EvaluateSH(N, GTAOMultiBounce(occlusion, albedo), sh);
+	//return EvaluateSH(N, GTAOMultiBounce(occlusion, albedo), sh);
+	return EvaluateSH(N, occlusion, sh);
 }
 
 float3 AmbientLight(float3 N, float occlusion = 1.0, float3 albedo = 1.0)
@@ -578,9 +579,8 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	
 	float3 irradiance =  AmbientLight(input.bentNormal, input.occlusion, input.albedo);
 	float3 backIrradiance = AmbientLight(-input.bentNormal, input.occlusion, input.translucency);
-
+	
 	// Ambient
-	//illuminance = irradiance;
 	float3 luminance = FssEss * radiance + Fms * Ems * irradiance + (kD * irradiance + bkD * backIrradiance);
 	
 	#ifdef REFLECTION_PROBE_RENDERING
@@ -591,7 +591,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
 		DirectionalLight light = _DirectionalLights[i];
-		
+
 		// Skip expensive shadow lookup if NdotL is negative
 		float NdotL = dot(input.normal, light.direction);
 		if (!isVolumetric && NdotL <= 0.0)
@@ -609,7 +609,16 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		
 		float attenuation = 1.0;
 		if(i == 0)
-			attenuation = CloudTransmittance(input.worldPosition);
+		{
+			attenuation *= CloudTransmittance(input.worldPosition);
+			
+			if(input.isWater)
+			{
+				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, input.worldPosition);
+				if(all(saturate(shadowPosition.xy) == shadowPosition.xy))
+					attenuation *= _WaterShadows.SampleCmpLevelZero(_LinearClampCompareSampler, shadowPosition.xy, shadowPosition.z);
+			}
+		}
 			
 		attenuation *= GetShadow(input.worldPosition, i, !isVolumetric);
 		if (!attenuation)
@@ -617,7 +626,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		
 		if (isVolumetric)
 			luminance += light.color * atmosphereTransmittance * (_Exposure * attenuation);
-		else if (NdotL > 0.0)
+		else
 		{
 			#ifdef WATER_SHADOW_ON
 			if(i == 0)

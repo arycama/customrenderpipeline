@@ -1,22 +1,8 @@
 #ifndef UTILITY_INCLUDED
 #define UTILITY_INCLUDED
 
+#include "Geometry.hlsl"
 #include "Math.hlsl"
-
-float3 SphericalToCartesian(float cosPhi, float sinPhi, float cosTheta)
-{
-	float sinTheta = SinFromCos(cosTheta);
-
-	return float3(float2(cosPhi, sinPhi) * sinTheta, cosTheta);
-}
-
-float3 SphericalToCartesian(float phi, float cosTheta)
-{
-	float sinPhi, cosPhi;
-	sincos(phi, sinPhi, cosPhi);
-
-	return SphericalToCartesian(cosPhi, sinPhi, cosTheta);
-}
 
 float3 SampleSphereUniform(float u1, float u2)
 {

@@ -281,8 +281,9 @@ float4 BilinearWeights(float2 uv, float2 textureSize)
 [earlydepthstencil]
 GBufferOutput Fragment(FragmentInput input)
 {
-	float2 uvCenter = (floor(input.uv * IdMapResolution - 0.5) + 0.5) / IdMapResolution;
-	uint4 layerData = IdMap.GatherRed(_LinearClampSampler, uvCenter);
+	float2 localUv = input.uv * IdMapResolution - 0.5;
+	float2 uvCenter = (floor(localUv) + 0.5) / IdMapResolution;
+	uint4 layerData = IdMap.Gather(_PointClampSampler, uvCenter);
 	
 	uint4 layers0 = (layerData >> 0) & 0xF;
 	float4 offsetsX0 = ((layerData >> 4) & 0x3) / 3.0;
@@ -297,186 +298,108 @@ GBufferOutput Fragment(FragmentInput input)
 	float4 blendWeights = Remap(((layerData >> 26) & 0xF) / 15.0, 0.0, 1.0, 0.0, 0.5);
 	uint4 triplanars = (layerData >> 30) & 0x3;
 	
-	const uint layerCount = 8;
+	float checker = frac(dot(floor(localUv), 0.5));
 	
-	float layers[8], blends[8];
-	for(uint i = 0; i < 8; i++)
+	localUv = frac(localUv);
+	float triMask = checker ? (localUv.x - localUv.y < 0.0) : (localUv.x + localUv.y > 1);
+
+	float3 weights;
+	float2 offsets[3]; 
+	if(checker)
 	{
-		layers[i] = i < 4 ? layers0[i % 4] : layers1[i % 4];
-		blends[i] = i < 4 ? (1.0 - blendWeights[i % 4]) : blendWeights[i % 4];
+		offsets[0] = triMask ? float2(0, 1) : float2(1, 0);
+		offsets[1] = float2(1, 1);
+		offsets[2] = float2(0, 0);
+		
+		weights.x = abs(localUv.y - localUv.x);
+		weights.y = min(localUv.x, localUv.y);
+		weights.z = min(1 - localUv.x, 1 - localUv.y);
 	}
-	
-	float2 localUv = frac(input.uv * IdMapResolution - 0.5);
-	
-	float2 offsets[4];
-	offsets[0] = float2(0, 1);
-	offsets[1] = float2(1, 1);
-	offsets[2] = float2(1, 0);
-	offsets[3] = float2(0, 0);
-	
-	// Get the max weight
-	float weights[8];
-	weights[0] = weights[4] = (1.0 - localUv.x) * (localUv.y);
-	weights[1] = weights[5] = (localUv.x) * (localUv.y);
-	weights[2] = weights[6] = (localUv.x) * (1.0 - localUv.y);
-	weights[3] = weights[7] = (1.0 - localUv.x) * (1.0 - localUv.y);
-	
-	//weights[0] *= 1.0 - blends.x;
-	//weights[1] *= 1.0 - blends.y;
-	//weights[2] *= 1.0 - blends.z;
-	//weights[3] *= 1.0 - blends.w;
-	//weights[4] *= blends.x;
-	//weights[5] *= blends.y;
-	//weights[6] *= blends.z;
-	//weights[7] *= blends.w;
-	
-	float4 albedoSmoothnesses[layerCount], masks[layerCount];
-	float2 normalDerivatives[layerCount];
-	
-	float transitions[layerCount];
-	
-	[unroll]
-	for(uint i = 0; i < layerCount; i++)
+	else
 	{
-		uint layer = layers[i];
-		LayerData data = TerrainLayerData[layer];
+		offsets[0] = float2(0, 1);
+		offsets[1] = triMask ? float2(1, 1) : float2(0, 0);
+		offsets[2] = float2(1, 0);
 		
-		float rotation = i < 4 ? rotations0[i % 4] : rotations1[i % 4];
-		float offsetX = i < 4 ? offsetsX0[i % 4] : offsetsX1[i % 4];
-		float offsetY = i < 4 ? offsetsY0[i % 4] : offsetsY1[i % 4];
-		uint triplanar = triplanars[i % 4];
-		
-		float2 triplanarUv = triplanar == 0 ? input.worldPosition.zy : (triplanar == 1 ? input.worldPosition.xz : input.worldPosition.xy);
-		
-		// Center in layer space
-		float2 layerUv = triplanarUv / data.Scale;
-		float2 center = floor((uvCenter + offsets[i % 4] / IdMapResolution) * TerrainSize.xz / data.Scale) + 0.5;
-		
-		float s, c;
-		sincos(rotation * TwoPi * data.Rotation, s, c);
-		float2x2 rotationMatrix = float2x2(c, s, -s, c);
-		
-		float2 uv = mul(rotationMatrix, layerUv - center) + center + (float2(offsetX, offsetY) - 0.5) * data.Stochastic;
-		albedoSmoothnesses[i] = AlbedoSmoothness.Sample(_TrilinearRepeatAniso16Sampler, float3(uv, layer));
-		masks[i] = Mask.Sample(_TrilinearRepeatAniso16Sampler, float3(uv, layer));
-		
-		float3 normal = UnpackNormalAG(Normal.Sample(_TrilinearRepeatAniso16Sampler, float3(uv, layer)));
-		float2 normalDerivative = normal.xy * rcp(normal.z);
-		normalDerivative = mul(normalDerivative, rotationMatrix);
-		normalDerivatives[i] = normalDerivative;
-		
-		transitions[i] = data.Blending;
-	}
-	
-	// Sum  weights from each unique layer index
-	float bilinearWeightSums[layerCount];
-	for (uint i = 0; i < layerCount; i++)
-	{
-		float weightSum = 0.0;
-		for (uint j = 0; j < layerCount; j++)
-		{
-			if (layers[j] == layers[i])
-				weightSum += weights[j];
-		}
-		
-		bilinearWeightSums[i] = weightSum;
-	}
-	
-	float blendWeightSums[layerCount];
-	for (uint i = 0; i < layerCount; i++)
-	{
-		float weightSum = 0.0;
-		for (uint j = 0; j < layerCount; j++)
-		{
-			if (layers[j] == layers[i])
-				weightSum += weights[j] * blends[j];
-		}
-		
-		blendWeightSums[i] = weightSum;
-	}
-	
-	float maxWeight = 0.0;
-	float layerWeightSums[layerCount];
-	for(uint i = 0; i < layerCount; i++)
-	{
-		float weightSum = 0.0;
-		for(uint j = 0; j < layerCount; j++)
-		{
-			if(layers[j] != layers[i])
-				continue;
-			
-			weightSum += weights[j] * blends[j] + (weights[j] / bilinearWeightSums[j]) * masks[j].b;
-		}
-		
-		for(uint j = 0; j < i; j++)
-		{
-			if(layers[j] != layers[i])
-				continue;
-			
-			weightSum = 0.0;
-			break;
-		}
-		
-		maxWeight = max(maxWeight, weightSum);
-		layerWeightSums[i] = weightSum;
-	}
-	
-	// Compute final weights
-	float finalWeights[layerCount];
-	float finalWeightSum = 0.0;
-	for(uint i = 0; i < layerCount; i++)
-	{
-		float layerWeightSum = layerWeightSums[i];
-		float finalLayerWeight = 0.0;
-		
-		if(layerWeightSum > 0.0)
-		{
-			finalLayerWeight = max(0.0, layerWeightSum + transitions[i] - maxWeight);
-			finalWeightSum += finalLayerWeight;
-		}
-		
-		finalWeights[i] = finalLayerWeight;
-	}
-	
-	// Now compute per channel weights again
-	float finalChannelWeights[layerCount];
-	for(uint i = 0; i < layerCount; i++)
-	{
-		float finalChannelWeight = 0.0;
-		
-		for(uint j = 0; j < layerCount; j++)
-		{
-			if(layers[j] != layers[i])
-				continue;
-			
-			finalChannelWeight = finalWeights[j] / bilinearWeightSums[j];
-			break;
-		}
-		
-		finalChannelWeights[i] = finalChannelWeight;
+		weights = float3(min(1 - localUv, localUv.yx), abs(localUv.x + localUv.y - 1)).xzy;
 	}
 	
 	float4 albedoSmoothness = 0.0, mask = 0.0;
-	float2 normalDerivative = 0.0;
+	float2 derivativeSum = 0.0;
 	
 	[unroll]
-	for(uint i = 0; i < layerCount; i++)
+	for (uint i = 0; i < 6; i++)
 	{
-		float weight = finalChannelWeights[i] * weights[i];
-		//weight = weights[i] * blends[i];
+		uint index;
+		if(checker)
+			index = (i >> 1) == 0 ? (triMask ? 0 : 2) : ((i >> 1) == 2 ? 3 : (i >> 1));
+		else
+			index = (i >> 1) == 1 ? (triMask ? 1 : 3) : (i >> 1);
 		
-		albedoSmoothness += albedoSmoothnesses[i] * weight;
-		normalDerivative += normalDerivatives[i] * weight;
-		mask += masks[i] * weight;
+		// Layer0
+		uint data = layerData[index];
+		float blend = Remap(((data >> 26) & 0xF) / 15.0, 0.0, 1.0, 0.0, 0.5);
+		
+		uint id0 = ((data >> 0) & 0xF);
+		uint id1 = ((data >> 13) & 0xF);
+		
+		uint layerIndex;
+		float offsetX, offsetY, rotation, layerWeight;
+		if(i & 1)
+		{
+			layerIndex = ((data >> 13) & 0xF);
+			offsetX = ((data >> 17) & 0x3) / 3.0;
+			offsetY = ((data >> 19) & 0x3) / 3.0;
+			rotation = ((data >> 21) & 0x1F) / 31.0;
+			layerWeight = blend;
+		}
+		else
+		{
+			layerIndex = ((data >> 0) & 0xF);
+			offsetX = ((data >> 4) & 0x3) / 3.0;
+			offsetY = ((data >> 6) & 0x3) / 3.0;
+			rotation = ((data >> 8) & 0x1F) / 31.0;
+			layerWeight = 1.0 - blend;
+		}
+		
+		layerWeight *= weights[i >> 1];
+		
+		uint triplanar = (data >> 30) & 0x3;
+		float3 dx = ddx_coarse(input.worldPosition);
+		float3 dy = ddy_coarse(input.worldPosition);
+		
+		float2 triplanarUv = triplanar == 0 ? input.worldPosition.zy : (triplanar == 1 ? input.worldPosition.xz : input.worldPosition.xy);
+		float2 triplanarDx = triplanar == 0 ? dx.zy : (triplanar == 1 ? dx.xz : dx.xy);
+		float2 triplanarDy = triplanar == 0 ? dy.zy : (triplanar == 1 ? dy.xz : dy.xy);
+		
+		float2 localUv = triplanarUv / TerrainLayerData[layerIndex].Scale;
+		float2 localDx = triplanarDx / TerrainLayerData[layerIndex].Scale;
+		float2 localDy = triplanarDy / TerrainLayerData[layerIndex].Scale;
+
+		// Rotate around control point center
+		float s, c;
+		sincos(rotation * TwoPi, s, c);
+		float2x2 rotationMatrix = float2x2(c, s, -s, c);
+		
+		// Center in terrain layer space
+		float2 center = floor((uvCenter + offsets[i >> 1] / IdMapResolution) * TerrainSize.xz / TerrainLayerData[layerIndex].Scale) + 0.5;
+		float3 sampleUv = float3(mul(rotationMatrix, localUv - center) + center + float2(offsetX, offsetY), layerIndex);
+		localDx = mul(rotationMatrix, localDx);
+		localDy = mul(rotationMatrix, localDy);
+		
+		albedoSmoothness += AlbedoSmoothness.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy) * layerWeight;
+		mask += Mask.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy) * layerWeight;
+		
+		float4 normalData = Normal.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy);
+		float3 unpackedNormal = UnpackNormalAG(normalData);
+		float2 d0 = unpackedNormal.xy / unpackedNormal.z;
+		float2 derivative = mul(d0, rotationMatrix);
+		
+		derivativeSum += derivative * layerWeight;
 	}
 	
-	float rcpWeightSum = rcp(finalWeightSum);
-	albedoSmoothness *= rcpWeightSum;
-	normalDerivative *= rcpWeightSum;
-	mask *= rcpWeightSum;
-	
 	float3 t = UnpackNormalSNorm(_TerrainNormalMap.Sample(_LinearClampSampler, input.uv)) + float3(0, 0, 1);
-	float3 u = normalize(float3(normalDerivative, 1.0)) * float2(-1,1).xxy;
+	float3 u = normalize(float3(derivativeSum, 1.0)) * float2(-1,1).xxy;
 	float3 normalWS = (t * dot(t, u) / t.z - u).xzy;
 	
 	return OutputGBuffer(albedoSmoothness.rgb, mask.r, normalWS, 1.0 - albedoSmoothness.a, normalWS, mask.g, 0.0);

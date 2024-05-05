@@ -12,6 +12,7 @@ namespace Arycama.CustomRenderPipeline
         private GraphicsBuffer indexBuffer;
         private BufferHandle indirectArgsBuffer;
         private MeshTopology topology;
+        private float depthBias, slopeDepthBias;
 
         public string Keyword { get; set; }
 
@@ -25,7 +26,7 @@ namespace Arycama.CustomRenderPipeline
             return $"{Name} {material} {passIndex}";
         }
 
-        public void Initialize(Material material, GraphicsBuffer indexBuffer, BufferHandle indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, string keyword = null)
+        public void Initialize(Material material, GraphicsBuffer indexBuffer, BufferHandle indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, string keyword = null, float depthBias = 0.0f, float slopeDepthBias = 0.0f)
         {
             this.material = material;
             this.passIndex = passIndex;
@@ -33,6 +34,8 @@ namespace Arycama.CustomRenderPipeline
             this.indexBuffer = indexBuffer;
             this.indirectArgsBuffer = indirectArgsBuffer;
             this.topology = topology;
+            this.depthBias = depthBias;
+            this.slopeDepthBias = slopeDepthBias;
         }
 
         public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -78,7 +81,13 @@ namespace Arycama.CustomRenderPipeline
                 command.EnableShaderKeyword(Keyword);
             }
 
+            if (depthBias != 0.0f || slopeDepthBias != 0.0f)
+                command.SetGlobalDepthBias(depthBias, slopeDepthBias);
+
             command.DrawProceduralIndirect(indexBuffer, Matrix4x4.identity, material, passIndex, topology, indirectArgsBuffer, 0, propertyBlock);
+
+            if (depthBias != 0.0f || slopeDepthBias != 0.0f)
+                command.SetGlobalDepthBias(0.0f, 0.0f);
 
             if (!string.IsNullOrEmpty(Keyword))
             {

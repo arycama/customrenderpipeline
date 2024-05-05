@@ -3,8 +3,24 @@
 
 #include "Math.hlsl"
 
+// TODO: Move to a common place or pass as args
 float4 _CullingPlanes[6];
 uint _CullingPlanesCount;
+
+float3 SphericalToCartesian(float cosPhi, float sinPhi, float cosTheta)
+{
+	float sinTheta = SinFromCos(cosTheta);
+
+	return float3(float2(cosPhi, sinPhi) * sinTheta, cosTheta);
+}
+
+float3 SphericalToCartesian(float phi, float cosTheta)
+{
+	float sinPhi, cosPhi;
+	sincos(phi, sinPhi, cosPhi);
+
+	return SphericalToCartesian(cosPhi, sinPhi, cosTheta);
+}
 
 float DistanceToSphereInside(float height, float cosAngle, float radius)
 {

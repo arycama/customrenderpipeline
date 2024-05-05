@@ -95,7 +95,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25 / linearWaterDepth;
 	
-	float2 uvOffset = N.xz * distortion * (1.0 - saturate(NdotV));
+	float2 uvOffset = N.xz * distortion;
 	float2 refractionUv = uvOffset * _ScaledResolution.xy + position.xy;
 	float2 refractedPositionSS = clamp(refractionUv, 0, _ScaledResolution.xy - 1);
 	float underwaterDepth = _UnderwaterDepth[refractedPositionSS];
@@ -137,7 +137,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			if(attenuation > 0.0)
 			{
 				float shadowDistance0 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
-				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix, P);
+				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, P);
 				if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
 				{
 					float shadowDepth = _WaterShadows.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);

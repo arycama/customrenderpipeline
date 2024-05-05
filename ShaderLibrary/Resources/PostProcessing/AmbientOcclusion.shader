@@ -8,23 +8,6 @@ Shader "Hidden/Ambient Occlusion"
 
         Pass
         {
-            Name "View Normals"
-            
-            Stencil
-            {
-                Ref 0
-                Comp NotEqual
-            }
-        
-            HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
-            #pragma fragment FragmentViewNormals
-            #include "AmbientOcclusion.hlsl"
-            ENDHLSL
-        }
-
-        Pass
-        {
             Name "Compute"
             
             Stencil
@@ -33,11 +16,43 @@ Shader "Hidden/Ambient Occlusion"
                 Comp NotEqual
             }
         
-            Blend DstColor Zero
-            
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #include "AmbientOcclusion.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "Temporal"
+            
+            Stencil
+            {
+                Ref 0
+                Comp NotEqual
+            }
+        
+            HLSLPROGRAM
+            #pragma vertex VertexFullscreenTriangle
+            #pragma fragment FragmentTemporal
+            #include "AmbientOcclusion.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "Resolve"
+            
+            Stencil
+            {
+                Ref 0
+                Comp NotEqual
+            }
+        
+            HLSLPROGRAM
+            #pragma vertex VertexFullscreenTriangle
+            #pragma fragment FragmentResolve
             #include "AmbientOcclusion.hlsl"
             ENDHLSL
         }
