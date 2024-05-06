@@ -38,6 +38,8 @@ public class DeferredLighting
             pass.AddRenderPassData<ScreenSpaceReflectionResult>();
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<WaterShadowResult>();
+            pass.AddRenderPassData<ScreenSpaceShadows.Result>();
+            pass.AddRenderPassData<ScreenSpaceGlobalIllumination.Result>();
 
             var data = pass.SetRenderFunction<Data>((command, pass, data) =>
             {
@@ -59,6 +61,10 @@ public class DeferredLighting
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<SkyResultData>();
             pass.AddRenderPassData<VolumetricLighting.Result>();
+
+            // Only for debugging 
+            pass.AddRenderPassData<ScreenSpaceReflectionResult>();
+
         }
     }
 

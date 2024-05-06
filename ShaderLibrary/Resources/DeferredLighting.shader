@@ -29,7 +29,6 @@ Shader "Hidden/Deferred Lighting"
 			#define SCREENSPACE_REFLECTIONS_ON
             #include "DeferredLighting.hlsl"
             ENDHLSL
-          
         }
 
 		Pass

@@ -9,6 +9,11 @@
 StructuredBuffer<float4> _DirectionalShadowTexelSizes;
 float ShadowMapResolution, RcpShadowMapResolution, ShadowFilterRadius, ShadowFilterSigma;
 
+Texture2D<float4> ScreenSpaceGlobalIllumination;
+Texture2D<float> ScreenSpaceShadows;
+
+float4 ScreenSpaceGlobalIlluminationScaleLimit, ScreenSpaceShadowsScaleLimit;
+
 cbuffer AmbientSh
 {
 	float4 _AmbientSh[7];

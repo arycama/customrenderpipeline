@@ -19,9 +19,10 @@ Shader "Terrain"
 
             Stencil
             {
-                Ref 1
+                // Bit 3 = terrain, 1 = non background
+                Ref 9
                 Pass Replace
-                WriteMask 1
+                WriteMask 9
             }
 
             HLSLPROGRAM
