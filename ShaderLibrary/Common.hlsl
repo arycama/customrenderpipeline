@@ -284,31 +284,6 @@ float3 ClipToWorld(float3 position)
 float3 PixelToWorld(float3 position)
 {
 	return MultiplyPointProj(_PixelToWorld, position);
-	
-	float2 jitter = 0.0;
-	
-	float4x4 mat = 0;
-	mat._m00 = _CameraAspect * _TanHalfFov;
-	mat._m03 = _CameraAspect * _TanHalfFov * jitter - _CameraAspect * _TanHalfFov;
-	mat._m11 = _TanHalfFov;
-	mat._m13 = jitter.y * _TanHalfFov - _TanHalfFov;
-	mat._m23 = 1.0;
-	mat._m32 = (_Far - _Near) / (_Near * _Far);
-	mat._m33 = 1.0 / _Far;
-	
-	float4 view = mul(_PixelToWorld, float4(position, 1));
-	
-	//view.x = position.x * (mat._m00 / _ScaledResolution.x * 2) + mat._m03;
-	//view.y = position.y * (mat._m11 / _ScaledResolution.y * 2) + mat._m13;
-	//view.z = mat._m23;
-	//view.w = position.z * mat._m32 + mat._m33;
-	
-	float4 world = mul(_ViewToWorld, view);
-	
-	return world.xyz / world.w;
-	
-	
-	return ClipToWorld(position);
 }
 
 float3 WorldToView(float3 position)
