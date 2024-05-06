@@ -59,6 +59,7 @@ cbuffer FrameData
 	float _FrameIndex;
 	float _ViewHeight;
 	float _CameraAspect;
+	float _TanHalfFov;
 };
 
 cbuffer CameraData
@@ -101,6 +102,9 @@ cbuffer CameraData
 	
 	float3 _PreviousViewPosition;
 	float _CameraDataPadding2;
+	
+	float _LinearDepthScale;
+	float _LinearDepthOffset;
 };
 
 cbuffer DrawData
@@ -182,24 +186,9 @@ float2 ApplyScaleOffset(float2 uv, float4 scaleOffset)
 	return uv * scaleOffset.xy + scaleOffset.zw;
 }
 
-float Linear01Depth(float depth)
-{
-	return rcp((_Far * rcp(_Near) - 1.0) * depth + 1.0);
-}
-
 float LinearEyeDepth(float depth)
 {
-	return rcp((rcp(_Near) - rcp(_Far)) * depth + rcp(_Far));
-}
-
-float EyeTo01Depth(float depth)
-{
-	return Remap(depth, _Near, _Far, 0.0, 1.0);
-}
-
-float NormalizedToEyeDepth(float depth)
-{
-	return lerp(_Near, _Far, depth);
+	return rcp(_LinearDepthScale * depth + _LinearDepthOffset);
 }
 
 float EyeToDeviceDepth(float eyeDepth)
@@ -294,7 +283,32 @@ float3 ClipToWorld(float3 position)
 
 float3 PixelToWorld(float3 position)
 {
-	return ClipToWorld(float3(position.xy * _ScaledResolution.zw * 2 - 1, position.z));
+	return MultiplyPointProj(_PixelToWorld, position);
+	
+	float2 jitter = 0.0;
+	
+	float4x4 mat = 0;
+	mat._m00 = _CameraAspect * _TanHalfFov;
+	mat._m03 = _CameraAspect * _TanHalfFov * jitter - _CameraAspect * _TanHalfFov;
+	mat._m11 = _TanHalfFov;
+	mat._m13 = jitter.y * _TanHalfFov - _TanHalfFov;
+	mat._m23 = 1.0;
+	mat._m32 = (_Far - _Near) / (_Near * _Far);
+	mat._m33 = 1.0 / _Far;
+	
+	float4 view = mul(_PixelToWorld, float4(position, 1));
+	
+	//view.x = position.x * (mat._m00 / _ScaledResolution.x * 2) + mat._m03;
+	//view.y = position.y * (mat._m11 / _ScaledResolution.y * 2) + mat._m13;
+	//view.z = mat._m23;
+	//view.w = position.z * mat._m32 + mat._m33;
+	
+	float4 world = mul(_ViewToWorld, view);
+	
+	return world.xyz / world.w;
+	
+	
+	return ClipToWorld(position);
 }
 
 float3 WorldToView(float3 position)

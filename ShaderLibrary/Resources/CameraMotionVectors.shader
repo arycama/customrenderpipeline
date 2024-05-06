@@ -10,8 +10,10 @@ Shader "Hidden/Camera Motion Vectors"
 
             Stencil
             {
+                // Ensure only bit 1 is set, and not bit 2
                 Ref 1
                 Comp Equal
+                ReadMask 3
             }
 
             HLSLPROGRAM

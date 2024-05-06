@@ -47,41 +47,6 @@ float Angle(float3 from, float3 to)
 	return FastACos(dot(from, to));
 }
 
-#define XE_HILBERT_LEVEL    6U
-#define XE_HILBERT_WIDTH    ( (1U << XE_HILBERT_LEVEL) )
-#define XE_HILBERT_AREA     ( XE_HILBERT_WIDTH * XE_HILBERT_WIDTH )
-
-uint HilbertIndex( uint posX, uint posY )
-{   
-    uint index = 0U;
-    for( uint curLevel = XE_HILBERT_WIDTH/2U; curLevel > 0U; curLevel /= 2U )
-    {
-        uint regionX = ( posX & curLevel ) > 0U;
-        uint regionY = ( posY & curLevel ) > 0U;
-        index += curLevel * curLevel * ( (3U * regionX) ^ regionY);
-        if( regionY == 0U )
-        {
-            if( regionX == 1U )
-            {
-                posX = uint( (XE_HILBERT_WIDTH - 1U) ) - posX;
-                posY = uint( (XE_HILBERT_WIDTH - 1U) ) - posY;
-            }
-
-            uint temp = posX;
-            posX = posY;
-            posY = temp;
-        }
-    }
-    return index;
-}
-
-float2 SpatioTemporalNoise( uint2 pixCoord, uint temporalIndex )    // without TAA, temporalIndex is always 0
-{
-    float2 noise;
-    uint index = HilbertIndex( pixCoord.x, pixCoord.y );
-    return float2(InterleavedGradientNoise(pixCoord, temporalIndex), InterleavedGradientNoise(pixCoord, index));
-}
-
 float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	uint2 id = uint2(position.xy);
@@ -92,7 +57,6 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float3 viewV = normalize(-cPosV);
 	
 	float2 noise = _BlueNoise2D[id % 128];
-	noise = SpatioTemporalNoise(position.xy, _FrameIndex);
 	float scaling = _Radius / cPosV.z;
 	
 	float phi = noise.x * Pi;
@@ -149,9 +113,8 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float cosTheta = rcp(12.0) * (-cos(3 * h.x - n) - cos(3 * h.y - n) + 8 * cos(n) - 3 * (cos(h.x + n) + cos(h.y + n)));
 		
 	// Rotate from(0,0,-1) to viewV using shortest arc quaternion
-	float3 up = float3(-cosPhi * sinTheta, -sinPhi * sinTheta, cosTheta);
-	float3 tp = viewV * float3(1, 1, -1) + float3(0, 0, 1);
-	float3 bentNormalV = (tp / tp.z * dot(tp, up) - up) * float3(1, 1, -1);
+	float3 bentNormalL = float3(cosPhi * sinTheta, sinPhi * sinTheta, cosTheta);
+	float3 bentNormalV = ShortestArcQuaternion(viewV * float2(1, -1).xxy, bentNormalL) * float2(1, -1).xxy;
 	
 	float3 bentNormal = normalize(mul((float3x3)_ViewToWorld, bentNormalV));
 	float4 result = float4(bentNormal, visibility) * sampleWeight / 1.5;

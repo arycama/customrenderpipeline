@@ -63,6 +63,9 @@ public class TerrainSystem
     {
         terrain = Terrain.activeTerrain;
 
+        if (terrain == null)
+            return;
+
         var resolution = terrainData.heightmapResolution;
         minMaxHeight = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R16G16_UNorm, hasMips: true, isPersistent: true);
         heightmap = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R16_UNorm, isPersistent: true);
@@ -264,6 +267,9 @@ public class TerrainSystem
     {
         if (terrain != Terrain.activeTerrain)
             InitializeTerrain();
+
+        if (terrain == null)
+            return;
 
         // Set this every frame incase of changes..
         // TODO: Only do when data changed?

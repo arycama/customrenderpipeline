@@ -136,3 +136,38 @@ float PlusNoise(float2 p, float frameIndex)
 	float goldenRatio = (1.0 + sqrt(5.0)) * rcp(2.0);
 	return frac(0.2 * frameIndex * goldenRatio + (0.2 * p.x + (0.6 * p.y + 0.1))); // Unbiased version
 }
+
+#define XE_HILBERT_LEVEL    6U
+#define XE_HILBERT_WIDTH    ( (1U << XE_HILBERT_LEVEL) )
+#define XE_HILBERT_AREA     ( XE_HILBERT_WIDTH * XE_HILBERT_WIDTH )
+
+uint HilbertIndex( uint posX, uint posY )
+{   
+    uint index = 0U;
+    for( uint curLevel = XE_HILBERT_WIDTH/2U; curLevel > 0U; curLevel /= 2U )
+    {
+        uint regionX = ( posX & curLevel ) > 0U;
+        uint regionY = ( posY & curLevel ) > 0U;
+        index += curLevel * curLevel * ( (3U * regionX) ^ regionY);
+        if( regionY == 0U )
+        {
+            if( regionX == 1U )
+            {
+                posX = uint( (XE_HILBERT_WIDTH - 1U) ) - posX;
+                posY = uint( (XE_HILBERT_WIDTH - 1U) ) - posY;
+            }
+
+            uint temp = posX;
+            posX = posY;
+            posY = temp;
+        }
+    }
+    return index;
+}
+
+float2 SpatioTemporalNoise( uint2 pixCoord, uint temporalIndex )    // without TAA, temporalIndex is always 0
+{
+    float2 noise;
+    uint index = HilbertIndex( pixCoord.x, pixCoord.y );
+    return float2(InterleavedGradientNoise(pixCoord, temporalIndex), InterleavedGradientNoise(pixCoord, index));
+}

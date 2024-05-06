@@ -3,9 +3,11 @@
 #include "../../Packing.hlsl"
 #include "../../Samplers.hlsl"
 #include "../../Temporal.hlsl"
+#include "../../Random.hlsl"
+#include "../../Lighting.hlsl"
 
 Texture2D<float4> _NormalRoughness, _BentNormalOcclusion;
-Texture2D<float3> _PreviousColor;
+Texture2D<float3> PreviousFrame;
 Texture2D<float2> Velocity;
 Texture2D<float> _HiZDepth;
 Texture2D<uint2> _Stencil;
@@ -15,35 +17,6 @@ cbuffer Properties
 	float4 _PreviousColorScaleLimit;
 	float _MaxSteps, _Thickness, _Intensity;
 };
-
-float3 SampleVndf_GGX(float2 u, float3 wi, float alpha, float3 n)
-{
-    // decompose the vector in parallel and perpendicular components
-    float3 wi_z = n * dot(wi, n);
-    float3 wi_xy = wi - wi_z;
-    // warp to the hemisphere configuration
-    float3 wiStd = normalize(wi_z - alpha * wi_xy);
-    // sample a spherical cap in (-wiStd.z, 1]
-    float wiStd_z = dot(wiStd, n);
-    float phi = (2.0f * u.x - 1.0f) * Pi;
-    float z = (1.0f - u.y) * (1.0f + wiStd_z) - wiStd_z;
-    float sinTheta = sqrt(clamp(1.0f - z * z, 0.0f, 1.0f));
-    float x = sinTheta * cos(phi);
-    float y = sinTheta * sin(phi);
-    float3 cStd = float3(x, y, z);
-    // reflect sample to align with normal
-    float3 up = float3(0, 0, 1);
-    float3 wr = n + up;
-    float3 c = dot(wr, cStd) * wr / wr.z - cStd;
-    // compute halfway direction as standard normal
-    float3 wmStd = c + wiStd;
-    float3 wmStd_z = n * dot(n, wmStd);
-    float3 wmStd_xy = wmStd_z - wmStd;
-    // warp back to the ellipsoid configuration
-    float3 wm = normalize(wmStd_z + alpha * wmStd_xy);
-    // return final normal
-    return wm;
-}
 
 #define FLOAT_MAX                          3.402823466e+38
 
@@ -200,103 +173,6 @@ float ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float
     return vignette * confidence;
 }
 
-// Todo: Put in a common file
-float4 _GGXDirectionalAlbedoRemap;
-Texture2D<float2> _GGXDirectionalAlbedo;
-TextureCube<float3> _SkyReflection;
-Texture3D<float> _GGXSpecularOcclusion;
-
-float2 DirectionalAlbedo(float NdotV, float perceptualRoughness)
-{
-	#if 1
-		float2 uv = float2(sqrt(NdotV), perceptualRoughness) * _GGXDirectionalAlbedoRemap.xy + _GGXDirectionalAlbedoRemap.zw;
-		return _GGXDirectionalAlbedo.SampleLevel(_LinearClampSampler, uv, 0);
-	#else
-		return 1.0 - 1.4594 * perceptualRoughness * NdotV *
-		(-0.20277 + perceptualRoughness * (2.772 + perceptualRoughness * (-2.6175 + 0.73343 * perceptualRoughness))) *
-		(3.09507 + NdotV * (-9.11369 + NdotV * (15.8884 + NdotV * (-13.70343 + 4.51786 * NdotV))));
-	#endif
-}
-
-float3 GetViewReflectedNormal(float3 N, float3 V, out float NdotV)
-{
-	NdotV = dot(N, V);
-
-    // N = (NdotV >= 0.0) ? N : (N - 2.0 * NdotV * V);
-	N += (2.0 * saturate(-NdotV)) * V;
-	NdotV = abs(NdotV);
-
-	return N;
-}
-
-// Ref: "Moving Frostbite to PBR", p. 69.
-float3 GetSpecularDominantDir(float3 N, float3 R, float perceptualRoughness, float NdotV)
-{
-    float p = perceptualRoughness;
-    float a = 1.0 - p * p;
-    float s = sqrt(a);
-
-#ifdef USE_FB_DSD
-    // This is the original formulation.
-    float lerpFactor = (s + p * p) * a;
-#else
-    // TODO: tweak this further to achieve a closer match to the reference.
-    float lerpFactor = (s + p * p) * saturate(a * a + lerp(0.0, a, NdotV * NdotV));
-#endif
-
-    // The result is not normalized as we fetch in a cubemap
-    return lerp(N, R, lerpFactor);
-}
-
-// The *accurate* version of the non-linear remapping. It works by
-// approximating the cone of the specular lobe, and then computing the MIP map level
-// which (approximately) covers the footprint of the lobe with a single texel.
-// Improves the perceptual roughness distribution and adds reflection (contact) hardening.
-// TODO: optimize!
-float PerceptualRoughnessToMipmapLevel(float perceptualRoughness, float NdotR)
-{
-	float m = PerceptualRoughnessToRoughness(perceptualRoughness);
-
-    // Remap to spec power. See eq. 21 in --> https://dl.dropboxusercontent.com/u/55891920/papers/mm_brdf.pdf
-	float n = (2.0 / max(HalfEps, m * m)) - 2.0;
-
-    // Remap from n_dot_h formulation to n_dot_r. See section "Pre-convolved Cube Maps vs Path Tracers" --> https://s3.amazonaws.com/docs.knaldtech.com/knald/1.0.0/lys_power_drops.html
-	n /= (4.0 * max(NdotR, HalfEps));
-
-    // remap back to square root of float roughness (0.25 include both the sqrt root of the conversion and sqrt for going from roughness to perceptualRoughness)
-	perceptualRoughness = pow(2.0 / (n + 2.0), 0.25);
-
-	return perceptualRoughness * UNITY_SPECCUBE_LOD_STEPS;
-}
-
-float SpecularOcclusion(float NdotV, float perceptualRoughness, float visibility, float BdotR)
-{
-	float4 specUv = float4(NdotV, Sq(perceptualRoughness), visibility, BdotR);
-	
-	// Remap to half texel
-	float4 start = 0.5 * rcp(32.0);
-	float4 len = 1.0 - rcp(32.0);
-	specUv = specUv * len + start;
-
-	// 4D LUT
-	float3 uvw0;
-	uvw0.xy = specUv.xy;
-	float q0Slice = clamp(floor(specUv.w * 32 - 0.5), 0, 31.0);
-	q0Slice = clamp(q0Slice, 0, 32 - 1.0);
-	float qWeight = max(specUv.w * 32 - 0.5 - q0Slice, 0);
-	float2 sliceMinMaxZ = float2(q0Slice, q0Slice + 1) / 32 + float2(0.5, -0.5) / (32 * 32); //?
-	uvw0.z = (q0Slice + specUv.z) / 32.0;
-	uvw0.z = clamp(uvw0.z, sliceMinMaxZ.x, sliceMinMaxZ.y);
-
-	float q1Slice = min(q0Slice + 1, 32 - 1);
-	float nextSliceOffset = (q1Slice - q0Slice) / 32;
-	float3 uvw1 = uvw0 + float3(0, 0, nextSliceOffset);
-
-	float specOcc0 = _GGXSpecularOcclusion.SampleLevel(_LinearClampSampler, uvw0, 0.0);
-	float specOcc1 = _GGXSpecularOcclusion.SampleLevel(_LinearClampSampler, uvw1, 0.0);
-	return lerp(specOcc0, specOcc1, qWeight);
-}
-
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float depth = _HiZDepth[position.xy];
@@ -308,13 +184,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	V *= rcpVLength;
 	
 	float3 N = UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(normalRoughness.xyz) - 1.0);
-	
-	float NdotV = dot(N, V);
-	N = GetViewReflectedNormal(N, V, NdotV);
-	
-	float roughness = Sq(normalRoughness.a);
-	float3 L = reflect(-V, SampleVndf_GGX(u, V, roughness, N));
-  
+	float3 L = SampleHemisphereCosine(u.x, u.y, N);
+    
     // We start tracing from the center of the current pixel, and do so up to the far plane.
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
 	
@@ -338,40 +209,18 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 		
 		// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
 		// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
-		result = _PreviousColor.Sample(_LinearClampSampler, ClampScaleTextureUv(hit.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit)); 
+		result = PreviousFrame.Sample(_LinearClampSampler, ClampScaleTextureUv(hit.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit)) * _PreviousToCurrentExposure; 
 	}
 	
 	if(confidence >= 1.0)
 		return result;
 	
-	float3 iblN = N;
-	float3 R = reflect(-V, N);
-	float3 rStrength = 1.0;
-	
-	// Reflection correction for water
-	bool isWater = (_Stencil[position.xy].g & 4) != 0;
-	if(isWater && R.y < 0.0)
-	{
-		iblN = float3(0.0, 1.0, 0.0);
-		float NdotR = dot(iblN, -R);
-		float2 f_ab = DirectionalAlbedo(NdotR, normalRoughness.a);
-		rStrength = lerp(f_ab.x, f_ab.y, 0.04);
-		R = reflect(R, iblN);
-	}
-	
-	float3 iblR = GetSpecularDominantDir(iblN, R, normalRoughness.a, NdotV);
-	float NdotR = dot(N, iblR);
-	float iblMipLevel = PerceptualRoughnessToMipmapLevel(normalRoughness.a, NdotR);
-	
-	float3 radiance = _SkyReflection.SampleLevel(_TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
-
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
-	float3 bentNormal = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
-	
-	float specularOcclusion = SpecularOcclusion(dot(N, R), normalRoughness.a, bentNormalOcclusion.a, dot(bentNormal, R));
-	radiance *= specularOcclusion;
-	
-	return lerp(radiance, result, confidence);
+	bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
+	float3 irradiance = AmbientLight(bentNormalOcclusion.xyz, bentNormalOcclusion.a);
+    
+    // TODO: output weight and use to weigh temporal accumulation
+	return lerp(irradiance, result, confidence);
 }
 
 Texture2D<float3> _Input, _History;

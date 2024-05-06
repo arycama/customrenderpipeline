@@ -560,33 +560,43 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	float3 kD = input.albedo * Edss;
 	float3 bkD = input.translucency * Edss;
 	
-	float3 iblN = input.normal;
-	float3 R = reflect(-V, input.normal);
-	float3 rStrength = 1.0;
-	
-	// Reflection correction for water
-	if(input.isWater && R.y < 0.0)
-	{
-		iblN = float3(0.0, 1.0, 0.0);
-		float NdotR = dot(iblN, -R);
-		float2 f_ab = DirectionalAlbedo(NdotR, input.perceptualRoughness);
-		rStrength = lerp(f_ab.x, f_ab.y, input.f0);
-		R = reflect(R, iblN);
-	}
-	
-	float3 iblR = GetSpecularDominantDir(iblN, R, input.perceptualRoughness, NdotV);
-	float NdotR = dot(input.normal, iblR);
-	float iblMipLevel = PerceptualRoughnessToMipmapLevel(input.perceptualRoughness, NdotR);
-	
 	// TODO: Need to handle non screenspace reflections, eg for transparent
 	//float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
-	float3 radiance = ScreenSpaceReflections[input.pixelPosition];
+	#ifdef SCREENSPACE_REFLECTIONS_ON
+		float3 radiance = ScreenSpaceReflections[input.pixelPosition];
+	#else
+		float3 iblN = input.normal;
+		float3 R = reflect(-V, input.normal);
+		float3 rStrength = 1.0;
 	
-	float3 irradiance =  AmbientLight(input.bentNormal, input.occlusion, input.albedo);
-	float3 backIrradiance = AmbientLight(-input.bentNormal, input.occlusion, input.translucency);
+		// Reflection correction for water
+		if(input.isWater && R.y < 0.0)
+		{
+			iblN = float3(0.0, 1.0, 0.0);
+			float NdotR = dot(iblN, -R);
+			float2 f_ab = DirectionalAlbedo(NdotR, input.perceptualRoughness);
+			rStrength = lerp(f_ab.x, f_ab.y, input.f0);
+			R = reflect(R, iblN);
+		}
+	
+		float3 iblR = GetSpecularDominantDir(iblN, R, input.perceptualRoughness, NdotV);
+		float NdotR = dot(input.normal, iblR);
+		float iblMipLevel = PerceptualRoughnessToMipmapLevel(input.perceptualRoughness, NdotR);
+	
+		float3 radiance = _SkyReflection.SampleLevel(_TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
+	
+		float specularOcclusion = SpecularOcclusion(dot(input.normal, R), input.perceptualRoughness, input.occlusion, dot(input.bentNormal, R));
+		radiance *= specularOcclusion;
+	#endif
+	
+	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
+		float3 irradiance = ScreenSpaceGlobalIllumination[input.pixelPosition];
+	#else
+		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
+	#endif
 	
 	// Ambient
-	float3 luminance = FssEss * radiance + Fms * Ems * irradiance + (kD * irradiance + bkD * backIrradiance);
+	float3 luminance = FssEss * radiance + Fms * Ems * irradiance + (kD * irradiance + bkD * irradiance);
 	
 	#ifdef REFLECTION_PROBE_RENDERING
 		luminance = kD * irradiance;
@@ -623,9 +633,12 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 				if(all(saturate(shadowPosition.xy) == shadowPosition.xy))
 					attenuation *= _WaterShadows.SampleCmpLevelZero(_LinearClampCompareSampler, shadowPosition.xy, shadowPosition.z);
 			}
-		}
 			
+			//attenuation *= ScreenSpaceShadows[input.pixelPosition];
+		}
+		
 		attenuation *= GetShadow(input.worldPosition, i, !isVolumetric);
+		
 		if (!attenuation)
 			continue;
 		
@@ -677,9 +690,9 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 			uint visibleFaces = light.shadowIndexVisibleFaces & 0xf;
 			float dominantAxis = Max3(abs(lightVector));
 			float depth = rcp(dominantAxis) * light.depthRemapScale + light.depthRemapOffset;
-			attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), shadowIndex), depth);
-			if (!attenuation)
-				continue;
+			//attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), shadowIndex), depth);
+			//if (!attenuation)
+			//	continue;
 		}
 		
 		if (isVolumetric)

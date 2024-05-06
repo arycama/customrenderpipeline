@@ -126,4 +126,13 @@ float CalculateSphereEdgeFactor(float3 corner0, float3 corner1, float targetEdge
 	return CalculateSphereEdgeFactor(r, edgeCenter, targetEdgeLength, cameraAspect, screenWidth);
 }
 
+// Calculates a rotation from (0,0,1) to t, and applies that rotation to u using shortest arc quaternion
+// https://blog.selfshadow.com/publications/blending-in-detail/
+float3 ShortestArcQuaternion(float3 t, float3 u)
+{
+	float3 tp = t + float3(0, 0, 1);
+	float3 up = u * float2(-1, 1).xxy;
+	return tp * dot(tp, up) / tp.z - up;
+}
+
 #endif

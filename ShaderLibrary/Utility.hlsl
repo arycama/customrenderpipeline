@@ -43,6 +43,13 @@ float3 SampleHemisphereCosine(float u1, float u2)
 	return localL;
 }
 
+// Generates a sample, then rotates it into the hemisphere of normal using reoriented normal mapping
+float3 SampleHemisphereCosine(float u1, float u2, float3 normal)
+{
+	float3 result = SampleHemisphereCosine(u1, u2);
+	return ShortestArcQuaternion(normal, result);
+}
+
 float3 SampleHemisphereUniform(float u1, float u2)
 {
 	float phi = TwoPi * u2;
@@ -83,10 +90,7 @@ float2 NormalDerivatives(float3 normal)
 // assume compositing in tangent space
 float3 BlendNormalRNM(float3 n1, float3 n2)
 {
-	float3 t = n1.xyz + float3(0.0, 0.0, 1.0);
-	float3 u = n2.xyz * float3(-1.0, -1.0, 1.0);
-	float3 r = (t / t.z) * dot(t, u) - u;
-	return r;
+	return ShortestArcQuaternion(n1, n2);
 }
 
 float PerceptualSmoothnessToPerceptualRoughness(float smoothness)
@@ -136,15 +140,39 @@ float2 QuadOffset(uint2 screenPos)
 	return float2(screenPos & 1) * 2.0 - 1.0;
 }
 
-float1 QuadReadAcrossX(float1 value, uint2 screenPos) { return value - ddx(value) * QuadOffset(screenPos).x; }
-float2 QuadReadAcrossX(float2 value, uint2 screenPos) { return value - ddx(value) * QuadOffset(screenPos).x; }
-float3 QuadReadAcrossX(float3 value, uint2 screenPos) { return value - ddx(value) * QuadOffset(screenPos).x; }
-float4 QuadReadAcrossX(float4 value, uint2 screenPos) { return value - ddx(value) * QuadOffset(screenPos).x; }
+float1 QuadReadAcrossX(float1 value, uint2 screenPos)
+{
+	return value - ddx(value) * QuadOffset(screenPos).x;
+}
+float2 QuadReadAcrossX(float2 value, uint2 screenPos)
+{
+	return value - ddx(value) * QuadOffset(screenPos).x;
+}
+float3 QuadReadAcrossX(float3 value, uint2 screenPos)
+{
+	return value - ddx(value) * QuadOffset(screenPos).x;
+}
+float4 QuadReadAcrossX(float4 value, uint2 screenPos)
+{
+	return value - ddx(value) * QuadOffset(screenPos).x;
+}
 
-float1 QuadReadAcrossY(float1 value, uint2 screenPos) { return value - ddy(value) * QuadOffset(screenPos).y; }
-float2 QuadReadAcrossY(float2 value, uint2 screenPos) { return value - ddy(value) * QuadOffset(screenPos).y; }
-float3 QuadReadAcrossY(float3 value, uint2 screenPos) { return value - ddy(value) * QuadOffset(screenPos).y; }
-float4 QuadReadAcrossY(float4 value, uint2 screenPos) { return value - ddy(value) * QuadOffset(screenPos).y; }
+float1 QuadReadAcrossY(float1 value, uint2 screenPos)
+{
+	return value - ddy(value) * QuadOffset(screenPos).y;
+}
+float2 QuadReadAcrossY(float2 value, uint2 screenPos)
+{
+	return value - ddy(value) * QuadOffset(screenPos).y;
+}
+float3 QuadReadAcrossY(float3 value, uint2 screenPos)
+{
+	return value - ddy(value) * QuadOffset(screenPos).y;
+}
+float4 QuadReadAcrossY(float4 value, uint2 screenPos)
+{
+	return value - ddy(value) * QuadOffset(screenPos).y;
+}
 
 float QuadReadAcrossDiagonal(float value, uint2 screenPos)
 {
@@ -155,22 +183,37 @@ float QuadReadAcrossDiagonal(float value, uint2 screenPos)
 	return X - (ddy_fine(value) * quadDir.y);
 }
 
-float Max2(float2 x) { return max(x.x, x.y); }
+float Max2(float2 x)
+{
+	return max(x.x, x.y);
+}
 
-float Max3(float3 x) 
-{ 
+float Max3(float3 x)
+{
 #ifdef INTRINSIC_MINMAX3
 	return Max3(x.x, x.y, x.z);
 #else
-	return max(x.x, max(x.y, x.z)); 
+	return max(x.x, max(x.y, x.z));
 #endif
 }
 
-float Max4(float4 x) { return Max2(max(x.xy, x.zw)); }
+float Max4(float4 x)
+{
+	return Max2(max(x.xy, x.zw));
+}
 
-float Min2(float2 x) { return min(x.x, x.y); }
-float Min3(float3 x) { return min(x.x, min(x.y, x.z)); }
-float Min4(float4 x) { return Min2(min(x.xy, x.zw)); }
+float Min2(float2 x)
+{
+	return min(x.x, x.y);
+}
+float Min3(float3 x)
+{
+	return min(x.x, min(x.y, x.z));
+}
+float Min4(float4 x)
+{
+	return Min2(min(x.xy, x.zw));
+}
 
 float DistToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
 {

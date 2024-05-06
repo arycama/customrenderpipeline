@@ -398,10 +398,12 @@ GBufferOutput Fragment(FragmentInput input)
 		derivativeSum += derivative * layerWeight;
 	}
 	
-	float3 t = UnpackNormalSNorm(_TerrainNormalMap.Sample(_LinearClampSampler, input.uv)) + float3(0, 0, 1);
-	float3 u = normalize(float3(derivativeSum, 1.0)) * float2(-1,1).xxy;
-	float3 normalWS = (t * dot(t, u) / t.z - u).xzy;
-	
+	float3 terrainNormal = UnpackNormalSNorm(_TerrainNormalMap.Sample(_LinearClampSampler, input.uv)).xzy;
+	float3 t = terrainNormal.xzy + float3(0, 0, 1);
+	float3 u = normalize(float3(derivativeSum, 1.0));
+	float3 up = u * float2(-1,1).xxy;
+	float3 normalWS = (t * dot(t, up) / t.z - up).xzy;
+
 	return OutputGBuffer(albedoSmoothness.rgb, mask.r, normalWS, 1.0 - albedoSmoothness.a, normalWS, mask.g, 0.0);
 }
 

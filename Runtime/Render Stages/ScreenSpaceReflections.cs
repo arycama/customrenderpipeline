@@ -53,6 +53,7 @@ public class ScreenSpaceReflections
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<LitData.Result>();
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+            pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
@@ -79,6 +80,7 @@ public class ScreenSpaceReflections
 
             commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+            pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {

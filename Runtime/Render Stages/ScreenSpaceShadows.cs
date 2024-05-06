@@ -1,20 +1,31 @@
 ﻿using Arycama.CustomRenderPipeline;
+using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 public class ScreenSpaceShadows
 {
+    [Serializable]
+    public class Settings
+    {
+        [field: SerializeField, Range(0.0f, 1.0f)] public float Intensity { get; private set; } = 1.0f;
+        [field: SerializeField, Range(1, 128)] public int MaxSamples { get; private set; } = 32;
+        [field: SerializeField, Range(0f, 1.0f)] public float Thickness { get; private set; } = 0.1f;
+    }
+
     private readonly RenderGraph renderGraph;
     private readonly Material material;
+    private readonly Settings settings;
 
-    public ScreenSpaceShadows(RenderGraph renderGraph)
+    public ScreenSpaceShadows(RenderGraph renderGraph, Settings settings)
     {
         this.renderGraph = renderGraph;
         material = new Material(Shader.Find("Hidden/ScreenSpaceShadows")) { hideFlags = HideFlags.HideAndDontSave };
+        this.settings = settings;
     }
 
-    public void Render(RTHandle depth, int width, int height, ICommonPassData commonPassData, Camera camera)
+    public void Render(RTHandle depth, RTHandle hiZDepth, int width, int height, ICommonPassData commonPassData, Camera camera, CullingResults cullingResults)
     {
         var result = renderGraph.GetTexture(width, height, GraphicsFormat.R8_UNorm);
 
@@ -28,12 +39,28 @@ public class ScreenSpaceShadows
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
 
             pass.ReadTexture("_Depth", depth);
-        
+            pass.ReadTexture("_HiZDepth", hiZDepth);
+            
             commonPassData.SetInputs(pass);
+
+            var lightDirection = Vector3.up;
+            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
+            {
+                var light = cullingResults.visibleLights[i];
+                if (light.lightType != LightType.Directional)
+                    continue;
+
+                lightDirection = -light.localToWorldMatrix.Forward();
+                break;
+            }
 
             var data = pass.SetRenderFunction<Data>((command, pass, data) =>
             {
                 commonPassData.SetProperties(pass, command);
+                pass.SetVector(command, "LightDirection", lightDirection);
+                pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
+                pass.SetFloat(command, "_Thickness", settings.Thickness);
+                pass.SetFloat(command, "_Intensity", settings.Intensity);
             });
         }
 
