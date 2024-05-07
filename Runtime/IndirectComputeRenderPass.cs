@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -10,12 +11,12 @@ namespace Arycama.CustomRenderPipeline
         private ComputeShader computeShader;
         private int kernelIndex;
         private uint argsOffset;
-        private GraphicsBuffer indirectBuffer;
+        private BufferHandle indirectBuffer;
 
         protected readonly List<(RTHandle, string)> colorBindings = new();
         private readonly List<string> keywords = new();
 
-        public void Initialize(ComputeShader computeShader, GraphicsBuffer indirectBuffer, int kernelIndex = 0, uint argsOffset = 0)
+        public void Initialize(ComputeShader computeShader, BufferHandle indirectBuffer, int kernelIndex = 0, uint argsOffset = 0)
         {
             this.computeShader = computeShader ?? throw new ArgumentNullException(nameof(computeShader));
             this.kernelIndex = kernelIndex;

@@ -9,8 +9,9 @@ public class BufferHandle
     public GraphicsBuffer.Target Target { get; }
     public int Count { get; }
     public int Stride { get; }
+    public GraphicsBuffer.UsageFlags UsageFlags { get; }
 
-    public BufferHandle(GraphicsBuffer.Target target, int count, int stride)
+    public BufferHandle(GraphicsBuffer.Target target, int count, int stride, GraphicsBuffer.UsageFlags usageFlags)
     {
         Assert.IsTrue(count > 0);
         Assert.IsTrue(stride > 0);
@@ -18,6 +19,7 @@ public class BufferHandle
         Target = target;
         Count = count;
         Stride = stride;
+        UsageFlags = usageFlags;
         Buffer = null;
     }
 
@@ -33,7 +35,7 @@ public class BufferHandle
     public void Create()
     {
         Assert.IsNull(Buffer);
-        Buffer = new GraphicsBuffer(Target, Count, Stride)
+        Buffer = new GraphicsBuffer(Target, UsageFlags, Count, Stride)
         {
             name = $"BufferHandle {Target} {Count} {Stride}"
         };

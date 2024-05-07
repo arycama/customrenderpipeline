@@ -11,8 +11,9 @@ namespace Arycama.CustomRenderPipeline
         public Matrix4x4 ProjectionMatrix { get; }
         public ShadowSplitData ShadowSplitData { get; }
         public int CubemapFace { get; }
+        public CullingPlanes CullingPlanes { get; }
 
-        public ShadowRequest(bool isValid, int visibleLightIndex, Matrix4x4 viewMatrix, Matrix4x4 projectionMatrix, ShadowSplitData shadowSplitData, int cubemapFace)
+        public ShadowRequest(bool isValid, int visibleLightIndex, Matrix4x4 viewMatrix, Matrix4x4 projectionMatrix, ShadowSplitData shadowSplitData, int cubemapFace, CullingPlanes cullingPlanes)
         {
             IsValid = isValid;
             VisibleLightIndex = visibleLightIndex;
@@ -20,6 +21,7 @@ namespace Arycama.CustomRenderPipeline
             ProjectionMatrix = projectionMatrix;
             ShadowSplitData = shadowSplitData;
             CubemapFace = cubemapFace;
+            CullingPlanes = cullingPlanes;
         }
     }
 }

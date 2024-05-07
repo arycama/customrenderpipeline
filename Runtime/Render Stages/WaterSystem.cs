@@ -9,7 +9,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class OceanSystem
+    public class WaterSystem
     {
         [Serializable]
         public class Settings
@@ -45,7 +45,7 @@ namespace Arycama.CustomRenderPipeline
 
         private RTHandle displacementCurrent;
 
-        public OceanSystem(RenderGraph renderGraph, Settings settings)
+        public WaterSystem(RenderGraph renderGraph, Settings settings)
         {
             this.renderGraph = renderGraph;
             this.settings = settings;
@@ -265,12 +265,10 @@ namespace Arycama.CustomRenderPipeline
             var frustumPlanes = ArrayPool<Plane>.Get(6);
             GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrix, frustumPlanes);
 
-            var cullingPlanes = ArrayPool<Vector4>.Get(6);
+            var cullingPlanes = new CullingPlanes() { Count = 6 };
             for (var j = 0; j < 6; j++)
-            {
-                var plane = frustumPlanes[j];
-                cullingPlanes[j] = new Vector4(plane.normal.x, plane.normal.y, plane.normal.z, plane.distance);
-            }
+                cullingPlanes.SetCullingPlane(j, frustumPlanes[j]);
+
             ArrayPool<Plane>.Release(frustumPlanes);
 
             var cullResult = Cull(viewPosition, cullingPlanes, commonPassData);
@@ -369,16 +367,21 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_RcpCascadeScales", rcpScales);
                     pass.SetVector(command, "_OceanTexelSize", texelSizes);
 
-                    pass.SetInt(command, "_CullingPlanesCount", passData.CullingPlanes.Length);
-                    pass.SetVectorArray(command, "_CullingPlanes", passData.CullingPlanes);
-                    ArrayPool<Vector4>.Release(passData.CullingPlanes);
+                    var cullingPlanesArray = ArrayPool<Vector4>.Get(passData.CullingPlanes.Count);
+                    for (var i = 0; i < passData.CullingPlanes.Count; i++)
+                        cullingPlanesArray[i] = passData.CullingPlanes.GetCullingPlaneVector4(i);
+
+                    pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                    ArrayPool<Vector4>.Release(cullingPlanesArray);
+
+                    pass.SetInt(command, "_CullingPlanesCount", passData.CullingPlanes.Count);
                 });
             }
 
             renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction")));
         }
 
-        public WaterCullResult Cull(Vector3 viewPosition, Vector4[] cullingPlanes, ICommonPassData commonPassData)
+        public WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
         {
             // TODO: Preload?
             var compute = Resources.Load<ComputeShader>("OceanQuadtreeCull");
@@ -466,7 +469,12 @@ namespace Arycama.CustomRenderPipeline
                         pass.SetInt(command, "_PassOffset", 6 * index);
                         pass.SetInt(command, "_TotalPassCount", totalPassCount);
 
-                        pass.SetVectorArray(command, "_CullingPlanes", cullingPlanes);
+                        var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
+                        for (var i = 0; i < cullingPlanes.Count; i++)
+                            cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
+
+                        pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                        ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                         // Snap to quad-sized increments on largest cell
                         var texelSizeX = settings.Size / (float)settings.PatchVertices;
@@ -477,7 +485,7 @@ namespace Arycama.CustomRenderPipeline
                         pass.SetVector(command, "_TerrainPositionOffset", positionOffset);
 
                         pass.SetFloat(command, "_EdgeLength", (float)settings.EdgeLength * settings.PatchVertices);
-                        pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Length);
+                        pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
                         pass.SetFloat(command, "MaxWaterHeight", settings.Profile.MaxWaterHeight);
                     });
                 }
@@ -515,13 +523,13 @@ namespace Arycama.CustomRenderPipeline
         }
 
 
-        public void CullRender(Vector3 viewPosition, Vector4[] cullingPlanes, ICommonPassData commonPassData)
+        public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
         {
             var result = Cull(viewPosition, cullingPlanes, commonPassData);
             renderGraph.ResourceMap.SetRenderPassData(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer));
         }
 
-        public RTHandle RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, IRenderPassData commonPassData, Vector4[] cullingPlanes)
+        public RTHandle RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, IRenderPassData commonPassData, CullingPlanes cullingPlanes)
         {
             // Depth, rgba8 normalFoam, rgba8 roughness, mask? 
             // Writes depth, stencil, and RGBA8 containing normalRG, roughness and foam
@@ -576,8 +584,13 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_RcpCascadeScales", rcpScales);
                     pass.SetVector(command, "_OceanTexelSize", texelSizes);
 
-                    pass.SetInt(command, "_CullingPlanesCount", 6);
-                    pass.SetVectorArray(command, "_CullingPlanes", cullingPlanes);
+                    pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
+                    var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
+                    for (var i = 0; i < cullingPlanes.Count; i++)
+                        cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
+
+                    pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                    ArrayPool<Vector4>.Release(cullingPlanesArray);
                 });
             }
 
@@ -786,9 +799,9 @@ namespace Arycama.CustomRenderPipeline
         public float Far { get; }
         public Matrix4x4 WorldToClip { get; }
         public Matrix4x4 ShadowMatrix { get; }
-        public Vector4[] CullingPlanes { get; }
+        public CullingPlanes CullingPlanes { get; }
 
-        public WaterShadowCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer, float near, float far, Matrix4x4 worldToClip, Matrix4x4 shadowMatrix, Vector4[] cullingPlanes)
+        public WaterShadowCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer, float near, float far, Matrix4x4 worldToClip, Matrix4x4 shadowMatrix, CullingPlanes cullingPlanes)
         {
             IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
             PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));

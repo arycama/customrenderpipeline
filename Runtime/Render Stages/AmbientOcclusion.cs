@@ -24,7 +24,7 @@ namespace Arycama.CustomRenderPipeline
             var scaledWidth = (int)(camera.pixelWidth * scale);
             var scaledHeight = (int)(camera.pixelHeight * scale);
 
-            var tempResult = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.R8G8B8A8_UNorm);
+            var tempResult = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Compute"))
             {
@@ -93,7 +93,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            var newBentNormalOcclusion = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.R8G8B8A8_UNorm);
+            var newBentNormalOcclusion = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Resolve"))
             {
                 pass.Initialize(material, 2);

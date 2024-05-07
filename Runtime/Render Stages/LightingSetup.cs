@@ -51,6 +51,8 @@ namespace Arycama.CustomRenderPipeline
                             // Transform camera bounds to light space
                             var minValue = Vector3.positiveInfinity;
                             var maxValue = Vector3.negativeInfinity;
+                            var minValueRws = Vector3.positiveInfinity;
+                            var maxValueRws = Vector3.negativeInfinity;
                             for (var z = 0; z < 2; z++)
                             {
                                 for (var y = 0; y < 2; y++)
@@ -73,6 +75,11 @@ namespace Arycama.CustomRenderPipeline
 
                                         minValue = Vector3.Min(minValue, localPoint);
                                         maxValue = Vector3.Max(maxValue, localPoint);
+
+                                        var localPointRws = worldToLight.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w - camera.transform.position);
+
+                                        minValueRws = Vector3.Min(minValueRws, localPointRws);
+                                        maxValueRws = Vector3.Max(maxValueRws, localPointRws);
                                     }
                                 }
                             }
@@ -87,8 +94,26 @@ namespace Arycama.CustomRenderPipeline
                             for (var k = 0; k < 6; k++)
                             {
                                 // Skip near plane
-                                if (k != 4)
-                                    cullingPlanes.Add(frustumPlanes[k]);
+                                if (k == 4)
+                                    continue;
+
+                                cullingPlanes.Add(frustumPlanes[k]);
+                            }
+
+                            var viewProjectionMatrixRws = Matrix4x4Extensions.OrthoOffCenter(minValueRws.x, maxValueRws.x, minValueRws.y, maxValueRws.y, minValueRws.z, maxValueRws.z) * worldToLight;
+
+                            GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrixRws, frustumPlanes);
+
+                            var cullingPlanes1 = new CullingPlanes();
+                            cullingPlanes1.Count = 5;
+                            for (var k = 0; k < 6; k++)
+                            {
+                                // Skip near plane
+                                if (k == 4)
+                                    continue;
+
+                                var index = k < 4 ? k : 4;
+                                cullingPlanes1.SetCullingPlane(index, frustumPlanes[k]);
                             }
 
                             // Add any planes that face away from the light direction. This avoids rendering shadowcasters that can never cast a visible shadow
@@ -131,7 +156,6 @@ namespace Arycama.CustomRenderPipeline
                             };
 
                             var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(-camera.transform.position, lightRotation);
-
                             var vm = viewMatrixRWS;
                             var shadowMatrix = new Matrix4x4
                             {
@@ -155,7 +179,7 @@ namespace Arycama.CustomRenderPipeline
 
                             directionalShadowMatrices.Add(shadowMatrix);
 
-                            var directionalShadowRequest = new ShadowRequest(true, i, viewMatrixRWS, gpuProjectionMatrix, shadowSplitData, 0);
+                            var directionalShadowRequest = new ShadowRequest(true, i, viewMatrixRWS, gpuProjectionMatrix, shadowSplitData, 0, cullingPlanes1);
                             directionalShadowRequests.Add(directionalShadowRequest);
 
                             directionalShadowTexelSizes.Add(new(width / settings.DirectionalShadowResolution, height / settings.DirectionalShadowResolution, 0.0f, maxValue.z));
@@ -202,7 +226,11 @@ namespace Arycama.CustomRenderPipeline
                             // Y also needs to be done in the shader
                             viewMatrix.SetRow(1, -viewMatrix.GetRow(1));
 
-                            var shadowRequest = new ShadowRequest(isValid, i, viewMatrix, projectionMatrix, shadowSplitData, index);
+                            // Todo: implemen
+                            var cullingPlanes = new CullingPlanes();
+                            cullingPlanes.Count = 0;
+
+                            var shadowRequest = new ShadowRequest(isValid, i, viewMatrix, projectionMatrix, shadowSplitData, index, cullingPlanes);
                             pointShadowRequests.Add(shadowRequest);
 
                             nearPlane = projectionMatrix[2, 3] / (projectionMatrix[2, 2] - 1f);

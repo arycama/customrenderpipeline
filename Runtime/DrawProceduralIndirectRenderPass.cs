@@ -13,6 +13,7 @@ namespace Arycama.CustomRenderPipeline
         private BufferHandle indirectArgsBuffer;
         private MeshTopology topology;
         private float depthBias, slopeDepthBias;
+        private bool zClip;
 
         public string Keyword { get; set; }
 
@@ -26,7 +27,7 @@ namespace Arycama.CustomRenderPipeline
             return $"{Name} {material} {passIndex}";
         }
 
-        public void Initialize(Material material, GraphicsBuffer indexBuffer, BufferHandle indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, string keyword = null, float depthBias = 0.0f, float slopeDepthBias = 0.0f)
+        public void Initialize(Material material, GraphicsBuffer indexBuffer, BufferHandle indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, string keyword = null, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true)
         {
             this.material = material;
             this.passIndex = passIndex;
@@ -36,6 +37,7 @@ namespace Arycama.CustomRenderPipeline
             this.topology = topology;
             this.depthBias = depthBias;
             this.slopeDepthBias = slopeDepthBias;
+            this.zClip = zClip;
         }
 
         public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -77,14 +79,15 @@ namespace Arycama.CustomRenderPipeline
         {
             if (!string.IsNullOrEmpty(Keyword))
             {
-                //keyword = new LocalKeyword(material.shader, Keyword);
                 command.EnableShaderKeyword(Keyword);
             }
 
             if (depthBias != 0.0f || slopeDepthBias != 0.0f)
                 command.SetGlobalDepthBias(depthBias, slopeDepthBias);
 
+            command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
             command.DrawProceduralIndirect(indexBuffer, Matrix4x4.identity, material, passIndex, topology, indirectArgsBuffer, 0, propertyBlock);
+            command.SetGlobalFloat("_ZClip", 1.0f);
 
             if (depthBias != 0.0f || slopeDepthBias != 0.0f)
                 command.SetGlobalDepthBias(0.0f, 0.0f);
@@ -98,6 +101,7 @@ namespace Arycama.CustomRenderPipeline
             material = null;
             passIndex = 0;
             propertyBlock.Clear();
+            zClip = true;
         }
 
         public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)

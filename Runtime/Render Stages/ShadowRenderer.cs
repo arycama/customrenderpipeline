@@ -10,13 +10,15 @@ namespace Arycama.CustomRenderPipeline
     public class ShadowRenderer : RenderFeature
     {
         private readonly ShadowSettings settings;
+        private readonly TerrainSystem terrainSystem;
 
-        public ShadowRenderer(ShadowSettings settings, RenderGraph renderGraph) : base(renderGraph)
+        public ShadowRenderer(ShadowSettings settings, RenderGraph renderGraph, TerrainSystem terrainSystem) : base(renderGraph)
         {
             this.settings = settings;
+            this.terrainSystem = terrainSystem;
         }
 
-        public void Render(ScriptableRenderContext context, CullingResults cullingResults, Camera camera, List<ShadowRequest> directionalShadowRequests, List<ShadowRequest> pointShadowRequests)
+        public void Render(ScriptableRenderContext context, CullingResults cullingResults, Camera camera, List<ShadowRequest> directionalShadowRequests, List<ShadowRequest> pointShadowRequests, Vector3 viewPosition, ICommonPassData commonPassData)
         {
             // Render Shadows
             RTHandle directionalShadows;
@@ -30,10 +32,12 @@ namespace Arycama.CustomRenderPipeline
 
                 for (var i = 0; i < directionalShadowRequests.Count; i++)
                 {
+                    var shadowRequest = directionalShadowRequests[i];
+                    var splitData = shadowRequest.ShadowSplitData;
+
                     using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Directional Light Shadows"))
                     {
-                        var shadowRequest = directionalShadowRequests[i];
-                        pass.Initialize(context, cullingResults, shadowRequest.VisibleLightIndex, BatchCullingProjectionType.Orthographic, shadowRequest.ShadowSplitData, settings.ShadowBias, settings.ShadowSlopeBias, false);
+                        pass.Initialize(context, cullingResults, shadowRequest.VisibleLightIndex, BatchCullingProjectionType.Orthographic, splitData, settings.ShadowBias, settings.ShadowSlopeBias, false);
 
                         // Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
                         pass.WriteTexture(directionalShadows);
@@ -54,6 +58,9 @@ namespace Arycama.CustomRenderPipeline
                         data.target = directionalShadows;
                         data.index = i;
                     }
+
+                    terrainSystem.CullShadow(viewPosition, shadowRequest.CullingPlanes, commonPassData);
+                    terrainSystem.RenderShadow(viewPosition, directionalShadows, shadowRequest.CullingPlanes, commonPassData, shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix, i, settings.ShadowBias, settings.ShadowSlopeBias);
                 }
             }
 

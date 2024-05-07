@@ -132,7 +132,7 @@ public class TerrainSystem
         // Graph doesn't support persistent buffers yet
         // TODO: Add persistent buffer support 
         //var layerDataBuffer = renderGraph.GetBuffer(layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>(), GraphicsBuffer.Target.Structured);
-        terrainLayerData = new GraphicsBuffer(GraphicsBuffer.Target.Structured, layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>());
+        terrainLayerData = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.LockBufferForWrite, layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>());
         FillLayerData();
 
         var idMapResolution = terrainData.alphamapResolution;
@@ -220,19 +220,15 @@ public class TerrainSystem
     {
         using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Layer Data Init"))
         {
-            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+            var layers = terrainData.terrainLayers;
+            var layerData = terrainLayerData.LockBufferForWrite<TerrainLayerData>(0, layers.Length);
+            for (var i = 0; i < layers.Length; i++)
             {
-                var layers = terrainData.terrainLayers;
-                var layerData = ArrayPool<TerrainLayerData>.Get(layers.Length);
-                for (var i = 0; i < layers.Length; i++)
-                {
-                    var layer = layers[i];
-                    layerData[i] = new TerrainLayerData(layer.tileSize.x, Mathf.Max(1e-3f, layer.smoothness), layer.normalScale, 1.0f - layer.metallic);
-                }
+                var layer = layers[i];
+                layerData[i] = new TerrainLayerData(layer.tileSize.x, Mathf.Max(1e-3f, layer.smoothness), layer.normalScale, 1.0f - layer.metallic);
+            }
 
-                command.SetBufferData(terrainLayerData, layerData);
-                ArrayPool<TerrainLayerData>.Release(layerData);
-            });
+            terrainLayerData.UnlockBufferAfterWrite<TerrainLayerData>(layers.Length);
         }
     }
 
@@ -276,11 +272,20 @@ public class TerrainSystem
         FillLayerData();
     }
 
-    public void Cull(Vector3 viewPosition, Vector4[] cullingPlanes, ICommonPassData commonPassData)
+    struct CullResult
     {
-        if (terrain == null)
-            return;
+        public BufferHandle IndirectArgsBuffer { get; }
+        public BufferHandle PatchDataBuffer { get; }
 
+        public CullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
+        {
+            IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
+            PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
+        }
+    }
+
+    private CullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
+    {
         // TODO: Preload?
         var compute = Resources.Load<ComputeShader>("Terrain/TerrainQuadtreeCull");
         var indirectArgsBuffer = renderGraph.GetBuffer(5, target: GraphicsBuffer.Target.IndirectArguments);
@@ -366,7 +371,12 @@ public class TerrainSystem
                     pass.SetInt(command, "_PassOffset", 6 * index);
                     pass.SetInt(command, "_TotalPassCount", totalPassCount);
 
-                    pass.SetVectorArray(command, "_CullingPlanes", cullingPlanes);
+                    var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
+                    for(var i = 0; i < cullingPlanes.Count; i++)
+                        cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
+
+                    pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                    ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                     // Snap to quad-sized increments on largest cell
                     var position = terrain.GetPosition() - viewPosition;
@@ -374,14 +384,12 @@ public class TerrainSystem
                     pass.SetVector(command, "_TerrainPositionOffset", positionOffset);
 
                     pass.SetFloat(command, "_EdgeLength", (float)settings.EdgeLength * settings.PatchVertices);
-                    pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Length);
+                    pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
 
                     pass.SetFloat(command, "_InputScale", terrainData.size.y);
                     pass.SetFloat(command, "_InputOffset", position.y);
 
                     pass.SetInt(command, "_MipCount", Texture2DExtensions.MipCount(terrainData.heightmapResolution) - 1);
-
-                    ArrayPool<Vector4>.Release(cullingPlanes);
                 });
             }
         }
@@ -414,10 +422,28 @@ public class TerrainSystem
 
         ListPool<RTHandle>.Release(tempIds);
 
-        renderGraph.ResourceMap.SetRenderPassData(new TerrainRenderCullResult(indirectArgsBuffer, patchDataBuffer));
+        return new(indirectArgsBuffer, patchDataBuffer);
     }
 
-    public void Render(string passName, Vector3 viewPosititon, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, Vector4[] cullingPlanes, ICommonPassData commonPassData)
+    public void CullShadow(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
+    {
+        if (terrain == null)
+            return;
+
+        var cullingResult = Cull(viewPosition, cullingPlanes, commonPassData);
+        renderGraph.ResourceMap.SetRenderPassData(new TerrainShadowCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer));
+    }
+
+    public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
+    {
+        if (terrain == null)
+            return;
+
+        var cullingResult = Cull(viewPosition, cullingPlanes, commonPassData);
+        renderGraph.ResourceMap.SetRenderPassData(new TerrainRenderCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer));
+    }
+
+    public void Render(string passName, Vector3 viewPosititon, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
     {
         if (terrain == null)
             return;
@@ -477,8 +503,13 @@ public class TerrainSystem
                 var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainData.heightmapResolution);
                 pass.SetVector(command, "_TerrainRemapHalfTexel", terrainRemapHalfTexel);
 
-                pass.SetInt(command, "_CullingPlanesCount", 6);
-                pass.SetVectorArray(command, "_CullingPlanes", cullingPlanes);
+                pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
+                var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
+                for (var i = 0; i < cullingPlanes.Count; i++)
+                    cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
+
+                pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                 pass.SetTexture(command, "AlbedoSmoothness", diffuseArray);
                 pass.SetTexture(command, "Normal", normalMapArray);
@@ -489,6 +520,78 @@ public class TerrainSystem
                 pass.SetFloat(command, "IdMapResolution", terrainData.alphamapResolution);
 
                 pass.SetVector(command, "TerrainSize", terrain.terrainData.size);
+            });
+        }
+    }
+
+    public void RenderShadow(Vector3 viewPosition, RTHandle shadow, CullingPlanes cullingPlanes, ICommonPassData commonPassData, Matrix4x4 worldToClip, int cascadeIndex, float bias, float slopeBias)
+    {
+        if (terrain == null)
+            return;
+
+        var material = terrain.materialTemplate;
+        Assert.IsNotNull(material, "Terrain Material is null");
+
+        var passIndex = material.FindPass("ShadowCaster");
+        Assert.IsFalse(passIndex == -1, "Terrain Material has no ShadowCaster Pass");
+
+        var size = terrainData.size;
+        var position = terrain.GetPosition() - viewPosition;
+        var passData = renderGraph.ResourceMap.GetRenderPassData<TerrainShadowCullResult>();
+
+        using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
+        {
+            pass.Initialize(material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, null, bias, slopeBias, false);
+
+            pass.WriteTexture(shadow);
+            pass.DepthSlice = cascadeIndex;
+
+            pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
+            pass.ReadTexture("_TerrainHeightmapTexture", heightmap);
+
+            commonPassData.SetInputs(pass);
+
+            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+            {
+                commonPassData.SetProperties(pass, command);
+
+                pass.SetTexture(command, "_TerrainHolesTexture", terrainData.holesTexture);
+
+                pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
+                pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
+                pass.SetFloat(command, "_RcpVerticesPerEdge", 1f / VerticesPerTileEdge);
+                pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
+
+                var scaleOffset = new Vector4(size.x / settings.CellCount, size.z / settings.CellCount, position.x, position.z);
+                pass.SetVector(command, "_PatchScaleOffset", scaleOffset);
+                pass.SetVector(command, "_SpacingScale", new Vector4(size.x / settings.CellCount / settings.PatchVertices, size.z / settings.CellCount / settings.PatchVertices, position.x, position.z));
+                pass.SetFloat(command, "_PatchUvScale", 1f / settings.CellCount);
+
+                pass.SetFloat(command, "_HeightUvScale", 1f / settings.CellCount * (1.0f - 1f / terrainData.heightmapResolution));
+                pass.SetFloat(command, "_HeightUvOffset", 0.5f / terrainData.heightmapResolution);
+
+                pass.SetFloat(command, "_MaxLod", Mathf.Log(settings.CellCount, 2));
+
+                // These may be needed in other passes
+                pass.SetFloat(command, "_TerrainHeightScale", size.y);
+                pass.SetFloat(command, "_TerrainHeightOffset", position.y);
+
+                pass.SetVector(command, "_TerrainScaleOffset", new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z));
+
+                var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainData.heightmapResolution);
+                pass.SetVector(command, "_TerrainRemapHalfTexel", terrainRemapHalfTexel);
+
+                pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
+
+                var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
+                for (var i = 0; i < cullingPlanes.Count; i++)
+                    cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
+
+                pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                ArrayPool<Vector4>.Release(cullingPlanesArray);
+
+                pass.SetVector(command, "TerrainSize", terrain.terrainData.size);
+                pass.SetMatrix(command, "_WorldToClip", worldToClip);
             });
         }
     }
@@ -504,6 +607,27 @@ public struct TerrainRenderCullResult : IRenderPassData
     public BufferHandle PatchDataBuffer { get; }
 
     public TerrainRenderCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
+    {
+        IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
+        PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
+    }
+
+    public void SetInputs(RenderPass pass)
+    {
+        pass.ReadBuffer("_PatchData", PatchDataBuffer);
+    }
+
+    public void SetProperties(RenderPass pass, CommandBuffer command)
+    {
+    }
+}
+
+public struct TerrainShadowCullResult : IRenderPassData
+{
+    public BufferHandle IndirectArgsBuffer { get; }
+    public BufferHandle PatchDataBuffer { get; }
+
+    public TerrainShadowCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
     {
         IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
         PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));

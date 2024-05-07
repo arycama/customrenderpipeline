@@ -286,7 +286,7 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured)
+        public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None)
         {
             Assert.IsTrue(count > 0);
             Assert.IsTrue(stride > 0);
@@ -305,6 +305,9 @@ namespace Arycama.CustomRenderPipeline
                 if (handle.Stride != stride)
                     continue;
 
+                if (handle.UsageFlags != usageFlags)
+                    continue;
+
                 if (handle.Target.HasFlag(GraphicsBuffer.Target.Constant))
                 {
                     // Constant buffers must have exact size
@@ -321,7 +324,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // If no handle was found, create a new one, and assign it as one to be created. 
-            var result = new BufferHandle(target, count, stride);
+            var result = new BufferHandle(target, count, stride, usageFlags);
             result.Size = count * stride;
             bufferHandlesToCreate.Add(result);
             usedBufferHandles.Add(result);
