@@ -3,6 +3,7 @@
 #include "../Lighting.hlsl"
 #include "../CloudCommon.hlsl"
 #include "../Color.hlsl"
+#include "../Random.hlsl"
 #include "../Temporal.hlsl"
 #include "../VolumetricLight.hlsl"
 
@@ -195,12 +196,12 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 {
 	#ifdef REFLECTION_PROBE
 		float3 rd = MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
-		float2 offsets = InterleavedGradientNoise(position.xy, 0.0);//float2(PlusNoise(position.xy), 0.5);
+		float2 offsets = InterleavedGradientNoise(position.xy, 0.0);
 	#else
 		float3 rd = worldDir;
 		float rcpRdLength = rsqrt(dot(rd, rd));
 		rd *= rcpRdLength;
-		float2 offsets = _BlueNoise2D[position.xy % 128];
+		float2 offsets = Noise2D(position.xy);
 	#endif
 	
 	float rayLength = DistanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
@@ -444,11 +445,9 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	mean /= 9.0;
 	stdDev /= 9.0;
-	//stdDev = sqrt(abs(stdDev - mean * mean));
-	//minValue = max(minValue, mean - stdDev);
-	//maxValue = min(maxValue, mean + stdDev);
-	//minValue = mean - stdDev * _ClampWindow;
-	//maxValue = mean + stdDev * _ClampWindow;
+	stdDev = sqrt(abs(stdDev - mean * mean));
+	minValue = max(minValue, mean - stdDev);
+	maxValue = min(maxValue, mean + stdDev);
 	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	

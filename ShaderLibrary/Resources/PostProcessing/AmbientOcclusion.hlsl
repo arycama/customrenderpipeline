@@ -56,7 +56,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float3 cPosV = ComputeViewspacePosition(position.xy);
 	float3 viewV = normalize(-cPosV);
 	
-	float2 noise = _BlueNoise2D[id % 128];
+	float2 noise = Noise2D(position.xy);
 	float scaling = _Radius / cPosV.z;
 	
 	float phi = noise.x * Pi;
@@ -127,6 +127,18 @@ Texture2D<float4> _Input, _History;
 Texture2D<float2> Velocity;
 float4 _HistoryScaleLimit;
 float _IsFirst;
+
+float4 UnpackSample(float4 sample)
+{
+	sample.rgb = 2.0 * sample.rgb - 1.0;
+	sample *= 1.5;
+	
+	float weight = length(sample.rgb);
+	if(weight)
+		sample /= weight;
+	
+	return sample;
+}
 
 float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {

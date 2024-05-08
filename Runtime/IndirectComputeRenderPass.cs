@@ -86,7 +86,6 @@ namespace Arycama.CustomRenderPipeline
                 command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].Item2, colorBindings[i].Item1);
 
             colorBindings.Clear();
-            screenWrite = false;
         }
 
         public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)

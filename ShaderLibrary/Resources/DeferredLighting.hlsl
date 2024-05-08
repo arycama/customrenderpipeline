@@ -47,7 +47,7 @@ Texture2D<float> CloudTransmittanceTexture;
 float4 CloudTextureScaleLimit, SkyTextureScaleLimit;
 
 float4 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
-{
+{	
 	float depth = _Depth[position.xy];
 	
 	// Sample the sky and clouds at the re-jittered coordinate, so that the final TAA resolve will not add further jitter. 
@@ -66,6 +66,10 @@ float4 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	// Note this is already jittered so we can sample directly
 	if(depth)
 		alpha = CloudTransmittanceTexture[position.xy];
+	
+	// Debugging
+	//result = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit)) * alpha;
+	//alpha = 0;
 	
 	return float4(result, alpha);
 }

@@ -1,6 +1,7 @@
 #include "../Atmosphere.hlsl"
 #include "../Common.hlsl"
 #include "../Lighting.hlsl"
+#include "../Random.hlsl"
 #include "../VolumetricLight.hlsl"
 
 #pragma kernel Compute
@@ -21,7 +22,7 @@ float3 _InputScale, _InputMax;
 [numthreads(8, 8, 8)]
 void Compute(uint3 id : SV_DispatchThreadID)
 {
-	float jitter = _BlueNoise1D[id.xy % 128];
+	float jitter = Noise1D(id.xy);
 	float3 worldDir = MultiplyVector(_PixelToWorldViewDir, float3(id.xy, 1.0), false);
 	float rcpWorldDirLength = rsqrt(dot(worldDir, worldDir));
 	worldDir *= rcpWorldDirLength;

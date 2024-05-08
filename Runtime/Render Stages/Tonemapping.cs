@@ -60,11 +60,10 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(RTHandle input, RTHandle bloom, bool isSceneView, int width, int height)
         {
-            using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Tonemapping");
+            using var pass = renderGraph.AddRenderPass<BlitToScreenPass>("Tonemapping");
             pass.Initialize(material);
             pass.ReadTexture("_MainTex", input);
             pass.ReadTexture("_Bloom", bloom);
-            pass.WriteScreen();
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {

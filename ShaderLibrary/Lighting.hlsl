@@ -487,16 +487,16 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 		{
 			float2 coord = floor(center) + 0.5 + float2(x, y);
 			float shadow = shadowPosition.z >= _DirectionalShadows[float3(coord, light.shadowIndex + cascade)];
-			float2 weights = saturate(1.0 - abs(center - coord) / filterSize);
+			//float2 weights = saturate(1.0 - abs(center - coord) / filterSize);
 			
 			// Parabola
-			weights = saturate(1.0 - (SqrLength(center - coord) / Sq(filterSize)));
+			//weights = saturate(1.0 - (SqrLength(center - coord) / Sq(filterSize)));
 			
 			// Smoothstep
-			weights = smoothstep(filterSize, 0, abs(center - coord));
+			//weights = smoothstep(filterSize, 0, abs(center - coord));
 			
 			// Gaussian
-			weights = exp2(-ShadowFilterSigma * Sq((center - coord) * data.xy));
+			float2 weights = exp2(-ShadowFilterSigma * Sq((center - coord) * data.xy));
 			
 			// cos?
 			//weights = 0.5 * cos(Pi * saturate(abs(center - coord) / filterSize)) + 0.5;
@@ -509,7 +509,7 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 		}
 	}
 	
-	return sum / weightSum;
+	return weightSum ? sum / weightSum : 1.0;
 }
 
 #ifdef __INTELLISENSE__
@@ -561,9 +561,8 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	float3 bkD = input.translucency * Edss;
 	
 	// TODO: Need to handle non screenspace reflections, eg for transparent
-	//float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
 	#ifdef SCREENSPACE_REFLECTIONS_ON
-		float3 radiance = ScreenSpaceReflections[input.pixelPosition];
+		float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
 	#else
 		float3 iblN = input.normal;
 		float3 R = reflect(-V, input.normal);
@@ -590,7 +589,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	#endif
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-		float3 irradiance = ScreenSpaceGlobalIllumination[input.pixelPosition];
+		float3 irradiance = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit));
 	#else
 		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
 	#endif

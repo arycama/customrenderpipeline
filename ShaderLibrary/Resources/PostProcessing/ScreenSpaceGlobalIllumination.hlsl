@@ -131,6 +131,7 @@ float3 HierarchicalRaymarch(float3 origin, float3 direction, bool is_mirror, flo
 }
 
 float ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float2 screen_size, float depth_buffer_thickness) {
+    
     // Reject hits outside the view frustum
     if (any(hit.xy < 0) || any(hit.xy > 1)) {
         return 0;
@@ -162,29 +163,28 @@ float ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float
     // Fade out hits near the screen borders
     float2 fov = 0.05 * float2(screen_size.y / screen_size.x, 1);
     float2 border = smoothstep(0, fov, hit.xy) * (1 - smoothstep(1 - fov, 1, hit.xy));
-    float vignette = border.x * border.y;
+    float vignette = 1;//border.x * border.y;
 
     // We accept all hits that are within a reasonable minimum distance below the surface.
     // Add constant in linear space to avoid growing of the reflections toward the reflected objects.
     //float confidence = 1 - smoothstep(0, depth_buffer_thickness, distance);
-    float confidence = 1 - step(depth_buffer_thickness, distance);
-    confidence *= confidence;
-
-    return vignette * confidence;
+    return step(distance, depth_buffer_thickness);
 }
 
-float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+struct TraceResult
+{
+    float3 color : SV_Target0;
+    float4 hit : SV_Target1;
+};
+
+TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	float depth = _HiZDepth[position.xy];
-	float2 u = _BlueNoise2D[position.xy % 128];
-	float4 normalRoughness = _NormalRoughness[position.xy];
-	
-	float3 V = -worldDir;
-	float rcpVLength = rsqrt(dot(V, V));
-	V *= rcpVLength;
-	
-	float3 N = UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(normalRoughness.xyz) - 1.0);
-	float3 L = SampleHemisphereCosine(u.x, u.y, N);
+    
+	float3 N = LoadWorldSpaceNormal(position.xy);
+    float3 noise3DCosine = Noise3DCosine(position.xy);
+	float3 L = ShortestArcQuaternion(N, noise3DCosine);
+    float rcpPdf = rcp(noise3DCosine.z);
     
     // We start tracing from the center of the current pixel, and do so up to the far plane.
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
@@ -199,47 +199,126 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	bool validHit;
 	float3 hit = HierarchicalRaymarch(rayOrigin, rayDir, false, _ScaledResolution.xy, 0, 0, _MaxSteps, validHit);
 	
-	float confidence = validHit ? ValidateHit(hit, uv, L, _ScaledResolution.xy, _Thickness * 100) * _Intensity : 0.0;
+	float confidence = validHit ? ValidateHit(hit, uv, L, _ScaledResolution.xy, _Thickness * 100) : 0.0;
 
+    float2 hitPixel = confidence > 0.0 ? floor(hit.xy * _ScaledResolution.xy) + 0.5 : 0.0;
+    
 	float3 result = 0.0;
 	if (confidence > 0.0)
 	{
-		float2 hitPixel = hit.xy * _ScaledResolution.xy;
 		float2 velocity = Velocity[hitPixel];
 		
 		// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
 		// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
 		result = PreviousFrame.Sample(_LinearClampSampler, ClampScaleTextureUv(hit.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit)) * _PreviousToCurrentExposure; 
 	}
-	
-	if(confidence >= 1.0)
-		return result;
-	
-	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
-	bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
-	float3 irradiance = AmbientLight(bentNormalOcclusion.xyz, bentNormalOcclusion.a);
+    else
+    {
+        rcpPdf = 0.0;
+    }
     
-    // TODO: output weight and use to weigh temporal accumulation
-	return lerp(irradiance, result, confidence);
+    float hitDepth = _HiZDepth[hitPixel];
+    float3 worldHit = PixelToWorld(float3(hitPixel, hitDepth));
+    
+    TraceResult output;
+    output.color = result;
+    output.hit = float4(worldHit, rcpPdf);
+    return output;
 }
 
-Texture2D<float3> _Input, _History;
+Texture2D<float4> _HitResult;
+Texture2D<float4> _Input, _History;
+Texture2D<float> _Depth;
 float4 _HistoryScaleLimit;
 float _IsFirst;
 
-float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float2 VogelDiskSample(int sampleIndex, int samplesCount, float phi)
+{
+  float GoldenAngle = 2.4f;
+
+  float r = sqrt(sampleIndex + 0.5f) / sqrt(samplesCount);
+  float theta = sampleIndex * GoldenAngle + phi;
+
+  float sine, cosine;
+  sincos(theta, sine, cosine);
+  
+  return float2(r * cosine, r * sine);
+}
+
+float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+{
+	float3 N = LoadWorldSpaceNormal(position.xy);
+	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
+    float phi = Noise1D(position.xy) * TwoPi;
+    
+    int sampleCount = 16;
+    float4 result = 0.0;
+    for(int i = 0; i < sampleCount; i++)
+	{
+        float size = 16;
+        float2 u = VogelDiskSample(i, sampleCount, phi) * size;
+        
+		float2 coord = floor(position.xy + u) + 0.5;
+        if(any(coord < 0.0 || coord > _ScaledResolution.xy - 1.0))
+            continue;
+            
+		float4 rayData = _HitResult[coord];
+        if(rayData.w <= 0.0)
+            continue;
+        
+		float3 L = normalize(rayData.xyz - worldPosition);
+        float weight = dot(N, L);
+        float weightOverPdf = weight * rayData.w;
+            
+		if(weight <= 0.0)
+			continue;
+            
+		float3 color = _Input[coord].rgb;
+		result.rgb += weightOverPdf * color;
+        result.a += weightOverPdf;
+	}
+
+    result /= sampleCount;
+    result = RemoveNaN(result);
+    return result;
+}
+
+struct TemporalOutput
+{
+    float4 result : SV_Target0;
+    float3 screenResult : SV_Target1;
+};
+
+float4 PackSample(float4 samp)
+{
+    samp.xyz *= samp.w;
+    return samp;
+}
+
+float4 UnpackSample(float4 samp)
+{
+    if(samp.w)
+        samp.xyz /= samp.w;
+    
+    samp.rgb = RgbToYCoCgFastTonemap(samp.rgb);
+    
+    return samp;
+}
+
+TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	// Neighborhood clamp
 	int2 offsets[8] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(1, 0), int2(-1, 1), int2(0, 1), int2(1, 1)};
-	float3 minValue, maxValue, result, mean, stdDev;
-	minValue = maxValue = mean = result = RgbToYCoCgFastTonemap(_Input[position.xy]);
+	float4 minValue, maxValue, result, mean, stdDev;
+
+	minValue = maxValue = mean = result = UnpackSample(_Input[position.xy]);
 	stdDev = result * result;
 	result *= _CenterBoxFilterWeight;
 	
 	[unroll]
 	for (int i = 0; i < 4; i++)
 	{
-		float3 color = RgbToYCoCgFastTonemap(_Input[position.xy + offsets[i]]);
+		float4 color = UnpackSample(_Input[position.xy + offsets[i]]);
 		result += color * _BoxFilterWeights0[i];
 		minValue = min(minValue, color);
 		maxValue = max(maxValue, color);
@@ -250,7 +329,7 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	[unroll]
 	for (i = 0; i < 4; i++)
 	{
-		float3 color = RgbToYCoCgFastTonemap(_Input[position.xy + offsets[i + 4]]);
+		float4 color = UnpackSample(_Input[position.xy + offsets[i + 4]]);
 		result += color * _BoxFilterWeights1[i];
 		minValue = min(minValue, color);
 		maxValue = max(maxValue, color);
@@ -259,12 +338,24 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	}
 	
 	float2 historyUv = uv - Velocity[position.xy];
-	float3 history = RgbToYCoCgFastTonemap(_History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw)) * _PreviousToCurrentExposure);
+	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
+    history.rgb *= _PreviousToCurrentExposure;
+    history.rgb = RgbToYCoCgFastTonemap(history.rgb);
 	
-	history = ClipToAABB(history, result, minValue, maxValue);
-	
+	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
+	history.a = clamp(history.a, minValue.a, maxValue.a);
+    
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
-	
-	return RemoveNaN(YCoCgToRgbFastTonemapInverse(result));
+    
+    float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
+    bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
+    float3 ambient = AmbientLight(bentNormalOcclusion.xyz, bentNormalOcclusion.w);
+    
+    result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
+    
+    TemporalOutput output;
+    output.result = result;
+    output.screenResult = lerp(ambient, result.rgb, saturate(result.a) * _Intensity);
+    return output;
 }

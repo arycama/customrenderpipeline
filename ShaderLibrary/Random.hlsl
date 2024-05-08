@@ -137,37 +137,36 @@ float PlusNoise(float2 p, float frameIndex)
 	return frac(0.2 * frameIndex * goldenRatio + (0.2 * p.x + (0.6 * p.y + 0.1))); // Unbiased version
 }
 
-#define XE_HILBERT_LEVEL    6U
-#define XE_HILBERT_WIDTH    ( (1U << XE_HILBERT_LEVEL) )
-#define XE_HILBERT_AREA     ( XE_HILBERT_WIDTH * XE_HILBERT_WIDTH )
+Texture2D<float> _BlueNoise1D;
+Texture2D<float2> _BlueNoise2D, _BlueNoise2DUnit;
+Texture2D<float3> _BlueNoise3D, _BlueNoise3DUnit, _BlueNoise3DCosine;
 
-uint HilbertIndex( uint posX, uint posY )
-{   
-    uint index = 0U;
-    for( uint curLevel = XE_HILBERT_WIDTH/2U; curLevel > 0U; curLevel /= 2U )
-    {
-        uint regionX = ( posX & curLevel ) > 0U;
-        uint regionY = ( posY & curLevel ) > 0U;
-        index += curLevel * curLevel * ( (3U * regionX) ^ regionY);
-        if( regionY == 0U )
-        {
-            if( regionX == 1U )
-            {
-                posX = uint( (XE_HILBERT_WIDTH - 1U) ) - posX;
-                posY = uint( (XE_HILBERT_WIDTH - 1U) ) - posY;
-            }
-
-            uint temp = posX;
-            posX = posY;
-            posY = temp;
-        }
-    }
-    return index;
+float Noise1D(uint2 coord)
+{
+	return _BlueNoise1D[coord % 128];
 }
 
-float2 SpatioTemporalNoise( uint2 pixCoord, uint temporalIndex )    // without TAA, temporalIndex is always 0
+float2 Noise2D(uint2 coord)
 {
-    float2 noise;
-    uint index = HilbertIndex( pixCoord.x, pixCoord.y );
-    return float2(InterleavedGradientNoise(pixCoord, temporalIndex), InterleavedGradientNoise(pixCoord, index));
+	return _BlueNoise2D[coord % 128];
+}
+
+float2 Noise2DUnit(uint2 coord)
+{
+	return _BlueNoise2DUnit[coord % 128];
+}
+
+float3 Noise3D(uint2 coord)
+{
+	return _BlueNoise3D[coord % 128];
+}
+
+float3 Noise3DUnit(uint2 coord)
+{
+	return _BlueNoise3DUnit[coord % 128];
+}
+
+float3 Noise3DCosine(uint2 coord)
+{
+	return 2.0 * _BlueNoise3DCosine[coord % 128] - 1.0;
 }

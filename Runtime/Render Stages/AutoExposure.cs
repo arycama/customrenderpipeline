@@ -1,6 +1,7 @@
 ﻿using GluonGui.Dialog;
 using System;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -118,6 +119,8 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
+        private float previousTime;
+
         public void Render(RTHandle input, int width, int height)
         {
             var exposurePixels = exposureTexture.GetRawTextureData<float>();
@@ -157,7 +160,12 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                 });
 
-                data.deltaTime = Time.deltaTime;
+                // TODO: Put this in a common place, eg main pipeline
+                var time = EditorApplication.isPlaying && !EditorApplication.isPaused ? Time.time : (float)EditorApplication.timeSinceStartup;
+                var deltaTime = time - previousTime;
+                previousTime = time;
+
+                data.deltaTime = deltaTime;
                 data.minEv = settings.MinEv;
                 data.maxEv = settings.MaxEv;
                 data.adaptationSpeed = settings.AdaptationSpeed;

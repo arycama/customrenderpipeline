@@ -93,6 +93,8 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
+            renderGraph.ResourceMap.SetRenderPassData(new Result(current));
+
             var newBentNormalOcclusion = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Resolve"))
             {
@@ -112,6 +114,26 @@ namespace Arycama.CustomRenderPipeline
             }
 
             bentNormalOcclusion = newBentNormalOcclusion;
+        }
+
+        // Only used for debugging as the result is combined into the bent normal texture
+        public struct Result : IRenderPassData
+        {
+            public RTHandle AmbientOcclusion { get; }
+
+            public Result(RTHandle ambientOcclusion)
+            {
+                AmbientOcclusion = ambientOcclusion ?? throw new ArgumentNullException(nameof(ambientOcclusion));
+            }
+
+            public void SetInputs(RenderPass pass)
+            {
+                pass.ReadTexture("AmbientOcclusion", AmbientOcclusion);
+            }
+
+            public void SetProperties(RenderPass pass, CommandBuffer command)
+            {
+            }
         }
 
         [Serializable]

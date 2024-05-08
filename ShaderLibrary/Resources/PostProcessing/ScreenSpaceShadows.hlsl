@@ -174,7 +174,6 @@ float ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float depth = _HiZDepth[position.xy];
-	float2 u = _BlueNoise2D[position.xy % 128];
 	
 	float3 V = -worldDir;
 	float rcpVLength = rsqrt(dot(V, V));

@@ -1,6 +1,7 @@
 #include "../../Common.hlsl"
 #include "../../Color.hlsl"
 #include "../../Packing.hlsl"
+#include "../../Random.hlsl"
 #include "../../Samplers.hlsl"
 #include "../../Temporal.hlsl"
 #include "../../Lighting.hlsl"
@@ -159,6 +160,7 @@ float3 HierarchicalRaymarch(float3 origin, float3 direction, bool is_mirror, flo
 }
 
 float ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float2 screen_size, float depth_buffer_thickness) {
+    
     // Reject hits outside the view frustum
     if (any(hit.xy < 0) || any(hit.xy > 1)) {
         return 0;
@@ -190,7 +192,7 @@ float ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float
     // Fade out hits near the screen borders
     float2 fov = 0.05 * float2(screen_size.y / screen_size.x, 1);
     float2 border = smoothstep(0, fov, hit.xy) * (1 - smoothstep(1 - fov, 1, hit.xy));
-    float vignette = border.x * border.y;
+    float vignette = 1;//border.x * border.y;
 
     // We accept all hits that are within a reasonable minimum distance below the surface.
     // Add constant in linear space to avoid growing of the reflections toward the reflected objects.
@@ -204,7 +206,7 @@ float ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float depth = _HiZDepth[position.xy];
-	float2 u = _BlueNoise2D[position.xy % 128];
+	float2 u = Noise2D(position.xy);
 	float4 normalRoughness = _NormalRoughness[position.xy];
 	
 	float3 V = -worldDir;

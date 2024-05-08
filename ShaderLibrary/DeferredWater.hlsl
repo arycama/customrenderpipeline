@@ -7,6 +7,7 @@
 #include "Common.hlsl"
 #include "GBuffer.hlsl"
 #include "Lighting.hlsl"
+#include "Random.hlsl"
 #include "WaterCommon.hlsl"
 
 Texture2D<float4> _WaterNormalFoam;
@@ -110,7 +111,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		refractedPositionSS = position.xy;
 	}
 	
-	float2 noise = _BlueNoise2D[position.xy % 128];
+	float2 noise = Noise2D(position.xy);
 	
 	// Select random channel
 	float3 channelMask = floor(noise.y * 3.0) == float3(0.0, 1.0, 2.0);

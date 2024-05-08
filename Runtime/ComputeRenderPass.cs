@@ -132,7 +132,6 @@ namespace Arycama.CustomRenderPipeline
             }
 
             colorBindings.Clear();
-            screenWrite = false;
         }
     }
 }

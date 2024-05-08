@@ -64,7 +64,9 @@ public class DeferredLighting
 
             // Only for debugging 
             pass.AddRenderPassData<ScreenSpaceReflectionResult>();
-
+            pass.AddRenderPassData<ScreenSpaceShadows.Result>();
+            pass.AddRenderPassData<ScreenSpaceGlobalIllumination.Result>();
+            pass.AddRenderPassData<AmbientOcclusion.Result>();
         }
     }
 

@@ -49,7 +49,6 @@ namespace Arycama.CustomRenderPipeline
         protected override void SetupTargets(CommandBuffer command)
         {
             int width = 0, height = 0, targetWidth = 0, targetHeight = 0;
-            var isScreen = false;
 
             var targets = ArrayPool<RenderTargetIdentifier>.Get(colorTargets.Count);
             var loads = ArrayPool<RenderBufferLoadAction>.Get(colorTargets.Count);
@@ -57,12 +56,7 @@ namespace Arycama.CustomRenderPipeline
 
             if (depthBuffer.Item1 == null)
             {
-                if (colorTargets.Count == 0)
-                {
-                    isScreen = true;
-                    command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
-                }
-                else if (colorTargets.Count == 1)
+                if (colorTargets.Count == 1)
                 {
                     width = colorTargets[0].Item1.Width;
                     height = colorTargets[0].Item1.Height;
@@ -122,8 +116,7 @@ namespace Arycama.CustomRenderPipeline
             if (clearFlags != RTClearFlags.None)
                 command.ClearRenderTarget(clearFlags, clearColor, clearDepth, (uint)clearStencil);
 
-            if (!isScreen)
-                command.SetViewport(new Rect(0, 0, width, height));
+            command.SetViewport(new Rect(0, 0, width, height));
 
             ArrayPool<RenderTargetIdentifier>.Release(targets);
             ArrayPool<RenderBufferLoadAction>.Release(loads);

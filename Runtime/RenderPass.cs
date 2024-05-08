@@ -11,8 +11,6 @@ namespace Arycama.CustomRenderPipeline
     {
         protected RenderGraphBuilder renderGraphBuilder;
 
-        protected bool screenWrite;
-
         // TODO: Convert to handles and remove
         private readonly List<(int, RTHandle, int, RenderTextureSubElement)> readTextures = new();
         private readonly List<(string, BufferHandle)> readBuffers = new();
@@ -63,10 +61,6 @@ namespace Arycama.CustomRenderPipeline
             ReadTexture(Shader.PropertyToID(propertyName), texture, 0, subElement);
         }
 
-        public void WriteScreen()
-        {
-            screenWrite = true;
-        }
 
         public void ReadBuffer(string propertyName, BufferHandle buffer)
         {

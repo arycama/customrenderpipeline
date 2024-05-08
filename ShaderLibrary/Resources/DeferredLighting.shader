@@ -2,15 +2,15 @@ Shader "Hidden/Deferred Lighting"
 {
     SubShader
     {
-		// Additive blending as we render into the emissive texture which is cleared to black
-		Blend One One
-
 		Cull Off
 		ZWrite Off
 		ZTest Off
 
         Pass
         {
+            // Additive blending as we render into the emissive texture which is cleared to black
+		    Blend One One
+
 			Name "Deferred Lighting"
 
 			// Render wherever there is either a non-background pixel (Bit 0 == 1) or a water pixel(bit2 == 1)

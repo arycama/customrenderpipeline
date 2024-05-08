@@ -125,7 +125,7 @@ namespace Arycama.CustomRenderPipeline
             var texelSizes = patchSizes / settings.Resolution;
 
             // TODO: Put this in a common place, eg main pipeline
-            var time = EditorApplication.isPlaying ? Time.time : (float)EditorApplication.timeSinceStartup;
+            var time = EditorApplication.isPlaying && !EditorApplication.isPaused ? Time.time : (float)EditorApplication.timeSinceStartup;
             var deltaTime = time - previousTime;
             previousTime = time;
 

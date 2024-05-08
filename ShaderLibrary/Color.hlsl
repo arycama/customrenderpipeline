@@ -3,11 +3,6 @@
 
 #include "Math.hlsl"
 
-float3 RemoveNaN(float3 rgb)
-{
-	return isnan(rgb) ? 0.0 : rgb;
-}
-
 // D65 illuminant in xy space
 static const float2 D65xy = float2(0.31272, 0.32903);
 

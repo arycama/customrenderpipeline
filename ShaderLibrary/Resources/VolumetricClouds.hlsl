@@ -1,6 +1,7 @@
 #include "../CloudCommon.hlsl"
 #include "../Color.hlsl"
 #include "../Temporal.hlsl"
+#include "../Random.hlsl"
 
 struct FragmentOutput
 {
@@ -23,14 +24,14 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float _ViewHeight = distance(_PlanetCenter, P);
 		float3 N = normalize(P - _PlanetCenter);
 		float cosViewAngle = dot(N, rd);
-		float2 offsets = 0.5;//InterleavedGradientNoise(position.xy, 0); // _BlueNoise1D[uint2(position.xy) % 128];
+		float2 offsets = 0.5;
 	#else
 		float3 P = 0.0;
 		float3 rd = worldDir;
 		float rcpRdLength = rsqrt(dot(rd, rd));
 		rd *= rcpRdLength;
 		float cosViewAngle = rd.y;
-		float2 offsets = _BlueNoise2D[uint2(position.xy) % 128];
+		float2 offsets = Noise2D(position.xy);
 	#endif
 	
 	FragmentOutput output;

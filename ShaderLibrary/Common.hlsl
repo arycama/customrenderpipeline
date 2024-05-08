@@ -38,8 +38,7 @@ Buffer<uint> _LightClusterList;
 StructuredBuffer<DirectionalLight> _DirectionalLights;
 StructuredBuffer<matrix> _DirectionalMatrices;
 StructuredBuffer<PointLight> _PointLights;
-Texture2D<float> _BlueNoise1D, _CameraDepth;
-Texture2D<float2> _BlueNoise2D;
+Texture2D<float> _CameraDepth;
 Texture2DArray<float> _DirectionalShadows;
 Texture3D<uint2> _LightClusterIndices;
 TextureCubeArray<float> _PointShadows;
@@ -186,9 +185,19 @@ float2 ApplyScaleOffset(float2 uv, float4 scaleOffset)
 	return uv * scaleOffset.xy + scaleOffset.zw;
 }
 
+float Linear01Depth(float depth)
+{
+	return rcp((_Far * rcp(_Near) - 1.0) * depth + 1.0);
+}
+
 float LinearEyeDepth(float depth)
 {
 	return rcp(_LinearDepthScale * depth + _LinearDepthOffset);
+}
+
+float Linear01ToDeviceDepth(float depth)
+{
+	return _Near * (1.0 - depth) * rcp(depth * (_Far - _Near));
 }
 
 float EyeToDeviceDepth(float eyeDepth)
@@ -319,11 +328,6 @@ float3 Remap01ToHalfTexelCoord(float3 coord, float3 size)
 	const float3 len = 1.0 - rcp(size);
 	return coord * len + start;
 }
-// Converts a value between 0 and 1 to a device depth value where 0 is far and 1 is near in both cases.
-float Linear01ToDeviceDepth(float z)
-{
-	return _Near * (1.0 - z) / (_Near + z * (_Far - _Near));
-}
 
 float SafeDiv(float numer, float denom)
 {
@@ -332,6 +336,11 @@ float SafeDiv(float numer, float denom)
 
 bool1 IsInfOrNaN(float1 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
 bool3 IsInfOrNaN(float3 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
+bool4 IsInfOrNaN(float4 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
+
+float1 RemoveNaN(float1 x) { return IsInfOrNaN(x) ? 0.0 : x; }
+float3 RemoveNaN(float3 x) { return IsInfOrNaN(x) ? 0.0 : x; }
+float4 RemoveNaN(float4 x) { return IsInfOrNaN(x) ? 0.0 : x; }
 
 const static float Sensitivity = 100.0;
 const static float LensAttenuation = 0.65; // q
