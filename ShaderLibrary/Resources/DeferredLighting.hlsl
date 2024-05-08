@@ -33,43 +33,48 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 
 	float3 result = GetLighting(lightingInput);
 	
-	// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
-	float rcpVLength = rsqrt(dot(worldDir, worldDir));
-	float3 V = -worldDir * rcpVLength;
-	result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
+
 	
 	return result;
 }
 
 Texture2D<float4> CloudTexture;
-Texture2D<float3> SkyTexture;
+Texture2D<float3> SkyTexture, _Input;
 Texture2D<float> CloudTransmittanceTexture;
 float4 CloudTextureScaleLimit, SkyTextureScaleLimit;
 
-float4 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {	
 	float depth = _Depth[position.xy];
+	
+	float3 result = 0.0;
+	if(depth != 0.0)
+	{
+		float cloudTransmittance = CloudTransmittanceTexture[position.xy];
+		
+		if(cloudTransmittance)
+		{
+			// We only want to blend with background if depth is not zero, eg a filled pixel (Could also use stecil, but we already have to sample depth
+			// Though that would allow us to save a depth sample+blend for non-filled pixels, hrm
+			result = _Input[position.xy] * cloudTransmittance;
+	
+			float eyeDepth = LinearEyeDepth(depth);
+	
+			// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
+			float rcpVLength = rsqrt(dot(worldDir, worldDir));
+			float3 V = -worldDir * rcpVLength;
+			result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
+		}
+	}
 	
 	// Sample the sky and clouds at the re-jittered coordinate, so that the final TAA resolve will not add further jitter. 
 	// (Should we also do this for vol lighting?)
 	
 	// TODO: Would be better to use some kind of filter instead of bilinear
-	float3 result = CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit));
+	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit));
 	result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
 	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
 	
-	float alpha = 0.0;
-	
-	// We only want to blend with background if depth is not zero, eg a filled pixel (Could also use stecil, but we already have to sample depth
-	// Though that would allow us to save a depth sample+blend for non-filled pixels, hrm
-	
 	// Note this is already jittered so we can sample directly
-	if(depth)
-		alpha = CloudTransmittanceTexture[position.xy];
-	
-	// Debugging
-	//result = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit)) * alpha;
-	//alpha = 0;
-	
-	return float4(result, alpha);
+	return result;
 }

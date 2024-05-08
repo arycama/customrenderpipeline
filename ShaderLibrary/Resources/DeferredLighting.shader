@@ -36,8 +36,6 @@ Shader "Hidden/Deferred Lighting"
         {
 			Name "Deferred Combine"
 
-			Blend One SrcAlpha
-
             HLSLPROGRAM
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
