@@ -12,6 +12,9 @@ public class ScreenSpaceGlobalIllumination
         [field: SerializeField, Range(0.0f, 1.0f)] public float Intensity { get; private set; } = 1.0f;
         [field: SerializeField, Range(1, 128)] public int MaxSamples { get; private set; } = 32;
         [field: SerializeField, Range(0f, 1.0f)] public float Thickness { get; private set; } = 0.1f;
+        [field: SerializeField, Range(0.0f, 179.0f)] public float ConeAngle { get; private set; } = (1.0f / Mathf.PI) * Mathf.Rad2Deg;
+        [field: SerializeField, Range(1, 32)] public int ResolveSamples { get; private set; } = 8;
+        [field: SerializeField, Min(0.0f)] public float ResolveSize { get; private set; } = 16.0f;
     }
 
     private readonly RenderGraph renderGraph;
@@ -32,7 +35,7 @@ public class ScreenSpaceGlobalIllumination
     public void Render(RTHandle depth, int width, int height, ICommonPassData commonPassData, Camera camera, RTHandle previousFrame, RTHandle velocity, RTHandle normalRoughness, RTHandle hiZDepth, RTHandle bentNormalOcclusion)
     {
         var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
+        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Trace"))
         {
@@ -62,6 +65,10 @@ public class ScreenSpaceGlobalIllumination
                 pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
                 pass.SetFloat(command, "_Thickness", settings.Thickness);
                 pass.SetVector(command, "_PreviousColorScaleLimit", previousFrame.ScaleLimit2D);
+
+                var tanHalfFov = Mathf.Tan(0.5f * camera.fieldOfView * Mathf.Deg2Rad);
+                pass.SetFloat(command, "_ConeAngle", Mathf.Tan(0.5f * settings.ConeAngle * Mathf.Deg2Rad) * (height / tanHalfFov * 0.5f));
+
                 commonPassData.SetProperties(pass, command);
             });
         }
@@ -92,6 +99,8 @@ public class ScreenSpaceGlobalIllumination
                 pass.SetFloat(command, "_Intensity", settings.Intensity);
                 pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
                 pass.SetFloat(command, "_Thickness", settings.Thickness);
+                pass.SetInt(command, "_ResolveSamples", settings.ResolveSamples);
+                pass.SetFloat(command, "_ResolveSize", settings.ResolveSize);
             });
         }
 

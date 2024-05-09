@@ -72,11 +72,6 @@ float LoadDepth(int2 current_mip_position, int current_mip)
 	return _HiZDepth.mips[current_mip][current_mip_position];
 }
 
-float3 LoadWorldSpaceNormal(int2 pixel_coordinate)
-{
-	return UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(_NormalRoughness[pixel_coordinate].xyz) - 1.0);
-}
-
 float3 ScreenSpaceToViewSpace(float3 screen_space_position)
 {
 	screen_space_position.y = (1 - screen_space_position.y);
@@ -145,12 +140,6 @@ float ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float
     float surface_z = LoadDepth(texel_coords / 2, 1);
     if (surface_z == 0.0) {
         return 0;
-    }
-
-    // We check if we hit the surface from the back, these should be rejected.
-    float3 hit_normal = LoadWorldSpaceNormal(texel_coords);
-    if (dot(hit_normal, world_space_ray_direction) > 0.0) {
-       // return 0;
     }
 
     float3 view_space_surface = ScreenSpaceToViewSpace(float3(hit.xy, surface_z));

@@ -1,4 +1,5 @@
 #include "../Atmosphere.hlsl"
+#include "../GBuffer.hlsl"
 #include "../Lighting.hlsl"
 #include "../Packing.hlsl"
 #include "../Temporal.hlsl"
@@ -18,7 +19,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float eyeDepth = LinearEyeDepth(depth);
 	
 	LightingInput lightingInput;
-	lightingInput.normal = UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(normalRoughness.xyz) - 1.0);
+	lightingInput.normal = GBufferNormal(normalRoughness);
 	lightingInput.worldPosition = worldDir * eyeDepth;
 	lightingInput.pixelPosition = position.xy;
 	lightingInput.eyeDepth = eyeDepth;
@@ -31,11 +32,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.isWater = (_Stencil[position.xy].g & 4) != 0;
 	lightingInput.uv = uv;
 
-	float3 result = GetLighting(lightingInput);
-	
-
-	
-	return result;
+	return GetLighting(lightingInput);
 }
 
 Texture2D<float4> CloudTexture;
@@ -46,6 +43,8 @@ float4 CloudTextureScaleLimit, SkyTextureScaleLimit;
 float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {	
 	float depth = _Depth[position.xy];
+	
+	//return ScreenSpaceReflections[position.xy];
 	
 	float3 result = 0.0;
 	if(depth != 0.0)

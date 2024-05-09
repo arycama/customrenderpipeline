@@ -2,6 +2,7 @@
 #define LIGHTING_INCLUDED
 
 #include "Atmosphere.hlsl"
+#include "Brdf.hlsl"
 #include "Common.hlsl"
 #include "Temporal.hlsl"
 
@@ -397,21 +398,8 @@ float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, fl
 	float invLenLV = rsqrt(2.0 * LdotV + 2.0);
 	float NdotH = (NdotL + NdotV) * invLenLV;
 	float LdotH = invLenLV * LdotV + invLenLV;
-	float3 H = (L + V) * invLenLV;
-		
-	float a2 = Sq(roughness);
-	float s = (NdotH * a2 - NdotH) * NdotH + 1.0;
-
-	float lambdaV = NdotL * sqrt((-NdotV * a2 + NdotV) * NdotV + a2);
-	float lambdaL = NdotV * sqrt((-NdotL * a2 + NdotL) * NdotL + a2);
-
-	// This function is only used for direct lighting.
-	// If roughness is 0, the probability of hitting a punctual or directional light is also 0.
-	// Therefore, we return 0. The most efficient way to do it is with a max().
-	float DV = rcp(Pi) * 0.5 * a2 * rcp(max(Sq(s) * (lambdaV + lambdaL), FloatMin));
-	float3 F = F_Schlick(f0, LdotH);
-
-	lighting += DV * F;
+	
+	lighting += GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL);
 	
 	// Multi scatter
 	lighting += GGXMultiScatter(NdotV, NdotL, perceptualRoughness, f0);

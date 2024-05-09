@@ -1,5 +1,6 @@
 #define WATER_SHADOW_ON
 
+#include "GBuffer.hlsl"
 #include "Lighting.hlsl"
 #include "Packing.hlsl"
 
@@ -16,7 +17,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float linearDepth = LinearEyeDepth(depth);
 	
 	LightingInput lightingInput;
-	lightingInput.normal = UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(normalRoughness.xyz) - 1.0);
+	lightingInput.normal = GBufferNormal(normalRoughness);
 	lightingInput.worldPosition = worldDir * linearDepth;
 	lightingInput.pixelPosition = position.xy;
 	lightingInput.eyeDepth = linearDepth;

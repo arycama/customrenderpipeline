@@ -3,6 +3,16 @@
 
 #include "Packing.hlsl"
 
+float3 GBufferNormal(float4 data)
+{
+	return UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(data.xyz) - 1.0);
+}
+
+float3 GBufferNormal(uint2 coord, Texture2D<float4> tex)
+{
+	return GBufferNormal(tex[coord]);
+}
+
 struct GBufferOutput
 {
 	float4 albedoMetallic : SV_Target0;
