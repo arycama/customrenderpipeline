@@ -6,8 +6,9 @@
 #include "../../Samplers.hlsl"
 #include "../../Temporal.hlsl"
 #include "../../Lighting.hlsl"
+#include "../../ImageBasedLighting.hlsl"
 
-Texture2D<float4> _NormalRoughness, _BentNormalOcclusion;
+Texture2D<float4> _NormalRoughness, _BentNormalOcclusion, AlbedoMetallic;
 Texture2D<float3> PreviousFrame;
 Texture2D<float2> Velocity;
 Texture2D<float> _HiZDepth, _Depth;
@@ -79,14 +80,58 @@ float3 SampleGGXVNDF(float3 V, float roughness, float U1, float U2)
 	return Ne;
 }
 
+float3 sample_vndf_isotropic(float2 u, float3 wi, float alpha, float3 n)
+{
+    // decompose the floattor in parallel and perpendicular components
+    float3 wi_z = -n * dot(wi, n);
+    float3 wi_xy = wi + wi_z;
+ 
+    // warp to the hemisphere configuration
+    float3 wiStd = -normalize(alpha * wi_xy + wi_z);
+ 
+    // sample a spherical cap in (-wiStd.z, 1]
+    float wiStd_z = dot(wiStd, n);
+    float z = 1.0 - u.y * (1.0 + wiStd_z);
+    float sinTheta = sqrt(saturate(1.0f - z * z));
+    float phi = TwoPi * u.x - Pi;
+    float x = sinTheta * cos(phi);
+    float y = sinTheta * sin(phi);
+    float3 cStd = float3(x, y, z);
+ 
+    // reflect sample to align with normal
+    float3 up = float3(0, 0, 1.000001); // Used for the singularity
+    float3 wr = n + up;
+    float3 c = dot(wr, cStd) * wr / wr.z - cStd;
+ 
+    // compute halfway direction as standard normal
+    float3 wmStd = c + wiStd;
+    float3 wmStd_z = n * dot(n, wmStd);
+    float3 wmStd_xy = wmStd_z - wmStd;
+     
+    // return final normal
+    return normalize(alpha * wmStd_xy + wmStd_z);
+}
+
+float pdf_vndf_isotropic(float3 wo, float3 wi, float alpha, float3 n)
+{
+    float alphaSquare = alpha * alpha;
+    float3 wm = normalize(wo + wi);
+    float zm = dot(wm, n);
+    float zi = dot(wi, n);
+    float nrm = rsqrt((zi * zi) * (1.0f - alphaSquare) + alphaSquare);
+    float sigmaStd = (zi * nrm) * 0.5f + 0.5f;
+    float sigmaI = sigmaStd / nrm;
+    float nrmN = (zm * zm) * (alphaSquare - 1.0f) + 1.0f;
+    return alphaSquare / (Pi * 4.0f * nrmN * nrmN * sigmaI);
+}
+
 #define FLOAT_MAX                          3.402823466e+38
 
-void InitialAdvanceRay(float3 origin, float3 direction, float3 inv_direction, float2 current_mip_resolution, float2 current_mip_resolution_inv, float2 floor_offset, float2 uv_offset, out float3 position, out float current_t) {
-    float2 current_mip_position = current_mip_resolution * origin.xy;
-
+void InitialAdvanceRay(float3 origin, float3 direction, float3 inv_direction, float2 currentMipResolution, float2 floor_offset, float2 uv_offset, out float3 position, out float current_t) 
+{
     // Intersect ray with the half box that is pointing away from the ray origin.
-    float2 xy_plane = floor(current_mip_position) + floor_offset;
-    xy_plane = xy_plane * current_mip_resolution_inv + uv_offset;
+    float2 xy_plane = floor(currentMipResolution * origin.xy) + floor_offset;
+    xy_plane = xy_plane * rcp(currentMipResolution) + uv_offset;
 
     // o + d * t = p' => t = (p' - o) / d
     float2 t = xy_plane * inv_direction.xy - origin.xy * inv_direction.xy;
@@ -94,10 +139,11 @@ void InitialAdvanceRay(float3 origin, float3 direction, float3 inv_direction, fl
     position = origin + current_t * direction;
 }
 
-bool AdvanceRay(float3 origin, float3 direction, float3 inv_direction, float2 current_mip_position, float2 current_mip_resolution_inv, float2 floor_offset, float2 uv_offset, float surface_z, inout float3 position, inout float current_t) {
+bool AdvanceRay(float3 origin, float3 direction, float3 inv_direction, float2 currentMipPosition, float2 currentMipResolution, float2 floor_offset, float2 uv_offset, float surface_z, inout float3 position, inout float current_t) 
+{
     // Create boundary planes
-    float2 xy_plane = floor(current_mip_position) + floor_offset;
-    xy_plane = xy_plane * current_mip_resolution_inv + uv_offset;
+    float2 xy_plane = floor(currentMipPosition) + floor_offset;
+    xy_plane = xy_plane * rcp(currentMipResolution) + uv_offset;
     float3 boundary_planes = float3(xy_plane, surface_z);
 
     // Intersect ray with the half box that is pointing away from the ray origin.
@@ -126,30 +172,16 @@ bool AdvanceRay(float3 origin, float3 direction, float3 inv_direction, float2 cu
     return skipped_tile;
 }
 
-float2 GetMipResolution(float2 screen_dimensions, int mip_level) {
-    return screen_dimensions * pow(0.5, mip_level);
-}
-
-float3 ScreenSpaceToViewSpace(float3 screen_space_position)
-{
-	screen_space_position.y = (1 - screen_space_position.y);
-	screen_space_position.xy = 2 * screen_space_position.xy - 1;
-	float4 projected = mul(_ClipToWorld, float4(screen_space_position, 1));
-	projected.xyz /= projected.w;
-	return MultiplyPoint3x4(_WorldToView, projected.xyz);
-}
-
 // Requires origin and direction of the ray to be in screen space [0, 1] x [0, 1]
-float3 HierarchicalRaymarch(float3 origin, float3 direction, out bool valid_hit) 
+float3 HierarchicalRaymarch(float3 origin, float3 direction, float lengthV, out bool validHit, out float t) 
 {
     float3 inv_direction = direction != 0 ? 1.0 / direction : FLOAT_MAX;
 
     // Start on mip with highest detail.
-    int current_mip = 0;
+    int currentMip = 0;
 
     // Could recompute these every iteration, but it's faster to hoist them out and update them.
-    float2 current_mip_resolution = GetMipResolution(_ScaledResolution.xy, current_mip);
-    float2 current_mip_resolution_inv = rcp(current_mip_resolution);
+    float2 currentMipResolution = floor(_ScaledResolution.xy * exp2(-currentMip));
 
     // Offset to the bounding boxes uv space to intersect the ray with the center of the next pixel.
     // This means we ever so slightly over shoot into the next region. 
@@ -157,49 +189,34 @@ float3 HierarchicalRaymarch(float3 origin, float3 direction, out bool valid_hit)
     uv_offset = direction.xy < 0 ? -uv_offset : uv_offset;
 
     // Offset applied depending on current mip resolution to move the boundary to the left/right upper/lower border depending on ray direction.
-    float2 floor_offset = direction.xy < 0 ? 0 : 1;
+    float2 floor_offset = direction.xy >= 0;
     
     // Initially advance ray to avoid immediate self intersections.
-    float current_t;
+    t = 0;
     float3 position;
-    InitialAdvanceRay(origin, direction, inv_direction, current_mip_resolution, current_mip_resolution_inv, floor_offset, uv_offset, position, current_t);
+    InitialAdvanceRay(origin, direction, inv_direction, currentMipResolution, floor_offset, uv_offset, position, t);
 
-    int i = 0;
-    while (i < _MaxSteps && current_mip >= 0) 
+    for (uint i = 0; i < _MaxSteps; i++) 
     {
-        float2 current_mip_position = current_mip_resolution * position.xy;
-        float surface_z = _HiZDepth.mips[current_mip][current_mip_position];
-        bool skipped_tile = AdvanceRay(origin, direction, inv_direction, current_mip_position, current_mip_resolution_inv, floor_offset, uv_offset, surface_z, position, current_t);
-        current_mip += skipped_tile ? 1 : -1;
-        current_mip_resolution *= skipped_tile ? 0.5 : 2;
-        current_mip_resolution_inv *= skipped_tile ? 2 : 0.5;
-        ++i;
-    }
+        float2 currentMipPosition = currentMipResolution * position.xy;
+        float surface_z = _HiZDepth.mips[currentMip][currentMipPosition];
+        bool skipped_tile = AdvanceRay(origin, direction, inv_direction, currentMipPosition, currentMipResolution, floor_offset, uv_offset, surface_z, position, t);
+        currentMip += skipped_tile ? 1 : -1;
+        currentMipResolution *= skipped_tile ? 0.5 : 2;
+        
+		if(currentMip >= 0)
+			continue;
+        
+        // Compute eye space distance between hit and current point
+		float distance = abs(LinearEyeDepth(position.z) - LinearEyeDepth(surface_z)) * lengthV;
+		if(distance <= _Thickness)
+			break;
+        
+		currentMip = 0;
+	}
 
-    valid_hit = (i <= _MaxSteps);
-
+    validHit = (i <= _MaxSteps);
     return position;
-}
-
-float ValidateHit(float3 hit, float3 L, float2 hitPixel) 
-{
-    if (any(hit.xy < 0) || any(hit.xy > 1))
-        return 0;
-    
-    float hitDepth = _Depth[hitPixel];
-    if (hitDepth == 0.0)
-        return 0;
-
-    // We check if we hit the surface from the back, these should be rejected.
-    float3 hit_normal = GBufferNormal(hitPixel, _NormalRoughness);
-    if (dot(hit_normal, L) > 0.0)
-       return 0;
-
-    float3 view_space_surface = ScreenSpaceToViewSpace(float3(hit.xy, hitDepth));
-    float3 view_space_hit = ScreenSpaceToViewSpace(hit);
-    float distance = length(view_space_surface - view_space_hit);
-
-    return step(distance, _Thickness * 100);
 }
 
 struct TraceResult
@@ -208,9 +225,45 @@ struct TraceResult
     float4 hit : SV_Target1;
 };
 
-float DV(float NdotV, float a2, float NdotH)
+float3 SampleGGXReflection(float3 i, float alpha, float2 rand)
 {
-	return G1(NdotV, a2) * max(0.0, NdotV) * D(a2, NdotH) * rcp(NdotV);
+	float3 i_std = normalize(float3(i.xy * alpha, i.z));
+    
+    // Sample a spherical cap
+	float phi = 2.0f * Pi * rand.x;
+	float a = alpha; // Eq. 6
+	float s = 1.0f + length(float2(i.x, i.y)); // Omit sgn for a<=1
+	float a2 = a * a;
+	float s2 = s * s;
+	float k = (1.0f - a2) * s2 / (s2 + a2 * i.z * i.z); // Eq. 5
+	float b = i.z > 0 ? k * i_std.z : i_std.z;
+	float z = mad(1.0f - rand.y, 1.0f + b, -b);
+	float sinTheta = sqrt(saturate(1.0f - z * z));
+	float3 o_std = float3(sinTheta * cos(phi), sinTheta * sin(phi), z);
+    
+    // Compute the microfacet normal m
+	float3 m_std = i_std + o_std;
+	return normalize(float3(m_std.xy * alpha, m_std.z));
+}
+
+float GGXReflectionPDF(float3 i, float alpha, float NdotH)
+{
+	float ndf = D_GGX(NdotH, alpha);
+	float2 ai = alpha * i.xy;
+	float len2 = dot(ai, ai);
+	float t = sqrt(len2 + i.z * i.z);
+	if(i.z >= 0.0f)
+	{
+		float a = alpha; // Eq. 6
+		float s = 1.0f + length(float2(i.x, i.y)); // Omit sgn for a<=1
+		float a2 = a * a;
+		float s2 = s * s;
+		float k = (1.0f - a2) * s2 / (s2 + a2 * i.z * i.z); // Eq. 5
+		return ndf / (2.0f * (k * i.z + t)); // Eq. 8 * ||dm/do||
+	}
+    
+    // Numerically stable form of the previous PDF for i.z < 0
+	return ndf * (t - i.z) / (2.0f * len2); // = Eq. 7 * ||dm/do||
 }
 
 TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
@@ -228,20 +281,15 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float NdotV = dot(N, V);
 	N = GetViewReflectedNormal(N, V, NdotV);
 	
-	float roughness = Sq(normalRoughness.a);
-	float3 L = reflect(-V, SampleVndf_GGX(u, V, roughness, N));
-    
+    float roughness = max(1e-3, Sq(normalRoughness.a));
+
     float3x3 localToWorld = GetLocalFrame(N);
-    float3 localV = mul(V, transpose(localToWorld));
-    float3 localN = SampleGGXVNDF(localV, roughness, u.x, u.y);
-    float VdotH = saturate(dot(localV, localN));
-    float3 localL = reflect(-localV, localN);
-    L = mul(localL, localToWorld);
-    
-    float a2 = roughness * roughness;
-    float dv = G1(localV.z, a2) * max(0.0, VdotH) * D(a2, localN.z) * rcp(localV.z);
-    float rcpPdf = rcp(dv * rcp(4.0 * dot(localV, localN)));
-    
+    float3 localV = mul(localToWorld, V);
+    float3 localH = SampleGGXReflection(localV, roughness, u);
+    float3 localL = reflect(-localV, localH);
+    float3 L = normalize(mul(localL, localToWorld));
+    float rcpPdf = rcp(GGXReflectionPDF(localV, roughness, localH.z));
+
     // We start tracing from the center of the current pixel, and do so up to the far plane.
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
 	
@@ -252,48 +300,48 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	
 	float3 rayDir = reflPosSS - rayOrigin;
 
+    float t;
 	bool validHit;
-	float3 hit = HierarchicalRaymarch(rayOrigin, rayDir, validHit);
+	float3 hit = HierarchicalRaymarch(rayOrigin, rayDir, rcp(rcpVLength), validHit, t);
 	
     float2 hitPixel = floor(hit.xy * _ScaledResolution.xy) + 0.5;
-	float confidence = validHit ? ValidateHit(hit, L, hitPixel) : 0.0;
+    
+    // Ensure hit has not gone off screen TODO: Feels like this could be handled during the raymarch?
+    if(any(hit.xy < 0.0 && hit.xy > 1.0))
+        validHit = false;
+    
+    // Ensure we have not hit the sky
     float hitDepth = _Depth[hitPixel];
+    if(!hitDepth)
+        validHit = false;
+    
+    float eyeHitDepth = LinearEyeDepth(hitDepth);
     float3 worldHit = PixelToWorld(float3(hitPixel, hitDepth));
     float3 hitRay = worldHit - worldPosition;
     float hitDist = length(hitRay);
-    float eyeHitDepth = LinearEyeDepth(hitDepth);
     
-	float3 result = 0.0;
-	if (confidence > 0.0)
-	{
-		float2 velocity = Velocity[hitPixel];
+	if (!validHit)
+        return (TraceResult)0;
+    
+	float2 velocity = Velocity[hitPixel];
+	float r = Sq(_NormalRoughness[position.xy].a);
+	float lobeApertureHalfAngle = r * (1.3331290497744692 - r * 0.5040552688878546);
+    float coneTangent = tan(lobeApertureHalfAngle);
+    float beta = 0.9;
+    coneTangent = r * r * sqrt(beta * rcp(1.0 - beta));
+    coneTangent *= lerp(saturate(NdotV * 2), 1, sqrt(roughness));
         
-		float r = Sq(_NormalRoughness[position.xy].a);
-		float lobeApertureHalfAngle = r * (1.3331290497744692 - r * 0.5040552688878546);
-        float coneTangent = tan(lobeApertureHalfAngle);
-        float beta = 0.9;
-        coneTangent = r * r * sqrt(beta * rcp(1.0 - beta));
-        coneTangent *= lerp(saturate(NdotV * 2), 1, sqrt(roughness));
-        
-		float coveredPixels = _ScaledResolution.y * 0.5 * hitDist * coneTangent / (eyeHitDepth * _TanHalfFov);
-		float mipLevel = log2(coveredPixels);
+	float coveredPixels = _ScaledResolution.y * 0.5 * hitDist * coneTangent / (eyeHitDepth * _TanHalfFov);
+	float mipLevel = log2(coveredPixels);
 		
-        if(position.x > _ScaledResolution.x / 2)
-            mipLevel = 0.0;
-        
-		// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
-		// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
-        float2 hitUv = ClampScaleTextureUv(hit.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
-		result = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel) * _PreviousToCurrentExposure; 
-	}
-    else
-    {
-        rcpPdf = 0.0;
-    }
-
+	// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
+	// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
+    float2 hitUv = ClampScaleTextureUv(hit.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
+    
     TraceResult output;
-    output.color = result;
-    output.hit = float4(hitPixel - position.xy, Linear01Depth(hitDepth), rcpPdf);
+	output.color =  PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel) * _PreviousToCurrentExposure; 
+    output.hit = float4(hitPixel, Linear01Depth(hitDepth), rcpPdf);
+    output.hit = float4(L , rcpPdf);
     return output;
 }
 
@@ -306,7 +354,7 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 {
     float4 normalRoughness = _NormalRoughness[position.xy];
 	float3 N = GBufferNormal(normalRoughness);
-    float roughness = Sq(normalRoughness.a);
+    float roughness = max(1e-3, Sq(normalRoughness.a));
     
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
     float phi = Noise1D(position.xy) * TwoPi;
@@ -320,21 +368,29 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
     
     float4 result = 0.0;
     
+    float3x3 localToWorld = GetLocalFrame(N);
+    float3 localV = mul(localToWorld, V);
+    
+    float4 albedoMetallic = AlbedoMetallic[position.xy];
+    float f0 = Max3(lerp(0.04, albedoMetallic.rgb, albedoMetallic.a));
+    float validHits = 0;
+
     // Sample center hit (Weight is always 1)
 	float4 hitData = _HitResult[position.xy];
     if(hitData.w > 0.0)
     {
-        float3 hitPosition = PixelToWorld(float3(position.xy + hitData.xy, Linear01ToDeviceDepth(hitData.z)));
-		float3 L = normalize(hitPosition - worldPosition);
+        float3 hitPosition = worldPosition + hitData.xyz;// PixelToWorld(float3(hitData.xy, Linear01ToDeviceDepth(hitData.z)));
+		float3 L = normalize(hitData.xyz);
         float NdotL = dot(N, L);
         
         float LdotV = dot(L, V);
         float invLenLV = rsqrt(2.0 * LdotV + 2.0);
         float NdotH = (NdotL + NdotV) * invLenLV;
         float LdotH = invLenLV * LdotV + invLenLV;
-        float3 localBrfd = GGX(roughness, 0.04, LdotH, NdotH, NdotV, NdotL) * NdotL;
-        float weightOverPdf = localBrfd * hitData.w;
-		result = float4(RgbToYCoCgFastTonemap(_Input[position.xy].rgb) * weightOverPdf, weightOverPdf);
+        float3 localBrdf = GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL) * NdotL;
+        float weightOverPdf = localBrdf * hitData.w;/// GGXReflectionPDF(localV, roughness, NdotH);
+		result = float4(RgbToYCoCgFastTonemap(_Input[position.xy].rgb * weightOverPdf), weightOverPdf);
+        validHits++;
     }
     
     for(int i = 0; i < _ResolveSamples; i++)
@@ -349,35 +405,37 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
         if(hitData.w <= 0.0)
             continue;
         
-        float3 hitPosition = PixelToWorld(float3(coord + hitData.xy, Linear01ToDeviceDepth(hitData.z)));
-        float3 hitN = GBufferNormal(coord + hitData.xy, _NormalRoughness);
-		float3 L = normalize(hitPosition - worldPosition);
+        //float3 hitPosition = worldPosition + hitData.xyz;// PixelToWorld(float3(hitData.xy, Linear01ToDeviceDepth(hitData.z)));
+        //float3 hitN = GBufferNormal(hitData.xy, _NormalRoughness);
+		float3 L = normalize(hitData.xyz);
         
         // Skip sample locations if we hit a backface
-        if(dot(hitN, L) > 0.0)
-            continue;
+        //if(dot(hitN, L) > 0.0)
+        //   continue;
         
         float NdotL = dot(N, L);
 		if(NdotL <= 0.0)
 			continue;
         
+        validHits++;
+        
         float LdotV = dot(L, V);
         float invLenLV = rsqrt(2.0 * LdotV + 2.0);
         float NdotH = (NdotL + NdotV) * invLenLV;
         float LdotH = invLenLV * LdotV + invLenLV;
-        float3 localBrfd = GGX(roughness, 0.04, LdotH, NdotH, NdotV, NdotL) * NdotL;
+        float3 localBrdf = GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL) * NdotL;
         
-        float weightOverPdf = localBrfd * hitData.w;
-		float3 color = RgbToYCoCgFastTonemap(_Input[coord].rgb);
-		result.rgb += weightOverPdf * color;
+        float weightOverPdf = localBrdf * hitData.w;// / GGXReflectionPDF(localV, roughness, NdotH);
+		float3 color = RgbToYCoCgFastTonemap(_Input[coord].rgb * weightOverPdf);
+		result.rgb += color;
         result.a += weightOverPdf;
 	}
 
-    result /= (_ResolveSamples + 1); // add 1 because of first sample
+    result /= validHits; // add 1 because of first sample
     result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
     
-    if(result.a)
-        result.rgb /= result.a;
+    //if(result.a)
+    //    result.rgb /= result.a;
     
     result = RemoveNaN(result);
     return result;
@@ -450,32 +508,24 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
     float NdotV = dot(N, V);
 	N = GetViewReflectedNormal(N, V, NdotV);
     
-    float3 iblN = N;
-	float3 R = reflect(-V, N);
-	float3 rStrength = 1.0;
-    
-    // Reflection correction for water
 	bool isWater = (_Stencil[position.xy].g & 4) != 0;
-	if(isWater && R.y < 0.0)
-	{
-		iblN = float3(0.0, 1.0, 0.0);
-		float NdotR = dot(iblN, -R);
-		float2 f_ab = DirectionalAlbedo(NdotR, normalRoughness.a);
-		rStrength = lerp(f_ab.x, f_ab.y, 0.04);
-		R = reflect(R, iblN);
-	}
-	
-	float3 iblR = GetSpecularDominantDir(iblN, R, normalRoughness.a, NdotV);
-	float NdotR = dot(N, iblR);
-	float iblMipLevel = PerceptualRoughnessToMipmapLevel(normalRoughness.a, NdotR);
-	
-	float3 radiance = _SkyReflection.SampleLevel(_TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
-
-	float specularOcclusion = SpecularOcclusion(dot(N, R), normalRoughness.a, bentNormalOcclusion.a, dot(bentNormalOcclusion.xyz, R));
-	radiance *= specularOcclusion;
+    float4 albedoMetallic = AlbedoMetallic[position.xy];
+    float3 f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
+	float3 radiance = IndirectSpecular(N, V, f0, NdotV, normalRoughness.a, bentNormalOcclusion.a, bentNormalOcclusion.xyz, isWater, _SkyReflection);
     
     TemporalOutput output;
     output.result = result;
-    output.screenResult = lerp(radiance, result.rgb, saturate(result.a) * _Intensity);
+    
+    //if(result.a)
+    //    result.rgb /= result.a;
+    
+	float2 directionalAlbedo = DirectionalAlbedo(NdotV, normalRoughness.a);
+    
+    float3 specularIntensity = lerp(directionalAlbedo.x, directionalAlbedo.y, f0);
+    
+    //output.screenResult = lerp(radiance, result.rgb, saturate(result.a / directionalAlbedo.x) * _Intensity) * specularIntensity;
+    
+    float weight = saturate(result.a / directionalAlbedo.x);
+    output.screenResult = radiance * (1.0 - weight * _Intensity) * specularIntensity + result.rgb;// * specularIntensity;
     return output;
 }

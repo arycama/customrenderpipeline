@@ -227,4 +227,9 @@ float3 ClipToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
 	return lerp(origin, target, saturate(t));
 }
 
+float SafeDiv(float numer, float denom)
+{
+	return (numer != denom) ? numer * rcp(denom) : 1.0;
+}
+
 #endif

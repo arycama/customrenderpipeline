@@ -4,6 +4,7 @@
 #include "Atmosphere.hlsl"
 #include "Brdf.hlsl"
 #include "Common.hlsl"
+#include "ImageBasedLighting.hlsl"
 #include "Temporal.hlsl"
 
 // TODO: Move to shadow.hlsl
@@ -97,220 +98,7 @@ float CloudTransmittance(float3 positionWS)
 	return max(transmittance, shadowData.b);
 }
 
-float4 _GGXDirectionalAlbedoRemap;
-float2 _GGXAverageAlbedoRemap;
-float2 _GGXDirectionalAlbedoMSScaleOffset;
-float4 _GGXAverageAlbedoMSRemap;
-
-Texture3D<float> _GGXDirectionalAlbedoMS;
-Texture2D<float2> _GGXDirectionalAlbedo;
-Texture2D<float> _GGXAverageAlbedo, _GGXAverageAlbedoMS;
-Texture3D<float> _GGXSpecularOcclusion;
-
 TextureCube<float3> _SkyReflection;
-
-void SampleGGXDir(float2 u, float3 V, float3x3 localToWorld, float roughness, out float3 L, out float NdotL, out float NdotH, out float VdotH, bool VeqN = false)
-{
-    // GGX NDF sampling
-	float cosTheta = sqrt(SafeDiv(1.0 - u.x, 1.0 + (roughness * roughness - 1.0) * u.x));
-	float phi = TwoPi * u.y;
-
-	float3 localH = SphericalToCartesian(phi, cosTheta);
-
-	NdotH = cosTheta;
-
-	float3 localV;
-
-	if (VeqN)
-	{
-        // localV == localN
-		localV = float3(0.0, 0.0, 1.0);
-		VdotH = NdotH;
-	}
-	else
-	{
-		localV = mul(V, transpose(localToWorld));
-		VdotH = saturate(dot(localV, localH));
-	}
-
-    // Compute { localL = reflect(-localV, localH) }
-	float3 localL = -localV + 2.0 * VdotH * localH;
-	NdotL = localL.z;
-
-	L = mul(localL, localToWorld);
-}
-
-// Note: V = G / (4 * NdotL * NdotV)
-// Ref: http://jcgt.org/published/0003/02/03/paper.pdf
-float V_SmithJointGGX(float NdotL, float NdotV, float roughness, float partLambdaV)
-{
-	float a2 = Sq(roughness);
-
-    // Original formulation:
-    // lambda_v = (-1 + sqrt(a2 * (1 - NdotL2) / NdotL2 + 1)) * 0.5
-    // lambda_l = (-1 + sqrt(a2 * (1 - NdotV2) / NdotV2 + 1)) * 0.5
-    // G        = 1 / (1 + lambda_v + lambda_l);
-
-    // Reorder code to be more optimal:
-	float lambdaV = NdotL * partLambdaV;
-	float lambdaL = NdotV * sqrt((-NdotL * a2 + NdotL) * NdotL + a2);
-
-    // Simplify visibility term: (2.0 * NdotL * NdotV) /  ((4.0 * NdotL * NdotV) * (lambda_v + lambda_l))
-	return 0.5 / max(lambdaV + lambdaL, FloatMin);
-}
-
-// Precompute part of lambdaV
-float GetSmithJointGGXPartLambdaV(float NdotV, float roughness)
-{
-	float a2 = Sq(roughness);
-	return sqrt((-NdotV * a2 + NdotV) * NdotV + a2);
-}
-
-float V_SmithJointGGX(float NdotL, float NdotV, float roughness)
-{
-	float partLambdaV = GetSmithJointGGXPartLambdaV(NdotV, roughness);
-	return V_SmithJointGGX(NdotL, NdotV, roughness, partLambdaV);
-}
-
-// weightOverPdf return the weight (without the Fresnel term) over pdf. Fresnel term must be apply by the caller.
-void ImportanceSampleGGX(float2 u, float3 V, float3x3 localToWorld, float roughness, float NdotV, out float3 L, out float VdotH, out float NdotL, out float weightOverPdf)
-{
-	float NdotH;
-	SampleGGXDir(u, V, localToWorld, roughness, L, NdotL, NdotH, VdotH);
-
-    // Importance sampling weight for each sample
-    // pdf = D(H) * (N.H) / (4 * (L.H))
-    // weight = fr * (N.L) with fr = F(H) * G(V, L) * D(H) / (4 * (N.L) * (N.V))
-    // weight over pdf is:
-    // weightOverPdf = F(H) * G(V, L) * (L.H) / ((N.H) * (N.V))
-    // weightOverPdf = F(H) * 4 * (N.L) * V(V, L) * (L.H) / (N.H) with V(V, L) = G(V, L) / (4 * (N.L) * (N.V))
-    // Remind (L.H) == (V.H)
-    // F is apply outside the function
-
-	float Vis = V_SmithJointGGX(NdotL, NdotV, roughness);
-	weightOverPdf = 4.0 * Vis * NdotL * VdotH / NdotH;
-}
-
-float F_Schlick(float f0, float u)
-{
-	return lerp(f0, 1.0, pow(1.0 - u, 5.0));
-}
-
-float3 F_Schlick(float3 f0, float u)
-{
-	return lerp(f0, 1.0, pow(1.0 - u, 5.0));
-}
-
-float D_GGXNoPI(float NdotH, float roughness)
-{
-	float a2 = Sq(roughness);
-	float s = (NdotH * a2 - NdotH) * NdotH + 1.0;
-
-    // If roughness is 0, returns (NdotH == 1 ? 1 : 0).
-    // That is, it returns 1 for perfect mirror reflection, and 0 otherwise.
-	return SafeDiv(a2, s * s);
-}
-
-float D_GGX(float NdotH, float roughness)
-{
-	return RcpPi * D_GGXNoPI(NdotH, roughness);
-}
-
-float2 DirectionalAlbedo(float NdotV, float perceptualRoughness)
-{
-	#if 1
-		float2 uv = float2(sqrt(NdotV), perceptualRoughness) * _GGXDirectionalAlbedoRemap.xy + _GGXDirectionalAlbedoRemap.zw;
-		return _GGXDirectionalAlbedo.SampleLevel(_LinearClampSampler, uv, 0);
-	#else
-		return 1.0 - 1.4594 * perceptualRoughness * NdotV *
-		(-0.20277 + perceptualRoughness * (2.772 + perceptualRoughness * (-2.6175 + 0.73343 * perceptualRoughness))) *
-		(3.09507 + NdotV * (-9.11369 + NdotV * (15.8884 + NdotV * (-13.70343 + 4.51786 * NdotV))));
-	#endif
-}
-
-float AverageAlbedo(float perceptualRoughness)
-{
-	#if 1
-		float2 averageUv = float2(perceptualRoughness * _GGXAverageAlbedoRemap.x + _GGXAverageAlbedoRemap.y, 0.0);
-		return _GGXAverageAlbedo.SampleLevel(_LinearClampSampler, averageUv, 0.0);
-	#else
-		return 1.0 + perceptualRoughness * (-0.113 + perceptualRoughness * (-1.8695 + perceptualRoughness * (2.2268 - 0.83397 * perceptualRoughness)));
-	#endif
-}
-
-float DirectionalAlbedoMs(float NdotV, float perceptualRoughness, float3 f0)
-{
-	#if 1
-		float3 uv = float3(sqrt(NdotV), perceptualRoughness, Max3(f0)) * _GGXDirectionalAlbedoMSScaleOffset.x + _GGXDirectionalAlbedoMSScaleOffset.y;
-		return _GGXDirectionalAlbedoMS.SampleLevel(_LinearClampSampler, uv, 0.0);
-	#else
-		return pow(1.0 - perceptualRoughness, 5.0) * (f0 + (1.0 - f0) * pow(1.0 - NdotV, 5.0)) +
-		(1.0 - pow(1.0 - perceptualRoughness, 5.0)) * (0.04762 + 0.95238 * f0);
-	#endif
-}
-
-float AverageAlbedoMs(float perceptualRoughness, float3 f0)
-{
-	#if 1
-		float2 uv = float2(perceptualRoughness, Max3(f0)) * _GGXAverageAlbedoMSRemap.xy + _GGXAverageAlbedoMSRemap.zw;
-		return _GGXAverageAlbedoMS.SampleLevel(_LinearClampSampler, uv, 0.0);
-	#else
-		return f0 + (-0.33263 * perceptualRoughness - 0.072359) * (1 - f0) * f0;
-	#endif
-}
-
-float3 AverageFresnel(float3 f0)
-{
-	return rcp(21.0) + 20 * rcp(21.0) * f0;
-}
-
-float GGXDiffuse(float NdotL, float NdotV, float perceptualRoughness, float3 f0)
-{
-	float Ewi = DirectionalAlbedoMs(NdotL, perceptualRoughness, f0);
-	float Ewo = DirectionalAlbedoMs(NdotV, perceptualRoughness, f0);
-	float Eavg = AverageAlbedoMs(perceptualRoughness, f0);
-	return (1.0 - Eavg) ? RcpPi * (1.0 - Ewo) * (1.0 - Ewi) * rcp(1.0 - Eavg) : 0.0;
-}
-
-float3 GGXMultiScatter(float NdotV, float NdotL, float perceptualRoughness, float3 f0)
-{
-	float Ewi = DirectionalAlbedo(NdotV, perceptualRoughness).g;
-	float Ewo = DirectionalAlbedo(NdotL, perceptualRoughness).g;
-	float Eavg = AverageAlbedo(perceptualRoughness);
-	float3 FAvg = AverageFresnel(f0);
-	
-	float ms = RcpPi * (1.0 - Ewi) * (1.0 - Ewo) * rcp(max(HalfEps, 1.0 - Eavg));
-	float3 f = Sq(FAvg) * Eavg * rcp(max(HalfEps, 1.0 - FAvg * (1.0 - Eavg)));
-	return ms * f;
-}
-
-float SpecularOcclusion(float NdotV, float perceptualRoughness, float visibility, float BdotR)
-{
-	float4 specUv = float4(NdotV, Sq(perceptualRoughness), visibility, BdotR);
-	
-	// Remap to half texel
-	float4 start = 0.5 * rcp(32.0);
-	float4 len = 1.0 - rcp(32.0);
-	specUv = specUv * len + start;
-
-	// 4D LUT
-	float3 uvw0;
-	uvw0.xy = specUv.xy;
-	float q0Slice = clamp(floor(specUv.w * 32 - 0.5), 0, 31.0);
-	q0Slice = clamp(q0Slice, 0, 32 - 1.0);
-	float qWeight = max(specUv.w * 32 - 0.5 - q0Slice, 0);
-	float2 sliceMinMaxZ = float2(q0Slice, q0Slice + 1) / 32 + float2(0.5, -0.5) / (32 * 32); //?
-	uvw0.z = (q0Slice + specUv.z) / 32.0;
-	uvw0.z = clamp(uvw0.z, sliceMinMaxZ.x, sliceMinMaxZ.y);
-
-	float q1Slice = min(q0Slice + 1, 32 - 1);
-	float nextSliceOffset = (q1Slice - q0Slice) / 32;
-	float3 uvw1 = uvw0 + float3(0, 0, nextSliceOffset);
-
-	float specOcc0 = _GGXSpecularOcclusion.SampleLevel(_LinearClampSampler, uvw0, 0.0);
-	float specOcc1 = _GGXSpecularOcclusion.SampleLevel(_LinearClampSampler, uvw1, 0.0);
-	return lerp(specOcc0, specOcc1, qWeight);
-}
 
 struct LightingInput
 {
@@ -327,62 +115,6 @@ struct LightingInput
 	bool isWater;
 	float2 uv;
 };
-
-// Ref: "Moving Frostbite to PBR", p. 69.
-float3 GetSpecularDominantDir(float3 N, float3 R, float perceptualRoughness, float NdotV)
-{
-    float p = perceptualRoughness;
-    float a = 1.0 - p * p;
-    float s = sqrt(a);
-
-#ifdef USE_FB_DSD
-    // This is the original formulation.
-    float lerpFactor = (s + p * p) * a;
-#else
-    // TODO: tweak this further to achieve a closer match to the reference.
-    float lerpFactor = (s + p * p) * saturate(a * a + lerp(0.0, a, NdotV * NdotV));
-#endif
-
-    // The result is not normalized as we fetch in a cubemap
-    return lerp(N, R, lerpFactor);
-}
-
-// The *approximated* version of the non-linear remapping. It works by
-// approximating the cone of the specular lobe, and then computing the MIP map level
-// which (approximately) covers the footprint of the lobe with a single texel.
-// Improves the perceptual roughness distribution.
-float PerceptualRoughnessToMipmapLevel(float perceptualRoughness)
-{
-	perceptualRoughness = perceptualRoughness * (1.7 - 0.7 * perceptualRoughness);
-
-	return perceptualRoughness * UNITY_SPECCUBE_LOD_STEPS;
-}
-
-// The *accurate* version of the non-linear remapping. It works by
-// approximating the cone of the specular lobe, and then computing the MIP map level
-// which (approximately) covers the footprint of the lobe with a single texel.
-// Improves the perceptual roughness distribution and adds reflection (contact) hardening.
-// TODO: optimize!
-float PerceptualRoughnessToMipmapLevel(float perceptualRoughness, float NdotR)
-{
-	float m = PerceptualRoughnessToRoughness(perceptualRoughness);
-
-    // Remap to spec power. See eq. 21 in --> https://dl.dropboxusercontent.com/u/55891920/papers/mm_brdf.pdf
-	float n = (2.0 / max(HalfEps, m * m)) - 2.0;
-
-    // Remap from n_dot_h formulation to n_dot_r. See section "Pre-convolved Cube Maps vs Path Tracers" --> https://s3.amazonaws.com/docs.knaldtech.com/knald/1.0.0/lys_power_drops.html
-	n /= (4.0 * max(NdotR, HalfEps));
-
-    // remap back to square root of float roughness (0.25 include both the sqrt root of the conversion and sqrt for going from roughness to perceptualRoughness)
-	perceptualRoughness = pow(2.0 / (n + 2.0), 0.25);
-
-	return perceptualRoughness * UNITY_SPECCUBE_LOD_STEPS;
-}
-
-float Lambda(float3 x, float3 N, float roughness)
-{
-	return (sqrt(1.0 + Sq(roughness) * (rcp(Sq(dot(x, N))) - 1.0)) - 1.0) * rcp(2.0);
-}
 
 float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, float3 L, float3 V, float3 N, float3 bentNormal, float occlusion)
 {
@@ -500,10 +232,6 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 	return weightSum ? sum / weightSum : 1.0;
 }
 
-#ifdef __INTELLISENSE__
-	#define WATER_ON
-#endif
-
 Texture2D<float> _WaterShadows;
 matrix _WaterShadowMatrix1;
 float3 _WaterShadowExtinction;
@@ -532,48 +260,12 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	float NdotV = max(0.0, dot(input.normal, V));
 	input.normal = GetViewReflectedNormal(input.normal, V, NdotV);
 	
-	// Environment lighting
-	// Ref https://jcgt.org/published/0008/01/03/
-	float2 f_ab = DirectionalAlbedo(NdotV, input.perceptualRoughness);
-	float3 FssEss = lerp(f_ab.x, f_ab.y, input.f0);
-	
-	// Multiple scattering
-	float Ess = f_ab.y;
-	float Ems = 1.0 - Ess;
-	float3 Favg = AverageFresnel(input.f0);
-	float3 Fms = FssEss * Favg / (1.0 - (1.0 - Ess) * Favg);
-
-	// Dielectrics
-	float3 Edss = 1.0 - (FssEss + Fms * Ems);
-	float3 kD = input.albedo * Edss;
-	float3 bkD = input.translucency * Edss;
-	
 	// TODO: Need to handle non screenspace reflections, eg for transparent
 	#ifdef SCREENSPACE_REFLECTIONS_ON
 		float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
 	#else
-		float3 iblN = input.normal;
-		float3 R = reflect(-V, input.normal);
-		float3 rStrength = 1.0;
-	
-		// Reflection correction for water
-		if(input.isWater && R.y < 0.0)
-		{
-			iblN = float3(0.0, 1.0, 0.0);
-			float NdotR = dot(iblN, -R);
-			float2 f_ab = DirectionalAlbedo(NdotR, input.perceptualRoughness);
-			rStrength = lerp(f_ab.x, f_ab.y, input.f0);
-			R = reflect(R, iblN);
-		}
-	
-		float3 iblR = GetSpecularDominantDir(iblN, R, input.perceptualRoughness, NdotV);
-		float NdotR = dot(input.normal, iblR);
-		float iblMipLevel = PerceptualRoughnessToMipmapLevel(input.perceptualRoughness, NdotR);
-	
-		float3 radiance = _SkyReflection.SampleLevel(_TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
-	
-		float specularOcclusion = SpecularOcclusion(dot(input.normal, R), input.perceptualRoughness, input.occlusion, dot(input.bentNormal, R));
-		radiance *= specularOcclusion;
+		float3 radiance = IndirectSpecular(input.normal, V, input.f0, NdotV, input.perceptualRoughness, input.occlusion, input.bentNormal, input.isWater, _SkyReflection);
+		radiance *= IndirectSpecularFactor(NdotV, input.perceptualRoughness, input.f0);
 	#endif
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
@@ -583,13 +275,8 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	#endif
 	
 	// Ambient
-	float3 luminance = FssEss * radiance + Fms * Ems * irradiance + (kD * irradiance + bkD * irradiance);
-	
-	#ifdef REFLECTION_PROBE_RENDERING
-		luminance = kD * irradiance;
-		luminance = 0.0;
-	#endif
-	
+	float3 luminance = radiance + irradiance * IndirectDiffuseFactor(NdotV, input.perceptualRoughness, input.f0, input.albedo);
+
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
 		DirectionalLight light = _DirectionalLights[i];

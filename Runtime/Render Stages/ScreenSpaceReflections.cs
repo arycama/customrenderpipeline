@@ -1,7 +1,5 @@
 using Arycama.CustomRenderPipeline;
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -13,8 +11,8 @@ public class ScreenSpaceReflections
     {
         [field: SerializeField, Range(0.0f, 1.0f)] public float Intensity { get; private set; } = 1.0f;
         [field: SerializeField, Range(1, 128)] public int MaxSamples { get; private set; } = 32;
-        [field: SerializeField, Range(0f, 1.0f)] public float Thickness { get; private set; } = 0.1f;
-        [field: SerializeField, Range(1, 32)] public int ResolveSamples { get; private set; } = 8;
+        [field: SerializeField, Range(0f, 10.0f), Tooltip("Thickness of a Depth Buffer Sample in world units")] public float Thickness { get; private set; } = 1.0f;
+        [field: SerializeField, Range(1, 128)] public int ResolveSamples { get; private set; } = 8;
         [field: SerializeField, Min(0.0f)] public float ResolveSize { get; private set; } = 16.0f;
     }
 
@@ -30,14 +28,14 @@ public class ScreenSpaceReflections
         this.settings = settings;
 
         material = new Material(Shader.Find("Hidden/ScreenSpaceReflections")) { hideFlags = HideFlags.HideAndDontSave };
-        temporalCache = new PersistentRTHandleCache(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Screen Space Reflections");
+        temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Screen Space Reflections");
     }
 
-    public void Render(RTHandle depth, RTHandle hiZDepth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, ICommonPassData commonPassData, int width, int height, RTHandle velocity, RTHandle bentNormalOcclusion)
+    public void Render(RTHandle depth, RTHandle hiZDepth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, ICommonPassData commonPassData, int width, int height, RTHandle velocity, RTHandle bentNormalOcclusion, RTHandle albedoMetallic)
     {
         // Must be screen texture since we use stencil to skip sky pixels
         var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
 
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Trace"))
         {
@@ -84,6 +82,7 @@ public class ScreenSpaceReflections
             pass.ReadTexture("_HitResult", hitResult);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
+            pass.ReadTexture("AlbedoMetallic", albedoMetallic);
 
             commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
@@ -117,11 +116,13 @@ public class ScreenSpaceReflections
             pass.ReadTexture("Velocity", velocity);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
+            pass.ReadTexture("AlbedoMetallic", albedoMetallic);
 
             commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+            pass.AddRenderPassData<LitData.Result>();
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {

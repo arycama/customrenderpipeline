@@ -329,11 +329,6 @@ float3 Remap01ToHalfTexelCoord(float3 coord, float3 size)
 	return coord * len + start;
 }
 
-float SafeDiv(float numer, float denom)
-{
-	return (numer != denom) ? numer * rcp(denom) : 1.0;
-}
-
 bool1 IsInfOrNaN(float1 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
 bool3 IsInfOrNaN(float3 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
 bool4 IsInfOrNaN(float4 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
