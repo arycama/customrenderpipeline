@@ -232,4 +232,16 @@ float SafeDiv(float numer, float denom)
 	return (numer != denom) ? numer * rcp(denom) : 1.0;
 }
 
+float3x3 TangentToWorldMatrix(float3 vertexNormal, float3 vertexTangent, float bitangentSign)
+{
+	float3 bitangent = cross(vertexNormal, vertexTangent) * bitangentSign;
+	return float3x3(vertexTangent, bitangent, vertexNormal);
+}
+
+float3 TangentToWorldNormal(float3 tangentNormal, float3 vertexNormal, float3 vertexTangent, float bitangentSign)
+{
+	float3x3 tangentToWorld = TangentToWorldMatrix(vertexNormal, vertexTangent, bitangentSign);
+	return normalize(mul(tangentNormal, tangentToWorld));
+}
+
 #endif
