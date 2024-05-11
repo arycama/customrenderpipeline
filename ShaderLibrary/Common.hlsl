@@ -38,7 +38,6 @@ Buffer<uint> _LightClusterList;
 StructuredBuffer<DirectionalLight> _DirectionalLights;
 StructuredBuffer<matrix> _DirectionalMatrices;
 StructuredBuffer<PointLight> _PointLights;
-Texture2D<float> _CameraDepth;
 Texture2DArray<float> _DirectionalShadows;
 Texture3D<uint2> _LightClusterIndices;
 TextureCubeArray<float> _PointShadows;

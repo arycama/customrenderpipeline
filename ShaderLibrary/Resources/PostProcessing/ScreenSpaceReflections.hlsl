@@ -526,6 +526,6 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
     //output.screenResult = lerp(radiance, result.rgb, saturate(result.a / directionalAlbedo.x) * _Intensity) * specularIntensity;
     
     float weight = saturate(result.a / directionalAlbedo.x);
-    output.screenResult = radiance * (1.0 - weight * _Intensity) * specularIntensity + result.rgb;// * specularIntensity;
+    output.screenResult = radiance * (1.0 - weight * _Intensity) * specularIntensity + result.rgb * specularIntensity * _Intensity;
     return output;
 }

@@ -28,6 +28,34 @@ cbuffer CloudCoverage
 
 float _CloudCoverageScale, _CloudCoverageOffset;
 
+// https://torust.me/ZH3.pdf
+float3 SHLinearEvaluateIrradiance(float3 sh[4], float3 direction)
+{
+	return 1.0;
+}
+
+float3 SHHallucinateZH3Irradiance(float3 sh[4], float3 direction)
+{
+	// Use the zonal axis from the luminance SH.
+	const float3 lumCoeffs = float3(0.2126f, 0.7152f, 0.0722f); // sRGB luminance.
+	float3 zonalAxis = normalize(float3(-dot(sh[3], lumCoeffs), -dot(sh[1], lumCoeffs), dot(sh[2], lumCoeffs)));
+	float3 ratio = 0.0;
+	ratio.r = abs(dot(float3(-sh[3].r, -sh[1].r, sh[2].r), zonalAxis));
+	ratio.g = abs(dot(float3(-sh[3].g, -sh[1].g, sh[2].g), zonalAxis));
+	ratio.b = abs(dot(float3(-sh[3].b, -sh[1].b, sh[2].b), zonalAxis));
+	ratio /= sh[0];
+	float3 zonalL2Coeff = sh[0] * (0.08f * ratio + 0.6f * ratio * ratio); // Curve-fit; Section3.4.3
+	float fZ = dot(zonalAxis, direction);
+	float zhDir = sqrt(5.0f / (16.0f * Pi)) * (3.0f * fZ * fZ - 1.0f);
+	// Convolve sh with the normalized cosine kernel (multiply the L1 band by the zonal scale 2/3), then dot with
+	// SH (direction) for linear SH (Equation5).
+	float3 result = SHLinearEvaluateIrradiance(sh, direction);
+	// Add irradiance from the ZH3 term. zonal L2 Coeff is the ZH3 coefficient for a radiance signal, so we need to
+	// multiply by 1/4 (the L2 zonal scale for a normalized clamped cosine kernel) to evaluate irradiance.
+	result += 0.25f * zonalL2Coeff * zhDir;
+	return result;
+}
+
 float3 EvaluateSH(float3 N, float3 occlusion, float4 sh[7])
 {
 	// Calculate the zonal harmonics expansion for V(x, ωi)*(n.l)
@@ -116,14 +144,15 @@ struct LightingInput
 	float2 uv;
 };
 
-float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, float3 L, float3 V, float3 N, float3 bentNormal, float occlusion)
+float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, float3 L, float3 V, float3 N, float3 bentNormal, float occlusion, float3 translucency)
 {
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 
 	float NdotL = dot(N, L);
-	float NdotV = max(0.0, dot(N, V));
+	float NdotV = dot(N, V);
 	
-	float3 lighting = albedo * GGXDiffuse(NdotL, NdotV, perceptualRoughness, f0);
+	float3 diffuse = GGXDiffuse(abs(NdotL), abs(NdotV), perceptualRoughness, f0);
+	float3 lighting = NdotL > 0.0 ? albedo * diffuse : translucency * diffuse;
 	
     // Optimized math. Ref: PBR Diffuse Lighting for GGX + Smith Microsurfaces (slide 114), assuming |L|=1 and |V|=1
 	float LdotV = dot(L, V);
@@ -131,12 +160,15 @@ float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, fl
 	float NdotH = (NdotL + NdotV) * invLenLV;
 	float LdotH = invLenLV * LdotV + invLenLV;
 	
-	lighting += GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL);
+	if(NdotL > 0.0)
+	{
+		lighting += GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL);
+		lighting += GGXMultiScatter(saturate(NdotV), saturate(NdotL), perceptualRoughness, f0);
+	}
 	
-	// Multi scatter
-	lighting += GGXMultiScatter(NdotV, NdotL, perceptualRoughness, f0);
+	// TODO: BTDF
 	
-	float microShadow = saturate(Sq(saturate(dot(bentNormal, L)) * rsqrt(saturate(1.0 - occlusion))));
+	float microShadow = saturate(Sq(abs(dot(bentNormal, L)) * rsqrt(saturate(1.0 - occlusion))));
 	
 	return lighting * microShadow;
 }
@@ -275,7 +307,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	#endif
 	
 	// Ambient
-	float3 luminance = radiance + irradiance * IndirectDiffuseFactor(NdotV, input.perceptualRoughness, input.f0, input.albedo);
+	float3 luminance = radiance + irradiance * IndirectDiffuseFactor(NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
 
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
@@ -283,7 +315,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 
 		// Skip expensive shadow lookup if NdotL is negative
 		float NdotL = dot(input.normal, light.direction);
-		if (!isVolumetric && NdotL <= 0.0)
+		if (!isVolumetric && NdotL <= 0.0 && all(input.translucency == 0.0))
 			continue;
 			
 		// Atmospheric transmittance
@@ -325,7 +357,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 				light.color *= WaterShadow(input.worldPosition, light.direction);
 			#endif
 			
-			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, light.direction, V, input.normal, input.bentNormal, input.occlusion) * light.color * atmosphereTransmittance) * (saturate(NdotL) * _Exposure * attenuation);
+			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, light.direction, V, input.normal, input.bentNormal, input.occlusion, input.translucency) * light.color * atmosphereTransmittance) * (abs(NdotL) * _Exposure * attenuation);
 		}
 	}
 	
@@ -374,7 +406,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		else
 		{
 			if (NdotL > 0.0)
-				luminance += CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion) * NdotL * attenuation * light.color * _Exposure;
+				luminance += CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency) * NdotL * attenuation * light.color * _Exposure;
 		}
 	}
 	

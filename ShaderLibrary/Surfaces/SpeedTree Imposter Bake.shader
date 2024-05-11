@@ -51,10 +51,10 @@ Shader "Hidden/Surface/Nature/SpeedTree 8 Imposter Bake"
             #pragma vertex Vertex
 			#pragma fragment Fragment
             #pragma shader_feature_local_fragment _CUTOUT_ON
-            #include "SpeedTree8ImposterBake.hlsl"
+            #include "SpeedTreeImposterBake.hlsl"
             ENDHLSL
         }
     }
 
-    Dependency "ImposterShader" = "Surface/Nature/SpeedTree 8 Imposter"
+    Dependency "ImposterShader" = "Surface/Nature/SpeedTree Imposter"
 }

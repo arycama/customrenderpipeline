@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
@@ -12,34 +13,42 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Camera Motion Vectors")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public void Render(RTHandle motionVectors, RTHandle cameraDepth, int width, int height, Matrix4x4 nonJitteredVpMatrix, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, Camera camera)
+        public RTHandle Render(RTHandle velocity, RTHandle cameraDepth, int width, int height, Camera camera, ICommonPassData commonPassData)
         {
-            using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Camera Motion Vectors");
-            pass.Initialize(material, camera: camera);
-            pass.ReadTexture("_CameraDepth", cameraDepth);
-            pass.WriteTexture(motionVectors);
-            pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
-
-            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Camera Velocity"))
             {
-                pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                pass.SetMatrix(command, "_WorldToNonJitteredClip", data.nonJitteredVpMatrix);
-                pass.SetMatrix(command, "_WorldToPreviousClip", data.previousVpMatrix);
-                pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
-            });
+                pass.Initialize(material, camera: camera);
+                pass.ReadTexture("Depth", cameraDepth);
+                pass.WriteTexture(velocity);
+                pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
+                commonPassData.SetInputs(pass);
 
-            data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
-            data.nonJitteredVpMatrix = nonJitteredVpMatrix;
-            data.previousVpMatrix = previousVpMatrix;
-            data.invVpMatrix = invVpMatrix;
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                {
+                    commonPassData.SetProperties(pass, command);
+                });
+            }
+
+            var result = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16_SFloat);
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Dilate Velocity"))
+            {
+                pass.Initialize(material, 1, camera: camera);
+                pass.ReadTexture("Depth", cameraDepth);
+                pass.ReadTexture("Velocity", velocity);
+                pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
+                commonPassData.SetInputs(pass);
+
+                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                {
+                    commonPassData.SetProperties(pass, command);
+                });
+            }
+
+            return result;
         }
 
         private class PassData
         {
-            internal Vector4 scaledResolution;
-            internal Matrix4x4 nonJitteredVpMatrix;
-            internal Matrix4x4 previousVpMatrix;
-            internal Matrix4x4 invVpMatrix;
         }
     }
 }

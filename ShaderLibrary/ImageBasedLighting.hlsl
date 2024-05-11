@@ -11,7 +11,7 @@ float3 IndirectSpecularFactor(float NdotV, float perceptualRoughness, float3 f0)
 	return lerp(directionalAlbedo.x, directionalAlbedo.y, f0);
 }
 
-float3 IndirectDiffuseFactor(float NdotV, float perceptualRoughness, float3 f0, float3 albedo)
+float3 IndirectDiffuseFactor(float NdotV, float perceptualRoughness, float3 f0, float3 albedo, float3 translucency)
 {
 	// Ref https://jcgt.org/published/0008/01/03/
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
@@ -25,7 +25,7 @@ float3 IndirectDiffuseFactor(float NdotV, float perceptualRoughness, float3 f0, 
 
 	// Dielectrics
 	float3 Edss = 1.0 - (FssEss + Fms * Ems);
-	float3 kD = albedo * Edss;
+	float3 kD = (albedo + translucency)* Edss;
 	return Fms * Ems + kD;
 }
 

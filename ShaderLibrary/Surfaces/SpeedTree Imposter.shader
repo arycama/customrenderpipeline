@@ -52,7 +52,7 @@
             #pragma fragment Fragment
             #pragma multi_compile _ REFLECTION_PROBE_RENDERING
 
-            #include "SpeedTree8Imposter.hlsl"
+            #include "SpeedTreeImposter.hlsl"
             ENDHLSL
         }
 
@@ -69,7 +69,7 @@
             #pragma fragment Fragment
             #pragma multi_compile _ PUNCTUAL_LIGHT_SHADOW
 
-            #include "SpeedTree8Imposter.hlsl"
+            #include "SpeedTreeImposter.hlsl"
 
             ENDHLSL
         }
@@ -83,7 +83,7 @@
             #pragma vertex Vertex
             #pragma fragment fragPicking
 
-            #include "SpeedTree8Imposter.hlsl"
+            #include "SpeedTreeImposter.hlsl"
 
             float4 _SelectionID;
 
@@ -107,7 +107,7 @@
             #pragma vertex Vertex
             #pragma fragment fragSelection
 
-            #include "SpeedTree8Imposter.hlsl"
+            #include "SpeedTreeImposter.hlsl"
 
             int _ObjectId, _PassValue;
 

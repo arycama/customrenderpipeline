@@ -15,6 +15,9 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float4 albedoMetallic = _AlbedoMetallic[position.xy];
 	float4 normalRoughness = _NormalRoughness[position.xy];
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
+	uint stencil = _Stencil[position.xy].g;
+	
+	bool isTranslucent = stencil & 16;
 	
 	float eyeDepth = LinearEyeDepth(depth);
 	
@@ -23,14 +26,15 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.worldPosition = worldDir * eyeDepth;
 	lightingInput.pixelPosition = position.xy;
 	lightingInput.eyeDepth = eyeDepth;
-	lightingInput.albedo = lerp(albedoMetallic.rgb, 0.0, albedoMetallic.a);
-	lightingInput.f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
+	lightingInput.albedo = isTranslucent ? albedoMetallic.rgb : lerp(albedoMetallic.rgb, 0.0, albedoMetallic.a);
+	lightingInput.f0 = isTranslucent ? 0.04 : lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
 	lightingInput.perceptualRoughness = normalRoughness.a;
 	lightingInput.occlusion = bentNormalOcclusion.a;
 	lightingInput.translucency = 0.0;
 	lightingInput.bentNormal = normalize(2.0 * bentNormalOcclusion.rgb - 1.0);
-	lightingInput.isWater = (_Stencil[position.xy].g & 4) != 0;
+	lightingInput.isWater = (stencil & 4) != 0;
 	lightingInput.uv = uv;
+	lightingInput.translucency = isTranslucent ? albedoMetallic.rgb * albedoMetallic.a : 0.0;
 
 	return GetLighting(lightingInput);
 }

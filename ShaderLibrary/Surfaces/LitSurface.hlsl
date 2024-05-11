@@ -1,4 +1,5 @@
-﻿#include "../Common.hlsl"
+﻿
+#include "../Common.hlsl"
 #include "../GBuffer.hlsl"
 #include "../Lighting.hlsl"
 #include "../Material.hlsl"
@@ -125,15 +126,6 @@ float3 blend_rnm(float3 n1, float3 n2)
 
 FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 {
-	#if !defined(UNITY_PASS_SHADOWCASTER)
-		//input.uv = UnjitterTextureUV(input.uv);
-	#endif
-	
-//	#ifdef _PARALLAXMAP
-//		float height = _ParallaxMap.SampleBias(_TrilinearRepeatAniso16Sampler, ApplyScaleOffset(input.uv0, _MainTex_ST)).b;`
-//		input.uv0.xy += ParallaxOffset(height, input.uv1, _Parallax);
-//	#endif
-	
 	#ifdef TRIPLANAR_ON
 		float3 absoluteWorldPosition = input.worldPosition + _ViewPosition;
 		float3 flip = input.normal < 0.0 ? 1.0 : -1.0;
@@ -250,9 +242,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 			output.gbuffer = OutputGBuffer(albedo, metallic, normal, perceptualRoughness, bentNormal, occlusion, emission);
 		
 			#ifdef MOTION_VECTORS_ON
-				float2 nonJitteredPosition = input.position.xy * _ScaledResolution.zw + _Jitter.zw;
-				float2 previousPosition = PerspectiveDivide(input.previousPositionCS).xy * 0.5 + 0.5;
-				output.velocity = nonJitteredPosition - previousPosition;
+				output.velocity = CalculateVelocity(input.position.xy, input.previousPositionCS);
 			#endif
 		#else
 			#ifdef MODE_TRANSPARENT

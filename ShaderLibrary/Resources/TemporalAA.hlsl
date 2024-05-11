@@ -60,17 +60,9 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 		uint2 centerCoord = (uint2)position.xy;
 	#endif
 	
-	float2 maxVelocity = 0.0;
-	for(int y = -1; y <= 1; y++)
-	{
-		for(int x = -1; x <= 1; x++)
-		{
-			float2 velocity = _Velocity[min(centerCoord + int2(x, y), int2(_MaxWidth, _MaxHeight))];
-			maxVelocity = dot(velocity, velocity) > dot(maxVelocity, maxVelocity) ? velocity : maxVelocity;
-		}
-	}
-	
-	float2 historyUv = uv - maxVelocity;
+	// Velocity is pre-dilated, no need to do 3x3 sample
+	float2 velocity = _Velocity[position.xy];
+	float2 historyUv = uv - velocity;
 	float2 f = frac(historyUv * _ScaledResolution.xy - 0.5);
 	float2 w = _Sharpness * (f * f - f);
 	float historyWeights[9] = { 0.0, f.y * w.y, 0.0, (1.0 - f.x) * w.x, -w.x - w.y, f.x * w.x, 0.0, 0.0, (1.0 - f.y) * w.y };
@@ -135,7 +127,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	const float maxFactorScale = 2.25f; // when stationary
 	const float minFactorScale = 0.8f; // when moving more than slightly
 
-	float motionVectorLenInPixels = length(maxVelocity) * length(_ScaledResolution.xy);
+	float motionVectorLenInPixels = length(velocity) * length(_ScaledResolution.xy);
 	float localizedAntiFlicker = lerp(_AntiFlickerIntensity * minFactorScale, _AntiFlickerIntensity * maxFactorScale, saturate(1.0f - 2.0f * motionVectorLenInPixels));
     // TODO: Because we use a very aggressivley clipped history to compute the temporal contrast (hopefully cutting a chunk of ghosting)
     // can we be more aggressive here, being a bit more confident that the issue is from flickering? To investigate.
@@ -169,7 +161,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	
 	// Blend to final value and output
     // The 10 multiplier serves a double purpose, it is an empirical scale value used to perform the rejection and it also helps with storing the value itself.
-	float lengthMV = length(maxVelocity) * 10;
+	float lengthMV = length(velocity) * 10;
 	//blendFactor = ModifyBlendWithMotionVectorRejection(lengthMV, historyUv, blendFactor, _SpeedRejectionIntensity);
 	
 	result = lerp(history, result, blendFactor * maxWeight);
