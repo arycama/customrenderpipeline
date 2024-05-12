@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class ScreenSpaceGlobalIllumination
+public class DiffuseGlobalIllumination
 {
     [Serializable]
     public class Settings
@@ -23,7 +23,7 @@ public class ScreenSpaceGlobalIllumination
 
     private PersistentRTHandleCache temporalCache;
 
-    public ScreenSpaceGlobalIllumination(RenderGraph renderGraph, Settings settings)
+    public DiffuseGlobalIllumination(RenderGraph renderGraph, Settings settings)
     {
         this.renderGraph = renderGraph;
         material = new Material(Shader.Find("Hidden/ScreenSpaceGlobalIllumination")) { hideFlags = HideFlags.HideAndDontSave };
@@ -35,7 +35,7 @@ public class ScreenSpaceGlobalIllumination
     public void Render(RTHandle depth, int width, int height, ICommonPassData commonPassData, Camera camera, RTHandle previousFrame, RTHandle velocity, RTHandle normalRoughness, RTHandle hiZDepth, RTHandle bentNormalOcclusion)
     {
         var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
 
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Trace"))
         {
@@ -64,6 +64,7 @@ public class ScreenSpaceGlobalIllumination
                 pass.SetFloat(command, "_Intensity", settings.Intensity);
                 pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
                 pass.SetFloat(command, "_Thickness", settings.Thickness);
+                pass.SetFloat(command, "_MaxMip", Texture2DExtensions.MipCount(width, height) - 1);
                 pass.SetVector(command, "_PreviousColorScaleLimit", previousFrame.ScaleLimit2D);
 
                 var tanHalfFov = Mathf.Tan(0.5f * camera.fieldOfView * Mathf.Deg2Rad);

@@ -46,6 +46,12 @@ float3 SampleHemisphereCosine(float u1, float u2)
 // Generates a sample, then rotates it into the hemisphere of normal using reoriented normal mapping
 float3 SampleHemisphereCosine(float u1, float u2, float3 normal)
 {
+	// This function needs to used safenormalize because there is a probability
+    // that the generated direction is the exact opposite of the normal and that would lead
+    // to a nan vector otheriwse.
+    float3 pointOnSphere = SampleSphereUniform(u1, u2);
+    return normalize(normal + pointOnSphere);
+	
 	float3 result = SampleHemisphereCosine(u1, u2);
 	return ShortestArcQuaternion(normal, result);
 }

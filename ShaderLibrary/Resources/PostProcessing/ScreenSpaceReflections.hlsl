@@ -438,6 +438,7 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
     //    result.rgb /= result.a;
     
     result = RemoveNaN(result);
+    return _Input[position.xy];
     return result;
 }
 
@@ -487,8 +488,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	minValue = max(minValue, mean - stdDev);
 	maxValue = min(maxValue, mean + stdDev);
 	
-	//history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
-	//history.a = clamp(history.a, minValue.a, maxValue.a);
+	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
+	history.a = clamp(history.a, minValue.a, maxValue.a);
     
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
