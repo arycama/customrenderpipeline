@@ -20,70 +20,6 @@ cbuffer Properties
 	uint _ResolveSamples;
 };
 
-// Requires origin and direction of the ray to be in screen space [0, 1] x [0, 1]
-float3 HierarchicalRaymarch(float3 position, float3 direction, float lengthV, out bool validHit) 
-{
-	validHit = false;
-	if(direction.z > 0)
-		return 0;
-	
-	int2 dirSign = direction >= 0 ? 1 : -1;
-	int3 cell = int3(position.xy, 0);
-	
-	for (int i = 0; i < _MaxSteps; i++) 
-	{
-		int2 offset = direction >= 0;
-		
-		float depth = _HiZDepth.mips[cell.z][cell.xy];
-		float3 boundaryPlanes = float3((cell.xy + offset) << cell.z, depth);
-		float3 t = (boundaryPlanes - position) / direction;
-		
-		float minT;
-		if(i == 0)
-			minT = min(t.x, t.y);
-		else
-			minT = Min3(t);
-		
-		// Only advance if we're above the depth buffer
-		if(depth < position.z || i == 0)
-		{
-			position += minT * direction;
-			
-			if(t.x < t.y && t.x < t.z)
-				cell.x += dirSign.x;
-			else if(t.y < t.x && t.y < t.z)
-				cell.y += dirSign.y;
-		}
-		
-		// If we're travelling towards depth (eg away from camera) and did not intersect depth, increment mip level
-		if(depth < position.z)
-		{
-			if(cell.z < (int)_MaxMip)
-			{
-				cell.z++;
-				cell /= 2;
-			}
-			
-			continue;
-		}
-		
-		if(cell.z > 0)
-		{
-			cell.z--;
-			cell *= 2;
-		}
-		else if(i > 0)
-		{
-			float distance = max(0.0, LinearEyeDepth(position.z) - LinearEyeDepth(depth)) * lengthV;
-			if(distance <= _Thickness)
-				break;
-		}
-	}
-	
-	validHit = i < _MaxSteps;
-	return position;
-}
-
 struct TraceResult
 {
 	float3 color : SV_Target0;
@@ -105,148 +41,109 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
 	
+	// We define the depth of the base as the depth value as:
+	// b = DeviceDepth((1 + thickness) * LinearDepth(d))
+	// b = ((f - n) * d + n * (1 - (1 + thickness))) / ((f - n) * (1 + thickness))
+	// b = ((f - n) * d - n * thickness) / ((f - n) * (1 + thickness))
+	// b = d / (1 + thickness) - n / (f - n) * (thickness / (1 + thickness))
+	// b = d * k_s + k_b
+	// TODO: Precompute
+	float _SsrThicknessScale = 1.0f / (1.0f + _Thickness);
+	float _SsrThicknessBias = -_Near / (_Far - _Near) * (_Thickness * _SsrThicknessScale);
+	
     // Apply normal bias with the magnitude dependent on the distance from the camera.
     // Unfortunately, we only have access to the shading normal, which is less than ideal...
-    worldPosition = worldPosition * (1 - 0.001 * rcp(max(dot(N, V), FloatEps)));
-
-    // Ref. #1: Michal Drobot - Quadtree Displacement Mapping with Height Blending.
-    // Ref. #2: Yasin Uludag  - Hi-Z Screen-Space Cone-Traced Reflections.
-    // Ref. #3: Jean-Philippe Grenier - Notes On Screen Space HIZ Tracing.
-    // Warning: virtually all of the code below assumes reverse Z.
+	worldPosition = worldPosition * (1 - 0.001 * rcp(max(NdotV, FloatEps)));
 
     // We start tracing from the center of the current pixel, and do so up to the far plane.
-    float3 rayOrigin = float3(position.xy, depth);
-
-    float3 reflPosWS  = worldPosition + L;
+	float3 rayOrigin = float3(position.xy, depth);
 	float3 reflPosSS = MultiplyPointProj(_WorldToScreen, worldPosition + L);
 	reflPosSS.xy *= _ScaledResolution.xy;
-    float3 rayDir     = reflPosSS - rayOrigin;
-    float3 rcpRayDir  = rcp(rayDir);
-    int2   rayStep    = int2(rcpRayDir.x >= 0 ? 1 : 0,
-                             rcpRayDir.y >= 0 ? 1 : 0);
-    float3 raySign  = float3(rcpRayDir.x >= 0 ? 1 : -1,
-                             rcpRayDir.y >= 0 ? 1 : -1,
-                             rcpRayDir.z >= 0 ? 1 : -1);
-    bool   rayTowardsEye  =  rcpRayDir.z >= 0;
-
-    // Extend and clip the end point to the frustum.
-    float tMax;
-    {
-        // Shrink the frustum by half a texel for efficiency reasons.
-        const float halfTexel = 0.5;
-
-        float3 bounds;
-        bounds.x = (rcpRayDir.x >= 0) ? _ScaledResolution.x - halfTexel : halfTexel;
-        bounds.y = (rcpRayDir.y >= 0) ? _ScaledResolution.y - halfTexel : halfTexel;
-        bounds.z = (rcpRayDir.z >= 0) ? 1 : 0;
-
-        float3 dist = bounds * rcpRayDir - (rayOrigin * rcpRayDir);
-        tMax = Min3(dist);
-    }
-
-    const int maxMipLevel = _MaxMip;
+	float3 rayDir = reflPosSS - rayOrigin;
+	
+	int2 rayStep = rayDir >= 0;
+	float3 raySign = rayDir >= 0 ? 1 : -1;
+	bool rayTowardsEye = rayDir.z >= 0;
 
     // Start ray marching from the next texel to avoid self-intersections.
-    float t;
-    {
-        // 'rayOrigin' is the exact texel center.
-        float2 dist = abs(0.5 * rcpRayDir.xy);
-        t = min(dist.x, dist.y);
-    }
+    // 'rayOrigin' is the exact texel center.
+	float2 dist1 = abs(0.5 / rayDir.xy);
+	float t = min(dist1.x, dist1.y);
 
-    float3 rayPos;
+	float3 rayPos = rayOrigin + t * rayDir;
 
-    int  mipLevel  = 0;
-    int  iterCount = 0;
-    bool hit       = false;
-    bool miss      = false;
-    bool belowMip0 = false; // This value is set prior to entering the cell
+	int mipLevel = 0;
+	bool hit = false;
+	bool miss = false;
+	bool belowMip0 = false; // This value is set prior to entering the cell
 
-    while (!(hit || miss) && (t <= tMax) && (iterCount < _MaxSteps ))
-    {
-        rayPos = rayOrigin + t * rayDir;
+	for(uint i = 0; i < _MaxSteps; i++)
+	{
+		float2 sgnEdgeDist = round(rayPos.xy) - rayPos.xy;
+		float2 satEdgeDist = clamp(raySign.xy * sgnEdgeDist + 0.000488281, 0, 0.000488281);
 
-        // Ray position often ends up on the edge. To determine (and look up) the right cell,
-        // we need to bias the position by a small epsilon in the direction of the ray.
-        float2 sgnEdgeDist = round(rayPos.xy) - rayPos.xy;
-        float2 satEdgeDist = clamp(raySign.xy * sgnEdgeDist + 0.000488281, 0, 0.000488281);
-        rayPos.xy += raySign.xy * satEdgeDist;
+		int2 mipCoord = (int2)(rayPos.xy + raySign.xy * satEdgeDist) >> mipLevel;
+		float depth = _HiZDepth.mips[mipLevel][mipCoord];
+		
+		float3 bounds;
+		bounds.xy = (mipCoord + rayStep) << mipLevel;
+		bounds.z = depth;
 
-        int2 mipCoord  = (int2)rayPos.xy >> mipLevel;
-        // Bounds define 4 faces of a cube:
-        // 2 walls in front of the ray, and a floor and a base below it.
-        float4 bounds;
+		float3 dist = (bounds - rayOrigin) / rayDir;
+		float distWall = min(dist.x, dist.y);
 
-        bounds.xy = (mipCoord + rayStep) << mipLevel;
-        bounds.z  = _HiZDepth.mips[mipLevel][mipCoord];
+		bool belowFloor = rayPos.z < depth;
+		bool aboveBase = rayPos.z >= depth * _SsrThicknessScale + _SsrThicknessBias;
+		bool insideFloor = belowFloor && aboveBase;
+		bool hitFloor = (t <= dist.z) && (dist.z <= distWall);
 
-        // We define the depth of the base as the depth value as:
-        // b = DeviceDepth((1 + thickness) * LinearDepth(d))
-        // b = ((f - n) * d + n * (1 - (1 + thickness))) / ((f - n) * (1 + thickness))
-        // b = ((f - n) * d - n * thickness) / ((f - n) * (1 + thickness))
-        // b = d / (1 + thickness) - n / (f - n) * (thickness / (1 + thickness))
-        // b = d * k_s + k_b
-		float _SsrThicknessScale = 1.0f / (1.0f + _Thickness);
-		float _SsrThicknessBias = -_Near / (_Far - _Near) * (_Thickness * _SsrThicknessScale);
-        bounds.w = bounds.z * _SsrThicknessScale + _SsrThicknessBias;
+		miss = belowMip0 && insideFloor;
+		hit = (mipLevel == 0) && (hitFloor || insideFloor);
+		
+		if(hit || miss)
+		{
+			rayPos.z = depth;
+			break;
+		}
+		
+		belowMip0 = (mipLevel == 0) && belowFloor;
+		
+		if(hitFloor)
+		{
+			t = dist.z;
+			rayPos = rayOrigin + t * rayDir;
+			
+			if(mipLevel > 0)
+				mipLevel--;
+		}
+		else
+		{
+			if(mipLevel == 0 || !belowFloor)
+			{
+				t = distWall;
+				rayPos = rayOrigin + t * rayDir;
+			}
+				
+			mipLevel += (belowFloor || rayTowardsEye) ? -1 : 1;
+			mipLevel = clamp(mipLevel, 0, _MaxMip);
+		}
 
-        float4 dist      = bounds * rcpRayDir.xyzz - (rayOrigin.xyzz * rcpRayDir.xyzz);
-        float  distWall  = min(dist.x, dist.y);
-        float  distFloor = dist.z;
-        float  distBase  = dist.w;
-
-        // Note: 'rayPos' given by 't' can correspond to one of several depth values:
-        // - above or exactly on the floor
-        // - inside the floor (between the floor and the base)
-        // - below the base
-        bool belowFloor  = rayPos.z  < bounds.z;
-        bool aboveBase   = rayPos.z >= bounds.w;
-        bool insideFloor = belowFloor && aboveBase;
-        bool hitFloor    = (t <= distFloor) && (distFloor <= distWall);
-
-        // Game rules:
-        // * if the closest intersection is with the wall of the cell, switch to the coarser MIP, and advance the ray.
-        // * if the closest intersection is with the heightmap below,  switch to the finer   MIP, and advance the ray.
-        // * if the closest intersection is with the heightmap above,  switch to the finer   MIP, and do NOT advance the ray.
-        // Victory conditions:
-        // * See below. Do NOT reorder the statements!
-
-        miss      = belowMip0 && insideFloor;
-        hit       = (mipLevel == 0) && (hitFloor || insideFloor);
-        belowMip0 = (mipLevel == 0) && belowFloor;
-
-        // 'distFloor' can be smaller than the current distance 't'.
-        // We can also safely ignore 'distBase'.
-        // If we hit the floor, it's always safe to jump there.
-        // If we are at (mipLevel != 0) and we are below the floor, we should not move.
-        t = hitFloor ? distFloor : (((mipLevel != 0) && belowFloor) ? t : distWall);
-        rayPos.z = bounds.z; // Retain the depth of the potential intersection
-
-        // Warning: both rays towards the eye, and tracing behind objects has linear
-        // rather than logarithmic complexity! This is due to the fact that we only store
-        // the maximum value of depth, and not the min-max.
-        mipLevel += (hitFloor || belowFloor || rayTowardsEye) ? -1 : 1;
-        mipLevel  = clamp(mipLevel, 0, maxMipLevel);
-
-        // mipLevel = 0;
-
-        iterCount++;
-    }
+	}
 
     // Treat intersections with the sky as misses.
-    hit  = hit && !miss;
+	hit = hit && !miss;
 
     // Note that we are using 'rayPos' from the penultimate iteration, rather than
     // recompute it using the last value of 't', which would result in an overshoot.
     // It also needs to be precisely at the center of the pixel to avoid artifacts.
-    float2 hitPositionNDC = floor(rayPos.xy) * _ScaledResolution.zw + (0.5 * _ScaledResolution.zw);
+	float2 hitPositionNDC = (floor(rayPos.xy) + 0.5) * _ScaledResolution.zw;
 	
 	bool validHit = hit;
 	
 	// Ensure we have not hit the sky or gone out of bounds (Out of bounds is always 0)
 	float hitDepth = _Depth[rayPos.xy];
-	//if(!hitDepth)
-	//	validHit = false;
+	if(!hitDepth)
+		validHit = false;
 	
 	float3 worldHit = PixelToWorld(rayPos);
 	float3 hitRay = worldHit - worldPosition;
@@ -256,7 +153,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	if(dot(hitL, N) <= 0.0)
 		validHit = false;
 	
-	if (!validHit)
+	if(!validHit)
 		return (TraceResult)0;
 	
 	float2 velocity = Velocity[rayPos.xy];
@@ -268,7 +165,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float2 hitUv = ClampScaleTextureUv(rayPos.xy / _ScaledResolution.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
 
 	TraceResult output;
-	output.color = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel1) * _PreviousToCurrentExposure; 
+	output.color = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel1) * _PreviousToCurrentExposure;
 	output.hit = float4(hitRay, rcpPdf);
 	return output;
 }
@@ -280,6 +177,8 @@ float _IsFirst;
 
 float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
+	//return float4(_Input[position.xy].rgb, 1);
+	
 	float3 N = GBufferNormal(position.xy, _NormalRoughness);
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
@@ -379,13 +278,13 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
 	history.a = clamp(history.a, minValue.a, maxValue.a);
 	
-	if (!_IsFirst && all(saturate(historyUv) == historyUv))
+	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
 	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
 	result = RemoveNaN(result);
 	
-	result = _Input[position.xy];
+	//result = _Input[position.xy];
 	
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
 	bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
@@ -395,6 +294,6 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	output.result = result;
 	
 	float finalWeight = saturate(result.a) * _Intensity;
-	output.screenResult = result.rgb * _Intensity;// + ambient * (1.0 - finalWeight);
+	output.screenResult = result.rgb * _Intensity + ambient * (1.0 - finalWeight);
 	return output;
 }

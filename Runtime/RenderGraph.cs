@@ -504,4 +504,8 @@ namespace Arycama.CustomRenderPipeline
             GC.SuppressFinalize(this);
         }
     }
+
+    public class EmptyPassData
+    {
+    }
 }

@@ -60,18 +60,6 @@
     {
         Cull[_Cull]
 
-        HLSLINCLUDE
-        #pragma target 5.0
-
-        #pragma vertex Vertex
-        #pragma fragment Fragment
-
-        #pragma multi_compile_instancing
-
-        #pragma multi_compile _ INDIRECT_RENDERING
-        #pragma multi_compile _ LOD_FADE_CROSSFADE
-        ENDHLSL
-
         Pass
         {
             Name "Deferred"
@@ -84,8 +72,11 @@
             }
 
             HLSLPROGRAM
+            #pragma target 5.0
+            #pragma vertex Vertex
+            #pragma fragment Fragment
+            #pragma multi_compile_instancing
             #pragma shader_feature_local MODE_CUTOUT
-            #pragma shader_feature_local _PARALLAXMAP
 			#pragma shader_feature_local TRIPLANAR_ON
 
             #pragma multi_compile _ REFLECTION_PROBE_RENDERING
@@ -103,9 +94,10 @@
             Tags { "LightMode" = "Forward" }
 
             HLSLPROGRAM
-            #define CLUSTERED_LIGHTING_ON
-
-            #pragma shader_feature_local _PARALLAXMAP
+            #pragma target 5.0
+            #pragma vertex Vertex
+            #pragma fragment Fragment
+            #pragma multi_compile_instancing
 			#pragma shader_feature_local TRIPLANAR_ON
 
             #include "LitSurface.hlsl"
@@ -121,9 +113,11 @@
             Tags { "LightMode" = "ShadowCaster" }
 
             HLSLPROGRAM
-
+            #pragma target 5.0
+            #pragma vertex Vertex
+            #pragma fragment Fragment
+            #pragma multi_compile_instancing
             #pragma shader_feature_local _ MODE_CUTOUT MODE_FADE MODE_TRANSPARENT
-            #pragma shader_feature_local _PARALLAXMAP
 
             #include "LitSurface.hlsl"
             ENDHLSL
@@ -142,12 +136,26 @@
             }
 
             HLSLPROGRAM
+            #pragma vertex Vertex
+            #pragma fragment Fragment
+            #pragma multi_compile_instancing
             #pragma shader_feature_local MODE_CUTOUT
-            #pragma shader_feature_local _PARALLAXMAP
 			#pragma shader_feature_local TRIPLANAR_ON
 
             #define MOTION_VECTORS_ON
 
+            #include "LitSurface.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "RayTracing"
+            Tags{ "LightMode" = "RayTracing" }
+
+            HLSLPROGRAM
+            #pragma raytracing Raytracing
+            #define RAYTRACING_ON
             #include "LitSurface.hlsl"
             ENDHLSL
         }
