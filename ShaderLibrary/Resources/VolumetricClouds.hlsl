@@ -99,7 +99,6 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 
 Texture2D<float> _InputTransmittance, _TransmittanceHistory;
 float4 _HistoryScaleLimit, _TransmittanceHistoryScaleLimit;
-uint _MaxWidth, _MaxHeight;
 float _IsFirst;
 float _StationaryBlend, _MotionBlend, _MotionFactor;
 

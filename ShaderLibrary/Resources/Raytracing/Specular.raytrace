@@ -3,6 +3,7 @@
 #include "../../Random.hlsl"
 #include "../../Samplers.hlsl"
 #include "../../Lighting.hlsl"
+#include "../../ImageBasedLighting.hlsl"
 #include "../../Raytracing.hlsl"
 
 Texture2D<float4> _NormalRoughness;
@@ -31,16 +32,22 @@ void RayGeneration()
 	if(depth == 0.0)
 		return;
 	
+	float4 normalRoughness = _NormalRoughness[position];
+	float2 u = Noise2D(position);
 	float3 N = GBufferNormal(position, _NormalRoughness);
-	float3 noise3DCosine = Noise3DCosine(position);
-	float3 L = ShortestArcQuaternion(N, noise3DCosine);
-	float rcpPdf = Pi * rcp(noise3DCosine.z);
+	
 	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
+	float3 V = normalize(-worldPosition);
+	
+	float roughness = Sq(normalRoughness.a);
+	float3 H = SampleGGXIsotropic(V, roughness, u, N);
+	float3 L = reflect(-V, H);
+	float rcpPdf = rcp(PdfGGXVndfIsotropic(V, roughness, L, N));
 	
 	RayDesc ray;
 	ray.Origin = worldPosition;
 	ray.Direction = L;
-	ray.TMin = 1;
+	ray.TMin = 0.05;
 	ray.TMax = 1e10f;
 	
 	RayPayload payload;

@@ -129,6 +129,9 @@ namespace Arycama.CustomRenderPipeline
                     //weight = Mathf.Clamp01(1.0f - Mathf.Abs(x + jitter.x));
                     //weight *= Mathf.Clamp01(1.0f - Mathf.Abs(y + jitter.y));
 
+                    if (!settings.IsEnabled)
+                        weight = (x == 0 && y == 0) ? 1.0f : 0.0f;
+
                     weights[i] = weight;
                     boxWeightSum += weight;
                     maxBoxWeight = Mathf.Max(maxBoxWeight, weight);

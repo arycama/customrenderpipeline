@@ -103,6 +103,8 @@ cbuffer CameraData
 	
 	float _LinearDepthScale;
 	float _LinearDepthOffset;
+	
+	uint _MaxWidth, _MaxHeight;
 };
 
 cbuffer DrawData
@@ -223,6 +225,7 @@ float3 MultiplyPoint3x4(float4x4 mat, float3 p) { return p.x * mat._m00_m10_m20 
 float3 MultiplyPoint3x4(float3x4 mat, float3 p) { return MultiplyPoint3x4(p, transpose(mat)); }
 
 float3 MultiplyVector(float3 v, float3x3 mat, bool doNormalize) { return ConditionalNormalize(v.x * mat[0] + v.y * mat[1] + v.z * mat[2], doNormalize); }
+float3 MultiplyVector(float3 v, float3x4 mat, bool doNormalize) { return MultiplyVector(v, (float3x3)mat, doNormalize); }
 float3 MultiplyVector(float3 v, float4x4 mat, bool doNormalize) { return MultiplyVector(v, (float3x3)mat, doNormalize); }
 float3 MultiplyVector(float3x3 mat, float3 v, bool doNormalize) { return ConditionalNormalize(v.x * mat._m00_m10_m20 + (v.y * mat._m01_m11_m21 + (v.z * mat._m02_m12_m22)), doNormalize); }
 float3 MultiplyVector(float4x4 mat, float3 v, bool doNormalize) { return MultiplyVector((float3x3) mat, v, doNormalize); }

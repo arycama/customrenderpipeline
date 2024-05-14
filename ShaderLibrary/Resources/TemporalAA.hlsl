@@ -12,7 +12,6 @@ cbuffer Properties
 {
 	float4 _Resolution, _HistoryScaleLimit;
 	float _HasHistory, _VelocityBlending, _VelocityWeight, _Sharpness, _StationaryBlending, _Scale;
-	uint _MaxWidth, _MaxHeight;
 	
 	float _FilterSize;
 	

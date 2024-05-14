@@ -32,7 +32,7 @@
         [NoScaleOffset] _BentNormal("Bent Normal", 2D) = "bump" {}
 
         _EmissiveExposureWeight("Emission Exposure Weight", Range(0.0, 1.0)) = 1.0
-        [HDR] _EmissionColor("Emission Color", Color) = (0, 0, 0)
+        [HDR] _EmissionColor("Emission Color", Color) = (0, 0, 0, 0.0)
         [NoScaleOffset] _EmissionMap("Emission", 2D) = "white" {}
 
         [Header(Detail)]
@@ -154,9 +154,8 @@
             Tags{ "LightMode" = "RayTracing" }
 
             HLSLPROGRAM
-            #pragma raytracing Raytracing
-            #define RAYTRACING_ON
-            #include "LitSurface.hlsl"
+            #pragma raytracing RayTracing
+            #include "LitSurfaceRaytracing.hlsl"
             ENDHLSL
         }
     }

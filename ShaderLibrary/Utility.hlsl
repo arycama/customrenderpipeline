@@ -119,28 +119,6 @@ float PerceptualRoughnessToRoughness(float perceptualRoughness)
 	return Sq(perceptualRoughness);
 }
 
-// Generates an orthonormal (row-major) basis from a unit vector. TODO: make it column-major.
-// The resulting rotation matrix has the determinant of +1.
-// Ref: 'ortho_basis_pixar_r2' from http://marc-b-reynolds.github.io/quaternions/2016/07/06/Orthonormal.html
-float3x3 GetLocalFrame(float3 localZ)
-{
-	float x = localZ.x;
-	float y = localZ.y;
-	float z = localZ.z;
-	float sz = sign(z);
-	float a = 1 / (sz + z);
-	float ya = y * a;
-	float b = x * ya;
-	float c = x * sz;
-
-	float3 localX = float3(c * x * a - 1, sz * b, c);
-	float3 localY = float3(b, y * ya - sz, y);
-
-    // Note: due to the quaternion formulation, the generated frame is rotated by 180 degrees,
-    // s.t. if localZ = {0, 0, 1}, then localX = {-1, 0, 0} and localY = {0, -1, 0}.
-	return float3x3(localX, localY, localZ);
-}
-
 float2 QuadOffset(uint2 screenPos)
 {
 	return float2(screenPos & 1) * 2.0 - 1.0;

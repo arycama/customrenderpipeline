@@ -153,9 +153,19 @@ float3 RgbToYCoCgFastTonemap(float3 rgb)
 	return FastTonemapYCoCg(RgbToYCoCg(rgb));
 }
 
+float4 RgbToYCoCgFastTonemap(float4 rgb)
+{
+	return float4(FastTonemapYCoCg(RgbToYCoCg(rgb.rgb)), rgb.a);
+}
+
 float3 YCoCgToRgbFastTonemapInverse(float3 tonemappedYCoCg)
 {
 	return YCoCgToRgb(FastTonemapYCoCgInverse(tonemappedYCoCg));
+}
+
+float4 YCoCgToRgbFastTonemapInverse(float4 tonemappedYCoCg)
+{
+	return float4(YCoCgToRgb(FastTonemapYCoCgInverse(tonemappedYCoCg.rgb)), tonemappedYCoCg.a);
 }
 
 #endif

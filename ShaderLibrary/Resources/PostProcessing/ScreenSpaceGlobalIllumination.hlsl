@@ -177,16 +177,13 @@ float _IsFirst;
 
 float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	//return float4(_Input[position.xy].rgb, 1);
-	
 	float3 N = GBufferNormal(position.xy, _NormalRoughness);
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
 	
 	float4 result = 0.0;
-	float validHits = 0.0;
 	
-	// Sample center hit (Weight is always 1)
+	// Sample center hit
 	float4 hitData = _HitResult[position.xy];
 	if(hitData.w > 0.0)
 	{
@@ -196,21 +193,20 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		{
 			float weightOverPdf = weight * hitData.w;
 			float3 color = RgbToYCoCgFastTonemap(_Input[position.xy].rgb);
-			result.rgb += weightOverPdf * color;
+			result.rgb += RgbToYCoCgFastTonemap(_Input[position.xy].rgb * weightOverPdf);
 			result.a += weightOverPdf;
-			validHits++;
 		}
 	}
 	
 	for(uint i = 0; i < _ResolveSamples; i++)
 	{
+		break;
 		float2 u = VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize;
 		
-		float2 coord = floor(position.xy + u) + 0.5;
-		if(any(coord < 0.0 || coord > _ScaledResolution.xy - 1.0))
+		int2 coord = (int2)(position.xy + u);
+		if(any(coord < 0 || coord > int2(_MaxWidth, _MaxHeight)))
 			continue;
 			
-		validHits++;
 		float4 hitData = _HitResult[coord];
 		if(hitData.w <= 0.0)
 			continue;
@@ -225,8 +221,8 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		result.a += weightOverPdf;
 	}
 
-	result /= validHits;
 	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
+	//result /= _ResolveSamples + 1;
 	result = RemoveNaN(result);
 	return result;
 }
@@ -237,17 +233,11 @@ struct TemporalOutput
 	float3 screenResult : SV_Target1;
 };
 
-float4 UnpackSample(float4 samp)
-{
-	samp.rgb = RgbToYCoCgFastTonemap(samp.rgb);
-	return samp;
-}
-
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	// Neighborhood clamp
 	float4 result, mean, stdDev;
-	mean = result = UnpackSample(_Input[position.xy]);
+	mean = result = RgbToYCoCgFastTonemap(_Input[position.xy]);
 	stdDev = result * result;
 	result *= _CenterBoxFilterWeight;
 	
@@ -257,8 +247,11 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 		[unroll]
 		for(int x = -1; x <= 1; x++, i++)
 		{
-			float4 color = UnpackSample(_Input[position.xy + int2(x, y)]);
-			result += color * (i < 4 ? _BoxFilterWeights0[i % 4] : _BoxFilterWeights1[i % 4]);
+			if(x == 0 && y == 0)
+				continue;
+			
+			float4 color = RgbToYCoCgFastTonemap(_Input[position.xy + int2(x, y)]);
+			result += color * (i < 4 ? _BoxFilterWeights0[i & 3] : _BoxFilterWeights1[(i - 1) & 3]);
 			mean += color;
 			stdDev += color * color;
 		}
@@ -267,7 +260,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float2 historyUv = uv - Velocity[position.xy];
 	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history.rgb *= _PreviousToCurrentExposure;
-	history.rgb = RgbToYCoCgFastTonemap(history.rgb);
+	history = RgbToYCoCgFastTonemap(history);
 	
 	mean /= 9.0;
 	stdDev /= 9.0;
@@ -281,10 +274,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
-	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
+	result = YCoCgToRgbFastTonemapInverse(result);
 	result = RemoveNaN(result);
-	
-	//result = _Input[position.xy];
 	
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
 	bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
@@ -293,7 +284,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	TemporalOutput output;
 	output.result = result;
 	
-	float finalWeight = saturate(result.a) * _Intensity;
-	output.screenResult = result.rgb * _Intensity + ambient * (1.0 - finalWeight);
+	
+	output.screenResult = ambient * (1.0 - result.a * _Intensity) + result.rgb * _Intensity;
 	return output;
 }

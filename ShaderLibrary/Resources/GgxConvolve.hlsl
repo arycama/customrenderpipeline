@@ -1,4 +1,5 @@
 #include "../Common.hlsl"
+#include "../ImageBasedLighting.hlsl"
 #include "../Random.hlsl"
 #include "../Samplers.hlsl"
 
@@ -40,84 +41,6 @@ float3 SampleVndf_GGX(float2 u, float3 wi, float alpha, float3 n)
     float3 wm = normalize(wmStd_z + alpha * wmStd_xy);
     // return final normal
     return wm;
-}
-
-void SampleGGXDir(float2 u, float3 V, float3x3 localToWorld, float roughness, out float3 L, out float NdotL, out float NdotH, out float VdotH, bool VeqN = false)
-{
-    // GGX NDF sampling
-	float cosTheta = sqrt(SafeDiv(1.0 - u.x, 1.0 + (roughness * roughness - 1.0) * u.x));
-	float phi = TwoPi * u.y;
-
-	float3 localH = SphericalToCartesian(phi, cosTheta);
-
-	NdotH = cosTheta;
-
-	float3 localV;
-
-	if (VeqN)
-	{
-        // localV == localN
-		localV = float3(0.0, 0.0, 1.0);
-		VdotH = NdotH;
-	}
-	else
-	{
-		localV = mul(V, transpose(localToWorld));
-		VdotH = saturate(dot(localV, localH));
-	}
-
-    // Compute { localL = reflect(-localV, localH) }
-	float3 localL = -localV + 2.0 * VdotH * localH;
-	NdotL = localL.z;
-
-	L = mul(localL, localToWorld);
-}
-
-float D_GGXNoPI(float NdotH, float roughness)
-{
-	float a2 = Sq(roughness);
-	float s = (NdotH * a2 - NdotH) * NdotH + 1.0;
-
-    // If roughness is 0, returns (NdotH == 1 ? 1 : 0).
-    // That is, it returns 1 for perfect mirror reflection, and 0 otherwise.
-	return SafeDiv(a2, s * s);
-}
-
-float D_GGX(float NdotH, float roughness)
-{
-	return RcpPi * D_GGXNoPI(NdotH, roughness);
-}
-
-// Note: V = G / (4 * NdotL * NdotV)
-// Ref: http://jcgt.org/published/0003/02/03/paper.pdf
-float V_SmithJointGGX(float NdotL, float NdotV, float roughness, float partLambdaV)
-{
-	float a2 = Sq(roughness);
-
-    // Original formulation:
-    // lambda_v = (-1 + sqrt(a2 * (1 - NdotL2) / NdotL2 + 1)) * 0.5
-    // lambda_l = (-1 + sqrt(a2 * (1 - NdotV2) / NdotV2 + 1)) * 0.5
-    // G        = 1 / (1 + lambda_v + lambda_l);
-
-    // Reorder code to be more optimal:
-	float lambdaV = NdotL * partLambdaV;
-	float lambdaL = NdotV * sqrt((-NdotL * a2 + NdotL) * NdotL + a2);
-
-    // Simplify visibility term: (2.0 * NdotL * NdotV) /  ((4.0 * NdotL * NdotV) * (lambda_v + lambda_l))
-	return 0.5 / max(lambdaV + lambdaL, FloatMin);
-}
-
-// Precompute part of lambdaV
-float GetSmithJointGGXPartLambdaV(float NdotV, float roughness)
-{
-	float a2 = Sq(roughness);
-	return sqrt((-NdotV * a2 + NdotV) * NdotV + a2);
-}
-
-float V_SmithJointGGX(float NdotL, float NdotV, float roughness)
-{
-	float partLambdaV = GetSmithJointGGXPartLambdaV(NdotV, roughness);
-	return V_SmithJointGGX(NdotL, NdotV, roughness, partLambdaV);
 }
 
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target

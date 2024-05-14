@@ -7,7 +7,13 @@ namespace Arycama.CustomRenderPipeline
     {
         public void WriteTexture(RTHandle texture)
         {
-            RenderGraph.SetRTHandleWrite(texture, Index);
+            if (!texture.IsPersistent || !texture.IsAssigned)
+            {
+                if (texture.IsPersistent)
+                    texture.IsAssigned = true;
+
+                RenderGraph.SetRTHandleWrite(texture, Index);
+            }
         }
 
         public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)

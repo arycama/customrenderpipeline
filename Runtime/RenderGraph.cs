@@ -428,6 +428,9 @@ namespace Arycama.CustomRenderPipeline
 
             var outputs = passRTHandleOutputs.GetOrAdd(passIndex);
             outputs.Add(handle);
+
+            // Also set this as read.. incase the texture never gets used, this will ensure it at least doesn't cause leaks
+            SetLastRTHandleRead(handle, passIndex);
         }
 
         public void SetLastRTHandleRead(RTHandle handle, int passIndex)

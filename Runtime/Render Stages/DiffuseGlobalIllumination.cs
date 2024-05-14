@@ -51,7 +51,10 @@ public class DiffuseGlobalIllumination
                 pass.WriteTexture(hitResult, "HitResult");
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
+                pass.ReadTexture("PreviousFrame", previousFrame); // Temporary, cuz of leaks if we don't use it..
                 pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<Data>((command, pass, data) =>

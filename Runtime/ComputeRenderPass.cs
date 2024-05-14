@@ -25,17 +25,23 @@ namespace Arycama.CustomRenderPipeline
             this.normalizedDispatch = normalizedDispatch;
         }
 
-        public void WriteTexture(int propertyId, RTHandle handle, int mip = 0)
+        public void WriteTexture(int propertyId, RTHandle texture, int mip = 0)
         {
-            handle.EnableRandomWrite = true;
+            colorBindings.Add(new(texture, propertyId, mip));
+            texture.EnableRandomWrite = true;
 
-            colorBindings.Add(new(handle, propertyId, mip));
-            RenderGraph.SetRTHandleWrite(handle, Index);
+            if (!texture.IsPersistent || !texture.IsAssigned)
+            {
+                if (texture.IsPersistent)
+                    texture.IsAssigned = true;
+
+                RenderGraph.SetRTHandleWrite(texture, Index);
+            }
         }
 
-        public void WriteTexture(string propertyName, RTHandle handle, int mip = 0)
+        public void WriteTexture(string propertyName, RTHandle texture, int mip = 0)
         {
-            WriteTexture(Shader.PropertyToID(propertyName), handle, mip);
+            WriteTexture(Shader.PropertyToID(propertyName), texture, mip);
         }
 
         public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)

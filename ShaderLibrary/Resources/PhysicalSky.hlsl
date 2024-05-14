@@ -363,7 +363,6 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 
 float4 _SkyHistoryScaleLimit;
 Texture2D<float3> _SkyInput, _SkyHistory;
-uint _MaxWidth, _MaxHeight;
 float _IsFirst, _ClampWindow;
 
 float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target

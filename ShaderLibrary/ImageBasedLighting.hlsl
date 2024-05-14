@@ -4,6 +4,114 @@
 #include "Brdf.hlsl"
 #include "Samplers.hlsl"
 
+// Generates an orthonormal (row-major) basis from a unit vector. TODO: make it column-major.
+// The resulting rotation matrix has the determinant of +1.
+// Ref: 'ortho_basis_pixar_r2' from http://marc-b-reynolds.github.io/quaternions/2016/07/06/Orthonormal.html
+float3x3 GetLocalFrame(float3 localZ)
+{
+	float x = localZ.x;
+	float y = localZ.y;
+	float z = localZ.z;
+	float sz = sign(z);
+	float a = 1 / (sz + z);
+	float ya = y * a;
+	float b = x * ya;
+	float c = x * sz;
+
+	float3 localX = float3(c * x * a - 1, sz * b, c);
+	float3 localY = float3(b, y * ya - sz, y);
+
+    // Note: due to the quaternion formulation, the generated frame is rotated by 180 degrees,
+    // s.t. if localZ = {0, 0, 1}, then localX = {-1, 0, 0} and localY = {0, -1, 0}.
+	return float3x3(localX, localY, localZ);
+}
+
+float3 SampleGGXReflection(float3 i, float alpha, float2 rand)
+{
+	float3 i_std = normalize(float3(i.xy * alpha, i.z));
+    
+    // Sample a spherical cap
+	float phi = 2.0f * Pi * rand.x;
+	float a = alpha; // Eq. 6
+	float s = 1.0f + length(float2(i.x, i.y)); // Omit sgn for a<=1
+	float a2 = a * a;
+	float s2 = s * s;
+	float k = (1.0f - a2) * s2 / (s2 + a2 * i.z * i.z); // Eq. 5
+	float b = i.z > 0 ? k * i_std.z : i_std.z;
+	float z = mad(1.0f - rand.y, 1.0f + b, -b);
+	float sinTheta = sqrt(saturate(1.0f - z * z));
+	float3 o_std = float3(sinTheta * cos(phi), sinTheta * sin(phi), z);
+    
+    // Compute the microfacet normal m
+	float3 m_std = i_std + o_std;
+	return normalize(float3(m_std.xy * alpha, m_std.z));
+}
+
+float GGXReflectionPDF(float3 i, float alpha, float NdotH)
+{
+	float ndf = D_GGX(NdotH, alpha);
+	float2 ai = alpha * i.xy;
+	float len2 = dot(ai, ai);
+	float t = sqrt(len2 + i.z * i.z);
+	if(i.z >= 0.0f)
+	{
+		float a = alpha; // Eq. 6
+		float s = 1.0f + length(float2(i.x, i.y)); // Omit sgn for a<=1
+		float a2 = a * a;
+		float s2 = s * s;
+		float k = (1.0f - a2) * s2 / (s2 + a2 * i.z * i.z); // Eq. 5
+		return ndf / (2.0f * (k * i.z + t)); // Eq. 8 * ||dm/do||
+	}
+    
+    // Numerically stable form of the previous PDF for i.z < 0
+	return ndf * (t - i.z) / (2.0f * len2); // = Eq. 7 * ||dm/do||
+}
+
+float3 SampleGGXIsotropic(float3 wi, float alpha, float2 u, float3 n)
+{
+    // decompose the floattor in parallel and perpendicular components
+	float3 wi_z = -n * dot(wi, n);
+	float3 wi_xy = wi + wi_z;
+ 
+    // warp to the hemisphere configuration
+	float3 wiStd = -normalize(alpha * wi_xy + wi_z);
+ 
+    // sample a spherical cap in (-wiStd.z, 1]
+	float wiStd_z = dot(wiStd, n);
+	float z = 1.0 - u.y * (1.0 + wiStd_z);
+	float sinTheta = sqrt(saturate(1.0f - z * z));
+	float phi = TwoPi * u.x - Pi;
+	float x = sinTheta * cos(phi);
+	float y = sinTheta * sin(phi);
+	float3 cStd = float3(x, y, z);
+ 
+    // reflect sample to align with normal
+	float3 up = float3(0, 0, 1.000001); // Used for the singularity
+	float3 wr = n + up;
+	float3 c = dot(wr, cStd) * wr / wr.z - cStd;
+ 
+    // compute halfway direction as standard normal
+	float3 wmStd = c + wiStd;
+	float3 wmStd_z = n * dot(n, wmStd);
+	float3 wmStd_xy = wmStd_z - wmStd;
+     
+    // return final normal
+	return normalize(alpha * wmStd_xy + wmStd_z);
+}
+
+float PdfGGXVndfIsotropic(float3 wi, float alpha, float3 wo, float3 n)
+{
+	float alphaSquare = alpha * alpha;
+	float3 wm = normalize(wo + wi);
+	float zm = dot(wm, n);
+	float zi = dot(wi, n);
+	float nrm = rsqrt((zi * zi) * (1.0f - alphaSquare) + alphaSquare);
+	float sigmaStd = (zi * nrm) * 0.5f + 0.5f;
+	float sigmaI = sigmaStd / nrm;
+	float nrmN = (zm * zm) * (alphaSquare - 1.0f) + 1.0f;
+	return alphaSquare / (Pi * 4.0f * nrmN * nrmN * sigmaI);
+}
+
 float3 IndirectSpecularFactor(float NdotV, float perceptualRoughness, float3 f0)
 {
 	// Ref https://jcgt.org/published/0008/01/03/
