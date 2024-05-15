@@ -54,6 +54,11 @@ namespace Arycama.CustomRenderPipeline
             command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, buffer);
         }
 
+        public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
+        {
+            command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, buffer);
+        }
+
         public override void SetVector(CommandBuffer command, string propertyName, Vector4 value)
         {
             command.SetComputeVectorParam(computeShader, propertyName, value);

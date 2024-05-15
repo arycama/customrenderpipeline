@@ -1,6 +1,7 @@
 using Arycama.CustomRenderPipeline;
 using System;
 using Unity.Collections.LowLevel.Unsafe;
+using Unity.Properties;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
@@ -25,7 +26,6 @@ public class TerrainSystem
     private Material generateIdMapMaterial;
 
     private Texture2DArray diffuseArray, normalMapArray, maskMapArray;
-
     private int VerticesPerTileEdge => settings.PatchVertices + 1;
     private int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
     private TerrainData terrainData => terrain.terrainData;
@@ -246,7 +246,7 @@ public class TerrainSystem
             {
                 pass.SetInt(command, "LayerCount", terrainData.alphamapLayers);
                 pass.SetFloat(command, "_Resolution", idMapResolution);
-                (pass as FullscreenRenderPass).propertyBlock.SetBuffer("TerrainLayerData", terrainLayerData);
+                pass.SetBuffer(command, "TerrainLayerData", terrainLayerData);
                 pass.SetVector(command, "TerrainSize", terrain.terrainData.size);
 
                 // Shader supports up to 8 layers. Can easily be increased by modifying shader though
@@ -270,6 +270,32 @@ public class TerrainSystem
         // Set this every frame incase of changes..
         // TODO: Only do when data changed?
         FillLayerData();
+    }
+
+    public void SetupRenderData(Vector3 viewPosition)
+    {
+        if (terrain == null)
+            return;
+
+        var position = terrain.GetPosition() - viewPosition;
+        var size = terrainData.size;
+        var terrainScaleOffset = new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z);
+        var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainData.heightmapResolution);
+        var terrainHeightOffset = position.y;
+        renderGraph.ResourceMap.SetRenderPassData(new TerrainRenderData(diffuseArray, normalMapArray, maskMapArray, heightmap, normalmap, idMap, terrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainData.alphamapResolution, terrainLayerData));
+
+        // This sets raytracing data on the terrain's material property block
+        using (var pass = renderGraph.AddRenderPass<SetPropertyBlockPass>("Terrain Data Property Block Update"))
+        {
+            var propertyBlock = pass.propertyBlock;
+            terrain.GetSplatMaterialPropertyBlock(propertyBlock);
+            pass.AddRenderPassData<TerrainRenderData>();
+
+            var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+            {
+                terrain.SetSplatMaterialPropertyBlock(propertyBlock);
+            });
+        }
     }
 
     struct CullResult
@@ -467,17 +493,14 @@ public class TerrainSystem
 
             pass.Initialize(material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
             pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
-            pass.ReadTexture("_TerrainHeightmapTexture", heightmap);
-            pass.ReadTexture("_TerrainNormalMap", normalmap);
 
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+            pass.AddRenderPassData<TerrainRenderData>();
             commonPassData.SetInputs(pass);
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
                 commonPassData.SetProperties(pass, command);
-
-                pass.SetTexture(command, "_TerrainHolesTexture", terrainData.holesTexture);
 
                 pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
                 pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
@@ -494,15 +517,6 @@ public class TerrainSystem
 
                 pass.SetFloat(command, "_MaxLod", Mathf.Log(settings.CellCount, 2));
 
-                // These may be needed in other passes
-                pass.SetFloat(command, "_TerrainHeightScale", size.y);
-                pass.SetFloat(command, "_TerrainHeightOffset", position.y);
-
-                pass.SetVector(command, "_TerrainScaleOffset", new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z));
-
-                var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainData.heightmapResolution);
-                pass.SetVector(command, "_TerrainRemapHalfTexel", terrainRemapHalfTexel);
-
                 pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
                 var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
                 for (var i = 0; i < cullingPlanes.Count; i++)
@@ -510,16 +524,6 @@ public class TerrainSystem
 
                 pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
                 ArrayPool<Vector4>.Release(cullingPlanesArray);
-
-                pass.SetTexture(command, "AlbedoSmoothness", diffuseArray);
-                pass.SetTexture(command, "Normal", normalMapArray);
-                pass.SetTexture(command, "Mask", maskMapArray);
-
-                (pass as DrawProceduralIndirectRenderPass).propertyBlock.SetBuffer("TerrainLayerData", terrainLayerData);
-                pass.SetTexture(command, "IdMap", idMap);
-                pass.SetFloat(command, "IdMapResolution", terrainData.alphamapResolution);
-
-                pass.SetVector(command, "TerrainSize", terrain.terrainData.size);
             });
         }
     }
@@ -547,15 +551,12 @@ public class TerrainSystem
             pass.DepthSlice = cascadeIndex;
 
             pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
-            pass.ReadTexture("_TerrainHeightmapTexture", heightmap);
-
             commonPassData.SetInputs(pass);
+            pass.AddRenderPassData<TerrainRenderData>();
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
                 commonPassData.SetProperties(pass, command);
-
-                pass.SetTexture(command, "_TerrainHolesTexture", terrainData.holesTexture);
 
                 pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
                 pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
@@ -571,16 +572,6 @@ public class TerrainSystem
                 pass.SetFloat(command, "_HeightUvOffset", 0.5f / terrainData.heightmapResolution);
 
                 pass.SetFloat(command, "_MaxLod", Mathf.Log(settings.CellCount, 2));
-
-                // These may be needed in other passes
-                pass.SetFloat(command, "_TerrainHeightScale", size.y);
-                pass.SetFloat(command, "_TerrainHeightOffset", position.y);
-
-                pass.SetVector(command, "_TerrainScaleOffset", new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z));
-
-                var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainData.heightmapResolution);
-                pass.SetVector(command, "_TerrainRemapHalfTexel", terrainRemapHalfTexel);
-
                 pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
 
                 var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
@@ -590,7 +581,6 @@ public class TerrainSystem
                 pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
                 ArrayPool<Vector4>.Release(cullingPlanesArray);
 
-                pass.SetVector(command, "TerrainSize", terrain.terrainData.size);
                 pass.SetMatrix(command, "_WorldToClip", worldToClip);
             });
         }

@@ -1,5 +1,6 @@
 #include "../../Color.hlsl"
 #include "../../Common.hlsl"
+#include "../../Exposure.hlsl"
 #include "../../Samplers.hlsl"
 
 #pragma kernel LuminanceBuildHistogram
@@ -94,7 +95,8 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	float previousExposure = _Exposure;
 	float evLastFrame = ExposureToEV100(previousExposure);// + ExposureCompensation;
 	float adaptedEv = lerp(averageEv, evLastFrame, exp(-DeltaTime * AdaptationSpeed));
-
+	adaptedEv = averageEv;
+	
 	if(Mode == 1.0)
 		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso) + ExposureCompensation;
 	

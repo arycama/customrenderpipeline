@@ -448,6 +448,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<CloudData>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<CloudShadowDataResult>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
                 commonPassData.SetInputs(pass);
 
@@ -481,6 +482,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Depth", cameraDepth);
                 commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {

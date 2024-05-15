@@ -167,6 +167,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	TraceResult output;
 	output.color = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel1) * _PreviousToCurrentExposure;
 	output.hit = float4(hitRay, rcpPdf);
+	output.hit = float4(hitRay, 1.0);
 	return output;
 }
 
@@ -181,49 +182,33 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
 	
+	float validHits = 0.0;
 	float4 result = 0.0;
-	
-	// Sample center hit
-	float4 hitData = _HitResult[position.xy];
-	if(hitData.w > 0.0)
+	for(uint i = 0; i <= _ResolveSamples; i++)
 	{
-		float3 L = normalize(hitData.xyz);
-		float weight = dot(N, L) * RcpPi;
-		if(weight > 0.0)
-		{
-			float weightOverPdf = weight * hitData.w;
-			float3 color = RgbToYCoCgFastTonemap(_Input[position.xy].rgb);
-			result.rgb += RgbToYCoCgFastTonemap(_Input[position.xy].rgb * weightOverPdf);
-			result.a += weightOverPdf;
-		}
-	}
-	
-	for(uint i = 0; i < _ResolveSamples; i++)
-	{
-		break;
-		float2 u = VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize;
+		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
 		
-		int2 coord = (int2)(position.xy + u);
-		if(any(coord < 0 || coord > int2(_MaxWidth, _MaxHeight)))
-			continue;
-			
+		int2 coord = clamp((int2)(position.xy + u), 0, int2(_MaxWidth, _MaxHeight));
 		float4 hitData = _HitResult[coord];
 		if(hitData.w <= 0.0)
 			continue;
 		
+		validHits++;
 		float3 L = normalize(hitData.xyz);
 		float weight = dot(N, L) * RcpPi;
 		if(weight <= 0.0)
 			continue;
 		
 		float weightOverPdf = weight * hitData.w;
-		result.rgb += RgbToYCoCgFastTonemap(_Input[coord].rgb * weightOverPdf);
+		result.rgb += RgbToYCoCgFastTonemap(_Input[coord].rgb) * weightOverPdf;
 		result.a += weightOverPdf;
 	}
 
+	if(result.a)
+		result.rgb /= result.a;
+	
 	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
-	//result /= _ResolveSamples + 1;
-	result = RemoveNaN(result);
+	result.a = validHits / (_ResolveSamples + 1);
 	return result;
 }
 
@@ -280,11 +265,9 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
 	bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
 	float3 ambient = AmbientLight(bentNormalOcclusion.xyz, bentNormalOcclusion.w);
-
+	
 	TemporalOutput output;
 	output.result = result;
-	
-	
-	output.screenResult = ambient * (1.0 - result.a * _Intensity) + result.rgb * _Intensity;
+	output.screenResult = lerp(ambient, result.rgb, result.a * _Intensity);
 	return output;
 }

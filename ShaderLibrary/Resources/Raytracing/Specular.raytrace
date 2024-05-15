@@ -12,9 +12,10 @@ Texture2D<float> _Depth;
 RWTexture2D<float3> HitColor;
 RWTexture2D<float4> HitResult;
 
+float _RaytracingBias, _RaytracingDistantBias;
+
 RaytracingAccelerationStructure SceneRaytracingAccelerationStructure;
 
-#pragma editor_sync_compilation
 #pragma max_recursion_depth 1
 
 [shader("miss")]
@@ -39,15 +40,18 @@ void RayGeneration()
 	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
 	float3 V = normalize(-worldPosition);
 	
+	// We also need to undo the planet curve, since it's not accounted for in the BLAS
+	worldPosition = PlanetCurveInverse(worldPosition);
+	
 	float roughness = Sq(normalRoughness.a);
 	float3 H = SampleGGXIsotropic(V, roughness, u, N);
 	float3 L = reflect(-V, H);
 	float rcpPdf = rcp(PdfGGXVndfIsotropic(V, roughness, L, N));
 	
 	RayDesc ray;
-	ray.Origin = worldPosition;
+	ray.Origin = worldPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
 	ray.Direction = L;
-	ray.TMin = 0.05;
+	ray.TMin = 0.0;
 	ray.TMax = 1e10f;
 	
 	RayPayload payload;
@@ -57,5 +61,5 @@ void RayGeneration()
 	TraceRay(SceneRaytracingAccelerationStructure, 0, 0xFF, 0, 1, 0, ray, payload);
 	
 	HitColor[position] = R11G11B10ToFloat3(payload.packedColor); // This is a bit redundant since we pack into a float3 anyway.. maybe just keep it packed?
-	HitResult[position] = float4(L, rcpPdf);
+	HitResult[position] = payload.hitDistance ? float4(L * payload.hitDistance, rcpPdf) : 0.0;
 }

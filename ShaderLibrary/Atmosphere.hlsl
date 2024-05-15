@@ -330,6 +330,13 @@ float3 PlanetCurve(float3 worldPosition)
 	return worldPosition;
 }
 
+// Undoes the planet curve, needed for raytracing to avoid self intersections
+float3 PlanetCurveInverse(float3 worldPosition)
+{
+	worldPosition.y -= sqrt(Sq(_PlanetRadius) - SqrLength(worldPosition.xz)) - _PlanetRadius;
+	return worldPosition;
+}
+
 float3 PlanetCurvePrevious(float3 positionRWS)
 {
 	float dst = length(positionRWS.xz) / _PlanetRadius;

@@ -1,4 +1,5 @@
 #include "../Common.hlsl"
+#include "../Exposure.hlsl"
 #include "../Utility.hlsl"
 #include "../Color.hlsl"
 #include "../Temporal.hlsl"

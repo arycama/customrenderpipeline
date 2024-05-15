@@ -1,6 +1,7 @@
 #ifndef CLOUD_COMMON_INCLUDED
 #define CLOUD_COMMON_INCLUDED
 
+#include "Exposure.hlsl"
 #include "Lighting.hlsl"
 #include "Geometry.hlsl"
 #include "Random.hlsl"

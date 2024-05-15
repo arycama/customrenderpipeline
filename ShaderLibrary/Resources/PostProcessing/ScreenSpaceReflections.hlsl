@@ -221,81 +221,43 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
     float NdotV;
     N = GetViewReflectedNormal(N, V, NdotV);
     
-    float4 result = 0.0;
-    
-    float3x3 localToWorld = GetLocalFrame(N);
-    float3 localV = mul(localToWorld, V);
-    
     float4 albedoMetallic = AlbedoMetallic[position.xy];
     float f0 = Max3(lerp(0.04, albedoMetallic.rgb, albedoMetallic.a));
-    float validHits = 0;
 
-    // Sample center hit (Weight is always 1)
-	float4 hitData = _HitResult[position.xy];
-    if(hitData.w > 0.0)
-    {
-		float3 L = normalize(hitData.xyz);
-        float NdotL = dot(N, L);
-		if(NdotL > 0.0)
-		{
-			float LdotV = dot(L, V);
-			float invLenLV = rsqrt(2.0 * LdotV + 2.0);
-			float NdotH = (NdotL + NdotV) * invLenLV;
-			float LdotH = invLenLV * LdotV + invLenLV;
-			float3 localBrdf = GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL) * NdotL;
-			float weightOverPdf = localBrdf * hitData.w;
-			result = float4(_Input[position.xy].rgb * weightOverPdf, weightOverPdf);
-			validHits++;
-		}
-	}
-    
-    for(int i = 0; i < _ResolveSamples; i++)
+	float validHits = 0.0;
+    float4 result = 0.0;
+    for(uint i = 0; i <= _ResolveSamples; i++)
 	{
-		break;
-        float2 u = VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize;
-        
-		float2 coord = floor(position.xy + u) + 0.5;
-        if(any(coord < 0.0 || coord > _ScaledResolution.xy - 1.0))
-            continue;
-            
+		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
+		
+		int2 coord = clamp((int2)(position.xy + u), 0, int2(_MaxWidth, _MaxHeight));
 		float4 hitData = _HitResult[coord];
-        if(hitData.w <= 0.0)
-            continue;
+		if(hitData.w <= 0.0)
+			continue;
         
-        //float3 hitPosition = worldPosition + hitData.xyz;// PixelToWorld(float3(hitData.xy, Linear01ToDeviceDepth(hitData.z)));
-        //float3 hitN = GBufferNormal(hitData.xy, _NormalRoughness);
+		validHits++;
 		float3 L = normalize(hitData.xyz);
-        
-        // Skip sample locations if we hit a backface
-        //if(dot(hitN, L) > 0.0)
-        //   continue;
-        
         float NdotL = dot(N, L);
 		if(NdotL <= 0.0)
 			continue;
-        
-        validHits++;
-        
-        float LdotV = dot(L, V);
-        float invLenLV = rsqrt(2.0 * LdotV + 2.0);
-        float NdotH = (NdotL + NdotV) * invLenLV;
-        float LdotH = invLenLV * LdotV + invLenLV;
-        float3 localBrdf = GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL) * NdotL;
-        
-        float weightOverPdf = localBrdf * hitData.w;// / GGXReflectionPDF(localV, roughness, NdotH);
-		float3 color = _Input[coord].rgb * weightOverPdf;
-		result.rgb += color;
-        result.a += weightOverPdf;
+		
+		float LdotV = dot(L, V);
+		float invLenLV = rsqrt(2.0 * LdotV + 2.0);
+		float NdotH = (NdotL + NdotV) * invLenLV;
+		float LdotH = invLenLV * LdotV + invLenLV;
+		float weight = GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL) * NdotL;
+		
+		float weightOverPdf = weight * hitData.w;
+		result.rgb += RgbToYCoCgFastTonemap(_Input[coord].rgb) * weightOverPdf;
+		result.a += weightOverPdf;
 	}
 
-    //result /= validHits; // add 1 because of first sample
-    //result = YCoCgToRgbFastTonemapInverse(result);
-    
-    //if(result.a)
-    //    result.rgb /= result.a;
-    
-    result = RemoveNaN(result);
-    return result;
+	if(result.a)
+		result.rgb /= result.a;
+	
+	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
+	result.a = validHits / (_ResolveSamples + 1);
+	return result;
 }
 
 struct TemporalOutput
@@ -304,17 +266,11 @@ struct TemporalOutput
     float3 screenResult : SV_Target1;
 };
 
-float4 UnpackSample(float4 samp)
-{
-    samp.rgb = RgbToYCoCgFastTonemap(samp.rgb);
-    return samp;
-}
-
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	// Neighborhood clamp
-	float4 minValue, maxValue, result, mean, stdDev;
-	minValue = maxValue = mean = result = RgbToYCoCgFastTonemap(_Input[position.xy]);
+	float4 result, mean, stdDev;
+	mean = result = RgbToYCoCgFastTonemap(_Input[position.xy]);
 	stdDev = result * result;
 	result *= _CenterBoxFilterWeight;
 	
@@ -336,23 +292,23 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	float2 historyUv = uv - Velocity[position.xy];
 	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
-    history.rgb *= _PreviousToCurrentExposure;
+	history.rgb *= _PreviousToCurrentExposure;
 	history = RgbToYCoCgFastTonemap(history);
-    
-    mean /= 9.0;
+	
+	mean /= 9.0;
 	stdDev /= 9.0;
 	stdDev = sqrt(abs(stdDev - mean * mean));
-	minValue = max(minValue, mean - stdDev);
-	maxValue = min(maxValue, mean + stdDev);
+	float4 minValue = mean - stdDev;
+	float4 maxValue = mean + stdDev;
 	
-	//history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
-	//history.a = clamp(history.a, minValue.a, maxValue.a);
-    
-	if (!_IsFirst && all(saturate(historyUv) == historyUv))
+	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
+	history.a = clamp(history.a, minValue.a, maxValue.a);
+	
+	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
-    
+	
 	result = YCoCgToRgbFastTonemapInverse(result);
-    result = RemoveNaN(result);
+	result = RemoveNaN(result);
     
     float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
     bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
@@ -371,20 +327,11 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
     float3 f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
 	float3 radiance = IndirectSpecular(N, V, f0, NdotV, normalRoughness.a, bentNormalOcclusion.a, bentNormalOcclusion.xyz, isWater, _SkyReflection);
     
-    TemporalOutput output;
-    output.result = result;
-    
-    if(result.a)
-        result.rgb /= result.a;
-    
 	float2 directionalAlbedo = DirectionalAlbedo(NdotV, normalRoughness.a);
-    
-    float3 specularIntensity = lerp(directionalAlbedo.x, directionalAlbedo.y, f0);
-    
-    //output.screenResult = lerp(radiance, result.rgb, saturate(result.a / directionalAlbedo.x) * _Intensity) * specularIntensity;
-    
-    //float weight = saturate(result.a / directionalAlbedo.x);
-    //output.screenResult = radiance * (1.0 - weight * _Intensity) * specularIntensity + result.rgb * specularIntensity * _Intensity;
-	output.screenResult = (result.rgb * _Intensity + radiance * (1.0 - result.a * _Intensity)) * specularIntensity;
-    return output;
+	float3 specularIntensity = lerp(directionalAlbedo.x, directionalAlbedo.y, f0);
+	
+	TemporalOutput output;
+	output.result = result;
+	output.screenResult = lerp(radiance, result.rgb, result.a * _Intensity);
+	return output;
 }

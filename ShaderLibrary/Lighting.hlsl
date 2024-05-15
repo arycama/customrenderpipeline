@@ -4,6 +4,7 @@
 #include "Atmosphere.hlsl"
 #include "Brdf.hlsl"
 #include "Common.hlsl"
+#include "Exposure.hlsl"
 #include "ImageBasedLighting.hlsl"
 #include "Temporal.hlsl"
 
@@ -297,8 +298,9 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
 	#else
 		float3 radiance = IndirectSpecular(input.normal, V, input.f0, NdotV, input.perceptualRoughness, input.occlusion, input.bentNormal, input.isWater, _SkyReflection);
-		radiance *= IndirectSpecularFactor(NdotV, input.perceptualRoughness, input.f0);
 	#endif
+	
+	radiance *= IndirectSpecularFactor(NdotV, input.perceptualRoughness, input.f0);
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float3 irradiance = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit));

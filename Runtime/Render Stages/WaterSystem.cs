@@ -621,6 +621,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<LitData.Result>();
                 pass.AddRenderPassData<WaterShadowResult>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
                 commonPassData.SetInputs(pass);
 

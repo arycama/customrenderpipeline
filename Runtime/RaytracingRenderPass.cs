@@ -11,10 +11,11 @@ namespace Arycama.CustomRenderPipeline
         private string rayGenName, shaderPassName;
         private int width, height, depth;
         private RayTracingAccelerationStructure rtas;
+        private float bias, distantBias;
 
         protected readonly List<(RTHandle, int)> colorBindings = new();
 
-        public void Initialize(RayTracingShader shader, string rayGenName, string shaderPassName, RayTracingAccelerationStructure rtas, int width = 1, int height = 1, int depth = 1)
+        public void Initialize(RayTracingShader shader, string rayGenName, string shaderPassName, RayTracingAccelerationStructure rtas, int width = 1, int height = 1, int depth = 1, float bias = 0.01f, float distantBias = 0.01f)
         {
             this.shader = shader;
             this.rayGenName = rayGenName;
@@ -23,6 +24,8 @@ namespace Arycama.CustomRenderPipeline
             this.height = height;
             this.depth = depth;
             this.rtas = rtas;
+            this.bias = bias;
+            this.distantBias = distantBias;
         }
 
         public void WriteTexture(RTHandle texture, int propertyId)
@@ -51,7 +54,16 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer)
         {
-            //command.SetRayTracingBufferParam(shader, propertyName, buffer);
+            // only way.. :( 
+            command.SetGlobalBuffer(propertyName, buffer);
+           // command.SetRayTracingBufferParam(shader, propertyName, buffer);
+        }
+
+        public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
+        {
+            // only way.. :( 
+            command.SetGlobalBuffer(propertyName, buffer);
+            //command.SetRayTracingBufferParam.SetBuffer(propertyName, buffer);
         }
 
         public override void SetVector(CommandBuffer command, string propertyName, Vector4 value)
@@ -81,6 +93,8 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Execute(CommandBuffer command)
         {
+            command.SetRayTracingFloatParams(shader, "_RaytracingBias", bias);
+            command.SetRayTracingFloatParams(shader, "_RaytracingDistantBias", distantBias);
             command.SetRayTracingAccelerationStructure(shader, "SceneRaytracingAccelerationStructure", rtas);
             command.SetRayTracingShaderPass(shader, shaderPassName);
             command.DispatchRays(shader, rayGenName, (uint)width, (uint)height, (uint)depth);

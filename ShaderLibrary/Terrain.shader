@@ -58,25 +58,15 @@ Shader "Terrain"
             ENDHLSL
         }
 
-        //Pass
-        //{
-        //    Name "Voxelization"
-        //    Tags{ "LightMode" = "Voxelization" }
+        Pass
+        {
+            Name "RayTracing"
+            Tags { "LightMode" = "RayTracing" }
 
-        //    ColorMask 0
-        //    ZWrite Off
-        //    Cull Off
-        //    ZTest Always
-        //    Conservative True
-
-        //    HLSLPROGRAM
-        //    #pragma target 5.0
-        //    #pragma vertex VertexVoxel
-        //    #pragma geometry Geometry
-        //    #pragma fragment FragmentVoxel
-
-        //    #include "LitTerrain.hlsl"
-        //    ENDHLSL
-        //}
+            HLSLPROGRAM
+            #pragma raytracing RayTracing
+            #include "TerrainRaytracing.hlsl"
+            ENDHLSL
+        }
     }
 }

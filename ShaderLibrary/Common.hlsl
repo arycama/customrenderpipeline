@@ -26,14 +26,6 @@ struct PointLight
 	float padding;
 };
 
-cbuffer Exposure
-{
-	float _Exposure;
-	float _RcpExposure;
-	float _PreviousToCurrentExposure;
-	float _CurrentToPreviousExposure;
-};
-
 Buffer<uint> _LightClusterList;
 StructuredBuffer<DirectionalLight> _DirectionalLights;
 StructuredBuffer<matrix> _DirectionalMatrices;

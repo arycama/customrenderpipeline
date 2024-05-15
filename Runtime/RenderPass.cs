@@ -25,6 +25,7 @@ namespace Arycama.CustomRenderPipeline
         public abstract void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
 
         public abstract void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer);
+        public abstract void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer);
         public abstract void SetVector(CommandBuffer command, string propertyName, Vector4 value);
         public abstract void SetVectorArray(CommandBuffer command, string propertyName, Vector4[] value);
         public abstract void SetFloat(CommandBuffer command, string propertyName, float value);

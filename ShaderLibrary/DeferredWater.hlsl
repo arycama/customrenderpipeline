@@ -5,6 +5,7 @@
 
 #include "Atmosphere.hlsl"
 #include "Common.hlsl"
+#include "Exposure.hlsl"
 #include "GBuffer.hlsl"
 #include "Lighting.hlsl"
 #include "Random.hlsl"

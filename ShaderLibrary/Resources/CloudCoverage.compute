@@ -45,5 +45,5 @@ void CSMain (uint groupIndex : SV_GroupIndex)
 	
 	result = isnan(result) || (result.y == 0) ? float2(0.0, 1.0).xxxy : result;
 	
-	_Result[0] = result;
+	_Result[0] = float4(0, 0, 0, 1);//result;
 }

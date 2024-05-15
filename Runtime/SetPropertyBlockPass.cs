@@ -1,48 +1,31 @@
 ﻿using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class DrawProceduralIndirectRenderPass : GraphicsRenderPass
+    public class SetPropertyBlockPass : RenderPass
     {
         public readonly MaterialPropertyBlock propertyBlock;
-        private Material material;
-        private int passIndex;
-        private GraphicsBuffer indexBuffer;
-        private BufferHandle indirectArgsBuffer;
-        private MeshTopology topology;
-        private float depthBias, slopeDepthBias;
-        private bool zClip;
 
-        public string Keyword { get; set; }
-
-        public DrawProceduralIndirectRenderPass()
+        public SetPropertyBlockPass()
         {
             propertyBlock = new MaterialPropertyBlock();
         }
 
-        public override string ToString()
-        {
-            return $"{Name} {material} {passIndex}";
-        }
-
-        public void Initialize(Material material, GraphicsBuffer indexBuffer, BufferHandle indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, string keyword = null, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true)
-        {
-            this.material = material;
-            this.passIndex = passIndex;
-            this.Keyword = keyword;
-            this.indexBuffer = indexBuffer;
-            this.indirectArgsBuffer = indirectArgsBuffer;
-            this.topology = topology;
-            this.depthBias = depthBias;
-            this.slopeDepthBias = slopeDepthBias;
-            this.zClip = zClip;
-        }
-
         public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
-            propertyBlock.SetTexture(propertyName, texture);
+            switch (subElement)
+            {
+                case RenderTextureSubElement.Depth:
+                    propertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Depth);
+                    break;
+                case RenderTextureSubElement.Stencil:
+                    propertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Stencil);
+                    break;
+                default:
+                    propertyBlock.SetTexture(propertyName, texture);
+                    break;
+            }
         }
 
         public override void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer)
@@ -82,31 +65,6 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Execute(CommandBuffer command)
         {
-            if (!string.IsNullOrEmpty(Keyword))
-            {
-                command.EnableShaderKeyword(Keyword);
-            }
-
-            if (depthBias != 0.0f || slopeDepthBias != 0.0f)
-                command.SetGlobalDepthBias(depthBias, slopeDepthBias);
-
-            command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
-            command.DrawProceduralIndirect(indexBuffer, Matrix4x4.identity, material, passIndex, topology, indirectArgsBuffer, 0, propertyBlock);
-            command.SetGlobalFloat("_ZClip", 1.0f);
-
-            if (depthBias != 0.0f || slopeDepthBias != 0.0f)
-                command.SetGlobalDepthBias(0.0f, 0.0f);
-
-            if (!string.IsNullOrEmpty(Keyword))
-            {
-                command.DisableShaderKeyword(Keyword);
-                Keyword = null;
-            }
-
-            material = null;
-            passIndex = 0;
-            propertyBlock.Clear();
-            zClip = true;
         }
 
         public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)
@@ -122,6 +80,10 @@ namespace Arycama.CustomRenderPipeline
         public override void SetMatrixArray(CommandBuffer command, string propertyName, Matrix4x4[] value)
         {
             propertyBlock.SetMatrixArray(propertyName, value);
+        }
+
+        protected override void SetupTargets(CommandBuffer command)
+        {
         }
     }
 }

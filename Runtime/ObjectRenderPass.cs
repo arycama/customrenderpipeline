@@ -33,6 +33,12 @@ namespace Arycama.CustomRenderPipeline
             //postRender.Add(cmd => cmd.SetGlobalBuffer(propertyName, (GraphicsBuffer)null));
         }
 
+        public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
+        {
+            command.SetGlobalBuffer(propertyName, buffer);
+            //postRender.Add(cmd => cmd.SetGlobalBuffer(propertyName, (GraphicsBuffer)null));
+        }
+
         public override void SetVector(CommandBuffer command, string propertyName, Vector4 value)
         {
             command.SetGlobalVector(propertyName, value);

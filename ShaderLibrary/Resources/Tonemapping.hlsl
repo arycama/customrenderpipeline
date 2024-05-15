@@ -1,4 +1,5 @@
 #include "../Common.hlsl"
+#include "../Exposure.hlsl"
 #include "../Color.hlsl"
 #include "../Samplers.hlsl"
 
