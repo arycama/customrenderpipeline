@@ -88,6 +88,7 @@ public class ScreenSpaceShadows
                     pass.SetFloat(command, "_Thickness", settings.Thickness);
                     pass.SetFloat(command, "_Intensity", settings.Intensity);
                     pass.SetFloat(command, "_MaxMip", Texture2DExtensions.MipCount(width, height) - 1);
+                    pass.SetFloat(command, "LightCosTheta", Mathf.Cos(settings.LightAngularDiameter * Mathf.Deg2Rad * 0.5f));
                 });
             }
         }

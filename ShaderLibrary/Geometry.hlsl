@@ -7,11 +7,15 @@
 float4 _CullingPlanes[6];
 uint _CullingPlanesCount;
 
+float3 SphericalToCartesian(float cosPhi, float sinPhi, float cosTheta, float sinTheta)
+{
+	return float3(float2(cosPhi, sinPhi) * sinTheta, cosTheta);
+}
+
 float3 SphericalToCartesian(float cosPhi, float sinPhi, float cosTheta)
 {
 	float sinTheta = SinFromCos(cosTheta);
-
-	return float3(float2(cosPhi, sinPhi) * sinTheta, cosTheta);
+	return SphericalToCartesian(cosPhi, sinPhi, cosTheta, sinTheta);
 }
 
 float3 SphericalToCartesian(float phi, float cosTheta)
@@ -133,6 +137,13 @@ float3 ShortestArcQuaternion(float3 baseNormal, float3 detailNormal)
 	float3 tp = baseNormal + float3(0, 0, 1);
 	float3 up = detailNormal * float2(-1, 1).xxy;
 	return tp * dot(tp, up) / tp.z - up;
+}
+
+float3 SampleConeUniform(float u1, float u2, float cosTheta)
+{
+	float r0 = cosTheta + u1 * (1.0 - cosTheta);
+	float phi = TwoPi * u2;
+	return SphericalToCartesian(phi, r0);
 }
 
 #endif
