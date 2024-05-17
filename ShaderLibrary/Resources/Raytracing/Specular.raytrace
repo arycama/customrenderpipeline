@@ -43,7 +43,7 @@ void RayGeneration()
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	worldPosition = PlanetCurveInverse(worldPosition);
 	
-	float roughness = Sq(normalRoughness.a);
+	float roughness = max(1e-6, Sq(normalRoughness.a));
 	float3 H = SampleGGXIsotropic(V, roughness, u, N);
 	float3 L = reflect(-V, H);
 	float rcpPdf = rcp(PdfGGXVndfIsotropic(V, roughness, L, N));
@@ -58,7 +58,8 @@ void RayGeneration()
 	payload.packedColor = 0.0;
 	payload.hitDistance = 0.0;
 	
-	TraceRay(SceneRaytracingAccelerationStructure, 0, 0xFF, 0, 1, 0, ray, payload);
+	uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
 	
 	HitColor[position] = R11G11B10ToFloat3(payload.packedColor); // This is a bit redundant since we pack into a float3 anyway.. maybe just keep it packed?
 	HitResult[position] = payload.hitDistance ? float4(L * payload.hitDistance, rcpPdf) : 0.0;

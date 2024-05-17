@@ -69,8 +69,8 @@ struct FragmentOutput
 Texture2D<float4> _BentNormal, _MainTex, _BumpMap, _MetallicGlossMap, _DetailAlbedoMap, _DetailNormalMap, _EmissionMap, _OcclusionMap, _ParallaxMap;
 Texture2D<float> _AnisotropyMap;
 
-//cbuffer UnityPerMaterial
-//{
+cbuffer UnityPerMaterial
+{
 	float4 _DetailAlbedoMap_ST, _MainTex_ST;
 	float4 _Color;
 	float3 _EmissionColor;
@@ -84,7 +84,7 @@ Texture2D<float> _AnisotropyMap;
 	float Blurry_Refractions;
 	float Anisotropy;
 	float _TriplanarSharpness;
-//};
+};
 
 FragmentInput Vertex(VertexInput input)
 {

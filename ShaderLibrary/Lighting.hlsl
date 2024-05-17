@@ -342,10 +342,10 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 					attenuation *= _WaterShadows.SampleCmpLevelZero(_LinearClampCompareSampler, shadowPosition.xy, shadowPosition.z);
 			}
 			
-			//attenuation *= ScreenSpaceShadows[input.pixelPosition];
+			attenuation = ScreenSpaceShadows[input.pixelPosition];
 		}
-		
-		attenuation *= GetShadow(input.worldPosition, i, !isVolumetric);
+		else
+			attenuation *= GetShadow(input.worldPosition, i, !isVolumetric);
 		
 		if (!attenuation)
 			continue;

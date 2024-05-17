@@ -21,14 +21,5 @@ Shader "Hidden/ScreenSpaceShadows"
             #include "ScreenSpaceShadows.hlsl"
             ENDHLSL
         }
-
-		Pass
-        {
-            HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
-            #pragma fragment FragmentTemporal
-            #include "ScreenSpaceShadows.hlsl"
-            ENDHLSL
-        }
     }
 }

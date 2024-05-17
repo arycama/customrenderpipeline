@@ -91,6 +91,7 @@ public class ScreenSpaceReflections
                     pass.SetFloat(command, "_Intensity", settings.Intensity);
                     pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
                     pass.SetFloat(command, "_Thickness", settings.Thickness);
+                    pass.SetFloat(command, "_MaxMip", Texture2DExtensions.MipCount(width, height) - 1);
                     pass.SetVector(command, "_PreviousColorScaleLimit", previousFrameColor.ScaleLimit2D);
                     commonPassData.SetProperties(pass, command);
                 });

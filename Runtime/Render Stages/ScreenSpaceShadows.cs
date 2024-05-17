@@ -9,6 +9,8 @@ public class ScreenSpaceShadows
     [Serializable]
     public class Settings
     {
+        [field: SerializeField] public bool UseRaytracing { get; private set; } = true;
+        [field: SerializeField, Range(0.0f, 180.0f)] public float LightAngularDiameter { get; private set; } = 0.5f;
         [field: SerializeField, Range(0.0f, 1.0f)] public float Intensity { get; private set; } = 1.0f;
         [field: SerializeField, Range(1, 128)] public int MaxSamples { get; private set; } = 32;
         [field: SerializeField, Range(0f, 1.0f)] public float Thickness { get; private set; } = 0.1f;
@@ -17,51 +19,77 @@ public class ScreenSpaceShadows
     private readonly RenderGraph renderGraph;
     private readonly Material material;
     private readonly Settings settings;
+    private readonly RayTracingShader shadowRaytracingShader;
 
     public ScreenSpaceShadows(RenderGraph renderGraph, Settings settings)
     {
         this.renderGraph = renderGraph;
         material = new Material(Shader.Find("Hidden/ScreenSpaceShadows")) { hideFlags = HideFlags.HideAndDontSave };
         this.settings = settings;
+        shadowRaytracingShader = Resources.Load<RayTracingShader>("Raytracing/Shadow");
     }
 
-    public void Render(RTHandle depth, RTHandle hiZDepth, int width, int height, ICommonPassData commonPassData, Camera camera, CullingResults cullingResults)
+    public void Render(RTHandle depth, RTHandle hiZDepth, int width, int height, ICommonPassData commonPassData, Camera camera, CullingResults cullingResults, float bias, float distantBias, RTHandle normalRoughness)
     {
+        var lightDirection = Vector3.up;
+        for (var i = 0; i < cullingResults.visibleLights.Length; i++)
+        {
+            var light = cullingResults.visibleLights[i];
+            if (light.lightType != LightType.Directional)
+                continue;
+
+            lightDirection = -light.localToWorldMatrix.Forward();
+            break;
+        }
+
         var result = renderGraph.GetTexture(width, height, GraphicsFormat.R8_UNorm);
 
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows"))
+        if (settings.UseRaytracing)
         {
-            pass.Initialize(material, 0, 1, null, camera);
-            pass.WriteTexture(result);
-
-            pass.AddRenderPassData<LightingSetup.Result>();
-            pass.AddRenderPassData<ShadowRenderer.Result>();
-            pass.AddRenderPassData<TemporalAA.TemporalAAData>();
-
-            pass.ReadTexture("_Depth", depth);
-            pass.ReadTexture("_HiZDepth", hiZDepth);
-            
-            commonPassData.SetInputs(pass);
-
-            var lightDirection = Vector3.up;
-            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
+            using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Raytraced Shadows"))
             {
-                var light = cullingResults.visibleLights[i];
-                if (light.lightType != LightType.Directional)
-                    continue;
+                var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>();
 
-                lightDirection = -light.localToWorldMatrix.Forward();
-                break;
+                pass.Initialize(shadowRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, width, height, 1, bias, distantBias);
+                pass.WriteTexture(result, "HitResult");
+                pass.ReadTexture("_Depth", depth);
+
+                commonPassData.SetInputs(pass);
+
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                {
+                    commonPassData.SetProperties(pass, command);
+                    pass.SetVector(command, "LightDirection", lightDirection);
+                    pass.SetFloat(command, "LightCosTheta", Mathf.Cos(settings.LightAngularDiameter * Mathf.Deg2Rad * 0.5f));
+                });
             }
-
-            var data = pass.SetRenderFunction<Data>((command, pass, data) =>
+        }
+        else
+        {
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows"))
             {
-                commonPassData.SetProperties(pass, command);
-                pass.SetVector(command, "LightDirection", lightDirection);
-                pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
-                pass.SetFloat(command, "_Thickness", settings.Thickness);
-                pass.SetFloat(command, "_Intensity", settings.Intensity);
-            });
+                pass.Initialize(material, 0, 1, null, camera);
+                pass.WriteTexture(result);
+
+                pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<ShadowRenderer.Result>();
+                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+
+                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_HiZDepth", hiZDepth);
+                pass.ReadTexture("_NormalRoughness", normalRoughness);
+
+                commonPassData.SetInputs(pass);
+                var data = pass.SetRenderFunction<Data>((command, pass, data) =>
+                {
+                    commonPassData.SetProperties(pass, command);
+                    pass.SetVector(command, "LightDirection", lightDirection);
+                    pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
+                    pass.SetFloat(command, "_Thickness", settings.Thickness);
+                    pass.SetFloat(command, "_Intensity", settings.Intensity);
+                    pass.SetFloat(command, "_MaxMip", Texture2DExtensions.MipCount(width, height) - 1);
+                });
+            }
         }
 
         renderGraph.ResourceMap.SetRenderPassData(new Result(result));

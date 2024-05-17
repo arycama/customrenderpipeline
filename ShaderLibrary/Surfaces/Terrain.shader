@@ -68,5 +68,16 @@ Shader "Terrain"
             #include "TerrainRaytracing.hlsl"
             ENDHLSL
         }
+
+        // Pass
+        // {
+        //     Name "RayTracing Visibility"
+        //     Tags{ "LightMode" = "RaytracingVisibility" }
+
+        //     HLSLPROGRAM
+        //     #pragma raytracing RayTracing
+        //     #include "TerrainRaytracingVisibility.hlsl"
+        //     ENDHLSL
+        // }
     }
 }

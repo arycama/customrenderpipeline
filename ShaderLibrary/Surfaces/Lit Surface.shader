@@ -158,6 +158,17 @@
             #include "LitSurfaceRaytracing.hlsl"
             ENDHLSL
         }
+
+        // Pass
+        // {
+        //     Name "RayTracing Visibility"
+        //     Tags{ "LightMode" = "RaytracingVisibility" }
+
+        //     HLSLPROGRAM
+        //     #pragma raytracing RayTracing
+        //     #include "LitSurfaceRaytracingVisibility.hlsl"
+        //     ENDHLSL
+        // }
     }
 
     CustomEditor "LitSurfaceShaderGUI"

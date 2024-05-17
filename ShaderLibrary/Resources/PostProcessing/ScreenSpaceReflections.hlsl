@@ -7,6 +7,7 @@
 #include "../../Temporal.hlsl"
 #include "../../Lighting.hlsl"
 #include "../../ImageBasedLighting.hlsl"
+#include "../../ScreenSpaceRaytracing.hlsl"
 
 Texture2D<float4> _NormalRoughness, _BentNormalOcclusion, AlbedoMetallic;
 Texture2D<float3> PreviousFrame;
@@ -17,103 +18,9 @@ Texture2D<uint2> _Stencil;
 cbuffer Properties
 {
 	float4 _PreviousColorScaleLimit;
-	float _MaxSteps, _Thickness, _Intensity, _ResolveSize;
+	float _MaxSteps, _Thickness, _Intensity, _ResolveSize, _MaxMip;
     uint _ResolveSamples;
 };
-
-#define FLOAT_MAX                          3.402823466e+38
-
-void InitialAdvanceRay(float3 origin, float3 direction, float3 inv_direction, float2 currentMipResolution, float2 floor_offset, float2 uv_offset, out float3 position, out float current_t) 
-{
-    // Intersect ray with the half box that is pointing away from the ray origin.
-    float2 xy_plane = floor(currentMipResolution * origin.xy) + floor_offset;
-    xy_plane = xy_plane * rcp(currentMipResolution) + uv_offset;
-
-    // o + d * t = p' => t = (p' - o) / d
-    float2 t = xy_plane * inv_direction.xy - origin.xy * inv_direction.xy;
-    current_t = min(t.x, t.y);
-    position = origin + current_t * direction;
-}
-
-bool AdvanceRay(float3 origin, float3 direction, float3 inv_direction, float2 currentMipPosition, float2 currentMipResolution, float2 floor_offset, float2 uv_offset, float surface_z, inout float3 position, inout float current_t) 
-{
-    // Create boundary planes
-    float2 xy_plane = floor(currentMipPosition) + floor_offset;
-    xy_plane = xy_plane * rcp(currentMipResolution) + uv_offset;
-    float3 boundary_planes = float3(xy_plane, surface_z);
-
-    // Intersect ray with the half box that is pointing away from the ray origin.
-    // o + d * t = p' => t = (p' - o) / d
-    float3 t = boundary_planes * inv_direction - origin * inv_direction;
-
-    // Prevent using z plane when shooting out of the depth buffer.
-    t.z = direction.z < 0 ? t.z : FLOAT_MAX;
-
-    // Choose nearest intersection with a boundary.
-    float t_min = min(min(t.x, t.y), t.z);
-
-    // Larger z means closer to the camera.
-    bool above_surface = surface_z < position.z;
-
-    // Decide whether we are able to advance the ray until we hit the xy boundaries or if we had to clamp it at the surface.
-    // We use the asuint comparison to avoid NaN / Inf logic, also we actually care about bitwise equality here to see if t_min is the t.z we fed into the min3 above.
-    bool skipped_tile = asuint(t_min) != asuint(t.z) && above_surface; 
-
-    // Make sure to only advance the ray if we're still above the surface.
-    current_t = above_surface ? t_min : current_t;
-
-    // Advance ray
-    position = origin + current_t * direction;
-
-    return skipped_tile;
-}
-
-// Requires origin and direction of the ray to be in screen space [0, 1] x [0, 1]
-float3 HierarchicalRaymarch(float3 origin, float3 direction, float lengthV, out bool validHit, out float t) 
-{
-    float3 inv_direction = direction != 0 ? 1.0 / direction : FLOAT_MAX;
-
-    // Start on mip with highest detail.
-    int currentMip = 0;
-
-    // Could recompute these every iteration, but it's faster to hoist them out and update them.
-    float2 currentMipResolution = floor(_ScaledResolution.xy * exp2(-currentMip));
-
-    // Offset to the bounding boxes uv space to intersect the ray with the center of the next pixel.
-    // This means we ever so slightly over shoot into the next region. 
-    float2 uv_offset = 0.005 * exp2(0) / _ScaledResolution.xy;
-    uv_offset = direction.xy < 0 ? -uv_offset : uv_offset;
-
-    // Offset applied depending on current mip resolution to move the boundary to the left/right upper/lower border depending on ray direction.
-    float2 floor_offset = direction.xy >= 0;
-    
-    // Initially advance ray to avoid immediate self intersections.
-    t = 0;
-    float3 position;
-    InitialAdvanceRay(origin, direction, inv_direction, currentMipResolution, floor_offset, uv_offset, position, t);
-
-    for (uint i = 0; i < _MaxSteps; i++) 
-    {
-        float2 currentMipPosition = currentMipResolution * position.xy;
-        float surface_z = _HiZDepth.mips[currentMip][currentMipPosition];
-        bool skipped_tile = AdvanceRay(origin, direction, inv_direction, currentMipPosition, currentMipResolution, floor_offset, uv_offset, surface_z, position, t);
-        currentMip += skipped_tile ? 1 : -1;
-        currentMipResolution *= skipped_tile ? 0.5 : 2;
-        
-		if(currentMip >= 0)
-			continue;
-        
-        // Compute eye space distance between hit and current point
-		float distance = abs(LinearEyeDepth(position.z) - LinearEyeDepth(surface_z)) * lengthV;
-		if(distance <= _Thickness)
-			break;
-        
-		currentMip = 0;
-	}
-
-    validHit = (i <= _MaxSteps);
-    return position;
-}
 
 struct TraceResult
 {
@@ -148,37 +55,26 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
     // We start tracing from the center of the current pixel, and do so up to the far plane.
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
 	
-	float3 rayOrigin = float3(uv, depth);
-	float3 reflPosSS = PerspectiveDivide(WorldToClip(worldPosition + L));
-	reflPosSS.xy = 0.5 * reflPosSS.xy + 0.5;
-	reflPosSS.y = 1.0 - reflPosSS.y;
+	// Apply normal bias with the magnitude dependent on the distance from the camera.
+    // Unfortunately, we only have access to the shading normal, which is less than ideal...
+	worldPosition = worldPosition * (1 - 0.001 * rcp(max(NdotV, FloatEps)));
 	
-	float3 rayDir = reflPosSS - rayOrigin;
-
-    float t;
 	bool validHit;
-	float3 hit = HierarchicalRaymarch(rayOrigin, rayDir, rcp(rcpVLength), validHit, t);
+	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZDepth, _MaxMip, validHit);
 	
-    float2 hitPixel = floor(hit.xy * _ScaledResolution.xy) + 0.5;
+	float3 worldHit = PixelToWorld(rayPos);
+	float3 hitRay = worldHit - worldPosition;
+	float hitDist = length(hitRay);
+	
+	float3 hitL = normalize(hitRay);
+	if(dot(hitL, N) <= 0.0)
+		validHit = false;
+	
+	if(!validHit)
+		return (TraceResult)0;
     
-    // Ensure hit has not gone off screen TODO: Feels like this could be handled during the raymarch?
-    if(any(hit.xy < 0.0 && hit.xy > 1.0))
-        validHit = false;
-    
-    // Ensure we have not hit the sky
-    float hitDepth = _Depth[hitPixel];
-    if(!hitDepth)
-        validHit = false;
-    
-    float eyeHitDepth = LinearEyeDepth(hitDepth);
-    float3 worldHit = PixelToWorld(float3(hitPixel, hitDepth));
-    float3 hitRay = worldHit - worldPosition;
-    float hitDist = length(hitRay);
-    
-	if (!validHit)
-        return (TraceResult)0;
-    
-	float2 velocity = Velocity[hitPixel];
+	float2 velocity = Velocity[rayPos.xy];
+	float linearHitDepth = LinearEyeDepth(rayPos.z);
 	float r = Sq(_NormalRoughness[position.xy].a);
 	float lobeApertureHalfAngle = r * (1.3331290497744692 - r * 0.5040552688878546);
     float coneTangent = tan(lobeApertureHalfAngle);
@@ -186,16 +82,16 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
     coneTangent = r * r * sqrt(beta * rcp(1.0 - beta));
     coneTangent *= lerp(saturate(NdotV * 2), 1, sqrt(roughness));
         
-	float coveredPixels = _ScaledResolution.y * 0.5 * hitDist * coneTangent / (eyeHitDepth * _TanHalfFov);
+	float coveredPixels = _ScaledResolution.y * 0.5 * hitDist * coneTangent / (linearHitDepth * _TanHalfFov);
 	float mipLevel = log2(coveredPixels);
 		
 	// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
 	// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
-    float2 hitUv = ClampScaleTextureUv(hit.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
+	float2 hitUv = ClampScaleTextureUv(rayPos.xy / _ScaledResolution.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
     
     TraceResult output;
 	output.color =  PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel) * _PreviousToCurrentExposure; 
-    output.hit = float4(hitPixel, Linear01Depth(hitDepth), rcpPdf);
+	output.hit = float4(hitRay, rcpPdf);
     output.hit = float4(L, rcpPdf);
     return output;
 }

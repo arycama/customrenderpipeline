@@ -1,10 +1,10 @@
-#include "Atmosphere.hlsl"
-#include "Common.hlsl"
-#include "GBuffer.hlsl"
-#include "Geometry.hlsl"
-#include "Lighting.hlsl"
-#include "Raytracing.hlsl"
-#include "Samplers.hlsl"
+#include "../Atmosphere.hlsl"
+#include "../Common.hlsl"
+#include "../GBuffer.hlsl"
+#include "../Geometry.hlsl"
+#include "../Lighting.hlsl"
+#include "../Raytracing.hlsl"
+#include "../Samplers.hlsl"
 
 Texture2D<float> _TerrainHeightmapTexture;
 Texture2D<float2> _TerrainNormalMap;
