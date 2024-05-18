@@ -47,7 +47,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	worldPosition = worldPosition * (1 - 0.001 * rcp(max(NdotV, FloatEps)));
 
 	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZDepth, _MaxMip, validHit);
+	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZDepth, _MaxMip, validHit, float3(position.xy, depth));
 	
 	float3 worldHit = PixelToWorld(rayPos);
 	float3 hitRay = worldHit - worldPosition;
@@ -70,7 +70,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 
 	TraceResult output;
 	output.color = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel) * _PreviousToCurrentExposure;
-	output.hit = float4(hitRay, rcpPdf);
+	output.hit = float4(rayPos.xy - position.xy, Linear01Depth(rayPos.z), rcpPdf);
 	return output;
 }
 
@@ -96,15 +96,16 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		if(hitData.w <= 0.0)
 			continue;
 		
-		validHits++;
-		float3 L = normalize(hitData.xyz);
-		float weight = dot(N, L) * RcpPi;
+		float3 hitPosition = PixelToWorld(float3(coord + hitData.xy, Linear01ToDeviceDepth(hitData.z)));
+		float3 L = normalize(hitPosition - worldPosition);
+		float weight = dot(N, L);
 		if(weight <= 0.0)
 			continue;
 		
-		float weightOverPdf = weight * hitData.w;
+		float weightOverPdf = weight * RcpPi * hitData.w;
 		result.rgb += RgbToYCoCgFastTonemap(_Input[coord].rgb) * weightOverPdf;
 		result.a += weightOverPdf;
+		validHits++;
 	}
 
 	if(result.a)

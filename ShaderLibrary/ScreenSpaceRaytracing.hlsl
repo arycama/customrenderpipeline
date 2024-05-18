@@ -5,7 +5,7 @@
 #include "Random.hlsl"
 #include "Lighting.hlsl"
 
-float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, float maxSteps, float thickness, Texture2D<float> hiZDepth, float maxMip, out bool validHit)
+float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, float maxSteps, float thickness, Texture2D<float> hiZDepth, float maxMip, out bool validHit, float3 screenPos)
 {
 	// We define the depth of the base as the depth value as:
 	// b = DeviceDepth((1 + thickness) * LinearDepth(d))
@@ -18,11 +18,8 @@ float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, float maxSteps, float
 	float _SsrThicknessBias = -_Near / (_Far - _Near) * (thickness * _SsrThicknessScale);
 	
     // We start tracing from the center of the current pixel, and do so up to the far plane.
-	float3 rayOrigin = MultiplyPointProj(_WorldToScreen, worldPosition);
-	rayOrigin.xy *= _ScaledResolution.xy;
-	
-	float3 reflPosSS = MultiplyPointProj(_WorldToScreen, worldPosition + L);
-	reflPosSS.xy *= _ScaledResolution.xy;
+	float3 rayOrigin = MultiplyPointProj(_WorldToPixel, worldPosition);
+	float3 reflPosSS = MultiplyPointProj(_WorldToPixel, worldPosition + L);
 	float3 rayDir = reflPosSS - rayOrigin;
 	
 	int2 rayStep = rayDir >= 0;
@@ -41,7 +38,8 @@ float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, float maxSteps, float
 	bool miss = false;
 	bool belowMip0 = false; // This value is set prior to entering the cell
 
-	for(uint i = 0; i < maxSteps; i++)
+	uint i = 0;
+	for(i = 0; i < maxSteps; i++)
 	{
 		float2 sgnEdgeDist = round(rayPos.xy) - rayPos.xy;
 		float2 satEdgeDist = clamp(raySign.xy * sgnEdgeDist + 0.000488281, 0, 0.000488281);
@@ -91,16 +89,23 @@ float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, float maxSteps, float
 			mipLevel += (belowFloor || rayTowardsEye) ? -1 : 1;
 			mipLevel = clamp(mipLevel, 0, maxMip);
 		}
-
 	}
 
     // Treat intersections with the sky as misses.
-	validHit = validHit && !miss;
+	if(miss)
+		validHit = false;
+		
+	if(i >= maxSteps - 1)
+	{
+		float hitDepth = hiZDepth[rayPos.xy];
+		if(!hitDepth)
+			validHit = false;
+	}
 
     // Note that we are using 'rayPos' from the penultimate iteration, rather than
     // recompute it using the last value of 't', which would result in an overshoot.
     // It also needs to be precisely at the center of the pixel to avoid artifacts.
-	float2 hitPositionNDC = (floor(rayPos.xy) + 0.5) * _ScaledResolution.zw;
+		float2 hitPositionNDC = (floor(rayPos.xy) + 0.5) * _ScaledResolution.zw;
 	
 	// Ensure we have not hit the sky or gone out of bounds (Out of bounds is always 0)
 	// TODO: I don't think this will ever be true

@@ -99,17 +99,13 @@ float3 SampleGGXIsotropic(float3 wi, float alpha, float2 u, float3 n)
 	return normalize(alpha * wmStd_xy + wmStd_z);
 }
 
-float PdfGGXVndfIsotropic(float3 wi, float alpha, float3 wo, float3 n)
+float RcpPdfGGXVndfIsotropic1(float NdotV, float NdotH, float alpha)
 {
-	float alphaSquare = alpha * alpha;
-	float3 wm = normalize(wo + wi);
-	float zm = dot(wm, n);
-	float zi = dot(wi, n);
-	float nrm = rsqrt((zi * zi) * (1.0f - alphaSquare) + alphaSquare);
-	float sigmaStd = (zi * nrm) * 0.5f + 0.5f;
-	float sigmaI = sigmaStd / nrm;
-	float nrmN = (zm * zm) * (alphaSquare - 1.0f) + 1.0f;
-	return alphaSquare / (Pi * 4.0f * nrmN * nrmN * sigmaI);
+	alpha = max(1e-3, alpha);
+	float a2 = alpha * alpha;
+	float nrm = sqrt(Sq(NdotV) * (1.0 - a2) + a2);
+	float s = (NdotH * a2 - NdotH) * NdotH + 1.0;
+	return 2.0 * NdotV * (nrm + 1.0) * s * s / a2;
 }
 
 float3 IndirectSpecularFactor(float NdotV, float perceptualRoughness, float3 f0)

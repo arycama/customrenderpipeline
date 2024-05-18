@@ -39,6 +39,8 @@ void RayGeneration()
 	
 	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
 	float3 V = normalize(-worldPosition);
+	float NdotV = dot(N, V);
+	N = GetViewReflectedNormal(N, V, NdotV);
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	worldPosition = PlanetCurveInverse(worldPosition);
@@ -46,7 +48,7 @@ void RayGeneration()
 	float roughness = max(1e-6, Sq(normalRoughness.a));
 	float3 H = SampleGGXIsotropic(V, roughness, u, N);
 	float3 L = reflect(-V, H);
-	float rcpPdf = rcp(PdfGGXVndfIsotropic(V, roughness, L, N));
+	float rcpPdf = RcpPdfGGXVndfIsotropic1(NdotV, dot(N, H), roughness);
 	
 	RayDesc ray;
 	ray.Origin = worldPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);

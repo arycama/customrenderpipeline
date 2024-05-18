@@ -43,14 +43,11 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float NdotV = dot(N, V);
 	N = GetViewReflectedNormal(N, V, NdotV);
 	
-    float roughness = max(1e-3, Sq(normalRoughness.a));
+    float roughness = Sq(normalRoughness.a);
 
-    float3x3 localToWorld = GetLocalFrame(N);
-    float3 localV = mul(localToWorld, V);
-    float3 localH = SampleGGXReflection(localV, roughness, u);
-    float3 localL = reflect(-localV, localH);
-    float3 L = normalize(mul(localL, localToWorld));
-    float rcpPdf = rcp(GGXReflectionPDF(localV, roughness, localH.z));
+	float3 H = SampleGGXIsotropic(V, roughness, u, N);
+    float3 L = reflect(-V, H);
+	float rcpPdf = RcpPdfGGXVndfIsotropic1(NdotV, dot(N, H), roughness);
 
     // We start tracing from the center of the current pixel, and do so up to the far plane.
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
@@ -60,15 +57,11 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	worldPosition = worldPosition * (1 - 0.001 * rcp(max(NdotV, FloatEps)));
 	
 	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZDepth, _MaxMip, validHit);
+	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZDepth, _MaxMip, validHit, float3(position.xy, depth));
 	
 	float3 worldHit = PixelToWorld(rayPos);
 	float3 hitRay = worldHit - worldPosition;
 	float hitDist = length(hitRay);
-	
-	float3 hitL = normalize(hitRay);
-	if(dot(hitL, N) <= 0.0)
-		validHit = false;
 	
 	if(!validHit)
 		return (TraceResult)0;
@@ -91,8 +84,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
     
     TraceResult output;
 	output.color =  PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel) * _PreviousToCurrentExposure; 
-	output.hit = float4(hitRay, rcpPdf);
-    output.hit = float4(L, rcpPdf);
+	output.hit = float4(rayPos.xy - position.xy, Linear01Depth(rayPos.z), rcpPdf);
     return output;
 }
 
@@ -105,7 +97,7 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 {
     float4 normalRoughness = _NormalRoughness[position.xy];
 	float3 N = GBufferNormal(normalRoughness);
-    float roughness = max(1e-3, Sq(normalRoughness.a));
+    float roughness = max(1e-11, Sq(normalRoughness.a));
     
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
     float phi = Noise1D(position.xy) * TwoPi;
@@ -132,7 +124,8 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			continue;
         
 		validHits++;
-		float3 L = normalize(hitData.xyz);
+		float3 hitPosition = PixelToWorld(float3(coord + hitData.xy, Linear01ToDeviceDepth(hitData.z)));
+		float3 L = normalize(hitPosition - worldPosition);
         float NdotL = dot(N, L);
 		if(NdotL <= 0.0)
 			continue;
