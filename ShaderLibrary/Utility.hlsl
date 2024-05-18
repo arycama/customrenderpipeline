@@ -228,4 +228,18 @@ float3 TangentToWorldNormal(float3 tangentNormal, float3 vertexNormal, float3 ve
 	return normalize(mul(tangentNormal, tangentToWorld));
 }
 
+float4 BilinearWeights(float2 uv)
+{
+	float4 weights = uv.xxyy * float4(-1, 1, 1, -1) + float4(1, 0, 0, 1);
+	return weights.zzww * weights.xyyx;
+}
+
+// Gives weights for four texels from a 0-1 input position to match a gather result
+float4 BilinearWeights(float2 uv, float2 textureSize)
+{
+	const float2 offset = 1.0 / 512.0;
+	float2 localUv = frac(uv * textureSize + (-0.5 + offset));
+	return BilinearWeights(localUv);
+}
+
 #endif

@@ -3,47 +3,9 @@
 #include "../GBuffer.hlsl"
 #include "../Geometry.hlsl"
 #include "../Samplers.hlsl"
+#include "../TerrainCommon.hlsl"
 
-Texture2D<float> _TerrainHeightmapTexture, _TerrainHolesTexture;
-Texture2D<float2> _TerrainNormalMap;
-Texture2D<uint> IdMap;
-Texture2DArray<float4> AlbedoSmoothness, Normal, Mask;
-
-float4 _TerrainRemapHalfTexel, _TerrainScaleOffset;
-float3 TerrainSize;
-float _TerrainHeightScale, _TerrainHeightOffset, IdMapResolution;
-
-// TODO: Move to common terrain
-struct LayerData
-{
-	float Scale;
-	float Blending;
-	float Stochastic;
-	float Rotation;
-};
-
-StructuredBuffer<LayerData> TerrainLayerData;
-
-float GetTerrainHeight(float2 uv)
-{
-	return _TerrainHeightmapTexture.SampleLevel(_LinearClampSampler, uv, 0) * _TerrainHeightScale + _TerrainHeightOffset;
-}
-
-float2 WorldToTerrainPositionHalfTexel(float3 positionWS)
-{
-	return positionWS.xz * _TerrainRemapHalfTexel.xy + _TerrainRemapHalfTexel.zw;
-}
-
-float2 WorldToTerrainPosition(float3 positionWS)
-{
-	return positionWS.xz * _TerrainScaleOffset.xy + _TerrainScaleOffset.zw;
-}
-
-float GetTerrainHeight(float3 positionWS)
-{
-	float2 uv = WorldToTerrainPositionHalfTexel(positionWS);
-	return GetTerrainHeight(uv);
-}
+Texture2D<float> _TerrainHolesTexture;
 
 struct VertexInput
 {
@@ -75,7 +37,6 @@ struct FragmentInput
 {
 	float4 positionCS : SV_POSITION;
 	float3 worldPosition : POSITION1;
-	float2 uv : TEXCOORD;
 };
 
 Buffer<uint> _PatchData;
@@ -253,35 +214,20 @@ FragmentInput Domain(HullConstantOutput tessFactors, OutputPatch<DomainInput, 4>
 	position = PlanetCurve(position);
 	
 	FragmentInput output;
-	output.uv = uv * _PatchUvScale;
 	
 	bool isNotHole = _TerrainHolesTexture.SampleLevel(_PointClampSampler, uv * _HeightUvScale + _HeightUvOffset, 0.0);
 	output.positionCS = isNotHole ? WorldToClip(position) : asfloat(0x7fc00000);
-	output.worldPosition = position + _ViewPosition;
+	output.worldPosition = position;
 	
 	return output;
 }
 
 void FragmentShadow() { }
 
-float4 BilinearWeights(float2 uv)
-{
-	float4 weights = uv.xxyy * float4(-1, 1, 1, -1) + float4(1, 0, 0, 1);
-	return weights.zzww * weights.xyyx;
-}
-
-// Gives weights for four texels from a 0-1 input position to match a gather result
-float4 BilinearWeights(float2 uv, float2 textureSize)
-{
-	const float2 offset = 1.0 / 512.0;
-	float2 localUv = frac(uv * textureSize + (-0.5 + offset));
-	return BilinearWeights(localUv);
-}
-
-[earlydepthstencil]
 GBufferOutput Fragment(FragmentInput input)
 {
-	float2 localUv = input.uv * IdMapResolution - 0.5;
+	float2 uv = WorldToTerrainPosition(input.worldPosition);
+	float2 localUv = uv * IdMapResolution - 0.5;
 	float2 uvCenter = (floor(localUv) + 0.5) / IdMapResolution;
 	uint4 layerData = IdMap.Gather(_PointClampSampler, uvCenter);
 	
@@ -365,10 +311,12 @@ GBufferOutput Fragment(FragmentInput input)
 		layerWeight *= weights[i >> 1];
 		
 		uint triplanar = (data >> 30) & 0x3;
-		float3 dx = ddx_coarse(input.worldPosition);
-		float3 dy = ddy_coarse(input.worldPosition);
 		
-		float2 triplanarUv = triplanar == 0 ? input.worldPosition.zy : (triplanar == 1 ? input.worldPosition.xz : input.worldPosition.xy);
+		float3 worldPosition = input.worldPosition + _ViewPosition;
+		float3 dx = ddx_coarse(worldPosition);
+		float3 dy = ddy_coarse(worldPosition);
+		
+		float2 triplanarUv = triplanar == 0 ? worldPosition.zy : (triplanar == 1 ? worldPosition.xz : worldPosition.xy);
 		float2 triplanarDx = triplanar == 0 ? dx.zy : (triplanar == 1 ? dx.xz : dx.xy);
 		float2 triplanarDy = triplanar == 0 ? dy.zy : (triplanar == 1 ? dy.xz : dy.xy);
 		
@@ -398,108 +346,9 @@ GBufferOutput Fragment(FragmentInput input)
 		derivativeSum += derivative * layerWeight;
 	}
 	
-	float3 terrainNormal = UnpackNormalSNorm(_TerrainNormalMap.Sample(_LinearClampSampler, input.uv));
+	float3 terrainNormal = UnpackNormalSNorm(_TerrainNormalMap.Sample(_LinearClampSampler, uv));
 	float3 tangentNormal = normalize(float3(derivativeSum, 1.0));
 	float3 worldNormal = ShortestArcQuaternion(terrainNormal, tangentNormal).xzy;
 
 	return OutputGBuffer(albedoSmoothness.rgb, mask.r, worldNormal, 1.0 - albedoSmoothness.a, worldNormal, mask.g, 0.0);
-}
-
-struct GeometryInput
-{
-	// As we're using orthographic, w will be 1, so we don't need to include it
-	float3 positionCS : TEXCOORD;
-};
-
-struct FragmentInputVoxel
-{
-	float4 positionCS : SV_POSITION;
-	uint axis : TEXCOORD;
-};
-
-RWTexture3D<float> _VoxelGIWrite : register(u1);
-
-GeometryInput VertexVoxel(VertexInput input)
-{
-	float row = floor(input.vertexID / _VerticesPerEdge);
-	float column = input.vertexID - row * _VerticesPerEdge;
-	float x = 2 * (column / (_VerticesPerEdge - 1.0)) - 1;
-	float y = 2 * (row / (_VerticesPerEdge - 1.0)) - 1;
-
-	uint data = _PatchData[input.instanceID];
-	float3 extents = 0;//float3(_PatchSize * exp2(data.lod), 0.0).xzy;
-	float3 positionWS = float3(0,0, 0).xzy + float3(x, 0, y) * extents;
-	positionWS.y = GetTerrainHeight(positionWS);
-
-	GeometryInput o;
-	o.positionCS = WorldToClip(positionWS).xyz;
-
-	float2 terrainCoords = WorldToTerrainPosition(positionWS);
-	float hole = _TerrainHolesTexture.SampleLevel(_PointClampSampler, terrainCoords, 0.0);
-	if (!hole)
-	{
-		o.positionCS /= 0;
-	}
-
-	return o;
-}
-
-[maxvertexcount(3)]
-void Geometry(triangle GeometryInput input[3], inout TriangleStream<FragmentInputVoxel> stream)
-{
-	// Select 0, 1 or 2 based on which normal component is largest
-	float3 normal = abs(cross(input[1].positionCS - input[0].positionCS, input[2].positionCS - input[0].positionCS));
-	uint axis = dot(normal == Max3(normal), uint3(0, 1, 2));
-
-	for (uint i = 0; i < 3; i++)
-	{
-		float3 position = input[i].positionCS;
-
-		// convert from -1:1 to 0:1
-		position.xy = position.xy * 0.5 + 0.5;
-
-		// Flip Y
-		position.y = 1.0 - position.y;
-
-		// Swizzle so that largest axis gets projected
-		float3 result = position.zyx * (axis == 0);
-		result += position.xzy * (axis == 1);
-		result += position.xyz * (axis == 2);
-
-		// Re flip Y
-		result.y = 1.0 - result.y;
-
-		// Convert xy back to a -1:1 ratio
-		result.xy = 2.0 * result.xy - 1.0;
-
-		FragmentInputVoxel output;
-		output.positionCS = float4(result, 1);
-		output.axis = axis;
-		stream.Append(output);
-	}
-}
-
-float3 mod(float3 x, float3 y)
-{
-	return x - y * floor(x / y);
-}
-
-float _VoxelResolution, _VoxelOffset;
-
-void FragmentVoxel(FragmentInputVoxel input)
-{
-	float3 swizzledPosition = input.positionCS.xyz;
-	swizzledPosition.z *= _VoxelResolution;
-
-	// Unswizzle largest projected axis from Geometry Shader
-	float3 result = swizzledPosition.zyx * (input.axis == 0);
-	result += swizzledPosition.xzy * (input.axis == 1);
-	result += swizzledPosition.xyz * (input.axis == 2);
-
-	result.z = _VoxelResolution - result.z;
-
-	// As we use toroidal addressing, we need to offset the final coordinates as the volume moves.
-	// This also needs to be wrapped at the end, so that out of bounds pixels will write to the starting layers of the volume
-	float3 dest = mod(result + _VoxelOffset, _VoxelResolution);
-	_VoxelGIWrite[dest] = 1;
 }

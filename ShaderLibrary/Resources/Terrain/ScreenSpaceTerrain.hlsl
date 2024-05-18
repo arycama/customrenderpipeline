@@ -1,30 +1,17 @@
-#include "../Atmosphere.hlsl"
-#include "../Common.hlsl"
-#include "../GBuffer.hlsl"
-#include "../Geometry.hlsl"
-#include "../Lighting.hlsl"
-#include "../Raytracing.hlsl"
-#include "../Samplers.hlsl"
-#include "../TerrainCommon.hlsl"
+#include "../../Common.hlsl"
+#include "../../GBuffer.hlsl"
+#include "../../Samplers.hlsl"
+#include "../../TerrainCommon.hlsl"
 
-[shader("closesthit")]
-void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
+Texture2D<float> _Depth;
+
+GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	uint index = PrimitiveIndex();
-	uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(index);
-	
-	Vert v0, v1, v2;
-	v0 = FetchVertex(triangleIndices.x);
-	v1 = FetchVertex(triangleIndices.y);
-	v2 = FetchVertex(triangleIndices.z);
-	
-	float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
-	Vert v = InterpolateVertices(v0, v1, v2, barycentricCoords);
-	
-	float3 worldPosition = MultiplyPoint3x4(ObjectToWorld3x4(), v.position) + _ViewPosition;
-	float2 uv = v.uv;// WorldToTerrainPosition(worldPosition);
-	
-	float2 localUv = uv * IdMapResolution - 0.5;
+	float depth = _Depth[position.xy];
+	float3 worldPosition = worldDir * LinearEyeDepth(depth);
+
+	float2 terrainUv = WorldToTerrainPosition(worldPosition);
+	float2 localUv = terrainUv * IdMapResolution - 0.5;
 	float2 uvCenter = (floor(localUv) + 0.5) / IdMapResolution;
 	uint4 layerData = IdMap.Gather(_PointClampSampler, uvCenter);
 	
@@ -47,7 +34,7 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	float triMask = checker ? (localUv.x - localUv.y < 0.0) : (localUv.x + localUv.y > 1);
 
 	float3 weights;
-	float2 offsets[3]; 
+	float2 offsets[3];
 	if(checker)
 	{
 		offsets[0] = triMask ? float2(0, 1) : float2(1, 0);
@@ -71,7 +58,7 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	float2 derivativeSum = 0.0;
 	
 	[unroll]
-	for (uint i = 0; i < 6; i++)
+	for(uint i = 0; i < 6; i++)
 	{
 		uint index;
 		if(checker)
@@ -108,16 +95,18 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 		layerWeight *= weights[i >> 1];
 		
 		uint triplanar = (data >> 30) & 0x3;
-		//float3 dx = ddx_coarse(input.worldPosition);
-		//float3 dy = ddy_coarse(input.worldPosition);
 		
-		float2 triplanarUv = triplanar == 0 ? worldPosition.zy : (triplanar == 1 ? worldPosition.xz : worldPosition.xy);
-		///float2 triplanarDx = triplanar == 0 ? dx.zy : (triplanar == 1 ? dx.xz : dx.xy);
-		//float2 triplanarDy = triplanar == 0 ? dy.zy : (triplanar == 1 ? dy.xz : dy.xy);
+		float3 uvWorldPosition = worldPosition + _ViewPosition;
+		float3 dx = ddx_coarse(uvWorldPosition);
+		float3 dy = ddy_coarse(uvWorldPosition);
+		
+		float2 triplanarUv = triplanar == 0 ? uvWorldPosition.zy : (triplanar == 1 ? uvWorldPosition.xz : uvWorldPosition.xy);
+		float2 triplanarDx = triplanar == 0 ? dx.zy : (triplanar == 1 ? dx.xz : dx.xy);
+		float2 triplanarDy = triplanar == 0 ? dy.zy : (triplanar == 1 ? dy.xz : dy.xy);
 		
 		float2 localUv = triplanarUv / TerrainLayerData[layerIndex].Scale;
-		//float2 localDx = triplanarDx / TerrainLayerData[layerIndex].Scale;
-		//float2 localDy = triplanarDy / TerrainLayerData[layerIndex].Scale;
+		float2 localDx = triplanarDx / TerrainLayerData[layerIndex].Scale;
+		float2 localDy = triplanarDy / TerrainLayerData[layerIndex].Scale;
 
 		// Rotate around control point center
 		float s, c;
@@ -127,17 +116,13 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 		// Center in terrain layer space
 		float2 center = floor((uvCenter + offsets[i >> 1] / IdMapResolution) * TerrainSize.xz / TerrainLayerData[layerIndex].Scale) + 0.5;
 		float3 sampleUv = float3(mul(rotationMatrix, localUv - center) + center + float2(offsetX, offsetY), layerIndex);
-		//localDx = mul(rotationMatrix, localDx);
-		//localDy = mul(rotationMatrix, localDy);
+		localDx = mul(rotationMatrix, localDx);
+		localDy = mul(rotationMatrix, localDy);
 		
-		//albedoSmoothness += AlbedoSmoothness.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy) * layerWeight;
-		//mask += Mask.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy) * layerWeight;
-		//float4 normalData = Normal.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy);
+		albedoSmoothness += AlbedoSmoothness.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy) * layerWeight;
+		mask += Mask.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy) * layerWeight;
 		
-		albedoSmoothness += AlbedoSmoothness.SampleLevel(_LinearRepeatSampler, sampleUv, 0.0) * layerWeight;
-		mask += Mask.SampleLevel(_LinearRepeatSampler, sampleUv, 0.0) * layerWeight;
-		float4 normalData = Normal.SampleLevel(_LinearRepeatSampler, sampleUv, 0.0);
-		
+		float4 normalData = Normal.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy);
 		float3 unpackedNormal = UnpackNormalAG(normalData);
 		float2 d0 = unpackedNormal.xy / unpackedNormal.z;
 		float2 derivative = mul(d0, rotationMatrix);
@@ -145,13 +130,9 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 		derivativeSum += derivative * layerWeight;
 	}
 	
-	float3 terrainNormal = UnpackNormalSNorm(_TerrainNormalMap.SampleLevel(_LinearClampSampler, uv, 0.0));
-	float3 tangentNormal = float3(0, 0, 1);//	normalize(float3(derivativeSum, 1.0));
+	float3 terrainNormal = UnpackNormalSNorm(_TerrainNormalMap.Sample(_LinearClampSampler, terrainUv));
+	float3 tangentNormal = normalize(float3(derivativeSum, 1.0));
 	float3 worldNormal = ShortestArcQuaternion(terrainNormal, tangentNormal).xzy;
-	
-	float3 lighting = saturate(dot(worldNormal, _DirectionalLights[0].direction)) * RcpPi * _Exposure * _DirectionalLights[0].color + AmbientLight(worldNormal, 1.0);
-	float3 color = albedoSmoothness.rgb * lighting;
-	
-	payload.packedColor = Float3ToR11G11B10(color);
-	payload.hitDistance = 1;
+
+	return OutputGBuffer(albedoSmoothness.rgb, mask.r, worldNormal, 1.0 - albedoSmoothness.a, worldNormal, mask.g, 0.0);
 }

@@ -286,7 +286,7 @@ float3 ClipToWorld(float3 position)
 
 float3 PixelToWorld(float3 position)
 {
-	return MultiplyPointProj(_PixelToWorld, position);
+	return MultiplyPointProj(_PixelToWorld, position).xyz;
 }
 
 float3 WorldToView(float3 position)

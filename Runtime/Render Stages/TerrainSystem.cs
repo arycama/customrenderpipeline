@@ -1,7 +1,6 @@
 using Arycama.CustomRenderPipeline;
 using System;
 using Unity.Collections.LowLevel.Unsafe;
-using Unity.Properties;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
@@ -23,7 +22,7 @@ public class TerrainSystem
     private GraphicsBuffer indexBuffer, terrainLayerData;
     private RTHandle minMaxHeight, heightmap, normalmap, idMap;
     private Terrain terrain;
-    private Material generateIdMapMaterial;
+    private Material generateIdMapMaterial, screenSpaceTerrainMaterial;
 
     private Texture2DArray diffuseArray, normalMapArray, maskMapArray;
     private int VerticesPerTileEdge => settings.PatchVertices + 1;
@@ -36,6 +35,7 @@ public class TerrainSystem
         this.settings = settings;
 
         generateIdMapMaterial = new Material(Shader.Find("Hidden/Terrain Id Map")) { hideFlags = HideFlags.HideAndDontSave };
+        screenSpaceTerrainMaterial = new Material(Shader.Find("Hidden/Screen Space Terrain")) { hideFlags = HideFlags.HideAndDontSave };
 
         TerrainCallbacks.textureChanged += TerrainCallbacks_textureChanged;
         TerrainCallbacks.heightmapChanged += TerrainCallbacks_heightmapChanged;
@@ -582,6 +582,27 @@ public class TerrainSystem
                 ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                 pass.SetMatrix(command, "_WorldToClip", worldToClip);
+            });
+        }
+    }
+
+    public void RenderTerrainScreenspace(Camera camera, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, IRenderPassData commonPassData)
+    {
+        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Terrain Screen Pass"))
+        {
+            pass.Initialize(screenSpaceTerrainMaterial, 0, 1, null, camera);
+            pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteTexture(albedoMetallic);
+            pass.WriteTexture(normalRoughness);
+            pass.WriteTexture(bentNormalOcclusion);
+            pass.ReadTexture("_Depth", cameraDepth);
+            commonPassData.SetInputs(pass);
+
+            pass.AddRenderPassData<TerrainRenderData>();
+
+            var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+            {
+                commonPassData.SetProperties(pass, command);
             });
         }
     }
