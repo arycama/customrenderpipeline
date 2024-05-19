@@ -52,7 +52,7 @@ Shader "Terrain"
             #pragma vertex Vertex
             #pragma hull Hull
             #pragma domain Domain
-            #pragma fragment FragmentShadow
+            #pragma fragment Fragment
 
             #include "Terrain.hlsl"
             ENDHLSL
@@ -68,16 +68,5 @@ Shader "Terrain"
             #include "TerrainRaytracing.hlsl"
             ENDHLSL
         }
-
-        // Pass
-        // {
-        //     Name "RayTracing Visibility"
-        //     Tags{ "LightMode" = "RaytracingVisibility" }
-
-        //     HLSLPROGRAM
-        //     #pragma raytracing RayTracing
-        //     #include "TerrainRaytracingVisibility.hlsl"
-        //     ENDHLSL
-        // }
     }
 }

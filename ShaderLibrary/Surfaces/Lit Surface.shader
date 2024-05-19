@@ -132,7 +132,6 @@
             {
                 Ref 3
                 Pass Replace
-                WriteMask 3
             }
 
             HLSLPROGRAM

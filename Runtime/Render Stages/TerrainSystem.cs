@@ -469,7 +469,7 @@ public class TerrainSystem
         renderGraph.ResourceMap.SetRenderPassData(new TerrainRenderCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer));
     }
 
-    public void Render(string passName, Vector3 viewPosititon, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
+    public void Render(string passName, Vector3 viewPosititon, RTHandle cameraDepth, CullingPlanes cullingPlanes, ICommonPassData commonPassData, ScriptableRenderContext context, Camera camera, CullingResults cullingResults)
     {
         if (terrain == null)
             return;
@@ -487,9 +487,6 @@ public class TerrainSystem
         using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
         {
             pass.WriteDepth(cameraDepth, RenderTargetFlags.None, RenderBufferLoadAction.DontCare);
-            pass.WriteTexture(albedoMetallic, RenderBufferLoadAction.DontCare);
-            pass.WriteTexture(normalRoughness, RenderBufferLoadAction.DontCare);
-            pass.WriteTexture(bentNormalOcclusion, RenderBufferLoadAction.DontCare);
 
             pass.Initialize(material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
             pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
@@ -524,6 +521,18 @@ public class TerrainSystem
 
                 pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
                 ArrayPool<Vector4>.Release(cullingPlanesArray);
+            });
+        }
+
+        using (var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Render Terrain Replacement"))
+        {
+            pass.Initialize("Terrain", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
+            pass.WriteDepth(cameraDepth, RenderTargetFlags.None);
+            commonPassData.SetInputs(pass);
+
+            var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+            {
+                commonPassData.SetProperties(pass, command);
             });
         }
     }
