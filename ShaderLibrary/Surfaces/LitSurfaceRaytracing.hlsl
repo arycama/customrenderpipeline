@@ -55,10 +55,26 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	
 	float3 emission = _EmissionMap.SampleLevel(_LinearRepeatSampler, uv, 0.0) * _EmissionColor;
 	emission = lerp(emission * _Exposure, emission, _EmissiveExposureWeight);
+
+	float3 worldPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+	float3 V = WorldRayDirection();
 	
-	float3 lighting = saturate(dot(normal, _DirectionalLights[0].direction)) * RcpPi * _Exposure * _DirectionalLights[0].color + AmbientLight(normal, 1.0);
-	float3 color = lighting * albedoAlpha.rgb + emission;
+	float4 metallicGloss = _MetallicGlossMap.SampleLevel(_LinearRepeatSampler, uv, 0.0);
+	float metallic = metallicGloss.r * _Metallic;
+
+	float perceptualSmoothness;
+	if(Smoothness_Source)
+		perceptualSmoothness = albedoAlpha.a * _Smoothness;
+	else
+		perceptualSmoothness = metallicGloss.a * _Smoothness;
+	
+	float perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(perceptualSmoothness);
+	
+	float3 f0 = lerp(0.04, albedoAlpha.rgb, metallic);
+	float occlusion = _OcclusionMap.SampleLevel(_LinearRepeatSampler, uv, 0.0).g;
+	
+	float3 color = RaytracedLighting(worldPosition, normal, V, f0, perceptualRoughness, occlusion, normal, albedoAlpha.rgb) + emission;
 	
 	payload.packedColor = Float3ToR11G11B10(color);
-	payload.hitDistance = 1;
+	payload.hitDistance = RayTCurrent();
 }

@@ -16,7 +16,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<(string, BufferHandle)> readBuffers = new();
         private readonly List<(string, BufferHandle)> writeBuffers = new();
 
-        public List<RenderPassDataHandle> RenderPassDataHandles { get; private set; } = new(); 
+        public List<(RenderPassDataHandle, bool)> RenderPassDataHandles { get; private set; } = new(); 
 
         public RenderGraph RenderGraph { get; set; }
         internal string Name { get; set; }
@@ -73,16 +73,16 @@ namespace Arycama.CustomRenderPipeline
             writeBuffers.Add((propertyName, buffer));
         }
 
-        public void AddRenderPassData(RenderPassDataHandle handle)
+        public void AddRenderPassData(RenderPassDataHandle handle, bool isOptional)
         {
-            RenderPassDataHandles.Add(handle);
+            RenderPassDataHandles.Add((handle, isOptional));
         }
 
-        public void AddRenderPassData<T>() where T : IRenderPassData
+        public void AddRenderPassData<T>(bool isOptional = false) where T : IRenderPassData
         {
             Assert.IsFalse(RenderGraph.IsExecuting);
             var handle = RenderGraph.ResourceMap.GetResourceHandle<T>();
-            AddRenderPassData(handle);
+            AddRenderPassData(handle, isOptional);
         }
 
         public void Run(CommandBuffer command)
@@ -123,8 +123,16 @@ namespace Arycama.CustomRenderPipeline
             // Set any data from each pass
             foreach (var renderPassDataHandle in RenderPassDataHandles)
             {
-                var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle);
-                data.SetProperties(this, command);
+                if (renderPassDataHandle.Item2)
+                {
+                    if(RenderGraph.ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, out var data))
+                       data.SetProperties(this, command);
+                }
+                else
+                {
+                    var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1);
+                    data.SetProperties(this, command);
+                }
             }
 
             if (renderGraphBuilder != null)

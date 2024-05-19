@@ -1,23 +1,11 @@
 #include "../../Common.hlsl"
 #include "../../Random.hlsl"
 #include "../../Samplers.hlsl"
-
-// TODO: Move to common terrain
-struct LayerData
-{
-	float Scale;
-	float Blending;
-	float Stochastic;
-	float Rotation;
-};
-
-StructuredBuffer<LayerData> TerrainLayerData;
+#include "../../TerrainCommon.hlsl"
 
 Texture2D<float4> _Input0, _Input1, _Input2, _Input3, _Input4, _Input5, _Input6, _Input7;
-Texture2D<float2> _TerrainNormalMap;
 uint LayerCount;
 float _Resolution;
-float3 TerrainSize;
 
 float nrand(float2 n)
 {

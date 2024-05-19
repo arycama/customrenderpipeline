@@ -81,6 +81,7 @@ namespace Arycama.CustomRenderPipeline
         private void DisposeInternal()
         {
             rtas.Dispose();
+            rtas = null;
         }
     }
 }

@@ -9,8 +9,7 @@
 Texture2D<float4> _NormalRoughness;
 Texture2D<float> _Depth;
 
-RWTexture2D<float3> HitColor;
-RWTexture2D<float4> HitResult;
+RWTexture2D<float4> HitColor, HitResult;
 
 float _RaytracingBias, _RaytracingDistantBias;
 
@@ -35,20 +34,21 @@ void RayGeneration()
 	
 	float4 normalRoughness = _NormalRoughness[position];
 	float2 u = Noise2D(position);
-	float3 N = GBufferNormal(position, _NormalRoughness);
+	float3 N = GBufferNormal(normalRoughness);
 	
 	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
 	float3 V = normalize(-worldPosition);
-	float NdotV = dot(N, V);
+	
+	float NdotV;
 	N = GetViewReflectedNormal(N, V, NdotV);
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	worldPosition = PlanetCurveInverse(worldPosition);
 	
-	float roughness = max(1e-6, Sq(normalRoughness.a));
+	float roughness = Sq(normalRoughness.a);
 	float3 H = SampleGGXIsotropic(V, roughness, u, N);
 	float3 L = reflect(-V, H);
-	float rcpPdf = RcpPdfGGXVndfIsotropic1(NdotV, dot(N, H), roughness);
+	float rcpPdf = RcpPdfGGXVndfIsotropic(NdotV, dot(N, H), roughness);
 	
 	RayDesc ray;
 	ray.Origin = worldPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
@@ -60,9 +60,9 @@ void RayGeneration()
 	payload.packedColor = 0.0;
 	payload.hitDistance = 0.0;
 	
-	uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+	uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
 	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
 	
-	HitColor[position] = R11G11B10ToFloat3(payload.packedColor); // This is a bit redundant since we pack into a float3 anyway.. maybe just keep it packed?
-	HitResult[position] = payload.hitDistance ? float4(L * payload.hitDistance, rcpPdf) : 0.0;
+	HitColor[position] = payload.hitDistance ? float4(R11G11B10ToFloat3(payload.packedColor), rcpPdf) : 0.0;
+	HitResult[position] = payload.hitDistance ? float4(L * payload.hitDistance, Linear01Depth(depth)) : 0.0;
 }

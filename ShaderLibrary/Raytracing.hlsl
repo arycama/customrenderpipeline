@@ -1,6 +1,9 @@
 #ifndef RAYTRACING_INCLUDED
 #define RAYTRACING_INCLUDED
 
+#include "Lighting.hlsl"
+#include "ImageBasedLighting.hlsl"
+
 #ifdef __INTELLISENSE__
 	static const uint RAY_FLAG_NONE = 0x00,
 	RAY_FLAG_FORCE_OPAQUE = 0x01,
@@ -20,6 +23,36 @@ float EvaluateRayTracingBias(float3 positionRWS, float near, float far, float bi
 	float distanceToCamera = length(positionRWS);
 	float blend = saturate((distanceToCamera - near) / (far - near));
 	return lerp(bias, distantBias, blend);
+}
+
+// TODO: Share with lighting.hlsl code somehow?
+float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, float perceptualRoughness, float occlusion, float3 bentNormal, float3 albedo)
+{
+	// Atmospheric transmittance
+	float3 lightDirection = _DirectionalLights[0].direction;
+	float3 V1 = normalize(-worldPosition);
+	float heightAtDistance = HeightAtDistance(_ViewHeight, -V1.y, length(worldPosition));
+	float lightCosAngleAtDistance = CosAngleAtDistance(_ViewHeight, lightDirection.y, length(worldPosition) * dot(lightDirection, -V1), heightAtDistance);
+	
+	float3 lightColor = _Exposure * _DirectionalLights[0].color;
+	
+	if(RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
+		return 0.0;
+		
+	float3 atmosphereTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
+	if(all(!atmosphereTransmittance))
+		return 0.0;
+	
+	lightColor *= atmosphereTransmittance;
+	float3 lighting = saturate(dot(N, lightDirection)) * RcpPi * lightColor + AmbientLight(N, 1.0);
+	
+	float NdotV = saturate(dot(N, V));
+	
+	float3 radiance = IndirectSpecular(N, V, f0, NdotV, perceptualRoughness, occlusion, bentNormal, false, _SkyReflection);
+	radiance *= IndirectSpecularFactor(NdotV, perceptualRoughness, f0);
+	
+	// Indirect specular contribution is minor in many cases
+	return lighting * albedo + radiance * 0;
 }
 
 struct RayPayload

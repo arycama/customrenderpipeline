@@ -15,16 +15,14 @@ Texture2D<float2> _GGXDirectionalAlbedo;
 Texture2D<float> _GGXAverageAlbedo, _GGXAverageAlbedoMS;
 Texture3D<float> _GGXSpecularOcclusion;
 
-float Lambda(float NdotH, float a2)
+float Lambda(float NdotV, float a2)
 {
-	//float lambdaV = NdotL * sqrt((-NdotV * a2 + NdotV) * NdotV + a2);
-	
-	return sqrt(1.0 + a2 * (rcp(Sq(NdotH)) - 1.0)) * 0.5 - 0.5;
+	return sqrt(1.0 + a2 * (rcp(Sq(NdotV)) - 1.0)) * 0.5 - 0.5;
 }
 
-float G1(float NdotH, float a2)
+float G1(float NdotV, float a2)
 {
-	return rcp(1.0 + Lambda(NdotH, a2));
+	return rcp(1.0 + Lambda(NdotV, a2));
 }
 
 float G2(float NdotV, float NdotL, float a2)
@@ -79,11 +77,6 @@ float D_GGX(float NdotH, float roughness)
 float3 GGX(float roughness, float3 specular, float VdotH, float NdotH, float NdotV, float NdotL)
 {
 	return F(VdotH, specular) * GGX_DV(roughness, NdotL, NdotV, NdotH);
-}
-
-float Lambda(float3 x, float3 N, float roughness)
-{
-	return (sqrt(1.0 + Sq(roughness) * (rcp(Sq(dot(x, N))) - 1.0)) - 1.0) * rcp(2.0);
 }
 
 // Note: V = G / (4 * NdotL * NdotV)

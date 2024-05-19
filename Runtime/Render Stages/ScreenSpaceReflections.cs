@@ -37,11 +37,27 @@ public class ScreenSpaceReflections
     public void Render(RTHandle depth, RTHandle hiZDepth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, ICommonPassData commonPassData, int width, int height, RTHandle velocity, RTHandle bentNormalOcclusion, RTHandle albedoMetallic, float bias, float distantBias)
     {
         // Must be screen texture since we use stencil to skip sky pixels
-        var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
+        var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
         if (settings.UseRaytracing)
         {
+            // Need to set some things as globals so that hit shaders can access them..
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Specular GI Raytrace Setup"))
+            {
+                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<TerrainRenderData>(true);
+                commonPassData.SetInputs(pass);
+
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                {
+                    commonPassData.SetProperties(pass, command);
+                });
+            }
+
             using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Specular GI Raytrace"))
             {
                 var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>();
@@ -52,10 +68,9 @@ public class ScreenSpaceReflections
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
                 pass.ReadTexture("PreviousFrame", previousFrameColor); // Temporary, cuz of leaks if we don't use it..
-                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
-                pass.AddRenderPassData<LightingSetup.Result>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 commonPassData.SetInputs(pass);
+
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
@@ -99,11 +114,13 @@ public class ScreenSpaceReflections
         }
 
         var spatialResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var rayDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Specular GI Spatial"))
         {
             pass.Initialize(material, 1, camera: camera);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
 
             pass.ReadTexture("_Input", tempResult);
             pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
@@ -147,6 +164,7 @@ public class ScreenSpaceReflections
             pass.ReadTexture("_NormalRoughness", normalRoughness);
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
             pass.ReadTexture("AlbedoMetallic", albedoMetallic);
+            pass.ReadTexture("RayDepth", rayDepth);
 
             commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();

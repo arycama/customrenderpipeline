@@ -23,7 +23,7 @@ cbuffer Properties
 
 struct TraceResult
 {
-	float3 color : SV_Target0;
+	float4 color : SV_Target0;
 	float4 hit : SV_Target1;
 };
 
@@ -48,17 +48,12 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 
 	bool validHit;
 	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZDepth, _MaxMip, validHit, float3(position.xy, depth));
-	
+	if(!validHit)
+		return (TraceResult)0;
+		
 	float3 worldHit = PixelToWorld(rayPos);
 	float3 hitRay = worldHit - worldPosition;
 	float hitDist = length(hitRay);
-	
-	float3 hitL = normalize(hitRay);
-	if(dot(hitL, N) <= 0.0)
-		validHit = false;
-	
-	if(!validHit)
-		return (TraceResult)0;
 	
 	float2 velocity = Velocity[rayPos.xy];
 	float linearHitDepth = LinearEyeDepth(rayPos.z);
@@ -67,10 +62,11 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
 	// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
 	float2 hitUv = ClampScaleTextureUv(rayPos.xy / _ScaledResolution.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
+	float3 previousColor = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel) * _PreviousToCurrentExposure;
 
 	TraceResult output;
-	output.color = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel) * _PreviousToCurrentExposure;
-	output.hit = float4(rayPos.xy - position.xy, Linear01Depth(rayPos.z), rcpPdf);
+	output.color = float4(previousColor, rcpPdf);
+	output.hit = float4(hitRay, Linear01Depth(depth));
 	return output;
 }
 
@@ -85,27 +81,42 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
 	
+	float3 V = -worldDir;
+	float rcpVLength = rsqrt(dot(V, V));
+	V *= rcpVLength;
+    
+	float NdotV;
+	N = GetViewReflectedNormal(N, V, NdotV);
+	
 	float validHits = 0.0;
 	float4 result = 0.0;
 	for(uint i = 0; i <= _ResolveSamples; i++)
 	{
 		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
+		float2 coord = clamp(floor(position.xy + u), 0.0, _ScaledResolution.xy - 1.0) + 0.5;
 		
-		int2 coord = clamp((int2)(position.xy + u), 0, int2(_MaxWidth, _MaxHeight));
 		float4 hitData = _HitResult[coord];
-		if(hitData.w <= 0.0)
+		if(hitData.w == 0.0)
 			continue;
 		
-		float3 hitPosition = PixelToWorld(float3(coord + hitData.xy, Linear01ToDeviceDepth(hitData.z)));
-		float3 L = normalize(hitPosition - worldPosition);
-		float weight = dot(N, L);
-		if(weight <= 0.0)
-			continue;
+		float3 sampleWorldPosition = PixelToWorld(float3(coord, Linear01ToDeviceDepth(hitData.w)));
+		float3 hitPosition = sampleWorldPosition + hitData.xyz;
 		
-		float weightOverPdf = weight * RcpPi * hitData.w;
-		result.rgb += RgbToYCoCgFastTonemap(_Input[coord].rgb) * weightOverPdf;
-		result.a += weightOverPdf;
+		float3 delta = hitPosition - worldPosition;
+		float rayLength = rsqrt(SqrLength(delta));
+		float3 L = (hitPosition - worldPosition) * rayLength;
+		
 		validHits++;
+		
+        float NdotL = dot(N, L);
+		if(NdotL <= 0.0)
+			continue;
+		
+		float weight = RcpPi * NdotL;
+		float4 hitColor = _Input[coord];
+		float weightOverPdf = weight * hitColor.w;
+		result.rgb += RgbToYCoCgFastTonemap(hitColor.rgb) * weightOverPdf;
+		result.a += weightOverPdf;
 	}
 
 	if(result.a)

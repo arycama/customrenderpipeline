@@ -37,11 +37,27 @@ public class DiffuseGlobalIllumination
 
     public void Render(RTHandle depth, int width, int height, ICommonPassData commonPassData, Camera camera, RTHandle previousFrame, RTHandle velocity, RTHandle normalRoughness, RTHandle hiZDepth, RTHandle bentNormalOcclusion, float bias, float distantBias)
     {
-        var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
+        var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
         if (settings.UseRaytracing)
         {
+            // Need to set some things as globals so that hit shaders can access them..
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Specular GI Raytrace Setup"))
+            {
+                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<TerrainRenderData>(true);
+                commonPassData.SetInputs(pass);
+
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                {
+                    commonPassData.SetProperties(pass, command);
+                });
+            }
+
             using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Diffuse GI Raytrace"))
             {
                 var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>();
