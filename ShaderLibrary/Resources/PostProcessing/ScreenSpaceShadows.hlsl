@@ -24,8 +24,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float rcpVLength = rsqrt(dot(worldDir, worldDir));
 	V *= rcpVLength;
 	
-	float3 N = GBufferNormal(position.xy, _NormalRoughness);
-	float NdotV = dot(N, V);
+	float NdotV;
+	float3 N = GBufferNormal(position.xy, _NormalRoughness, V, NdotV);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
 

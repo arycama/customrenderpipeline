@@ -2,15 +2,29 @@
 #define GBUFFER_INCLUDED
 
 #include "Packing.hlsl"
+#include "Lighting.hlsl"
 
-float3 GBufferNormal(float4 data)
+float3 GBufferNormal(float4 data, float3 V, out float NdotV)
 {
-	return UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(data.xyz) - 1.0);
+	float3 N = UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(data.xyz) - 1.0);
+	return GetViewReflectedNormal(N, V, NdotV);
 }
 
-float3 GBufferNormal(uint2 coord, Texture2D<float4> tex)
+float3 GBufferNormal(float4 data, float3 V)
 {
-	return GBufferNormal(tex[coord]);
+	float NdotV;
+	return GBufferNormal(data, V, NdotV);
+}
+
+float3 GBufferNormal(uint2 coord, Texture2D<float4> tex, float3 V, out float NdotV)
+{
+	return GBufferNormal(tex[coord], V, NdotV);
+}
+
+float3 GBufferNormal(uint2 coord, Texture2D<float4> tex, float3 V)
+{
+	float NdotV;
+	return GBufferNormal(coord, tex, V, NdotV);
 }
 
 struct GBufferOutput

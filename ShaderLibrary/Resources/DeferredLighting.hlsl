@@ -21,8 +21,10 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 	float eyeDepth = LinearEyeDepth(depth);
 	
+	float3 V = normalize(-worldDir);
+	
 	LightingInput lightingInput;
-	lightingInput.normal = GBufferNormal(normalRoughness);
+	lightingInput.normal = GBufferNormal(normalRoughness, V);
 	lightingInput.worldPosition = worldDir * eyeDepth;
 	lightingInput.pixelPosition = position.xy;
 	lightingInput.eyeDepth = eyeDepth;

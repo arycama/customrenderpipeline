@@ -51,7 +51,8 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 {
 	uint2 id = uint2(position.xy);
 
-	float3 worldNormal = GBufferNormal(position.xy, _Normals);
+	float3 V = normalize(-worldDir);
+	float3 worldNormal = GBufferNormal(position.xy, _Normals, V);
 	float3 normalV = mul((float3x3)_WorldToView, worldNormal);
 	float3 cPosV = ComputeViewspacePosition(position.xy);
 	float3 viewV = normalize(-cPosV);

@@ -34,13 +34,12 @@ void RayGeneration()
 	
 	float4 normalRoughness = _NormalRoughness[position];
 	float2 u = Noise2D(position);
-	float3 N = GBufferNormal(normalRoughness);
 	
 	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
 	float3 V = normalize(-worldPosition);
 	
 	float NdotV;
-	N = GetViewReflectedNormal(N, V, NdotV);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	worldPosition = PlanetCurveInverse(worldPosition);

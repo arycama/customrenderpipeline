@@ -153,7 +153,7 @@ float2 Noise2D(uint2 coord)
 
 float2 Noise2DUnit(uint2 coord)
 {
-	return _BlueNoise2DUnit[coord % 128];
+	return normalize(2.0 * _BlueNoise2DUnit[coord % 128] - 1.0);
 }
 
 float3 Noise3D(uint2 coord)
@@ -163,12 +163,12 @@ float3 Noise3D(uint2 coord)
 
 float3 Noise3DUnit(uint2 coord)
 {
-	return _BlueNoise3DUnit[coord % 128];
+	return normalize(2.0 * _BlueNoise3DUnit[coord % 128] - 1.0);
 }
 
 float3 Noise3DCosine(uint2 coord)
 {
-	return 2.0 * _BlueNoise3DCosine[coord % 128] - 1.0;
+	return normalize(2.0 * _BlueNoise3DCosine[coord % 128] - 1.0);
 }
 
 float2 VogelDiskSample(int sampleIndex, int samplesCount, float phi)

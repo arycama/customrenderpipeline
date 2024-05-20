@@ -52,10 +52,8 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float rcpVLength = rsqrt(dot(V, V));
 	V *= rcpVLength;
 	
-	float3 N = GBufferNormal(normalRoughness);
-	
-	float NdotV = dot(N, V);
-	N = GetViewReflectedNormal(N, V, NdotV);
+	float NdotV;
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
     float roughness = Sq(normalRoughness.a);
 
@@ -110,19 +108,17 @@ struct SpatialResult
 
 SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
+	float3 V = -worldDir;
+	float rcpVLength = rsqrt(dot(V, V));
+	V *= rcpVLength;
+	
     float4 normalRoughness = _NormalRoughness[position.xy];
-	float3 N = GBufferNormal(normalRoughness);
+	float NdotV;
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
     float roughness = max(1e-11, Sq(normalRoughness.a));
     
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
     float phi = Noise1D(position.xy) * TwoPi;
-    
-    float3 V = -worldDir;
-	float rcpVLength = rsqrt(dot(V, V));
-	V *= rcpVLength;
-    
-    float NdotV;
-    N = GetViewReflectedNormal(N, V, NdotV);
     
     float4 albedoMetallic = AlbedoMetallic[position.xy];
     float f0 = Max3(lerp(0.04, albedoMetallic.rgb, albedoMetallic.a));
@@ -247,9 +243,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float rcpVLength = rsqrt(dot(V, V));
 	V *= rcpVLength;
 	
-	float3 N = GBufferNormal(normalRoughness);
-    float NdotV = dot(N, V);
-	N = GetViewReflectedNormal(N, V, NdotV);
+    float NdotV;
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
     
 	bool isWater = (_Stencil[position.xy].g & 4) != 0;
     float4 albedoMetallic = AlbedoMetallic[position.xy];
@@ -261,6 +256,6 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	TemporalOutput output;
 	output.result = result;
-	output.screenResult = lerp(radiance, result.rgb, result.a * _Intensity);
+	output.screenResult = result.rgb;// lerp(radiance, result.rgb, result.a * _Intensity);
 	return output;
 }

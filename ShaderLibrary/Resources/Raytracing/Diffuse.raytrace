@@ -32,11 +32,15 @@ void RayGeneration()
 	if(depth == 0.0)
 		return;
 	
-	float3 N = GBufferNormal(position, _NormalRoughness);
+	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
+	float3 V = normalize(-worldPosition);
+	
+	float NdotV;
+	float3 N = GBufferNormal(position, _NormalRoughness, V, NdotV);
+	
 	float3 noise3DCosine = Noise3DCosine(position);
 	float3 L = ShortestArcQuaternion(N, noise3DCosine);
 	float rcpPdf = Pi * rcp(noise3DCosine.z);
-	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	worldPosition = PlanetCurveInverse(worldPosition);

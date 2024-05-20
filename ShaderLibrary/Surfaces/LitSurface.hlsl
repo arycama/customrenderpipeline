@@ -203,7 +203,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 		//float PerceptualRoughness = roughness * sqrt(1 + anisotropy * float2(1, -1));
 
 		float3 emission = _EmissionMap.SampleBias(_TrilinearRepeatAniso16Sampler, uv, _MipBias).rgb * _EmissionColor;
-		emission = lerp(emission * _Exposure, emission, _EmissiveExposureWeight);
+		emission = lerp(emission, emission * _Exposure, _EmissiveExposureWeight);
 
 		// Occlusion, no keyword?
 		float occlusion = _OcclusionMap.SampleBias(_TrilinearRepeatAniso16Sampler, uv, _MipBias).g;

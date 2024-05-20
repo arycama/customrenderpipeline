@@ -54,7 +54,7 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	float4 albedoAlpha = _MainTex.SampleLevel(_LinearRepeatSampler, uv, 0.0);
 	
 	float3 emission = _EmissionMap.SampleLevel(_LinearRepeatSampler, uv, 0.0) * _EmissionColor;
-	emission = lerp(emission * _Exposure, emission, _EmissiveExposureWeight);
+	emission = lerp(emission, emission * _Exposure, _EmissiveExposureWeight);
 
 	float3 worldPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
 	float3 V = WorldRayDirection();

@@ -290,8 +290,8 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 {
 	float3 V = normalize(-input.worldPosition);
 	
+	// TODO: Pass this in as part of lighting input?
 	float NdotV = max(0.0, dot(input.normal, V));
-	input.normal = GetViewReflectedNormal(input.normal, V, NdotV);
 	
 	// TODO: Need to handle non screenspace reflections, eg for transparent
 	#ifdef SCREENSPACE_REFLECTIONS_ON

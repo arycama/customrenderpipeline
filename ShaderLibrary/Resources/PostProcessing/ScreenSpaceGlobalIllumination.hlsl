@@ -34,11 +34,11 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float rcpVLength = rsqrt(dot(worldDir, worldDir));
 	V *= rcpVLength;
 	
-	float3 N = GBufferNormal(position.xy, _NormalRoughness);
+	float NdotV;
+	float3 N = GBufferNormal(position.xy, _NormalRoughness, V, NdotV);
 	float3 noise3DCosine = Noise3DCosine(position.xy);
 	float3 L = ShortestArcQuaternion(N, noise3DCosine);
 	float rcpPdf = Pi * rcp(noise3DCosine.z);
-	float NdotV = dot(N, V);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
 	
@@ -77,18 +77,15 @@ float _IsFirst;
 
 float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float3 N = GBufferNormal(position.xy, _NormalRoughness);
-	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
-	float phi = Noise1D(position.xy) * TwoPi;
-	
 	float3 V = -worldDir;
 	float rcpVLength = rsqrt(dot(V, V));
 	V *= rcpVLength;
-    
-	float NdotV;
-	N = GetViewReflectedNormal(N, V, NdotV);
 	
-	float validHits = 0.0;
+	float NdotV;
+	float3 N = GBufferNormal(position.xy, _NormalRoughness, V, NdotV);
+	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
+	float phi = Noise1D(position.xy) * TwoPi;
+	
 	float4 result = 0.0;
 	for(uint i = 0; i <= _ResolveSamples; i++)
 	{
@@ -104,9 +101,7 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		
 		float3 delta = hitPosition - worldPosition;
 		float rayLength = rsqrt(SqrLength(delta));
-		float3 L = (hitPosition - worldPosition) * rayLength;
-		
-		validHits++;
+		float3 L = delta * rayLength;
 		
         float NdotL = dot(N, L);
 		if(NdotL <= 0.0)
@@ -119,11 +114,10 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		result.a += weightOverPdf;
 	}
 
-	if(result.a)
-		result.rgb /= result.a;
+	result /= (_ResolveSamples + 1);
+	result = PremultiplyAlpha(result);
+	result = YCoCgToRgbFastTonemapInverse(result);
 	
-	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
-	result.a = validHits / (_ResolveSamples + 1);
 	return result;
 }
 
@@ -183,6 +177,10 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	TemporalOutput output;
 	output.result = result;
+	
+	// Since the final weight should be 1/pi, we divide by that, which is result.a * Pi
+	result.a = saturate(result.a * Pi);
+	
 	output.screenResult = lerp(ambient, result.rgb, result.a * _Intensity);
 	return output;
 }
