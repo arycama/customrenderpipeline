@@ -28,18 +28,10 @@ struct TraceResult
     float4 hit : SV_Target1;
 };
 
-// Defines a cone angle, where micro-normals are distributed
-// [Lagarde 2014, "Moving Frostbite to Physically Based Rendering 3.0"]
-// Formula with typo:
-//      https://seblagarde.files.wordpress.com/2015/07/course_notes_moving_frostbite_to_pbr_v32.pdf (page 72)
-// Correct formula is here:
-//      https://seblagarde.wordpress.com/2015/07/14/siggraph-2014-moving-frostbite-to-physically-based-rendering/ (4-9-3-DistanceBasedRoughnessLobeBounding.pdf, page 3)
-// https://www.desmos.com/calculator/mv1fteycal
+// https://seblagarde.wordpress.com/2015/07/14/siggraph-2014-moving-frostbite-to-physically-based-rendering/ (4-9-3-DistanceBasedRoughnessLobeBounding.pdf, page 3)
 float GetSpecularLobeTanHalfAngle(float roughness, float percentOfVolume = 0.75)
 {
 	return tan(radians(90 * roughness * roughness / (1.0 + roughness * roughness)));
-
-	return roughness * sqrt(percentOfVolume / (1.0 - percentOfVolume + 1e-6));
 }
 
 TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
@@ -81,7 +73,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float linearHitDepth = LinearEyeDepth(rayPos.z);
 	float coneTangent = GetSpecularLobeTanHalfAngle(roughness);
     coneTangent *= lerp(saturate(NdotV * 2), 1, sqrt(roughness));
-        
+	
 	float coveredPixels = _ScaledResolution.y * hitDist * 0.5 * coneTangent / (linearHitDepth * _TanHalfFov);
 	float mipLevel = log2(coveredPixels);
 		
@@ -123,7 +115,6 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
     float4 albedoMetallic = AlbedoMetallic[position.xy];
     float f0 = Max3(lerp(0.04, albedoMetallic.rgb, albedoMetallic.a));
 
-	float validHits = 0.0;
     float4 result = 0.0;
 	float avgRayLength = 0.0;
     for(uint i = 0; i <= _ResolveSamples; i++)
@@ -139,12 +130,10 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		float3 hitPosition = sampleWorldPosition + hitData.xyz;
 		
 		float3 delta = hitPosition - worldPosition;
-		float rayLength = rsqrt(SqrLength(delta));
-		float3 L = (hitPosition - worldPosition) * rayLength;
+		float rcpRayLength = rsqrt(SqrLength(delta));
+		float3 L = delta * rcpRayLength;
 		
-		validHits++;
-		
-        float NdotL = dot(N, L);
+		float NdotL = dot(N, L);
 		if(NdotL <= 0.0)
 			continue;
 		
@@ -153,23 +142,20 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		float NdotH = (NdotL + NdotV) * invLenLV;
 		float LdotH = invLenLV * LdotV + invLenLV;
 		
-		float weight = GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL) * NdotL;
+		float weight = GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL).r * NdotL;
 		float4 hitColor = _Input[coord];
 		float weightOverPdf = weight * hitColor.w;
 		result.rgb += RgbToYCoCgFastTonemap(hitColor.rgb) * weightOverPdf;
 		result.a += weightOverPdf;
 		
-		avgRayLength += rcp(rayLength) * weightOverPdf;
-	}
-
-	if(result.a)
-	{
-		result.rgb /= result.a;
-		avgRayLength /= result.a;
+		avgRayLength += rcp(rcpRayLength) * weightOverPdf;
 	}
 	
+	avgRayLength *= result.a ? rcp(result.a) : 0.0;
+	
+	result /= (_ResolveSamples + 1);
+	result = AlphaPremultiply(result);
 	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
-	result.a = validHits / (_ResolveSamples + 1);
 	
 	SpatialResult output;
 	output.result = result;
@@ -187,7 +173,6 @@ Texture2D<float> RayDepth;
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	// Neighborhood clamp
 	float4 result, mean, stdDev;
 	mean = result = RgbToYCoCgFastTonemap(_Input[position.xy]);
 	stdDev = result * result;
@@ -213,9 +198,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	worldPosition += normalize(worldDir) * rayLength;
 	
-	//float2 historyUv = uv - Velocity[position.xy];
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
-	
 	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history.rgb *= _PreviousToCurrentExposure;
 	history = RgbToYCoCgFastTonemap(history);
@@ -234,6 +217,9 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	result = YCoCgToRgbFastTonemapInverse(result);
 	result = RemoveNaN(result);
+	
+	TemporalOutput output;
+	output.result = result;
     
     float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
     bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
@@ -254,8 +240,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float2 directionalAlbedo = DirectionalAlbedo(NdotV, normalRoughness.a);
 	float3 specularIntensity = lerp(directionalAlbedo.x, directionalAlbedo.y, f0);
 	
-	TemporalOutput output;
-	output.result = result;
-	output.screenResult = result.rgb;// lerp(radiance, result.rgb, result.a * _Intensity);
+	float3 specularFactor = IndirectSpecularFactor(NdotV, normalRoughness.a, f0);
+	
+	output.screenResult = lerp(radiance, result.rgb, saturate(result.a * rcp(specularFactor) * _Intensity));
 	return output;
 }

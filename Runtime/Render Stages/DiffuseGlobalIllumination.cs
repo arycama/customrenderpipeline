@@ -120,11 +120,13 @@ public class DiffuseGlobalIllumination
         }
 
         var spatialResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var rayDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
         {
             pass.Initialize(material, 1, camera: camera);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
 
             pass.ReadTexture("_Input", tempResult);
             pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
@@ -169,6 +171,7 @@ public class DiffuseGlobalIllumination
             pass.ReadTexture("_HitResult", hitResult);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
+            pass.ReadTexture("RayDepth", rayDepth);
 
             commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();

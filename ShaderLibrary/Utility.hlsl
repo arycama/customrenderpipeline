@@ -242,13 +242,13 @@ float4 BilinearWeights(float2 uv, float2 textureSize)
 	return BilinearWeights(localUv);
 }
 
-float4 PremultiplyAlpha(float4 value)
+float4 AlphaPremultiply(float4 value)
 {
-	value.rgb = value.a ? value.rgb * rcp(value.a) : 0.0;
+	value.rgb *= value.a ? rcp(value.a) : 0.0;
 	return value;
 }
 
-float4 UnPremultiplyAlpha(float4 value)
+float4 AlphaPremultiplyInv(float4 value)
 {
 	value.rgb *= value.a;
 	return value;

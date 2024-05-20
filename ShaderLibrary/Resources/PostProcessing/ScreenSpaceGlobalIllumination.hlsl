@@ -75,18 +75,27 @@ Texture2D<float4> _Input, _History;
 float4 _HistoryScaleLimit;
 float _IsFirst;
 
-float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+struct SpatialResult
+{
+	float4 result : SV_Target0;
+	float rayLength : SV_Target1;
+};
+
+SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float3 V = -worldDir;
 	float rcpVLength = rsqrt(dot(V, V));
 	V *= rcpVLength;
 	
+	float4 normalRoughness = _NormalRoughness[position.xy];
 	float NdotV;
-	float3 N = GBufferNormal(position.xy, _NormalRoughness, V, NdotV);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
+	
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
 	
 	float4 result = 0.0;
+	float avgRayLength = 0.0;
 	for(uint i = 0; i <= _ResolveSamples; i++)
 	{
 		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
@@ -100,10 +109,10 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		float3 hitPosition = sampleWorldPosition + hitData.xyz;
 		
 		float3 delta = hitPosition - worldPosition;
-		float rayLength = rsqrt(SqrLength(delta));
-		float3 L = delta * rayLength;
+		float rcpRayLength = rsqrt(SqrLength(delta));
+		float3 L = delta * rcpRayLength;
 		
-        float NdotL = dot(N, L);
+		float NdotL = dot(N, L);
 		if(NdotL <= 0.0)
 			continue;
 		
@@ -112,13 +121,18 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		float weightOverPdf = weight * hitColor.w;
 		result.rgb += RgbToYCoCgFastTonemap(hitColor.rgb) * weightOverPdf;
 		result.a += weightOverPdf;
+		
+		avgRayLength += rcp(rcpRayLength) * weightOverPdf;
 	}
 
 	result /= (_ResolveSamples + 1);
-	result = PremultiplyAlpha(result);
+	result = AlphaPremultiply(result);
 	result = YCoCgToRgbFastTonemapInverse(result);
 	
-	return result;
+	SpatialResult output;
+	output.result = result;
+	output.rayLength = avgRayLength;
+	return output;
 }
 
 struct TemporalOutput
@@ -127,9 +141,10 @@ struct TemporalOutput
 	float3 screenResult : SV_Target1;
 };
 
+Texture2D<float> RayDepth;
+
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	// Neighborhood clamp
 	float4 result, mean, stdDev;
 	mean = result = RgbToYCoCgFastTonemap(_Input[position.xy]);
 	stdDev = result * result;
@@ -151,7 +166,11 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 		}
 	}
 	
-	float2 historyUv = uv - Velocity[position.xy];
+	float rayLength = RayDepth[position.xy];
+	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
+	worldPosition += normalize(worldDir) * rayLength;
+	
+	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
 	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history.rgb *= _PreviousToCurrentExposure;
 	history = RgbToYCoCgFastTonemap(history);
@@ -171,16 +190,14 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	result = YCoCgToRgbFastTonemapInverse(result);
 	result = RemoveNaN(result);
 	
+	TemporalOutput output;
+	output.result = result;
+	
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
 	bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
 	float3 ambient = AmbientLight(bentNormalOcclusion.xyz, bentNormalOcclusion.w);
 	
-	TemporalOutput output;
-	output.result = result;
-	
 	// Since the final weight should be 1/pi, we divide by that, which is result.a * Pi
-	result.a = saturate(result.a * Pi);
-	
-	output.screenResult = lerp(ambient, result.rgb, result.a * _Intensity);
+	output.screenResult = lerp(ambient, result.rgb, saturate(result.a * Pi) * _Intensity);
 	return output;
 }
