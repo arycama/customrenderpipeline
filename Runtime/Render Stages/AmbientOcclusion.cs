@@ -9,6 +9,7 @@ namespace Arycama.CustomRenderPipeline
     {
         private readonly Settings settings;
         private readonly Material material;
+        private RayTracingShader ambientOcclusionRaytracingShader;
 
         private PersistentRTHandleCache temporalCache;
 
@@ -16,60 +17,146 @@ namespace Arycama.CustomRenderPipeline
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
-            temporalCache = new(GraphicsFormat.R8G8B8A8_UNorm, renderGraph, "Physical Sky");
+            temporalCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Physical Sky");
+            ambientOcclusionRaytracingShader = Resources.Load<RayTracingShader>("Raytracing/AmbientOcclusion");
         }
 
-        public void Render(Camera camera, RTHandle depth, float scale, Texture2D blueNoise2D, Matrix4x4 invVpMatrix, RTHandle normal, ICommonPassData commonPassData, RTHandle velocity, ref RTHandle bentNormalOcclusion)
+        public void Render(Camera camera, RTHandle depth, float scale, Texture2D blueNoise2D, Matrix4x4 invVpMatrix, RTHandle normal, ICommonPassData commonPassData, RTHandle velocity, ref RTHandle bentNormalOcclusion, float bias, float distantBias)
         {
-            var scaledWidth = (int)(camera.pixelWidth * scale);
-            var scaledHeight = (int)(camera.pixelHeight * scale);
+            var width = (int)(camera.pixelWidth * scale);
+            var height = (int)(camera.pixelHeight * scale);
 
-            var tempResult = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
+            var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion/Compute"))
+            if (settings.UseRaytracing)
             {
-                pass.Initialize(material, 0, 1, null, camera);
-                pass.WriteTexture(tempResult);
-                pass.ReadTexture("_Depth", depth);
-                pass.ReadTexture("_Normals", normal);
-                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<Pass1Data>((command, pass, data) =>
+                using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Raytraced Ambient Occlusion"))
                 {
-                    commonPassData.SetProperties(pass, command);
+                    var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>();
 
-                    pass.SetVector(command, "ScaleOffset", data.scaleOffset);
-                    pass.SetVector(command, "_UvToView", data.uvToView);
-                    pass.SetFloat(command, "_Radius", data.radius);
-                    pass.SetFloat(command, "_AoStrength", data.aoStrength);
-                    pass.SetFloat(command, "_FalloffScale", data.falloffScale);
-                    pass.SetFloat(command, "_FalloffBias", data.falloffBias);
-                    pass.SetInt(command, "_DirectionCount", data.directionCount);
-                    pass.SetInt(command, "_SampleCount", data.sampleCount);
-                    pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2d);
-                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                    pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
-                    pass.SetVector(command, "_CameraDepthScaleLimit", depth.ScaleLimit2D);
-                });
+                    pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, width, height, 1, bias, distantBias);
+                    pass.WriteTexture(tempResult, "HitColor");
+                    pass.WriteTexture(hitResult, "HitResult");
+                    pass.ReadTexture("_Depth", depth);
 
-                var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
-                var tanHalfFovX = tanHalfFovY * camera.aspect;
+                    commonPassData.SetInputs(pass);
 
-                data.scaleOffset = new Vector2(1.0f / scaledWidth, 1.0f / scaledHeight);
-                data.uvToView = new Vector4(tanHalfFovX * 2.0f, tanHalfFovY * 2.0f, -tanHalfFovX, -tanHalfFovY);
-                data.radius = settings.Radius * scaledHeight / tanHalfFovY * 0.5f;
-                data.aoStrength = settings.Strength;
-                data.falloffScale = settings.Falloff == 1.0f ? 0.0f : 1.0f / (settings.Radius * settings.Falloff - settings.Radius);
-                data.falloffBias = settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff);
-                data.directionCount = settings.DirectionCount;
-                data.sampleCount = settings.SampleCount;
-                data.blueNoise2d = blueNoise2D;
-                data.scaledResolution = new Vector4(scaledWidth, scaledHeight, 1.0f / scaledWidth, 1.0f / scaledHeight);
-                data.invVpMatrix = invVpMatrix;
+                    var data = pass.SetRenderFunction<Pass1Data>((command, pass, data) =>
+                    {
+                        commonPassData.SetProperties(pass, command);
+                        pass.SetVector(command, "ScaleOffset", data.scaleOffset);
+                        pass.SetVector(command, "_UvToView", data.uvToView);
+                        pass.SetFloat(command, "_Radius", data.radius);
+                        pass.SetFloat(command, "_AoStrength", data.aoStrength);
+                        pass.SetFloat(command, "_FalloffScale", data.falloffScale);
+                        pass.SetFloat(command, "_FalloffBias", data.falloffBias);
+                        pass.SetInt(command, "_DirectionCount", data.directionCount);
+                        pass.SetInt(command, "_SampleCount", data.sampleCount);
+                        pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2d);
+                        pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
+                        pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
+                        pass.SetVector(command, "_CameraDepthScaleLimit", depth.ScaleLimit2D);
+                    });
+
+                    var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+                    var tanHalfFovX = tanHalfFovY * camera.aspect;
+
+                    data.scaleOffset = new Vector2(1.0f / width, 1.0f / height);
+                    data.uvToView = new Vector4(tanHalfFovX * 2.0f, tanHalfFovY * 2.0f, -tanHalfFovX, -tanHalfFovY);
+                    data.radius = settings.Radius * height / tanHalfFovY * 0.5f;
+                    data.aoStrength = settings.Strength;
+                    data.falloffScale = settings.Falloff == 1.0f ? 0.0f : 1.0f / (settings.Radius * settings.Falloff - settings.Radius);
+                    data.falloffBias = settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff);
+                    data.directionCount = settings.DirectionCount;
+                    data.sampleCount = settings.SampleCount;
+                    data.blueNoise2d = blueNoise2D;
+                    data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
+                    data.invVpMatrix = invVpMatrix;
+                }
+            }
+            else
+            {
+                using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Trace"))
+                {
+                    pass.Initialize(material, 0, 1, null, camera);
+                    pass.WriteTexture(tempResult);
+                    pass.WriteTexture(hitResult);
+                    pass.ReadTexture("_Depth", depth);
+                    pass.ReadTexture("_Normals", normal);
+                    pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                    commonPassData.SetInputs(pass);
+
+                    var data = pass.SetRenderFunction<Pass1Data>((command, pass, data) =>
+                    {
+                        commonPassData.SetProperties(pass, command);
+
+                        pass.SetVector(command, "ScaleOffset", data.scaleOffset);
+                        pass.SetVector(command, "_UvToView", data.uvToView);
+                        pass.SetFloat(command, "_Radius", data.radius);
+                        pass.SetFloat(command, "_AoStrength", data.aoStrength);
+                        pass.SetFloat(command, "_FalloffScale", data.falloffScale);
+                        pass.SetFloat(command, "_FalloffBias", data.falloffBias);
+                        pass.SetInt(command, "_DirectionCount", data.directionCount);
+                        pass.SetInt(command, "_SampleCount", data.sampleCount);
+                        pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2d);
+                        pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
+                        pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
+                        pass.SetVector(command, "_CameraDepthScaleLimit", depth.ScaleLimit2D);
+                    });
+
+                    var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+                    var tanHalfFovX = tanHalfFovY * camera.aspect;
+
+                    data.scaleOffset = new Vector2(1.0f / width, 1.0f / height);
+                    data.uvToView = new Vector4(tanHalfFovX * 2.0f, tanHalfFovY * 2.0f, -tanHalfFovX, -tanHalfFovY);
+                    data.radius = settings.Radius * height / tanHalfFovY * 0.5f;
+                    data.aoStrength = settings.Strength;
+                    data.falloffScale = settings.Falloff == 1.0f ? 0.0f : 1.0f / (settings.Radius * settings.Falloff - settings.Radius);
+                    data.falloffBias = settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff);
+                    data.directionCount = settings.DirectionCount;
+                    data.sampleCount = settings.SampleCount;
+                    data.blueNoise2d = blueNoise2D;
+                    data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
+                    data.invVpMatrix = invVpMatrix;
+                }
             }
 
-            var (current, history, wasCreated) = temporalCache.GetTextures(scaledWidth, scaledHeight, camera, true);
+            var spatialResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var rayDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R16_SFloat, isScreenTexture: true);
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
+            {
+                pass.Initialize(material, 1, camera: camera);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
+                pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
+
+                pass.ReadTexture("_Input", tempResult);
+                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("Velocity", velocity);
+                pass.ReadTexture("_HitResult", hitResult);
+                pass.ReadTexture("_NormalRoughness", normal);
+                pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
+
+                commonPassData.SetInputs(pass);
+                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                {
+                    commonPassData.SetProperties(pass, command);
+                    //pass.SetFloat(command, "_Intensity", settings.Strength);
+                    //pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
+                    //pass.SetFloat(command, "_Thickness", settings.Thickness);
+                    pass.SetInt(command, "_ResolveSamples", settings.ResolveSamples);
+                    pass.SetFloat(command, "_ResolveSize", settings.ResolveSize);
+                });
+            }
+
+            var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Temporal"))
             {
                 pass.Initialize(material, 1, camera: camera);
@@ -95,7 +182,7 @@ namespace Arycama.CustomRenderPipeline
 
             renderGraph.ResourceMap.SetRenderPassData(new Result(current));
 
-            var newBentNormalOcclusion = renderGraph.GetTexture(scaledWidth, scaledHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
+            var newBentNormalOcclusion = renderGraph.GetTexture(width, height, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Resolve"))
             {
                 pass.Initialize(material, 2);
@@ -139,19 +226,15 @@ namespace Arycama.CustomRenderPipeline
         [Serializable]
         public class Settings
         {
-            [SerializeField, Range(0.0f, 8.0f)] private float strength = 1.0f;
-            [SerializeField] private Color tint = Color.black;
-            [SerializeField] private float radius = 5.0f;
-            [SerializeField, Range(0f, 1f)] private float falloff = 0.75f;
-            [SerializeField, Range(1, 8)] private int directionCount = 1;
-            [SerializeField, Range(1, 32)] private int sampleCount = 8;
+            [field: SerializeField, Range(0.0f, 8.0f)] public float Strength { get; private set; } = 1.0f;
+            [field: SerializeField] public float Radius { get; private set; } = 5.0f;
+            [field: SerializeField, Range(0f, 1f)] public float Falloff { get; private set; } = 0.75f;
+            [field: SerializeField, Range(1, 8)] public int DirectionCount { get; private set; } = 1;
+            [field: SerializeField, Range(1, 32)] public int SampleCount { get; private set; } = 8;
 
-            public float Strength => strength;
-            public Color Tint => tint;
-            public float Radius => radius;
-            public float Falloff => falloff;
-            public int DirectionCount => directionCount;
-            public int SampleCount => sampleCount;
+            [field: SerializeField, Range(0, 32)] public int ResolveSamples { get; private set; } = 8;
+            [field: SerializeField, Min(0.0f)] public float ResolveSize { get; private set; } = 16.0f;
+            [field: SerializeField] public bool UseRaytracing { get; private set; } = false;
         }
 
         private class Pass0Data

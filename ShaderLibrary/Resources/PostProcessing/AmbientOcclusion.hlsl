@@ -241,7 +241,7 @@ float4 FragmentResolve(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	ambientOcclusion.a = pow(ambientOcclusion.a, _AoStrength);
 	
-	float4 result = BlendVisibiltyCones(bentNormalOcclusion, ambientOcclusion);
+	float4 result = ambientOcclusion;// BlendVisibiltyCones(bentNormalOcclusion, ambientOcclusion);
 	result.rgb = 0.5 * result.rgb + 0.5;
 	return result;
 }

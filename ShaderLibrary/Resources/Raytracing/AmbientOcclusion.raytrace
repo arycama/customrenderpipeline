@@ -1,0 +1,55 @@
+#include "../../Common.hlsl"
+#include "../../GBuffer.hlsl"
+#include "../../Random.hlsl"
+#include "../../Samplers.hlsl"
+#include "../../Lighting.hlsl"
+#include "../../Raytracing.hlsl"
+
+Texture2D<float> _Depth;
+RWTexture2D<float> HitResult;
+
+float3 LightDirection;
+float _RaytracingBias, _RaytracingDistantBias, LightCosTheta;
+
+RaytracingAccelerationStructure SceneRaytracingAccelerationStructure;
+
+#pragma max_recursion_depth 1
+
+[shader("miss")]
+void MissShader(inout RayPayloadShadow payload : SV_RayPayload)
+{
+	payload.hasHit = false;
+}
+
+[shader("raygeneration")]
+void RayGeneration()
+{
+	uint2 position = DispatchRaysIndex().xy;
+	float depth = _Depth[position];
+	if(depth == 0.0)
+		return;
+	
+	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
+	
+	// We also need to undo the planet curve, since it's not accounted for in the BLAS
+	worldPosition = PlanetCurveInverse(worldPosition);
+	
+	float2 u = Noise2D(position);
+	
+    float3 localL = SampleConeUniform(u.x, u.y, LightCosTheta);
+	float3 L = ShortestArcQuaternion(LightDirection, localL);
+	
+	RayDesc ray;
+	ray.Origin = worldPosition + L * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
+	ray.Direction = L;
+	ray.TMin = 0.0;
+	ray.TMax = 1e10f;
+	
+	RayPayloadShadow payload;
+	payload.hasHit = true;
+	
+	uint flags = RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+	
+	HitResult[position] = !payload.hasHit;
+}

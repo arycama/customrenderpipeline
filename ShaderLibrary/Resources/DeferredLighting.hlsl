@@ -15,6 +15,9 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float4 albedoMetallic = _AlbedoMetallic[position.xy];
 	float4 normalRoughness = _NormalRoughness[position.xy];
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
+	
+	return bentNormalOcclusion.a;
+	
 	uint stencil = _Stencil[position.xy].g;
 	
 	bool isTranslucent = stencil & 16;
