@@ -71,7 +71,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			float eyeDepth = LinearEyeDepth(depth);
 	
 			// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
-			float rcpVLength = rsqrt(dot(worldDir, worldDir));
+			float rcpVLength = RcpLength(worldDir);
 			float3 V = -worldDir * rcpVLength;
 			result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
 		}

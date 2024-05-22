@@ -130,10 +130,37 @@ float CalculateSphereEdgeFactor(float3 corner0, float3 corner1, float targetEdge
 	return CalculateSphereEdgeFactor(r, edgeCenter, targetEdgeLength, cameraAspect, screenWidth);
 }
 
-// Calculates a rotation from (0,0,1) to t, and applies that rotation to u using shortest arc quaternion
-// https://blog.selfshadow.com/publications/blending-in-detail/
-float3 ShortestArcQuaternion(float3 baseNormal, float3 detailNormal)
+float4 qmul(float4 q1, float4 q2)
 {
+	return float4(
+        q2.xyz * q1.w + q1.xyz * q2.w + cross(q1.xyz, q2.xyz),
+        q1.w * q2.w - dot(q1.xyz, q2.xyz)
+    );
+}
+
+float3 rotate_vector(float3 v, float4 r)
+{
+	float4 r_c = r * float4(-1, -1, -1, 1);
+	return qmul(r, qmul(float4(v, 0), r_c)).xyz;
+}
+
+// Quaternion that rotates between from and to
+float4 FromToRotation(float3 F, float3 T)
+{
+	float rcpS = rsqrt(dot(F, T) * 2.0 + 2.0);
+	float4 result;
+	result.xyz = cross(F, T) * rcpS;
+	result.w = rcp(rcpS) * 0.5;
+	return result;
+}
+
+// Calculates a rotation from (0,0,1) to baseNormal, and applies that rotation to detailNormal using shortest arc quaternion
+// https://blog.selfshadow.com/publications/blending-in-detail/
+float3 FromToRotationZ(float3 baseNormal, float3 detailNormal)
+{
+	//float4 q = FromToRotation(float3(0, 0, 1), baseNormal);
+	//return rotate_vector(detailNormal, q);
+
 	float3 tp = baseNormal + float3(0, 0, 1);
 	float3 up = detailNormal * float2(-1, 1).xxy;
 	return tp * dot(tp, up) / tp.z - up;
@@ -144,6 +171,38 @@ float3 SampleConeUniform(float u1, float u2, float cosTheta)
 	float r0 = cosTheta + u1 * (1.0 - cosTheta);
 	float phi = TwoPi * u2;
 	return SphericalToCartesian(phi, r0);
+}
+
+
+// Projects a vector onto another vector (Assumes vectors are normalized)
+float3 Project(float3 V, float3 N)
+{
+	return N * dot(V, N);
+}
+
+// Projects a vector onto a plane defined by a normal orthongal to the plane (Assumes vectors are normalized)
+float3 ProjectOnPlane(float3 V, float3 N)
+{
+	return V - Project(V, N);
+}
+
+// Ref: https://seblagarde.wordpress.com/2014/12/01/inverse-trigonometric-functions-gpu-optimization-for-amd-gcn-architecture/
+// Input [-1, 1] and output [0, PI], 12 VALU
+float FastACos(float inX)
+{
+	float res = FastACosPos(inX);
+	return inX >= 0 ? res : Pi - res; // Undo range reduction
+}
+
+float2 FastACos(float2 inX)
+{
+	float2 res = FastACosPos(inX);
+	return inX >= 0 ? res : Pi - res; // Undo range reduction
+}
+
+float Angle(float3 from, float3 to)
+{
+	return FastACos(dot(from, to));
 }
 
 #endif

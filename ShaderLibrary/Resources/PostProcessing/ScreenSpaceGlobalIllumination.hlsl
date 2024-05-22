@@ -30,14 +30,13 @@ struct TraceResult
 TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	float depth = _Depth[position.xy];
-	float3 V = -worldDir;
-	float rcpVLength = rsqrt(dot(worldDir, worldDir));
-	V *= rcpVLength;
+	float rcpVLength = RcpLength(worldDir);
+	float3 V = -worldDir * rcpVLength;
 	
 	float NdotV;
 	float3 N = GBufferNormal(position.xy, _NormalRoughness, V, NdotV);
 	float3 noise3DCosine = Noise3DCosine(position.xy);
-	float3 L = ShortestArcQuaternion(N, noise3DCosine);
+	float3 L = FromToRotationZ(N, noise3DCosine);
 	float rcpPdf = Pi * rcp(noise3DCosine.z);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
@@ -83,9 +82,8 @@ struct SpatialResult
 
 SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float3 V = -worldDir;
-	float rcpVLength = rsqrt(dot(V, V));
-	V *= rcpVLength;
+	float rcpVLength = RcpLength(worldDir);
+	float3 V = -worldDir * rcpVLength;
 	
 	float4 normalRoughness = _NormalRoughness[position.xy];
 	float NdotV;
@@ -109,7 +107,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		float3 hitPosition = sampleWorldPosition + hitData.xyz;
 		
 		float3 delta = hitPosition - worldPosition;
-		float rcpRayLength = rsqrt(SqrLength(delta));
+		float rcpRayLength = RcpLength(delta);
 		float3 L = delta * rcpRayLength;
 		
 		float NdotL = dot(N, L);

@@ -37,7 +37,7 @@ void RayGeneration()
 	float2 u = Noise2D(position);
 	
     float3 localL = SampleConeUniform(u.x, u.y, LightCosTheta);
-	float3 L = ShortestArcQuaternion(LightDirection, localL);
+	float3 L = FromToRotationZ(LightDirection, localL);
 	
 	RayDesc ray;
 	ray.Origin = worldPosition + L * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);

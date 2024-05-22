@@ -66,6 +66,10 @@ struct RayPayloadShadow
 	bool hasHit;
 };
 
+struct RayPayloadAmbientOcclusion
+{
+	float hitDistance;
+};
 
 struct AttributeData
 {

@@ -177,7 +177,7 @@ void SampleTerrain(float3 worldPosition, out float4 albedoSmoothness, out float3
 	// TODO: Figure out why derivatives aren't working for raytracing
 	tangentNormal = normalize(normalSum);
 	
-	normal = ShortestArcQuaternion(terrainNormal, tangentNormal).xzy;
+	normal = FromToRotationZ(terrainNormal, tangentNormal).xzy;
 	//normal = terrainNormal.xzy;
 }
 

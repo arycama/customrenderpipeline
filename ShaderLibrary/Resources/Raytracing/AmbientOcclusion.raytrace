@@ -5,20 +5,94 @@
 #include "../../Lighting.hlsl"
 #include "../../Raytracing.hlsl"
 
+RWTexture2D<float4> HitResult, HitColor;
 Texture2D<float> _Depth;
-RWTexture2D<float> HitResult;
-
-float3 LightDirection;
-float _RaytracingBias, _RaytracingDistantBias, LightCosTheta;
+Texture2D<float4> _Normals;
+float _Radius, _RawRadius, _AoStrength, _FalloffScale, _FalloffBias, _SampleCount;
+float _RaytracingBias, _RaytracingDistantBias;
 
 RaytracingAccelerationStructure SceneRaytracingAccelerationStructure;
 
 #pragma max_recursion_depth 1
 
 [shader("miss")]
-void MissShader(inout RayPayloadShadow payload : SV_RayPayload)
+void MissShader(inout RayPayloadAmbientOcclusion payload : SV_RayPayload)
 {
-	payload.hasHit = false;
+	payload.hitDistance = 0.0;
+}
+
+float3 ComputeViewspacePosition(float2 screenPos)
+{
+	return WorldToView(PixelToWorld(float3(screenPos, _Depth[screenPos])));
+}
+
+float CalculateHorizon(float lowHorizonCosAngle, float offset, float2 position, float2 direction, float3 cPosV, float3 viewV, float scaling, float3 N, float samples)
+{
+    // Start ray marching from the next texel to avoid self-intersections.
+	float t = Max2(abs(0.5 / direction));
+	
+	float2 start = position.xy + t * direction;
+	float2 step = direction * scaling / samples;
+
+	float3 worldPosition = MultiplyPoint3x4(_ViewToWorld, cPosV);
+
+	float horizonCosAngle = lowHorizonCosAngle;
+	for(float j = 0.0; j < samples; j++)
+	{
+	#if 0
+		float2 sampleCoord = floor(start + (j + offset) * step) + 0.5;
+		float3 samplePosition = ComputeViewspacePosition(sampleCoord);
+		
+		float3 delta = samplePosition - cPosV;
+		float sqDist = SqrLength(delta);
+		float weight = saturate(sqDist * _FalloffScale + _FalloffBias);
+		
+		float3 sampleHorizonDirection = delta * rsqrt(sqDist);
+		float sampleHorizonCosAngle = lerp(lowHorizonCosAngle, dot(sampleHorizonDirection, viewV), weight);
+		
+		horizonCosAngle = max(horizonCosAngle, sampleHorizonCosAngle);
+	#else
+	
+		float theta = lerp(HalfPi, 0.0, (j + offset) / samples);
+		//float cosTheta = lerp(1.0, 0.0, (j + offset) / samples);
+		float cosTheta = cos(theta);
+
+		float sinTheta = sin(theta);
+		//float3 rayDirV = SphericalToCartesian(direction.x, direction.y, -cosTheta, sinTheta);
+		//float3 rayDir = MultiplyVector(_ViewToWorld, rayDirV, true);
+		
+		float3 bentNormalL = SphericalToCartesian(direction.x, direction.y, cosTheta, sinTheta);//		float3(direction.x * sinTheta, direction.y * sinTheta, cosTheta);
+		float3 bentNormalV = FromToRotationZ(viewV * float2(1, -1).xxy, bentNormalL) * float2(1, -1).xxy;
+		float3 rayDir = normalize(mul((float3x3)_ViewToWorld, bentNormalV));
+		
+		RayDesc ray;
+		ray.Origin = worldPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
+		ray.Direction = rayDir;
+		ray.TMin = 0.0;
+		ray.TMax = _Radius;
+	
+		RayPayloadAmbientOcclusion payload;
+		payload.hitDistance = 0.0;
+	
+		uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+		TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+		
+		if(!payload.hitDistance)
+			continue;
+			
+		float3 rayHit = ray.Origin + ray.Direction * payload.hitDistance;
+		float3 delta = rayHit - worldPosition;
+		float sqDist = SqrLength(delta);
+		float weight = saturate(sqDist * _FalloffScale + _FalloffBias);
+		
+		float3 sampleHorizonDirection = delta * rsqrt(sqDist);
+		float sampleHorizonCosAngle = lerp(lowHorizonCosAngle, cosTheta, weight);
+		
+		horizonCosAngle = max(horizonCosAngle, sampleHorizonCosAngle);
+	#endif
+	}
+	
+	return horizonCosAngle;
 }
 
 [shader("raygeneration")]
@@ -30,26 +104,97 @@ void RayGeneration()
 		return;
 	
 	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
+	float3 V = normalize(-worldPosition);
+	float3 N = GBufferNormal(position, _Normals, V);
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	worldPosition = PlanetCurveInverse(worldPosition);
 	
-	float2 u = Noise2D(position);
+	float samples = 8;
+	#if 0
+	float2 offset1 = Noise2D(position);
+	float3 bentN = 0.0;
+	float visibleCount = 0.0;
 	
-    float3 localL = SampleConeUniform(u.x, u.y, LightCosTheta);
-	float3 L = ShortestArcQuaternion(LightDirection, localL);
+	for(float j = 0.0; j < samples; j++)
+	{
+		float2 u = frac(Hammersley2dSeq(j, samples) + offset1);
+		//float3 rayDir = FromToRotationZ(N, SampleHemisphereUniform(u.x, u.y));
+		float3 rayDir = SampleHemisphereCosine(u.x, u.y, N);
 	
-	RayDesc ray;
-	ray.Origin = worldPosition + L * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
-	ray.Direction = L;
-	ray.TMin = 0.0;
-	ray.TMax = 1e10f;
+		RayDesc ray;
+		ray.Origin = worldPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
+		ray.Direction = rayDir;
+		ray.TMin = 0.0;
+		ray.TMax = _RawRadius;
 	
-	RayPayloadShadow payload;
-	payload.hasHit = true;
+		RayPayloadAmbientOcclusion payload;
+		payload.hitDistance = 0.0;
+		
+		uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+		TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+		
+		if(payload.hitDistance)
+			continue;
+			
+		bentN += rayDir;
+		visibleCount++;
+	}
 	
-	uint flags = RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
-	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+	HitColor[position] = float4(normalize(bentN), visibleCount / samples);
+	return;
+	#endif
 	
-	HitResult[position] = !payload.hasHit;
+	float3 normalV = mul((float3x3)_WorldToView, N);
+	float3 cPosV = ComputeViewspacePosition(position.xy + 0.5);
+	float3 viewV = normalize(-cPosV);
+	
+	float2 noise = Noise2DUnit(position.xy);
+	float scaling = _Radius * rcp(LinearEyeDepth(depth));
+	
+	float3 directionV = float3(noise.x, noise.y, 0.0);
+	float3 orthoDirectionV = ProjectOnPlane(directionV, viewV);
+	float3 axisV = normalize(cross(directionV, viewV));
+	float3 projNormalV = ProjectOnPlane(normalV, axisV);
+		
+	float rcpWeight = rsqrt(SqrLength(projNormalV));
+	
+	float sgnN = sign(dot(orthoDirectionV, projNormalV));
+	float cosN = saturate(dot(projNormalV, viewV) * rcpWeight);
+	float n = sgnN * FastACos(cosN);
+	
+	float offset = Noise1D(position.xy);
+	
+	float h = CalculateHorizon(cos(-HalfPi + n), offset, position + 0.5, -directionV.xy, cPosV, viewV, scaling, N, samples);
+	h = n + max(-HalfPi, -FastACos(h) - n);
+	float visibility = cosN + 2.0 * h * sin(n) - cos(2.0 * h - n);
+	
+	// Note the formulation of cosTheta is inverted
+	float cosTheta = -(-cos(3.0 * h.x - n) - 3.0 * cos(h.x + n));
+	float sinTheta = 6.0 * sin(h - n) - sin(3.0 * h - n) - 3.0 * sin(h + n);
+	
+	h = CalculateHorizon(cos(HalfPi + n), offset, position + 0.5, directionV.xy, cPosV, viewV, scaling, N, samples);
+	h = n + min(HalfPi, FastACos(h) - n);
+	visibility += cosN + 2.0 * h * sin(n) - cos(2.0 * h - n);
+	visibility *= 0.25;
+	
+	cosTheta += -(-cos(3.0 * h - n) - 3.0 * cos(h + n));
+	sinTheta += 6.0 * sin(h - n) - sin(3.0 * h - n) - 3.0 * sin(h + n);
+	
+	sinTheta += 16.0 * sin(n);
+	sinTheta *= rcp(12.0);
+	
+	cosTheta -= 8.0 * cos(n);
+	cosTheta *= rcp(12.0);
+	
+	///float3 bentNormalL = SphericalToCartesian(directionV.x, directionV.y, cosTheta, sinTheta);
+	//float3 bentNormal = FromToRotationZ(-V, bentNormalL);
+	
+	float3 bentNormalL = float3(directionV.x * sinTheta, directionV.y * sinTheta, cosTheta);
+	float3 bentNormalV = FromToRotationZ(viewV * float2(1, -1).xxy, bentNormalL) * float2(1, -1).xxy;
+	float3 bentNormal = normalize(mul((float3x3)_ViewToWorld, bentNormalV));
+	
+	float sampleWeight = rcp(rcpWeight);
+	
+	HitColor[position] = float4(normalize(bentNormal), visibility) * sampleWeight;
 }

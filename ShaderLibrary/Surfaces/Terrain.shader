@@ -68,5 +68,16 @@ Shader "Terrain"
             #include "TerrainRaytracing.hlsl"
             ENDHLSL
         }
+
+        Pass
+        {
+            Name "RayTracing Ambient Occlusion"
+            Tags{ "LightMode" = "RaytracingAmbientOcclusion" }
+
+            HLSLPROGRAM
+            #pragma raytracing RayTracing
+            #include "TerrainRaytracingAmbientOcclusion.hlsl"
+            ENDHLSL
+        }
     }
 }

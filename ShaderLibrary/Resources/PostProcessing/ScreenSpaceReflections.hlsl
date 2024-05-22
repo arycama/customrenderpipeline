@@ -39,10 +39,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float depth = _HiZDepth[position.xy];
 	float2 u = Noise2D(position.xy);
 	float4 normalRoughness = _NormalRoughness[position.xy];
-	
-	float3 V = -worldDir;
-	float rcpVLength = rsqrt(dot(V, V));
-	V *= rcpVLength;
+	float3 V = -worldDir * RcpLength(worldDir);
 	
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
@@ -100,14 +97,12 @@ struct SpatialResult
 
 SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float3 V = -worldDir;
-	float rcpVLength = rsqrt(dot(V, V));
-	V *= rcpVLength;
+	float3 V = -worldDir * RcpLength(worldDir);
 	
     float4 normalRoughness = _NormalRoughness[position.xy];
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
-    float roughness = max(1e-11, Sq(normalRoughness.a));
+    float roughness = max(1e-6, Sq(normalRoughness.a));
     
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
     float phi = Noise1D(position.xy) * TwoPi;
@@ -130,7 +125,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		float3 hitPosition = sampleWorldPosition + hitData.xyz;
 		
 		float3 delta = hitPosition - worldPosition;
-		float rcpRayLength = rsqrt(SqrLength(delta));
+		float rcpRayLength = RcpLength(delta);
 		float3 L = delta * rcpRayLength;
 		
 		float NdotL = dot(N, L);
@@ -225,9 +220,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
     bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
     
     float4 normalRoughness = _NormalRoughness[position.xy];
-	float3 V = -worldDir;
-	float rcpVLength = rsqrt(dot(V, V));
-	V *= rcpVLength;
+	float3 V = -worldDir * RcpLength(worldDir);
 	
     float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
@@ -240,7 +233,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float2 directionalAlbedo = DirectionalAlbedo(NdotV, normalRoughness.a);
 	float3 specularIntensity = lerp(directionalAlbedo.x, directionalAlbedo.y, f0);
 	
-	float3 specularFactor = IndirectSpecularFactor(NdotV, normalRoughness.a, f0);
+	float3 specularFactor = IndirectSpecularFactor(NdotV, normalRoughness.a, Max3(f0));
 	
 	output.screenResult = lerp(radiance, result.rgb, saturate(result.a * rcp(specularFactor) * _Intensity));
 	return output;

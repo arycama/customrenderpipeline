@@ -53,7 +53,7 @@ float3 SampleHemisphereCosine(float u1, float u2, float3 normal)
     return normalize(normal + pointOnSphere);
 	
 	float3 result = SampleHemisphereCosine(u1, u2);
-	return ShortestArcQuaternion(normal, result);
+	return FromToRotationZ(normal, result);
 }
 
 float3 SampleHemisphereUniform(float u1, float u2)
@@ -96,7 +96,7 @@ float2 NormalDerivatives(float3 normal)
 // assume compositing in tangent space
 float3 BlendNormalRNM(float3 n1, float3 n2)
 {
-	return ShortestArcQuaternion(n1, n2);
+	return FromToRotationZ(n1, n2);
 }
 
 float PerceptualSmoothnessToPerceptualRoughness(float smoothness)

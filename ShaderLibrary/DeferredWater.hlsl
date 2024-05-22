@@ -34,9 +34,8 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float waterDepth = _Depth[position.xy];
 	float4 waterNormalFoamRoughness = _WaterNormalFoam[position.xy];
 	
-	float3 V = -worldDir;
-	float rcpLenV = rsqrt(dot(V, V));
-	V *= rcpLenV;
+	float rcpLenV = RcpLength(worldDir);
+	float3 V = -worldDir * rcpLenV;
 	
 	float linearWaterDepth = LinearEyeDepth(waterDepth);
 	float waterDistance = linearWaterDepth * rcp(rcpLenV);

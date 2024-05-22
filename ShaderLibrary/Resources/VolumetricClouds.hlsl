@@ -27,9 +27,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float2 offsets = 0.5;
 	#else
 		float3 P = 0.0;
-		float3 rd = worldDir;
-		float rcpRdLength = rsqrt(dot(rd, rd));
-		rd *= rcpRdLength;
+		float rcpRdLength = RcpLength(worldDir);
+		float3 rd = worldDir * rcpRdLength;
 		float cosViewAngle = rd.y;
 		float2 offsets = Noise2D(position.xy);
 	#endif
@@ -111,9 +110,7 @@ struct TemporalOutput
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	int2 pixelId = (int2) position.xy;
-	float3 rd = worldDir;
-	float rcpRdLength = rsqrt(dot(rd, rd));
-	rd *= rcpRdLength;
+	float3 rd = worldDir * RcpLength(worldDir);
 	
 	float cloudDistance = CloudDepthTexture[pixelId].r;
 

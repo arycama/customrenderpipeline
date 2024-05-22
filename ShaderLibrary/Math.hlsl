@@ -45,6 +45,11 @@ float SqrLength(float2 x) { return dot(x, x); }
 float SqrLength(float3 x) { return dot(x, x); }
 float SqrLength(float4 x) { return dot(x, x); }
 
+float RcpLength(float1 x) { return rsqrt(SqrLength(x)); }
+float RcpLength(float2 x) { return rsqrt(SqrLength(x)); }
+float RcpLength(float3 x) { return rsqrt(SqrLength(x)); }
+float RcpLength(float4 x) { return rsqrt(SqrLength(x)); }
+
 float SinFromCos(float x) { return sqrt(saturate(1.0 - Sq(x))); }
 
 // Input [0, 1] and output [0, PI/2], 9 VALU

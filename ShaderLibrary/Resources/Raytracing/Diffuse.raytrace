@@ -39,7 +39,7 @@ void RayGeneration()
 	float3 N = GBufferNormal(position, _NormalRoughness, V, NdotV);
 	
 	float3 noise3DCosine = Noise3DCosine(position);
-	float3 L = ShortestArcQuaternion(N, noise3DCosine);
+	float3 L = FromToRotationZ(N, noise3DCosine);
 	float rcpPdf = Pi * rcp(noise3DCosine.z);
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS

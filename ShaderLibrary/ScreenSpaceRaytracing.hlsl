@@ -27,10 +27,7 @@ float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, float maxSteps, float
 	bool rayTowardsEye = rayDir.z >= 0;
 
     // Start ray marching from the next texel to avoid self-intersections.
-    // 'rayOrigin' is the exact texel center.
-	float2 dist1 = abs(0.5 / rayDir.xy);
-	float t = min(dist1.x, dist1.y);
-
+	float t = Min2(abs(0.5 / rayDir.xy));
 	float3 rayPos = rayOrigin + t * rayDir;
 
 	int mipLevel = 0;

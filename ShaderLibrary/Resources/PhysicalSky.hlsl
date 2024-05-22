@@ -198,9 +198,8 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		float3 rd = MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0), true);
 		float2 offsets = InterleavedGradientNoise(position.xy, 0.0);
 	#else
-		float3 rd = worldDir;
-		float rcpRdLength = rsqrt(dot(rd, rd));
-		rd *= rcpRdLength;
+		float rcpRdLength = RcpLength(worldDir);
+		float3 rd = worldDir * rcpRdLength;
 		float2 offsets = Noise2D(position.xy);
 	#endif
 	
@@ -369,9 +368,8 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 {
 	float cloudTransmittance = CloudTransmittanceTexture[position.xy];
 	
-	float3 rd = worldDir;
-	float rcpRdLength = rsqrt(dot(rd, rd));
-	rd *= rcpRdLength;
+	float rcpRdLength = RcpLength(worldDir);
+	float3 rd = worldDir * rcpRdLength;
 	
 	float cloudDistance;
 	if(cloudTransmittance < 1.0)

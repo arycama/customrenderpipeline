@@ -158,16 +158,16 @@
             ENDHLSL
         }
 
-        // Pass
-        // {
-        //     Name "RayTracing Visibility"
-        //     Tags{ "LightMode" = "RaytracingVisibility" }
+        Pass
+        {
+            Name "RayTracingAmbientOcclusion"
+            Tags{ "LightMode" = "RayTracingAmbientOcclusion" }
 
-        //     HLSLPROGRAM
-        //     #pragma raytracing RayTracing
-        //     #include "LitSurfaceRaytracingVisibility.hlsl"
-        //     ENDHLSL
-        // }
+            HLSLPROGRAM
+            #pragma raytracing RayTracing
+            #include "LitSurfaceRaytracingAmbientOcclusion.hlsl"
+            ENDHLSL
+        }
     }
 
     CustomEditor "LitSurfaceShaderGUI"

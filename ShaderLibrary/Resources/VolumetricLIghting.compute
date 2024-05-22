@@ -24,7 +24,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 {
 	float jitter = Noise1D(id.xy);
 	float3 worldDir = MultiplyVector(_PixelToWorldViewDir, float3(id.xy, 1.0), false);
-	float rcpWorldDirLength = rsqrt(dot(worldDir, worldDir));
+	float rcpWorldDirLength = RcpLength(worldDir);
 	worldDir *= rcpWorldDirLength;
 	
 	float eyeDepth = lerp(_VolumetricLightNear, _VolumetricLightFar, (id.z + jitter) / _VolumeSlices);
@@ -136,7 +136,7 @@ uint _VolumeSlicesInt;
 void Accumulate(uint2 id : SV_DispatchThreadID)
 {
 	float3 worldDir = MultiplyVector(_PixelToWorldViewDir, float3(id.xy, 1.0), false);
-	float rcpWorldDirLength = rsqrt(dot(worldDir, worldDir));
+	float rcpWorldDirLength = RcpLength(worldDir);
 	worldDir *= rcpWorldDirLength;
 	
 	float ds = _VolumeDistancePerSlice * rcp(rcpWorldDirLength);

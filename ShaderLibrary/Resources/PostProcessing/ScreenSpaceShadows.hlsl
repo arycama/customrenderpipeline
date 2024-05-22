@@ -19,10 +19,7 @@ cbuffer Properties
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float depth = _HiZDepth[position.xy];
-	
-	float3 V = -worldDir;
-	float rcpVLength = rsqrt(dot(worldDir, worldDir));
-	V *= rcpVLength;
+	float3 V = -worldDir * RcpLength(worldDir);
 	
 	float NdotV;
 	float3 N = GBufferNormal(position.xy, _NormalRoughness, V, NdotV);
@@ -37,7 +34,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 	float2 u = Noise2D(position.xy);
 	float3 localL = SampleConeUniform(u.x, u.y, LightCosTheta);
-	float3 L = ShortestArcQuaternion(LightDirection, localL);
+	float3 L = FromToRotationZ(LightDirection, localL);
 
 	bool validHit;
 	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZDepth, _MaxMip, validHit, float3(position.xy, depth));
