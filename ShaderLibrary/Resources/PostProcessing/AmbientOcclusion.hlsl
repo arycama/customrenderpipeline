@@ -7,14 +7,14 @@
 
 Texture2D<float> _Depth;
 Texture2D<float4> _Normals;
-float _Radius, _AoStrength, _FalloffScale, _FalloffBias, _SampleCount;
+float _Radius, _AoStrength, _FalloffScale, _FalloffBias, _SampleCount, _ThinOccluderCompensation, _ThinOccluderScale, _ThinOccluderOffset, _ThinOccluderFalloff;
 
 float3 ComputeViewspacePosition(float2 screenPos)
 {
 	return WorldToView(PixelToWorld(float3(screenPos, _Depth[screenPos])));
 }
 
-float CalculateHorizon(float lowHorizonCosAngle, float offset, float2 position, float2 direction, float3 cPosV, float3 viewV, float scaling)
+float CalculateHorizon(float minHorizonCosAngle, float offset, float2 position, float2 direction, float3 cPosV, float3 viewV, float scaling)
 {
     // Start ray marching from the next texel to avoid self-intersections.
 	float t = Max2(abs(0.5 / direction));
@@ -22,7 +22,7 @@ float CalculateHorizon(float lowHorizonCosAngle, float offset, float2 position, 
 	float2 start = position.xy + t * direction;
 	float2 step = direction * scaling / _SampleCount;
 	
-	float horizonCosAngle = lowHorizonCosAngle;
+	float horizonCosAngle = minHorizonCosAngle;
 	for(float j = 0.0; j < _SampleCount; j++)
 	{
 		float2 sampleCoord = floor(start + (j + offset) * step) + 0.5;
@@ -31,11 +31,29 @@ float CalculateHorizon(float lowHorizonCosAngle, float offset, float2 position, 
 		float3 delta = samplePosition - cPosV;
 		float sqDist = SqrLength(delta);
 		float weight = saturate(sqDist * _FalloffScale + _FalloffBias);
+		float rcpDist = rsqrt(sqDist);
 		
-		float3 sampleHorizonDirection = delta * rsqrt(sqDist);
-		float sampleHorizonCosAngle = lerp(lowHorizonCosAngle, dot(sampleHorizonDirection, viewV), weight);
+		float3 sampleHorizonDirection = delta * rcpDist;
+		float sampleHorizonCosAngle = lerp(minHorizonCosAngle, dot(sampleHorizonDirection, viewV), weight);
 		
-		horizonCosAngle = max(horizonCosAngle, sampleHorizonCosAngle);
+		//horizonCosAngle = max(horizonCosAngle, sampleHorizonCosAngle);
+		//continue;
+		
+		if(sampleHorizonCosAngle >= horizonCosAngle)
+		{
+			// If weighted horizon is greater than the previous sample, it becomes the new horizon
+			horizonCosAngle = sampleHorizonCosAngle;
+		}
+		else if(dot(sampleHorizonCosAngle, viewV) < horizonCosAngle)
+		{
+			// Otherwise, reduce the max horizon to attenuate thin features, but only if the -non- weighted sample is also below the current sample
+			// This prevents the falloff causing objects to be treated as thin when they would not be otherwise
+			float dist = rcp(rcpDist);
+			float thinOccScale = max(0.0, _ThinOccluderFalloff - abs(dist * _ThinOccluderScale + _ThinOccluderOffset));
+			
+			//horizonCosAngle = max(minHorizonCosAngle, lerp(horizonCosAngle, sampleHorizonCosAngle, _ThinOccluderCompensation* thinOccScale));
+			horizonCosAngle = max(minHorizonCosAngle, horizonCosAngle - _ThinOccluderCompensation * thinOccScale);
+		}
 	}
 	
 	return horizonCosAngle;
@@ -64,7 +82,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float rcpWeight = rsqrt(SqrLength(projNormalV));
 	
 	float sgnN = sign(dot(orthoDirectionV, projNormalV));
-	float cosN = saturate(dot(projNormalV, viewV) * rcpWeight);
+	float cosN = saturate(dot(projNormalV * rcpWeight, viewV));
 	float n = sgnN * FastACos(cosN);
 	
 	float offset = Noise1D(position.xy);
@@ -90,16 +108,13 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 	cosTheta -= 8.0 * cos(n);
 	cosTheta *= rcp(12.0);
-	
-	///float3 bentNormalL = SphericalToCartesian(directionV.x, directionV.y, cosTheta, sinTheta);
-	//float3 bentNormal = FromToRotationZ(-V, bentNormalL);
-	
+
 	float3 bentNormalL = float3(directionV.x * sinTheta, directionV.y * sinTheta, cosTheta);
-	float3 bentNormalV = FromToRotationZ(viewV * float2(1, -1).xxy, bentNormalL) * float2(1, -1).xxy;
-	float3 bentNormal = normalize(mul((float3x3)_ViewToWorld, bentNormalV));
+	float3 bentNormalV = FromToRotationZ(-viewV, bentNormalL);
+	float3 bentNormal = mul((float3x3)_ViewToWorld, bentNormalV);
 	
 	float sampleWeight = rcp(rcpWeight);
-	return float4(normalize(bentNormal), visibility) * sampleWeight;
+	return float4(bentNormal, visibility) * sampleWeight;
 }
 
 Texture2D<float4> _Input, _History;
@@ -109,8 +124,6 @@ float _IsFirst;
 
 float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	//return _Input[position.xy];
-
 	// Neighborhood clamp
 	int2 offsets[8] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(1, 0), int2(-1, 1), int2(0, 1), int2(1, 1)};
 	float4 minValue, maxValue, result, mean, stdDev;
@@ -149,9 +162,9 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	if(historyWeight)
 		history /= historyWeight;
 	
-	if (!_IsFirst && all(saturate(historyUv) == historyUv))
+	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
-	
+		
 	// Reapply weights
 	result *= lerp(historyWeight, aoWeight, 0.05 * _MaxBoxWeight);
 	

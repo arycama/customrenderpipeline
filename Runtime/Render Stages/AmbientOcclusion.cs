@@ -88,6 +88,14 @@ namespace Arycama.CustomRenderPipeline
                         pass.SetFloat(command, "_FalloffScale", data.falloffScale);
                         pass.SetFloat(command, "_FalloffBias", data.falloffBias);
                         pass.SetFloat(command, "_SampleCount", data.sampleCount);
+                        pass.SetFloat(command, "_ThinOccluderCompensation", data.thinOccluderCompensation);
+
+                        var thinOccStart = settings.ThinOccluderStart * settings.Radius;
+                        var thinOccEnd = settings.ThinOccluderEnd * settings.Radius;
+
+                        pass.SetFloat(command, "_ThinOccluderScale", settings.ThinOccluderFalloff / (0.5f * (thinOccEnd - thinOccStart)));
+                        pass.SetFloat(command, "_ThinOccluderOffset", settings.ThinOccluderFalloff * (thinOccStart + thinOccEnd) / (thinOccStart - thinOccEnd));
+                        pass.SetFloat(command, "_ThinOccluderFalloff", settings.ThinOccluderFalloff);
                     });
 
                     var tanHalfFov = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
@@ -100,6 +108,7 @@ namespace Arycama.CustomRenderPipeline
                     data.falloffScale = settings.Falloff == 1.0f ? 0.0f : 1.0f / (falloffStart * falloffStart - falloffEnd * falloffEnd);
                     data.falloffBias = settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff * settings.Falloff);
                     data.sampleCount = settings.SampleCount;
+                    data.thinOccluderCompensation = settings.ThinOccluderCompensation;
                 }
             }
 
@@ -210,6 +219,10 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Range(0.0f, 8.0f)] public float Strength { get; private set; } = 1.0f;
             [field: SerializeField] public float Radius { get; private set; } = 5.0f;
             [field: SerializeField, Range(0f, 1f)] public float Falloff { get; private set; } = 0.75f;
+            [field: SerializeField, Min(0.0f)] public float ThinOccluderCompensation { get; private set; } = 0.02f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float ThinOccluderStart { get; private set; } = 0.25f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float ThinOccluderEnd { get; private set; } = 0.75f;
+            [field: SerializeField, Min(0.0f)] public float ThinOccluderFalloff { get; private set; } = 2.0f;
             [field: SerializeField, Range(1, 32)] public int SampleCount { get; private set; } = 8;
 
             [field: SerializeField, Range(0, 32)] public int ResolveSamples { get; private set; } = 8;
@@ -225,6 +238,7 @@ namespace Arycama.CustomRenderPipeline
             internal float falloffBias;
             internal int sampleCount;
             internal float rawRadius;
+            internal float thinOccluderCompensation;
         }
 
         private class Pass2Data
