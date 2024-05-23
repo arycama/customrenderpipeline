@@ -111,7 +111,7 @@ void RayGeneration()
 	worldPosition = PlanetCurveInverse(worldPosition);
 	
 	float samples = 8;
-	#if 0
+	#if 1
 	float2 offset1 = Noise2D(position);
 	float3 bentN = 0.0;
 	float visibleCount = 0.0;

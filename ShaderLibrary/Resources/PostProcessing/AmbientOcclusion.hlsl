@@ -140,8 +140,20 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	history = clamp(history, minValue, maxValue);
 	
+	// Remove weights to get a better blend
+	float aoWeight = length(result.xyz);
+	if(aoWeight)
+		result /= aoWeight;
+	
+	float historyWeight = length(history.xyz);
+	if(historyWeight)
+		history /= historyWeight;
+	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
+	
+	// Reapply weights
+	result *= lerp(historyWeight, aoWeight, 0.05 * _MaxBoxWeight);
 	
 	return result;
 }
@@ -197,17 +209,14 @@ float4 InputScaleLimit;
 float4 FragmentResolve(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float4 ambientOcclusion = _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, InputScaleLimit));
+	ambientOcclusion.xyz = normalize(ambientOcclusion.xyz);
+	
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
 	bentNormalOcclusion.rgb = normalize(2.0 * bentNormalOcclusion.rgb - 1.0);
 	
-	float aoWeight = length(ambientOcclusion.xyz);
-	
-	if(aoWeight > 0.0)
-		ambientOcclusion /= aoWeight;
-	
 	ambientOcclusion.a = pow(ambientOcclusion.a, _AoStrength);
 	
-	float4 result = ambientOcclusion;//BlendVisibiltyCones(bentNormalOcclusion, ambientOcclusion);
+	float4 result = BlendVisibiltyCones(bentNormalOcclusion, ambientOcclusion);
 	result.rgb = 0.5 * result.rgb + 0.5;
 	return result;
 }
