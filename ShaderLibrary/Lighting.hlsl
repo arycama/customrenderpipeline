@@ -157,9 +157,9 @@ float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, fl
 	
     // Optimized math. Ref: PBR Diffuse Lighting for GGX + Smith Microsurfaces (slide 114), assuming |L|=1 and |V|=1
 	float LdotV = dot(L, V);
-	float invLenLV = rsqrt(2.0 * LdotV + 2.0);
-	float NdotH = (NdotL + NdotV) * invLenLV;
-	float LdotH = invLenLV * LdotV + invLenLV;
+	float invLenLV = max(FloatEps, rsqrt(2.0 * LdotV + 2.0));
+	float NdotH = saturate((NdotL + NdotV) * invLenLV);
+	float LdotH = saturate(invLenLV * LdotV + invLenLV);
 	
 	if(NdotL > 0.0)
 	{

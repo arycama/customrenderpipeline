@@ -124,33 +124,11 @@ float _IsFirst;
 
 float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	// Neighborhood clamp
-	int2 offsets[8] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(1, 0), int2(-1, 1), int2(0, 1), int2(1, 1)};
-	float4 minValue, maxValue, result, mean, stdDev;
-	minValue = maxValue = mean = result = _Input[position.xy];
-	stdDev = result * result;
-	result *= _CenterBoxFilterWeight;
-	
-	[unroll]
-	for (int i = 0; i < 8; i++)
-	{
-		float4 color = _Input[position.xy + offsets[i]];
-		result += color * (i < 4 ? _BoxFilterWeights0[i & 3] : _BoxFilterWeights1[(i - 1) & 3]);;
-		minValue = min(minValue, color);
-		maxValue = max(maxValue, color);
-		mean += color;
-		stdDev += color * color;
-	}
-	
-	mean /= 9.0;
-	stdDev = abs(sqrt(stdDev / 9.0 - mean * mean));
+	float4 minValue, maxValue, result;
+	TemporalNeighborhood(_Input, position.xy, minValue, maxValue, result, false);
 	
 	float2 historyUv = uv - Velocity[position.xy];
 	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
-	
-	minValue = max(minValue, mean - stdDev);
-	maxValue = min(maxValue, mean + stdDev);
-	
 	history = clamp(history, minValue, maxValue);
 	
 	// Remove weights to get a better blend

@@ -407,45 +407,11 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float4 nonJitteredClip = WorldToClipNonJittered(worldPosition);
 	float2 motion = MotionVectorFragment(nonJitteredClip, previousClip);
 	
-	float2 historyUv = uv - motion;
+	float3 minValue, maxValue, result;
+	TemporalNeighborhood(_SkyInput, position.xy, minValue, maxValue, result);
 
-	// Neighborhood clamp
-	int2 offsets[8] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(1, 0), int2(-1, 1), int2(0, 1), int2(1, 1)};
-	float3 minValue, maxValue, result, mean, stdDev;
-	minValue = maxValue = mean = result = RgbToYCoCgFastTonemap(_SkyInput[position.xy]);
-	stdDev = result * result;
-	result *= _CenterBoxFilterWeight;
-	
-	[unroll]
-	for (int i = 0; i < 4; i++)
-	{
-		float3 color = RgbToYCoCgFastTonemap(_SkyInput[position.xy + offsets[i]]);
-		result += color * _BoxFilterWeights0[i];
-		minValue = min(minValue, color);
-		maxValue = max(maxValue, color);
-		mean += color;
-		stdDev += color * color;
-	}
-	
-	[unroll]
-	for (i = 0; i < 4; i++)
-	{
-		float3 color = RgbToYCoCgFastTonemap(_SkyInput[position.xy + offsets[i + 4]]);
-		result += color * _BoxFilterWeights1[i];
-		minValue = min(minValue, color);
-		maxValue = max(maxValue, color);
-		mean += color;
-		stdDev += color * color;
-	}
-	
+	float2 historyUv = uv - motion;
 	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, min(historyUv * _SkyHistoryScaleLimit.xy, _SkyHistoryScaleLimit.zw)) * _PreviousToCurrentExposure);
-	
-	mean /= 9.0;
-	stdDev /= 9.0;
-	stdDev = sqrt(abs(stdDev - mean * mean));
-	minValue = max(minValue, mean - stdDev);
-	maxValue = min(maxValue, mean + stdDev);
-	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))

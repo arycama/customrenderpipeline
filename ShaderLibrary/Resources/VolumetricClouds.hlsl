@@ -123,32 +123,29 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float2 historyUv = uv - motion;
 	
 	// Neighborhood clamp
-	int2 offsets[8] = {int2(-1, -1), int2(0, -1), int2(1, -1), int2(-1, 0), int2(1, 0), int2(-1, 1), int2(0, 1), int2(1, 1)};
-	float4 minValue, maxValue, result;
-	result = float4(_Input[pixelId], _InputTransmittance[pixelId]);
-	result.rgb = RgbToYCoCgFastTonemap(result.rgb);
-	minValue = maxValue = result;
-	result *= _CenterBoxFilterWeight;
+	float4 mean = 0.0, stdDev = 0.0, result = 0.0, minValue = 0.0, maxValue = 0.0;
 	
 	[unroll]
-	for (int i = 0; i < 4; i++)
+	for(int y = -1, i = 0; y <= 1; y++)
 	{
-		float4 color =  float4(_Input[pixelId + offsets[i]], _InputTransmittance[pixelId + offsets[i]]);
-		color.rgb = RgbToYCoCgFastTonemap(color.rgb);
-		result += color * _BoxFilterWeights0[i];
-		minValue = min(minValue, color);
-		maxValue = max(maxValue, color);
+		[unroll]
+		for(int x = -1; x <= 1; x++, i++)
+		{
+			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
+			float4 color = RgbToYCoCgFastTonemap(float4(_Input[pixelId + int2(x, y)], _InputTransmittance[pixelId + int2(x, y)]));
+			result = i == 0 ? color * weight : result + color * weight;
+			mean += color;
+			stdDev += color * color;
+			minValue = i == 0 ? color : min(minValue, color);
+			maxValue = i == 0 ? color : max(maxValue, color);
+		}
 	}
 	
-	[unroll]
-	for (i = 0; i < 4; i++)
-	{
-		float4 color = float4(_Input[pixelId + offsets[i + 4]], _InputTransmittance[pixelId + offsets[i + 4]]);
-		color.rgb = RgbToYCoCgFastTonemap(color.rgb);
-		result += color * _BoxFilterWeights1[i];
-		minValue = min(minValue, color);
-		maxValue = max(maxValue, color);
-	}
+	mean /= 9.0;
+	stdDev /= 9.0;
+	stdDev = sqrt(abs(stdDev - mean * mean));
+	minValue = max(minValue, mean - stdDev);
+	maxValue = min(maxValue, mean + stdDev);
 
 	float4 history;
 	history.rgb = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));

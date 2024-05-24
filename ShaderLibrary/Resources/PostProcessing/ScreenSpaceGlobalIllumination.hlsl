@@ -143,26 +143,8 @@ Texture2D<float> RayDepth;
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float4 result, mean, stdDev;
-	mean = result = RgbToYCoCgFastTonemap(_Input[position.xy]);
-	stdDev = result * result;
-	result *= _CenterBoxFilterWeight;
-	
-	[unroll]
-	for(int y = -1, i = 0; y <= 1; y++)
-	{
-		[unroll]
-		for(int x = -1; x <= 1; x++, i++)
-		{
-			if(x == 0 && y == 0)
-				continue;
-			
-			float4 color = RgbToYCoCgFastTonemap(_Input[position.xy + int2(x, y)]);
-			result += color * (i < 4 ? _BoxFilterWeights0[i & 3] : _BoxFilterWeights1[(i - 1) & 3]);
-			mean += color;
-			stdDev += color * color;
-		}
-	}
+	float4 minValue, maxValue, result;
+	TemporalNeighborhood(_Input, position.xy, minValue, maxValue, result);
 	
 	float rayLength = RayDepth[position.xy];
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
@@ -172,13 +154,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history.rgb *= _PreviousToCurrentExposure;
 	history = RgbToYCoCgFastTonemap(history);
-	
-	mean /= 9.0;
-	stdDev /= 9.0;
-	stdDev = sqrt(abs(stdDev - mean * mean));
-	float4 minValue = mean - stdDev;
-	float4 maxValue = mean + stdDev;
-	
+
 	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
 	history.a = clamp(history.a, minValue.a, maxValue.a);
 	
