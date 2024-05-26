@@ -18,23 +18,17 @@ Texture2D<uint2> _Stencil;
 cbuffer Properties
 {
 	float4 _PreviousColorScaleLimit;
-	float _MaxSteps, _Thickness, _Intensity, _ResolveSize, _MaxMip;
+	float _MaxSteps, _Thickness, _ResolveSize, _MaxMip;
     uint _ResolveSamples;
 };
 
 struct TraceResult
 {
-    float4 color : SV_Target0;
+    float3 color : SV_Target0;
     float4 hit : SV_Target1;
 };
 
-// https://seblagarde.wordpress.com/2015/07/14/siggraph-2014-moving-frostbite-to-physically-based-rendering/ (4-9-3-DistanceBasedRoughnessLobeBounding.pdf, page 3)
-float GetSpecularLobeTanHalfAngle(float roughness, float percentOfVolume = 0.75)
-{
-	return tan(radians(90 * roughness * roughness / (1.0 + roughness * roughness)));
-}
-
-TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	float depth = _HiZDepth[position.xy];
 	float2 u = Noise2D(position.xy);
@@ -45,11 +39,8 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
     float roughness = Sq(normalRoughness.a);
-
-	float3 H = SampleGGXIsotropic(V, roughness, u, N);
-    float3 L = reflect(-V, H);
-	float rcpPdf = RcpPdfGGXVndfIsotropic(NdotV, dot(N, H), roughness);
-
+	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV);
+	
     // We start tracing from the center of the current pixel, and do so up to the far plane.
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
 	
@@ -59,29 +50,39 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	
 	bool validHit;
 	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZDepth, _MaxMip, validHit, float3(position.xy, depth));
-	if(!validHit)
-		return (TraceResult)0;
-		
-	float3 worldHit = PixelToWorld(rayPos);
-	float3 hitRay = worldHit - worldPosition;
-	float hitDist = length(hitRay);
 	
-	float2 velocity = Velocity[rayPos.xy];
-	float linearHitDepth = LinearEyeDepth(rayPos.z);
-	float coneTangent = GetSpecularLobeTanHalfAngle(roughness);
-    coneTangent *= lerp(saturate(NdotV * 2), 1, sqrt(roughness));
+	float outDepth;
+	float3 color, hitRay;
+	if(validHit)
+	{
+		float3 worldHit = PixelToWorld(rayPos);
+		hitRay = worldHit - worldPosition;
+		float hitDist = length(hitRay);
 	
-	float coveredPixels = _ScaledResolution.y * hitDist * 0.5 * coneTangent / (linearHitDepth * _TanHalfFov);
-	float mipLevel = log2(coveredPixels);
+		float2 velocity = Velocity[rayPos.xy];
+		float linearHitDepth = LinearEyeDepth(rayPos.z);
+		float coneTangent = GetSpecularLobeTanHalfAngle(roughness);
+		coneTangent *= lerp(saturate(NdotV * 2), 1, sqrt(roughness));
+	
+		float coveredPixels = _ScaledResolution.y * hitDist * 0.5 * coneTangent / (linearHitDepth * _TanHalfFov);
+		float mipLevel = log2(coveredPixels);
 		
-	// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
-	// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
-	float2 hitUv = ClampScaleTextureUv(rayPos.xy / _ScaledResolution.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
-	float3 previousColor = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel) * _PreviousToCurrentExposure;
-    
+		// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
+		// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
+		float2 hitUv = ClampScaleTextureUv(rayPos.xy / _ScaledResolution.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
+		color = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel) * _PreviousToCurrentExposure;
+		outDepth = Linear01Depth(depth);
+	}
+	else
+	{
+		color = 0.0;
+		hitRay = L;
+		outDepth = 0.0;
+	}
+	
     TraceResult output;
-	output.color = float4(previousColor, rcpPdf);
-	output.hit = float4(hitRay, Linear01Depth(depth));
+	output.color = color;
+	output.hit = float4(hitRay, outDepth);
     return output;
 }
 
@@ -102,7 +103,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
     float4 normalRoughness = _NormalRoughness[position.xy];
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
-    float roughness = max(1e-6, Sq(normalRoughness.a));
+    float roughness = Sq(normalRoughness.a);
     
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
     float phi = Noise1D(position.xy) * TwoPi;
@@ -111,46 +112,69 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
     float f0 = Max3(lerp(0.04, albedoMetallic.rgb, albedoMetallic.a));
 
     float4 result = 0.0;
-	float avgRayLength = 0.0;
+	float avgRayLength = 0.0, nonHitWeight = 0.0;
     for(uint i = 0; i <= _ResolveSamples; i++)
 	{
 		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
 		float2 coord = clamp(floor(position.xy + u), 0.0, _ScaledResolution.xy - 1.0) + 0.5;
 		
 		float4 hitData = _HitResult[coord];
-		if(hitData.w == 0.0)
-			continue;
 		
-		float3 sampleWorldPosition = PixelToWorld(float3(coord, Linear01ToDeviceDepth(hitData.w)));
-		float3 hitPosition = sampleWorldPosition + hitData.xyz;
+		// For misses, just store the ray direction, since it represents a hit at an infinite distance (eg probe)
+		bool hasHit = hitData.w != 0.0;
+		float3 L;
+		float rcpRayLength;
+		if(hasHit)
+		{
+			float3 sampleWorldPosition = PixelToWorld(float3(coord, Linear01ToDeviceDepth(hitData.w)));
+			float3 hitPosition = sampleWorldPosition + hitData.xyz;
 		
-		float3 delta = hitPosition - worldPosition;
-		float rcpRayLength = RcpLength(delta);
-		float3 L = delta * rcpRayLength;
+			float3 delta = hitPosition - worldPosition;
+			rcpRayLength = RcpLength(delta);
+			L = delta * rcpRayLength;
+		}
+		else
+		{
+			L = hitData.xyz;
+			rcpRayLength = 0.0;
+		}
 		
 		float NdotL = dot(N, L);
 		if(NdotL <= 0.0)
 			continue;
 		
 		float LdotV = dot(L, V);
-		float invLenLV = rsqrt(2.0 * LdotV + 2.0);
-		float NdotH = (NdotL + NdotV) * invLenLV;
-		float LdotH = invLenLV * LdotV + invLenLV;
+		float weight = GGX(max(1e-18, roughness), f0, NdotL, NdotV, LdotV).r * NdotL;
 		
-		float weight = GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL).r * NdotL;
-		float4 hitColor = _Input[coord];
-		float weightOverPdf = weight * hitColor.w;
-		result.rgb += RgbToYCoCgFastTonemap(hitColor.rgb) * weightOverPdf;
-		result.a += weightOverPdf;
+		float invLenLV = max(FloatEps, rsqrt(2.0 * LdotV + 2.0));
+		float NdotH = saturate((NdotL + NdotV) * invLenLV);
+		float LdotH = saturate(invLenLV * LdotV + invLenLV);
+		float weightOverPdf = weight * GGXVndfRcpPdf(max(1e-3, roughness), NdotV, NdotH, LdotH);
 		
-		avgRayLength += rcp(rcpRayLength) * weightOverPdf;
+		if(hasHit)
+		{
+			float3 hitColor = _Input[coord].rgb;
+			result.rgb += RgbToYCoCgFastTonemap(hitColor) * weightOverPdf;
+			result.a += weightOverPdf;
+			avgRayLength += rcp(rcpRayLength) * weightOverPdf;
+		}
+		else
+		{
+			nonHitWeight += weightOverPdf;
+		}
 	}
+	
+	// Normalize color and result by total hitweight
+	result = AlphaPremultiply(result);
+	result = YCoCgToRgbFastTonemapInverse(result);
 	
 	avgRayLength *= result.a ? rcp(result.a) : 0.0;
 	
-	result /= (_ResolveSamples + 1);
-	result = AlphaPremultiply(result);
-	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
+	// Add the nonhit and hit weights to get a total weight
+	float totalWeight = result.a + nonHitWeight;
+	
+	// Final alpha is the ratio of hit weight vs non hit weight
+	result.a = totalWeight ? result.a / totalWeight : 0.0;
 	
 	SpatialResult output;
 	output.result = result;
@@ -158,15 +182,9 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	return output;
 }
 
-struct TemporalOutput
-{
-    float4 result : SV_Target0;
-    float3 screenResult : SV_Target1;
-};
-
 Texture2D<float> RayDepth;
 
-TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float4 minValue, maxValue, result;
 	TemporalNeighborhood(_Input, position.xy, minValue, maxValue, result);
@@ -189,28 +207,5 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	result = YCoCgToRgbFastTonemapInverse(result);
 	result = RemoveNaN(result);
 	
-	TemporalOutput output;
-	output.result = result;
-    
-    float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
-    bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
-    
-    float4 normalRoughness = _NormalRoughness[position.xy];
-	float3 V = -worldDir * RcpLength(worldDir);
-	
-    float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV);
-    
-	bool isWater = (_Stencil[position.xy].g & 4) != 0;
-    float4 albedoMetallic = AlbedoMetallic[position.xy];
-    float3 f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
-	float3 radiance = IndirectSpecular(N, V, f0, NdotV, normalRoughness.a, bentNormalOcclusion.a, bentNormalOcclusion.xyz, isWater, _SkyReflection);
-    
-	float2 directionalAlbedo = DirectionalAlbedo(NdotV, normalRoughness.a);
-	float3 specularIntensity = lerp(directionalAlbedo.x, directionalAlbedo.y, f0);
-	
-	float3 specularFactor = IndirectSpecularFactor(NdotV, normalRoughness.a, Max3(f0));
-	
-	output.screenResult = lerp(radiance, result.rgb, saturate(result.a * rcp(specularFactor) * _Intensity));
-	return output;
+	return result;
 }

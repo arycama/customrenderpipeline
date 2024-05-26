@@ -16,6 +16,7 @@ Texture2D<float4> ScreenSpaceGlobalIllumination;
 Texture2D<float> ScreenSpaceShadows;
 
 float4 ScreenSpaceGlobalIlluminationScaleLimit, ScreenSpaceShadowsScaleLimit;
+float DiffuseGiStrength, SpecularGiStrength;
 
 cbuffer AmbientSh
 {
@@ -155,15 +156,10 @@ float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, fl
 	float3 diffuse = GGXDiffuse(abs(NdotL), abs(NdotV), perceptualRoughness, f0);
 	float3 lighting = NdotL > 0.0 ? albedo * diffuse : translucency * diffuse;
 	
-    // Optimized math. Ref: PBR Diffuse Lighting for GGX + Smith Microsurfaces (slide 114), assuming |L|=1 and |V|=1
-	float LdotV = dot(L, V);
-	float invLenLV = max(FloatEps, rsqrt(2.0 * LdotV + 2.0));
-	float NdotH = saturate((NdotL + NdotV) * invLenLV);
-	float LdotH = saturate(invLenLV * LdotV + invLenLV);
-	
 	if(NdotL > 0.0)
 	{
-		lighting += GGX(roughness, f0, LdotH, NdotH, NdotV, NdotL);
+		float LdotV = dot(L, V);
+		lighting += GGX(roughness, f0, NdotL, NdotV, LdotV);
 		lighting += GGXMultiScatter(saturate(NdotV), saturate(NdotL), perceptualRoughness, f0);
 	}
 	
@@ -283,7 +279,7 @@ float3 WaterShadow(float3 position, float3 L)
 	return exp(-_WaterShadowExtinction * shadowDistance);
 }
 
-Texture2D<float3> ScreenSpaceReflections;
+Texture2D<float4> ScreenSpaceReflections;
 float4 ScreenSpaceReflectionsScaleLimit;
 
 float3 GetLighting(LightingInput input, bool isVolumetric = false)
@@ -293,19 +289,20 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	// TODO: Pass this in as part of lighting input?
 	float NdotV = max(0.0, dot(input.normal, V));
 	
-	// TODO: Need to handle non screenspace reflections, eg for transparent
+	float3 radiance = IndirectSpecular(input.normal, V, input.f0, NdotV, input.perceptualRoughness, input.occlusion, input.bentNormal, input.isWater, _SkyReflection);
+	
 	#ifdef SCREENSPACE_REFLECTIONS_ON
-		float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
-	#else
-		float3 radiance = IndirectSpecular(input.normal, V, input.f0, NdotV, input.perceptualRoughness, input.occlusion, input.bentNormal, input.isWater, _SkyReflection);
+		float4 screenSpaceReflections = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
+		radiance = lerp(radiance, screenSpaceReflections.rgb, screenSpaceReflections.a * SpecularGiStrength);
 	#endif
 	
 	radiance *= IndirectSpecularFactor(NdotV, input.perceptualRoughness, input.f0);
 	
+	float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
+	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-		float3 irradiance = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit));
-	#else
-		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
+		float4 diffuseGi = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit));
+		irradiance = lerp(irradiance, diffuseGi.rgb, diffuseGi.a * DiffuseGiStrength);
 	#endif
 	
 	// Ambient

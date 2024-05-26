@@ -244,7 +244,7 @@ float4 BilinearWeights(float2 uv, float2 textureSize)
 
 float4 AlphaPremultiply(float4 value)
 {
-	value.rgb *= value.a ? rcp(value.a) : 0.0;
+	value.rgb = value.a ? value.rgb * rcp(value.a) : 0.0;
 	return value;
 }
 

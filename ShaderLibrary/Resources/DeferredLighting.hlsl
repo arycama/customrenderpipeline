@@ -16,8 +16,6 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float4 normalRoughness = _NormalRoughness[position.xy];
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
 	
-	//return bentNormalOcclusion.a;
-	
 	uint stencil = _Stencil[position.xy].g;
 	
 	bool isTranslucent = stencil & 16;
@@ -50,7 +48,7 @@ Texture2D<float> CloudTransmittanceTexture;
 float4 CloudTextureScaleLimit, SkyTextureScaleLimit;
 
 float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
-{	
+{
 	float depth = _Depth[position.xy];
 	
 	float3 result = 0.0;

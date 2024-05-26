@@ -15,19 +15,19 @@ Texture2D<float2> _GGXDirectionalAlbedo;
 Texture2D<float> _GGXAverageAlbedo, _GGXAverageAlbedoMS;
 Texture3D<float> _GGXSpecularOcclusion;
 
-float Lambda(float NdotV, float a2)
+float Lambda(float NdotV, float roughness)
 {
-	return sqrt(1.0 + a2 * (rcp(Sq(NdotV)) - 1.0)) * 0.5 - 0.5;
+	return 0.5 * sqrt(1.0 + roughness * roughness * (rcp(Sq(NdotV)) - 1.0)) - 0.5;
 }
 
-float G1(float NdotV, float a2)
+float G1(float NdotV, float roughness)
 {
-	return rcp(1.0 + Lambda(NdotV, a2));
+	return rcp(1.0 + Lambda(NdotV, roughness));
 }
 
-float G2(float NdotV, float NdotL, float a2)
+float G2(float NdotV, float NdotL, float roughness)
 {
-	return rcp(1.0 + Lambda(NdotV, a2) + Lambda(NdotL, a2));
+	return rcp(1.0 + Lambda(NdotV, roughness) + Lambda(NdotL, roughness));
 }
 
 float3 F(float VdotH, float3 f0)
@@ -46,7 +46,7 @@ float GGX_DV(float roughness, float NdotL, float NdotV, float NdotH)
 	// This function is only used for direct lighting.
 	// If roughness is 0, the probability of hitting a punctual or directional light is also 0.
 	// Therefore, we return 0. The most efficient way to do it is with a max().
-	return rcp(Pi) * 0.5 * a2 * rcp(max(Sq(s) * (lambdaV + lambdaL), FloatMin));
+	return rcp(Pi) * 0.5 * a2 * rcp(max(Sq(s) * (lambdaV + lambdaL), HalfMin));
 }
 
 float F_Schlick(float f0, float u)
@@ -74,9 +74,14 @@ float D_GGX(float NdotH, float roughness)
 	return RcpPi * D_GGXNoPI(NdotH, roughness);
 }
 
-float3 GGX(float roughness, float3 specular, float VdotH, float NdotH, float NdotV, float NdotL)
+float3 GGX(float roughness, float3 specular, float NdotL, float NdotV, float LdotV)
 {
-	return F(VdotH, specular) * GGX_DV(roughness, NdotL, NdotV, NdotH);
+	// Optimized math. Ref: PBR Diffuse Lighting for GGX + Smith Microsurfaces (slide 114), assuming |L|=1 and |V|=1
+	float invLenLV = max(FloatEps, rsqrt(2.0 * LdotV + 2.0));
+	float NdotH = saturate((NdotL + NdotV) * invLenLV);
+	float LdotH = saturate(invLenLV * LdotV + invLenLV);
+
+	return F(LdotH, specular) * GGX_DV(roughness, NdotL, NdotV, NdotH);
 }
 
 // Note: V = G / (4 * NdotL * NdotV)

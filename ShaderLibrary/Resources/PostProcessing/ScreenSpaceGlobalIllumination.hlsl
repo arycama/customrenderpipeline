@@ -23,7 +23,7 @@ cbuffer Properties
 
 struct TraceResult
 {
-	float4 color : SV_Target0;
+	float3 color : SV_Target0;
 	float4 hit : SV_Target1;
 };
 
@@ -37,7 +37,6 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float3 N = GBufferNormal(position.xy, _NormalRoughness, V, NdotV);
 	float3 noise3DCosine = Noise3DCosine(position.xy);
 	float3 L = FromToRotationZ(N, noise3DCosine);
-	float rcpPdf = Pi * rcp(noise3DCosine.z);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
 	
@@ -47,25 +46,35 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 
 	bool validHit;
 	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZDepth, _MaxMip, validHit, float3(position.xy, depth));
-	if(!validHit)
-		return (TraceResult)0;
-		
-	float3 worldHit = PixelToWorld(rayPos);
-	float3 hitRay = worldHit - worldPosition;
-	float hitDist = length(hitRay);
+
+	float outDepth;
+	float3 color, hitRay;
+	if(validHit)
+	{
+		float3 worldHit = PixelToWorld(rayPos);
+		float3 hitRay = worldHit - worldPosition;
+		float hitDist = length(hitRay);
 	
-	float2 velocity = Velocity[rayPos.xy];
-	float linearHitDepth = LinearEyeDepth(rayPos.z);
-	float mipLevel = log2(_ConeAngle * hitDist * rcp(linearHitDepth));
+		float2 velocity = Velocity[rayPos.xy];
+		float linearHitDepth = LinearEyeDepth(rayPos.z);
+		float mipLevel = log2(_ConeAngle * hitDist * rcp(linearHitDepth));
 		
-	// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
-	// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
-	float2 hitUv = ClampScaleTextureUv(rayPos.xy / _ScaledResolution.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
-	float3 previousColor = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel) * _PreviousToCurrentExposure;
+		// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
+		// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
+		float2 hitUv = ClampScaleTextureUv(rayPos.xy / _ScaledResolution.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
+		color = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel) * _PreviousToCurrentExposure;
+		outDepth = Linear01Depth(depth);
+	}
+	else
+	{
+		color = 0.0;
+		hitRay = L;
+		outDepth = 0.0;
+	}
 
 	TraceResult output;
-	output.color = float4(previousColor, rcpPdf);
-	output.hit = float4(hitRay, Linear01Depth(depth));
+	output.color = color;
+	output.hit = float4(hitRay, outDepth);
 	return output;
 }
 
@@ -93,39 +102,61 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	float phi = Noise1D(position.xy) * TwoPi;
 	
 	float4 result = 0.0;
-	float avgRayLength = 0.0;
+	float avgRayLength = 0.0, nonHitWeight = 0.0;
 	for(uint i = 0; i <= _ResolveSamples; i++)
 	{
 		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
 		float2 coord = clamp(floor(position.xy + u), 0.0, _ScaledResolution.xy - 1.0) + 0.5;
 		
 		float4 hitData = _HitResult[coord];
-		if(hitData.w == 0.0)
-			continue;
 		
-		float3 sampleWorldPosition = PixelToWorld(float3(coord, Linear01ToDeviceDepth(hitData.w)));
-		float3 hitPosition = sampleWorldPosition + hitData.xyz;
+		// For misses, just store the ray direction, since it represents a hit at an infinite distance (eg probe)
+		bool hasHit = hitData.w != 0.0;
+		float3 L;
+		float rcpRayLength;
+		if(hasHit)
+		{
+			float3 sampleWorldPosition = PixelToWorld(float3(coord, Linear01ToDeviceDepth(hitData.w)));
+			float3 hitPosition = sampleWorldPosition + hitData.xyz;
 		
-		float3 delta = hitPosition - worldPosition;
-		float rcpRayLength = RcpLength(delta);
-		float3 L = delta * rcpRayLength;
+			float3 delta = hitPosition - worldPosition;
+			rcpRayLength = RcpLength(delta);
+			L = delta * rcpRayLength;
+		}
+		else
+		{
+			L = hitData.xyz;
+			rcpRayLength = 0.0;
+		}
 		
 		float NdotL = dot(N, L);
 		if(NdotL <= 0.0)
 			continue;
 		
-		float weight = RcpPi * NdotL;
-		float4 hitColor = _Input[coord];
-		float weightOverPdf = weight * hitColor.w;
-		result.rgb += RgbToYCoCgFastTonemap(hitColor.rgb) * weightOverPdf;
-		result.a += weightOverPdf;
-		
-		avgRayLength += rcp(rcpRayLength) * weightOverPdf;
+		if(hasHit)
+		{
+			float3 hitColor = _Input[coord].rgb;
+			result.rgb += RgbToYCoCgFastTonemap(hitColor);
+			result.a += 1.0;
+			avgRayLength += rcp(rcpRayLength);
+		}
+		else
+		{
+			nonHitWeight += 1.0;
+		}
 	}
 
-	result /= (_ResolveSamples + 1);
+	// Normalize color and result by total hitweight
 	result = AlphaPremultiply(result);
 	result = YCoCgToRgbFastTonemapInverse(result);
+	
+	avgRayLength *= result.a ? rcp(result.a) : 0.0;
+	
+	// Add the nonhit and hit weights to get a total weight
+	float totalWeight = result.a + nonHitWeight;
+	
+	// Final alpha is the ratio of hit weight vs non hit weight
+	result.a = totalWeight ? result.a / totalWeight : 0.0;
 	
 	SpatialResult output;
 	output.result = result;
@@ -133,15 +164,9 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	return output;
 }
 
-struct TemporalOutput
-{
-	float4 result : SV_Target0;
-	float3 screenResult : SV_Target1;
-};
-
 Texture2D<float> RayDepth;
 
-TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float4 minValue, maxValue, result;
 	TemporalNeighborhood(_Input, position.xy, minValue, maxValue, result);
@@ -164,14 +189,5 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	result = YCoCgToRgbFastTonemapInverse(result);
 	result = RemoveNaN(result);
 	
-	TemporalOutput output;
-	output.result = result;
-	
-	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
-	bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
-	float3 ambient = AmbientLight(bentNormalOcclusion.xyz, bentNormalOcclusion.w);
-	
-	// Since the final weight should be 1/pi, we divide by that, which is result.a * Pi
-	output.screenResult = lerp(ambient, result.rgb, saturate(result.a * Pi) * _Intensity);
-	return output;
+	return result;
 }

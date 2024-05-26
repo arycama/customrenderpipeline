@@ -40,7 +40,6 @@ void RayGeneration()
 	
 	float3 noise3DCosine = Noise3DCosine(position);
 	float3 L = FromToRotationZ(N, noise3DCosine);
-	float rcpPdf = Pi * rcp(noise3DCosine.z);
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	worldPosition = PlanetCurveInverse(worldPosition);
@@ -58,6 +57,22 @@ void RayGeneration()
 	uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
 	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
 	
-	HitColor[position] = payload.hitDistance ? float4(R11G11B10ToFloat3(payload.packedColor), rcpPdf) : 0.0;
-	HitResult[position] = payload.hitDistance ? float4(L * payload.hitDistance, Linear01Depth(depth)) : 0.0;
+	bool validHit = payload.hitDistance;
+	float outDepth;
+	float3 color, hitRay;
+	if(validHit)
+	{
+		hitRay = L * payload.hitDistance;
+		color = R11G11B10ToFloat3(payload.packedColor);
+		outDepth = Linear01Depth(depth);
+	}
+	else
+	{
+		color = 0.0;
+		hitRay = L;
+		outDepth = 0.0;
+	}
+	
+	HitColor[position] = color;
+	HitResult[position] = float4(hitRay, outDepth);
 }

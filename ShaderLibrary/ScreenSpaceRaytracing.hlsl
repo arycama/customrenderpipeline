@@ -5,7 +5,7 @@
 #include "Random.hlsl"
 #include "Lighting.hlsl"
 
-float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, float maxSteps, float thickness, Texture2D<float> hiZDepth, float maxMip, out bool validHit, float3 screenPos)
+float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, uint maxSteps, float thickness, Texture2D<float> hiZDepth, float maxMip, out bool validHit, float3 screenPos)
 {
 	// We define the depth of the base as the depth value as:
 	// b = DeviceDepth((1 + thickness) * LinearDepth(d))
@@ -18,11 +18,11 @@ float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, float maxSteps, float
 	float _SsrThicknessBias = -_Near / (_Far - _Near) * (thickness * _SsrThicknessScale);
 	
     // We start tracing from the center of the current pixel, and do so up to the far plane.
-	float3 rayOrigin = MultiplyPointProj(_WorldToPixel, worldPosition);
-	float3 reflPosSS = MultiplyPointProj(_WorldToPixel, worldPosition + L);
+	float3 rayOrigin = MultiplyPointProj(_WorldToPixel, worldPosition).xyz;
+	float3 reflPosSS = MultiplyPointProj(_WorldToPixel, worldPosition + L).xyz;
 	float3 rayDir = reflPosSS - rayOrigin;
 	
-	int2 rayStep = rayDir >= 0;
+	int2 rayStep = rayDir.xy >= 0;
 	float3 raySign = rayDir >= 0 ? 1 : -1;
 	bool rayTowardsEye = rayDir.z >= 0;
 

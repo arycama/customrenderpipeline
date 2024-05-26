@@ -37,7 +37,7 @@ public class DiffuseGlobalIllumination
 
     public void Render(RTHandle depth, int width, int height, ICommonPassData commonPassData, Camera camera, RTHandle previousFrame, RTHandle velocity, RTHandle normalRoughness, RTHandle hiZDepth, RTHandle bentNormalOcclusion, float bias, float distantBias)
     {
-        var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
         var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
         if (settings.UseRaytracing)
@@ -154,14 +154,12 @@ public class DiffuseGlobalIllumination
         }
 
         // Write final temporal result out to rgba16 (color+weight) and rgb111110 for final ambient composition
-        var temporalResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
         var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Temporal"))
         {
             pass.Initialize(material, 2, camera: camera);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
-            pass.WriteTexture(temporalResult, RenderBufferLoadAction.DontCare);
 
             pass.ReadTexture("_Input", spatialResult);
             pass.ReadTexture("_History", history);
@@ -190,7 +188,7 @@ public class DiffuseGlobalIllumination
             });
         }
 
-        renderGraph.ResourceMap.SetRenderPassData(new Result(temporalResult));
+        renderGraph.ResourceMap.SetRenderPassData(new Result(current, settings.Intensity));
     }
 
     private class Data
@@ -200,10 +198,12 @@ public class DiffuseGlobalIllumination
     public struct Result : IRenderPassData
     {
         public RTHandle ScreenSpaceGlobalIllumination { get; }
+        private float intensity;
 
-        public Result(RTHandle screenSpaceGlobalIllumination)
+        public Result(RTHandle screenSpaceGlobalIllumination, float intensity)
         {
             ScreenSpaceGlobalIllumination = screenSpaceGlobalIllumination;
+            this.intensity = intensity;
         }
 
         public void SetInputs(RenderPass pass)
@@ -214,6 +214,7 @@ public class DiffuseGlobalIllumination
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
             pass.SetVector(command, "ScreenSpaceGlobalIlluminationScaleLimit", ScreenSpaceGlobalIllumination.ScaleLimit2D);
+            pass.SetFloat(command, "DiffuseGiStrength", intensity);
         }
     }
 }

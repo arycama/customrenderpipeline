@@ -181,7 +181,7 @@ float PerceptualRoughnessToMipmapLevel(float perceptualRoughness, float NdotR)
 	n /= (4.0 * max(NdotR, HalfEps));
 
     // remap back to square root of float roughness (0.25 include both the sqrt root of the conversion and sqrt for going from roughness to perceptualRoughness)
-	perceptualRoughness = pow(2.0 / (n + 2.0), 0.25);
+	perceptualRoughness = pow(abs(2.0 / (n + 2.0)), 0.25);
 
 	return perceptualRoughness * UNITY_SPECCUBE_LOD_STEPS;
 }
@@ -291,6 +291,53 @@ void ImportanceSampleGGX(float2 u, float3 V, float3x3 localToWorld, float roughn
 
 	float Vis = V_SmithJointGGX(NdotL, NdotV, roughness);
 	weightOverPdf = 4.0 * Vis * NdotL * VdotH / NdotH;
+}
+
+// https://seblagarde.wordpress.com/2015/07/14/siggraph-2014-moving-frostbite-to-physically-based-rendering/ (4-9-3-DistanceBasedRoughnessLobeBounding.pdf, page 3)
+float GetSpecularLobeTanHalfAngle(float roughness, float percentOfVolume = 0.75)
+{
+	return tan(radians(90 * roughness * roughness / (1.0 + roughness * roughness)));
+}
+
+float GGXVndfRcpPdf(float a, float NdotV, float NdotH, float VdotH)
+{
+	float a2 = a * a;
+	float g1 = (1.0 + 0.5 * sqrt(1.0 + a2 * (1.0 / Sq(NdotV) - 1.0)) - 0.5);
+	float d = Sq(Sq(NdotH) * (a2 - 1.0) + 1.0);
+
+	return RcpPi * VdotH * a2 / (NdotV * g1 * d);
+}
+
+float3 SampleGGXVNDF(float3 V_, float roughness, float2 u)
+{
+	// stretch view
+	float3 V = normalize(float3(roughness * V_.x, roughness * V_.y, V_.z));
+	
+	// orthonormal basis
+	float3 T1 = (V.z < 0.9999) ? normalize(cross(V, float3(0, 0, 1))) : float3(1, 0, 0);
+	float3 T2 = cross(T1, V);
+	
+	// sample point with polar coordinates (r, phi)
+	float a = 1.0 / (1.0 + V.z);
+	float r = sqrt(u.x);
+	float phi = (u.y < a) ? u.y / a * Pi : Pi + (u.y - a) / (1.0 - a) * Pi;
+	float P1 = r * cos(phi);
+	float P2 = r * sin(phi) * ((u.y < a) ? 1.0 : V.z);
+	
+	// compute normal
+	float3 N = P1 * T1 + P2 * T2 + sqrt(max(0.0, 1.0 - P1 * P1 - P2 * P2)) * V;
+	
+	// unstretch
+	return normalize(float3(roughness * N.x, roughness * N.y, max(0.0, N.z)));
+}
+
+float3 ImportanceSampleGGX(float roughness, float3 N, float3 V, float2 u, float NdotV)
+{
+	float3x3 localToWorld = GetLocalFrame(N);
+	float3 localV = mul(localToWorld, V);
+	float3 localH = SampleGGXVNDF(localV, max(1e-18, roughness), u);
+	float3 H = mul(localH, localToWorld);
+	return reflect(-V, H);
 }
 
 #endif
