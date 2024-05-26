@@ -13,9 +13,7 @@ RWTexture2D<float4> HitResult;
 
 float _RaytracingBias, _RaytracingDistantBias;
 
-RaytracingAccelerationStructure SceneRaytracingAccelerationStructure;
-
-#pragma max_recursion_depth 1
+#pragma max_recursion_depth 5
 
 [shader("miss")]
 void MissShader(inout RayPayload payload : SV_RayPayload)
@@ -23,6 +21,12 @@ void MissShader(inout RayPayload payload : SV_RayPayload)
 	payload.packedColor = 0.0;
 	payload.hitDistance = 0.0;
 }
+
+//[shader("miss")]
+//void MissShaderShadow(inout RayPayloadShadow payload : SV_RayPayload)
+//{
+//	payload.hasHit = false;
+//}
 
 [shader("raygeneration")]
 void RayGeneration()

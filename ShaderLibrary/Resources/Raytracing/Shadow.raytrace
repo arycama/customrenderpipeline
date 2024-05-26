@@ -11,9 +11,7 @@ RWTexture2D<float> HitResult;
 float3 LightDirection;
 float _RaytracingBias, _RaytracingDistantBias, LightCosTheta;
 
-RaytracingAccelerationStructure SceneRaytracingAccelerationStructure;
-
-#pragma max_recursion_depth 1
+#pragma max_recursion_depth 5
 
 [shader("miss")]
 void MissShader(inout RayPayloadShadow payload : SV_RayPayload)

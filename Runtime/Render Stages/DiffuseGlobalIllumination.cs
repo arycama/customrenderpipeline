@@ -50,6 +50,8 @@ public class DiffuseGlobalIllumination
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TerrainRenderData>(true);
+                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<ShadowRenderer.Result>(); 
                 commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>

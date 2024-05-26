@@ -11,9 +11,7 @@ Texture2D<float4> _Normals;
 float _Radius, _RawRadius, _AoStrength, _FalloffScale, _FalloffBias, _SampleCount;
 float _RaytracingBias, _RaytracingDistantBias;
 
-RaytracingAccelerationStructure SceneRaytracingAccelerationStructure;
-
-#pragma max_recursion_depth 1
+#pragma max_recursion_depth 5
 
 [shader("miss")]
 void MissShader(inout RayPayloadAmbientOcclusion payload : SV_RayPayload)

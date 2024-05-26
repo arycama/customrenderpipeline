@@ -4,6 +4,7 @@
 #include "../Geometry.hlsl"
 #include "../Lighting.hlsl"
 #include "../Raytracing.hlsl"
+#include "../RaytracingLighting.hlsl"
 #include "../Samplers.hlsl"
 #include "../TerrainCommon.hlsl"
 
@@ -16,7 +17,7 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	float3 normal;
 	SampleTerrain(worldPosition, albedoSmoothness, normal, mask, true);
 	
-	float3 color = RaytracedLighting(worldPosition, normal, WorldRayDirection(), mask.r, 1.0 - albedoSmoothness.a, mask.g, normal, albedoSmoothness.rgb);
+	float3 color = RaytracedLighting(worldPosition, normal, -WorldRayDirection(), mask.r, 1.0 - albedoSmoothness.a, mask.g, normal, albedoSmoothness.rgb);
 	
 	payload.packedColor = Float3ToR11G11B10(color);
 	payload.hitDistance = RayTCurrent();

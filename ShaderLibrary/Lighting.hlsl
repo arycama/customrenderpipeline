@@ -208,8 +208,9 @@ uint GetShadowCascade(uint lightIndex, float3 lightPosition, out float3 position
 	return ~0u;
 }
 
-float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
+float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow, out bool validShadow)
 {
+	validShadow = false;
 	DirectionalLight light = _DirectionalLights[lightIndex];
 	if (light.shadowIndex == ~0u)
 		return 1.0;
@@ -220,6 +221,7 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 	if (cascade == ~0u)
 		return 1.0;
 	
+	validShadow = true;
 	if (!softShadow)
 		return _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z);
 	
@@ -260,6 +262,13 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow = false)
 	
 	return weightSum ? sum / weightSum : 1.0;
 }
+
+float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow)
+{
+	bool validShadow;
+	return GetShadow(worldPosition, lightIndex, softShadow, validShadow);
+}
+
 
 Texture2D<float> _WaterShadows;
 matrix _WaterShadowMatrix1;
@@ -340,7 +349,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 			}
 			
 			#ifdef SCREEN_SPACE_SHADOWS_ON
-				attenuation = ScreenSpaceShadows[input.pixelPosition];
+				attenuation *= ScreenSpaceShadows[input.pixelPosition];
 			#else
 				attenuation *= GetShadow(input.worldPosition, i, !isVolumetric);
 			#endif

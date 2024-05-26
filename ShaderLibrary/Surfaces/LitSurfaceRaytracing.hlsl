@@ -8,6 +8,7 @@
 #include "../Temporal.hlsl"
 #include "../Random.hlsl"
 #include "../Raytracing.hlsl"
+#include "../RaytracingLighting.hlsl"
 
 Texture2D<float4> _BentNormal, _MainTex, _BumpMap, _MetallicGlossMap, _DetailAlbedoMap, _DetailNormalMap, _OcclusionMap, _ParallaxMap;
 Texture2D<float3> _EmissionMap;
@@ -57,7 +58,7 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	emission = lerp(emission, emission * _Exposure, _EmissiveExposureWeight);
 
 	float3 worldPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-	float3 V = WorldRayDirection();
+	float3 V = -WorldRayDirection();
 	
 	float4 metallicGloss = _MetallicGlossMap.SampleLevel(_LinearRepeatSampler, uv, 0.0);
 	float metallic = metallicGloss.r * _Metallic;
