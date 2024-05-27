@@ -42,8 +42,8 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
     float roughness = Sq(normalRoughness.a);
-	float pdf;
-	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, pdf);
+	float rcpPdf;
+	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	
     // We start tracing from the center of the current pixel, and do so up to the far plane.
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
@@ -85,7 +85,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	}
 	
     TraceResult output;
-	output.color = float4(color, pdf);
+	output.color = float4(color, rcpPdf);
 	output.hit = float4(hitRay, outDepth);
     return output;
 }
@@ -148,16 +148,14 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 			continue;
 		
 		float LdotV = dot(L, V);
-		float weight = GGX(max(1e-18, roughness), f0, NdotL, NdotV, LdotV).r * NdotL;
 		
 		float invLenLV = max(FloatEps, rsqrt(2.0 * LdotV + 2.0));
 		float NdotH = saturate((NdotL + NdotV) * invLenLV);
 		float LdotH = saturate(invLenLV * LdotV + invLenLV);
+		float weight = D_GGX(NdotH, max(1e-3, roughness)) * V_SmithJointGGX(NdotL, NdotV, roughness) * Fresnel(LdotH, f0).r * NdotL;
 		
 		float4 hitColor = _Input[coord];
-		float pdf = hitColor.w;
-		//pdf = PdfGGXVndfIsotropic(NdotV, NdotH, roughness);
-		float weightOverPdf = weight / pdf;
+		float weightOverPdf = weight * hitColor.w;
 		
 		if(hasHit)
 		{
@@ -184,7 +182,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	result.a = totalWeight ? result.a / totalWeight : 0.0;
 	
 	SpatialResult output;
-	output.result = result;//_Input[position.xy];
+	output.result = result;
 	output.rayLength = avgRayLength;
 	return output;
 }
@@ -193,7 +191,6 @@ Texture2D<float> RayDepth;
 
 float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-
 	float4 minValue, maxValue, result;
 	TemporalNeighborhood(_Input, position.xy, minValue, maxValue, result);
 	

@@ -30,7 +30,7 @@ float G2(float NdotV, float NdotL, float roughness)
 	return rcp(1.0 + Lambda(NdotV, roughness) + Lambda(NdotL, roughness));
 }
 
-float3 F(float VdotH, float3 f0)
+float3 Fresnel(float VdotH, float3 f0)
 {
 	return lerp(f0, 1.0, pow(1.0 - VdotH, 5.0));
 }
@@ -49,29 +49,14 @@ float GGX_DV(float roughness, float NdotL, float NdotV, float NdotH)
 	return rcp(Pi) * 0.5 * a2 * rcp(max(Sq(s) * (lambdaV + lambdaL), HalfMin));
 }
 
-float F_Schlick(float f0, float u)
-{
-	return lerp(f0, 1.0, pow(1.0 - u, 5.0));
-}
-
-float3 F_Schlick(float3 f0, float u)
-{
-	return lerp(f0, 1.0, pow(1.0 - u, 5.0));
-}
-
-float D_GGXNoPI(float NdotH, float roughness)
+float D_GGX(float NdotH, float roughness)
 {
 	float a2 = Sq(roughness);
-	float s = (NdotH * a2 - NdotH) * NdotH + 1.0;
+	float s = (NdotH * a2 * NdotH - NdotH * NdotH) + 1.0;
 
     // If roughness is 0, returns (NdotH == 1 ? 1 : 0).
     // That is, it returns 1 for perfect mirror reflection, and 0 otherwise.
-	return SafeDiv(a2, s * s);
-}
-
-float D_GGX(float NdotH, float roughness)
-{
-	return RcpPi * D_GGXNoPI(NdotH, roughness);
+	return a2 == 0.0 ? NdotH == 1.0 : (a2 * rcp(Sq(s))) * RcpPi;
 }
 
 float3 GGX(float roughness, float3 specular, float NdotL, float NdotV, float LdotV)
@@ -81,7 +66,7 @@ float3 GGX(float roughness, float3 specular, float NdotL, float NdotV, float Ldo
 	float NdotH = saturate((NdotL + NdotV) * invLenLV);
 	float LdotH = saturate(invLenLV * LdotV + invLenLV);
 
-	return F(LdotH, specular) * GGX_DV(roughness, NdotL, NdotV, NdotH);
+	return Fresnel(LdotH, specular) * GGX_DV(roughness, NdotL, NdotV, NdotH);
 }
 
 // Note: V = G / (4 * NdotL * NdotV)

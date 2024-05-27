@@ -12,7 +12,7 @@
 StructuredBuffer<float4> _DirectionalShadowTexelSizes;
 float ShadowMapResolution, RcpShadowMapResolution, ShadowFilterRadius, ShadowFilterSigma;
 
-Texture2D<float4> ScreenSpaceGlobalIllumination;
+Texture2D<float3> ScreenSpaceGlobalIllumination;
 Texture2D<float> ScreenSpaceShadows;
 
 float4 ScreenSpaceGlobalIlluminationScaleLimit, ScreenSpaceShadowsScaleLimit;
@@ -307,11 +307,10 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	
 	radiance *= IndirectSpecularFactor(NdotV, input.perceptualRoughness, input.f0);
 	
-	float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
-	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-		float4 diffuseGi = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit));
-		irradiance = lerp(irradiance, diffuseGi.rgb, diffuseGi.a * DiffuseGiStrength);
+		float3 irradiance = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit));
+	#else
+		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
 	#endif
 	
 	// Ambient

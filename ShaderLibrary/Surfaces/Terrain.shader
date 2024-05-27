@@ -71,7 +71,7 @@ Shader "Terrain"
 
         Pass
         {
-            Name "RayTracing"
+            Name "RayTracingAmbientOcclusion"
             Tags{ "LightMode" = "RayTracingAmbientOcclusion" }
 
             HLSLPROGRAM

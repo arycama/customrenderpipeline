@@ -23,12 +23,6 @@ void MissShader(inout RayPayload payload : SV_RayPayload)
 	payload.hitDistance = 0.0;
 }
 
-[shader("miss")]
-void MissShaderShadow(inout RayPayloadShadow payload : SV_RayPayload)
-{
-	payload.hasHit = false;
-}
-
 [shader("raygeneration")]
 void RayGeneration()
 {
@@ -50,8 +44,8 @@ void RayGeneration()
 	worldPosition = PlanetCurveInverse(worldPosition);
 	
 	float roughness = Sq(normalRoughness.a);
-	float pdf;
-	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, pdf);
+	float rcpPdf;
+	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	
 	RayDesc ray;
 	ray.Origin = worldPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
@@ -64,7 +58,7 @@ void RayGeneration()
 	payload.hitDistance = 0.0;
 	
 	uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
-	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 1, 2, 0, ray, payload);
+	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
 	
 	bool validHit = payload.hitDistance;
 	float outDepth;
@@ -82,6 +76,6 @@ void RayGeneration()
 		outDepth = 0.0;
 	}
 	
-	HitColor[position] = float4(color, pdf);
+	HitColor[position] = float4(color, rcpPdf);
 	HitResult[position] = float4(hitRay, outDepth);
 }

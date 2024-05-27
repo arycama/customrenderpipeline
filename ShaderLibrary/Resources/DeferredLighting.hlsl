@@ -53,7 +53,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 {
 	//return ScreenSpaceReflections[position.xy].a;
 
-	//return ScreenSpaceGlobalIllumination[position.xy].	rgb;
+	return ScreenSpaceGlobalIllumination[position.xy].rgb;
 	return AlphaPremultiplyInv(ScreenSpaceReflections[position.xy]).rgb;
 
 	float depth = _Depth[position.xy];

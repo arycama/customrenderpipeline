@@ -23,7 +23,7 @@ cbuffer Properties
 
 struct TraceResult
 {
-	float3 color : SV_Target0;
+	float4 color : SV_Target0;
 	float4 hit : SV_Target1;
 };
 
@@ -36,6 +36,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float NdotV;
 	float3 N = GBufferNormal(position.xy, _NormalRoughness, V, NdotV);
 	float3 noise3DCosine = Noise3DCosine(position.xy);
+	float rcpPdf = Pi * rcp(noise3DCosine.z);
 	float3 L = FromToRotationZ(N, noise3DCosine);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
@@ -73,19 +74,19 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	}
 
 	TraceResult output;
-	output.color = color;
+	output.color = float4(color, rcpPdf);
 	output.hit = float4(hitRay, outDepth);
 	return output;
 }
 
 Texture2D<float4> _HitResult;
-Texture2D<float4> _Input, _History;
+Texture2D<float4> _Input;
 float4 _HistoryScaleLimit;
 float _IsFirst;
 
 struct SpatialResult
 {
-	float4 result : SV_Target0;
+	float3 result : SV_Target0;
 	float rayLength : SV_Target1;
 };
 
@@ -133,16 +134,19 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		if(NdotL <= 0.0)
 			continue;
 		
+		float4 hitColor = _Input[coord];
+		float weight = RcpPi * NdotL;
+		float weightOverPdf = weight * hitColor.w;
+		
 		if(hasHit)
 		{
-			float3 hitColor = _Input[coord].rgb;
-			result.rgb += RgbToYCoCgFastTonemap(hitColor);
-			result.a += 1.0;
-			avgRayLength += rcp(rcpRayLength);
+			result.rgb += RgbToYCoCgFastTonemap(hitColor.rgb) * weightOverPdf;
+			result.a += weightOverPdf;
+			avgRayLength += rcp(rcpRayLength) * weightOverPdf;
 		}
 		else
 		{
-			nonHitWeight += 1.0;
+			nonHitWeight += weightOverPdf;
 		}
 	}
 
@@ -158,30 +162,34 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	// Final alpha is the ratio of hit weight vs non hit weight
 	result.a = totalWeight ? result.a / totalWeight : 0.0;
 	
+	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
+	bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
+	float3 ambient = AmbientLight(bentNormalOcclusion.rgb, bentNormalOcclusion.a);
+	
 	SpatialResult output;
-	output.result = result;
+	output.result = lerp(ambient, result.rgb, result.a * DiffuseGiStrength);
 	output.rayLength = avgRayLength;
 	return output;
 }
 
 Texture2D<float> RayDepth;
+Texture2D<float3> _TemporalInput, _History;
 
-float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float4 minValue, maxValue, result;
-	TemporalNeighborhood(_Input, position.xy, minValue, maxValue, result);
+	float3 minValue, maxValue, result;
+	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, result);
 	
 	float rayLength = RayDepth[position.xy];
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	worldPosition += normalize(worldDir) * rayLength;
 	
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
-	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
-	history.rgb *= _PreviousToCurrentExposure;
+	float3 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
+	history *= _PreviousToCurrentExposure;
 	history = RgbToYCoCgFastTonemap(history);
 
-	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
-	history.a = clamp(history.a, minValue.a, maxValue.a);
+	history = ClipToAABB(history, result, minValue, maxValue);
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);

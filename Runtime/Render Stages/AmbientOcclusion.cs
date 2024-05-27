@@ -35,7 +35,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>();
 
-                    pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, width, height, 1, bias, distantBias);
+                    pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, width, height, 1, bias, distantBias);
                     pass.WriteTexture(tempResult, "HitColor");
                     //pass.WriteTexture(hitResult);
                     pass.ReadTexture("_Depth", depth);
