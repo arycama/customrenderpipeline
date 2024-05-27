@@ -22,11 +22,11 @@ void MissShader(inout RayPayload payload : SV_RayPayload)
 	payload.hitDistance = 0.0;
 }
 
-//[shader("miss")]
-//void MissShaderShadow(inout RayPayloadShadow payload : SV_RayPayload)
-//{
-//	payload.hasHit = false;
-//}
+[shader("miss")]
+void MissShaderShadow(inout RayPayloadShadow payload : SV_RayPayload)
+{
+	payload.hasHit = false;
+}
 
 [shader("raygeneration")]
 void RayGeneration()
@@ -59,7 +59,7 @@ void RayGeneration()
 	payload.hitDistance = 0.0;
 	
 	uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
-	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 1, 2, 0, ray, payload);
 	
 	bool validHit = payload.hitDistance;
 	float outDepth;

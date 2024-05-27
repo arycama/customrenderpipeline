@@ -24,13 +24,16 @@ cbuffer Properties
 
 struct TraceResult
 {
-    float3 color : SV_Target0;
+    float4 color : SV_Target0;
     float4 hit : SV_Target1;
 };
 
 TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	float depth = _HiZDepth[position.xy];
+	if(!depth)
+		return (TraceResult)0;
+	
 	float2 u = Noise2D(position.xy);
 	float4 normalRoughness = _NormalRoughness[position.xy];
 	float3 V = -worldDir * RcpLength(worldDir);
@@ -39,7 +42,8 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
     float roughness = Sq(normalRoughness.a);
-	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV);
+	float pdf;
+	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, pdf);
 	
     // We start tracing from the center of the current pixel, and do so up to the far plane.
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
@@ -81,7 +85,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	}
 	
     TraceResult output;
-	output.color = color;
+	output.color = float4(color, pdf);
 	output.hit = float4(hitRay, outDepth);
     return output;
 }
@@ -149,12 +153,15 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		float invLenLV = max(FloatEps, rsqrt(2.0 * LdotV + 2.0));
 		float NdotH = saturate((NdotL + NdotV) * invLenLV);
 		float LdotH = saturate(invLenLV * LdotV + invLenLV);
-		float weightOverPdf = weight * GGXVndfRcpPdf(max(1e-3, roughness), NdotV, NdotH, LdotH);
+		
+		float4 hitColor = _Input[coord];
+		float pdf = hitColor.w;
+		//pdf = PdfGGXVndfIsotropic(NdotV, NdotH, roughness);
+		float weightOverPdf = weight / pdf;
 		
 		if(hasHit)
 		{
-			float3 hitColor = _Input[coord].rgb;
-			result.rgb += RgbToYCoCgFastTonemap(hitColor) * weightOverPdf;
+			result.rgb += RgbToYCoCgFastTonemap(hitColor.rgb) * weightOverPdf;
 			result.a += weightOverPdf;
 			avgRayLength += rcp(rcpRayLength) * weightOverPdf;
 		}
@@ -177,7 +184,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	result.a = totalWeight ? result.a / totalWeight : 0.0;
 	
 	SpatialResult output;
-	output.result = result;
+	output.result = result;//_Input[position.xy];
 	output.rayLength = avgRayLength;
 	return output;
 }
@@ -186,6 +193,7 @@ Texture2D<float> RayDepth;
 
 float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
+
 	float4 minValue, maxValue, result;
 	TemporalNeighborhood(_Input, position.xy, minValue, maxValue, result);
 	

@@ -30,15 +30,16 @@ public class ScreenSpaceReflections
         this.settings = settings;
 
         material = new Material(Shader.Find("Hidden/ScreenSpaceReflections")) { hideFlags = HideFlags.HideAndDontSave };
-        temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Screen Space Reflections");
+        temporalCache = new PersistentRTHandleCache(GraphicsFormat.R32G32B32A32_SFloat, renderGraph, "Screen Space Reflections");
         raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Specular");
     }
 
     public void Render(RTHandle depth, RTHandle hiZDepth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, ICommonPassData commonPassData, int width, int height, RTHandle velocity, RTHandle bentNormalOcclusion, RTHandle albedoMetallic, float bias, float distantBias)
     {
         // Must be screen texture since we use stencil to skip sky pixels
-        var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
+        var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
+
 
         if (settings.UseRaytracing)
         {

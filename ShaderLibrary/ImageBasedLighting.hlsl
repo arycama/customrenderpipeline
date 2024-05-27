@@ -26,47 +26,6 @@ float3x3 GetLocalFrame(float3 localZ)
 	return float3x3(localX, localY, localZ);
 }
 
-float3 SampleGGXReflection(float3 i, float alpha, float2 rand)
-{
-	float3 i_std = normalize(float3(i.xy * alpha, i.z));
-    
-    // Sample a spherical cap
-	float phi = 2.0f * Pi * rand.x;
-	float a = alpha; // Eq. 6
-	float s = 1.0f + length(float2(i.x, i.y)); // Omit sgn for a<=1
-	float a2 = a * a;
-	float s2 = s * s;
-	float k = (1.0f - a2) * s2 / (s2 + a2 * i.z * i.z); // Eq. 5
-	float b = i.z > 0 ? k * i_std.z : i_std.z;
-	float z = mad(1.0f - rand.y, 1.0f + b, -b);
-	float sinTheta = sqrt(saturate(1.0f - z * z));
-	float3 o_std = float3(sinTheta * cos(phi), sinTheta * sin(phi), z);
-    
-    // Compute the microfacet normal m
-	float3 m_std = i_std + o_std;
-	return normalize(float3(m_std.xy * alpha, m_std.z));
-}
-
-float GGXReflectionPDF(float3 i, float alpha, float NdotH)
-{
-	float ndf = D_GGX(NdotH, alpha);
-	float2 ai = alpha * i.xy;
-	float len2 = dot(ai, ai);
-	float t = sqrt(len2 + i.z * i.z);
-	if(i.z >= 0.0f)
-	{
-		float a = alpha; // Eq. 6
-		float s = 1.0f + length(float2(i.x, i.y)); // Omit sgn for a<=1
-		float a2 = a * a;
-		float s2 = s * s;
-		float k = (1.0f - a2) * s2 / (s2 + a2 * i.z * i.z); // Eq. 5
-		return ndf / (2.0f * (k * i.z + t)); // Eq. 8 * ||dm/do||
-	}
-    
-    // Numerically stable form of the previous PDF for i.z < 0
-	return ndf * (t - i.z) / (2.0f * len2); // = Eq. 7 * ||dm/do||
-}
-
 float3 SampleGGXIsotropic(float3 wi, float alpha, float2 u, float3 n)
 {
     // decompose the floattor in parallel and perpendicular components
@@ -99,15 +58,14 @@ float3 SampleGGXIsotropic(float3 wi, float alpha, float2 u, float3 n)
 	return normalize(alpha * wmStd_xy + wmStd_z);
 }
 
-float RcpPdfGGXVndfIsotropic(float NdotV, float NdotH, float roughness)
+float PdfGGXVndfIsotropic(float NdotV, float NdotH, float alpha)
 {
-	roughness = max(1e-18, roughness);
-	float a2 = roughness * roughness;
-	
-	// pdf is dv/(4*vdoth)
-	// dv = g1*Vdoth*D_GGX/NdotV
-	float sigmaI = 0.5 * NdotV + 0.5 * sqrt(Sq(NdotV) - Sq(NdotV) * a2 + a2);
-	return (4.0 * sigmaI) / D_GGX(NdotH, roughness);
+	float alphaSquare = max(1e-6, alpha * alpha);
+	float nrm = rsqrt(Sq(NdotV) * (1.0f - alphaSquare) + alphaSquare);
+	float sigmaStd = (NdotV * nrm) * 0.5f + 0.5f;
+	float sigmaI = sigmaStd / nrm;
+	float nrmN = Sq(NdotH) * (alphaSquare - 1.0f) + 1.0f;
+	return alphaSquare / (Pi * 4.0f * nrmN * nrmN * sigmaI);
 }
 
 float3 IndirectSpecularFactor(float NdotV, float perceptualRoughness, float3 f0)
@@ -299,13 +257,17 @@ float GetSpecularLobeTanHalfAngle(float roughness, float percentOfVolume = 0.75)
 	return tan(radians(90 * roughness * roughness / (1.0 + roughness * roughness)));
 }
 
-float GGXVndfRcpPdf(float a, float NdotV, float NdotH, float VdotH)
+float GGXVndfPdf(float a, float NdotV, float NdotH, float VdotH)
 {
-	float a2 = a * a;
-	float g1 = (1.0 + 0.5 * sqrt(1.0 + a2 * (1.0 / Sq(NdotV) - 1.0)) - 0.5);
-	float d = Sq(Sq(NdotH) * (a2 - 1.0) + 1.0);
+	double a2 = a * a;
+	double d = 1.0 / Pi * (a2 / (Sq(Sq(NdotH) * (a2 - 1.0) + 1.0)));
+	
+	double lambda = (-1.0 + sqrt(1.0 + a2 * (1.0 / Sq(NdotV) - 1.0))) / 2.0;
+	double g1 = 1.0 / (1.0 + lambda);
+	
+	double dv = g1 * max(0.0, VdotH) * d / NdotV;
 
-	return RcpPi * VdotH * a2 / (NdotV * g1 * d);
+	return dv / (4.0 * VdotH);
 }
 
 float3 SampleGGXVNDF(float3 V_, float roughness, float2 u)
@@ -331,12 +293,10 @@ float3 SampleGGXVNDF(float3 V_, float roughness, float2 u)
 	return normalize(float3(roughness * N.x, roughness * N.y, max(0.0, N.z)));
 }
 
-float3 ImportanceSampleGGX(float roughness, float3 N, float3 V, float2 u, float NdotV)
+float3 ImportanceSampleGGX(float a, float3 N, float3 V, float2 u, float NdotV, out float pdf)
 {
-	float3x3 localToWorld = GetLocalFrame(N);
-	float3 localV = mul(localToWorld, V);
-	float3 localH = SampleGGXVNDF(localV, max(1e-18, roughness), u);
-	float3 H = mul(localH, localToWorld);
+	float3 H = SampleGGXIsotropic(V, a, u, N);
+	pdf = PdfGGXVndfIsotropic(NdotV, dot(N, H), a);
 	return reflect(-V, H);
 }
 

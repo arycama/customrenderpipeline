@@ -160,7 +160,7 @@
 
         Pass
         {
-            Name "RayTracingAmbientOcclusion"
+            Name "RayTracing"
             Tags{ "LightMode" = "RayTracingAmbientOcclusion" }
 
             HLSLPROGRAM

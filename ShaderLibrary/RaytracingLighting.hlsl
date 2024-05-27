@@ -63,7 +63,7 @@ float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, fl
 			payload.hitDistance = 0.0;
 	
 			uint flags = 0;
-			TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 0, 0, ray, payload);
+			TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 1, ray, payload);
 			
 			if(payload.hitDistance)
 				continue;

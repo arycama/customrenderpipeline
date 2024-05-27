@@ -26,6 +26,8 @@ namespace Arycama.CustomRenderPipeline
 
         public void Build(Camera camera)
         {
+            return;
+
             RayTracingInstanceCullingConfig cullingConfig = new RayTracingInstanceCullingConfig();
 
             cullingConfig.flags = RayTracingInstanceCullingFlags.None;
