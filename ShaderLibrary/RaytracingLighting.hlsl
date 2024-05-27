@@ -10,8 +10,11 @@ float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, fl
 	float NdotV;
 	N = GetViewReflectedNormal(N, V, NdotV);
 	
-	float3 radiance = IndirectSpecular(N, V, f0, NdotV, perceptualRoughness, occlusion, bentNormal, false, _SkyReflection);
-	radiance *= IndirectSpecularFactor(NdotV, perceptualRoughness, f0);
+	float3 radiance = IndirectSpecular(N, V, f0, NdotV, perceptualRoughness, false, _SkyReflection);
+	
+	float3 R = reflect(-V, N);
+	float BdotR = dot(bentNormal, R);
+	radiance *= IndirectSpecularFactor(NdotV, perceptualRoughness, f0) * SpecularOcclusion(NdotV, perceptualRoughness, occlusion, BdotR);
 	
 	float3 irradiance = AmbientLight(N, occlusion);
 	

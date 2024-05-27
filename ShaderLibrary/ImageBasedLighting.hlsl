@@ -37,12 +37,9 @@ float3 SampleGGXIsotropic(float3 wi, float alpha, float2 u, float3 n)
  
     // sample a spherical cap in (-wiStd.z, 1]
 	float wiStd_z = dot(wiStd, n);
-	float z = 1.0 - u.y * (1.0 + wiStd_z);
-	float sinTheta = sqrt(saturate(1.0f - z * z));
+	float theta = 1.0 - u.y * (1.0 + wiStd_z);
 	float phi = TwoPi * u.x - Pi;
-	float x = sinTheta * cos(phi);
-	float y = sinTheta * sin(phi);
-	float3 cStd = float3(x, y, z);
+	float3 cStd = SphericalToCartesian(phi, theta);
  
     // reflect sample to align with normal
 	float3 up = float3(0, 0, 1.000001); // Used for the singularity
@@ -173,7 +170,7 @@ float SpecularOcclusion(float NdotV, float perceptualRoughness, float visibility
 }
 
 // Result must be multiplied with IndirectSpecularFactor()
-float3 IndirectSpecular(float3 N, float3 V, float3 f0, float NdotV, float perceptualRoughness, float occlusion, float3 bentNormal, bool isWater, TextureCube<float3> environmentMap)
+float3 IndirectSpecular(float3 N, float3 V, float3 f0, float NdotV, float perceptualRoughness, bool isWater, TextureCube<float3> environmentMap)
 {
 	float3 iblN = N;
 	float3 R = reflect(-V, N);
@@ -193,12 +190,7 @@ float3 IndirectSpecular(float3 N, float3 V, float3 f0, float NdotV, float percep
 	float NdotR = dot(N, iblR);
 	float iblMipLevel = PerceptualRoughnessToMipmapLevel(perceptualRoughness, NdotR);
 	
-	float3 radiance = environmentMap.SampleLevel(_TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
-	
-	float specularOcclusion = SpecularOcclusion(dot(N, R), perceptualRoughness, occlusion, dot(bentNormal, R));
-	radiance *= specularOcclusion;
-	
-	return radiance;
+	return environmentMap.SampleLevel(_TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
 }
 
 void SampleGGXDir(float2 u, float3 V, float3x3 localToWorld, float roughness, out float3 L, out float NdotL, out float NdotH, out float VdotH, bool VeqN = false)

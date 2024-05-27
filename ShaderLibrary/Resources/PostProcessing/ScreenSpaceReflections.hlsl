@@ -90,13 +90,13 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
     return output;
 }
 
-Texture2D<float4> _HitResult, _Input, _History;
+Texture2D<float4> _HitResult, _Input;
 float4 _HistoryScaleLimit;
 float _IsFirst;
 
 struct SpatialResult
 {
-	float4 result : SV_Target0;
+	float3 result : SV_Target0;
 	float rayLength : SV_Target1;
 };
 
@@ -105,15 +105,16 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	float3 V = -worldDir * RcpLength(worldDir);
 	
     float4 normalRoughness = _NormalRoughness[position.xy];
+	float perceptualRoughness = normalRoughness.a;
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
-    float roughness = Sq(normalRoughness.a);
+	float roughness = Sq(perceptualRoughness);
     
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
     float phi = Noise1D(position.xy) * TwoPi;
     
     float4 albedoMetallic = AlbedoMetallic[position.xy];
-    float f0 = Max3(lerp(0.04, albedoMetallic.rgb, albedoMetallic.a));
+    float3 f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
 
     float4 result = 0.0;
 	float avgRayLength = 0.0, nonHitWeight = 0.0;
@@ -152,7 +153,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		float invLenLV = max(FloatEps, rsqrt(2.0 * LdotV + 2.0));
 		float NdotH = saturate((NdotL + NdotV) * invLenLV);
 		float LdotH = saturate(invLenLV * LdotV + invLenLV);
-		float weight = D_GGX(NdotH, max(1e-3, roughness)) * V_SmithJointGGX(NdotL, NdotV, roughness) * Fresnel(LdotH, f0).r * NdotL;
+		float weight = D_GGX(NdotH, max(1e-3, roughness)) * V_SmithJointGGX(NdotL, NdotV, roughness) * Fresnel(LdotH, Max3(f0)).r * NdotL;
 		
 		float4 hitColor = _Input[coord];
 		float weightOverPdf = weight * hitColor.w;
@@ -181,30 +182,34 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	// Final alpha is the ratio of hit weight vs non hit weight
 	result.a = totalWeight ? result.a / totalWeight : 0.0;
 	
+	uint stencil = _Stencil[position.xy].g;
+	bool isWater = (stencil & 4);
+	float3 radiance = IndirectSpecular(N, V, f0, NdotV, perceptualRoughness, isWater, _SkyReflection);
+	
 	SpatialResult output;
-	output.result = result;
+	output.result = lerp(radiance, result.rgb, result.a * SpecularGiStrength);
 	output.rayLength = avgRayLength;
 	return output;
 }
 
+Texture2D<float3> _TemporalInput, _History;
 Texture2D<float> RayDepth;
 
-float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float4 minValue, maxValue, result;
-	TemporalNeighborhood(_Input, position.xy, minValue, maxValue, result);
+	float3 minValue, maxValue, result;
+	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, result);
 	
 	float rayLength = RayDepth[position.xy];
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	worldPosition += normalize(worldDir) * rayLength;
 	
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
-	float4 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
-	history.rgb *= _PreviousToCurrentExposure;
+	float3 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
+	history *= _PreviousToCurrentExposure;
 	history = RgbToYCoCgFastTonemap(history);
 	
-	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
-	history.a = clamp(history.a, minValue.a, maxValue.a);
+	history = ClipToAABB(history, result, minValue, maxValue);
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);

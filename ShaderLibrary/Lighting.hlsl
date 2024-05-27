@@ -288,7 +288,7 @@ float3 WaterShadow(float3 position, float3 L)
 	return exp(-_WaterShadowExtinction * shadowDistance);
 }
 
-Texture2D<float4> ScreenSpaceReflections;
+Texture2D<float3> ScreenSpaceReflections;
 float4 ScreenSpaceReflectionsScaleLimit;
 
 float3 GetLighting(LightingInput input, bool isVolumetric = false)
@@ -298,14 +298,15 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 	// TODO: Pass this in as part of lighting input?
 	float NdotV = max(0.0, dot(input.normal, V));
 	
-	float3 radiance = IndirectSpecular(input.normal, V, input.f0, NdotV, input.perceptualRoughness, input.occlusion, input.bentNormal, input.isWater, _SkyReflection);
-	
 	#ifdef SCREENSPACE_REFLECTIONS_ON
-		float4 screenSpaceReflections = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
-		radiance = lerp(radiance, screenSpaceReflections.rgb, screenSpaceReflections.a * SpecularGiStrength);
+		float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
+	#else
+		float3 radiance = IndirectSpecular(input.normal, V, input.f0, NdotV, input.perceptualRoughness, input.isWater, _SkyReflection);
 	#endif
 	
-	radiance *= IndirectSpecularFactor(NdotV, input.perceptualRoughness, input.f0);
+	float3 R = reflect(-V, input.normal);
+	float BdotR = dot(input.bentNormal, R);
+	radiance *= IndirectSpecularFactor(NdotV, input.perceptualRoughness, input.f0) * SpecularOcclusion(NdotV, input.perceptualRoughness, input.occlusion, BdotR);
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float3 irradiance = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit));
@@ -313,7 +314,6 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
 	#endif
 	
-	// Ambient
 	float3 luminance = radiance + irradiance * IndirectDiffuseFactor(NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
 
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
