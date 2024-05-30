@@ -6,16 +6,17 @@ Shader "Hidden/Ambient Occlusion"
         ZWrite Off
         ZTest Off
 
+        Stencil
+        {
+            Ref 0
+            Comp NotEqual
+            ReadMask 5
+        }
+
         Pass
         {
             Name "Compute"
-            
-            Stencil
-            {
-                Ref 0
-                Comp NotEqual
-            }
-        
+
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
@@ -25,14 +26,16 @@ Shader "Hidden/Ambient Occlusion"
 
         Pass
         {
+            HLSLPROGRAM
+            #pragma vertex VertexFullscreenTriangle
+            #pragma fragment FragmentSpatial
+            #include "AmbientOcclusion.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
             Name "Temporal"
-            
-            Stencil
-            {
-                Ref 0
-                Comp NotEqual
-            }
-        
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
@@ -43,13 +46,6 @@ Shader "Hidden/Ambient Occlusion"
         Pass
         {
             Name "Resolve"
-            
-            Stencil
-            {
-                Ref 0
-                Comp NotEqual
-            }
-        
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentResolve

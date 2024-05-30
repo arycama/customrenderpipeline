@@ -99,7 +99,7 @@ float3 BlendNormalRNM(float3 n1, float3 n2)
 	return FromToRotationZ(n1, n2);
 }
 
-float PerceptualSmoothnessToPerceptualRoughness(float smoothness)
+float SmoothnessToPerceptualRoughness(float smoothness)
 {
 	return 1.0 - smoothness;
 }
@@ -252,6 +252,11 @@ float4 AlphaPremultiplyInv(float4 value)
 {
 	value.rgb *= value.a;
 	return value;
+}
+
+float2 ApplyScaleOffset(float2 uv, float4 scaleOffset)
+{
+	return uv * scaleOffset.xy + scaleOffset.zw;
 }
 
 #endif

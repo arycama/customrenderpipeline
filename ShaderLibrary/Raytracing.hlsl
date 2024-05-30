@@ -53,6 +53,7 @@ struct Vert
 	float3 position;
 	float3 normal;
 	float2 uv;
+	float4 tangent;
 };
 
 #define kMaxVertexStreams 8
@@ -307,6 +308,7 @@ Vert FetchVertex(uint vertexIndex)
 	v.position = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributePosition);
 	v.normal = UnityRayTracingFetchVertexAttribute3(vertexIndex, kVertexAttributeNormal);
 	v.uv = UnityRayTracingFetchVertexAttribute2(vertexIndex, kVertexAttributeTexCoord0);
+	v.tangent = UnityRayTracingFetchVertexAttribute4(vertexIndex, kVertexAttributeTangent);
 	return v;
 }
 
@@ -317,6 +319,7 @@ Vert InterpolateVertices(Vert v0, Vert v1, Vert v2, float3 barycentrics)
 	INTERPOLATE_ATTRIBUTE(position);
 	INTERPOLATE_ATTRIBUTE(normal);
 	INTERPOLATE_ATTRIBUTE(uv);
+	INTERPOLATE_ATTRIBUTE(tangent);
 	return v;
 }
 

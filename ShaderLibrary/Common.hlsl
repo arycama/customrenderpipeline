@@ -173,11 +173,6 @@ bool IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePositi
 	return IntersectRayPlane(rayOrigin, rayDirection, planePosition, planeNormal, t);
 }
 
-float2 ApplyScaleOffset(float2 uv, float4 scaleOffset)
-{
-	return uv * scaleOffset.xy + scaleOffset.zw;
-}
-
 float Linear01Depth(float depth)
 {
 	return rcp((_Far * rcp(_Near) - 1.0) * depth + 1.0);

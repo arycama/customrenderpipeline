@@ -7,9 +7,10 @@
 
 Texture2D<float> _LengthToRoughness;
 
-float PerceptualSmoothnessToRoughness(float perceptualSmoothness)
+float SmoothnessToRoughness(float smoothness)
 {
-    return (1.0 - perceptualSmoothness) * (1.0 - perceptualSmoothness);
+	// Sq(1-smoothness) rewritten as 2 mads, vs sub sub mul
+	return Sq(smoothness) * (-2.0 * smoothness + 1.0);
 }
 
 float RoughnessToPerceptualRoughness(float roughness)
@@ -17,32 +18,32 @@ float RoughnessToPerceptualRoughness(float roughness)
 	return sqrt(roughness);
 }
 
-float RoughnessToPerceptualSmoothness(float roughness)
+float RoughnessToSmoothness(float roughness)
 {
     return 1.0 - sqrt(roughness);
 }
 
 // Move into material? 
-// Return modified perceptualSmoothness based on provided variance (get from GeometricNormalVariance + TextureNormalVariance)
-float NormalFiltering(float perceptualSmoothness, float variance, float threshold)
+// Return modified smoothness based on provided variance (get from GeometricNormalVariance + TextureNormalVariance)
+float NormalFiltering(float perceptualRoughness, float variance, float threshold)
 {
-    float roughness = PerceptualSmoothnessToRoughness(perceptualSmoothness);
+	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
     // Ref: Geometry into Shading - http://graphics.pixar.com/library/BumpRoughness/paper.pdf - equation (3)
     float squaredRoughness = saturate(roughness * roughness + min(2.0 * variance, threshold * threshold)); // threshold can be really low, square the value for easier control
 
-    return RoughnessToPerceptualSmoothness(sqrt(squaredRoughness));
+    return RoughnessToPerceptualRoughness(sqrt(squaredRoughness));
 }
 
-float ProjectedSpaceNormalFiltering(float perceptualSmoothness, float variance, float threshold)
+float ProjectedSpaceNormalFiltering(float perceptualRoughness, float variance, float threshold)
 {
-    float roughness = PerceptualSmoothnessToRoughness(perceptualSmoothness);
+	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
     // Ref: Stable Geometric Specular Antialiasing with Projected-Space NDF Filtering - https://yusuketokuyoshi.com/papers/2021/Tokuyoshi2021SAA.pdf
     float squaredRoughness = roughness * roughness;
     float projRoughness2 = squaredRoughness / (1.0 - squaredRoughness);
     float filteredProjRoughness2 = saturate(projRoughness2 + min(2.0 * variance, threshold * threshold));
     squaredRoughness = filteredProjRoughness2 / (filteredProjRoughness2 + 1.0f);
 
-    return RoughnessToPerceptualSmoothness(sqrt(squaredRoughness));
+    return RoughnessToPerceptualRoughness(sqrt(squaredRoughness));
 }
 
 // Reference: Error Reduction and Simplification for Shading Anti-Aliasing
@@ -58,17 +59,17 @@ float GeometricNormalVariance(float3 geometricNormalWS, float screenSpaceVarianc
     return screenSpaceVariance * (dot(deltaU, deltaU) + dot(deltaV, deltaV));
 }
 
-// Return modified perceptualSmoothness
-float GeometricNormalFiltering(float perceptualSmoothness, float3 geometricNormalWS, float screenSpaceVariance, float threshold)
+// Return modified smoothness
+float GeometricNormalFiltering(float perceptualRoughness, float3 geometricNormalWS, float screenSpaceVariance, float threshold)
 {
     float variance = GeometricNormalVariance(geometricNormalWS, screenSpaceVariance);
-    return NormalFiltering(perceptualSmoothness, variance, threshold);
+	return NormalFiltering(perceptualRoughness, variance, threshold);
 }
 
-float ProjectedSpaceGeometricNormalFiltering(float perceptualSmoothness, float3 geometricNormalWS, float screenSpaceVariance, float threshold)
+float ProjectedSpaceGeometricNormalFiltering(float perceptualRoughness, float3 geometricNormalWS, float screenSpaceVariance, float threshold)
 {
     float variance = GeometricNormalVariance(geometricNormalWS, screenSpaceVariance);
-    return ProjectedSpaceNormalFiltering(perceptualSmoothness, variance, threshold);
+	return ProjectedSpaceNormalFiltering(perceptualRoughness, variance, threshold);
 }
 
 float LengthToRoughness(float len)
@@ -85,7 +86,7 @@ float LengthToPerceptualRoughness(float len)
 
 float LengthToSmoothness(float len)
 {
-	return RoughnessToPerceptualSmoothness(LengthToRoughness(len));
+	return RoughnessToSmoothness(LengthToRoughness(len));
 }
 
 float RoughnessToNormalLength(float roughness)
@@ -106,7 +107,7 @@ float PerceptualRoughnessToNormalLength(float perceptualRoughness)
 
 float SmoothnessToNormalLength(float smoothness)
 {
-	return RoughnessToNormalLength(PerceptualSmoothnessToRoughness(smoothness));
+	return RoughnessToNormalLength(SmoothnessToRoughness(smoothness));
 }
 
 #endif

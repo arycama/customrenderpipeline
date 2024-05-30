@@ -139,7 +139,7 @@ FragmentOutput Fragment(FragmentInput input)
 	SurfaceData surface = DefaultSurface();
 	surface.Albedo = color.rgb;
 	surface.Normal = surface.bentNormal = ObjectToWorldNormal(normalSmoothness.rgb * 2 - 1, input.instanceID, true);
-	surface.PerceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(normalSmoothness.a);
+	surface.PerceptualRoughness = SmoothnessToPerceptualRoughness(normalSmoothness.a);
 	surface.Translucency = subsurfaceOcclusion.rgb;
 	surface.Occlusion = subsurfaceOcclusion.a;
 	

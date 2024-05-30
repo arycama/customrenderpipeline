@@ -73,7 +73,7 @@ float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, fl
 		}
 		#endif
 		
-		luminance += (CalculateLighting(albedo, f0, perceptualRoughness, light.direction, V, N, N, occlusion, translucency) * light.color * atmosphereTransmittance) * (abs(NdotL) * _Exposure * attenuation);
+		luminance += (CalculateLighting(albedo, f0, perceptualRoughness, light.direction, V, N, bentNormal, occlusion, translucency) * light.color * atmosphereTransmittance) * (saturate(NdotL) * _Exposure * attenuation);
 	}
 	
 	return luminance;

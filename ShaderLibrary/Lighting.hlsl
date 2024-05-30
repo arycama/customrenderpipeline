@@ -62,8 +62,8 @@ float3 EvaluateSH(float3 N, float3 occlusion, float4 sh[7])
 {
 	// Calculate the zonal harmonics expansion for V(x, ωi)*(n.l)
 	float3 t = FastACosPos(sqrt(saturate(1.0 - occlusion)));
-	float3 a = sin(t);
-	float3 b = cos(t);
+	float3 a = 1;//sin(t);
+	float3 b = 0;//cos(t);
 	
 	// Calculate the zonal harmonics expansion for V(x, ωi)*(n.l)
 	float3 A0 = a * a;
@@ -85,7 +85,7 @@ float3 EvaluateSH(float3 N, float3 occlusion, float4 sh[7])
 	float vC = N.x * N.x - N.y * N.y;
 	irradiance += sh[6].rgb * A2 * vC;
 	
-	return irradiance;
+	return irradiance * occlusion;
 }
 
 // ref: Practical Realtime Strategies for Accurate Indirect Occlusion

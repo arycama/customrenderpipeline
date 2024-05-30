@@ -27,7 +27,7 @@ namespace Arycama.CustomRenderPipeline
             var height = (int)(camera.pixelHeight * scale);
 
             var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-            //var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
             if (settings.UseRaytracing)
             {
@@ -37,9 +37,9 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, width, height, 1, bias, distantBias);
                     pass.WriteTexture(tempResult, "HitColor");
-                    //pass.WriteTexture(hitResult);
+                    pass.WriteTexture(hitResult, "HitResult");
                     pass.ReadTexture("_Depth", depth);
-                    pass.ReadTexture("_Normals", normal);
+                    pass.ReadTexture("_NormalRoughness", normal);
                     commonPassData.SetInputs(pass);
 
                     var data = pass.SetRenderFunction<Pass1Data>((command, pass, data) =>
@@ -74,7 +74,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.WriteTexture(tempResult);
                     //pass.WriteTexture(hitResult);
                     pass.ReadTexture("_Depth", depth);
-                    pass.ReadTexture("_Normals", normal);
+                    pass.ReadTexture("_NormalRoughness", normal);
                     pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                     commonPassData.SetInputs(pass);
 
@@ -112,48 +112,48 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            //var spatialResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var spatialResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
             //var rayDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R16_SFloat, isScreenTexture: true);
-            //using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
-            //{
-            //    pass.Initialize(material, 1, camera: camera);
-            //    pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
-            //    pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
-            //    pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
+            {
+                pass.Initialize(material, 1, camera: camera);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
+                //pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
 
-            //    pass.ReadTexture("_Input", tempResult);
-            //    pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
-            //    pass.ReadTexture("_Depth", depth);
-            //    pass.ReadTexture("Velocity", velocity);
-            //    pass.ReadTexture("_HitResult", hitResult);
-            //    pass.ReadTexture("_NormalRoughness", normal);
-            //    pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
+                pass.ReadTexture("_Input", tempResult);
+                pass.ReadTexture("_HitResult", hitResult);
+                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("Velocity", velocity);
+                pass.ReadTexture("_NormalRoughness", normal);
+                pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
-            //    commonPassData.SetInputs(pass);
-            //    pass.AddRenderPassData<TemporalAA.TemporalAAData>();
-            //    pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
-            //    pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
-            //    pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                commonPassData.SetInputs(pass);
+                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
-            //    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
-            //    {
-            //        commonPassData.SetProperties(pass, command);
-            //        //pass.SetFloat(command, "_Intensity", settings.Strength);
-            //        //pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
-            //        //pass.SetFloat(command, "_Thickness", settings.Thickness);
-            //        pass.SetInt(command, "_ResolveSamples", settings.ResolveSamples);
-            //        pass.SetFloat(command, "_ResolveSize", settings.ResolveSize);
-            //    });
-            //}
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                {
+                    commonPassData.SetProperties(pass, command);
+                    //pass.SetFloat(command, "_Intensity", settings.Strength);
+                    //pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
+                    //pass.SetFloat(command, "_Thickness", settings.Thickness);
+                    pass.SetInt(command, "_ResolveSamples", settings.ResolveSamples);
+                    pass.SetFloat(command, "_ResolveSize", settings.ResolveSize);
+                });
+            }
 
             var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Temporal"))
             {
-                pass.Initialize(material, 1, camera: camera);
+                pass.Initialize(material, 2, camera: camera);
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 
-                pass.ReadTexture("_Input", tempResult);
+                pass.ReadTexture("_Input", spatialResult);
                 pass.ReadTexture("_History", history);
                 pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
                 pass.ReadTexture("_Depth", depth);
@@ -175,7 +175,7 @@ namespace Arycama.CustomRenderPipeline
             var newBentNormalOcclusion = renderGraph.GetTexture(width, height, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Resolve"))
             {
-                pass.Initialize(material, 2);
+                pass.Initialize(material, 3);
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(newBentNormalOcclusion, RenderBufferLoadAction.DontCare);
 

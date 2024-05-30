@@ -6,7 +6,7 @@
 #include "../../Temporal.hlsl"
 
 Texture2D<float> _Depth;
-Texture2D<float4> _Normals;
+Texture2D<float4> _NormalRoughness;
 float _Radius, _AoStrength, _FalloffScale, _FalloffBias, _SampleCount, _ThinOccluderCompensation, _ThinOccluderScale, _ThinOccluderOffset, _ThinOccluderFalloff;
 
 float3 ComputeViewspacePosition(float2 screenPos)
@@ -63,7 +63,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 {
 	float rcpVLength = RcpLength(worldDir);
 	float3 V = -worldDir * rcpVLength;
-	float3 N = GBufferNormal(position.xy, _Normals, V);
+	float3 N = GBufferNormal(position.xy, _NormalRoughness, V);
 	float depth = _Depth[position.xy];
 	float3 worldPosition = PixelToWorld(float3(position.xy, depth));
 	
@@ -76,7 +76,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 	float3 directionV = float3(noise.x, noise.y, 0.0);
 	float3 orthoDirectionV = ProjectOnPlane(directionV, viewV);
-	float3 axisV = normalize(cross(directionV, viewV));
+	float3 axisV = cross(directionV, viewV);
 	float3 projNormalV = ProjectOnPlane(normalV, axisV);
 		
 	float rcpWeight = rsqrt(SqrLength(projNormalV));
@@ -117,7 +117,79 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	return float4(bentNormal, visibility) * sampleWeight;
 }
 
-Texture2D<float4> _Input, _History;
+Texture2D<float4> _Input, _HitResult;
+
+float _ResolveSamples, _ResolveSize;
+
+float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+{
+	float rcpVLength = RcpLength(worldDir);
+	float3 V = -worldDir * rcpVLength;
+	
+	float4 normalRoughness = _NormalRoughness[position.xy];
+	float NdotV;
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
+	
+	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
+	float phi = Noise1D(position.xy) * TwoPi;
+	
+	float3 bentNormal = 0.0;
+	float hitWeight = 0.0, nonHitWeight = 0.0;
+	for(uint i = 0; i <= _ResolveSamples; i++)
+	{
+		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
+		float2 coord = clamp(floor(position.xy + u), 0.0, _ScaledResolution.xy - 1.0) + 0.5;
+		
+		float4 hitData = _HitResult[coord];
+		
+		// For misses, just store the ray direction, since it represents a hit at an infinite distance (eg probe)
+		bool hasHit = hitData.w != 0.0;
+		float3 L;
+		float rcpRayLength;
+		if(hasHit)
+		{
+			float3 sampleWorldPosition = PixelToWorld(float3(coord, Linear01ToDeviceDepth(hitData.w)));
+			float3 hitPosition = sampleWorldPosition + hitData.xyz;
+		
+			float3 delta = hitPosition - worldPosition;
+			rcpRayLength = RcpLength(delta);
+			L = delta * rcpRayLength;
+		}
+		else
+		{
+			L = hitData.xyz;
+			rcpRayLength = 0.0;
+		}
+		
+		float NdotL = dot(N, L);
+		if(NdotL <= 0.0)
+			continue;
+		
+		float4 hitColor = _Input[coord];
+		float weightOverPdf = RcpPi * NdotL * hitColor.w;
+		
+		if(hasHit)
+		{
+			hitWeight += weightOverPdf;
+		}
+		else
+		{
+			nonHitWeight += weightOverPdf;
+			bentNormal += L;
+		}
+	}
+
+	// Add the nonhit and hit weights to get a total weight
+	float totalWeight = hitWeight + nonHitWeight;
+	
+	// Final alpha is the ratio of hit weight vs non hit weight
+	float visibility = totalWeight ? nonHitWeight / totalWeight : 1.0;
+	bentNormal = normalize(bentNormal);
+	
+	return float4(bentNormal, visibility);
+}
+
+Texture2D<float4> _History;
 Texture2D<float2> Velocity;
 float4 _HistoryScaleLimit;
 float _IsFirst;
@@ -132,21 +204,21 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	history = clamp(history, minValue, maxValue);
 	
 	// Remove weights to get a better blend
-	float aoWeight = length(result.xyz);
-	if(aoWeight)
-		result /= aoWeight;
+	//float aoWeight = length(result.xyz);
+	//if(aoWeight)
+	//	result /= aoWeight;
 	
-	float historyWeight = length(history.xyz);
-	if(historyWeight)
-		history /= historyWeight;
+	//float historyWeight = length(history.xyz);
+	//if(historyWeight)
+	//	history /= historyWeight;
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 		
 	// Reapply weights
-	result *= lerp(historyWeight, aoWeight, 0.05 * _MaxBoxWeight);
+	//result *= lerp(historyWeight, aoWeight, 0.05 * _MaxBoxWeight);
 	
-	return result;
+	return RemoveNaN(result);
 }
 
 Texture2D<float4> _BentNormalOcclusion;

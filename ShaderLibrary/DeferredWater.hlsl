@@ -88,8 +88,10 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		smoothness = lerp(smoothness, _FoamSmoothness, foamFactor);
 	}
 
+	// TODO: Use RNM
 	N = normalize(mul(oceanN, tangentToWorld));
-	smoothness = ProjectedSpaceGeometricNormalFiltering(smoothness, N, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
+	float perceptualRoughness = SmoothnessToPerceptualRoughness(smoothness);
+	perceptualRoughness = ProjectedSpaceGeometricNormalFiltering(perceptualRoughness, N, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
 	
 	float NdotV;
 	N = GetViewReflectedNormal(N, V, NdotV);
@@ -177,7 +179,6 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		luminance += _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit)) * exp(-_Extinction * underwaterDistance);
 	
 	// Apply roughness to transmission
-	float perceptualRoughness = 1.0 - smoothness;
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
 	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.04);
 	luminance *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?

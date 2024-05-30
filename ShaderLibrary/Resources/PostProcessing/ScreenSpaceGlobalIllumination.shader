@@ -18,7 +18,6 @@ Shader "Hidden/ScreenSpaceGlobalIllumination"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
-            #pragma enable_d3d11_debug_symbols
             #include "ScreenSpaceGlobalIllumination.hlsl"
             ENDHLSL
         }
@@ -28,7 +27,6 @@ Shader "Hidden/ScreenSpaceGlobalIllumination"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSpatial
-            #pragma enable_d3d11_debug_symbols
             #include "ScreenSpaceGlobalIllumination.hlsl"
             ENDHLSL
         }
@@ -38,7 +36,6 @@ Shader "Hidden/ScreenSpaceGlobalIllumination"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
-            #pragma enable_d3d11_debug_symbols
             #include "ScreenSpaceGlobalIllumination.hlsl"
             ENDHLSL
         }

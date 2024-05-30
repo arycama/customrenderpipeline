@@ -9,27 +9,7 @@
 #include "../Random.hlsl"
 #include "../Raytracing.hlsl"
 #include "../RaytracingLighting.hlsl"
-
-Texture2D<float4> _BentNormal, _MainTex, _BumpMap, _MetallicGlossMap, _DetailAlbedoMap, _DetailNormalMap, _OcclusionMap, _ParallaxMap;
-Texture2D<float3> _EmissionMap;
-Texture2D<float> _AnisotropyMap;
-
-//cbuffer UnityPerMaterial
-//{
-	float4 _DetailAlbedoMap_ST, _MainTex_ST;
-	float4 _Color;
-	float3 _EmissionColor;
-	float _BumpScale, _Cutoff, _DetailNormalMapScale, _Metallic, _Smoothness;
-	float _HeightBlend, _NormalBlend;
-	float BentNormal, _EmissiveExposureWeight;
-	float _Anisotropy;
-	float Smoothness_Source;
-	float _Parallax;
-	float Terrain_Blending;
-	float Blurry_Refractions;
-	float Anisotropy;
-	float _TriplanarSharpness;
-//};
+#include "LitSurfaceCommon.hlsl"
 
 [shader("closesthit")]
 void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
@@ -50,31 +30,23 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	Vert v = InterpolateVertices(v0, v1, v2, barycentricCoords);
 	
 	float3 normal = MultiplyVector(v.normal, WorldToObject3x4(), true);
-	float2 uv = v.uv;
-
-	float4 albedoAlpha = _MainTex.SampleLevel(_LinearRepeatSampler, uv, 0.0);
-	
-	float3 emission = _EmissionMap.SampleLevel(_LinearRepeatSampler, uv, 0.0) * _EmissionColor;
-	emission = lerp(emission, emission * _Exposure, _EmissiveExposureWeight);
-
+	float4 tangent = float4(MultiplyVector(ObjectToWorld3x4(), v.tangent.xyz, true), v.tangent.w);
 	float3 worldPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-	float3 V = -WorldRayDirection();
-	
-	float4 metallicGloss = _MetallicGlossMap.SampleLevel(_LinearRepeatSampler, uv, 0.0);
-	float metallic = metallicGloss.r * _Metallic;
 
-	float perceptualSmoothness;
-	if(Smoothness_Source)
-		perceptualSmoothness = albedoAlpha.a * _Smoothness;
-	else
-		perceptualSmoothness = metallicGloss.a * _Smoothness;
+	SurfaceInput surfaceInput;
+	surfaceInput.uv = v.uv;
+	surfaceInput.worldPosition = worldPosition;
+	surfaceInput.vertexNormal = normal;
+	surfaceInput.vertexTangent = tangent.xyz;
+	surfaceInput.tangentSign = tangent.w;
+	surfaceInput.isFrontFace = true;
 	
-	float perceptualRoughness = PerceptualSmoothnessToPerceptualRoughness(perceptualSmoothness);
-	
-	float3 f0 = lerp(0.04, albedoAlpha.rgb, metallic);
-	float occlusion = _OcclusionMap.SampleLevel(_LinearRepeatSampler, uv, 0.0).g;
-	
-	float3 color = RaytracedLighting(worldPosition, normal, V, f0, perceptualRoughness, occlusion, normal, albedoAlpha.rgb) + emission;
+	SurfaceOutput surface = GetSurfaceAttributes(surfaceInput, true);
+
+	// Should make this a function as it's duplicated in a few places
+	float3 f0 = lerp(0.04, surface.albedo, surface.metallic);
+	float3 V = -WorldRayDirection();
+	float3 color = RaytracedLighting(worldPosition, surface.normal, V, f0, surface.roughness, surface.occlusion, surface.bentNormal, surface.albedo) + surface.emission;
 	
 	payload.packedColor = Float3ToR11G11B10(color);
 	payload.hitDistance = RayTCurrent();

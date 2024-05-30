@@ -7,7 +7,7 @@
 
 RWTexture2D<float4> HitResult, HitColor;
 Texture2D<float> _Depth;
-Texture2D<float4> _Normals;
+Texture2D<float4> _NormalRoughness;
 float _Radius, _RawRadius, _AoStrength, _FalloffScale, _FalloffBias, _SampleCount;
 float _RaytracingBias, _RaytracingDistantBias;
 
@@ -29,47 +29,45 @@ void RayGeneration()
 	
 	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
 	float3 V = normalize(-worldPosition);
-	float3 N = GBufferNormal(position, _Normals, V);
+	
+	float NdotV;
+	float3 N = GBufferNormal(position, _NormalRoughness, V, NdotV);
+	
+	float3 noise3DCosine = Noise3DCosine(position);
+	float rcpPdf = Pi * rcp(noise3DCosine.z);
+	float3 L = FromToRotationZ(N, noise3DCosine);
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	worldPosition = PlanetCurveInverse(worldPosition);
 	
-	float samples = 8;
-	float2 offset1 = Noise2D(position);
-	float3 bentN = 0.0;
-	float visibilitySum = 0.0;
+	RayDesc ray;
+	ray.Origin = worldPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
+	ray.Direction = L;
+	ray.TMin = 0.0;
+	ray.TMax = _RawRadius;
 	
-	for(float j = 0.0; j < samples; j++)
+	RayPayloadAmbientOcclusion payload;
+	payload.hitDistance = 0.0;
+		
+	uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+	
+	bool validHit = payload.hitDistance;
+	float outDepth;
+	float3 color, hitRay;
+	if(validHit)
 	{
-		float2 u = frac(Hammersley2dSeq(j, samples) + offset1);
-		float3 rayDir = SampleHemisphereCosine(u.x, u.y, N);
-	
-		RayDesc ray;
-		ray.Origin = worldPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
-		ray.Direction = rayDir;
-		ray.TMin = 0.0;
-		ray.TMax = _RawRadius;
-	
-		RayPayloadAmbientOcclusion payload;
-		payload.hitDistance = 0.0;
-		
-		uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
-		TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
-		
-		float visibility;
-		if(!payload.hitDistance)
-		{
-			visibility = 1.0;
-			bentN += rayDir;
-		}
-		else
-		{
-			float weight = saturate(Sq(payload.hitDistance) * _FalloffScale + _FalloffBias);
-			visibility = lerp(1.0, 0.0, weight);
-		}
-		
-		visibilitySum += visibility;
+		color = 0.0;
+		hitRay = L * payload.hitDistance;
+		outDepth = Linear01Depth(depth);
+	}
+	else
+	{
+		color = 0.0;
+		hitRay = L;
+		outDepth = 0.0;
 	}
 	
-	HitColor[position] = float4(normalize(bentN), visibilitySum / samples);
+	HitColor[position] = float4(color, rcpPdf);
+	HitResult[position] = float4(hitRay, outDepth);
 }
