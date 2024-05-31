@@ -168,7 +168,7 @@ public class LitData : IDisposable
             });
         }
 
-        renderGraph.ResourceMap.SetRenderPassData(result);
+        renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex, true);
     }
 
     public struct Result : IRenderPassData

@@ -163,7 +163,7 @@ namespace Arycama.CustomRenderPipeline
 
             ArrayPool<float>.Release(weights);
 
-            renderGraph.ResourceMap.SetRenderPassData<TemporalAAData>(result);
+            renderGraph.ResourceMap.SetRenderPassData<TemporalAAData>(result, renderGraph.FrameIndex);
         }
 
         private class PassData

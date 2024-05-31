@@ -62,7 +62,7 @@ public class DiffuseGlobalIllumination
 
             using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Diffuse GI Raytrace"))
             {
-                var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>();
+                var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
 
                 pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, width, height, 1, bias, distantBias);
                 pass.WriteTexture(tempResult, "HitColor");
@@ -191,7 +191,7 @@ public class DiffuseGlobalIllumination
             });
         }
 
-        renderGraph.ResourceMap.SetRenderPassData(new Result(current, settings.Intensity));
+        renderGraph.ResourceMap.SetRenderPassData(new Result(current, settings.Intensity), renderGraph.FrameIndex);
     }
 
     private class Data

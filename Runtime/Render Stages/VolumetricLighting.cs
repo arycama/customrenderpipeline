@@ -30,7 +30,7 @@ namespace Arycama.CustomRenderPipeline
             var volumetricLight = renderGraph.GetTexture(volumeWidth, volumeHeight, GraphicsFormat.R16G16B16A16_SFloat, volumeDepth, TextureDimension.Tex3D);
 
             var result = new Result(volumetricLight, /*volumetricLight.Scale, */camera.nearClipPlane, /*volumetricLight.Limit, */settings.MaxDistance, new Vector2(1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight), settings.DepthSlices, settings.NonLinearDepth ? 1.0f : 0.0f);
-            renderGraph.ResourceMap.SetRenderPassData(result);
+            renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex);
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
             {

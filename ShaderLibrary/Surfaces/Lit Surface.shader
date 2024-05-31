@@ -15,10 +15,9 @@
         _Cutoff("Alpha Cutoff", Range(0.0, 1.0)) = 0.5
         _MainTex("Albedo", 2D) = "white" {}
 
-        [KeywordEnum(Metallic, Albedo)] Smoothness_Source("Smoothness Source", Float) = 0
         _Smoothness("Smoothness", Range(0.0, 1.0)) = 1.0
-        _Anisotropy("Anisotropy", Range(0.0, 1.0)) = 0.5
-        _AnisotropyMap("AnisotropyMap", 2D) = "linearGrey" {}
+        [KeywordEnum(Metallic, Albedo)] Smoothness_Source("Smoothness Source", Float) = 0
+
         [Gamma] _Metallic("Metallic", Range(0.0, 1.0)) = 0.0
         [NoScaleOffset] _MetallicGlossMap("Metallic", 2D) = "white" {}
 
@@ -34,6 +33,9 @@
         _EmissiveExposureWeight("Emission Exposure Weight", Range(0.0, 1.0)) = 1.0
         [HDR] _EmissionColor("Emission Color", Color) = (0, 0, 0, 0.0)
         [NoScaleOffset] _EmissionMap("Emission", 2D) = "white" {}
+
+        _Anisotropy("Anisotropy", Range(0.0, 1.0)) = 0.5
+        _AnisotropyMap("AnisotropyMap", 2D) = "linearGrey" {}
 
         [Header(Detail)]
         [NoScaleOffset] _DetailMask("Detail Mask", 2D) = "white" {}

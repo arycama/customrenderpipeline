@@ -7,6 +7,29 @@
 // TODO: Share with lighting.hlsl code somehow?
 float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, float perceptualRoughness, float occlusion, float3 bentNormal, float3 albedo, float3 translucency = 0.0)
 {
+	float4 clipPosition = PerspectiveDivide(WorldToClip(worldPosition));
+	bool isInScreen = all(clipPosition.xyz >= float2(-1.0, 0.0).xxy && clipPosition.xyz <= 1.0);
+
+	// Do lighting with existing light cluster, shadow matrices, etc
+	if(isInScreen)
+	{
+		LightingInput input;
+		input.normal = N;
+		input.worldPosition = worldPosition;
+		input.pixelPosition = (clipPosition.xy * 0.5 + 0.5) * _ScaledResolution.xy;
+		input.eyeDepth = clipPosition.w;
+		input.albedo = albedo;
+		input.f0 = f0;
+		input.perceptualRoughness = perceptualRoughness;
+		input.occlusion = occlusion;
+		input.translucency = translucency;
+		input.bentNormal = bentNormal;
+		input.isWater = false; // TODO: Implement when raytraced water is added
+		input.uv = clipPosition.xy * 0.5 + 0.5;
+		return GetLighting(input);
+	}
+	
+	// Off screen lighting
 	float NdotV;
 	N = GetViewReflectedNormal(N, V, NdotV);
 	

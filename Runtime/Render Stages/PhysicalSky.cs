@@ -237,7 +237,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(result);
+            renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex, true);
         }
 
         public void GenerateData(Vector3 viewPosition, CullingResults cullingResults, Vector3 cameraPosition)
@@ -419,7 +419,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Specular convolution
-            renderGraph.ResourceMap.SetRenderPassData(new ReflectionAmbientData(ambientBuffer, reflectionProbe));
+            renderGraph.ResourceMap.SetRenderPassData(new ReflectionAmbientData(ambientBuffer, reflectionProbe), renderGraph.FrameIndex);
         }
 
         public void Render(RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector2 jitter, IRenderPassData commonPassData, Camera camera, CullingResults cullingResults)
@@ -546,7 +546,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new SkyResultData(skyColor.current));
+            renderGraph.ResourceMap.SetRenderPassData(new SkyResultData(skyColor.current), renderGraph.FrameIndex);
         }
 
         public void Cleanup()

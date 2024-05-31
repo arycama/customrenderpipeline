@@ -113,7 +113,7 @@ namespace Arycama.CustomRenderPipeline
                 data.far = far;
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize));
+            renderGraph.ResourceMap.SetRenderPassData(new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize), renderGraph.FrameIndex);
         }
     }
 }

@@ -64,7 +64,7 @@ public class ScreenSpaceReflections
 
             using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Specular GI Raytrace"))
             {
-                var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>();
+                var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
 
                 pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, width, height, 1, bias, distantBias);
                 pass.WriteTexture(tempResult, "HitColor");
@@ -179,7 +179,7 @@ public class ScreenSpaceReflections
             });
         }
 
-        renderGraph.ResourceMap.SetRenderPassData(new ScreenSpaceReflectionResult(current, settings.Intensity));
+        renderGraph.ResourceMap.SetRenderPassData(new ScreenSpaceReflectionResult(current, settings.Intensity), renderGraph.FrameIndex);
     }
 
     class PassData

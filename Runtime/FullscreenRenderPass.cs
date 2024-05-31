@@ -40,7 +40,7 @@ namespace Arycama.CustomRenderPipeline
                 var aspect = camera.aspect;
                 var tanHalfFov = MathF.Tan(0.5f * Mathf.Deg2Rad * (float)camera.fieldOfView);
 
-                var temporalData = RenderGraph.ResourceMap.GetRenderPassData<TemporalAA.TemporalAAData>();
+                var temporalData = RenderGraph.ResourceMap.GetRenderPassData<TemporalAA.TemporalAAData>(RenderGraph.FrameIndex);
                 var jitterX = 2.0f * temporalData.Jitter.z * tanHalfFov;
                 var jitterY = 2.0f * temporalData.Jitter.w * tanHalfFov;
 

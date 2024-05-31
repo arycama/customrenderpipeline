@@ -122,12 +122,12 @@ namespace Arycama.CustomRenderPipeline
                 {
                     if (renderPassDataHandle.Item2)
                     {
-                        if (ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, out var data))
+                        if (ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, FrameIndex, out var data))
                             data.SetInputs(renderPass);
                     }
                     else
                     {
-                        var data = ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1);
+                        var data = ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, FrameIndex);
                         data.SetInputs(renderPass);
                     }
                 }
@@ -421,8 +421,6 @@ namespace Arycama.CustomRenderPipeline
                 availableRenderTextures[i] = (null, renderTexture.lastFrameUsed, false, false);
                 availableRtSlots.Enqueue(i);
             }
-
-            ResourceMap.ClearData();
 
             if (!FrameDebugger.enabled)
                 FrameIndex++;

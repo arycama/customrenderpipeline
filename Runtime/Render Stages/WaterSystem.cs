@@ -211,7 +211,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new OceanFftResult(displacementCurrent, displacementHistory, normalFoamSmoothness));
+            renderGraph.ResourceMap.SetRenderPassData(new OceanFftResult(displacementCurrent, displacementHistory, normalFoamSmoothness), renderGraph.FrameIndex);
         }
 
         public void CullShadow(Vector3 viewPosition, CullingResults cullingResults, ICommonPassData commonPassData)
@@ -312,7 +312,7 @@ namespace Arycama.CustomRenderPipeline
             };
 
             // TODO: Change to near/far
-            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, gpuProjectionMatrix * viewMatrixRWS, shadowMatrix, cullingPlanes));
+            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, gpuProjectionMatrix * viewMatrixRWS, shadowMatrix, cullingPlanes), renderGraph.FrameIndex);
         }
 
         public void RenderShadow(Vector3 viewPosition, ICommonPassData commonPassData)
@@ -334,8 +334,8 @@ namespace Arycama.CustomRenderPipeline
             var rcpTexelSizes = new Vector4(resolution / patchSizes.x, resolution / patchSizes.y, resolution / patchSizes.z, resolution / patchSizes.w);
             var texelSizes = patchSizes / resolution;
 
-            var fftData = renderGraph.ResourceMap.GetRenderPassData<OceanFftResult>();
-            var passData = renderGraph.ResourceMap.GetRenderPassData<WaterShadowCullResult>();
+            var fftData = renderGraph.ResourceMap.GetRenderPassData<OceanFftResult>(renderGraph.FrameIndex);
+            var passData = renderGraph.ResourceMap.GetRenderPassData<WaterShadowCullResult>(renderGraph.FrameIndex);
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Shadow"))
             {
                 pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
@@ -378,7 +378,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction")));
+            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction")), renderGraph.FrameIndex);
         }
 
         public WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
@@ -526,7 +526,7 @@ namespace Arycama.CustomRenderPipeline
         public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
         {
             var result = Cull(viewPosition, cullingPlanes, commonPassData);
-            renderGraph.ResourceMap.SetRenderPassData(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer));
+            renderGraph.ResourceMap.SetRenderPassData(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer), renderGraph.FrameIndex);
         }
 
         public RTHandle RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, IRenderPassData commonPassData, CullingPlanes cullingPlanes)
@@ -552,7 +552,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Render"))
             {
-                var passData = renderGraph.ResourceMap.GetRenderPassData<WaterRenderCullResult>();
+                var passData = renderGraph.ResourceMap.GetRenderPassData<WaterRenderCullResult>(renderGraph.FrameIndex);
                 pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
 
                 pass.WriteDepth(cameraDepth);

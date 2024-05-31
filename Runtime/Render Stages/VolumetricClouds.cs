@@ -179,7 +179,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(result);
+            renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex, true);
         }
 
         public void RenderShadow(CullingResults cullingResults, Camera camera, float planetRadius)
@@ -282,7 +282,7 @@ namespace Arycama.CustomRenderPipeline
             var cloudCoverageBuffer = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
 
             var result = new CloudShadowDataResult(cloudShadow, depth, worldToShadow, settings.Density, cloudCoverageBuffer, planetRadius, planetRadius + settings.StartHeight + settings.LayerThickness);
-            renderGraph.ResourceMap.SetRenderPassData(result);
+            renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex);
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Cloud Coverage"))
             {
@@ -503,7 +503,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new CloudRenderResult(luminanceCurrent, transmittanceCurrent, cloudDepth));
+            renderGraph.ResourceMap.SetRenderPassData(new CloudRenderResult(luminanceCurrent, transmittanceCurrent, cloudDepth), renderGraph.FrameIndex);
         }
 
         private class PassData

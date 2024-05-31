@@ -281,7 +281,7 @@ namespace Arycama.CustomRenderPipeline
 
             var result = new Result(directionalShadowMatricesBuffer, directionalShadowTexelSizesBuffer, directionalLightBuffer, pointLightBuffer, directionalLightList.Count, pointLightList.Count);
 
-            renderGraph.ResourceMap.SetRenderPassData(result);
+            renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex);
         }
 
         private class PassData

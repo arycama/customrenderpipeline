@@ -282,7 +282,7 @@ public class TerrainSystem
         var terrainScaleOffset = new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z);
         var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainData.heightmapResolution);
         var terrainHeightOffset = position.y;
-        renderGraph.ResourceMap.SetRenderPassData(new TerrainRenderData(diffuseArray, normalMapArray, maskMapArray, heightmap, normalmap, idMap, terrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainData.alphamapResolution, terrainLayerData));
+        renderGraph.ResourceMap.SetRenderPassData(new TerrainRenderData(diffuseArray, normalMapArray, maskMapArray, heightmap, normalmap, idMap, terrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainData.alphamapResolution, terrainLayerData), renderGraph.FrameIndex);
 
         // This sets raytracing data on the terrain's material property block
         using (var pass = renderGraph.AddRenderPass<SetPropertyBlockPass>("Terrain Data Property Block Update"))
@@ -457,7 +457,7 @@ public class TerrainSystem
             return;
 
         var cullingResult = Cull(viewPosition, cullingPlanes, commonPassData);
-        renderGraph.ResourceMap.SetRenderPassData(new TerrainShadowCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer));
+        renderGraph.ResourceMap.SetRenderPassData(new TerrainShadowCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer), renderGraph.FrameIndex);
     }
 
     public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
@@ -466,7 +466,7 @@ public class TerrainSystem
             return;
 
         var cullingResult = Cull(viewPosition, cullingPlanes, commonPassData);
-        renderGraph.ResourceMap.SetRenderPassData(new TerrainRenderCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer));
+        renderGraph.ResourceMap.SetRenderPassData(new TerrainRenderCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer), renderGraph.FrameIndex);
     }
 
     public void Render(string passName, Vector3 viewPosititon, RTHandle cameraDepth, CullingPlanes cullingPlanes, ICommonPassData commonPassData, ScriptableRenderContext context, Camera camera, CullingResults cullingResults)
@@ -482,7 +482,7 @@ public class TerrainSystem
 
         var size = terrainData.size;
         var position = terrain.GetPosition() - viewPosititon;
-        var passData = renderGraph.ResourceMap.GetRenderPassData<TerrainRenderCullResult>();
+        var passData = renderGraph.ResourceMap.GetRenderPassData<TerrainRenderCullResult>(renderGraph.FrameIndex);
 
         using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
         {
@@ -550,7 +550,7 @@ public class TerrainSystem
 
         var size = terrainData.size;
         var position = terrain.GetPosition() - viewPosition;
-        var passData = renderGraph.ResourceMap.GetRenderPassData<TerrainShadowCullResult>();
+        var passData = renderGraph.ResourceMap.GetRenderPassData<TerrainShadowCullResult>(renderGraph.FrameIndex);
 
         using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
         {
@@ -597,6 +597,9 @@ public class TerrainSystem
 
     public void RenderTerrainScreenspace(Camera camera, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, IRenderPassData commonPassData)
     {
+        if (!renderGraph.ResourceMap.IsRenderPassDataValid<TerrainRenderData>(renderGraph.FrameIndex))
+            return;
+
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Terrain Screen Pass"))
         {
             pass.Initialize(screenSpaceTerrainMaterial, 0, 1, null, camera);

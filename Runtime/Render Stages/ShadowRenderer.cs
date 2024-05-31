@@ -111,7 +111,7 @@ namespace Arycama.CustomRenderPipeline
             ListPool<ShadowRequest>.Release(pointShadowRequests);
 
             var result = new Result(directionalShadows, pointShadows, settings.DirectionalShadowResolution, 1.0f / settings.DirectionalShadowResolution, settings.PcfFilterRadius, settings.PcfFilterSigma);
-            renderGraph.ResourceMap.SetRenderPassData(result);
+            renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex);
         }
 
         private class PassData

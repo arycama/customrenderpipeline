@@ -48,7 +48,7 @@ public class ScreenSpaceShadows
         {
             using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Raytraced Shadows"))
             {
-                var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>();
+                var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
 
                 pass.Initialize(shadowRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, width, height, 1, bias, distantBias);
                 pass.WriteTexture(result, "HitResult");
@@ -93,7 +93,7 @@ public class ScreenSpaceShadows
             }
         }
 
-        renderGraph.ResourceMap.SetRenderPassData(new Result(result));
+        renderGraph.ResourceMap.SetRenderPassData(new Result(result), renderGraph.FrameIndex);
     }
 
     private class Data

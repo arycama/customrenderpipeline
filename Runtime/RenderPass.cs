@@ -125,12 +125,12 @@ namespace Arycama.CustomRenderPipeline
             {
                 if (renderPassDataHandle.Item2)
                 {
-                    if(RenderGraph.ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, out var data))
+                    if(RenderGraph.ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, RenderGraph.FrameIndex, out var data))
                        data.SetProperties(this, command);
                 }
                 else
                 {
-                    var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1);
+                    var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, RenderGraph.FrameIndex);
                     data.SetProperties(this, command);
                 }
             }
