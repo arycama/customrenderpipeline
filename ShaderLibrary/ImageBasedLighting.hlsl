@@ -249,19 +249,6 @@ float GetSpecularLobeTanHalfAngle(float roughness, float percentOfVolume = 0.75)
 	return tan(radians(90 * roughness * roughness / (1.0 + roughness * roughness)));
 }
 
-float GGXVndfPdf(float a, float NdotV, float NdotH, float VdotH)
-{
-	double a2 = a * a;
-	double d = 1.0 / Pi * (a2 / (Sq(Sq(NdotH) * (a2 - 1.0) + 1.0)));
-	
-	double lambda = (-1.0 + sqrt(1.0 + a2 * (1.0 / Sq(NdotV) - 1.0))) / 2.0;
-	double g1 = 1.0 / (1.0 + lambda);
-	
-	double dv = g1 * max(0.0, VdotH) * d / NdotV;
-
-	return dv / (4.0 * VdotH);
-}
-
 float3 SampleGGXVNDF(float3 V_, float roughness, float2 u)
 {
 	// stretch view

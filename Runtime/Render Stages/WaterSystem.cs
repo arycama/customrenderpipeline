@@ -157,6 +157,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
+            // TODO: Why can't this use persistent texture cache
             var displacementHistory = displacementCurrent;
             var hasDisplacementHistory = displacementHistory != null;
             displacementCurrent = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R16G16B16A16_SFloat, 4, TextureDimension.Tex2DArray, hasMips: true, isPersistent: true);

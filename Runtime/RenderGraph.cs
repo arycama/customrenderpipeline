@@ -181,6 +181,7 @@ namespace Arycama.CustomRenderPipeline
 
                                 result = renderTexture;
                                 Assert.IsNotNull(renderTexture);
+                                Assert.IsTrue(renderTexture.IsCreated());
                                 availableRenderTextures[j] = (renderTexture, lastFrameUsed, false, handle.IsPersistent);
                                 handle.RenderTextureIndex = j;
                                 break;
