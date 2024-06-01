@@ -54,7 +54,7 @@ namespace Arycama.CustomRenderPipeline
 
         public RenderGraph()
         {
-            EmptyBuffer = ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)));
+            EmptyBuffer = ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" });
             EmptyTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
             EmptyUavTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, enableRandomWrite = true });
             EmptyTextureArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
@@ -274,8 +274,10 @@ namespace Arycama.CustomRenderPipeline
 
             if (!availableRtHandles.TryDequeue(out var result))
             {
-                result = new RTHandle();
-                result.Id = rtHandleCount++;
+                result = new RTHandle
+                {
+                    Id = rtHandleCount++
+                };
             }
 
             result.Width = width;
@@ -333,8 +335,10 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // If no handle was found, create a new one, and assign it as one to be created. 
-            var result = new BufferHandle(target, count, stride, usageFlags);
-            result.Size = count * stride;
+            var result = new BufferHandle(target, count, stride, usageFlags)
+            {
+                Size = count * stride
+            };
             bufferHandlesToCreate.Add(result);
             usedBufferHandles.Add(result);
             return result;
@@ -349,7 +353,7 @@ namespace Arycama.CustomRenderPipeline
             if (!renderTexture.IsCreated())
                 renderTexture.Create();
 
-            result = new RTHandle()
+            result = new RTHandle
             {
                 Width = renderTexture.width,
                 Height = renderTexture.height,
@@ -360,9 +364,8 @@ namespace Arycama.CustomRenderPipeline
                 RenderTexture = renderTexture,
                 HasMips = renderTexture.useMipMap,
                 AutoGenerateMips = autoGenerateMips,
+                Id = rtHandleCount++
             };
-
-            result.Id = rtHandleCount++;
             importedTextures.Add(renderTexture, result);
             result.IsImported = true;
             result.IsScreenTexture = false;

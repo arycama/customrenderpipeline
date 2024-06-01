@@ -12,6 +12,7 @@ public class TerrainSystem
     [Serializable]
     public class Settings
     {
+        [field: SerializeField] public Material Material { get; private set; } = null;
         [field: SerializeField] public int CellCount { get; private set; } = 32;
         [field: SerializeField] public int PatchVertices { get; private set; } = 32;
         [field: SerializeField] public float EdgeLength { get; private set; } = 64;
@@ -71,7 +72,7 @@ public class TerrainSystem
         heightmap = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R16_UNorm, isPersistent: true);
         normalmap = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R8G8_SNorm, autoGenerateMips: true, hasMips: true, isPersistent: true);
 
-        indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort));
+        indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Terrain System Index Buffer" };
 
         var pIndices = new ushort[QuadListIndexCount];
         for (int y = 0, i = 0; y < settings.PatchVertices; y++)
@@ -132,7 +133,7 @@ public class TerrainSystem
         // Graph doesn't support persistent buffers yet
         // TODO: Add persistent buffer support 
         //var layerDataBuffer = renderGraph.GetBuffer(layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>(), GraphicsBuffer.Target.Structured);
-        terrainLayerData = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.LockBufferForWrite, layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>());
+        terrainLayerData = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.LockBufferForWrite, layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>()) { name = "Terarin Layer Data" };
         FillLayerData();
 
         var idMapResolution = terrainData.alphamapResolution;
@@ -471,13 +472,10 @@ public class TerrainSystem
 
     public void Render(string passName, Vector3 viewPosititon, RTHandle cameraDepth, CullingPlanes cullingPlanes, ICommonPassData commonPassData, ScriptableRenderContext context, Camera camera, CullingResults cullingResults)
     {
-        if (terrain == null)
+        if (terrain == null || settings.Material == null)
             return;
 
-        var material = terrain.materialTemplate;
-        Assert.IsNotNull(material, "Terrain Material is null");
-
-        var passIndex = material.FindPass(passName);
+        var passIndex = settings.Material.FindPass(passName);
         Assert.IsFalse(passIndex == -1, "Terrain Material has no Terrain Pass");
 
         var size = terrainData.size;
@@ -488,7 +486,7 @@ public class TerrainSystem
         {
             pass.WriteDepth(cameraDepth, RenderTargetFlags.None, RenderBufferLoadAction.DontCare);
 
-            pass.Initialize(material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
+            pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
             pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
 
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
@@ -539,13 +537,10 @@ public class TerrainSystem
 
     public void RenderShadow(Vector3 viewPosition, RTHandle shadow, CullingPlanes cullingPlanes, ICommonPassData commonPassData, Matrix4x4 worldToClip, int cascadeIndex, float bias, float slopeBias)
     {
-        if (terrain == null)
+        if (terrain == null || settings.Material == null)
             return;
 
-        var material = terrain.materialTemplate;
-        Assert.IsNotNull(material, "Terrain Material is null");
-
-        var passIndex = material.FindPass("ShadowCaster");
+        var passIndex = settings.Material.FindPass("ShadowCaster");
         Assert.IsFalse(passIndex == -1, "Terrain Material has no ShadowCaster Pass");
 
         var size = terrainData.size;
@@ -554,7 +549,7 @@ public class TerrainSystem
 
         using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
         {
-            pass.Initialize(material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, null, bias, slopeBias, false);
+            pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, null, bias, slopeBias, false);
 
             pass.WriteTexture(shadow);
             pass.DepthSlice = cascadeIndex;
@@ -562,6 +557,7 @@ public class TerrainSystem
             pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
             commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TerrainRenderData>();
+            pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {

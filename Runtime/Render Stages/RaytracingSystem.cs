@@ -11,50 +11,60 @@ namespace Arycama.CustomRenderPipeline
         private RenderGraph renderGraph;
         private RayTracingAccelerationStructure rtas;
         private LayerMask layerMask;
+        private RayTracingInstanceCullingConfig config;
 
         public RaytracingSystem(RenderGraph renderGraph, LayerMask layerMask)
         {
             this.renderGraph = renderGraph;
             this.layerMask = layerMask;
 
-            RayTracingAccelerationStructure.RASSettings settings = new RayTracingAccelerationStructure.RASSettings();
-            settings.rayTracingModeMask = RayTracingAccelerationStructure.RayTracingModeMask.Everything;
-            settings.managementMode = RayTracingAccelerationStructure.ManagementMode.Manual;
-            settings.layerMask = layerMask;
+            RayTracingAccelerationStructure.RASSettings settings = new RayTracingAccelerationStructure.RASSettings
+            {
+                rayTracingModeMask = RayTracingAccelerationStructure.RayTracingModeMask.Everything,
+                managementMode = RayTracingAccelerationStructure.ManagementMode.Manual,
+                layerMask = layerMask
+            };
             rtas = new RayTracingAccelerationStructure(settings);
+
+            config = new RayTracingInstanceCullingConfig
+            {
+                flags = RayTracingInstanceCullingFlags.None,
+                subMeshFlagsConfig = new RayTracingSubMeshFlagsConfig()
+                {
+                    opaqueMaterials = RayTracingSubMeshFlags.Enabled | RayTracingSubMeshFlags.ClosestHitOnly
+                    //opaqueMaterials = RayTracingSubMeshFlags.Enabled | RayTracingSubMeshFlags.ClosestHitOnly,
+                    //alphaTestedMaterials = RayTracingSubMeshFlags.Enabled,
+                    //transparentMaterials = RayTracingSubMeshFlags.Disabled
+                },
+
+                instanceTests = new RayTracingInstanceCullingTest[]
+                {
+                    new()
+                    {
+                        //allowTransparentMaterials = false,
+                        allowOpaqueMaterials = true,
+                        //allowAlphaTestedMaterials = true,
+                        layerMask = layerMask,
+                        shadowCastingModeMask = (1 << (int)ShadowCastingMode.Off) | (1 << (int)ShadowCastingMode.On) | (1 << (int)ShadowCastingMode.TwoSided),
+                        instanceMask = 1
+                    }
+                },
+
+                //alphaTestedMaterialConfig = default,
+                //lodParameters = default,
+                //materialTest = default,
+                //planes = default,
+                //sphereCenter = default,
+                //sphereRadius = default,
+                //transparentMaterialConfig = default,
+                //triangleCullingConfig = default
+            };
         }
 
         public void Build(Camera camera)
         {
-            RayTracingInstanceCullingConfig cullingConfig = new RayTracingInstanceCullingConfig();
-
-            cullingConfig.flags = RayTracingInstanceCullingFlags.None;
-
-            // Disable anyhit shaders for opaque geometries for best ray tracing performance.
-            cullingConfig.subMeshFlagsConfig.opaqueMaterials = RayTracingSubMeshFlags.Enabled | RayTracingSubMeshFlags.ClosestHitOnly;
-
-            // Disable transparent geometries.
-            cullingConfig.subMeshFlagsConfig.transparentMaterials = RayTracingSubMeshFlags.Disabled;
-
-            // Enable anyhit shaders for alpha-tested / cutout geometries.
-            cullingConfig.subMeshFlagsConfig.alphaTestedMaterials = RayTracingSubMeshFlags.Enabled;
-
-            List<RayTracingInstanceCullingTest> instanceTests = new List<RayTracingInstanceCullingTest>();
-
-            RayTracingInstanceCullingTest instanceTest = new RayTracingInstanceCullingTest();
-            instanceTest.allowTransparentMaterials = false;
-            instanceTest.allowOpaqueMaterials = true;
-            instanceTest.allowAlphaTestedMaterials = true;
-            instanceTest.layerMask = layerMask;
-            instanceTest.shadowCastingModeMask = (1 << (int)ShadowCastingMode.Off) | (1 << (int)ShadowCastingMode.On) | (1 << (int)ShadowCastingMode.TwoSided);
-            instanceTest.instanceMask = 1 << 0;
-
-            instanceTests.Add(instanceTest);
-
-            cullingConfig.instanceTests = instanceTests.ToArray();
-
             rtas.ClearInstances();
-            rtas.CullInstances(ref cullingConfig);
+            rtas.CullInstances(ref config);
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("RTAS Update"))
             {
@@ -80,7 +90,7 @@ namespace Arycama.CustomRenderPipeline
 
         private void DisposeInternal()
         {
-            if(rtas != null)
+            if (rtas != null)
                 rtas.Dispose();
 
             rtas = null;

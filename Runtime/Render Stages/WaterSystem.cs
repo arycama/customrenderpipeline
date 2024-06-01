@@ -55,7 +55,7 @@ namespace Arycama.CustomRenderPipeline
             deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water 1")) { hideFlags = HideFlags.HideAndDontSave };
 
             lengthToRoughness = renderGraph.GetTexture(256, 1, GraphicsFormat.R16_UNorm, isPersistent: true);
-            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort));
+            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
 
             int index = 0;
             var pIndices = new ushort[QuadListIndexCount];
@@ -580,6 +580,7 @@ namespace Arycama.CustomRenderPipeline
 
                 commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<OceanFftResult>();
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {

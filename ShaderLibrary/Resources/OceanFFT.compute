@@ -422,7 +422,7 @@ void GenerateFilteredMips(uint2 groupThreadID : SV_GroupThreadID, uint2 groupID 
 	{
 		GroupMemoryBarrierWithGroupSync();
 		
-		float4 mipDataSum;
+		float4 mipDataSum = 0.0;
 		if (all(groupThreadID < s))
 		{
             // Load four normals and average

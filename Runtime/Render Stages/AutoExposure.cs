@@ -95,7 +95,7 @@ namespace Arycama.CustomRenderPipeline
                 var isFirst = !exposureBuffers.TryGetValue(camera, out var exposureBuffer);
                 if (isFirst)
                 {
-                    exposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 4, sizeof(float));
+                    exposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 4, sizeof(float)) { name = "Auto Exposure Buffer" };
                     exposureBuffers.Add(camera, exposureBuffer);
                 }
 
