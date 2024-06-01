@@ -131,8 +131,14 @@ namespace Arycama.CustomRenderPipeline
                     command.GenerateMips(colorTarget.Item1);
             }
 
+            // Reset all properties
             depthBuffer = default;
             colorTargets.Clear();
+            clearFlags = RTClearFlags.None;
+            clearColor = Color.clear;
+            clearDepth = 1.0f;
+            clearStencil = 0;
+            renderTargetFlags = RenderTargetFlags.None;
             DepthSlice = 0;
             MipLevel = 0;
         }

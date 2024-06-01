@@ -14,6 +14,7 @@ namespace Arycama.CustomRenderPipeline
         [Serializable]
         public class Settings
         {
+            [field: SerializeField, Tooltip("Whether water is enabled or not by default. (Can be overridden in scene")] public bool IsEnabled { get; private set; } = true;
             [field: SerializeField, Tooltip("The resolution of the simulation, higher numbers give more detail but are more expensive")] public int Resolution { get; private set; } = 128;
             [field: SerializeField, Tooltip("Use Trilinear for the normal/foam map, improves quality of lighting/reflections in shader")] public bool UseTrilinear { get; private set; } = true;
             [field: SerializeField, Range(1, 16), Tooltip("Anisotropic level for the normal/foam map")] public int AnisoLevel { get; private set; } = 4;
@@ -103,7 +104,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.WriteTexture("_LengthToRoughnessResult", lengthToRoughness);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_MaxIterations", 32);
                     pass.SetFloat(command, "_Resolution", 256);
@@ -115,6 +116,9 @@ namespace Arycama.CustomRenderPipeline
 
         public void UpdateFft()
         {
+            if (!settings.IsEnabled)
+                return;
+
             // Calculate constants
             var rcpScales = new Vector4(1f / Mathf.Pow(settings.Profile.CascadeScale, 0f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 1f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 2f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 3f));
             var patchSizes = new Vector4(settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 0f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 1f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 2f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 3f));
@@ -143,7 +147,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture("targetTexture1", tempBufferID2);
                 pass.ReadBuffer("OceanData", oceanBuffer);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetVector(command, "_OceanScale", oceanScale);
                     pass.SetVector(command, "SpectrumStart", spectrumStart);
@@ -177,7 +181,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture("DisplacementInput", displacementCurrent);
                 pass.WriteTexture("OceanNormalFoamSmoothness", normalFoamSmoothness);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetVector(command, "_CascadeTexelSizes", texelSizes);
                     pass.SetInt(command, "_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
@@ -201,7 +205,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.WriteTexture(smoothnessId, normalFoamSmoothness, j);
                 }
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     // TODO: Do this manually? Since this will be compute shader anyway.. could do in same pass
                     command.GenerateMips(displacementCurrent);
@@ -216,6 +220,9 @@ namespace Arycama.CustomRenderPipeline
 
         public void CullShadow(Vector3 viewPosition, CullingResults cullingResults, ICommonPassData commonPassData)
         {
+            if (!settings.IsEnabled)
+                return;
+
             var lightRotation = Quaternion.identity;
             for (var i = 0; i < cullingResults.visibleLights.Length; i++)
             {
@@ -317,6 +324,9 @@ namespace Arycama.CustomRenderPipeline
 
         public void RenderShadow(Vector3 viewPosition, ICommonPassData commonPassData)
         {
+            if (!settings.IsEnabled)
+                return;
+
             var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.D16_UNorm);
 
             var passIndex = settings.Material.FindPass("WaterShadow");
@@ -347,7 +357,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_OceanDisplacement", displacementCurrent);
                 pass.AddRenderPassData<OceanFftResult>();
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     commonPassData.SetProperties(pass, command);
 
@@ -381,7 +391,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction")), renderGraph.FrameIndex);
         }
 
-        public WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
+        private WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
         {
             // TODO: Preload?
             var compute = Resources.Load<ComputeShader>("OceanQuadtreeCull");
@@ -447,7 +457,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
 
                     var index = i;
-                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                     {
                         // First pass sets the buffer contents
                         if (isFirstPass)
@@ -510,7 +520,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.ReadTexture("_LodInput", tempLodId);
                     pass.ReadBuffer("_IndirectArgs", indirectArgsBuffer);
 
-                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                     {
                         pass.SetInt(command, "_CellCount", settings.CellCount);
                     });
@@ -525,12 +535,18 @@ namespace Arycama.CustomRenderPipeline
 
         public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
         {
+            if (!settings.IsEnabled)
+                return;
+
             var result = Cull(viewPosition, cullingPlanes, commonPassData);
             renderGraph.ResourceMap.SetRenderPassData(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer), renderGraph.FrameIndex);
         }
 
-        public RTHandle RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, IRenderPassData commonPassData, CullingPlanes cullingPlanes)
+        public void RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, IRenderPassData commonPassData, CullingPlanes cullingPlanes)
         {
+            if (!settings.IsEnabled)
+                return;
+
             // Depth, rgba8 normalFoam, rgba8 roughness, mask? 
             // Writes depth, stencil, and RGBA8 containing normalRG, roughness and foam
             var oceanRenderResult = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R32G32_SFloat, isScreenTexture: true);
@@ -564,7 +580,7 @@ namespace Arycama.CustomRenderPipeline
                 commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<OceanFftResult>();
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     commonPassData.SetProperties(pass, command);
 
@@ -594,11 +610,14 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            return oceanRenderResult;
+            renderGraph.ResourceMap.SetRenderPassData(new WaterPrepassResult(oceanRenderResult), renderGraph.FrameIndex);
         }
 
-        public RTHandle RenderUnderwaterLighting(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, Camera camera)
+        public void RenderUnderwaterLighting(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, Camera camera)
         {
+            if (!settings.IsEnabled)
+                return;
+
             var underwaterResultId = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Underwater Lighting"))
@@ -625,17 +644,20 @@ namespace Arycama.CustomRenderPipeline
 
                 commonPassData.SetInputs(pass);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetVector(command, "_WaterExtinction", settings.Material.GetColor("_Extinction"));
                 });
             }
 
-            return underwaterResultId;
+            renderGraph.ResourceMap.SetRenderPassData(new UnderwaterLightingResult(underwaterResultId), renderGraph.FrameIndex);
         }
 
-        public void RenderDeferredWater(CullingResults cullingResults, RTHandle underwaterLighting, RTHandle waterNormalMask, RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, IRenderPassData commonPassData, Camera camera)
+        public void RenderDeferredWater(CullingResults cullingResults, RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, IRenderPassData commonPassData, Camera camera)
         {
+            if (!settings.IsEnabled)
+                return;
+
             // Calculate constants
             var rcpScales = new Vector4(1f / Mathf.Pow(settings.Profile.CascadeScale, 0f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 1f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 2f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 3f));
             var patchSizes = new Vector4(settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 0f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 1f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 2f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 3f));
@@ -685,8 +707,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(bentNormalOcclusion);
                 pass.WriteTexture(emissive);
 
-                pass.ReadTexture("_UnderwaterResult", underwaterLighting);
-                pass.ReadTexture("_WaterNormalFoam", waterNormalMask);
                 pass.ReadTexture("_UnderwaterDepth", underwaterDepth);
                 pass.ReadTexture("_Depth", cameraDepth, subElement: RenderTextureSubElement.Depth);
                 pass.ReadTexture("_Stencil", cameraDepth, subElement: RenderTextureSubElement.Stencil);
@@ -698,19 +718,19 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<LitData.Result>();
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<WaterPrepassResult>();
+                pass.AddRenderPassData<UnderwaterLightingResult>();
 
                 commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<OceanFftResult>();
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     commonPassData.SetProperties(pass, command);
 
                     var material = settings.Material;
                     pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
                     pass.SetVector(command, "_Extinction", material.GetColor("_Extinction"));
-
-                    pass.SetVector(command, "_UnderwaterResultScaleLimit", underwaterLighting.ScaleLimit2D);
 
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
                     pass.SetVector(command, "_LightColor0", lightColor0);
@@ -742,11 +762,6 @@ namespace Arycama.CustomRenderPipeline
 
                 });
             }
-        }
-
-        class PassData
-        {
-
         }
     }
 
@@ -866,6 +881,45 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
+        }
+    }
+
+    public struct WaterPrepassResult : IRenderPassData
+    {
+        private RTHandle waterNormalFoam;
+
+        public WaterPrepassResult(RTHandle waterNormalFoam)
+        {
+            this.waterNormalFoam = waterNormalFoam ?? throw new ArgumentNullException(nameof(waterNormalFoam));
+        }
+
+        public void SetInputs(RenderPass pass)
+        {
+            pass.ReadTexture("_WaterNormalFoam", waterNormalFoam);
+        }
+
+        public void SetProperties(RenderPass pass, CommandBuffer command)
+        {
+        }
+    }
+
+    public struct UnderwaterLightingResult : IRenderPassData
+    {
+        private RTHandle underwaterLighting;
+
+        public UnderwaterLightingResult(RTHandle waterNormalFoam)
+        {
+            this.underwaterLighting = waterNormalFoam ?? throw new ArgumentNullException(nameof(waterNormalFoam));
+        }
+
+        public void SetInputs(RenderPass pass)
+        {
+            pass.ReadTexture("_UnderwaterResult", underwaterLighting);
+        }
+
+        public void SetProperties(RenderPass pass, CommandBuffer command)
+        {
+            pass.SetVector(command, "_UnderwaterResultScaleLimit", underwaterLighting.ScaleLimit2D);
         }
     }
 }

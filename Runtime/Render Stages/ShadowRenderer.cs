@@ -59,8 +59,8 @@ namespace Arycama.CustomRenderPipeline
                         data.index = i;
                     }
 
-                    //terrainSystem.CullShadow(viewPosition, shadowRequest.CullingPlanes, commonPassData);
-                    //terrainSystem.RenderShadow(viewPosition, directionalShadows, shadowRequest.CullingPlanes, commonPassData, shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix, i, settings.ShadowBias, settings.ShadowSlopeBias);
+                    terrainSystem.CullShadow(viewPosition, shadowRequest.CullingPlanes, commonPassData);
+                    terrainSystem.RenderShadow(viewPosition, directionalShadows, shadowRequest.CullingPlanes, commonPassData, shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix, i, settings.ShadowBias, settings.ShadowSlopeBias);
                 }
             }
 

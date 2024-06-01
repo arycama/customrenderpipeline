@@ -340,12 +340,14 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		{
 			attenuation *= CloudTransmittance(input.worldPosition);
 			
+			#ifdef WATER_SHADOWS_ON
 			if(input.isWater)
 			{
 				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, input.worldPosition);
 				if(all(saturate(shadowPosition.xy) == shadowPosition.xy))
 					attenuation *= _WaterShadows.SampleCmpLevelZero(_LinearClampCompareSampler, shadowPosition.xy, shadowPosition.z);
 			}
+			#endif
 			
 			#ifdef SCREEN_SPACE_SHADOWS_ON
 				attenuation *= ScreenSpaceShadows[input.pixelPosition];

@@ -72,7 +72,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.Initialize(material, 0, 1, null, camera);
                     pass.WriteTexture(tempResult);
-                    //pass.WriteTexture(hitResult);
+                    pass.WriteTexture(hitResult);
                     pass.ReadTexture("_Depth", depth);
                     pass.ReadTexture("_NormalRoughness", normal);
                     pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);

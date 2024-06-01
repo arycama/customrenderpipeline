@@ -29,6 +29,9 @@ Shader "Hidden/Deferred Lighting"
 			#define SCREENSPACE_REFLECTIONS_ON
             #define SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
             #define SCREEN_SPACE_SHADOWS_ON
+
+            #pragma multi_compile _ WATER_SHADOWS_ON
+
             #include "DeferredLighting.hlsl"
             ENDHLSL
         }

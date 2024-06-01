@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -93,6 +94,8 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Execute(CommandBuffer command)
         {
+            Assert.IsNotNull(rtas);
+
             command.SetRayTracingFloatParams(shader, "_RaytracingBias", bias);
             command.SetRayTracingFloatParams(shader, "_RaytracingDistantBias", distantBias);
             command.SetRayTracingAccelerationStructure(shader, "SceneRaytracingAccelerationStructure", rtas);

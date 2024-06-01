@@ -38,13 +38,17 @@ public class DeferredLighting
             pass.AddRenderPassData<LitData.Result>();
             pass.AddRenderPassData<ScreenSpaceReflectionResult>();
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
-            pass.AddRenderPassData<WaterShadowResult>();
+            pass.AddRenderPassData<WaterShadowResult>(true);
             pass.AddRenderPassData<ScreenSpaceShadows.Result>();
             pass.AddRenderPassData<DiffuseGlobalIllumination.Result>();
+
+            var hasWaterShadow = renderGraph.ResourceMap.IsRenderPassDataValid<WaterShadowResult>(renderGraph.FrameIndex);
+            pass.Keyword = hasWaterShadow ? "WATER_SHADOWS_ON" : string.Empty;
 
             var data = pass.SetRenderFunction<Data>((command, pass, data) =>
             {
                 commonPassData.SetProperties(pass, command);
+                pass.SetFloat(command, "HasWaterShadow", hasWaterShadow ? 1.0f : 0.0f);
             });
         }
     }
