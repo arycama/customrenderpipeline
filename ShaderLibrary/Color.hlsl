@@ -9,25 +9,37 @@ static const float2 D65xy = float2(0.31272, 0.32903);
 // D65 illuminant in XYZ space
 static const float3 D65 = float3(0.95047, 1.0, 1.08883); 
 
-// CIE RGB http://www.brucelindbloom.com/index.html?Eqn_RGB_to_XYZ.html
-static const float3x3 rgbToXyz = float3x3(0.4124564, 0.3575761, 0.1804375, 0.2126729, 0.7151522, 0.0721750, 0.0193339, 0.1191920, 0.9503041);
-
-static const float3x3 xyzToRgb = float3x3(3.2404542, -1.5371385, -0.4985314, -0.9692660, 1.8760108, 0.0415560, 0.0556434, -0.2040259, 1.0572252);
-
 float Luminance(float3 color)
 {
 	//return mul(color, rgbToXyz).y;
 	return dot(color, float3(0.2126729, 0.7151522, 0.0721750));
 }
 
-float3 RgbToXyz(float3 rgb)
+float3 GammaToLinear(float3 c)
 {
-	return mul(rgbToXyz, rgb);
+	float3 linearRgbLo = c * rcp(12.92);
+	float3 linearRgbHi = pow(c * rcp(1.055) + (0.055 * rcp(1.055)), 2.4);
+	return (c <= 0.04045) ? linearRgbLo : linearRgbHi;
 }
 
-float3 XyzToRgb(float3 xyz)
+float3 LinearToGamma(float3 c)
 {
-	return mul(xyzToRgb, xyz);
+	float3 sRgbLo = c * 12.92;
+	float3 sRgbHi = pow(c, rcp(2.4)) * 1.055 - 0.055;
+	return (c <= 0.0031308) ? sRgbLo : sRgbHi;
+}
+
+float3 RgbToXYZ(float3 rgb)
+{
+	// CIE RGB http://www.brucelindbloom.com/index.html?Eqn_RGB_to_XYZ.html
+	float3x3 mat = float3x3(0.4124564, 0.3575761, 0.1804375, 0.2126729, 0.7151522, 0.0721750, 0.0193339, 0.1191920, 0.9503041);
+	return mul(mat, rgb);
+}
+
+float3 XYZToRgb(float3 xyz)
+{
+	float3x3 mat = float3x3(3.2404542, -1.5371385, -0.4985314, -0.9692660, 1.8760108, 0.0415560, 0.0556434, -0.2040259, 1.0572252);
+	return mul(mat, xyz);
 }
 
 float3 XyzToXyy(float3 xyz)
@@ -53,14 +65,14 @@ float3 XyyToXyz(float3 xyy)
 
 float3 RgbToXyy(float3 rgb)
 {
-	float3 xyz = RgbToXyz(rgb);
+	float3 xyz = RgbToXYZ(rgb);
 	return XyzToXyy(xyz);
 }
 
 float3 XyyToRgb(float3 xyy)
 {
 	float3 xyz = XyyToXyz(xyy);
-	return XyzToRgb(xyz);
+	return XYZToRgb(xyz);
 }
 
 float3 XyzToLuv(float3 xyz)
@@ -110,14 +122,14 @@ float3 LuvToXyz(float3 luv)
 
 float3 RgbToLuv(float3 rgb)
 {
-	float3 xyz = RgbToXyz(rgb);
+	float3 xyz = RgbToXYZ(rgb);
 	return XyzToLuv(xyz);
 }
 
 float3 LuvToRgb(float3 luv)
 {
 	float3 xyz = LuvToXyz(luv);
-	return XyzToRgb(xyz);
+	return XYZToRgb(xyz);
 }
 
 float3 RgbToYCoCg(float3 rgb)

@@ -24,13 +24,13 @@ namespace Arycama.CustomRenderPipeline
             [SerializeField] private float shoulderStrength = 2.0f;
             [SerializeField] private float shoulderLength = 0.5f;
             [SerializeField] private float shoulderAngle = 1.0f;
-
             
             [field: SerializeField] public bool HdrEnabled { get; private set; } = true;
-            [field: SerializeField] public bool AutomaticHdrTonemapping { get; private set; } = true;
-            [field: SerializeField, Min(0.0f)] public float HdrMinNits { get; private set; } = 1000.0f;
-            [field: SerializeField, Min(0.0f)] public float HdrMaxNits { get; private set; } = 1000.0f;
+            [field: SerializeField] public bool AutoDetectValues { get; private set; } = true;
+            [field: SerializeField, Min(0)] public int HdrMinNits { get; private set; } = 0;
+            [field: SerializeField, Min(0)] public int HdrMaxNits { get; private set; } = 1000;
             [field: SerializeField, Min(0.0f)] public float PaperWhiteNits { get; private set; } = 300.0f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float HueShift { get; private set; } = 0.0f;
 
             public float NoiseIntensity => noiseIntensity;
             public float NoiseResponse => noiseResponse;
@@ -48,6 +48,10 @@ namespace Arycama.CustomRenderPipeline
             this.bloomSettings = bloomSettings;
             this.lensSettings = lensSettings;
             material = new Material(Shader.Find("Hidden/Tonemapping")) { hideFlags = HideFlags.HideAndDontSave };
+
+            var hdrInfo = HDROutputSettings.main;
+            if(hdrInfo.available)
+                Debug.Log($"HDR Display Info: Min Nits {hdrInfo.minToneMapLuminance}, Max Nits {hdrInfo.maxToneMapLuminance}, Paper White {hdrInfo.paperWhiteNits}, Max Full Frame Nits {hdrInfo.maxFullFrameToneMapLuminance}");
         }
 
         class PassData
@@ -58,12 +62,28 @@ namespace Arycama.CustomRenderPipeline
             internal Vector4 resolution;
         }
 
-        public void Render(RTHandle input, RTHandle bloom, bool isSceneView, int width, int height)
+        public void Render(RTHandle input, RTHandle bloom, RTHandle uITexture, bool isSceneView, int width, int height)
         {
             using var pass = renderGraph.AddRenderPass<BlitToScreenPass>("Tonemapping");
             pass.Initialize(material);
             pass.ReadTexture("_MainTex", input);
             pass.ReadTexture("_Bloom", bloom);
+            pass.ReadTexture("UITexture", uITexture);
+
+            var minNits = settings.AutoDetectValues ? HDROutputSettings.main.minToneMapLuminance : settings.HdrMinNits;
+            var maxNits = settings.AutoDetectValues ? HDROutputSettings.main.maxToneMapLuminance : settings.HdrMaxNits;
+            if (minNits < 0 || maxNits <= 0)
+            {
+                minNits = settings.HdrMinNits;
+                maxNits = settings.HdrMaxNits;
+            }
+
+            var paperWhiteNits = settings.AutoDetectValues ? HDROutputSettings.main.paperWhiteNits : settings.PaperWhiteNits;
+            if (paperWhiteNits <= 0)
+            {
+                paperWhiteNits = settings.PaperWhiteNits;
+                HDROutputSettings.main.paperWhiteNits = paperWhiteNits;
+            }
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
@@ -81,9 +101,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "NoiseIntensity", data.noiseIntensity);
                 pass.SetFloat(command, "NoiseResponse", data.noiseResponse);
 
-                pass.SetFloat(command, "PaperWhiteNits", settings.PaperWhiteNits);
-                pass.SetFloat(command, "HdrMinNits", settings.HdrMinNits);
-                pass.SetFloat(command, "HdrMaxNits", settings.HdrMaxNits);
+                pass.SetFloat(command, "PaperWhiteNits", paperWhiteNits);
+                pass.SetFloat(command, "HdrMinNits", minNits);
+                pass.SetFloat(command, "HdrMaxNits", maxNits);
 
                 pass.SetFloat(command, "ShutterSpeed", data.shutterSpeed);
                 pass.SetFloat(command, "Aperture", data.aperture);
@@ -91,40 +111,16 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetVector(command, "_Resolution", data.resolution);
 
                 pass.SetVector(command, "_BloomScaleLimit", new Vector4(bloom.Scale.x, bloom.Scale.y, bloom.Limit.x, bloom.Limit.y));
+                pass.SetFloat(command, "HueShift", settings.HueShift);
 
-                //TransferFunction transferFunction = ColorGamutUtility.GetTransferFunction(gamut);
-                //switch (transferFunction)
-                //{
-                //    case TransferFunction.Linear:
-                //        encoding = (int)HDREncoding.Linear;
-                //        return true;
+                var colorGamut = HDROutputSettings.main.displayColorGamut;
+                pass.SetInt(command, "ColorGamut", (int)colorGamut);
 
-                //    case TransferFunction.PQ:
-                //        encoding = (int)HDREncoding.PQ;
-                //        return true;
+                var colorPrimaries = ColorGamutUtility.GetColorPrimaries(colorGamut);
+                pass.SetInt(command, "ColorPrimaries", (int)colorPrimaries);
 
-                //    default:
-                //        Debug.LogWarningFormat("{0} color encoding is currently unsupported for outputting to HDR.", gamut.ToString());
-                //        encoding = -1;
-                //        return false;
-                //}
-
-                //ColorPrimaries primaries = ColorGamutUtility.GetColorPrimaries(gamut);
-                //switch (primaries)
-                //{
-                //    case ColorPrimaries.Rec709:
-                //        colorspace = (int)HDRColorspace.Rec709;
-                //        return true;
-
-                //    case ColorPrimaries.Rec2020:
-                //        colorspace = (int)HDRColorspace.Rec2020;
-                //        return true;
-
-                //    default:
-                //        Debug.LogWarningFormat("{0} color space is currently unsupported for outputting to HDR.", gamut.ToString());
-                //        colorspace = -1;
-                //        return false;
-                //}
+                var transferFunction = ColorGamutUtility.GetTransferFunction(colorGamut);
+                pass.SetInt(command, "TransferFunction", (int)transferFunction);
             });
 
             var offsetX = Random.value;

@@ -230,6 +230,23 @@ float3 ObjectToWorld(float3 position, uint instanceID)
 	return MultiplyPoint3x4(objectToWorld, position);
 }
 
+float3 WorldToObject(float3 worldPosition, uint instanceID)
+{
+	#ifdef INSTANCING_ON
+		float3x4 worldToObject = (float3x4) unity_Builtins1Array[unity_BaseInstanceID + instanceID].unity_WorldToObjectArray;
+	#else
+		float3x4 worldToObject = (float3x4)unity_WorldToObject;
+	#endif
+
+	float4x4 mat = float4x4(worldToObject[0], worldToObject[1], worldToObject[2], float4(0, 0, 0, 1));
+	
+    // To handle camera relative rendering we need to apply translation before converting to object space
+	float4x4 translationMatrix = { {1.0, 0.0, 0.0, _ViewPosition.x}, {0.0, 1.0, 0.0, _ViewPosition.y}, {0.0, 0.0, 1.0, _ViewPosition.z}, {0.0, 0.0, 0.0, 1.0}};
+	worldToObject = (float3x4)mul(worldToObject, translationMatrix);
+	
+	return MultiplyPoint3x4(worldToObject, worldPosition);
+}
+
 float3 PreviousObjectToWorld(float3 position, uint instanceID)
 {
 	#ifdef INSTANCING_ON
