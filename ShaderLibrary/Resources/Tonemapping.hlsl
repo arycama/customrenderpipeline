@@ -1,3 +1,4 @@
+#include "../ACES.hlsl"
 #include "../Common.hlsl"
 #include "../Exposure.hlsl"
 #include "../Color.hlsl"
@@ -11,225 +12,97 @@ float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, Shu
 float HdrMinNits, HdrMaxNits, PaperWhiteNits, HdrEnabled, HueShift;
 uint ColorGamut, ColorPrimaries, TransferFunction;
 
-static const uint ColorGamutSRGB = 0;
-static const uint ColorGamutRec709 = 1;
-static const uint ColorGamutRec2020 = 2;
-static const uint ColorGamutDisplayP3 = 3;
-static const uint ColorGamutHDR10 = 4;
-static const uint ColorGamutDolbyHDR = 5;
-static const uint ColorGamutP3D65G22 = 6;
-
-static const uint ColorPrimariesRec709 = 0;
-static const uint ColorPrimariesRec2020 = 1;
-static const uint ColorPrimariesP3 = 2;
-
-static const uint TransferFunctionsRGB = 0;
-static const uint TransferFunctionBT1886 = 1;
-static const uint TransferFunctionPQ = 2;
-static const uint TransferFunctionLinear = 3;
-
-static const float maxPqValue = 10000.0;
-static const float SceneViewNitsForPaperWhite = 160.0;
-static const float SceneViewMaxDisplayNits = 160.0;
-
-static const float kReferenceLuminanceWhiteForRec709 = 100.0;
-
-static const float3x3 Rec709ToRec2020 =
+static const float3x3 D65_2_D60_CAT =
 {
-	0.627402, 0.329292, 0.043306,
-    0.069095, 0.919544, 0.011360,
-    0.016394, 0.088028, 0.895578
+	1.01303, 0.00610531, -0.014971,
+	0.00769823, 0.998165, -0.00503203,
+	-0.00284131, 0.00468516, 0.924507,
+};
+/*
+static const float3 AP1_RGB2Y =
+{
+	0.2722287168, //AP1_2_XYZ_MAT[0][1],
+	0.6740817658, //AP1_2_XYZ_MAT[1][1],
+	0.0536895174, //AP1_2_XYZ_MAT[2][1]
+};
+*/
+
+static const float3x3 sRGB_2_XYZ_MAT =
+{
+	0.41239089f, 0.35758430f, 0.18048084f,
+	0.21263906f, 0.71516860f, 0.07219233f,
+	0.01933082f, 0.11919472f, 0.95053232f
 };
 
-static const float3x3 Rec2020ToRec709 =
+static const float3x3 XYZ_2_sRGB_MAT =
 {
-	1.660496, -0.587656, -0.072840,
-    -0.124547, 1.132895, -0.008348,
-    -0.018154, -0.100597, 1.118751
+	3.24096942f, -1.53738296f, -0.49861076f,
+	-0.96924388f, 1.87596786f, 0.04155510f,
+	0.05563002f, -0.20397684f, 1.05697131f,
 };
 
-static const float PQ_constant_N = (2610.0 / 4096.0 / 4);
-static const float PQ_constant_M = (2523.0 / 4096.0 * 128);
-static const float PQ_constant_C1 = (3424.0 / 4096.0);
-static const float PQ_constant_C2 = (2413.0 / 4096.0 * 32);
-static const float PQ_constant_C3 = (2392.0 / 4096.0 * 32);
+static const float DISPGAMMA = 2.4;
+static const float OFFSET = 0.055;
 
-float3 LinearToPQ(float3 linearCol, float maxPqValue)
+float2 ACES_min;
+float2 ACES_mid;
+float2 ACES_max;
+float2 ACES_slope;
+float4 ACES_coefs[10];
+row_major float3x3 XYZ_2_DISPLAY_PRI_MAT;
+row_major float3x3 DISPLAY_PRI_MAT_2_XYZ;
+float2 CinemaLimits;
+int OutputMode;
+uint Flags;
+float surroundGamma;
+float saturation;
+float postScale;
+float gamma;
+
+float uniform_segmented_spline_c9_fwd(float x)
 {
-	linearCol /= maxPqValue;
-	
-	float3 colToPow = pow(linearCol, PQ_constant_N);
-	float3 numerator = PQ_constant_C1 + PQ_constant_C2 * colToPow;
-	float3 denominator = 1.0 + PQ_constant_C3 * colToPow;
-	float3 pq = pow(numerator / denominator, PQ_constant_M);
-	
-	return pq;
-}
+	const int N_KNOTS_LOW = 8;
+	const int N_KNOTS_HIGH = 8;
 
-float3 PQToLinear(float3 linearCol, float maxPqValue)
-{
-	float3 colToPow = pow(linearCol, 1.0 / PQ_constant_M);
-	float3 numerator = max(colToPow - PQ_constant_C1, 0.0);
-	float3 denominator = PQ_constant_C2 - (PQ_constant_C3 * colToPow);
-	float3 linearColor = pow(numerator / denominator, 1.0 / PQ_constant_N);
+	// Check for negatives or zero before taking the log. If negative or zero,
+	// set to OCESMIN.
+	float xCheck = x <= 0 ? 1e-4 : x;
 
-	linearColor *= maxPqValue;
-	
-	return linearColor;
-}
+	float logx = log10(xCheck);
+	float logy;
 
-static const float3x3 Rec709ToP3D65Mat =
-{
-	0.822462, 0.177538, 0.000000,
-    0.033194, 0.966806, 0.000000,
-    0.017083, 0.072397, 0.910520
-};
-
-static const float3x3 P3D65MatToRec709 =
-{
-	1.224940, -0.224940, 0.000000,
-    -0.042056, 1.042056, 0.000000,
-    -0.019637, -0.078636, 1.098273
-};
-
-float3 RotateRec709ToRec2020(float3 Rec709Input)
-{
-	static const float3x3 Rec709ToRec2020Mat = float3x3(
-
-        0.627402, 0.329292, 0.043306,
-        0.069095, 0.919544, 0.011360,
-        0.016394, 0.088028, 0.895578
-    );
-
-	return mul(Rec709ToRec2020Mat, Rec709Input);
-}
-
-float3 RotateRec709ToOutputSpace(float3 Rec709Input)
-{
-	if(ColorPrimaries == ColorPrimariesRec2020)
+	if(logx <= log10(ACES_min.x))
 	{
-		return RotateRec709ToRec2020(Rec709Input);
+		logy = logx * ACES_slope.x + (log10(ACES_min.y) - ACES_slope.x * log10(ACES_min.x));
 	}
-	else // HDRCOLORSPACE_REC709
+	else if((logx > log10(ACES_min.x)) && (logx < log10(ACES_mid.x)))
 	{
-		return Rec709Input;
+		float knot_coord = (N_KNOTS_LOW - 1) * (logx - log10(ACES_min.x)) / (log10(ACES_mid.x) - log10(ACES_min.x));
+		int j = knot_coord;
+		float t = knot_coord - j;
+
+		float3 cf = {ACES_coefs[j].x, ACES_coefs[j + 1].x, ACES_coefs[j + 2].x};
+
+		float3 monomials = {t * t, t, 1};
+		logy = dot(monomials, mul(cf, M));
 	}
-}
-
-// Converts XYZ tristimulus values into cone responses for the three types of cones in the human visual system, matching long, medium, and shrot wavelenghts.
-// Note that there are many LMS color spaces; this one follows the ICtCp color space specification.
-float3 XYZToLMS(float3 c)
-{
-	float3x3 mat = float3x3(0.3592, 0.6976, -0.0358, -0.1922, 1.1004, 0.0755, 0.0070, 0.0749, 0.8434);
-	return mul(mat, c);
-}
-
-float3 LMSToXYZ(float3 c)
-{
-	float3x3 mat = float3x3(
-        2.07018005669561320, -1.32645687610302100, 0.206616006847855170,
-        0.36498825003265756, 0.68046736285223520, -0.045421753075853236,
-        -0.04959554223893212, -0.04942116118675749, 1.187995941732803400
-    );
-	
-	return mul(mat, c);
-}
-
-
-float3 RotateRec2020ToLMS(float3 Rec2020Input)
-{
-	static const float3x3 Rec2020ToLMSMat =
+	else if((logx >= log10(ACES_mid.x)) && (logx < log10(ACES_max.x)))
 	{
-		0.412109375, 0.52392578125, 0.06396484375,
-         0.166748046875, 0.720458984375, 0.11279296875,
-         0.024169921875, 0.075439453125, 0.900390625
-	};
+		float knot_coord = (N_KNOTS_HIGH - 1) * (logx - log10(ACES_mid.x)) / (log10(ACES_max.x) - log10(ACES_mid.x));
+		int j = knot_coord;
+		float t = knot_coord - j;
 
-	return mul(Rec2020ToLMSMat, Rec2020Input);
-}
+		float3 cf = {ACES_coefs[j].y, ACES_coefs[j + 1].y, ACES_coefs[j + 2].y};
 
-// RGB with sRGB/Rec.709 primaries to ICtCp
-float3 RgbToICtCp(float3 col)
-{
-	col = RgbToXYZ(col);
-	col = XYZToLMS(col);
-	// 1.0f = 100 HdrMaxNits, 100.0f = 10k nits
-	col = LinearToPQ(max(0.0, col), 100.0);
+		float3 monomials = {t * t, t, 1};
+		logy = dot(monomials, mul(cf, M));
+	}
+	else //if ( logIn >= log10(ACES_max.x) )
+	{
+		logy = logx * ACES_slope.y + (log10(ACES_max.y) - ACES_slope.y * log10(ACES_max.x));
+	}
 
-	// Convert PQ-LMS into ICtCp. Note that the "S" channel is not used,
-	// but overlap between the cone responses for long, medium, and short wavelengths
-	// ensures that the corresponding part of the spectrum contributes to luminance
-	
-	float3x3 mat = float3x3(0.5, 0.5, 0.0, 1.6137, -3.3234, 1.7097, 4.3780, -4.2455, -0.1325);
-
-	return mul(mat, col);
-}
-
-float3 ICtCpToRGB(float3 col)
-{
-	float3x3 mat = float3x3(1.0, 0.00860514569398152, 0.11103560447547328, 1.0, -0.00860514569398152, -0.11103560447547328, 1.0, 0.56004885956263900, -0.32063747023212210);
-
-	col = mul(mat, col);
-	
-	// 1.0f = 100 nts, 100.0f = 10k nits
-	col = PQToLinear(col, 100.0);
-	col = LMSToXYZ(col);
-	return XYZToRgb(col);
-}
-
-float RangeCompress(float x)
-{
-	return 1.0 - exp(-x);
-}
-
-float RangeCompress(float val, float threshold)
-{
-	float v1 = val;
-	float v2 = threshold + (1.0 - threshold) * RangeCompress((val - threshold) / (1 - threshold));
-	return val < threshold ? v1 : v2;
-}
-
-float3 RangeCompress(float3 val, float threshold)
-{
-	return float3(RangeCompress(val.x, threshold), RangeCompress(val.y, threshold), RangeCompress(val.z, threshold));
-}
-
-float3 ApplyHuePreservingShoulder(float3 col)
-{
-	float3 ictcp = RgbToICtCp(col);
-
-	// Hue-preserving range compression requires desaturation in order to achieve a natural look. We apdatively desaturate the input based on its luminance.
-	float saturationAmount = pow(smoothstep(1.0, 0.3, ictcp.x), 1.3);
-	col = ICtCpToRGB(ictcp * float3(1, saturationAmount.xx));
-
-	// Only compress luminance starting at a certain point. Dimmer inputs are passed through without modification.
-	float linearSegmentEnd = 0.25;
-	
-	// Hue-preserving mapping
-	float maxCol = Max3(col);
-	float mappedMax = RangeCompress(maxCol, linearSegmentEnd);
-	float3 compressedHuePreserving = col * mappedMax / maxCol;
-	
-	//Non-hue preserving mapping
-	float3 perChannelCompressed = RangeCompress(col, linearSegmentEnd);
-	
-	// Combine hue-preserving and non=hue preserving colors. Absolute hue preservation looks unnatural, as bright colors *appear* to have been hue shifted.
-	// Actually doing some amount of hue shifting looks more pleasing
-	col = lerp(perChannelCompressed, compressedHuePreserving, 0.6);
-
-	float3 ictcpMapped = RgbToICtCp(col);
-	
-	// Smoothly ramp off saturation as brightness increases, but keep some ven for very bright input
-	float postCompressionSaturationBoost = 0.3 * smoothstep(1.0, 0.5, ictcp.x);
-
-	// Re-introduce some hue from the pre-compression color. something similar could be accomplished by delaying the luma-dependent desaturation before range compression.
-	// Doing it here however does a better job of preserving perceptual luminance of highly saturated colors. Because in the hue-preserving path we only range-compress the max channel.
-	// saturated colors lose luminance. By desaturating them more aggresively first, compressing, and then re-adding some saturation, we ca preserve their brightness to a greater extent.
-	ictcpMapped.yz = lerp(ictcpMapped.yz, ictcp.yz * ictcpMapped.x / max(1e-3, ictcp.x), postCompressionSaturationBoost);
-
-	col = ICtCpToRGB(ictcpMapped);
-	
-	return col;
+	return pow(10, logy);
 }
 
 /// BT2390 EETF Helper functions
@@ -249,13 +122,13 @@ float P(float B, float Ks, float L_max)
 // Ref: https://www.itu.int/dms_pub/itu-r/opb/rep/R-REP-BT.2390-4-2018-PDF-E.pdf page 21
 // This takes values in [0...10k nits] and it outputs in the same space. PQ conversion outside.
 // If we chose this, it can be optimized (a few identity happen with moving between linear and PQ)
-float BT2390EETF(float x, float minLimit, float maxLimit)
+float BT2390EETF(float x)
 {
-	float E_0 = LinearToPQ(x, maxPqValue);
+	float E_0 = (x);
     // For the following formulas we are assuming L_B = 0 and L_W = 10000 -- see original paper for full formulation
 	float E_1 = E_0;
-	float L_min = LinearToPQ(minLimit, maxPqValue);
-	float L_max = LinearToPQ(maxLimit, maxPqValue);
+	float L_min = LinearToST2084(HdrMinNits);
+	float L_max = LinearToST2084(HdrMaxNits);
 	float Ks = 1.5f * L_max - 0.5f; // Knee start
 	float b = L_min;
 
@@ -265,214 +138,7 @@ float BT2390EETF(float x, float minLimit, float maxLimit)
 	float E_3 = E_2 + b * (E3Part2 * E3Part2);
 	float E_4 = E_3; // Is like this because PQ(L_W)=  1 and PQ(L_B) = 0
 
-	return PQToLinear(E_4, maxPqValue);
-}
-
-// Ref: ICtCp Dolby white paper (https://www.dolby.com/us/en/technologies/dolby-vision/ictcp-white-paper.pdf)
-float3 RotatePQLMSToICtCp(float3 LMSInput)
-{
-	static const float3x3 PQLMSToICtCpMat = float3x3(
-        0.5f, 0.5f, 0.0f,
-        1.613769f, -3.323486f, 1.709716f,
-        4.378174f, -4.245605f, -0.1325683f
-        );
-
-	return mul(PQLMSToICtCpMat, LMSInput);
-}
-
-float3 RotateRec2020ToICtCp(float3 Rec2020)
-{
-	float3 lms = RotateRec2020ToLMS(Rec2020);
-	float3 PQLMS = LinearToPQ(max(0.0f, lms), maxPqValue);
-	return RotatePQLMSToICtCp(PQLMS);
-}
-
-float3 RotateOutputSpaceToICtCp(float3 inputColor)
-{
-    // TODO: Do the conversion directly from Rec709 (bake matrix Rec709 -> XYZ -> LMS)
-	if(ColorPrimaries == ColorPrimariesRec709)
-	{
-		inputColor = RotateRec709ToRec2020(inputColor);
-	}
-
-	return RotateRec2020ToICtCp(inputColor);
-}
-
-static const half3x3 XYZ_2_REC709_MAT =
-{
-	3.2409699419, -1.5373831776, -0.4986107603,
-    -0.9692436363, 1.8759675015, 0.0415550574,
-     0.0556300797, -0.2039769589, 1.0569715142
-};
-
-float3 RotateXYZToRec709(float3 XYZ)
-{
-	return mul(XYZ_2_REC709_MAT, XYZ);
-}
-
-float3 RotateICtCpToPQLMS(float3 ICtCp)
-{
-	static const float3x3 ICtCpToPQLMSMat = float3x3(
-        1.0f, 0.0086051456939815f, 0.1110356044754732f,
-        1.0f, -0.0086051456939815f, -0.1110356044754732f,
-        1.0f, 0.5600488595626390f, -0.3206374702321221f
-    );
-
-	return mul(ICtCpToPQLMSMat, ICtCp);
-}
-
-float3 RotateLMSToXYZ(float3 LMSInput)
-{
-	static const float3x3 LMSToXYZMat = float3x3(
-        2.07018005669561320f, -1.32645687610302100f, 0.206616006847855170f,
-        0.36498825003265756f, 0.68046736285223520f, -0.045421753075853236f,
-        -0.04959554223893212f, -0.04942116118675749f, 1.187995941732803400f
-        );
-	return mul(LMSToXYZMat, LMSInput);
-}
-
-float3 RotateXYZToRec2020(float3 XYZ)
-{
-	static const float3x3 XYZToRec2020Mat = float3x3(
-        1.71235168f, -0.35487896f, -0.25034135f,
-        -0.66728621f, 1.61794055f, 0.01495380f,
-        0.01763985f, -0.04277060f, 0.94210320f
-    );
-
-	return mul(XYZToRec2020Mat, XYZ);
-}
-
-float3 RotateICtCpToXYZ(float3 ICtCp)
-{
-	float3 PQLMS = RotateICtCpToPQLMS(ICtCp);
-	float3 LMS = PQToLinear(PQLMS, maxPqValue);
-	return RotateLMSToXYZ(LMS);
-}
-
-float3 RotateICtCpToRec2020(float3 ICtCp)
-{
-	return RotateXYZToRec2020(RotateICtCpToXYZ(ICtCp));
-}
-
-float3 RotateICtCpToRec709(float3 ICtCp)
-{
-	return RotateXYZToRec709(RotateICtCpToXYZ(ICtCp));
-}
-
-float3 RotateICtCpToOutputSpace(float3 ICtCp)
-{
-	if(ColorPrimaries == ColorPrimariesRec2020)
-	{
-		return RotateICtCpToRec2020(ICtCp);
-	}
-	else // HDRCOLORSPACE_REC709
-	{
-		return RotateICtCpToRec709(ICtCp);
-	}
-}
-
-//float3 PerformRangeReduction(float3 input, float minNits, float maxNits)
-//{
-//	float3 ICtCp = RotateOutputSpaceToICtCp(input); // This is in PQ space.
-//	float linearLuma = PQToLinear(ICtCp.x, maxPqValue);
-////#if RANGE_REDUCTION == HDRRANGEREDUCTION_REINHARD_LUMA_ONLY
-////	linearLuma = ReinhardTonemap(linearLuma, maxNits);
-////#elif RANGE_REDUCTION == HDRRANGEREDUCTION_BT2390LUMA_ONLY
-//    linearLuma = BT2390EETF(linearLuma, minNits, maxNits);
-////#endif
-//	ICtCp.x = LinearToPQ(linearLuma, maxPqValue);
-
-//	return RotateICtCpToOutputSpace(ICtCp); // This moves back to linear too!
-//}
-
-float LumaRangeReduction(float input, float minNits, float maxNits, int mode)
-{
-	float output = input;
-	//if(mode == HDRRANGEREDUCTION_REINHARD)
-	//{
-	//	output = ReinhardTonemap(input, maxNits);
-	//}
-	//else if(mode == HDRRANGEREDUCTION_BT2390)
-	{
-		output = BT2390EETF(input, minNits, maxNits);
-	}
-
-	return output;
-}
-
-// TODO: This is very ad-hoc and eyeballed on a limited set. Would be nice to find a standard.
-float3 DesaturateReducedICtCp(float3 ICtCp, float lumaPre, float maxNits)
-{
-	float saturationAmount = min(1.0f, ICtCp.x / max(lumaPre, 1e-6f)); // BT2390, but only when getting darker.
-    //saturationAmount = min(lumaPre / ICtCp.x, ICtCp.x / lumaPre); // Actual BT2390 suggestion
-	saturationAmount *= saturationAmount;
-    //saturationAmount =  pow(smoothstep(1.0f, 0.4f, ICtCp.x), 0.9f);   // A smoothstepp-y function.
-	ICtCp.yz *= saturationAmount;
-	return ICtCp;
-}
-
-float3 HuePreservingRangeReduction(float3 input, float minNits, float maxNits, int mode)
-{
-	float3 ICtCp = RotateOutputSpaceToICtCp(input);
-
-	float lumaPreRed = ICtCp.x;
-	float linearLuma = PQToLinear(ICtCp.x, maxPqValue);
-	linearLuma = LumaRangeReduction(linearLuma, minNits, maxNits, mode);
-	ICtCp.x = LinearToPQ(linearLuma, maxPqValue);
-	ICtCp = DesaturateReducedICtCp(ICtCp, lumaPreRed, maxNits);
-
-	return RotateICtCpToOutputSpace(ICtCp);
-}
-
-float3 HueShiftingRangeReduction(float3 input, float minNits, float maxNits, int mode)
-{
-	float3 hueShiftedResult = input;
-	//if(mode == HDRRANGEREDUCTION_REINHARD)
-	//{
-	//	hueShiftedResult.x = ReinhardTonemap(input.x, maxNits);
-	//	hueShiftedResult.y = ReinhardTonemap(input.y, maxNits);
-	//	hueShiftedResult.z = ReinhardTonemap(input.z, maxNits);
-	//}
-	//else if(mode == HDRRANGEREDUCTION_BT2390)
-	{
-		hueShiftedResult.x = BT2390EETF(input.x, minNits, maxNits);
-		hueShiftedResult.y = BT2390EETF(input.y, minNits, maxNits);
-		hueShiftedResult.z = BT2390EETF(input.z, minNits, maxNits);
-	}
-	return hueShiftedResult;
-}
-
-float3 PerformRangeReduction(float3 input, float minNits, float maxNits, int mode, float hueShift)
-{
-	float3 outputValue = input;
-	bool reduceLuma = hueShift < 1.0f;
-	bool needHueShiftVersion = hueShift > 0.0f;
-
-	//if(mode == HDRRANGEREDUCTION_NONE)
-	//{
-	//	outputValue = input;
-	//}
-	//else
-	{
-		float3 huePreserving = reduceLuma ? HuePreservingRangeReduction(input, minNits, maxNits, mode) : 0;
-		float3 hueShifted = needHueShiftVersion ? HueShiftingRangeReduction(input, minNits, maxNits, mode) : 0;
-
-		if(reduceLuma && !needHueShiftVersion)
-		{
-			outputValue = huePreserving;
-		}
-		else if(!reduceLuma && needHueShiftVersion)
-		{
-			outputValue = hueShifted;
-		}
-		else
-		{
-            // We need to combine the two cases
-			outputValue = lerp(huePreserving, hueShifted, hueShift);
-		}
-	}
-
-	return outputValue;
+	return (E_4);
 }
 
 float3 Fragment(float4 position : SV_Position) : SV_Target
@@ -509,12 +175,63 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
     // Convert blended result back to linear for OEFT
 	color = GammaToLinear(color);
 	
+	// Derived from rec709 ODT
+	//color *= PaperWhiteNits;
+
+	#if 0
+	float3 aces = mul(XYZ_2_AP0_MAT, mul(D65_2_D60_CAT, mul(sRGB_2_XYZ_MAT, color)));
+
+	float3 oces = rrt(aces);
+	
+	// OCES to RGB rendering space
+	float3 rgbPre = mul(AP0_2_AP1_MAT, oces);
+	
+	// Apply the tonescale independently in rendering-space RGB
+	float3 rgbPost;
+	rgbPost[0] = uniform_segmented_spline_c9_fwd(rgbPre[0]);
+	rgbPost[1] = uniform_segmented_spline_c9_fwd(rgbPre[1]);
+	rgbPost[2] = uniform_segmented_spline_c9_fwd(rgbPre[2]);
+	
+	// Scale luminance to linear code value
+	float3 linearCV;
+	linearCV[0] = Y_2_linCV(rgbPost[0], CinemaLimits.y, CinemaLimits.x);
+	linearCV[1] = Y_2_linCV(rgbPost[1], CinemaLimits.y, CinemaLimits.x);
+	linearCV[2] = Y_2_linCV(rgbPost[2], CinemaLimits.y, CinemaLimits.x);
+	
+	//if(Flags & 0x2)
+	//{
+	//	// Apply desaturation to compensate for luminance difference
+	//	// Saturation compensation factor
+	//	const float ODT_SAT_FACTOR = 0.93;
+	//	const float3x3 ODT_SAT_MAT = calc_sat_adjust_matrix(ODT_SAT_FACTOR, AP1_RGB2Y);
+	//	linearCV = mul(ODT_SAT_MAT, linearCV);
+	//}
+	
+	// Convert to display primary encoding
+	// Rendering space RGB to XYZ
+	float3 XYZ = mul(AP1_2_XYZ_MAT, linearCV);
+	
+	// CIE XYZ to display primaries
+	linearCV = mul(XYZ_2_DISPLAY_PRI_MAT, XYZ);
+	
+	// Encode linear code values with transfer function
+	float3 outputCV = linearCV;
+	#endif
+	
 	// Hdr output
 	switch(ColorGamut)
 	{
 		// Return linear sRGB, hardware will convert to gmama
 		case ColorGamutSRGB:
-			break;
+		{
+			// LDR mode, clamp 0/1 and encode 
+			//linearCV = clamp(linearCV, 0., 1.);
+
+			//outputCV[0] = moncurve_r(linearCV[0], DISPGAMMA, OFFSET);
+			//outputCV[1] = moncurve_r(linearCV[1], DISPGAMMA, OFFSET);
+			//outputCV[2] = moncurve_r(linearCV[2], DISPGAMMA, OFFSET);
+		}
+		break;
 		
 		case ColorGamutRec709:
 			color /= kReferenceLuminanceWhiteForRec709;
@@ -528,10 +245,24 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		
 		case ColorGamutHDR10:
 		{
-			color = mul(Rec709ToRec2020, color);
+			////scale to bring the ACES data back to the proper range
+			//linearCV[0] = linCV_2_Y(linearCV[0], CinemaLimits.y, CinemaLimits.x);
+			//linearCV[1] = linCV_2_Y(linearCV[1], CinemaLimits.y, CinemaLimits.x);
+			//linearCV[2] = linCV_2_Y(linearCV[2], CinemaLimits.y, CinemaLimits.x);
+
+			//// Handle out-of-gamut values
+			//// Clip values < 0 (i.e. projecting outside the display primaries)
+			////rgb = clamp(rgb, 0., HALF_POS_INF);
+			//linearCV = max(linearCV, 0.);
+
+			//// Encode with PQ transfer function
+			//outputCV = pq_r_f3(linearCV);
 			color *= PaperWhiteNits;
-			color = PerformRangeReduction(color, HdrMinNits, HdrMaxNits, 0, HueShift);
-			color = LinearToPQ(color, maxPqValue);
+			color = Rec709ToRec2020(color);
+			color = LinearToST2084(color);
+			color.r = BT2390EETF(color.r);
+			color.g = BT2390EETF(color.g);
+			color.b = BT2390EETF(color.b);
 			break;
 		}
 		
@@ -541,8 +272,8 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		case ColorGamutP3D65G22:
 		{
 			// The HDR scene is in Rec.709, but the display is P3
-			color = mul(Rec709ToP3D65Mat, color);
-		
+			color = Rec709ToP3D65(color);
+			
 			// Apply gamma 2.2
 			color = pow(color / HdrMaxNits, rcp(2.2));
 			break;
@@ -574,14 +305,14 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		
 			case ColorGamutHDR10:
 			{
-				const float hdrScalar = SceneViewNitsForPaperWhite / maxPqValue;
+				const float hdrScalar = SceneViewNitsForPaperWhite;
 
 				// Unapply the ST.2084 curve to the scene.
-				color = PQToLinear(color, 1.0);
+				color = ST2084ToLinear(color);
 				color = color / hdrScalar;
 
 				// The display is Rec.2020, but HDR scene is in Rec.709
-				color = mul(Rec2020ToRec709, color);
+				color = Rec2020ToRec709(color);
 				break;
 			}
 		
@@ -597,7 +328,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 				color = color / hdrScalar;
 
 				// The display is P3, but he HDR scene is in Rec.709
-				color = mul(P3D65MatToRec709, color);
+				color = P3D65ToRec709(color);
 				break;
 			}
 		}

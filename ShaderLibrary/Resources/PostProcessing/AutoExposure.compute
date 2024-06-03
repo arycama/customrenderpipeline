@@ -88,7 +88,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	
 	float averageLuminance = EV100ToLuminance(averageEv);
 	exposureCompensation = LuminanceToEV100(1.03 - 2.0 * rcp(log10(averageLuminance + 1.0) + 2.0));
-	exposureCompensation += ExposureCompensation;
+	exposureCompensation = ExposureCompensation;
 	
 	averageEv -= exposureCompensation;
 		

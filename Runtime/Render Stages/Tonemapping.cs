@@ -51,7 +51,14 @@ namespace Arycama.CustomRenderPipeline
 
             var hdrInfo = HDROutputSettings.main;
             if(hdrInfo.available)
-                Debug.Log($"HDR Display Info: Min Nits {hdrInfo.minToneMapLuminance}, Max Nits {hdrInfo.maxToneMapLuminance}, Paper White {hdrInfo.paperWhiteNits}, Max Full Frame Nits {hdrInfo.maxFullFrameToneMapLuminance}");
+            {
+                var gamut = hdrInfo.displayColorGamut;
+                var primaries = ColorGamutUtility.GetColorPrimaries(gamut);
+                var transfer = ColorGamutUtility.GetTransferFunction(gamut);
+                var whitePoint = ColorGamutUtility.GetWhitePoint(gamut);
+                Debug.Log($"HDR Display Info: Min Nits {hdrInfo.minToneMapLuminance}, Max Nits {hdrInfo.maxToneMapLuminance}, Paper White {hdrInfo.paperWhiteNits}, Max Full Frame Nits {hdrInfo.maxFullFrameToneMapLuminance}, Gamut {hdrInfo.displayColorGamut}, Primaries {primaries}, Transfer {transfer}, WhitePoint {whitePoint}");
+
+            }
         }
 
         class PassData
