@@ -9,9 +9,9 @@ Shader"Hidden/Tonemapping"
             ZTest Off
 
             HLSLPROGRAM
+            #pragma enable_d3d11_debug_symbols
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
-            #pragma enable_d3d11_debug_symbols
             #include "Tonemapping.hlsl"
             ENDHLSL
           

@@ -95,14 +95,9 @@ namespace Arycama.CustomRenderPipeline
                 HDROutputSettings.main.paperWhiteNits = paperWhiteNits;
             }
 
-            var acesSettingsBuffer = renderGraph.GetBuffer(1, UnsafeUtility.SizeOf<AcesConstants>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite);
+            var acesSettingsBuffer = renderGraph.SetConstantBuffer(GetAcesConstants());
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {
-                var acesData = GetAcesConstants();
-                var acesConstants = acesSettingsBuffer.Buffer.LockBufferForWrite<AcesConstants>(0, 1);
-                acesConstants[0] = acesData;
-                acesSettingsBuffer.Buffer.UnlockBufferAfterWrite<AcesConstants>(1);
-
                 pass.ReadBuffer("AcesConstants", acesSettingsBuffer);
 
                 pass.SetFloat(command, "HdrEnabled", HDROutputSettings.main.available ? 1.0f : 0.0f);
@@ -233,11 +228,11 @@ namespace Arycama.CustomRenderPipeline
             AcesConstants constants;
 
             // setup the color matrix
-            constants.colorMat = ColorMatrices[(int)settings.selectedColorMatrix];
-            constants.colorMatInv = ColorMatricesInv[(int)settings.selectedColorMatrix];
+            constants.colorMat = ColorMatrices[(int)settings.ColorSpace];
+            constants.colorMatInv = ColorMatricesInv[(int)settings.ColorSpace];
 
             // setup the aces data
-            var aces = Aces.GetAcesODTData(settings.selectedCurve, settings.minStops, settings.maxStops, settings.maxLevel, settings.midGrayScale);
+            var aces = Aces.GetAcesODTData(settings.ToneCurve, settings.minStops, settings.maxStops, settings.maxLevel, settings.midGrayScale);
 
             constants.ACES_coef0 = aces.coefs[0];
             constants.ACES_coef1 = aces.coefs[1];
@@ -262,7 +257,7 @@ namespace Arycama.CustomRenderPipeline
             constants.flags |= settings.dimSurround ? 0x1 : 0x0;
             constants.flags |= settings.luminanceOnly ? 0x8 : 0x0;
 
-            constants.OutputMode = (int)settings.outputMode;
+            constants.OutputMode = (int)settings.EOTF;
             constants.saturation = settings.toneCurveSaturation;
             constants.surroundGamma = settings.surroundGamma;
             constants.gamma = settings.outputGamma;

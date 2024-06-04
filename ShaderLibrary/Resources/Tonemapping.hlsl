@@ -12,35 +12,6 @@ float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, Shu
 float HdrMinNits, HdrMaxNits, PaperWhiteNits, HdrEnabled, HueShift;
 uint ColorGamut, ColorPrimaries, TransferFunction;
 
-static const float3x3 D65_2_D60_CAT =
-{
-	1.01303, 0.00610531, -0.014971,
-	0.00769823, 0.998165, -0.00503203,
-	-0.00284131, 0.00468516, 0.924507,
-};
-/*
-static const float3 AP1_RGB2Y =
-{
-	0.2722287168, //AP1_2_XYZ_MAT[0][1],
-	0.6740817658, //AP1_2_XYZ_MAT[1][1],
-	0.0536895174, //AP1_2_XYZ_MAT[2][1]
-};
-*/
-
-static const float3x3 sRGB_2_XYZ_MAT =
-{
-	0.41239089f, 0.35758430f, 0.18048084f,
-	0.21263906f, 0.71516860f, 0.07219233f,
-	0.01933082f, 0.11919472f, 0.95053232f
-};
-
-static const float3x3 XYZ_2_sRGB_MAT =
-{
-	3.24096942f, -1.53738296f, -0.49861076f,
-	-0.96924388f, 1.87596786f, 0.04155510f,
-	0.05563002f, -0.20397684f, 1.05697131f,
-};
-
 static const float DISPGAMMA = 2.4;
 static const float OFFSET = 0.055;
 
@@ -144,16 +115,6 @@ float BT2390EETF(float x)
 	return (E_4);
 }
 
-float3 sRGB_2_Linear(float3 c)
-{
-	return (c <= 0.04045f) ? (c / 12.92f) : (pow(c + 0.055f, 2.4f) / 1.055f);
-}
-
-float3 Linear_2_sRGB(float3 c)
-{
-	return (c <= 0.0031308f) ? (c * 12.92f) : (1.055f * pow(c, 1.0f / 2.4f) - 0.055f);
-}
-
 float3 Fragment(float4 position : SV_Position) : SV_Target
 {
 	// Need to flip for game view
@@ -191,7 +152,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	// Derived from rec709 ODT
 	//color *= PaperWhiteNits;
 
-	float3 aces = mul(XYZ_2_AP0_MAT, mul(D65_2_D60_CAT, mul(sRGB_2_XYZ_MAT, color)));
+	float3 aces = mul(XYZ_2_AP0_MAT, mul(D65_2_D60_CAT, Rec709ToXYZ(color)));
 
 	float3 oces = rrt(aces);
 
@@ -200,39 +161,16 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 
 	// Apply the tonescale independently in rendering-space RGB
 	float3 rgbPost;
-	if(Flags & 0x8)
-	{
-		// luminance only path, for content that has been mastered for an expectation of an oversaturated tonemap operator
-		float y = dot(rgbPre, AP1_RGB2Y);
-		float scale = uniform_segmented_spline_c9_fwd(y) / y;
-
-		// compute the more desaturated per-channel version
-		rgbPost[0] = uniform_segmented_spline_c9_fwd(rgbPre[0]);
-		rgbPost[1] = uniform_segmented_spline_c9_fwd(rgbPre[1]);
-		rgbPost[2] = uniform_segmented_spline_c9_fwd(rgbPre[2]);
-
-		// lerp between values
-		rgbPost = max(lerp(rgbPost, rgbPre * scale, saturation), CinemaLimits.x); // clamp to min to prevent the genration of negative values
-	}
-	else
-	{
-		rgbPost[0] = uniform_segmented_spline_c9_fwd(rgbPre[0]);
-		rgbPost[1] = uniform_segmented_spline_c9_fwd(rgbPre[1]);
-		rgbPost[2] = uniform_segmented_spline_c9_fwd(rgbPre[2]);
-	}
-
+	rgbPost.x = uniform_segmented_spline_c9_fwd(rgbPre.x);
+	rgbPost.y = uniform_segmented_spline_c9_fwd(rgbPre.y);
+	rgbPost.z = uniform_segmented_spline_c9_fwd(rgbPre.z);
+	
 	// Scale luminance to linear code value
 	float3 linearCV;
-	linearCV[0] = Y_2_linCV(rgbPost[0], CinemaLimits.y, CinemaLimits.x);
-	linearCV[1] = Y_2_linCV(rgbPost[1], CinemaLimits.y, CinemaLimits.x);
-	linearCV[2] = Y_2_linCV(rgbPost[2], CinemaLimits.y, CinemaLimits.x);
-
-	if(Flags & 0x1)
-	{
-		// Apply gamma adjustment to compensate for surround
-		linearCV = alter_surround(linearCV, surroundGamma);
-	}
-
+	linearCV.x = Y_2_linCV(rgbPost.x, CinemaLimits.y, CinemaLimits.x);
+	linearCV.y = Y_2_linCV(rgbPost.y, CinemaLimits.y, CinemaLimits.x);
+	linearCV.z = Y_2_linCV(rgbPost.z, CinemaLimits.y, CinemaLimits.x);
+	
 	if(Flags & 0x2)
 	{
 		// Apply desaturation to compensate for luminance difference
@@ -241,12 +179,12 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		const float3x3 ODT_SAT_MAT = calc_sat_adjust_matrix(ODT_SAT_FACTOR, AP1_RGB2Y);
 		linearCV = mul(ODT_SAT_MAT, linearCV);
 	}
-	return linearCV;
 
 	// Convert to display primary encoding
 	// Rendering space RGB to XYZ
 	float3 XYZ = mul(AP1_2_XYZ_MAT, linearCV);
-
+	
+	// Should always do this
 	if(Flags & 0x4)
 	{
 		// Apply CAT from ACES white point to assumed observer adapted white point
@@ -260,23 +198,29 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		XYZ = mul(D60_2_D65_CAT, XYZ);
 	}
 
-	// CIE XYZ to display primaries
-	linearCV = mul(XYZ_2_DISPLAY_PRI_MAT, XYZ);
-
 	// Encode linear code values with transfer function
 	float3 outputCV = linearCV;
 
-	if(OutputMode == 0)
+	if(OutputMode == 0) // SRGB 
 	{
+		// CIE XYZ to display primaries
+		linearCV = XYZToRec709(XYZ);
+		
 		// LDR mode, clamp 0/1 and encode 
 		linearCV = clamp(linearCV, 0., 1.);
 
 		outputCV[0] = moncurve_r(linearCV[0], DISPGAMMA, OFFSET);
 		outputCV[1] = moncurve_r(linearCV[1], DISPGAMMA, OFFSET);
 		outputCV[2] = moncurve_r(linearCV[2], DISPGAMMA, OFFSET);
+		
+		//encode it with sRGB, to counteract a Windows display driver transform
+		outputCV = GammaToLinear(outputCV);
 	}
-	else if(OutputMode == 1)
+	else if(OutputMode == 1) // PQ
 	{
+		// CIE XYZ to display primaries
+		linearCV = XYZToRec2020(XYZ);
+		
 		//scale to bring the ACES data back to the proper range
 		linearCV[0] = linCV_2_Y(linearCV[0], CinemaLimits.y, CinemaLimits.x);
 		linearCV[1] = linCV_2_Y(linearCV[1], CinemaLimits.y, CinemaLimits.x);
@@ -289,9 +233,15 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 
 		// Encode with PQ transfer function
 		outputCV = pq_r_f3(linearCV);
+		
+		//encode it with sRGB, to counteract a Windows display driver transform
+		//outputCV = GammaToLinear(outputCV);
 	}
-	else if(OutputMode == 2)
+	else if(OutputMode == 2) // scRGB
 	{
+		// CIE XYZ to display primaries
+		linearCV = mul(XYZ_2_DISPLAY_PRI_MAT, XYZ);
+	
 		// output in scRGB
 
 		//scale to bring the ACES data back to the proper range
@@ -305,7 +255,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 
 		// convert from eported display primaries to sRGB primaries
 		linearCV = mul(DISPLAY_PRI_MAT_2_XYZ, linearCV);
-		linearCV = mul(XYZ_2_sRGB_MAT, linearCV);
+		linearCV = XYZToRec709(linearCV);
 
 		// map 1.0 to 80 nits (or max nit level if it is lower)
 		//outputCV = (linearCV / min(80.0f, CinemaLimits.y) ) * postScale;
@@ -318,23 +268,62 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		}
 		outputCV = ccSpace * postScale;
 	}
-	else if(OutputMode == 3)
+	else if(OutputMode == 3) // Gamma?
 	{
+		// CIE XYZ to display primaries
+		linearCV = mul(XYZ_2_DISPLAY_PRI_MAT, XYZ);
+	
 		// LDR mode, clamp 0/1 and encode 
 		linearCV = clamp(linearCV, 0., 1.);
 
 		outputCV = outputCV > 0.0f ? pow(linearCV, 1.0f / gamma) : 0.0f;
-
-	}
-
-	if(OutputMode != 2)
-	{
+		
 		//encode it with sRGB, to counteract a Windows display driver transform
-		outputCV = sRGB_2_Linear(outputCV);
+		outputCV = GammaToLinear(outputCV);
 	}
-	
+
 	color = outputCV;
-	return color;
+	
+	#if 0
+	// Hdr output
+	switch(ColorGamut)
+	{
+		// Return linear sRGB, hardware will convert to gmama
+		case ColorGamutSRGB:
+			break;
+		
+		case ColorGamutRec709:
+			color /= kReferenceLuminanceWhiteForRec709;
+			break;
+		
+		case ColorGamutRec2020:
+			break;
+			
+		case ColorGamutDisplayP3:
+			break;
+		
+		case ColorGamutHDR10:
+		{
+				//color *= PaperWhiteNits;
+				color = Rec709ToRec2020(color);
+				color = LinearToST2084(color);
+				break;
+			}
+		
+		case ColorGamutDolbyHDR:
+			break;
+		
+		case ColorGamutP3D65G22:
+		{
+			// The HDR scene is in Rec.709, but the display is P3
+			color = Rec709ToP3D65(color);
+			
+			// Apply gamma 2.2
+			color = pow(color / HdrMaxNits, rcp(2.2));
+			break;
+		}
+	}
+	#endif
 	
 	// When in scene view, Unity converts the output to sRGB, renders editor content, then applies the above transfer function at the end.
 	// To maintain our own tonemapping, we need to perform the inverse of this.

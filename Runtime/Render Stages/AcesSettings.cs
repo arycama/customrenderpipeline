@@ -6,15 +6,15 @@ namespace Arycama.CustomRenderPipeline
     [Serializable]
     public class AcesSettings
     {
-        public ColorSpace selectedColorMatrix = ColorSpace.Rec709; // Color Space
+        public ColorSpace ColorSpace = ColorSpace.Rec709;
 
-        public ODTCurve selectedCurve = ODTCurve.ODT_LDR_Ref; // Tone Curve
+        public ODTCurve ToneCurve = ODTCurve.ODT_LDR_Ref; // Tone Curve
 
-        public EOTF outputMode = EOTF.scRGB; // scRGB
+        public EOTF EOTF = EOTF.scRGB; // scRGB
 
         [Range(-14.0f, 0.0f)] public float minStops = 0.0f;
 
-        [Range(0.0f, 14.0f)] public float maxStops = 8.0f;
+        [Range(0.0f, 20.0f)] public float maxStops = 8.0f;
 
         [Range(-1.0f, 4000.0f)] public float maxLevel = -1.0f; // "Max Level (nits -1=default)"
 
@@ -36,11 +36,11 @@ namespace Arycama.CustomRenderPipeline
 
         public AcesSettings()
         {
-            outputMode = EOTF.scRGB; // scRGB
+            EOTF = EOTF.scRGB; // scRGB
             surroundGamma = 0.9811f;
             toneCurveSaturation = 1.0f;
-            selectedColorMatrix = ColorSpace.Rec709;
-            selectedCurve = ODTCurve.ODT_LDR_Ref;
+            ColorSpace = ColorSpace.Rec709;
+            ToneCurve = ODTCurve.ODT_LDR_Ref;
             outputGamma = 2.2f;
             adjustWP = true;
             desaturate = true;
@@ -53,62 +53,62 @@ namespace Arycama.CustomRenderPipeline
 
         void Apply1000nitHDR()
         {
-            selectedCurve = ODTCurve.ODT_1000Nit_Adj;
+            ToneCurve = ODTCurve.ODT_1000Nit_Adj;
             maxStops = -12.0f;
             maxStops = 10.0f;
             midGrayScale = 1.0f;
             adjustWP = true;
             desaturate = false;
-            selectedColorMatrix = ColorSpace.BT2020;
-            outputMode = EOTF.scRGB; // scRGB
+            ColorSpace = ColorSpace.BT2020;
+            EOTF = EOTF.scRGB; // scRGB
         }
 
         void Apply1000nitHDRSharpened()
         {
-            selectedCurve = ODTCurve.ODT_1000Nit_Adj;
+            ToneCurve = ODTCurve.ODT_1000Nit_Adj;
             minStops = -8.0f;
             maxStops = 8.0f;
             midGrayScale = 1.0f;
             adjustWP = true;
             desaturate = false;
-            selectedColorMatrix = ColorSpace.BT2020;
-            outputMode = EOTF.scRGB; // scRGB
+            ColorSpace = ColorSpace.BT2020;
+            EOTF = EOTF.scRGB; // scRGB
         }
 
         void ApplySDR()
         {
-            selectedCurve = ODTCurve.ODT_LDR_Adj;
+            ToneCurve = ODTCurve.ODT_LDR_Adj;
             minStops = -6.5f;
             maxStops = 6.5f;
             midGrayScale = 1.0f;
             adjustWP = true;
             desaturate = true;
-            selectedColorMatrix = ColorSpace.Rec709;
-            outputMode = EOTF.sRGB; // sRGB
+            ColorSpace = ColorSpace.Rec709;
+            EOTF = EOTF.sRGB; // sRGB
         }
 
         void ApplyEDRExtreme()
         {
-            selectedCurve = ODTCurve.ODT_1000Nit_Adj;
+            ToneCurve = ODTCurve.ODT_1000Nit_Adj;
             minStops = -12.0f;
             maxStops = 9.0f;
             midGrayScale = 1.0f;
             adjustWP = true;
             desaturate = false;
-            selectedColorMatrix = ColorSpace.Rec709;
-            outputMode = EOTF.sRGB; // sRGB
+            ColorSpace = ColorSpace.Rec709;
+            EOTF = EOTF.sRGB; // sRGB
         }
 
         void ApplyEDR()
         {
-            selectedCurve = ODTCurve.ODT_1000Nit_Adj;
+            ToneCurve = ODTCurve.ODT_1000Nit_Adj;
             minStops = -8.0f;
             maxStops = 8.0f;
             midGrayScale = 3.0f;
             adjustWP = true;
             desaturate = false;
-            selectedColorMatrix = ColorSpace.Rec709;
-            outputMode = EOTF.sRGB; // sRGB
+            ColorSpace = ColorSpace.Rec709;
+            EOTF = EOTF.sRGB; // sRGB
         }
     };
 }

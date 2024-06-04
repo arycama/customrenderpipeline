@@ -151,67 +151,6 @@ float linCV_2_Y(float linCV, float Ymax, float Ymin)
 	return linCV * (Ymax - Ymin) + Ymin;
 }
 
-// Gamma compensation factor
-static const float DIM_SURROUND_GAMMA = 0.9811;
-
-float3 darkSurround_to_dimSurround(float3 linearCV)
-{
-	float3 XYZ = mul(AP1_2_XYZ_MAT, linearCV);
-
-	float3 xyY = XYZ_2_xyY(XYZ);
-	//xyY[2] = clamp(xyY[2], 0., HALF_POS_INF);
-	xyY[2] = max(xyY[2], 0.);
-	xyY[2] = pow(xyY[2], DIM_SURROUND_GAMMA);
-	XYZ = xyY_2_XYZ(xyY);
-
-	return mul(XYZ_2_AP1_MAT, XYZ);
-}
-
-float3 dimSurround_to_darkSurround(float3 linearCV)
-{
-	float3 XYZ = mul(AP1_2_XYZ_MAT, linearCV);
-
-	float3 xyY = XYZ_2_xyY(XYZ);
-	//xyY[2] = clamp(xyY[2], 0., HALF_POS_INF);
-	xyY[2] = max(xyY[2], 0.);
-	xyY[2] = pow(xyY[2], 1. / DIM_SURROUND_GAMMA);
-	XYZ = xyY_2_XYZ(xyY);
-
-	return mul(XYZ_2_AP1_MAT, XYZ);
-}
-
-float3 alter_surround(float3 linearCV, float gamma)
-{
-	float3 XYZ = mul(AP1_2_XYZ_MAT, linearCV);
-
-	float3 xyY = XYZ_2_xyY(XYZ);
-		//xyY[2] = clamp(xyY[2], 0., HALF_POS_INF);
-	xyY[2] = max(xyY[2], 0.);
-	xyY[2] = pow(xyY[2], gamma);
-	XYZ = xyY_2_XYZ(xyY);
-
-	return mul(XYZ_2_AP1_MAT, XYZ);
-}
-
-float3x3 transpose_f33(float3x3 inM)
-{
-	float3x3 M;
-
-	M[0][0] = inM[0][0];
-	M[1][0] = inM[0][1];
-	M[2][0] = inM[0][2];
-			  
-	M[0][1] = inM[1][0];
-	M[1][1] = inM[1][1];
-	M[2][1] = inM[1][2];
-			  
-	M[0][2] = inM[2][0];
-	M[1][2] = inM[2][1];
-	M[2][2] = inM[2][2];
-
-	return M;
-}
-
 float3x3 calc_sat_adjust_matrix(float sat, float3 rgb2Y)
 {
 	//
@@ -477,64 +416,6 @@ float segmented_spline_c5_fwd(float x, SegmentedSplineParams_c5 C = RRT_PARAMS)
 }
 
 
-
-static const SegmentedSplineParams_c9 ODT_48nits =
-{
-	// coefsLow[10]
-	{-1.6989700043, -1.6989700043, -1.4779000000, -1.2291000000, -0.8648000000, -0.4480000000, 0.0051800000, 0.4511080334, 0.9113744414, 0.9113744414},
-	// coefsHigh[10]
-	{0.5154386965, 0.8470437783, 1.1358000000, 1.3802000000, 1.5197000000, 1.5985000000, 1.6467000000, 1.6746091357, 1.6878733390, 1.6878733390},
-	{segmented_spline_c5_fwd(0.18 * pow(2., -6.5)), 0.02}, // minPoint
-	{segmented_spline_c5_fwd(0.18), 4.8}, // midPoint  
-	{segmented_spline_c5_fwd(0.18 * pow(2., 6.5)), 48.0}, // maxPoint
-	0.0, // slopeLow
-	0.04 // slopeHigh
-};
-
-static const SegmentedSplineParams_c9 ODT_1000nits =
-{
-	// coefsLow[10]
-	{-2.3010299957, -2.3010299957, -1.9312000000, -1.5205000000, -1.0578000000, -0.4668000000, 0.1193800000, 0.7088134201, 1.2911865799, 1.2911865799},
-	// coefsHigh[10]
-	{0.8089132070, 1.1910867930, 1.5683000000, 1.9483000000, 2.3083000000, 2.6384000000, 2.8595000000, 2.9872608805, 3.0127391195, 3.0127391195},
-	{segmented_spline_c5_fwd(0.18 * pow(2., -12.)), 0.005}, // minPoint
-	{segmented_spline_c5_fwd(0.18), 10.0}, // midPoint  
-	{segmented_spline_c5_fwd(0.18 * pow(2., 10.)), 1000.0}, // maxPoint
-	0.0, // slopeLow
-	0.06 // slopeHigh
-};
-
-static const SegmentedSplineParams_c9 ODT_2000nits =
-{
-	// coefsLow[10]
-	{-2.3010299957, -2.3010299957, -1.9312000000, -1.5205000000, -1.0578000000, -0.4668000000, 0.1193800000, 0.7088134201, 1.2911865799, 1.2911865799},
-	// coefsHigh[10]
-	{0.8019952042, 1.1980047958, 1.5943000000, 1.9973000000, 2.3783000000, 2.7684000000, 3.0515000000, 3.2746293562, 3.3274306351, 3.3274306351},
-	{segmented_spline_c5_fwd(0.18 * pow(2., -12.)), 0.005}, // minPoint
-	{segmented_spline_c5_fwd(0.18), 10.0}, // midPoint  
-	{segmented_spline_c5_fwd(0.18 * pow(2., 11.)), 2000.0}, // maxPoint
-	0.0, // slopeLow
-	0.12 // slopeHigh
-};
-
-static const SegmentedSplineParams_c9 ODT_4000nits =
-{
-	// coefsLow[10]
-	{-2.3010299957, -2.3010299957, -1.9312000000, -1.5205000000, -1.0578000000, -0.4668000000, 0.1193800000, 0.7088134201, 1.2911865799, 1.2911865799},
-	// coefsHigh[10]
-	{0.7973186613, 1.2026813387, 1.6093000000, 2.0108000000, 2.4148000000, 2.8179000000, 3.1725000000, 3.5344995451, 3.6696204376, 3.6696204376},
-	{segmented_spline_c5_fwd(0.18 * pow(2., -12.)), 0.005}, // minPoint
-	{segmented_spline_c5_fwd(0.18), 10.0}, // midPoint  
-	{segmented_spline_c5_fwd(0.18 * pow(2., 12.)), 4000.0}, // maxPoint
-	0.0, // slopeLow
-	0.3 // slopeHigh
-};
-
-
-
-
-
-
 float segmented_spline_c9_fwd(float x, SegmentedSplineParams_c9 C)
 {
 	const int N_KNOTS_LOW = 8;
@@ -590,11 +471,6 @@ float segmented_spline_c9_fwd(float x, SegmentedSplineParams_c9 C)
 	}
 
 	return pow10(logy);
-}
-
-float segmented_spline_c9_fwd(float x)
-{
-	return segmented_spline_c9_fwd(x, ODT_48nits);
 }
 
 float glow_fwd(float ycIn, float glowGainIn, float glowMid)
@@ -717,7 +593,8 @@ float3 rrt( float3 rgbIn)
 	// --- ACES to RGB rendering space --- //
 	aces = max(aces, 0.0f);  // avoids saturated negative colors from becoming positive in the matrix
 
-	
+	/// Test
+	//aces = rgbIn;
 
 	float3 rgbPre = mul(AP0_2_AP1_MAT, aces);
 
@@ -732,7 +609,7 @@ float3 rrt( float3 rgbIn)
 
 	// --- Apply the tonescale independently in rendering-space RGB --- //
 	float3 rgbPost;
-	rgbPost[0] = segmented_spline_c5_fwd(rgbPre[0]);
+	rgbPost.x = segmented_spline_c5_fwd(rgbPre[0]);
 	rgbPost[1] = segmented_spline_c5_fwd(rgbPre[1]);
 	rgbPost[2] = segmented_spline_c5_fwd(rgbPre[2]);
 

@@ -96,6 +96,13 @@ float3 Rec709ToXYZ(float3 rgb)
 	return mul(mat, rgb);
 }
 
+static const float3x3 sRGB_2_XYZ_MAT =
+{
+	0.41239089f, 0.35758430f, 0.18048084f,
+	0.21263906f, 0.71516860f, 0.07219233f,
+	0.01933082f, 0.11919472f, 0.95053232f
+};
+
 float3 LMSToXYZ(float3 c)
 {
 	float3x3 mat = float3x3(2.07018005669561320, -1.32645687610302100, 0.206616006847855170, 0.36498825003265756, 0.68046736285223520, -0.045421753075853236, -0.04959554223893212, -0.04942116118675749, 1.187995941732803400);
@@ -194,12 +201,10 @@ float Luminance(float3 color)
 
 float3 GammaToLinear(float3 c)
 {
-	float3 linearRgbLo = c * rcp(12.92);
-	float3 linearRgbHi = pow(c * rcp(1.055) + (0.055 * rcp(1.055)), 2.4);
-	return (c <= 0.04045) ? linearRgbLo : linearRgbHi;
+	return (c <= 0.04045) ? (c * rcp(12.92)) : (pow(c + 0.055, 2.4) * rcp(1.055));
 }
 
-float3 XYZToRgb(float3 xyz)
+float3 XYZToRec709(float3 xyz)
 {
 	float3x3 mat = float3x3(3.2404542, -1.5371385, -0.4985314, -0.9692660, 1.8760108, 0.0415560, 0.0556434, -0.2040259, 1.0572252);
 	return mul(mat, xyz);
@@ -208,13 +213,13 @@ float3 XYZToRgb(float3 xyz)
 float3 XyyToRgb(float3 xyy)
 {
 	float3 xyz = XyyToXYZ(xyy);
-	return XYZToRgb(xyz);
+	return XYZToRec709(xyz);
 }
 
 float3 LuvToRgb(float3 luv)
 {
 	float3 xyz = LuvToXYZ(luv);
-	return XYZToRgb(xyz);
+	return XYZToRec709(xyz);
 }
 
 float3 Rec2020ToRec709(float3 rec2020)
@@ -232,11 +237,9 @@ float3 P3D65ToRec709(float3 p3d65)
 float3 ICtCpToRec709(float3 iCtCp, float maxValue)
 {
 	float3 pqLms = ICtCpToPQLMS(iCtCp);
-	//return Rec2020ToRec709(rec2020);
 	float3 lms = ST2084ToLinear(pqLms, maxValue);
-	//float3 rec2020 = LMSToRec2020(lms);
 	float3 xyz = LMSToXYZ(lms);
-	return XYZToRgb(xyz);
+	return XYZToRec709(xyz);
 }
 
 // LUV
@@ -342,5 +345,12 @@ float4 YCoCgToRgbFastTonemapInverse(float4 tonemappedYCoCg)
 {
 	return float4(YCoCgToRgb(FastTonemapYCoCgInverse(tonemappedYCoCg.rgb)), tonemappedYCoCg.a);
 }
+
+static const float3x3 D65_2_D60_CAT =
+{
+	1.01303, 0.00610531, -0.014971,
+	0.00769823, 0.998165, -0.00503203,
+	-0.00284131, 0.00468516, 0.924507,
+};
 
 #endif
