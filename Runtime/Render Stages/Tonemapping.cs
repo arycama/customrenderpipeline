@@ -1,12 +1,20 @@
 ﻿using System;
-using System.Runtime.InteropServices;
-using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
 namespace Arycama.CustomRenderPipeline
 {
+    public enum HdrSettingsPreset
+    {
+        Default,
+        _1000NitHDR,
+        _1000NitHDRSharpened,
+        SDR,
+        EDRExtreme,
+        EDR,
+        Custom
+    }
+
     public class Tonemapping : RenderFeature
     {
         private readonly Settings settings;
@@ -33,6 +41,7 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Min(0.0f)] public float PaperWhiteNits { get; private set; } = 300.0f;
             [field: SerializeField, Range(0.0f, 1.0f)] public float HueShift { get; private set; } = 0.0f;
 
+            [field: SerializeField] public HdrSettingsPreset HdrSettingsPreset { get; private set; } = HdrSettingsPreset.Custom;
             [field: SerializeField] public AcesSettings AcesSettings { get; private set; } = new();
 
             public float NoiseIntensity => noiseIntensity;
@@ -156,48 +165,15 @@ namespace Arycama.CustomRenderPipeline
             data.resolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
         }
 
-        static Matrix3x4[] ColorMatrices = new Matrix3x4[3]
-        {
-	        // rec 709
-	        new (3.24096942f, -1.53738296f, -0.49861076f, 0.0f,
-            -0.96924388f, 1.87596786f, 0.04155510f, 0.0f,
-            0.05563002f, -0.20397684f, 1.05697131f, 0.0f),
-
-	        // DCI-P3
-	        new (2.72539496f, -1.01800334f, -0.44016343f, 0.0f,
-            -0.79516816f, 1.68973231f, 0.02264720f, 0.0f,
-            0.04124193f, -0.08763910f, 1.10092998f, 0.0f),
-
-	        // BT2020
-	        new(1.71665096f, -0.35567081f, -0.25336623f, 0.0f,
-            -0.66668433f, 1.61648130f, 0.01576854f, 0.0f,
-            0.01763985f, -0.04277061f, 0.94210327f, 0.0f)
-        };
-
-        static Matrix3x4[] ColorMatricesInv = new Matrix3x4[3]
-        {
-	        //rec709 to XYZ
-	        new (0.41239089f, 0.35758430f, 0.18048084f, 0.0f,
-            0.21263906f, 0.71516860f, 0.07219233f, 0.0f,
-            0.01933082f, 0.11919472f, 0.95053232f, 0.0f),
-
-	        //DCI - P3 2 XYZ
-	        new (0.44516969f, 0.27713439f, 0.17228261f, 0.0f,
-            0.20949161f, 0.72159523f, 0.06891304f, 0.0f,
-            0.00000000f, 0.04706058f, 0.90735501f, 0.0f),
-
-	        //bt2020 2 XYZ
-	        new (0.63695812f, 0.14461692f, 0.16888094f, 0.0f,
-            0.26270023f, 0.67799807f, 0.05930171f, 0.0f,
-            0.00000000f, 0.02807269f, 1.06098485f, 0.0f)
-        };
-
         struct AcesConstants
         {
             public Vector2 ACES_min;
             public Vector2 ACES_mid;
             public Vector2 ACES_max;
             public Vector2 ACES_slope;
+
+            public Vector2 CinemaLimits;
+            public Vector2 Padding;
 
             // No array support..
             public Vector4 ACES_coef0;
@@ -210,29 +186,48 @@ namespace Arycama.CustomRenderPipeline
             public Vector4 ACES_coef7;
             public Vector4 ACES_coef8;
             public Vector4 ACES_coef9;
-
-            public Matrix3x4 colorMat;
-            public Matrix3x4 colorMatInv;
-            public Vector2 CinemaLimits;
-            public int OutputMode;
-            public int flags;
-            public float surroundGamma;
-            public float saturation;
-            public float postScale;
-            public float gamma;
         };
+
+        public float MaxLevel => settings.AcesSettings.maxLevel;
 
         AcesConstants GetAcesConstants()
         {
-            var settings = this.settings.AcesSettings;
+            var preset = this.settings.HdrSettingsPreset;
+
+            //preset = this.settings.HdrEnabled ? HdrSettingsPreset._1000NitHDRSharpened : HdrSettingsPreset.SDR;
+
+            AcesSettings hdrSettings;
+            switch(preset)
+            {
+                case HdrSettingsPreset.Default:
+                    hdrSettings = new(ODTCurve.ODT_LDR_Ref, 0, 8, -1, 1);
+                    break;
+                case HdrSettingsPreset._1000NitHDR:
+                    hdrSettings = new AcesSettings(ODTCurve.ODT_1000Nit_Adj, -12, 10, MaxLevel, 1);
+                    break;
+                case HdrSettingsPreset._1000NitHDRSharpened:
+                    hdrSettings = new AcesSettings(ODTCurve.ODT_1000Nit_Adj, -8, 8, MaxLevel, 1);
+                    break;
+                case HdrSettingsPreset.SDR:
+                    hdrSettings = new AcesSettings(ODTCurve.ODT_LDR_Adj, -6.5f, 6.5f, -1, 1);
+                    break;
+                case HdrSettingsPreset.EDRExtreme:
+                    hdrSettings = new AcesSettings(ODTCurve.ODT_1000Nit_Adj, -12, 9, MaxLevel, 1);
+                    break;
+                case HdrSettingsPreset.EDR:
+                    hdrSettings = new AcesSettings(ODTCurve.ODT_1000Nit_Adj, -8, 8, MaxLevel, 3);
+                    break;
+                case HdrSettingsPreset.Custom:
+                    hdrSettings = this.settings.AcesSettings;
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(this.settings.HdrSettingsPreset));
+            }
+
             AcesConstants constants;
 
-            // setup the color matrix
-            constants.colorMat = ColorMatrices[(int)settings.ColorSpace];
-            constants.colorMatInv = ColorMatricesInv[(int)settings.ColorSpace];
-
             // setup the aces data
-            var aces = Aces.GetAcesODTData(settings.ToneCurve, settings.minStops, settings.maxStops, settings.maxLevel, settings.midGrayScale);
+            var aces = Aces.GetAcesODTData(hdrSettings.ToneCurve, hdrSettings.minStops, hdrSettings.maxStops, hdrSettings.maxLevel, hdrSettings.midGrayScale);
 
             constants.ACES_coef0 = aces.coefs[0];
             constants.ACES_coef1 = aces.coefs[1];
@@ -251,19 +246,36 @@ namespace Arycama.CustomRenderPipeline
 
             constants.CinemaLimits.x = aces.minPoint.y;
             constants.CinemaLimits.y = aces.maxPoint.y;
-
-            constants.flags = settings.adjustWP ? 0x4 : 0x0;
-            constants.flags |= settings.desaturate ? 0x2 : 0x0;
-            constants.flags |= settings.dimSurround ? 0x1 : 0x0;
-            constants.flags |= settings.luminanceOnly ? 0x8 : 0x0;
-
-            constants.OutputMode = (int)settings.EOTF;
-            constants.saturation = settings.toneCurveSaturation;
-            constants.surroundGamma = settings.surroundGamma;
-            constants.gamma = settings.outputGamma;
-            constants.postScale = 1.0f;
+            constants.Padding = Vector2.zero;
 
             return constants;
         }
     }
+
+    [Serializable]
+    public class AcesSettings
+    {
+        public ODTCurve ToneCurve = ODTCurve.ODT_LDR_Ref; // Tone Curve
+        [Range(-14.0f, 0.0f)] public float minStops = 0.0f;
+        [Range(0.0f, 20.0f)] public float maxStops = 8.0f;
+        [Range(-1.0f, 4000.0f)] public float maxLevel = -1.0f; // "Max Level (nits -1=default)"
+        [Range(0.01f, 100.0f)] public float midGrayScale = 1.0f; // "Middle Gray Scale"
+
+        public AcesSettings()
+        {
+            ToneCurve = ODTCurve.ODT_LDR_Ref;
+            maxStops = 8.0f;
+            maxLevel = -1.0f;
+            midGrayScale = 1.0f;
+        }
+
+        public AcesSettings(ODTCurve toneCurve, float minStops, float maxStops, float maxLevel, float midGrayScale)
+        {
+            ToneCurve = toneCurve;
+            this.minStops = minStops;
+            this.maxStops = maxStops;
+            this.maxLevel = maxLevel;
+            this.midGrayScale = midGrayScale;
+        }
+    };
 }

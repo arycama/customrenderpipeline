@@ -1,7 +1,6 @@
-// Copyright(c) 2016, NVIDIA CORPORATION.All rights reserved.
-//
+#include "Color.hlsl"
+
 static const float TINY = 1e-10;
-static const float M_PI = 3.1415927f;
 static const float HALF_MAX = 65504.0f;
 
 static const float3x3 AP0_2_XYZ_MAT =
@@ -64,35 +63,6 @@ float rgb_2_saturation(float3 rgb)
 	return (max(max_f3(rgb), TINY) - max(min_f3(rgb), TINY)) / max(max_f3(rgb), 1e-2);
 }
 
-/* ---- Conversion Functions ---- */
-// Various transformations between color encodings and data representations
-//
-
-// Transformations between CIE XYZ tristimulus values and CIE x,y 
-// chromaticity coordinates
-float3 XYZ_2_xyY(float3 XYZ)
-{
-	float3 xyY;
-	float divisor = (XYZ[0] + XYZ[1] + XYZ[2]);
-	if(divisor == 0.)
-		divisor = 1e-10;
-	xyY[0] = XYZ[0] / divisor;
-	xyY[1] = XYZ[1] / divisor;
-	xyY[2] = XYZ[1];
-
-	return xyY;
-}
-
-float3 xyY_2_XYZ(float3 xyY)
-{
-	float3 XYZ;
-	XYZ[0] = xyY[0] * xyY[2] / max(xyY[1], 1e-10);
-	XYZ[1] = xyY[2];
-	XYZ[2] = (1.0 - xyY[0] - xyY[1]) * xyY[2] / max(xyY[1], 1e-10);
-
-	return XYZ;
-}
-
 // Transformations from RGB to other color representations
 float rgb_2_hue(float3 rgb)
 {
@@ -107,7 +77,7 @@ float rgb_2_hue(float3 rgb)
 	}
 	else
 	{
-		hue = (180. / M_PI) * atan2(sqrt(3) * (rgb[1] - rgb[2]), 2 * rgb[0] - rgb[1] - rgb[2]);
+		hue = (180. / Pi) * atan2(sqrt(3) * (rgb[1] - rgb[2]), 2 * rgb[0] - rgb[1] - rgb[2]);
 	}
 
 	if(hue < 0.)
@@ -140,17 +110,6 @@ float rgb_2_yc(float3 rgb, float ycRadiusWeight = 1.75)
 	return (b + g + r + ycRadiusWeight * chroma) / 3.;
 }
 
-/* ODT utility functions */
-float Y_2_linCV(float Y, float Ymax, float Ymin)
-{
-	return (Y - Ymin) / (Ymax - Ymin);
-}
-
-float linCV_2_Y(float linCV, float Ymax, float Ymin)
-{
-	return linCV * (Ymax - Ymin) + Ymin;
-}
-
 float3x3 calc_sat_adjust_matrix(float sat, float3 rgb2Y)
 {
 	//
@@ -175,131 +134,10 @@ float3x3 calc_sat_adjust_matrix(float sat, float3 rgb2Y)
 	return M;
 }
 
-/* ---- Signal encode/decode functions ---- */
-
-float moncurve_f(float x, float gamma, float offs)
-{
-	// Forward monitor curve
-	float y;
-	const float fs = ((gamma - 1.0) / offs) * pow(offs * gamma / ((gamma - 1.0) * (1.0 + offs)), gamma);
-	const float xb = offs / (gamma - 1.0);
-	if(x >= xb)
-		y = pow((x + offs) / (1.0 + offs), gamma);
-	else
-		y = x * fs;
-	return y;
-}
-
-float moncurve_r(float y, float gamma, float offs)
-{
-	// Reverse monitor curve
-	float x;
-	const float yb = pow(offs * gamma / ((gamma - 1.0) * (1.0 + offs)), gamma);
-	const float rs = pow((gamma - 1.0) / offs, gamma - 1.0) * pow((1.0 + offs) / gamma, gamma);
-	if(y >= yb)
-		x = (1.0 + offs) * pow(y, 1.0 / gamma) - offs;
-	else
-		x = y * rs;
-	return x;
-}
-
-// Base functions from SMPTE ST 2084-2014
-
-// Constants from SMPTE ST 2084-2014
-static const float pq_m1 = 0.1593017578125; // ( 2610.0 / 4096.0 ) / 4.0;
-static const float pq_m2 = 78.84375; // ( 2523.0 / 4096.0 ) * 128.0;
-static const float pq_c1 = 0.8359375; // 3424.0 / 4096.0 or pq_c3 - pq_c2 + 1.0;
-static const float pq_c2 = 18.8515625; // ( 2413.0 / 4096.0 ) * 32.0;
-static const float pq_c3 = 18.6875; // ( 2392.0 / 4096.0 ) * 32.0;
-
-static const float pq_C = 10000.0;
-
-// Converts from the non-linear perceptually quantized space to linear cd/m^2
-// Note that this is in float, and assumes normalization from 0 - 1
-// (0 - pq_C for linear) and does not handle the integer coding in the Annex 
-// sections of SMPTE ST 2084-2014
-float pq_f(float N)
-{
-	// Note that this does NOT handle any of the signal range
-	// considerations from 2084 - this assumes full range (0 - 1)
-	float Np = pow(N, 1.0 / pq_m2);
-	float L = Np - pq_c1;
-	if(L < 0.0)
-		L = 0.0;
-	L = L / (pq_c2 - pq_c3 * Np);
-	L = pow(L, 1.0 / pq_m1);
-	return L * pq_C; // returns cd/m^2
-}
-
-// Converts from linear cd/m^2 to the non-linear perceptually quantized space
-// Note that this is in float, and assumes normalization from 0 - 1
-// (0 - pq_C for linear) and does not handle the integer coding in the Annex 
-// sections of SMPTE ST 2084-2014
-float pq_r(float C)
-{
-	// Note that this does NOT handle any of the signal range
-	// considerations from 2084 - this returns full range (0 - 1)
-	float L = C / pq_C;
-	float Lm = pow(L, pq_m1);
-	float N = (pq_c1 + pq_c2 * Lm) / (1.0 + pq_c3 * Lm);
-	N = pow(N, pq_m2);
-	return N;
-}
-
-float3 pq_r_f3(float3 In)
-{
-	// converts from linear cd/m^2 to PQ code values
-
-	float3 Out;
-	Out[0] = pq_r(In[0]);
-	Out[1] = pq_r(In[1]);
-	Out[2] = pq_r(In[2]);
-
-	return Out;
-}
-
-float3 pq_f_f3(float3 In)
-{
-	// converts from PQ code values to linear cd/m^2
-
-	float3 Out;
-	Out[0] = pq_f(In[0]);
-	Out[1] = pq_f(In[1]);
-	Out[2] = pq_f(In[2]);
-
-	return Out;
-}
-
-// Copyright(c) 2016, NVIDIA CORPORATION.All rights reserved.
-//
-// Redistribution and use in source and binary forms, with or without
-// modification, are permitted provided that the following conditions
-// are met :
-//  * Redistributions of source code must retain the above copyright
-//    notice, this list of conditions and the following disclaimer.
-//  * Redistributions in binary form must reproduce the above copyright
-//    notice, this list of conditions and the following disclaimer in the
-//    documentation and / or other materials provided with the distribution.
-//  * Neither the name of NVIDIA CORPORATION nor the names of its
-//    contributors may be used to endorse or promote products derived
-//    from this software without specific prior written permission.
-//
-// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
-// EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-// IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
-// PURPOSE ARE DISCLAIMED.IN NO EVENT SHALL THE COPYRIGHT OWNER OR
-// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
-// EXEMPLARY, OR CONSEQUENTIAL DAMAGES(INCLUDING, BUT NOT LIMITED TO,
-// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
-// OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 
 float pow10(float f)
 {
-	return pow(10.0f, f);
+	return pow(10.0, f);
 }
 
 // Textbook monomial to basis-function conversion matrix.
@@ -309,8 +147,6 @@ static const float3x3 M =
 	{-1.0, 1.0, 0.5},
 	{0.5, 0.0, 0.0}
 };
-
-
 
 struct SplineMapPoint
 {
@@ -340,7 +176,6 @@ struct SegmentedSplineParams_c9
 	float slopeHigh; // log-log slope of high linear extension
 };
 
-
 static const SegmentedSplineParams_c5 RRT_PARAMS =
 {
 	// coefsLow[6]
@@ -353,7 +188,6 @@ static const SegmentedSplineParams_c5 RRT_PARAMS =
 	0.0, // slopeLow
 	0.0 // slopeHigh
 };
-
 
 float segmented_spline_c5_fwd(float x, SegmentedSplineParams_c5 C = RRT_PARAMS)
 {
@@ -412,9 +246,7 @@ float segmented_spline_c5_fwd(float x, SegmentedSplineParams_c5 C = RRT_PARAMS)
 	}
 
 	return pow10(logy);
-
 }
-
 
 float segmented_spline_c9_fwd(float x, SegmentedSplineParams_c9 C)
 {
@@ -562,56 +394,52 @@ float center_hue(float hue, float centerH)
 	return hueCentered;
 }
 
+// "Glow" module constants
+static const float RRT_GLOW_GAIN = 0.05;
+static const float RRT_GLOW_MID = 0.08;
+
+// Red modifier constants
+static const float RRT_RED_SCALE = 0.82;
+static const float RRT_RED_PIVOT = 0.03;
+static const float RRT_RED_HUE = 0.0;
+static const float RRT_RED_WIDTH = 135.0;
+
+static const float RRT_SAT_FACTOR = 0.96;
+
 float3 rrt( float3 rgbIn)
 {
-	
-	// "Glow" module constants
-	const float RRT_GLOW_GAIN = 0.05;
-	const float RRT_GLOW_MID = 0.08;
 	// --- Glow module --- //
 	float saturation = rgb_2_saturation(rgbIn);
 	float ycIn = rgb_2_yc(rgbIn);
 	float s = sigmoid_shaper((saturation - 0.4) / 0.2);
-	float addedGlow = 1. + glow_fwd(ycIn, RRT_GLOW_GAIN * s, RRT_GLOW_MID);
+	float addedGlow = 1.0 + glow_fwd(ycIn, RRT_GLOW_GAIN * s, RRT_GLOW_MID);
 
 	float3 aces = addedGlow * rgbIn;
-
-
-	// Red modifier constants
-	const float RRT_RED_SCALE = 0.82;
-	const float RRT_RED_PIVOT = 0.03;
-	const float RRT_RED_HUE = 0.;
-	const float RRT_RED_WIDTH = 135.;
+	
 	// --- Red modifier --- //
 	float hue = rgb_2_hue(aces);
 	float centeredHue = center_hue(hue, RRT_RED_HUE);
 	float hueWeight = cubic_basis_shaper(centeredHue, RRT_RED_WIDTH);
 
-	aces[0] = aces[0] + hueWeight * saturation *(RRT_RED_PIVOT - aces[0]) * (1. - RRT_RED_SCALE);
-
+	aces.r += hueWeight * saturation * (RRT_RED_PIVOT - aces.r) * (1.0 - RRT_RED_SCALE);
 
 	// --- ACES to RGB rendering space --- //
 	aces = max(aces, 0.0f);  // avoids saturated negative colors from becoming positive in the matrix
-
-	/// Test
-	//aces = rgbIn;
-
 	float3 rgbPre = mul(AP0_2_AP1_MAT, aces);
-
 	rgbPre = clamp(rgbPre, 0., HALF_MAX);
 
 	// Desaturation contants
 	const float RRT_SAT_FACTOR = 0.96;
 	const float3x3 RRT_SAT_MAT = calc_sat_adjust_matrix(RRT_SAT_FACTOR, AP1_RGB2Y);
+	
 	// --- Global desaturation --- //
 	rgbPre = mul(RRT_SAT_MAT, rgbPre);
 
-
 	// --- Apply the tonescale independently in rendering-space RGB --- //
 	float3 rgbPost;
-	rgbPost.x = segmented_spline_c5_fwd(rgbPre[0]);
-	rgbPost[1] = segmented_spline_c5_fwd(rgbPre[1]);
-	rgbPost[2] = segmented_spline_c5_fwd(rgbPre[2]);
+	rgbPost.x = segmented_spline_c5_fwd(rgbPre.x);
+	rgbPost.y = segmented_spline_c5_fwd(rgbPre.y);
+	rgbPost.z = segmented_spline_c5_fwd(rgbPre.z);
 
 	// --- RGB rendering space to OCES --- //
 	float3 rgbOces = mul(AP1_2_AP0_MAT, rgbPost);

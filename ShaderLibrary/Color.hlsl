@@ -29,7 +29,23 @@ static const uint TransferFunctionLinear = 3;
 static const float SceneViewNitsForPaperWhite = 160.0;
 static const float SceneViewMaxDisplayNits = 160.0;
 
-static const float kReferenceLuminanceWhiteForRec709 = 100.0;
+static const float kReferenceLuminanceWhiteForRec709 = 80.0;
+
+// D60 to D65 White Point
+static const float3x3 D60_2_D65_CAT =
+{
+	0.987224, -0.00611327, 0.0159533,
+	-0.00759836, 1.00186, 0.00533002,
+	0.00307257, -0.00509595, 1.08168,
+};
+
+// D65 to D60 White Point
+static const float3x3 D65_2_D60_CAT =
+{
+	1.01303, 0.00610531, -0.014971,
+	0.00769823, 0.998165, -0.00503203,
+	-0.00284131, 0.00468516, 0.924507,
+};
 
 // Color spaces listed in the following order: XYZ, Xyy, LMS, RGB/Rec709, Rec2020, Luv, P3, ICtCp, YCoCg. RGB is Rec709 (Linear, not gamma) unless noted
 
@@ -276,6 +292,14 @@ float3 Rec709ToP3D65(float3 rec709)
 	return mul(mat, rec709);
 }
 
+// XYZ to P3
+static const float3x3 XYZ_2_DCIP3 =
+{
+	2.7253940305, -1.0180030062, -0.4401631952,
+	-0.7951680258, 1.6897320548, 0.0226471906,
+	0.0412418914, -0.0876390192, 1.1009293786
+};
+
 // ICtCp
 // RGB with sRGB/Rec.709 primaries to ICtCp
 float3 PQLMSToICtCp(float3 lms)
@@ -345,12 +369,5 @@ float4 YCoCgToRgbFastTonemapInverse(float4 tonemappedYCoCg)
 {
 	return float4(YCoCgToRgb(FastTonemapYCoCgInverse(tonemappedYCoCg.rgb)), tonemappedYCoCg.a);
 }
-
-static const float3x3 D65_2_D60_CAT =
-{
-	1.01303, 0.00610531, -0.014971,
-	0.00769823, 0.998165, -0.00503203,
-	-0.00284131, 0.00468516, 0.924507,
-};
 
 #endif
