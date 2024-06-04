@@ -156,7 +156,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		
 		case ColorGamutRec709:
 			color = XYZToRec709(color);
-			color = color * PaperWhiteNits / kReferenceLuminanceWhiteForRec709;
+			color = color / kReferenceLuminanceWhiteForRec709;
 			break;
 		
 		case ColorGamutRec2020:
@@ -167,7 +167,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		
 		case ColorGamutHDR10:
 		{
-			color = XYZToRec2020(color) * PaperWhiteNits;
+			color = XYZToRec2020(color);
 			color = LinearToST2084(color);
 			break;
 		}
