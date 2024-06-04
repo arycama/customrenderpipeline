@@ -209,12 +209,12 @@ namespace Arycama.CustomRenderPipeline
                 this.nonLinearDepth = nonLinearDepth;
             }
 
-            public void SetInputs(RenderPass pass)
+            public readonly void SetInputs(RenderPass pass)
             {
                 pass.ReadTexture("_VolumetricLighting", volumetricLighting);
             }
 
-            public void SetProperties(RenderPass pass, CommandBuffer command)
+            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
                 pass.SetVector(command, "_VolumetricLightScale", volumetricLighting.Scale);
                 pass.SetFloat(command, "_VolumetricLightNear", volumetricLightNear);

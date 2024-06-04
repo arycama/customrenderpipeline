@@ -31,14 +31,14 @@ public struct TerrainRenderData : IRenderPassData
         this.terrainLayerData = terrainLayerData;
     }
 
-    public void SetInputs(RenderPass pass)
+    public readonly void SetInputs(RenderPass pass)
     {
         pass.ReadTexture("_TerrainHeightmapTexture", terrainHeightmapTexture);
         pass.ReadTexture("_TerrainNormalMap", terrainNormalMap);
         pass.ReadTexture("IdMap", idMap);
     }
 
-    public void SetProperties(RenderPass pass, CommandBuffer command)
+    public readonly void SetProperties(RenderPass pass, CommandBuffer command)
     {
         pass.SetBuffer(command, "TerrainLayerData", terrainLayerData);
 

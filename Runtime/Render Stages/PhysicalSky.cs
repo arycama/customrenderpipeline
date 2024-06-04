@@ -589,7 +589,7 @@ namespace Arycama.CustomRenderPipeline
                 this.cdfLookupSize = cdfLookupSize;
             }
 
-            public void SetInputs(RenderPass pass)
+            public readonly void SetInputs(RenderPass pass)
             {
                 pass.ReadBuffer("AtmosphereProperties", atmospherePropertiesBuffer);
                 pass.ReadTexture("_Transmittance", transmittance);
@@ -600,7 +600,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_SkyCdf", cdfLookup);
             }
 
-            public void SetProperties(RenderPass pass, CommandBuffer command)
+            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
                 pass.SetVector(command, "_AtmosphereTransmittanceRemap", transmittanceRemap);
                 pass.SetVector(command, "_MultiScatterRemap", multiScatterRemap);
@@ -621,13 +621,13 @@ namespace Arycama.CustomRenderPipeline
                 this.reflectionProbe = reflectionProbe;
             }
 
-            public void SetInputs(RenderPass pass)
+            public readonly void SetInputs(RenderPass pass)
             {
                 pass.ReadTexture("_SkyReflection", reflectionProbe);
                 pass.ReadBuffer("AmbientSh", ambientBuffer);
             }
 
-            public void SetProperties(RenderPass pass, CommandBuffer command)
+            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
             }
         }
@@ -687,12 +687,12 @@ public struct SkyResultData : IRenderPassData
         SkyTexture = skyTexture ?? throw new ArgumentNullException(nameof(skyTexture));
     }
 
-    public void SetInputs(RenderPass pass)
+    public readonly void SetInputs(RenderPass pass)
     {
         pass.ReadTexture("SkyTexture", SkyTexture);
     }
 
-    public void SetProperties(RenderPass pass, CommandBuffer command)
+    public readonly void SetProperties(RenderPass pass, CommandBuffer command)
     {
         pass.SetVector(command, "SkyTextureScaleLimit", SkyTexture.ScaleLimit2D);
     }

@@ -783,12 +783,12 @@ namespace Arycama.CustomRenderPipeline
             this.waterShadowExtinction = waterShadowExtinction;
         }
 
-        public void SetInputs(RenderPass pass)
+        public readonly void SetInputs(RenderPass pass)
         {
             pass.ReadTexture("_WaterShadows", waterShadowTexture);
         }
 
-        public void SetProperties(RenderPass pass, CommandBuffer command)
+        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
             pass.SetMatrix(command, "_WaterShadowMatrix1", waterShadowMatrix);
             pass.SetFloat(command, "_WaterShadowNear", waterShadowNear);
@@ -830,12 +830,12 @@ namespace Arycama.CustomRenderPipeline
             CullingPlanes = cullingPlanes;
         }
 
-        public void SetInputs(RenderPass pass)
+        public readonly void SetInputs(RenderPass pass)
         {
             pass.ReadBuffer("_PatchData", PatchDataBuffer);
         }
 
-        public void SetProperties(RenderPass pass, CommandBuffer command)
+        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
         }
     }
@@ -851,12 +851,12 @@ namespace Arycama.CustomRenderPipeline
             PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
         }
 
-        public void SetInputs(RenderPass pass)
+        public readonly void SetInputs(RenderPass pass)
         {
             pass.ReadBuffer("_PatchData", PatchDataBuffer);
         }
 
-        public void SetProperties(RenderPass pass, CommandBuffer command)
+        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
         }
     }
@@ -874,14 +874,14 @@ namespace Arycama.CustomRenderPipeline
             OceanNormalFoamSmoothness = oceanNormalFoamSmoothness ?? throw new ArgumentNullException(nameof(oceanNormalFoamSmoothness));
         }
 
-        public void SetInputs(RenderPass pass)
+        public readonly void SetInputs(RenderPass pass)
         {
             pass.ReadTexture("OceanDisplacement", OceanDisplacement);
             pass.ReadTexture("OceanDisplacementHistory", OceanDisplacementHistory);
             pass.ReadTexture("OceanNormalFoamSmoothness", OceanNormalFoamSmoothness);
         }
 
-        public void SetProperties(RenderPass pass, CommandBuffer command)
+        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
         }
     }
@@ -895,12 +895,12 @@ namespace Arycama.CustomRenderPipeline
             this.waterNormalFoam = waterNormalFoam ?? throw new ArgumentNullException(nameof(waterNormalFoam));
         }
 
-        public void SetInputs(RenderPass pass)
+        public readonly void SetInputs(RenderPass pass)
         {
             pass.ReadTexture("_WaterNormalFoam", waterNormalFoam);
         }
 
-        public void SetProperties(RenderPass pass, CommandBuffer command)
+        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
         }
     }
@@ -914,12 +914,12 @@ namespace Arycama.CustomRenderPipeline
             this.underwaterLighting = waterNormalFoam ?? throw new ArgumentNullException(nameof(waterNormalFoam));
         }
 
-        public void SetInputs(RenderPass pass)
+        public readonly void SetInputs(RenderPass pass)
         {
             pass.ReadTexture("_UnderwaterResult", underwaterLighting);
         }
 
-        public void SetProperties(RenderPass pass, CommandBuffer command)
+        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
             pass.SetVector(command, "_UnderwaterResultScaleLimit", underwaterLighting.ScaleLimit2D);
         }

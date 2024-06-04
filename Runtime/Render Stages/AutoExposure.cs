@@ -228,12 +228,12 @@ namespace Arycama.CustomRenderPipeline
                 IsFirst = isFirst;
             }
 
-            public void SetInputs(RenderPass pass)
+            public readonly void SetInputs(RenderPass pass)
             {
                 pass.ReadBuffer("Exposure", exposureBuffer);
             }
 
-            public void SetProperties(RenderPass pass, CommandBuffer command)
+            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
             }
         }

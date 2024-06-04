@@ -142,13 +142,13 @@ namespace Arycama.CustomRenderPipeline
                 this.shadowFilterSigma = shadowFilterSigma;
             }
 
-            public void SetInputs(RenderPass pass)
+            public readonly void SetInputs(RenderPass pass)
             {
                 pass.ReadTexture("_DirectionalShadows", directionalShadows);
                 pass.ReadTexture("_PointShadows", pointShadows);
             }
 
-            public void SetProperties(RenderPass pass, CommandBuffer command)
+            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
                 pass.SetFloat(command, "ShadowMapResolution", shadowMapResolution);
                 pass.SetFloat(command, "RcpShadowMapResolution", rcpShadowMapResolution);

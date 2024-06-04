@@ -209,12 +209,12 @@ public class DiffuseGlobalIllumination
             this.intensity = intensity;
         }
 
-        public void SetInputs(RenderPass pass)
+        public readonly void SetInputs(RenderPass pass)
         {
             pass.ReadTexture("ScreenSpaceGlobalIllumination", ScreenSpaceGlobalIllumination);
         }
 
-        public void SetProperties(RenderPass pass, CommandBuffer command)
+        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
             pass.SetVector(command, "ScreenSpaceGlobalIlluminationScaleLimit", ScreenSpaceGlobalIllumination.ScaleLimit2D);
             pass.SetFloat(command, "DiffuseGiStrength", intensity);

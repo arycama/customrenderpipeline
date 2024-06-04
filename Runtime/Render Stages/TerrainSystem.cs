@@ -631,12 +631,12 @@ public struct TerrainRenderCullResult : IRenderPassData
         PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
     }
 
-    public void SetInputs(RenderPass pass)
+    public readonly void SetInputs(RenderPass pass)
     {
         pass.ReadBuffer("_PatchData", PatchDataBuffer);
     }
 
-    public void SetProperties(RenderPass pass, CommandBuffer command)
+    public readonly void SetProperties(RenderPass pass, CommandBuffer command)
     {
     }
 }
@@ -652,12 +652,12 @@ public struct TerrainShadowCullResult : IRenderPassData
         PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
     }
 
-    public void SetInputs(RenderPass pass)
+    public readonly void SetInputs(RenderPass pass)
     {
         pass.ReadBuffer("_PatchData", PatchDataBuffer);
     }
 
-    public void SetProperties(RenderPass pass, CommandBuffer command)
+    public readonly void SetProperties(RenderPass pass, CommandBuffer command)
     {
     }
 }

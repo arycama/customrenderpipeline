@@ -190,7 +190,7 @@ public class LitData : IDisposable
             this.ggxDirectionalAlbedoMSScaleOffset = ggxDirectionalAlbedoMSScaleOffset;
         }
 
-        public void SetInputs(RenderPass pass)
+        public readonly void SetInputs(RenderPass pass)
         {
             pass.ReadTexture("_GGXDirectionalAlbedo", directionalAlbedo);
             pass.ReadTexture("_GGXAverageAlbedo", averageAlbedo);
@@ -199,7 +199,7 @@ public class LitData : IDisposable
             pass.ReadTexture("_GGXSpecularOcclusion", specularOcclusion);
         }
 
-        public void SetProperties(RenderPass pass, CommandBuffer command)
+        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
             pass.SetVector(command, "_GGXDirectionalAlbedoRemap", ggxDirectionalAlbedoRemap);
             pass.SetVector(command, "_GGXAverageAlbedoRemap", ggxAverageAlbedoRemap);

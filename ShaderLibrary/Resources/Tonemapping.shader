@@ -11,6 +11,7 @@ Shader"Hidden/Tonemapping"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma enable_d3d11_debug_symbols
             #include "Tonemapping.hlsl"
             ENDHLSL
           

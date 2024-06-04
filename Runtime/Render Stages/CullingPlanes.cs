@@ -11,7 +11,7 @@ namespace Arycama.CustomRenderPipeline
 
         public int Count
         {
-            get
+            readonly get
             {
                 return count;
             }

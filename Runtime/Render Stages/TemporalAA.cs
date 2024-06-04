@@ -75,11 +75,11 @@ namespace Arycama.CustomRenderPipeline
                 this.boxFilterWeights1 = boxFilterWeights1;
             }
 
-            public void SetInputs(RenderPass pass)
+            public readonly void SetInputs(RenderPass pass)
             {
             }
 
-            public void SetProperties(RenderPass pass, CommandBuffer command)
+            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
                 pass.SetVector(command, "_Jitter", jitter);
                 pass.SetVector(command, "_PreviousJitter", previousJitter);

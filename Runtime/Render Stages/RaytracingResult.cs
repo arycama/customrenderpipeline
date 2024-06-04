@@ -13,12 +13,12 @@ namespace Arycama.CustomRenderPipeline
             Rtas = rtas ?? throw new ArgumentNullException(nameof(rtas));
         }
 
-        public void SetInputs(RenderPass pass)
+        public readonly void SetInputs(RenderPass pass)
         {
             // TODO: RTAS input handling
         }
 
-        public void SetProperties(RenderPass pass, CommandBuffer command)
+        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
         }
     }

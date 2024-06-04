@@ -203,12 +203,12 @@ namespace Arycama.CustomRenderPipeline
                 AmbientOcclusion = ambientOcclusion ?? throw new ArgumentNullException(nameof(ambientOcclusion));
             }
 
-            public void SetInputs(RenderPass pass)
+            public readonly void SetInputs(RenderPass pass)
             {
                 pass.ReadTexture("AmbientOcclusion", AmbientOcclusion);
             }
 
-            public void SetProperties(RenderPass pass, CommandBuffer command)
+            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
             }
         }
