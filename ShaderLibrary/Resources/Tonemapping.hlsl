@@ -23,55 +23,10 @@ cbuffer AcesConstants
 	float2 ACES_slope;
 	float2 CinemaLimits;
 	float2 AcesConstantsPadding;
-	float4 ACES_coefs[10];
+	float4 packedCoefs[5]; // Packed, 10 low and 10 high coefs
 }
 
-// TODO: Convert this to use the function in ACES.hlsl
-float uniform_segmented_spline_c9_fwd(float x)
-{
-	const int N_KNOTS_LOW = 8;
-	const int N_KNOTS_HIGH = 8;
-
-	// Check for negatives or zero before taking the log. If negative or zero,
-	// set to OCESMIN.
-	float xCheck = x <= 0 ? 1e-4 : x;
-
-	float logx = log10(xCheck);
-	float logy;
-
-	if(logx <= log10(ACES_min.x))
-	{
-		logy = logx * ACES_slope.x + (log10(ACES_min.y) - ACES_slope.x * log10(ACES_min.x));
-	}
-	else if((logx > log10(ACES_min.x)) && (logx < log10(ACES_mid.x)))
-	{
-		float knot_coord = (N_KNOTS_LOW - 1) * (logx - log10(ACES_min.x)) / (log10(ACES_mid.x) - log10(ACES_min.x));
-		int j = knot_coord;
-		float t = knot_coord - j;
-
-		float3 cf = {ACES_coefs[j].x, ACES_coefs[j + 1].x, ACES_coefs[j + 2].x};
-
-		float3 monomials = {t * t, t, 1};
-		logy = dot(monomials, mul(cf, M));
-	}
-	else if((logx >= log10(ACES_mid.x)) && (logx < log10(ACES_max.x)))
-	{
-		float knot_coord = (N_KNOTS_HIGH - 1) * (logx - log10(ACES_mid.x)) / (log10(ACES_max.x) - log10(ACES_mid.x));
-		int j = knot_coord;
-		float t = knot_coord - j;
-
-		float3 cf = {ACES_coefs[j].y, ACES_coefs[j + 1].y, ACES_coefs[j + 2].y};
-
-		float3 monomials = {t * t, t, 1};
-		logy = dot(monomials, mul(cf, M));
-	}
-	else //if ( logIn >= log10(ACES_max.x) )
-	{
-		logy = logx * ACES_slope.y + (log10(ACES_max.y) - ACES_slope.y * log10(ACES_max.x));
-	}
-
-	return pow(10, logy);
-}
+static const float unpackedCoefs[20] = (float[20])packedCoefs;
 
 float Y_2_linCV(float Y, float Ymax, float Ymin)
 {
@@ -112,50 +67,55 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
     // Convert blended result back to linear for OEFT
 	color = GammaToLinear(color);
 	
-	// Conert color to XYZ, then from D65 to D60 whitepoint, and finally to Aces colorspace
-	color = mul(XYZ_2_AP0_MAT, mul(D65_2_D60_CAT, Rec709ToXYZ(color)));
-
-	// Apply Reference Render Transform
-	color = rrt(color);
-
-	// Convert to AcesCG space
-	color = mul(AP0_2_AP1_MAT, color);
-
-	// Apply the Tone Curve
-	color.x = uniform_segmented_spline_c9_fwd(color.x);
-	color.y = uniform_segmented_spline_c9_fwd(color.y);
-	color.z = uniform_segmented_spline_c9_fwd(color.z);
-	
-	// Normalize to min/max values for sRGB?
-	if(ColorGamut == ColorGamutSRGB)
+	if(true)
 	{
-		color.x = Y_2_linCV(color.x, CinemaLimits.y, CinemaLimits.x);
-		color.y = Y_2_linCV(color.y, CinemaLimits.y, CinemaLimits.x);
-		color.z = Y_2_linCV(color.z, CinemaLimits.y, CinemaLimits.x);
+		// Convert color to XYZ, then from D65 to D60 whitepoint, and finally to Aces colorspace
+		color = mul(XYZ_2_AP0_MAT, mul(D65_2_D60_CAT, Rec709ToXYZ(color)));
+
+		// Apply Reference Render Transform
+		color = rrt(color);
+
+		// Convert to AcesCG space
+		color = mul(AP0_2_AP1_MAT, color);
 	
-		// Apply desaturation to compensate for luminance difference
-		// Saturation compensation factor
-		const float ODT_SAT_FACTOR = 0.93;
-		const float3x3 ODT_SAT_MAT = calc_sat_adjust_matrix(ODT_SAT_FACTOR, AP1_RGB2Y);
-		color = mul(ODT_SAT_MAT, color);
+		float coefsLow[10] = {unpackedCoefs[0], unpackedCoefs[1], unpackedCoefs[2], unpackedCoefs[3], unpackedCoefs[4], unpackedCoefs[5], unpackedCoefs[6], unpackedCoefs[7], unpackedCoefs[8], unpackedCoefs[9]};
+		float coefsHigh[10] = {unpackedCoefs[10], unpackedCoefs[11], unpackedCoefs[12], unpackedCoefs[13], unpackedCoefs[14], unpackedCoefs[15], unpackedCoefs[16], unpackedCoefs[17], unpackedCoefs[18], unpackedCoefs[19]};
+	
+		SegmentedSplineParams_c9 spline;
+		spline.coefsLow = coefsLow;
+		spline.coefsHigh = coefsHigh;
+		spline.minPoint = ACES_min;
+		spline.midPoint = ACES_mid;
+		spline.maxPoint = ACES_max;
+		spline.slopeLow = ACES_slope.x;
+		spline.slopeHigh = ACES_slope.y;
+	
+		// Apply the Tone Curve
+		color.x = segmented_spline_c9_fwd(color.x, spline);
+		color.y = segmented_spline_c9_fwd(color.y, spline);
+		color.z = segmented_spline_c9_fwd(color.z, spline);
+
+		// Convert from AcesCG back to XYZ
+		color = mul(AP1_2_XYZ_MAT, color);
+	
+		// Convert from D60 back to D65
+		color = mul(D60_2_D65_CAT, color);
+	
+		// Convert back to Rec709. Could instead convert straight to output colorspace, but 
+		color = XYZToRec709(color);
 	}
-
-	// Convert from AcesCG back to XYZ
-	color = mul(AP1_2_XYZ_MAT, color);
+	else
+		color *= 80;
 	
-	// Convert from D60 back to D65
-	color = mul(D60_2_D65_CAT, color);
-
 	// Hdr output
 	switch(ColorGamut)
 	{
 		// Return linear sRGB, hardware will convert to gmama
 		case ColorGamutSRGB:
-			color = XYZToRec709(color);
+			color = color * (PaperWhiteNits / HdrMaxNits);
 			break;
 		
 		case ColorGamutRec709:
-			color = XYZToRec709(color);
 			color = color / kReferenceLuminanceWhiteForRec709;
 			break;
 		
@@ -167,7 +127,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		
 		case ColorGamutHDR10:
 		{
-			color = XYZToRec2020(color);
+			color = Rec709ToRec2020(color);
 			color = LinearToST2084(color);
 			break;
 		}
@@ -178,7 +138,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		case ColorGamutP3D65G22:
 		{
 			// The HDR scene is in Rec.709, but the display is P3
-			color = mul(XYZ_2_DCIP3, color);
+			color = Rec709ToP3D65(color);
 			
 			// Apply gamma 2.2
 			color = pow(color / HdrMaxNits, rcp(2.2));
@@ -197,11 +157,8 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 				break;
 		
 			case ColorGamutRec709:
-			{
-				const float hdrScalar = SceneViewNitsForPaperWhite / kReferenceLuminanceWhiteForRec709;
-				color /= hdrScalar;
+				color *= kReferenceLuminanceWhiteForRec709 / SceneViewNitsForPaperWhite;
 				break;
-			}
 		
 			case ColorGamutRec2020:
 				break;
@@ -212,9 +169,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 			case ColorGamutHDR10:
 			{
 				// Unapply the ST.2084 curve to the scene.
-				color = ST2084ToLinear(color);
-				color = color / SceneViewNitsForPaperWhite;
-
+				color = ST2084ToLinear(color)  / SceneViewNitsForPaperWhite;
 				// The display is Rec.2020, but HDR scene is in Rec.709
 				color = Rec2020ToRec709(color);
 				break;
@@ -225,11 +180,9 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		
 			case ColorGamutP3D65G22:
 			{
-				const float hdrScalar = SceneViewNitsForPaperWhite / SceneViewMaxDisplayNits;
-
 				// Unapply gamma 2.2
 				color = pow(color, 2.2);
-				color = color / hdrScalar;
+				color *= SceneViewMaxDisplayNits / SceneViewNitsForPaperWhite;
 
 				// The display is P3, but he HDR scene is in Rec.709
 				color = P3D65ToRec709(color);

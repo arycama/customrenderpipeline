@@ -88,6 +88,7 @@ namespace Arycama.CustomRenderPipeline
             pass.ReadTexture("_MainTex", input);
             pass.ReadTexture("_Bloom", bloom);
             pass.ReadTexture("UITexture", uITexture);
+            pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
             var minNits = settings.AutoDetectValues ? HDROutputSettings.main.minToneMapLuminance : settings.HdrMinNits;
             var maxNits = settings.AutoDetectValues ? HDROutputSettings.main.maxToneMapLuminance : settings.HdrMaxNits;
@@ -109,7 +110,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.ReadBuffer("AcesConstants", acesSettingsBuffer);
 
-                pass.SetFloat(command, "HdrEnabled", HDROutputSettings.main.available ? 1.0f : 0.0f);
+                pass.SetFloat(command, "HdrEnabled", HDROutputSettings.main.active ? 1.0f : 0.0f);
                 pass.SetTexture(command, "_GrainTexture", data.grainTexture);
 
                 pass.SetFloat(command, "_BloomStrength", data.bloomStrength);
@@ -176,16 +177,27 @@ namespace Arycama.CustomRenderPipeline
             public Vector2 Padding;
 
             // No array support..
-            public Vector4 ACES_coef0;
-            public Vector4 ACES_coef1;
-            public Vector4 ACES_coef2;
-            public Vector4 ACES_coef3;
-            public Vector4 ACES_coef4;
-            public Vector4 ACES_coef5;
-            public Vector4 ACES_coef6;
-            public Vector4 ACES_coef7;
-            public Vector4 ACES_coef8;
-            public Vector4 ACES_coef9;
+            public float coefLow0;
+            public float coefLow1;
+            public float coefLow2;
+            public float coefLow3;
+            public float coefLow4;
+            public float coefLow5;
+            public float coefLow6;
+            public float coefLow7;
+            public float coefLow8;
+            public float coefLow9;
+
+            public float coefHigh0;
+            public float coefHigh1;
+            public float coefHigh2;
+            public float coefHigh3;
+            public float coefHigh4;
+            public float coefHigh5;
+            public float coefHigh6;
+            public float coefHigh7;
+            public float coefHigh8;
+            public float coefHigh9;
         };
 
         public float MaxLevel => settings.AcesSettings.maxLevel;
@@ -229,16 +241,26 @@ namespace Arycama.CustomRenderPipeline
             // setup the aces data
             var aces = Aces.GetAcesODTData(hdrSettings.ToneCurve, hdrSettings.minStops, hdrSettings.maxStops, hdrSettings.maxLevel, hdrSettings.midGrayScale);
 
-            constants.ACES_coef0 = aces.coefs[0];
-            constants.ACES_coef1 = aces.coefs[1];
-            constants.ACES_coef2 = aces.coefs[2];
-            constants.ACES_coef3 = aces.coefs[3];
-            constants.ACES_coef4 = aces.coefs[4];
-            constants.ACES_coef5 = aces.coefs[5];
-            constants.ACES_coef6 = aces.coefs[6];
-            constants.ACES_coef7 = aces.coefs[7];
-            constants.ACES_coef8 = aces.coefs[8];
-            constants.ACES_coef9 = aces.coefs[9];
+            constants.coefLow0 = aces.coefs[0].x;
+            constants.coefLow1 = aces.coefs[1].x;
+            constants.coefLow2 = aces.coefs[2].x;
+            constants.coefLow3 = aces.coefs[3].x;
+            constants.coefLow4 = aces.coefs[4].x;
+            constants.coefLow5 = aces.coefs[5].x;
+            constants.coefLow6 = aces.coefs[6].x;
+            constants.coefLow7 = aces.coefs[7].x;
+            constants.coefLow8 = aces.coefs[8].x;
+            constants.coefLow9 = aces.coefs[9].x;
+            constants.coefHigh0 = aces.coefs[0].y;
+            constants.coefHigh1 = aces.coefs[1].y;
+            constants.coefHigh2 = aces.coefs[2].y;
+            constants.coefHigh3 = aces.coefs[3].y;
+            constants.coefHigh4 = aces.coefs[4].y;
+            constants.coefHigh5 = aces.coefs[5].y;
+            constants.coefHigh6 = aces.coefs[6].y;
+            constants.coefHigh7 = aces.coefs[7].y;
+            constants.coefHigh8 = aces.coefs[8].y;
+            constants.coefHigh9 = aces.coefs[9].y;
             constants.ACES_max = aces.maxPoint;
             constants.ACES_mid = aces.midPoint;
             constants.ACES_min = aces.minPoint;
@@ -258,8 +280,8 @@ namespace Arycama.CustomRenderPipeline
         public ODTCurve ToneCurve = ODTCurve.ODT_LDR_Ref; // Tone Curve
         [Range(-14.0f, 0.0f)] public float minStops = 0.0f;
         [Range(0.0f, 20.0f)] public float maxStops = 8.0f;
-        [Range(-1.0f, 4000.0f)] public float maxLevel = -1.0f; // "Max Level (nits -1=default)"
-        [Range(0.01f, 100.0f)] public float midGrayScale = 1.0f; // "Middle Gray Scale"
+        [Range(-1.0f, 1000.0f)] public float maxLevel = -1.0f; // "Max Level (nits -1=default)"
+        [Range(0.01f, 2.0f)] public float midGrayScale = 1.0f; // "Middle Gray Scale"
 
         public AcesSettings()
         {

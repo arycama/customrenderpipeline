@@ -31,6 +31,9 @@ static const float SceneViewMaxDisplayNits = 160.0;
 
 static const float kReferenceLuminanceWhiteForRec709 = 80.0;
 
+static const float LumensToNits = 3.426;
+static const float NitsToLumens = rcp(3.426);
+
 // D60 to D65 White Point
 static const float3x3 D60_2_D65_CAT =
 {

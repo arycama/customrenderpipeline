@@ -6,7 +6,7 @@
 #pragma kernel LuminanceBuildHistogram
 #pragma kernel LuminanceHistogramAverage
 
-#define NUM_HISTOGRAM_BINS 256
+#define HISTOGRAM_BINS 256
 
 Texture2D<float3> Input;
 Texture2D<float> ExposureTexture;
@@ -19,11 +19,39 @@ cbuffer Properties
 	float AdaptationSpeed;
 	float ExposureCompensation;
 	float Aperture, Iso, ShutterSpeed;
+	float HistogramMin, HistogramMax;
 	float DeltaTime;
 	float IsFirst, Mode;
+	float MeteringMode;
 };
 
-groupshared uint HistogramShared[NUM_HISTOGRAM_BINS];
+static const float _HistogramRangeScale = 1.0 / max(1e-5, MaxEv - MinEv);
+static const float _HistogramRangeBias = -MinEv * _HistogramRangeScale;
+
+groupshared uint HistogramShared[HISTOGRAM_BINS];
+
+// Because atomics are only on uint and we need a weighted value, we need to convert.
+// If we multiply the weight by 2048, we get somewhat ok precision and we support up to
+// the equivalent of 1920x1080 image in one bin. (Note, we run this at half res, so equivalent of 4k image)
+uint PackWeight(float weight)
+{
+	return uint(weight * 2048.0);
+}
+
+float UnpackWeight(uint val)
+{
+	return val * rcp(2048.0);
+}
+
+uint GetHistogramBinLocation(float luminance)
+{
+	return luminance ? Remap(LuminanceToEV100(luminance), MinEv, MaxEv, 1.0, 255.0) : 0;
+}
+
+float BinLocationToEV(uint binIdx)
+{
+	return binIdx ? Remap(binIdx, 1.0, 255.0, MinEv, MaxEv) : 0;
+}
 
 [numthreads(16, 16, 1)]
 void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : SV_DispatchThreadID)
@@ -35,46 +63,122 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
 	if (all(threadId < _ScaledResolution.xy))
 	{
 		float3 color = Input[threadId];
-		float luminance = Luminance(color) / (_Exposure/* + ExposureCompensation*/);
+		float luminance = Luminance(color) * _RcpExposure;
 		
-		float minLuminance = EV100ToLuminance(MinEv);
-		float maxLuminance = EV100ToLuminance(MaxEv);
+		float weight = 1.0;
 		
-		uint binIndex = luminance ? Remap(LuminanceToEV100(luminance), MinEv, MaxEv, 1.0, 255.0) : 0;
-		InterlockedAdd(HistogramShared[binIndex], 1);
+		switch(MeteringMode)
+		{
+			case 1:
+			{
+				// Spot metering
+				float screenDiagonal = 0.5f * (_ScaledResolution.x + _ScaledResolution.y);
+				const float kRadius = 0.075 * screenDiagonal;
+				const float2 kCenter = _ScaledResolution.xy * 0.5;
+				float d = length(kCenter - threadId) - kRadius;
+				weight = 1.0 - saturate(d);
+				break;
+			}
+			case 2:
+			{
+				// Center-weighted
+				float screenDiagonal = 0.5f * (_ScaledResolution.x + _ScaledResolution.y);
+				const float2 kCenter = _ScaledResolution.xy * 0.5;
+				weight = 1.0 - saturate(pow(length(kCenter - threadId) / screenDiagonal, 1.0));
+				break;
+			}
+			#if 0
+			case 3u:
+			{
+				// Mask weigthing
+				weight = SAMPLE_TEXTURE2D_LOD(_ExposureWeightMask, s_linear_clamp_sampler, threadId * _ScaledResolution.zw, 0.0).x;
+				break;
+			}
+			case 4u:
+			{
+				// Procedural.
+				float radius = max(ProceduralRadii.x, ProceduralRadii.y);
+				float2 ellipseScale = float2(radius / ProceduralRadii.x, radius / ProceduralRadii.y);
+
+				float dist = length(ProceduralCenter * ellipseScale - threadId * ellipseScale);
+				weight = (luminance > ProceduralMin && luminance < ProceduralMax) ? saturate(1.0 - PositivePow((dist / radius), ProceduralSoftness)) : 0.0f;
+				break;
+			}
+		#endif
+		}
+		
+		uint binIndex = GetHistogramBinLocation(luminance);
+		InterlockedAdd(HistogramShared[binIndex], PackWeight(weight));
 	}
     
-    GroupMemoryBarrierWithGroupSync();
-    
-	InterlockedAdd(LuminanceHistogram[groupIndex], HistogramShared[groupIndex]);
+	// Wait for all threads in the work group to reach this point before adding our
+	// local histogram to the global one
+	GroupMemoryBarrierWithGroupSync();
+
+	if(all(threadId < _ScaledResolution.xy))
+	{
+		// Technically there's no chance that two threads write to the same bin here,
+		// but different work groups might! So we still need the atomic add.
+		InterlockedAdd(LuminanceHistogram[groupIndex], HistogramShared[groupIndex]);
+	}
 }
+
+groupshared float gs_partialSums[HISTOGRAM_BINS];
+groupshared float gs_values[HISTOGRAM_BINS];
 
 [numthreads(256, 1, 1)]
 void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 {
-	uint countForThisBin = LuminanceHistogram[groupIndex];
+	uint countForThisBin = UnpackWeight(LuminanceHistogram[groupIndex]);
 	HistogramShared[groupIndex] = countForThisBin * groupIndex;
-    
-	GroupMemoryBarrierWithGroupSync();
+	gs_values[groupIndex] = countForThisBin;
+	gs_partialSums[groupIndex] = countForThisBin;
     
 	// Reset the count stored in the buffer in anticipation of the next pass
 	LuminanceHistogram[groupIndex] = 0;
 	
     [unroll]
-	for (uint histogramSampleIndex = (NUM_HISTOGRAM_BINS >> 1); histogramSampleIndex > 0; histogramSampleIndex >>= 1)
+	for(uint i = (HISTOGRAM_BINS >> 1); i > 0; i >>= 1)
 	{
-		if (groupIndex < histogramSampleIndex)
-		{
-			HistogramShared[groupIndex] += HistogramShared[groupIndex + histogramSampleIndex];
-		}
-
 		GroupMemoryBarrierWithGroupSync();
+	
+		if (groupIndex < i)
+		{
+			HistogramShared[groupIndex] += HistogramShared[groupIndex + i];
+			gs_partialSums[groupIndex] += gs_partialSums[groupIndex + i];
+		}
 	}
     
 	if (groupIndex)
 		return;
 	
+	float sum = gs_partialSums[0];
 	float pixelCount = _ScaledResolution.x * _ScaledResolution.y;
+	float2 extremesSums = float2(HistogramMin, HistogramMax) / 100.0 * sum;
+	
+	float evSum = 0;
+	float totalWeight = 0;
+	
+    // TODO: Can we be a bit more parallel here?
+	for(uint i = 1; i < HISTOGRAM_BINS; ++i)
+	{
+		float histVal = gs_values[i];
+		float binEV = BinLocationToEV(i);
+
+		// Shadows
+		float off = min(extremesSums.x, histVal);
+		extremesSums -= off;
+		histVal -= off;
+		
+		// Highlights
+		histVal = min(extremesSums.y, histVal);
+		extremesSums.y -= histVal;
+
+		evSum += histVal * binEV;
+		totalWeight += histVal;
+	}
+	
+	float avgEV = evSum * rcp(totalWeight);
 	
 	// Here we take our weighted sum and divide it by the number of pixels
     // that had luminance greater than zero (since the index == 0, we can
@@ -82,20 +186,21 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	float weightedLogAverage = (HistogramShared[0] / max(pixelCount - float(countForThisBin), 1.0)) - 1.0;
 	
 	float averageEv = Remap(weightedLogAverage, 1.0, 255.0, MinEv, MaxEv);
-
+	averageEv = avgEV;
+	
 	float2 uv = saturate(Remap(averageEv, MinEv, MaxEv));
 	float exposureCompensation = ExposureTexture.SampleLevel(_LinearClampSampler, float2(uv.x, 0.5), 0.0);
 	
 	float averageLuminance = EV100ToLuminance(averageEv);
 	exposureCompensation = LuminanceToEV100(1.03 - 2.0 * rcp(log10(averageLuminance + 1.0) + 2.0));
-	//exposureCompensation = ExposureCompensation;
+	exposureCompensation += ExposureCompensation;
 	
 	averageEv -= exposureCompensation;
 		
 	float previousExposure = _Exposure;
 	float evLastFrame = ExposureToEV100(previousExposure);// + ExposureCompensation;
 	float adaptedEv = lerp(averageEv, evLastFrame, exp(-DeltaTime * AdaptationSpeed));
-	adaptedEv = averageEv;
+	//adaptedEv = averageEv;
 	
 	if(Mode == 1.0)
 		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso) + ExposureCompensation;

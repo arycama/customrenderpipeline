@@ -13,28 +13,30 @@ namespace Arycama.CustomRenderPipeline
         Manual
     }
 
+    public enum MeteringMode
+    {
+        Uniform,
+        Spot,
+        Center,
+        Mask,
+        Procedural
+    }
+
     public class AutoExposure : RenderFeature
     {
         [Serializable]
         public class Settings
         {
-            [SerializeField] private ExposureMode exposureMode = ExposureMode.Automatic;
-            [SerializeField] private float minEv = -10f;
-            [SerializeField] private float maxEv = 18f;
-            [SerializeField] private float adaptationSpeed = 1.1f;
-            [SerializeField] private float exposureCompensation = 0.0f;
-            [SerializeField] private Vector2 histogramPercentages = new(40f, 90f);
-            [SerializeField] private int exposureResolution = 128;
-            [SerializeField] private AnimationCurve exposureCurve = AnimationCurve.Linear(0.0f, 1.0f, 1.0f, 1.0f);
-
-            public ExposureMode ExposureMode => exposureMode;
-            public float MinEv => minEv;
-            public float MaxEv => maxEv;
-            public float AdaptationSpeed => adaptationSpeed;
-            public float ExposureCompensation => exposureCompensation;
-            public AnimationCurve ExposureCurve => exposureCurve;
-            public Vector2 HistogramPercentages => histogramPercentages;
-            public int ExposureResolution => exposureResolution;
+            [field: SerializeField] public ExposureMode ExposureMode { get; private set; } = ExposureMode.Automatic;
+            [field: SerializeField] public MeteringMode MeteringMode { get; private set; } = MeteringMode.Center;
+            [field: SerializeField] public float MinEv { get; private set; } = -10f;
+            [field: SerializeField] public float MaxEv { get; private set; } = 18f;
+            [field: SerializeField] public float AdaptationSpeed { get; private set; } = 1.1f;
+            [field: SerializeField] public float ExposureCompensation { get; private set; } = 0.0f;
+            [field: SerializeField, Range(0.0f, 100.0f)] public float HistogramMin { get; private set; } = 40.0f;
+            [field: SerializeField, Range(0.0f, 100.0f)] public float HistogramMax { get; private set; } = 90.0f;
+            [field: SerializeField] public int ExposureResolution { get; private set; } = 128;
+            [field: SerializeField] public AnimationCurve ExposureCurve { get; private set; } = AnimationCurve.Linear(0.0f, 1.0f, 1.0f, 1.0f);
         }
 
         private readonly Settings settings;
@@ -156,6 +158,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "ShutterSpeed", data.shutterSpeed);
                     pass.SetFloat(command, "HistogramMin", data.histogramMin);
                     pass.SetFloat(command, "HistogramMax", data.histogramMax);
+                    pass.SetFloat(command, "MeteringMode", (float)settings.MeteringMode);
                     pass.SetVector(command, "_ExposureCompensationRemap", data.exposureCompensationRemap);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                 });
@@ -173,8 +176,8 @@ namespace Arycama.CustomRenderPipeline
                 data.iso = lensSettings.Iso;
                 data.aperture = lensSettings.Aperture;
                 data.shutterSpeed = lensSettings.ShutterSpeed;
-                data.histogramMin = settings.HistogramPercentages.x;
-                data.histogramMax = settings.HistogramPercentages.y;
+                data.histogramMin = settings.HistogramMin;
+                data.histogramMax = settings.HistogramMax;
                 data.exposureCompensationRemap = GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1);
                 data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
             }

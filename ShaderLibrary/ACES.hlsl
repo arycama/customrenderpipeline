@@ -148,19 +148,13 @@ static const float3x3 M =
 	{0.5, 0.0, 0.0}
 };
 
-struct SplineMapPoint
-{
-	float x;
-	float y;
-};
-
 struct SegmentedSplineParams_c5
 {
 	float coefsLow[6]; // coefs for B-spline between minPoint and midPoint (units of log luminance)
 	float coefsHigh[6]; // coefs for B-spline between midPoint and maxPoint (units of log luminance)
-	SplineMapPoint minPoint; // {luminance, luminance} linear extension below this
-	SplineMapPoint midPoint; // {luminance, luminance} 
-	SplineMapPoint maxPoint; // {luminance, luminance} linear extension above this
+	float2 minPoint; // {luminance, luminance} linear extension below this
+	float2 midPoint; // {luminance, luminance} 
+	float2 maxPoint; // {luminance, luminance} linear extension above this
 	float slopeLow; // log-log slope of low linear extension
 	float slopeHigh; // log-log slope of high linear extension
 };
@@ -169,9 +163,9 @@ struct SegmentedSplineParams_c9
 {
 	float coefsLow[10]; // coefs for B-spline between minPoint and midPoint (units of log luminance)
 	float coefsHigh[10]; // coefs for B-spline between midPoint and maxPoint (units of log luminance)
-	SplineMapPoint minPoint; // {luminance, luminance} linear extension below this
-	SplineMapPoint midPoint; // {luminance, luminance} 
-	SplineMapPoint maxPoint; // {luminance, luminance} linear extension above this
+	float2 minPoint; // {luminance, luminance} linear extension below this
+	float2 midPoint; // {luminance, luminance} 
+	float2 maxPoint; // {luminance, luminance} linear extension above this
 	float slopeLow; // log-log slope of low linear extension
 	float slopeHigh; // log-log slope of high linear extension
 };
