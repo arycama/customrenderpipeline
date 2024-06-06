@@ -67,7 +67,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
     // Convert blended result back to linear for OEFT
 	color = GammaToLinear(color);
 	
-	if(true)
+	if(false)
 	{
 		// Convert color to XYZ, then from D65 to D60 whitepoint, and finally to Aces colorspace
 		color = mul(XYZ_2_AP0_MAT, mul(D65_2_D60_CAT, Rec709ToXYZ(color)));

@@ -110,7 +110,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.ReadBuffer("AcesConstants", acesSettingsBuffer);
 
-                pass.SetFloat(command, "HdrEnabled", HDROutputSettings.main.active ? 1.0f : 0.0f);
+                pass.SetFloat(command, "HdrEnabled", HDROutputSettings.main.available ? 1.0f : 0.0f);
                 pass.SetTexture(command, "_GrainTexture", data.grainTexture);
 
                 pass.SetFloat(command, "_BloomStrength", data.bloomStrength);
@@ -135,7 +135,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetVector(command, "_BloomScaleLimit", new Vector4(bloom.Scale.x, bloom.Scale.y, bloom.Limit.x, bloom.Limit.y));
                 pass.SetFloat(command, "HueShift", settings.HueShift);
 
-                var colorGamut = HDROutputSettings.main.displayColorGamut;
+                var colorGamut = HDROutputSettings.main.available ? HDROutputSettings.main.displayColorGamut : ColorGamut.sRGB;
                 pass.SetInt(command, "ColorGamut", (int)colorGamut);
 
                 var colorPrimaries = ColorGamutUtility.GetColorPrimaries(colorGamut);
