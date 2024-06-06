@@ -9,4 +9,10 @@ cbuffer Exposure
 	float _CurrentToPreviousExposure;
 };
 
+// This allows an emissive color to retain the same relative brightness regardless of lighting environment
+float3 ApplyEmissiveExposureWeight(float3 emissive, float weight)
+{
+	return lerp(emissive, emissive * _Exposure, weight);
+}
+
 #endif

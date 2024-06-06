@@ -10,10 +10,8 @@ Texture2D<float> _GrainTexture;
 float4 _GrainTextureParams, _Resolution, _BloomScaleLimit, _Bloom_TexelSize;
 float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, ShutterSpeed;
 float HdrMinNits, HdrMaxNits, PaperWhiteNits, HdrEnabled, HueShift;
-uint ColorGamut, ColorPrimaries, TransferFunction;
-
-static const float DISPGAMMA = 2.4;
-static const float OFFSET = 0.055;
+uint ColorGamut;
+float Tonemap;
 
 cbuffer AcesConstants
 {
@@ -67,7 +65,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
     // Convert blended result back to linear for OEFT
 	color = GammaToLinear(color);
 	
-	if(false)
+	if(Tonemap)
 	{
 		// Convert color to XYZ, then from D65 to D60 whitepoint, and finally to Aces colorspace
 		color = mul(XYZ_2_AP0_MAT, mul(D65_2_D60_CAT, Rec709ToXYZ(color)));
@@ -105,14 +103,16 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 		color = XYZToRec709(color);
 	}
 	else
-		color *= 80;
+	{
+		color *= PaperWhiteNits;
+	}
 	
 	// Hdr output
 	switch(ColorGamut)
 	{
 		// Return linear sRGB, hardware will convert to gmama
 		case ColorGamutSRGB:
-			color = color * (PaperWhiteNits / HdrMaxNits);
+			color = color / kReferenceLuminanceWhiteForRec709;
 			break;
 		
 		case ColorGamutRec709:

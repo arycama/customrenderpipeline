@@ -7,58 +7,58 @@ namespace Arycama.CustomRenderPipeline
 {
     public class Aces
     {
-        public struct SegmentedSplineParams_c9
-        {
-            public Vector4[] coefs;// = new Vector4[10];
-            public Vector2 minPoint; // {luminance, luminance} linear extension below this
-            public Vector2 midPoint; // {luminance, luminance} 
-            public Vector2 maxPoint; // {luminance, luminance} linear extension above this
-            public Vector2 slope;
-            public Vector2 limits; // limits in ODT curve prior to RRT adjustment
+        const float MiddleGrey = 0.18f;
 
-            public SegmentedSplineParams_c9(Vector4[] coefs, Vector2 minPoint, Vector2 midPoint, Vector2 maxPoint, Vector2 slope, Vector2 limits)
-            {
-                this.coefs = coefs ?? throw new ArgumentNullException(nameof(coefs));
-                this.minPoint = minPoint;
-                this.midPoint = midPoint;
-                this.maxPoint = maxPoint;
-                this.slope = slope;
-                this.limits = limits;
-            }
-        };
+        // Precomputed curves
+        // ODT_48nits
+        static SegmentedSplineParamsC9 ODT_48nits => new SegmentedSplineParamsC9
+        (
+            new[] { -1.6989700043f, -1.6989700043f, -1.4779000000f, -1.2291000000f, -0.8648000000f, -0.4480000000f, 0.0051800000f, 0.4511080334f, 0.9113744414f, 0.9113744414f },
+            new[] { 0.5154386965f, 0.8470437783f, 1.1358000000f, 1.3802000000f, 1.5197000000f, 1.5985000000f, 1.6467000000f, 1.6746091357f, 1.6878733390f, 1.6878733390f },
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey * Exp2(-6.5f)), 0.02f), //-65 = 0.01 nits
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey), 4.8f),
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey * Exp2(6.5f)), 48.0f), // 6.5 = ~90 nits
+            new Vector2(0.0f, 0.04f),
+            new Vector2(MiddleGrey * Exp2(-6.5f), MiddleGrey * Exp2(6.5f))
+        );
 
-        public struct ACESparams
-        {
-            public SegmentedSplineParams_c9 C;
-            public Matrix3x3 XYZ_2_DISPLAY_PRI_MAT;
-            public Matrix3x3 DISPLAY_PRI_MAT_2_XYZ;
-            public Vector2 CinemaLimits;
-            public int OutputMode;
-            public float surroundGamma;
-            public bool desaturate;
-            public bool surroundAdjust;
-            public bool applyCAT;
-            public bool tonemapLuminance;
-            public float saturationLevel;
+        // ODT_1000nits
+        static SegmentedSplineParamsC9 ODT_1000nits => new SegmentedSplineParamsC9
+        (
+            new[] { -2.3010299957f, -2.3010299957f, -1.9312000000f, -1.5205000000f, -1.0578000000f, -0.4668000000f, 0.1193800000f, 0.7088134201f, 1.2911865799f, 1.2911865799f },
+            new[] { 0.8089132070f, 1.1910867930f, 1.5683000000f, 1.9483000000f, 2.3083000000f, 2.6384000000f, 2.8595000000f, 2.9872608805f, 3.0127391195f, 3.0127391195f },
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey * Exp2(-12.0f)), 0.005f), //-12 = 0.0002 nits
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey), 10.0f),
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey * Exp2(10.0f)), 1000.0f), // 1024 nits
+            new Vector2(0.0f, 0.06f),
+            new Vector2(MiddleGrey * Exp2(-12.0f), MiddleGrey * Exp2(10.0f))
+        );
 
-            public ACESparams(SegmentedSplineParams_c9 c, Matrix3x3 xYZ_2_DISPLAY_PRI_MAT, Matrix3x3 dISPLAY_PRI_MAT_2_XYZ, Vector2 cinemaLimits, int outputMode, float surroundGamma, bool desaturate, bool surroundAdjust, bool applyCAT, bool tonemapLuminance, float saturationLevel)
-            {
-                C = c;
-                XYZ_2_DISPLAY_PRI_MAT = xYZ_2_DISPLAY_PRI_MAT;
-                DISPLAY_PRI_MAT_2_XYZ = dISPLAY_PRI_MAT_2_XYZ;
-                CinemaLimits = cinemaLimits;
-                OutputMode = outputMode;
-                this.surroundGamma = surroundGamma;
-                this.desaturate = desaturate;
-                this.surroundAdjust = surroundAdjust;
-                this.applyCAT = applyCAT;
-                this.tonemapLuminance = tonemapLuminance;
-                this.saturationLevel = saturationLevel;
-            }
-        };
+        // ODT_2000nits
+        static SegmentedSplineParamsC9 ODT_2000nits => new SegmentedSplineParamsC9
+        (
+            new[] { -2.3010299957f, -2.3010299957f, -1.9312000000f, -1.5205000000f, -1.0578000000f, -0.4668000000f, 0.1193800000f, 0.7088134201f, 1.2911865799f, 1.2911865799f },
+            new[] { 0.8019952042f, 1.1980047958f, 1.5943000000f, 1.9973000000f, 2.3783000000f, 2.7684000000f, 3.0515000000f, 3.2746293562f, 3.3274306351f, 3.3274306351f },
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey * Exp2(-12.0f)), 0.005f), //-12 = 0.0002 nits
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey), 10.0f),
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey * Exp2(11.0f)), 2000.0f), // 11 = 2048 nits
+            new Vector2(0.0f, 0.12f),
+            new Vector2(MiddleGrey * Exp2(-12.0f), MiddleGrey * Exp2(11.0f))
+        );
 
-        // Struct with RRT spline parameters
-        struct SegmentedSplineParams_c5
+        // ODT_4000nits
+        static SegmentedSplineParamsC9 ODT_4000nits => new SegmentedSplineParamsC9
+        (
+            new[] { -2.3010299957f, -2.3010299957f, -1.9312000000f, -1.5205000000f, -1.0578000000f, -0.4668000000f, 0.1193800000f, 0.7088134201f, 1.2911865799f, 1.2911865799f },
+            new[] { 0.7973186613f, 1.2026813387f, 1.6093000000f, 2.0108000000f, 2.4148000000f, 2.8179000000f, 3.1725000000f, 3.5344995451f, 3.6696204376f, 3.6696204376f },
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey * Exp2(-12.0f)), 0.005f),
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey), 10.0f),
+            new Vector2(SegmentedSplineC5Fwd(MiddleGrey * Exp2(12.0f)), 4000.0f), // 12 = 4096 nits
+            new Vector2(0.0f, 0.3f),
+            new Vector2(MiddleGrey * Exp2(-12.0f), MiddleGrey * Exp2(12.0f))
+        );
+
+        struct SegmentedSplineParamsC5
         {
             public float[] coefsLow;    // coefs for B-spline between minPoint and midPoint (units of log luminance)
             public float[] coefsHigh;   // coefs for B-spline between midPoint and maxPoint (units of log luminance)
@@ -68,7 +68,7 @@ namespace Arycama.CustomRenderPipeline
             public float slopeLow;       // log-log slope of low linear extension
             public float slopeHigh;      // log-log slope of high linear extension
 
-            public SegmentedSplineParams_c5(float[] coefsLow, float[] coefsHigh, Vector2 minPoint, Vector2 midPoint, Vector2 maxPoint, float slopeLow, float slopeHigh)
+            public SegmentedSplineParamsC5(float[] coefsLow, float[] coefsHigh, Vector2 minPoint, Vector2 midPoint, Vector2 maxPoint, float slopeLow, float slopeHigh)
             {
                 this.coefsLow = coefsLow ?? throw new ArgumentNullException(nameof(coefsLow));
                 this.coefsHigh = coefsHigh ?? throw new ArgumentNullException(nameof(coefsHigh));
@@ -80,8 +80,7 @@ namespace Arycama.CustomRenderPipeline
             }
         };
 
-        // Struct with ODT spline parameters
-        struct SegmentedSplineParams_c9_internal
+        public struct SegmentedSplineParamsC9
         {
             public float[] coefsLow;    // coefs for B-spline between minPoint and midPoint (units of log luminance)
             public float[] coefsHigh;   // coefs for B-spline between midPoint and maxPoint (units of log luminance)
@@ -91,7 +90,7 @@ namespace Arycama.CustomRenderPipeline
             public Vector2 slope;
             public Vector2 limits; // Min and Max prior to RRT
 
-            public SegmentedSplineParams_c9_internal(float[] coefsLow, float[] coefsHigh, Vector2 minPoint, Vector2 midPoint, Vector2 maxPoint, Vector2 slope, Vector2 limits)
+            public SegmentedSplineParamsC9(float[] coefsLow, float[] coefsHigh, Vector2 minPoint, Vector2 midPoint, Vector2 maxPoint, Vector2 slope, Vector2 limits)
             {
                 this.coefsLow = coefsLow ?? throw new ArgumentNullException(nameof(coefsLow));
                 this.coefsHigh = coefsHigh ?? throw new ArgumentNullException(nameof(coefsHigh));
@@ -104,15 +103,15 @@ namespace Arycama.CustomRenderPipeline
         };
 
         //  Spline function used by RRT
-        static float segmented_spline_c5_fwd(float x)
+        static float SegmentedSplineC5Fwd(float x)
         {
             // RRT_PARAMS
-            SegmentedSplineParams_c5 C = new(
+            SegmentedSplineParamsC5 C = new(
                 new float[] { -4.0000000000f, -4.0000000000f, -3.1573765773f, -0.4852499958f, 1.8477324706f, 1.8477324706f },
                 new float[] { -0.7185482425f, 2.0810307172f, 3.6681241237f, 4.0000000000f, 4.0000000000f, 4.0000000000f },
-                new Vector2(0.18f * Exp2(-15.0f), 0.0001f),
-                new Vector2(0.18f, 4.8f),
-                new Vector2(0.18f * Exp2(18.0f), 10000.0f),
+                new Vector2(MiddleGrey * Exp2(-15.0f), 0.0001f),
+                new Vector2(MiddleGrey, 4.8f),
+                new Vector2(MiddleGrey * Exp2(18.0f), 10000.0f),
                 0.0f,
                 0.0f);
 
@@ -175,7 +174,7 @@ namespace Arycama.CustomRenderPipeline
         }
 
         // Using a reference ODT spline, adjust middle gray and Max levels
-        static SegmentedSplineParams_c9_internal AdaptSpline(SegmentedSplineParams_c9_internal C, float newMin, float newMax, float outMax, float outMidScale)
+        static SegmentedSplineParamsC9 AdaptSpline(SegmentedSplineParamsC9 C, float minLuminance, float paperWhite, float maxLuminance, float outMax)
         {
             // Monomial and inverse monomial matrices
             var M = new Matrix3x3(0.5f, -1.0f, 0.5f, -1.0f, 1.0f, 0.5f, 0.5f, 0.0f, 0.0f);
@@ -184,21 +183,22 @@ namespace Arycama.CustomRenderPipeline
             const int N_KNOTS_LOW = 8;
             const int N_KNOTS_HIGH = 8;
 
-            SegmentedSplineParams_c9_internal C2 = C;
+            SegmentedSplineParamsC9 C2 = C;
 
             // Set the new Max input and output levels
-            C2.maxPoint.x = segmented_spline_c5_fwd(newMax);
+            C2.maxPoint.x = SegmentedSplineC5Fwd(maxLuminance * MiddleGrey);
             C2.maxPoint.y = outMax;
 
-            C2.limits.y = newMax;
+            C2.limits.y = maxLuminance * MiddleGrey;
 
             // Set new minimum levels
-            C2.minPoint.x = segmented_spline_c5_fwd(newMin);
+            C2.minPoint.x = SegmentedSplineC5Fwd(minLuminance * MiddleGrey);
 
-            C2.limits.x = newMin;
+            C2.limits.x = minLuminance * MiddleGrey;
 
             // scale the middle gray output level
-            C2.midPoint.y *= outMidScale;
+            var paperMiddleGrey = MiddleGrey * paperWhite;
+            C2.midPoint.y *= paperMiddleGrey / C2.midPoint.y;
 
             // compute and apply scale used to bring bottom segment of the transform to the level desired for middle gray
             float scale = (Log10(C.midPoint[1]) - Log10(C.minPoint[1])) / (Log10(C2.midPoint[1]) - Log10(C2.minPoint[1]));
@@ -295,121 +295,23 @@ namespace Arycama.CustomRenderPipeline
             return C2;
         }
 
-        // ODT_48nits
-        static SegmentedSplineParams_c9_internal ODT_48nits => new SegmentedSplineParams_c9_internal
-        (
-            new[] { -1.6989700043f, -1.6989700043f, -1.4779000000f, -1.2291000000f, -0.8648000000f, -0.4480000000f, 0.0051800000f, 0.4511080334f, 0.9113744414f, 0.9113744414f },
-            new[] { 0.5154386965f, 0.8470437783f, 1.1358000000f, 1.3802000000f, 1.5197000000f, 1.5985000000f, 1.6467000000f, 1.6746091357f, 1.6878733390f, 1.6878733390f },
-            new Vector2(segmented_spline_c5_fwd(0.18f * Exp2(-6.5f)), 0.02f),
-            new Vector2(segmented_spline_c5_fwd(0.18f), 4.8f),
-            new Vector2(segmented_spline_c5_fwd(0.18f * Exp2(6.5f)), 48.0f),
-            new Vector2(0.0f, 0.04f),
-            new Vector2(0.18f * Exp2(-6.5f), 0.18f * Exp2(6.5f))
-        );
+       
 
-        // ODT_1000nits
-        static SegmentedSplineParams_c9_internal ODT_1000nits => new SegmentedSplineParams_c9_internal
-        (
-            new[] { -2.3010299957f, -2.3010299957f, -1.9312000000f, -1.5205000000f, -1.0578000000f, -0.4668000000f, 0.1193800000f, 0.7088134201f, 1.2911865799f, 1.2911865799f },
-            new[] { 0.8089132070f, 1.1910867930f, 1.5683000000f, 1.9483000000f, 2.3083000000f, 2.6384000000f, 2.8595000000f, 2.9872608805f, 3.0127391195f, 3.0127391195f },
-            new Vector2(segmented_spline_c5_fwd(0.18f * Pow(2.0f, -12.0f)), 0.005f),
-            new Vector2(segmented_spline_c5_fwd(0.18f), 10.0f),
-            new Vector2(segmented_spline_c5_fwd(0.18f * Pow(2.0f, 10.0f)), 1000.0f),
-            new Vector2(0.0f, 0.06f),
-            new Vector2(0.18f * Exp2(-12.0f), 0.18f * Exp2(10.0f))
-        );
-
-        // ODT_2000nits
-        static SegmentedSplineParams_c9_internal ODT_2000nits => new SegmentedSplineParams_c9_internal
-        (
-            new[] { -2.3010299957f, -2.3010299957f, -1.9312000000f, -1.5205000000f, -1.0578000000f, -0.4668000000f, 0.1193800000f, 0.7088134201f, 1.2911865799f, 1.2911865799f },
-            new[] { 0.8019952042f, 1.1980047958f, 1.5943000000f, 1.9973000000f, 2.3783000000f, 2.7684000000f, 3.0515000000f, 3.2746293562f, 3.3274306351f, 3.3274306351f },
-            new Vector2(segmented_spline_c5_fwd(0.18f * Pow(2.0f, -12.0f)), 0.005f),
-            new Vector2(segmented_spline_c5_fwd(0.18f), 10.0f),
-            new Vector2(segmented_spline_c5_fwd(0.18f * Pow(2.0f, 11.0f)), 2000.0f),
-            new Vector2(0.0f, 0.12f),
-            new Vector2(0.18f * Exp2(-12.0f), 0.18f * Exp2(11.0f))
-        );
-
-        // ODT_4000nits
-        static SegmentedSplineParams_c9_internal ODT_4000nits => new SegmentedSplineParams_c9_internal
-        (
-            new[] { -2.3010299957f, -2.3010299957f, -1.9312000000f, -1.5205000000f, -1.0578000000f, -0.4668000000f, 0.1193800000f, 0.7088134201f, 1.2911865799f, 1.2911865799f },
-            new[] { 0.7973186613f, 1.2026813387f, 1.6093000000f, 2.0108000000f, 2.4148000000f, 2.8179000000f, 3.1725000000f, 3.5344995451f, 3.6696204376f, 3.6696204376f },
-            new Vector2(segmented_spline_c5_fwd(0.18f * Pow(2.0f, -12.0f)), 0.005f),
-            new Vector2(segmented_spline_c5_fwd(0.18f), 10.0f),
-            new Vector2(segmented_spline_c5_fwd(0.18f * Pow(2.0f, 12.0f)), 4000.0f),
-            new Vector2(0.0f, 0.3f),
-            new Vector2(0.18f * Exp2(-12.0f), 0.18f * Exp2(12.0f))
-        );
-
-        // Select a curve used as part of the ACES ODT. Optionally, derive a modified version of the base curve with an altered middle gray and maximum number of stops.
-        public static SegmentedSplineParams_c9 GetAcesODTData(ODTCurve BaseCurve, float MinStop, float MaxStop, float MaxLevel, float MidGrayScale)
+        public static SegmentedSplineParamsC9 GetAcesODTData(ODTCurve baseCurve, float minLuminance, float paperWhite, float maxLuminance, float outMax)
         {
-            // Standard ACES ODT curves
-            // convert, defaulting to 48 nits
-            var Src = ODT_48nits;
-            SegmentedSplineParams_c9_internal Generated;
-            SegmentedSplineParams_c9 C;
-
-            switch (BaseCurve)
+            // Select a curve used as part of the ACES ODT. Optionally, derive a modified version of the base curve with an altered middle gray and maximum number of stops.
+            return baseCurve switch
             {
-                case ODTCurve.ODT_LDR_Ref: Src = ODT_48nits; break;
-                case ODTCurve.ODT_1000Nit_Ref: Src = ODT_1000nits; break;
-                case ODTCurve.ODT_2000Nit_Ref: Src = ODT_2000nits; break;
-                case ODTCurve.ODT_4000Nit_Ref: Src = ODT_4000nits; break;
-
-                // Adjustable curves
-                case ODTCurve.ODT_LDR_Adj:
-                    MaxLevel = MaxLevel > 0.0f ? MaxLevel : 48.0f;
-                    MaxStop = MaxStop > 0 ? MaxStop : 6.5f;
-                    MinStop = MinStop < 0 ? MinStop : -6.5f;
-                    Generated = AdaptSpline(ODT_48nits, 0.18f * Pow(2.0f, MinStop), 0.18f * Pow(2.0f, MaxStop), MaxLevel, MidGrayScale);
-                    Src = Generated;
-                    break;
-
-                case ODTCurve.ODT_1000Nit_Adj:
-                    MaxLevel = MaxLevel > 0.0f ? MaxLevel : 1000.0f;
-                    MaxStop = MaxStop > 0 ? MaxStop : 10.0f;
-                    MinStop = MinStop < 0 ? MinStop : -12.0f;
-                    Generated = AdaptSpline(ODT_1000nits, 0.18f * Pow(2.0f, MinStop), 0.18f * Pow(2.0f, MaxStop), MaxLevel, MidGrayScale);
-                    Src = Generated;
-                    break;
-
-                case ODTCurve.ODT_2000Nit_Adj:
-                    MaxLevel = MaxLevel > 0.0f ? MaxLevel : 2000.0f;
-                    MaxStop = MaxStop > 0 ? MaxStop : 11.0f;
-                    MinStop = MinStop < 0 ? MinStop : -12.0f;
-                    Generated = AdaptSpline(ODT_2000nits, 0.18f * Pow(2.0f, MinStop), 0.18f * Pow(2.0f, MaxStop), MaxLevel, MidGrayScale);
-                    Src = Generated;
-                    break;
-
-                case ODTCurve.ODT_4000Nit_Adj:
-                    MaxLevel = MaxLevel > 0.0f ? MaxLevel : 4000.0f;
-                    MaxStop = MaxStop > 0 ? MaxStop : 12.0f;
-                    MinStop = MinStop < 0 ? MinStop : -12.0f;
-                    Generated = AdaptSpline(ODT_4000nits, 0.18f * Pow(2.0f, MinStop), 0.18f * Pow(2.0f, MaxStop), MaxLevel, MidGrayScale);
-                    Src = Generated;
-                    break;
+                ODTCurve.RefLdr => ODT_48nits,
+                ODTCurve.Ref1000Nit => ODT_1000nits,
+                ODTCurve.Ref2000Nit => ODT_2000nits,
+                ODTCurve.Ref4000Nit => ODT_4000nits,
+                ODTCurve.AdjLdr => AdaptSpline(ODT_48nits, minLuminance, paperWhite, maxLuminance, outMax),
+                ODTCurve.Adj1000Nit => AdaptSpline(ODT_1000nits, minLuminance, paperWhite, maxLuminance, outMax),
+                ODTCurve.Adj2000Nit => AdaptSpline(ODT_2000nits, minLuminance, paperWhite, maxLuminance, outMax),
+                ODTCurve.Adj4000Nit => AdaptSpline(ODT_4000nits, minLuminance, paperWhite, maxLuminance, outMax),
+                _ => throw new ArgumentException(nameof(baseCurve)),
             };
-
-            {
-                var Curve = Src;
-
-                C.coefs = new Vector4[10];
-                for (int Index = 0; Index < 10; Index++)
-                {
-                    C.coefs[Index] = new Vector4(Curve.coefsLow[Index], Curve.coefsHigh[Index], 0.0f, 0.0f);
-                }
-
-                C.minPoint = Curve.minPoint;
-                C.midPoint = Curve.midPoint;
-                C.maxPoint = Curve.maxPoint;
-                C.slope = Curve.slope;
-                C.limits = Curve.limits;
-            }
-
-            return C;
         }
     }
 }

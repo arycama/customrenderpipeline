@@ -63,6 +63,8 @@ namespace Arycama.CustomRenderPipeline
 
         public void Build(Camera camera)
         {
+            return;
+
             rtas.ClearInstances();
             rtas.CullInstances(ref config);
 

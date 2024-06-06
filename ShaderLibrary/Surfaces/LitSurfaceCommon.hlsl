@@ -147,7 +147,7 @@ SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false
 	result.roughness = SmoothnessToPerceptualRoughness(smoothness);
 
 	float3 emission = SampleTexture(_EmissionMap, uv, isRaytracing) * _EmissionColor;
-	result.emission = lerp(emission, emission * _Exposure, _EmissiveExposureWeight);
+	result.emission = ApplyEmissiveExposureWeight(emission, _EmissiveExposureWeight);
 
 	result.occlusion = SampleTexture(_OcclusionMap, uv, isRaytracing).g;
 	return result;
