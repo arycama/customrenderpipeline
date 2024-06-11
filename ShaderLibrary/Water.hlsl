@@ -2,7 +2,9 @@
 #include "Common.hlsl"
 #include "Material.hlsl"
 #include "Geometry.hlsl"
+#include "Packing.hlsl"
 #include "Samplers.hlsl"
+#include "Temporal.hlsl"
 #include "WaterCommon.hlsl"
 
 struct VertexInput
@@ -30,19 +32,20 @@ struct DomainInput
 	float3 position : TEXCOORD;
 };
 
+// TODO: Optimize
 struct FragmentInput
 {
 	float4 positionCS : SV_POSITION;
-	float4 uv0 : TEXCOORD0;
-	float4 nonJitteredPositionCS : POSITION2;
-	float4 previousPositionCS : POSITION3;
-	float2 delta : POSITION4;
+	float4 previousPositionCS : POSITION1;
+	float2 delta : POSITION2;
+	float3 worldPosition : POSITION3;
 };
 
 struct FragmentOutput
 {
 	float2 normalFoamRoughness : SV_Target0;
 	float2 velocity : SV_Target1;
+	float2 triangleNormal : SV_Target2;
 };
 
 cbuffer UnityPerMaterial
@@ -203,52 +206,50 @@ float3 Bilerp(float3 v0, float3 v1, float3 v2, float3 v3, float2 i)
 [domain("quad")]
 FragmentInput Domain(HullConstantOutput tessFactors, OutputPatch<DomainInput, 4> input, float2 weights : SV_DomainLocation)
 {
-	float3 position = Bilerp(input[0].position, input[1].position, input[2].position, input[3].position, weights);
+	float3 worldPosition = Bilerp(input[0].position, input[1].position, input[2].position, input[3].position, weights);
+	float3 previousPosition = worldPosition;
 	
 	// TODO: Camera relative
-	float2 uv = position.xz + _ViewPosition.xz;
+	float2 uv = worldPosition.xz + _ViewPosition.xz;
 	float2 dx = float2(Bilerp(tessFactors.dx, weights), 0.0);
 	float2 dy = float2(0.0, Bilerp(tessFactors.dy, weights));
 	
 	FragmentInput output;
-	output.uv0 = float4(position + _ViewPosition, 0);
 
-	float3 waveDisplacement = 0, previousWaveDisplacement = 0;
+	float3 displacement = 0, previousDisplacement = 0;
 
 	[unroll]
 	for (uint i = 0; i < 4; i++)
 	{
-		waveDisplacement += OceanDisplacement.SampleGrad(_TrilinearRepeatSampler, float3(uv * _OceanScale[i], i), dx * _OceanScale[i], dy * _OceanScale[i]);
-		previousWaveDisplacement += OceanDisplacementHistory.SampleGrad(_TrilinearRepeatSampler, float3(uv * _OceanScale[i], i), dx * _OceanScale[i], dy * _OceanScale[i]);
+		displacement += OceanDisplacement.SampleGrad(_TrilinearRepeatSampler, float3(uv * _OceanScale[i], i), dx * _OceanScale[i], dy * _OceanScale[i]);
+		previousDisplacement += OceanDisplacementHistory.SampleGrad(_TrilinearRepeatSampler, float3(uv * _OceanScale[i], i), dx * _OceanScale[i], dy * _OceanScale[i]);
 	}
-
+	
+	worldPosition += displacement;
+	previousPosition += previousDisplacement;
+	
 	// shore waves
 	float shoreFactor, breaker, foam;
 	float3 normal, shoreDisplacement, tangent;
-	GerstnerWaves(position + _ViewPosition, shoreDisplacement, normal, tangent, shoreFactor, _Time, breaker, foam);
-	float3 displacement = shoreDisplacement + waveDisplacement * lerp(1.0, 0.0, 0.75 * shoreFactor);
-
-	float3 previousPositionWS = position;
-
-	// Apply displacement, Curve horizon
-	float3 outPosition = PlanetCurve(position + displacement);
+	GerstnerWaves(worldPosition + _ViewPosition, shoreDisplacement, normal, tangent, shoreFactor, _Time, breaker, foam);
+	
+	float previousShoreFactor, previousBreaker, previousFoam;
+	float3 previousNormal, previousShoreDisplacement, previousTangent;
+	GerstnerWaves(previousPosition + _ViewPosition, previousShoreDisplacement, previousNormal, previousTangent, previousShoreFactor, _PreviousTime, previousBreaker, previousFoam);
+	
+	worldPosition = PlanetCurve(worldPosition);
+	previousPosition = PlanetCurve(previousPosition);
 
 	#ifdef WATER_SHADOW_CASTER
-		output.positionCS = MultiplyPoint(_WaterShadowMatrix, outPosition);
+		output.positionCS = MultiplyPoint(_WaterShadowMatrix, worldPosition);
 	#else
-		output.positionCS = WorldToClip(outPosition);
+		output.positionCS = WorldToClip(worldPosition);
 	#endif
 
 	// Motion vectors
-	GerstnerWaves(previousPositionWS + _ViewPosition, shoreDisplacement, normal, tangent, shoreFactor, _PreviousTime, breaker, foam);
-	previousPositionWS += shoreDisplacement + previousWaveDisplacement * lerp(1.0, 0.0, 0.75 * shoreFactor);
-	
-	output.nonJitteredPositionCS = WorldToClipNonJittered(outPosition);
-	previousPositionWS = PlanetCurvePrevious(previousPositionWS);
-	output.previousPositionCS = WorldToClipPrevious(previousPositionWS);
-	
-	output.delta = outPosition.xz - position.xz;
-	
+	output.previousPositionCS = WorldToClipPrevious(previousPosition);
+	output.delta = displacement.xz;
+	output.worldPosition = worldPosition;
 	return output;
 }
 
@@ -256,8 +257,13 @@ void FragmentShadow() { }
 
 FragmentOutput Fragment(FragmentInput input)
 {
+	float3 dx = ddx_coarse(input.worldPosition);
+	float3 dy = ddy_coarse(input.worldPosition);
+	float3 triangleNormal = normalize(cross(dy, dx));
+
 	FragmentOutput output;
-	output.velocity = MotionVectorFragment(input.nonJitteredPositionCS, input.previousPositionCS);
+	output.velocity = CalculateVelocity(input.positionCS.xy, input.previousPositionCS);
 	output.normalFoamRoughness = input.delta;
+	output.triangleNormal = PackNormalOctQuadEncode(triangleNormal);
 	return output;
 }

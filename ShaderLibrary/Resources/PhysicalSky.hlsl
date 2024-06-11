@@ -408,7 +408,7 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 motion = MotionVectorFragment(nonJitteredClip, previousClip);
 	
 	float3 minValue, maxValue, result;
-	TemporalNeighborhood(_SkyInput, position.xy, minValue, maxValue, result);
+	TemporalNeighborhood(_SkyInput, position.xy, minValue, maxValue, result, true, true, 2);
 
 	float2 historyUv = uv - motion;
 	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, min(historyUv * _SkyHistoryScaleLimit.xy, _SkyHistoryScaleLimit.zw)) * _PreviousToCurrentExposure);

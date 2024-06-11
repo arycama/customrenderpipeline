@@ -122,7 +122,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	#endif
 	
 	FragmentOutput output;
-	
+
 	#if defined(UNITY_PASS_SHADOWCASTER) 
 		#if defined(MODE_FADE) || defined(MODE_TRANSPARENT)
 			clip(surface.alpha - Noise1D(input.position.xy));
@@ -141,8 +141,12 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 				albedo *= alpha;
 			#endif
 		
+			float NdotV;
+			float3 V = normalize(-input.worldPosition);
+			float3 N = GetViewReflectedNormal(surface.normal, V, NdotV);
+		
 			LightingInput lightingInput;
-			lightingInput.normal = surface.normal;
+			lightingInput.normal = N;
 			lightingInput.worldPosition = input.worldPosition;
 			lightingInput.pixelPosition = input.position.xy;
 			lightingInput.eyeDepth = input.position.w;
@@ -154,6 +158,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 			lightingInput.bentNormal = surface.bentNormal;
 			lightingInput.isWater = false;
 			lightingInput.uv = input.position.xy * _ScaledResolution.zw;
+			lightingInput.NdotV = NdotV;
 		
 			float3 lighting = GetLighting(lightingInput) + surface.emission;
 

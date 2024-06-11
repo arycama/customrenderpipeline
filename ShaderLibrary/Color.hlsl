@@ -343,14 +343,34 @@ float3 YCoCgToRgb(float3 yCoCg)
 	return rgb;
 }
 
+float3 FastTonemap(float3 color, float luminance)
+{
+	return color * rcp(1.0 + luminance);
+}
+
+float3 FastTonemap(float3 color)
+{
+	return FastTonemap(color, Luminance(color));
+}
+
+float3 FastTonemapInverse(float3 color, float luminance)
+{
+	return color * rcp(1.0 - luminance);
+}
+
+float3 FastTonemapInverse(float3 color)
+{
+	return FastTonemapInverse(color, Luminance(color));
+}
+
 float3 FastTonemapYCoCg(float3 yCoCg)
 {
-	return yCoCg * rcp(1.0 + yCoCg.r);
+	return FastTonemap(yCoCg, yCoCg.r);
 }
 
 float3 FastTonemapYCoCgInverse(float3 yCoCg)
 {
-	return yCoCg * rcp(1.0 - yCoCg.r);
+	return FastTonemapInverse(yCoCg, yCoCg.r);
 }
 
 float3 RgbToYCoCgFastTonemap(float3 rgb)

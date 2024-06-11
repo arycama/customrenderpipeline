@@ -337,11 +337,10 @@ float3 PlanetCurveInverse(float3 worldPosition)
 	return worldPosition;
 }
 
-float3 PlanetCurvePrevious(float3 positionRWS)
+float3 PlanetCurvePrevious(float3 worldPosition)
 {
-	float dst = length(positionRWS.xz) / _PlanetRadius;
-	positionRWS.y += _PlanetRadius * (sqrt(1 - dst * dst) - 1.0);
-	return positionRWS;
+	worldPosition.y -= sqrt(Sq(_PlanetRadius) - SqrLength(worldPosition.xz)) - _PlanetRadius;
+	return worldPosition;
 }
 
 #endif

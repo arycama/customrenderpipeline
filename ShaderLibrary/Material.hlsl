@@ -10,7 +10,7 @@ Texture2D<float> _LengthToRoughness;
 float SmoothnessToRoughness(float smoothness)
 {
 	// Sq(1-smoothness) rewritten as 2 mads, vs sub sub mul
-	return Sq(smoothness) * (-2.0 * smoothness + 1.0);
+	return -2.0 * smoothness + (smoothness * smoothness + 1.0);
 }
 
 float RoughnessToPerceptualRoughness(float roughness)

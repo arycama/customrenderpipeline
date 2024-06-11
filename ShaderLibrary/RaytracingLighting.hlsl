@@ -10,6 +10,8 @@ float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, fl
 	float4 clipPosition = PerspectiveDivide(WorldToClip(worldPosition));
 	bool isInScreen = all(clipPosition.xyz >= float2(-1.0, 0.0).xxy && clipPosition.xyz <= 1.0);
 
+	float NdotV = dot(N, V);
+	
 	// Do lighting with existing light cluster, shadow matrices, etc
 	if(isInScreen)
 	{
@@ -26,12 +28,9 @@ float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, fl
 		input.bentNormal = bentNormal;
 		input.isWater = false; // TODO: Implement when raytraced water is added
 		input.uv = clipPosition.xy * 0.5 + 0.5;
+		input.NdotV = NdotV;
 		return GetLighting(input);
 	}
-	
-	// Off screen lighting
-	float NdotV;
-	N = GetViewReflectedNormal(N, V, NdotV);
 	
 	float3 radiance = IndirectSpecular(N, V, f0, NdotV, perceptualRoughness, false, _SkyReflection);
 	

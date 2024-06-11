@@ -16,10 +16,11 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
 	float linearDepth = LinearEyeDepth(depth);
 	
+	float NdotV;
 	float3 V = normalize(-worldDir);
 	
 	LightingInput lightingInput;
-	lightingInput.normal = GBufferNormal(normalRoughness, V);
+	lightingInput.normal = GBufferNormal(normalRoughness, V, NdotV);
 	lightingInput.worldPosition = worldDir * linearDepth;
 	lightingInput.pixelPosition = position.xy;
 	lightingInput.eyeDepth = linearDepth;
@@ -31,6 +32,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.bentNormal = normalize(2.0 * bentNormalOcclusion.rgb - 1.0);
 	lightingInput.isWater = false;
 	lightingInput.uv = uv;
+	lightingInput.NdotV = NdotV;
 	
 	return GetLighting(lightingInput) + _Emissive[position.xy];
 }

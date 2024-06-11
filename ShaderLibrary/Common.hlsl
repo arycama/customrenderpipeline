@@ -167,10 +167,10 @@ bool IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePositi
 	return res;
 }
 
-bool IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal)
+float3 IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal)
 {
-	float t;
-	return IntersectRayPlane(rayOrigin, rayDirection, planePosition, planeNormal, t);
+	float t = dot(planePosition - rayOrigin, planeNormal) / dot(planeNormal, rayDirection);
+	return rayDirection * t + rayOrigin;
 }
 
 float Linear01Depth(float depth)

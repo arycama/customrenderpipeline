@@ -65,7 +65,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	float2 historyUv = uv - velocity;
 	float2 f = frac(historyUv * _ScaledResolution.xy - 0.5);
 	float2 w = _Sharpness * (f * f - f);
-	float historyWeights[9] = { 0.0, f.y * w.y, 0.0, (1.0 - f.x) * w.x, -w.x - w.y, f.x * w.x, 0.0, 0.0, (1.0 - f.y) * w.y };
+	float historyWeights[9] = { 0.0, f.y * w.y, 0.0, (1.0 - f.x) * w.x, -w.x - w.y, f.x * w.x, 0.0, (1.0 - f.y) * w.y, 0.0};
 	
 	float _FilterWeights[9] = { _BoxFilterWeights0[0], _BoxFilterWeights0[1],_BoxFilterWeights0[2],_BoxFilterWeights0[3], _CenterBoxFilterWeight, _BoxFilterWeights1[0], _BoxFilterWeights1[1], _BoxFilterWeights1[2], _BoxFilterWeights1[3]};
 	

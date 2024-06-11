@@ -22,10 +22,11 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 	float eyeDepth = LinearEyeDepth(depth);
 	
+	float NdotV;
 	float3 V = normalize(-worldDir);
 	
 	LightingInput lightingInput;
-	lightingInput.normal = GBufferNormal(normalRoughness, V);
+	lightingInput.normal = GBufferNormal(normalRoughness, V, NdotV);
 	lightingInput.worldPosition = worldDir * eyeDepth;
 	lightingInput.pixelPosition = position.xy;
 	lightingInput.eyeDepth = eyeDepth;
@@ -38,6 +39,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.isWater = (stencil & 4) != 0;
 	lightingInput.uv = uv;
 	lightingInput.translucency = isTranslucent ? albedoMetallic.rgb * albedoMetallic.a : 0.0;
+	lightingInput.NdotV = NdotV;
 
 	return GetLighting(lightingInput);
 }

@@ -144,14 +144,14 @@ struct LightingInput
 	float3 bentNormal;
 	bool isWater;
 	float2 uv;
+	float NdotV;
 };
 
-float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, float3 L, float3 V, float3 N, float3 bentNormal, float occlusion, float3 translucency)
+float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, float3 L, float3 V, float3 N, float3 bentNormal, float occlusion, float3 translucency, float NdotV)
 {
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 
 	float NdotL = dot(N, L);
-	float NdotV = dot(N, V);
 	
 	float3 diffuse = GGXDiffuse(abs(NdotL), abs(NdotV), perceptualRoughness, f0);
 	float3 lighting = NdotL > 0.0 ? albedo * diffuse : translucency * diffuse;
@@ -295,18 +295,15 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 {
 	float3 V = normalize(-input.worldPosition);
 	
-	// TODO: Pass this in as part of lighting input?
-	float NdotV = max(0.0, dot(input.normal, V));
-	
 	#ifdef SCREENSPACE_REFLECTIONS_ON
 		float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
 	#else
-		float3 radiance = IndirectSpecular(input.normal, V, input.f0, NdotV, input.perceptualRoughness, input.isWater, _SkyReflection);
+		float3 radiance = IndirectSpecular(input.normal, V, input.f0, input.NdotV, input.perceptualRoughness, input.isWater, _SkyReflection);
 	#endif
 	
 	float3 R = reflect(-V, input.normal);
 	float BdotR = dot(input.bentNormal, R);
-	radiance *= IndirectSpecularFactor(NdotV, input.perceptualRoughness, input.f0) * SpecularOcclusion(NdotV, input.perceptualRoughness, input.occlusion, BdotR);
+	radiance *= IndirectSpecularFactor(input.NdotV, input.perceptualRoughness, input.f0) * SpecularOcclusion(input.NdotV, input.perceptualRoughness, input.occlusion, BdotR);
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float3 irradiance = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit));
@@ -314,7 +311,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
 	#endif
 	
-	float3 luminance = radiance + irradiance * IndirectDiffuseFactor(NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
+	float3 luminance = radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
 
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
@@ -370,7 +367,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 				light.color *= WaterShadow(input.worldPosition, light.direction);
 			#endif
 			
-			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, light.direction, V, input.normal, input.bentNormal, input.occlusion, input.translucency) * light.color * atmosphereTransmittance) * (abs(NdotL) * _Exposure * attenuation);
+			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, light.direction, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV) * light.color * atmosphereTransmittance) * (abs(NdotL) * _Exposure * attenuation);
 		}
 	}
 	
@@ -419,7 +416,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		else
 		{
 			if (NdotL > 0.0)
-				luminance += CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency) * NdotL * attenuation * light.color * _Exposure;
+				luminance += CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV) * NdotL * attenuation * light.color * _Exposure;
 		}
 	}
 	

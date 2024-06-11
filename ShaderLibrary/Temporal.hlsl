@@ -54,7 +54,7 @@ void TemporalNeighborhood(Texture2D<float4> input, int2 coord, out float4 minVal
 	maxValue = min(maxValue, mean + stdDev);
 }
 
-void TemporalNeighborhood(Texture2D<float3> input, int2 coord, out float3 minValue, out float3 maxValue, out float3 result, bool useYCoCg = true)
+void TemporalNeighborhood(Texture2D<float3> input, int2 coord, out float3 minValue, out float3 maxValue, out float3 result, bool useYCoCg = true, bool useTonemap = true, float stdDevFactor = 1.0)
 {
 	float3 mean = 0.0, stdDev = 0.0;
 	
@@ -66,7 +66,14 @@ void TemporalNeighborhood(Texture2D<float3> input, int2 coord, out float3 minVal
 		{
 			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
 			float3 color = input[coord + int2(x, y)];
-			color = useYCoCg ? RgbToYCoCgFastTonemap(color) : color;
+			
+			if(useYCoCg && useTonemap)
+				color = RgbToYCoCgFastTonemap(color);
+			else if(useYCoCg)
+				color = RgbToYCoCg(color);
+			else if(useTonemap)
+				color = FastTonemap(color);
+			
 			result = i == 0 ? color * weight : result + color * weight;
 			mean += color;
 			stdDev += color * color;
@@ -77,9 +84,9 @@ void TemporalNeighborhood(Texture2D<float3> input, int2 coord, out float3 minVal
 	
 	mean /= 9.0;
 	stdDev /= 9.0;
-	stdDev = sqrt(abs(stdDev - mean * mean));
-	minValue = max(minValue, mean - stdDev);
-	maxValue = min(maxValue, mean + stdDev);
+	stdDev = sqrt(abs(stdDev - mean * mean)) * stdDevFactor;
+	minValue = mean - stdDev;
+	maxValue = mean + stdDev;
 }
 
 #endif

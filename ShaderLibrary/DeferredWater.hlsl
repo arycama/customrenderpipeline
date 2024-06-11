@@ -13,6 +13,7 @@
 
 Texture2D<float4> _WaterNormalFoam;
 Texture2D<float3> _WaterEmission, _UnderwaterResult;
+Texture2D<float2> _WaterTriangleNormal;
 Texture2D<float> _Depth, _UnderwaterDepth;
 
 float4 _UnderwaterResultScaleLimit;
@@ -26,10 +27,17 @@ float _WaveFoamFalloff;
 float _WaveFoamSharpness;
 float _WaveFoamStrength;
 float4 _FoamTex_ST;
+float _Smoothness;
 
 matrix _PixelToWorldDir;
 
-GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+struct FragmentOutput
+{
+	GBufferOutput gbuffer;
+	float3 luminance : SV_Target4;
+};
+
+FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	float waterDepth = _Depth[position.xy];
 	float4 waterNormalFoamRoughness = _WaterNormalFoam[position.xy];
@@ -53,11 +61,23 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float foam = 0.0;
 	float smoothness = 1.0;
 
+	float3 triangleNormal = UnpackNormalOctQuadEncode(_WaterTriangleNormal[position.xy]);
+	
+	float3 rayX = QuadReadAcrossX(-V, position.xy);
+	float3 rayY = QuadReadAcrossY(-V, position.xy);
+	
+	float3 positionX = IntersectRayPlane(0.0, rayX, positionWS, triangleNormal);
+	float3 positionY = IntersectRayPlane(0.0, rayY, positionWS, triangleNormal);
+	
+	float2 dx = (positionX - positionWS).xz;
+	float2 dy = (positionY - positionWS).xz;
+	
 	[unroll]
 	for (uint i = 0; i < 4; i++)
 	{
-		float3 uv = float3(oceanUv * _OceanScale[i], i);
-		float4 cascadeData = OceanNormalFoamSmoothness.Sample(_TrilinearRepeatAniso16Sampler, uv);
+		float scale = _OceanScale[i];
+		float3 uv = float3(oceanUv * scale, i);
+		float4 cascadeData = OceanNormalFoamSmoothness.SampleGrad(_TrilinearRepeatSampler, uv, dx * scale, dy * scale);
 		
 		float3 normal = UnpackNormalSNorm(cascadeData.rg);
 		normalData += normal.xy / normal.z;
@@ -71,7 +91,8 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	float3 B = cross(T, N);
 	float3x3 tangentToWorld = float3x3(T, B, N);
-	float3 oceanN = normalize(float3(normalData * lerp(1.0, 0.0, shoreFactor * 0.75), 1.0));
+	//float3 N = normalize(float3(normalData * lerp(1.0, 0.0, shoreFactor * 0.75), 1.0));
+	N = normalize(float3(normalData, 1.0)).xzy;
 	
 	// Foam calculations
 	//float foamFactor = saturate(lerp(_WaveFoamStrength * (-foam + _WaveFoamFalloff), breaker + shoreFoam, shoreFactor));
@@ -84,14 +105,14 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		// Sample/unpack normal, reconstruct partial derivatives, scale these by foam factor and normal scale and add.
 		float3 foamNormal = UnpackNormalAG(_FoamBump.Sample(_TrilinearRepeatAniso16Sampler, foamUv));
 		float2 foamDerivs = foamNormal.xy / foamNormal.z;
-		oceanN.xy += foamDerivs * _FoamNormalScale * foamFactor;
-		smoothness = lerp(smoothness, _FoamSmoothness, foamFactor);
+		//oceanN.xy += foamDerivs * _FoamNormalScale * foamFactor;
+		//smoothness = lerp(smoothness, _FoamSmoothness, foamFactor);
 	}
 
 	// TODO: Use RNM
-	N = normalize(mul(oceanN, tangentToWorld));
+	// = normalize(mul(oceanN, tangentToWorld));
 	float perceptualRoughness = SmoothnessToPerceptualRoughness(smoothness);
-	perceptualRoughness = ProjectedSpaceGeometricNormalFiltering(perceptualRoughness, N, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
+	float3 originalN = N;
 	
 	float NdotV;
 	N = GetViewReflectedNormal(N, V, NdotV);
@@ -143,14 +164,15 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, P);
 				if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
 				{
-					float shadowDepth = _WaterShadows.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);
+					float shadowDepth = _WaterShadows.Sample(_LinearClampSampler, shadowPosition.xy);
 					shadowDistance0 = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
 				}
 			
 				float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
-				float LdotV0 = dot(_LightDirection0, -V);
+				float3 r = -V;// refract(-V, N, rcp(1.5));
+				float LdotV0 = dot(_LightDirection0, r);
 				float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, t * LdotV0, _PlanetRadius);
-				float3 phase = lerp(MiePhase(LdotV0, -0.15) * 2.16, MiePhase(LdotV0, 0.85), asymmetry);
+				float phase = lerp(MiePhase(LdotV0, -0.15) , MiePhase(LdotV0, 0.85), asymmetry)* 4;
 				float3 lightColor0 = phase * _LightColor0 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance0);
 				luminance += lightColor0 * attenuation * asymmetry;
 			}
@@ -160,28 +182,85 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			float shadowDistance1 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection1.y));
 			float LdotV1 = dot(_LightDirection1, V);
 			float lightCosAngleAtDistance1 = CosAngleAtDistance(_ViewHeight, _LightDirection1.y, t * LdotV1, _PlanetRadius);
-			float3 lightColor1 = RcpFourPi * _LightColor1 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance1);
+			float3 lightColor1 = RcpPi * _LightColor1 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance1);
 			luminance += lightColor1 * exp(-_Extinction * (shadowDistance1 + t));
 		#endif
 	#endif
 	
-	luminance *= _Extinction * weight * _Exposure * 4;
+	luminance *= _Extinction * weight * _Exposure;
 	
 	// Ambient 
-	float3 finalTransmittance = exp(-underwaterDistance * _Extinction);
+	float3 finalTransmittance = exp(-t * _Extinction);
 	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
-	luminance *= _Color;
 	
+	luminance *= _Color;
 	luminance = IsInfOrNaN(luminance) ? 0.0 : luminance;
 
 	// TODO: Stencil? Or hw blend?
+	float3 underwater = 0.0;
 	if(underwaterDepth != 0.0)
-		luminance += _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit)) * exp(-_Extinction * underwaterDistance);
+		underwater = _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit)) * exp(-_Extinction * underwaterDistance);
 	
 	// Apply roughness to transmission
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
 	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.04);
-	luminance *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
+	underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
 	
-	return OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, luminance);
+	FragmentOutput output;
+	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);
+	output.luminance = luminance * (1.0 - foamFactor) * (1.0 - FssEss);
+	return output;
+}
+
+Texture2D<float4> _NormalRoughness;
+Texture2D<float3> _TemporalInput, _History;
+float4 _HistoryScaleLimit;
+float _IsFirst;
+
+struct TemporalOutput
+{
+	float3 temporal : SV_Target0;
+	float3 emissive : SV_Target1;
+};
+
+TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+{
+	// Note: Not using yCoCg or tonemapping gives less noisy results here
+	float3 minValue, maxValue, result;
+	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, result, false, false, 1.5);
+	
+	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
+	
+	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
+	float3 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
+	history *= _PreviousToCurrentExposure;
+	
+	history = ClipToAABB(history, result, minValue, maxValue);
+	
+	if(!_IsFirst && all(saturate(historyUv) == historyUv))
+		result = lerp(history, result, 0.05 * _MaxBoxWeight);
+	
+	result = RemoveNaN(result);
+	
+	TemporalOutput output;
+	output.temporal = result;
+	
+	//result *= _Color;
+	
+	// Apply roughness to transmission
+	float4 normalRoughness = _NormalRoughness[position.xy];
+	
+	float3 V = normalize(-worldDir);
+	
+	float NdotV;
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
+	float perceptualRoughness = normalRoughness.a;
+	
+	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
+	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.04);
+	//result *= (1.0 - FssEss); // TODO: Diffuse transmittance?
+	
+	output.emissive = result;
+	
+	return output;
 }
