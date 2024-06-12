@@ -78,6 +78,7 @@ cbuffer CameraData
 	matrix _PixelToView;
 	matrix _PixelToClip;
 	matrix _PixelToScreen;
+	matrix _PixelToWorldDir;
 	
 	matrix _WorldToPreviousClip;
 	matrix _WorldToNonJitteredClip;
@@ -304,6 +305,11 @@ float3 PixelToWorld(float3 position)
 float3 WorldToView(float3 position)
 {
 	return MultiplyPoint3x4(_WorldToView, position);
+}
+
+float3 PixelToWorldDir(float2 position, bool doNormalize)
+{
+	return MultiplyVector(_PixelToWorldDir, float3(position, 1.0), doNormalize);
 }
 
 float4 WorldToClipNonJittered(float3 position) { return MultiplyPoint(_WorldToNonJitteredClip, position); }

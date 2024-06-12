@@ -29,8 +29,6 @@ float _WaveFoamStrength;
 float4 _FoamTex_ST;
 float _Smoothness;
 
-matrix _PixelToWorldDir;
-
 struct FragmentOutput
 {
 	GBufferOutput gbuffer;
@@ -63,8 +61,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 
 	float3 triangleNormal = UnpackNormalOctQuadEncode(_WaterTriangleNormal[position.xy]);
 	
-	float3 rayX = QuadReadAcrossX(-V, position.xy);
-	float3 rayY = QuadReadAcrossY(-V, position.xy);
+	//float3 rayX = QuadReadAcrossX(-V, position.xy);
+	//float3 rayY = QuadReadAcrossY(-V, position.xy);
+	
+	float3 rayX = -PixelToWorldDir(position.xy + float2(1.0, 0.0), true);
+	float3 rayY = -PixelToWorldDir(position.xy + float2(0.0, 1.0), true);
 	
 	float3 positionX = IntersectRayPlane(0.0, rayX, positionWS, triangleNormal);
 	float3 positionY = IntersectRayPlane(0.0, rayY, positionWS, triangleNormal);
@@ -78,6 +79,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float scale = _OceanScale[i];
 		float3 uv = float3(oceanUv * scale, i);
 		float4 cascadeData = OceanNormalFoamSmoothness.SampleGrad(_TrilinearRepeatSampler, uv, dx * scale, dy * scale);
+		//cascadeData = OceanNormalFoamSmoothness.SampleLevel(_TrilinearRepeatSampler, uv, 0);
 		
 		float3 normal = UnpackNormalSNorm(cascadeData.rg);
 		normalData += normal.xy / normal.z;
