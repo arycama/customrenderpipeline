@@ -239,19 +239,15 @@ namespace Arycama.CustomRenderPipeline
 
             // TODO: Should be able to simply just define a box and not even worry about view position since we translate it anyway
             var size = new Vector3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
-            var min = new Vector3(-settings.ShadowRadius, -settings.Profile.MaxWaterHeight, -settings.ShadowRadius);
+            var min = new Vector3(-settings.ShadowRadius, -settings.Profile.MaxWaterHeight - viewPosition.y, -settings.ShadowRadius);
+
+            var texelSize = settings.ShadowRadius * 2.0f / settings.ShadowResolution;
+
+            var snappedViewPositionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x;
+            var snappedViewPositionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z;
 
             var worldToLight = Matrix4x4.Rotate(Quaternion.Inverse(lightRotation));
             Vector3 minValue = Vector3.positiveInfinity, maxValue = Vector3.negativeInfinity;
-
-            var texelSize = settings.Size / (float)settings.PatchVertices;
-            //var snappedViewPositionX = MathUtils.Snap(viewPosition.x - settings.Size * 0.5f, texelSize) + settings.Size * 0.5f;
-            //var snappedViewPositionZ = MathUtils.Snap(viewPosition.z - settings.Size * 0.5f, texelSize) + settings.Size * 0.5f;
-
-            var snappedViewPositionX = Mathf.Floor(viewPosition.x / settings.ShadowResolution) * settings.ShadowResolution;
-            var snappedViewPositionZ = Mathf.Floor(viewPosition.z / settings.ShadowResolution) * settings.ShadowResolution;
-
-            //pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
             for (var z = 0; z < 2; z++)
             {
@@ -271,23 +267,10 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Calculate culling planes
-            var viewProjectionMatrix = Matrix4x4Extensions.OrthoOffCenter(minValue.x, maxValue.x, minValue.y, maxValue.y, minValue.z, maxValue.z) * worldToLight;
-            var frustumPlanes = ArrayPool<Plane>.Get(6);
-            GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrix, frustumPlanes);
-
-            var cullingPlanes = new CullingPlanes() { Count = 6 };
-            for (var j = 0; j < 6; j++)
-                cullingPlanes.SetCullingPlane(j, frustumPlanes[j]);
-
-            ArrayPool<Plane>.Release(frustumPlanes);
-
-            var cullResult = Cull(viewPosition, cullingPlanes, commonPassData);
-
             var width = maxValue.x - minValue.x;
             var height = maxValue.y - minValue.y;
             var depth = maxValue.z - minValue.z;
-
-            var gpuProjectionMatrix = new Matrix4x4
+            var projectionMatrix = new Matrix4x4
             {
                 m00 = 2.0f / width,
                 m03 = (maxValue.x + minValue.x) / -width,
@@ -298,9 +281,22 @@ namespace Arycama.CustomRenderPipeline
                 m33 = 1.0f
             };
 
-            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(-viewPosition, lightRotation);
+            var viewProjectionMatrix = projectionMatrix * worldToLight;
 
-            var vm = viewMatrixRWS;
+            var frustumPlanes = ArrayPool<Plane>.Get(6);
+            GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrix, frustumPlanes);
+
+            var cullingPlanes = new CullingPlanes() { Count = 6 };
+            for (var j = 0; j < 6; j++)
+            {
+                cullingPlanes.SetCullingPlane(j, frustumPlanes[j]);
+            }
+
+            ArrayPool<Plane>.Release(frustumPlanes);
+
+            var cullResult = Cull(viewPosition, cullingPlanes, commonPassData);
+
+            var vm = worldToLight;
             var shadowMatrix = new Matrix4x4
             {
                 m00 = vm.m00 / width,
@@ -322,7 +318,7 @@ namespace Arycama.CustomRenderPipeline
             };
 
             // TODO: Change to near/far
-            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, gpuProjectionMatrix * viewMatrixRWS, shadowMatrix, cullingPlanes), renderGraph.FrameIndex);
+            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewProjectionMatrix, shadowMatrix, cullingPlanes), renderGraph.FrameIndex);
         }
 
         public void RenderShadow(Vector3 viewPosition, ICommonPassData commonPassData)
@@ -371,8 +367,8 @@ namespace Arycama.CustomRenderPipeline
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;
-                    var positionX = Mathf.Floor((viewPosition.x - settings.Size * 0.5f) / texelSize) * texelSize - viewPosition.x;
-                    var positionZ = Mathf.Floor((viewPosition.z - settings.Size * 0.5f) / texelSize) * texelSize - viewPosition.z;
+                    var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
+                    var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
                     var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
@@ -490,10 +486,10 @@ namespace Arycama.CustomRenderPipeline
                         ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                         // Snap to quad-sized increments on largest cell
-                        var texelSizeX = settings.Size / (float)settings.PatchVertices;
-                        var texelSizeZ = settings.Size / (float)settings.PatchVertices;
-                        var positionX = Mathf.Floor((viewPosition.x - settings.Size * 0.5f) / texelSizeX) * texelSizeX - viewPosition.x;
-                        var positionZ = Mathf.Floor((viewPosition.z - settings.Size * 0.5f) / texelSizeZ) * texelSizeZ - viewPosition.z;
+                        var texelSize = settings.Size / (float)settings.PatchVertices;
+                        var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
+                        var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
+
                         var positionOffset = new Vector4(settings.Size, settings.Size, positionX, positionZ);
                         pass.SetVector(command, "_TerrainPositionOffset", positionOffset);
 
@@ -547,6 +543,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, IRenderPassData commonPassData, CullingPlanes cullingPlanes)
         {
+            var viewPosition = camera.transform.position;
             if (!settings.IsEnabled)
                 return;
 
@@ -600,8 +597,8 @@ namespace Arycama.CustomRenderPipeline
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;
-                    var positionX = MathUtils.Snap(camera.transform.position.x - settings.Size * 0.5f, texelSize) - camera.transform.position.x;
-                    var positionZ = MathUtils.Snap(camera.transform.position.z - settings.Size * 0.5f, texelSize) - camera.transform.position.z;
+                    var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
+                    var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
                     var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
@@ -775,7 +772,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            var(current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
+            var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water Temporal"))
             {
                 pass.Initialize(deferredWaterMaterial, 1, camera: camera);

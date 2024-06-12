@@ -98,7 +98,7 @@ HullConstantOutput HullConstant(InputPatch<HullInput, 4> inputs)
 {
 	HullConstantOutput output = (HullConstantOutput) -1;
 	
-	if (QuadFrustumCull(inputs[0].position, inputs[1].position, inputs[2].position, inputs[3].position, 0))
+	if (!QuadFrustumCull(inputs[0].position, inputs[1].position, inputs[2].position, inputs[3].position, 0))
 		return output;
 	
 	[unroll]

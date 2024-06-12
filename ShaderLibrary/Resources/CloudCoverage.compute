@@ -16,13 +16,12 @@ void CSMain (uint groupIndex : SV_GroupIndex)
 {
 	float2 u = Hammersley2dSeq(groupIndex, _ThreadCount);
 	float3 V = SampleHemisphereUniform(u.x, u.y).xzy;
-	//float3 V = SampleHemisphereCosine(u.x, u.y).xzy;
 	
 	float rayStart = DistanceToSphereInside(_PlanetRadius, V.y, _PlanetRadius + _StartHeight);
 	float rayEnd = DistanceToSphereInside(_PlanetRadius, V.y, _PlanetRadius + _StartHeight + _LayerThickness);
 	
-	float cloudDistance = 0;
-	float4 clouds = EvaluateCloud(rayStart, rayEnd - rayStart, 8, V, _PlanetRadius, V.y, 0.5, float3(0.0, -_ViewPosition.y, 0.0), false, cloudDistance);
+	float cloudDistance;
+	float4 clouds = EvaluateCloud(rayStart, rayEnd - rayStart, 8, V, _PlanetRadius, V.y, 0.5, float3(0.0, -_ViewPosition.y, 0.0), false, cloudDistance, false);
 	
 	_SharedLuminanceExtinction[groupIndex] = clouds;
 	
@@ -45,5 +44,5 @@ void CSMain (uint groupIndex : SV_GroupIndex)
 	
 	result = isnan(result) || (result.y == 0) ? float2(0.0, 1.0).xxxy : result;
 	
-	_Result[0] = result;
+	_Result[0] = float4(0, 0, 0, 1);//	result;
 }

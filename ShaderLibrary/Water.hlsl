@@ -106,7 +106,7 @@ HullConstantOutput HullConstant(InputPatch<HullInput, 4> inputs)
 {
 	HullConstantOutput output = (HullConstantOutput) - 1;
 	
-	if (QuadFrustumCull(inputs[0].position, inputs[1].position, inputs[2].position, inputs[3].position, _FrustumThreshold))
+	if (!QuadFrustumCull(inputs[0].position, inputs[1].position, inputs[2].position, inputs[3].position, _FrustumThreshold))
 		return output;
 	
 	if (!CheckTerrainMask(inputs[0].position + _ViewPosition, inputs[1].position + _ViewPosition, inputs[2].position + _ViewPosition, inputs[3].position + _ViewPosition))

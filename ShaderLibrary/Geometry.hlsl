@@ -104,18 +104,13 @@ float ProjectedSphereRadius(float worldRadius, float3 worldPosition, float camer
 // Quad variant
 bool QuadFrustumCull(float3 p0, float3 p1, float3 p2, float3 p3, float threshold)
 {
-	for(uint i = 0; i < 6; i++)
-	{
-		float4 plane = _CullingPlanes[i];
-		
-		if(any(DistanceFromPlane(p0, plane) > -threshold ||
-			DistanceFromPlane(p1, plane) > -threshold ||
-			DistanceFromPlane(p2, plane) > -threshold ||
-			DistanceFromPlane(p3, plane) > -threshold))
-			return false;
-	}
+	float3 minValue = min(p0, min(p1, min(p2, p3))) - threshold;
+	float3 maxValue = max(p0, max(p1, max(p2, p3))) + threshold;
+
+	float3 center = 0.5 * (maxValue + minValue);
+	float3 extents = 0.5 * (maxValue - minValue);
 	
-	return true;
+	return FrustumCull(center, extents);
 }
 
 float CalculateSphereEdgeFactor(float radius, float3 edgeCenter, float targetEdgeLength, float cameraAspect, float screenWidth)

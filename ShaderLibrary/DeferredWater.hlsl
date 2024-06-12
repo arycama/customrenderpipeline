@@ -61,11 +61,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 
 	float3 triangleNormal = UnpackNormalOctQuadEncode(_WaterTriangleNormal[position.xy]);
 	
-	//float3 rayX = QuadReadAcrossX(-V, position.xy);
-	//float3 rayY = QuadReadAcrossY(-V, position.xy);
+	float3 rayX = QuadReadAcrossX(-V, position.xy);
+	float3 rayY = QuadReadAcrossY(-V, position.xy);
 	
-	float3 rayX = -PixelToWorldDir(position.xy + float2(1.0, 0.0), true);
-	float3 rayY = -PixelToWorldDir(position.xy + float2(0.0, 1.0), true);
+	//float3 rayX = -PixelToWorldDir(position.xy + float2(1.0, 0.0), true);
+	//float3 rayY = -PixelToWorldDir(position.xy + float2(0.0, 1.0), true);
 	
 	float3 positionX = IntersectRayPlane(0.0, rayX, positionWS, triangleNormal);
 	float3 positionY = IntersectRayPlane(0.0, rayY, positionWS, triangleNormal);
@@ -79,7 +79,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float scale = _OceanScale[i];
 		float3 uv = float3(oceanUv * scale, i);
 		float4 cascadeData = OceanNormalFoamSmoothness.SampleGrad(_TrilinearRepeatSampler, uv, dx * scale, dy * scale);
-		//cascadeData = OceanNormalFoamSmoothness.SampleLevel(_TrilinearRepeatSampler, uv, 0);
+		//cascadeData = OceanNormalFoamSmoothness.Sample(_TrilinearRepeatSampler, uv);
 		
 		float3 normal = UnpackNormalSNorm(cascadeData.rg);
 		normalData += normal.xy / normal.z;
@@ -154,6 +154,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float3 P = positionWS + underwaterV * t;
 	
 	float3 luminance = 0.0;
+	float planetDistance = DistanceToBottomAtmosphereBoundary(_ViewHeight, -V.y);
 	
 	#if defined(LIGHT_COUNT_ONE) || defined(LIGHT_COUNT_TWO)
 		float attenuation = GetShadow(P, 0, false);
@@ -164,17 +165,21 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			{
 				float shadowDistance0 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
 				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, P);
-				if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
+				if (all(saturate(shadowPosition.xyz) == shadowPosition.xyz))
 				{
 					float shadowDepth = _WaterShadows.Sample(_LinearClampSampler, shadowPosition.xy);
 					shadowDistance0 = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
 				}
 			
 				float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
-				float3 r = -V;// refract(-V, N, rcp(1.5));
-				float LdotV0 = dot(_LightDirection0, r);
-				float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, t * LdotV0, _PlanetRadius);
-				float phase = lerp(MiePhase(LdotV0, -0.15) , MiePhase(LdotV0, 0.85), asymmetry)* 4;
+				float LdotV0 = dot(_LightDirection0, -V);
+				float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, planetDistance * LdotV0, _PlanetRadius);
+				float3 r = -V;
+				r = refract(-V, N, rcp(1.5));
+				float3 lR = _LightDirection0;
+				//lR = -refract(-_LightDirection0, N * float3(-1, 1, -1), rcp(1.5));
+				LdotV0 = dot(lR, r);
+				float phase = lerp(MiePhase(LdotV0, -0.15) , MiePhase(LdotV0, 0.85), asymmetry) * 2.5;
 				float3 lightColor0 = phase * _LightColor0 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance0);
 				luminance += lightColor0 * attenuation * asymmetry;
 			}
@@ -182,8 +187,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 		#ifdef LIGHT_COUNT_TWO
 			float shadowDistance1 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection1.y));
-			float LdotV1 = dot(_LightDirection1, V);
-			float lightCosAngleAtDistance1 = CosAngleAtDistance(_ViewHeight, _LightDirection1.y, t * LdotV1, _PlanetRadius);
+			float LdotV1 = dot(_LightDirection1, -V);
+			float lightCosAngleAtDistance1 = CosAngleAtDistance(_ViewHeight, _LightDirection1.y, planetDistance * LdotV1, _PlanetRadius);
 			float3 lightColor1 = RcpPi * _LightColor1 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance1);
 			luminance += lightColor1 * exp(-_Extinction * (shadowDistance1 + t));
 		#endif

@@ -341,7 +341,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 			if(input.isWater)
 			{
 				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, input.worldPosition);
-				if(all(saturate(shadowPosition.xy) == shadowPosition.xy))
+				if(all(saturate(shadowPosition.xyz) == shadowPosition.xyz))
 					attenuation *= _WaterShadows.SampleCmpLevelZero(_LinearClampCompareSampler, shadowPosition.xy, shadowPosition.z);
 			}
 			#endif
