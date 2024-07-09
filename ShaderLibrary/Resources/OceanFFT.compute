@@ -65,30 +65,16 @@ OceanSpectrum LocalSpectrum()
 	return s;
 }
 
-OceanSpectrum DistantSpectrum()
-{
-	OceanSpectrum s;
-	s.scale = scale1;
-	s.windSpeed = windSpeed1;
-	s.windAngle = windAngle1;
-	s.fetch = fetch1;
-	s.spreadBlend = spreadBlend1;
-	s.swell = swell1;
-	s.peakEnhancement = peakEnhancement1;
-	s.shortWavesFade = shortWavesFade1;
-	return s;
-}
+groupshared float2 _HShared[2][_Resolution];
+groupshared float2 _DxShared[2][_Resolution];
+groupshared float2 _DzShared[2][_Resolution];
 
-groupshared complex _HShared[2][_Resolution];
-groupshared complex _DxShared[2][_Resolution];
-groupshared complex _DzShared[2][_Resolution];
-
-void Fft(uint3 id, inout complex height, inout complex dispX, inout complex dispZ)
+void Fft(uint id, inout float2 height, inout float2 dispX, inout float2 dispZ)
 {
     // Load entire row or column into scratch array
-	_HShared[0][id.x] = height;
-	_DxShared[0][id.x] = dispX;
-	_DzShared[0][id.x] = dispZ;
+	_HShared[0][id] = height;
+	_DxShared[0][id] = dispX;
+	_DzShared[0][id] = dispZ;
 
 	uint2 textureIndices = uint2(0, 1);
 	
@@ -101,9 +87,9 @@ void Fft(uint3 id, inout complex height, inout complex dispX, inout complex disp
 		uint sectionWidth = 2 << i;
 		uint halfSectionWidth = sectionWidth / 2;
 
-		uint sectionStartOffset = id.x & ~(sectionWidth - 1);
-		uint halfSectionOffset = id.x & (halfSectionWidth - 1);
-		uint sectionOffset = id.x & (sectionWidth - 1);
+		uint sectionStartOffset = id & ~(sectionWidth - 1);
+		uint halfSectionOffset = id & (halfSectionWidth - 1);
+		uint sectionOffset = id & (sectionWidth - 1);
 
 		uint2 indices = sectionStartOffset + halfSectionOffset;
 		indices.y += halfSectionWidth;
@@ -111,193 +97,79 @@ void Fft(uint3 id, inout complex height, inout complex dispX, inout complex disp
 		if (i == 0)
 			indices = reversebits(indices) >> (32 - passCount) & (_Resolution - 1);
 		
-		complex weights = cexp(cimg(2.0 * Pi * sectionOffset / sectionWidth));
+		float2 weights = cexp(cimg(2.0 * Pi * sectionOffset / sectionWidth));
 
-		height = _HShared[textureIndices.y][id.x] = cadd(_HShared[textureIndices.x][indices.x], cmul(_HShared[textureIndices.x][indices.y], weights));
-		dispX = _DxShared[textureIndices.y][id.x] = cadd(_DxShared[textureIndices.x][indices.x], cmul(_DxShared[textureIndices.x][indices.y], weights));
-		dispZ = _DzShared[textureIndices.y][id.x] = cadd(_DzShared[textureIndices.x][indices.x], cmul(_DzShared[textureIndices.x][indices.y], weights));
+		height = _HShared[textureIndices.y][id] = cadd(_HShared[textureIndices.x][indices.x], cmul(_HShared[textureIndices.x][indices.y], weights));
+		dispX = _DxShared[textureIndices.y][id] = cadd(_DxShared[textureIndices.x][indices.x], cmul(_DxShared[textureIndices.x][indices.y], weights));
+		dispZ = _DzShared[textureIndices.y][id] = cadd(_DzShared[textureIndices.x][indices.x], cmul(_DzShared[textureIndices.x][indices.y], weights));
 
 		textureIndices.xy = textureIndices.yx;
 	}
 }
 
-float AlphaBetaSpectrum(float a, float b, float g, float w, float wp)
+float h0(float2 k, float A)
 {
-	return a * Sq(g) / pow(w, 5.0) * exp(-b * pow(wp / w, 4.0));
-}
-
-float PhillipsSpectrum(float w, OceanSpectrum spectrum)
-{
-	float a = 0.01f;
-	float b = _OceanGravity / spectrum.windSpeed;
-	return AlphaBetaSpectrum(a, b, _OceanGravity, w, 1.0f);
-}
-
-float PiersonMoskowitzSpectrum(float w, OceanSpectrum spectrum)
-{
-	float wm = 0.877 * _OceanGravity / spectrum.windSpeed;
-	return AlphaBetaSpectrum(8.1e-3, 0.74, _OceanGravity, w, wm);
-}
-
-float JonswapSpectrum(float w, OceanSpectrum spectrum)
-{
-	float u10 = spectrum.windSpeed; // Wind speed 10m above sea level
-	float F = spectrum.fetch * 1000.0;
-	
-	float a = 0.076 * pow(Sq(u10) / (F * _OceanGravity), 0.22);
-	float b = 5.0 / 4.0;
-	float wp = 22.0 * pow(Sq(_OceanGravity) / (F * 1000), 1.0 / 3.0);
-	float gamma = spectrum.peakEnhancement;
-	float sigma = w <= wp ? 0.07 : 0.09;
-	float r = exp(-Sq(w - wp) / (2.0 * Sq(sigma) * Sq(wp)));
-	return AlphaBetaSpectrum(a, b, _OceanGravity, w, wp) * pow(gamma, r);
-}
-
-float SpreadPower(float omega, float wp)
-{
-	if (omega > wp)
-	{
-		return 9.77 * pow(abs(omega / wp), -2.5);
-	}
-	else
-	{
-		return 6.97 * pow(abs(omega / wp), 5);
-	}
-}
-
-float NormalisationFactor(float s)
-{
-	float s2 = s * s;
-	float s3 = s2 * s;
-	float s4 = s3 * s;
-	if (s < 5)
-		return -0.000564 * s4 + 0.00776 * s3 - 0.044 * s2 + 0.192 * s + 0.163;
-	else
-		return -4.80e-08 * s4 + 1.07e-05 * s3 - 9.53e-04 * s2 + 5.90e-02 * s + 3.93e-01;
-}
-
-float Cosine2s(float theta, float s)
-{
-	return NormalisationFactor(s) * pow(abs(cos(0.5 * theta)), 2 * s);
-}
-
-float DirectionSpectrum(float theta, float omega, OceanSpectrum spectrum, float wp)
-{
-	float s = SpreadPower(omega, wp) + 16 * tanh(min(omega / wp, 20)) * spectrum.swell * spectrum.swell;
-	return lerp(2 / Pi * cos(theta) * cos(theta), Cosine2s(theta - spectrum.windAngle * TwoPi, s), spectrum.spreadBlend);
-	//return Cosine2s(theta - spectrum.windAngle * TwoPi, s);
-}
-
-float FrequencyDerivative(float k, float g, float depth)
-{
-	float th = tanh(min(k * depth, 20));
-	float ch = cosh(k * depth);
-	return g * (depth * k / ch / ch + th) / sqrt(g * k) / 2;
-}
-
-// Height
-complex h0(float2 k, float A, complex r, uint3 id, OceanSpectrum spectrum)
-{
-	float lengthScale = rcp(_OceanScale[id.z]);
-	float fftNorm = pow(_Resolution, -0.25);
-	float philNorm = exp(1) * _OceanScale[id.z];
-	A = Sq(fftNorm * philNorm);
-	
-	float deltaK = TwoPi / lengthScale;
-	
 	float kl = length(k);
 	
 	// Phillips spectrum
-	float V = spectrum.windSpeed;
-	float g = _OceanGravity; // Gravitational constant
+	float2 windDirection = float2(cos(windAngle0 * TwoPi), sin(windAngle0 * TwoPi));
+	float windFactor = dot(normalize(k), windDirection);
+	float L = Sq(windSpeed0) / _OceanGravity; // Largest possible waves arising from a continuous wind speed of V
 
-	float windFactor = dot(normalize(k), float2(cos(spectrum.windAngle * TwoPi), sin(spectrum.windAngle * TwoPi)));
-	float L = Sq(V) / g; // Largest possible waves arising from a continuous wind speed of V
-
-	float p = A * exp(-1.0 / Sq(kl * L)) / pow(kl, 4.0) * pow(windFactor, 6.0); // Eq 40: Phillips spectrum
+	// Eq 40
+	float p = A * exp(-1.0 / Sq(kl * L)) / pow(kl, 4.0) * pow(windFactor, 6.0);
 	
-	float omega = sqrt(kl * _OceanGravity);
-	float kAngle = atan2(k.y, k.x);
-	float dOmegadk = FrequencyDerivative(kl, _OceanGravity, 500);
-	
-	//p = PhillipsSpectrum(omega, spectrum) * pow(windFactor, 6.0);
-	//p = JonswapSpectrum(omega, spectrum) * spectrum.scale;
-	
-	//p = PiersonMoskowitzSpectrum(omega, spectrum);
-	//p = 2 * p * abs(dOmegadk) / kl * deltaK * deltaK;
-	//p *= philNorm;
-	
-	float wp = 22.0 * pow(Sq(_OceanGravity) / (spectrum.windSpeed * spectrum.fetch * 1000), 1.0 / 3.0);
-	//wp = 0.877 * _OceanGravity / spectrum.windSpeed;
-	
-	//p *= DirectionSpectrum(kAngle, omega, spectrum, wp);
+	// Eq 41
+	p *= exp(-dot(k, k) * Sq(shortWavesFade0)); // Eq 41: Supress small wavelengths
 	
 	// Move waves along wind direction
-	p *= dot(normalize(k), float2(cos(spectrum.windAngle * TwoPi), sin(spectrum.windAngle * TwoPi))) < 0 ? (1 - spectrum.swell) : 1;
-	
-	p *= exp(-dot(k, k) * Sq(spectrum.shortWavesFade)); // Eq 41: Supress small wavelengths
+	p *= dot(normalize(k), windDirection) < 0 ? (1 - swell0) : 1;
 
-	// Eq 42
-	complex result = cmul(creal(rcp(sqrt(2.0))), r);
-	return cmul(r, creal(sqrt(p)));
+	return p;
 }
 
 [numthreads(_Resolution, 1, 1)]
 void InitSpectrum(uint3 id : SV_DispatchThreadID)
 {
-	complex h = czero(), dispX = czero(), dispZ = czero();
+	float2 h = czero(), dispX = czero(), dispZ = czero();
 	
-	uint N = _Resolution;
-	uint M = _Resolution;
-	
-	int n = id.x - N / 2;
-	int m = id.y - M / 2;
-	
-	float Lx = rcp(_OceanScale[id.z]);
-	float Lz = rcp(_OceanScale[id.z]);
+	int n = id.x - _Resolution / 2;
+	int m = id.y - _Resolution / 2;
 	
 	float nr = length(float2(n, m));
 	
 	if ((n || m) && nr >= SpectrumStart[id.z] && nr < SpectrumEnd[id.z])
 	{
-		float kx = 2.0 * Pi * n / Lx;
-		float kz = 2.0 * Pi * m / Lz;
-		float2 k = float2(kx, kz);
-		
-		float fftNorm = pow(_Resolution, -0.25);
-		float philNorm = exp(1) * _OceanScale[id.z];
-		float A = Sq(fftNorm * philNorm);
-		
-		float4 r = GaussianFloat4(id.x + id.y * _Resolution);
-		complex rx = { r.xy };
-		complex rz = { r.zw };
+		float2 k = TwoPi * float2(n, m) / rcp(_OceanScale[id.z]);
 		
 		float kLen = length(k);
 		float w = sqrt(_OceanGravity * kLen);
 		float t = Time;
 		
-		// Eq 43
-		h = cmul(h0(k, A, rx, id, LocalSpectrum()), cexp(cimg(w * t)));
-		h = cadd(h, cmul(h0(-k, A, rz, id, LocalSpectrum()), cexp(cimg(-w * t))));
+		float lengthScale = rcp(_OceanScale[id.z]);
+		float fftNorm = pow(_Resolution, -0.25);
+		float philNorm = exp(1) * _OceanScale[id.z];
+		float A = rsqrt(2.0) * Sq(fftNorm * philNorm);
 		
-		OceanSpectrum distantSpectrum = DistantSpectrum();
-		if (distantSpectrum.scale > 0.0)
-		{
-			h = cadd(h, cmul(h0(k, A, rz, id, distantSpectrum), cexp(cimg(w * t))));
-			h = cadd(h, cmul(h0(-k, A, rz, id, distantSpectrum), cexp(cimg(-w * t))));
-		}
+		float w0 = TwoPi / 200.0;
+		float wtk = floor(w / w0) * w0 * t;
+		
+		// Eq 43
+		float4 r = GaussianFloat4(id.x + id.y * _Resolution);
+		h = cmul(cmul(r.xy, creal(sqrt(h0(k, A)))), cexp(cimg(wtk)));
+		h += h, cmul(cmul(r.zw, creal(sqrt(h0(-k, A)))), cexp(cimg(-wtk)));
 
 		// Eq 44
-		dispX = cmul(cimg(-k.x / kLen), h);
-		dispZ = cmul(cimg(-k.y / kLen), h);
+		dispX = cmul(-cimg(k.x / kLen), h);
+		dispZ = cmul(-cimg(k.y / kLen), h);
 	}
 	
 	// Perform the FFT
-	Fft(id, h, dispX, dispZ);
+	Fft(id.x, h, dispX, dispZ);
 	
 	// Output results to textures
-	targetTexture1[id] = float2(h.r, h.i);
-	targetTexture[id] = float4(dispX.r, dispX.i, dispZ.r, dispZ.i);
+	targetTexture1[id] = h;
+	targetTexture[id] = float4(dispX, dispZ);
 }
 
 RWTexture2DArray<float3> DisplacementOutput;
@@ -321,11 +193,11 @@ void FftColumns(uint3 id : SV_DispatchThreadID)
 	float2 height = sourceTexture1[uint3(texturePos, id.z)];
 	float4 displacement = sourceTexture[uint3(texturePos, id.z)];
 
-	complex h = { height.x, height.y };
-	complex dispX = { displacement.x, displacement.y };
-	complex dispZ = { displacement.z, displacement.w };
+	float2 h = height;
+	float2 dispX = displacement.xy;
+	float2 dispZ = displacement.zw;
 	
-	Fft(id, h, dispX, dispZ);
+	Fft(id.x, h, dispX, dispZ);
 	
 	float sign = ((id.x + id.y) & 1) == 0 ? 1.0 : -1.0;
 	DisplacementOutput[uint3(texturePos, id.z)] = float3(-dispX.r, h.r, -dispZ.r) * sign;

@@ -3,70 +3,54 @@
 #ifndef COMPLEX_INCLUDED
 #define COMPLEX_INCLUDED
 
-struct complex
+float2 czero()
 {
-	float r;
-	float i;
-};
-
-complex czero()
-{
-	complex result = { 0.0, 0.0 };
-	return result;
+	return 0.0;
 }
 
-// Initialize a complex number with only a real (Setting imaginary to zero)
-complex creal(float r)
+// Initialize a float2 number with only a real (Setting imaginary to zero)
+float2 creal(float r)
 {
-	complex result = { r, 0.0 };
-	return result;
+	return float2(r, 0.0);
 }
 
-// Initialize a complex number with only an imaginary number (Setting the real to zero)
-complex cimg(float i)
+// Initialize a float2 number with only an imaginary number (Setting the real to zero)
+float2 cimg(float i)
 {
-	complex result = { 0.0, i };
-	return result;
+	return float2(0.0, i);
 }
 
-complex cadd(complex c0, complex c1)
+float2 cadd(float2 c0, float2 c1)
 {
-	complex result = { c0.r + c1.r, c0.i + c1.i };
-	return result;
+	return c0 + c1;
 }
 
-complex csub(complex c0, complex c1)
+float2 csub(float2 c0, float2 c1)
 {
-	complex result = { c0.r - c1.r, c0.i - c1.i };
-	return result;
+	return c0 - c1;
 }
 
-complex cmul(complex c0, complex c1)
+float2 cmul(float2 c0, float2 c1)
 {
-	complex result = { c0.r * c1.r - c0.i * c1.i, c0.r * c1.i + c0.i * c1.r };
-	return result;
+	return c0.xx * c1.xy + c0.yy * float2(-1, 1) * c1.yx;
 }
 
-complex conj(complex c)
+float2 conj(float2 c)
 {
-	complex result = { c.r, -c.i };
-	return result;
+	return float2(c.x, -c.y);
 }
 
-complex cexp(complex c)
+float2 cexp(float2 c)
 {
-	complex result;
-	result.r = cos(c.i) * exp(c.r);
-	result.i = sin(c.i) * exp(c.r);
-	return result;
+	return float2(cos(c.y), sin(c.y)) * exp(c.x);
 }
 
-// https://cirosantilli.com/complex-dot-product
-complex cdot(complex a, complex b)
+// https://cirosantilli.com/float2-dot-product
+float2 cdot(float2 a, float2 b)
 {
-	complex result;
-	result.r = a.r * b.r + a.i * b.i;
-	result.i = a.i * b.r - a.r * b.i;
+	float2 result;
+	result.x = a.x * b.x + a.y * b.y;
+	result.y = a.y * b.x - a.x * b.y;
 	return result;
 }
 

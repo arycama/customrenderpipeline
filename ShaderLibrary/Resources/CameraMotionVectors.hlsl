@@ -31,5 +31,10 @@ float2 FragmentPreDilate(float4 position : SV_Position, float2 uv : TEXCOORD0, f
 		}
 	}
 	
-	return Velocity[position.xy + uvOffset];
+	// For far plane, return 0 (Todo, handle with clear?)
+	// Or, maybe this is better since it will handle edges against sky
+	if(closestDepth == 0.0)
+		return 0.0;
+	
+	return Velocity[position.xy + uvOffset * 0];
 }
