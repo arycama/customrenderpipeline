@@ -52,9 +52,10 @@ float4 CloudTextureScaleLimit, SkyTextureScaleLimit;
 float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float depth = _Depth[position.xy];
+	uint stencil = _Stencil[position.xy].g;
 	
 	float3 result = 0.0;
-	if(depth != 0.0)
+	if (depth || (stencil & 32))
 	{
 		float cloudTransmittance = CloudTransmittanceTexture[position.xy];
 		

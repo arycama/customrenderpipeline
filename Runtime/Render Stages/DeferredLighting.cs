@@ -63,6 +63,7 @@ public class DeferredLighting
             pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
 
             pass.ReadTexture("_Depth", depth);
+            pass.ReadTexture("_Stencil", depth, 0, RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Input", input);
 
             pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();

@@ -19,6 +19,8 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public float MotionWeight { get; private set; } = 6000f;
             [field: SerializeField] public bool JitterOverride { get; private set; } = false;
             [field: SerializeField] public Vector2 JitterOverrideValue { get; private set; } = Vector2.zero;
+            [field: SerializeField, Range(0.0f, 8.0f)] public float BlendSharpness { get; private set; } = 1.0f;
+
 
             [Range(0, 2)]
             public float taaSharpenStrength = 0.5f;
@@ -45,7 +47,7 @@ namespace Arycama.CustomRenderPipeline
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Temporal AA")) { hideFlags = HideFlags.HideAndDontSave };
-            textureCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Temporal AA");
+            textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Temporal AA");
         }
 
         public struct TemporalAAData : IRenderPassData
@@ -191,7 +193,6 @@ namespace Arycama.CustomRenderPipeline
             if (!settings.IsEnabled)
                 return input;
 
-            var descriptor = new RenderTextureDescriptor(camera.pixelWidth, camera.pixelHeight, RenderTextureFormat.RGB111110Float);
             var (current, history, wasCreated) = textureCache.GetTextures(camera.pixelWidth, camera.pixelHeight, camera);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA"))
@@ -220,6 +221,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_HistoryContrastBlendLerp", data.historyContrastBlendLerp);
                     pass.SetFloat(command, "_SharpenStrength", settings.taaSharpenStrength);
                     pass.SetFloat(command, "_SpeedRejectionIntensity", data.motionRejectionMultiplier);
+                    pass.SetFloat(command, "_BlendSharpness", settings.BlendSharpness);
+                    
                     pass.SetVector(command, "_HistoryScaleLimit", new Vector4(history.Scale.x, history.Scale.y, history.Limit.x, history.Limit.y));
 
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
