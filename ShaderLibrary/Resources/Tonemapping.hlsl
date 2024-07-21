@@ -58,6 +58,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float4 ui = UITexture[position.xy];
 	
 	// Convert scene to sRGB and blend "incorrectly" which matches image-editing programs
+	color = Rec2020ToRec709(color);
 	color = LinearToGamma(color);
 	
 	color = color * (1.0 - ui.a) + ui.rgb;

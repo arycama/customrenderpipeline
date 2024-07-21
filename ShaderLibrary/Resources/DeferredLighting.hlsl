@@ -41,7 +41,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.translucency = isTranslucent ? albedoMetallic.rgb * albedoMetallic.a : 0.0;
 	lightingInput.NdotV = NdotV;
 
-	return GetLighting(lightingInput);
+	return Rec709ToRec2020(GetLighting(lightingInput));
 }
 
 Texture2D<float4> CloudTexture;
@@ -69,7 +69,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
 			float rcpVLength = RcpLength(worldDir);
 			float3 V = -worldDir * rcpVLength;
-			result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
+			result *= Rec709ToRec2020(TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength)));
 		}
 	}
 	
@@ -77,9 +77,9 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	// (Should we also do this for vol lighting?)
 	
 	// TODO: Would be better to use some kind of filter instead of bilinear
-	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit));
-	result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
-	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
+	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit)).rgb;
+	result += Rec709ToRec2020(SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit)));
+	result += Rec709ToRec2020(ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth)));
 	
 	// Note this is already jittered so we can sample directly
 	return result;
