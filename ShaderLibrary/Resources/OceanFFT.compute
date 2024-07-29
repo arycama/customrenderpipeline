@@ -18,6 +18,8 @@ RWTexture2DArray<float4> targetTexture;
 RWTexture2DArray<float2> targetTexture1;
 
 static const uint _Resolution = 128;
+static const uint Log2Resolution = log2(_Resolution);
+static const uint HalfResolution = _Resolution >> 1;
 
 struct OceanSpectrum
 {
@@ -107,10 +109,8 @@ void Fft(uint id, inout float2 height, inout float2 dispX, inout float2 dispZ)
 	}
 }
 
-float h0(float2 k, float A)
+float PhillipsSpectrum(float2 k, float A, float kl)
 {
-	float kl = length(k);
-	
 	// Phillips spectrum
 	float2 windDirection = float2(cos(windAngle0 * TwoPi), sin(windAngle0 * TwoPi));
 	float windFactor = dot(normalize(k), windDirection);
@@ -131,37 +131,49 @@ float h0(float2 k, float A)
 [numthreads(_Resolution, 1, 1)]
 void InitSpectrum(uint3 id : SV_DispatchThreadID)
 {
-	float2 h = czero(), dispX = czero(), dispZ = czero();
-	
-	int n = id.x - _Resolution / 2;
-	int m = id.y - _Resolution / 2;
-	
-	float nr = length(float2(n, m));
-	
-	if ((n || m) && nr >= SpectrumStart[id.z] && nr < SpectrumEnd[id.z])
-	{
-		float2 k = TwoPi * float2(n, m) / rcp(_OceanScale[id.z]);
-		
-		float kLen = length(k);
-		float w = sqrt(_OceanGravity * kLen);
-		float t = Time;
-		
-		float lengthScale = rcp(_OceanScale[id.z]);
-		float fftNorm = pow(_Resolution, -0.25);
-		float philNorm = exp(1) * _OceanScale[id.z];
-		float A = rsqrt(2.0) * Sq(fftNorm * philNorm);
-		
-		float w0 = TwoPi / 200.0;
-		float wtk = floor(w / w0) * w0 * t;
-		
-		// Eq 43
-		float4 r = GaussianFloat4(id.x + id.y * _Resolution);
-		h = cmul(cmul(r.xy, creal(sqrt(h0(k, A)))), cexp(cimg(wtk)));
-		h += h, cmul(cmul(r.zw, creal(sqrt(h0(-k, A)))), cexp(cimg(-wtk)));
+	float rcpPatchSize = _OceanScale[id.z];
 
+	int n = id.x - HalfResolution;
+	int m = id.y - HalfResolution;
+	
+	float2 k = TwoPi * rcpPatchSize * float2(n, m);
+	
+	float rcpFrequency = (n && m) ? rsqrt(dot(k, k)) : 1.0;
+	float frequency = rcpFrequency ? rcp(rcpFrequency) : 1.0;
+	
+	// Eq 31
+	float w = sqrt(_OceanGravity * frequency);
+	
+	// Eq 35 (Todo: precalculate)
+	float w0 = TwoPi / 200.0;
+	float dispersion = floor(w / w0) * w0;
+	
+	// Eq 43
+	float wtk = dispersion * Time;
+	float4 xi = GaussianFloat4(id.x + id.y * _Resolution);
+	
+	// Eq 42 (Todo: precalculate)
+	float fftNorm = pow(_Resolution, -0.25);
+	float philNorm = exp(1.0) * rcpPatchSize;
+	float A = rsqrt(2.0) * Sq(fftNorm * philNorm);
+	float4 h0 = 1.0 / sqrt(2.0) * xi * sqrt(float2(PhillipsSpectrum(k, A, frequency), PhillipsSpectrum(-k, A, frequency))).xxyy;
+
+	float2 h = czero(), dispX = czero(), dispZ = czero(), slopeX = czero(), slopeZ = czero();
+
+	float nr = length(float2(n, m));
+	if (n && m && nr >= SpectrumStart[id.z] && nr < SpectrumEnd[id.z])
+	{
+		// Eq 36
+		h = cmul(h0.xy, cexp(cimg(wtk)));
+		h = cadd(h, cmul(h0.zw, cexp(-cimg(wtk))));
+		
+		// Eq 37
+		slopeX = cmul(cimg(k.x), h);
+		slopeZ = cmul(cimg(k.y), h);
+		
 		// Eq 44
-		dispX = cmul(-cimg(k.x / kLen), h);
-		dispZ = cmul(-cimg(k.y / kLen), h);
+		dispX = cmul(-cimg(k.x * rcpFrequency), h);
+		dispZ = cmul(-cimg(k.y * rcpFrequency), h);
 	}
 	
 	// Perform the FFT

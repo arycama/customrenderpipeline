@@ -7,34 +7,39 @@ Texture2D<float> Depth;
 float2 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float depth = Depth[position.xy];
-	float3 positionWS = worldDir * LinearEyeDepth(depth);
-	float4 previousPositionCS = WorldToClipPrevious(positionWS);
-	return CalculateVelocity(position.xy, previousPositionCS);
+	float eyeDepth = LinearEyeDepth(depth);
+	
+	float4 clipPosition = float4(uv * 2 - 1, depth, eyeDepth);
+	clipPosition.xyz *= eyeDepth;
+	
+	float4x4 clipToPreviousClip = mul(_WorldToPreviousClip, _ClipToWorld);
+	float4 previousPositionCS = mul(clipToPreviousClip, clipPosition);
+	
+	float2 previousPosition = PerspectiveDivide(previousPositionCS).xy * 0.5 + 0.5;
+	return uv + _Jitter.zw - previousPosition;
 }
 
 float2 FragmentPreDilate(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float closestDepth = 0.0;
-	int2 uvOffset = 0;
+	float2 maxVelocity = 0.0;
+	float maxVelLenSqr = 0.0;
 	
+	// Todo: use gather+ddx?
+	[unroll]
 	for(int y = -1; y <= 1; y++)
 	{
-		for(int x = -1; x <= 1; x++)
+		[unroll]
+		for (int x = -1; x <= 1; x++)
 		{
-			float depth = Depth[position.xy + int2(x, y)];
-			
-			if(depth < closestDepth)
+			float2 velocity = Velocity[position.xy + int2(x, y)];
+			float velLenSqr = SqrLength(velocity);
+			if (velLenSqr < maxVelLenSqr)
 				continue;
 			
-			closestDepth = depth;
-			uvOffset = int2(x, y);
+			maxVelocity = velocity;
+			maxVelLenSqr = velLenSqr;
 		}
 	}
 	
-	// For far plane, return 0 (Todo, handle with clear?)
-	// Or, maybe this is better since it will handle edges against sky
-	if(closestDepth == 0.0)
-		return 0.0;
-	
-	return Velocity[position.xy + uvOffset * 0];
+	return maxVelocity;
 }

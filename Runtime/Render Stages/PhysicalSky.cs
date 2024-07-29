@@ -95,8 +95,8 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Range(0.0f, 1.0f)] public float StationaryBlend { get; private set; } = 0.95f;
             [field: SerializeField, Range(0.0f, 1.0f)] public float MotionBlend { get; private set; } = 0.0f;
             [field: SerializeField, Min(0.0f)] public float MotionFactor { get; private set; } = 6000.0f;
-            [field: SerializeField, Min(0.0f)] public float DepthFactor { get; private set; } = 0.0f;
-            [field: SerializeField, Min(0.0f)] public float ClampWindow { get; private set; } = 1.0f;
+            [field: SerializeField, Range(0.0f, 2.0f)] public float DepthFactor { get; private set; } = 0.0f;
+            [field: SerializeField, Range(0.0f, 2.0f)] public float ClampWindow { get; private set; } = 1.0f;
 
             [field: Header("Spatial")]
             [field: SerializeField, Range(0, 32)] public int SpatialSamples { get; private set; } = 4;
@@ -497,6 +497,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
                 pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<PreviousFrameDepth>();
+                pass.AddRenderPassData<PreviousFrameVelocity>();
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
@@ -656,7 +658,25 @@ namespace Arycama.CustomRenderPipeline
 
         public AtmosphereProperties(PhysicalSky.Settings settings)
         {
+            var wavelengthR = 6.8e-7;// 630.0f * 1e-9f;
+            var wavelengthG = 5.5e-7;// 532.0f * 1e-9f;
+            var wavelengthB = 4.4e-7;// 467.0f * 1e-9f;
+
+            //var wavelengthR = 6.3e-7;// 630.0f * 1e-9f;
+            //var wavelengthG = 5.32e-7;// 532.0f * 1e-9f;
+            //var wavelengthB = 4.67e-7;// 467.0f * 1e-9f;
+
+            var N = 0.02504e+27;
+            var n = 1.0003;
+
+            var K = 2.0 * Math.PI * Math.PI * Math.Pow(n * n - 1.0, 2.0) / (3.0 * N);
+            var sr = 4.0 * Math.PI * K / Math.Pow(wavelengthR, 4.0);
+            var sg = 4.0 * Math.PI * K / Math.Pow(wavelengthG, 4.0);
+            var sb = 4.0 * Math.PI * K / Math.Pow(wavelengthB, 4.0);
+
             rayleighScatter = settings.RayleighScatter / settings.EarthScale;
+            rayleighScatter = new Vector3((float)sr, (float)sg, (float)sb) / settings.EarthScale;
+
             mieScatter = settings.MieScatter / settings.EarthScale;
 
             ozoneAbsorption = settings.OzoneAbsorption / settings.EarthScale;

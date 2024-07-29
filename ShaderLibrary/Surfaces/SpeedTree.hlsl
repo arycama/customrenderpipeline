@@ -111,7 +111,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	
 	normal = TangentToWorldNormal(normal, input.normal, input.tangent.xyz, input.tangent.w);
 	output.gbuffer = OutputGBuffer(albedoTransparency.rgb, translucency, normal, 1.0 - extra.r, normal, extra.b * input.color.r, 0.0);
-	output.velocity = CalculateVelocity(input.position.xy, input.previousPositionCS);
+	output.velocity = CalculateVelocity(input.position.xy * _ScaledResolution.zw, input.previousPositionCS);
 #endif
 	
 	return output;

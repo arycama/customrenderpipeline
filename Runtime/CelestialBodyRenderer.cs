@@ -22,6 +22,7 @@ public class CelestialBodyRenderer
             var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
             {
                 command.SetRenderTarget(input, depth);
+                command.SetViewport(new Rect(0, 0, input.Width, input.Height));
                 commonPassData.SetProperties(pass, command);
 
                 foreach (var celestialBody in CelestialBody.CelestialBodies)

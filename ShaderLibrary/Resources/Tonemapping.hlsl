@@ -9,7 +9,7 @@ Texture2D<float3> _MainTex, _Bloom;
 Texture2D<float> _GrainTexture;
 float4 _GrainTextureParams, _Resolution, _BloomScaleLimit, _Bloom_TexelSize;
 float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, ShutterSpeed;
-float HdrMinNits, HdrMaxNits, PaperWhiteNits, HdrEnabled, HueShift;
+float HdrMinNits, HdrMaxNits, PaperWhiteNits, HdrEnabled, HueShift, SdrPaperWhiteNits, SdrBrightness;
 uint ColorGamut;
 float Tonemap;
 
@@ -26,11 +26,6 @@ cbuffer AcesConstants
 
 static const float unpackedCoefs[20] = (float[20])packedCoefs;
 
-float Y_2_linCV(float Y, float Ymax, float Ymin)
-{
-	return (Y - Ymin) / (Ymax - Ymin);
-}
-
 float3 Fragment(float4 position : SV_Position) : SV_Target
 {
 	// Need to flip for game view
@@ -40,17 +35,17 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float3 color = _MainTex[position.xy];
 	float2 uv = position.xy * _Resolution.zw;
 	
-	float3 bloom = _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(-1, 1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.0625;
-	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(0, 1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.125;
-	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(1, 1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.0625;
+	float3 bloom = _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(-1, 1), _BloomScaleLimit)) * 0.0625;
+	bloom += _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(0, 1), _BloomScaleLimit)) * 0.125;
+	bloom += _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(1, 1), _BloomScaleLimit)) * 0.0625;
 
-	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(-1, 0)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.125;
-	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(0, 0)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.25;
-	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(1, 0)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.125;
+	bloom += _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(-1, 0), _BloomScaleLimit)) * 0.125;
+	bloom += _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(0, 0), _BloomScaleLimit)) * 0.25;
+	bloom += _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(1, 0), _BloomScaleLimit)) * 0.125;
 
-	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(-1, -1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.0625;
-	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(0, -1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.125;
-	bloom += _Bloom.Sample(_LinearClampSampler, min((uv + _Bloom_TexelSize.xy * float2(1, -1)) * _BloomScaleLimit.xy, _BloomScaleLimit.zw)) * 0.0625;
+	bloom += _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(-1, -1), _BloomScaleLimit)) * 0.0625;
+	bloom += _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(0, -1), _BloomScaleLimit)) * 0.125;
+	bloom += _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(1, -1), _BloomScaleLimit)) * 0.0625;
 	
 	color = lerp(color, bloom, _BloomStrength);
 	
@@ -58,7 +53,6 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	float4 ui = UITexture[position.xy];
 	
 	// Convert scene to sRGB and blend "incorrectly" which matches image-editing programs
-	color = Rec2020ToRec709(color);
 	color = LinearToGamma(color);
 	
 	color = color * (1.0 - ui.a) + ui.rgb;
@@ -113,7 +107,7 @@ float3 Fragment(float4 position : SV_Position) : SV_Target
 	{
 		// Return linear sRGB, hardware will convert to gmama
 		case ColorGamutSRGB:
-			color = color / kReferenceLuminanceWhiteForRec709;
+			color = color / lerp(kReferenceLuminanceWhiteForRec709, 480, SdrBrightness);
 			break;
 		
 		case ColorGamutRec709:

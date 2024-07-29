@@ -12,7 +12,7 @@ namespace Arycama.CustomRenderPipeline
         public class Settings
         {
             [SerializeField, Range(0f, 1f)] private float strength = 0.125f;
-            [SerializeField, Range(2, 8)] private int maxMips = 6;
+            [SerializeField, Range(2, 12)] private int maxMips = 6;
 
             public float Strength => strength;
             public int MaxMips => maxMips;
@@ -59,7 +59,7 @@ namespace Arycama.CustomRenderPipeline
                 var input = i == 0 ? target : bloomIds[i - 1];
 
                 using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Bloom");
-                pass.Initialize(material);
+                pass.Initialize(material, i == 0 ? 0 : 1);
                 pass.WriteTexture(bloomIds[i], RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_Input", input);
 
@@ -69,7 +69,7 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
                 {
                     pass.SetVector(command, "_RcpResolution", data.rcpResolution);
-                    pass.SetVector(command, "_InputScaleLimit", new Vector4(input.Scale.x, input.Scale.y, input.Limit.x, input.Limit.y));
+                    pass.SetVector(command, "_InputScaleLimit", input.ScaleLimit2D);
                 });
 
                 data.rcpResolution = new Vector2(1.0f / width, 1.0f / height);
@@ -81,7 +81,7 @@ namespace Arycama.CustomRenderPipeline
                 var input = bloomIds[i];
 
                 using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Bloom");
-                pass.Initialize(material, 1);
+                pass.Initialize(material, 2);
                 pass.WriteTexture(bloomIds[i - 1]);
                 pass.ReadTexture("_Input", input);
 
@@ -92,7 +92,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.SetFloat(command, "_Strength", data.strength);
                     pass.SetVector(command, "_RcpResolution", data.rcpResolution);
-                    pass.SetVector(command, "_InputScaleLimit", new Vector4(input.Scale.x, input.Scale.y, input.Limit.x, input.Limit.y));
+                    pass.SetVector(command, "_InputScaleLimit", input.ScaleLimit2D);
                 });
 
                 data.strength = settings.Strength;

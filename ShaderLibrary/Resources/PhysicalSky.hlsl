@@ -204,12 +204,9 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	#endif
 	
 	float rayLength = DistanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
-	
 	float3 colorMask = floor(offsets.y * 3.0) == float3(0.0, 1.0, 2.0);
-	
 	float cosViewAngle = rd.y;
 	
-	float scale = 1.0;
 	bool hasSceneHit = false;
 	float3 luminance = 0.0;
 	#ifdef REFLECTION_PROBE
@@ -255,8 +252,8 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	
 	float3 maxTransmittance = TransmittanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
 	float3 transmittanceAtDistance = TransmittanceToPoint(_ViewHeight, rd.y, rayLength);
-	scale = dot(colorMask, (1.0 - transmittanceAtDistance) / (1.0 - maxTransmittance));
-	maxTransmittance = transmittanceAtDistance;
+	float scale = dot(colorMask, (1.0 - transmittanceAtDistance) / (1.0 - maxTransmittance));
+	float3 rcpOpacity = rcp(1.0 - transmittanceAtDistance);
 	
 	// The table may be slightly inaccurate, so calculate it's max value and use that to scale the final distance
 	float maxT = GetSkyCdf(_ViewHeight, rd.y, scale, colorMask);
@@ -310,7 +307,6 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		}
 		
 		float3 viewTransmittance = TransmittanceToPoint(_ViewHeight, rd.y, currentDistance);
-		lighting *= viewTransmittance;
 		
 		// Blend clouds if needed
 		if (cloudTransmittance && currentDistance >= cloudDistance)
@@ -321,8 +317,8 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 			//lighting *= cloudTransmittance;
 		}
 		
-		float3 pdf = viewTransmittance * extinction * rcp(1.0 - maxTransmittance);
-		luminance += lighting * rcp(dot(pdf, rcp(3.0))) / _Samples;
+		float3 pdf = viewTransmittance * extinction * rcpOpacity;
+		luminance += lighting * viewTransmittance * rcp(dot(pdf, rcp(3.0))) / _Samples;
 	}
 	
 	// Account for bounced light off the earth
@@ -362,7 +358,9 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 
 float4 _SkyHistoryScaleLimit;
 Texture2D<float3> _SkyInput, _SkyHistory;
-float _IsFirst, _ClampWindow;
+Texture2D<float> PreviousDepth;
+Texture2D<float2> PreviousVelocity;
+float _IsFirst, _ClampWindow, _DepthFactor, _MotionFactor;
 
 float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
@@ -408,15 +406,34 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 motion = MotionVectorFragment(nonJitteredClip, previousClip);
 	
 	float3 minValue, maxValue, result;
-	TemporalNeighborhood(_SkyInput, position.xy, minValue, maxValue, result, true, true, 2);
+	TemporalNeighborhood(_SkyInput, position.xy, minValue, maxValue, result, true, true, 1);
 
 	float2 historyUv = uv - motion;
 	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, min(historyUv * _SkyHistoryScaleLimit.xy, _SkyHistoryScaleLimit.zw)) * _PreviousToCurrentExposure);
+	
+	float previousDepth = LinearEyeDepth(PreviousDepth[historyUv * _ScaledResolution.xy]);
+	float2 previousVelocity = PreviousVelocity[historyUv * _ScaledResolution.xy];
+	
+	float depthWeight = saturate(1.0 - (sceneDistance - previousDepth) / sceneDistance * _DepthFactor);
+	
+	// TODO: Should use gather and 4 samples for this
+	history = lerp(result, history, depthWeight);
+	
+	float velLenSqr = SqrLength(motion - previousVelocity);
+	float velocityWeight = velLenSqr ? saturate(1.0 - sqrt(velLenSqr) * _MotionFactor) : 1.0;
+	float3 window = velocityWeight * (maxValue - minValue);
+	
+	minValue -= _ClampWindow * window;
+	maxValue += _ClampWindow * window;
+	
+	// Clamp clip etc
 	history = ClipToAABB(history, result, minValue, maxValue);
+	
+	//float weight = lerp(1.0, 0.05, depthWeight) * _MaxBoxWeight;
 	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
-	
+		
 	return RemoveNaN(YCoCgToRgbFastTonemapInverse(result));
 }
 

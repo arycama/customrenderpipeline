@@ -193,7 +193,17 @@ namespace Arycama.CustomRenderPipeline
                             shadowIndex = directionalShadowRequests.Count - cascadeCount;
                     }
 
-                    var directionalLightData = new DirectionalLightData((Vector4)light.color.linear * light.intensity, shadowIndex, -light.transform.forward, cascadeCount, worldToLight);
+                    Vector3 color = (Vector4)light.color.linear;
+
+                    // Convert to rec2020
+                    var finalColor = new Vector4(
+                        Vector3.Dot(color, new Vector3(0.627402f, 0.329292f, 0.043306f)),
+                        Vector3.Dot(color, new Vector3(0.069095f, 0.919544f, 0.011360f)),
+                        Vector3.Dot(color, new Vector3(0.016394f, 0.088028f, 0.895578f)),
+                        1.0f
+                    );
+
+                    var directionalLightData = new DirectionalLightData(finalColor * light.intensity, shadowIndex, -light.transform.forward, cascadeCount, worldToLight);
                     directionalLightList.Add(directionalLightData);
                 }
                 else if (visibleLight.lightType == LightType.Point)

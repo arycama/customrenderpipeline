@@ -19,11 +19,10 @@ cbuffer TemporalProperties
 	float4 _BoxFilterWeights1;
 };
 
-float2 CalculateVelocity(float2 currentPixelPosition, float4 previousClipPosition)
+float2 CalculateVelocity(float2 screenUv, float4 previousClipPosition)
 {
-	float2 nonJitteredPosition = currentPixelPosition * _ScaledResolution.zw + _Jitter.zw;
 	float2 previousPosition = PerspectiveDivide(previousClipPosition).xy * 0.5 + 0.5;
-	return nonJitteredPosition - previousPosition;
+	return screenUv + _Jitter.zw - previousPosition;
 }
 
 void TemporalNeighborhood(Texture2D<float4> input, int2 coord, out float4 minValue, out float4 maxValue, out float4 result, bool useYCoCg = true)

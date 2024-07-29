@@ -8,6 +8,18 @@ Shader "Hidden/Bloom"
         
         Pass
         {
+            Name "Downsample First"
+        
+            HLSLPROGRAM
+            #pragma vertex VertexFullscreenTriangle
+            #pragma fragment FragmentDownsample
+            #define KARIS_AVERAGE
+            #include "Bloom.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
             Name "Downsample"
         
             HLSLPROGRAM

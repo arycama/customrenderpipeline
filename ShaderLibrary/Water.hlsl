@@ -262,7 +262,7 @@ FragmentOutput Fragment(FragmentInput input)
 	float3 triangleNormal = normalize(cross(dy, dx));
 
 	FragmentOutput output;
-	output.velocity = CalculateVelocity(input.positionCS.xy, input.previousPositionCS);
+	output.velocity = CalculateVelocity(input.positionCS.xy * _ScaledResolution.zw, input.previousPositionCS);
 	output.normalFoamRoughness = input.delta;
 	output.triangleNormal = PackNormalOctQuadEncode(triangleNormal);
 	return output;

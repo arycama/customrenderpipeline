@@ -134,7 +134,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 			output.gbuffer = OutputGBuffer(surface.albedo, surface.metallic, surface.normal, surface.roughness, surface.bentNormal, surface.occlusion, surface.emission);
 		
 			#ifdef MOTION_VECTORS_ON
-				output.velocity = CalculateVelocity(input.position.xy, input.previousPositionCS);
+				output.velocity = CalculateVelocity(input.position.xy * _ScaledResolution.zw, input.previousPositionCS);
 			#endif
 		#else
 			#ifdef MODE_TRANSPARENT

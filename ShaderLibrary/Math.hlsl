@@ -52,27 +52,16 @@ float RcpLength(float4 x) { return rsqrt(SqrLength(x)); }
 
 float SinFromCos(float x) { return sqrt(saturate(1.0 - Sq(x))); }
 
+float1 FastSqrt(float1 x) { return asfloat(0x1FBD1DF5 + (asint(x) >> 1)); }
+float2 FastSqrt(float2 x) { return asfloat(0x1FBD1DF5 + (asint(x) >> 1)); }
+float3 FastSqrt(float3 x) { return asfloat(0x1FBD1DF5 + (asint(x) >> 1)); }
+float4 FastSqrt(float4 x) { return asfloat(0x1FBD1DF5 + (asint(x) >> 1)); }
+
 // Input [0, 1] and output [0, PI/2], 9 VALU
-float FastACosPos(float inX)
-{
-	float x = abs(inX);
-	float res = (0.0468878 * x + -0.203471) * x + HalfPi; // p(x)
-	return res * sqrt(max(0.0, 1.0 - x));
-}
-
-float2 FastACosPos(float2 inX)
-{
-	float2 x = abs(inX);
-	float2 res = (0.0468878 * x + -0.203471) * x + HalfPi; // p(x)
-	return res * sqrt(max(0.0, 1.0 - x));
-}
-
-float3 FastACosPos(float3 inX)
-{
-	float3 x = abs(inX);
-	float3 res = (0.0468878 * x + -0.203471) * x + HalfPi; // p(x)
-	return res * sqrt(max(0.0, 1.0 - x));
-}
+float1 FastACosPos(float1 x) { return (-0.156583 * abs(x) + HalfPi) * FastSqrt(1.0 - abs(x)); }
+float2 FastACosPos(float2 x) { return (-0.156583 * abs(x) + HalfPi) * FastSqrt(1.0 - abs(x)); }
+float3 FastACosPos(float3 x) { return (-0.156583 * abs(x) + HalfPi) * FastSqrt(1.0 - abs(x)); }
+float4 FastACosPos(float4 x) { return (-0.156583 * abs(x) + HalfPi) * FastSqrt(1.0 - abs(x)); }
 
 float atanh(float x)
 {

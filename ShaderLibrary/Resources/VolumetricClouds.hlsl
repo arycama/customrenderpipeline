@@ -88,7 +88,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	#ifdef CLOUD_SHADOW
 		output.result = float3(cloudDepth * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a);
 	#else
-		output.luminance = Rec709ToRec2020(result.rgb);
+		output.luminance = result.rgb;
 		output.transmittance = result.a;
 		output.depth = float2(cloudDepth, -(result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) : 0.0);
 	#endif

@@ -24,6 +24,7 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Min(0)] public int HdrMinNits { get; private set; } = 0;
             [field: SerializeField, Min(0)] public int HdrMaxNits { get; private set; } = 1000;
             [field: SerializeField, Min(0.0f)] public float PaperWhiteNits { get; private set; } = 300.0f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float SdrBrightness { get; private set; } = 0.5f;
 
             [field: SerializeField] public float MaxLuminance { get; private set; } = 1000.0f;
             [field: SerializeField] public ODTCurve ToneCurve { get; private set; } = ODTCurve.RefLdr;
@@ -92,7 +93,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.ReadBuffer("AcesConstants", acesSettingsBuffer);
 
-                pass.SetFloat(command, "HdrEnabled", hdrSettings.available ? 1.0f : 0.0f);
+                pass.SetFloat(command, "HdrEnabled", hdrSettings.available && settings.HdrEnabled ? 1.0f : 0.0f);
                 pass.SetTexture(command, "_GrainTexture", data.grainTexture);
 
                 pass.SetFloat(command, "_BloomStrength", data.bloomStrength);
@@ -101,6 +102,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "NoiseResponse", data.noiseResponse);
 
                 pass.SetFloat(command, "PaperWhiteNits", paperWhiteNits);
+                pass.SetFloat(command, "SdrBrightness", settings.SdrBrightness);
                 pass.SetFloat(command, "HdrMinNits", minNits);
                 pass.SetFloat(command, "HdrMaxNits", maxNits);
                 pass.SetFloat(command, "Tonemap", settings.Tonemap ? 1.0f : 0.0f);
@@ -137,7 +139,9 @@ namespace Arycama.CustomRenderPipeline
             AcesConstants constants;
 
             // setup the aces data
-            var aces = Aces.GetAcesODTData(settings.ToneCurve, settings.HdrMinNits, settings.PaperWhiteNits, settings.HdrMaxNits, settings.MaxLuminance);
+            var sdrPaperWhiteNits = Mathf.Lerp(80, 480, settings.SdrBrightness);
+            var paperWhite = HDROutputSettings.main.available && settings.HdrEnabled ? settings.PaperWhiteNits : sdrPaperWhiteNits;
+            var aces = Aces.GetAcesODTData(settings.ToneCurve, settings.HdrMinNits, paperWhite, settings.HdrMaxNits, settings.MaxLuminance);
 
             constants.ACES_max = aces.maxPoint;
             constants.ACES_mid = aces.midPoint;
