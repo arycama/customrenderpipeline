@@ -1,4 +1,5 @@
 ﻿using System;
+using UnityEditor;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -24,10 +25,12 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Min(0)] public int HdrMinNits { get; private set; } = 0;
             [field: SerializeField, Min(0)] public int HdrMaxNits { get; private set; } = 1000;
             [field: SerializeField, Min(0.0f)] public float PaperWhiteNits { get; private set; } = 300.0f;
+            [field: SerializeField, Min(0.0f)] public float SdrPaperWhiteNits { get; private set; } = 300.0f;
             [field: SerializeField, Range(0.0f, 1.0f)] public float SdrBrightness { get; private set; } = 0.5f;
 
             [field: SerializeField] public float MaxLuminance { get; private set; } = 1000.0f;
             [field: SerializeField] public ODTCurve ToneCurve { get; private set; } = ODTCurve.RefLdr;
+            [field: SerializeField] public HDRDisplayBitDepth BitDepth { get; private set; } = HDRDisplayBitDepth.BitDepth10;
         }
 
         public Tonemapping(Settings settings, Bloom.Settings bloomSettings, LensSettings lensSettings, RenderGraph renderGraph) : base(renderGraph)
@@ -72,6 +75,10 @@ namespace Arycama.CustomRenderPipeline
             pass.ReadTexture("UITexture", uITexture);
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
+#if UNITY_EDITOR
+            PlayerSettings.hdrBitDepth = settings.BitDepth;
+#endif
+
             var hdrSettings = HDROutputSettings.main;
             var minNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.minToneMapLuminance : settings.HdrMinNits;
             var maxNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.maxToneMapLuminance : settings.HdrMaxNits;
@@ -79,13 +86,6 @@ namespace Arycama.CustomRenderPipeline
             {
                 minNits = settings.HdrMinNits;
                 maxNits = settings.HdrMaxNits;
-            }
-
-            var paperWhiteNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.paperWhiteNits : settings.PaperWhiteNits;
-            if (paperWhiteNits <= 0)
-            {
-                paperWhiteNits = settings.PaperWhiteNits;
-                hdrSettings.paperWhiteNits = paperWhiteNits;
             }
 
             var acesSettingsBuffer = renderGraph.SetConstantBuffer(GetAcesConstants());
@@ -101,10 +101,12 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "NoiseIntensity", data.noiseIntensity);
                 pass.SetFloat(command, "NoiseResponse", data.noiseResponse);
 
-                pass.SetFloat(command, "PaperWhiteNits", paperWhiteNits);
+                pass.SetFloat(command, "PaperWhiteNits", settings.PaperWhiteNits);
+                pass.SetFloat(command, "SdrPaperWhiteNits", settings.SdrPaperWhiteNits);
                 pass.SetFloat(command, "SdrBrightness", settings.SdrBrightness);
                 pass.SetFloat(command, "HdrMinNits", minNits);
                 pass.SetFloat(command, "HdrMaxNits", maxNits);
+                pass.SetFloat(command, "MaxLuminance", settings.MaxLuminance);
                 pass.SetFloat(command, "Tonemap", settings.Tonemap ? 1.0f : 0.0f);
 
                 pass.SetFloat(command, "ShutterSpeed", data.shutterSpeed);

@@ -469,6 +469,26 @@ void GeometryVolumeRender(triangle uint id[3] : TEXCOORD, inout TriangleStream<G
 	}
 }
 
+[instance(3)]
+[maxvertexcount(3)]
+void GeometryVolumeRender3(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryVolumeRenderOutput> stream, uint instanceId : SV_GSInstanceID)
+{
+	[unroll]
+	for (uint i = 0; i < 3; i++)
+	{
+		uint localId = id[i] % 3;
+		float2 uv = (localId << uint2(1, 0)) & 2;
+		
+		GeometryVolumeRenderOutput output;
+		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+		uv.y = 1.0 - uv.y;
+		output.uv = uv;
+		output.worldDir = _FrustumCorners[localId].xyz;
+		output.index = id[i] / 3 * 32 + instanceId;
+		stream.Append(output);
+	}
+}
+
 [instance(6)]
 [maxvertexcount(3)]
 void GeometryCubemapRender(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryVolumeRenderOutput> stream, uint instanceId : SV_GSInstanceID)

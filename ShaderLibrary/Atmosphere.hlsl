@@ -35,8 +35,8 @@ Texture2D<float3> _GroundAmbient;
 Texture2D<float3> _SkyAmbient;
 float4 _SkyAmbientRemap;
 
-Texture3D<float> _SkyCdf;
-float3 _SkyCdfSize;
+Texture2DArray<float> _SkyCdf;
+float2 _SkyCdfSize;
 
 Texture2D<float> _AtmosphereDepth;
 Texture2D<float3> _MiePhaseTexture;
@@ -277,13 +277,12 @@ float3 GetSkyAmbient(float lightCosAngle, float height)
 	return _SkyAmbient.SampleLevel(_LinearClampSampler, ambientUv, 0.0);
 }
 
-float GetSkyCdf(float viewHeight, float cosAngle, float xi, float3 colorMask, bool rayIntersectsGround)
+float GetSkyCdf(float viewHeight, float cosAngle, float xi, float colorIndex, bool rayIntersectsGround)
 {
-	float H = sqrt(_TopRadius * _TopRadius - _PlanetRadius * _PlanetRadius);
+	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
 	
 	// Distance to the horizon.
 	float rho = sqrt(max(0.0, viewHeight * viewHeight - _PlanetRadius * _PlanetRadius));
-	float u_r = GetTextureCoordFromUnitRange(rho / H, _SkyCdfSize.x / 3.0);
 
 	// Discriminant of the quadratic equation for the intersections of the ray
 	// (viewHeight,cosAngle) with the ground (see RayIntersectsGround).
@@ -310,18 +309,14 @@ float GetSkyCdf(float viewHeight, float cosAngle, float xi, float3 colorMask, bo
 		u_mu = 0.5 + 0.5 * GetTextureCoordFromUnitRange((d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
 	}
 	
-	// Remap x uv depending on color mask
-	u_r = (u_r + dot(colorMask, float3(0.0, 1.0, 2.0))) / 3.0;
-	
-	float3 uv = float3(u_r, u_mu, GetTextureCoordFromUnitRange(xi, _SkyCdfSize.z));
-
+	float3 uv = float3(GetTextureCoordFromUnitRange(xi, _SkyCdfSize.x), u_mu, colorIndex);
 	return _SkyCdf.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
-float GetSkyCdf(float viewHeight, float cosAngle, float xi, float3 colorMask)
+float GetSkyCdf(float viewHeight, float cosAngle, float xi, float colorIndex)
 {
 	bool rayIntersectsGround = RayIntersectsGround(viewHeight, cosAngle);
-	return GetSkyCdf(viewHeight, cosAngle, xi, colorMask, rayIntersectsGround);
+	return GetSkyCdf(viewHeight, cosAngle, xi, colorIndex, rayIntersectsGround);
 }
 
 float3 PlanetCurve(float3 worldPosition)

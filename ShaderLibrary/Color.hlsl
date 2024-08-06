@@ -35,12 +35,12 @@ static const float LumensToNits = 3.426;
 static const float NitsToLumens = rcp(3.426);
 
 // D60 to D65 White Point
-static const float3x3 D60_2_D65_CAT =
-{
-	0.987224, -0.00611327, 0.0159533,
-	-0.00759836, 1.00186, 0.00533002,
-	0.00307257, -0.00509595, 1.08168,
-};
+//static const float3x3 D60_2_D65_CAT =
+//{
+//	0.987224, -0.00611327, 0.0159533,
+//	-0.00759836, 1.00186, 0.00533002,
+//	0.00307257, -0.00509595, 1.08168,
+//};
 
 // D65 to D60 White Point
 static const float3x3 D65_2_D60_CAT =

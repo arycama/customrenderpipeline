@@ -57,15 +57,15 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	// Normal + Foam data
 	float2 normalData = 0.0;
 	float foam = 0.0;
-	float smoothness = 1.0;
+	float smoothness = 0.0;
 
 	float3 triangleNormal = UnpackNormalOctQuadEncode(_WaterTriangleNormal[position.xy]);
 	
 	float3 rayX = QuadReadAcrossX(-V, position.xy);
 	float3 rayY = QuadReadAcrossY(-V, position.xy);
 	
-	//float3 rayX = -PixelToWorldDir(position.xy + float2(1.0, 0.0), true);
-	//float3 rayY = -PixelToWorldDir(position.xy + float2(0.0, 1.0), true);
+	rayX = -PixelToWorldDir(position.xy + float2(1.0, 0.0), true);
+	rayY = -PixelToWorldDir(position.xy + float2(0.0, 1.0), true);
 	
 	float3 positionX = IntersectRayPlane(0.0, rayX, positionWS, triangleNormal);
 	float3 positionY = IntersectRayPlane(0.0, rayY, positionWS, triangleNormal);
@@ -84,10 +84,10 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float3 normal = UnpackNormalSNorm(cascadeData.rg);
 		normalData += normal.xy / normal.z;
 		foam += cascadeData.b * _RcpCascadeScales[i];
-		smoothness *= SmoothnessToNormalLength(0.5 * cascadeData.a + 0.5);
+		smoothness += SmoothnessToNormalLength(0.5 * cascadeData.a + 0.5);
 	}
 	
-	smoothness = LengthToSmoothness(smoothness);
+	smoothness = LengthToSmoothness(smoothness * 0.25);
 	
 	//smoothness = _Smoothness;
 	

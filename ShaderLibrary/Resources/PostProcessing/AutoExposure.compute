@@ -56,9 +56,9 @@ float BinLocationToEV(uint binIdx)
 [numthreads(16, 16, 1)]
 void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : SV_DispatchThreadID)
 {
-    HistogramShared[groupIndex] = 0;
+	HistogramShared[groupIndex] = 0;
     
-    GroupMemoryBarrierWithGroupSync();
+	GroupMemoryBarrierWithGroupSync();
     
 	if (all(threadId < _ScaledResolution.xy))
 	{
@@ -67,27 +67,27 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
 		
 		float weight = 1.0;
 		
-		switch(MeteringMode)
+		switch (MeteringMode)
 		{
 			case 1:
 			{
 				// Spot metering
-				float screenDiagonal = 0.5f * (_ScaledResolution.x + _ScaledResolution.y);
-				const float kRadius = 0.075 * screenDiagonal;
-				const float2 kCenter = _ScaledResolution.xy * 0.5;
-				float d = length(kCenter - threadId) - kRadius;
-				weight = 1.0 - saturate(d);
-				break;
-			}
+					float screenDiagonal = 0.5f * (_ScaledResolution.x + _ScaledResolution.y);
+					const float kRadius = 0.075 * screenDiagonal;
+					const float2 kCenter = _ScaledResolution.xy * 0.5;
+					float d = length(kCenter - threadId) - kRadius;
+					weight = 1.0 - saturate(d);
+					break;
+				}
 			case 2:
 			{
 				// Center-weighted
-				float screenDiagonal = 0.5f * (_ScaledResolution.x + _ScaledResolution.y);
-				const float2 kCenter = _ScaledResolution.xy * 0.5;
-				weight = 1.0 - saturate(pow(length(kCenter - threadId) / screenDiagonal, 1.0));
-				break;
-			}
-			#if 0
+					float screenDiagonal = 0.5f * (_ScaledResolution.x + _ScaledResolution.y);
+					const float2 kCenter = _ScaledResolution.xy * 0.5;
+					weight = 1.0 - saturate(pow(length(kCenter - threadId) / screenDiagonal, 1.0));
+					break;
+				}
+#if 0
 			case 3u:
 			{
 				// Mask weigthing
@@ -104,7 +104,7 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
 				weight = (luminance > ProceduralMin && luminance < ProceduralMax) ? saturate(1.0 - PositivePow((dist / radius), ProceduralSoftness)) : 0.0f;
 				break;
 			}
-		#endif
+#endif
 		}
 		
 		uint binIndex = GetHistogramBinLocation(luminance);
@@ -115,7 +115,7 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
 	// local histogram to the global one
 	GroupMemoryBarrierWithGroupSync();
 
-	if(all(threadId < _ScaledResolution.xy))
+	if (all(threadId < _ScaledResolution.xy))
 	{
 		// Technically there's no chance that two threads write to the same bin here,
 		// but different work groups might! So we still need the atomic add.
@@ -138,7 +138,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	LuminanceHistogram[groupIndex] = 0;
 	
     [unroll]
-	for(uint i = (HISTOGRAM_BINS >> 1); i > 0; i >>= 1)
+	for (uint i = (HISTOGRAM_BINS >> 1); i > 0; i >>= 1)
 	{
 		GroupMemoryBarrierWithGroupSync();
 	
@@ -160,7 +160,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	float totalWeight = 0;
 	
     // TODO: Can we be a bit more parallel here?
-	for(uint i = 1; i < HISTOGRAM_BINS; ++i)
+	for (uint i = 1; i < HISTOGRAM_BINS; ++i)
 	{
 		float histVal = gs_values[i];
 		float binEV = BinLocationToEV(i);
@@ -178,16 +178,8 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 		totalWeight += histVal;
 	}
 	
-	float avgEV = evSum * rcp(totalWeight);
-	
-	// Here we take our weighted sum and divide it by the number of pixels
-    // that had luminance greater than zero (since the index == 0, we can
-    // use countForThisBin to find the number of black pixels)
-	float weightedLogAverage = (HistogramShared[0] / max(pixelCount - float(countForThisBin), 1.0)) - 1.0;
-	
-	float averageEv = Remap(weightedLogAverage, 1.0, 255.0, MinEv, MaxEv);
-	averageEv = avgEV;
-	
+	float averageEv = evSum * rcp(totalWeight);
+
 	float2 uv = saturate(Remap(averageEv, MinEv, MaxEv));
 	float exposureCompensation = ExposureTexture.SampleLevel(_LinearClampSampler, float2(uv.x, 0.5), 0.0);
 	
@@ -198,11 +190,11 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	averageEv -= exposureCompensation;
 		
 	float previousExposure = _Exposure;
-	float evLastFrame = ExposureToEV100(previousExposure);// + ExposureCompensation;
+	float evLastFrame = ExposureToEV100(previousExposure); // + ExposureCompensation;
 	float adaptedEv = lerp(averageEv, evLastFrame, exp(-DeltaTime * AdaptationSpeed));
 	//adaptedEv = averageEv;
 	
-	if(Mode == 1.0)
+	if (Mode == 1.0)
 		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso) + ExposureCompensation;
 	
 	

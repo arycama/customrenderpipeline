@@ -259,7 +259,7 @@ static const uint ThreadCount = 32;
 
 float4 UnpackData(float4 data)
 {
-	return float4(UnpackNormalSNorm(data.rg), data.b);
+	return float4(UnpackNormalSNorm(data.rg) * SmoothnessToNormalLength(0.5 * data.a + 0.5), data.b);
 }
 
 [numthreads(32, 32, 1)]

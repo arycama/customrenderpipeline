@@ -27,7 +27,7 @@ Shader "Hidden/Physical Sky"
 
             HLSLPROGRAM
             #pragma vertex VertexIdPassthrough
-            #pragma geometry GeometryVolumeRender
+            #pragma geometry GeometryVolumeRender3
             #pragma fragment FragmentCdfLookup
             #include "PhysicalSky.hlsl"
             ENDHLSL
