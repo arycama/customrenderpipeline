@@ -26,7 +26,6 @@ Shader "Hidden/Physical Sky"
             Name "CDF Lookup"
 
             HLSLPROGRAM
-            #pragma enable_d3d11_debug_symbols
             #pragma vertex VertexIdPassthrough
             #pragma geometry GeometryVolumeRender3
             #pragma fragment FragmentCdfLookup
@@ -55,7 +54,6 @@ Shader "Hidden/Physical Sky"
             Name "Render"
 
             HLSLPROGRAM
-            #pragma enable_d3d11_debug_symbols
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentRender
             #include "PhysicalSky.hlsl"
@@ -89,7 +87,6 @@ Shader "Hidden/Physical Sky"
             Name "Luminance LUT"
 
             HLSLPROGRAM
-            #pragma enable_d3d11_debug_symbols
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentLuminance
             #include "PhysicalSky.hlsl"

@@ -197,7 +197,6 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	if (Mode == 1.0)
 		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso) + ExposureCompensation;
 	
-	
 	float currentExposure = EV100ToExposure(adaptedEv);
 	if (IsFirst || IsInfOrNaN(currentExposure) || currentExposure == 0.0)
 		currentExposure = 1.0;

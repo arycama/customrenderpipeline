@@ -279,7 +279,37 @@ float3 GetSkyAmbient(float lightCosAngle, float height)
 
 float GetSkyCdf(float viewHeight, float cosAngle, float xi, float colorIndex, bool rayIntersectsGround)
 {
-	float3 uv = float3(GetTextureCoordFromUnitRange(xi, _SkyCdfSize.x), GetTextureCoordFromUnitRange(0.5 * cosAngle + 0.5, _SkyCdfSize.y), colorIndex);
+	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
+	
+	// Distance to the horizon.
+	float rho = sqrt(max(0.0, viewHeight * viewHeight - _PlanetRadius * _PlanetRadius));
+
+	// Discriminant of the quadratic equation for the intersections of the ray
+	// (viewHeight,cosAngle) with the ground (see RayIntersectsGround).
+	float r_mu = viewHeight * cosAngle;
+	float discriminant = r_mu * r_mu - viewHeight * viewHeight + _PlanetRadius * _PlanetRadius;
+	float u_mu;
+	if (rayIntersectsGround)
+	{
+		// Distance to the ground for the ray (viewHeight,cosAngle), and its minimum and maximum
+		// values over all cosAngle - obtained for (viewHeight,-1) and (viewHeight,mu_horizon).
+		float d = -r_mu - sqrt(max(0.0, discriminant));
+		float d_min = viewHeight - _PlanetRadius;
+		float d_max = rho;
+		u_mu = 0.5 - 0.5 * GetTextureCoordFromUnitRange(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
+	}
+	else
+	{
+		// Distance to the top atmosphere boundary for the ray (viewHeight,cosAngle), and its
+		// minimum and maximum values over all cosAngle - obtained for (viewHeight,1) and
+		// (viewHeight,mu_horizon).
+		float d = -r_mu + sqrt(max(0.0, discriminant + H * H));
+		float d_min = _TopRadius - viewHeight;
+		float d_max = rho + H;
+		u_mu = 0.5 + 0.5 * GetTextureCoordFromUnitRange((d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
+	}
+	
+	float3 uv = float3(GetTextureCoordFromUnitRange(xi, _SkyCdfSize.x), u_mu, colorIndex);
 	return _SkyCdf.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
