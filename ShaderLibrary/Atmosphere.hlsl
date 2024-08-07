@@ -329,4 +329,60 @@ float3 PlanetCurvePrevious(float3 worldPosition)
 	return worldPosition;
 }
 
+struct AtmosphereResult
+{
+	float3 transmittance;
+	float3 singleScatter;
+	float3 multiScatter;
+	float weightedDepth;
+};
+
+AtmosphereResult SampleAtmosphere(float viewHeight, float cosViewAngle, float lightCosAngle, float samples, float maxT, bool applyMultiScatter, uint colorIndex = 0, float targetLuminance = -1.0)
+{
+	float dt = maxT / samples;
+	float LdotV = lightCosAngle * cosViewAngle;
+
+	float3 transmittance = 1.0, singleScatter = 0.0, multiScatter = 0.0, transmittanceSum = 0.0, weightedDepthSum = 0.0;
+	for (float i = 0.5; i < samples; i++)
+	{
+		float currentDistance = i * dt;
+		float heightAtDistance = HeightAtDistance(viewHeight, cosViewAngle, currentDistance);
+		float4 scatter = AtmosphereScatter(heightAtDistance);
+		
+		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, currentDistance * LdotV, heightAtDistance);
+		float3 viewTransmittance = TransmittanceToPoint(viewHeight, cosViewAngle, currentDistance);
+		float3 extinction = AtmosphereExtinction(heightAtDistance);
+		
+		transmittance *= exp(-AtmosphereExtinction(heightAtDistance) * dt);
+		transmittanceSum += transmittance;
+		weightedDepthSum += currentDistance * transmittance;
+		
+		float3 inscatter = (scatter.xyz + scatter.w) * viewTransmittance * (1.0 - exp(-extinction * dt)) / extinction;
+		
+		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
+			singleScatter += AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * inscatter;
+		
+		multiScatter += inscatter;
+		
+		if (applyMultiScatter)
+		{
+			float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
+			float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
+			singleScatter += ms * (scatter.xyz + scatter.w);
+		}
+		
+		if (targetLuminance != -1.0 && singleScatter[colorIndex] >= targetLuminance)
+			break;
+	}
+	
+	weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
+	
+	AtmosphereResult output;
+	output.transmittance = transmittance;
+	output.singleScatter = singleScatter;
+	output.multiScatter = multiScatter;
+	output.weightedDepth = dot(weightedDepthSum / maxT, transmittance) / dot(transmittance, 1.0);
+	return output;
+}
+
 #endif

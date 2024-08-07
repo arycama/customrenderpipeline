@@ -51,13 +51,13 @@ FragmentInput Vertex(VertexInput input)
 	output.instanceID = input.instanceID;
 	output.positionCS = WorldToClip(worldPosition);
 	
-#ifdef UNITY_PASS_SHADOWCASTER
-		float3 viewDirOS = WorldToObjectDir(-_WorldToView[2].xyz, input.instanceID);
+	#ifdef UNITY_PASS_SHADOWCASTER
+		float3 viewDirOS = WorldToObjectDirection(-_WorldToView[2].xyz, input.instanceID);
 		float3 view = viewDirOS;
-#else
-	float3 view = WorldToObject(0.0, input.instanceID);
-	float3 viewDirOS = view - input.position;
-#endif
+	#else
+		float3 view = WorldToObject(0.0, input.instanceID);
+		float3 viewDirOS = view - input.position;
+	#endif
 	
 	float l1norm = dot(abs(view), 1.0);
 	float2 res = view.xz * rcp(l1norm);
@@ -131,7 +131,7 @@ FragmentOutput Fragment(FragmentInput input)
 	FragmentOutput output;
 	
 #ifdef UNITY_PASS_SHADOWCASTER
-	output.depth = -_ShadowProjMatrix._m22 * depth + input.positionCS.z;
+	output.depth = -_ViewToClip._m22 * depth + input.positionCS.z;
 #else
 	output.depth = (-_ViewToClip._m22 * depth + input.positionCS.z) * rcp(1.0 - depth);
 	

@@ -54,7 +54,7 @@ float3 FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, f
 	
 	float sampleCount = _Samples * 1; // 4096 * 4;
 	
-	float luminanceSum = 0.0;
+	float3 luminanceSum = 0.0;
 	float ds = maxDist / sampleCount;
 	for (float i = 0.5; i < sampleCount; i++)
 	{
@@ -79,7 +79,7 @@ float3 FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, f
 		float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
 		luminanceSum += ms * (scatter.xyz + scatter.w);
 		
-		if (luminanceSum >= targetLuminance)
+		if (luminanceSum[index] >= targetLuminance)
 			break;
 		
 		//float delta = dot(colorMask, abs(luminance - targetLuminance));
@@ -119,43 +119,21 @@ FragmentTransmittanceOutput FragmentTransmittanceLut(float4 position : SV_Positi
 	float cosAngle = d ? (Sq(H) - Sq(rho) - Sq(d)) / (2.0 * _ViewHeight * d) : 1.0;
 	float dx = d / _Samples;
 
-	#if 1
-		float3 opticalDepth = 0.0, transmittanceSum = 0.0;
-		float3 weightedDepthSum = 0.0;
-		for (float i = 0.0; i <= _Samples; i++)
-		{
-			float currentDistance = i * dx;
-			float height = HeightAtDistance(_ViewHeight, cosAngle, currentDistance);
-			float weight = (i > 0.0 && i < _Samples) ? 1.0 : 0.5;
-			opticalDepth += AtmosphereExtinction(height) * dx * weight;
-		
-			float3 transmittance = exp(-opticalDepth);
-			transmittanceSum += transmittance;
-			weightedDepthSum += currentDistance * transmittance;
-		}
+	float3 transmittance = 1.0, transmittanceSum = 0.0;
+	float3 weightedDepthSum = 0.0;
+	for (float i = 0.5; i < _Samples; i++)
+	{
+		float currentDistance = i * dx;
+		float height = HeightAtDistance(_ViewHeight, cosAngle, currentDistance);
+		transmittance *= exp(-AtmosphereExtinction(height) * dx);
+		transmittanceSum += transmittance;
+		weightedDepthSum += currentDistance * transmittance;
+	}
 	
-		weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
-		float3 transmittance = exp(-opticalDepth);
+	weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
 	
-		FragmentTransmittanceOutput output;
-		output.transmittance = saturate(transmittance) * HalfMax;
-	#else
-		float3 transmittance = 1.0, transmittanceSum = 0.0;
-		float3 weightedDepthSum = 0.0;
-		for (float i = 0.5; i < _Samples; i++)
-		{
-			float currentDistance = i * dx;
-			float height = HeightAtDistance(_ViewHeight, cosAngle, currentDistance);
-			transmittance *= exp(-AtmosphereExtinction(height) * dx);
-			transmittanceSum += transmittance;
-			weightedDepthSum += currentDistance * transmittance;
-		}
-	
-		weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
-	
-		FragmentTransmittanceOutput output;
-		output.transmittance = transmittance * HalfMax;
-	#endif
+	FragmentTransmittanceOutput output;
+	output.transmittance = transmittance * HalfMax;
 
 	// Store greyscale depth, weighted by transmittance
 	output.weightedDepth = dot(weightedDepthSum / d, transmittance) / dot(transmittance, 1.0);

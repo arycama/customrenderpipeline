@@ -228,6 +228,15 @@ float3x4 GetObjectToWorld(uint instanceId)
 #endif
 }
 
+float3x4 GetWorldToObject(uint instanceId)
+{
+	#ifdef INSTANCING_ON
+		return (float3x4)unity_Builtins1Array[unity_BaseInstanceID + instanceId].unity_WorldToObjectArray;
+	#else
+		return (float3x4)unity_WorldToObject;
+	#endif
+}
+
 float3 ObjectToWorld(float3 position, uint instanceID)
 {
 	float3x4 objectToWorld = GetObjectToWorld(instanceID);
@@ -237,12 +246,7 @@ float3 ObjectToWorld(float3 position, uint instanceID)
 
 float3 WorldToObject(float3 worldPosition, uint instanceID)
 {
-	#ifdef INSTANCING_ON
-		float3x4 worldToObject = (float3x4) unity_Builtins1Array[unity_BaseInstanceID + instanceID].unity_WorldToObjectArray;
-	#else
-		float3x4 worldToObject = (float3x4)unity_WorldToObject;
-	#endif
-
+	float3x4 worldToObject = GetWorldToObject(instanceID);
 	float4x4 mat = float4x4(worldToObject[0], worldToObject[1], worldToObject[2], float4(0, 0, 0, 1));
 	
     // To handle camera relative rendering we need to apply translation before converting to object space
@@ -276,24 +280,19 @@ float4 ObjectToClip(float3 position, uint instanceID)
 
 float3 ObjectToWorldDirection(float3 direction, uint instanceID, bool doNormalize = false)
 {
-#ifdef INSTANCING_ON
-	float3x3 objectToWorld = (float3x3) unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_ObjectToWorldArray;
-#else
-	float3x3 objectToWorld = (float3x3) unity_ObjectToWorld;
-#endif
-	
+	float3x4 objectToWorld = GetObjectToWorld(instanceID);
 	return MultiplyVector(objectToWorld, direction, doNormalize);
 }
 
 float3 ObjectToWorldNormal(float3 normal, uint instanceID, bool doNormalize = false)
 {
-#ifdef INSTANCING_ON
-	float3x3 worldToObject = (float3x3) unity_Builtins1Array[unity_BaseInstanceID + instanceID].unity_WorldToObjectArray;
-#else
-	float3x3 worldToObject = (float3x3) unity_WorldToObject;
-#endif
-	
+	float3x4 worldToObject = GetWorldToObject(instanceID);
 	return MultiplyVector(normal, worldToObject, doNormalize);
+}
+
+float3 WorldToObjectDirection(float3 direction, uint instanceID, bool doNormalize = false)
+{
+	return MultiplyVector(GetWorldToObject(instanceID), direction, doNormalize);
 }
 
 float3 ClipToWorld(float3 position)
