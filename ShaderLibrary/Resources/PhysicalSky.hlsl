@@ -40,47 +40,26 @@ float3 F(float viewCosAngle, float currentDistance)
 
 float3 FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
-	// Distance to top atmosphere boundary for a horizontal ray at ground level.
-	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
-	
-	// Distance to the horizon.
-	float rho = sqrt(max(0.0, _ViewHeight * _ViewHeight - _PlanetRadius * _PlanetRadius));
-
-	float cosAngle, maxDist;
-	bool rayIntersectsGround = uv.y < 0.5;
-	if (rayIntersectsGround)
-	{
-		float d_min = _ViewHeight - _PlanetRadius;
-		float d_max = rho;
-		maxDist = lerp(d_min, d_max, GetUnitRangeFromTextureCoord(1.0 - 2.0 * uv.y, _CdfSize.y / 2));
-		cosAngle = maxDist == 0.0 ? -1.0 : clamp(-(Sq(rho) + Sq(maxDist)) / (2.0 * _ViewHeight * maxDist), -1.0, 1.0);
-	}
-	else
-	{
-		float d_min = _TopRadius - _ViewHeight;
-		float d_max = rho + H;
-		maxDist = lerp(d_min, d_max, GetUnitRangeFromTextureCoord(2.0 * uv.y - 1.0, _CdfSize.y / 2));
-		cosAngle = maxDist == 0.0 ? 1.0 : clamp((Sq(H) - Sq(rho) - Sq(maxDist)) / (2.0 * _ViewHeight * maxDist), -1.0, 1.0);
-	}
-
 	float3 colorMask = index == 0 ? float3(1, 0, 0) : (index == 1 ? float3(0, 1, 0) : float3(0, 0, 1));
 	float xi = GetUnitRangeFromTextureCoord(uv.x, _CdfSize.x);
+	float cosViewAngle = GetUnitRangeFromTextureCoord(uv.y, _CdfSize.y) * 2.0 - 1.0;
 	
 	float3 maxLuminance = SkyLuminance[float2(position.y, 0.0)];
-	float targetLuminance = dot(colorMask, maxLuminance * xi);
+	float targetLuminance = maxLuminance[index] * xi;
 	
 	// Brute force linear search
 	float t = 0; //xi;
 	float minDist = FloatMax;
+	float maxDist = DistanceToNearestAtmosphereBoundary(_ViewHeight, cosViewAngle);
 	
-	float sampleCount = _Samples * 4; // 4096 * 4;
+	float sampleCount = _Samples * 8; // 4096 * 4;
 	
 	float luminance = 0.0;
 	float ds = maxDist / sampleCount;
 	for (float i = 0.5; i < sampleCount; i++)
 	{
 		float distance = i / sampleCount * maxDist;
-		luminance += dot(colorMask, F(cosAngle, distance)) * ds;
+		luminance += dot(colorMask, F(cosViewAngle, distance)) * ds;
 		
 		if (luminance >= targetLuminance)
 			break;
@@ -326,31 +305,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		luminance += lighting * viewTransmittance * rcp(dot(pdf, rcp(3.0))) / _Samples;
 	}
 	
-	// Account for bounced light off the earth
-	bool rayIntersectsGround = RayIntersectsGround(_ViewHeight, rd.y);
-	if (rayIntersectsGround && !hasSceneHit)
-	{
-		float LdotV = dot(_LightDirection0, rd);
-		float maxRayLength = DistanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
-		float lightCosAngleAtMaxDistance = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, maxRayLength * LdotV, _PlanetRadius);
-		float3 sunTransmittanceAtMaxDistance = AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtMaxDistance);
-			
-		float3 ambient = GetGroundAmbient(lightCosAngleAtMaxDistance);
-		float3 transmittanceAtMaxDistance = TransmittanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
-			
-		#ifndef REFLECTION_PROBE
-			float cloudShadow = CloudTransmittance(rd * maxRayLength);
-			sunTransmittanceAtMaxDistance *= cloudShadow;
-		#endif
-			
-		float3 surface = (ambient + sunTransmittanceAtMaxDistance * saturate(lightCosAngleAtMaxDistance) * RcpPi) * _LightColor0 * _Exposure * _GroundColor * transmittanceAtMaxDistance;
-			
-		// Clouds block out surface
-		surface *= cloudTransmittance;
-			
-		luminance += surface;
-	}
-
+	//return maxLuminance * _LightColor0 * _Exposure * RcpFourPi;
 	return luminance;
 }
 
@@ -362,6 +317,8 @@ float _IsFirst, _ClampWindow, _DepthFactor, _MotionFactor;
 
 float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
+	return _SkyInput[position.xy];
+
 	float cloudTransmittance = CloudTransmittanceTexture[position.xy];
 	
 	float rcpRdLength = RcpLength(worldDir);

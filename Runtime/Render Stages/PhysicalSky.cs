@@ -430,7 +430,7 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            var luminanceLut = renderGraph.GetTexture(settings.CdfHeight, 1, GraphicsFormat.B10G11R11_UFloatPack32);
+            var luminanceLut = renderGraph.GetTexture(settings.CdfHeight, 1, GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Luminance"))
             {
                 pass.Initialize(skyMaterial, skyMaterial.FindPass("Luminance LUT"));
@@ -439,6 +439,11 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
+                    pass.SetVector(command, "_LightDirection0", lightDirection0);
+                    pass.SetVector(command, "_LightColor0", lightColor0);
+                    pass.SetVector(command, "_LightDirection1", lightDirection1);
+                    pass.SetVector(command, "_LightColor1", lightColor1);
+
                     pass.SetFloat(command, "_Samples", settings.CdfSamples);
                     pass.SetFloat(command, "_ViewHeight", camera.transform.position.y + settings.PlanetRadius * settings.EarthScale);
                 });

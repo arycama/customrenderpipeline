@@ -165,9 +165,15 @@ namespace Arycama.CustomRenderPipeline
                             if ((isDepth && handle.Format != renderTexture.depthStencilFormat) || (!isDepth && handle.Format != renderTexture.graphicsFormat))
                                 continue;
 
-                            // For screen textures, ensure we get a rendertexture that is the actual screen width/height
-                            if (handle.IsScreenTexture)
+                            // TODO: Use some enum instead?
+                            if(handle.IsExactSize)
                             {
+                                if (renderTexture.width != handle.Width || renderTexture.height != handle.Height)
+                                    continue;
+                            }
+                            else if (handle.IsScreenTexture)
+                            {
+                                // For screen textures, ensure we get a rendertexture that is the actual screen width/height
                                 if (renderTexture.width != screenWidth || renderTexture.height != screenHeight)
                                     continue;
                             }
@@ -267,7 +273,7 @@ namespace Arycama.CustomRenderPipeline
                 output.Value.Clear();
         }
 
-        public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
+        public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
         {
             // Ensure we're not getting a texture during execution, this must be done in the setup
             Assert.IsFalse(IsExecuting);
@@ -290,6 +296,7 @@ namespace Arycama.CustomRenderPipeline
             result.AutoGenerateMips = autoGenerateMips;
             result.IsPersistent = isPersistent;
             result.IsAssigned = isPersistent ? false : true;
+            result.IsExactSize = isExactSize;
 
             // This gets set automatically if a texture is written to by a compute shader
             result.EnableRandomWrite = false;
@@ -370,6 +377,7 @@ namespace Arycama.CustomRenderPipeline
             result.IsImported = true;
             result.IsScreenTexture = false;
             result.IsAssigned = true;
+            result.IsExactSize = true;
 
             return result;
         }
