@@ -7,6 +7,11 @@
 
 Texture2D<float> _LengthToRoughness;
 
+float SmoothnessToPerceptualRoughness(float smoothness)
+{
+	return 1.0 - smoothness;
+}
+
 float SmoothnessToRoughness(float smoothness)
 {
 	// Sq(1-smoothness) rewritten as 2 mads, vs sub sub mul
@@ -75,7 +80,7 @@ float ProjectedSpaceGeometricNormalFiltering(float perceptualRoughness, float3 g
 float LengthToRoughness(float len)
 {
 	len = saturate(Remap(len, 2.0 / 3.0, 1.0));
-	float2 uv = Remap01ToHalfTexelCoord(float2(len, 0.5), float2(256.0, 1));
+	float2 uv = Remap01ToHalfTexel(float2(len, 0.5), float2(256.0, 1));
 	return _LengthToRoughness.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 

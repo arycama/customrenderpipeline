@@ -219,14 +219,18 @@ float3 MultiplyVector(float3x3 mat, float3 v, bool doNormalize) { return Conditi
 float3 MultiplyVector(float4x4 mat, float3 v, bool doNormalize) { return MultiplyVector((float3x3) mat, v, doNormalize); }
 float3 MultiplyVector(float3x4 mat, float3 v, bool doNormalize) { return MultiplyVector((float3x3) mat, v, doNormalize); }
 
-float3 ObjectToWorld(float3 position, uint instanceID)
+float3x4 GetObjectToWorld(uint instanceId)
 {
 #ifdef INSTANCING_ON
-	float3x4 objectToWorld = (float3x4)unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_ObjectToWorldArray;
+	return (float3x4)unity_Builtins0Array[unity_BaseInstanceID + instanceId].unity_ObjectToWorldArray;
 #else
-	float3x4 objectToWorld = unity_ObjectToWorld;
+	return (float3x4) unity_ObjectToWorld;
 #endif
-	
+}
+
+float3 ObjectToWorld(float3 position, uint instanceID)
+{
+	float3x4 objectToWorld = GetObjectToWorld(instanceID);
 	objectToWorld._m03_m13_m23 -= _ViewPosition;
 	return MultiplyPoint3x4(objectToWorld, position);
 }
@@ -319,35 +323,6 @@ float2 MotionVectorFragment(float4 nonJitteredPositionCS, float4 previousPositio
 {
 	return (PerspectiveDivide(nonJitteredPositionCS).xy * 0.5 + 0.5) - (PerspectiveDivide(previousPositionCS).xy * 0.5 + 0.5);
 }
-
-float Remap01ToHalfTexelCoord(float coord, float size)
-{
-	const float start = 0.5 * rcp(size);
-	const float len = 1.0 - rcp(size);
-	return coord * len + start;
-}
-
-float2 Remap01ToHalfTexelCoord(float2 coord, float2 size)
-{
-	const float2 start = 0.5 * rcp(size);
-	const float2 len = 1.0 - rcp(size);
-	return coord * len + start;
-}
-
-float3 Remap01ToHalfTexelCoord(float3 coord, float3 size)
-{
-	const float3 start = 0.5 * rcp(size);
-	const float3 len = 1.0 - rcp(size);
-	return coord * len + start;
-}
-
-bool1 IsInfOrNaN(float1 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
-bool3 IsInfOrNaN(float3 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
-bool4 IsInfOrNaN(float4 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
-
-float1 RemoveNaN(float1 x) { return IsInfOrNaN(x) ? 0.0 : x; }
-float3 RemoveNaN(float3 x) { return IsInfOrNaN(x) ? 0.0 : x; }
-float4 RemoveNaN(float4 x) { return IsInfOrNaN(x) ? 0.0 : x; }
 
 const static float Sensitivity = 100.0;
 const static float LensAttenuation = 0.65; // q

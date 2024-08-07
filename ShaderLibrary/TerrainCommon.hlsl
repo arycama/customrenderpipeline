@@ -2,6 +2,7 @@
 #define TERRAIN_COMMON_INCLUDED
 
 #include "Common.hlsl"
+#include "Geometry.hlsl"
 #include "Samplers.hlsl"
 #include "Utility.hlsl"
 
@@ -177,7 +178,7 @@ void SampleTerrain(float3 worldPosition, out float4 albedoSmoothness, out float3
 	// TODO: Figure out why derivatives aren't working for raytracing
 	tangentNormal = normalize(normalSum);
 	
-	normal = FromToRotationZ(terrainNormal, tangentNormal).xzy;
+	normal = BlendNormalRNM(terrainNormal, tangentNormal).xzy;
 	//normal = terrainNormal.xzy;
 }
 

@@ -200,4 +200,75 @@ float Angle(float3 from, float3 to)
 	return FastACos(dot(from, to));
 }
 
+// Move to sampling.hlsl
+float3 SampleSphereUniform(float u1, float u2)
+{
+	float phi = TwoPi * u2;
+	float cosTheta = 1.0 - 2.0 * u1;
+
+	return SphericalToCartesian(phi, cosTheta);
+}
+
+// Reference : http://www.cs.virginia.edu/~jdl/bib/globillum/mis/shirley96.pdf + PBRT
+
+// Performs uniform sampling of the unit disk.
+// Ref: PBRT v3, p. 777.
+float2 SampleDiskUniform(float u1, float u2)
+{
+	float r = sqrt(u1);
+	float phi = TwoPi * u2;
+
+	float sinPhi, cosPhi;
+	sincos(phi, sinPhi, cosPhi);
+
+	return r * float2(cosPhi, sinPhi);
+}
+
+// Performs cosine-weighted sampling of the hemisphere.
+// Ref: PBRT v3, p. 780.
+float3 SampleHemisphereCosine(float u1, float u2)
+{
+	float3 localL;
+
+    // Since we don't really care about the area distortion,
+    // we substitute uniform disk sampling for the concentric one.
+	localL.xy = SampleDiskUniform(u1, u2);
+
+    // Project the point from the disk onto the hemisphere.
+	localL.z = sqrt(1.0 - u1);
+
+	return localL;
+}
+
+// Generates a sample, then rotates it into the hemisphere of normal using reoriented normal mapping
+float3 SampleHemisphereCosine(float u1, float u2, float3 normal)
+{
+	// This function needs to used safenormalize because there is a probability
+    // that the generated direction is the exact opposite of the normal and that would lead
+    // to a nan vector otheriwse.
+	float3 pointOnSphere = SampleSphereUniform(u1, u2);
+	return normalize(normal + pointOnSphere);
+	
+	float3 result = SampleHemisphereCosine(u1, u2);
+	return FromToRotationZ(normal, result);
+}
+
+float3 SampleHemisphereUniform(float u1, float u2)
+{
+	float phi = TwoPi * u2;
+	float cosTheta = 1.0 - u1;
+
+	return SphericalToCartesian(phi, cosTheta);
+}
+
+// ref http://blog.selfshadow.com/publications/blending-in-detail/
+// ref https://gist.github.com/selfshadow/8048308
+// Reoriented Normal Mapping
+// Blending when n1 and n2 are already 'unpacked' and normalised
+// assume compositing in tangent space
+float3 BlendNormalRNM(float3 n1, float3 n2)
+{
+	return FromToRotationZ(n1, n2);
+}
+
 #endif

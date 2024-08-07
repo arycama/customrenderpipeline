@@ -1,9 +1,8 @@
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Deferred.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Geometry.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/ImposterCommon.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/IndirectRendering.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Lighting.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Random.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/GBuffer.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Geometry.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Lighting.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Material.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Random.hlsl"
 
 struct VertexInput
 {
@@ -26,7 +25,7 @@ struct FragmentInput
 struct FragmentOutput
 {
 #ifndef UNITY_PASS_SHADOWCASTER
-	GBufferOut gbufferOut;
+	GBufferOutput gbufferOut;
 #endif
 	
 	float depth : SV_DepthLessEqual;
@@ -53,7 +52,7 @@ FragmentInput Vertex(VertexInput input)
 	output.positionCS = WorldToClip(worldPosition);
 	
 #ifdef UNITY_PASS_SHADOWCASTER
-		float3 viewDirOS = WorldToObjectDir(-_ViewMatrix[2].xyz, input.instanceID);
+		float3 viewDirOS = WorldToObjectDir(-_WorldToView[2].xyz, input.instanceID);
 		float3 view = viewDirOS;
 #else
 	float3 view = WorldToObject(0.0, input.instanceID);
@@ -91,7 +90,7 @@ FragmentInput Vertex(VertexInput input)
 	}
 	
 #ifndef UNITY_PASS_SHADOWCASTER
-	float3 treePos = MultiplyPoint3x4(GetObjectToWorld(input.instanceID, false), _WorldOffset);
+	float3 treePos = MultiplyPoint3x4(GetObjectToWorld(input.instanceID), _WorldOffset);
 	float hueVariationAmount = frac(treePos.x + treePos.y + treePos.z);
 	output.hueVariation = saturate(hueVariationAmount * _HueVariationColor.a);
 #endif
@@ -134,23 +133,20 @@ FragmentOutput Fragment(FragmentInput input)
 #ifdef UNITY_PASS_SHADOWCASTER
 	output.depth = -_ShadowProjMatrix._m22 * depth + input.positionCS.z;
 #else
-	output.depth = (-_ProjMatrix._m22 * depth + input.positionCS.z) * rcp(1.0 - depth);
+	output.depth = (-_ViewToClip._m22 * depth + input.positionCS.z) * rcp(1.0 - depth);
 	
-	SurfaceData surface = DefaultSurface();
-	surface.Albedo = color.rgb;
-	surface.Normal = surface.bentNormal = ObjectToWorldNormal(normalSmoothness.rgb * 2 - 1, input.instanceID, true);
-	surface.PerceptualRoughness = SmoothnessToPerceptualRoughness(normalSmoothness.a);
-	surface.Translucency = subsurfaceOcclusion.rgb;
-	surface.Occlusion = subsurfaceOcclusion.a;
+	float3 normal = ObjectToWorldNormal(normalSmoothness.rgb * 2 - 1, input.instanceID, true);
+	float perceptualRoughness = SmoothnessToPerceptualRoughness(normalSmoothness.a);
 	
 	// Hue varation
-	float3 shiftedColor = lerp(surface.Albedo, _HueVariationColor.rgb, input.hueVariation);
-	surface.Albedo = saturate(shiftedColor * (Max3(surface.Albedo) * rcp(Max3(shiftedColor)) * 0.5 + 0.5));
+	float3 shiftedColor = lerp(color.rgb, _HueVariationColor.rgb, input.hueVariation);
+	color.rgb = saturate(shiftedColor * (Max3(color.rgb) * rcp(Max3(shiftedColor)) * 0.5 + 0.5));
 	
-	shiftedColor = lerp(surface.Translucency, _HueVariationColor.rgb, input.hueVariation);
-	surface.Translucency = saturate(shiftedColor * (Max3(surface.Translucency) * rcp(Max3(shiftedColor)) * 0.5 + 0.5));
+	shiftedColor = lerp(subsurfaceOcclusion.rgb, _HueVariationColor.rgb, input.hueVariation);
+	subsurfaceOcclusion.rgb = saturate(shiftedColor * (Max3(subsurfaceOcclusion.rgb) * rcp(Max3(shiftedColor)) * 0.5 + 0.5));
+	float translucency = Max3(color.rgb * subsurfaceOcclusion.rgb ? color.rgb * rcp(subsurfaceOcclusion.rgb) : 0.0);
 	
-	output.gbufferOut = SurfaceToGBuffer(surface, input.positionCS.xy);
+	output.gbufferOut = OutputGBuffer(color.rgb, translucency, normal, perceptualRoughness, normal, subsurfaceOcclusion.a, 0.0);
 #endif
 	
 	return output;

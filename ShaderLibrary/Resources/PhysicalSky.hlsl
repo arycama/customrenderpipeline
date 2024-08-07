@@ -31,19 +31,19 @@ float3 FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, f
 	{
 		float d_min = _ViewHeight - _PlanetRadius;
 		float d_max = rho;
-		maxDist = lerp(d_min, d_max, GetUnitRangeFromTextureCoord(1.0 - 2.0 * uv.y, _CdfSize.y / 2));
+		maxDist = lerp(d_min, d_max, RemapHalfTexelTo01(1.0 - 2.0 * uv.y, _CdfSize.y / 2));
 		cosViewAngle = maxDist == 0.0 ? -1.0 : clamp(-(Sq(rho) + Sq(maxDist)) / (2.0 * _ViewHeight * maxDist), -1.0, 1.0);
 	}
 	else
 	{
 		float d_min = _TopRadius - _ViewHeight;
 		float d_max = rho + H;
-		maxDist = lerp(d_min, d_max, GetUnitRangeFromTextureCoord(2.0 * uv.y - 1.0, _CdfSize.y / 2));
+		maxDist = lerp(d_min, d_max, RemapHalfTexelTo01(2.0 * uv.y - 1.0, _CdfSize.y / 2));
 		cosViewAngle = maxDist == 0.0 ? 1.0 : clamp((Sq(H) - Sq(rho) - Sq(maxDist)) / (2.0 * _ViewHeight * maxDist), -1.0, 1.0);
 	}
 
 	float3 colorMask = index == 0 ? float3(1, 0, 0) : (index == 1 ? float3(0, 1, 0) : float3(0, 0, 1));
-	float xi = GetUnitRangeFromTextureCoord(uv.x, _CdfSize.x);
+	float xi = RemapHalfTexelTo01(uv.x, _CdfSize.x);
 	
 	float3 maxLuminance = SkyLuminance[float2(position.y, 0.0)];
 	float targetLuminance = maxLuminance[index] * xi;

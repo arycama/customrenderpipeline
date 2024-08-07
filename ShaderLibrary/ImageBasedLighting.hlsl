@@ -2,6 +2,7 @@
 #define IMAGE_BASED_LIGHTING_INCLUDED
 
 #include "Brdf.hlsl"
+#include "Geometry.hlsl"
 #include "Samplers.hlsl"
 
 // Generates an orthonormal (row-major) basis from a unit vector. TODO: make it column-major.

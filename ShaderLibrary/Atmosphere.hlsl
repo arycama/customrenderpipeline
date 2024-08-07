@@ -3,6 +3,7 @@
 
 #include "Geometry.hlsl"
 #include "Samplers.hlsl" 
+#include "Utility.hlsl" 
 
 cbuffer AtmosphereProperties
 {
@@ -40,16 +41,6 @@ float2 _SkyCdfSize;
 
 Texture2D<float> _AtmosphereDepth;
 Texture2D<float3> _MiePhaseTexture;
-
-float GetTextureCoordFromUnitRange(float x, float texture_size)
-{
-	return 0.5 / texture_size + x * (1.0 - 1.0 / texture_size);
-}
-
-float GetUnitRangeFromTextureCoord(float u, float texture_size)
-{
-	return (u - 0.5 / texture_size) / (1.0 - 1.0 / texture_size);
-}
 
 float DistanceToTopAtmosphereBoundary(float height, float cosAngle)
 {
@@ -296,7 +287,7 @@ float GetSkyCdf(float viewHeight, float cosAngle, float xi, float colorIndex, bo
 		float d = -r_mu - sqrt(max(0.0, discriminant));
 		float d_min = viewHeight - _PlanetRadius;
 		float d_max = rho;
-		u_mu = 0.5 - 0.5 * GetTextureCoordFromUnitRange(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
+		u_mu = 0.5 - 0.5 * Remap01ToHalfTexel(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
 	}
 	else
 	{
@@ -306,10 +297,10 @@ float GetSkyCdf(float viewHeight, float cosAngle, float xi, float colorIndex, bo
 		float d = -r_mu + sqrt(max(0.0, discriminant + H * H));
 		float d_min = _TopRadius - viewHeight;
 		float d_max = rho + H;
-		u_mu = 0.5 + 0.5 * GetTextureCoordFromUnitRange((d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
+		u_mu = 0.5 + 0.5 * Remap01ToHalfTexel((d - d_min) / (d_max - d_min), _SkyCdfSize.y / 2);
 	}
 	
-	float3 uv = float3(GetTextureCoordFromUnitRange(xi, _SkyCdfSize.x), u_mu, colorIndex);
+	float3 uv = float3(Remap01ToHalfTexel(xi, _SkyCdfSize.x), u_mu, colorIndex);
 	return _SkyCdf.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 

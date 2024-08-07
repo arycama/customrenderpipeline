@@ -1,68 +1,7 @@
 #ifndef UTILITY_INCLUDED
 #define UTILITY_INCLUDED
 
-#include "Geometry.hlsl"
 #include "Math.hlsl"
-
-float3 SampleSphereUniform(float u1, float u2)
-{
-	float phi = TwoPi * u2;
-	float cosTheta = 1.0 - 2.0 * u1;
-
-	return SphericalToCartesian(phi, cosTheta);
-}
-
-// Reference : http://www.cs.virginia.edu/~jdl/bib/globillum/mis/shirley96.pdf + PBRT
-
-// Performs uniform sampling of the unit disk.
-// Ref: PBRT v3, p. 777.
-float2 SampleDiskUniform(float u1, float u2)
-{
-	float r = sqrt(u1);
-	float phi = TwoPi * u2;
-
-	float sinPhi, cosPhi;
-	sincos(phi, sinPhi, cosPhi);
-
-	return r * float2(cosPhi, sinPhi);
-}
-
-// Performs cosine-weighted sampling of the hemisphere.
-// Ref: PBRT v3, p. 780.
-float3 SampleHemisphereCosine(float u1, float u2)
-{
-	float3 localL;
-
-    // Since we don't really care about the area distortion,
-    // we substitute uniform disk sampling for the concentric one.
-	localL.xy = SampleDiskUniform(u1, u2);
-
-    // Project the point from the disk onto the hemisphere.
-	localL.z = sqrt(1.0 - u1);
-
-	return localL;
-}
-
-// Generates a sample, then rotates it into the hemisphere of normal using reoriented normal mapping
-float3 SampleHemisphereCosine(float u1, float u2, float3 normal)
-{
-	// This function needs to used safenormalize because there is a probability
-    // that the generated direction is the exact opposite of the normal and that would lead
-    // to a nan vector otheriwse.
-    float3 pointOnSphere = SampleSphereUniform(u1, u2);
-    return normalize(normal + pointOnSphere);
-	
-	float3 result = SampleHemisphereCosine(u1, u2);
-	return FromToRotationZ(normal, result);
-}
-
-float3 SampleHemisphereUniform(float u1, float u2)
-{
-	float phi = TwoPi * u2;
-	float cosTheta = 1.0 - u1;
-
-	return SphericalToCartesian(phi, cosTheta);
-}
 
 float3 UnpackNormalSNorm(float2 packedNormal, float scale = 1.0)
 {
@@ -87,21 +26,6 @@ float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
 float2 NormalDerivatives(float3 normal)
 {
 	return normal.xy * rcp(normal.z);
-}
-
-// ref http://blog.selfshadow.com/publications/blending-in-detail/
-// ref https://gist.github.com/selfshadow/8048308
-// Reoriented Normal Mapping
-// Blending when n1 and n2 are already 'unpacked' and normalised
-// assume compositing in tangent space
-float3 BlendNormalRNM(float3 n1, float3 n2)
-{
-	return FromToRotationZ(n1, n2);
-}
-
-float SmoothnessToPerceptualRoughness(float smoothness)
-{
-	return 1.0 - smoothness;
 }
 
 // This is actuall the last mip index, we generate 7 mips of convolution
@@ -296,5 +220,23 @@ float2 ApplyScaleOffset(float2 uv, float4 scaleOffset)
 {
 	return uv * scaleOffset.xy + scaleOffset.zw;
 }
+
+float1 Remap01ToHalfTexel(float1 coord, float1 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
+float2 Remap01ToHalfTexel(float2 coord, float2 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
+float3 Remap01ToHalfTexel(float3 coord, float3 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
+float4 Remap01ToHalfTexel(float4 coord, float4 size) { return Remap(coord, 0.0, 1.0, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size)); }
+
+float1 RemapHalfTexelTo01(float1 coord, float1 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
+float2 RemapHalfTexelTo01(float2 coord, float2 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
+float3 RemapHalfTexelTo01(float3 coord, float3 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
+float4 RemapHalfTexelTo01(float4 coord, float4 size) { return Remap(coord, 0.5 * rcp(size), 1.0 - 0.5 * rcp(size), 0.0, 1.0); }
+
+bool1 IsInfOrNaN(float1 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
+bool3 IsInfOrNaN(float3 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
+bool4 IsInfOrNaN(float4 x) { return (asuint(x) & 0x7FFFFFFF) >= 0x7F800000; }
+
+float1 RemoveNaN(float1 x) { return IsInfOrNaN(x) ? 0.0 : x; }
+float3 RemoveNaN(float3 x) { return IsInfOrNaN(x) ? 0.0 : x; }
+float4 RemoveNaN(float4 x) { return IsInfOrNaN(x) ? 0.0 : x; }
 
 #endif
