@@ -329,59 +329,88 @@ float3 PlanetCurvePrevious(float3 worldPosition)
 	return worldPosition;
 }
 
+struct AtmosphereInput
+{
+	float viewHeight;
+	float cosViewAngle;
+	float cosLightAngle;
+	float samples;
+	float startT;
+	float maxT;
+	bool applyMultiScatter;
+	uint colorIndex;
+	float targetLuminance;
+	float sampleOffset;
+	bool samplePlanet;
+};
+
 struct AtmosphereResult
 {
 	float3 transmittance;
-	float3 singleScatter;
-	float3 multiScatter;
+	float3 luminance;
+	float3 density;
 	float weightedDepth;
+	float currentT;
 };
 
-AtmosphereResult SampleAtmosphere(float viewHeight, float cosViewAngle, float lightCosAngle, float samples, float maxT, bool applyMultiScatter, uint colorIndex = 0, float targetLuminance = -1.0)
+AtmosphereResult SampleAtmosphere(float viewHeight, float cosViewAngle, float cosLightAngle, float samples, float rayLength = -1.0, bool applyMultiScatter = true, uint colorIndex = 0, float targetLuminance = -1.0, float sampleOffset = 0.5, bool samplePlanet = false)
 {
-	float dt = maxT / samples;
-	float LdotV = lightCosAngle * cosViewAngle;
+	if(rayLength == -1.0)
+		rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, cosViewAngle);
 
-	float3 transmittance = 1.0, singleScatter = 0.0, multiScatter = 0.0, transmittanceSum = 0.0, weightedDepthSum = 0.0;
-	for (float i = 0.5; i < samples; i++)
+	float dt = rayLength / samples;
+	float LdotV = cosViewAngle * cosLightAngle;
+
+	float3 transmittance = 1.0, luminance = 0.0, density = 0.0, transmittanceSum = 0.0, weightedDepthSum = 0.0;
+	for (float i = 0.0; i < samples; i++)
 	{
-		float currentDistance = i * dt;
+		float currentDistance = (i + sampleOffset) * dt;
 		float heightAtDistance = HeightAtDistance(viewHeight, cosViewAngle, currentDistance);
-		float4 scatter = AtmosphereScatter(heightAtDistance);
 		
-		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, currentDistance * LdotV, heightAtDistance);
 		float3 viewTransmittance = TransmittanceToPoint(viewHeight, cosViewAngle, currentDistance);
 		float3 extinction = AtmosphereExtinction(heightAtDistance);
 		
-		transmittance *= exp(-AtmosphereExtinction(heightAtDistance) * dt);
+		transmittance *= exp(-extinction * dt);
 		transmittanceSum += transmittance;
 		weightedDepthSum += currentDistance * transmittance;
 		
+		float4 scatter = AtmosphereScatter(heightAtDistance);
 		float3 inscatter = (scatter.xyz + scatter.w) * viewTransmittance * (1.0 - exp(-extinction * dt)) / extinction;
 		
-		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
-			singleScatter += AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * inscatter;
+		float cosLightAngleAtDistance = CosAngleAtDistance(viewHeight, cosLightAngle, currentDistance * LdotV, heightAtDistance);
+		if (!RayIntersectsGround(heightAtDistance, cosLightAngleAtDistance))
+			luminance += AtmosphereTransmittance(heightAtDistance, cosLightAngleAtDistance) * inscatter;
 		
-		multiScatter += inscatter;
+		density += inscatter;
 		
 		if (applyMultiScatter)
 		{
-			float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
+			float2 uv = ApplyScaleOffset(float2(0.5 * cosLightAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
 			float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
-			singleScatter += ms * (scatter.xyz + scatter.w);
+			luminance += ms * (scatter.xyz + scatter.w);
 		}
 		
-		if (targetLuminance != -1.0 && singleScatter[colorIndex] >= targetLuminance)
+		if (targetLuminance != -1.0 && luminance[colorIndex] >= targetLuminance)
 			break;
+	}
+	
+	// Account for bounced light off the earth
+	if (samplePlanet && RayIntersectsGround(viewHeight, cosViewAngle))
+	{
+		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, cosLightAngle, rayLength * LdotV, _PlanetRadius);
+		float3 sunTransmittance = AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance);
+		float3 transmittance = TransmittanceToBottomAtmosphereBoundary(viewHeight, cosViewAngle, rayLength);
+		luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi;
 	}
 	
 	weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
 	
 	AtmosphereResult output;
 	output.transmittance = transmittance;
-	output.singleScatter = singleScatter;
-	output.multiScatter = multiScatter;
-	output.weightedDepth = dot(weightedDepthSum / maxT, transmittance) / dot(transmittance, 1.0);
+	output.luminance = luminance;
+	output.density = density;
+	output.weightedDepth = dot(weightedDepthSum / rayLength, transmittance) / dot(transmittance, 1.0);
+	output.currentT = i * dt;
 	return output;
 }
 

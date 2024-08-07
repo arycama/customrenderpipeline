@@ -19,7 +19,7 @@ float4 SkyLuminanceScaleLimit;
 
 float3 FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
-		// Distance to top atmosphere boundary for a horizontal ray at ground level.
+	// Distance to top atmosphere boundary for a horizontal ray at ground level.
 	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
 	
 	// Distance to the horizon.
@@ -47,50 +47,7 @@ float3 FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, f
 	
 	float3 maxLuminance = SkyLuminance[float2(position.y, 0.0)];
 	float targetLuminance = maxLuminance[index] * xi;
-	
-	// Brute force linear search
-	float t = 0; //xi;
-	float minDist = FloatMax;
-	
-	float sampleCount = _Samples * 1; // 4096 * 4;
-	
-	float3 luminanceSum = 0.0;
-	float ds = maxDist / sampleCount;
-	for (float i = 0.5; i < sampleCount; i++)
-	{
-		float currentDistance = i / sampleCount * maxDist;
-		
-		float heightAtDistance = HeightAtDistance(_ViewHeight, cosViewAngle, currentDistance);
-		float lightCosAngle = _LightDirection0.y;
-		float LdotV = lightCosAngle * cosViewAngle;
-		float4 scatter = AtmosphereScatter(heightAtDistance);
-		
-		float lightCosAngleAtDistance = CosAngleAtDistance(_ViewHeight, lightCosAngle, currentDistance * LdotV, heightAtDistance);
-		float3 viewTransmittance = TransmittanceToPoint(_ViewHeight, cosViewAngle, currentDistance);
-		float3 extinction = AtmosphereExtinction(heightAtDistance);
-		
-		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
-		{
-			float3 lightTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
-			luminanceSum += lightTransmittance * viewTransmittance * (scatter.xyz + scatter.w) * (1.0 - exp(-extinction * ds)) / extinction;
-		}
-		
-		float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
-		float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
-		luminanceSum += ms * (scatter.xyz + scatter.w);
-		
-		if (luminanceSum[index] >= targetLuminance)
-			break;
-		
-		//float delta = dot(colorMask, abs(luminance - targetLuminance));
-		//if (delta < minDist)
-		//{
-		//	t = distance;
-		//	minDist = delta;
-		//}
-	}
-	
-	return i / sampleCount * maxDist;
+	return SampleAtmosphere(_ViewHeight, cosViewAngle, _LightDirection0.y, _Samples, -1.0, true, index, targetLuminance).currentT;
 }
 
 struct FragmentTransmittanceOutput
@@ -103,79 +60,24 @@ FragmentTransmittanceOutput FragmentTransmittanceLut(float4 position : SV_Positi
 {
 	float2 uv = position.xy * _ScaleOffset.xy + _ScaleOffset.zw;
 	
-	// Distance to top atmosphere boundary for a horizontal ray at ground level.
 	float H = sqrt(Sq(_TopRadius) - Sq(_PlanetRadius));
-	
-	// Distance to the horizon, from which we can compute _ViewHeight:
 	float rho = H * uv.y;
-	float _ViewHeight = sqrt(Sq(rho) + Sq(_PlanetRadius));
-	
-	// Distance to the top atmosphere boundary for the ray (_ViewHeight,cosAngle), and its minimum
-	// and maximum values over all cosAngle - obtained for (_ViewHeight,1) and (_ViewHeight,mu_horizon) -
-	// from which we can recover cosAngle:
-	float dMin = _TopRadius - _ViewHeight;
-	float dMax = rho + H;
-	float d = lerp(dMin, dMax, uv.x);
-	float cosAngle = d ? (Sq(H) - Sq(rho) - Sq(d)) / (2.0 * _ViewHeight * d) : 1.0;
-	float dx = d / _Samples;
+	float viewHeight = sqrt(Sq(rho) + Sq(_PlanetRadius));
+	float d = lerp(_TopRadius - viewHeight, rho + H, uv.x);
+	float cosViewAngle = d ? (Sq(H) - Sq(rho) - Sq(d)) / (2.0 * viewHeight * d) : 1.0;
 
-	float3 transmittance = 1.0, transmittanceSum = 0.0;
-	float3 weightedDepthSum = 0.0;
-	for (float i = 0.5; i < _Samples; i++)
-	{
-		float currentDistance = i * dx;
-		float height = HeightAtDistance(_ViewHeight, cosAngle, currentDistance);
-		transmittance *= exp(-AtmosphereExtinction(height) * dx);
-		transmittanceSum += transmittance;
-		weightedDepthSum += currentDistance * transmittance;
-	}
-	
-	weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
+	AtmosphereResult result = SampleAtmosphere(viewHeight, cosViewAngle, 0.0, _Samples, -1.0);
 	
 	FragmentTransmittanceOutput output;
-	output.transmittance = transmittance * HalfMax;
-
-	// Store greyscale depth, weighted by transmittance
-	output.weightedDepth = dot(weightedDepthSum / d, transmittance) / dot(transmittance, 1.0);
+	output.transmittance = result.transmittance * HalfMax;
+	output.weightedDepth = result.weightedDepth;
 	return output;
 }
 
 float3 FragmentLuminance(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float lightCosAngle = _LightDirection0.y;
-	
 	float cosViewAngle = 2.0 * uv.x - 1.0;
-	bool rayIntersectsGround = RayIntersectsGround(_ViewHeight, cosViewAngle);
-	float rayLength = DistanceToNearestAtmosphereBoundary(_ViewHeight, cosViewAngle, rayIntersectsGround);
-	
-	float dt = rayLength / _Samples;
-	float LdotV = lightCosAngle * cosViewAngle;
-	
-	float3 luminanceSum = 0.0, multiScatter = 0.0;
-	for (float i = 0.5; i < _Samples; i++)
-	{
-		float currentDistance = i * dt;
-		float heightAtDistance = HeightAtDistance(_ViewHeight, cosViewAngle, currentDistance);
-		float4 scatter = AtmosphereScatter(heightAtDistance);
-		
-		float lightCosAngleAtDistance = CosAngleAtDistance(_ViewHeight, lightCosAngle, currentDistance * LdotV, heightAtDistance);
-		float3 transmittance = TransmittanceToPoint(_ViewHeight, cosViewAngle, currentDistance);
-		float3 extinction = AtmosphereExtinction(_ViewHeight);
-		
-		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
-		{
-			float3 inscatter = (scatter.xyz + scatter.w) * transmittance * (1.0 - exp(-extinction * dt)) / extinction;
-			luminanceSum += AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * inscatter;
-		}
-		
-		//multiScatter += inscatter;
-		
-		float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
-		float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
-		luminanceSum += ms * (scatter.xyz + scatter.w);
-	}
-	
-	return luminanceSum;
+	return SampleAtmosphere(_ViewHeight, cosViewAngle, _LightDirection0.y, _Samples, -1.0, true).luminance;
 }
 
 #ifdef REFLECTION_PROBE

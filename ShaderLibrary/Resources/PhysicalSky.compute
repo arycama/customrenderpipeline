@@ -23,58 +23,34 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	
 	#ifdef AMBIENT_GROUND
 		float viewHeight = _PlanetRadius;
-		float3 V = SampleHemisphereCosine(u.x, u.y).xzy;
+		float cosViewAngle = SampleHemisphereCosine(u.x, u.y).z;
 	#else
 		float viewHeight = uv.y * _AtmosphereHeight + _PlanetRadius;
-		float3 V = SampleSphereUniform(u.x, u.y);
+		float cosViewAngle = SampleSphereUniform(u.x, u.y).z;
 	#endif
 	
-	bool rayIntersectsGround = RayIntersectsGround(viewHeight, V.y);
-	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, V.y, rayIntersectsGround);
+	bool rayIntersectsGround = RayIntersectsGround(viewHeight, cosViewAngle);
+	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, cosViewAngle, rayIntersectsGround);
 	
-	float viewCosAngle = V.y;
-	float dt = rayLength / _Samples;
+	float viewCosAngle = cosViewAngle;
 	float LdotV = lightCosAngle * viewCosAngle;
 	
-	float3 luminance = 0.0, multiScatter = 0.0;
-	for (float i = 0.5; i < _Samples; i++)
-	{
-		float currentDistance = i * dt;
-		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, currentDistance);
-		float4 scatter = AtmosphereScatter(heightAtDistance);
-		
-		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, currentDistance * LdotV, heightAtDistance);
-		float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, currentDistance);
-		float3 extinction = AtmosphereExtinction(heightAtDistance);
-		
-		float3 inscatter = (scatter.xyz + scatter.w) * transmittance * (1.0 - exp(-extinction * dt)) / extinction;
-		
-		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
-			luminance += AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance) * inscatter;
-		
-		multiScatter += inscatter;
-		
-		#if defined(AMBIENT_GROUND) || defined(AMBIENT_SKY)
-			float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
-			float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
-			luminance += ms * (scatter.xyz + scatter.w);
-		#endif
-	}
+	#if defined(AMBIENT_GROUND) || defined(AMBIENT_SKY)
+		bool applyMultiScatter = true;
+	#else
+		bool applyMultiScatter = false;
+	#endif
+	
+	AtmosphereResult result = SampleAtmosphere(viewHeight, viewCosAngle, lightCosAngle, _Samples, -1.0, applyMultiScatter);
+	float3 luminance = result.luminance;
+	float3 multiScatter = result.density;
 	
 	// Account for bounced light off the earth
+	// Sky can also take into account ambient light that has bounced off the surface
+	#ifdef AMBIENT_SKY
 	if (rayIntersectsGround)
-	{
-		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, _PlanetRadius);
-		float3 sunTransmittance = AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance);
-		float3 transmittance = TransmittanceToBottomAtmosphereBoundary(viewHeight, viewCosAngle, rayLength);
-
-		luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi;
-		
-		// Sky can also take into account ambient light that has bounced off the surface
-		#ifdef AMBIENT_SKY
-			luminance += GetGroundAmbient(lightCosAngleAtDistance) * _GroundColor;
-		#endif
-	}
+		luminance += GetGroundAmbient(CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, _PlanetRadius)) * _GroundColor;
+	#endif
 	
 	ScatterShared[groupIndex] = luminance * RcpFourPi;
 	MultiScatterShared[groupIndex] = multiScatter * RcpFourPi;
