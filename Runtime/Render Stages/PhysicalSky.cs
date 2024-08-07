@@ -157,7 +157,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(weightedDepth, RenderBufferLoadAction.DontCare);
                 result.SetInputs(pass);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     command.SetGlobalTexture("_MiePhaseTexture", settings.miePhase);
 
@@ -175,7 +175,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture("_MultiScatterResult", multiScatter);
                 result.SetInputs(pass);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     result.SetProperties(pass, command);
                     pass.SetFloat(command, "_Samples", settings.MultiScatterSamples);
@@ -190,7 +190,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture("_AmbientGroundResult", groundAmbient);
                 result.SetInputs(pass);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     result.SetProperties(pass, command);
                     pass.SetFloat(command, "_Samples", settings.AmbientGroundSamples);
@@ -205,7 +205,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture("_AmbientSkyResult", skyAmbient);
                 result.SetInputs(pass);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     result.SetProperties(pass, command);
                     pass.SetFloat(command, "_Samples", settings.AmbientSkySamples);
@@ -274,7 +274,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     cloudSettings.SetCloudPassData(command, pass);
 
@@ -323,7 +323,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_AmbientProbeInputCubemap", skyReflection);
                 pass.WriteBuffer("_AmbientProbeOutputBuffer", ambientBufferTemp);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_MipLevel", mipLevel);
                 });
@@ -333,7 +333,7 @@ namespace Arycama.CustomRenderPipeline
             var ambientBuffer = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Atmosphere Ambient Probe Copy"))
             {
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     command.CopyBuffer(ambientBufferTemp, ambientBuffer);
                 });
@@ -346,7 +346,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(reflectionProbe);
                 pass.ReadTexture("_SkyReflection", skyReflection);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     command.CopyTexture(skyReflection, reflectionProbe);
                 });
@@ -366,7 +366,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.MipLevel = i;
                     var index = i;
 
-                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                     {
                         pass.SetFloat(command, "_Samples", settings.ConvolutionSamples);
 
@@ -430,6 +430,20 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
+            var luminanceLut = renderGraph.GetTexture(settings.CdfHeight, 1, GraphicsFormat.B10G11R11_UFloatPack32);
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Luminance"))
+            {
+                pass.Initialize(skyMaterial, skyMaterial.FindPass("Luminance LUT"));
+                pass.WriteTexture(luminanceLut, RenderBufferLoadAction.DontCare);
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
+
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                {
+                    pass.SetFloat(command, "_Samples", settings.CdfSamples);
+                    pass.SetFloat(command, "_ViewHeight", camera.transform.position.y + settings.PlanetRadius * settings.EarthScale);
+                });
+            }
+
             // CDF
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere CDF"))
             {
@@ -437,8 +451,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.DepthSlice = -1;
                 pass.WriteTexture(cdf, RenderBufferLoadAction.DontCare);
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.ReadTexture("SkyLuminance", luminanceLut);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_Samples", settings.CdfSamples);
                     pass.SetFloat(command, "_ColorChannelScale", (settings.CdfWidth - 1.0f) / (settings.CdfWidth / 3.0f));
@@ -448,6 +463,8 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetVector(command, "_SkyCdfSize", new Vector2(settings.CdfWidth, settings.CdfHeight));
                     pass.SetVector(command, "_CdfSize", new Vector2(settings.CdfWidth, settings.CdfHeight));
+
+                    pass.SetVector(command, "SkyLuminanceScaleLimit", luminanceLut.ScaleLimit2D);
 
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
                     pass.SetVector(command, "_LightColor0", lightColor0);
@@ -469,8 +486,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
+                pass.ReadTexture("SkyLuminance", luminanceLut);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_ViewHeight", camera.transform.position.y + settings.PlanetRadius);
                     pass.SetFloat(command, "_Samples", settings.RenderSamples);
@@ -478,6 +496,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightColor0", lightColor0);
                     pass.SetVector(command, "_LightDirection1", lightDirection1);
                     pass.SetVector(command, "_LightColor1", lightColor1);
+                    pass.SetVector(command, "SkyLuminanceScaleLimit", luminanceLut.ScaleLimit2D);
 
                     commonPassData.SetProperties(pass, command);
                 });
@@ -502,7 +521,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<PreviousFrameDepth>();
                 pass.AddRenderPassData<PreviousFrameVelocity>();
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetVector(command, "_SkyHistoryScaleLimit", skyColor.history.ScaleLimit2D);
 
@@ -534,7 +553,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_BlurSigma", settings.SpatialBlurSigma);
                     pass.SetFloat(command, "_SpatialSamples", settings.SpatialSamples);
@@ -554,10 +573,6 @@ namespace Arycama.CustomRenderPipeline
         }
 
         public void Cleanup()
-        {
-        }
-
-        public class PassData
         {
         }
 

@@ -249,6 +249,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	result = RemoveNaN(result);
 	
+	result = _TemporalInput[position.xy];
+	
 	TemporalOutput output;
 	output.temporal = result;
 	

@@ -45,7 +45,7 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		
 		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, currentDistance * LdotV, heightAtDistance);
 		float3 transmittance = TransmittanceToPoint(viewHeight, viewCosAngle, currentDistance);
-		float3 extinction = AtmosphereExtinction(viewHeight);
+		float3 extinction = AtmosphereExtinction(heightAtDistance);
 		
 		float3 inscatter = (scatter.xyz + scatter.w) * transmittance * (1.0 - exp(-extinction * dt)) / extinction;
 		
