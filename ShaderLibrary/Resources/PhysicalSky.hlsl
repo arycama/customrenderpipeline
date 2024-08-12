@@ -30,7 +30,7 @@ FragmentTransmittanceOutput FragmentTransmittanceLut(float4 position : SV_Positi
 	AtmosphereResult result = SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, rayLength);
 	
 	FragmentTransmittanceOutput output;
-	output.transmittance = result.transmittance * HalfMax;
+	output.transmittance = result.transmittance;
 	output.weightedDepth = result.weightedDepth;
 	return output;
 }
@@ -43,9 +43,9 @@ float3 FragmentLuminance(float4 position : SV_Position, float2 uv : TEXCOORD0, f
 
 float3 FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
-	float xi = RemapHalfTexelTo01(uv.x, _CdfSize.x);
 	float2 skyParams = CosViewAngleAndMaxDistFromUv(uv.y, _ViewHeight);
 	float3 maxLuminance = SkyLuminance[float2(position.y, 0.0)];
+	float xi = RemapHalfTexelTo01(uv.x, _CdfSize.x);
 	float targetLuminance = maxLuminance[index] * xi;
 	return SampleAtmosphere(_ViewHeight, skyParams.x, _LightDirection0.y, _Samples, skyParams.y, true, index, targetLuminance).currentT;
 }
@@ -152,15 +152,14 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 			}
 		}
 		
-		float2 uv = ApplyScaleOffset(float2(0.5 * lightCosAngleAtDistance + 0.5, (heightAtDistance - _PlanetRadius) / _AtmosphereHeight), _MultiScatterRemap);
-		float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
-		lum += ms * (scatter.xyz + scatter.w);
+		float3 ms = GetMultiScatter(lightCosAngleAtDistance, heightAtDistance);
+		lum += ms;
 		ms *= _LightColor0 * _Exposure;
 
 		// Apply cloud coverage only to multi scatter, since single scatter is already shadowed by clouds
 		float cloudFactor = saturate(heightAtDistance * heightAtDistance * _CloudCoverageScale + _CloudCoverageOffset);
 		//ms = lerp(ms * _CloudCoverage.a, _CloudCoverage.rgb, cloudFactor);
-		lighting += ms * (scatter.xyz + scatter.w);
+		lighting += ms;
 
 		float3 viewTransmittance = TransmittanceToPoint(_ViewHeight, rd.y, currentDistance);
 		

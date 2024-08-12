@@ -239,4 +239,9 @@ float1 RemoveNaN(float1 x) { return IsInfOrNaN(x) ? 0.0 : x; }
 float3 RemoveNaN(float3 x) { return IsInfOrNaN(x) ? 0.0 : x; }
 float4 RemoveNaN(float4 x) { return IsInfOrNaN(x) ? 0.0 : x; }
 
+void Swap(inout float1 x, inout float1 y) { float1 temp = x; x = y; y = temp; }
+void Swap(inout float2 x, inout float2 y) { float2 temp = x; x = y; y = temp; }
+void Swap(inout float3 x, inout float3 y) { float3 temp = x; x = y; y = temp; }
+void Swap(inout float4 x, inout float4 y) { float4 temp = x; x = y; y = temp; }
+
 #endif
