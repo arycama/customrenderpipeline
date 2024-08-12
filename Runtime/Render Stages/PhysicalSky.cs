@@ -246,21 +246,6 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            // Generate multi-scatter LUT
-            var computeShader = Resources.Load<ComputeShader>("PhysicalSky");
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Atmosphere Multi Scatter"))
-            {
-                pass.Initialize(computeShader, 0, settings.MultiScatterWidth, settings.MultiScatterHeight, 1, false);
-                pass.WriteTexture("_MultiScatterResult", multiScatter);
-                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
-                {
-                    pass.SetFloat(command, "_Samples", settings.MultiScatterSamples);
-                    pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.MultiScatterWidth, settings.MultiScatterHeight));
-                });
-            }
-
             var luminanceLut = renderGraph.GetTexture(settings.CdfHeight, 1, GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Luminance"))
             {

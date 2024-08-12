@@ -19,16 +19,20 @@ float _Samples;
 [numthreads(_ThreadCount, 1, 1)]
 void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 {
-	float2 uv = float2(1, 0);//	groupId * _ScaleOffset;
+	float2 uv = groupId * _ScaleOffset;
 	float lightCosAngle = 2.0 * uv.x - 1.0;
 	float2 u = Hammersley2dSeq(groupIndex, _ThreadCount);
 	
 	#ifdef AMBIENT_GROUND
 		float viewHeight = _PlanetRadius;
 		float cosViewAngle = SampleHemisphereCosine(u.x, u.y).z;
+		bool samplePlanet = false;
+		bool rayIntersectsGround = false;
 	#else
 		float viewHeight = uv.y * _AtmosphereHeight + _PlanetRadius;
 		float cosViewAngle = SampleSphereUniform(u.x, u.y).z;
+		bool samplePlanet = true;
+		bool rayIntersectsGround = RayIntersectsGround(viewHeight, cosViewAngle);
 	#endif
 	
 	#if defined(AMBIENT_GROUND) || defined(AMBIENT_SKY)
@@ -37,16 +41,14 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		bool applyMultiScatter = false;
 	#endif
 	
-	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, cosViewAngle);
-	AtmosphereResult result = SampleAtmosphere(viewHeight, cosViewAngle, lightCosAngle, _Samples, rayLength, applyMultiScatter);
+	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, cosViewAngle, rayIntersectsGround);
+	AtmosphereResult result = SampleAtmosphere(viewHeight, cosViewAngle, lightCosAngle, _Samples, rayLength, applyMultiScatter, 0, 0.0, 0.5, samplePlanet, rayIntersectsGround);
 	
 	// Account for bounced light off the earth
 	// Sky can also take into account ambient light that has bounced off the surface
 	#ifdef AMBIENT_SKY
-		bool rayIntersectsGround = RayIntersectsGround(viewHeight, cosViewAngle);
 		if (rayIntersectsGround)
 		{
-			float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, cosViewAngle, rayIntersectsGround);
 			float LdotV = lightCosAngle * cosViewAngle;
 			float cosLightAngle = CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, _PlanetRadius);
 			result.luminance += GetGroundAmbient(cosLightAngle) * _GroundColor;

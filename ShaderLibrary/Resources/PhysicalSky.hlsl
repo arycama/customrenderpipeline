@@ -25,9 +25,8 @@ struct FragmentTransmittanceOutput
 
 FragmentTransmittanceOutput FragmentTransmittanceLut(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float2 skyParams = SkyParamsFromUv(ApplyScaleOffset(uv, _ScaleOffset));
-	float rayLength = DistanceToNearestAtmosphereBoundary(skyParams.x, skyParams.y);
-	AtmosphereResult result = SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, rayLength);
+	float3 skyParams = SkyParamsFromUv(ApplyScaleOffset(uv, _ScaleOffset));
+	AtmosphereResult result = SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, skyParams.z);
 	
 	FragmentTransmittanceOutput output;
 	output.transmittance = result.transmittance;
@@ -47,7 +46,7 @@ float3 FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, f
 	float3 maxLuminance = SkyLuminance[float2(position.y, 0.0)];
 	float xi = RemapHalfTexelTo01(uv.x, _CdfSize.x);
 	float targetLuminance = maxLuminance[index] * xi;
-	return SampleAtmosphere(_ViewHeight, skyParams.x, _LightDirection0.y, _Samples, skyParams.y, true, index, targetLuminance).currentT;
+	return SampleAtmosphere(_ViewHeight, skyParams.x, _LightDirection0.y, _Samples, skyParams.y, true, index, targetLuminance, 0.5, false, false, true).currentT;
 }
 
 #ifdef REFLECTION_PROBE
@@ -261,20 +260,20 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 historyUv = uv - motion;
 	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, min(historyUv * _SkyHistoryScaleLimit.xy, _SkyHistoryScaleLimit.zw)) * _PreviousToCurrentExposure);
 	
-	float previousDepth = LinearEyeDepth(PreviousDepth[historyUv * _ScaledResolution.xy]);
-	float2 previousVelocity = PreviousVelocity[historyUv * _ScaledResolution.xy];
+	//float previousDepth = LinearEyeDepth(PreviousDepth[historyUv * _ScaledResolution.xy]);
+	//float2 previousVelocity = PreviousVelocity[historyUv * _ScaledResolution.xy];
 	
-	float depthWeight = saturate(1.0 - (sceneDistance - previousDepth) / sceneDistance * _DepthFactor);
+	//float depthWeight = saturate(1.0 - (sceneDistance - previousDepth) / sceneDistance * _DepthFactor);
 	
 	// TODO: Should use gather and 4 samples for this
-	history = lerp(result, history, depthWeight);
+	//history = lerp(result, history, depthWeight);
 	
-	float velLenSqr = SqrLength(motion - previousVelocity);
-	float velocityWeight = velLenSqr ? saturate(1.0 - sqrt(velLenSqr) * _MotionFactor) : 1.0;
-	float3 window = velocityWeight * (maxValue - minValue);
+	//float velLenSqr = SqrLength(motion - previousVelocity);
+	//float velocityWeight = velLenSqr ? saturate(1.0 - sqrt(velLenSqr) * _MotionFactor) : 1.0;
+	//float3 window = velocityWeight * (maxValue - minValue);
 	
-	minValue -= _ClampWindow * window;
-	maxValue += _ClampWindow * window;
+	//minValue -= _ClampWindow * window;
+	//maxValue += _ClampWindow * window;
 	
 	// Clamp clip etc
 	history = ClipToAABB(history, result, minValue, maxValue);

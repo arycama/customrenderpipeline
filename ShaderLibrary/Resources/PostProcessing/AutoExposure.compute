@@ -187,12 +187,12 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	exposureCompensation = LuminanceToEV100(1.03 - 2.0 * rcp(log10(averageLuminance + 1.0) + 2.0));
 	exposureCompensation += ExposureCompensation;
 	
-	averageEv -= exposureCompensation;
+	//averageEv -= exposureCompensation;
 		
 	float previousExposure = _Exposure;
 	float evLastFrame = ExposureToEV100(previousExposure); // + ExposureCompensation;
 	float adaptedEv = lerp(averageEv, evLastFrame, exp(-DeltaTime * AdaptationSpeed));
-	//adaptedEv = averageEv;
+	adaptedEv = averageEv;
 	
 	if (Mode == 1.0)
 		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso) + ExposureCompensation;
