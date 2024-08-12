@@ -50,6 +50,15 @@ namespace Arycama.CustomRenderPipeline
             offset = new Vector3(0.5f * invWidth, 0.5f * invHeight, 0.5f * invDepth);
         }
 
+        public static Vector4 RemapHalfTexelTo01(float width, float height)
+        {
+            Vector4 result;
+            result.x = width / (width - 1f);
+            result.y = height / (height - 1f);
+            result.z = -0.5f / (width - 1f);
+            result.w = -0.5f / (height - 1f);
+            return result;
+        }
 
         /// <summary>
         /// Calculates ScaleOffset to Remap a CS thread to UV coordinate that stretches from 0:1. (No half-texel offset)

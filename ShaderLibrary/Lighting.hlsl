@@ -311,7 +311,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
 	#endif
 	
-	float3 luminance = 0;//radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
+	float3 luminance = radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
 
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{

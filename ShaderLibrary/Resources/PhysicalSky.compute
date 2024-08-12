@@ -1,3 +1,5 @@
+#pragma use_dxc
+
 #pragma kernel MultiScatter KERNEL=MultiScatter MULTI_SCATTER
 #pragma kernel AmbientGroundLookup KERNEL=AmbientGroundLookup AMBIENT_GROUND
 #pragma kernel AmbientSkyLookup KERNEL=AmbientSkyLookup AMBIENT_SKY
@@ -17,7 +19,7 @@ float _Samples;
 [numthreads(_ThreadCount, 1, 1)]
 void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 {
-	float2 uv = groupId * _ScaleOffset;
+	float2 uv = float2(1, 0);//	groupId * _ScaleOffset;
 	float lightCosAngle = 2.0 * uv.x - 1.0;
 	float2 u = Hammersley2dSeq(groupIndex, _ThreadCount);
 	
@@ -26,14 +28,8 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		float cosViewAngle = SampleHemisphereCosine(u.x, u.y).z;
 	#else
 		float viewHeight = uv.y * _AtmosphereHeight + _PlanetRadius;
-		float cosViewAngle = SampleSphereUniform(u.x, u.y).z;
+	float cosViewAngle = SampleSphereUniform(u.x, u.y).z;
 	#endif
-	
-	bool rayIntersectsGround = RayIntersectsGround(viewHeight, cosViewAngle);
-	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, cosViewAngle, rayIntersectsGround);
-	
-	float viewCosAngle = cosViewAngle;
-	float LdotV = lightCosAngle * viewCosAngle;
 	
 	#if defined(AMBIENT_GROUND) || defined(AMBIENT_SKY)
 		bool applyMultiScatter = true;
@@ -41,19 +37,24 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		bool applyMultiScatter = false;
 	#endif
 	
-	AtmosphereResult result = SampleAtmosphere(viewHeight, viewCosAngle, lightCosAngle, _Samples, -1.0, applyMultiScatter);
-	float3 luminance = result.luminance;
-	float3 multiScatter = result.density;
+	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, cosViewAngle);
+	AtmosphereResult result = SampleAtmosphere(viewHeight, cosViewAngle, lightCosAngle, _Samples, rayLength, applyMultiScatter);
 	
 	// Account for bounced light off the earth
 	// Sky can also take into account ambient light that has bounced off the surface
 	#ifdef AMBIENT_SKY
-	if (rayIntersectsGround)
-		luminance += GetGroundAmbient(CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, _PlanetRadius)) * _GroundColor;
+		bool rayIntersectsGround = RayIntersectsGround(viewHeight, cosViewAngle);
+		if (rayIntersectsGround)
+		{
+			float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, cosViewAngle, rayIntersectsGround);
+			float LdotV = lightCosAngle * cosViewAngle;
+			float cosLightAngle = CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, _PlanetRadius);
+			result.luminance += GetGroundAmbient(cosLightAngle) * _GroundColor;
+		}
 	#endif
 	
-	ScatterShared[groupIndex] = luminance * RcpFourPi;
-	MultiScatterShared[groupIndex] = multiScatter * RcpFourPi;
+	ScatterShared[groupIndex] = result.luminance / _ThreadCount;
+	MultiScatterShared[groupIndex] = result.density / _ThreadCount;
 	
 	[unroll]
 	for (uint s = _ThreadCount >> 1; s > 0; s >>= 1)
@@ -63,8 +64,8 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		if (groupIndex >= s)
 			continue;
 		
-		ScatterShared[groupIndex] = (ScatterShared[groupIndex] + ScatterShared[groupIndex + s]) * 0.5;
-		MultiScatterShared[groupIndex] = (MultiScatterShared[groupIndex] + MultiScatterShared[groupIndex + s]) * 0.5;
+		ScatterShared[groupIndex] += ScatterShared[groupIndex + s];
+		MultiScatterShared[groupIndex] += MultiScatterShared[groupIndex + s];
 	}
 	
 	if (groupIndex > 0)
@@ -75,8 +76,12 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	#elif defined(AMBIENT_SKY)
 		_AmbientSkyResult[groupId] = ScatterShared[0];
 	#else
-		_MultiScatterResult[groupId] = ScatterShared[0] / (1.0 - MultiScatterShared[0]);
-#endif
+		float3 luminance = ScatterShared[0];
+		float3 multiScatter = MultiScatterShared[0];
+		float3 output = luminance * rcp(1.0 - multiScatter);
+	
+		_MultiScatterResult[groupId] = output;
+	#endif
 }
 
 float _MipLevel;
