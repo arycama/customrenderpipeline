@@ -60,6 +60,12 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public int TransmittanceHeight { get; private set; } = 64;
             [field: SerializeField] public int TransmittanceSamples { get; private set; } = 64;
 
+            [field: Header("Luminance Lookup")]
+            [field: SerializeField] public int LuminanceWidth { get; private set; } = 128;
+            [field: SerializeField] public int LuminanceHeight { get; private set; } = 64;
+            [field: SerializeField] public int LuminanceDepth { get; private set; } = 64;
+            [field: SerializeField] public int LuminanceSamples { get; private set; } = 64;
+
             [field: Header("CDF Lookup")]
             [field: SerializeField] public int CdfWidth { get; private set; } = 64;
             [field: SerializeField] public int CdfHeight { get; private set; } = 64;
@@ -111,7 +117,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly VolumetricClouds.Settings cloudSettings;
         private readonly Material skyMaterial;
         private readonly Material ggxConvolutionMaterial;
-        private readonly RTHandle transmittance, cdf, multiScatter, groundAmbient, skyAmbient, weightedDepth;
+        private readonly RTHandle transmittance, cdf, multiScatter, groundAmbient, skyAmbient, weightedDepth, skyLuminance;
         private int version = -1;
 
         private PersistentRTHandleCache textureCache;
@@ -126,12 +132,13 @@ namespace Arycama.CustomRenderPipeline
             ggxConvolutionMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
             textureCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Physical Sky");
 
-            transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.R16G16B16A16_SFloat, isPersistent: true);
+            transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
             weightedDepth = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.R32_SFloat, isPersistent: true);
             cdf = renderGraph.GetTexture(settings.CdfWidth, settings.CdfHeight, GraphicsFormat.R32_SFloat, dimension: TextureDimension.Tex2DArray, volumeDepth: 3, isPersistent: true);
             multiScatter = renderGraph.GetTexture(settings.MultiScatterWidth, settings.MultiScatterHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
             groundAmbient = renderGraph.GetTexture(settings.AmbientGroundWidth, 1, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
             skyAmbient = renderGraph.GetTexture(settings.AmbientSkyWidth, settings.AmbientSkyHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
+            skyLuminance = renderGraph.GetTexture(settings.LuminanceWidth, settings.LuminanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, settings.LuminanceDepth, TextureDimension.Tex3D, isPersistent: true);
         }
 
         public void GenerateLookupTables()
@@ -142,7 +149,7 @@ namespace Arycama.CustomRenderPipeline
             var groundAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientGroundWidth);
             var skyAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientSkyWidth, settings.AmbientSkyHeight);
 
-            var result = new AtmospherePropertiesAndTables(atmospherePropertiesBuffer, transmittance, weightedDepth, multiScatter, groundAmbient, cdf, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap, new Vector2(settings.CdfWidth, settings.CdfHeight));
+            var result = new AtmospherePropertiesAndTables(atmospherePropertiesBuffer, transmittance, weightedDepth, multiScatter, groundAmbient, cdf, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap, new Vector2(settings.CdfWidth, settings.CdfHeight), new Vector3(settings.LuminanceWidth, settings.LuminanceHeight, settings.LuminanceDepth), skyLuminance);
 
             if (version >= settings.Version)
                 return;
@@ -180,6 +187,24 @@ namespace Arycama.CustomRenderPipeline
                     result.SetProperties(pass, command);
                     pass.SetFloat(command, "_Samples", settings.MultiScatterSamples);
                     pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.MultiScatterWidth, settings.MultiScatterHeight));
+                });
+            }
+
+            // Sky luminance
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Luminance"))
+            {
+                var primitiveCount = MathUtils.DivRoundUp(settings.LuminanceDepth, 32);
+                pass.Initialize(skyMaterial, skyMaterial.FindPass("Luminance LUT"), primitiveCount);
+                pass.WriteTexture(skyLuminance, RenderBufferLoadAction.DontCare);
+                pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
+
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                {
+                    pass.SetFloat(command, "_Samples", settings.LuminanceSamples);
+                    GraphicsUtilities.HalfTexelRemap(settings.LuminanceWidth, settings.LuminanceHeight, settings.LuminanceDepth, out var scale, out var offset);
+                    pass.SetVector(command, "_Scale", scale);
+                    pass.SetVector(command, "_Offset", offset);
                 });
             }
 
@@ -246,25 +271,7 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            var luminanceLut = renderGraph.GetTexture(settings.CdfHeight, 1, GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true);
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Luminance"))
-            {
-                pass.Initialize(skyMaterial, skyMaterial.FindPass("Luminance LUT"));
-                pass.WriteTexture(luminanceLut, RenderBufferLoadAction.DontCare);
-                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
-                {
-                    pass.SetVector(command, "_LightDirection0", lightDirection0);
-                    pass.SetVector(command, "_LightColor0", lightColor0);
-                    pass.SetVector(command, "_LightDirection1", lightDirection1);
-                    pass.SetVector(command, "_LightColor1", lightColor1);
-
-                    pass.SetFloat(command, "_Samples", settings.CdfSamples);
-                    pass.SetFloat(command, "_ViewHeight", cameraPosition.y + settings.PlanetRadius * settings.EarthScale);
-                    pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(settings.CdfHeight, 1));
-                });
-            }
+           
 
             // CDF
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere CDF"))
@@ -272,8 +279,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(skyMaterial, 1);
                 pass.DepthSlice = -1;
                 pass.WriteTexture(cdf, RenderBufferLoadAction.DontCare);
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
-                pass.ReadTexture("SkyLuminance", luminanceLut);
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
@@ -285,8 +291,6 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetVector(command, "_SkyCdfSize", new Vector2(settings.CdfWidth, settings.CdfHeight));
                     pass.SetVector(command, "_CdfSize", new Vector2(settings.CdfWidth, settings.CdfHeight));
-
-                    pass.SetVector(command, "SkyLuminanceScaleLimit", luminanceLut.ScaleLimit2D);
 
                     pass.SetVector(command, "_LightDirection0", lightDirection0);
                     pass.SetVector(command, "_LightColor0", lightColor0);
@@ -322,7 +326,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<VolumetricClouds.CloudData>();
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();
-                pass.ReadTexture("SkyLuminance", luminanceLut);
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
@@ -336,7 +339,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "_LightColor0", lightColor0);
                     pass.SetVector(command, "_LightDirection1", lightDirection1);
                     pass.SetVector(command, "_LightColor1", lightColor1);
-                    pass.SetVector(command, "SkyLuminanceScaleLimit", luminanceLut.ScaleLimit2D);
 
                     var array = ArrayPool<Matrix4x4>.Get(6);
 
@@ -446,7 +448,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Specular convolution
-            renderGraph.ResourceMap.SetRenderPassData(new ReflectionAmbientData(ambientBuffer, reflectionProbe,luminanceLut, cdf), renderGraph.FrameIndex);
+            renderGraph.ResourceMap.SetRenderPassData(new ReflectionAmbientData(ambientBuffer, reflectionProbe, cdf), renderGraph.FrameIndex);
         }
 
         public void Render(RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector2 jitter, IRenderPassData commonPassData, Camera camera, CullingResults cullingResults)
@@ -592,14 +594,16 @@ namespace Arycama.CustomRenderPipeline
             private readonly RTHandle cdfLookup;
             private readonly RTHandle skyAmbient;
             private readonly RTHandle weightedDepth;
+            private readonly RTHandle skyLuminance;
 
             private Vector4 transmittanceRemap;
             private Vector4 multiScatterRemap;
             private Vector4 skyAmbientRemap;
             private Vector2 groundAmbientRemap;
             private Vector2 cdfLookupSize;
+            private Vector3 luminanceSize;
 
-            public AtmospherePropertiesAndTables(BufferHandle atmospherePropertiesBuffer, RTHandle transmittance, RTHandle weightedDepth, RTHandle multiScatter, RTHandle groundAmbient, RTHandle cdfLookup, RTHandle skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector2 cdfLookupSize)
+            public AtmospherePropertiesAndTables(BufferHandle atmospherePropertiesBuffer, RTHandle transmittance, RTHandle weightedDepth, RTHandle multiScatter, RTHandle groundAmbient, RTHandle cdfLookup, RTHandle skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector2 cdfLookupSize, Vector3 luminanceSize, RTHandle skyLuminance)
             {
                 this.atmospherePropertiesBuffer = atmospherePropertiesBuffer ?? throw new ArgumentNullException(nameof(atmospherePropertiesBuffer));
                 this.transmittance = transmittance ?? throw new ArgumentNullException(nameof(transmittance));
@@ -613,6 +617,8 @@ namespace Arycama.CustomRenderPipeline
                 this.skyAmbientRemap = skyAmbientRemap;
                 this.groundAmbientRemap = groundAmbientRemap;
                 this.cdfLookupSize = cdfLookupSize;
+                this.luminanceSize = luminanceSize;
+                this.skyLuminance = skyLuminance;
             }
 
             public readonly void SetInputs(RenderPass pass)
@@ -624,6 +630,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_SkyAmbient", skyAmbient);
                 pass.ReadTexture("_GroundAmbient", groundAmbient);
                 pass.ReadTexture("_SkyCdf", cdfLookup);
+                pass.ReadTexture("SkyLuminance", skyLuminance);
             }
 
             public readonly void SetProperties(RenderPass pass, CommandBuffer command)
@@ -633,33 +640,32 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetVector(command, "_SkyAmbientRemap", skyAmbientRemap);
                 pass.SetVector(command, "_GroundAmbientRemap", groundAmbientRemap);
                 pass.SetVector(command, "_SkyCdfSize", cdfLookupSize);
+                pass.SetVector(command, "SkyLuminanceScaleLimit", skyLuminance.ScaleLimit2D);
+                pass.SetVector(command, "SkyLuminanceSize", luminanceSize);
             }
         }
 
         public struct ReflectionAmbientData : IRenderPassData
         {
-            private readonly RTHandle reflectionProbe, skyLuminance, skyCdf;
+            private readonly RTHandle reflectionProbe, skyCdf;
             private readonly BufferHandle ambientBuffer;
 
-            public ReflectionAmbientData(BufferHandle ambientBuffer, RTHandle reflectionProbe, RTHandle skyLuminance, RTHandle skyCdf)
+            public ReflectionAmbientData(BufferHandle ambientBuffer, RTHandle reflectionProbe, RTHandle skyCdf)
             {
                 this.ambientBuffer = ambientBuffer;
                 this.reflectionProbe = reflectionProbe;
-                this.skyLuminance = skyLuminance;
                 this.skyCdf = skyCdf;
             }
 
             public readonly void SetInputs(RenderPass pass)
             {
                 pass.ReadTexture("_SkyReflection", reflectionProbe);
-                pass.ReadTexture("SkyLuminance", skyLuminance);
                 pass.ReadTexture("_SkyCdf", skyCdf);
                 pass.ReadBuffer("AmbientSh", ambientBuffer);
             }
 
             public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetVector(command, "SkyLuminanceScaleLimit", skyLuminance.ScaleLimit2D);
                 pass.SetVector(command, "_SkyCdfSize", new Vector2(skyCdf.Width, skyCdf.Height));
             }
         }

@@ -11,8 +11,8 @@ matrix _PixelToWorldViewDirs[6];
 float4 _ScaleOffset;
 float3 _Scale, _Offset;
 float _ColorChannelScale;
-Texture2D<float3> CloudTexture, SkyLuminance;
 Texture2D<float> CloudTransmittanceTexture;
+Texture2D<float3> CloudTexture;
 float4 CloudTextureScaleLimit, CloudTransmittanceTextureScaleLimit;
 float3 _CdfSize;
 float4 SkyLuminanceScaleLimit;
@@ -25,8 +25,11 @@ struct FragmentTransmittanceOutput
 
 FragmentTransmittanceOutput FragmentTransmittanceLut(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float3 skyParams = SkyParamsFromUv(ApplyScaleOffset(uv, _ScaleOffset));
-	AtmosphereResult result = SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, skyParams.z);
+	uv = ApplyScaleOffset(uv, _ScaleOffset);
+
+	float maxDist;
+	float2 skyParams = SkyParamsFromUv(float3(uv, 0), false, maxDist).xy;
+	AtmosphereResult result = SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, maxDist);
 	
 	FragmentTransmittanceOutput output;
 	output.transmittance = result.transmittance;
@@ -34,19 +37,59 @@ FragmentTransmittanceOutput FragmentTransmittanceLut(float4 position : SV_Positi
 	return output;
 }
 
-float3 FragmentLuminance(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float3 FragmentLuminance(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
-	float2 skyParams = CosViewAngleAndMaxDistFromUv(uv.x, _ViewHeight);
-	return SampleAtmosphere(_ViewHeight, skyParams.x, _LightDirection0.y, _Samples, skyParams.y, true).luminance;
+	uv.x = RemapHalfTexelTo01(uv.x, SkyLuminanceSize.x);
+	float uvz = RemapHalfTexelTo01((index + 0.5) / SkyLuminanceSize.z, SkyLuminanceSize.z);
+	
+	bool rayIntersectsGround = uv.y < 0.5;
+	uv.y = rayIntersectsGround ? RemapHalfTexelTo01(1.0 - 2.0 * uv.y, SkyLuminanceSize.y / 2) : RemapHalfTexelTo01(2.0 * uv.y - 1.0, SkyLuminanceSize.y / 2);
+	
+	float maxDist;
+	float3 skyParams = SkyParamsFromUv(float3(uv, uvz), rayIntersectsGround, maxDist);
+	return SampleAtmosphere(skyParams.x, skyParams.y, skyParams.z, _Samples, maxDist, true).luminance;
 }
 
-float3 FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
-	float2 skyParams = CosViewAngleAndMaxDistFromUv(uv.y, _ViewHeight);
-	float3 maxLuminance = SkyLuminance[float2(position.y, 0.0)];
+	float maxDist;
+	float rho = sqrt(max(0.0, Sq(_ViewHeight) - Sq(_PlanetRadius)));
+	bool rayIntersectsGround = uv.y < 0.5;
+	uv.y = rayIntersectsGround ? RemapHalfTexelTo01(1.0 - 2.0 * uv.y, _SkyCdfSize.y / 2.0) : RemapHalfTexelTo01(2.0 * uv.y - 1.0, _SkyCdfSize.y / 2.0);
+	float cosViewAngle = CosViewAngleFromUv(uv.y, _ViewHeight, rho, rayIntersectsGround, maxDist);
+	
+	float cosLightAngle = _LightDirection0.y;
+	float3 maxLuminance = GetSkyLuminance(_ViewHeight, cosViewAngle, cosLightAngle);
 	float xi = RemapHalfTexelTo01(uv.x, _CdfSize.x);
 	float targetLuminance = maxLuminance[index] * xi;
-	return SampleAtmosphere(_ViewHeight, skyParams.x, _LightDirection0.y, _Samples, skyParams.y, true, index, targetLuminance, 0.5, false, false, true).currentT;
+	
+	float a = 0.0;
+	float b = maxDist;
+	float c;
+	
+	//while((b - a) > 1e-1)
+	for (float i = 0.0; i < _Samples; i++)
+	{
+		c = (a + b) * 0.5;
+		float fc = LuminanceToPoint(_ViewHeight, cosViewAngle, c, cosLightAngle)[index] - targetLuminance;
+		
+		if (fc == 0.0)
+			break;
+		
+		float fa = LuminanceToPoint(_ViewHeight, cosViewAngle, a, cosLightAngle)[index] - targetLuminance;
+		if (sign(fc) == sign(fa))
+		{
+			a = c;
+		}
+		else
+		{
+			b = c;
+		}
+	}
+	
+	return (a + b) * 0.5;
+	
+	return SampleAtmosphere(_ViewHeight, cosViewAngle, cosLightAngle, _Samples, maxDist, true, index, targetLuminance, 0.5, false, rayIntersectsGround, true).currentT;
 }
 
 #ifdef REFLECTION_PROBE
@@ -111,13 +154,19 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	
 	rayLength = lerp(cloudDistance, rayLength, cloudTransmittance);
 	
-	float u_mu = UvFromSkyParams(_ViewHeight, cosViewAngle);
-	float3 maxLuminance = SkyLuminance.Sample(_LinearClampSampler, ClampScaleTextureUv(float2(u_mu, 0.5), SkyLuminanceScaleLimit));
+	float3 maxLuminance = GetSkyLuminance(_ViewHeight, cosViewAngle, _LightDirection0.y);
+	
+	float3 luminanceAtDistance = LuminanceToPoint(_ViewHeight, rd.y, rayLength, _LightDirection0.y);
+	float scale = (luminanceAtDistance / maxLuminance)[colorIndex];
+	float3 rcpMaxLuminance = rcp(luminanceAtDistance);
+	
+	// The table may be slightly inaccurate, so calculate it's max value and use that to scale the final distance
+	float maxT = GetSkyCdf(_ViewHeight, rd.y, scale, colorIndex);
 	
 	for (float i = offsets.x; i < _Samples; i++)
 	{
-		float xi = i / _Samples;
-		float currentDistance = GetSkyCdf(_ViewHeight, rd.y, xi, colorIndex);
+		float xi = i / _Samples * scale;
+		float currentDistance = GetSkyCdf(_ViewHeight, rd.y, xi, colorIndex) * saturate(rayLength / maxT);
 		float heightAtDistance = HeightAtDistance(_ViewHeight, rd.y, currentDistance);
 		
 		float4 scatter = AtmosphereScatter(heightAtDistance);
@@ -145,6 +194,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 						if (shadow)
 						{
 							lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * _LightColor0 * _Exposure * shadow * cloudShadow;
+							//lighting += lightTransmittance * (scatter.xyz + scatter.w) * RcpFourPi * _LightColor0 * _Exposure * shadow * cloudShadow;
 						}
 					#endif
 				}
@@ -168,12 +218,15 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 			float depth = currentDistance - cloudDistance;
 			float transmittance = exp2(-depth * cloudOpticalDepth);
 			//lighting *= max(exp2(-depth * cloudOpticalDepth), cloudTransmittance);
-			//lighting *= cloudTransmittance;
+			lighting *= cloudTransmittance;
 		}
 		
-		float3 pdf = viewTransmittance * lum / maxLuminance;
+		float3 pdf = viewTransmittance * lum * rcpMaxLuminance;
 		luminance += lighting * viewTransmittance * rcp(dot(pdf, rcp(3.0))) / _Samples;
 	}
+	
+	//luminance = LuminanceToPoint(_ViewHeight, rd.y, rayLength, _LightDirection0.y) * _LightColor0 * _Exposure;
+	//luminance = GetSkyLuminance(_ViewHeight, cosViewAngle, _LightDirection0.y) * _LightColor0 * _Exposure;
 	
 	// Account for bounced light off the earth
 	bool rayIntersectsGround = RayIntersectsGround(_ViewHeight, rd.y);
@@ -260,20 +313,20 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 historyUv = uv - motion;
 	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, min(historyUv * _SkyHistoryScaleLimit.xy, _SkyHistoryScaleLimit.zw)) * _PreviousToCurrentExposure);
 	
-	//float previousDepth = LinearEyeDepth(PreviousDepth[historyUv * _ScaledResolution.xy]);
-	//float2 previousVelocity = PreviousVelocity[historyUv * _ScaledResolution.xy];
+	float previousDepth = LinearEyeDepth(PreviousDepth[historyUv * _ScaledResolution.xy]);
+	float2 previousVelocity = PreviousVelocity[historyUv * _ScaledResolution.xy];
 	
-	//float depthWeight = saturate(1.0 - (sceneDistance - previousDepth) / sceneDistance * _DepthFactor);
+	float depthWeight = saturate(1.0 - (sceneDistance - previousDepth) / sceneDistance * _DepthFactor);
 	
 	// TODO: Should use gather and 4 samples for this
-	//history = lerp(result, history, depthWeight);
+	history = lerp(result, history, depthWeight);
 	
-	//float velLenSqr = SqrLength(motion - previousVelocity);
-	//float velocityWeight = velLenSqr ? saturate(1.0 - sqrt(velLenSqr) * _MotionFactor) : 1.0;
-	//float3 window = velocityWeight * (maxValue - minValue);
+	float velLenSqr = SqrLength(motion - previousVelocity);
+	float velocityWeight = velLenSqr ? saturate(1.0 - sqrt(velLenSqr) * _MotionFactor) : 1.0;
+	float3 window = velocityWeight * (maxValue - minValue);
 	
-	//minValue -= _ClampWindow * window;
-	//maxValue += _ClampWindow * window;
+	minValue -= _ClampWindow * window;
+	maxValue += _ClampWindow * window;
 	
 	// Clamp clip etc
 	history = ClipToAABB(history, result, minValue, maxValue);
