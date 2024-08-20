@@ -6,7 +6,7 @@ cbuffer Exposure
 	float _Exposure;
 	float _RcpExposure;
 	float _PreviousToCurrentExposure;
-	float _CurrentToPreviousExposure;
+	float _PreviousExposureCompensation;
 };
 
 // This allows an emissive color to retain the same relative brightness regardless of lighting environment

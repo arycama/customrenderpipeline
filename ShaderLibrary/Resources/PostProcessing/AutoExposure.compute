@@ -6,12 +6,12 @@
 #pragma kernel LuminanceBuildHistogram
 #pragma kernel LuminanceHistogramAverage
 
-#define HISTOGRAM_BINS 256
+static const uint HISTOGRAM_BINS = 256;
 
 Texture2D<float3> Input;
 Texture2D<float> ExposureTexture;
 RWStructuredBuffer<uint> LuminanceHistogram;
-RWStructuredBuffer<float> LuminanceOutput;
+RWStructuredBuffer<float4> LuminanceOutput;
 
 cbuffer Properties
 {
@@ -23,12 +23,9 @@ cbuffer Properties
 	float DeltaTime;
 	float IsFirst, Mode;
 	float MeteringMode;
+	float2 ProceduralCenter, ProceduralRadii;
+	float ProceduralSoftness;
 };
-
-static const float _HistogramRangeScale = 1.0 / max(1e-5, MaxEv - MinEv);
-static const float _HistogramRangeBias = -MinEv * _HistogramRangeScale;
-
-groupshared uint HistogramShared[HISTOGRAM_BINS];
 
 // Because atomics are only on uint and we need a weighted value, we need to convert.
 // If we multiply the weight by 2048, we get somewhat ok precision and we support up to
@@ -52,6 +49,8 @@ float BinLocationToEV(uint binIdx)
 {
 	return binIdx ? Remap(binIdx, 1.0, 255.0, MinEv, MaxEv) : 0;
 }
+
+groupshared uint HistogramShared[HISTOGRAM_BINS];
 
 [numthreads(16, 16, 1)]
 void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : SV_DispatchThreadID)
@@ -88,23 +87,24 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
 					break;
 				}
 #if 0
-			case 3u:
+			case 3:
 			{
 				// Mask weigthing
 				weight = SAMPLE_TEXTURE2D_LOD(_ExposureWeightMask, s_linear_clamp_sampler, threadId * _ScaledResolution.zw, 0.0).x;
 				break;
 			}
-			case 4u:
+#endif
+			case 4:
 			{
 				// Procedural.
-				float radius = max(ProceduralRadii.x, ProceduralRadii.y);
-				float2 ellipseScale = float2(radius / ProceduralRadii.x, radius / ProceduralRadii.y);
+				float radius = max(ProceduralRadii.x * _ScaledResolution.x, ProceduralRadii.y * _ScaledResolution.y);
+				float2 ellipseScale = float2(radius / (ProceduralRadii.x * _ScaledResolution.x), radius / (ProceduralRadii.y * _ScaledResolution.y));
 
-				float dist = length(ProceduralCenter * ellipseScale - threadId * ellipseScale);
-				weight = (luminance > ProceduralMin && luminance < ProceduralMax) ? saturate(1.0 - PositivePow((dist / radius), ProceduralSoftness)) : 0.0f;
+				float dist = length(ProceduralCenter  * _ScaledResolution.xy * ellipseScale - threadId * ellipseScale);
+				//weight = (luminance > ProceduralMin && luminance < ProceduralMax) ? saturate(1.0 - pow((dist / radius), rcp(ProceduralSoftness))) : 0.0f;
+				weight = saturate(1.0 - pow((dist / radius), rcp(ProceduralSoftness)));
 				break;
 			}
-#endif
 		}
 		
 		uint binIndex = GetHistogramBinLocation(luminance);
@@ -130,7 +130,6 @@ groupshared float gs_values[HISTOGRAM_BINS];
 void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 {
 	uint countForThisBin = UnpackWeight(LuminanceHistogram[groupIndex]);
-	HistogramShared[groupIndex] = countForThisBin * groupIndex;
 	gs_values[groupIndex] = countForThisBin;
 	gs_partialSums[groupIndex] = countForThisBin;
     
@@ -143,10 +142,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 		GroupMemoryBarrierWithGroupSync();
 	
 		if (groupIndex < i)
-		{
-			HistogramShared[groupIndex] += HistogramShared[groupIndex + i];
 			gs_partialSums[groupIndex] += gs_partialSums[groupIndex + i];
-		}
 	}
     
 	if (groupIndex)
@@ -179,33 +175,23 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	}
 	
 	float averageEv = evSum * rcp(totalWeight);
-
-	float2 uv = saturate(Remap(averageEv, MinEv, MaxEv));
-	float exposureCompensation = ExposureTexture.SampleLevel(_LinearClampSampler, float2(uv.x, 0.5), 0.0);
-	
-	float averageLuminance = EV100ToLuminance(averageEv);
-	exposureCompensation = LuminanceToEV100(1.03 - 2.0 * rcp(log10(averageLuminance + 1.0) + 2.0));
-	exposureCompensation += ExposureCompensation;
-	
-	//averageEv -= exposureCompensation;
-		
 	float previousExposure = _Exposure;
-	float evLastFrame = ExposureToEV100(previousExposure); // + ExposureCompensation;
-	float adaptedEv = lerp(averageEv, evLastFrame, exp(-DeltaTime * AdaptationSpeed));
-	adaptedEv = averageEv;
+	float previousEv = ExposureToEV100(previousExposure) + _PreviousExposureCompensation;
+	float adaptedEv = lerp(averageEv, previousEv, exp(-DeltaTime * AdaptationSpeed));
 	
 	if (Mode == 1.0)
-		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso) + ExposureCompensation;
+		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
+		
+	float adaptedLuminance = EV100ToLuminance(adaptedEv);
+	float k = 1.03 - 2.0 / (log10(adaptedLuminance + 1.0) + 2.0);
+	float exposureCompensation = ExposureCompensation + LuminanceToEV100(k * LensImperfectionExposureScale);
+	float currentExposure = EV100ToExposure(adaptedEv - exposureCompensation);
 	
-	float currentExposure = EV100ToExposure(adaptedEv);
 	if (IsFirst || IsInfOrNaN(currentExposure) || currentExposure == 0.0)
 		currentExposure = 1.0;
 	
 	if (previousExposure == 0.0 || IsInfOrNaN(previousExposure))
 		previousExposure = 1.0;
 	
-	LuminanceOutput[0] = currentExposure; // Apply exposure
-	LuminanceOutput[1] = rcp(currentExposure); // Remove exposure
-	LuminanceOutput[2] = currentExposure * rcp(previousExposure); // Previous to current
-	LuminanceOutput[3] = previousExposure * rcp(currentExposure); // Current to previous
+	LuminanceOutput[0] = float4(currentExposure, rcp(currentExposure), currentExposure * rcp(previousExposure), exposureCompensation);
 }

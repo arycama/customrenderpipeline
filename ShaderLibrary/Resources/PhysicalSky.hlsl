@@ -156,9 +156,10 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	
 	float3 maxLuminance = GetSkyLuminance(_ViewHeight, cosViewAngle, _LightDirection0.y);
 	
+	//float3 luminanceAtDistance = SampleAtmosphere(_ViewHeight, cosViewAngle, _LightDirection0.y, 64, rayLength, true, 0, 0, 0.5, false, false, false).luminance;
 	float3 luminanceAtDistance = LuminanceToPoint(_ViewHeight, rd.y, rayLength, _LightDirection0.y);
 	float scale = (luminanceAtDistance / maxLuminance)[colorIndex];
-	float3 rcpMaxLuminance = rcp(luminanceAtDistance);
+	float3 rcpLuminanceAtDistance = rcp(luminanceAtDistance);
 	
 	// The table may be slightly inaccurate, so calculate it's max value and use that to scale the final distance
 	float maxT = GetSkyCdf(_ViewHeight, rd.y, scale, colorIndex);
@@ -166,7 +167,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	for (float i = offsets.x; i < _Samples; i++)
 	{
 		float xi = i / _Samples * scale;
-		float currentDistance = GetSkyCdf(_ViewHeight, rd.y, xi, colorIndex) * saturate(rayLength / maxT);
+		float currentDistance = GetSkyCdf(_ViewHeight, rd.y, xi, colorIndex);// * saturate(rayLength / maxT);
 		float heightAtDistance = HeightAtDistance(_ViewHeight, rd.y, currentDistance);
 		
 		float4 scatter = AtmosphereScatter(heightAtDistance);
@@ -221,7 +222,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 			lighting *= cloudTransmittance;
 		}
 		
-		float3 pdf = viewTransmittance * lum * rcpMaxLuminance;
+		float3 pdf = viewTransmittance * lum * rcpLuminanceAtDistance;
 		luminance += lighting * viewTransmittance * rcp(dot(pdf, rcp(3.0))) / _Samples;
 	}
 	
@@ -250,7 +251,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		// Clouds block out surface
 		surface *= cloudTransmittance;
 			
-		luminance += surface;
+		//luminance += surface;
 	}
 
 	return luminance;
@@ -264,7 +265,7 @@ float _IsFirst, _ClampWindow, _DepthFactor, _MotionFactor;
 
 float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	return _SkyInput[position.xy];
+	//return _SkyInput[position.xy];
 
 	float cloudTransmittance = CloudTransmittanceTexture[position.xy];
 	

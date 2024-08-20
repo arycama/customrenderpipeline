@@ -40,7 +40,6 @@ public class UIBlur
             {
                 pass.SetFloat(command, "BlurRadius", settings.BlurRadius);
                 pass.SetFloat(command, "BlurSigma", settings.BlurSigma);
-                pass.SetVector(command, "Direction", new Vector2(1f, 0f));
                 pass.SetVector(command, "TexelSize", new Vector4(1f / width, 1f / height, width, height));
                 pass.SetVector(command, "Input0ScaleLimit", input.ScaleLimit2D);
             });
@@ -49,7 +48,7 @@ public class UIBlur
         var verticalResult = renderGraph.GetTexture(input.Width, input.Height, GraphicsFormat.B10G11R11_UFloatPack32);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("UI Blur Vertical"))
         {
-            pass.Initialize(material, 0);
+            pass.Initialize(material, 1);
             pass.WriteTexture(verticalResult);
             pass.ReadTexture("Input0", horizontalResult);
 
@@ -57,9 +56,8 @@ public class UIBlur
             {
                 pass.SetFloat(command, "BlurRadius", settings.BlurRadius);
                 pass.SetFloat(command, "BlurSigma", settings.BlurSigma);
-                pass.SetVector(command, "Direction", new Vector2(0f, 1f));
                 pass.SetVector(command, "TexelSize", new Vector4(1f / width, 1f / height, width, height));
-                pass.SetVector(command, "Input0ScaleLimit", verticalResult.ScaleLimit2D);
+                pass.SetVector(command, "Input0ScaleLimit", horizontalResult.ScaleLimit2D);
             });
         }
 

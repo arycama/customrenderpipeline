@@ -28,13 +28,21 @@ namespace Arycama.CustomRenderPipeline
         public class Settings
         {
             [field: SerializeField] public ExposureMode ExposureMode { get; private set; } = ExposureMode.Automatic;
-            [field: SerializeField] public MeteringMode MeteringMode { get; private set; } = MeteringMode.Center;
-            [field: SerializeField] public float MinEv { get; private set; } = -10f;
-            [field: SerializeField] public float MaxEv { get; private set; } = 18f;
             [field: SerializeField] public float AdaptationSpeed { get; private set; } = 1.1f;
-            [field: SerializeField] public float ExposureCompensation { get; private set; } = 0.0f;
             [field: SerializeField, Range(0.0f, 100.0f)] public float HistogramMin { get; private set; } = 40.0f;
             [field: SerializeField, Range(0.0f, 100.0f)] public float HistogramMax { get; private set; } = 90.0f;
+            [field: SerializeField] public float MinEv { get; private set; } = -10f;
+            [field: SerializeField] public float MaxEv { get; private set; } = 18f;
+
+            [field: Header("Metering")]
+            [field: SerializeField] public MeteringMode MeteringMode { get; private set; } = MeteringMode.Center;
+            [field: SerializeField] public Vector2 ProceduralCenter { get; private set; } = new(0.5f, 0.5f);
+            [field: SerializeField] public Vector2 ProceduralRadii { get; private set; } = new(0.2f, 0.3f);
+            [field: SerializeField, Min(0.0f)] public float ProceduralSoftness { get; private set; } = 0.5f;
+
+
+            [field: Header("Exposure Compensation")]
+            [field: SerializeField] public float ExposureCompensation { get; private set; } = 0.0f;
             [field: SerializeField] public int ExposureResolution { get; private set; } = 128;
             [field: SerializeField] public AnimationCurve ExposureCurve { get; private set; } = AnimationCurve.Linear(0.0f, 1.0f, 1.0f, 1.0f);
         }
@@ -161,6 +169,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "MeteringMode", (float)settings.MeteringMode);
                     pass.SetVector(command, "_ExposureCompensationRemap", data.exposureCompensationRemap);
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
+                    pass.SetVector(command, "ProceduralCenter", settings.ProceduralCenter);
+                    pass.SetVector(command, "ProceduralRadii", settings.ProceduralRadii);
+                    pass.SetFloat(command, "ProceduralSoftness", settings.ProceduralSoftness);
                 });
 
                 // TODO: Put this in a common place, eg main pipeline
@@ -182,7 +193,7 @@ namespace Arycama.CustomRenderPipeline
                 data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
             }
 
-            var output = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
+            var output = renderGraph.GetBuffer(1, 16, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Auto Exposure"))
             {

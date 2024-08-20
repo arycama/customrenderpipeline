@@ -9,102 +9,6 @@ float pow10(float x)
 	return pow(10.0, x);
 }
 
-float3x3 Inverse(float3x3 m)
-{
-	float n11 = m[0][0], n12 = m[1][0], n13 = m[2][0];
-	float n21 = m[0][1], n22 = m[1][1], n23 = m[2][1];
-	float n31 = m[0][2], n32 = m[1][2], n33 = m[2][2];
-
-	float t11 = -n23 * n32 + n22 * n33;
-	float t12 = n13 * n32 - n12 * n33;
-	float t13 = -n13 * n22 + n12 * n23;
-
-	float det = n11 * t11 + n21 * t12 + n31 * t13;
-	float idet = 1.0f / det;
-
-	float3x3 ret;
-	ret[0][0] = t11 * idet;
-	ret[0][1] = (n23 * n31 - n21 * n33) * idet;
-	ret[0][2] = (-n22 * n31 + n21 * n32) * idet;
-
-	ret[1][0] = t12 * idet;
-	ret[1][1] = (-n13 * n31 + n11 * n33) * idet;
-	ret[1][2] = (n12 * n31 - n11 * n32) * idet;
-
-	ret[2][0] = t13 * idet;
-	ret[2][1] = (n13 * n21 - n11 * n23) * idet;
-	ret[2][2] = (-n12 * n21 + n11 * n22) * idet;
-	return ret;
-}
-
-struct Chromaticities
-{
-	float2 red;
-	float2 green;
-	float2 blue;
-	float2 white;
-};
-
-float3x3 RGBtoXYZ(Chromaticities chroma, float Y)
-{
-    // For an explanation of how the color conversion matrix is derived,
-    // see Roy Hall, "Illumination and Color in Computer Generated Imagery",
-    // Springer-Verlag, 1989, chapter 3, "Perceptual Response"; and
-    // Charles A. Poynton, "A Technical Introduction to Digital Video",
-    // John Wiley & Sons, 1996, chapter 7, "Color science for video".
-
-    // X and Z values of RGB value (1, 1, 1), or "white"
-	float X = chroma.white.x * Y / chroma.white.y;
-	float Z = (1 - chroma.white.x - chroma.white.y) * Y / chroma.white.y;
-
-    // Scale factors for matrix rows, compute numerators and common denominator
-	float d = chroma.red.x * (chroma.blue.y - chroma.green.y) +
-              chroma.blue.x * (chroma.green.y - chroma.red.y) +
-              chroma.green.x * (chroma.red.y - chroma.blue.y);
-
-	float SrN =
-        (X * (chroma.blue.y - chroma.green.y) -
-         chroma.green.x * (Y * (chroma.blue.y - 1) + chroma.blue.y * (X + Z)) +
-         chroma.blue.x * (Y * (chroma.green.y - 1) + chroma.green.y * (X + Z)));
-
-	float SgN =
-        (X * (chroma.red.y - chroma.blue.y) +
-         chroma.red.x * (Y * (chroma.blue.y - 1) + chroma.blue.y * (X + Z)) -
-         chroma.blue.x * (Y * (chroma.red.y - 1) + chroma.red.y * (X + Z)));
-
-	float SbN =
-        (X * (chroma.green.y - chroma.red.y) -
-         chroma.red.x * (Y * (chroma.green.y - 1) + chroma.green.y * (X + Z)) +
-         chroma.green.x * (Y * (chroma.red.y - 1) + chroma.red.y * (X + Z)));
-
-
-	float Sr = SrN / d;
-	float Sg = SgN / d;
-	float Sb = SbN / d;
-
-    // Assemble the matrix
-	float3x3 M;
-
-	M[0][0] = Sr * chroma.red.x;
-	M[0][1] = Sr * chroma.red.y;
-	M[0][2] = Sr * (1 - chroma.red.x - chroma.red.y);
-
-	M[1][0] = Sg * chroma.green.x;
-	M[1][1] = Sg * chroma.green.y;
-	M[1][2] = Sg * (1 - chroma.green.x - chroma.green.y);
-
-	M[2][0] = Sb * chroma.blue.x;
-	M[2][1] = Sb * chroma.blue.y;
-	M[2][2] = Sb * (1 - chroma.blue.x - chroma.blue.y);
-
-	return M;
-}
-
-float3x3 XYZtoRGB(Chromaticities chroma, float Y)
-{
-	return Inverse(RGBtoXYZ(chroma, Y));
-}
-
 // Generic functions that may be useful for writing CTL programs
 float min_f3(float3 a)
 {
@@ -134,14 +38,6 @@ static const Chromaticities AP1 = // Working space and rendering primaries for A
 	{ 0.32168, 0.33767 }
 };
 
-static const Chromaticities REC709_PRI =
-{
-	{ 0.64000, 0.33000 },
-	{ 0.30000, 0.60000 },
-	{ 0.15000, 0.06000 },
-	{ 0.31270, 0.32900 }
-};
-
 static const Chromaticities P3D60_PRI =
 {
 	{ 0.68000, 0.32000 },
@@ -150,13 +46,6 @@ static const Chromaticities P3D60_PRI =
 	{ 0.32168, 0.33767 }
 };
 
-static const Chromaticities P3D65_PRI =
-{
-	{ 0.68000, 0.32000 },
-	{ 0.26500, 0.69000 },
-	{ 0.15000, 0.06000 },
-	{ 0.31270, 0.32900 }
-};
 
 static const Chromaticities P3DCI_PRI =
 {
@@ -171,14 +60,6 @@ static const Chromaticities ARRI_ALEXA_WG_PRI =
 	{ 0.68400, 0.31300 },
 	{ 0.22100, 0.84800 },
 	{ 0.08610, -0.10200 },
-	{ 0.31270, 0.32900 }
-};
-
-static const Chromaticities REC2020_PRI =
-{
-	{ 0.70800, 0.29200 },
-	{ 0.17000, 0.79700 },
-	{ 0.13100, 0.04600 },
 	{ 0.31270, 0.32900 }
 };
 
@@ -331,55 +212,13 @@ float rgb_2_yc(float3 rgb, float ycRadiusWeight = 1.75)
 	return (b + g + r + ycRadiusWeight * chroma) / 3.;
 }
 
-
-
 /* ---- Chromatic Adaptation ---- */
-
-static const float3x3 CONE_RESP_MAT_BRADFORD =
-{
-	{ 0.89510, -0.75020, 0.03890 },
-	{ 0.26640, 1.71350, -0.06850 },
-	{ -0.16140, 0.03670, 1.02960 }
-};
-
 static const float3x3 CONE_RESP_MAT_CAT02 =
 {
 	{ 0.73280, -0.70360, 0.00300 },
 	{ 0.42960, 1.69750, 0.01360 },
 	{ -0.16240, 0.00610, 0.98340 }
 };
-
-float3x3 calculate_cat_matrix
-  (
-	float2 src_xy, // x,y chromaticity of source white
-    float2 des_xy, // x,y chromaticity of destination white
-    float3x3 coneRespMat = CONE_RESP_MAT_BRADFORD
-  )
-{
-  // Calculates and returns a 3x3 Von Kries chromatic adaptation transform 
-  // from src_xy to des_xy using the cone response primaries defined 
-  // by coneRespMat. By default, coneRespMat is set to CONE_RESP_MAT_BRADFORD. 
-  // The default coneRespMat can be overridden at runtime. 
-	const float3 src_xyY = { src_xy[0], src_xy[1], 1. };
-	const float3 des_xyY = { des_xy[0], des_xy[1], 1. };
-
-	float3 src_XYZ = xyY_2_XYZ(src_xyY);
-	float3 des_XYZ = xyY_2_XYZ(des_xyY);
-
-	float3 src_coneResp = mul(src_XYZ, coneRespMat);
-	float3 des_coneResp = mul(des_XYZ, coneRespMat);
-
-	float3x3 vkMat =
-	{
-		{ des_coneResp[0] / src_coneResp[0], 0.0, 0.0 },
-		{ 0.0, des_coneResp[1] / src_coneResp[1], 0.0 },
-		{ 0.0, 0.0, des_coneResp[2] / src_coneResp[2] }
-	};
-
-	float3x3 cat_matrix = mul(coneRespMat, mul(vkMat, Inverse(coneRespMat)));
-
-	return cat_matrix;
-}
 
 float3x3 calculate_rgb_to_rgb_matrix(Chromaticities SOURCE_PRIMARIES, Chromaticities DEST_PRIMARIES, float3x3 coneRespMat = CONE_RESP_MAT_BRADFORD
   )
@@ -1628,48 +1467,6 @@ float segmented_spline_c9_rev
 	return pow10(logx);
 }
 
-// Reference Rendering Transform (RRT)
-//   Input is ACES
-//   Output is OCES
-float3 RRT(float3 aces)
-{
-    // --- Glow module --- //
-	float saturation = rgb_2_saturation(aces);
-	float ycIn = rgb_2_yc(aces);
-	float s = sigmoid_shaper((saturation - 0.4) / 0.2);
-	float addedGlow = 1. + glow_fwd(ycIn, RRT_GLOW_GAIN * s, RRT_GLOW_MID);
-
-	aces *= addedGlow;
-
-    // --- Red modifier --- //
-	float hue = rgb_2_hue(aces);
-	float centeredHue = center_hue(hue, RRT_RED_HUE);
-	float hueWeight = cubic_basis_shaper(centeredHue, RRT_RED_WIDTH);
-
-	aces[0] = aces[0] + hueWeight * saturation * (RRT_RED_PIVOT - aces[0]) * (1. - RRT_RED_SCALE);
-
-    // --- ACES to RGB rendering space --- //
-	aces = clamp(aces, 0., HALF_POS_INF); // avoids saturated negative colors from becoming positive in the matrix
-
-	float3 rgbPre = mul(aces, AP0_2_AP1_MAT);
-
-	rgbPre = clamp(rgbPre, 0., HALF_MAX);
-
-    // --- Global desaturation --- //
-	rgbPre = mul(rgbPre, RRT_SAT_MAT);
-	
-    // --- Apply the tonescale independently in rendering-space RGB --- //
-	float3 rgbPost;
-	rgbPost[0] = segmented_spline_c5_fwd(rgbPre[0]);
-	rgbPost[1] = segmented_spline_c5_fwd(rgbPre[1]);
-	rgbPost[2] = segmented_spline_c5_fwd(rgbPre[2]);
-
-    // --- RGB rendering space to OCES --- //
-	float3 rgbOces = mul(rgbPost, AP1_2_AP0_MAT);
-
-	return rgbOces;
-}
-
 // Contains functions and constants shared by forward and inverse ODT transforms 
 
 // Target white and black points for cinema system tonescale
@@ -1700,15 +1497,6 @@ float Y_2_linCV(float Y, float Ymax, float Ymin)
 float linCV_2_Y(float linCV, float Ymax, float Ymin)
 {
 	return linCV * (Ymax - Ymin) + Ymin;
-}
-
-float3 Y_2_linCV_f3(float3 Y, float Ymax, float Ymin)
-{
-	float3 linCV;
-	linCV[0] = Y_2_linCV(Y[0], Ymax, Ymin);
-	linCV[1] = Y_2_linCV(Y[1], Ymax, Ymin);
-	linCV[2] = Y_2_linCV(Y[2], Ymax, Ymin);
-	return linCV;
 }
 
 float3 linCV_2_Y_f3(float3 linCV, float Ymax, float Ymin)
@@ -1801,140 +1589,13 @@ float roll_white_rev(
 	return o;
 }
 
-float3 ODTsRGB100Nits(float3 oces)
+float3 ODTRec709100Nits(float3 rgbPost, bool dimSurround, bool desaturate)
 {
-	/* --- ODT Parameters --- */
-	const Chromaticities DISPLAY_PRI = REC709_PRI;
-	const float3x3 XYZ_2_DISPLAY_PRI_MAT = XYZtoRGB(DISPLAY_PRI, 1.0);
-
-	// NOTE: The EOTF is *NOT* gamma 2.4, it follows IEC 61966-2-1:1999
-	const float DISPGAMMA = 2.4;
-	const float OFFSET = 0.055;
-	
-    // OCES to RGB rendering space
-	float3 rgbPre = mul(oces, AP0_2_AP1_MAT);
-
-    // Apply the tonescale independently in rendering-space RGB
-	float3 rgbPost;
-	rgbPost[0] = segmented_spline_c9_fwd(rgbPre[0], ODT_48nits);
-	rgbPost[1] = segmented_spline_c9_fwd(rgbPre[1], ODT_48nits);
-	rgbPost[2] = segmented_spline_c9_fwd(rgbPre[2], ODT_48nits);
-
     // Scale luminance to linear code value
-	float3 linearCV;
-	linearCV[0] = Y_2_linCV(rgbPost[0], CINEMA_WHITE, CINEMA_BLACK);
-	linearCV[1] = Y_2_linCV(rgbPost[1], CINEMA_WHITE, CINEMA_BLACK);
-	linearCV[2] = Y_2_linCV(rgbPost[2], CINEMA_WHITE, CINEMA_BLACK);
+	float3 linearCV = Remap(rgbPost, CINEMA_BLACK, CINEMA_WHITE);
 
     // Apply gamma adjustment to compensate for dim surround
-	linearCV = darkSurround_to_dimSurround(linearCV);
-
-    // Apply desaturation to compensate for luminance difference
-	linearCV = mul(linearCV, ODT_SAT_MAT);
-
-    // Convert to display primary encoding
-    // Rendering space RGB to XYZ
-	float3 XYZ = mul(linearCV, AP1_2_XYZ_MAT);
-
-    // Apply CAT from ACES white point to assumed observer adapted white point
-	XYZ = mul(XYZ, D60_2_D65_CAT);
-
-    // CIE XYZ to display primaries
-	linearCV = mul(XYZ, XYZ_2_DISPLAY_PRI_MAT);
-
-    // Handle out-of-gamut values
-    // Clip values < 0 or > 1 (i.e. projecting outside the display primaries)
-	linearCV = clamp(linearCV, 0., 1.);
-
-    // Encode linear code values with transfer function
-	float3 outputCV;
-    // moncurve_r with gamma of 2.4 and offset of 0.055 matches the EOTF found in IEC 61966-2-1:1999 (sRGB)
-	outputCV[0] = moncurve_r(linearCV[0], DISPGAMMA, OFFSET);
-	outputCV[1] = moncurve_r(linearCV[1], DISPGAMMA, OFFSET);
-	outputCV[2] = moncurve_r(linearCV[2], DISPGAMMA, OFFSET);
-
-	return outputCV;
-}
-
-float3 ODTRec709100Nits(float3 oces)
-{
-	/* --- ODT Parameters --- */
-	const Chromaticities DISPLAY_PRI = REC709_PRI;
-	const float3x3 XYZ_2_DISPLAY_PRI_MAT = XYZtoRGB(DISPLAY_PRI, 1.0);
-
-	const float DISPGAMMA = 2.4;
-	const float L_W = 1.0;
-	const float L_B = 0.0;
-
-    // OCES to RGB rendering space
-	float3 rgbPre = mul(oces, AP0_2_AP1_MAT);
-
-    // Apply the tonescale independently in rendering-space RGB
-	float3 rgbPost;
-	rgbPost[0] = segmented_spline_c9_fwd(rgbPre[0], ODT_48nits);
-	rgbPost[1] = segmented_spline_c9_fwd(rgbPre[1], ODT_48nits);
-	rgbPost[2] = segmented_spline_c9_fwd(rgbPre[2], ODT_48nits);
-
-    // Scale luminance to linear code value
-	float3 linearCV;
-	linearCV[0] = Y_2_linCV(rgbPost[0], CINEMA_WHITE, CINEMA_BLACK);
-	linearCV[1] = Y_2_linCV(rgbPost[1], CINEMA_WHITE, CINEMA_BLACK);
-	linearCV[2] = Y_2_linCV(rgbPost[2], CINEMA_WHITE, CINEMA_BLACK);
-
-    // Apply gamma adjustment to compensate for dim surround
-	linearCV = darkSurround_to_dimSurround(linearCV);
-
-    // Apply desaturation to compensate for luminance difference
-	linearCV = mul(linearCV, ODT_SAT_MAT);
-
-    // Convert to display primary encoding
-    // Rendering space RGB to XYZ
-	float3 XYZ = mul(linearCV, AP1_2_XYZ_MAT);
-
-    // Apply CAT from ACES white point to assumed observer adapted white point
-	XYZ = mul(XYZ, D60_2_D65_CAT);
-
-    // CIE XYZ to display primaries
-	linearCV = mul(XYZ, XYZ_2_DISPLAY_PRI_MAT);
-
-    // Handle out-of-gamut values
-    // Clip values < 0 or > 1 (i.e. projecting outside the display primaries)
-	//linearCV = clamp(linearCV, 0., 1.);
-
-    // Encode linear code values with transfer function
-	float3 outputCV;
-	outputCV[0] = bt1886_r(linearCV[0], DISPGAMMA, L_W, L_B);
-	outputCV[1] = bt1886_r(linearCV[1], DISPGAMMA, L_W, L_B);
-	outputCV[2] = bt1886_r(linearCV[2], DISPGAMMA, L_W, L_B);
-
-    // Default output is full range, check if legalRange param was set to true
-	//if (legalRange == 1)
-	{
-		//outputCV = fullRange_to_smpteRange_f3(outputCV);
-	}
-	
-	return linearCV;
-}
-
-float3 ODTGeneral(float3 oces, SegmentedSplineParams_c9 C, bool surround, bool desaturate)
-{
-    // OCES to RGB rendering space
-	float3 rgbPre = mul(oces, AP0_2_AP1_MAT);
-
-    // Apply the tonescale independently in rendering-space RGB
-	float3 rgbPost;
-	rgbPost[0] = segmented_spline_c9_fwd(rgbPre[0], C);
-	rgbPost[1] = segmented_spline_c9_fwd(rgbPre[1], C);
-	rgbPost[2] = segmented_spline_c9_fwd(rgbPre[2], C);
-
-    // Scale luminance to linear code value
-	float3 linearCV;
-	linearCV[0] = Y_2_linCV(rgbPost[0], C.maxPoint.y, C.minPoint.y);
-	linearCV[1] = Y_2_linCV(rgbPost[1], C.maxPoint.y, C.minPoint.y);
-	linearCV[2] = Y_2_linCV(rgbPost[2], C.maxPoint.y, C.minPoint.y);
-
-    // Apply gamma adjustment to compensate for dim surround
-	if(surround)
+	if (dimSurround)
 		linearCV = darkSurround_to_dimSurround(linearCV);
 
     // Apply desaturation to compensate for luminance difference
@@ -1947,8 +1608,14 @@ float3 ODTGeneral(float3 oces, SegmentedSplineParams_c9 C, bool surround, bool d
 
     // Apply CAT from ACES white point to assumed observer adapted white point
 	XYZ = mul(XYZ, D60_2_D65_CAT);
+	
+	/* --- ODT Parameters --- */
+	const float3x3 XYZ_2_DISPLAY_PRI_MAT = XYZtoRGB(REC709_PRI, 1.0);
 
-	return XYZToRec709(XYZ);
+    // CIE XYZ to display primaries
+	linearCV = mul(XYZ, XYZ_2_DISPLAY_PRI_MAT);
+
+	return linearCV;
 }
 
 //
@@ -2330,7 +1997,7 @@ float3 limit_to_primaries(float3 XYZ, Chromaticities LIMITING_PRI)
 	float3 rgb = mul(XYZ, XYZ_2_LIMITING_PRI_MAT);
 
     // Clip any values outside the limiting primaries
-	float3 limitedRgb = clamp(rgb, 0., 1.);
+	float3 limitedRgb = saturate(rgb);
     
     // Convert limited RGB to XYZ
 	return mul(limitedRgb, LIMITING_PRI_2_XYZ_MAT);
@@ -2359,209 +2026,64 @@ float3 outputTransform
     bool LEGAL_RANGE = false
 )
 {
-	float3x3 XYZ_2_DISPLAY_PRI_MAT = XYZtoRGB(DISPLAY_PRI, 1.0);
-
-    /* 
-        NOTE: This is a bit of a hack - probably a more direct way to do this.
-        TODO: Fix in future version
-    */
-	TsParams PARAMS_DEFAULT = init_TsParams(Y_MIN, Y_MAX);
-	float expShift = log2(inv_ssts(Y_MID, PARAMS_DEFAULT)) - log2(0.18);
-	TsParams PARAMS = init_TsParams(Y_MIN, Y_MAX, expShift);
-
-    // RRT sweeteners
-	float3 rgbPre = rrt_sweeteners(aces);
-
-    // Apply the tonescale independently in rendering-space RGB
-	float3 rgbPost = ssts_f3(rgbPre, PARAMS);
-
-    // At this point data encoded AP1, scaled absolute luminance (cd/m^2)
-
-    /*  Scale absolute luminance to linear code value  */
-	float3 linearCV = Y_2_linCV_f3(rgbPost, Y_MAX, Y_MIN);
-    
-    // Rendering primaries to XYZ
-	float3 XYZ = mul(linearCV, AP1_2_XYZ_MAT);
-
-    // Apply gamma adjustment to compensate for dim surround
-    /*  
-        NOTE: This is more or less a placeholder block and is largely inactive 
-        in its current form. This section currently only applies for SDR, and
-        even then, only in very specific cases.
-        In the future it is fully intended for this module to be updated to 
-        support surround compensation regardless of luminance dynamic range. */
-    /*  
-        TOD0: Come up with new surround compensation algorithm, applicable 
-        across all dynamic ranges and supporting dark/dim/normal surround.  
-    */
-	if (SURROUND == 0)
-	{ // Dark surround
-        /*  
-        Current tone scale is designed for dark surround environment so no 
-        adjustment is necessary. 
-        */
-	}
-	else if (SURROUND == 1)
-	{ // Dim surround
-        // INACTIVE for HDR and crudely implemented for SDR (see comment below)        
-		if ((EOTF == 1) || (EOTF == 2) || (EOTF == 3))
-		{
-            /* 
-            This uses a crude logical assumption that if the EOTF is BT.1886,
-            sRGB, or gamma 2.6 that the data is SDR and so the SDR gamma
-            compensation factor from v1.0 will apply. 
-            */
-			XYZ = dark_to_dim(XYZ); /*
-            This uses a local dark_to_dim function that is designed to take in
-            XYZ and return XYZ rather than AP1 as is currently in the functions
-            in 'ACESlib.ODT_Common.ctl' */
-		}
-	}
-	else if (SURROUND == 2)
-	{ // Normal surround
-        // INACTIVE - this does NOTHING
-	}
-
-    // Gamut limit to limiting primaries
-    // NOTE: Would be nice to just say
-    //    if (LIMITING_PRI != DISPLAY_PRI)
-    // but you can't because Chromaticities do not work with bool comparison operator
-    // For now, limit no matter what.
-	XYZ = limit_to_primaries(XYZ, LIMITING_PRI);
-    
-    // Apply CAT from ACES white point to assumed observer adapted white point
-    // TODO: Needs to expand from just supporting D60 sim to allow for any
-    // observer adapted white point.
-	if (D60_SIM == false)
-	{
-		if ((DISPLAY_PRI.white[0] != AP0.white[0]) &
-            (DISPLAY_PRI.white[1] != AP0.white[1]))
-		{
-			float3x3 CAT = calculate_cat_matrix(AP0.white, DISPLAY_PRI.white);
-			XYZ = mul(XYZ, D60_2_D65_CAT);
-		}
-	}
-
-    // CIE XYZ to display encoding primaries
-	linearCV = mul(XYZ, XYZ_2_DISPLAY_PRI_MAT);
-
-    // Scale to avoid clipping when device calibration is different from D60. 
-    // To simulate D60, unequal code values are sent to the display.
-    // TODO: Needs to expand from just supporting D60 sim to allow for any
-    // observer adapted white point.
-	if (D60_SIM == true)
-	{
-        /* TODO: The scale requires calling itself. Scale is same no matter the luminance.
-           Currently precalculated for D65, DCI. If DCI, roll_white_fwd is used also.
-           This needs a more complex algorithm to handle all cases.
-        */
-		float SCALE = 1.0;
-		if ((DISPLAY_PRI.white[0] == 0.3127) &
-            (DISPLAY_PRI.white[1] == 0.329))
-		{ // D65
-			SCALE = 0.96362;
-		}
-		else if ((DISPLAY_PRI.white[0] == 0.314) &
-                 (DISPLAY_PRI.white[1] == 0.351))
-		{ // DCI
-			linearCV[0] = roll_white_fwd(linearCV[0], 0.918, 0.5);
-			linearCV[1] = roll_white_fwd(linearCV[1], 0.918, 0.5);
-			linearCV[2] = roll_white_fwd(linearCV[2], 0.918, 0.5);
-			SCALE = 0.96;
-		}
-		linearCV = mul(SCALE, linearCV);
-	}
-
-
-    // Clip values < 0 (i.e. projecting outside the display primaries)
-    // NOTE: P3 red and values close to it fall outside of Rec.2020 green-red 
-    // boundary
-	linearCV = clamp(linearCV, 0., HALF_POS_INF);
-
-    // EOTF
-    // 0: ST-2084 (PQ)
-    // 1: BT.1886 (Rec.709/2020 settings)
-    // 2: sRGB (mon_curve w/ presets)
-    //    moncurve_r with gamma of 2.4 and offset of 0.055 matches the EOTF found in IEC 61966-2-1:1999 (sRGB)
-    // 3: gamma 2.6
-    // 4: linear (no EOTF)
-    // 5: HLG
-	float3 outputCV;
-	if (EOTF == 0)
-	{ // ST-2084 (PQ)
-        // NOTE: This is a kludgy way of ensuring a PQ code value of 0. Ideally,
-        // luminance would map directly to code value, but colorists don't like
-        // that. Might just need the tonescale to go darker so that darkest
-        // values through the tone scale quantize to code value of 0.
-		if (STRETCH_BLACK == true)
-		{
-			outputCV = Y_2_ST2084_f3(clamp(linCV_2_Y_f3(linearCV, Y_MAX, 0.0), 0.0, HALF_POS_INF));
-		}
-		else
-		{
-			outputCV = Y_2_ST2084_f3(linCV_2_Y_f3(linearCV, Y_MAX, Y_MIN));
-		}
-	}
-	else if (EOTF == 1)
-	{ // BT.1886 (Rec.709/2020 settings)
-		outputCV = bt1886_r_f3(linearCV, 2.4, 1.0, 0.0);
-	}
-	else if (EOTF == 2)
-	{ // sRGB (mon_curve w/ presets)
-		outputCV = moncurve_r_f3(linearCV, 2.4, 0.055);
-	}
-	else if (EOTF == 3)
-	{ // gamma 2.6
-		outputCV = pow(linearCV, 1. / 2.6);
-	}
-	else if (EOTF == 4)
-	{ // linear
-		outputCV = linCV_2_Y_f3(linearCV, Y_MAX, Y_MIN);
-	}
-	else if (EOTF == 5)
-	{ // HLG
-        // NOTE: HLG just maps ST.2084 output to HLG encoding. 
-        // TODO: Restructure if/else tree to minimize this redundancy.
-		if (STRETCH_BLACK == true)
-		{
-			outputCV = Y_2_ST2084_f3(clamp(linCV_2_Y_f3(linearCV, Y_MAX, 0.0), 0.0, HALF_POS_INF));
-		}
-		else
-		{
-			outputCV = Y_2_ST2084_f3(linCV_2_Y_f3(linearCV, Y_MAX, Y_MIN));
-		}
-		outputCV = ST2084_2_HLG_1000nits_f3(outputCV);
-	}
-
-	if (LEGAL_RANGE == true)
-	{
-		outputCV = fullRange_to_smpteRange_f3(outputCV);
-	}
-
-	return outputCV;
+	return mul(mul(mul(aces, AP1_2_XYZ_MAT), D60_2_D65_CAT), XYZtoRGB(REC709_PRI)); //lerp(0.0, Y_MAX, linearCV);
 }
 
-float3 AcesRRT(float3 color, bool hdr, float paperWhite)
+float3 AcesRRT(float3 color, bool hdr, float paperWhite, float maxNits)
 {
 	// Convert color to XYZ, then from D65 to D60 whitepoint, and finally to Aces colorspace
 	color = mul(mul(D65_2_D60_CAT, Rec709ToXYZ(color)), XYZ_2_AP0_MAT);
 
-	//color = GammaToLinear(ODTsRGB100Nits(color));
+	color = rrt_sweeteners(color);
 	
+	float Y_MIN = 0.0001, Y_MID = 4.8, Y_MAX = 10000;
+	if (hdr)
+	{
+		Y_MID = paperWhite * 0.18;
+		Y_MAX = maxNits;
+	}
+	
+	TsParams PARAMS_DEFAULT = init_TsParams(Y_MIN, Y_MAX);
+	float expShift = log2(inv_ssts(Y_MID, PARAMS_DEFAULT)) - log2(0.18);
+	TsParams PARAMS = init_TsParams(Y_MIN, Y_MAX, expShift);
+		
+	// Apply the tonescale independently in rendering-space RGB
+	color = ssts_f3(color, PARAMS);
 	
 	if (hdr)
-		return outputTransform(color, 0.0001, 15.0, 1000.0, REC2020_PRI, REC2020_PRI, 0, 0, true, false, false);
+	{
+		//return outputTransform(color, Y_MIN, Y_MID, Y_MAX, REC709_PRI, REC709_PRI, 6, 1, false, false, false);
 		
-	//return outputTransform(color, 0.0001, 15.0, 1000.0, REC2020_PRI, REC2020_PRI, 6, 0, true, false, false);
-	//return outputTransform(color, 0.2, 15.0, 48.0, REC709_PRI, REC709_PRI, 6, 0, false, false, false);
-		
-		
-	//return outputTransform(color, 0.0001, 1 * 0.18, 1, REC709_PRI, REC709_PRI, 6, 0, true, false, false);
-		
-	color = RRT(color);
+		// Apply the tonescale independently in rendering-space RGB
+		color[0] = segmented_spline_c9_fwd(color[0], ODT_1000nits);
+		color[1] = segmented_spline_c9_fwd(color[1], ODT_1000nits);
+		color[2] = segmented_spline_c9_fwd(color[2], ODT_1000nits);
+	}
+	else
+	{
+	    // Apply the tonescale independently in rendering-space RGB
+		color[0] = segmented_spline_c9_fwd(color[0], ODT_48nits);
+		color[1] = segmented_spline_c9_fwd(color[1], ODT_48nits);
+		color[2] = segmented_spline_c9_fwd(color[2], ODT_48nits);
 	
+		//color = outputTransform(color, CINEMA_BLACK, Y_MID, CINEMA_WHITE, REC709_PRI, REC709_PRI, 6, 1, false, false, false);
+		//color = ODTRec709100Nits(color, true, true);
+		
+		color = Remap(color, CINEMA_BLACK, CINEMA_WHITE);
+	}
 	
+	// Convert to display primary encoding
+	// Rendering space RGB to XYZ
+	float3 XYZ = mul(color, AP1_2_XYZ_MAT);
+
+	// Apply CAT from ACES white point to assumed observer adapted white point
+	XYZ = mul(XYZ, D60_2_D65_CAT);
 	
-	color = ODTRec709100Nits(color);
+	/* --- ODT Parameters --- */
+	const float3x3 XYZ_2_DISPLAY_PRI_MAT = XYZtoRGB(REC709_PRI, 1.0);
+
+	// CIE XYZ to display primaries
+	color = mul(XYZ, XYZ_2_DISPLAY_PRI_MAT);
+	
 	return color;
 }

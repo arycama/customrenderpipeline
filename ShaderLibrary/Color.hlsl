@@ -34,6 +34,126 @@ static const float kReferenceLuminanceWhiteForRec709 = 80.0;
 static const float LumensToNits = 3.426;
 static const float NitsToLumens = rcp(3.426);
 
+float3x3 Inverse(float3x3 m)
+{
+	float n11 = m[0][0], n12 = m[1][0], n13 = m[2][0];
+	float n21 = m[0][1], n22 = m[1][1], n23 = m[2][1];
+	float n31 = m[0][2], n32 = m[1][2], n33 = m[2][2];
+
+	float t11 = -n23 * n32 + n22 * n33;
+	float t12 = n13 * n32 - n12 * n33;
+	float t13 = -n13 * n22 + n12 * n23;
+
+	float det = n11 * t11 + n21 * t12 + n31 * t13;
+	float idet = 1.0f / det;
+
+	float3x3 ret;
+	ret[0][0] = t11 * idet;
+	ret[0][1] = (n23 * n31 - n21 * n33) * idet;
+	ret[0][2] = (-n22 * n31 + n21 * n32) * idet;
+
+	ret[1][0] = t12 * idet;
+	ret[1][1] = (-n13 * n31 + n11 * n33) * idet;
+	ret[1][2] = (n12 * n31 - n11 * n32) * idet;
+
+	ret[2][0] = t13 * idet;
+	ret[2][1] = (n13 * n21 - n11 * n23) * idet;
+	ret[2][2] = (-n12 * n21 + n11 * n22) * idet;
+	return ret;
+}
+
+struct Chromaticities
+{
+	float2 red;
+	float2 green;
+	float2 blue;
+	float2 white;
+};
+
+static const Chromaticities REC709_PRI =
+{
+	{ 0.6400, 0.3300 },
+	{ 0.3000, 0.6000 },
+	{ 0.1500, 0.0600 },
+	{ 0.3127, 0.3290 }
+};
+
+static const Chromaticities REC2020_PRI =
+{
+	{ 0.7080, 0.2920 },
+	{ 0.1700, 0.7970 },
+	{ 0.1310, 0.0460 },
+	{ 0.3127, 0.3290 }
+};
+
+static const Chromaticities P3D65_PRI =
+{
+	{ 0.6800, 0.3200 },
+	{ 0.2650, 0.6900 },
+	{ 0.1500, 0.0600 },
+	{ 0.3127, 0.3290 }
+};
+
+float3x3 RGBtoXYZ(Chromaticities chroma, float Y = 1.0)
+{
+    // For an explanation of how the color conversion matrix is derived,
+    // see Roy Hall, "Illumination and Color in Computer Generated Imagery",
+    // Springer-Verlag, 1989, chapter 3, "Perceptual Response"; and
+    // Charles A. Poynton, "A Technical Introduction to Digital Video",
+    // John Wiley & Sons, 1996, chapter 7, "Color science for video".
+
+    // X and Z values of RGB value (1, 1, 1), or "white"
+	float X = chroma.white.x * Y / chroma.white.y;
+	float Z = (1 - chroma.white.x - chroma.white.y) * Y / chroma.white.y;
+
+    // Scale factors for matrix rows, compute numerators and common denominator
+	float d = chroma.red.x * (chroma.blue.y - chroma.green.y) +
+              chroma.blue.x * (chroma.green.y - chroma.red.y) +
+              chroma.green.x * (chroma.red.y - chroma.blue.y);
+
+	float SrN =
+        (X * (chroma.blue.y - chroma.green.y) -
+         chroma.green.x * (Y * (chroma.blue.y - 1) + chroma.blue.y * (X + Z)) +
+         chroma.blue.x * (Y * (chroma.green.y - 1) + chroma.green.y * (X + Z)));
+
+	float SgN =
+        (X * (chroma.red.y - chroma.blue.y) +
+         chroma.red.x * (Y * (chroma.blue.y - 1) + chroma.blue.y * (X + Z)) -
+         chroma.blue.x * (Y * (chroma.red.y - 1) + chroma.red.y * (X + Z)));
+
+	float SbN =
+        (X * (chroma.green.y - chroma.red.y) -
+         chroma.red.x * (Y * (chroma.green.y - 1) + chroma.green.y * (X + Z)) +
+         chroma.green.x * (Y * (chroma.red.y - 1) + chroma.red.y * (X + Z)));
+
+
+	float Sr = SrN / d;
+	float Sg = SgN / d;
+	float Sb = SbN / d;
+
+    // Assemble the matrix
+	float3x3 M;
+
+	M[0][0] = Sr * chroma.red.x;
+	M[0][1] = Sr * chroma.red.y;
+	M[0][2] = Sr * (1 - chroma.red.x - chroma.red.y);
+
+	M[1][0] = Sg * chroma.green.x;
+	M[1][1] = Sg * chroma.green.y;
+	M[1][2] = Sg * (1 - chroma.green.x - chroma.green.y);
+
+	M[2][0] = Sb * chroma.blue.x;
+	M[2][1] = Sb * chroma.blue.y;
+	M[2][2] = Sb * (1 - chroma.blue.x - chroma.blue.y);
+
+	return M;
+}
+
+float3x3 XYZtoRGB(Chromaticities chroma, float Y = 1.0)
+{
+	return Inverse(RGBtoXYZ(chroma, Y));
+}
+
 // D60 to D65 White Point
 //static const float3x3 D60_2_D65_CAT =
 //{
@@ -108,19 +228,20 @@ float3 XyyToXYZ(float3 xyy)
 	return xyz;
 }
 
-float3 Rec709ToXYZ(float3 rgb)
+float3 Rec709ToXYZ(float3 rec709)
 {
-	// CIE RGB http://www.brucelindbloom.com/index.html?Eqn_RGB_to_XYZ.html
-	float3x3 mat = float3x3(0.4124564, 0.3575761, 0.1804375, 0.2126729, 0.7151522, 0.0721750, 0.0193339, 0.1191920, 0.9503041);
-	return mul(mat, rgb);
+	return mul(RGBtoXYZ(REC709_PRI), rec709);
 }
 
-static const float3x3 sRGB_2_XYZ_MAT =
+float3 Rec2020ToXYZ(float3 rec2020)
 {
-	0.41239089f, 0.35758430f, 0.18048084f,
-	0.21263906f, 0.71516860f, 0.07219233f,
-	0.01933082f, 0.11919472f, 0.95053232f
-};
+	return mul(RGBtoXYZ(REC2020_PRI), rec2020);
+}
+
+float3 P3D65ToXYZ(float3 p3d65)
+{
+	return mul(RGBtoXYZ(P3D65_PRI), p3d65);
+}
 
 float3 LMSToXYZ(float3 c)
 {
@@ -179,22 +300,54 @@ float3 Rec709ToXyy(float3 rgb)
 	return XYZToXyy(xyz);
 }
 
-// Rec 2020
-float3 Rec709ToRec2020(float3 rec709)
+static const float3x3 CONE_RESP_MAT_BRADFORD =
 {
-	float3x3 mat = float3x3(0.627402, 0.329292, 0.043306, 0.069095, 0.919544, 0.011360, 0.016394, 0.088028, 0.895578);
-	return mul(mat, rec709);
+	{ 0.89510, -0.75020, 0.03890 },
+	{ 0.26640, 1.71350, -0.06850 },
+	{ -0.16140, 0.03670, 1.02960 }
+};
+
+float3x3 calculate_cat_matrix
+  (
+	float2 src_xy, // x,y chromaticity of source white
+    float2 des_xy, // x,y chromaticity of destination white
+    float3x3 coneRespMat = CONE_RESP_MAT_BRADFORD
+  )
+{
+	// Calculates and returns a 3x3 Von Kries chromatic adaptation transform 
+	// from src_xy to des_xy using the cone response primaries defined 
+	// by coneRespMat. By default, coneRespMat is set to CONE_RESP_MAT_BRADFORD. 
+	// The default coneRespMat can be overridden at runtime. 
+	const float3 src_xyY = { src_xy[0], src_xy[1], 1. };
+	const float3 des_xyY = { des_xy[0], des_xy[1], 1. };
+
+	float3 src_XYZ = XyyToXYZ(src_xyY);
+	float3 des_XYZ = XyyToXYZ(des_xyY);
+
+	float3 src_coneResp = mul(src_XYZ, CONE_RESP_MAT_BRADFORD);
+	float3 des_coneResp = mul(des_XYZ, CONE_RESP_MAT_BRADFORD);
+
+	float3x3 vkMat =
+	{
+		{ des_coneResp[0] / src_coneResp[0], 0.0, 0.0 },
+		{ 0.0, des_coneResp[1] / src_coneResp[1], 0.0 },
+		{ 0.0, 0.0, des_coneResp[2] / src_coneResp[2] }
+	};
+
+	float3x3 cat_matrix = mul(CONE_RESP_MAT_BRADFORD, mul(vkMat, Inverse(CONE_RESP_MAT_BRADFORD)));
+
+	return cat_matrix;
 }
 
+// Rec 2020
 float3 XYZToRec2020(float3 XYZ)
 {
-	float3x3 XYZToRec2020Mat = float3x3(
-        1.71235168f, -0.35487896f, -0.25034135f,
-        -0.66728621f, 1.61794055f, 0.01495380f,
-        0.01763985f, -0.04277060f, 0.94210320f
-    );
+	return mul(XYZtoRGB(REC2020_PRI), XYZ);
+}
 
-	return mul(XYZToRec2020Mat, XYZ);
+float3 Rec709ToRec2020(float3 rec709)
+{
+	return XYZToRec2020(Rec709ToXYZ(rec709));
 }
 
 float3 LMSToRec2020(float3 iCtCp)
@@ -212,10 +365,9 @@ float3 LinearToGamma(float3 c)
 
 // To RGB (Linear/Rec709)
 // Rec 709 luminance
-float Luminance(float3 color)
+float Luminance(float3 color, Chromaticities chromacity = REC709_PRI)
 {
-	//return mul(color, rgbToXyz).y;
-	return dot(color, float3(0.2126729, 0.7151522, 0.0721750));
+	return mul(RGBtoXYZ(REC709_PRI), color).y;
 }
 
 float3 GammaToLinear(float3 c)
@@ -225,32 +377,27 @@ float3 GammaToLinear(float3 c)
 
 float3 XYZToRec709(float3 xyz)
 {
-	float3x3 mat = float3x3(3.2404542, -1.5371385, -0.4985314, -0.9692660, 1.8760108, 0.0415560, 0.0556434, -0.2040259, 1.0572252);
-	return mul(mat, xyz);
+	return mul(XYZtoRGB(REC709_PRI), xyz);
 }
 
-float3 XyyToRgb(float3 xyy)
+float3 XyyToRec709(float3 xyy)
 {
-	float3 xyz = XyyToXYZ(xyy);
-	return XYZToRec709(xyz);
+	return XYZToRec709(XyyToXYZ(xyy));
 }
 
-float3 LuvToRgb(float3 luv)
+float3 LuvToRec709(float3 luv)
 {
-	float3 xyz = LuvToXYZ(luv);
-	return XYZToRec709(xyz);
+	return XYZToRec709(LuvToXYZ(luv));
 }
 
 float3 Rec2020ToRec709(float3 rec2020)
 {
-	float3x3 mat = float3x3(1.660496, -0.587656, -0.072840, -0.124547, 1.132895, -0.008348, -0.018154, -0.100597, 1.118751);
-	return mul(mat, rec2020);
+	return XYZToRec709(Rec2020ToXYZ(rec2020));
 }
 
 float3 P3D65ToRec709(float3 p3d65)
 {
-	float3x3 mat = float3x3(1.224940, -0.224940, 0.000000, -0.042056, 1.042056, 0.000000, -0.019637, -0.078636, 1.098273);
-	return mul(mat, p3d65);
+	return XYZToRec709(P3D65ToXYZ(p3d65));
 }
 
 float3 ICtCpToRec709(float3 iCtCp, float maxValue)
@@ -288,20 +435,16 @@ float3 RgbToLuv(float3 rgb)
 	return XYZToLuv(xyz);
 }
 
-// P3
-float3 Rec709ToP3D65(float3 rec709)
+// P3D65
+float3 XYZToP3D65(float3 xyz)
 {
-	float3x3 mat = float3x3(0.822462, 0.177538, 0.000000, 0.033194, 0.966806, 0.000000, 0.017083, 0.072397, 0.910520);
-	return mul(mat, rec709);
+	return mul(XYZtoRGB(P3D65_PRI), xyz);
 }
 
-// XYZ to P3
-static const float3x3 XYZ_2_DCIP3 =
+float3 Rec709ToP3D65(float3 rec709)
 {
-	2.7253940305, -1.0180030062, -0.4401631952,
-	-0.7951680258, 1.6897320548, 0.0226471906,
-	0.0412418914, -0.0876390192, 1.1009293786
-};
+	return XYZToP3D65(Rec709ToXYZ(rec709));
+}
 
 // ICtCp
 // RGB with sRGB/Rec.709 primaries to ICtCp
