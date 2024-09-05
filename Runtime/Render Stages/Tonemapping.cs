@@ -18,7 +18,15 @@ namespace Arycama.CustomRenderPipeline
         {
             [field: Header("Tonemapping")]
             [field: SerializeField] public bool Tonemap { get; private set; } = true;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float WhitePoint { get; private set; } = 1.0f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float SdrBrightness { get; private set; } = 0.5f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float SdrContrast { get; private set; } = 0.5f;
+            [field: SerializeField] public float SceneWhiteLuminance { get; private set; } = 80.0f;
+            [field: SerializeField] public float SceneMaxLuminance { get; private set; } = 1000.0f;
+            [field: SerializeField, Range(1.0f, 2.0f)] public float Contrast { get; private set; } = 1.0f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float Shoulder { get; private set; } = 1.0f;
+            [field: SerializeField] public float CrossTalk { get; private set; } = 1.0f;
+            [field: SerializeField] public float Saturation { get; private set; } = 1.0f;
+            [field: SerializeField] public float CrossSaturation { get; private set; } = 1.0f;
 
             [field: Header("Hdr Output")]
             [field: SerializeField] public bool HdrEnabled { get; private set; } = true;
@@ -84,13 +92,13 @@ namespace Arycama.CustomRenderPipeline
 #endif
 
             var hdrSettings = HDROutputSettings.main;
-            var minNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.minToneMapLuminance : settings.HdrMinNits;
-            var maxNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.maxToneMapLuminance : settings.HdrMaxNits;
-            if (minNits < 0 || maxNits <= 0)
-            {
-                minNits = settings.HdrMinNits;
-                maxNits = settings.HdrMaxNits;
-            }
+            //var minNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.minToneMapLuminance : settings.HdrMinNits;
+            //var maxNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.maxToneMapLuminance : settings.HdrMaxNits;
+            //if (minNits < 0 || maxNits <= 0)
+            //{
+            //    minNits = settings.HdrMinNits;
+            //    maxNits = settings.HdrMaxNits;
+            //}
 
             var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
             {
@@ -105,11 +113,20 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "NoiseIntensity", settings.NoiseIntensity);
                 pass.SetFloat(command, "NoiseResponse", settings.NoiseResponse);
 
+                pass.SetFloat(command, "SdrBrightness", settings.SdrBrightness);
+                pass.SetFloat(command, "SdrContrast", settings.SdrContrast);
                 pass.SetFloat(command, "PaperWhiteNits", settings.PaperWhiteNits);
-                pass.SetFloat(command, "HdrMinNits", minNits);
-                pass.SetFloat(command, "HdrMaxNits", maxNits);
+                pass.SetFloat(command, "HdrMinNits", settings.HdrMinNits);
+                pass.SetFloat(command, "HdrMaxNits", settings.HdrMaxNits);
                 pass.SetFloat(command, "Tonemap", settings.Tonemap ? 1.0f : 0.0f);
-                pass.SetFloat(command, "WhitePoint", settings.WhitePoint);
+
+                pass.SetFloat(command, "SceneWhiteLuminance", settings.SceneWhiteLuminance);
+                pass.SetFloat(command, "SceneMaxLuminance", settings.SceneMaxLuminance);
+                pass.SetFloat(command, "Contrast", settings.Contrast);
+                pass.SetFloat(command, "Shoulder", settings.Shoulder);
+                pass.SetFloat(command, "CrossTalk", settings.CrossTalk);
+                pass.SetFloat(command, "Saturation", settings.Saturation);
+                pass.SetFloat(command, "CrossSaturation", settings.CrossSaturation);
 
                 pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
                 pass.SetFloat(command, "Aperture", lensSettings.Aperture);

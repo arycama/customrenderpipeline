@@ -68,4 +68,22 @@ float atanh(float x)
 	return 0.5 * log((1.0 + x) / (1.0 - x));
 }
 
+float3x3 Inverse(float3x3 m)
+{
+	float3x3 c;
+	c[0].x = m[1].y * m[2].z - m[2].y * m[1].z;
+	c[0].y = m[0].z * m[2].y - m[0].y * m[2].z;
+	c[0].z = m[0].y * m[1].z - m[0].z * m[1].y;
+	
+	c[1].x = m[1].z * m[2].x - m[1].x * m[2].z;
+	c[1].y = m[0].x * m[2].z - m[0].z * m[2].x;
+	c[1].z = m[1].x * m[0].z - m[0].x * m[1].z;
+	
+	c[2].x = m[1].x * m[2].y - m[2].x * m[1].y;
+	c[2].y = m[2].x * m[0].y - m[0].x * m[2].y;
+	c[2].z = m[0].x * m[1].y - m[1].x * m[0].y;
+	
+	return c * rcp(determinant(m));
+}
+
 #endif

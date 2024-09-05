@@ -34,34 +34,6 @@ static const float kReferenceLuminanceWhiteForRec709 = 80.0;
 static const float LumensToNits = 3.426;
 static const float NitsToLumens = rcp(3.426);
 
-float3x3 Inverse(float3x3 m)
-{
-	float n11 = m[0][0], n12 = m[1][0], n13 = m[2][0];
-	float n21 = m[0][1], n22 = m[1][1], n23 = m[2][1];
-	float n31 = m[0][2], n32 = m[1][2], n33 = m[2][2];
-
-	float t11 = -n23 * n32 + n22 * n33;
-	float t12 = n13 * n32 - n12 * n33;
-	float t13 = -n13 * n22 + n12 * n23;
-
-	float det = n11 * t11 + n21 * t12 + n31 * t13;
-	float idet = 1.0f / det;
-
-	float3x3 ret;
-	ret[0][0] = t11 * idet;
-	ret[0][1] = (n23 * n31 - n21 * n33) * idet;
-	ret[0][2] = (-n22 * n31 + n21 * n32) * idet;
-
-	ret[1][0] = t12 * idet;
-	ret[1][1] = (-n13 * n31 + n11 * n33) * idet;
-	ret[1][2] = (n12 * n31 - n11 * n32) * idet;
-
-	ret[2][0] = t13 * idet;
-	ret[2][1] = (n13 * n21 - n11 * n23) * idet;
-	ret[2][2] = (-n12 * n21 + n11 * n22) * idet;
-	return ret;
-}
-
 struct Chromaticities
 {
 	float2 red;
@@ -94,81 +66,42 @@ static const Chromaticities P3D65_PRI =
 	{ 0.3127, 0.3290 }
 };
 
+float3 xyYToXYZ(float3 xyY)
+{
+	if (xyY.y == 0.0f)
+		return float3(0, 0, 0);
+
+	float Y = xyY.z;
+	float X = (xyY.x * Y) / xyY.y;
+	float Z = ((1.0f - xyY.x - xyY.y) * Y) / xyY.y;
+
+	return float3(X, Y, Z);
+}
+
+float3x3 PrimariesToMatrix(float2 xy_red, float2 xy_green, float2 xy_blue, float2 xy_white)
+{
+	float3 XYZ_red = xyYToXYZ(float3(xy_red, 1.0));
+	float3 XYZ_green = xyYToXYZ(float3(xy_green, 1.0));
+	float3 XYZ_blue = xyYToXYZ(float3(xy_blue, 1.0));
+	float3 XYZ_white = xyYToXYZ(float3(xy_white, 1.0));
+
+	float3x3 temp = float3x3(XYZ_red, XYZ_green, XYZ_blue);
+
+	float3x3 inverse = Inverse(temp);
+	float3 scale = mul(XYZ_white, inverse);
+
+	return transpose(float3x3(scale.x * XYZ_red, scale.y * XYZ_green, scale.z * XYZ_blue));
+}
+
 float3x3 RGBtoXYZ(Chromaticities chroma, float Y = 1.0)
 {
-    // For an explanation of how the color conversion matrix is derived,
-    // see Roy Hall, "Illumination and Color in Computer Generated Imagery",
-    // Springer-Verlag, 1989, chapter 3, "Perceptual Response"; and
-    // Charles A. Poynton, "A Technical Introduction to Digital Video",
-    // John Wiley & Sons, 1996, chapter 7, "Color science for video".
-
-    // X and Z values of RGB value (1, 1, 1), or "white"
-	float X = chroma.white.x * Y / chroma.white.y;
-	float Z = (1 - chroma.white.x - chroma.white.y) * Y / chroma.white.y;
-
-    // Scale factors for matrix rows, compute numerators and common denominator
-	float d = chroma.red.x * (chroma.blue.y - chroma.green.y) +
-              chroma.blue.x * (chroma.green.y - chroma.red.y) +
-              chroma.green.x * (chroma.red.y - chroma.blue.y);
-
-	float SrN =
-        (X * (chroma.blue.y - chroma.green.y) -
-         chroma.green.x * (Y * (chroma.blue.y - 1) + chroma.blue.y * (X + Z)) +
-         chroma.blue.x * (Y * (chroma.green.y - 1) + chroma.green.y * (X + Z)));
-
-	float SgN =
-        (X * (chroma.red.y - chroma.blue.y) +
-         chroma.red.x * (Y * (chroma.blue.y - 1) + chroma.blue.y * (X + Z)) -
-         chroma.blue.x * (Y * (chroma.red.y - 1) + chroma.red.y * (X + Z)));
-
-	float SbN =
-        (X * (chroma.green.y - chroma.red.y) -
-         chroma.red.x * (Y * (chroma.green.y - 1) + chroma.green.y * (X + Z)) +
-         chroma.green.x * (Y * (chroma.red.y - 1) + chroma.red.y * (X + Z)));
-
-
-	float Sr = SrN / d;
-	float Sg = SgN / d;
-	float Sb = SbN / d;
-
-    // Assemble the matrix
-	float3x3 M;
-
-	M[0][0] = Sr * chroma.red.x;
-	M[0][1] = Sr * chroma.red.y;
-	M[0][2] = Sr * (1 - chroma.red.x - chroma.red.y);
-
-	M[1][0] = Sg * chroma.green.x;
-	M[1][1] = Sg * chroma.green.y;
-	M[1][2] = Sg * (1 - chroma.green.x - chroma.green.y);
-
-	M[2][0] = Sb * chroma.blue.x;
-	M[2][1] = Sb * chroma.blue.y;
-	M[2][2] = Sb * (1 - chroma.blue.x - chroma.blue.y);
-
-	return M;
+	return PrimariesToMatrix(chroma.red, chroma.green, chroma.blue, chroma.white);
 }
 
 float3x3 XYZtoRGB(Chromaticities chroma, float Y = 1.0)
 {
 	return Inverse(RGBtoXYZ(chroma, Y));
 }
-
-// D60 to D65 White Point
-//static const float3x3 D60_2_D65_CAT =
-//{
-//	0.987224, -0.00611327, 0.0159533,
-//	-0.00759836, 1.00186, 0.00533002,
-//	0.00307257, -0.00509595, 1.08168,
-//};
-
-// D65 to D60 White Point
-static const float3x3 D65_2_D60_CAT =
-{
-	1.01303, 0.00610531, -0.014971,
-	0.00769823, 0.998165, -0.00503203,
-	-0.00284131, 0.00468516, 0.924507,
-};
 
 // Color spaces listed in the following order: XYZ, Xyy, LMS, RGB/Rec709, Rec2020, Luv, P3, ICtCp, YCoCg. RGB is Rec709 (Linear, not gamma) unless noted
 
@@ -294,10 +227,14 @@ float3 XYZToXyy(float3 xyz)
 	return xyy;
 }
 
-float3 Rec709ToXyy(float3 rgb)
+float3 Rec709ToXyy(float3 rec709)
 {
-	float3 xyz = Rec709ToXYZ(rgb);
-	return XYZToXyy(xyz);
+	return XYZToXyy(Rec709ToXYZ(rec709));
+}
+
+float3 Rec2020ToXyy(float3 rec2020)
+{
+	return XYZToXyy(Rec2020ToXYZ(rec2020));
 }
 
 static const float3x3 CONE_RESP_MAT_BRADFORD =
@@ -334,45 +271,18 @@ float3x3 calculate_cat_matrix
 		{ 0.0, 0.0, des_coneResp[2] / src_coneResp[2] }
 	};
 
-	float3x3 cat_matrix = mul(CONE_RESP_MAT_BRADFORD, mul(vkMat, Inverse(CONE_RESP_MAT_BRADFORD)));
-
-	return cat_matrix;
+	return mul(CONE_RESP_MAT_BRADFORD, mul(vkMat, Inverse(CONE_RESP_MAT_BRADFORD)));
 }
 
-// Rec 2020
-float3 XYZToRec2020(float3 XYZ)
-{
-	return mul(XYZtoRGB(REC2020_PRI), XYZ);
-}
-
-float3 Rec709ToRec2020(float3 rec709)
-{
-	return XYZToRec2020(Rec709ToXYZ(rec709));
-}
-
-float3 LMSToRec2020(float3 iCtCp)
-{
-	return XYZToRec2020(ICtCpToXYZ(iCtCp));
-}
-
-// To gamma-sRGB
-float3 LinearToGamma(float3 c)
-{
-	float3 sRgbLo = c * 12.92;
-	float3 sRgbHi = pow(c, rcp(2.4)) * 1.055 - 0.055;
-	return (c <= 0.0031308) ? sRgbLo : sRgbHi;
-}
-
-// To RGB (Linear/Rec709)
-// Rec 709 luminance
 float Luminance(float3 color, Chromaticities chromacity = REC709_PRI)
 {
 	return mul(RGBtoXYZ(REC709_PRI), color).y;
 }
 
+// Rec 709
 float3 GammaToLinear(float3 c)
 {
-	return (c <= 0.04045) ? (c * rcp(12.92)) : (pow(c + 0.055, 2.4) * rcp(1.055));
+	return (c <= 0.04045) ? (c * rcp(12.92)) : (pow((c + 0.055) * rcp(1.055), 2.4));
 }
 
 float3 XYZToRec709(float3 xyz)
@@ -400,12 +310,49 @@ float3 P3D65ToRec709(float3 p3d65)
 	return XYZToRec709(P3D65ToXYZ(p3d65));
 }
 
-float3 ICtCpToRec709(float3 iCtCp, float maxValue)
+float3 ICtCpToRec709(float3 iCtCp, float maxValue = ST2084Max)
 {
 	float3 pqLms = ICtCpToPQLMS(iCtCp);
 	float3 lms = ST2084ToLinear(pqLms, maxValue);
 	float3 xyz = LMSToXYZ(lms);
 	return XYZToRec709(xyz);
+}
+
+// Rec 2020
+float3 XYZToRec2020(float3 XYZ)
+{
+	return mul(XYZtoRGB(REC2020_PRI), XYZ);
+}
+
+float3 XyyToRec2020(float3 xyY)
+{
+	return XYZToRec2020(XyyToXYZ(xyY));
+}
+
+float3 Rec709ToRec2020(float3 rec709)
+{
+	return XYZToRec2020(Rec709ToXYZ(rec709));
+}
+
+float3 LMSToRec2020(float3 iCtCp)
+{
+	return XYZToRec2020(ICtCpToXYZ(iCtCp));
+}
+
+float3 ICtCpToRec2020(float3 iCtCp, float maxValue)
+{
+	float3 pqLms = ICtCpToPQLMS(iCtCp);
+	float3 lms = ST2084ToLinear(pqLms, maxValue);
+	float3 xyz = LMSToXYZ(lms);
+	return XYZToRec2020(xyz);
+}
+
+// To gamma-sRGB
+float3 LinearToGamma(float3 c)
+{
+	float3 sRgbLo = c * 12.92;
+	float3 sRgbHi = pow(c, rcp(2.4)) * 1.055 - 0.055;
+	return (c <= 0.0031308) ? sRgbLo : sRgbHi;
 }
 
 // LUV
@@ -455,17 +402,20 @@ float3 PQLMSToICtCp(float3 lms)
 	return mul(mat, lms);
 }
 
-float3 Rec2020ToICtCp(float3 rec2020, float maxValue)
+float3 Rec709ToICtCp(float3 rec709, float maxValue = ST2084Max)
 {
-	float3 lms = Rec2020ToLMS(rec2020);
+	float3 xyz = Rec709ToXYZ(rec709);
+	float3 lms = XYZToLMS(xyz);
 	float3 lmsPq = LinearToST2084(lms, maxValue);
 	return PQLMSToICtCp(lmsPq);
 }
 
-float3 Rec709ToICtCp(float3 rec709, float maxValue)
+float3 Rec2020ToICtCp(float3 rec2020, float maxValue = ST2084Max)
 {
-	float3 rec2020 = Rec709ToRec2020(rec709);
-	return Rec2020ToICtCp(rec2020, maxValue);
+	float3 xyz = Rec2020ToXYZ(rec2020);
+	float3 lms = XYZToLMS(xyz);
+	float3 lmsPq = LinearToST2084(lms, maxValue);
+	return PQLMSToICtCp(lmsPq);
 }
 
 float3 RgbToYCoCg(float3 rgb)

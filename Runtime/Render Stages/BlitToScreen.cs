@@ -23,6 +23,13 @@ namespace Arycama.CustomRenderPipeline
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
 
             var hdrSettings = HDROutputSettings.main;
+            //var minNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.minToneMapLuminance : settings.HdrMinNits;
+            //var maxNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.maxToneMapLuminance : settings.HdrMaxNits;
+            //if (minNits < 0 || maxNits <= 0)
+            //{
+            //    minNits = settings.HdrMinNits;
+            //    maxNits = settings.HdrMaxNits;
+            //}
 
             var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
             {
@@ -31,6 +38,8 @@ namespace Arycama.CustomRenderPipeline
                 var colorGamut = hdrSettings.available ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
                 pass.SetInt(command, "ColorGamut", (int)colorGamut);
                 pass.SetFloat(command, "PaperWhiteNits", settings.PaperWhiteNits);
+                pass.SetFloat(command, "HdrMinNits", settings.HdrMinNits);
+                pass.SetFloat(command, "HdrMaxNits", settings.HdrMaxNits);
             });
         }
     }

@@ -1,6 +1,7 @@
 #include "../../Color.hlsl"
 #include "../../Common.hlsl"
 #include "../../Exposure.hlsl"
+#include "../../PhysicalCamera.hlsl"
 #include "../../Samplers.hlsl"
 
 #pragma kernel LuminanceBuildHistogram
@@ -183,8 +184,8 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
 		
 	float adaptedLuminance = EV100ToLuminance(adaptedEv);
-	float k = 1.03 - 2.0 / (log10(adaptedLuminance + 1.0) + 2.0);
-	float exposureCompensation = ExposureCompensation + LuminanceToEV100(k * LensImperfectionExposureScale);
+	float k = adaptedLuminance > 0.0 ? 1.03 - 2.0 / (log10(adaptedLuminance + 1.0) + 2.0) : 1.0;
+	float exposureCompensation = ExposureCompensation;//	+LuminanceToEV100(k * LensImperfectionExposureScale);
 	float currentExposure = EV100ToExposure(adaptedEv - exposureCompensation);
 	
 	if (IsFirst || IsInfOrNaN(currentExposure) || currentExposure == 0.0)
