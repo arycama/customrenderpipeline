@@ -45,14 +45,14 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Targe
 	
 	if (Tonemap)
 	{
-		float midIn = 0.18;
-		float hdrMax = SceneMaxLuminance;
+		float midIn = 0.18 * SceneWhiteLuminance / 100.0;
+		float hdrMax = SceneMaxLuminance / 100.0;
 		
 		color = min(hdrMax, color);
 		
-		float outMaxNits = HdrEnabled ? HdrMaxNits : 350;//		lerp(80, 480, SdrContrast);
-		float paperWhite = HdrEnabled ? PaperWhiteNits : 80;//lerp(80, 480, SdrBrightness);
-		float midOut = paperWhite / outMaxNits * 0.18;
+		float outMax = HdrEnabled ? HdrMaxNits : SceneWhiteLuminance * SdrContrast;
+		float paperWhite = HdrEnabled ? PaperWhiteNits : (SceneWhiteLuminance * SdrBrightness);
+		float midOut = 0.18 * paperWhite / outMax;
 	
 		float a = Contrast;
 		float d = Shoulder;
@@ -70,12 +70,12 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Targe
 		
 		// improved crosstalk – maintaining saturation
 		float tonemappedMaximum = Max3(color);
-		//ratio = color / tonemappedMaximum;
+		ratio = color / tonemappedMaximum;
 		
 		// wrap crosstalk in transform
-		//ratio = pow(ratio, Saturation / CrossSaturation);
-		//ratio = lerp(ratio, 1.0, pow(tonemappedMaximum, CrossTalk));
-		//ratio = pow(ratio, CrossSaturation);
+		ratio = pow(ratio, Saturation / CrossSaturation);
+		ratio = lerp(ratio, 1.0, pow(tonemappedMaximum, CrossTalk));
+		ratio = pow(ratio, CrossSaturation);
 		
 		// final color
 		color = ratio * tonemappedMaximum;
