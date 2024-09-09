@@ -1,6 +1,7 @@
 #include "../Color.hlsl"
 #include "../Common.hlsl"
 #include "../Exposure.hlsl"
+#include "../FilmicColorGrading.hlsl"
 #include "../PhysicalCamera.hlsl"
 #include "../Samplers.hlsl"
 
@@ -12,6 +13,8 @@ float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, Shu
 float HdrMinNits, HdrMaxNits, PaperWhiteNits, HdrEnabled, SceneWhiteLuminance, SceneMaxLuminance, Contrast, Shoulder, SdrBrightness, CrossTalk, Saturation, SdrContrast, CrossSaturation;
 uint ColorGamut;
 float Tonemap;
+
+float Gamma, ShoulderAngle, ShoulderLength, ShoulderStrength, ToeLength, ToeStrength;
 
 float3 LuminanceToEV100(float3 luminance)
 {
@@ -42,43 +45,26 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Targe
 	color = lerp(color, bloom, _BloomStrength);
 
 	color = RemoveNaN(color);
-	
+
 	if (Tonemap)
 	{
-		float midIn = 0.18 * SceneWhiteLuminance / 100.0;
-		float hdrMax = SceneMaxLuminance / 100.0;
-		
-		color = min(hdrMax, color);
-		
-		float outMax = HdrEnabled ? HdrMaxNits : SceneWhiteLuminance * SdrContrast;
-		float paperWhite = HdrEnabled ? PaperWhiteNits : (SceneWhiteLuminance * SdrBrightness);
-		float midOut = 0.18 * paperWhite / outMax;
+		CurveParamsUser filmicParams;
+		filmicParams.m_gamma = Gamma;
+		filmicParams.m_shoulderAngle = ShoulderAngle;
+		filmicParams.m_shoulderLength = ShoulderLength;
+		filmicParams.m_shoulderStrength = ShoulderStrength;
+		filmicParams.m_toeLength = ToeLength;
+		filmicParams.m_toeStrength = ToeStrength;
 	
-		float a = Contrast;
-		float d = Shoulder;
+		CurveParamsDirect directParams;
+		CalcDirectParamsFromUser(directParams, filmicParams);
 		
-		float b = -((-pow(midIn, a) + (midOut * (pow(hdrMax, a * d) * pow(midIn, a) - pow(hdrMax, a) * pow(midIn, a * d) * midOut)) / (pow(hdrMax, a * d) * midOut -
-		pow(midIn, a * d) * midOut)) / (pow(midIn, a * d) * midOut));
-		float c = (pow(hdrMax, a * d) * pow(midIn, a) - pow(hdrMax, a) * pow(midIn, a * d) * midOut) / (pow(hdrMax, a * d) * midOut - pow(midIn, a * d) * midOut);
+		FullCurve fullCurve;
+		CreateCurve(fullCurve, directParams);
 
-		float peak = Max3(color);
-		float3 ratio = color / peak;
-		
-		peak = pow(peak, a);
-		peak = peak / (pow(peak, d) * b + c);
-		color = peak * ratio;
-		
-		// improved crosstalk – maintaining saturation
-		float tonemappedMaximum = Max3(color);
-		ratio = color / tonemappedMaximum;
-		
-		// wrap crosstalk in transform
-		ratio = pow(ratio, Saturation / CrossSaturation);
-		ratio = lerp(ratio, 1.0, pow(tonemappedMaximum, CrossTalk));
-		ratio = pow(ratio, CrossSaturation);
-		
-		// final color
-		color = ratio * tonemappedMaximum;
+		color.x = fullCurve.Eval(color.x);
+		color.y = fullCurve.Eval(color.y);
+		color.z = fullCurve.Eval(color.z);
 	}
 	
 	color = RemoveNaN(color);

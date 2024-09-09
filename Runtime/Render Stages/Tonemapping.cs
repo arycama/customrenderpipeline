@@ -18,15 +18,12 @@ namespace Arycama.CustomRenderPipeline
         {
             [field: Header("Tonemapping")]
             [field: SerializeField] public bool Tonemap { get; private set; } = true;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float SdrBrightness { get; private set; } = 0.5f;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float SdrContrast { get; private set; } = 0.5f;
-            [field: SerializeField] public float SceneWhiteLuminance { get; private set; } = 80.0f;
-            [field: SerializeField] public float SceneMaxLuminance { get; private set; } = 1000.0f;
-            [field: SerializeField, Range(1.0f, 2.0f)] public float Contrast { get; private set; } = 1.0f;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float Shoulder { get; private set; } = 1.0f;
-            [field: SerializeField] public float CrossTalk { get; private set; } = 1.0f;
-            [field: SerializeField] public float Saturation { get; private set; } = 1.0f;
-            [field: SerializeField] public float CrossSaturation { get; private set; } = 1.0f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float ToeStrength { get; private set; } = 0.0f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float ToeLength { get; private set; } = 0.5f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float ShoulderStrength { get; private set; } = 0.0f;
+            [field: SerializeField, Min(1e-5f)] public float ShoulderLength { get; private set; } = 0.5f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float ShoulderAngle { get; private set; } = 0.0f;
+            [field: SerializeField, Min(0.0f)] public float Gamma { get; private set; } = 1.0f;
 
             [field: Header("Hdr Output")]
             [field: SerializeField] public bool HdrEnabled { get; private set; } = true;
@@ -113,20 +110,17 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "NoiseIntensity", settings.NoiseIntensity);
                 pass.SetFloat(command, "NoiseResponse", settings.NoiseResponse);
 
-                pass.SetFloat(command, "SdrBrightness", settings.SdrBrightness);
-                pass.SetFloat(command, "SdrContrast", settings.SdrContrast);
                 pass.SetFloat(command, "PaperWhiteNits", settings.PaperWhiteNits);
                 pass.SetFloat(command, "HdrMinNits", settings.HdrMinNits);
                 pass.SetFloat(command, "HdrMaxNits", settings.HdrMaxNits);
                 pass.SetFloat(command, "Tonemap", settings.Tonemap ? 1.0f : 0.0f);
 
-                pass.SetFloat(command, "SceneWhiteLuminance", settings.SceneWhiteLuminance);
-                pass.SetFloat(command, "SceneMaxLuminance", settings.SceneMaxLuminance);
-                pass.SetFloat(command, "Contrast", settings.Contrast);
-                pass.SetFloat(command, "Shoulder", settings.Shoulder);
-                pass.SetFloat(command, "CrossTalk", settings.CrossTalk);
-                pass.SetFloat(command, "Saturation", settings.Saturation);
-                pass.SetFloat(command, "CrossSaturation", settings.CrossSaturation);
+                pass.SetFloat(command, "ToeStrength", settings.ToeStrength);
+                pass.SetFloat(command, "ToeLength", Mathf.Pow(settings.ToeLength, 2.2f));
+                pass.SetFloat(command, "ShoulderStrength", settings.ShoulderStrength);
+                pass.SetFloat(command, "ShoulderLength", settings.ShoulderLength);
+                pass.SetFloat(command, "ShoulderAngle", settings.ShoulderAngle);
+                pass.SetFloat(command, "Gamma", settings.Gamma);
 
                 pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
                 pass.SetFloat(command, "Aperture", lensSettings.Aperture);
