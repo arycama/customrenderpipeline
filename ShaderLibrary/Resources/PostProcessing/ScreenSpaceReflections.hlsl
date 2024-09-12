@@ -198,7 +198,7 @@ Texture2D<float> RayDepth;
 float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float3 minValue, maxValue, result;
-	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, result, false, false);
+	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, result, true, true);
 	
 	float rayLength = RayDepth[position.xy];
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
@@ -207,14 +207,14 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
 	float3 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history *= _PreviousToCurrentExposure;
-	//history = RgbToYCoCgFastTonemap(history);
+	history = RgbToYCoCgFastTonemap(history);
 	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
-	//result = YCoCgToRgbFastTonemapInverse(result);
+	result = YCoCgToRgbFastTonemapInverse(result);
 	result = RemoveNaN(result);
 	
 	return result;

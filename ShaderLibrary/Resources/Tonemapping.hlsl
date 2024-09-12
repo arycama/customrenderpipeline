@@ -1,7 +1,7 @@
 #include "../Color.hlsl"
 #include "../Common.hlsl"
 #include "../Exposure.hlsl"
-#include "../FilmicColorGrading.hlsl"
+#include "../FilmicToneCurve.hlsl"
 #include "../PhysicalCamera.hlsl"
 #include "../Samplers.hlsl"
 
@@ -49,22 +49,32 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Targe
 	if (Tonemap)
 	{
 		CurveParamsUser filmicParams;
-		filmicParams.m_gamma = Gamma;
-		filmicParams.m_shoulderAngle = ShoulderAngle;
-		filmicParams.m_shoulderLength = ShoulderLength;
-		filmicParams.m_shoulderStrength = ShoulderStrength;
-		filmicParams.m_toeLength = ToeLength;
-		filmicParams.m_toeStrength = ToeStrength;
+		filmicParams.gamma = Gamma;
+		filmicParams.shoulderAngle = ShoulderAngle;
+		filmicParams.shoulderLength = ShoulderLength;
+		filmicParams.shoulderStrength = ShoulderStrength;
+		filmicParams.toeLength = ToeLength;
+		filmicParams.toeStrength = ToeStrength;
 	
 		CurveParamsDirect directParams;
 		CalcDirectParamsFromUser(directParams, filmicParams);
 		
 		FullCurve fullCurve;
 		CreateCurve(fullCurve, directParams);
+		
+		//float maxColor = Max3(color);
+		//float3 ratio = color / maxColor;
 
+		//maxColor.x = fullCurve.Eval(maxColor.x);
 		color.x = fullCurve.Eval(color.x);
 		color.y = fullCurve.Eval(color.y);
 		color.z = fullCurve.Eval(color.z);
+		
+		color = pow(color, rcp(Gamma));
+		
+		//maxColor.x = pow(maxColor.x, rcp(Gamma));
+		
+		//color = maxColor * ratio;
 	}
 	
 	color = RemoveNaN(color);

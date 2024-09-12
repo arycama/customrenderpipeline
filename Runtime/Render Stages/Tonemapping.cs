@@ -20,8 +20,8 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public bool Tonemap { get; private set; } = true;
             [field: SerializeField, Range(0.0f, 1.0f)] public float ToeStrength { get; private set; } = 0.0f;
             [field: SerializeField, Range(0.0f, 1.0f)] public float ToeLength { get; private set; } = 0.5f;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float ShoulderStrength { get; private set; } = 0.0f;
-            [field: SerializeField, Min(1e-5f)] public float ShoulderLength { get; private set; } = 0.5f;
+            [field: SerializeField, Min(0.0f)] public float ShoulderStrength { get; private set; } = 0.0f;
+            [field: SerializeField, Range(1e-5f, 1.0f)] public float ShoulderLength { get; private set; } = 0.5f;
             [field: SerializeField, Range(0.0f, 1.0f)] public float ShoulderAngle { get; private set; } = 0.0f;
             [field: SerializeField, Min(0.0f)] public float Gamma { get; private set; } = 1.0f;
 
