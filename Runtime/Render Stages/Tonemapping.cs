@@ -18,12 +18,11 @@ namespace Arycama.CustomRenderPipeline
         {
             [field: Header("Tonemapping")]
             [field: SerializeField] public bool Tonemap { get; private set; } = true;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float ToeStrength { get; private set; } = 0.0f;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float ToeLength { get; private set; } = 0.5f;
-            [field: SerializeField, Min(0.0f)] public float ShoulderStrength { get; private set; } = 0.0f;
-            [field: SerializeField, Range(1e-5f, 1.0f)] public float ShoulderLength { get; private set; } = 0.5f;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float ShoulderAngle { get; private set; } = 0.0f;
-            [field: SerializeField, Min(0.0f)] public float Gamma { get; private set; } = 1.0f;
+            [field: SerializeField, Min(0.0f)] public float ToeIn { get; private set; } = 0.25f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float ToeOut { get; private set; } = 0.25f;
+            [field: SerializeField, Min(0.0f)] public float ShoulderIn { get; private set; } = 0.75f;
+            [field: SerializeField, Range(0.0f, 1.0f)] public float ShoulderOut { get; private set; } = 0.75f;
+            [field: SerializeField, Min(0.0f)] public float WhitePoint { get; private set; } = 1.0f;
 
             [field: Header("Hdr Output")]
             [field: SerializeField] public bool HdrEnabled { get; private set; } = true;
@@ -115,12 +114,11 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "HdrMaxNits", settings.HdrMaxNits);
                 pass.SetFloat(command, "Tonemap", settings.Tonemap ? 1.0f : 0.0f);
 
-                pass.SetFloat(command, "ToeStrength", settings.ToeStrength);
-                pass.SetFloat(command, "ToeLength", Mathf.Pow(settings.ToeLength, 2.2f));
-                pass.SetFloat(command, "ShoulderStrength", settings.ShoulderStrength);
-                pass.SetFloat(command, "ShoulderLength", settings.ShoulderLength);
-                pass.SetFloat(command, "ShoulderAngle", settings.ShoulderAngle);
-                pass.SetFloat(command, "Gamma", settings.Gamma);
+                pass.SetFloat(command, "ToeIn", settings.ToeIn);
+                pass.SetFloat(command, "ToeOut", settings.ToeOut);
+                pass.SetFloat(command, "ShoulderIn", settings.ShoulderIn);
+                pass.SetFloat(command, "ShoulderOut", settings.ShoulderOut);
+                pass.SetFloat(command, "WhitePoint", settings.WhitePoint);
 
                 pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
                 pass.SetFloat(command, "Aperture", lensSettings.Aperture);
