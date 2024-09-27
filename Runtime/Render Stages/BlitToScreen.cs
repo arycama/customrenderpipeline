@@ -30,16 +30,15 @@ namespace Arycama.CustomRenderPipeline
             //    minNits = settings.HdrMinNits;
             //    maxNits = settings.HdrMaxNits;
             //}
+            var hdrEnabled = hdrSettings.available && settings.HdrEnabled;
 
             var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
             {
                 pass.SetVector(command, "_Resolution", new Vector2(width, height));
                 pass.SetFloat(command, "_IsSceneView", isSceneView ? 1.0f : 0.0f);
-                var colorGamut = hdrSettings.available ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
+                var colorGamut = hdrEnabled ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
                 pass.SetInt(command, "ColorGamut", (int)colorGamut);
-                pass.SetFloat(command, "PaperWhiteNits", settings.PaperWhiteNits);
-                pass.SetFloat(command, "HdrMinNits", settings.HdrMinNits);
-                pass.SetFloat(command, "HdrMaxNits", settings.HdrMaxNits);
+                pass.SetFloat(command, "HdrMaxNits", settings.Tonemap ? hdrSettings.maxToneMapLuminance : 100.0f);
             });
         }
     }

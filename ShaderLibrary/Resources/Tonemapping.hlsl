@@ -1,6 +1,7 @@
 #include "../Color.hlsl"
 #include "../Common.hlsl"
 #include "../Exposure.hlsl"
+#include "../OpenDRT.hlsl"
 #include "../PhysicalCamera.hlsl"
 #include "../Samplers.hlsl"
 
@@ -8,22 +9,9 @@ Texture2D<float4> UITexture;
 Texture2D<float3> _MainTex, _Bloom;
 Texture2D<float> _GrainTexture;
 float4 _GrainTextureParams, _Resolution, _BloomScaleLimit, _Bloom_TexelSize;
-float _IsSceneView, _BloomStrength, NoiseIntensity, NoiseResponse, Aperture, ShutterSpeed;
-float HdrMinNits, HdrMaxNits, PaperWhiteNits, HdrEnabled, SceneWhiteLuminance, SceneMaxLuminance, Contrast, Shoulder, SdrBrightness, CrossTalk, Saturation, SdrContrast, CrossSaturation;
+float _IsSceneView, _BloomStrength;
 uint ColorGamut;
-float Tonemap;
-
-float ToeIn, ToeOut, ShoulderIn, ShoulderOut, WhitePoint;
-
-float3 LuminanceToEV100(float3 luminance)
-{
-	return log2(luminance) - log2(ReflectedLightMeterConstant / Sensitivity);
-}
-
-float3 EV100ToLuminance(float3 ev)
-{
-	return exp2(ev) * (ReflectedLightMeterConstant * rcp(Sensitivity));
-}
+float Tonemap, HdrMaxNits;
 
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {
@@ -43,20 +31,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Targe
 	
 	color = lerp(color, bloom, _BloomStrength);
 
-	color = RemoveNaN(color);
-
 	if (Tonemap)
-	{
-		float3 x = color;
-		float x0 = ToeIn, x1 = ShoulderIn, y0 = ToeOut, y1 = ShoulderOut, W = WhitePoint;
-		float m = (y1 - y0) * rcp(x1 - x0);
-		
-		float3 T = exp(log(y0) + m * x0 * rcp(y0) * (log(x) - log(x0)));
-		float3 L = m * x + (y0 - x0 * m);
-		float3 S = 1.0 - exp(log(1.0 - y1) + m * (W - x1) * rcp(1.0 - y1) * (log(W - x) - log(W - x1)));
-	
-		color = color < x0 ? T : (color < x1 ? L : (x < W ? S : W));
-	}
+		color = OpenDRT(color.r, color.g, color.b);
 	
 	color = RemoveNaN(color);
 

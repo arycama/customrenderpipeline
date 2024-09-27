@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Runtime.InteropServices;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -18,18 +19,22 @@ namespace Arycama.CustomRenderPipeline
         {
             [field: Header("Tonemapping")]
             [field: SerializeField] public bool Tonemap { get; private set; } = true;
-            [field: SerializeField, Min(0.0f)] public float ToeIn { get; private set; } = 0.25f;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float ToeOut { get; private set; } = 0.25f;
-            [field: SerializeField, Min(0.0f)] public float ShoulderIn { get; private set; } = 0.75f;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float ShoulderOut { get; private set; } = 0.75f;
-            [field: SerializeField, Min(0.0f)] public float WhitePoint { get; private set; } = 1.0f;
+
+            [field: Header("Tonescale Parameters")]
+            [field: SerializeField, Range(3, 30)] public float GreyLuminance { get; private set; } = 10;
+            [field: SerializeField, Range(0, 0.5f)] public float Lgb { get; private set; } = 0.12f;
+            [field: SerializeField, Range(1.0f, 2.0f)] public float Contrast { get; private set; } = 1.4f;
+            [field: SerializeField, Range(0, 0.02f)] public float Toe { get; private set; } = 0.001f;
+
+            [field: Header("Color Parameters")]
+            [field: SerializeField, Range(0, 1)] public float PurityCompress { get; private set; } = 0.3f;
+            [field: SerializeField, Range(0, 1)] public float PurityBoost { get; private set; } = 0.3f;
+            [field: SerializeField, Range(-1, 1)] public float HueshiftR { get; private set; } = 0.3f;
+            [field: SerializeField, Range(-1, 1)] public float HueshiftG { get; private set; } = 0;
+            [field: SerializeField, Range(-1, 1)] public float HueshiftB { get; private set; } = -0.3f;
 
             [field: Header("Hdr Output")]
             [field: SerializeField] public bool HdrEnabled { get; private set; } = true;
-            [field: SerializeField] public bool AutoDetectValues { get; private set; } = true;
-            [field: SerializeField, Min(0)] public float HdrMinNits { get; private set; } = 0;
-            [field: SerializeField, Min(0)] public float HdrMaxNits { get; private set; } = 1000;
-            [field: SerializeField, Min(0.0f)] public float PaperWhiteNits { get; private set; } = 300.0f;
             [field: SerializeField] public HDRDisplayBitDepth BitDepth { get; private set; } = HDRDisplayBitDepth.BitDepth10;
 
             // TODO: Move to lens settings or something?
@@ -103,22 +108,27 @@ namespace Arycama.CustomRenderPipeline
                 var uvScaleX = settings.FilmGrainTexture ? width / (float)settings.FilmGrainTexture.width : 1.0f;
                 var uvScaleY = settings.FilmGrainTexture ? height / (float)settings.FilmGrainTexture.height : 1.0f;
 
-                pass.SetFloat(command, "HdrEnabled", hdrSettings.available && settings.HdrEnabled ? 1.0f : 0.0f);
+                var hdrEnabled = hdrSettings.available && settings.HdrEnabled;
+                var maxNits = hdrEnabled ? hdrSettings.maxToneMapLuminance : 100.0f;
+
+                pass.SetFloat(command, "HdrEnabled", hdrEnabled ? 1.0f : 0.0f);
                 pass.SetTexture(command, "_GrainTexture", settings.FilmGrainTexture);
 
                 pass.SetFloat(command, "NoiseIntensity", settings.NoiseIntensity);
                 pass.SetFloat(command, "NoiseResponse", settings.NoiseResponse);
 
-                pass.SetFloat(command, "PaperWhiteNits", settings.PaperWhiteNits);
-                pass.SetFloat(command, "HdrMinNits", settings.HdrMinNits);
-                pass.SetFloat(command, "HdrMaxNits", settings.HdrMaxNits);
                 pass.SetFloat(command, "Tonemap", settings.Tonemap ? 1.0f : 0.0f);
 
-                pass.SetFloat(command, "ToeIn", settings.ToeIn);
-                pass.SetFloat(command, "ToeOut", settings.ToeOut);
-                pass.SetFloat(command, "ShoulderIn", settings.ShoulderIn);
-                pass.SetFloat(command, "ShoulderOut", settings.ShoulderOut);
-                pass.SetFloat(command, "WhitePoint", settings.WhitePoint);
+                pass.SetFloat(command, "Lp", hdrEnabled ? maxNits : 100);
+                pass.SetFloat(command, "Lg", settings.GreyLuminance);
+                pass.SetFloat(command, "LgBoost", settings.Lgb);
+                pass.SetFloat(command, "Contrast", settings.Contrast);
+                pass.SetFloat(command, "Toe", settings.Toe);
+                pass.SetFloat(command, "PurityCompress", settings.PurityCompress);
+                pass.SetFloat(command, "PurityBoost", settings.PurityBoost);
+                pass.SetFloat(command, "HueshiftR", settings.HueshiftR);
+                pass.SetFloat(command, "HueshiftG", settings.HueshiftG);
+                pass.SetFloat(command, "HueshiftB", settings.HueshiftB);
 
                 pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
                 pass.SetFloat(command, "Aperture", lensSettings.Aperture);
