@@ -22,7 +22,7 @@ namespace Arycama.CustomRenderPipeline
 
             [field: Header("Tonescale Parameters")]
             [field: SerializeField, Range(80, 480)] public float PaperWhite { get; private set; } = 203;
-            [field: SerializeField, Range(0, 0.5f)] public float Lgb { get; private set; } = 0.12f;
+            [field: SerializeField, Range(0, 0.5f)] public float GreyLuminanceBoost { get; private set; } = 0.12f;
             [field: SerializeField, Range(1.0f, 2.0f)] public float Contrast { get; private set; } = 1.4f;
             [field: SerializeField, Range(0, 0.02f)] public float Toe { get; private set; } = 0.001f;
 
@@ -119,16 +119,14 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetFloat(command, "Tonemap", settings.Tonemap ? 1.0f : 0.0f);
 
-                pass.SetFloat(command, "PeakLuminance", hdrEnabled ? maxNits : 100);
-                pass.SetFloat(command, "GreyLuminance", hdrEnabled ? settings.PaperWhite * 0.18f : 18f); // Todo: Brightness setting
-                pass.SetFloat(command, "LgBoost", settings.Lgb);
+                pass.SetFloat(command, "MaxLuminance", hdrEnabled ? maxNits : 100);
+                pass.SetFloat(command, "PaperWhiteLuminance", hdrEnabled ? settings.PaperWhite : 100.0f); // Todo: Brightness setting
+                pass.SetFloat(command, "PaperWhiteBoost", settings.GreyLuminanceBoost);
                 pass.SetFloat(command, "Contrast", settings.Contrast);
                 pass.SetFloat(command, "Toe", settings.Toe);
                 pass.SetFloat(command, "PurityCompress", settings.PurityCompress);
                 pass.SetFloat(command, "PurityBoost", settings.PurityBoost);
-                pass.SetFloat(command, "HueshiftR", settings.HueshiftR);
-                pass.SetFloat(command, "HueshiftG", settings.HueshiftG);
-                pass.SetFloat(command, "HueshiftB", settings.HueshiftB);
+                pass.SetVector(command, "Hueshift", new Vector3(settings.HueshiftR, settings.HueshiftG, settings.HueshiftB));
 
                 pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
                 pass.SetFloat(command, "Aperture", lensSettings.Aperture);
