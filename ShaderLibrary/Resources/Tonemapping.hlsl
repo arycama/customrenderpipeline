@@ -32,7 +32,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Targe
 	color = lerp(color, bloom, _BloomStrength);
 
 	if (Tonemap)
-		color = OpenDRT(color.r, color.g, color.b);
+		color = OpenDRT(color);
 	
 	color = RemoveNaN(color);
 

@@ -21,7 +21,7 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public bool Tonemap { get; private set; } = true;
 
             [field: Header("Tonescale Parameters")]
-            [field: SerializeField, Range(3, 30)] public float GreyLuminance { get; private set; } = 10;
+            [field: SerializeField, Range(80, 480)] public float PaperWhite { get; private set; } = 203;
             [field: SerializeField, Range(0, 0.5f)] public float Lgb { get; private set; } = 0.12f;
             [field: SerializeField, Range(1.0f, 2.0f)] public float Contrast { get; private set; } = 1.4f;
             [field: SerializeField, Range(0, 0.02f)] public float Toe { get; private set; } = 0.001f;
@@ -119,8 +119,8 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetFloat(command, "Tonemap", settings.Tonemap ? 1.0f : 0.0f);
 
-                pass.SetFloat(command, "Lp", hdrEnabled ? maxNits : 100);
-                pass.SetFloat(command, "Lg", settings.GreyLuminance);
+                pass.SetFloat(command, "PeakLuminance", hdrEnabled ? maxNits : 100);
+                pass.SetFloat(command, "GreyLuminance", hdrEnabled ? settings.PaperWhite * 0.18f : 18f); // Todo: Brightness setting
                 pass.SetFloat(command, "LgBoost", settings.Lgb);
                 pass.SetFloat(command, "Contrast", settings.Contrast);
                 pass.SetFloat(command, "Toe", settings.Toe);
