@@ -30,15 +30,17 @@ struct TraceResult
 TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	float depth = _Depth[position.xy];
-	float rcpVLength = RcpLength(worldDir);
-	float3 V = -worldDir * rcpVLength;
+	float3 V = -worldDir * RcpLength(worldDir);
+	
+	float3 noise3DCosine = Noise3DCosine(position.xy);
 	
 	float NdotV;
 	float3 N = GBufferNormal(position.xy, _NormalRoughness, V, NdotV);
-	float3 noise3DCosine = Noise3DCosine(position.xy);
+	
 	float rcpPdf = Pi * rcp(noise3DCosine.z);
 	float3 L = FromToRotationZ(N, noise3DCosine);
 	
+    // We start tracing from the center of the current pixel, and do so up to the far plane.
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
 	
     // Apply normal bias with the magnitude dependent on the distance from the camera.
@@ -53,7 +55,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	if(validHit)
 	{
 		float3 worldHit = PixelToWorld(rayPos);
-		float3 hitRay = worldHit - worldPosition;
+		hitRay = worldHit - worldPosition;
 		float hitDist = length(hitRay);
 	
 		float2 velocity = Velocity[rayPos.xy];
@@ -92,8 +94,7 @@ struct SpatialResult
 
 SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float rcpVLength = RcpLength(worldDir);
-	float3 V = -worldDir * rcpVLength;
+	float3 V = -worldDir * RcpLength(worldDir);
 	
 	float4 normalRoughness = _NormalRoughness[position.xy];
 	float NdotV;
@@ -108,34 +109,29 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	{
 		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
 		float2 coord = clamp(floor(position.xy + u), 0.0, _ScaledResolution.xy - 1.0) + 0.5;
-		
 		float4 hitData = _HitResult[coord];
 		
-		// For misses, just store the ray direction, since it represents a hit at an infinite distance (eg probe)
-		bool hasHit = hitData.w != 0.0;
-		float3 L;
-		float rcpRayLength;
-		if(hasHit)
+		// For misses, we just store the ray direction, since it represents a hit at an infinite distance (eg probe)
+		bool hasHit = hitData.w;
+		float3 L = hitData.xyz;
+		if (hasHit)
 		{
 			float3 sampleWorldPosition = PixelToWorld(float3(coord, Linear01ToDeviceDepth(hitData.w)));
-			float3 hitPosition = sampleWorldPosition + hitData.xyz;
+			L += sampleWorldPosition - worldPosition;
+		}
 		
-			float3 delta = hitPosition - worldPosition;
-			rcpRayLength = RcpLength(delta);
-			L = delta * rcpRayLength;
-		}
-		else
-		{
-			L = hitData.xyz;
-			rcpRayLength = 0.0;
-		}
+		// Normalize (In theory, shouldn't be required for no hit, but since it comes from 16-bit float, might not be unit length
+		float rcpRayLength = RcpLength(L);
+		L *= rcpRayLength;
 		
 		float NdotL = dot(N, L);
 		if(NdotL <= 0.0)
 			continue;
+			
+		float weight = RcpPi * NdotL;
 		
 		float4 hitColor = _Input[coord];
-		float weightOverPdf = RcpPi * NdotL * hitColor.w;
+		float weightOverPdf = weight * hitColor.w;
 		
 		if(hasHit)
 		{
@@ -163,10 +159,10 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
 	bentNormalOcclusion.xyz = normalize(2.0 * bentNormalOcclusion.xyz - 1.0);
-	float3 ambient = AmbientLight(bentNormalOcclusion.rgb, bentNormalOcclusion.a);
+	float3 radiance = AmbientLight(bentNormalOcclusion.rgb, bentNormalOcclusion.a);
 	
 	SpatialResult output;
-	output.result = lerp(ambient, result.rgb, result.a * DiffuseGiStrength);
+	output.result = lerp(radiance, result.rgb, result.a * DiffuseGiStrength);
 	output.rayLength = avgRayLength;
 	return output;
 }

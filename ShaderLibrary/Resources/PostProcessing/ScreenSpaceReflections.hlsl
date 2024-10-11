@@ -31,12 +31,10 @@ struct TraceResult
 TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	float depth = _HiZDepth[position.xy];
-	if(!depth)
-		return (TraceResult)0;
+	float3 V = -worldDir * RcpLength(worldDir);
 	
 	float2 u = Noise2D(position.xy);
 	float4 normalRoughness = _NormalRoughness[position.xy];
-	float3 V = -worldDir * RcpLength(worldDir);
 	
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
@@ -68,7 +66,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 		float coneTangent = GetSpecularLobeTanHalfAngle(roughness);
 		coneTangent *= lerp(saturate(NdotV * 2), 1, sqrt(roughness));
 	
-		float coveredPixels = _ScaledResolution.y * hitDist * 0.5 * coneTangent / (linearHitDepth * _TanHalfFov);
+		float coveredPixels = _ScaledResolution.y * 0.5 * coneTangent * hitDist / (linearHitDepth * _TanHalfFov);
 		float mipLevel = log2(coveredPixels);
 		
 		// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
@@ -105,14 +103,15 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	float3 V = -worldDir * RcpLength(worldDir);
 	
     float4 normalRoughness = _NormalRoughness[position.xy];
-	float perceptualRoughness = normalRoughness.a;
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
-	float roughness = Sq(perceptualRoughness);
-    
+	
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
-    float phi = Noise1D(position.xy) * TwoPi;
-    
+	float phi = Noise1D(position.xy) * TwoPi;
+	
+	float perceptualRoughness = normalRoughness.a;
+	float roughness = Sq(perceptualRoughness);
+
     float4 albedoMetallic = AlbedoMetallic[position.xy];
     float3 f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
 
@@ -122,27 +121,20 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	{
 		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
 		float2 coord = clamp(floor(position.xy + u), 0.0, _ScaledResolution.xy - 1.0) + 0.5;
-		
 		float4 hitData = _HitResult[coord];
 		
-		// For misses, just store the ray direction, since it represents a hit at an infinite distance (eg probe)
-		bool hasHit = hitData.w != 0.0;
-		float3 L;
-		float rcpRayLength;
+		// For misses, we just store the ray direction, since it represents a hit at an infinite distance (eg probe)
+		bool hasHit = hitData.w;
+		float3 L = hitData.xyz;
 		if(hasHit)
 		{
 			float3 sampleWorldPosition = PixelToWorld(float3(coord, Linear01ToDeviceDepth(hitData.w)));
-			float3 hitPosition = sampleWorldPosition + hitData.xyz;
+			L += sampleWorldPosition - worldPosition;
+		}
 		
-			float3 delta = hitPosition - worldPosition;
-			rcpRayLength = RcpLength(delta);
-			L = delta * rcpRayLength;
-		}
-		else
-		{
-			L = hitData.xyz;
-			rcpRayLength = 0.0;
-		}
+		// Normalize (In theory, shouldn't be required for no hit, but since it comes from 16-bit float, might not be unit length
+		float rcpRayLength = RcpLength(L);
+		L *= rcpRayLength;
 		
 		float NdotL = dot(N, L);
 		if(NdotL <= 0.0)

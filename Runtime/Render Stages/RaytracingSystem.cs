@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -8,23 +7,32 @@ namespace Arycama.CustomRenderPipeline
 {
     public class RaytracingSystem : IDisposable
     {
+        [Serializable]
+        public class Settings
+        {
+            [field: SerializeField] public bool Enabled { get; private set; } = true;
+            [field: SerializeField, Range(0.0f, 0.1f)] public float RaytracingBias { get; private set; } = 0.001f;
+            [field: SerializeField, Range(0.0f, 0.1f)] public float RaytracingDistantBias { get; private set; } = 0.001f;
+            [field: SerializeField] public LayerMask RaytracingLayers { get; private set; } = 0;
+        }
+
         private RenderGraph renderGraph;
         private RayTracingAccelerationStructure rtas;
-        private LayerMask layerMask;
         private RayTracingInstanceCullingConfig config;
+        private Settings settings;
 
-        public RaytracingSystem(RenderGraph renderGraph, LayerMask layerMask)
+        public RaytracingSystem(RenderGraph renderGraph, Settings settings)
         {
+            this.settings = settings;
             this.renderGraph = renderGraph;
-            this.layerMask = layerMask;
 
-            RayTracingAccelerationStructure.RASSettings settings = new RayTracingAccelerationStructure.RASSettings
+            RayTracingAccelerationStructure.RASSettings rasSettings = new RayTracingAccelerationStructure.RASSettings
             {
                 rayTracingModeMask = RayTracingAccelerationStructure.RayTracingModeMask.Everything,
                 managementMode = RayTracingAccelerationStructure.ManagementMode.Manual,
-                layerMask = layerMask
+                layerMask = settings.RaytracingLayers
             };
-            rtas = new RayTracingAccelerationStructure(settings);
+            rtas = new RayTracingAccelerationStructure(rasSettings);
 
             config = new RayTracingInstanceCullingConfig
             {
@@ -44,7 +52,7 @@ namespace Arycama.CustomRenderPipeline
                         //allowTransparentMaterials = false,
                         allowOpaqueMaterials = true,
                         //allowAlphaTestedMaterials = true,
-                        layerMask = layerMask,
+                        layerMask = settings.RaytracingLayers,
                         shadowCastingModeMask = (1 << (int)ShadowCastingMode.Off) | (1 << (int)ShadowCastingMode.On) | (1 << (int)ShadowCastingMode.TwoSided),
                         instanceMask = 1
                     }
@@ -63,7 +71,8 @@ namespace Arycama.CustomRenderPipeline
 
         public void Build(Camera camera)
         {
-            return;
+            if (!settings.Enabled)
+                return;
 
             rtas.ClearInstances();
             rtas.CullInstances(ref config);

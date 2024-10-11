@@ -54,6 +54,8 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float depth = _Depth[position.xy];
 	uint stencil = _Stencil[position.xy].g;
 	
+	//return ScreenSpaceGlobalIllumination[position.xy];
+	
 	float3 result = 0.0;
 	if (depth || (stencil & 32))
 	{

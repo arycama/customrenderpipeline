@@ -1,4 +1,4 @@
-Shader "Terrain"
+Shader "Lit Terrain"
 {
     Properties
     {
@@ -15,7 +15,11 @@ Shader "Terrain"
         Pass
         {
             Name "Terrain"
-            Tags { "LightMode" = "Terrain"}
+
+            Tags 
+            { 
+                "LightMode" = "Terrain"
+            }
 
             Stencil
             {

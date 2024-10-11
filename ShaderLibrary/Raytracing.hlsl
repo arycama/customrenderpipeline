@@ -24,11 +24,6 @@ struct RayPayload
 	float hitDistance;
 };
 
-struct RayPayloadShadow
-{
-	bool hasHit;
-};
-
 struct RayPayloadAmbientOcclusion
 {
 	float hitDistance;

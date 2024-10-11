@@ -14,7 +14,7 @@ float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, uint maxSteps, float 
 	// b = d / (1 + thickness) - n / (f - n) * (thickness / (1 + thickness))
 	// b = d * k_s + k_b
 	// TODO: Precompute
-	float _SsrThicknessScale = 1.0f / (1.0f + thickness);
+	float _SsrThicknessScale = rcp(1.0 + thickness);
 	float _SsrThicknessBias = -_Near / (_Far - _Near) * (thickness * _SsrThicknessScale);
 	
     // We start tracing from the center of the current pixel, and do so up to the far plane.
@@ -102,7 +102,8 @@ float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, uint maxSteps, float 
     // Note that we are using 'rayPos' from the penultimate iteration, rather than
     // recompute it using the last value of 't', which would result in an overshoot.
     // It also needs to be precisely at the center of the pixel to avoid artifacts.
-		float2 hitPositionNDC = (floor(rayPos.xy) + 0.5) * _ScaledResolution.zw;
+	float2 hitPositionNDC = (floor(rayPos.xy) + 0.5) * _ScaledResolution.zw;
+	//rayPos.xy = (floor(rayPos.xy) + 0.5);
 	
 	// Ensure we have not hit the sky or gone out of bounds (Out of bounds is always 0)
 	// TODO: I don't think this will ever be true

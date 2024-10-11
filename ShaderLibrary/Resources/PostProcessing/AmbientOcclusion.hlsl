@@ -123,10 +123,9 @@ float _ResolveSamples, _ResolveSize;
 
 float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float rcpVLength = RcpLength(worldDir);
-	float3 V = -worldDir * rcpVLength;
+	float3 V = -worldDir * RcpLength(worldDir);
 	
-	float4 normalRoughness = _NormalRoughness[position.xy];
+    float4 normalRoughness = _NormalRoughness[position.xy];
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
@@ -135,38 +134,33 @@ float4 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	float3 bentNormal = 0.0;
 	float hitWeight = 0.0, nonHitWeight = 0.0;
-	for(uint i = 0; i <= _ResolveSamples; i++)
+	for (uint i = 0; i <= _ResolveSamples; i++)
 	{
 		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
 		float2 coord = clamp(floor(position.xy + u), 0.0, _ScaledResolution.xy - 1.0) + 0.5;
-		
 		float4 hitData = _HitResult[coord];
 		
-		// For misses, just store the ray direction, since it represents a hit at an infinite distance (eg probe)
-		bool hasHit = hitData.w != 0.0;
-		float3 L;
-		float rcpRayLength;
-		if(hasHit)
+		// For misses, we just store the ray direction, since it represents a hit at an infinite distance (eg probe)
+		bool hasHit = hitData.w;
+		float3 L = hitData.xyz;
+		if (hasHit)
 		{
 			float3 sampleWorldPosition = PixelToWorld(float3(coord, Linear01ToDeviceDepth(hitData.w)));
-			float3 hitPosition = sampleWorldPosition + hitData.xyz;
+			L += sampleWorldPosition - worldPosition;
+		}
 		
-			float3 delta = hitPosition - worldPosition;
-			rcpRayLength = RcpLength(delta);
-			L = delta * rcpRayLength;
-		}
-		else
-		{
-			L = hitData.xyz;
-			rcpRayLength = 0.0;
-		}
+		// Normalize (In theory, shouldn't be required for no hit, but since it comes from 16-bit float, might not be unit length
+		float rcpRayLength = RcpLength(L);
+		L *= rcpRayLength;
 		
 		float NdotL = dot(N, L);
-		if(NdotL <= 0.0)
+		if (NdotL <= 0.0)
 			continue;
 		
+		float weight = RcpPi * NdotL;
+		
 		float4 hitColor = _Input[coord];
-		float weightOverPdf = RcpPi * NdotL * hitColor.w;
+		float weightOverPdf = weight * hitColor.w;
 		
 		if(hasHit)
 		{
@@ -279,7 +273,7 @@ float4 FragmentResolve(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	ambientOcclusion.a = pow(ambientOcclusion.a, _AoStrength);
 	
-	float4 result = bentNormalOcclusion;//BlendVisibiltyCones(bentNormalOcclusion, ambientOcclusion);
+	float4 result = BlendVisibiltyCones(bentNormalOcclusion, ambientOcclusion);
 	result.rgb = 0.5 * result.rgb + 0.5;
 	return result;
 }

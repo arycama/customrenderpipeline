@@ -6,17 +6,16 @@
 #include "../../Raytracing.hlsl"
 
 Texture2D<float> _Depth;
-RWTexture2D<float> HitResult;
+Texture2D<float4> _NormalRoughness;
+RWTexture2D<float4> HitResult;
 
 float3 LightDirection;
 float _RaytracingBias, _RaytracingDistantBias, LightCosTheta;
 
-#pragma max_recursion_depth 5
-
 [shader("miss")]
-void MissShader(inout RayPayloadShadow payload : SV_RayPayload)
+void MissShader(inout RayPayloadAmbientOcclusion payload : SV_RayPayload)
 {
-	payload.hasHit = false;
+	payload.hitDistance = 0.0;
 }
 
 [shader("raygeneration")]
@@ -26,28 +25,58 @@ void RayGeneration()
 	float depth = _Depth[position];
 	if(depth == 0.0)
 		return;
+		
+	float4 normalRoughness = _NormalRoughness[position];
+	float2 u = Noise2D(position);
 	
 	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
+	float3 V = normalize(-worldPosition);
+	
+	float NdotV;
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	worldPosition = PlanetCurveInverse(worldPosition);
 	
-	float2 u = Noise2D(position);
-	
     float3 localL = SampleConeUniform(u.x, u.y, LightCosTheta);
 	float3 L = FromToRotationZ(LightDirection, localL);
 	
-	RayDesc ray;
-	ray.Origin = worldPosition + L * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
-	ray.Direction = L;
-	ray.TMin = 0.0;
-	ray.TMax = 1e10f;
+	RayPayloadAmbientOcclusion payload;
+	payload.hitDistance = 0.0;
 	
-	RayPayloadShadow payload;
-	payload.hasHit = true;
+	// Skip tracing rays where NdotL <= 0.0, as this will always be in shadow
+	float NdotL = dot(N, L);
+	if(NdotL > 0.0)
+	{
+		RayDesc ray;
+		ray.Origin = worldPosition;
+		ray.Direction = L;
+		ray.TMin = 0.0;
+		ray.TMax = 1e10f;
 	
-	uint flags = RAY_FLAG_SKIP_CLOSEST_HIT_SHADER | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
-	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+		// TODO: Need to cull backface triangles, but not for terrain.. should use terrain shadow casting mode, butdoesn't work for some reason
+		uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+		//uint flags = RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
+		TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+	}
+	else
+	{
+		payload.hitDistance = 1e-6;
+	}
 	
-	HitResult[position] = !payload.hasHit;
+	bool validHit = payload.hitDistance;
+	float outDepth;
+	float3 hitRay;
+	if (validHit)
+	{
+		hitRay = L * payload.hitDistance;
+		outDepth = Linear01Depth(depth);
+	}
+	else
+	{
+		hitRay = L;
+		outDepth = 0.0;
+	}
+	
+	HitResult[position] = float4(hitRay, outDepth);
 }

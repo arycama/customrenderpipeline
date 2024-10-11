@@ -88,4 +88,31 @@ void TemporalNeighborhood(Texture2D<float3> input, int2 coord, out float3 minVal
 	maxValue = mean + stdDev;
 }
 
+void TemporalNeighborhood(Texture2D<float> input, int2 coord, out float minValue, out float maxValue, out float result)
+{
+	float mean = 0.0, stdDev = 0.0;
+	
+	[unroll]
+	for (int y = -1, i = 0; y <= 1; y++)
+	{
+		[unroll]
+		for (int x = -1; x <= 1; x++, i++)
+		{
+			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
+			float color = input[coord + int2(x, y)];
+			result = i == 0 ? color * weight : result + color * weight;
+			mean += color;
+			stdDev += color * color;
+			minValue = i == 0 ? color : min(minValue, color);
+			maxValue = i == 0 ? color : max(maxValue, color);
+		}
+	}
+	
+	mean /= 9.0;
+	stdDev /= 9.0;
+	stdDev = sqrt(abs(stdDev - mean * mean));
+	minValue = max(minValue, mean - stdDev);
+	maxValue = min(maxValue, mean + stdDev);
+}
+
 #endif
