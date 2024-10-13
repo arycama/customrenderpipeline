@@ -13,6 +13,11 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 {
 	float3 worldPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
 	
+	//     outVertex.triangleArea  = length(cross(v1.positionOS - v0.positionOS, v2.positionOS - v0.positionOS));
+	// outVertex.texCoord0Area = abs((v1.texCoord0.x - v0.texCoord0.x) * (v2.texCoord0.y - v0.texCoord0.y) - (v2.texCoord0.x - v0.texCoord0.x) * (v1.texCoord0.y - v0.texCoord0.y));
+	
+	payload.cone.width += RayTCurrent() * payload.cone.spreadAngle;
+	
 	float4 albedoSmoothness, mask;
 	float3 normal;
 	SampleTerrain(worldPosition, albedoSmoothness, normal, mask, true);

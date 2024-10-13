@@ -53,7 +53,7 @@ float4 SampleTexture(Texture2D<float4> tex, float2 uv, bool isRaytracing)
 {
 	// TODO: Ray cones
 	if(isRaytracing)
-		return tex.SampleLevel(_LinearClampSampler, uv, 0.0);
+		return tex.SampleLevel(_LinearRepeatSampler, uv, 0.0);
 	else
 		return tex.SampleBias(_TrilinearRepeatAniso16Sampler, uv, _MipBias);
 }

@@ -269,7 +269,11 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.04);
 	//result *= (1.0 - FssEss); // TODO: Diffuse transmittance?
 	
+	
 	output.emissive = result;
+	output.emissive = _TemporalInput[position.xy] * (1.0 - FssEss);
+	
+	
 	
 	return output;
 }

@@ -265,6 +265,7 @@ float4 InputScaleLimit;
 
 float4 FragmentResolve(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
+	return _Input[position.xy];
 	float4 ambientOcclusion = _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, InputScaleLimit));
 	ambientOcclusion.xyz = normalize(ambientOcclusion.xyz);
 	

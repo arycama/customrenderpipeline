@@ -16,14 +16,13 @@ namespace Arycama.CustomRenderPipeline
         {
             [field: SerializeField, Tooltip("Whether water is enabled or not by default. (Can be overridden in scene")] public bool IsEnabled { get; private set; } = true;
             [field: SerializeField, Tooltip("The resolution of the simulation, higher numbers give more detail but are more expensive")] public int Resolution { get; private set; } = 128;
-            [field: SerializeField, Tooltip("Use Trilinear for the normal/foam map, improves quality of lighting/reflections in shader")] public bool UseTrilinear { get; private set; } = true;
-            [field: SerializeField, Range(1, 16), Tooltip("Anisotropic level for the normal/foam map")] public int AnisoLevel { get; private set; } = 4;
             [field: SerializeField] public Material Material { get; private set; }
             [field: SerializeField] public WaterProfile Profile { get; private set; }
             [field: SerializeField] public float ShadowRadius { get; private set; } = 8192;
             [field: SerializeField] public float ShadowBias { get; private set; } = 0;
             [field: SerializeField] public float ShadowSlopeBias { get; private set; } = 0;
             [field: SerializeField] public int ShadowResolution { get; private set; } = 512;
+            [field: SerializeField] public bool RaytracedRefractions { get; private set; } = false;
 
             [field: Header("Rendering")]
             [field: SerializeField] public int CellCount { get; private set; } = 32;
@@ -41,6 +40,7 @@ namespace Arycama.CustomRenderPipeline
         private GraphicsBuffer indexBuffer;
         private bool isInitialized;
         private PersistentRTHandleCache temporalCache;
+        private RayTracingShader raytracingShader;
 
         private int VerticesPerTileEdge => settings.PatchVertices + 1;
         private int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
@@ -88,6 +88,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             indexBuffer.SetData(pIndices);
+            raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Refraction");
         }
 
         public void Initialize()
@@ -659,6 +660,16 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(new UnderwaterLightingResult(underwaterResultId), renderGraph.FrameIndex);
         }
 
+        static internal float GetPixelSpreadTangent(float fov, int width, int height)
+        {
+            return Mathf.Tan(fov * Mathf.Deg2Rad * 0.5f) * 2.0f / Mathf.Min(width, height);
+        }
+
+        static internal float GetPixelSpreadAngle(float fov, int width, int height)
+        {
+            return Mathf.Atan(GetPixelSpreadTangent(fov, width, height));
+        }
+
         public void RenderDeferredWater(CullingResults cullingResults, RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, IRenderPassData commonPassData, Camera camera, int width, int height, RTHandle velocity)
         {
             if (!settings.IsEnabled)
@@ -772,6 +783,51 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
+            if(settings.RaytracedRefractions)
+            {
+                // Need to set some things as globals so that hit shaders can access them..
+                using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Raytraced Refractions Setup"))
+                {
+                    pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                    pass.AddRenderPassData<LightingSetup.Result>();
+                    pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                    pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                    pass.AddRenderPassData<TerrainRenderData>(true);
+                    pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                    pass.AddRenderPassData<ShadowRenderer.Result>();
+                    commonPassData.SetInputs(pass);
+
+                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                    {
+                        commonPassData.SetProperties(pass, command);
+                    });
+                }
+
+                using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Water Raytraced Refractions"))
+                {
+                    var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
+
+                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, width, height, 1, 0.1f, 0.1f);
+                    pass.WriteTexture(tempResult, "Result");
+                    //pass.WriteTexture(tempResult, "HitColor");
+                    //pass.WriteTexture(hitResult, "HitResult");
+                    pass.ReadTexture("_Depth", cameraDepth, subElement: RenderTextureSubElement.Depth);
+                    pass.ReadTexture("_Stencil", cameraDepth, subElement: RenderTextureSubElement.Stencil);
+                    pass.ReadTexture("_NormalRoughness", normalRoughness);
+                    //pass.ReadTexture("PreviousFrame", previousFrameColor); // Temporary, cuz of leaks if we don't use it..
+                    commonPassData.SetInputs(pass);
+
+                    pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+
+                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                    {
+                        commonPassData.SetProperties(pass, command);
+                        pass.SetVector(command, "_Extinction", settings.Material.GetColor("_Extinction"));
+                        pass.SetFloat(command, "_RaytracingPixelSpreadAngle", GetPixelSpreadAngle(camera.fieldOfView, camera.pixelWidth, camera.pixelHeight));
+                    });
+                }
+            }
+
             var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water Temporal"))
             {
@@ -806,9 +862,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
                     pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
 
-                    var material = settings.Material;
-                    pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
-                    pass.SetVector(command, "_Extinction", material.GetColor("_Extinction"));
+                    pass.SetVector(command, "_Color", settings.Material.GetColor("_Color").linear);
+                    pass.SetVector(command, "_Extinction", settings.Material.GetColor("_Extinction"));
                 });
             }
 

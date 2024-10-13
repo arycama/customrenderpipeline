@@ -251,7 +251,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		// Clouds block out surface
 		surface *= cloudTransmittance;
 			
-		//luminance += surface;
+		luminance += surface;
 	}
 
 	return luminance;

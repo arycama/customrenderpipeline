@@ -156,6 +156,7 @@
 
             HLSLPROGRAM
             #pragma raytracing RayTracing
+			#pragma shader_feature_local TRIPLANAR_ON
             #include "LitSurfaceRaytracing.hlsl"
             ENDHLSL
         }

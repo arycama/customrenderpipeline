@@ -66,8 +66,6 @@ float _IsFirst;
 
 float FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	return !_Input[position.xy].w;
-
 	float rcpVLength = RcpLength(worldDir);
 	float3 V = -worldDir * rcpVLength;
 	
@@ -116,8 +114,6 @@ Texture2D<float> _TemporalInput, _History;
 
 float FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	return _TemporalInput[position.xy];
-
 	float minValue, maxValue, result;
 	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, result);
 	

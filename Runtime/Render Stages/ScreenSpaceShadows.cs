@@ -50,6 +50,24 @@ public class ScreenSpaceShadows
 
         if (settings.UseRaytracing)
         {
+            // Need to set some things as globals so that hit shaders can access them..
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Raytraced Shadows Setup"))
+            {
+                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<TerrainRenderData>(true);
+                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<ShadowRenderer.Result>();
+                commonPassData.SetInputs(pass);
+
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                {
+                    commonPassData.SetProperties(pass, command);
+                });
+            }
+
             using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Raytraced Shadows"))
             {
                 var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
@@ -79,6 +97,14 @@ public class ScreenSpaceShadows
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+
+                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<TerrainRenderData>(true);
+                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<ShadowRenderer.Result>();
 
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_HiZDepth", hiZDepth);

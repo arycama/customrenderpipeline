@@ -10,7 +10,8 @@ float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, fl
 	float4 clipPosition = PerspectiveDivide(WorldToClip(worldPosition));
 	bool isInScreen = all(clipPosition.xyz >= float2(-1.0, 0.0).xxy && clipPosition.xyz <= 1.0);
 
-	float NdotV = dot(N, V);
+	float NdotV;
+	N = GetViewReflectedNormal(N, V, NdotV);
 	
 	// Do lighting with existing light cluster, shadow matrices, etc
 	if(isInScreen)

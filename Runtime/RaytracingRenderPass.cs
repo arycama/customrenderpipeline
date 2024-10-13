@@ -50,7 +50,10 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
-            command.SetRayTracingTextureParam(shader, propertyName, texture);
+            if(subElement == RenderTextureSubElement.Depth || subElement == RenderTextureSubElement.Default)
+                command.SetRayTracingTextureParam(shader, propertyName, texture);
+            else
+                command.SetGlobalTexture(propertyName, texture, subElement);
         }
 
         public override void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer)
