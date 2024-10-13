@@ -271,7 +271,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	
 	output.emissive = result;
-	output.emissive = _TemporalInput[position.xy] * (1.0 - FssEss);
+	output.emissive = _TemporalInput[position.xy];// * (1.0 - FssEss);
 	
 	
 	

@@ -38,7 +38,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "_IsSceneView", isSceneView ? 1.0f : 0.0f);
                 var colorGamut = hdrEnabled ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
                 pass.SetInt(command, "ColorGamut", (int)colorGamut);
-                pass.SetFloat(command, "HdrMaxNits", settings.Tonemap ? hdrSettings.maxToneMapLuminance : 100.0f);
+                pass.SetFloat(command, "HdrMaxNits", settings.Tonemap && hdrSettings.available && hdrSettings.active ? hdrSettings.maxToneMapLuminance : 100.0f);
             });
         }
     }

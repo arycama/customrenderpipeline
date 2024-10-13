@@ -95,7 +95,7 @@ void RayGeneration()
 		outDepth = 0.0;
 	}
 	
-	Result[position] = color * exp(-_Extinction * payload.hitDistance);
+	Result[position] = color;// * exp(-_Extinction * payload.hitDistance);
 	
 	//HitColor[position] = float4(color, rcpPdf);
 	//HitResult[position] = float4(hitRay, outDepth);

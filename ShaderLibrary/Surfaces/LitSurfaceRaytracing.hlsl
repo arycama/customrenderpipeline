@@ -14,9 +14,9 @@
 [shader("closesthit")]
 void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
 {
-	MeshInfo meshInfo = unity_MeshInfo_RT[0];
-	if(meshInfo.indexSize != 2)
-		return;
+	//MeshInfo meshInfo = unity_MeshInfo_RT[0];
+	//if(meshInfo.indexSize != 2)
+	//	return;
 	
 	uint index = PrimitiveIndex();
     uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(index);

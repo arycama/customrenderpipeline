@@ -71,6 +71,8 @@ struct Vert
 	float3 normal;
 	float2 uv;
 	float4 tangent;
+	float triangleArea;
+	float uvArea;
 };
 
 #define kMaxVertexStreams 8
@@ -337,6 +339,10 @@ Vert InterpolateVertices(Vert v0, Vert v1, Vert v2, float3 barycentrics)
 	INTERPOLATE_ATTRIBUTE(normal);
 	INTERPOLATE_ATTRIBUTE(uv);
 	INTERPOLATE_ATTRIBUTE(tangent);
+	
+	v.triangleArea = length(cross(v1.position - v0.position, v2.position - v0.position));
+	v.uvArea = abs((v1.uv.x - v0.uv.x) * (v2.uv.y - v0.uv.y) - (v2.uv.x - v0.uv.x) * (v1.uv.y - v0.uv.y));
+	
 	return v;
 }
 
@@ -374,28 +380,6 @@ float2 GetFloat2Attribute(uint3 vertexIndices, uint attributeIndex, float2 weigh
 	float2 y = GetFloat2(vertexIndices.y, attributeIndex);
 	float2 z = GetFloat2(vertexIndices.z, attributeIndex);
 	return BarycentricInterpolate(GetFloat2(vertexIndices.x, attributeIndex), GetFloat2(vertexIndices.x, attributeIndex), GetFloat2(vertexIndices.x, attributeIndex), weights.x, weights.y);
-}
-
-float computeBaseTextureLOD(float3 viewWS,
-                            float3 normalWS,
-                            float coneWidth,
-                            float areaUV,
-                            float areaWS)
-{
-    // Compute LOD following the ray cone formulation in Ray Tracing Gems (20.3.4)
-	float lambda = 0.5 * log2(areaUV / areaWS);
-	lambda += log2(abs(coneWidth / dot(viewWS, normalWS)));
-
-	return lambda;
-}
-
-float computeTargetTextureLOD(Texture2D targetTexture, float baseLambda)
-{
-    // Grab dimensions of the target texture
-	uint texWidth, texHeight;
-	targetTexture.GetDimensions(texWidth, texHeight);
-
-	return max(0.0, baseLambda + 0.5 * log2(texWidth * texHeight));
 }
 
 //void RayGenerationShader(SurfaceHit gbuffer)
