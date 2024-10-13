@@ -15,7 +15,7 @@ RWTexture2D<float3> Result;
 Texture2D<uint2> _Stencil;
 
 float3 _Extinction;
-float _RaytracingBias, _RaytracingDistantBias, _RaytracingPixelSpreadAngle;
+float _RaytracingBias, _RaytracingDistantBias;
 
 [shader("miss")]
 void MissShader(inout RayPayload payload : SV_RayPayload)
@@ -56,7 +56,7 @@ void RayGeneration()
 	
 	float roughness = Sq(normalRoughness.a);
 	float rcpPdf;
-	float3 L = refract(-V, N, rcp(1.34));//	ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
+	float3 L = refract(-V, N, rcp(1.34)); //	ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	rcpPdf = 1;
 	
 	float _RaytracingBias = 0.1, _RaytracingDistantBias = 0.1;
@@ -73,8 +73,12 @@ void RayGeneration()
 	
 	// In order to achieve filtering for the textures, we need to compute the spread angle of the pixel
 	float distanceToCamera = length(worldPosition);
-	payload.cone.spreadAngle = _RaytracingPixelSpreadAngle + roughnessToSpreadAngle(roughness);
-	payload.cone.width = distanceToCamera * _RaytracingPixelSpreadAngle;
+	
+	SurfaceHit gbuffer = { worldPosition, N, roughnessToSpreadAngle(roughness), distanceToCamera };
+	payload.cone = ComputeRayConeFromGBuffer(gbuffer);
+	
+	Ray ray1 = { ray.Origin, ray.Direction };
+	payload.ray = ray1;
 	
 	uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
 	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);

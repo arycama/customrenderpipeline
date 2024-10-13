@@ -5,7 +5,6 @@
 #include "../Lighting.hlsl"
 #include "../Raytracing.hlsl"
 #include "../RaytracingLighting.hlsl"
-#include "../RaytracingUtils.hlsl"
 #include "../Samplers.hlsl"
 #include "../TerrainCommon.hlsl"
 
@@ -21,20 +20,19 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	v0 = FetchVertex(triangleIndices.x);
 	v1 = FetchVertex(triangleIndices.y);
 	v2 = FetchVertex(triangleIndices.z);
-
-	float3 barycentricCoords = float3(1.0 - attribs.barycentrics.x - attribs.barycentrics.y, attribs.barycentrics.x, attribs.barycentrics.y);
-	Vert v = InterpolateVertices(v0, v1, v2, barycentricCoords);
 	
-	worldPosition = MultiplyPoint3x4(ObjectToWorld3x4(), v.position); // WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
-	float3 worldNormal = MultiplyVector(v.normal, WorldToObject3x4(), true);
+	Vert v = InterpolateVertices(v0, v1, v2, attribs.barycentrics);
 	
-	float coneWidth = payload.cone.width + RayTCurrent() * payload.cone.spreadAngle;
+	float3 worldNormal = normalize(v.normal);
 	
-	float baseLambda = ComputeBaseTextureLOD(-WorldRayDirection(), worldNormal, coneWidth, v.uvArea, v.triangleArea);
+	SurfaceHit surf = { worldPosition, worldNormal, 0, RayTCurrent() };
+	
+	// Propogate cone to second hit
+	RayCone cone = Propogate(payload.cone, 0, RayTCurrent()); // Using 0 since no curvature measure at second hit
 	
 	float4 albedoSmoothness, mask;
 	float3 normal;
-	SampleTerrain(worldPosition, albedoSmoothness, normal, mask, true, baseLambda);
+	SampleTerrain(worldPosition, albedoSmoothness, normal, mask, true, payload.ray, surf, cone);
 	
 	float3 color = RaytracedLighting(worldPosition, normal, -WorldRayDirection(), mask.r, 1.0 - albedoSmoothness.a, mask.g, normal, albedoSmoothness.rgb);
 	

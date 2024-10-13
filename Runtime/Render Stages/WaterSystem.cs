@@ -800,7 +800,8 @@ namespace Arycama.CustomRenderPipeline
                     var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                     {
                         commonPassData.SetProperties(pass, command);
-                        pass.SetFloat(command, "_RaytracingPixelSpreadAngle", GetPixelSpreadAngle(camera.fieldOfView, camera.pixelWidth, camera.pixelHeight));
+                        var angle = GetPixelSpreadAngle(camera.fieldOfView, camera.pixelWidth, camera.pixelHeight);
+                        pass.SetFloat(command, "_RaytracingPixelSpreadAngle", angle);
                     });
                 }
 
