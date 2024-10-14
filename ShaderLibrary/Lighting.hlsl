@@ -222,7 +222,7 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow, out bool
 		return 1.0;
 	
 	validShadow = true;
-	if (!softShadow)
+	//if (!softShadow)
 		return _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z);
 	
 	float2 center = shadowPosition.xy * ShadowMapResolution;
@@ -311,7 +311,7 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
 	#endif
 	
-	float3 luminance = radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
+	float3 luminance = 0;//	radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
 
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
@@ -363,8 +363,8 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		else
 		{
 			#ifdef WATER_SHADOW_ON
-			if(i == 0)
-				light.color *= WaterShadow(input.worldPosition, light.direction);
+			///if(i == 0)
+			//	light.color *= WaterShadow(input.worldPosition, light.direction);
 			#endif
 			
 			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, light.direction, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV) * light.color * atmosphereTransmittance) * (abs(NdotL) * _Exposure * attenuation);

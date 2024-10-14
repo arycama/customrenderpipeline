@@ -24,15 +24,11 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	Vert v = InterpolateVertices(v0, v1, v2, attribs.barycentrics);
 	
 	float3 worldNormal = normalize(v.normal);
-	
-	SurfaceHit surf = { worldPosition, worldNormal, 0, RayTCurrent() };
-	
-	// Propogate cone to second hit
-	RayCone cone = Propogate(payload.cone, 0, RayTCurrent()); // Using 0 since no curvature measure at second hit
+	float coneWidth = payload.cone.spreadAngle * RayTCurrent() + payload.cone.width;
 	
 	float4 albedoSmoothness, mask;
 	float3 normal;
-	SampleTerrain(worldPosition, albedoSmoothness, normal, mask, true, payload.ray, surf, cone);
+	SampleTerrain(worldPosition, albedoSmoothness, normal, mask, true, worldNormal, coneWidth);
 	
 	float3 color = RaytracedLighting(worldPosition, normal, -WorldRayDirection(), mask.r, 1.0 - albedoSmoothness.a, mask.g, normal, albedoSmoothness.rgb);
 	

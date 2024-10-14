@@ -12,11 +12,11 @@ namespace Arycama.CustomRenderPipeline
         private string rayGenName, shaderPassName;
         private int width, height, depth;
         private RayTracingAccelerationStructure rtas;
-        private float bias, distantBias;
+        private float bias, distantBias, fieldOfView;
 
         protected readonly List<(RTHandle, int)> colorBindings = new();
 
-        public void Initialize(RayTracingShader shader, string rayGenName, string shaderPassName, RayTracingAccelerationStructure rtas, int width = 1, int height = 1, int depth = 1, float bias = 0.01f, float distantBias = 0.01f)
+        public void Initialize(RayTracingShader shader, string rayGenName, string shaderPassName, RayTracingAccelerationStructure rtas, int width = 1, int height = 1, int depth = 1, float bias = 0.01f, float distantBias = 0.01f, float fieldOfView = 0)
         {
             this.shader = shader;
             this.rayGenName = rayGenName;
@@ -27,6 +27,7 @@ namespace Arycama.CustomRenderPipeline
             this.rtas = rtas;
             this.bias = bias;
             this.distantBias = distantBias;
+            this.fieldOfView = fieldOfView;
         }
 
         public void WriteTexture(RTHandle texture, int propertyId)
@@ -95,9 +96,22 @@ namespace Arycama.CustomRenderPipeline
             command.SetRayTracingIntParam(shader, propertyName, value);
         }
 
+        static internal float GetPixelSpreadTangent(float fov, int width, int height)
+        {
+            return Mathf.Tan(fov * Mathf.Deg2Rad * 0.5f) * 2.0f / Mathf.Min(width, height);
+        }
+
+        static internal float GetPixelSpreadAngle(float fov, int width, int height)
+        {
+            return Mathf.Atan(GetPixelSpreadTangent(fov, width, height));
+        }
+
         protected override void Execute(CommandBuffer command)
         {
             Assert.IsNotNull(rtas);
+
+            command.SetGlobalFloat("_RaytracingPixelSpreadAngle", GetPixelSpreadAngle(fieldOfView, width, height));
+            command.SetRayTracingFloatParams(shader, "_RaytracingPixelSpreadAngle", GetPixelSpreadAngle(fieldOfView, width, height));
 
             command.SetRayTracingFloatParams(shader, "_RaytracingBias", bias);
             command.SetRayTracingFloatParams(shader, "_RaytracingDistantBias", distantBias);

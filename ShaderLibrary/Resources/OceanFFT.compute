@@ -149,7 +149,7 @@ void InitSpectrum(uint3 id : SV_DispatchThreadID)
 	float dispersion = floor(w / w0) * w0;
 	
 	// Eq 43
-	float wtk = dispersion * Time * 0;
+	float wtk = dispersion * Time * 1;
 	float4 xi = GaussianFloat4(id.x + id.y * _Resolution);
 	
 	// Eq 42 (Todo: precalculate)

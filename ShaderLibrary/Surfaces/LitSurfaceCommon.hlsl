@@ -4,6 +4,7 @@
 #include "../Common.hlsl"
 #include "../Samplers.hlsl"
 #include "../Exposure.hlsl"
+#include "../Raytracing.hlsl"
 #include "../Utility.hlsl"
 
 cbuffer UnityPerMaterial
@@ -27,6 +28,9 @@ Texture2D<float4> _BentNormal, _MainTex, _BumpMap, _MetallicGlossMap, _DetailAlb
 Texture2D<float3> _EmissionMap;
 Texture2D<float> _AnisotropyMap;
 
+float4 _BentNormal_TexelSize,_MainTex_TexelSize, _BumpMap_TexelSize, _MetallicGlossMap_TexelSize, _DetailAlbedoMap_TexelSize, _DetailNormalMap_TexelSize, _OcclusionMap_TexelSize, _ParalllaxMap_TexelSize, _EmissionMap_TexelSize,
+_AnisotropyMap_TexelSize;
+
 struct SurfaceInput
 {
 	float2 uv;
@@ -49,26 +53,32 @@ struct SurfaceOutput
 	float3 emission;
 };
 
-float4 SampleTexture(Texture2D<float4> tex, float2 uv, bool isRaytracing)
+float4 SampleTexture(Texture2D<float4> tex, float2 uv, float2 texelSize, bool isRaytracing = false, float3 worldNormal = 0, float coneWidth = 0, float scale = 1)
 {
 	// TODO: Ray cones
 	if(isRaytracing)
-		return tex.SampleLevel(_LinearRepeatSampler, uv, 0.0);
+	{
+		float lod = 0 * ComputeTextureLOD(texelSize, worldNormal, coneWidth, scale);
+		return tex.SampleLevel(_TrilinearRepeatSampler, uv, lod);
+	}
 	else
 		return tex.SampleBias(_TrilinearRepeatAniso16Sampler, uv, _MipBias);
 }
 
-float3 SampleTexture(Texture2D<float3> tex, float2 uv, bool isRaytracing)
+float3 SampleTexture(Texture2D<float3> tex, float2 uv, float2 texelSize, bool isRaytracing = false, float3 worldNormal = 0, float coneWidth = 0, float scale = 1)
 {
 	// TODO: Ray cones
 	if(isRaytracing)
-		return tex.SampleLevel(_LinearClampSampler, uv, 0.0);
+	{
+		float lod = 0 * ComputeTextureLOD(texelSize, worldNormal, coneWidth, scale);
+		return tex.SampleLevel(_TrilinearRepeatSampler, uv, lod);
+	}
 	else
 		return tex.SampleBias(_TrilinearRepeatAniso16Sampler, uv, _MipBias);
 }
 
 // TODO: World position only required for triplanar, is there a better way?
-SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false)
+SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false, float3 worldNormal = 0, float coneWidth = 0)
 {
 	SurfaceOutput result;
 	
@@ -85,13 +95,13 @@ SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false
 		float3 triplanarWeights = pow(abs(vertexNormal), _TriplanarSharpness);
 		triplanarWeights *= rcp(triplanarWeights.x + triplanarWeights.y + triplanarWeights.z);
 	
-		float4 albedoAlpha = SampleTexture(_MainTex, triplanarUvX, isRaytracing) * triplanarWeights.x;
-		albedoAlpha += SampleTexture(_MainTex, triplanarUvY, isRaytracing) * triplanarWeights.y;
-		albedoAlpha += SampleTexture(_MainTex, triplanarUvZ, isRaytracing) * triplanarWeights.z;
+		float4 albedoAlpha = SampleTexture(_MainTex, triplanarUvX, _MainTex_TexelSize.zw, isRaytracing, worldNormal, coneWidth) * triplanarWeights.x;
+		albedoAlpha += SampleTexture(_MainTex, triplanarUvY, _MainTex_TexelSize.zw, isRaytracing, worldNormal, coneWidth) * triplanarWeights.y;
+		albedoAlpha += SampleTexture(_MainTex, triplanarUvZ, _MainTex_TexelSize.zw, isRaytracing, worldNormal, coneWidth) * triplanarWeights.z;
 		
-		float3 tnormalX = UnpackNormalAG(SampleTexture(_BumpMap, triplanarUvX, isRaytracing), _BumpScale);
-		float3 tnormalY = UnpackNormalAG(SampleTexture(_BumpMap, triplanarUvY, isRaytracing), _BumpScale);
-		float3 tnormalZ = UnpackNormalAG(SampleTexture(_BumpMap, triplanarUvZ, isRaytracing), _BumpScale);
+		float3 tnormalX = UnpackNormalAG(SampleTexture(_BumpMap, triplanarUvX, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
+		float3 tnormalY = UnpackNormalAG(SampleTexture(_BumpMap, triplanarUvY, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
+		float3 tnormalZ = UnpackNormalAG(SampleTexture(_BumpMap, triplanarUvZ, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
 		
 		// minor optimization of sign(). prevents return value of 0
 		float3 axisSign = vertexNormal < 0 ? -1 : 1;
@@ -110,14 +120,14 @@ SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false
 		// sizzle tangent normals to match world normal and blend together
 		result.normal = result.bentNormal = normalize(tnormalX.zyx * triplanarWeights.x + tnormalY.xzy * triplanarWeights.y + tnormalZ.xyz * triplanarWeights.z);
 	#else
-		float4 albedoAlpha = SampleTexture(_MainTex, uv, isRaytracing);
-		float4 detail = SampleTexture(_DetailAlbedoMap, detailUv, isRaytracing);
+		float4 albedoAlpha = SampleTexture(_MainTex, uv, _MainTex_TexelSize.zw, isRaytracing, worldNormal, coneWidth);
+		float4 detail = SampleTexture(_DetailAlbedoMap, detailUv, _DetailAlbedoMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth);
 		albedoAlpha.rgb = albedoAlpha.rgb * detail.rgb * 2;
 		
-		float3 normalTS = UnpackNormalAG(SampleTexture(_BumpMap, uv, isRaytracing), _BumpScale);
+		float3 normalTS = UnpackNormalAG(SampleTexture(_BumpMap, uv, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
 	
 		// Detail Normal Map
-		float3 detailNormalTangent = UnpackNormalAG(SampleTexture(_DetailNormalMap, detailUv, isRaytracing), _DetailNormalMapScale);
+		float3 detailNormalTangent = UnpackNormalAG(SampleTexture(_DetailNormalMap, detailUv, _DetailNormalMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _DetailNormalMapScale);
 		normalTS = BlendNormalRNM(normalTS, detailNormalTangent);
 		
 		float3x3 tangentToWorld = TangentToWorldMatrix(vertexNormal, input.vertexTangent, input.tangentSign);
@@ -126,7 +136,7 @@ SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false
 		
 		if(BentNormal)
 		{
-			float3 bentNormalTS = UnpackNormalAG(SampleTexture(_BentNormal, uv, isRaytracing));
+			float3 bentNormalTS = UnpackNormalAG(SampleTexture(_BentNormal, uv, _BentNormal_TexelSize.zw, isRaytracing, worldNormal, coneWidth));
 			result.bentNormal = normalize(mul(bentNormalTS, tangentToWorld));
 		}
 	#endif
@@ -135,7 +145,7 @@ SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false
 	result.alpha = albedoAlpha.a * _Color.a;
 
 	// TODO: Triplanar?
-	float4 metallicGloss = SampleTexture(_MetallicGlossMap, uv, isRaytracing);
+	float4 metallicGloss = SampleTexture(_MetallicGlossMap, uv, _MetallicGlossMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth);
 	result.metallic = metallicGloss.r * _Metallic;
 
 	float smoothness;
@@ -146,10 +156,10 @@ SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false
 
 	result.roughness = SmoothnessToPerceptualRoughness(smoothness);
 
-	float3 emission = SampleTexture(_EmissionMap, uv, isRaytracing) * _EmissionColor;
+	float3 emission = SampleTexture(_EmissionMap, uv, _EmissionMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth) * _EmissionColor;
 	result.emission = ApplyEmissiveExposureWeight(emission, _EmissiveExposureWeight);
 
-	result.occlusion = SampleTexture(_OcclusionMap, uv, isRaytracing).g;
+	result.occlusion = SampleTexture(_OcclusionMap, _OcclusionMap_TexelSize.zw, uv, isRaytracing, worldNormal, coneWidth).g;
 	return result;
 }
 

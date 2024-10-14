@@ -40,7 +40,9 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	surfaceInput.tangentSign = tangent.w;
 	surfaceInput.isFrontFace = true;
 	
-	SurfaceOutput surface = GetSurfaceAttributes(surfaceInput, true);
+	float coneWidth = payload.cone.spreadAngle * RayTCurrent() + payload.cone.width;
+	
+	SurfaceOutput surface = GetSurfaceAttributes(surfaceInput, true, normal, coneWidth);
 
 	// Should make this a function as it's duplicated in a few places
 	float3 f0 = lerp(0.04, surface.albedo, surface.metallic);

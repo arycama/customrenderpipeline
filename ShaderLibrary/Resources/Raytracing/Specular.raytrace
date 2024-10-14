@@ -55,6 +55,11 @@ void RayGeneration()
 	payload.packedColor = 0.0;
 	payload.hitDistance = 0.0;
 	
+	// In order to achieve filtering for the textures, we need to compute the spread angle of the pixel
+	float distanceToCamera = length(worldPosition);
+	payload.cone.width = _RaytracingPixelSpreadAngle * distanceToCamera;
+	payload.cone.spreadAngle = _RaytracingPixelSpreadAngle + RoughnessToSpreadAngle(roughness);
+	
 	uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
 	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
 	

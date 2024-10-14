@@ -206,11 +206,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	// TODO: Stencil? Or hw blend?
 	float3 underwater = 0.0;
 	if(underwaterDepth != 0.0)
-		underwater = _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit)) * exp(-_Extinction * underwaterDistance);
+		underwater = _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit));// * exp(-_Extinction * underwaterDistance);
 	
 	// Apply roughness to transmission
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
-	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.04);
+	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
 	underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
 	
 	FragmentOutput output;
@@ -266,11 +266,11 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float perceptualRoughness = normalRoughness.a;
 	
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
-	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.04);
+	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
 	//result *= (1.0 - FssEss); // TODO: Diffuse transmittance?
 	
 	
-	output.emissive = result;
+	output.emissive = result * 0;
 	output.emissive = _TemporalInput[position.xy];// * (1.0 - FssEss);
 	
 	

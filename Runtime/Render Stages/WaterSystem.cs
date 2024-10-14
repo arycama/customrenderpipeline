@@ -660,16 +660,6 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(new UnderwaterLightingResult(underwaterResultId), renderGraph.FrameIndex);
         }
 
-        static internal float GetPixelSpreadTangent(float fov, int width, int height)
-        {
-            return Mathf.Tan(fov * Mathf.Deg2Rad * 0.5f) * 2.0f / Mathf.Min(width, height);
-        }
-
-        static internal float GetPixelSpreadAngle(float fov, int width, int height)
-        {
-            return Mathf.Atan(GetPixelSpreadTangent(fov, width, height));
-        }
-
         public void RenderDeferredWater(CullingResults cullingResults, RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, IRenderPassData commonPassData, Camera camera, int width, int height, RTHandle velocity)
         {
             if (!settings.IsEnabled)
@@ -800,8 +790,6 @@ namespace Arycama.CustomRenderPipeline
                     var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                     {
                         commonPassData.SetProperties(pass, command);
-                        var angle = GetPixelSpreadAngle(camera.fieldOfView, camera.pixelWidth, camera.pixelHeight);
-                        pass.SetFloat(command, "_RaytracingPixelSpreadAngle", angle);
                     });
                 }
 
@@ -809,7 +797,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
 
-                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, width, height, 1, 0.1f, 0.1f);
+                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, width, height, 1, 0.1f, 0.1f, camera.fieldOfView);
                     pass.WriteTexture(tempResult, "Result");
                     //pass.WriteTexture(tempResult, "HitColor");
                     //pass.WriteTexture(hitResult, "HitResult");
@@ -825,7 +813,6 @@ namespace Arycama.CustomRenderPipeline
                     {
                         commonPassData.SetProperties(pass, command);
                         pass.SetVector(command, "_Extinction", settings.Material.GetColor("_Extinction"));
-                        pass.SetFloat(command, "_RaytracingPixelSpreadAngle", GetPixelSpreadAngle(camera.fieldOfView, camera.pixelWidth, camera.pixelHeight));
                     });
                 }
             }
