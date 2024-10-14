@@ -34,5 +34,5 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.uv = uv;
 	lightingInput.NdotV = NdotV;
 	
-	return GetLighting(lightingInput) + _Emissive[position.xy];
+	return GetLighting(lightingInput, V) + _Emissive[position.xy];
 }

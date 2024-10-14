@@ -40,8 +40,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.uv = uv;
 	lightingInput.translucency = isTranslucent ? albedoMetallic.rgb * albedoMetallic.a : 0.0;
 	lightingInput.NdotV = NdotV;
-
-	return GetLighting(lightingInput);
+	
+	return GetLighting(lightingInput, V);
 }
 
 Texture2D<float4> CloudTexture;

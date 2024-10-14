@@ -30,7 +30,7 @@ float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, fl
 		input.isWater = false; // TODO: Implement when raytraced water is added
 		input.uv = clipPosition.xy * 0.5 + 0.5;
 		input.NdotV = NdotV;
-		return GetLighting(input);
+		return GetLighting(input, V);
 	}
 	
 	float3 radiance = IndirectSpecular(N, V, f0, NdotV, perceptualRoughness, false, _SkyReflection);
@@ -39,7 +39,7 @@ float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, fl
 	float BdotR = dot(bentNormal, R);
 	radiance *= IndirectSpecularFactor(NdotV, perceptualRoughness, f0) * SpecularOcclusion(NdotV, perceptualRoughness, occlusion, BdotR);
 	
-	float3 irradiance = AmbientLight(N, occlusion);
+	float3 irradiance = AmbientLight(bentNormal, occlusion, albedo);
 	
 	float3 luminance = radiance + irradiance * IndirectDiffuseFactor(NdotV, perceptualRoughness, f0, albedo, translucency);
 	
@@ -71,6 +71,11 @@ float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, fl
 		
 		if (!attenuation)
 			continue;
+			
+		#ifdef WATER_SHADOW_ON
+			if(i == 0)
+				light.color *= WaterShadow(worldPosition, light.direction);
+		#endif
 			
 		#if 0
 		if(!validShadow)

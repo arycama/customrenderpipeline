@@ -30,7 +30,8 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	float3 normal;
 	SampleTerrain(worldPosition, albedoSmoothness, normal, mask, true, worldNormal, coneWidth);
 	
-	float3 color = RaytracedLighting(worldPosition, normal, -WorldRayDirection(), mask.r, 1.0 - albedoSmoothness.a, mask.g, normal, albedoSmoothness.rgb);
+	float3 f0 = lerp(0.04, albedoSmoothness.rgb, mask.r);
+	float3 color = RaytracedLighting(worldPosition, normal, -WorldRayDirection(), f0, 1.0 - albedoSmoothness.a, mask.g, normal, albedoSmoothness.rgb);
 	
 	payload.packedColor = Float3ToR11G11B10(color);
 	payload.hitDistance = RayTCurrent();

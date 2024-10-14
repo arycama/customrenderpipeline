@@ -291,10 +291,8 @@ float3 WaterShadow(float3 position, float3 L)
 Texture2D<float3> ScreenSpaceReflections;
 float4 ScreenSpaceReflectionsScaleLimit;
 
-float3 GetLighting(LightingInput input, bool isVolumetric = false)
+float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 {
-	float3 V = normalize(-input.worldPosition);
-	
 	#ifdef SCREENSPACE_REFLECTIONS_ON
 		float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
 	#else
@@ -311,8 +309,8 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
 	#endif
 	
-	float3 luminance = 0;//	radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
-
+	float3 luminance = radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
+	
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
 		DirectionalLight light = _DirectionalLights[i];
@@ -363,8 +361,8 @@ float3 GetLighting(LightingInput input, bool isVolumetric = false)
 		else
 		{
 			#ifdef WATER_SHADOW_ON
-			///if(i == 0)
-			//	light.color *= WaterShadow(input.worldPosition, light.direction);
+			if(i == 0)
+				light.color *= WaterShadow(input.worldPosition, light.direction);
 			#endif
 			
 			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, light.direction, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV) * light.color * atmosphereTransmittance) * (abs(NdotL) * _Exposure * attenuation);

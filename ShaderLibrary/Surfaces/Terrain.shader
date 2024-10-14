@@ -69,6 +69,7 @@ Shader "Lit Terrain"
 
             HLSLPROGRAM
             #pragma raytracing RayTracing
+            #pragma multi_compile _ WATER_SHADOW_ON
             #include "TerrainRaytracing.hlsl"
             ENDHLSL
         }

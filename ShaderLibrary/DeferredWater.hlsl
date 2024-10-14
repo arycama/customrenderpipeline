@@ -214,7 +214,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
 	
 	FragmentOutput output;
-	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);
+	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater * 0);
 	output.luminance = luminance * (1.0 - foamFactor) * (1.0 - FssEss);
 	return output;
 }
@@ -269,11 +269,6 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
 	//result *= (1.0 - FssEss); // TODO: Diffuse transmittance?
 	
-	
-	output.emissive = result * 0;
-	output.emissive = _TemporalInput[position.xy];// * (1.0 - FssEss);
-	
-	
-	
+	output.emissive = result * (1.0 - FssEss);
 	return output;
 }

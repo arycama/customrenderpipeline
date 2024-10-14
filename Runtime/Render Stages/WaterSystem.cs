@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Assertions;
@@ -773,7 +772,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            if(settings.RaytracedRefractions)
+            if (settings.RaytracedRefractions)
             {
                 // Need to set some things as globals so that hit shaders can access them..
                 using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Raytraced Refractions Setup"))
@@ -785,11 +784,17 @@ namespace Arycama.CustomRenderPipeline
                     pass.AddRenderPassData<TerrainRenderData>(true);
                     pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                     pass.AddRenderPassData<ShadowRenderer.Result>();
+                    pass.AddRenderPassData<LitData.Result>();
+                    pass.AddRenderPassData<WaterShadowResult>();
                     commonPassData.SetInputs(pass);
 
                     var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                     {
                         commonPassData.SetProperties(pass, command);
+
+                        //command.SetRenderTarget(tempResult);
+                        //command.ClearRenderTarget(false, true, Color.clear);
+                        command.EnableShaderKeyword("WATER_SHADOW_ON");
                     });
                 }
 
@@ -808,11 +813,20 @@ namespace Arycama.CustomRenderPipeline
                     commonPassData.SetInputs(pass);
 
                     pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                    pass.AddRenderPassData<WaterShadowResult>();
 
                     var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                     {
                         commonPassData.SetProperties(pass, command);
                         pass.SetVector(command, "_Extinction", settings.Material.GetColor("_Extinction"));
+                    });
+                }
+
+                using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Raytraced Refractions Setup"))
+                {
+                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                    {
+                        command.DisableShaderKeyword("WATER_SHADOW_ON");
                     });
                 }
             }

@@ -49,7 +49,7 @@ void RayGeneration()
 	
 	float roughness = Sq(normalRoughness.a);
 	float rcpPdf;
-	float3 L = -V;//	refract(-V, N, rcp(1.34)); //	ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
+	float3 L = refract(-V, N, rcp(1.34)); //	ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	rcpPdf = 1;
 	
 	float _RaytracingBias = 0.1, _RaytracingDistantBias = 0.1;
@@ -88,7 +88,7 @@ void RayGeneration()
 		outDepth = 0.0;
 	}
 	
-	Result[position] = color;// * exp(-_Extinction * payload.hitDistance);
+	Result[position] += color  * exp(-_Extinction * payload.hitDistance);
 	
 	//HitColor[position] = float4(color, rcpPdf);
 	//HitResult[position] = float4(hitRay, outDepth);
