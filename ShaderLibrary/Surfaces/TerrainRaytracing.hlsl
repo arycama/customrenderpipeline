@@ -23,15 +23,15 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	
 	Vert v = InterpolateVertices(v0, v1, v2, attribs.barycentrics);
 	
-	float3 worldNormal = normalize(v.normal);
+	float3 N = normalize(v.normal);
 	float coneWidth = payload.cone.spreadAngle * RayTCurrent() + payload.cone.width;
 	
 	float4 albedoSmoothness, mask;
 	float3 normal;
-	SampleTerrain(worldPosition, albedoSmoothness, normal, mask, true, worldNormal, coneWidth);
+	SampleTerrain(worldPosition, albedoSmoothness, normal, mask, true, N, coneWidth);
 	
 	float3 f0 = lerp(0.04, albedoSmoothness.rgb, mask.r);
-	float3 color = RaytracedLighting(worldPosition, normal, -WorldRayDirection(), f0, 1.0 - albedoSmoothness.a, mask.g, normal, albedoSmoothness.rgb);
+	float3 color = RaytracedLighting(normal, f0, 1.0 - albedoSmoothness.a, mask.g, normal, albedoSmoothness.rgb);
 	
 	payload.packedColor = Float3ToR11G11B10(color);
 	payload.hitDistance = RayTCurrent();

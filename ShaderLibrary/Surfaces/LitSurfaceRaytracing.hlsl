@@ -28,26 +28,25 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	
 	Vert v = InterpolateVertices(v0, v1, v2, attribs.barycentrics);
 	
-	float3 normal = MultiplyVector(v.normal, WorldToObject3x4(), true);
+	float3 N = MultiplyVector(v.normal, WorldToObject3x4(), true);
+	float coneWidth = payload.cone.spreadAngle * RayTCurrent() + payload.cone.width;
+	
 	float4 tangent = float4(MultiplyVector(ObjectToWorld3x4(), v.tangent.xyz, true), v.tangent.w);
-	float3 worldPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
 
 	SurfaceInput surfaceInput;
 	surfaceInput.uv = v.uv;
-	surfaceInput.worldPosition = worldPosition;
-	surfaceInput.vertexNormal = normal;
+	surfaceInput.worldPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+	surfaceInput.vertexNormal = N;
 	surfaceInput.vertexTangent = tangent.xyz;
 	surfaceInput.tangentSign = tangent.w;
 	surfaceInput.isFrontFace = true;
 	
-	float coneWidth = payload.cone.spreadAngle * RayTCurrent() + payload.cone.width;
 	
-	SurfaceOutput surface = GetSurfaceAttributes(surfaceInput, true, normal, coneWidth);
+	SurfaceOutput surface = GetSurfaceAttributes(surfaceInput, true, N, coneWidth);
 
 	// Should make this a function as it's duplicated in a few places
 	float3 f0 = lerp(0.04, surface.albedo, surface.metallic);
-	float3 V = -WorldRayDirection();
-	float3 color = RaytracedLighting(worldPosition, surface.normal, V, f0, surface.roughness, surface.occlusion, surface.bentNormal, surface.albedo) + surface.emission;
+	float3 color = RaytracedLighting(surface.normal, f0, surface.roughness, surface.occlusion, surface.bentNormal, surface.albedo) + surface.emission;
 	
 	payload.packedColor = Float3ToR11G11B10(color);
 	payload.hitDistance = RayTCurrent();

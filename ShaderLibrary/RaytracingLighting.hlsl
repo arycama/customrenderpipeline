@@ -5,8 +5,11 @@
 #include "Raytracing.hlsl"
 
 // TODO: Share with lighting.hlsl code somehow?
-float3 RaytracedLighting(float3 worldPosition, float3 N, float3 V, float3 f0, float perceptualRoughness, float occlusion, float3 bentNormal, float3 albedo, float3 translucency = 0.0)
+float3 RaytracedLighting(float3 N, float3 f0, float perceptualRoughness, float occlusion, float3 bentNormal, float3 albedo, float3 translucency = 0.0)
 {
+	float3 worldPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+	float3 V = -WorldRayDirection();
+	
 	float4 clipPosition = PerspectiveDivide(WorldToClip(worldPosition));
 	bool isInScreen = all(clipPosition.xyz >= float2(-1.0, 0.0).xxy && clipPosition.xyz <= 1.0);
 
