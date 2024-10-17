@@ -30,13 +30,15 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Range(1, 128)] public float EdgeLength { get; private set; } = 64;
         }
 
+        private const int CascadeCount = 4;
+
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
 
         private RTHandle lengthToRoughness;
         private Settings settings;
         private RenderGraph renderGraph;
         private Material underwaterLightingMaterial, deferredWaterMaterial;
-        private GraphicsBuffer indexBuffer;
+        private GraphicsBuffer indexBuffer, spectrumBuffer, dispersionBuffer;
         private bool isInitialized;
         private PersistentRTHandleCache temporalCache;
         private RayTracingShader raytracingShader;
@@ -57,6 +59,8 @@ namespace Arycama.CustomRenderPipeline
 
             lengthToRoughness = renderGraph.GetTexture(256, 1, GraphicsFormat.R16_UNorm, isPersistent: true);
             indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
+            spectrumBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, settings.Resolution * settings.Resolution * CascadeCount, sizeof(float) * 4) { name = "Ocean Spectrum" };
+            dispersionBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, settings.Resolution * settings.Resolution * CascadeCount, sizeof(float)) { name = "Ocean Spectrum" };
 
             int index = 0;
             var pIndices = new ushort[QuadListIndexCount];
@@ -88,6 +92,13 @@ namespace Arycama.CustomRenderPipeline
 
             indexBuffer.SetData(pIndices);
             raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Refraction");
+        }
+
+        ~WaterSystem()
+        {
+            indexBuffer.Dispose();
+            spectrumBuffer.Dispose();
+            dispersionBuffer.Dispose();
         }
 
         public void Initialize()
@@ -139,23 +150,50 @@ namespace Arycama.CustomRenderPipeline
             var computeShader = Resources.Load<ComputeShader>("OceanFFT");
             var oceanBuffer = settings.Profile.SetShaderProperties(renderGraph);
 
-            var tempBufferID4 = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
-            var tempBufferID2 = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32_SFloat, 4, TextureDimension.Tex2DArray);
-
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Fft Row"))
+            // Update spectrum (TODO: Only when properties change)
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Spectrum"))
             {
-                pass.Initialize(computeShader, 0, 1, settings.Resolution, 4, false);
-                pass.WriteTexture("targetTexture", tempBufferID4);
-                pass.WriteTexture("targetTexture1", tempBufferID2);
+                pass.Initialize(computeShader, 4, settings.Resolution, settings.Resolution, 4);
+                //pass.WriteBuffer("OceanSpectrum", spectrumBuffer);
                 pass.ReadBuffer("OceanData", oceanBuffer);
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
+                    pass.SetBuffer(command, "OceanSpectrumWrite", spectrumBuffer);
+                    pass.SetBuffer(command, "OceanDispersionWrite", dispersionBuffer);
                     pass.SetVector(command, "_OceanScale", oceanScale);
                     pass.SetVector(command, "SpectrumStart", spectrumStart);
                     pass.SetVector(command, "SpectrumEnd", spectrumEnd);
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
                     pass.SetFloat(command, "Time", time);
+                    pass.SetFloat(command, "SequenceLength", settings.Profile.SequenceLength);
+                    pass.SetFloat(command, "TimeScale", settings.Profile.TimeScale);
+                });
+            }
+
+            var heightResult = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32_SFloat, 4, TextureDimension.Tex2DArray);
+            var displacementResult = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
+            var slopeResult = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
+
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Fft Row"))
+            {
+                pass.Initialize(computeShader, 0, 1, settings.Resolution, 4, false);
+                pass.WriteTexture("HeightResult", heightResult);
+                pass.WriteTexture("DisplacementResult", displacementResult);
+                pass.WriteTexture("SlopeResult", slopeResult);
+                pass.ReadBuffer("OceanData", oceanBuffer);
+
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                {
+                    pass.SetBuffer(command, "OceanSpectrum", spectrumBuffer);
+                    pass.SetBuffer(command, "OceanDispersion", dispersionBuffer);
+                    pass.SetVector(command, "_OceanScale", oceanScale);
+                    pass.SetVector(command, "SpectrumStart", spectrumStart);
+                    pass.SetVector(command, "SpectrumEnd", spectrumEnd);
+                    pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
+                    pass.SetFloat(command, "Time", time);
+                    pass.SetFloat(command, "SequenceLength", settings.Profile.SequenceLength);
+                    pass.SetFloat(command, "TimeScale", settings.Profile.TimeScale);
                 });
             }
 
@@ -173,9 +211,11 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Fft Column"))
             {
                 pass.Initialize(computeShader, 1, 1, settings.Resolution, 4, false);
-                pass.ReadTexture("sourceTexture", tempBufferID4);
-                pass.ReadTexture("sourceTexture1", tempBufferID2);
+                pass.ReadTexture("Height", heightResult);
+                pass.ReadTexture("Displacement", displacementResult);
+                pass.ReadTexture("Slope", slopeResult);
                 pass.WriteTexture("DisplacementOutput", displacementCurrent);
+                pass.WriteTexture("OceanNormalFoamSmoothness", normalFoamSmoothness);
             }
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Calculate Normals"))
@@ -703,8 +743,9 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var keyword = dirLightCount == 2 ? "LIGHT_COUNT_TWO" : (dirLightCount == 1 ? "LIGHT_COUNT_ONE" : string.Empty);
+            var refractionResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            var scatterResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
-            var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water"))
             {
                 pass.Initialize(deferredWaterMaterial, keyword: keyword, camera: camera);
@@ -712,8 +753,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(albedoMetallic);
                 pass.WriteTexture(normalRoughness);
                 pass.WriteTexture(bentNormalOcclusion);
-                pass.WriteTexture(emissive);
-                pass.WriteTexture(tempResult);
+                pass.WriteTexture(refractionResult);
+                pass.WriteTexture(scatterResult);
 
                 pass.ReadTexture("_UnderwaterDepth", underwaterDepth);
                 pass.ReadTexture("_Depth", cameraDepth, subElement: RenderTextureSubElement.Depth);
@@ -792,7 +833,9 @@ namespace Arycama.CustomRenderPipeline
                     {
                         commonPassData.SetProperties(pass, command);
 
-                        //command.SetRenderTarget(tempResult);
+                        //command.SetRenderTarget(refractionResult);
+                        //command.ClearRenderTarget(false, true, Color.clear);
+                        //command.SetRenderTarget(scatterResult);
                         //command.ClearRenderTarget(false, true, Color.clear);
                         command.EnableShaderKeyword("WATER_SHADOW_ON");
                     });
@@ -803,7 +846,8 @@ namespace Arycama.CustomRenderPipeline
                     var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
 
                     pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, width, height, 1, 0.1f, 0.1f, camera.fieldOfView);
-                    pass.WriteTexture(tempResult, "Result");
+                    pass.WriteTexture(refractionResult, "RefractionResult");
+                    pass.WriteTexture(scatterResult, "ScatterResult");
                     //pass.WriteTexture(tempResult, "HitColor");
                     //pass.WriteTexture(hitResult, "HitResult");
                     pass.ReadTexture("_Depth", cameraDepth, subElement: RenderTextureSubElement.Depth);
@@ -819,6 +863,16 @@ namespace Arycama.CustomRenderPipeline
                     {
                         commonPassData.SetProperties(pass, command);
                         pass.SetVector(command, "_Extinction", settings.Material.GetColor("_Extinction"));
+
+                        var material = settings.Material;
+                        pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
+                        pass.SetVector(command, "_Extinction", material.GetColor("_Extinction"));
+
+                        pass.SetVector(command, "_LightDirection0", lightDirection0);
+                        pass.SetVector(command, "_LightColor0", lightColor0);
+
+                        pass.SetVector(command, "_LightDirection1", lightDirection1);
+                        pass.SetVector(command, "_LightColor1", lightColor1);
                     });
                 }
 
@@ -830,13 +884,21 @@ namespace Arycama.CustomRenderPipeline
                     });
                 }
             }
+            else
+            {
+              
+            }
 
             var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water Temporal"))
             {
+                if (settings.RaytracedRefractions)
+                    pass.Keyword = "RAYTRACED_REFRACTIONS_ON";
+
                 pass.Initialize(deferredWaterMaterial, 1, camera: camera);
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
-                pass.ReadTexture("_TemporalInput", tempResult);
+                pass.ReadTexture("_RefractionInput", refractionResult);
+                pass.ReadTexture("_ScatterInput", scatterResult);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(emissive);
 
@@ -844,7 +906,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Depth", cameraDepth, subElement: RenderTextureSubElement.Depth);
                 pass.ReadTexture("_Stencil", cameraDepth, subElement: RenderTextureSubElement.Stencil);
 
-                pass.ReadTexture("_TemporalInput", tempResult);
                 pass.ReadTexture("_History", history);
                 pass.ReadTexture("_Stencil", cameraDepth, subElement: RenderTextureSubElement.Stencil);
                 pass.ReadTexture("_Depth", cameraDepth);

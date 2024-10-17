@@ -79,12 +79,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float scale = _OceanScale[i];
 		float3 uv = float3(oceanUv * scale, i);
 		float4 cascadeData = OceanNormalFoamSmoothness.SampleGrad(_TrilinearRepeatSampler, uv, dx * scale, dy * scale);
-		//cascadeData = OceanNormalFoamSmoothness.Sample(_TrilinearRepeatSampler, uv);
 		
 		float3 normal = UnpackNormalSNorm(cascadeData.rg);
 		normalData += normal.xy / normal.z;
 		foam += cascadeData.b * _RcpCascadeScales[i];
-		smoothness += SmoothnessToNormalLength(0.5 * cascadeData.a + 0.5);
+		smoothness += Remap(cascadeData.a, -1.0, 1.0, 2.0 / 3.0);
 	}
 	
 	smoothness = LengthToSmoothness(smoothness * 0.25);
@@ -200,13 +199,13 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float3 finalTransmittance = exp(-t * _Extinction);
 	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
 	
-	luminance *= _Color;
+	//luminance *= _Color;
 	luminance = IsInfOrNaN(luminance) ? 0.0 : luminance;
 
 	// TODO: Stencil? Or hw blend?
 	float3 underwater = 0.0;
 	if(underwaterDepth != 0.0)
-		underwater = _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit));// * exp(-_Extinction * underwaterDistance);
+		underwater = _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit)) * exp(-_Extinction * underwaterDistance);
 	
 	// Apply roughness to transmission
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
@@ -214,13 +213,13 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
 	
 	FragmentOutput output;
-	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater * 0);
-	output.luminance = luminance * (1.0 - foamFactor) * (1.0 - FssEss);
+	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);
+	output.luminance = luminance;// * (1.0 - foamFactor) * (1.0 - FssEss);
 	return output;
 }
 
 Texture2D<float4> _NormalRoughness;
-Texture2D<float3> _TemporalInput, _History;
+Texture2D<float3> _RefractionInput, _ScatterInput, _History;
 float4 _HistoryScaleLimit;
 float _IsFirst;
 
@@ -234,7 +233,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 {
 	// Note: Not using yCoCg or tonemapping gives less noisy results here
 	float3 minValue, maxValue, result;
-	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, result, false, false, 1.5);
+	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result, false, false, 1.5);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	
@@ -248,13 +247,12 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
 	result = RemoveNaN(result);
-	
-	//result = _TemporalInput[position.xy];
-	
+
 	TemporalOutput output;
 	output.temporal = result;
 	
-	//result *= _Color;
+	result *= _Color;
+	result += _RefractionInput[position.xy];
 	
 	// Apply roughness to transmission
 	float4 normalRoughness = _NormalRoughness[position.xy];

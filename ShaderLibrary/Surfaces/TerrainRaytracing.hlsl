@@ -16,19 +16,12 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	uint index = PrimitiveIndex();
 	uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(index);
 	
-	Vert v0, v1, v2;
-	v0 = FetchVertex(triangleIndices.x);
-	v1 = FetchVertex(triangleIndices.y);
-	v2 = FetchVertex(triangleIndices.z);
-	
-	Vert v = InterpolateVertices(v0, v1, v2, attribs.barycentrics);
-	
-	float3 N = normalize(v.normal);
+	float3 N = GetTerrainNormal(worldPosition);
 	float coneWidth = payload.cone.spreadAngle * RayTCurrent() + payload.cone.width;
 	
 	float4 albedoSmoothness, mask;
 	float3 normal;
-	SampleTerrain(worldPosition, albedoSmoothness, normal, mask, true, N, coneWidth);
+	SampleTerrain(worldPosition, N, albedoSmoothness, normal, mask, true, coneWidth);
 	
 	float3 f0 = lerp(0.04, albedoSmoothness.rgb, mask.r);
 	float3 color = RaytracedLighting(normal, f0, 1.0 - albedoSmoothness.a, mask.g, normal, albedoSmoothness.rgb);

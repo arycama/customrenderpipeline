@@ -30,23 +30,34 @@ float GetTerrainHeight(float2 uv)
 	return _TerrainHeightmapTexture.SampleLevel(_LinearClampSampler, uv, 0) * _TerrainHeightScale + _TerrainHeightOffset;
 }
 
-float2 WorldToTerrainPositionHalfTexel(float3 positionWS)
+float2 WorldToTerrainPositionHalfTexel(float3 worldPosition)
 {
-	return positionWS.xz * _TerrainRemapHalfTexel.xy + _TerrainRemapHalfTexel.zw;
+	return worldPosition.xz * _TerrainRemapHalfTexel.xy + _TerrainRemapHalfTexel.zw;
 }
 
-float2 WorldToTerrainPosition(float3 positionWS)
+float2 WorldToTerrainPosition(float3 worldPosition)
 {
-	return positionWS.xz * _TerrainScaleOffset.xy + _TerrainScaleOffset.zw;
+	return worldPosition.xz * _TerrainScaleOffset.xy + _TerrainScaleOffset.zw;
 }
 
-float GetTerrainHeight(float3 positionWS)
+float GetTerrainHeight(float3 worldPosition)
 {
-	float2 uv = WorldToTerrainPositionHalfTexel(positionWS);
+	float2 uv = WorldToTerrainPositionHalfTexel(worldPosition);
 	return GetTerrainHeight(uv);
 }
 
-void SampleTerrain(float3 worldPosition, out float4 albedoSmoothness, out float3 normal, out float4 mask, bool sampleMip0 = false, float3 worldNormal = 0, float coneWidth = 0.0)
+float3 GetTerrainNormal(float2 uv)
+{
+	return UnpackNormalSNorm(_TerrainNormalMap.SampleLevel(_LinearClampSampler, uv, 0.0)).xzy;
+}
+
+float3 GetTerrainNormal(float3 worldPosition)
+{
+	float2 terrainUv = WorldToTerrainPosition(worldPosition);
+	return GetTerrainNormal(terrainUv);
+}
+
+void SampleTerrain(float3 worldPosition, float3 terrainNormal, out float4 albedoSmoothness, out float3 normal, out float4 mask, bool sampleMip0 = false, float coneWidth = 0.0)
 {
 	float2 terrainUv = WorldToTerrainPosition(worldPosition);
 	float2 localUv = terrainUv * IdMapResolution - 0.5;
@@ -159,10 +170,10 @@ void SampleTerrain(float3 worldPosition, out float4 albedoSmoothness, out float3
 		localDx = mul(rotationMatrix, localDx);
 		localDy = mul(rotationMatrix, localDy);
 		
-		albedoSmoothness += (sampleMip0 ? AlbedoSmoothness.SampleLevel(_TrilinearRepeatSampler, sampleUv, ComputeTextureLOD(AlbedoSmoothness_TexelSize.zw, worldNormal, coneWidth, scale)) : AlbedoSmoothness.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy)) * layerWeight;
-		mask += (sampleMip0 ? Mask.SampleLevel(_TrilinearRepeatSampler, sampleUv, ComputeTextureLOD(Mask_TexelSize.zw, worldNormal, coneWidth, scale)) : Mask.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy)) * layerWeight;
+		albedoSmoothness += (sampleMip0 ? AlbedoSmoothness.SampleLevel(_TrilinearRepeatSampler, sampleUv, ComputeTextureLOD(AlbedoSmoothness_TexelSize.zw, terrainNormal, coneWidth, scale)) : AlbedoSmoothness.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy)) * layerWeight;
+		mask += (sampleMip0 ? Mask.SampleLevel(_TrilinearRepeatSampler, sampleUv, ComputeTextureLOD(Mask_TexelSize.zw, terrainNormal, coneWidth, scale)) : Mask.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy)) * layerWeight;
 		
-		float4 normalData = (sampleMip0 ? Normal.SampleLevel(_TrilinearRepeatSampler, sampleUv, ComputeTextureLOD(Normal_TexelSize.zw, worldNormal, coneWidth, scale)) : Normal.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy));
+		float4 normalData = (sampleMip0 ? Normal.SampleLevel(_TrilinearRepeatSampler, sampleUv, ComputeTextureLOD(Normal_TexelSize.zw, terrainNormal, coneWidth, scale)) : Normal.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy));
 		float3 unpackedNormal = UnpackNormalAG(normalData);
 		
 		float2 d0 = unpackedNormal.xy / unpackedNormal.z;
@@ -174,14 +185,18 @@ void SampleTerrain(float3 worldPosition, out float4 albedoSmoothness, out float3
 		derivativeSum += derivative * layerWeight;
 	}
 	
-	float3 terrainNormal = UnpackNormalSNorm(sampleMip0 ? _TerrainNormalMap.SampleLevel(_LinearClampSampler, terrainUv, ComputeTextureLOD(_TerrainNormalMap_TexelSize.zw, worldNormal, coneWidth)) : _TerrainNormalMap.Sample(_LinearClampSampler, terrainUv));
 	float3 tangentNormal = normalize(float3(derivativeSum, 1.0));
 	
-	// TODO: Figure out why derivatives aren't working for raytracing
 	tangentNormal = normalize(normalSum);
 	
-	normal = BlendNormalRNM(terrainNormal, tangentNormal).xzy;
-	//normal = terrainNormal.xzy;
+	normal = BlendNormalRNM(terrainNormal.xzy, tangentNormal).xzy;
+}
+
+void SampleTerrain(float3 worldPosition, out float4 albedoSmoothness, out float3 normal, out float4 mask, bool sampleMip0 = false, float coneWidth = 0.0)
+{
+	float2 terrainUv = WorldToTerrainPosition(worldPosition);
+	float3 terrainNormal = GetTerrainNormal(terrainUv);
+	SampleTerrain(worldPosition, terrainNormal, albedoSmoothness, normal, mask, sampleMip0, coneWidth);
 }
 
 #endif

@@ -34,12 +34,13 @@ Shader "Hidden/Deferred Water 1"
             Name "Deferred Water Temporal"
 
             Blend 0 Off
-            Blend 1 One One
+            //Blend 1 One One
 
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
             #pragma target 5.0
+            #pragma multi_compile _ RAYTRACED_REFRACTIONS_ON
 
             #include "DeferredWater.hlsl"
             ENDHLSL

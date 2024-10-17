@@ -13,6 +13,8 @@ public class WaterProfile : ScriptableObject
     [field: SerializeField, Range(0f, 1f)] public float FoamStrength { get; private set; } = 0.5f;
     [field: SerializeField, Range(0f, 1f)] public float FoamDecay { get; private set; } = 0.85f;
     [field: SerializeField] public float MaxWaterHeight { get; private set; } = 32f;
+    [field: SerializeField] public float TimeScale { get; private set; } = 1.0f;
+    [field: SerializeField] public float SequenceLength { get; private set; } = 200.0f;
     [field: SerializeField] public OceanSpectrum LocalSpectrum { get; private set; } = new(1f, 12f, 0f, 1e+5f, 1f, 0.2f, 3.3f, 0.01f);
     [field: SerializeField] public OceanSpectrum DistantSpectrum { get; private set; } = new(0f, 12f, 0f, 1e+5f, 1f, 0.2f, 3.3f, 0.01f);
     [field: SerializeField] public float MaxWaveNumberMultiplier { get; private set; } = 10.0f;
