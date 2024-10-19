@@ -395,6 +395,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.ReadTexture("_OceanDisplacement", displacementCurrent);
                 pass.AddRenderPassData<OceanFftResult>();
+                pass.AddRenderPassData<WaterShoreMask.Result>();
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
@@ -625,6 +626,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<OceanFftResult>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<WaterShoreMask.Result>();
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
@@ -772,6 +774,7 @@ namespace Arycama.CustomRenderPipeline
 
                 commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<OceanFftResult>();
+                pass.AddRenderPassData<WaterShoreMask.Result>();
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {

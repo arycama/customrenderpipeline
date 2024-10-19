@@ -9,10 +9,10 @@ namespace Arycama.CustomRenderPipeline
         public const float Log2e = (float)1.44269504088896340736;
 
         public static int DivRoundUp(int x, int y) => (x + y - 1) / y;
-        public static float Exp2(float x) => MathF.Pow(2.0f, x);
-        public static float Exp10(float x) => MathF.Pow(10.0f, x);
+        public static float Exp2(float x) => Pow(2.0f, x);
+        public static float Exp10(float x) => Pow(10.0f, x);
         public static float Rcp(float x) => 1.0f / x;
-        public static float Log2(float x) => MathF.Log(x, 2.0f);
+        public static float Log2(float x) => Log(x, 2.0f);
 
         public static int MipCount(int width, int height)
         {
@@ -26,7 +26,7 @@ namespace Arycama.CustomRenderPipeline
 
         public static float Snap(float value, float cellSize)
         {
-            return MathF.Floor(value / cellSize) * cellSize;
+            return Floor(value / cellSize) * cellSize;
         }
 
         public static Vector3 Mul(Matrix3x3 m, Vector3 v)

@@ -6,6 +6,7 @@
 #include "Samplers.hlsl"
 #include "Temporal.hlsl"
 #include "WaterCommon.hlsl"
+#include "Water/WaterShoreMask.hlsl"
 
 struct VertexInput
 {

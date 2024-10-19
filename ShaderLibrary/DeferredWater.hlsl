@@ -10,6 +10,7 @@
 #include "Lighting.hlsl"
 #include "Random.hlsl"
 #include "WaterCommon.hlsl"
+#include "Water/WaterShoreMask.hlsl"
 
 Texture2D<float4> _WaterNormalFoam;
 Texture2D<float3> _WaterEmission, _UnderwaterResult;
@@ -45,9 +46,9 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	float linearWaterDepth = LinearEyeDepth(waterDepth);
 	float waterDistance = linearWaterDepth * rcp(rcpLenV);
-	float3 positionWS = -V * waterDistance;
+	float3 worldPosition = -V * waterDistance;
 	
-	float2 oceanUv = positionWS.xz - waterNormalFoamRoughness.xy + _ViewPosition.xz;
+	float2 oceanUv = worldPosition.xz - waterNormalFoamRoughness.xy + _ViewPosition.xz;
 	
 	// Gerstner normals + foam
 	float shoreFactor, breaker, shoreFoam;
@@ -67,11 +68,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	rayX = -PixelToWorldDir(position.xy + float2(1.0, 0.0), true);
 	rayY = -PixelToWorldDir(position.xy + float2(0.0, 1.0), true);
 	
-	float3 positionX = IntersectRayPlane(0.0, rayX, positionWS, triangleNormal);
-	float3 positionY = IntersectRayPlane(0.0, rayY, positionWS, triangleNormal);
+	float3 positionX = IntersectRayPlane(0.0, rayX, worldPosition, triangleNormal);
+	float3 positionY = IntersectRayPlane(0.0, rayY, worldPosition, triangleNormal);
 	
-	float2 dx = (positionX - positionWS).xz;
-	float2 dy = (positionY - positionWS).xz;
+	float2 dx = (positionX - worldPosition).xz;
+	float2 dy = (positionY - worldPosition).xz;
 	
 	[unroll]
 	for (uint i = 0; i < 4; i++)
@@ -149,8 +150,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float weight = rcp(dot(rcp(rcpPdf), 1.0 / 3.0));
 
 	float3 underwaterPositionWS = PixelToWorld(float3(refractedPositionSS, underwaterDepth));
-	float3 underwaterV = normalize(underwaterPositionWS - positionWS);
-	float3 P = positionWS + underwaterV * t;
+	float3 underwaterV = normalize(underwaterPositionWS - worldPosition);
+	float3 P = worldPosition + underwaterV * t;
 	
 	float3 luminance = 0.0;
 	float planetDistance = DistanceToBottomAtmosphereBoundary(_ViewHeight, -V.y);
@@ -162,7 +163,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			attenuation *= CloudTransmittance(P);
 			if(attenuation > 0.0)
 			{
-				float shadowDistance0 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
+				float shadowDistance0 = max(0.0, worldPosition.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
 				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, P);
 				if (all(saturate(shadowPosition.xyz) == shadowPosition.xyz))
 				{
@@ -185,7 +186,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		}
 	
 		#ifdef LIGHT_COUNT_TWO
-			float shadowDistance1 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection1.y));
+			float shadowDistance1 = max(0.0, worldPosition.y - P.y) / max(1e-6, saturate(_LightDirection1.y));
 			float LdotV1 = dot(_LightDirection1, -V);
 			float lightCosAngleAtDistance1 = CosAngleAtDistance(_ViewHeight, _LightDirection1.y, planetDistance * LdotV1, _PlanetRadius);
 			float3 lightColor1 = RcpPi * _LightColor1 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance1);
@@ -211,6 +212,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
 	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
 	underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
+	
+	underwater = GetShoreData(worldPosition).g;
 	
 	FragmentOutput output;
 	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);
