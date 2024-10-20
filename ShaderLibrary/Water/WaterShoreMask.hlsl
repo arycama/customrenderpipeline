@@ -13,35 +13,17 @@ cbuffer WaterShoreMaskProperties
 
 float4 ShoreScaleOffset;
 float2 ShoreTerrainSize;
-float ShoreMaxOceanDepth, ShoreMaxShoreDistance;
+float ShoreMaxOceanDepth;
+float ShoreMaxTerrainDistance;
 
-float4 GetShoreData(float3 worldPosition)
+void GetShoreData(float3 worldPosition, out float depth, out float shoreDistance, out float2 direction)
 {
 	float2 uv = (worldPosition.xz + _ViewPosition.xz) * ShoreScaleOffset.xy + ShoreScaleOffset.zw;
-	return ShoreDistance.SampleLevel(_LinearClampSampler, uv, 0.0);
-}
-
-float2 GetShoreDirection(float4 shoreData)
-{
-	return shoreData.zw;
-}
-
-float2 GetShoreDirection(float3 worldPosition)
-{
-	float4 shoreData = GetShoreData(worldPosition);
-	return GetShoreDirection(shoreData);
-}
-
-float GetShoreDistance(float4 shoreData)
-{
-	return shoreData.g;
-	return Remap(shoreData.g, 0.0, 1.0, -ShoreMinDist, ShoreMaxDist);
-}
-
-float GetShoreDistance(float3 worldPosition)
-{
-	float4 shoreData = GetShoreData(worldPosition);
-	return GetShoreDistance(shoreData);
+	float4 data = ShoreDistance.SampleLevel(_LinearClampSampler, uv, 0.0);
+	
+	depth = Remap(data.r, 0.0, 1.0, ShoreMaxOceanDepth, 0.0);
+	shoreDistance = Remap(data.g, 0.0, 1.0, ShoreMinDist, ShoreMaxDist) * ShoreMaxTerrainDistance;
+	direction = normalize(2.0 * data.ba - 1.0);
 }
 
 #endif

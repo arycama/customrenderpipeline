@@ -425,6 +425,7 @@ namespace Arycama.CustomRenderPipeline
                     ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                     pass.SetInt(command, "_CullingPlanesCount", passData.CullingPlanes.Count);
+                    pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
                 });
             }
 
@@ -655,6 +656,8 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
                     ArrayPool<Vector4>.Release(cullingPlanesArray);
+
+                    pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
                 });
             }
 
@@ -813,6 +816,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetTexture(command, "_FoamTex", settings.Material.GetTexture("_FoamTex"));
                     pass.SetTexture(command, "_FoamBump", settings.Material.GetTexture("_FoamBump"));
 
+                    pass.SetFloat(command, "_ShoreWaveLength", material.GetFloat("_ShoreWaveLength"));
+                    pass.SetFloat(command, "_ShoreWaveHeight", material.GetFloat("_ShoreWaveHeight"));
                 });
             }
 

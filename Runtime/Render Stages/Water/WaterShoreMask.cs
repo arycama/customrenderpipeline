@@ -47,12 +47,10 @@ namespace Arycama.CustomRenderPipeline
             // Seed pixels
             var heightmapResolution = terrainData.heightmapResolution;
             var heightmapTexture = terrainData.heightmapTexture;
-            var cutoff = -terrainPosition.y / terrainSize.y;// * 2.0f;
-            var maxDistance = new Vector2(terrainSize.x, terrainSize.y).magnitude;
-            var terrainHeightScaleOffset = new Vector2(2.0f * terrainSize.y, terrainPosition.y);
+            var cutoff = Mathf.InverseLerp(terrainPosition.y, terrainPosition.y + terrainSize.y * 2.0f, 0.0f);
             var invResolution = 1.0f / heightmapResolution;
 
-            var src = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R16G16_SNorm, isExactSize: true);
+            var src = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R32G32_SFloat, isExactSize: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Water Shore Mask Blit"))
             {
                 pass.Initialize(material);
@@ -61,21 +59,19 @@ namespace Arycama.CustomRenderPipeline
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "Cutoff", cutoff);
-                    pass.SetFloat(command, "MaxDistance", maxDistance);
                     pass.SetFloat(command, "InvResolution", invResolution);
                     pass.SetFloat(command, "Resolution", heightmapResolution);
-                    pass.SetVector(command, "TerrainHeightScaleOffset", terrainHeightScaleOffset);
                     pass.SetTexture(command, "Heightmap", terrainData.heightmapTexture);
                 });
             }
 
             // Jump flood, Ping pong between two temporary textures.
-            var passes = (int)Mathf.Log(heightmapResolution, 2);
+            var passes = Mathf.CeilToInt(Mathf.Log(heightmapResolution, 2));
             var minMaxValues = renderGraph.GetBuffer(4, sizeof(float), GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
             for (var i = 0; i < passes; i++)
             {
                 var offset = Mathf.Pow(2, passes - i - 1);
-                var dst = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R16G16_SNorm, isExactSize: true);
+                var dst = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R32G32_SFloat, isExactSize: true);
 
                 using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Water Shore Mask Jump Flood"))
                 {
@@ -94,11 +90,10 @@ namespace Arycama.CustomRenderPipeline
                     var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                     {
                         pass.SetFloat(command, "Offset", offset);
-                        pass.SetFloat(command, "MaxDistance", maxDistance);
                         pass.SetTexture(command, "Heightmap", terrainData.heightmapTexture);
-                        pass.SetVector(command, "TerrainHeightScaleOffset", terrainHeightScaleOffset);
                         pass.SetFloat(command, "InvResolution", invResolution);
                         pass.SetFloat(command, "Resolution", heightmapResolution);
+                        pass.SetFloat(command, "Cutoff", cutoff);
 
                         if (index == passes - 1)
                         {
@@ -129,7 +124,6 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
-                    pass.SetVector(command, "TerrainHeightScaleOffset", terrainHeightScaleOffset);
                     pass.SetTexture(command, "Heightmap", heightmapTexture);
                     pass.SetFloat(command, "Cutoff", cutoff);
                     pass.SetFloat(command, "InvResolution", invResolution);
@@ -139,7 +133,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var scaleOffset = new Vector4(1f / terrainSize.x, 1f / terrainSize.z, -terrainPosition.x / terrainSize.x, -terrainPosition.z / terrainSize.z);
-            renderGraph.ResourceMap.SetRenderPassData<Result>(new Result(result, resultDataBuffer, scaleOffset, terrainSize, -terrainPosition.y, maxDistance), renderGraph.FrameIndex, true);
+            renderGraph.ResourceMap.SetRenderPassData<Result>(new Result(result, resultDataBuffer, scaleOffset, terrainSize, terrainPosition.y, terrainSize.x), renderGraph.FrameIndex, true);
         }
 
         struct ResultData
@@ -161,16 +155,16 @@ namespace Arycama.CustomRenderPipeline
             BufferHandle resultDataBuffer;
             Vector4 scaleOffset;
             Vector2 terrainSize;
-            float maxOceanDepth, maxShoreDistance;
+            float maxOceanDepth, maxTerrainDistance;
 
-            public Result(RTHandle shoreDistance, BufferHandle resultDataBuffer, Vector4 scaleOffset, Vector2 terrainSize, float maxOceanDepth, float maxShoreDistance)
+            public Result(RTHandle shoreDistance, BufferHandle resultDataBuffer, Vector4 scaleOffset, Vector2 terrainSize, float maxOceanDepth, float maxTerrainDistance)
             {
                 this.shoreDistance = shoreDistance ?? throw new ArgumentNullException(nameof(shoreDistance));
                 this.resultDataBuffer = resultDataBuffer;
                 this.scaleOffset = scaleOffset;
                 this.terrainSize = terrainSize;
                 this.maxOceanDepth = maxOceanDepth;
-                this.maxShoreDistance = maxShoreDistance;
+                this.maxTerrainDistance = maxTerrainDistance;
             }
 
             void IRenderPassData.SetInputs(RenderPass pass)
@@ -184,7 +178,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetVector(command, "ShoreScaleOffset", scaleOffset);
                 pass.SetVector(command, "ShoreTerrainSize", terrainSize);
                 pass.SetFloat(command, "ShoreMaxOceanDepth", maxOceanDepth);
-                pass.SetFloat(command, "ShoreMaxOceanDepth", maxShoreDistance);
+                pass.SetFloat(command, "ShoreMaxTerrainDistance", maxTerrainDistance);
             }
         }
     }

@@ -226,17 +226,19 @@ FragmentInput Domain(HullConstantOutput tessFactors, OutputPatch<DomainInput, 4>
 		previousDisplacement += OceanDisplacementHistory.SampleGrad(_TrilinearRepeatSampler, float3(uv * _OceanScale[i], i), dx * _OceanScale[i], dy * _OceanScale[i]);
 	}
 	
-	worldPosition += displacement;
-	previousPosition += previousDisplacement;
-	
 	// shore waves
 	float shoreFactor, breaker, foam;
 	float3 normal, shoreDisplacement, tangent;
-	GerstnerWaves(worldPosition + _ViewPosition, shoreDisplacement, normal, tangent, shoreFactor, _Time, breaker, foam);
+	GerstnerWaves(worldPosition, shoreDisplacement, normal, tangent, shoreFactor, _Time, breaker, foam);
 	
 	float previousShoreFactor, previousBreaker, previousFoam;
 	float3 previousNormal, previousShoreDisplacement, previousTangent;
-	GerstnerWaves(previousPosition + _ViewPosition, previousShoreDisplacement, previousNormal, previousTangent, previousShoreFactor, _PreviousTime, previousBreaker, previousFoam);
+	GerstnerWaves(previousPosition, previousShoreDisplacement, previousNormal, previousTangent, previousShoreFactor, _PreviousTime, previousBreaker, previousFoam);
+	
+	displacement = shoreDisplacement;
+	
+	worldPosition += displacement;
+	previousPosition += previousDisplacement;
 	
 	worldPosition = PlanetCurve(worldPosition);
 	previousPosition = PlanetCurve(previousPosition);
