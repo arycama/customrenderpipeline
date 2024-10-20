@@ -10,7 +10,6 @@ float2 FragmentSeed(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Ta
 	float2 minSeed = -1;
 
 	float height = Heightmap[position.xy];
-	bool isAboveWater = height >= Cutoff;
 	
 	[unroll]
 	for (int y = -1; y < 2; y++)
@@ -69,7 +68,7 @@ float2 FragmentJumpFlood(float4 position : SV_Position, float2 uv : TEXCOORD) : 
 			if (any(neighbourSeed == -1))
 				continue;
 				
-			float sqDist = SqrLength(uv - neighbourSeed);
+			float sqDist = SqrLength(neighbourSeed - uv);
 			if (sqDist >= minDistSq)
 				continue;
 					
@@ -81,7 +80,7 @@ float2 FragmentJumpFlood(float4 position : SV_Position, float2 uv : TEXCOORD) : 
 #ifdef FINAL_PASS
 	float minDist = sqrt(minDistSq);
 	float height = Heightmap[position.xy];
-	if (height < Cutoff)
+	if (height > Cutoff)
 	{
 		InterlockedMax(MinMaxValuesWrite[0], asuint(-minDist));
 	}
@@ -103,7 +102,7 @@ float4 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD) : SV
 	float dist = length(delta);
 
 	float height = Heightmap[position.xy];
-	if (height < Cutoff)
+	if (height > Cutoff)
 	{
 		// Invert the distance
 		dist = -dist;

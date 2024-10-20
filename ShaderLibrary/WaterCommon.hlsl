@@ -27,6 +27,7 @@ float _ShoreWaveSteepness;
 float _ShoreWaveHeight;
 float _ShoreWaveLength;
 float _ShoreWindAngle;
+float _ShoreWaveWindSpeed;
 uint _VerticesPerEdge, _VerticesPerEdgeMinusOne;
 
 Buffer<uint> _PatchData;
@@ -63,35 +64,36 @@ bool CheckTerrainMask(float3 p0, float3 p1, float3 p2, float3 p3)
 	return true;
 }
 
-
-void GerstnerWaves(float3 worldPosition, out float3 displacement, out float3 normal, out float3 tangent, out float shoreFactor, float time, out float breaker, out float foam)
+void GerstnerWaves(float3 worldPosition, float time, out float3 displacement, out float3 normal)
 {
-	normal = float3(0, 1, 0), tangent = float3(1, 0, 0);
-	displacement = shoreFactor = breaker = foam = 0;
-
+	// Early exit if out of bounds
 	float2 uv = (worldPosition.xz + _ViewPosition.xz) * ShoreScaleOffset.xy + ShoreScaleOffset.zw;
 	if (any(saturate(uv) != uv))
+	{
+		displacement = normal = 0;
 		return;
+	}
 	
 	float shoreDepth, shoreDistance;
 	float2 shoreDirection;
 	GetShoreData(worldPosition, shoreDepth, shoreDistance, shoreDirection);
+	shoreDistance = max(0.0, shoreDistance);
 	
 	// Largest wave arising from a wind speed
 	float waveLength = _ShoreWaveLength;
 	float frequency = TwoPi / waveLength;
 	float phase = sqrt(_OceanGravity * frequency) * time;
-	float amplitude = _ShoreWaveHeight;
+	float amplitude = _ShoreWaveHeight;//Sq(_ShoreWaveWindSpeed) / _OceanGravity * 0.5; //_ShoreWaveHeight;
+	float qi = 0;//1.0 / (frequency * amplitude);
 	
 	float sinFactor, cosFactor;
-	sincos(frequency * shoreDistance - phase, sinFactor, cosFactor);
+	sincos(frequency * shoreDistance + phase, sinFactor, cosFactor);
 	
 	displacement.y = amplitude * sinFactor;
+	displacement.xz = qi * amplitude * shoreDirection * cosFactor;
 
-	normal = normalize(float3(-frequency * shoreDirection * amplitude * cosFactor, 1.0).xzy);
-
-	tangent = normalize(float3(1.0, frequency * shoreDirection.y * amplitude * cosFactor, 0.0));
-
+	// We return the partial derivatives directly for blending with the ocean waves
+	normal = float3(-shoreDirection * frequency * amplitude * cosFactor, -qi * frequency * amplitude * sinFactor).xzy;
 }
 
 

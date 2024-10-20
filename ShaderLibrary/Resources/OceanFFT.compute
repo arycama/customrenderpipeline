@@ -12,7 +12,7 @@
 cbuffer InitSpectrumProperties
 {
 	float4 _OceanScale, SpectrumStart, SpectrumEnd;
-	float _OceanGravity, Time, TimeScale, SequenceLength;
+	float _OceanGravity, TimeScale, SequenceLength;
 };
 
 RWBuffer<float> OceanDispersionWrite;
@@ -176,7 +176,7 @@ void Dispersion(uint3 id : SV_DispatchThreadID)
 	
 	// Eq 43
 	float4 h0 = OceanSpectrum[index];
-	float wtk = OceanDispersion[index] * Time * TimeScale;
+	float wtk = OceanDispersion[index] * _Time * TimeScale;
 	float2 h = cmul(h0.xy, cexp(cimg(wtk)));
 	h = cadd(h, cmul(h0.zw, cexp(-cimg(wtk))));
 	

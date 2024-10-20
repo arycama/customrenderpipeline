@@ -21,7 +21,6 @@ cbuffer Properties
 	float ExposureCompensation;
 	float Aperture, Iso, ShutterSpeed;
 	float HistogramMin, HistogramMax;
-	float DeltaTime;
 	float IsFirst, Mode;
 	float MeteringMode;
 	float2 ProceduralCenter, ProceduralRadii;
@@ -178,7 +177,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	float averageEv = evSum * rcp(totalWeight);
 	float previousExposure = _Exposure;
 	float previousEv = ExposureToEV100(previousExposure) + _PreviousExposureCompensation;
-	float adaptedEv = lerp(averageEv, previousEv, exp(-DeltaTime * AdaptationSpeed));
+	float adaptedEv = lerp(averageEv, previousEv, exp(-_DeltaTime * AdaptationSpeed));
 	
 	if (Mode == 1.0)
 		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);

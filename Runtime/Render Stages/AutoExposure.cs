@@ -82,7 +82,6 @@ namespace Arycama.CustomRenderPipeline
             internal Vector4 exposureCompensationRemap;
             internal BufferHandle exposureBuffer;
             internal Vector4 scaledResolution;
-            internal float deltaTime;
         }
 
         class Pass1Data
@@ -129,8 +128,6 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        private float previousTime;
-
         public void Render(RTHandle input, int width, int height)
         {
             var exposurePixels = exposureTexture.GetRawTextureData<float>();
@@ -156,7 +153,6 @@ namespace Arycama.CustomRenderPipeline
 
                 var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
                 {
-                    pass.SetFloat(command, "DeltaTime", data.deltaTime);
                     pass.SetFloat(command, "MinEv", data.minEv);
                     pass.SetFloat(command, "MaxEv", data.maxEv);
                     pass.SetFloat(command, "AdaptationSpeed", data.adaptationSpeed);
@@ -175,11 +171,6 @@ namespace Arycama.CustomRenderPipeline
                 });
 
                 // TODO: Put this in a common place, eg main pipeline
-                var time = EditorApplication.isPlaying && !EditorApplication.isPaused ? Time.time : (float)EditorApplication.timeSinceStartup;
-                var deltaTime = time - previousTime;
-                previousTime = time;
-
-                data.deltaTime = deltaTime;
                 data.minEv = settings.MinEv;
                 data.maxEv = settings.MaxEv;
                 data.adaptationSpeed = settings.AdaptationSpeed;

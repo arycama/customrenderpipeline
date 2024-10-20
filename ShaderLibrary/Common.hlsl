@@ -39,6 +39,7 @@ cbuffer FrameData
 	float _MipBias;
 	float _Time;
 	float _PreviousTime;
+	float _DeltaTime;
 	
 	float _BlockerRadius, _ClusterBias, _ClusterScale, _PcfRadius, _PcssSoftness;
 	uint _BlockerSamples, _DirectionalLightCount, _PcfSamples, _PointLightCount, _TileSize;

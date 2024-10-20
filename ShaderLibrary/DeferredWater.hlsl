@@ -51,9 +51,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 oceanUv = worldPosition.xz - waterNormalFoamRoughness.xy ;
 	
 	// Gerstner normals + foam
-	float shoreFactor, breaker, shoreFoam;
-	float3 shoreN, shoredisplacement, shoreT;
-	GerstnerWaves(float3(oceanUv, 0.0).xzy, shoredisplacement, shoreN, shoreT, shoreFactor, _Time, breaker, shoreFoam);
+	float3 shoreNormal, displacement;
+	GerstnerWaves(float3(oceanUv, 0.0).xzy, _Time, displacement, shoreNormal);
 	
 	// Normal + Foam data
 	float2 normalData = 0.0;
@@ -89,16 +88,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		smoothness += Remap(cascadeData.a, -1.0, 1.0, 2.0 / 3.0);
 	}
 	
+	// Convert normal length back to smoothness
 	smoothness = LengthToSmoothness(smoothness * 0.25);
 	
-	//smoothness = _Smoothness;
-	
-	//float3 B = cross(T, N);
-	//float3x3 tangentToWorld = float3x3(T, B, N);
-	//float3 N = normalize(float3(normalData * lerp(1.0, 0.0, shoreFactor * 0.75), 1.0));
-	float3 N = normalize(float3(normalData, 1.0)).xzy;
-	
-	N = FromToRotationZ(shoreN.xzy, N.xzy).xzy;
+	// Our normals contain partial derivatives, and since we add the height field with the shore waves, we can simply sum the partial derivatives and renormalize
+	float3 N = normalize(float3(normalData, 1.0).xzy + shoreNormal);
 	
 	// Foam calculations
 	//float foamFactor = saturate(lerp(_WaveFoamStrength * (-foam + _WaveFoamFalloff), breaker + shoreFoam, shoreFactor));

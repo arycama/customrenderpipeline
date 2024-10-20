@@ -125,8 +125,6 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        private float previousTime;
-
         public void UpdateFft()
         {
             if (!settings.IsEnabled)
@@ -140,11 +138,6 @@ namespace Arycama.CustomRenderPipeline
             var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
             var rcpTexelSizes = new Vector4(settings.Resolution / patchSizes.x, settings.Resolution / patchSizes.y, settings.Resolution / patchSizes.z, settings.Resolution / patchSizes.w);
             var texelSizes = patchSizes / settings.Resolution;
-
-            // TODO: Put this in a common place, eg main pipeline
-            var time = EditorApplication.isPlaying && !EditorApplication.isPaused ? Time.time : (float)EditorApplication.timeSinceStartup;
-            var deltaTime = time - previousTime;
-            previousTime = time;
 
             // Load resources
             var computeShader = Resources.Load<ComputeShader>("OceanFFT");
@@ -165,7 +158,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "SpectrumStart", spectrumStart);
                     pass.SetVector(command, "SpectrumEnd", spectrumEnd);
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
-                    pass.SetFloat(command, "Time", time);
                     pass.SetFloat(command, "SequenceLength", settings.Profile.SequenceLength);
                     pass.SetFloat(command, "TimeScale", settings.Profile.TimeScale);
                 });
@@ -191,7 +183,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "SpectrumStart", spectrumStart);
                     pass.SetVector(command, "SpectrumEnd", spectrumEnd);
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
-                    pass.SetFloat(command, "Time", time);
                     pass.SetFloat(command, "SequenceLength", settings.Profile.SequenceLength);
                     pass.SetFloat(command, "TimeScale", settings.Profile.TimeScale);
                 });
@@ -232,7 +223,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_FoamStrength", settings.Profile.FoamStrength);
                     pass.SetFloat(command, "_FoamDecay", settings.Profile.FoamDecay);
                     pass.SetFloat(command, "_FoamThreshold", settings.Profile.FoamThreshold);
-                    pass.SetFloat(command, "_DeltaTime", deltaTime);
                 });
             }
 
@@ -426,6 +416,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetInt(command, "_CullingPlanesCount", passData.CullingPlanes.Count);
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
+                    pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
                 });
             }
 
@@ -658,6 +649,7 @@ namespace Arycama.CustomRenderPipeline
                     ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
+                    pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
                 });
             }
 
@@ -818,6 +810,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetFloat(command, "_ShoreWaveLength", material.GetFloat("_ShoreWaveLength"));
                     pass.SetFloat(command, "_ShoreWaveHeight", material.GetFloat("_ShoreWaveHeight"));
+                    pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
                 });
             }
 

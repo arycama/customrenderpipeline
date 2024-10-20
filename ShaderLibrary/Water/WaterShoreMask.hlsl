@@ -23,7 +23,7 @@ void GetShoreData(float3 worldPosition, out float depth, out float shoreDistance
 	
 	depth = Remap(data.r, 0.0, 1.0, ShoreMaxOceanDepth, 0.0);
 	shoreDistance = Remap(data.g, 0.0, 1.0, ShoreMinDist, ShoreMaxDist) * ShoreMaxTerrainDistance;
-	direction = normalize(2.0 * data.ba - 1.0);
+	direction = -normalize(2.0 * data.ba - 1.0);
 }
 
 #endif

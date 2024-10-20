@@ -227,17 +227,14 @@ FragmentInput Domain(HullConstantOutput tessFactors, OutputPatch<DomainInput, 4>
 	}
 	
 	// shore waves
-	float shoreFactor, breaker, foam;
-	float3 normal, shoreDisplacement, tangent;
-	GerstnerWaves(worldPosition, shoreDisplacement, normal, tangent, shoreFactor, _Time, breaker, foam);
+	float3 shoreDisplacement, shoreNormal, previousShoreDisplacement, previousShoreNormal;
+	GerstnerWaves(worldPosition, _Time, shoreDisplacement, shoreNormal);
+	GerstnerWaves(previousPosition, _PreviousTime, previousShoreDisplacement, previousShoreNormal);
 	
-	float previousShoreFactor, previousBreaker, previousFoam;
-	float3 previousNormal, previousShoreDisplacement, previousTangent;
-	GerstnerWaves(previousPosition, previousShoreDisplacement, previousNormal, previousTangent, previousShoreFactor, _PreviousTime, previousBreaker, previousFoam);
-	
-	displacement = shoreDisplacement;
-	
+	displacement += shoreDisplacement;
 	worldPosition += displacement;
+	
+	displacement += previousShoreDisplacement;
 	previousPosition += previousDisplacement;
 	
 	worldPosition = PlanetCurve(worldPosition);
