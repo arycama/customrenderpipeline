@@ -125,7 +125,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void UpdateFft()
+        public void UpdateFft(float time)
         {
             if (!settings.IsEnabled)
                 return;
@@ -185,6 +185,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
                     pass.SetFloat(command, "SequenceLength", settings.Profile.SequenceLength);
                     pass.SetFloat(command, "TimeScale", settings.Profile.TimeScale);
+                    pass.SetFloat(command, "Time", time);
                 });
             }
 
@@ -417,6 +418,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_CullingPlanesCount", passData.CullingPlanes.Count);
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
                     pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
+                    pass.SetFloat(command, "_ShoreWaveWindAngle", settings.Profile.LocalSpectrum.WindAngle);
                 });
             }
 
@@ -650,6 +652,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
                     pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
+                    pass.SetFloat(command, "_ShoreWaveWindAngle", settings.Profile.LocalSpectrum.WindAngle);
                 });
             }
 
@@ -811,6 +814,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_ShoreWaveLength", material.GetFloat("_ShoreWaveLength"));
                     pass.SetFloat(command, "_ShoreWaveHeight", material.GetFloat("_ShoreWaveHeight"));
                     pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
+                    pass.SetFloat(command, "_ShoreWaveWindAngle", settings.Profile.LocalSpectrum.WindAngle);
                     pass.SetFloat(command, "_ShoreWaveSteepness", material.GetFloat("_ShoreWaveSteepness"));
                 }); 
             }

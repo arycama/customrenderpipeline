@@ -90,7 +90,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	}
 	
 	// Convert normal length back to smoothness
-	smoothness = LengthToSmoothness(smoothness * 0.25);
+	smoothness = lerp(LengthToSmoothness(smoothness * 0.25), _Smoothness, shoreScale);
 	
 	// Our normals contain partial derivatives, and since we add the height field with the shore waves, we can simply sum the partial derivatives and renormalize
 	float3 N = normalize(float3(normalData * (1.0 - shoreScale), 1.0).xzy + shoreNormal);
@@ -211,10 +211,6 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
 	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
 	underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
-	
-	float shoreDepth, shoreDistance;
-	float2 shoreDirection;
-	GetShoreData(worldPosition, shoreDepth, shoreDistance, shoreDirection);
 	
 	FragmentOutput output;
 	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);
