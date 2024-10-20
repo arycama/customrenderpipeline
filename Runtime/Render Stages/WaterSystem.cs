@@ -811,7 +811,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_ShoreWaveLength", material.GetFloat("_ShoreWaveLength"));
                     pass.SetFloat(command, "_ShoreWaveHeight", material.GetFloat("_ShoreWaveHeight"));
                     pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
-                });
+                    pass.SetFloat(command, "_ShoreWaveSteepness", material.GetFloat("_ShoreWaveSteepness"));
+                }); 
             }
 
             if (settings.RaytracedRefractions)
