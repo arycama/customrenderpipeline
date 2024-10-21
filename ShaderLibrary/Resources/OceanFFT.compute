@@ -25,7 +25,7 @@ RWTexture2DArray<float4> DisplacementResult, SlopeResult;
 
 static const uint _Resolution = 128;
 static const uint Log2Resolution = log2(_Resolution);
-static const float HalfResolution = _Resolution * 0.5;
+static const uint HalfResolution = _Resolution >> 1;
 
 cbuffer OceanData
 {
@@ -46,6 +46,31 @@ cbuffer OceanData
 	float peakEnhancement1;
 	float shortWavesFade1;
 };
+
+float DispersionShallow(float kLength, float depth)
+{
+	float a = kLength * depth;
+	float b = tanh(a);
+	return sqrt(_OceanGravity * kLength * b);
+}
+
+float DispersionShallowDerivative(float kLength, float depth)
+{
+	float a = kLength * depth;
+	float b = tanh(a);
+	float dispersionRelation = sqrt(_OceanGravity * kLength * b);
+	return 0.5 * _OceanGravity * (b + a * (1.0 - b * b)) / dispersionRelation;
+}
+
+float DispersionDeep(float kLength)
+{
+	return sqrt(_OceanGravity * kLength);
+}
+
+float DispersionDeepDerivative(float kLength)
+{
+	return 0.5 * _OceanGravity / DispersionDeep(kLength);
+}
 
 float PhillipsSpectrum(float2 k, float kLength, float rcpPatchSize)
 {
@@ -72,13 +97,80 @@ float PhillipsSpectrum(float2 k, float kLength, float rcpPatchSize)
 	return phillips;
 }
 
+// Source: https://wikiwaves.org/Ocean-Wave_Spectra#JONSWAP_Spectrum
+float JonswapAlpha(float windSpeed, float fetch)
+{
+	return 0.076 * pow(Sq(windSpeed) / (fetch * _OceanGravity), 0.22);
+}
+
+// Source: https://wikiwaves.org/Ocean-Wave_Spectra#JONSWAP_Spectrum
+float JonswapPeakAngularFrequency(float windSpeed, float fetch)
+{
+	return 22.0 * pow(Sq(_OceanGravity) / (windSpeed * fetch), 1.0 / 3.0);
+}
+
+// Normalization factor approximation for Longuet-Higgins function
+float LonguetHigginsNormalization(float s)
+{
+	// Note: i forgot how i derived this :skull:
+	float a = sqrt(s);
+	return (s < 0.4) ? (0.5 / Pi) + s * (0.220636 + s * (-0.109 + s * 0.090)) : rsqrt(Pi) * (a * 0.5 + (1.0 / a) * 0.0625);
+}
+
+// Source: Christopher J. Horvath - Empirical Directional Wave Spectra for Computer Graphics
+float LonguetHigginsFunction(float s, float theta)
+{
+	return LonguetHigginsNormalization(s) * pow(abs(cos(theta * 0.5)), 2.0 * s);
+}
+
+// Source: Christopher J. Horvath - Empirical Directional Wave Spectra for Computer Graphics
+float HasselmannDirectionalSpread(float w, float w_p, float wind_speed, float theta)
+{
+	float p = w / w_p;
+	float s = (w <= w_p) ? 6.97 * pow(abs(p), 4.06) : 9.77 * pow(abs(p), -2.33 - 1.45 * (wind_speed * w_p / _OceanGravity - 1.17)); // Shaping parameter
+	float s_xi = 16.0 * tanh(w_p / w) * swell0 * swell0; // Shaping parameter w/ swell
+	return LonguetHigginsFunction(s + s_xi, theta - windAngle0 * TwoPi);
+}
+
+// Source: Christopher J. Horvath - Empirical Directional Wave Spectra for Computer Graphics
+float TmaSpectrum(float w, float w_p, float alpha, float depth)
+{
+	const float beta = 1.25;
+	const float gamma = 3.3; // Spectral peak shape constant
+	
+	float sigma = (w <= w_p) ? 0.07 : 0.09;
+	float r = exp(-(w - w_p) * (w - w_p) / (2.0 * sigma * sigma * w_p * w_p));
+	float jonswap_spectrum = (alpha * Sq(_OceanGravity)) / pow(w, 5) * exp(-beta * pow(w_p / w, 4)) * pow(gamma, r);
+
+	float w_h = min(w * sqrt(depth / _OceanGravity), 2.0);
+	float kitaigorodskii_depth_attenuation = (w_h <= 1.0) ? 0.5 * w_h * w_h : 1.0 - 0.5 * (2.0 - w_h) * (2.0 - w_h);
+
+	return jonswap_spectrum * kitaigorodskii_depth_attenuation;
+}
+
+float2 GetSpectrumAmplitude(float2 k_vec, float rcpTileLength, float depth = 100)
+{
+	float2 dk = 2.0 * Pi * rcpTileLength;
+	float k = length(k_vec);
+	float theta = atan2(k_vec.y, k_vec.x);
+	
+	float alpha = JonswapAlpha(windSpeed0, fetch0);
+	float omega = JonswapPeakAngularFrequency(windSpeed0, fetch0);
+
+	float w = DispersionShallow(k, depth);
+	float wNorm = DispersionShallowDerivative(k, depth) / k * dk.x * dk.y;
+	float s = TmaSpectrum(w, omega, alpha, depth);
+	float d = lerp(0.5 / Pi, HasselmannDirectionalSpread(w, omega, windSpeed0, theta), spreadBlend0) * exp(-Sq(shortWavesFade0 * k));
+	
+	return sqrt(2.0) * sqrt(max(0, s * d * wNorm));
+}
+
 [numthreads(32, 32, 1)]
 void Spectrum(uint3 id : SV_DispatchThreadID)
 {
-	float rcpPatchSize = _OceanScale[id.z];
 
-	float n = id.x - HalfResolution;
-	float m = id.y - HalfResolution;
+	int n = (int) id.x - HalfResolution;
+	int m = (int) id.y - HalfResolution;
 	
 	float4 hkt = 0.0;
 	float wk = 0.0;
@@ -88,13 +180,13 @@ void Spectrum(uint3 id : SV_DispatchThreadID)
 	float nr = length(float2(n, m));
 	if ((n || m) && nr >= SpectrumStart[id.z] && nr < SpectrumEnd[id.z])
 	{
+		float rcpPatchSize = _OceanScale[id.z];
 		float2 k = TwoPi * float2(n, m) * rcpPatchSize;
 		float rcpKLength = RcpLength(k);
 		float kLength = rcp(rcpKLength);
 	
 		// Eq 31
-		float w2 = _OceanGravity * kLength;
-		float w = sqrt(w2);
+		float w = DispersionDeep(kLength);
 	
 		// Eq 34
 		float T = SequenceLength;
@@ -106,8 +198,11 @@ void Spectrum(uint3 id : SV_DispatchThreadID)
 		// Gaussian random numbers
 		float4 xi = GaussianFloat4(index);
 		
-		hkt.xy = rcp(sqrt(2.0)) * xi.xy * PhillipsSpectrum(k / kLength, kLength, rcpPatchSize);
-		hkt.zw = rcp(sqrt(2.0)) * xi.zw * PhillipsSpectrum(-k / kLength, kLength, rcpPatchSize);
+		hkt.xy = rcp(sqrt(2.0)) * xi.xy * PhillipsSpectrum(k * rcpKLength, kLength, rcpPatchSize);
+		hkt.zw = rcp(sqrt(2.0)) * xi.zw * PhillipsSpectrum(-k * rcpKLength, kLength, rcpPatchSize);
+		
+		//hkt.xy = xi.xy * GetSpectrumAmplitude(k, rcpPatchSize);
+		//hkt.zw = xi.zw * GetSpectrumAmplitude(-k, rcpPatchSize);
 	}
 	
 	OceanDispersionWrite[index] = wk;
@@ -129,11 +224,7 @@ void Fft(uint id, inout float2 height, inout float2 dispX, inout float2 dispZ, i
 	_SxShared[0][id] = slopeX;
 	_SzShared[0][id] = slopeZ;
 
-	uint2 textureIndices = uint2(0, 1);
-	
-	uint2 indices = 0;
-	uint passCount = log2(_Resolution);
-	for (uint i = 0; i < passCount; i++)
+	for (uint i = 0; i < Log2Resolution; i++)
 	{
 		GroupMemoryBarrierWithGroupSync();
 
@@ -143,15 +234,17 @@ void Fft(uint id, inout float2 height, inout float2 dispX, inout float2 dispZ, i
 		uint sectionStartOffset = id & ~(sectionWidth - 1);
 		uint halfSectionOffset = id & (halfSectionWidth - 1);
 		uint sectionOffset = id & (sectionWidth - 1);
+		
+		float2 weights = cexp(cimg(2.0 * Pi * sectionOffset / sectionWidth));
 
 		uint2 indices = sectionStartOffset + halfSectionOffset;
 		indices.y += halfSectionWidth;
 
 		if (i == 0)
-			indices = reversebits(indices) >> (32 - passCount) & (_Resolution - 1);
+			indices = reversebits(indices) >> (32 - Log2Resolution) & (_Resolution - 1);
+			
+		uint2 textureIndices = (i & 1) ? uint2(1, 0) : uint2(0, 1);
 		
-		float2 weights = cexp(cimg(2.0 * Pi * sectionOffset / sectionWidth));
-
 		height = _HShared[textureIndices.y][id] = cadd(_HShared[textureIndices.x][indices.x], cmul(_HShared[textureIndices.x][indices.y], weights));
 		
 		dispX = _DxShared[textureIndices.y][id] = cadd(_DxShared[textureIndices.x][indices.x], cmul(_DxShared[textureIndices.x][indices.y], weights));
@@ -159,18 +252,14 @@ void Fft(uint id, inout float2 height, inout float2 dispX, inout float2 dispZ, i
 		
 		slopeX = _SxShared[textureIndices.y][id] = cadd(_SxShared[textureIndices.x][indices.x], cmul(_SxShared[textureIndices.x][indices.y], weights));
 		slopeZ = _SzShared[textureIndices.y][id] = cadd(_SzShared[textureIndices.x][indices.x], cmul(_SzShared[textureIndices.x][indices.y], weights));
-		
-		textureIndices.xy = textureIndices.yx;
 	}
 }
 
 [numthreads(_Resolution, 1, 1)]
 void Dispersion(uint3 id : SV_DispatchThreadID)
 {
-	float rcpPatchSize = _OceanScale[id.z];
-
-	float n = id.x - HalfResolution;
-	float m = id.y - HalfResolution;
+	int n = (int) id.x - HalfResolution;
+	int m = (int) id.y - HalfResolution;
 	
 	uint index = (id.z * _Resolution + id.y) * _Resolution + id.x;
 	
@@ -181,7 +270,7 @@ void Dispersion(uint3 id : SV_DispatchThreadID)
 	h = cadd(h, cmul(h0.zw, cexp(-cimg(wtk))));
 	
 	// Eq 37
-	float2 k = TwoPi * float2(n, m) * rcpPatchSize;
+	float2 k = TwoPi * float2(n, m) * _OceanScale[id.z];
 	float kLengthRcp = rsqrt(dot(k, k));
 		
 	float2 slopeX = cmul(cimg(k.x), h);
@@ -202,36 +291,26 @@ void Dispersion(uint3 id : SV_DispatchThreadID)
 }
 
 RWTexture2DArray<float3> DisplacementOutput;
-Texture2DArray<float3> DisplacementInput;
-
+RWTexture2DArray<float4> OceanNormalFoamSmoothness;
 Texture2DArray<float2> Height;
 Texture2DArray<float4> Displacement, Slope;
-
-RWTexture2DArray<float4> SmoothnessOutput0, SmoothnessOutput1, SmoothnessOutput2, SmoothnessOutput3, SmoothnessOutput4, SmoothnessOutput5, SmoothnessOutput6, SmoothnessOutput7;
-RWTexture2DArray<float4> OceanNormalFoamSmoothness;
-
-float _OceanScale0, _OceanWindSpeed0, _OceanWindDirection0, _OceanFetch0, _OceanSpreadBlend0, _OceanSwell0, _OceanPeakEnhancement0, _OceanShortWavesFade0;
-float _OceanScale1, _OceanWindSpeed1, _OceanWindDirection1, _OceanFetch1, _OceanSpreadBlend1, _OceanSwell1, _OceanPeakEnhancement1, _OceanShortWavesFade1;
-uint Size;
 
 [numthreads(_Resolution, 1, 1)]
 void FftColumns(uint3 id : SV_DispatchThreadID)
 {
-	uint2 texturePos = uint2(id.yx);
-
     // Load entire row or column into scratch array
-	float2 height = Height[uint3(texturePos, id.z)];
-	float4 displacement = Displacement[uint3(texturePos, id.z)];
-	float4 slope = Slope[uint3(texturePos, id.z)];
+	float2 height = Height[id.yxz];
+	float4 displacement = Displacement[id.yxz];
+	float4 slope = Slope[id.yxz];
 	
 	Fft(id.x, height, displacement.xy, displacement.zw, slope.xy, slope.zw);
 	
 	float sign = ((id.x + id.y) & 1) ? -1.0 : 1.0;
-	DisplacementOutput[uint3(texturePos, id.z)] = float3(-displacement.x, height.x, -displacement.z) * sign;
+	DisplacementOutput[id.yxz] = float3(-displacement.x, height.x, -displacement.z) * sign;
 	
 	float3 normal = normalize(float3(-slope.xz * sign, 1.0));
 	
-	OceanNormalFoamSmoothness[uint3(texturePos, id.z)] = float4(normal.xy, 0.0, 0.0); // Snorm texture, need to put smoothness into -1 to 1 range
+	OceanNormalFoamSmoothness[id.yxz] = float4(normal.xy, 0.0, 0.0); // Snorm texture, need to put smoothness into -1 to 1 range
 }
 
 cbuffer CalculateNormalsProperties
@@ -242,10 +321,12 @@ cbuffer CalculateNormalsProperties
 	uint _OceanTextureSlicePreviousOffset;
 };
 
+Texture2DArray<float3> DisplacementInput;
+
 [numthreads(8, 8, 1)]
 void CalculateNormals(uint3 id : SV_DispatchThreadID)
 {
-    // Original change in x/y
+    // Original change x/y
 	float delta = _CascadeTexelSizes[id.z];
 
 	float3 left = DisplacementInput[int3((id.xy + int2(-1, 0)) % _Resolution, id.z)];
@@ -272,6 +353,9 @@ void CalculateNormals(uint3 id : SV_DispatchThreadID)
 	float jacobian = jxx * jyy - jxy * jyx;
 	OceanNormalFoamSmoothness[uint3(id.xy, id.z)] = float4(normal.xy, jacobian, Remap(normalLength, 2.0 / 3.0, 1.0, -1.0)); // Snorm texture, need to put smoothness into -1 to 1 range
 }
+
+RWTexture2DArray<float4> SmoothnessOutput0, SmoothnessOutput1, SmoothnessOutput2, SmoothnessOutput3, SmoothnessOutput4, SmoothnessOutput5, SmoothnessOutput6, SmoothnessOutput7;
+uint Size;
 
 // Thread group size of 32 is required to process  the entire 128x128 texture in shared memory
 groupshared float4 mipDataShared[32][32];
