@@ -193,7 +193,7 @@ namespace Arycama.CustomRenderPipeline
             // Sky luminance
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Luminance"))
             {
-                var primitiveCount = MathUtils.DivRoundUp(settings.LuminanceDepth, 32);
+                var primitiveCount = Maths.DivRoundUp(settings.LuminanceDepth, 32);
                 pass.Initialize(skyMaterial, skyMaterial.FindPass("Luminance LUT"), primitiveCount);
                 pass.WriteTexture(skyLuminance, RenderBufferLoadAction.DontCare);
                 pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;

@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 using static System.MathF;
-using static Arycama.CustomRenderPipeline.MathUtils;
+using static Arycama.CustomRenderPipeline.Maths;
 
 namespace Arycama.CustomRenderPipeline
 {

@@ -4,7 +4,7 @@ using static System.MathF;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public static class MathUtils
+    public static class Maths
     {
         public const float Log2e = (float)1.44269504088896340736;
 
@@ -51,5 +51,8 @@ namespace Arycama.CustomRenderPipeline
             result.z = Math.Clamp(x.z, min, max);
             return result;
         }
+
+        public static float Square(float x) => x * x;
+        public static int Square(int x) => x * x;
     }
 }
