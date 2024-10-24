@@ -59,7 +59,7 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
     
 	GroupMemoryBarrierWithGroupSync();
     
-	if (all(threadId < _ScaledResolution.xy))
+	if (all(threadId < (uint2) _ScaledResolution.xy))
 	{
 		float3 color = Input[threadId];
 		float luminance = Luminance(color) * _RcpExposure;
@@ -102,7 +102,7 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
 
 				float dist = length(ProceduralCenter  * _ScaledResolution.xy * ellipseScale - threadId * ellipseScale);
 				//weight = (luminance > ProceduralMin && luminance < ProceduralMax) ? saturate(1.0 - pow((dist / radius), rcp(ProceduralSoftness))) : 0.0f;
-				weight = saturate(1.0 - pow((dist / radius), rcp(ProceduralSoftness)));
+				weight = saturate(1.0 - pow(abs(dist / radius), rcp(ProceduralSoftness)));
 				break;
 			}
 		}
@@ -115,7 +115,7 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
 	// local histogram to the global one
 	GroupMemoryBarrierWithGroupSync();
 
-	if (all(threadId < _ScaledResolution.xy))
+	if (all(threadId < (uint2) _ScaledResolution.xy))
 	{
 		// Technically there's no chance that two threads write to the same bin here,
 		// but different work groups might! So we still need the atomic add.
@@ -156,7 +156,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	float totalWeight = 0;
 	
     // TODO: Can we be a bit more parallel here?
-	for (uint i = 1; i < HISTOGRAM_BINS; ++i)
+	for (i = 1; i < HISTOGRAM_BINS; ++i)
 	{
 		float histVal = gs_values[i];
 		float binEV = BinLocationToEV(i);

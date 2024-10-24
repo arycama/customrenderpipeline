@@ -49,7 +49,7 @@ void RayGeneration()
 	if(NdotL > 0.0)
 	{
 		RayDesc ray;
-		ray.Origin = worldPosition;
+		ray.Origin = worldPosition + _ViewPosition;
 		ray.Direction = L;
 		ray.TMin = 0.0;
 		ray.TMax = 1e10f;

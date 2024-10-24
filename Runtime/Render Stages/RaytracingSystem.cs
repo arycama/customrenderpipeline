@@ -69,7 +69,7 @@ namespace Arycama.CustomRenderPipeline
             };
         }
 
-        public void Build(Camera camera)
+        public void Build()
         {
             if (!settings.Enabled)
                 return;
@@ -81,7 +81,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
-                    command.BuildRayTracingAccelerationStructure(rtas, camera.transform.position);
+                    command.BuildRayTracingAccelerationStructure(rtas);
                 });
             }
 

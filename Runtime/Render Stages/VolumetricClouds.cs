@@ -61,20 +61,20 @@ namespace Arycama.CustomRenderPipeline
             public void SetCloudPassData(CommandBuffer command, RenderPass pass)
             {
                 pass.SetFloat(command, "_WeatherMapStrength", WeatherMapStrength);
-                pass.SetFloat(command, "_WeatherMapScale", Maths.Rcp(WeatherMapScale));
+                pass.SetFloat(command, "_WeatherMapScale", MathUtils.Rcp(WeatherMapScale));
                 pass.SetVector(command, "_WeatherMapOffset", WeatherMapSpeed * Time.time / WeatherMapScale);
                 pass.SetVector(command, "_WeatherMapSpeed", WeatherMapSpeed);
 
-                pass.SetFloat(command, "_NoiseScale", Maths.Rcp(NoiseScale));
+                pass.SetFloat(command, "_NoiseScale", MathUtils.Rcp(NoiseScale));
                 pass.SetFloat(command, "_NoiseStrength", NoiseStrength);
 
-                pass.SetFloat(command, "_DetailNoiseScale", Maths.Rcp(DetailScale));
+                pass.SetFloat(command, "_DetailNoiseScale", MathUtils.Rcp(DetailScale));
                 pass.SetFloat(command, "_DetailNoiseStrength", DetailStrength);
 
                 pass.SetFloat(command, "_StartHeight", StartHeight);
                 pass.SetFloat(command, "_LayerThickness", LayerThickness);
                 pass.SetFloat(command, "_LightDistance", LightDistance);
-                pass.SetFloat(command, "_Density", Density * Maths.Log2e);
+                pass.SetFloat(command, "_Density", Density * MathUtils.Log2e);
 
                 pass.SetFloat(command, "_TransmittanceThreshold", TransmittanceThreshold);
 
@@ -142,7 +142,7 @@ namespace Arycama.CustomRenderPipeline
             var maxInstanceCount = 32;
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Noise Texture"))
             {
-                var primitiveCount = Maths.DivRoundUp(settings.NoiseResolution.z, maxInstanceCount);
+                var primitiveCount = MathUtils.DivRoundUp(settings.NoiseResolution.z, maxInstanceCount);
                 pass.Initialize(material, 1, primitiveCount);
                 pass.DepthSlice = -1;
                 pass.WriteTexture(noiseTexture, RenderBufferLoadAction.DontCare);
@@ -164,7 +164,7 @@ namespace Arycama.CustomRenderPipeline
             // Detail
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Detail Noise Texture"))
             {
-                var primitiveCount = Maths.DivRoundUp(settings.DetailNoiseResolution.z, maxInstanceCount);
+                var primitiveCount = MathUtils.DivRoundUp(settings.DetailNoiseResolution.z, maxInstanceCount);
                 pass.Initialize(material, 2, primitiveCount);
                 pass.DepthSlice = -1;
                 pass.WriteTexture(detailNoiseTexture, RenderBufferLoadAction.DontCare);

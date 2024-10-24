@@ -41,7 +41,7 @@ void RayGeneration()
 	worldPosition = PlanetCurveInverse(worldPosition);
 	
 	RayDesc ray;
-	ray.Origin = worldPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
+	ray.Origin = worldPosition + _ViewPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
 	ray.Direction = L;
 	ray.TMin = 0.0;
 	ray.TMax = 1e10f;

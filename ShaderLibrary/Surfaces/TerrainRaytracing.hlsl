@@ -11,7 +11,7 @@
 [shader("closesthit")]
 void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs : SV_IntersectionAttributes)
 {
-	float3 worldPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+	float3 worldPosition = WorldRayOrigin() - _ViewPosition + WorldRayDirection() * RayTCurrent();
 	
 	uint index = PrimitiveIndex();
 	uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(index);

@@ -232,10 +232,10 @@ FragmentInput Domain(HullConstantOutput tessFactors, OutputPatch<DomainInput, 4>
 	GerstnerWaves(worldPosition, _Time, shoreDisplacement, shoreNormal, scale);
 	GerstnerWaves(previousPosition, _PreviousTime, previousShoreDisplacement, previousShoreNormal, previousScale);
 	
-	displacement = displacement;// * (1.0 - scale) + shoreDisplacement;
+	displacement = displacement * (1.0 - scale) + shoreDisplacement;
 	worldPosition += displacement;
 	
-	previousDisplacement = previousDisplacement;// * (1.0 - previousScale) + previousShoreDisplacement;
+	previousDisplacement = previousDisplacement * (1.0 - previousScale) + previousShoreDisplacement;
 	previousPosition += previousDisplacement;
 	
 	worldPosition = PlanetCurve(worldPosition);

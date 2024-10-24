@@ -1,10 +1,10 @@
 ﻿using System;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
-using static UnityEngine.Mathf;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -59,8 +59,8 @@ namespace Arycama.CustomRenderPipeline
 
             lengthToRoughness = renderGraph.GetTexture(256, 1, GraphicsFormat.R16_UNorm, isPersistent: true);
             indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
-            spectrumBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Maths.Square(settings.Resolution + 1) * CascadeCount, sizeof(float) * 2) { name = "Ocean Spectrum" };
-            dispersionBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, Maths.Square(settings.Resolution + 1) * CascadeCount, sizeof(float)) { name = "Ocean Spectrum" };
+            spectrumBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, settings.Resolution * settings.Resolution * CascadeCount, sizeof(float) * 4) { name = "Ocean Spectrum" };
+            dispersionBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, settings.Resolution * settings.Resolution * CascadeCount, sizeof(float)) { name = "Ocean Spectrum" };
 
             int index = 0;
             var pIndices = new ushort[QuadListIndexCount];
@@ -131,98 +131,23 @@ namespace Arycama.CustomRenderPipeline
                 return;
 
             // Calculate constants
-            var cascadeScale = settings.Profile.CascadeScale;
-            var rcpPatchSize = 1.0f / settings.Profile.PatchSize;
-            var fftPeriod = new Vector4(settings.Profile.PatchSize / Pow(cascadeScale, 0f), settings.Profile.PatchSize / Pow(cascadeScale, 1f), settings.Profile.PatchSize / Pow(cascadeScale, 2f), settings.Profile.PatchSize / Pow(cascadeScale, 3f));
-            var spectrumStart = new Vector4(0, settings.Profile.MaxWaveNumber * fftPeriod.y / fftPeriod.x, settings.Profile.MaxWaveNumber * fftPeriod.z / fftPeriod.y, settings.Profile.MaxWaveNumber * fftPeriod.w / fftPeriod.z);
+            var rcpScales = new Vector4(1f / Mathf.Pow(settings.Profile.CascadeScale, 0f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 1f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 2f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 3f));
+            var patchSizes = new Vector4(settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 0f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 1f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 2f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 3f));
+            var spectrumStart = new Vector4(0, settings.Profile.MaxWaveNumber * patchSizes.y / patchSizes.x, settings.Profile.MaxWaveNumber * patchSizes.z / patchSizes.y, settings.Profile.MaxWaveNumber * patchSizes.w / patchSizes.z);
             var spectrumEnd = new Vector4(settings.Profile.MaxWaveNumber, settings.Profile.MaxWaveNumber, settings.Profile.MaxWaveNumber, settings.Resolution);
-            var oceanScale = new Vector4(Pow(cascadeScale, 0f) * rcpPatchSize, Pow(cascadeScale, 1f) * rcpPatchSize, Pow(cascadeScale, 2f) * rcpPatchSize, Pow(cascadeScale, 3f) * rcpPatchSize);
-            var rcpTexelSizes = new Vector4(settings.Resolution / fftPeriod.x, settings.Resolution / fftPeriod.y, settings.Resolution / fftPeriod.z, settings.Resolution / fftPeriod.w);
-            var texelSizes = fftPeriod / settings.Resolution;
+            var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
+            var rcpTexelSizes = new Vector4(settings.Resolution / patchSizes.x, settings.Resolution / patchSizes.y, settings.Resolution / patchSizes.z, settings.Resolution / patchSizes.w);
+            var texelSizes = patchSizes / settings.Resolution;
 
             // Load resources
             var computeShader = Resources.Load<ComputeShader>("OceanFFT");
             var oceanBuffer = settings.Profile.SetShaderProperties(renderGraph);
 
-            var m_resolution = 128;
-            var m_half_resolution_plus_one = m_resolution / 2 + 1; int gauss_size = m_resolution * m_resolution;
-            int h0_size = (m_resolution + 1) * (m_resolution + 1);
-            int omega_size = m_half_resolution_plus_one * m_half_resolution_plus_one;
-            int htdt_size = m_half_resolution_plus_one * m_resolution;
-
-            var gauss_map_resolution = 512;
-            int omega_width = m_resolution + 4;
-            int gauss_width = gauss_map_resolution + 4;
-
-            var GRAV_ACCEL = 9.810f;
-
-            var fft_resolution = 128;
-            var fft_period = 1f / oceanScale.x;
-
-            int dmap_dim = fft_resolution;
-            //float fft_period = fft_period;
-
-            var omega = new float[omega_width * (m_resolution + 1)];
-            for (int i = 0; i <= dmap_dim; i++)
-            {
-                // ny is y-coord wave number
-                int ny = (-dmap_dim / 2 + i);
-
-                // K is wave-vector, range [-|DX/W, |DX/W], [-|DY/H, |DY/H]
-                Vector2 K;
-                K.y = (float)(ny) * (2 * (float)(PI) / fft_period);
-
-                for (int j = 0; j <= dmap_dim; j++)
-                {
-                    // nx is x-coord wave number
-                    int nx = (-dmap_dim / 2 + j);
-
-                    K.x = (float)(nx) * (2 * PI / fft_period);
-
-                    // The angular frequency is following the dispersion relation:
-                    //            omega^2 = g*k
-                    // So the equation of Gerstner wave is:
-                    //            x = x0 - K/k * A * sin(dot(K, x0) - sqrt(g * k) * t), x is a 2D vector.
-                    //            z = A * cos(dot(K, x0) - sqrt(g * k) * t)
-                    // Gerstner wave means: a point on a simple sinusoid wave is doing a uniform circular motion. The
-                    // center is (x0, y0, z0), the radius is A, and the circle plane is parallel to K.
-                    omega[i * (dmap_dim + 4) + j] = Sqrt(GRAV_ACCEL * Sqrt(K.x * K.x + K.y * K.y));
-                    //functor(i, j, nx, ny, K);
-                }
-            }
-
-            var spectrumTexture = renderGraph.GetTexture((m_resolution + 1), (m_resolution + 1), GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
-            var dispersionTexture = renderGraph.GetTexture((m_resolution + 1), (m_resolution + 1), GraphicsFormat.R32_SFloat, 4, TextureDimension.Tex2DArray);
-
-            const float twoPi = 6.28318530718f;
-            const float gravity = 9.810f;
-            const float sqrtHalf = 0.707106781186f;
-            const float euler = 2.71828182846f;
-
-            var wind_speed = settings.Profile.LocalSpectrum.WindSpeed;
-
-            float fftNorm = Pow((float)(m_resolution), -0.25f);
-            var philNorm = oceanScale * euler;
-            float gravityScale = Maths.Square(gravity / Maths.Square(wind_speed));
-
-            // uh
-            var res = 0;
-            for (int i = 0; 1 << i <= m_resolution; ++i)
-                res = 32 - i;
-
-            var window_in = spectrumStart;
-            var window_out = spectrumEnd;
-            var windRads = settings.Profile.LocalSpectrum.WindAngle * 2.0f * PI;
-            var wind_dir = new Vector2(Cos(windRads), Sin(windRads));
-            var wave_amplitude = 1.0f;
-            var wind_dependency = settings.Profile.LocalSpectrum.Swell;
-            var small_wave_fraction = settings.Profile.LocalSpectrum.ShortWavesFade;
-            var choppy_scale = 1f;
-
             // Update spectrum (TODO: Only when properties change)
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Spectrum"))
             {
-                pass.Initialize(computeShader, 4, 1, settings.Resolution, 4, false);
+                pass.Initialize(computeShader, 4, settings.Resolution, settings.Resolution, 4);
+                //pass.WriteBuffer("OceanSpectrum", spectrumBuffer);
                 pass.ReadBuffer("OceanData", oceanBuffer);
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
@@ -235,23 +160,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
                     pass.SetFloat(command, "SequenceLength", settings.Profile.SequenceLength);
                     pass.SetFloat(command, "TimeScale", settings.Profile.TimeScale);
-
-                    pass.SetInt(command, "m_resolution", m_resolution);
-                    pass.SetInt(command, "m_resolution_plus_one", m_resolution + 1);
-                    pass.SetInt(command, "m_half_resolution", m_resolution / 2);
-                    pass.SetInt(command, "m_half_resolution_plus_one", m_resolution / 2 + 1);
-                    pass.SetInt(command, "m_resolution_plus_one_squared_minus_one", Maths.Square(m_resolution + 1) - 1);
-                    pass.SetInt(command, "m_32_minus_log2_resolution", res);
-                    pass.SetVector(command, "m_window_in", window_in);
-                    pass.SetVector(command, "m_window_out", window_out);
-                    pass.SetVector(command, "m_wind_dir", wind_dir);
-                    pass.SetVector(command, "m_frequency_scale", 2.0f * PI * oceanScale);
-                    pass.SetVector(command, "m_linear_scale", fftNorm * philNorm * sqrtHalf * wave_amplitude);
-                    pass.SetFloat(command, "m_wind_scale", -Sqrt(1.0f - wind_dependency));
-                    pass.SetFloat(command, "m_root_scale", -0.5f * gravityScale);
-                    pass.SetFloat(command, "m_power_scale", -0.5f / gravityScale * Maths.Square(small_wave_fraction));
-                    pass.SetFloat(command, "m_time", time);
-                    pass.SetFloat(command, "m_choppy_scale", choppy_scale);
                 });
             }
 
@@ -324,7 +232,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(computeShader, 3, (settings.Resolution * 4) >> 2, (settings.Resolution) >> 2, 1);
                 pass.ReadTexture("_LengthToRoughness", lengthToRoughness);
 
-                var mipCount = (int)Log(settings.Resolution, 2) + 1;
+                var mipCount = (int)Mathf.Log(settings.Resolution, 2) + 1;
                 for (var j = 0; j < mipCount; j++)
                 {
                     var smoothnessId = smoothnessMapIds.GetProperty(j);
@@ -366,8 +274,8 @@ namespace Arycama.CustomRenderPipeline
 
             var texelSize = settings.ShadowRadius * 2.0f / settings.ShadowResolution;
 
-            var snappedViewPositionX = Maths.Snap(viewPosition.x, texelSize) - viewPosition.x;
-            var snappedViewPositionZ = Maths.Snap(viewPosition.z, texelSize) - viewPosition.z;
+            var snappedViewPositionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x;
+            var snappedViewPositionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z;
 
             var worldToLight = Matrix4x4.Rotate(Quaternion.Inverse(lightRotation));
             Vector3 minValue = Vector3.positiveInfinity, maxValue = Vector3.negativeInfinity;
@@ -458,8 +366,8 @@ namespace Arycama.CustomRenderPipeline
             var resolution = settings.Resolution;
 
             // Calculate constants
-            var rcpScales = new Vector4(1f / Pow(profile.CascadeScale, 0f), 1f / Pow(profile.CascadeScale, 1f), 1f / Pow(profile.CascadeScale, 2f), 1f / Pow(profile.CascadeScale, 3f));
-            var patchSizes = new Vector4(profile.PatchSize / Pow(profile.CascadeScale, 0f), profile.PatchSize / Pow(profile.CascadeScale, 1f), profile.PatchSize / Pow(profile.CascadeScale, 2f), profile.PatchSize / Pow(profile.CascadeScale, 3f));
+            var rcpScales = new Vector4(1f / Mathf.Pow(profile.CascadeScale, 0f), 1f / Mathf.Pow(profile.CascadeScale, 1f), 1f / Mathf.Pow(profile.CascadeScale, 2f), 1f / Mathf.Pow(profile.CascadeScale, 3f));
+            var patchSizes = new Vector4(profile.PatchSize / Mathf.Pow(profile.CascadeScale, 0f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 1f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 2f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 3f));
             var spectrumStart = new Vector4(0, profile.MaxWaveNumber * patchSizes.y / patchSizes.x, profile.MaxWaveNumber * patchSizes.z / patchSizes.y, profile.MaxWaveNumber * patchSizes.w / patchSizes.z);
             var spectrumEnd = new Vector4(profile.MaxWaveNumber, profile.MaxWaveNumber, profile.MaxWaveNumber, resolution);
             var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
@@ -491,8 +399,8 @@ namespace Arycama.CustomRenderPipeline
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;
-                    var positionX = Maths.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
-                    var positionZ = Maths.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
+                    var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
+                    var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
                     var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
@@ -526,8 +434,8 @@ namespace Arycama.CustomRenderPipeline
 
             // We can do 32x32 cells in a single pass, larger counts need to be broken up into several passes
             var maxPassesPerDispatch = 6;
-            var totalPassCount = (int)Log(settings.CellCount, 2f) + 1;
-            var dispatchCount = Ceil(totalPassCount / (float)maxPassesPerDispatch);
+            var totalPassCount = (int)Mathf.Log(settings.CellCount, 2f) + 1;
+            var dispatchCount = Mathf.Ceil(totalPassCount / (float)maxPassesPerDispatch);
 
             RTHandle tempLodId = null;
             BufferHandle lodIndirectArgsBuffer = null;
@@ -558,7 +466,7 @@ namespace Arycama.CustomRenderPipeline
 
                     var isFinalPass = i == dispatchCount - 1; // Also indicates whether this is -not- the final pass
 
-                    var passCount = Min(maxPassesPerDispatch, totalPassCount - i * maxPassesPerDispatch);
+                    var passCount = Mathf.Min(maxPassesPerDispatch, totalPassCount - i * maxPassesPerDispatch);
                     var threadCount = 1 << (i * 6 + passCount - 1);
                     pass.Initialize(compute, 0, threadCount, threadCount);
 
@@ -614,8 +522,8 @@ namespace Arycama.CustomRenderPipeline
 
                         // Snap to quad-sized increments on largest cell
                         var texelSize = settings.Size / (float)settings.PatchVertices;
-                        var positionX = Maths.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
-                        var positionZ = Maths.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
+                        var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
+                        var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
 
                         var positionOffset = new Vector4(settings.Size, settings.Size, positionX, positionZ);
                         pass.SetVector(command, "_TerrainPositionOffset", positionOffset);
@@ -688,8 +596,8 @@ namespace Arycama.CustomRenderPipeline
             var resolution = settings.Resolution;
 
             // Calculate constants
-            var rcpScales = new Vector4(1f / Pow(profile.CascadeScale, 0f), 1f / Pow(profile.CascadeScale, 1f), 1f / Pow(profile.CascadeScale, 2f), 1f / Pow(profile.CascadeScale, 3f));
-            var patchSizes = new Vector4(profile.PatchSize / Pow(profile.CascadeScale, 0f), profile.PatchSize / Pow(profile.CascadeScale, 1f), profile.PatchSize / Pow(profile.CascadeScale, 2f), profile.PatchSize / Pow(profile.CascadeScale, 3f));
+            var rcpScales = new Vector4(1f / Mathf.Pow(profile.CascadeScale, 0f), 1f / Mathf.Pow(profile.CascadeScale, 1f), 1f / Mathf.Pow(profile.CascadeScale, 2f), 1f / Mathf.Pow(profile.CascadeScale, 3f));
+            var patchSizes = new Vector4(profile.PatchSize / Mathf.Pow(profile.CascadeScale, 0f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 1f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 2f), profile.PatchSize / Mathf.Pow(profile.CascadeScale, 3f));
             var spectrumStart = new Vector4(0, profile.MaxWaveNumber * patchSizes.y / patchSizes.x, profile.MaxWaveNumber * patchSizes.z / patchSizes.y, profile.MaxWaveNumber * patchSizes.w / patchSizes.z);
             var spectrumEnd = new Vector4(profile.MaxWaveNumber, profile.MaxWaveNumber, profile.MaxWaveNumber, resolution);
             var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
@@ -725,8 +633,8 @@ namespace Arycama.CustomRenderPipeline
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;
-                    var positionX = Maths.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
-                    var positionZ = Maths.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
+                    var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
+                    var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
                     var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
@@ -797,8 +705,8 @@ namespace Arycama.CustomRenderPipeline
                 return;
 
             // Calculate constants
-            var rcpScales = new Vector4(1f / Pow(settings.Profile.CascadeScale, 0f), 1f / Pow(settings.Profile.CascadeScale, 1f), 1f / Pow(settings.Profile.CascadeScale, 2f), 1f / Pow(settings.Profile.CascadeScale, 3f));
-            var patchSizes = new Vector4(settings.Profile.PatchSize / Pow(settings.Profile.CascadeScale, 0f), settings.Profile.PatchSize / Pow(settings.Profile.CascadeScale, 1f), settings.Profile.PatchSize / Pow(settings.Profile.CascadeScale, 2f), settings.Profile.PatchSize / Pow(settings.Profile.CascadeScale, 3f));
+            var rcpScales = new Vector4(1f / Mathf.Pow(settings.Profile.CascadeScale, 0f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 1f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 2f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 3f));
+            var patchSizes = new Vector4(settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 0f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 1f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 2f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 3f));
             var spectrumStart = new Vector4(0, settings.Profile.MaxWaveNumber * patchSizes.y / patchSizes.x, settings.Profile.MaxWaveNumber * patchSizes.z / patchSizes.y, settings.Profile.MaxWaveNumber * patchSizes.w / patchSizes.z);
             var spectrumEnd = new Vector4(settings.Profile.MaxWaveNumber, settings.Profile.MaxWaveNumber, settings.Profile.MaxWaveNumber, settings.Resolution);
             var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);

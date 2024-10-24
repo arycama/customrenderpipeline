@@ -71,8 +71,8 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(int width, int height, float near, float far, Matrix4x4 invVpMatrix)
         {
-            var clusterWidth = Maths.DivRoundUp(width, settings.TileSize);
-            var clusterHeight = Maths.DivRoundUp(height, settings.TileSize);
+            var clusterWidth = MathUtils.DivRoundUp(width, settings.TileSize);
+            var clusterHeight = MathUtils.DivRoundUp(height, settings.TileSize);
             var clusterCount = clusterWidth * clusterHeight * settings.ClusterDepth;
 
             var clusterScale = settings.ClusterDepth / Mathf.Log(far / near, 2f);

@@ -35,7 +35,7 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 
 	SurfaceInput surfaceInput;
 	surfaceInput.uv = v.uv;
-	surfaceInput.worldPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+	surfaceInput.worldPosition = WorldRayOrigin() - _ViewPosition + WorldRayDirection() * RayTCurrent();
 	surfaceInput.vertexNormal = N;
 	surfaceInput.vertexTangent = tangent.xyz;
 	surfaceInput.tangentSign = tangent.w;

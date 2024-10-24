@@ -63,7 +63,7 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 		}
 	}
 	
-	uint rand00 = PcgHash(uv * TerrainSize.xz / TerrainLayerData[index0].Scale);
+	uint rand00 = PcgHash2(uv * TerrainSize.xz / TerrainLayerData[index0].Scale);
 	float rotation0 = ConstructFloat(rand00);
 	
 	uint rand01 = PcgHash(rand00);
@@ -72,7 +72,7 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	uint rand02 = PcgHash(rand01);
 	float offsetY0 = ConstructFloat(rand02);
 	
-	uint rand10 = PcgHash(uv * TerrainSize.xz / TerrainLayerData[index1].Scale);
+	uint rand10 = PcgHash2(uv * TerrainSize.xz / TerrainLayerData[index1].Scale);
 	float rotation1 = ConstructFloat(rand10);
 	
 	uint rand11 = PcgHash(rand10);

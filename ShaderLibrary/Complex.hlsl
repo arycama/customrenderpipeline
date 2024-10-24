@@ -42,7 +42,7 @@ float2 conj(float2 c)
 
 float2 cexp(float2 c)
 {
-	return float2(cos(c.y), sin(c.y));
+	return float2(cos(c.y), sin(c.y)) * exp(c.x);
 }
 
 // https://cirosantilli.com/float2-dot-product

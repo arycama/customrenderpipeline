@@ -7,7 +7,7 @@
 // TODO: Share with lighting.hlsl code somehow?
 float3 RaytracedLighting(float3 N, float3 f0, float perceptualRoughness, float occlusion, float3 bentNormal, float3 albedo, float3 translucency = 0.0)
 {
-	float3 worldPosition = WorldRayOrigin() + WorldRayDirection() * RayTCurrent();
+	float3 worldPosition = WorldRayOrigin() - _ViewPosition + WorldRayDirection() * RayTCurrent();
 	float3 V = -WorldRayDirection();
 	
 	float4 clipPosition = PerspectiveDivide(WorldToClip(worldPosition));
@@ -87,7 +87,7 @@ float3 RaytracedLighting(float3 N, float3 f0, float perceptualRoughness, float o
 			float3 L = light.direction;
 		
 			RayDesc ray;
-			ray.Origin = worldPosition;
+			ray.Origin = worldPosition + _ViewPosition;
 			ray.Direction = L;
 			ray.TMin = 0.0;
 			ray.TMax = 1e10f;

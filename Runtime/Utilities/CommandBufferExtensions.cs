@@ -12,9 +12,9 @@ namespace Arycama.CustomRenderPipeline
         {
             computeShader.GetKernelThreadGroupSizes(kernelIndex, out var x, out var y, out var z);
 
-            var threadGroupsX = Maths.DivRoundUp(threadsX, (int)x);
-            var threadGroupsY = Maths.DivRoundUp(threadsY, (int)y);
-            var threadGroupsZ = Maths.DivRoundUp(threadsZ, (int)z);
+            var threadGroupsX = MathUtils.DivRoundUp(threadsX, (int)x);
+            var threadGroupsY = MathUtils.DivRoundUp(threadsY, (int)y);
+            var threadGroupsZ = MathUtils.DivRoundUp(threadsZ, (int)z);
 
             Assert.IsTrue(threadGroupsX > 0);
             Assert.IsTrue(threadGroupsY > 0);

@@ -69,12 +69,12 @@ namespace Arycama.CustomRenderPipeline
 
         public static float LuminanceToEV100(float luminance)
         {
-            return Maths.Log2(luminance) * Maths.Log2(ReflectedLightMeterConstant / Sensitivity);
+            return MathUtils.Log2(luminance) * MathUtils.Log2(ReflectedLightMeterConstant / Sensitivity);
         }
 
         public static float Ev100ToLuminance(float ev100)
         {
-            return Maths.Exp2(ev100) * (ReflectedLightMeterConstant / Sensitivity);
+            return MathUtils.Exp2(ev100) * (ReflectedLightMeterConstant / Sensitivity);
         }
 
         public RTHandle Render(RTHandle input, RTHandle bloom, int width, int height)

@@ -30,7 +30,7 @@ void ClusteredLighting(uint3 id : SV_DispatchThreadId, uint groupIndex : SV_Grou
 			[unroll]
 			for (uint x = 0; x < 2; x++)
 			{
-				float eyeDepth = _Near * pow(_Far / _Near, (id.z + z) * _RcpClusterDepth);
+				float eyeDepth = _Near * pow(abs(_Far / _Near), (id.z + z) * _RcpClusterDepth);
                 
 				float3 positionSS;
 				positionSS.x = (id.x + x) * _TileSize;

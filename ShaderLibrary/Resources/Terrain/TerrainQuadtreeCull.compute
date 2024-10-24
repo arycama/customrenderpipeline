@@ -8,10 +8,10 @@
 #pragma multi_compile _ FIRST
 #pragma multi_compile _ FINAL
 
-globallycoherent RWBuffer<int>_IndirectArgs;
+globallycoherent RWBuffer<uint>_IndirectArgs;
 globallycoherent RWBuffer<int> _PatchDataWrite;
 globallycoherent RWTexture2D<int> _LodResult, _TempResultWrite;
-Buffer<int> _IndirectArgsInput;
+Buffer<uint> _IndirectArgsInput;
 Texture2D<float2> _TerrainHeights;
 Texture2D<int> _LodInput, _TempResult;
 
@@ -26,7 +26,7 @@ static const int _ThreadCount = 32;
 
 groupshared int _CellLods[_ThreadCount][_ThreadCount];
 groupshared int _CellData[_ThreadCount * _ThreadCount];
-groupshared int _CellCounter, _WriteOffset;
+groupshared uint _CellCounter, _WriteOffset;
 
 [numthreads(_ThreadCount, _ThreadCount, 1)]
 void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_GroupIndex, uint2 dispatchThreadId : SV_DispatchThreadID, uint2 groupId : SV_GroupID)
@@ -47,7 +47,7 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 		
 		int lod = 0;
 
-		if (all(groupThreadId < maxThread))
+		if (all(groupThreadId < (uint) maxThread))
 		{
 			int2 coord = groupId * (1 << (i + (6 - _PassCount))) + groupThreadId;
 			
@@ -91,7 +91,7 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 			
 		GroupMemoryBarrierWithGroupSync();
 		
-		if (all(groupThreadId < maxThread))
+		if (all(groupThreadId < (uint) maxThread))
 		{
 			if (i < _PassCount - 1)
 			{
@@ -124,7 +124,7 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 	
 	GroupMemoryBarrierWithGroupSync();
 	
-	if(groupIndex >= _CellCounter)
+	if (groupIndex >= (uint) _CellCounter)
 		return;
 	
 	// Each thread writes one cell data to global memory
@@ -163,17 +163,17 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 void IndirectArgs(uint2 id : SV_DispatchThreadID)
 {
 	// Read input from the indirect args buffer
-	int threadCount = _IndirectArgsInput[1];
-	_IndirectArgs[0] = (threadCount + 64 - 1) / 64;
-	_IndirectArgs[1] = 1;
-	_IndirectArgs[2] = 1;
+	uint threadCount = _IndirectArgsInput[1];
+	_IndirectArgs[0] = (threadCount + 64u - 1u) / 64u;
+	_IndirectArgs[1] = 1u;
+	_IndirectArgs[2] = 1u;
 }
 
 [numthreads(64, 1, 1)]
 void CalculateLod(uint id : SV_DispatchThreadID)
 {
 	// Ensure we're not out of bounds
-	int threadCount = _IndirectArgs[1];
+	uint threadCount = _IndirectArgs[1];
 	if(id >= threadCount)
 		return;
 	

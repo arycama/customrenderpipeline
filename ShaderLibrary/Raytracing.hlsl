@@ -196,7 +196,11 @@ float2 UnityRayTracingFetchVertexAttribute2(uint vertexIndex, uint attributeType
 
 	float2 value = float2(0, 0);
 
-	ByteAddressBuffer vertexBuffer = unity_MeshVertexBuffers_RT[NonUniformResourceIndex(vertexDecl.Stream)];
+	#ifdef SHADER_STAGE_RAYTRACING
+		ByteAddressBuffer vertexBuffer = unity_MeshVertexBuffers_RT[NonUniformResourceIndex(vertexDecl.Stream)];
+	#else
+		ByteAddressBuffer vertexBuffer = unity_MeshVertexBuffers_RT[0];
+	#endif
 
 	if(attributeFormat == kVertexFormatFloat)
 	{
@@ -406,9 +410,9 @@ float ComputeTextureCoordsArea(float scale = 1.0)
 	uint index = PrimitiveIndex();
 	uint3 triangleIndices = UnityRayTracingFetchTriangleIndices(index);
 	
-	float2 uv0 = UnityRayTracingFetchVertexAttribute3(triangleIndices.x, kVertexAttributeTexCoord0) * scale;
-	float2 uv1 = UnityRayTracingFetchVertexAttribute3(triangleIndices.y, kVertexAttributeTexCoord0) * scale;
-	float2 uv2 = UnityRayTracingFetchVertexAttribute3(triangleIndices.z, kVertexAttributeTexCoord0) * scale;
+	float2 uv0 = UnityRayTracingFetchVertexAttribute2(triangleIndices.x, kVertexAttributeTexCoord0) * scale;
+	float2 uv1 = UnityRayTracingFetchVertexAttribute2(triangleIndices.y, kVertexAttributeTexCoord0) * scale;
+	float2 uv2 = UnityRayTracingFetchVertexAttribute2(triangleIndices.z, kVertexAttributeTexCoord0) * scale;
 	return abs((uv1.x - uv0.x) * (uv2.y - uv0.y) - (uv2.x - uv0.x) * (uv1.y - uv0.y));
 }
 
