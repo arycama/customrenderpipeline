@@ -277,7 +277,7 @@ float _WaterShadowFar;
 
 float3 WaterShadow(float3 position, float3 L)
 {
-	float shadowDistance = max(0.0, 0.0 - position.y) / max(1e-6, saturate(L.y));
+	float shadowDistance = max(0.0, -_ViewPosition.y - position.y) / max(1e-6, saturate(L.y));
 	float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, position);
 	if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
 	{

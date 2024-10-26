@@ -105,7 +105,7 @@ void RayGeneration()
 	float3 rcpPdf = (exp(c * t) / c) - rcp(c * exp(c * (b - t)));
 	float weight = rcp(dot(rcp(rcpPdf), 1.0 / 3.0));
 
-	float3 P = ray.Origin + ray.Direction * t;
+	float3 P = ray.Origin + ray.Direction * t - _ViewPosition;
 	
 	float3 luminance = 0.0;
 	float planetDistance = DistanceToBottomAtmosphereBoundary(_ViewHeight, -V.y);
