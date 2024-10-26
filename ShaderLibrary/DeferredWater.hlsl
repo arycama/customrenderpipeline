@@ -135,22 +135,31 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		refractedPositionSS = position.xy;
 	}
 	
-	float2 noise = Noise2D(position.xy);
-	
 	// Select random channel
+	float2 noise = Noise2D(position.xy);
 	float3 channelMask = floor(noise.y * 3.0) == float3(0.0, 1.0, 2.0);
-	float3 c = _Extinction;
-	
 	float xi = noise.x;
+	float t, pdf;
+	float c = dot(_Extinction, channelMask);
+	if (underwaterDepth)
+	{
+		// Bounded homogenous sampling
+		float b = underwaterDistance;
+		t = -log(1.0 - xi * (1.0 - exp(-c * b))) * rcp(c);
+		pdf = c * exp(c * (b - t)) / (exp(c * b) - 1.0);
+	}
+	else
+	{
+		// Infinite homogenous sampling
+		t = -log(1.0 - xi) * rcp(c);
+		pdf = c * exp(-c * t);
+	}
 	
-	float b = underwaterDistance;
-	float t = dot(-log(1.0 - xi * (1.0 - exp(-c * b))) / c, channelMask);
-	float3 rcpPdf = (exp(c * t) / c) - rcp(c * exp(c * (b - t)));
-	float weight = rcp(dot(rcp(rcpPdf), 1.0 / 3.0));
+	float weight = rcp(dot(pdf, rcp(3.0)));
 
 	float3 underwaterPositionWS = PixelToWorld(float3(refractedPositionSS, underwaterDepth));
-	float3 underwaterV = normalize(underwaterPositionWS - worldPosition);
-	float3 P = worldPosition + underwaterV * t;
+	float3 underwaterV = normalize(worldPosition - underwaterPositionWS);
+	float3 P = worldPosition - underwaterV * t;
 	
 	float3 luminance = 0.0;
 	float planetDistance = DistanceToBottomAtmosphereBoundary(_ViewHeight, -V.y);
@@ -171,14 +180,9 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 				}
 			
 				float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
-				float LdotV0 = dot(_LightDirection0, -V);
+				float LdotV0 = dot(_LightDirection0, -underwaterV);
 				float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, planetDistance * LdotV0, _PlanetRadius);
-				float3 r = -V;
-				r = refract(-V, N, rcp(1.5));
-				float3 lR = _LightDirection0;
-				//lR = -refract(-_LightDirection0, N * float3(-1, 1, -1), rcp(1.5));
-				LdotV0 = dot(lR, r);
-				float phase = lerp(MiePhase(LdotV0, -0.15) , MiePhase(LdotV0, 0.85), asymmetry) * 2.5;
+				float phase = lerp(MiePhase(LdotV0, -0.3) , MiePhase(LdotV0, 0.85), asymmetry);
 				float3 lightColor0 = phase * _LightColor0 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance0);
 				luminance += lightColor0 * attenuation * asymmetry;
 			}
