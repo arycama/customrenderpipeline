@@ -139,21 +139,22 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	// Select random channel
 	float2 noise = Noise2D(position.xy);
 	float3 channelMask = floor(noise.y * 3.0) == float3(0.0, 1.0, 2.0);
-	float xi = noise.x;
-	float t, pdf;
-	float c = dot(_Extinction, channelMask);
+	float xi = min(noise.x, 0.999);
+	float t;
+	float3 pdf;
+	float3 c = _Extinction;
 	if (underwaterDepth || !isFrontFace)
 	{
 		// Bounded homogenous sampling
 		float b = isFrontFace ? underwaterDistance : waterDistance;
-		t = -log(1.0 - xi * (1.0 - exp(-c * b))) * rcp(c);
+		t = dot(channelMask, -log(1.0 - xi * (1.0 - exp(-c * b))) * rcp(c));
 		pdf = c * exp(c * (b - t)) / (exp(c * b) - 1.0);
 	}
 	else
 	{
 		// Infinite homogenous sampling
-		t = -log(1.0 - xi) * rcp(c);
-		pdf = c * exp(-c * t);
+		t = dot(channelMask, -log(1.0 - xi) * rcp(c));
+		pdf = c * (1.0 - xi); // == c * exp(-c * t);
 	}
 	
 	float weight = rcp(dot(pdf, rcp(3.0)));
@@ -203,8 +204,6 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	// Ambient 
 	float3 finalTransmittance = exp(-t * _Extinction);
 	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
-	
-	luminance = IsInfOrNaN(luminance) ? 0.0 : luminance;
 
 	// TODO: Stencil? Or hw blend?
 	float3 underwater = 0.0;
@@ -239,7 +238,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	// Apply roughness to transmission
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
 	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
-	//underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
+	underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
 	
 	FragmentOutput output;
 	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);
@@ -262,7 +261,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 {
 	// Note: Not using yCoCg or tonemapping gives less noisy results here
 	float3 minValue, maxValue, result;
-	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result, false, false, 1.5);
+	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result, false, false, 1);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	
