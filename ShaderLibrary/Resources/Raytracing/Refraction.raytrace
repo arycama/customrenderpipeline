@@ -5,6 +5,7 @@
 #include "../../Lighting.hlsl"
 #include "../../ImageBasedLighting.hlsl"
 #include "../../Raytracing.hlsl"
+#include "../../Water/WaterPrepassCommon.hlsl"
 
 Texture2D<float4> _NormalRoughness;
 Texture2D<float> _Depth;
@@ -49,8 +50,14 @@ void RayGeneration()
 	worldPosition = PlanetCurveInverse(worldPosition);
 	
 	float roughness = Sq(normalRoughness.a);
+	
+	bool isFrontFace;
+	float3 triangleNormal = GetTriangleNormal(position.xy, V, isFrontFace);
+	
 	//float rcpPdf;
-	float3 L = refract(-V, N, rcp(1.34)); //	ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
+	float eta = isFrontFace ? rcp(1.34) : 1.34;
+	float3 L = refract(-V, N, eta); //	ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
+	bool isTotalInternalReflection = all(L == 0.0);
 	//rcpPdf = 1;
 	
 	float _RaytracingBias = 0.1, _RaytracingDistantBias = 0.1;
@@ -70,26 +77,30 @@ void RayGeneration()
 	payload.cone.width = _RaytracingPixelSpreadAngle * distanceToCamera;
 	payload.cone.spreadAngle = _RaytracingPixelSpreadAngle + RoughnessToSpreadAngle(roughness);
 	
-	uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
-	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+	if (!isTotalInternalReflection)
+	{
+		uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+		TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+	}
 	
 	bool validHit = payload.hitDistance;
 	float outDepth;
 	float3 color, hitRay;
-	if(validHit)
+	if (validHit && !isTotalInternalReflection)
 	{
 		hitRay = L * payload.hitDistance;
 		color = R11G11B10ToFloat3(payload.packedColor);
 		outDepth = Linear01Depth(depth);
+		color *= exp(-_Extinction * (isFrontFace ? payload.hitDistance : length(worldPosition)));
 	}
 	else
 	{
-		color = 0.0;
+		color = isFrontFace || isTotalInternalReflection ? 0.0 : _SkyReflection.SampleLevel(_LinearClampSampler, L, 0.0) * exp(-_Extinction * length(worldPosition));
 		hitRay = L;
 		outDepth = 0.0;
 	}
 	
-	RefractionResult[position] = validHit ? color * exp(-_Extinction * payload.hitDistance) : 0.0;
+	RefractionResult[position] = color;
 	
 	// Select random channel
 	float2 noise = Noise2D(position.xy);

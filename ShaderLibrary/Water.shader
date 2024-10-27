@@ -41,6 +41,8 @@
 			Name "Water"
 			Tags { "LightMode"="Water" }
 
+			Cull Off
+
 			Stencil
 			{
 				Ref 6
@@ -57,7 +59,6 @@
 
 			#pragma target 5.0
 			#define MOTION_VECTORS_ON
-			#pragma enable_d3d11_debug_symbols
 			#include "Water.hlsl"
 
 			ENDHLSL

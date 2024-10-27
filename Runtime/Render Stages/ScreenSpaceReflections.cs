@@ -75,7 +75,8 @@ public class ScreenSpaceReflections
                 commonPassData.SetInputs(pass);
 
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
-
+                pass.AddRenderPassData<WaterPrepassResult>();
+                
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     commonPassData.SetProperties(pass, command);
@@ -138,6 +139,7 @@ public class ScreenSpaceReflections
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+            pass.AddRenderPassData<WaterPrepassResult>();
 
             var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
             {

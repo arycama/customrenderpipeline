@@ -83,7 +83,9 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	// TODO: Would be better to use some kind of filter instead of bilinear
 	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit)).rgb;
-	result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
+	
+	if (!depth)
+		result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
 	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
 	
 	// Note this is already jittered so we can sample directly

@@ -44,7 +44,7 @@ struct FragmentInput
 
 struct FragmentOutput
 {
-	float2 normalFoamRoughness : SV_Target0;
+	float2 delta : SV_Target0;
 	float2 velocity : SV_Target1;
 	float2 triangleNormal : SV_Target2;
 };
@@ -256,15 +256,18 @@ FragmentInput Domain(HullConstantOutput tessFactors, OutputPatch<DomainInput, 4>
 
 void FragmentShadow() { }
 
-FragmentOutput Fragment(FragmentInput input)
+FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 {
 	float3 dx = ddx_coarse(input.worldPosition);
 	float3 dy = ddy_coarse(input.worldPosition);
 	float3 triangleNormal = normalize(cross(dy, dx));
+	
+	if (!isFrontFace)
+		triangleNormal = -triangleNormal;
 
 	FragmentOutput output;
 	output.velocity = CalculateVelocity(input.positionCS.xy * _ScaledResolution.zw, input.previousPositionCS);
-	output.normalFoamRoughness = input.delta;
-	output.triangleNormal = PackNormalOctQuadEncode(triangleNormal);
+	output.delta = input.delta;
+	output.triangleNormal = PackNormalOctQuadEncode(triangleNormal) * 0.5 + 0.5;
 	return output;
 }

@@ -20,6 +20,7 @@ namespace Arycama.CustomRenderPipeline
         private Material material;
         private RTHandle result;
         private BufferHandle resultDataBuffer;
+        private int version = 0, lastVersion = -1;
 
         public WaterShoreMask(RenderGraph renderGraph, Settings settings)
         {
@@ -27,17 +28,33 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
             this.material = new Material(Shader.Find("Hidden/WaterShoreMask")) { hideFlags = HideFlags.HideAndDontSave };
             resultDataBuffer = renderGraph.ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 1, UnsafeUtility.SizeOf<ResultData>()));
+
+            TerrainCallbacks.heightmapChanged += TerrainHeightmapChanged;
+        }
+
+        ~WaterShoreMask()
+        {
+            TerrainCallbacks.heightmapChanged -= TerrainHeightmapChanged;
+        }
+
+        private void TerrainHeightmapChanged(Terrain terrain, RectInt heightRegion, bool synched)
+        {
+            if (terrain == this.terrain)
+                version++;
         }
 
         public void Render()
         {
             // TODO: Also check if properties have changed such as size etc.
-            //if (Terrain.activeTerrain == terrain)
-            //    return;
+            if (Terrain.activeTerrain == terrain && version == lastVersion)
+                return;
 
-            //if (terrain != null)
-            //    result.IsPersistent = false;
+            if (terrain != null)
+                result.IsPersistent = false;
 
+            Debug.Log("Updating Shore Mask");
+
+            lastVersion = version;
             terrain = Terrain.activeTerrain;
 
             var terrainPosition = terrain.transform.position;
@@ -50,7 +67,7 @@ namespace Arycama.CustomRenderPipeline
             var cutoff = Mathf.InverseLerp(terrainPosition.y, terrainPosition.y + terrainSize.y * 2.0f, 0.0f);
             var invResolution = 1.0f / heightmapResolution;
 
-            var src = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R32G32_SFloat, isExactSize: true);
+            var src = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R32G32_SFloat);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Water Shore Mask Blit"))
             {
                 pass.Initialize(material);
@@ -71,7 +88,7 @@ namespace Arycama.CustomRenderPipeline
             for (var i = 0; i < passes; i++)
             {
                 var offset = Mathf.Pow(2, passes - i - 1);
-                var dst = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R32G32_SFloat, isExactSize: true);
+                var dst = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R32G32_SFloat);
 
                 using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Water Shore Mask Jump Flood"))
                 {
@@ -113,7 +130,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Final combination pass
-            result = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R16G16B16A16_UNorm, isExactSize: true);
+            result = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R16G16B16A16_UNorm, isExactSize: true, isPersistent: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Water Shore Final Combine"))
             {

@@ -582,12 +582,12 @@ namespace Arycama.CustomRenderPipeline
             if (!settings.IsEnabled)
                 return;
 
-            // Depth, rgba8 normalFoam, rgba8 roughness, mask? 
-            // Writes depth, stencil, and RGBA8 containing normalRG, roughness and foam
+            // Writes (worldPos - displacementPos).xz. Uv coord is reconstructed later from delta and worldPosition (reconstructed from depth)
             var oceanRenderResult = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);
 
-            // Also write triangleNormal to another texture with oct encoding. This allows reconstructing the derivative correctly to avoid mip issues on edges etc
-            var waterTriangleNormal = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);
+            // Also write triangleNormal to another texture with oct encoding. This allows reconstructing the derivative correctly to avoid mip issues on edges,
+            // As well as backfacing triangle detection for rendering under the surface
+            var waterTriangleNormal = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R16G16_UNorm, isScreenTexture: true);
 
             var passIndex = settings.Material.FindPass("Water");
             Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
@@ -656,7 +656,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal), renderGraph.FrameIndex);
+            renderGraph.ResourceMap.SetRenderPassData(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction")), renderGraph.FrameIndex);
         }
 
         public void RenderUnderwaterLighting(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, Camera camera)
@@ -833,6 +833,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.AddRenderPassData<ShadowRenderer.Result>();
                     pass.AddRenderPassData<LitData.Result>();
                     pass.AddRenderPassData<WaterShadowResult>();
+                    pass.AddRenderPassData<WaterPrepassResult>();
                     commonPassData.SetInputs(pass);
 
                     var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
@@ -1062,11 +1063,14 @@ namespace Arycama.CustomRenderPipeline
     public struct WaterPrepassResult : IRenderPassData
     {
         private RTHandle waterNormalFoam, waterTriangleNormal;
+        private Vector3 albedo, extinction;
 
-        public WaterPrepassResult(RTHandle waterNormalFoam, RTHandle waterTriangleNormal)
+        public WaterPrepassResult(RTHandle waterNormalFoam, RTHandle waterTriangleNormal, Vector3 albedo, Vector3 extinction)
         {
             this.waterNormalFoam = waterNormalFoam ?? throw new ArgumentNullException(nameof(waterNormalFoam));
             this.waterTriangleNormal = waterTriangleNormal ?? throw new ArgumentNullException(nameof(waterTriangleNormal));
+            this.albedo = albedo;
+            this.extinction = extinction;
         }
 
         public readonly void SetInputs(RenderPass pass)
@@ -1077,6 +1081,8 @@ namespace Arycama.CustomRenderPipeline
 
         public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
+            pass.SetVector(command, "_WaterAlbedo", albedo);
+            pass.SetVector(command, "_WaterExtinction", extinction);
         }
     }
 

@@ -5,6 +5,7 @@
 #include "../../Lighting.hlsl"
 #include "../../ImageBasedLighting.hlsl"
 #include "../../Raytracing.hlsl"
+#include "../../Water/WaterPrepassCommon.hlsl"
 
 Texture2D<float4> _NormalRoughness;
 Texture2D<float> _Depth;
@@ -77,6 +78,13 @@ void RayGeneration()
 		color = 0.0;
 		hitRay = L;
 		outDepth = 0.0;
+	}
+	
+	bool isFrontFace;
+	float3 triangleNormal = GetTriangleNormal(position.xy, V, isFrontFace);
+	if (!isFrontFace & validHit)
+	{
+		color *= exp(-payload.hitDistance * _WaterExtinction);
 	}
 	
 	HitColor[position] = float4(color, rcpPdf);

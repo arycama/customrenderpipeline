@@ -8,6 +8,7 @@
 #include "../../Lighting.hlsl"
 #include "../../ImageBasedLighting.hlsl"
 #include "../../ScreenSpaceRaytracing.hlsl"
+#include "../../Water/WaterPrepassCommon.hlsl"
 
 Texture2D<float4> _NormalRoughness, _BentNormalOcclusion, AlbedoMetallic;
 Texture2D<float3> PreviousFrame;
@@ -177,6 +178,15 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	uint stencil = _Stencil[position.xy].g;
 	bool isWater = (stencil & 4);
 	float3 radiance = IndirectSpecular(N, V, f0, NdotV, perceptualRoughness, isWater, _SkyReflection);
+	
+	bool isFrontFace;
+	float3 triangleNormal = GetTriangleNormal(position.xy, V, isFrontFace);
+	
+	if (!isFrontFace)
+	{
+		// Should do a 2nd trace thing here
+		radiance = _WaterAlbedo * 0;
+	}
 	
 	SpatialResult output;
 	output.result = lerp(radiance, result.rgb, result.a * SpecularGiStrength);

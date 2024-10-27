@@ -11,10 +11,10 @@
 #include "Random.hlsl"
 #include "WaterCommon.hlsl"
 #include "Water/WaterShoreMask.hlsl"
+#include "Water/WaterPrepassCommon.hlsl"
 
 Texture2D<float4> _WaterNormalFoam;
 Texture2D<float3> _WaterEmission, _UnderwaterResult;
-Texture2D<float2> _WaterTriangleNormal;
 Texture2D<float> _Depth, _UnderwaterDepth;
 
 float4 _UnderwaterResultScaleLimit;
@@ -60,7 +60,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float foam = 0.0;
 	float smoothness = 0.0;
 
-	float3 triangleNormal = UnpackNormalOctQuadEncode(_WaterTriangleNormal[position.xy]);
+	bool isFrontFace;
+	float3 triangleNormal = GetTriangleNormal(position.xy, V, isFrontFace);
 	
 	float3 rayX = QuadReadAcrossX(-V, position.xy);
 	float3 rayY = QuadReadAcrossY(-V, position.xy);
@@ -95,6 +96,9 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	// Our normals contain partial derivatives, and since we add the height field with the shore waves, we can simply sum the partial derivatives and renormalize
 	float3 N = normalize(float3(normalData * (1.0 - shoreScale), 1.0).xzy + shoreNormal);
 	
+	if (!isFrontFace)
+		N = -N;
+		
 	// Foam calculations
 	//float foamFactor = saturate(lerp(_WaveFoamStrength * (-foam + _WaveFoamFalloff), breaker + shoreFoam, shoreFactor));
 	float foamFactor = saturate(_WaveFoamStrength * (-foam + _WaveFoamFalloff));
@@ -110,15 +114,12 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		//smoothness = lerp(smoothness, _FoamSmoothness, foamFactor);
 	}
 
-	// TODO: Use RNM
-	// = normalize(mul(oceanN, tangentToWorld));
 	float perceptualRoughness = SmoothnessToPerceptualRoughness(smoothness);
-	float3 originalN = N;
 	
 	float NdotV;
 	N = GetViewReflectedNormal(N, V, NdotV);
 	
-	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25 / linearWaterDepth;
+	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25;// / linearWaterDepth;
 	
 	float2 uvOffset = N.xz * distortion;
 	float2 refractionUv = uvOffset * _ScaledResolution.xy + position.xy;
@@ -141,10 +142,10 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float xi = noise.x;
 	float t, pdf;
 	float c = dot(_Extinction, channelMask);
-	if (underwaterDepth)
+	if (underwaterDepth || !isFrontFace)
 	{
 		// Bounded homogenous sampling
-		float b = underwaterDistance;
+		float b = isFrontFace ? underwaterDistance : waterDistance;
 		t = -log(1.0 - xi * (1.0 - exp(-c * b))) * rcp(c);
 		pdf = c * exp(c * (b - t)) / (exp(c * b) - 1.0);
 	}
@@ -158,8 +159,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float weight = rcp(dot(pdf, rcp(3.0)));
 
 	float3 underwaterPositionWS = PixelToWorld(float3(refractedPositionSS, underwaterDepth));
-	float3 underwaterV = normalize(worldPosition - underwaterPositionWS);
-	float3 P = worldPosition - underwaterV * t;
+	float3 underwaterV = isFrontFace ? normalize(worldPosition - underwaterPositionWS) : V;
+	float3 P = isFrontFace ? worldPosition + -underwaterV * t : -V * t;
 	
 	float3 luminance = 0.0;
 	float planetDistance = DistanceToBottomAtmosphereBoundary(_ViewHeight, -V.y);
@@ -178,7 +179,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 					float shadowDepth = _WaterShadows.Sample(_LinearClampSampler, shadowPosition.xy);
 					shadowDistance0 = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
 				}
-			
+				
 				float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
 				float LdotV0 = dot(_LightDirection0, -underwaterV);
 				float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, planetDistance * LdotV0, _PlanetRadius);
@@ -188,13 +189,13 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			}
 		}
 	
-		#ifdef LIGHT_COUNT_TWO
-			float shadowDistance1 = max(0.0, worldPosition.y - P.y) / max(1e-6, saturate(_LightDirection1.y));
-			float LdotV1 = dot(_LightDirection1, -V);
-			float lightCosAngleAtDistance1 = CosAngleAtDistance(_ViewHeight, _LightDirection1.y, planetDistance * LdotV1, _PlanetRadius);
-			float3 lightColor1 = RcpPi * _LightColor1 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance1);
-			luminance += lightColor1 * exp(-_Extinction * (shadowDistance1 + t));
-		#endif
+		//#ifdef LIGHT_COUNT_TWO
+		//	float shadowDistance1 = max(0.0, worldPosition.y - P.y) / max(1e-6, saturate(_LightDirection1.y));
+		//	float LdotV1 = dot(_LightDirection1, -V);
+		//	float lightCosAngleAtDistance1 = CosAngleAtDistance(_ViewHeight, _LightDirection1.y, planetDistance * LdotV1, _PlanetRadius);
+		//	float3 lightColor1 = RcpPi * _LightColor1 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance1);
+		//	luminance += lightColor1 * exp(-_Extinction * (shadowDistance1 + t));
+		//#endif
 	#endif
 	
 	luminance *= _Extinction * weight * _Exposure;
@@ -203,18 +204,42 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float3 finalTransmittance = exp(-t * _Extinction);
 	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
 	
-	//luminance *= _Color;
 	luminance = IsInfOrNaN(luminance) ? 0.0 : luminance;
 
 	// TODO: Stencil? Or hw blend?
 	float3 underwater = 0.0;
-	if(underwaterDepth != 0.0)
-		underwater = _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit)) * exp(-_Extinction * underwaterDistance);
+	if (underwaterDepth != 0.0 || !isFrontFace)
+	{
+		// Critical angle, no specular
+		float eta = 1.34;
+		float NdotI = dot(N, -V);
+		float k = 1.0 - eta * eta * (1.0 - NdotI * NdotI);
+		bool isCriticalAngle = !isFrontFace && k <= 0.0;
+		float3 refractV = eta * -V - (eta * NdotI + sqrt(k)) * N;
+	
+		if(!isCriticalAngle)
+		{
+			if(underwaterDepth)
+				underwater = _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit));
+		
+			if (isFrontFace)
+			{
+				underwater *= exp(-_Extinction * underwaterDistance);
+			}
+			else
+			{
+				if (!underwaterDepth)
+					underwater = _SkyReflection.SampleLevel(_LinearClampSampler, refractV, 0.0);
+					
+				underwater *= exp(-_Extinction * waterDistance);
+			}
+		}
+	}
 	
 	// Apply roughness to transmission
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
 	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
-	underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
+	//underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
 	
 	FragmentOutput output;
 	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);
