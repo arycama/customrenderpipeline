@@ -44,17 +44,17 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	float3 lighting = 0.0;
 	for (uint i = 0; i < min(128, lightOffsetAndCount.y); i++)
 	{
-		PointLight light = _PointLights[_LightClusterList[lightOffsetAndCount.x + i]];
+		LightData light = _PointLights[_LightClusterList[lightOffsetAndCount.x + i]];
 		
 		float3 lightVector = light.position - worldPosition;
 		float sqrLightDist = dot(lightVector, lightVector);
-		if (sqrLightDist >= light.sqRange)
+		if (sqrLightDist >= Sq(light.range))
 			continue;
 		
 		float rcpLightDist = rsqrt(sqrLightDist);
 		float3 L = lightVector * rcpLightDist;
 
-		float attenuation = Sq(min(rcp(0.01), rcpLightDist) * saturate(1.0 - Sq(sqrLightDist * light.sqRcpRange)));
+		float attenuation = Sq(min(rcp(0.01), rcpLightDist) * saturate(1.0 - Sq(sqrLightDist * rcp(Sq(light.range)))));
 		if (!attenuation)
 			continue;
 		
@@ -63,16 +63,16 @@ void Compute(uint3 id : SV_DispatchThreadID)
 		if(all(!intensity))
 			continue;
 			
-		if (light.shadowIndexVisibleFaces)
-		{
-			uint shadowIndex = light.shadowIndexVisibleFaces >> 8;
-			uint visibleFaces = light.shadowIndexVisibleFaces & 0xf;
-			float dominantAxis = Max3(abs(lightVector));
-			float depth = rcp(dominantAxis) * light.depthRemapScale + light.depthRemapOffset;
-			attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), shadowIndex), depth);
-			if (!attenuation)
-				continue;
-		}
+		//if (light.shadowIndexVisibleFaces)
+		//{
+		//	uint shadowIndex = light.shadowIndexVisibleFaces >> 8;
+		//	uint visibleFaces = light.shadowIndexVisibleFaces & 0xf;
+		//	float dominantAxis = Max3(abs(lightVector));
+		//	float depth = rcp(dominantAxis) * light.depthRemapScale + light.depthRemapOffset;
+		//	attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), shadowIndex), depth);
+		//	if (!attenuation)
+		//		continue;
+		//}
 		
 		lighting += (attenuation * _Exposure) * (intensity * light.color);
 	}

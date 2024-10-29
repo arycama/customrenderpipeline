@@ -25,7 +25,7 @@ namespace Arycama.CustomRenderPipeline
             directionalShadowRequests = ListPool<ShadowRequest>.Get();
             var directionalShadowMatrices = ListPool<Matrix4x4>.Get();
             var directionalShadowTexelSizes = ListPool<Vector4>.Get();
-            var pointLightList = ListPool<PointLightData>.Get();
+            var lightList = ListPool<LightData>.Get();
             pointShadowRequests = ListPool<ShadowRequest>.Get();
 
             // Setup lights/shadows
@@ -33,8 +33,8 @@ namespace Arycama.CustomRenderPipeline
             {
                 var visibleLight = cullingResults.visibleLights[i];
                 var light = visibleLight.light;
-                var cascadeCount = 0;
-                var shadowIndex = 0;
+                var cascadeCount = 0u;
+                var shadowIndex = uint.MaxValue;
 
                 if (visibleLight.lightType == LightType.Directional)
                 {
@@ -190,7 +190,7 @@ namespace Arycama.CustomRenderPipeline
                         }
 
                         if (cascadeCount > 0)
-                            shadowIndex = directionalShadowRequests.Count - cascadeCount;
+                            shadowIndex = (uint)(directionalShadowRequests.Count - cascadeCount);
                     }
 
                     Vector3 color = (Vector4)light.color.linear;
@@ -206,7 +206,7 @@ namespace Arycama.CustomRenderPipeline
                     var directionalLightData = new DirectionalLightData(color * light.intensity, shadowIndex, -light.transform.forward, cascadeCount, worldToLight);
                     directionalLightList.Add(directionalLightData);
                 }
-                else if (visibleLight.lightType == LightType.Point)
+                else
                 {
                     var nearPlane = light.shadowNearPlane;
                     var farPlane = light.range;
@@ -215,44 +215,128 @@ namespace Arycama.CustomRenderPipeline
                     var visibleFaceCount = 0;
                     if (light.shadows != LightShadows.None && cullingResults.GetShadowCasterBounds(i, out var bounds))
                     {
-                        for (var j = 0; j < 6; j++)
+                        if (visibleLight.lightType == LightType.Point)
                         {
-                            // We also need to swap the top/bottom faces of the cubemap
-                            var index = j;
-                            if (j == 2) index = 3;
-                            else if (j == 3) index = 2;
-
-                            var isValid = false;
-                            if (cullingResults.ComputePointShadowMatricesAndCullingPrimitives(i, (CubemapFace)index, 0.0f, out var viewMatrix, out var projectionMatrix, out var shadowSplitData))
+                            for (var j = 0; j < 6; j++)
                             {
-                                visibleFaceMask |= 1 << index;
-                                visibleFaceCount++;
-                                isValid = true;
+                                // We also need to swap the top/bottom faces of the cubemap
+                                var index = j;
+                                if (j == 2) index = 3;
+                                else if (j == 3) index = 2;
+
+                                var isValid = false;
+                                if (cullingResults.ComputePointShadowMatricesAndCullingPrimitives(i, (CubemapFace)index, 0.0f, out var viewMatrix, out var projectionMatrix, out var shadowSplitData))
+                                {
+                                    visibleFaceMask |= 1 << index;
+                                    visibleFaceCount++;
+                                    isValid = true;
+                                }
+
+                                viewMatrix = Matrix4x4.TRS(light.transform.position - camera.transform.position, viewMatrix.inverse.rotation, Vector3.one).inverse;
+
+                                // To undo unity's builtin inverted culling for point shadows, flip the y axis.
+                                // Y also needs to be done in the shader
+                                viewMatrix.SetRow(1, -viewMatrix.GetRow(1));
+
+                                // Todo: implemen
+                                var cullingPlanes = new CullingPlanes();
+                                cullingPlanes.Count = 0;
+
+                                var shadowRequest = new ShadowRequest(isValid, i, viewMatrix, projectionMatrix, shadowSplitData, index, cullingPlanes);
+                                pointShadowRequests.Add(shadowRequest);
+
+                                nearPlane = projectionMatrix[2, 3] / (projectionMatrix[2, 2] - 1f);
+                                farPlane = projectionMatrix[2, 3] / (projectionMatrix[2, 2] + 1f);
                             }
 
-                            viewMatrix = Matrix4x4.TRS(light.transform.position - camera.transform.position, viewMatrix.inverse.rotation, Vector3.one).inverse;
-
-                            // To undo unity's builtin inverted culling for point shadows, flip the y axis.
-                            // Y also needs to be done in the shader
-                            viewMatrix.SetRow(1, -viewMatrix.GetRow(1));
-
-                            // Todo: implemen
-                            var cullingPlanes = new CullingPlanes();
-                            cullingPlanes.Count = 0;
-
-                            var shadowRequest = new ShadowRequest(isValid, i, viewMatrix, projectionMatrix, shadowSplitData, index, cullingPlanes);
-                            pointShadowRequests.Add(shadowRequest);
-
-                            nearPlane = projectionMatrix[2, 3] / (projectionMatrix[2, 2] - 1f);
-                            farPlane = projectionMatrix[2, 3] / (projectionMatrix[2, 2] + 1f);
+                            if (visibleFaceCount > 0)
+                                shadowIndex = (uint)(pointShadowRequests.Count - visibleFaceCount) / 6;
                         }
-
-                        if (visibleFaceCount > 0)
-                            shadowIndex = (pointShadowRequests.Count - visibleFaceCount) / 6;
                     }
 
-                    var pointLightData = new PointLightData(light.transform.position - camera.transform.position, light.range, (Vector4)light.color.linear * light.intensity, shadowIndex, visibleFaceMask, nearPlane, farPlane);
-                    pointLightList.Add(pointLightData);
+                    var angleScale = 0f;
+                    var angleOffset = 1f;
+
+                    uint lightType;
+                    switch (light.type)
+                    {
+                        case LightType.Directional:
+                            lightType = 0;
+                            break;
+                        case LightType.Point:
+                            lightType = 1;
+                            break;
+                        case LightType.Spot:
+                            {
+                                switch (light.shape)
+                                {
+                                    case LightShape.Cone:
+                                        lightType = 2;
+                                        break;
+                                    case LightShape.Pyramid:
+                                        lightType = 3;
+                                        break;
+                                    case LightShape.Box:
+                                        lightType = 4;
+                                        break;
+                                    default:
+                                        throw new ArgumentOutOfRangeException(nameof(light.shape));
+                                }
+
+                                break;
+                            }
+                        case LightType.Area:
+                            {
+                                switch (light.shape)
+                                {
+                                    // Use as area
+                                    case LightShape.Cone:
+                                        lightType = 5;
+                                        // Spotlight angle
+                                        var innerConePercent = light.innerSpotAngle / visibleLight.spotAngle;
+                                        var cosSpotOuterHalfAngle = Mathf.Clamp01(Mathf.Cos(visibleLight.spotAngle * Mathf.Deg2Rad * 0.5f));
+                                        var cosSpotInnerHalfAngle = Mathf.Clamp01(Mathf.Cos(visibleLight.spotAngle * Mathf.Deg2Rad * 0.5f * innerConePercent)); // inner cone
+                                        angleScale = 1f / Mathf.Max(1e-4f, cosSpotInnerHalfAngle - cosSpotOuterHalfAngle);
+                                        angleOffset = -cosSpotOuterHalfAngle * angleScale;
+
+                                        break;
+                                    // Use as line
+                                    case LightShape.Pyramid:
+                                        lightType = 6;
+                                        break;
+                                    // Use as sphere
+                                    case LightShape.Box:
+                                        lightType = 7;
+                                        break;
+                                    default:
+                                        throw new ArgumentOutOfRangeException(nameof(light.shape));
+                                }
+
+                                break;
+                            }
+                        case LightType.Disc:
+                            lightType = 8;
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException(nameof(light.type));
+                    }
+
+                    var lightToWorld = visibleLight.localToWorldMatrix;
+                    var pointLightData = new LightData(
+                        lightToWorld.GetPosition() - camera.transform.position,
+                        light.range,
+                        (Vector4)light.color.linear * light.intensity,
+                        lightType,
+                        lightToWorld.Right(),
+                        angleScale,
+                        lightToWorld.Up(),
+                        angleOffset,
+                        lightToWorld.Forward(),
+                        shadowIndex,
+                        light.areaSize,
+                        (nearPlane * farPlane) / (farPlane - nearPlane),
+                        1.0f + farPlane / (nearPlane - farPlane));
+                    lightList.Add(pointLightData);
                 }
             }
 
@@ -260,7 +344,7 @@ namespace Arycama.CustomRenderPipeline
             var directionalShadowMatricesBuffer = directionalShadowRequests.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(directionalShadowMatrices.Count, UnsafeUtility.SizeOf<Matrix4x4>());
             var directionalShadowTexelSizesBuffer = directionalShadowRequests.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(directionalShadowTexelSizes.Count, UnsafeUtility.SizeOf<Vector4>());
 
-            var pointLightBuffer = pointLightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(pointLightList.Count, UnsafeUtility.SizeOf<PointLightData>());
+            var pointLightBuffer = lightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(lightList.Count, UnsafeUtility.SizeOf<LightData>());
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Set Light Data"))
             {
@@ -275,8 +359,8 @@ namespace Arycama.CustomRenderPipeline
                     command.SetBufferData(data.directionalLightBuffer, data.directionalLightList);
                     ListPool<DirectionalLightData>.Release(data.directionalLightList);
 
-                    command.SetBufferData(data.pointLightBuffer, data.pointLightList);
-                    ListPool<PointLightData>.Release(data.pointLightList);
+                    command.SetBufferData(data.pointLightBuffer, data.lightList);
+                    ListPool<LightData>.Release(data.lightList);
                 });
 
                 data.directionalMatrixBuffer = directionalShadowMatricesBuffer;
@@ -285,11 +369,11 @@ namespace Arycama.CustomRenderPipeline
                 data.directionalTexelSizeBuffer = directionalShadowTexelSizesBuffer;
                 data.directionalLightBuffer = directionalLightBuffer;
                 data.directionalLightList = directionalLightList;
-                data.pointLightList = pointLightList;
+                data.lightList = lightList;
                 data.pointLightBuffer = pointLightBuffer;
             }
 
-            var result = new Result(directionalShadowMatricesBuffer, directionalShadowTexelSizesBuffer, directionalLightBuffer, pointLightBuffer, directionalLightList.Count, pointLightList.Count);
+            var result = new Result(directionalShadowMatricesBuffer, directionalShadowTexelSizesBuffer, directionalLightBuffer, pointLightBuffer, directionalLightList.Count, lightList.Count);
 
             renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex);
         }
@@ -298,7 +382,7 @@ namespace Arycama.CustomRenderPipeline
         {
             internal List<DirectionalLightData> directionalLightList;
             internal BufferHandle directionalLightBuffer;
-            internal List<PointLightData> pointLightList;
+            internal List<LightData> lightList;
             internal BufferHandle pointLightBuffer;
             internal BufferHandle directionalMatrixBuffer;
             internal List<Vector4> directionalShadowTexelSizes;

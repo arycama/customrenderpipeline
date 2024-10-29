@@ -56,11 +56,11 @@ void ClusteredLighting(uint3 id : SV_DispatchThreadId, uint groupIndex : SV_Grou
 	uint lightCount = 0;
 	for (uint i = 0; i < _PointLightCount; i++)
 	{
-		PointLight lightData = _PointLights[i];
+		LightData lightData = _PointLights[i];
 
         // For spotlights, modify their culling sphere
 		float3 centerWS = lightData.position;
-		if (!IntersectSphereAABB(centerWS, lightData.sqRange, minBounds, maxBounds))
+		if (!IntersectSphereAABB(centerWS, Sq(lightData.range), minBounds, maxBounds))
 			continue;
 
 		_LightIndices[groupIndex][lightCount++] = i;

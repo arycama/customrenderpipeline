@@ -19,8 +19,6 @@ namespace Arycama.CustomRenderPipeline
 
         public static Vector3 Forward(this Matrix4x4 matrix) => matrix.GetColumn(2);
 
-        public static Vector3 Position(this Matrix4x4 matrix) => matrix.GetColumn(3);
-
         public static Matrix4x4 ConvertToAtlasMatrix(this Matrix4x4 m, bool reverseZ = true)
         {
             if (reverseZ && SystemInfo.usesReversedZBuffer)

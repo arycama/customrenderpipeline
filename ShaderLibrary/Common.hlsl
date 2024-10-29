@@ -12,24 +12,27 @@ struct DirectionalLight
 	float3x4 worldToLight;
 };
 
-struct PointLight
+struct LightData
 {
 	float3 position;
-	float sqRange;
-	
-	float sqRcpRange;
-	uint shadowIndexVisibleFaces;
-	float depthRemapScale;
-	float depthRemapOffset;
-	
+	float range;
 	float3 color;
-	float padding;
+	uint lightType;
+	float3 right;
+	float angleScale;
+	float3 up;
+	float angleOffset;
+	float3 forward;
+	uint shadowIndex;
+	float2 size;
+	float shadowProjectionX;
+	float shadowProjectionY;
 };
 
 Buffer<uint> _LightClusterList;
 StructuredBuffer<DirectionalLight> _DirectionalLights;
 StructuredBuffer<matrix> _DirectionalMatrices;
-StructuredBuffer<PointLight> _PointLights;
+StructuredBuffer<LightData> _PointLights;
 Texture2DArray<float> _DirectionalShadows;
 Texture3D<uint2> _LightClusterIndices;
 TextureCubeArray<float> _PointShadows;

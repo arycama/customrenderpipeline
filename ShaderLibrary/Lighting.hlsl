@@ -291,6 +291,223 @@ float3 WaterShadow(float3 position, float3 L)
 Texture2D<float3> ScreenSpaceReflections;
 float4 ScreenSpaceReflectionsScaleLimit;
 
+
+// Ref: Moving Frostbite to PBR.
+
+// Non physically based hack to limit light influence to attenuationRadius.
+// Square the result to smoothen the function.
+float DistanceWindowing(float distSquare, float rangeAttenuationScale, float rangeAttenuationBias)
+{
+    // If (range attenuation is enabled)
+    //   rangeAttenuationScale = 1 / r^2
+    //   rangeAttenuationBias  = 1
+    // Else
+    //   rangeAttenuationScale = 2^12 / r^2
+    //   rangeAttenuationBias  = 2^24
+	return saturate(rangeAttenuationBias - Sq(distSquare * rangeAttenuationScale));
+}
+
+float SmoothDistanceWindowing(float distSquare, float rangeAttenuationScale, float rangeAttenuationBias)
+{
+	float factor = DistanceWindowing(distSquare, rangeAttenuationScale, rangeAttenuationBias);
+	return Sq(factor);
+}
+
+// Applies SmoothDistanceWindowing() after transforming the attenuation ellipsoid into a sphere.
+// If r = rsqrt(invSqRadius), then the ellipsoid is defined s.t. r1 = r / invAspectRatio, r2 = r3 = r.
+// The transformation is performed along the major axis of the ellipsoid (corresponding to 'r1').
+// Both the ellipsoid (e.i. 'axis') and 'unL' should be in the same coordinate system.
+// 'unL' should be computed from the center of the ellipsoid.
+float EllipsoidalDistanceAttenuation(float3 unL, float3 axis, float invAspectRatio,
+                                    float rangeAttenuationScale, float rangeAttenuationBias)
+{
+    // Project the unnormalized light vector onto the axis.
+	float projL = dot(unL, axis);
+
+    // Transform the light vector so that we can work with
+    // with the ellipsoid as if it was a sphere with the radius of light's range.
+	float diff = projL - projL * invAspectRatio;
+	unL -= diff * axis;
+
+	float sqDist = dot(unL, unL);
+	return SmoothDistanceWindowing(sqDist, rangeAttenuationScale, rangeAttenuationBias);
+}
+
+// Applies SmoothDistanceWindowing() using the axis-aligned ellipsoid of the given dimensions.
+// Both the ellipsoid and 'unL' should be in the same coordinate system.
+// 'unL' should be computed from the center of the ellipsoid.
+float EllipsoidalDistanceAttenuation(float3 unL, float3 invHalfDim,
+                                    float rangeAttenuationScale, float rangeAttenuationBias)
+{
+    // Transform the light vector so that we can work with
+    // with the ellipsoid as if it was a unit sphere.
+	unL *= invHalfDim;
+
+	float sqDist = dot(unL, unL);
+	return SmoothDistanceWindowing(sqDist, rangeAttenuationScale, rangeAttenuationBias);
+}
+
+// Computes the squared magnitude of the vector computed by MapCubeToSphere().
+float ComputeCubeToSphereMapSqMagnitude(float3 v)
+{
+	float3 v2 = v * v;
+    // Note: dot(v, v) is often computed before this function is called,
+    // so the compiler should optimize and use the precomputed result here.
+	return dot(v, v) - v2.x * v2.y - v2.y * v2.z - v2.z * v2.x + v2.x * v2.y * v2.z;
+}
+
+// Applies SmoothDistanceWindowing() after mapping the axis-aligned box to a sphere.
+// If the diagonal of the box is 'd', invHalfDim = rcp(0.5 * d).
+// Both the box and 'unL' should be in the same coordinate system.
+// 'unL' should be computed from the center of the box.
+float BoxDistanceAttenuation(float3 unL, float3 invHalfDim,
+                            float rangeAttenuationScale, float rangeAttenuationBias)
+{
+	float attenuation = 0.0;
+
+    // Transform the light vector so that we can work with
+    // with the box as if it was a [-1, 1]^2 cube.
+	unL *= invHalfDim;
+
+    // Our algorithm expects the input vector to be within the cube.
+	if ((Max3(abs(unL)) <= 1.0))
+	{
+		float sqDist = ComputeCubeToSphereMapSqMagnitude(unL);
+		attenuation = SmoothDistanceWindowing(sqDist, rangeAttenuationScale, rangeAttenuationBias);
+	}
+	return attenuation;
+}
+
+// Square the result to smoothen the function.
+float AngleAttenuation(float cosFwd, float lightAngleScale, float lightAngleOffset)
+{
+	return saturate(cosFwd * lightAngleScale + lightAngleOffset);
+}
+
+float SmoothAngleAttenuation(float cosFwd, float lightAngleScale, float lightAngleOffset)
+{
+	float attenuation = AngleAttenuation(cosFwd, lightAngleScale, lightAngleOffset);
+	return Sq(attenuation);
+}
+
+#define PUNCTUAL_LIGHT_THRESHOLD 0.01 // 1cm (in Unity 1 is 1m)
+
+// Combines SmoothWindowedDistanceAttenuation() and SmoothAngleAttenuation() in an efficient manner.
+// distances = {d, d^2, 1/d, d_proj}, where d_proj = dot(lightToSample, lightData.forward).
+float PunctualLightAttenuation(float4 distances, float rangeAttenuationScale, float rangeAttenuationBias,
+                              float lightAngleScale, float lightAngleOffset)
+{
+	float distSq = distances.y;
+	float distRcp = distances.z;
+	float distProj = distances.w;
+	float cosFwd = distProj * distRcp;
+
+	float attenuation = min(distRcp, 1.0 / PUNCTUAL_LIGHT_THRESHOLD);
+	attenuation *= DistanceWindowing(distSq, rangeAttenuationScale, rangeAttenuationBias);
+	attenuation *= AngleAttenuation(cosFwd, lightAngleScale, lightAngleOffset);
+
+    // Effectively results in SmoothWindowedDistanceAttenuation(...) * SmoothAngleAttenuation(...).
+	return Sq(attenuation);
+}
+
+float GetLightAttenuation(LightData lightData, float3 positionWS, float dither, bool softShadows)
+{
+	float rangeAttenuationScale = rcp(Sq(lightData.range));
+	float3 lightVector = lightData.position - positionWS;
+	float3 direction = normalize(lightVector);
+
+    // Rotate the light direction into the light space.
+	float3x3 lightToWorld = float3x3(lightData.right, lightData.up, lightData.forward);
+	float3 positionLS = mul(lightToWorld, -lightVector);
+
+    // Apply the sphere light hack to soften the core of the punctual light.
+    // It is not physically plausible (using max() is more correct, but looks worse).
+    // See https://www.desmos.com/calculator/otqhxunqhl
+	float dist = max(lightData.size.x, length(lightVector));
+	float distSq = dist * dist;
+	float distRcp = rsqrt(distSq);
+    
+	float3 invHalfDim = rcp(float3(lightData.range + lightData.size.x * 0.5, lightData.range + lightData.size.y * 0.5, lightData.range));
+
+    // Line Light
+	float attenuation = 1.0;
+	if (lightData.lightType == 5)
+	{
+		attenuation *= EllipsoidalDistanceAttenuation(lightVector, invHalfDim, rangeAttenuationScale, 1.0);
+	}
+
+    // Rectangle/area light
+	if (lightData.lightType == 6)
+	{
+		if (dot(lightData.forward, lightVector) >= FloatEps)
+			attenuation = 0.0;
+        
+		attenuation *= BoxDistanceAttenuation(positionLS, invHalfDim, 1, 1);
+	}
+	else
+	{
+        // Inverse square + radial distance falloff
+        // {d, d^2, 1/d, d_proj}
+		float4 distances = float4(dist, distSq, distRcp, dot(-lightVector, lightData.forward));
+		light.color *= PunctualLightAttenuation(distances, rangeAttenuationScale, 1.0, lightData.angleScale, lightData.angleOffset);
+
+        // Manually clip box light X/Y (Z is handled by above)
+		if (lightData.lightType == 3 || lightData.lightType == 4)
+		{
+            // Perform perspective projection for frustum light
+			float2 positionCS = positionLS.xy;
+			if (lightData.lightType == 3)
+				positionCS /= positionLS.z;
+
+         // Box lights have no range attenuation, so we must clip manually.
+			if (Max3(float3(abs(positionCS), abs(positionLS.z - 0.5 * lightData.range) - 0.5 * lightData.range + 1)) > 1.0)
+				light.color = 0.0;
+		}
+	}
+    
+    // Shadows (If enabled, disabled in reflection probes for now)
+#ifndef NO_SHADOWS
+	if (lightData.shadowIndex != UintMax)
+	{
+        // Point light
+		if (lightData.lightType == 1)
+		{
+			float3 toLight = lightVector * float3(-1, 1, -1);
+			float dominantAxis = Max3(abs(toLight));
+			float depth = rcp(dominantAxis) * lightData.shadowProjectionY + lightData.shadowProjectionX;
+			light.color *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(toLight, lightData.shadowIndex), depth);
+		}
+
+        // Spot light
+		if (lightData.lightType == 2 || lightData.lightType == 3 || lightData.lightType == 4)
+		{
+			float3 positionLS = MultiplyPointProj(_SpotlightShadowMatrices[lightData.shadowIndex], positionWS).xyz;
+			if (all(saturate(positionLS.xy) == positionLS.xy))            
+				light.color *= _SpotlightShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(positionLS.xy, lightData.shadowIndex), positionLS.z);
+		}
+        
+        // Area light
+		if (lightData.lightType == 6)
+		{
+			float4 positionLS = MultiplyPoint(_AreaShadowMatrices[lightData.shadowIndex], positionWS);
+            
+            // Vogel disk randomised PCF
+			float sum = 0.0;
+			for (uint j = 0; j < _PcfSamples; j++)
+			{
+				float2 offset = VogelDiskSample(j, _PcfSamples, dither * TwoPi) * _ShadowPcfRadius;
+				float3 uv = float3(positionLS.xy + offset, positionLS.z) / positionLS.w;
+				sum += _AreaShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(uv.xy, lightData.shadowIndex), uv.z);
+			}
+                
+			light.color *= sum / _PcfSamples;
+		}
+	}
+#endif
+
+	return light;
+}
+
 float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 {
 	#ifdef SCREENSPACE_REFLECTIONS_ON
@@ -381,11 +598,11 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 	for (i = 0; i < min(128, lightCount); i++)
 	{
 		uint index = _LightClusterList[startOffset + i];
-		PointLight light = _PointLights[index];
+		LightData light = _PointLights[index];
 		
 		float3 lightVector = light.position - input.worldPosition;
 		float sqrLightDist = dot(lightVector, lightVector);
-		if (sqrLightDist >= light.sqRange)
+		if (sqrLightDist >= Sq(light.range))
 			continue;
 		
 		float rcpLightDist = rsqrt(sqrLightDist);
@@ -394,10 +611,11 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 		if (!isVolumetric && NdotL <= 0.0)
 			continue;
 		
-		float attenuation = Sq(min(rcp(0.01), rcpLightDist) * saturate(1.0 - Sq(sqrLightDist * light.sqRcpRange)));
+		float attenuation = Sq(min(rcp(0.01), rcpLightDist) * saturate(1.0 - Sq(sqrLightDist * rcp(Sq(light.range)))));
 		if (!attenuation)
 			continue;
-			
+		
+		#if 0
 		if (light.shadowIndexVisibleFaces)
 		{
 			uint shadowIndex = light.shadowIndexVisibleFaces >> 8;
@@ -408,6 +626,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 			//if (!attenuation)
 			//	continue;
 		}
+		#endif
 		
 		if (isVolumetric)
 			luminance += light.color * _Exposure * attenuation;
