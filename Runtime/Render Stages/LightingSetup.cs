@@ -272,6 +272,14 @@ namespace Arycama.CustomRenderPipeline
                                 {
                                     case LightShape.Cone:
                                         lightType = 2;
+
+                                        // Spotlight angle
+                                        var innerConePercent = light.innerSpotAngle / visibleLight.spotAngle;
+                                        var cosSpotOuterHalfAngle = Mathf.Clamp01(Mathf.Cos(visibleLight.spotAngle * Mathf.Deg2Rad * 0.5f));
+                                        var cosSpotInnerHalfAngle = Mathf.Clamp01(Mathf.Cos(visibleLight.spotAngle * Mathf.Deg2Rad * 0.5f * innerConePercent)); // inner cone
+                                        angleScale = 1f / Mathf.Max(1e-4f, cosSpotInnerHalfAngle - cosSpotOuterHalfAngle);
+                                        angleOffset = -cosSpotOuterHalfAngle * angleScale;
+
                                         break;
                                     case LightShape.Pyramid:
                                         lightType = 3;
@@ -292,13 +300,6 @@ namespace Arycama.CustomRenderPipeline
                                     // Use as area
                                     case LightShape.Cone:
                                         lightType = 5;
-                                        // Spotlight angle
-                                        var innerConePercent = light.innerSpotAngle / visibleLight.spotAngle;
-                                        var cosSpotOuterHalfAngle = Mathf.Clamp01(Mathf.Cos(visibleLight.spotAngle * Mathf.Deg2Rad * 0.5f));
-                                        var cosSpotInnerHalfAngle = Mathf.Clamp01(Mathf.Cos(visibleLight.spotAngle * Mathf.Deg2Rad * 0.5f * innerConePercent)); // inner cone
-                                        angleScale = 1f / Mathf.Max(1e-4f, cosSpotInnerHalfAngle - cosSpotOuterHalfAngle);
-                                        angleOffset = -cosSpotOuterHalfAngle * angleScale;
-
                                         break;
                                     // Use as line
                                     case LightShape.Pyramid:

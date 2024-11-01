@@ -54,7 +54,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 		float rcpLightDist = rsqrt(sqrLightDist);
 		float3 L = lightVector * rcpLightDist;
 
-		float attenuation = Sq(min(rcp(0.01), rcpLightDist) * saturate(1.0 - Sq(sqrLightDist * rcp(Sq(light.range)))));
+		float attenuation = GetLightAttenuation(light, worldPosition, 0.5, false);
 		if (!attenuation)
 			continue;
 		
