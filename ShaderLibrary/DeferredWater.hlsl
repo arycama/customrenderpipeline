@@ -138,7 +138,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	// Select random channel
 	float2 noise = Noise2D(position.xy);
-	float3 channelMask = floor(noise.y * 3.0) == float3(0.0, 1.0, 2.0);
+	float3 channelMask = (noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2)) == float3(0.0, 1.0, 2.0);
 	float xi = min(noise.x, 0.999); // xi of 1 maps to infinity, so clamp
 	float t;
 	float3 pdf;

@@ -108,7 +108,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	#endif
 	
 	float rayLength = DistanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
-	float colorIndex = floor(offsets.y * 3.0);
+	uint colorIndex = offsets.y < (1.0 / 3.0) ? 0 : (offsets.y < 2.0 / 3.0 ? 1 : 2);
 	float cosViewAngle = rd.y;
 	
 	bool hasSceneHit = false;
