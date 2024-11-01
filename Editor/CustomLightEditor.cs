@@ -1,7 +1,8 @@
 using System;
 using UnityEditor;
-using UnityEditor.Rendering;
+using UnityEditor.IMGUI.Controls;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -23,14 +24,11 @@ namespace Arycama.CustomRenderPipeline
             base.OnInspectorGUI();
         }
 
-        //copy of CoreLightEditorUtilities
         static float SliderLineHandle(Vector3 position, Vector3 direction, float value)
         {
             return SliderLineHandle(GUIUtility.GetControlID(FocusType.Passive), position, direction, value, "");
         }
 
-
-        //copy of CoreLightEditorUtilities
         static void DrawHandleLabel(Vector3 handlePosition, string labelText, float offsetFromHandle = 0.3f)
         {
             Vector3 labelPosition = Vector3.zero;
@@ -42,7 +40,6 @@ namespace Arycama.CustomRenderPipeline
             Handles.Label(labelPosition, labelText, style);
         }
 
-        //copy of CoreLightEditorUtilities
         static float SliderLineHandle(int id, Vector3 position, Vector3 direction, float value, string labelText = "")
         {
             Vector3 pos = position + direction * value;
@@ -387,28 +384,17 @@ namespace Arycama.CustomRenderPipeline
                         DrawPointLightGizmo(light);
                     break;
                 case LightType.Spot:
-                    if (additionalLightData.AreaLightType != AreaLightType.None)
-                    {
-                        using (new Handles.DrawingScope(Matrix4x4.TRS(light.transform.position, light.transform.rotation, Vector3.one)))
-                        {
-                            DrawPointLightGizmo(light);
-                            CoreLightEditorUtilities.DrawRectangleLightGizmo(light);
-                            additionalLightData.ShapeWidth = light.areaSize.x;
-                            additionalLightData.ShapeHeight = light.areaSize.y;
-                        }
-                    }
-                    else
                     {
                         using (new Handles.DrawingScope(Matrix4x4.TRS(light.transform.position, light.transform.rotation, Vector3.one)))
                             switch (shape)
                             {
                                 case LightShape.Cone:
-                                    CoreLightEditorUtilities.DrawSpotLightGizmo(light);
+                                    DrawSpotLightGizmo(light);
                                     break;
                                 case LightShape.Pyramid:
                                     using (new Handles.DrawingScope(Matrix4x4.TRS(light.transform.position, light.transform.rotation, Vector3.one)))
                                     {
-                                        Vector4 aspectFovMaxRangeMinRange = new Vector4(additionalLightData.ShapeWidth / additionalLightData.ShapeHeight, light.spotAngle, light.range);
+                                        Vector4 aspectFovMaxRangeMinRange = new Vector4(light.areaSize.x / light.areaSize.y, light.spotAngle, light.range);
                                         Handles.zTest = UnityEngine.Rendering.CompareFunction.Greater;
                                         Handles.color = light.color;
                                         DrawSpherePortionWireframe(aspectFovMaxRangeMinRange, light.shadowNearPlane);
@@ -429,8 +415,7 @@ namespace Arycama.CustomRenderPipeline
                                             light.range = aspectFovMaxRangeMinRange.z;
 
                                             var angle = light.spotAngle * Mathf.Deg2Rad * 0.5f;
-                                            additionalLightData.ShapeWidth = light.range * Mathf.Sin(angle) / Mathf.Cos(angle) * aspectFovMaxRangeMinRange.x;
-                                            additionalLightData.ShapeHeight = light.range * Mathf.Sin(angle) / Mathf.Cos(angle);
+                                            light.areaSize = new Vector2(light.range * Mathf.Sin(angle) / Mathf.Cos(angle) * aspectFovMaxRangeMinRange.x, light.range * Mathf.Sin(angle) / Mathf.Cos(angle));
                                         }
 
                                         // Handles.color reseted at end of scope
@@ -440,7 +425,7 @@ namespace Arycama.CustomRenderPipeline
                                 case LightShape.Box:
                                     using (new Handles.DrawingScope(Matrix4x4.TRS(light.transform.position, light.transform.rotation, Vector3.one)))
                                     {
-                                        Vector4 widthHeightMaxRangeMinRange = new Vector4(additionalLightData.ShapeWidth, additionalLightData.ShapeHeight, light.range);
+                                        Vector4 widthHeightMaxRangeMinRange = new Vector4(light.areaSize.x, light.areaSize.y, light.range);
                                         Handles.zTest = UnityEngine.Rendering.CompareFunction.Greater;
                                         Handles.color = light.color;
                                         DrawOrthoFrustumWireframe(widthHeightMaxRangeMinRange, light.shadowNearPlane);
@@ -457,8 +442,7 @@ namespace Arycama.CustomRenderPipeline
                                         if (EditorGUI.EndChangeCheck())
                                         {
                                             Undo.RecordObject(light, "Adjust Box Spot Light");
-                                            additionalLightData.ShapeWidth = widthHeightMaxRangeMinRange.x;
-                                            additionalLightData.ShapeHeight = widthHeightMaxRangeMinRange.y;
+                                            light.areaSize = new Vector2(widthHeightMaxRangeMinRange.x, widthHeightMaxRangeMinRange.y);
                                             light.range = widthHeightMaxRangeMinRange.z;
                                         }
 
@@ -468,9 +452,16 @@ namespace Arycama.CustomRenderPipeline
                                     break;
                             }
                     }
+                    break;
 
-                    case LightType.
-
+                case LightType.Area:
+                    {
+                        using (new Handles.DrawingScope(Matrix4x4.TRS(light.transform.position, light.transform.rotation, Vector3.one)))
+                        {
+                            DrawPointLightGizmo(light);
+                            DrawRectangleLightGizmo(light);
+                        }
+                    }
                     break;
             }
         }
@@ -775,16 +766,7 @@ namespace Arycama.CustomRenderPipeline
             Handles.zTest = CompareFunction.Always;
         }
 
-        static void DrawHandleLabel(Vector3 handlePosition, string labelText, float offsetFromHandle = 0.3f)
-        {
-            Vector3 labelPosition = Vector3.zero;
 
-            var style = new GUIStyle { normal = { background = Texture2D.whiteTexture } };
-            GUI.color = new Color(0.82f, 0.82f, 0.82f, 1);
-
-            labelPosition = handlePosition + Handles.inverseMatrix.MultiplyVector(Vector3.up) * HandleUtility.GetHandleSize(handlePosition) * offsetFromHandle;
-            Handles.Label(labelPosition, labelText, style);
-        }
 
         static readonly BoxBoundsHandle s_AreaLightHandle =
             new BoxBoundsHandle { axes = PrimitiveBoundsHandle.Axes.X | PrimitiveBoundsHandle.Axes.Y };
@@ -1090,27 +1072,7 @@ namespace Arycama.CustomRenderPipeline
             return angle;
         }
 
-        static float SliderLineHandle(int id, Vector3 position, Vector3 direction, float value, string labelText = "")
-        {
-            Vector3 pos = position + direction * value;
-            float sizeHandle = HandleUtility.GetHandleSize(pos);
-            bool temp = GUI.changed;
-            GUI.changed = false;
-            pos = Handles.Slider(id, pos, direction, sizeHandle * 0.03f, Handles.DotHandleCap, 0f);
-            if (GUI.changed)
-            {
-                value = Vector3.Dot(pos - position, direction);
-            }
-            GUI.changed |= temp;
-
-            if (GUIUtility.hotControl == id && !String.IsNullOrEmpty(labelText))
-            {
-                labelText += FormattableString.Invariant($"{value:0.00}");
-                DrawHandleLabel(pos, labelText);
-            }
-
-            return value;
-        }
+       
 
         static float SizeSliderSpotAngle(Vector3 position, Vector3 forward, Vector3 axis, float range, float spotAngle, string controlName)
         {

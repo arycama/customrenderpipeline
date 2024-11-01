@@ -1,5 +1,3 @@
-//#define WATER_SHADOW_ON
-
 #include "GBuffer.hlsl"
 #include "Lighting.hlsl"
 #include "Packing.hlsl"
