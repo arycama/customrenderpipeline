@@ -244,4 +244,8 @@ void Swap(inout float2 x, inout float2 y) { float2 temp = x; x = y; y = temp; }
 void Swap(inout float3 x, inout float3 y) { float3 temp = x; x = y; y = temp; }
 void Swap(inout float4 x, inout float4 y) { float4 temp = x; x = y; y = temp; }
 
+float2 Select(float2 v, uint index) { return index ? v.y : v.x; }
+float3 Select(float3 v, uint index) { return index ? (index == 2 ? v.z : v.y) : v.x; }
+float4 Select(float4 v, uint index) { return index ? (index == 3 ? v.w : (index == 2 ? v.z : v.y)) : v.x; }
+
 #endif

@@ -58,7 +58,6 @@ void RayGeneration()
 	float eta = isFrontFace ? rcp(1.34) : 1.34;
 	float3 L = refract(-V, N, eta); //	ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	bool isTotalInternalReflection = all(L == 0.0);
-	//rcpPdf = 1;
 	
 	float _RaytracingBias = 0.1, _RaytracingDistantBias = 0.1;
 	
@@ -91,7 +90,7 @@ void RayGeneration()
 		hitRay = L * payload.hitDistance;
 		color = R11G11B10ToFloat3(payload.packedColor);
 		outDepth = Linear01Depth(depth);
-		//color *= exp(-_Extinction * (isFrontFace ? payload.hitDistance : length(worldPosition)));
+		color *= exp(-_Extinction * (isFrontFace ? payload.hitDistance : length(worldPosition)));
 	}
 	else
 	{
@@ -104,27 +103,18 @@ void RayGeneration()
 	
 	// Select random channel
 	float2 noise = Noise2D(position.xy);
-	float3 channelMask = (noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2)) == float3(0.0, 1.0, 2.0);
+	uint channelIndex = noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2);
 	float xi = min(noise.x, 0.999); // xi of 1 maps to infinity, so clamp
-	float t;
-	float3 pdf;
 	float3 c = _Extinction;
-	if (validHit)
-	{
-		// Bounded homogenous sampling
-		float b = payload.hitDistance;
-		float3 dist = -log(1.0 - xi * (1.0 - exp(-c * b))) / c;
-		t = dot(channelMask, dist);
-		pdf = c / (exp(c * t) - exp(c * t - c * b)); // Alternate formulation which cancels out some terms and avoids nans
-	}
-	else
-	{
-		// Infinite homogenous sampling
-		t = dot(channelMask, -log(1.0 - xi) * rcp(c));
-		pdf = c * exp(-c * t);
-	}
-	
+	float3 cp = Select(_Extinction, channelIndex);
+	float l = _DirectionalLights[0].direction.y;
+	float v = V.y;
+	float b = validHit ? payload.hitDistance : 1e+32;
+		
+	float t = -(l * log((xi * (exp(b * cp * (-v / l - 1)) - 1) + 1))) / (cp * (l + v));
+	float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
 	float weight = rcp(dot(pdf, rcp(3.0)));
+	
 	float3 P = ray.Origin + ray.Direction * t - _ViewPosition;
 	
 	float3 luminance = 0.0;
@@ -150,7 +140,7 @@ void RayGeneration()
 				float LdotV0 = dot(_LightDirection0, L);
 				float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, planetDistance * LdotV0, _PlanetRadius);
 				float phase = lerp(MiePhase(LdotV0, -0.3) , MiePhase(LdotV0, 0.85), asymmetry);
-				float3 lightColor0 = phase * _LightColor0 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance0);
+				float3 lightColor0 = phase * _LightColor0  * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance0);
 				luminance += lightColor0 * attenuation * asymmetry;
 			}
 		}
@@ -168,7 +158,8 @@ void RayGeneration()
 	
 	// Ambient 
 	float3 finalTransmittance = exp(-t * _Extinction);
-	//luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
+	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
+	luminance *= _Color;
 	
-	ScatterResult[position] = 0;
+	ScatterResult[position] = luminance;
 }

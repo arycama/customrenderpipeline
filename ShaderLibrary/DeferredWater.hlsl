@@ -138,26 +138,16 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	// Select random channel
 	float2 noise = Noise2D(position.xy);
-	float3 channelMask = (noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2)) == float3(0.0, 1.0, 2.0);
+	uint channelIndex = noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2);
 	float xi = min(noise.x, 0.999); // xi of 1 maps to infinity, so clamp
-	float t;
-	float3 pdf;
 	float3 c = _Extinction;
-	if (underwaterDepth || !isFrontFace)
-	{
-		// Bounded homogenous sampling
-		float b = isFrontFace ? underwaterDistance : waterDistance;
-		float3 dist = -log(1.0 - xi * (1.0 - exp(-c * b))) / c;
-		t = dot(channelMask, dist);
-		pdf = c / (exp(c * t) - exp(c * t - c * b)); // Alternate formulation which cancels out some terms and avoids nans
-	}
-	else
-	{
-		// Infinite homogenous sampling
-		t = dot(channelMask, -log(1.0 - xi) * rcp(c));
-		pdf = c * exp(-c * t);
-	}
-	
+	float3 cp = Select(_Extinction, channelIndex);
+	float l = _DirectionalLights[0].direction.y;
+	float v = V.y;
+	float b = underwaterDistance;
+		
+	float t = -(l * log((xi * (exp(b * cp * (-v / l - 1)) - 1) + 1))) / (cp * (l + v));
+	float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
 	float weight = rcp(dot(pdf, rcp(3.0)));
 
 	float3 underwaterPositionWS = PixelToWorld(float3(refractedPositionSS, underwaterDepth));
@@ -205,6 +195,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	// Ambient 
 	float3 finalTransmittance = exp(-t * _Extinction);
 	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
+	luminance *= _Color;
 
 	// TODO: Stencil? Or hw blend?
 	float3 underwater = 0.0;
@@ -262,7 +253,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 {
 	// Note: Not using yCoCg or tonemapping gives less noisy results here
 	float3 minValue, maxValue, result;
-	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result, false, false, 1);
+	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result, false, true);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	
@@ -274,13 +265,10 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
-	
-	result = RemoveNaN(result);
 
 	TemporalOutput output;
 	output.temporal = result;
 	
-	result *= _Color;
 	result += _RefractionInput[position.xy];
 	
 	// Apply roughness to transmission
@@ -294,8 +282,6 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
 	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
-	//result *= (1.0 - FssEss); // TODO: Diffuse transmittance?
-	
 	output.emissive = result * (1.0 - FssEss);
 	return output;
 }
