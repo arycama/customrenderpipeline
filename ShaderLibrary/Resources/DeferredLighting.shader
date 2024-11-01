@@ -28,7 +28,7 @@ Shader "Hidden/Deferred Lighting"
             #pragma fragment Fragment
 			#define SCREENSPACE_REFLECTIONS_ON
             #define SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-            #define SCREEN_SPACE_SHADOWS_ON
+            //#define SCREEN_SPACE_SHADOWS_ON
             #define WATER_SHADOW_ON
 
             #pragma multi_compile _ WATER_SHADOWS_ON
@@ -45,6 +45,7 @@ Shader "Hidden/Deferred Lighting"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentCombine
+            #pragma enable_d3d11_debug_symbols
             #include "DeferredLighting.hlsl"
             ENDHLSL
         }

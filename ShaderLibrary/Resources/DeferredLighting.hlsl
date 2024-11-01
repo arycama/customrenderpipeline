@@ -105,78 +105,26 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		float3 transmittance = exp(-viewDistance * _WaterExtinction);
 		result = result * transmittance;
 		
-		float3 dir = _DirectionalLights[0].direction;
-		
-		float a = -_ViewPosition.y;
-		float l = dir.y;
-		float3 c = _WaterExtinction;
-		float x = viewDistance;
-		float v = V.y;
-		
-		float3 luminance = -l * (exp(-c * ((a + x * v) / l + x)) - exp(-c * a / l)) / (v + l);
-		
 		// Importance sample
 		float2 noise = Noise2D(position.xy);
 		uint channelIndex = (noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2));
-		float xi = noise.x; // xi of 1 maps to infinity, so clamp
 		
-		//float3 dist = (-l * log(-xi * (v + l) / l + exp(-c * a / l)) - c * a) / (c * (v + l));
-		//float t = dot(channelMask, dist);
+		float xi = min(0.999, noise.x);
+		float a = -_ViewPosition.y;
+		float l = _DirectionalLights[0].direction.y;
+		float3 c = _WaterExtinction;
+		float v = V.y;
+		float b = viewDistance;
 		
-		//float3 pdf = c * exp(-c * ((l * t + t * v + a) / l));
-		//float weight = rcp(dot(pdf, rcp(3.0)));
+		float3 dist = -(l * log(exp(-a * c / l) * (xi * (exp(b * c * (-v / l - 1)) - 1) + 1)) + a * c) / (c * (l + v));
+		float t = channelIndex ? (channelIndex == 1 ? dist.y : dist.z) : dist.x;
+		float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
+		float weight = rcp(dot(pdf, rcp(3.0)));
 		
-		
-		//luminance = color * exp(-t * _WaterExtinction);
-		
-		float samples = 12;
-		float3 rayStart = _ViewPosition;
-		float3 rayEnd = worldPosition;
-		float3 ray = rayEnd - rayStart;
-		float3 rayDir = normalize(ray);
-		float3 rayStep = ray / samples;
-		float dx = viewDistance / samples;
-		
-		// Select random channel
-		float3 scatter = _WaterExtinction * _WaterAlbedo;
-		
-		luminance = 0;
-		for (float i = 0; i < samples; i++)
-		{
-			float t = (i + noise) * dx;
-			float weight = dx;
-		
-			float xi = min(0.999, (i + noise.x) / samples);
-			
-			#if 1
-				float b = viewDistance;
-				float3 dist = -log(1.0 - xi * (1.0 - exp(-c * b))) / c;
-				t = channelIndex ? (channelIndex == 1 ? dist.y : dist.z) : dist.x;
-				float3 pdf = c / (exp(c * t) - exp(c * t - c * b)); // Alternate formulation which cancels out some terms and avoids nans
-				
-				#if 1
-					dist = (-l * log(-xi * (v + l) / l + exp(-c * a / l)) - c * a) / (c * (v + l));
-					t = channelIndex ? (channelIndex == 1 ? dist.y : dist.z) : dist.x;
-					pdf = c * exp(-c * (l * t + t * v + a) / l);
-				#endif
-				
-				weight = rcp(dot(pdf, rcp(3.0))) / samples;
-			#endif
-		
-			float3 p = rayStart + rayDir * t;
-			float sunT = -p.y / l;
-			float3 transmittance = exp(-(sunT + t) * c);
-			luminance += transmittance * c * weight;
-		}
-		
-		//luminance = 1 - transmittance;
-		
-		//v = -v;
-		//luminance = -l * (exp(-c * ((a + x * v) / l + x)) - exp(-c * a / l)) / (v + l);
-		
-		luminance *= _WaterAlbedo * RcpFourPi * color;
-		
-		result+= luminance;
+		float sunT = (-_ViewPosition.y - -V.y * t) / l;
+		float3 transmittance1 = exp(-(sunT + t) * c);
+		float shadow = GetShadow(-V * t, 0, false);
+		result += transmittance1 * c * weight * shadow * _WaterAlbedo * RcpFourPi * color;
 	}
 	
 	// Note this is already jittered so we can sample directly
