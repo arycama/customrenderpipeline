@@ -4,6 +4,8 @@
 #include "../Packing.hlsl"
 #include "../Temporal.hlsl"
 #include "../VolumetricLight.hlsl"
+#include "../Water/WaterPrepassCommon.hlsl"
+#include "../Random.hlsl"
 
 Texture2D<float> _Depth;
 Texture2D<float4> _AlbedoMetallic, _NormalRoughness, _BentNormalOcclusion;
@@ -22,8 +24,9 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 	float eyeDepth = LinearEyeDepth(depth);
 	
+	float rcpLenV = RcpLength(worldDir);
+	float3 V = -worldDir * rcpLenV;
 	float NdotV;
-	float3 V = normalize(-worldDir);
 	
 	LightingInput lightingInput;
 	lightingInput.normal = GBufferNormal(normalRoughness, V, NdotV);
@@ -87,6 +90,50 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	if (!depth)
 		result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
 	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
+	
+	float eyeDepth = LinearEyeDepth(depth);
+	
+	float rcpLenV = RcpLength(worldDir);
+	float3 V = -worldDir * rcpLenV;
+	float viewDistance = eyeDepth * rcp(rcpLenV);
+	float3 worldPosition = -V * viewDistance + _ViewPosition;
+	
+	bool isWater = stencil & 4;
+	if (worldPosition.y < 0.1 || isWater)
+	{
+		float3 color = _DirectionalLights[0].color * _Exposure;
+		float3 transmittance = exp(-viewDistance * _WaterExtinction);
+		result = result * transmittance;
+		
+		float3 dir = _DirectionalLights[0].direction;
+		
+		float a = -_ViewPosition.y;
+		float l = dir.y;
+		float3 c = _WaterExtinction;
+		float x = viewDistance;
+		float v = -V.y;
+		
+		float3 luminance = -exp(-c * a / l) * (l * exp(-c * x * (v + l) / l) - l) / (c * (v + l));
+		
+		// Importance sample
+		float2 noise = Noise2D(position.xy);
+		float3 channelMask = floor(noise.y * 3.0) == float3(0.0, 1.0, 2.0);
+		float xi = min(noise.x, 0.999); // xi of 1 maps to infinity, so clamp
+		
+		float3 dist = (-l * log(-xi * (v + l) / l + exp(-c * a / l)) - c * a) / (c * (v + l));
+		float t = dot(channelMask, dist);
+		
+		float3 pdf = c * exp(-c * ((l * t + t * v + a) / l));
+		float weight = rcp(dot(pdf, rcp(3.0)));
+		
+		
+		luminance = color * exp(-t * _WaterExtinction);
+		
+		
+		luminance *= _WaterExtinction * _WaterAlbedo * RcpPi;
+		
+		result+= luminance;
+	}
 	
 	// Note this is already jittered so we can sample directly
 	return result;

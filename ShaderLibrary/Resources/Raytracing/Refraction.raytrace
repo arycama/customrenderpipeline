@@ -91,11 +91,11 @@ void RayGeneration()
 		hitRay = L * payload.hitDistance;
 		color = R11G11B10ToFloat3(payload.packedColor);
 		outDepth = Linear01Depth(depth);
-		color *= exp(-_Extinction * (isFrontFace ? payload.hitDistance : length(worldPosition)));
+		//color *= exp(-_Extinction * (isFrontFace ? payload.hitDistance : length(worldPosition)));
 	}
 	else
 	{
-		color = isFrontFace || isTotalInternalReflection ? 0.0 : _SkyReflection.SampleLevel(_LinearClampSampler, L, 0.0) * exp(-_Extinction * length(worldPosition));
+		color = isFrontFace || isTotalInternalReflection ? 0.0 : _SkyReflection.SampleLevel(_LinearClampSampler, L, 0.0);
 		hitRay = L;
 		outDepth = 0.0;
 	}
@@ -168,9 +168,7 @@ void RayGeneration()
 	
 	// Ambient 
 	float3 finalTransmittance = exp(-t * _Extinction);
-	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
+	//luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
 	
-	luminance = IsInfOrNaN(luminance) ? 0.0 : luminance;
-	
-	ScatterResult[position] = luminance;
+	ScatterResult[position] = 0;
 }

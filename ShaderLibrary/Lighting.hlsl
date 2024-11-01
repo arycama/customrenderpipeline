@@ -282,7 +282,7 @@ float3 WaterShadow(float3 position, float3 L)
 	if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
 	{
 		float shadowDepth = _WaterShadows.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);
-		shadowDistance = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
+		//shadowDistance = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
 	}
 	
 	return exp(-_WaterShadowExtinction * shadowDistance);
@@ -497,7 +497,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
 	#endif
 	
-	float3 luminance = radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
+	float3 luminance = 0;// radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency);
 	
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
