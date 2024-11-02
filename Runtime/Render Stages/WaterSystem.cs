@@ -713,42 +713,12 @@ namespace Arycama.CustomRenderPipeline
             var rcpTexelSizes = new Vector4(settings.Resolution / patchSizes.x, settings.Resolution / patchSizes.y, settings.Resolution / patchSizes.z, settings.Resolution / patchSizes.w);
             var texelSizes = patchSizes / settings.Resolution;
 
-            // Find first 2 directional lights
-            Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
-            Color lightColor0 = Color.clear, lightColor1 = Color.clear;
-            var dirLightCount = 0;
-            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
-            {
-                var light = cullingResults.visibleLights[i];
-                if (light.lightType != LightType.Directional)
-                    continue;
-
-                dirLightCount++;
-
-                if (dirLightCount == 1)
-                {
-                    lightDirection0 = -light.localToWorldMatrix.Forward();
-                    lightColor0 = light.finalColor;
-                }
-                else if (dirLightCount == 2)
-                {
-                    lightDirection1 = -light.localToWorldMatrix.Forward();
-                    lightColor1 = light.finalColor;
-                }
-                else
-                {
-                    // Only 2 lights supported
-                    break;
-                }
-            }
-
-            var keyword = dirLightCount == 2 ? "LIGHT_COUNT_TWO" : (dirLightCount == 1 ? "LIGHT_COUNT_ONE" : string.Empty);
             var refractionResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             var scatterResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water"))
             {
-                pass.Initialize(deferredWaterMaterial, keyword: keyword, camera: camera);
+                pass.Initialize(deferredWaterMaterial,  camera: camera);
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(albedoMetallic);
                 pass.WriteTexture(normalRoughness);
@@ -769,6 +739,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<WaterPrepassResult>();
                 pass.AddRenderPassData<UnderwaterLightingResult>();
+                pass.AddRenderPassData<DirectionalLightInfo>();
 
                 commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<OceanFftResult>();
@@ -781,12 +752,6 @@ namespace Arycama.CustomRenderPipeline
                     var material = settings.Material;
                     pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
                     pass.SetVector(command, "_Extinction", material.GetColor("_Extinction"));
-
-                    pass.SetVector(command, "_LightDirection0", lightDirection0);
-                    pass.SetVector(command, "_LightColor0", lightColor0);
-
-                    pass.SetVector(command, "_LightDirection1", lightDirection1);
-                    pass.SetVector(command, "_LightColor1", lightColor1);
 
                     pass.SetFloat(command, "_RefractOffset", material.GetFloat("_RefractOffset"));
                     pass.SetFloat(command, "_Steps", material.GetFloat("_Steps"));
@@ -865,6 +830,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<WaterShadowResult>();
+                    pass.AddRenderPassData<DirectionalLightInfo>();
 
                     var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                     {
@@ -874,12 +840,6 @@ namespace Arycama.CustomRenderPipeline
                         var material = settings.Material;
                         pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
                         pass.SetVector(command, "_Extinction", material.GetColor("_Extinction"));
-
-                        pass.SetVector(command, "_LightDirection0", lightDirection0);
-                        pass.SetVector(command, "_LightColor0", lightColor0);
-
-                        pass.SetVector(command, "_LightDirection1", lightDirection1);
-                        pass.SetVector(command, "_LightColor1", lightColor1);
                     });
                 }
 

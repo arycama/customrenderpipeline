@@ -286,34 +286,6 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Cloud Coverage"))
             {
-                Color lightColor0 = Color.clear, lightColor1 = Color.clear;
-                Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
-
-                // Find first 2 directional lights
-                var dirLightCount = 0;
-                for (var i = 0; i < cullingResults.visibleLights.Length; i++)
-                {
-                    var light = cullingResults.visibleLights[i];
-                    if (light.lightType != LightType.Directional)
-                        continue;
-
-                    dirLightCount++;
-
-                    if (dirLightCount == 1)
-                    {
-                        lightDirection0 = -light.localToWorldMatrix.Forward();
-                        lightColor0 = light.finalColor;
-                    }
-                    else if (dirLightCount == 2)
-                    {
-                        lightDirection1 = -light.localToWorldMatrix.Forward();
-                        lightColor1 = light.finalColor;
-
-                        // Only 2 lights supported
-                        break;
-                    }
-                }
-
                 pass.Initialize(cloudCoverageComputeShader, 0, 1);
 
                 pass.AddRenderPassData<CloudData>();
@@ -321,15 +293,11 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("_Result", cloudCoverageBufferTemp);
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<CloudShadowDataResult>();
+                pass.AddRenderPassData<DirectionalLightInfo>();
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     settings.SetCloudPassData(command, pass);
-
-                    pass.SetVector(command, "_LightDirection0", lightDirection0);
-                    pass.SetVector(command, "_LightColor0", lightColor0);
-                    pass.SetVector(command, "_LightDirection1", lightDirection1);
-                    pass.SetVector(command, "_LightColor1", lightColor1);
 
                     pass.SetVector(command, "_ViewPosition", camera.transform.position);
                     pass.SetFloat(command, "_ViewHeight", camera.transform.position.y + planetRadius);
@@ -390,34 +358,6 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, IRenderPassData commonPassData, Camera camera, CullingResults cullingResults, float viewHeight)
         {
-            Color lightColor0 = Color.clear, lightColor1 = Color.clear;
-            Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
-
-            // Find first 2 directional lights
-            var dirLightCount = 0;
-            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
-            {
-                var light = cullingResults.visibleLights[i];
-                if (light.lightType != LightType.Directional)
-                    continue;
-
-                dirLightCount++;
-
-                if (dirLightCount == 1)
-                {
-                    lightDirection0 = -light.localToWorldMatrix.Forward();
-                    lightColor0 = light.finalColor;
-                }
-                else if (dirLightCount == 2)
-                {
-                    lightDirection1 = -light.localToWorldMatrix.Forward();
-                    lightColor1 = light.finalColor;
-
-                    // Only 2 lights supported
-                    break;
-                }
-            }
-
             var cloudLuminanceTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             var cloudTransmittanceTemp = renderGraph.GetTexture(width, height, GraphicsFormat.R8_UNorm, isScreenTexture: true);
             var cloudDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R32G32_SFloat, isScreenTexture: true);
@@ -449,19 +389,14 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<CloudShadowDataResult>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<DirectionalLightInfo>();
 
                 commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
                 {
                     settings.SetCloudPassData(command, pass);
-                    pass.SetVector(command, "_LightDirection0", lightDirection0);
-                    pass.SetVector(command, "_LightColor0", lightColor0);
-                    pass.SetVector(command, "_LightDirection1", lightDirection1);
-                    pass.SetVector(command, "_LightColor1", lightColor1);
-
                     pass.SetFloat(command, "_ViewHeight", viewHeight);
-
                     commonPassData.SetProperties(pass, command);
                 });
             }

@@ -243,36 +243,6 @@ namespace Arycama.CustomRenderPipeline
 
         public void GenerateData(Vector3 viewPosition, CullingResults cullingResults, Vector3 cameraPosition)
         {
-            Color lightColor0 = Color.clear, lightColor1 = Color.clear;
-            Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
-
-            // Find first 2 directional lights
-            var dirLightCount = 0;
-            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
-            {
-                var light = cullingResults.visibleLights[i];
-                if (light.lightType != LightType.Directional)
-                    continue;
-
-                dirLightCount++;
-
-                if (dirLightCount == 1)
-                {
-                    lightDirection0 = -light.localToWorldMatrix.Forward();
-                    lightColor0 = light.finalColor;
-                }
-                else if (dirLightCount == 2)
-                {
-                    lightDirection1 = -light.localToWorldMatrix.Forward();
-                    lightColor1 = light.finalColor;
-
-                    // Only 2 lights supported
-                    break;
-                }
-            }
-
-           
-
             // CDF
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere CDF"))
             {
@@ -280,6 +250,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.DepthSlice = -1;
                 pass.WriteTexture(cdf, RenderBufferLoadAction.DontCare);
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<DirectionalLightInfo>();
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
@@ -291,11 +262,6 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetVector(command, "_SkyCdfSize", new Vector2(settings.CdfWidth, settings.CdfHeight));
                     pass.SetVector(command, "_CdfSize", new Vector2(settings.CdfWidth, settings.CdfHeight));
-
-                    pass.SetVector(command, "_LightDirection0", lightDirection0);
-                    pass.SetVector(command, "_LightColor0", lightColor0);
-                    pass.SetVector(command, "_LightDirection1", lightDirection1);
-                    pass.SetVector(command, "_LightColor1", lightColor1);
                 });
             }
 
@@ -326,6 +292,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<VolumetricClouds.CloudData>();
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();
+                pass.AddRenderPassData<DirectionalLightInfo>();
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
@@ -334,11 +301,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_ViewHeight", cameraPosition.y + settings.PlanetRadius * settings.EarthScale);
                     pass.SetFloat(command, "_Samples", settings.ReflectionSamples);
                     pass.SetVector(command, "_ViewPosition", viewPosition);
-                    
-                    pass.SetVector(command, "_LightDirection0", lightDirection0);
-                    pass.SetVector(command, "_LightColor0", lightColor0);
-                    pass.SetVector(command, "_LightDirection1", lightDirection1);
-                    pass.SetVector(command, "_LightColor1", lightColor1);
 
                     var array = ArrayPool<Matrix4x4>.Get(6);
 
@@ -455,34 +417,6 @@ namespace Arycama.CustomRenderPipeline
         {
             var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
-            Color lightColor0 = Color.clear, lightColor1 = Color.clear;
-            Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
-
-            // Find first 2 directional lights
-            var dirLightCount = 0;
-            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
-            {
-                var light = cullingResults.visibleLights[i];
-                if (light.lightType != LightType.Directional)
-                    continue;
-
-                dirLightCount++;
-
-                if (dirLightCount == 1)
-                {
-                    lightDirection0 = -light.localToWorldMatrix.Forward();
-                    lightColor0 = light.finalColor;
-                }
-                else if (dirLightCount == 2)
-                {
-                    lightDirection1 = -light.localToWorldMatrix.Forward();
-                    lightColor1 = light.finalColor;
-
-                    // Only 2 lights supported
-                    break;
-                }
-            }
-
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
             {
                 pass.Initialize(skyMaterial, 3, camera: camera);
@@ -497,16 +431,12 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<ReflectionAmbientData>();
+                pass.AddRenderPassData<DirectionalLightInfo>();
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetFloat(command, "_ViewHeight", camera.transform.position.y + settings.PlanetRadius);
                     pass.SetFloat(command, "_Samples", settings.RenderSamples);
-                    pass.SetVector(command, "_LightDirection0", lightDirection0);
-                    pass.SetVector(command, "_LightColor0", lightColor0);
-                    pass.SetVector(command, "_LightDirection1", lightDirection1);
-                    pass.SetVector(command, "_LightColor1", lightColor1);
-
                     commonPassData.SetProperties(pass, command);
                 });
             }

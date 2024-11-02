@@ -167,7 +167,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	for (float i = offsets.x; i < _Samples; i++)
 	{
 		float xi = i / _Samples * scale;
-		float currentDistance = GetSkyCdf(_ViewHeight, rd.y, xi, colorIndex);// * saturate(rayLength / maxT);
+		float currentDistance = GetSkyCdf(_ViewHeight, rd.y, xi, colorIndex) * saturate(rayLength / maxT);
 		float heightAtDistance = HeightAtDistance(_ViewHeight, rd.y, currentDistance);
 		
 		float4 scatter = AtmosphereScatter(heightAtDistance);
@@ -195,7 +195,6 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 						if (shadow)
 						{
 							lighting += lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) * _LightColor0 * _Exposure * shadow * cloudShadow;
-							//lighting += lightTransmittance * (scatter.xyz + scatter.w) * RcpFourPi * _LightColor0 * _Exposure * shadow * cloudShadow;
 						}
 					#endif
 				}
@@ -265,7 +264,7 @@ float _IsFirst, _ClampWindow, _DepthFactor, _MotionFactor;
 
 float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	//return _SkyInput[position.xy];
+	return _SkyInput[position.xy];
 
 	float cloudTransmittance = CloudTransmittanceTexture[position.xy];
 	

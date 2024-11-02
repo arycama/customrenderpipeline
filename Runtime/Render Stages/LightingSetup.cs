@@ -28,6 +28,11 @@ namespace Arycama.CustomRenderPipeline
             var lightList = ListPool<LightData>.Get();
             pointShadowRequests = ListPool<ShadowRequest>.Get();
 
+            // Find first 2 directional lights
+            Color lightColor0 = Color.clear, lightColor1 = Color.clear;
+            Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
+            var dirLightCount = 0;
+
             // Setup lights/shadows
             for (var i = 0; i < cullingResults.visibleLights.Length; i++)
             {
@@ -38,6 +43,18 @@ namespace Arycama.CustomRenderPipeline
 
                 if (visibleLight.lightType == LightType.Directional)
                 {
+                    dirLightCount++;
+                    if (dirLightCount == 1)
+                    {
+                        lightDirection0 = -visibleLight.localToWorldMatrix.Forward();
+                        lightColor0 = visibleLight.finalColor;
+                    }
+                    else if (dirLightCount < 3)
+                    {
+                        lightDirection1 = -visibleLight.localToWorldMatrix.Forward();
+                        lightColor1 = visibleLight.finalColor;
+                    }
+
                     var lightRotation = visibleLight.localToWorldMatrix.rotation;
                     var worldToLight = Matrix4x4.Rotate(Quaternion.Inverse(lightRotation));
 
@@ -340,6 +357,8 @@ namespace Arycama.CustomRenderPipeline
                     lightList.Add(pointLightData);
                 }
             }
+
+            renderGraph.ResourceMap.SetRenderPassData(new DirectionalLightInfo(lightDirection0, (Vector4)lightColor0, lightDirection1, (Vector4)lightColor1, dirLightCount), renderGraph.FrameIndex);
 
             var directionalLightBuffer = directionalLightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(directionalLightList.Count, UnsafeUtility.SizeOf<DirectionalLightData>());
             var directionalShadowMatricesBuffer = directionalShadowRequests.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(directionalShadowMatrices.Count, UnsafeUtility.SizeOf<Matrix4x4>());
