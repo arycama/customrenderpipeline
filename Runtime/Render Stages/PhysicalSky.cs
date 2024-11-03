@@ -132,8 +132,8 @@ namespace Arycama.CustomRenderPipeline
             ggxConvolutionMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
             textureCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Physical Sky");
 
-            transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
-            weightedDepth = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.R32_SFloat, isPersistent: true);
+            transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, settings.TransmittanceHeight, TextureDimension.Tex3D, isPersistent: true);
+            weightedDepth = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.R32_SFloat, settings.TransmittanceHeight, TextureDimension.Tex3D, isPersistent: true);
             cdf = renderGraph.GetTexture(settings.CdfWidth, settings.CdfHeight, GraphicsFormat.R32_SFloat, dimension: TextureDimension.Tex2DArray, volumeDepth: 3, isPersistent: true);
             multiScatter = renderGraph.GetTexture(settings.MultiScatterWidth, settings.MultiScatterHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
             groundAmbient = renderGraph.GetTexture(settings.AmbientGroundWidth, 1, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
@@ -159,9 +159,10 @@ namespace Arycama.CustomRenderPipeline
             // Generate transmittance LUT
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere Transmittance"))
             {
-                pass.Initialize(skyMaterial, 0);
+                var primitiveCount = MathUtils.DivRoundUp(settings.TransmittanceHeight, 32);
+                pass.Initialize(skyMaterial, 0, primitiveCount);
                 pass.WriteTexture(transmittance, RenderBufferLoadAction.DontCare);
-                pass.WriteTexture(weightedDepth, RenderBufferLoadAction.DontCare);
+                pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
                 result.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
@@ -171,6 +172,26 @@ namespace Arycama.CustomRenderPipeline
                     result.SetProperties(pass, command);
                     pass.SetFloat(command, "_Samples", settings.TransmittanceSamples);
                     pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(settings.TransmittanceWidth, settings.TransmittanceHeight));
+                    pass.SetFloat(command, "_TransmittanceDepth", settings.TransmittanceHeight);
+                });
+            }
+
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere Transmittance"))
+            {
+                var primitiveCount = MathUtils.DivRoundUp(settings.TransmittanceHeight, 32);
+                pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Depth Lookup"), primitiveCount);
+                pass.WriteTexture(weightedDepth, RenderBufferLoadAction.DontCare);
+                pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
+                result.SetInputs(pass);
+
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                {
+                    command.SetGlobalTexture("_MiePhaseTexture", settings.miePhase);
+
+                    result.SetProperties(pass, command);
+                    pass.SetFloat(command, "_Samples", settings.TransmittanceSamples);
+                    pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(settings.TransmittanceWidth, settings.TransmittanceHeight));
+                    pass.SetFloat(command, "_TransmittanceDepth", settings.TransmittanceHeight);
                 });
             }
 

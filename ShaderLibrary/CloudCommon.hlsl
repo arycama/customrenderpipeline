@@ -140,7 +140,7 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 	
 		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, cosViewAngle, cloudDepth, heightAtDistance);
 		
-		float3 viewTransmittance = TransmittanceToPoint(viewHeight, cosViewAngle, heightAtDistance, viewCosAngleAtDistance);
+		float3 viewTransmittance = TransmittanceToPoint(viewHeight, cosViewAngle, cloudDepth);
 		result.rgb *= viewTransmittance;
 	}
 	

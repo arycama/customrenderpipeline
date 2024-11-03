@@ -16,25 +16,28 @@ Texture2D<float3> CloudTexture;
 float4 CloudTextureScaleLimit, CloudTransmittanceTextureScaleLimit;
 float3 _CdfSize;
 float4 SkyLuminanceScaleLimit;
+float _TransmittanceDepth;
 
-struct FragmentTransmittanceOutput
-{
-	float3 transmittance : SV_Target0;
-	float weightedDepth : SV_Target1;
-};
-
-FragmentTransmittanceOutput FragmentTransmittanceLut(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+float3 FragmentTransmittanceLut(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	uv = ApplyScaleOffset(uv, _ScaleOffset);
+	float uvz = index / (_TransmittanceDepth - 1.0);
 
 	float maxDist;
 	float2 skyParams = SkyParamsFromUv(float3(uv, 0), false, maxDist).xy;
-	AtmosphereResult result = SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, maxDist);
-	
-	FragmentTransmittanceOutput output;
-	output.transmittance = result.transmittance;
-	output.weightedDepth = result.weightedDepth;
-	return output;
+	AtmosphereResult result = SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, maxDist * uvz);
+	return result.transmittance;
+}
+
+float FragmentTransmittanceDepthLut(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+{
+	uv = ApplyScaleOffset(uv, _ScaleOffset);
+	float uvz = index / (_TransmittanceDepth - 1.0);
+
+	float maxDist;
+	float2 skyParams = SkyParamsFromUv(float3(uv, 0), false, maxDist).xy;
+	AtmosphereResult result = SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, maxDist * uvz);
+	return result.weightedDepth;
 }
 
 float3 FragmentLuminance(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
@@ -164,9 +167,9 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	// The table may be slightly inaccurate, so calculate it's max value and use that to scale the final distance
 	float maxT = GetSkyCdf(_ViewHeight, rd.y, scale, colorIndex);
 	
-	for (float i = offsets.x; i < _Samples; i++)
+	for (float i = 0.0; i < _Samples; i++)
 	{
-		float xi = i / _Samples * scale;
+		float xi = (i + offsets.x) / _Samples * scale;
 		float currentDistance = GetSkyCdf(_ViewHeight, rd.y, xi, colorIndex) * saturate(rayLength / maxT);
 		float heightAtDistance = HeightAtDistance(_ViewHeight, rd.y, currentDistance);
 		
@@ -264,7 +267,7 @@ float _IsFirst, _ClampWindow, _DepthFactor, _MotionFactor;
 
 float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	return _SkyInput[position.xy];
+	//return _SkyInput[position.xy];
 
 	float cloudTransmittance = CloudTransmittanceTexture[position.xy];
 	
@@ -319,14 +322,14 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float depthWeight = saturate(1.0 - (sceneDistance - previousDepth) / sceneDistance * _DepthFactor);
 	
 	// TODO: Should use gather and 4 samples for this
-	history = lerp(result, history, depthWeight);
+	//history = lerp(result, history, depthWeight);
 	
 	float velLenSqr = SqrLength(motion - previousVelocity);
 	float velocityWeight = velLenSqr ? saturate(1.0 - sqrt(velLenSqr) * _MotionFactor) : 1.0;
 	float3 window = velocityWeight * (maxValue - minValue);
 	
-	minValue -= _ClampWindow * window;
-	maxValue += _ClampWindow * window;
+	//minValue -= _ClampWindow * window;
+	//maxValue += _ClampWindow * window;
 	
 	// Clamp clip etc
 	history = ClipToAABB(history, result, minValue, maxValue);

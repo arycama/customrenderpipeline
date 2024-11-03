@@ -27,7 +27,8 @@ cbuffer AtmosphereProperties
 	float _CloudScatter;
 };
 
-Texture2D<float3> _Transmittance, _MultiScatter;
+Texture3D<float3> _Transmittance;
+Texture2D<float3> _MultiScatter;
 float4 _AtmosphereTransmittanceRemap, _MultiScatterRemap;
 
 float3 SkyLuminanceSize;
@@ -41,7 +42,7 @@ float4 _SkyAmbientRemap;
 Texture2DArray<float> _SkyCdf;
 float2 _SkyCdfSize;
 
-Texture2D<float> _AtmosphereDepth;
+Texture3D<float> _AtmosphereDepth;
 Texture2D<float3> _MiePhaseTexture;
 Texture3D<float3> SkyLuminance;
 
@@ -262,13 +263,13 @@ float2 AtmosphereTransmittanceUv(float viewHeight, float cosViewAngle)
 float3 AtmosphereTransmittance(float height, float cosAngle)
 {
 	float2 uv = AtmosphereTransmittanceUv(height, cosAngle);
-	return _Transmittance.SampleLevel(_LinearClampSampler, uv, 0.0);
+	return _Transmittance.SampleLevel(_LinearClampSampler, float3(uv, 1.0), 0.0);
 }
 
 float AtmosphereDepth(float height, float cosAngle)
 {
 	float2 uv = AtmosphereTransmittanceUv(height, cosAngle);
-	return _AtmosphereDepth.SampleLevel(_LinearClampSampler, uv, 0.0);
+	return _AtmosphereDepth.SampleLevel(_LinearClampSampler, float3(uv, 1), 0.0);
 }
 
 float3 TransmittanceToBottomAtmosphereBoundary(float height, float cosAngle, float maxDist)
@@ -307,26 +308,32 @@ float3 TransmittanceToNearestAtmosphereBoundary(float height, float cosAngle)
 	return TransmittanceToNearestAtmosphereBoundary(height, cosAngle, rayIntersectsGround);
 }
 
-float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float cosAngle1)
-{
-	if (cosAngle0 < 0.0)
-	{
-		Swap(radius0, radius1);
-		Swap(cosAngle0, cosAngle1);
-		cosAngle0 = -cosAngle0;
-		cosAngle1 = -cosAngle1;
-	}
+//float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float cosAngle1)
+//{
+//	if (cosAngle0 < 0.0)
+//	{
+//		Swap(radius0, radius1);
+//		Swap(cosAngle0, cosAngle1);
+//		cosAngle0 = -cosAngle0;
+//		cosAngle1 = -cosAngle1;
+//	}
 	
-	float3 lowTransmittance = AtmosphereTransmittance(radius0, cosAngle0);
-	float3 highTransmittance = AtmosphereTransmittance(radius1, cosAngle1);
-	return highTransmittance == 0.0 ? 0.0 : lowTransmittance * rcp(highTransmittance);
-}
+//	float3 lowTransmittance = AtmosphereTransmittance(radius0, cosAngle0);
+//	float3 highTransmittance = AtmosphereTransmittance(radius1, cosAngle1);
+//	return highTransmittance == 0.0 ? 0.0 : lowTransmittance * rcp(highTransmittance);
+//}
 
 float3 TransmittanceToPoint(float viewHeight, float cosAngle, float distance)
 {
 	float heightAtDistance = HeightAtDistance(viewHeight, cosAngle, distance);
 	float cosAngleAtDistance = CosAngleAtDistance(viewHeight, cosAngle, distance, heightAtDistance);
-	return TransmittanceToPoint(viewHeight, cosAngle, heightAtDistance, cosAngleAtDistance);
+	float maxDistance = DistanceToTopAtmosphereBoundary(viewHeight, cosAngle);
+	float uvz = (distance / maxDistance) * _AtmosphereTransmittanceRemap.y + _AtmosphereTransmittanceRemap.w;
+	
+	float2 uv = AtmosphereTransmittanceUv(viewHeight, cosAngle);
+	return _Transmittance.SampleLevel(_LinearClampSampler, float3(uv, uvz), 0.0);
+	
+	//return TransmittanceToPoint(viewHeight, cosAngle, heightAtDistance, cosAngleAtDistance);
 }
 
 float3 GetGroundAmbient(float lightCosAngle)
