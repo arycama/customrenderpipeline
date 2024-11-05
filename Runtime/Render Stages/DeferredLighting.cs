@@ -41,9 +41,9 @@ public class DeferredLighting
             pass.AddRenderPassData<WaterShadowResult>(true);
             pass.AddRenderPassData<ScreenSpaceShadows.Result>();
             pass.AddRenderPassData<DiffuseGlobalIllumination.Result>();
-            pass.AddRenderPassData<WaterPrepassResult>();
+            pass.AddRenderPassData<WaterPrepassResult>(true);
             pass.AddRenderPassData<LightingSetup.Result>();
-            pass.AddRenderPassData<WaterShadowResult>();
+            pass.AddRenderPassData<WaterShadowResult>(true);
             
             var hasWaterShadow = renderGraph.ResourceMap.IsRenderPassDataValid<WaterShadowResult>(renderGraph.FrameIndex);
             pass.Keyword = hasWaterShadow ? "WATER_SHADOWS_ON" : string.Empty;
@@ -74,7 +74,7 @@ public class DeferredLighting
             pass.AddRenderPassData<SkyResultData>();
             pass.AddRenderPassData<VolumetricLighting.Result>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
-            pass.AddRenderPassData<WaterPrepassResult>();
+            pass.AddRenderPassData<WaterPrepassResult>(true);
 
             // Only for debugging 
             pass.AddRenderPassData<ScreenSpaceReflectionResult>();

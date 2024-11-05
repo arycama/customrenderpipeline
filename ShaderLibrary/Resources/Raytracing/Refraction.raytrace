@@ -122,11 +122,14 @@ void RayGeneration()
 	
 	// Todo: share/merge with non raytraced code?
 	//#if defined(LIGHT_COUNT_ONE) || defined(LIGHT_COUNT_TWO)
+	float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, planetDistance * dot(_LightDirection0, -V), _PlanetRadius);
+	if (!RayIntersectsGround(_PlanetRadius, lightCosAngleAtDistance0))
+	{
 		float attenuation = GetShadow(P, 0, false);
-		if(attenuation > 0.0)
+		if (attenuation > 0.0)
 		{
 			attenuation *= CloudTransmittance(P);
-			if(attenuation > 0.0)
+			if (attenuation > 0.0)
 			{
 				float shadowDistance0 = max(0.0, worldPosition.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
 				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, P);
@@ -138,12 +141,12 @@ void RayGeneration()
 			
 				float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
 				float LdotV0 = dot(_LightDirection0, L);
-				float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, planetDistance * LdotV0, _PlanetRadius);
-				float phase = lerp(MiePhase(LdotV0, -0.3) , MiePhase(LdotV0, 0.85), asymmetry);
-				float3 lightColor0 = phase * _LightColor0  * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance0);
+				float phase = lerp(MiePhase(LdotV0, -0.3), MiePhase(LdotV0, 0.85), asymmetry);
+				float3 lightColor0 = phase * _LightColor0 * TransmittanceToPoint(_PlanetRadius, lightCosAngleAtDistance0, DistanceToTopAtmosphereBoundary(_PlanetRadius, lightCosAngleAtDistance0));
 				luminance += lightColor0 * attenuation * asymmetry;
 			}
 		}
+	}
 	
 	//	#ifdef LIGHT_COUNT_TWO
 	//		float shadowDistance1 = max(0.0, positionWS.y - P.y) / max(1e-6, saturate(_LightDirection1.y));

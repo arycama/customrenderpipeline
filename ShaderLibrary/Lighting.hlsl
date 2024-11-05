@@ -514,7 +514,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 		if (RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 			continue;
 		
-		float3 atmosphereTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
+		float3 atmosphereTransmittance = TransmittanceToPoint(heightAtDistance, lightCosAngleAtDistance, DistanceToTopAtmosphereBoundary(heightAtDistance, lightCosAngleAtDistance));
 		if(all(!atmosphereTransmittance))
 			continue;
 		

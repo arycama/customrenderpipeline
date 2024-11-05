@@ -158,26 +158,29 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float planetDistance = DistanceToBottomAtmosphereBoundary(_ViewHeight, -V.y);
 	
 	#if defined(LIGHT_COUNT_ONE) || defined(LIGHT_COUNT_TWO)
-		float attenuation = GetShadow(P, 0, false);
-		if(attenuation > 0.0)
+		float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, planetDistance * dot(_LightDirection0, -underwaterV), _PlanetRadius);
+		if (_LightDirection0.y > 0.0 && !RayIntersectsGround(_PlanetRadius, lightCosAngleAtDistance0))
 		{
-			attenuation *= CloudTransmittance(P);
-			if(attenuation > 0.0)
+			float attenuation = GetShadow(P, 0, false);
+			if (attenuation > 0.0)
 			{
-				float shadowDistance0 = max(0.0, worldPosition.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
-				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, P);
-				if (all(saturate(shadowPosition.xyz) == shadowPosition.xyz))
+				attenuation *= CloudTransmittance(P);
+				if (attenuation > 0.0)
 				{
-					float shadowDepth = _WaterShadows.Sample(_LinearClampSampler, shadowPosition.xy);
-					shadowDistance0 = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
-				}
+					float shadowDistance0 = max(0.0, worldPosition.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
+					float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, P);
+					if (all(saturate(shadowPosition.xyz) == shadowPosition.xyz))
+					{
+						float shadowDepth = _WaterShadows.Sample(_LinearClampSampler, shadowPosition.xy);
+						shadowDistance0 = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
+					}
 				
-				float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
-				float LdotV0 = dot(_LightDirection0, -underwaterV);
-				float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, planetDistance * LdotV0, _PlanetRadius);
-				float phase = lerp(MiePhase(LdotV0, -0.3) , MiePhase(LdotV0, 0.85), asymmetry);
-				float3 lightColor0 = phase * _LightColor0 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance0);
-				luminance += lightColor0 * attenuation * asymmetry;
+					float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
+					float LdotV0 = dot(_LightDirection0, -underwaterV);
+					float phase = lerp(MiePhase(LdotV0, -0.3), MiePhase(LdotV0, 0.85), asymmetry);
+					float3 lightColor0 = phase * _LightColor0 * TransmittanceToPoint(_PlanetRadius, lightCosAngleAtDistance0, DistanceToTopAtmosphereBoundary(_PlanetRadius, lightCosAngleAtDistance0));
+					luminance += lightColor0 * attenuation * asymmetry;
+				}
 			}
 		}
 	
@@ -253,19 +256,22 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 {
 	// Note: Not using yCoCg or tonemapping gives less noisy results here
 	float3 minValue, maxValue, result;
-	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result, false, true);
+	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result, true, true);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
 	float3 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history *= _PreviousToCurrentExposure;
+	history = RgbToYCoCgFastTonemap(history);
 	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 
+	result = YCoCgToRgbFastTonemapInverse(result);
+		
 	TemporalOutput output;
 	output.temporal = result;
 	

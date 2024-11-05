@@ -122,8 +122,7 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 	
 		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 		{
-			float3 atmosphereTransmittance = AtmosphereTransmittance(heightAtDistance, lightCosAngleAtDistance);
-			
+			float3 atmosphereTransmittance = TransmittanceToPoint(heightAtDistance, lightCosAngleAtDistance, DistanceToTopAtmosphereBoundary(heightAtDistance, lightCosAngleAtDistance));
 			if (any(atmosphereTransmittance))
 			{
 				float attenuation = sunShadow ? GetShadow(rd * cloudDepth, 0, false) : 1.0;
