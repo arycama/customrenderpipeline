@@ -61,7 +61,7 @@ float3 RaytracedLighting(float3 N, float3 f0, float perceptualRoughness, float o
 		if (RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 			continue;
 		
-		float3 atmosphereTransmittance = TransmittanceToPoint(heightAtDistance, lightCosAngleAtDistance, DistanceToTopAtmosphereBoundary(heightAtDistance, lightCosAngleAtDistance));
+		float3 atmosphereTransmittance = TransmittanceToPoint(heightAtDistance, lightCosAngleAtDistance, DistanceToTopAtmosphereBoundary(heightAtDistance, lightCosAngleAtDistance), false);
 		if(all(!atmosphereTransmittance))
 			continue;
 		

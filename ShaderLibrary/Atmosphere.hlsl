@@ -84,11 +84,6 @@ float DistanceToNearestAtmosphereBoundary(float height, float cosAngle, bool ray
 	}
 }
 
-float DistanceToNearestAtmosphereBoundary(float height, float cosAngle)
-{
-	return DistanceToNearestAtmosphereBoundary(height, cosAngle, RayIntersectsGround(height, cosAngle));
-}
-
 // Calculates the height above the atmosphere based on the current view height, angle and distance
 float HeightAtDistance(float viewHeight, float cosAngle, float distance)
 {
@@ -258,31 +253,24 @@ float3 UvFromSkyParams(float viewHeight, float cosViewAngle, float cosLightAngle
 	return float3(u_r, u_mu, u_mu_s);
 }
 
-float3 UvFromSkyParams(float viewHeight, float cosViewAngle, float cosLightAngle)
+float2 AtmosphereTransmittanceUv(float viewHeight, float cosViewAngle, bool rayIntersectsGround)
 {
-	return UvFromSkyParams(viewHeight, cosViewAngle, cosLightAngle, RayIntersectsGround(viewHeight, cosViewAngle));
-}
-
-float2 AtmosphereTransmittanceUv(float viewHeight, float cosViewAngle)
-{
-	bool rayIntersectsGround = RayIntersectsGround(viewHeight, cosViewAngle);
 	float2 uv = UvFromSkyParams(viewHeight, cosViewAngle, 0.0, rayIntersectsGround).xy;
-	//uv.y = 2.0 * uv.y - 1.0;
 	return ApplyScaleOffset(uv, _AtmosphereTransmittanceRemap);
 }
 
-float AtmosphereDepth(float height, float cosAngle)
+float AtmosphereDepth(float height, float cosAngle, bool rayIntersectsGround)
 {
-	float2 uv = AtmosphereTransmittanceUv(height, cosAngle);
+	float2 uv = AtmosphereTransmittanceUv(height, cosAngle, rayIntersectsGround);
 	return _AtmosphereDepth.SampleLevel(_LinearClampSampler, float3(uv, 1), 0.0);
 }
 
-float3 TransmittanceToPoint(float viewHeight, float cosAngle, float distance)
+float3 TransmittanceToPoint(float viewHeight, float cosAngle, float distance, bool rayIntersectsGround)
 {
-	float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, cosAngle);
+	float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, cosAngle, rayIntersectsGround);
 	float uvz = (distance / maxDistance) * _AtmosphereTransmittanceRemap.y + _AtmosphereTransmittanceRemap.w;
 	
-	float2 uv = AtmosphereTransmittanceUv(viewHeight, cosAngle);
+	float2 uv = AtmosphereTransmittanceUv(viewHeight, cosAngle, rayIntersectsGround);
 	return _Transmittance.SampleLevel(_LinearClampSampler, float3(uv, uvz), 0.0);
 }
 
@@ -292,9 +280,9 @@ float3 GetGroundAmbient(float lightCosAngle)
 	return _GroundAmbient.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
-float3 GetSkyAmbient(float lightCosAngle, float height)
+float3 GetSkyAmbient(float lightCosAngle, float height, bool rayIntersectsGround)
 {
-	float2 uv = ApplyScaleOffset(UvFromSkyParams(height, 0.0, lightCosAngle).xz, _SkyAmbientRemap);
+	float2 uv = ApplyScaleOffset(UvFromSkyParams(height, 0.0, lightCosAngle, rayIntersectsGround).xz, _SkyAmbientRemap);
 	return _SkyAmbient.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
@@ -324,9 +312,9 @@ float3 PlanetCurvePrevious(float3 worldPosition)
 	return worldPosition;
 }
 
-float3 GetMultiScatter(float cosLightAngle, float height)
+float3 GetMultiScatter(float cosLightAngle, float height, bool rayIntersectsGround)
 {
-	float2 uv = ApplyScaleOffset(UvFromSkyParams(height, 0.0, cosLightAngle).xz, _MultiScatterRemap);
+	float2 uv = ApplyScaleOffset(UvFromSkyParams(height, 0.0, cosLightAngle, rayIntersectsGround).xz, _MultiScatterRemap);
 	float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
 	float4 scatter = AtmosphereScatter(height);
 	return ms * (scatter.xyz + scatter.w);
@@ -334,7 +322,7 @@ float3 GetMultiScatter(float cosLightAngle, float height)
 
 float3 LuminanceToPoint(float viewHeight, float cosViewAngle, float distance, bool rayIntersectsGround)
 {
-	float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, cosViewAngle);
+	float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, cosViewAngle, rayIntersectsGround);
 	
 	float2 uv;
 	uv.x = distance / maxDistance;
@@ -382,20 +370,22 @@ AtmosphereResult SampleAtmosphere(float viewHeight, float cosViewAngle, float co
 		float3 extinction = exp(-opticalDepth * dt);
 		opticalDepthSum += opticalDepth;
 		
-		float3 viewTransmittance = TransmittanceToPoint(viewHeight, cosViewAngle, currentDistance);
+		float currentCosLightAngle = CosAngleAtDistance(viewHeight, cosLightAngle, currentDistance * LdotV, currentHeight);
+		bool rayIntersectsGround = RayIntersectsGround(currentHeight, currentCosLightAngle);
+		
+		float3 viewTransmittance = TransmittanceToPoint(viewHeight, cosViewAngle, currentDistance, rayIntersectsGround);
 		float3 throughput = viewTransmittance * (1.0 - extinction) * rcp(opticalDepth);
 		
-		float currentCosLightAngle = CosAngleAtDistance(viewHeight, cosLightAngle, currentDistance * LdotV, currentHeight);
 		if (applyMultiScatter)
-			luminance += throughput * GetMultiScatter(currentCosLightAngle, currentHeight);
+			luminance += throughput * GetMultiScatter(currentCosLightAngle, currentHeight, rayIntersectsGround);
 		
 		float4 scatter = AtmosphereScatter(currentHeight);
 		float3 currentScatter = throughput * (scatter.xyz * RcpFourPi + scatter.w * RcpFourPi);
 		density += currentScatter;
 		
-		if (!RayIntersectsGround(currentHeight, currentCosLightAngle))
+		if (!rayIntersectsGround)
 		{
-			float3 lightTransmittance = TransmittanceToPoint(currentHeight, currentCosLightAngle, DistanceToTopAtmosphereBoundary(currentHeight, currentCosLightAngle));
+			float3 lightTransmittance = TransmittanceToPoint(currentHeight, currentCosLightAngle, DistanceToTopAtmosphereBoundary(currentHeight, currentCosLightAngle), rayIntersectsGround);
 			luminance += currentScatter * lightTransmittance;
 		}
 		
@@ -411,8 +401,8 @@ AtmosphereResult SampleAtmosphere(float viewHeight, float cosViewAngle, float co
 	if (samplePlanet && rayIntersectsGround)
 	{
 		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, cosLightAngle, rayLength * LdotV, _PlanetRadius);
-		float3 sunTransmittance = TransmittanceToPoint(_PlanetRadius, lightCosAngleAtDistance, DistanceToTopAtmosphereBoundary(_PlanetRadius, lightCosAngleAtDistance));
-		float3 transmittance = TransmittanceToPoint(viewHeight, cosViewAngle, rayLength);
+		float3 sunTransmittance = TransmittanceToPoint(_PlanetRadius, lightCosAngleAtDistance, DistanceToTopAtmosphereBoundary(_PlanetRadius, lightCosAngleAtDistance), rayIntersectsGround);
+		float3 transmittance = TransmittanceToPoint(viewHeight, cosViewAngle, rayLength, rayIntersectsGround);
 		luminance += sunTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi;
 	}
 	

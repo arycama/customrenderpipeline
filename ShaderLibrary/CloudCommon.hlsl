@@ -120,9 +120,10 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		float LdotV = dot(_LightDirection0, rd);
 		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, _LightDirection0.y, cloudDepth * LdotV, heightAtDistance);
 	
-		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
+		bool rayIntersectsGround = RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance);
+		if (!rayIntersectsGround)
 		{
-			float3 atmosphereTransmittance = TransmittanceToPoint(heightAtDistance, lightCosAngleAtDistance, DistanceToTopAtmosphereBoundary(heightAtDistance, lightCosAngleAtDistance));
+			float3 atmosphereTransmittance = TransmittanceToPoint(heightAtDistance, lightCosAngleAtDistance, DistanceToTopAtmosphereBoundary(heightAtDistance, lightCosAngleAtDistance), rayIntersectsGround);
 			if (any(atmosphereTransmittance))
 			{
 				float attenuation = sunShadow ? GetShadow(rd * cloudDepth, 0, false) : 1.0;
@@ -134,12 +135,12 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 			result.rgb = 0.0;
 		}
 		
-		float3 ambient = GetSkyAmbient(lightCosAngleAtDistance, heightAtDistance) * _LightColor0 * _Exposure;
+		float3 ambient = GetSkyAmbient(lightCosAngleAtDistance, heightAtDistance, rayIntersectsGround) * _LightColor0 * _Exposure;
 		result.rgb += ambient * (1.0 - result.a);
 	
 		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, cosViewAngle, cloudDepth, heightAtDistance);
 		
-		float3 viewTransmittance = TransmittanceToPoint(viewHeight, cosViewAngle, cloudDepth);
+		float3 viewTransmittance = TransmittanceToPoint(viewHeight, cosViewAngle, cloudDepth, rayIntersectsGround);
 		result.rgb *= viewTransmittance;
 	}
 	
