@@ -88,8 +88,7 @@ Shader "Hidden/Physical Sky"
             Name "Luminance LUT"
 
             HLSLPROGRAM
-            #pragma vertex VertexIdPassthrough
-            #pragma geometry GeometryVolumeRender
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentLuminance
             #include "PhysicalSky.hlsl"
             ENDHLSL
