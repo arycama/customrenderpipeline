@@ -508,15 +508,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 		if (!isVolumetric && NdotL <= 0.0 && all(input.translucency == 0.0))
 			continue;
 			
-		// Atmospheric transmittance
-		float heightAtDistance = HeightAtDistance(_ViewHeight, -V.y, length(input.worldPosition));
-		float lightCosAngleAtDistance = CosAngleAtDistance(_ViewHeight, light.direction.y, length(input.worldPosition) * dot(light.direction, -V), heightAtDistance);
-		if (RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
-			continue;
-		
-		float3 lightTransmittance = TransmittanceToAtmosphere(heightAtDistance, lightCosAngleAtDistance);
-		if(all(!lightTransmittance))
-			continue;
+		float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, -V.y, light.direction.y, length(input.worldPosition));
 		
 		float attenuation = 1.0;
 		if(i == 0)

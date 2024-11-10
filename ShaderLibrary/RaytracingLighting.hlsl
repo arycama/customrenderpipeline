@@ -56,14 +56,7 @@ float3 RaytracedLighting(float3 N, float3 f0, float perceptualRoughness, float o
 			continue;
 			
 		// Atmospheric transmittance
-		float heightAtDistance = HeightAtDistance(_ViewHeight, -V.y, length(worldPosition));
-		float lightCosAngleAtDistance = CosAngleAtDistance(_ViewHeight, light.direction.y, length(worldPosition) * dot(light.direction, -V), heightAtDistance);
-		if (RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
-			continue;
-		
-		float3 lightTransmittance = TransmittanceToAtmosphere(heightAtDistance, lightCosAngleAtDistance);
-		if(all(!lightTransmittance))
-			continue;
+		float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, -V.y, light.direction.y, length(worldPosition));
 		
 		float attenuation = 1.0;
 		if(i == 0)

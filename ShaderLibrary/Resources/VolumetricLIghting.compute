@@ -58,8 +58,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 		if (!attenuation)
 			continue;
 		
-		float height = HeightAtDistance(_ViewHeight, worldDir.y, viewDistance);
-		float3 intensity = AtmosphereScatter(height, dot(L, worldDir));
+		float3 intensity = AtmosphereScatter(_ViewHeight, worldDir.y, viewDistance, dot(L, worldDir));
 		if(all(!intensity))
 			continue;
 			
@@ -149,8 +148,7 @@ void Accumulate(uint2 id : SV_DispatchThreadID)
 		float4 luminanceExtinction = _Input[uint3(id.xy, i)];
 		
 		// Attenuate due to atmosphere and local extinction
-		float atmosphereHeight = HeightAtDistance(_ViewHeight, worldDir.y, t);
-		float3 extinction = AtmosphereExtinction(atmosphereHeight) + luminanceExtinction.a;
+		float3 extinction = AtmosphereExtinction(_ViewHeight, worldDir.y, t) + luminanceExtinction.a;
 		float3 transmittance = exp(-extinction * ds);
 		float3 integScatt = (luminanceExtinction.rgb - luminanceExtinction.rgb * transmittance) / max(1e-7, extinction);
 		

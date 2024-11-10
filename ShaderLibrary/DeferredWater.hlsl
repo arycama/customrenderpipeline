@@ -155,11 +155,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float3 P = isFrontFace ? worldPosition + -underwaterV * t : -V * t;
 	
 	float3 luminance = 0.0;
-	float planetDistance = DistanceToBottomAtmosphereBoundary(_ViewHeight, -V.y);
+	float planetDistance = DistanceToNearestAtmosphereBoundary(_ViewHeight, -V.y);
 	
 	#if defined(LIGHT_COUNT_ONE) || defined(LIGHT_COUNT_TWO)
-		float lightCosAngleAtDistance0 = CosAngleAtDistance(_ViewHeight, _LightDirection0.y, planetDistance * dot(_LightDirection0, -underwaterV), _PlanetRadius);
-		if (_LightDirection0.y > 0.0 && !RayIntersectsGround(_PlanetRadius, lightCosAngleAtDistance0))
+		float LdotV = dot(_LightDirection0, -V);
+		if (_LightDirection0.y > 0.0)
 		{
 			float attenuation = GetShadow(P, 0, false);
 			if (attenuation > 0.0)
@@ -178,19 +178,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 					float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
 					float LdotV0 = dot(_LightDirection0, -underwaterV);
 					float phase = lerp(MiePhase(LdotV0, -0.3), MiePhase(LdotV0, 0.85), asymmetry);
-					float3 lightColor0 = phase * _LightColor0 * TransmittanceToAtmosphere(_PlanetRadius, lightCosAngleAtDistance0);
+					float3 lightColor0 = phase * _LightColor0 * TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
 					luminance += lightColor0 * attenuation * asymmetry;
 				}
 			}
 		}
-	
-		//#ifdef LIGHT_COUNT_TWO
-		//	float shadowDistance1 = max(0.0, worldPosition.y - P.y) / max(1e-6, saturate(_LightDirection1.y));
-		//	float LdotV1 = dot(_LightDirection1, -V);
-		//	float lightCosAngleAtDistance1 = CosAngleAtDistance(_ViewHeight, _LightDirection1.y, planetDistance * LdotV1, _PlanetRadius);
-		//	float3 lightColor1 = RcpPi * _LightColor1 * AtmosphereTransmittance(_PlanetRadius, lightCosAngleAtDistance1);
-		//	luminance += lightColor1 * exp(-_Extinction * (shadowDistance1 + t));
-		//#endif
 	#endif
 	
 	luminance *= _Extinction * weight * _Exposure;

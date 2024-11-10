@@ -188,8 +188,6 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            
-
             // Ambient Ground LUT
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Atmosphere Ambient Ground"))
             {
