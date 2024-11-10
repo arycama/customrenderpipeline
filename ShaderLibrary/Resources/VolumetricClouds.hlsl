@@ -23,23 +23,23 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float3 rd = _CloudShadowViewDirection;
 		float _ViewHeight = distance(_PlanetCenter, P);
 		float3 N = normalize(P - _PlanetCenter);
-		float cosViewAngle = dot(N, rd);
+		float viewCosAngle = dot(N, rd);
 		float2 offsets = 0.5;
 	#else
 		float3 P = 0.0;
 		float rcpRdLength = RcpLength(worldDir);
 		float3 rd = worldDir * rcpRdLength;
-		float cosViewAngle = rd.y;
+		float viewCosAngle = rd.y;
 		float2 offsets = Noise2D(position.xy);
 	#endif
 	
 	FragmentOutput output;
 	
 	#ifdef BELOW_CLOUD_LAYER
-		float rayStart = DistanceToSphereInside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
-		float rayEnd = DistanceToSphereInside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+		float rayStart = DistanceToSphereInside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
+		float rayEnd = DistanceToSphereInside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
 	
-		if (RayIntersectsGround(_ViewHeight, cosViewAngle))
+		if (RayIntersectsGround(_ViewHeight, viewCosAngle))
 		{
 			output.luminance = 0.0;
 			output.transmittance = 1.0;
@@ -47,12 +47,12 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			return output;
 		}
 	#elif defined(ABOVE_CLOUD_LAYER) || defined(CLOUD_SHADOW)
-		float rayStart = DistanceToSphereOutside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness);
-		float rayEnd = DistanceToSphereOutside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
+		float rayStart = DistanceToSphereOutside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+		float rayEnd = DistanceToSphereOutside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
 	#else
 		float rayStart = 0.0;
-		bool rayIntersectsLowerCloud = RayIntersectsSphere(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight);
-		float rayEnd = rayIntersectsLowerCloud ? DistanceToSphereOutside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight) : DistanceToSphereInside(_ViewHeight, cosViewAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+		bool rayIntersectsLowerCloud = RayIntersectsSphere(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
+		float rayEnd = rayIntersectsLowerCloud ? DistanceToSphereOutside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight) : DistanceToSphereInside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
 	#endif
 	
 	#ifndef CLOUD_SHADOW
@@ -82,7 +82,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	float cloudDepth;
 	float rayLength = rayEnd - rayStart;
-	float4 result = EvaluateCloud(rayStart, rayLength, sampleCount, rd, _ViewHeight, cosViewAngle, offsets, P, isShadow, cloudDepth, false);
+	float4 result = EvaluateCloud(rayStart, rayLength, sampleCount, rd, _ViewHeight, viewCosAngle, offsets, P, isShadow, cloudDepth, false);
 	float totalRayLength = rayEnd - cloudDepth;
 	
 	#ifdef CLOUD_SHADOW

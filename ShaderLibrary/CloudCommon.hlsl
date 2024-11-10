@@ -55,7 +55,7 @@ float CloudExtinction(float3 worldPosition, float height, bool useDetail)
 	return max(0.0, density * _Density);
 }
 
-float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 rd, float viewHeight, float cosViewAngle, float2 offsets, float3 P, bool isShadow, out float cloudDepth, bool sunShadow = false)
+float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 rd, float viewHeight, float viewCosAngle, float2 offsets, float3 P, bool isShadow, out float cloudDepth, bool sunShadow = false)
 {
 	float dt = rayLength / sampleCount;
 	float LdotV = dot(_LightDirection0, rd);
@@ -68,7 +68,7 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		float t = dt * (i + offsets.x) + rayStart;
 		float3 worldPosition = rd * t + P;
 		
-		float heightAtDistance = HeightAtDistance(viewHeight, cosViewAngle, t);
+		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, t);
 		float extinction = CloudExtinction(worldPosition, heightAtDistance, true);
 		if (extinction)
 		{
@@ -115,19 +115,18 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		if(!isShadow)
 			result.a = saturate(Remap(result.a, _TransmittanceThreshold));
 	
-			// Final lighting
-		float heightAtDistance = HeightAtDistance(viewHeight, cosViewAngle, cloudDepth);
+		// Final lighting
+		float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, cloudDepth);
 		float LdotV = dot(_LightDirection0, rd);
 		float lightCosAngleAtDistance = CosAngleAtDistance(viewHeight, _LightDirection0.y, cloudDepth * LdotV, heightAtDistance);
 	
-		bool rayIntersectsGround = RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance);
-		if (!rayIntersectsGround)
+		if (!RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 		{
-			float3 atmosphereTransmittance = TransmittanceToPoint(heightAtDistance, lightCosAngleAtDistance, DistanceToTopAtmosphereBoundary(heightAtDistance, lightCosAngleAtDistance), rayIntersectsGround);
-			if (any(atmosphereTransmittance))
+			float3 lightTransmittance = TransmittanceToAtmosphere(heightAtDistance, lightCosAngleAtDistance);
+			if (any(lightTransmittance))
 			{
 				float attenuation = sunShadow ? GetShadow(rd * cloudDepth, 0, false) : 1.0;
-				result.rgb *= atmosphereTransmittance * _LightColor0 * (_Exposure * attenuation);
+				result.rgb *= lightTransmittance * _LightColor0 * (_Exposure * attenuation);
 			}
 		}
 		else
@@ -135,12 +134,12 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 			result.rgb = 0.0;
 		}
 		
-		float3 ambient = GetSkyAmbient(lightCosAngleAtDistance, heightAtDistance, rayIntersectsGround) * _LightColor0 * _Exposure;
+		float3 ambient = GetSkyAmbient(heightAtDistance, lightCosAngleAtDistance) * _LightColor0 * _Exposure;
 		result.rgb += ambient * (1.0 - result.a);
 	
-		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, cosViewAngle, cloudDepth, heightAtDistance);
+		float viewCosAngleAtDistance = CosAngleAtDistance(viewHeight, viewCosAngle, cloudDepth, heightAtDistance);
 		
-		float3 viewTransmittance = TransmittanceToPoint(viewHeight, cosViewAngle, cloudDepth, rayIntersectsGround);
+		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, cloudDepth);
 		result.rgb *= viewTransmittance;
 	}
 	

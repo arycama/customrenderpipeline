@@ -216,6 +216,11 @@ float4 AlphaPremultiplyInv(float4 value)
 	return value;
 }
 
+float ApplyScaleOffset(float uv, float2 scaleOffset)
+{
+	return uv * scaleOffset.x + scaleOffset.y;
+}
+
 float2 ApplyScaleOffset(float2 uv, float4 scaleOffset)
 {
 	return uv * scaleOffset.xy + scaleOffset.zw;

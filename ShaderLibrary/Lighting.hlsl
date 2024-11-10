@@ -514,8 +514,8 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 		if (RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 			continue;
 		
-		float3 atmosphereTransmittance = TransmittanceToPoint(heightAtDistance, lightCosAngleAtDistance, DistanceToTopAtmosphereBoundary(heightAtDistance, lightCosAngleAtDistance), false);
-		if(all(!atmosphereTransmittance))
+		float3 lightTransmittance = TransmittanceToAtmosphere(heightAtDistance, lightCosAngleAtDistance);
+		if(all(!lightTransmittance))
 			continue;
 		
 		float attenuation = 1.0;
@@ -545,7 +545,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 			continue;
 		
 		if (isVolumetric)
-			luminance += light.color * atmosphereTransmittance * (_Exposure * attenuation);
+			luminance += light.color * lightTransmittance * (_Exposure * attenuation);
 		else
 		{
 			#ifdef WATER_SHADOW_ON
@@ -553,7 +553,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 				light.color *= WaterShadow(input.worldPosition, light.direction);
 			#endif
 			
-			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, light.direction, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV) * light.color * atmosphereTransmittance) * (abs(NdotL) * _Exposure * attenuation);
+			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, light.direction, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV) * light.color * lightTransmittance) * (abs(NdotL) * _Exposure * attenuation);
 		}
 	}
 	

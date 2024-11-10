@@ -178,7 +178,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 					float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
 					float LdotV0 = dot(_LightDirection0, -underwaterV);
 					float phase = lerp(MiePhase(LdotV0, -0.3), MiePhase(LdotV0, 0.85), asymmetry);
-					float3 lightColor0 = phase * _LightColor0 * TransmittanceToPoint(_PlanetRadius, lightCosAngleAtDistance0, DistanceToTopAtmosphereBoundary(_PlanetRadius, lightCosAngleAtDistance0));
+					float3 lightColor0 = phase * _LightColor0 * TransmittanceToAtmosphere(_PlanetRadius, lightCosAngleAtDistance0);
 					luminance += lightColor0 * attenuation * asymmetry;
 				}
 			}

@@ -61,8 +61,8 @@ float3 RaytracedLighting(float3 N, float3 f0, float perceptualRoughness, float o
 		if (RayIntersectsGround(heightAtDistance, lightCosAngleAtDistance))
 			continue;
 		
-		float3 atmosphereTransmittance = TransmittanceToPoint(heightAtDistance, lightCosAngleAtDistance, DistanceToTopAtmosphereBoundary(heightAtDistance, lightCosAngleAtDistance), false);
-		if(all(!atmosphereTransmittance))
+		float3 lightTransmittance = TransmittanceToAtmosphere(heightAtDistance, lightCosAngleAtDistance);
+		if(all(!lightTransmittance))
 			continue;
 		
 		float attenuation = 1.0;
@@ -104,7 +104,7 @@ float3 RaytracedLighting(float3 N, float3 f0, float perceptualRoughness, float o
 		}
 		#endif
 		
-		luminance += (CalculateLighting(albedo, f0, perceptualRoughness, light.direction, V, N, bentNormal, occlusion, translucency, NdotV) * light.color * atmosphereTransmittance) * (saturate(NdotL) * _Exposure * attenuation);
+		luminance += (CalculateLighting(albedo, f0, perceptualRoughness, light.direction, V, N, bentNormal, occlusion, translucency, NdotV) * light.color * lightTransmittance) * (saturate(NdotL) * _Exposure * attenuation);
 	}
 	
 	return luminance;

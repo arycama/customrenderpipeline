@@ -73,7 +73,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
 			float rcpVLength = RcpLength(worldDir);
 			float3 V = -worldDir * rcpVLength;
-			result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength), RayIntersectsGround(_ViewHeight, -V.y));
+			result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
 		}
 	}
 	

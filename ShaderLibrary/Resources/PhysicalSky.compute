@@ -23,22 +23,17 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		float3 uv = float3(groupId * _ScaleOffset, 0.0).xzy;
 	#endif
 	
-	float maxDist;
-	float3 skyParams = SkyParamsFromUv(uv, false, maxDist);
 	float2 u = Hammersley2dSeq(groupIndex, _ThreadCount);
-	float cosLightAngle = skyParams.z;
+	float lightCosAngle = LightCosAngleFromUv(uv.z);
 	
 	#ifdef AMBIENT_GROUND
 		float viewHeight = _PlanetRadius;
-		float cosViewAngle = SampleHemisphereCosine(u.x, u.y).z;
+		float viewCosAngle = SampleHemisphereCosine(u.x, u.y).z;
 		bool samplePlanet = false;
-		bool rayIntersectsGround = false;
 	#else
-		float viewHeight = skyParams.x;
-		float cosViewAngle = SampleSphereUniform(u.x, u.y).z;
-		
+		float viewHeight = ViewHeightFromUv(uv.x);
+		float viewCosAngle = SampleSphereUniform(u.x, u.y).z;
 		bool samplePlanet = true;
-		bool rayIntersectsGround = RayIntersectsGround(viewHeight, cosViewAngle);
 	#endif
 	
 	#if defined(AMBIENT_GROUND) || defined(AMBIENT_SKY)
@@ -47,16 +42,16 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		bool applyMultiScatter = false;
 	#endif
 	
-	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, cosViewAngle, rayIntersectsGround);
-	AtmosphereResult result = SampleAtmosphere(viewHeight, cosViewAngle, cosLightAngle, _Samples, rayLength, applyMultiScatter, 0, 0.0, 0.5, samplePlanet, rayIntersectsGround);
+	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle);
+	AtmosphereResult result = SampleAtmosphere(viewHeight, viewCosAngle, lightCosAngle, _Samples, rayLength, applyMultiScatter, 0, 0.0, 0.5, samplePlanet);
 	
 	// Account for bounced light off the earth
 	// Sky can also take into account ambient light that has bounced off the surface
 	#ifdef AMBIENT_SKY
-		if (rayIntersectsGround)
+		if (RayIntersectsGround(viewHeight, viewCosAngle))
 		{
-			float LdotV = cosLightAngle * cosViewAngle;
-			float cosLightAngleAtDistance = CosAngleAtDistance(viewHeight, cosLightAngle, rayLength * LdotV, _PlanetRadius);
+			float LdotV = lightCosAngle * viewCosAngle;
+			float cosLightAngleAtDistance = CosAngleAtDistance(viewHeight, lightCosAngle, rayLength * LdotV, _PlanetRadius);
 			result.luminance += GetGroundAmbient(cosLightAngleAtDistance) * _GroundColor;
 		}
 	#endif
