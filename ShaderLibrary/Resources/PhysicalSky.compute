@@ -43,7 +43,7 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	#endif
 	
 	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle);
-	AtmosphereResult result = SampleAtmosphere(viewHeight, viewCosAngle, lightCosAngle, _Samples, rayLength, applyMultiScatter, 0.5, samplePlanet, false);
+	AtmosphereResult result = SampleAtmosphere(viewHeight, viewCosAngle, lightCosAngle, _Samples, rayLength, applyMultiScatter, 0.5, samplePlanet);
 	
 	// Account for bounced light off the earth
 	// Sky can also take into account ambient light that has bounced off the surface

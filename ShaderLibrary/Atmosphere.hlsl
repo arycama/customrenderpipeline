@@ -156,20 +156,17 @@ float3 PlanetCurvePrevious(float3 worldPosition)
 
 float3 AtmosphereExtinction(float viewHeight, float viewCosAngle, float distance)
 {
-	float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, distance);
-	float clampedHeight = max(0.0, heightAtDistance - _PlanetRadius);
-
-	float3 opticalDepth = exp(-clampedHeight / _RayleighHeight) * _RayleighScatter;
-	opticalDepth += exp(-clampedHeight / _MieHeight) * (_MieScatter + _MieAbsorption);
-	opticalDepth += max(0.0, 1.0 - abs(clampedHeight - _OzoneHeight) / _OzoneWidth) * _OzoneAbsorption;
+	float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, distance) - _PlanetRadius;
+	float3 opticalDepth = exp(-heightAtDistance / _RayleighHeight) * _RayleighScatter;
+	opticalDepth += exp(-heightAtDistance / _MieHeight) * (_MieScatter + _MieAbsorption);
+	opticalDepth += max(0.0, 1.0 - abs(heightAtDistance - _OzoneHeight) / _OzoneWidth) * _OzoneAbsorption;
 	return opticalDepth;
 }
 
 float4 AtmosphereScatter(float viewHeight, float viewCosAngle, float distance)
 {
-	float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, distance);
-	float clampedHeight = max(0.0, heightAtDistance - _PlanetRadius);
-	return exp(-clampedHeight / float2(_RayleighHeight, _MieHeight)).xxxy * float4(_RayleighScatter, _MieScatter);
+	float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, distance) - _PlanetRadius;
+	return exp(-heightAtDistance / float2(_RayleighHeight, _MieHeight)).xxxy * float4(_RayleighScatter, _MieScatter);
 }
 
 float3 AtmosphereScatter(float viewHeight, float viewCosAngle, float distance, float LdotV)
@@ -286,16 +283,17 @@ struct AtmosphereResult
 	float currentT;
 };
 
-AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float lightCosAngle, float samples, float rayLength, bool applyMultiScatter, float sampleOffset, bool samplePlanet, bool importanceSample)
+AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float lightCosAngle, float samples, float rayLength, bool applyMultiScatter, float sampleOffset, bool samplePlanet)
 {
 	float dt = rayLength / samples;
 
-	float3 transmittance = 1.0, luminance = 0.0, density = 0.0, transmittanceSum = 0.0, weightedDepthSum = 0.0;
+	float3 transmittance = 1.0, luminance = 0.0, density = 0.0, transmittanceSum = 0.0, weightedDepthSum = 0.0, opticalDepthSum = 0.0;
 	for (float i = 0.0; i < samples; i++)
 	{
 		float currentDistance = (i + sampleOffset) * dt;
 		
 		float3 opticalDepth = AtmosphereExtinction(viewHeight, viewCosAngle, currentDistance);
+		opticalDepthSum += opticalDepth * dt;
 		float3 extinction = exp(-opticalDepth * dt);
 		
 		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, currentDistance);
@@ -328,7 +326,7 @@ AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float li
 	weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
 	
 	AtmosphereResult output;
-	output.transmittance = transmittance;
+	output.transmittance = transmittance;//exp(-opticalDepthSum);
 	output.luminance = luminance;
 	output.density = density;
 	output.weightedDepth = dot(weightedDepthSum / rayLength, transmittance) / dot(transmittance, 1.0);

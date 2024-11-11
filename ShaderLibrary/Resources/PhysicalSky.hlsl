@@ -26,19 +26,19 @@ float3 FragmentTransmittanceLut(float4 position : SV_Position, float2 uv : TEXCO
 	float2 skyParams = float2(_PlanetRadius + uv.x * _AtmosphereHeight, 2.0 * uv.y - 1.0);
 	float rayLength = DistanceToNearestAtmosphereBoundary(skyParams.x, skyParams.y) * uvz;
 	
-	AtmosphereResult result = SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, rayLength, true, 0.5, true, false);
-	return result.transmittance;
+	return SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, rayLength, true, 0.5, true).transmittance;
 }
 
 float FragmentTransmittanceDepthLut(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
+	return 1;
 	uv = ApplyScaleOffset(uv, _ScaleOffset);
 	float uvz = index / (_TransmittanceDepth - 1.0);
 	
 	float2 skyParams = float2(_PlanetRadius + uv.x * _AtmosphereHeight, 2.0 * uv.y - 1.0);
 	float rayLength = DistanceToNearestAtmosphereBoundary(skyParams.x, skyParams.y) * uvz;
 	
-	AtmosphereResult result = SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, rayLength, true, 0.5, true, false);
+	AtmosphereResult result = SampleAtmosphere(skyParams.x, skyParams.y, 0.0, _Samples, rayLength, true, 0.5, true);
 	return result.weightedDepth;
 }
 
@@ -49,7 +49,7 @@ float3 FragmentLuminance(float4 position : SV_Position, float2 uv : TEXCOORD0, f
 	float viewCosAngle = 2.0 * uv.y - 1.0;
 	float rayLength = DistanceToNearestAtmosphereBoundary(_ViewHeight, viewCosAngle) * RemapHalfTexelTo01(uv.x, SkyLuminanceSize.x);
 	
-	return SampleAtmosphere(_ViewHeight, viewCosAngle, _LightDirection0.y, _Samples, rayLength, true, 0.5, false, false).luminance;
+	return SampleAtmosphere(_ViewHeight, viewCosAngle, _LightDirection0.y, _Samples, rayLength, true, 0.5, false).luminance;
 }
 
 float FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
@@ -86,8 +86,15 @@ float FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	}
 	
 	return (a + b) * 0.5;
-	
 	//return SampleAtmosphere(_ViewHeight, viewCosAngle, _LightDirection0.y, _Samples, rayLength, true, index, targetLuminance, 0.5, false, true).currentT;
+}
+
+float3 TransmittanceToPoint1(float viewHeight, float viewCosAngle, float distance)
+{
+	float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle);
+	float uvz = (distance / maxDistance) * _AtmosphereTransmittanceRemap.y + _AtmosphereTransmittanceRemap.w;
+	float2 uv = AtmosphereTransmittanceUv(viewHeight, viewCosAngle);
+	return _Transmittance.SampleLevel(_LinearClampSampler, float3(uv, uvz), 0.0);
 }
 
 float3 SampleAtmosphere1(float viewHeight, float viewCosAngle, float lightCosAngle, float samples, float rayLength, float sampleOffset, float LdotV, float3 rd)
@@ -103,7 +110,8 @@ float3 SampleAtmosphere1(float viewHeight, float viewCosAngle, float lightCosAng
 		float3 extinction = exp(-opticalDepth * dt);
 		
 		float3 lightTransmittance = TransmittanceToAtmosphere(viewHeight, viewCosAngle, lightCosAngle, currentDistance);
-		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, currentDistance);
+		float3 viewTransmittance = TransmittanceToPoint1(viewHeight, viewCosAngle, currentDistance);
+		//viewTransmittance = transmittance;
 		
 		#ifndef REFLECTION_PROBE
 			float attenuation = CloudTransmittance(rd * currentDistance);
@@ -112,7 +120,7 @@ float3 SampleAtmosphere1(float viewHeight, float viewCosAngle, float lightCosAng
 		#endif
 		
 		float3 scatter = AtmosphereScatter(viewHeight, viewCosAngle, currentDistance, LdotV);
-		luminance += (scatter * lightTransmittance + GetMultiScatter(viewHeight, viewCosAngle, lightCosAngle, currentDistance)) * viewTransmittance * (1.0 - extinction) * rcp(opticalDepth);
+		luminance += (scatter * lightTransmittance + GetMultiScatter(viewHeight, viewCosAngle, lightCosAngle, currentDistance)) * viewTransmittance * dt; //(1.0 - extinction) * rcp(opticalDepth);
 		
 		transmittance *= extinction;
 	}
@@ -240,7 +248,7 @@ float _IsFirst, _ClampWindow, _DepthFactor, _MotionFactor;
 
 float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	//return _SkyInput[position.xy];
+	return _SkyInput[position.xy];
 
 	float cloudTransmittance = CloudTransmittanceTexture[position.xy];
 	
