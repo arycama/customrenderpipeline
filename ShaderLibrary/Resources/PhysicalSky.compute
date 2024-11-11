@@ -30,10 +30,12 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		float viewHeight = _PlanetRadius;
 		float viewCosAngle = SampleHemisphereCosine(u.x, u.y).z;
 		bool samplePlanet = false;
+		bool rayIntersectsGround = false;
 	#else
 		float viewHeight = uv.x * _AtmosphereHeight + _PlanetRadius;
 		float viewCosAngle = SampleSphereUniform(u.x, u.y).z;
 		bool samplePlanet = true;
+		bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
 	#endif
 	
 	#if defined(AMBIENT_GROUND) || defined(AMBIENT_SKY)
@@ -42,13 +44,13 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		bool applyMultiScatter = false;
 	#endif
 	
-	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle);
-	AtmosphereResult result = SampleAtmosphere(viewHeight, viewCosAngle, lightCosAngle, _Samples, rayLength, applyMultiScatter, 0.5, samplePlanet);
+	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
+	AtmosphereResult result = SampleAtmosphere(viewHeight, viewCosAngle, lightCosAngle, _Samples, rayLength, applyMultiScatter, 0.5, samplePlanet, rayIntersectsGround);
 	
 	// Account for bounced light off the earth
 	// Sky can also take into account ambient light that has bounced off the surface
 	#ifdef AMBIENT_SKY
-		if (RayIntersectsGround(viewHeight, viewCosAngle))
+		if (rayIntersectsGround)
 			result.luminance += GetGroundAmbient(viewHeight, viewCosAngle, lightCosAngle, rayLength) * _GroundColor;
 	#endif
 	

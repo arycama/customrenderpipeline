@@ -58,6 +58,7 @@ namespace Arycama.CustomRenderPipeline
             [field: Header("Transmittance Lookup")]
             [field: SerializeField] public int TransmittanceWidth { get; private set; } = 128;
             [field: SerializeField] public int TransmittanceHeight { get; private set; } = 64;
+            [field: SerializeField] public int TransmittanceDepth { get; private set; } = 64;
             [field: SerializeField] public int TransmittanceSamples { get; private set; } = 64;
 
             [field: Header("Luminance Lookup")]
@@ -131,7 +132,7 @@ namespace Arycama.CustomRenderPipeline
             ggxConvolutionMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
             textureCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Physical Sky");
 
-            transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, settings.TransmittanceHeight, TextureDimension.Tex3D, isPersistent: true);
+            transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, settings.TransmittanceDepth, TextureDimension.Tex3D, isPersistent: true);
             multiScatter = renderGraph.GetTexture(settings.MultiScatterWidth, settings.MultiScatterHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
             groundAmbient = renderGraph.GetTexture(settings.AmbientGroundWidth, 1, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
             skyAmbient = renderGraph.GetTexture(settings.AmbientSkyWidth, settings.AmbientSkyHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
@@ -145,7 +146,7 @@ namespace Arycama.CustomRenderPipeline
             var groundAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientGroundWidth);
             var skyAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientSkyWidth, settings.AmbientSkyHeight);
 
-            var result = new AtmospherePropertiesAndTables(atmospherePropertiesBuffer, transmittance, multiScatter, groundAmbient, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap);
+            var result = new AtmospherePropertiesAndTables(atmospherePropertiesBuffer, transmittance, multiScatter, groundAmbient, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap, new Vector3(settings.TransmittanceWidth, settings.TransmittanceHeight, settings.TransmittanceDepth));
 
             if (version >= settings.Version)
                 return;
@@ -155,7 +156,7 @@ namespace Arycama.CustomRenderPipeline
             // Generate transmittance LUT
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere Transmittance"))
             {
-                var primitiveCount = MathUtils.DivRoundUp(settings.TransmittanceHeight, 32);
+                var primitiveCount = MathUtils.DivRoundUp(settings.TransmittanceDepth, 32);
                 pass.Initialize(skyMaterial, 0, primitiveCount);
                 pass.WriteTexture(transmittance, RenderBufferLoadAction.DontCare);
                 pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
@@ -168,7 +169,10 @@ namespace Arycama.CustomRenderPipeline
                     result.SetProperties(pass, command);
                     pass.SetFloat(command, "_Samples", settings.TransmittanceSamples);
                     pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(settings.TransmittanceWidth, settings.TransmittanceHeight));
-                    pass.SetFloat(command, "_TransmittanceDepth", settings.TransmittanceHeight);
+                    pass.SetFloat(command, "_TransmittanceWidth", settings.TransmittanceWidth);
+                    pass.SetFloat(command, "_TransmittanceHeight", settings.TransmittanceHeight);
+                    pass.SetFloat(command, "_TransmittanceDepth", settings.TransmittanceDepth);
+                    
                 });
             }
 
@@ -281,7 +285,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetFloat(command, "_Samples", settings.TransmittanceSamples);
                     pass.SetVector(command, "_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(settings.TransmittanceWidth, settings.TransmittanceHeight));
-                    pass.SetFloat(command, "_TransmittanceDepth", settings.TransmittanceHeight);
+                    pass.SetFloat(command, "_TransmittanceDepth", settings.TransmittanceDepth);
                 });
             }
 
@@ -547,8 +551,9 @@ namespace Arycama.CustomRenderPipeline
             private Vector4 multiScatterRemap;
             private Vector4 skyAmbientRemap;
             private Vector2 groundAmbientRemap;
+            private Vector3 transmittanceSize;
 
-            public AtmospherePropertiesAndTables(BufferHandle atmospherePropertiesBuffer, RTHandle transmittance, RTHandle multiScatter, RTHandle groundAmbient, RTHandle skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap)
+            public AtmospherePropertiesAndTables(BufferHandle atmospherePropertiesBuffer, RTHandle transmittance, RTHandle multiScatter, RTHandle groundAmbient, RTHandle skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector3 transmittanceSize)
             {
                 this.atmospherePropertiesBuffer = atmospherePropertiesBuffer ?? throw new ArgumentNullException(nameof(atmospherePropertiesBuffer));
                 this.transmittance = transmittance ?? throw new ArgumentNullException(nameof(transmittance));
@@ -559,6 +564,7 @@ namespace Arycama.CustomRenderPipeline
                 this.multiScatterRemap = multiScatterRemap;
                 this.skyAmbientRemap = skyAmbientRemap;
                 this.groundAmbientRemap = groundAmbientRemap;
+                this.transmittanceSize = transmittanceSize;
             }
 
             public readonly void SetInputs(RenderPass pass)
@@ -576,6 +582,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetVector(command, "_MultiScatterRemap", multiScatterRemap);
                 pass.SetVector(command, "_SkyAmbientRemap", skyAmbientRemap);
                 pass.SetVector(command, "_GroundAmbientRemap", groundAmbientRemap);
+                pass.SetVector(command, "_TransmittanceSize", transmittanceSize);
             }
         }
 

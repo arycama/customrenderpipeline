@@ -42,21 +42,22 @@ float4 _SkyAmbientRemap;
 Texture2DArray<float> _SkyCdf;
 float2 _SkyCdfSize;
 
+float3 _TransmittanceSize;
+
 Texture3D<float> _AtmosphereDepth;
 Texture2D<float3> _MiePhaseTexture;
 Texture2D<float3> SkyLuminance;
 
 // Todo: Move into cbuffer and precalculate
 static const float SqMaxAtmosphereDistance = Sq(_TopRadius) - Sq(_PlanetRadius);
-static const float RcpMaxAtmosphereDistance = rsqrt(SqMaxAtmosphereDistance);
-static const float MaxAtmosphereDistance = rcp(RcpMaxAtmosphereDistance);
+static const float RcpMaxHorizonDistance = rsqrt(SqMaxAtmosphereDistance);
+static const float MaxHorizonDistance = rcp(RcpMaxHorizonDistance);
 
 // The cosine of the maximum Sun zenith angle for which atmospheric scattering
 // must be precomputed (for maximum precision, use the smallest Sun zenith
 // angle yielding negligible sky light radiance values. For instance, for the
 // Earth case, 102 degrees is a good choice - yielding mu_s_min = -0.2).
 static const float mu_s_min = cos(radians(102));
-
 
 // Calculates the height above the atmosphere based on the current view height, angle and distance
 float HeightAtDistance(float viewHeight, float cosAngle, float distance)
@@ -83,7 +84,7 @@ bool LightIntersectsGround(float viewHeight, float viewCosAngle, float lightCosA
 	return RayIntersectsGround(heightAtDistance, lightCosAngleAtMaxDistance);
 }
 
-float DistanceToNearestAtmosphereBoundary(float height, float cosAngle)
+float DistanceToNearestAtmosphereBoundary(float height, float cosAngle, bool rayIntersectsGround)
 {
 	if (RayIntersectsGround(height, cosAngle))
 	{
@@ -93,6 +94,11 @@ float DistanceToNearestAtmosphereBoundary(float height, float cosAngle)
 	{
 		return DistanceToSphereInside(height, cosAngle, _TopRadius);
 	}
+}
+
+float DistanceToNearestAtmosphereBoundary(float height, float cosAngle)
+{
+	return DistanceToNearestAtmosphereBoundary(height, cosAngle, RayIntersectsGround(height, cosAngle));
 }
 
 float RayleighPhase(float cosAngle)
@@ -176,17 +182,162 @@ float3 AtmosphereScatter(float viewHeight, float viewCosAngle, float distance, f
 	return scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase);
 }
 
-float2 AtmosphereTransmittanceUv(float viewHeight, float viewCosAngle)
+// Texture sampling helpers
+float HorizonDistanceFromViewHeight(float viewHeight)
 {
-	float viewHeightUv = (viewHeight - _PlanetRadius) / _AtmosphereHeight;
-	float viewCosAngleUv = 0.5 * viewCosAngle + 0.5;
-	float2 uv = float2(viewHeightUv, viewCosAngleUv);
-	return ApplyScaleOffset(uv, _AtmosphereTransmittanceRemap);
+	return sqrt(max(0.0, Sq(viewHeight) - Sq(_PlanetRadius)));
 }
 
-float AtmosphereDepth(float viewHeight, float viewCosAngle)
+float ViewHeightFromUv(float uv, float textureSize)
 {
-	float2 uv = AtmosphereTransmittanceUv(viewHeight, viewCosAngle);
+	uv = RemapHalfTexelTo01(uv, textureSize);
+	return sqrt(Sq(MaxHorizonDistance * uv) + Sq(_PlanetRadius));
+}
+
+float UvFromViewHeight(float viewHeight, float textureSize)
+{
+	return Remap01ToHalfTexel(HorizonDistanceFromViewHeight(viewHeight) * RcpMaxHorizonDistance, textureSize);
+}
+
+float GetUnitRangeFromTextureCoord(float u, float texture_size)
+{
+	return (u - 0.5 / texture_size) / (1.0 - 1.0 / texture_size);
+}
+
+float ViewCosAngleFromUv(float uv, float viewHeight, bool rayIntersectsGround, float textureSize)
+{
+#if 0
+	// Distance to top atmosphere boundary for a horizontal ray at ground level.
+	float H = sqrt(_TopRadius * _TopRadius - _PlanetRadius * _PlanetRadius);
+	
+	// Distance to the horizon.
+	float rho = sqrt(max(0.0, Sq(viewHeight) - Sq(_PlanetRadius)));
+	//viewHeight = sqrt(rho * rho + _PlanetRadius * _PlanetRadius); // viewHeight
+
+	if (rayIntersectsGround)
+	{
+		// Distance to the ground for the ray (r,mu), and its minimum and maximum
+		// values over all mu - obtained for (r,-1) and (r,mu_horizon) - from which
+		// we can recover mu:
+		float d_min = viewHeight - _PlanetRadius;
+		float d_max = rho;
+		float d = d_min + (d_max - d_min) * GetUnitRangeFromTextureCoord(1.0 - 2.0 * uv, textureSize / 2.0);
+		return d == 0.0 ? -1.0 : clamp(-(rho * rho + d * d) / (2.0 * viewHeight * d), -1.0, 1.0);
+	}
+	else
+	{
+		// Distance to the top atmosphere boundary for the ray (r,mu), and its
+		// minimum and maximum values over all mu - obtained for (r,1) and
+		// (r,mu_horizon) - from which we can recover mu:
+		float d_min = _TopRadius - viewHeight;
+		float d_max = rho + H;
+		float d = d_min + (d_max - d_min) * GetUnitRangeFromTextureCoord(2.0 * uv - 1.0, textureSize / 2.0);
+		return d == 0.0 ? 1.0 : clamp((H * H - rho * rho - d * d) / (2.0 * viewHeight * d), -1.0, 1.0);
+	}
+	#else
+	float horizonDistance = HorizonDistanceFromViewHeight(viewHeight);
+	
+	if (rayIntersectsGround)
+	{
+		float minDist = max(0.0, viewHeight - _PlanetRadius);
+		float dMax = horizonDistance;
+		uv = RemapHalfTexelTo01(1.0 - 2.0 * uv, textureSize / 2); // Doing these as size/1 fixes horizon issues, not sure why
+		float maxDist = lerp(minDist, dMax, uv);
+		return maxDist ? clamp((-Sq(horizonDistance) - Sq(maxDist)) / (2.0 * viewHeight * maxDist), -1.0, 1.0) : -1.0;
+	}
+	else
+	{
+		float minDist = _TopRadius - viewHeight;
+		float dMax = horizonDistance + MaxHorizonDistance;
+		uv = RemapHalfTexelTo01(2.0 * uv - 1.0, textureSize / 2); // Doing these as size/1 fixes horizon issues, not sure why
+		float maxDist = lerp(minDist, dMax, uv);
+		return maxDist ? clamp((SqMaxAtmosphereDistance - Sq(horizonDistance) - Sq(maxDist)) / (2.0 * viewHeight * maxDist), -1.0, 1.0) : 1.0;
+	}
+#endif
+}
+
+float GetTextureCoordFromUnitRange(float x, float texture_size)
+{
+	return 0.5 / texture_size + x * (1.0 - 1.0 / texture_size);
+}
+
+float UvFromViewCosAngle(float viewHeight, float viewCosAngle, bool rayIntersectsGround, float textureSize)
+{
+	#if 0
+		// Distance to top atmosphere boundary for a horizontal ray at ground level.
+		float H = sqrt(_TopRadius * _TopRadius - _PlanetRadius * _PlanetRadius);
+
+		// Distance to the horizon.
+		float rho = sqrt(max(0.0, viewHeight * viewHeight - _PlanetRadius * _PlanetRadius));
+
+		// Discriminant of the quadratic equation for the intersections of the ray
+		// (viewHeight,viewCosAngle) with the ground (see RayIntersectsGround).
+		float r_mu = viewHeight * viewCosAngle;
+		float discriminant = r_mu * r_mu - viewHeight * viewHeight + _PlanetRadius * _PlanetRadius;
+		float u_mu;
+
+		if (rayIntersectsGround)
+		{
+			// Distance to the ground for the ray (viewHeight,viewCosAngle), and its minimum and maximum
+			// values over all viewCosAngle - obtained for (viewHeight,-1) and (viewHeight,mu_horizon).
+			float d = -r_mu - sqrt(max(0.0, discriminant));
+			float d_min = viewHeight - _PlanetRadius;
+			float d_max = rho;
+			u_mu = 0.5 - 0.5 * GetTextureCoordFromUnitRange(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), textureSize / 2.0);
+		}
+		else
+		{
+			// Distance to the top atmosphere boundary for the ray (viewHeight,viewCosAngle), and its
+			// minimum and maximum values over all viewCosAngle - obtained for (viewHeight,1) and
+			// (viewHeight,mu_horizon).
+			float d = -r_mu + sqrt(max(0.0, discriminant + H * H));
+			float d_min = _TopRadius - viewHeight;
+			float d_max = rho + H;
+			u_mu = 0.5 + 0.5 * GetTextureCoordFromUnitRange((d - d_min) / (d_max - d_min), textureSize / 2.0);
+		}
+
+		return u_mu;
+	#else
+		float horizonDistance = HorizonDistanceFromViewHeight(viewHeight);
+	
+		// Discriminant of the quadratic equation for the intersections of the ray
+		float r_mu = viewHeight * viewCosAngle;
+		float discriminant = Sq(r_mu) - Sq(viewHeight) + Sq(_PlanetRadius);
+		if (rayIntersectsGround)
+		{
+			// Distance to the ground for the ray (viewHeight,cosAngle), and its minimum and maximum
+			// values over all cosAngle - obtained for (viewHeight,-1) and (viewHeight,mu_horizon).
+			float d = -r_mu - sqrt(max(0.0, discriminant));
+			float minDist = viewHeight - _PlanetRadius;
+			float maxDist = horizonDistance;
+			float uv = (maxDist == minDist ? 0.0 : Remap(d, minDist, maxDist));
+		
+			return 0.5 - 0.5 * Remap01ToHalfTexel(uv, textureSize / 2);
+		}
+		else
+		{
+			// Distance to the top atmosphere boundary for the ray (viewHeight,cosAngle), and its
+			// minimum and maximum values over all cosAngle - obtained for (viewHeight,1) and
+			// (viewHeight,mu_horizon).
+			float d = -r_mu + sqrt(max(0.0, discriminant + SqMaxAtmosphereDistance));
+			float minDist = _TopRadius - viewHeight;
+			float maxDist = horizonDistance + MaxHorizonDistance;
+			float uv = Remap(d, minDist, maxDist);
+			return 0.5 * Remap01ToHalfTexel(uv, textureSize / 2) + 0.5;
+		}
+	#endif
+}
+
+float2 AtmosphereUv(float viewHeight, float viewCosAngle, bool rayIntersectsGround)
+{
+	float viewHeightUv = UvFromViewHeight(viewHeight, _TransmittanceSize.x);
+	float viewCosAngleUv = UvFromViewCosAngle(viewHeight, viewCosAngle, rayIntersectsGround, _TransmittanceSize.y);
+	return float2(viewHeightUv, viewCosAngleUv);
+}
+
+float AtmosphereDepth(float viewHeight, float viewCosAngle, bool rayIntersectsGround)
+{
+	float2 uv = AtmosphereUv(viewHeight, viewCosAngle, rayIntersectsGround);
 	return _AtmosphereDepth.SampleLevel(_LinearClampSampler, float3(uv, 1), 0.0);
 }
 
@@ -197,26 +348,31 @@ float3 TransmittanceToAtmosphere(float viewHeight, float viewCosAngle, float lig
 
 	float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, distance);
 	float lightCosAngleAtDistance = LightCosAngleAtDistance(viewHeight, viewCosAngle, lightCosAngle, distance);
-	float2 uv = AtmosphereTransmittanceUv(heightAtDistance, lightCosAngleAtDistance);
+	float2 uv = AtmosphereUv(heightAtDistance, lightCosAngleAtDistance, false);
 	return _Transmittance.SampleLevel(_LinearClampSampler, float3(uv, 1.0), 0.0);
+}
+
+float3 TransmittanceToPoint(float viewHeight, float viewCosAngle, float distance, bool rayIntersectsGround)
+{
+	float2 uv = AtmosphereUv(viewHeight, viewCosAngle, rayIntersectsGround);
+	float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
+	float uvz = Remap01ToHalfTexel(distance / maxDistance, _TransmittanceSize.z);
+	return _Transmittance.SampleLevel(_LinearClampSampler, float3(uv, uvz), 0.0);
 }
 
 float3 TransmittanceToPoint(float viewHeight, float viewCosAngle, float distance)
 {
-	float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle);
-	float uvz = (distance / maxDistance) * _AtmosphereTransmittanceRemap.y + _AtmosphereTransmittanceRemap.w;
-	float2 uv = AtmosphereTransmittanceUv(viewHeight, viewCosAngle);
-	return _Transmittance.SampleLevel(_LinearClampSampler, float3(uv, uvz), 0.0);
+	bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
+	return TransmittanceToPoint(viewHeight, viewCosAngle, distance, rayIntersectsGround);
 }
 
-float3 LuminanceToPoint(float viewHeight, float viewCosAngle, float distance)
+float3 LuminanceToPoint(float viewHeight, float viewCosAngle, float distance, bool rayIntersectsGround)
 {
-	float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle);
+	float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
 	
 	float2 uv;
-	uv.x = distance / maxDistance;
-	uv.y = 0.5 * viewCosAngle + 0.5;
-	uv = Remap01ToHalfTexel(uv, SkyLuminanceSize * float2(1.0, 0.5));
+	uv.x = Remap01ToHalfTexel(distance / maxDistance, SkyLuminanceSize.x);
+	uv.y = UvFromViewCosAngle(viewHeight, viewCosAngle, rayIntersectsGround, SkyLuminanceSize.y);
 	return SkyLuminance.SampleLevel(_LinearClampSampler, uv.xy, 0.0);
 }
 
@@ -238,11 +394,11 @@ float3 GetSkyAmbient(float viewHeight, float viewCosAngle, float lightCosAngle, 
 	return _SkyAmbient.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
-float GetSkyCdf(float viewCosAngle, float xi, float colorIndex)
+float GetSkyCdf(float viewHeight, float viewCosAngle, float xi, float colorIndex, bool rayIntersectsGround)
 {
-	float u_mu = 0.5 * viewCosAngle + 0.5;
-	float3 uv = float3(Remap01ToHalfTexel(float2(xi, u_mu), _SkyCdfSize.xy * float2(1.0, 0.5)), colorIndex);
-	return _SkyCdf.SampleLevel(_LinearClampSampler, uv, 0.0);
+	float distanceUv = Remap01ToHalfTexel(xi, _SkyCdfSize.x);
+	float cosAngleUv = UvFromViewCosAngle(viewHeight, viewCosAngle, rayIntersectsGround, _SkyCdfSize.y);
+	return _SkyCdf.SampleLevel(_LinearClampSampler, float3(distanceUv, cosAngleUv, colorIndex), 0.0);
 }
 
 float3 GetMultiScatter(float viewHeight, float viewCosAngle, float lightCosAngle, float distance)
@@ -283,7 +439,7 @@ struct AtmosphereResult
 	float currentT;
 };
 
-AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float lightCosAngle, float samples, float rayLength, bool applyMultiScatter, float sampleOffset, bool samplePlanet)
+AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float lightCosAngle, float samples, float rayLength, bool applyMultiScatter, float sampleOffset, bool samplePlanet, bool rayIntersectsGround)
 {
 	float dt = rayLength / samples;
 
@@ -296,7 +452,7 @@ AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float li
 		opticalDepthSum += opticalDepth * dt;
 		float3 extinction = exp(-opticalDepth * dt);
 		
-		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, currentDistance);
+		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, currentDistance, rayIntersectsGround);
 		float3 throughput = viewTransmittance * (1.0 - extinction) * rcp(opticalDepth);
 		
 		if (applyMultiScatter)
@@ -315,11 +471,11 @@ AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float li
 	}
 	
 	// Account for bounced light off the earth
-	if (samplePlanet && RayIntersectsGround(viewHeight, viewCosAngle))
+	if (samplePlanet && rayIntersectsGround)
 	{
 		float lightCosAngleAtDistance = LightCosAngleAtDistance(viewHeight, viewCosAngle, lightCosAngle, rayLength);
 		float3 lightTransmittance = TransmittanceToAtmosphere(viewHeight, viewCosAngle, lightCosAngle, rayLength);
-		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, rayLength);
+		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, rayLength, true);
 		luminance += lightTransmittance * viewTransmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi;
 	}
 	
