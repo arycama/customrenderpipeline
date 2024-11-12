@@ -465,15 +465,43 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
+            // Spatial
+            var skyTemp2 = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Spatial"))
+            {
+                pass.Initialize(skyMaterial, 5, camera: camera);
+                pass.WriteTexture(skyTemp2, RenderBufferLoadAction.DontCare);
+                pass.ReadTexture("_SkyInput", skyTemp);
+                pass.ReadTexture("_Depth", depth);
+                commonPassData.SetInputs(pass);
+                pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
+                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+
+                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                {
+                    pass.SetFloat(command, "_BlurSigma", settings.SpatialBlurSigma);
+                    pass.SetFloat(command, "_SpatialSamples", settings.SpatialSamples);
+                    pass.SetFloat(command, "_SpatialDepthFactor", settings.SpatialDepthFactor);
+                    pass.SetFloat(command, "_SpatialBlurFrames", settings.SpatialBlurFrames);
+                    pass.SetFloat(command, "_MaxFrameCount", settings.MaxFrameCount);
+
+                    pass.SetInt(command, "_MaxWidth", width - 1);
+                    pass.SetInt(command, "_MaxHeight", height - 1);
+                    pass.SetVector(command, "_ScaledResolution", new Vector4(width, height, 1.0f / width, 1.0f / height));
+
+                    commonPassData.SetProperties(pass, command);
+                });
+            }
+
+
             // Reprojection
             var skyColor = textureCache.GetTextures(width, height, camera, true);
 
-            var skyTemp2 = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Temporal"))
             {
                 pass.Initialize(skyMaterial, 4, camera: camera);
-                pass.WriteTexture(skyTemp2, RenderBufferLoadAction.DontCare);
-                pass.ReadTexture("_SkyInput", skyTemp);
+                pass.WriteTexture(skyColor.current, RenderBufferLoadAction.DontCare);
+                pass.ReadTexture("_SkyInput", skyTemp2);
                 pass.ReadTexture("_SkyHistory", skyColor.history);
                 pass.ReadTexture("_Depth", depth);
                 commonPassData.SetInputs(pass);
@@ -500,33 +528,6 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetInt(command, "_MaxWidth", width - 1);
                     pass.SetInt(command, "_MaxHeight", height - 1);
-
-                    commonPassData.SetProperties(pass, command);
-                });
-            }
-
-            // Spatial
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Spatial"))
-            {
-                pass.Initialize(skyMaterial, 5, camera: camera);
-                pass.WriteTexture(skyColor.current, RenderBufferLoadAction.DontCare);
-                pass.ReadTexture("_SkyInput", skyTemp2);
-                pass.ReadTexture("_Depth", depth);
-                commonPassData.SetInputs(pass);
-                pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
-
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
-                {
-                    pass.SetFloat(command, "_BlurSigma", settings.SpatialBlurSigma);
-                    pass.SetFloat(command, "_SpatialSamples", settings.SpatialSamples);
-                    pass.SetFloat(command, "_SpatialDepthFactor", settings.SpatialDepthFactor);
-                    pass.SetFloat(command, "_SpatialBlurFrames", settings.SpatialBlurFrames);
-                    pass.SetFloat(command, "_MaxFrameCount", settings.MaxFrameCount);
-
-                    pass.SetInt(command, "_MaxWidth", width - 1);
-                    pass.SetInt(command, "_MaxHeight", height - 1);
-                    pass.SetVector(command, "_ScaledResolution", new Vector4(width, height, 1.0f / width, 1.0f / height));
 
                     commonPassData.SetProperties(pass, command);
                 });
