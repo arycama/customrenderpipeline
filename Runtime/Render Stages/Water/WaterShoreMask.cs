@@ -46,7 +46,7 @@ namespace Arycama.CustomRenderPipeline
         public void Render()
         {
             // TODO: Also check if properties have changed such as size etc.
-            if (Terrain.activeTerrain == terrain && version == lastVersion)
+            if ((Terrain.activeTerrain == terrain && version == lastVersion) || Terrain.activeTerrain == null)
                 return;
 
             if (terrain != null)

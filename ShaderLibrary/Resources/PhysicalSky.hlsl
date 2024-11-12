@@ -301,8 +301,8 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float velocityWeight = velLenSqr ? saturate(1.0 - sqrt(velLenSqr) * _MotionFactor) : 1.0;
 	float3 window = velocityWeight * (maxValue - minValue);
 	
-	//minValue -= _ClampWindow * window;
-	//maxValue += _ClampWindow * window;
+	minValue -= _ClampWindow * window;
+	maxValue += _ClampWindow * window;
 	
 	// Clamp clip etc
 	history = ClipToAABB(history, result, minValue, maxValue);
@@ -327,7 +327,34 @@ float _SpatialSamples, _SpatialDepthFactor, _BlurSigma;
 
 float3 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-    return _SkyInput[position.xy];
+	return _SkyInput[position.xy];
+
+	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
+	float phi = Noise1D(position.xy) * TwoPi;
+	
+	float _ResolveSize = 8;
+	float _ResolveSamples = 64;
+	float rcpSigma2 = rcp(Sq(8));
+	
+	float centerDepth = LinearEyeDepth(_Depth[position.xy]);
+	float depthSigma = 4 / centerDepth;
+	
+	float4 result = 0.0;
+	for (uint i = 0; i <= _ResolveSamples; i++)
+	{
+		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
+		float2 coord = clamp(floor(position.xy + u), 0.0, _ScaledResolution.xy - 1.0) + 0.5;
+		float3 input = _SkyInput[coord];
+		float weight = exp2(-SqrLength(u) * rcpSigma2);
+		
+		float sampleDepth = LinearEyeDepth(_Depth[coord]);
+		float depthDelta = 1.0 - saturate(abs(centerDepth - sampleDepth) * depthSigma);
+		
+		result += float4(input, 1.0) * weight * depthDelta;
+	}
+	
+	result.rgb *= rcp(result.a);
+	return result.rgb;
 	
     float3 v[9];
     // Add the pixels which make up our window to the pixel array.

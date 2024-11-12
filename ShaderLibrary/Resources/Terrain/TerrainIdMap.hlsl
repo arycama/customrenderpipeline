@@ -4,8 +4,10 @@
 #include "../../TerrainCommon.hlsl"
 
 Texture2D<float4> _Input0, _Input1, _Input2, _Input3, _Input4, _Input5, _Input6, _Input7;
-uint LayerCount;
+uint LayerCount, _TotalLayers, _TextureCount;
 float _Resolution;
+Buffer<uint> _ProceduralIndices;
+Texture2DArray<float> _ExtraLayers;
 
 float nrand(float2 n)
 {
@@ -23,27 +25,35 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	uint index0 = 0, index1 = 0;
 	float weight0 = 0.0, weight1 = 0.0;
 	
-	for (uint i = 0; i < LayerCount; i++)
+	for (uint i = 0; i < _TotalLayers; i++)
 	{
 		float alpha = 0.0;
 		
 		// Ugh
-		if(i < 4)
-			alpha += _Input0[position.xy][i % 4];
-		else if(i < 8)
-			alpha += _Input1[position.xy][i % 4];
-		else if (i < 12)
-			alpha += _Input2[position.xy][i % 4];
-		else if (i < 16)
-			alpha += _Input3[position.xy][i % 4];
-		else if (i < 20)
-			alpha += _Input4[position.xy][i % 4];
-		else if (i < 24)
-			alpha += _Input5[position.xy][i % 4];
-		else if (i < 28)
-			alpha += _Input6[position.xy][i % 4];
-		else if (i < 32)
-			alpha += _Input7[position.xy][i % 4];
+		if (i < _TextureCount)
+		{
+			if (i < 4)
+				alpha += _Input0[position.xy][i % 4];
+			else if (i < 8)
+				alpha += _Input1[position.xy][i % 4];
+			else if (i < 12)
+				alpha += _Input2[position.xy][i % 4];
+			else if (i < 16)
+				alpha += _Input3[position.xy][i % 4];
+			else if (i < 20)
+				alpha += _Input4[position.xy][i % 4];
+			else if (i < 24)
+				alpha += _Input5[position.xy][i % 4];
+			else if (i < 28)
+				alpha += _Input6[position.xy][i % 4];
+			else if (i < 32)
+				alpha += _Input7[position.xy][i % 4];
+		}
+			
+		// Procedural layer
+		uint proceduralIndex = _ProceduralIndices[i];
+		if (proceduralIndex > 0)
+			alpha += _ExtraLayers[uint3(position.xy, proceduralIndex - 1)];
 		
         // Check the strength of the current splatmap layer
 		if (alpha > weight0)

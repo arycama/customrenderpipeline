@@ -15,13 +15,13 @@ public struct TerrainRenderData : IRenderPassData
 
     public TerrainRenderData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray mask, RTHandle terrainHeightmapTexture, RTHandle terrainNormalMap, RTHandle idMap, Texture terrainHolesTexture, Vector4 terrainRemapHalfTexel, Vector4 terrainScaleOffset, Vector3 terrainSize, float terrainHeightScale, float terrainHeightOffset, float idMapResolution, GraphicsBuffer terrainLayerData)
     {
-        this.albedoSmoothness = albedoSmoothness ?? throw new ArgumentNullException(nameof(albedoSmoothness));
-        this.normal = normal ?? throw new ArgumentNullException(nameof(normal));
-        this.mask = mask ?? throw new ArgumentNullException(nameof(mask));
-        this.terrainHeightmapTexture = terrainHeightmapTexture ?? throw new ArgumentNullException(nameof(terrainHeightmapTexture));
-        this.terrainNormalMap = terrainNormalMap ?? throw new ArgumentNullException(nameof(terrainNormalMap));
-        this.idMap = idMap ?? throw new ArgumentNullException(nameof(idMap));
-        this.terrainHolesTexture = terrainHolesTexture ?? throw new ArgumentNullException(nameof(terrainHolesTexture));
+        this.albedoSmoothness = albedoSmoothness;
+        this.normal = normal;
+        this.mask = mask;
+        this.terrainHeightmapTexture = terrainHeightmapTexture;
+        this.terrainNormalMap = terrainNormalMap;
+        this.idMap = idMap;
+        this.terrainHolesTexture = terrainHolesTexture;
         this.terrainRemapHalfTexel = terrainRemapHalfTexel;
         this.terrainScaleOffset = terrainScaleOffset;
         this.terrainSize = terrainSize;
