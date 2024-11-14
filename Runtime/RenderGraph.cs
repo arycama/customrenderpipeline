@@ -450,6 +450,7 @@ namespace Arycama.CustomRenderPipeline
             outputs.Add(handle);
 
             // Also set this as read.. incase the texture never gets used, this will ensure it at least doesn't cause leaks
+            // TODO: Better approach would be to not render passes whose outputs don't get used.. though I guess its possible that some outputs will get used, but not others
             SetLastRTHandleRead(handle, passIndex);
         }
 

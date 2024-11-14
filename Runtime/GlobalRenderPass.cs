@@ -5,15 +5,9 @@ namespace Arycama.CustomRenderPipeline
 {
     public class GlobalRenderPass : RenderPass
     {
-        public void WriteTexture(RTHandle texture)
+        public void WriteTexture(RTHandle rtHandle)
         {
-            if (!texture.IsPersistent || !texture.IsAssigned)
-            {
-                if (texture.IsPersistent)
-                    texture.IsAssigned = true;
-
-                RenderGraph.SetRTHandleWrite(texture, Index);
-            }
+            SetTextureWrite(rtHandle);
         }
 
         public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)

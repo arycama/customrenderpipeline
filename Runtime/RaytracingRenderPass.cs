@@ -30,18 +30,11 @@ namespace Arycama.CustomRenderPipeline
             this.fieldOfView = fieldOfView;
         }
 
-        public void WriteTexture(RTHandle texture, int propertyId)
+        public void WriteTexture(RTHandle rtHandle, int propertyId)
         {
-            texture.EnableRandomWrite = true;
-            colorBindings.Add(new(texture, propertyId));
-
-            if (!texture.IsPersistent || !texture.IsAssigned)
-            {
-                if (texture.IsPersistent)
-                    texture.IsAssigned = true;
-
-                RenderGraph.SetRTHandleWrite(texture, Index);
-            }
+            SetTextureWrite(rtHandle);
+            rtHandle.EnableRandomWrite = true;
+            colorBindings.Add((rtHandle, propertyId));
         }
 
         public void WriteTexture(RTHandle texture, string propertyName)

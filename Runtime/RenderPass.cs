@@ -62,6 +62,16 @@ namespace Arycama.CustomRenderPipeline
             ReadTexture(Shader.PropertyToID(propertyName), texture, 0, subElement);
         }
 
+        protected void SetTextureWrite(RTHandle texture)
+        {
+            if (!texture.IsPersistent || !texture.IsAssigned)
+            {
+                if (texture.IsPersistent)
+                    texture.IsAssigned = true;
+
+                RenderGraph.SetRTHandleWrite(texture, Index);
+            }
+        }
 
         public void ReadBuffer(string propertyName, BufferHandle buffer)
         {

@@ -27,24 +27,17 @@ namespace Arycama.CustomRenderPipeline
             this.clearStencil = clearStencil;
         }
 
-        public void WriteTexture(RTHandle texture, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
+        public void WriteTexture(RTHandle rtHandle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
         {
-            colorTargets.Add((texture, loadAction, storeAction));
-
-            if(!texture.IsPersistent || !texture.IsAssigned)
-            {
-                if (texture.IsPersistent)
-                    texture.IsAssigned = true;
-
-                RenderGraph.SetRTHandleWrite(texture, Index);
-            }
+            SetTextureWrite(rtHandle);
+            colorTargets.Add((rtHandle, loadAction, storeAction));
         }
 
-        public void WriteDepth(RTHandle depth, RenderTargetFlags renderTargetFlags = RenderTargetFlags.None, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
+        public void WriteDepth(RTHandle rtHandle, RenderTargetFlags renderTargetFlags = RenderTargetFlags.None, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
         {
+            SetTextureWrite(rtHandle);
             this.renderTargetFlags = renderTargetFlags;
-            depthBuffer = (depth, loadAction, storeAction);
-            RenderGraph.SetRTHandleWrite(depth, Index);
+            depthBuffer = (rtHandle, loadAction, storeAction);
         }
         protected override void SetupTargets(CommandBuffer command)
         {

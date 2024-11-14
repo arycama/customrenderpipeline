@@ -9,9 +9,9 @@ namespace Arycama.CustomRenderPipeline
         private float bias, slopeBias;
         private bool zClip;
 
-        public void WriteTexture(RTHandle texture)
+        public void WriteTexture(RTHandle rtHandle)
         {
-            RenderGraph.SetRTHandleWrite(texture, Index);
+            SetTextureWrite(rtHandle);
         }
 
         public void Initialize(ScriptableRenderContext context, CullingResults cullingResults, int lightIndex, BatchCullingProjectionType projectionType, ShadowSplitData shadowSplitData, float bias, float slopeBias, bool zClip)
