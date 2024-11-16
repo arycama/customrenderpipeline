@@ -8,6 +8,7 @@ using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
+using Object = UnityEngine.Object;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -73,10 +74,24 @@ namespace Arycama.CustomRenderPipeline
                 InitializeIdMap();
         }
 
+        private void CleanupResources()
+        {
+            minMaxHeight.IsPersistent = false;
+            heightmap.IsPersistent = false;
+            normalmap.IsPersistent = false;
+            idMap.IsPersistent = false;
+            Object.DestroyImmediate(diffuseArray);
+            Object.DestroyImmediate(normalMapArray);
+            Object.DestroyImmediate(maskMapArray);
+            terrainLayerData.Dispose();
+        }
+
         private void InitializeTerrain()
         {
-            terrain = Terrain.activeTerrain;
+            if (terrain != null)
+                CleanupResources();
 
+            terrain = Terrain.activeTerrain;
             if (terrain == null)
                 return;
 
@@ -141,7 +156,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var component in alphamapModifiers)
                 component.PreGenerate(terrainLayers, terrainProceduralLayers);
 
-            var layerCount = terrainLayers.Count + terrainProceduralLayers.Count;
+            var layerCount = terrainLayers.Count;
             if (alphamapModifiers.Length > 0 && layerCount > 0)
             {
                 using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Generate Alphamap Callback"))
@@ -290,7 +305,7 @@ namespace Arycama.CustomRenderPipeline
 
         private void FillLayerData()
         {
-            var count = terrainLayers.Count + terrainProceduralLayers.Count;
+            var count = terrainLayers.Count;
             if (count == 0)
                 return;
 
@@ -301,22 +316,18 @@ namespace Arycama.CustomRenderPipeline
                 layerData[index] = new TerrainLayerData(layer.Key.tileSize.x, Mathf.Max(1e-3f, layer.Key.smoothness), layer.Key.normalScale, 1.0f - layer.Key.metallic);
             }
 
-            foreach (var layer in terrainProceduralLayers)
-            {
-                var index = layer.Value;
-                layerData[index] = new TerrainLayerData(layer.Key.tileSize.x, Mathf.Max(1e-3f, layer.Key.smoothness), layer.Key.normalScale, 1.0f - layer.Key.metallic);
-            }
-
             terrainLayerData.UnlockBufferAfterWrite<TerrainLayerData>(count);
         }
 
         private void InitializeIdMap()
         {
+            if (terrainLayers.Count == 0)
+                return;
+
             var idMapResolution = terrainData.alphamapResolution;
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Terrain Layer Data Init"))
             {
-                var count = terrainLayers.Count + terrainProceduralLayers.Count;
-                var indicesBuffer = renderGraph.GetBuffer(count);
+                var indicesBuffer = renderGraph.GetBuffer(terrainLayers.Count);
 
                 pass.Initialize(generateIdMapMaterial);
                 pass.WriteTexture(idMap, RenderBufferLoadAction.DontCare);
@@ -360,11 +371,26 @@ namespace Arycama.CustomRenderPipeline
 
         public void Update()
         {
+            // TODO: Logic here seems a bit off
             if (terrain != Terrain.activeTerrain)
                 InitializeTerrain();
 
             if (terrain == null)
                 return;
+
+            var alphamapModifiers = terrain.GetComponents<ITerrainAlphamapModifier>();
+            var needsUpdate = false;
+            foreach(var alphamapModifier in alphamapModifiers)
+            {
+                if (!alphamapModifier.NeedsUpdate)
+                    continue;
+
+                needsUpdate = true;
+                break;
+            }
+
+            if(needsUpdate)
+                InitializeTerrain();
 
             // Set this every frame incase of changes..
             // TODO: Only do when data changed?
@@ -783,6 +809,7 @@ namespace Arycama.CustomRenderPipeline
 
     public interface ITerrainAlphamapModifier
     {
+        bool NeedsUpdate { get; }
         // TODO: Encapsulate arguments in some kind of terrain layer data struct
         void PreGenerate(Dictionary<TerrainLayer, int> terrainLayers, Dictionary<TerrainLayer, int> proceduralLayers);
         void Generate(CommandBuffer command, Dictionary<TerrainLayer, int> terrainLayers, Dictionary<TerrainLayer, int> proceduralLayers, RenderTexture idMap);
