@@ -158,6 +158,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "SpectrumStart", spectrumStart);
                     pass.SetVector(command, "SpectrumEnd", spectrumEnd);
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
+                    pass.SetFloat(command, "_WindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
                     pass.SetFloat(command, "SequenceLength", settings.Profile.SequenceLength);
                     pass.SetFloat(command, "TimeScale", settings.Profile.TimeScale);
                 });
@@ -183,6 +184,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector(command, "SpectrumStart", spectrumStart);
                     pass.SetVector(command, "SpectrumEnd", spectrumEnd);
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
+                    pass.SetFloat(command, "_WindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
                     pass.SetFloat(command, "SequenceLength", settings.Profile.SequenceLength);
                     pass.SetFloat(command, "TimeScale", settings.Profile.TimeScale);
                     pass.SetFloat(command, "Time", time);
@@ -417,6 +419,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetInt(command, "_CullingPlanesCount", passData.CullingPlanes.Count);
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
+                    pass.SetFloat(command, "_WindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
                     pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
                     pass.SetFloat(command, "_ShoreWaveWindAngle", settings.Profile.LocalSpectrum.WindAngle);
                 });
@@ -651,6 +654,7 @@ namespace Arycama.CustomRenderPipeline
                     ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
+                    pass.SetFloat(command, "_WindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
                     pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
                     pass.SetFloat(command, "_ShoreWaveWindAngle", settings.Profile.LocalSpectrum.WindAngle);
                 });
@@ -771,6 +775,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetVector(command, "_FoamTex_ST", new Vector4(foamScale.x, foamScale.y, foamOffset.x, foamOffset.y));
                     pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
+                    pass.SetFloat(command, "_WindSpeed", settings.Profile.LocalSpectrum.WindSpeed);
                     pass.SetTexture(command, "_LengthToRoughness", lengthToRoughness);
 
                     pass.SetTexture(command, "_FoamTex", settings.Material.GetTexture("_FoamTex"));
