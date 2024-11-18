@@ -489,18 +489,17 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public BufferHandle SetConstantBuffer<T>(T data) where T : struct
+        public BufferHandle SetConstantBuffer<T>(in T data) where T : struct
         {
-            var buffer = GetBuffer(1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant);
+            var buffer = GetBuffer(1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite);
 
             using (var pass = AddRenderPass<GlobalRenderPass>("Set Constant Buffer"))
             {
                 var passData = pass.SetRenderFunction<ConstantBufferPassData<T>>((command, pass, data) =>
                 {
-                    var bufferData = ArrayPool<T>.Get(1);
+                    var bufferData = buffer.Buffer.LockBufferForWrite<T>(0, 1);
                     bufferData[0] = data.data;
-                    command.SetBufferData(data.buffer, bufferData);
-                    ArrayPool<T>.Release(bufferData);
+                    buffer.Buffer.UnlockBufferAfterWrite<T>(1);
                 });
 
                 passData.data = data;

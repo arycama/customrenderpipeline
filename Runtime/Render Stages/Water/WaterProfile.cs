@@ -15,24 +15,15 @@ public class WaterProfile : ScriptableObject
     [field: SerializeField] public float MaxWaterHeight { get; private set; } = 32f;
     [field: SerializeField] public float TimeScale { get; private set; } = 1.0f;
     [field: SerializeField] public float SequenceLength { get; private set; } = 200.0f;
-    [field: SerializeField] public OceanSpectrum LocalSpectrum { get; private set; } = new(1f, 12f, 0f, 1e+5f, 1f, 0.2f, 3.3f, 0.01f);
-    [field: SerializeField] public OceanSpectrum DistantSpectrum { get; private set; } = new(0f, 12f, 0f, 1e+5f, 1f, 0.2f, 3.3f, 0.01f);
     [field: SerializeField] public float MaxWaveNumberMultiplier { get; private set; } = 10.0f;
+
+    [field: Header("Spectrum")]
+    [field: SerializeField, Range(0, 64)] public float WindSpeed { get; private set; }
+    [field: SerializeField, Range(0f, 1f)] public float WindAngle { get; private set; }
+    [field: SerializeField, Min(0f)] public float Fetch { get; private set; }
+    [field: SerializeField, Range(0, 1)] public float SpreadBlend { get; private set; }
+    [field: SerializeField, Range(0, 1)] public float Swell { get; private set; }
+    [field: SerializeField, Min(1e-6f)] public float PeakEnhancement { get; private set; }
+    [field: SerializeField, Range(0, 2f)] public float ShortWavesFade { get; private set; }
     public float MaxWaveNumber => CascadeScale * MaxWaveNumberMultiplier;
-
-    public BufferHandle SetShaderProperties(RenderGraph renderGraph)
-    {
-        return renderGraph.SetConstantBuffer(new OceanData(LocalSpectrum, DistantSpectrum));
-    }
-}
-
-public struct OceanData
-{
-    public OceanSpectrum spectrum0, spectrum1;
-
-    public OceanData(OceanSpectrum spectrum0, OceanSpectrum spectrum1)
-    {
-        this.spectrum0 = spectrum0;
-        this.spectrum1 = spectrum1;
-    }
 }

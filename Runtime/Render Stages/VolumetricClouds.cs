@@ -259,9 +259,7 @@ namespace Arycama.CustomRenderPipeline
             var worldToShadow = projectionMatrix * viewMatrix;
 
             var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32);
-
-            var cloudShadowData = new CloudShadowData(invViewProjection, -lightDirection, 1f / depth, 1f / settings.Density, settings.ShadowSamples, 0.0f, 0.0f);
-            var cloudShadowDataBuffer = renderGraph.SetConstantBuffer(cloudShadowData);
+            var cloudShadowDataBuffer = renderGraph.SetConstantBuffer((invViewProjection, -lightDirection, 1f / depth, 1f / settings.Density, settings.ShadowSamples, 0.0f, 0.0f));
 
             using(var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Cloud Shadow"))
             {
@@ -492,27 +490,5 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetVector(command, "CloudTransmittanceTextureScaleLimit", cloudTransmittanceTexture.ScaleLimit2D);
             }
         }
-    }
-}
-
-struct CloudShadowData
-{
-    private Matrix4x4 invViewProjection;
-    private Vector3 vector3;
-    private float v1;
-    private float v2;
-    private float shadowSamples;
-    private float v3;
-    private float v4;
-
-    public CloudShadowData(Matrix4x4 invViewProjection, Vector3 vector3, float v1, float v2, float shadowSamples, float v3, float v4)
-    {
-        this.invViewProjection = invViewProjection;
-        this.vector3 = vector3;
-        this.v1 = v1;
-        this.v2 = v2;
-        this.shadowSamples = shadowSamples;
-        this.v3 = v3;
-        this.v4 = v4;
     }
 }

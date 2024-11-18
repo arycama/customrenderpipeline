@@ -93,12 +93,12 @@ void GerstnerWaves(float3 worldPosition, float time, out float3 displacement, ou
 	sincos(_ShoreWaveWindAngle * TwoPi, windVector.y, windVector.x);
 	
 	scale = (1.0 - saturate(shoreDepth / wavelength * 2));
-	float windFactor = Sq(saturate(dot(shoreDirection, windVector)));
+	float windFactor = saturate(dot(shoreDirection, windVector));
 	
 	float phase = sqrt(_OceanGravity * frequency) * time;
 	//float steepness = _ShoreWaveSteepness * scale * windFactor / (frequency * amplitude);
 	float steepness = _ShoreWaveSteepness / (frequency * amplitude);
-	amplitude *= scale;// * windFactor;
+	amplitude *= scale * windFactor;
 	
 	float sinFactor, cosFactor;
 	sincos(frequency * shoreDistance + phase, sinFactor, cosFactor);

@@ -29,7 +29,6 @@ static const int HalfResolution = _Resolution >> 1;
 
 cbuffer OceanData
 {
-	float scale0;
 	float windSpeed0;
 	float windAngle0;
 	float fetch0;
@@ -37,14 +36,6 @@ cbuffer OceanData
 	float swell0;
 	float peakEnhancement0;
 	float shortWavesFade0;
-	float scale1;
-	float windSpeed1;
-	float windAngle1;
-	float fetch1;
-	float spreadBlend1;
-	float swell1;
-	float peakEnhancement1;
-	float shortWavesFade1;
 };
 
 float DispersionShallow(float kLength, float depth)
@@ -150,15 +141,9 @@ float TmaSpectrum(float w, float wp, float depth)
 // Normalization factor approximation for Longuet-Higgins function
 float LonguetHigginsNormalization(float s)
 {
-	// Note: i forgot how i derived this :skull:
+	// I think this is an approximation to the gamma function
 	float a = sqrt(s);
 	return (s < 0.4) ? (0.5 / Pi) + s * (0.220636 + s * (-0.109 + s * 0.090)) : rsqrt(Pi) * (a * 0.5 + (1.0 / a) * 0.0625);
-}
-
-// Source: Christopher J. Horvath - Empirical Directional Wave Spectra for Computer Graphics
-float LonguetHigginsFunction(float s, float theta)
-{
-	return LonguetHigginsNormalization(s) * pow(abs(cos((theta - windAngle0 * TwoPi) / 2.0)), 2.0 * s);
 }
 
 // Source: Christopher J. Horvath - Empirical Directional Wave Spectra for Computer Graphics
@@ -166,10 +151,14 @@ float LonguetHigginsFunction(float s, float theta)
 float HasselmannDirectionalSpread(float w, float wp, float wind_speed, float theta)
 {
 	float p = w / wp;
+	
 	float sp = w >= wp ? 9.77 : 6.97;
-	float s = sp * pow(abs(p), (w >= wp) ? -2.33 - 1.45 * (wind_speed * wp / _OceanGravity - 1.17) : 4.06);
+	
+	float s = sp * pow(abs(w / wp), (w >= wp) ? -2.33 - 1.45 * (wind_speed * wp / _OceanGravity - 1.17) : 4.06);
 	float s_xi = 16.0 * tanh(wp / w) * swell0 * swell0;
-	return LonguetHigginsFunction(s + s_xi, theta);
+	s += s_xi;
+	
+	return LonguetHigginsNormalization(s) * pow(abs(cos((theta - windAngle0 * TwoPi) / 2.0)), 2.0 * s);
 }
 
 float GetSpectrumAmplitude(float2 k, float kLength, float rcpTileLength)
@@ -200,7 +189,7 @@ float GetSpectrumAmplitude(float2 k, float kLength, float rcpTileLength)
 		
 	//spectrum = PhillipsSpectrum(k, kLength, rcpTileLength) * d;
 	
-	return rcp(sqrt(2.0)) * spectrum;
+	return spectrum;
 }
 
 [numthreads(32, 32, 1)]
@@ -235,8 +224,8 @@ void Spectrum(uint3 id : SV_DispatchThreadID)
 		// Gaussian random numbers
 		float4 xi = GaussianFloat4(index);
 		
-		hkt.xy = xi.xy * GetSpectrumAmplitude(k * rcpKLength, kLength, rcpPatchSize);
-		hkt.zw = xi.zw * conj(GetSpectrumAmplitude(-k * rcpKLength, kLength, rcpPatchSize));
+		hkt.xy = rcp(sqrt(2.0)) * xi.xy * GetSpectrumAmplitude(k * rcpKLength, kLength, rcpPatchSize);
+		hkt.zw = rcp(sqrt(2.0)) * xi.zw * conj(GetSpectrumAmplitude(-k * rcpKLength, kLength, rcpPatchSize));
 	}
 	
 	OceanDispersionWrite[index] = wk;

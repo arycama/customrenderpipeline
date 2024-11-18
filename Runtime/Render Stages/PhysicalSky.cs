@@ -140,7 +140,23 @@ namespace Arycama.CustomRenderPipeline
 
         public void GenerateLookupTables()
         {
-            var atmospherePropertiesBuffer = renderGraph.SetConstantBuffer(new AtmosphereProperties(settings));
+            var atmospherePropertiesBuffer = renderGraph.SetConstantBuffer((
+                    rayleighScatter: settings.RayleighScatter / settings.EarthScale,
+                    mieScatter: settings.MieScatter / settings.EarthScale,
+                    ozoneAbsorption: settings.OzoneAbsorption / settings.EarthScale,
+                    mieAbsorption: settings.MieAbsorption / settings.EarthScale,
+                    groundColor: settings.GroundColor.linear.AsVector3(),
+                    miePhase: settings.MiePhase,
+                    rayleighHeight: settings.RayleighHeight * settings.EarthScale,
+                    mieHeight: settings.MieHeight * settings.EarthScale,
+                    ozoneWidth: settings.OzoneWidth * settings.EarthScale,
+                    ozoneHeight: settings.OzoneHeight * settings.EarthScale,
+                    planetRadius: settings.PlanetRadius * settings.EarthScale,
+                    atmosphereHeight: settings.AtmosphereHeight * settings.EarthScale,
+                    topRadius: (settings.PlanetRadius + settings.AtmosphereHeight) * settings.EarthScale,
+                    cloudScatter: settings.CloudScatter
+            ));
+
             var transmittanceRemap = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
             var multiScatterRemap = GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight);
             var groundAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientGroundWidth);
@@ -624,68 +640,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetVector(command, "SkyLuminanceSize", skyLuminanceSize);
                 pass.SetVector(command, "_SkyCdfSize", cdfLookupSize);
             }
-        }
-    }
-
-    public struct AtmosphereProperties
-    {
-        private Vector3 rayleighScatter;
-        private readonly float mieScatter;
-
-        private Vector3 ozoneAbsorption;
-        private readonly float mieAbsorption;
-
-        private Vector3 groundColor;
-        private readonly float miePhase;
-
-        private readonly float rayleighHeight;
-        private readonly float mieHeight;
-        private readonly float ozoneWidth;
-        private readonly float ozoneHeight;
-
-        private readonly float planetRadius;
-        private readonly float atmosphereHeight;
-        private readonly float topRadius;
-        private readonly float cloudScatter;
-
-        public AtmosphereProperties(PhysicalSky.Settings settings)
-        {
-            var wavelengthR = 6.8e-7;// 630.0f * 1e-9f;
-            var wavelengthG = 5.5e-7;// 532.0f * 1e-9f;
-            var wavelengthB = 4.4e-7;// 467.0f * 1e-9f;
-
-            //var wavelengthR = 6.3e-7;// 630.0f * 1e-9f;
-            //var wavelengthG = 5.32e-7;// 532.0f * 1e-9f;
-            //var wavelengthB = 4.67e-7;// 467.0f * 1e-9f;
-
-            var N = 0.02504e+27;
-            var n = 1.00029;
-
-            var K = 2.0 * Math.PI * Math.PI * Math.Pow(n * n - 1.0, 2.0) / (3.0 * N);
-            var sr = 4.0 * Math.PI * K / Math.Pow(wavelengthR, 4.0);
-            var sg = 4.0 * Math.PI * K / Math.Pow(wavelengthG, 4.0);
-            var sb = 4.0 * Math.PI * K / Math.Pow(wavelengthB, 4.0);
-
-            rayleighScatter = settings.RayleighScatter / settings.EarthScale;
-            //rayleighScatter = new Vector3((float)sr, (float)sg, (float)sb) / settings.EarthScale;
-
-            mieScatter = settings.MieScatter / settings.EarthScale;
-
-            ozoneAbsorption = settings.OzoneAbsorption / settings.EarthScale;
-            mieAbsorption = settings.MieAbsorption / settings.EarthScale;
-
-            groundColor = (Vector4)settings.GroundColor.linear;
-            miePhase = settings.MiePhase;
-
-            rayleighHeight = settings.RayleighHeight * settings.EarthScale;
-            mieHeight = settings.MieHeight * settings.EarthScale;
-            ozoneWidth = settings.OzoneWidth * settings.EarthScale;
-            ozoneHeight = settings.OzoneHeight * settings.EarthScale;
-
-            planetRadius = settings.PlanetRadius * settings.EarthScale;
-            atmosphereHeight = settings.AtmosphereHeight * settings.EarthScale;
-            topRadius = (settings.PlanetRadius + settings.AtmosphereHeight) * settings.EarthScale;
-            cloudScatter = settings.CloudScatter;
         }
     }
 }
