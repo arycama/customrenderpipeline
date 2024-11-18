@@ -12,6 +12,7 @@ namespace Arycama.CustomRenderPipeline
     public class RenderGraph : IDisposable
     {
         private readonly Dictionary<Type, Queue<RenderPass>> renderPassPool = new();
+        private readonly Dictionary<Type, Queue<RenderGraphBuilder>> builderPool = new();
         private readonly Dictionary<RenderTexture, RTHandle> importedTextures = new();
         private readonly Dictionary<GraphicsBuffer, BufferHandle> importedBuffers = new();
 
@@ -93,6 +94,29 @@ namespace Arycama.CustomRenderPipeline
         public void AddRenderPassInternal(RenderPass renderPass)
         {
             renderPasses.Add(renderPass);
+        }
+
+        public RenderGraphBuilder GetRenderGraphBuilder()
+        {
+            var pool = builderPool.GetOrAdd(typeof(RenderGraphBuilder));
+            if (!pool.TryDequeue(out var value))
+                value = new RenderGraphBuilder();
+
+            return value;
+        }
+
+        public RenderGraphBuilder<T> GetRenderGraphBuilder<T>()
+        {
+            var pool = builderPool.GetOrAdd(typeof(RenderGraphBuilder<T>));
+            if (!pool.TryDequeue(out var value))
+                value = new RenderGraphBuilder<T>();
+
+            return value as RenderGraphBuilder<T>;
+        }
+
+        public void ReleaseRenderGraphBuilder(RenderGraphBuilder builder)
+        {
+            builderPool[builder.GetType()].Enqueue(builder);
         }
 
         public void Execute(CommandBuffer command)

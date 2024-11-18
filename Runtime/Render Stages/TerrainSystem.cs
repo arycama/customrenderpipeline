@@ -497,45 +497,59 @@ namespace Arycama.CustomRenderPipeline
                     pass.AddRenderPassData<ICommonPassData>();
 
                     var index = i;
-                    pass.SetRenderFunction((command, pass) =>
+                    pass.SetRenderFunction(
+                    (
+                        viewPosition,
+                        cullingPlanes,
+                        indirectArgsBuffer,
+                        totalPassCount,
+                        isFirstPass,
+                        passCount,
+                        index,
+                        QuadListIndexCount,
+                        terrain,
+                        terrainData,
+                        settings
+                    ),
+                    (command, pass, data) =>
                     {
                         // First pass sets the buffer contents
-                        if (isFirstPass)
+                        if (data.isFirstPass)
                         {
                             var indirectArgs = ListPool<int>.Get();
-                            indirectArgs.Add(QuadListIndexCount); // index count per instance
+                            indirectArgs.Add(data.QuadListIndexCount); // index count per instance
                             indirectArgs.Add(0); // instance count (filled in later)
                             indirectArgs.Add(0); // start index location
                             indirectArgs.Add(0); // base vertex location
                             indirectArgs.Add(0); // start instance location
-                            command.SetBufferData(indirectArgsBuffer, indirectArgs);
+                            command.SetBufferData(data.indirectArgsBuffer, indirectArgs);
                             ListPool<int>.Release(indirectArgs);
                         }
 
                         // Do up to 6 passes per dispatch.
-                        pass.SetInt(command, "_PassCount", passCount);
-                        pass.SetInt(command, "_PassOffset", 6 * index);
-                        pass.SetInt(command, "_TotalPassCount", totalPassCount);
+                        pass.SetInt(command, "_PassCount", data.passCount);
+                        pass.SetInt(command, "_PassOffset", 6 * data.index);
+                        pass.SetInt(command, "_TotalPassCount", data.totalPassCount);
 
-                        var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
-                        for (var i = 0; i < cullingPlanes.Count; i++)
-                            cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
+                        var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
+                        for (var i = 0; i < data.cullingPlanes.Count; i++)
+                            cullingPlanesArray[i] = data.cullingPlanes.GetCullingPlaneVector4(i);
 
                         pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
                         ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                         // Snap to quad-sized increments on largest cell
-                        var position = terrain.GetPosition() - viewPosition;
-                        var positionOffset = new Vector4(terrainData.size.x, terrainData.size.z, position.x, position.z);
+                        var position = data.terrain.GetPosition() - data.viewPosition;
+                        var positionOffset = new Vector4(data.terrainData.size.x, data.terrainData.size.z, position.x, position.z);
                         pass.SetVector(command, "_TerrainPositionOffset", positionOffset);
 
-                        pass.SetFloat(command, "_EdgeLength", (float)settings.EdgeLength * settings.PatchVertices);
-                        pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
+                        pass.SetFloat(command, "_EdgeLength", (float)data.settings.EdgeLength * data.settings.PatchVertices);
+                        pass.SetInt(command, "_CullingPlanesCount", data.cullingPlanes.Count);
 
-                        pass.SetFloat(command, "_InputScale", terrainData.size.y);
+                        pass.SetFloat(command, "_InputScale", data.terrainData.size.y);
                         pass.SetFloat(command, "_InputOffset", position.y);
 
-                        pass.SetInt(command, "_MipCount", Texture2DExtensions.MipCount(terrainData.heightmapResolution) - 1);
+                        pass.SetInt(command, "_MipCount", Texture2DExtensions.MipCount(data.terrainData.heightmapResolution) - 1);
                     });
                 }
             }
