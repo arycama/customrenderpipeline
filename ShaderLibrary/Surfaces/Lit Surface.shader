@@ -157,7 +157,7 @@
             HLSLPROGRAM
             #pragma raytracing RayTracing
 			#pragma shader_feature_local TRIPLANAR_ON
-            #pragma multi_compile _ WATER_SHADOW_ON
+            #pragma multi_compile _ UNDERWATER_LIGHTING_ON
             #include "LitSurfaceRaytracing.hlsl"
             ENDHLSL
         }

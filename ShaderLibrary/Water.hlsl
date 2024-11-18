@@ -70,6 +70,11 @@ cbuffer UnityPerMaterial
 	float4 _FoamTex_ST;
 };
 
+Buffer<uint> _PatchData;
+uint _VerticesPerEdge, _VerticesPerEdgeMinusOne;
+float4 _PatchScaleOffset;
+float _RcpVerticesPerEdgeMinusOne;
+
 HullInput Vertex(VertexInput input)
 {
 	uint col = input.vertexID % _VerticesPerEdge;

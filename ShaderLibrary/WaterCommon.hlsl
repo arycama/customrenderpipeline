@@ -1,4 +1,7 @@
-﻿#include "Atmosphere.hlsl"
+﻿#ifndef WATER_COMMON_INCLUDED
+#define WATER_COMMON_INCLUDED
+
+#include "Atmosphere.hlsl"
 #include "Common.hlsl"
 #include "Material.hlsl"
 #include "Geometry.hlsl"
@@ -31,18 +34,21 @@ float4 _OceanTerrainMask_ST;
 float4 _OceanTerrainMask_TexelSize;
 float3 _TerrainSize;
 float _MaxOceanDepth, _MaxShoreDistance, CausticsScale, _OceanCascadeScale;
-float4 _PatchScaleOffset;
 
-float _RcpVerticesPerEdgeMinusOne;
 float _ShoreWaveSteepness;
 float _ShoreWaveHeight;
 float _ShoreWaveLength;
 float _ShoreWindAngle;
 float _ShoreWaveWindSpeed;
 float _ShoreWaveWindAngle;
-uint _VerticesPerEdge, _VerticesPerEdgeMinusOne;
 
-Buffer<uint> _PatchData;
+Texture2D<float> _WaterShadows;
+matrix _WaterShadowMatrix1;
+float3 _WaterShadowExtinction;
+float _WaterShadowFar;
+
+float CausticsCascade, CausticsDepth;
+Texture2D<float3> OceanCaustics;
 
 bool CheckTerrainMask(float3 p0, float3 p1, float3 p2, float3 p3)
 {
@@ -121,3 +127,35 @@ void GerstnerWaves(float3 worldPosition, float time, out float3 displacement, ou
 	// We return the partial derivatives directly for blending with the ocean waves
 	normal = -frequency * amplitude * float3(shoreDirection * cosFactor, steepness * sinFactor).xzy;
 }
+
+float3 GetCaustics(float3 worldPosition, float3 L, bool sampleLevel = false)
+{
+	float3 hit = IntersectRayPlane(worldPosition, L, float3(0, -CausticsDepth, 0), float3(0, 1, 0));
+	float2 causticsUv = hit.xz * _OceanScale[CausticsCascade];
+	
+#ifdef SHADER_STAGE_RAYTRACING
+	float3 caustics = OceanCaustics.SampleLevel(_LinearRepeatSampler, causticsUv, 0.0);
+#else
+	//float3 caustics = OceanCaustics.Sample(_TrilinearRepeatSampler, causticsUv);
+	float3 caustics = OceanCaustics.SampleLevel(_LinearRepeatSampler, causticsUv, 0.0);
+#endif
+	
+	//return caustics;
+	
+	return lerp(caustics, 1.0, saturate(1.0 - -worldPosition.y / CausticsDepth));
+}
+
+float3 WaterShadow(float3 position, float3 L, bool sampleLevel = false)
+{
+	float shadowDistance = max(0.0, -_ViewPosition.y - position.y) / max(1e-6, saturate(L.y));
+	float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, position);
+	if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
+	{
+		float shadowDepth = _WaterShadows.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);
+		shadowDistance = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
+	}
+	
+	return exp(-_WaterShadowExtinction * shadowDistance) * GetCaustics(position + _ViewPosition, L, sampleLevel);
+}
+
+#endif

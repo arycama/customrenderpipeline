@@ -157,33 +157,32 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float3 luminance = 0.0;
 	float planetDistance = DistanceToNearestAtmosphereBoundary(_ViewHeight, -V.y);
 	
-	#if defined(LIGHT_COUNT_ONE) || defined(LIGHT_COUNT_TWO)
-		float LdotV = dot(_LightDirection0, -V);
-		if (_LightDirection0.y > 0.0)
+	float LdotV = dot(_LightDirection0, -V);
+	if (_LightDirection0.y > 0.0)
+	{
+		float attenuation = GetShadow(P, 0, false);
+		if (attenuation > 0.0)
 		{
-			float attenuation = GetShadow(P, 0, false);
+			attenuation *= CloudTransmittance(P);
 			if (attenuation > 0.0)
 			{
-				attenuation *= CloudTransmittance(P);
-				if (attenuation > 0.0)
+				float shadowDistance0 = max(0.0, worldPosition.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
+				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, P);
+				if (all(saturate(shadowPosition.xyz) == shadowPosition.xyz))
 				{
-					float shadowDistance0 = max(0.0, worldPosition.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
-					float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, P);
-					if (all(saturate(shadowPosition.xyz) == shadowPosition.xyz))
-					{
-						float shadowDepth = _WaterShadows.Sample(_LinearClampSampler, shadowPosition.xy);
-						shadowDistance0 = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
-					}
-				
-					float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
-					float LdotV0 = dot(_LightDirection0, -underwaterV);
-					float phase = lerp(MiePhase(LdotV0, -0.3), MiePhase(LdotV0, 0.85), asymmetry);
-					float3 lightColor0 = phase * _LightColor0 * TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
-					luminance += lightColor0 * attenuation * asymmetry;
+					float shadowDepth = _WaterShadows.Sample(_LinearClampSampler, shadowPosition.xy);
+					shadowDistance0 = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
 				}
+				
+				float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
+				float LdotV0 = dot(_LightDirection0, -underwaterV);
+				float phase = lerp(MiePhase(LdotV0, -0.3), MiePhase(LdotV0, 0.85), asymmetry);
+				float3 lightColor0 = phase * _LightColor0 * TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
+				lightColor0 *= GetCaustics(P + _ViewPosition, _LightDirection0);
+				luminance += lightColor0 * attenuation * asymmetry;
 			}
 		}
-	#endif
+	}
 	
 	luminance *= _Extinction * weight * _Exposure;
 	
@@ -206,7 +205,10 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		if(!isCriticalAngle)
 		{
 			if(underwaterDepth)
+			{
 				underwater = _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit));
+				//underwater *= GetCaustics(underwaterPositionWS + _ViewPosition);
+			}
 		
 			if (isFrontFace)
 			{

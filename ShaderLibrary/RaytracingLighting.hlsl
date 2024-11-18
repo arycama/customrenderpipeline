@@ -68,9 +68,9 @@ float3 RaytracedLighting(float3 N, float3 f0, float perceptualRoughness, float o
 		if (!attenuation)
 			continue;
 			
-		#ifdef WATER_SHADOW_ON
+		#ifdef UNDERWATER_LIGHTING_ON
 			if(i == 0)
-				light.color *= WaterShadow(worldPosition, light.direction);
+				light.color *= WaterShadow(worldPosition, light.direction, true);
 		#endif
 			
 		#if 0

@@ -27,6 +27,10 @@ namespace Arycama.CustomRenderPipeline.Water
             [field: SerializeField, Tooltip("Size of the Mesh in World Space")] public int Size { get; private set; } = 256;
             [field: SerializeField] public int PatchVertices { get; private set; } = 32;
             [field: SerializeField, Range(1, 128)] public float EdgeLength { get; private set; } = 64;
+            [field: SerializeField] public int CasuticsResolution { get; private set; } = 256;
+            [field: SerializeField, Range(0, 3)] public int CasuticsCascade { get; private set; } = 0;
+            [field: SerializeField, Min(0)] public float CausticsDepth { get; private set; } = 10;
+
         }
 
         private readonly Settings settings;
@@ -36,6 +40,7 @@ namespace Arycama.CustomRenderPipeline.Water
         private readonly WaterFft waterFft;
         private readonly UnderwaterLighting underwaterLighting;
         private readonly DeferredWater deferredWater;
+        private readonly WaterCaustics caustics;
 
         private int VerticesPerTileEdge => settings.PatchVertices + 1;
         private int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
@@ -81,6 +86,7 @@ namespace Arycama.CustomRenderPipeline.Water
             waterFft = new(renderGraph, settings);
             underwaterLighting = new(renderGraph, settings);
             deferredWater = new(renderGraph, settings);
+            caustics = new(renderGraph, settings);
         }
 
         ~WaterSystem()
@@ -90,8 +96,11 @@ namespace Arycama.CustomRenderPipeline.Water
 
         public void UpdateFft(double time)
         {
-            if (settings.IsEnabled)
-                waterFft.Render(time);
+            if (!settings.IsEnabled)
+                return;
+
+            waterFft.Render(time);
+            caustics.Render();
         }
 
         public void CullShadow(Vector3 viewPosition, CullingResults cullingResults)

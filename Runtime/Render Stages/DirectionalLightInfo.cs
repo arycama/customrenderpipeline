@@ -5,7 +5,7 @@ namespace Arycama.CustomRenderPipeline
 {
     public readonly struct DirectionalLightInfo : IRenderPassData
     {
-        private readonly Vector3 lightDirection0, lightColor0, lightDirection1, lightColor1;
+        public readonly Vector3 lightDirection0, lightColor0, lightDirection1, lightColor1;
         public int LightCount { get; }
 
         public DirectionalLightInfo(Vector3 lightDirection0, Vector3 lightColor0, Vector3 lightDirection1, Vector3 lightColor1, int lightCount)

@@ -52,6 +52,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.AddRenderPassData<OceanFftResult>();
                 pass.AddRenderPassData<WaterShoreMask.Result>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<CausticsResult>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -99,6 +100,8 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.AddRenderPassData<WaterShadowResult>();
                     pass.AddRenderPassData<WaterPrepassResult>();
                     pass.AddRenderPassData<ICommonPassData>();
+                    pass.AddRenderPassData<OceanFftResult>();
+                    pass.AddRenderPassData<CausticsResult>();
 
                     pass.SetRenderFunction((command, pass) =>
                     {
@@ -106,7 +109,7 @@ namespace Arycama.CustomRenderPipeline.Water
                         //command.ClearRenderTarget(false, true, Color.clear);
                         //command.SetRenderTarget(scatterResult);
                         //command.ClearRenderTarget(false, true, Color.clear);
-                        command.EnableShaderKeyword("WATER_SHADOW_ON");
+                        command.EnableShaderKeyword("UNDERWATER_LIGHTING_ON");
                     });
                 }
 
@@ -128,6 +131,8 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.AddRenderPassData<WaterShadowResult>();
                     pass.AddRenderPassData<DirectionalLightInfo>();
                     pass.AddRenderPassData<ICommonPassData>();
+                    pass.AddRenderPassData<OceanFftResult>();
+                    pass.AddRenderPassData<CausticsResult>();
 
                     pass.SetRenderFunction((command, pass) =>
                     {
@@ -143,7 +148,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 {
                     pass.SetRenderFunction((command, pass) =>
                     {
-                        command.DisableShaderKeyword("WATER_SHADOW_ON");
+                        command.DisableShaderKeyword("UNDERWATER_LIGHTING_ON");
                     });
                 }
             }

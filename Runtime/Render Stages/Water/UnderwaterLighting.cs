@@ -41,6 +41,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.AddRenderPassData<WaterShadowResult>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<CausticsResult>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {

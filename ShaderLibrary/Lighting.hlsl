@@ -7,6 +7,7 @@
 #include "Exposure.hlsl"
 #include "ImageBasedLighting.hlsl"
 #include "Temporal.hlsl"
+#include "WaterCommon.hlsl"
 
 // TODO: Move to shadow.hlsl
 StructuredBuffer<float4> _DirectionalShadowTexelSizes;
@@ -269,28 +270,8 @@ float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow)
 	return GetShadow(worldPosition, lightIndex, softShadow, validShadow);
 }
 
-
-Texture2D<float> _WaterShadows;
-matrix _WaterShadowMatrix1;
-float3 _WaterShadowExtinction;
-float _WaterShadowFar;
-
-float3 WaterShadow(float3 position, float3 L)
-{
-	float shadowDistance = max(0.0, -_ViewPosition.y - position.y) / max(1e-6, saturate(L.y));
-	float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, position);
-	if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
-	{
-		float shadowDepth = _WaterShadows.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);
-		shadowDistance = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
-	}
-	
-	return exp(-_WaterShadowExtinction * shadowDistance);
-}
-
 Texture2D<float3> ScreenSpaceReflections;
 float4 ScreenSpaceReflectionsScaleLimit;
-
 
 // Computes the squared magnitude of the vector computed by MapCubeToSphere().
 float ComputeCubeToSphereMapSqMagnitude(float3 v)
@@ -555,7 +536,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 			luminance += light.color * lightTransmittance * (_Exposure * attenuation);
 		else
 		{
-			#ifdef WATER_SHADOW_ON
+			#ifdef UNDERWATER_LIGHTING_ON
 			if(i == 0)
 				light.color *= WaterShadow(input.worldPosition, L);
 			#endif

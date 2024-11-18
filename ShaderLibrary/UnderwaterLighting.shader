@@ -21,7 +21,7 @@ Shader "Hidden/Underwater Lighting 1"
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #pragma target 5.0
-            #define WATER_SHADOW_ON
+            #define UNDERWATER_LIGHTING_ON
 
             #include "UnderwaterLighting.hlsl"
 

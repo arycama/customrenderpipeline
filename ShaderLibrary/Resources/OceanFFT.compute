@@ -78,13 +78,13 @@ float PhillipsSpectrum(float2 k, float kLength, float rcpPatchSize)
 	float phillips = a * exp(-rcp(Sq(kLength * maxWaveHeight))) / pow(kLength, 4.0) * pow(dot(k, windDirection), 2.0);
 	
 	// Remove small wavelengths (eq 41)
-	//phillips *= exp(-Sq(kLength * OceanShortWavesFade));
+	phillips *= exp(-Sq(kLength * OceanShortWavesFade));
 	
 	phillips = sqrt(phillips);
 	
 	// Move waves along wind direction
-	//if (dot(k, windDirection) < 0.0)
-	//	phillips *= -sqrt(1.0 - OceanSwell);
+	if (dot(k, windDirection) < 0.0)
+		phillips *= -sqrt(1.0 - OceanSwell);
 
 	return phillips;
 }
@@ -171,7 +171,7 @@ float GetSpectrumAmplitude(float2 k, float kLength, float rcpTileLength)
 	//if (dot(k, windDirection) < 0.0)
 	//	spectrum *= -sqrt(1.0 - OceanSwell);
 		
-	//spectrum = PhillipsSpectrum(k, kLength, rcpTileLength) * d;
+	spectrum = PhillipsSpectrum(k, kLength, rcpTileLength);
 	
 	return spectrum;
 }
