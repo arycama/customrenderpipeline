@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Runtime.InteropServices;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
@@ -63,9 +62,8 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-
-        const float ReflectedLightMeterConstant = 12.5f;
-        const float Sensitivity = 100.0f;
+        private const float ReflectedLightMeterConstant = 12.5f;
+        private const float Sensitivity = 100.0f;
 
         public static float LuminanceToEV100(float luminance)
         {

@@ -228,7 +228,7 @@ namespace Arycama.CustomRenderPipeline
                         maxValue = Vector3.Max(maxValue, localPoint);
 
                         // Also raycast each point against the outer planet sphere in the light direction
-                        if(GeometryUtilities.IntersectRaySphere(worldPoint - planetCenter, lightDirection, planetRadius + settings.StartHeight + settings.LayerThickness, out var hits) && hits.y > 0.0f)
+                        if (GeometryUtilities.IntersectRaySphere(worldPoint - planetCenter, lightDirection, planetRadius + settings.StartHeight + settings.LayerThickness, out var hits) && hits.y > 0.0f)
                         {
                             var worldPoint1 = worldPoint + lightDirection * hits.y;
                             var localPoint1 = worldToLight * worldPoint1;
@@ -261,7 +261,7 @@ namespace Arycama.CustomRenderPipeline
             var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32);
             var cloudShadowDataBuffer = renderGraph.SetConstantBuffer((invViewProjection, -lightDirection, 1f / depth, 1f / settings.Density, settings.ShadowSamples, 0.0f, 0.0f));
 
-            using(var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Cloud Shadow"))
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Cloud Shadow"))
             {
                 pass.Initialize(material, 3);
                 pass.WriteTexture(cloudShadow, RenderBufferLoadAction.DontCare);
@@ -363,11 +363,11 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Render"))
             {
                 // Determine pass
-                string keyword = string.Empty;
+                var keyword = string.Empty;
                 var viewHeight1 = camera.transform.position.y;
-                if(viewHeight > settings.StartHeight)
+                if (viewHeight > settings.StartHeight)
                 {
-                    if(viewHeight1 > settings.StartHeight + settings.LayerThickness)
+                    if (viewHeight1 > settings.StartHeight + settings.LayerThickness)
                     {
                         keyword = "ABOVE_CLOUD_LAYER";
                     }

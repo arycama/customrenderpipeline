@@ -3,9 +3,9 @@ using UnityEngine;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public struct Matrix3x4
+    public readonly struct Matrix3x4
     {
-        float m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23;
+        private readonly float m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23;
 
         public readonly float this[int index]
         {

@@ -8,13 +8,13 @@ namespace Arycama.CustomRenderPipeline
 {
     public class PersistentRTHandleCache
     {
-        private Dictionary<Camera, RTHandle> textureCache = new();
+        private readonly Dictionary<Camera, RTHandle> textureCache = new();
 
-        private GraphicsFormat format;
-        private TextureDimension dimension;
+        private readonly GraphicsFormat format;
+        private readonly TextureDimension dimension;
 
-        private bool hasMips;
-        private string name;
+        private readonly bool hasMips;
+        private readonly string name;
 
         public RenderGraph renderGraph;
 
@@ -33,7 +33,7 @@ namespace Arycama.CustomRenderPipeline
             var wasCreated = !textureCache.TryGetValue(camera, out var history);
             if (wasCreated)
             {
-                switch(dimension)
+                switch (dimension)
                 {
                     case TextureDimension.Tex2D:
                         history = renderGraph.EmptyTexture;

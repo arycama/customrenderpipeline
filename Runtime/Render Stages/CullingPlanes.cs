@@ -31,7 +31,7 @@ namespace Arycama.CustomRenderPipeline
 
             fixed (byte* ptr = cullingPlanes)
             {
-                Plane* ptr2 = (Plane*)ptr;
+                var ptr2 = (Plane*)ptr;
                 return ptr2[index];
             }
         }
@@ -43,7 +43,7 @@ namespace Arycama.CustomRenderPipeline
 
             fixed (byte* ptr = cullingPlanes)
             {
-                Vector4* ptr2 = (Vector4*)ptr;
+                var ptr2 = (Vector4*)ptr;
                 return ptr2[index];
             }
         }
@@ -55,7 +55,7 @@ namespace Arycama.CustomRenderPipeline
 
             fixed (byte* ptr = cullingPlanes)
             {
-                Plane* ptr2 = (Plane*)ptr;
+                var ptr2 = (Plane*)ptr;
                 ptr2[index] = plane;
             }
         }

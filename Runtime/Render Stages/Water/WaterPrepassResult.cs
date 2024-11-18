@@ -6,7 +6,7 @@ namespace Arycama.CustomRenderPipeline.Water
 {
     public struct WaterPrepassResult : IRenderPassData
     {
-        private RTHandle waterNormalFoam, waterTriangleNormal;
+        private readonly RTHandle waterNormalFoam, waterTriangleNormal;
         private Vector3 albedo, extinction;
 
         public WaterPrepassResult(RTHandle waterNormalFoam, RTHandle waterTriangleNormal, Vector3 albedo, Vector3 extinction)

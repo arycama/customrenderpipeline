@@ -16,17 +16,17 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public LayerMask RaytracingLayers { get; private set; } = 0;
         }
 
-        private RenderGraph renderGraph;
+        private readonly RenderGraph renderGraph;
         private RayTracingAccelerationStructure rtas;
         private RayTracingInstanceCullingConfig config;
-        private Settings settings;
+        private readonly Settings settings;
 
         public RaytracingSystem(RenderGraph renderGraph, Settings settings)
         {
             this.settings = settings;
             this.renderGraph = renderGraph;
 
-            RayTracingAccelerationStructure.RASSettings rasSettings = new RayTracingAccelerationStructure.RASSettings
+            var rasSettings = new RayTracingAccelerationStructure.RASSettings
             {
                 rayTracingModeMask = RayTracingAccelerationStructure.RayTracingModeMask.Everything,
                 managementMode = RayTracingAccelerationStructure.ManagementMode.Manual,
@@ -75,11 +75,11 @@ namespace Arycama.CustomRenderPipeline
                 return;
 
             rtas.ClearInstances();
-            rtas.CullInstances(ref config);
+            _ = rtas.CullInstances(ref config);
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("RTAS Update"))
             {
-                pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                _ = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     command.BuildRayTracingAccelerationStructure(rtas);
                 });

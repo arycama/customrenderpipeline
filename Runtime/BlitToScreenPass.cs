@@ -5,7 +5,7 @@ namespace Arycama.CustomRenderPipeline
 {
     public class BlitToScreenPass : RenderPass
     {
-        private MaterialPropertyBlock propertyBlock;
+        private readonly MaterialPropertyBlock propertyBlock;
         private Material material;
         private int passIndex;
 

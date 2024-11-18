@@ -22,8 +22,8 @@ public class DiffuseGlobalIllumination
     private readonly Material material;
     private readonly Settings settings;
 
-    private PersistentRTHandleCache temporalCache;
-    private RayTracingShader raytracingShader;
+    private readonly PersistentRTHandleCache temporalCache;
+    private readonly RayTracingShader raytracingShader;
 
     public DiffuseGlobalIllumination(RenderGraph renderGraph, Settings settings)
     {
@@ -51,7 +51,7 @@ public class DiffuseGlobalIllumination
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TerrainRenderData>(true);
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
-                pass.AddRenderPassData<ShadowRenderer.Result>(); 
+                pass.AddRenderPassData<ShadowRenderer.Result>();
                 commonPassData.SetInputs(pass);
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
@@ -198,10 +198,10 @@ public class DiffuseGlobalIllumination
     {
     }
 
-    public struct Result : IRenderPassData
+    public readonly struct Result : IRenderPassData
     {
         public RTHandle ScreenSpaceGlobalIllumination { get; }
-        private float intensity;
+        private readonly float intensity;
 
         public Result(RTHandle screenSpaceGlobalIllumination, float intensity)
         {

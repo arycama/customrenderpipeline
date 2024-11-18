@@ -3,9 +3,9 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public struct UnderwaterLightingResult : IRenderPassData
+    public readonly struct UnderwaterLightingResult : IRenderPassData
     {
-        private RTHandle underwaterLighting;
+        private readonly RTHandle underwaterLighting;
 
         public UnderwaterLightingResult(RTHandle waterNormalFoam)
         {

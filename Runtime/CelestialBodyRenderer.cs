@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class CelestialBodyRenderer
 {
-    private RenderGraph renderGraph;
+    private readonly RenderGraph renderGraph;
 
     public CelestialBodyRenderer(RenderGraph renderGraph)
     {

@@ -1,6 +1,6 @@
-﻿public struct OceanData
+﻿public readonly struct OceanData
 {
-    private float windSpeed, windAngle, fetch, spreadBlend, swell, peakEnhancement, shortWavesFade;
+    private readonly float windSpeed, windAngle, fetch, spreadBlend, swell, peakEnhancement, shortWavesFade;
 
     public OceanData(float windSpeed, float windAngle, float fetch, float spreadBlend, float swell, float peakEnhancement, float shortWavesFade)
     {

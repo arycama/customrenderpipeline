@@ -1,7 +1,5 @@
-﻿using GluonGui.Dialog;
-using System;
+﻿using System;
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -76,7 +74,7 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.Apply(false, false);
         }
 
-        class Pass0Data
+        private class Pass0Data
         {
             internal float minEv, maxEv, adaptationSpeed, exposureCompensation, iso, aperture, shutterSpeed, histogramMin, histogramMax;
             internal Vector4 exposureCompensationRemap;
@@ -84,7 +82,7 @@ namespace Arycama.CustomRenderPipeline
             internal Vector4 scaledResolution;
         }
 
-        class Pass1Data
+        private class Pass1Data
         {
             internal Texture2D exposureTexture;
             internal BufferHandle exposureBuffer;
@@ -92,7 +90,7 @@ namespace Arycama.CustomRenderPipeline
             internal bool isFirst;
         }
 
-        class Pass2Data
+        private class Pass2Data
         {
             internal BufferHandle output;
         }
@@ -222,7 +220,7 @@ namespace Arycama.CustomRenderPipeline
             internal BufferHandle bufferHandle;
         }
 
-        public struct AutoExposureData : IRenderPassData
+        public readonly struct AutoExposureData : IRenderPassData
         {
             public BufferHandle exposureBuffer { get; }
             public bool IsFirst { get; }

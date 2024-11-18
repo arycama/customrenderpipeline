@@ -16,35 +16,35 @@ namespace Arycama.CustomRenderPipeline
             var type = (LightType)settings.lightType.enumValueIndex;
             if (type == LightType.Spot)
             {
-                EditorGUILayout.PropertyField(settings.lightShape);
+                _ = EditorGUILayout.PropertyField(settings.lightShape);
                 settings.DrawInnerAndOuterSpotAngle();
             }
 
-            serializedObject.ApplyModifiedProperties();
+            _ = serializedObject.ApplyModifiedProperties();
             base.OnInspectorGUI();
         }
 
-        static float SliderLineHandle(Vector3 position, Vector3 direction, float value)
+        private static float SliderLineHandle(Vector3 position, Vector3 direction, float value)
         {
             return SliderLineHandle(GUIUtility.GetControlID(FocusType.Passive), position, direction, value, "");
         }
 
-        static void DrawHandleLabel(Vector3 handlePosition, string labelText, float offsetFromHandle = 0.3f)
+        private static void DrawHandleLabel(Vector3 handlePosition, string labelText, float offsetFromHandle = 0.3f)
         {
-            Vector3 labelPosition = Vector3.zero;
+            _ = Vector3.zero;
 
             var style = new GUIStyle { normal = { background = Texture2D.whiteTexture } };
             GUI.color = new Color(0.82f, 0.82f, 0.82f, 1);
 
-            labelPosition = handlePosition + Handles.inverseMatrix.MultiplyVector(Vector3.up) * HandleUtility.GetHandleSize(handlePosition) * offsetFromHandle;
+            var labelPosition = handlePosition + Handles.inverseMatrix.MultiplyVector(Vector3.up) * HandleUtility.GetHandleSize(handlePosition) * offsetFromHandle;
             Handles.Label(labelPosition, labelText, style);
         }
 
-        static float SliderLineHandle(int id, Vector3 position, Vector3 direction, float value, string labelText = "")
+        private static float SliderLineHandle(int id, Vector3 position, Vector3 direction, float value, string labelText = "")
         {
-            Vector3 pos = position + direction * value;
-            float sizeHandle = HandleUtility.GetHandleSize(pos);
-            bool temp = GUI.changed;
+            var pos = position + direction * value;
+            var sizeHandle = HandleUtility.GetHandleSize(pos);
+            var temp = GUI.changed;
             GUI.changed = false;
             pos = Handles.Slider(id, pos, direction, sizeHandle * 0.03f, Handles.DotHandleCap, 0f);
             if (GUI.changed)
@@ -64,27 +64,27 @@ namespace Arycama.CustomRenderPipeline
         }
 
         //TODO: decompose arguments (or tuples) + put back to CoreLightEditorUtilities
-        static void DrawOrthoFrustumWireframe(Vector4 widthHeightMaxRangeMinRange, float distanceTruncPlane = 0f)
+        private static void DrawOrthoFrustumWireframe(Vector4 widthHeightMaxRangeMinRange, float distanceTruncPlane = 0f)
         {
-            float halfWidth = widthHeightMaxRangeMinRange.x * 0.5f;
-            float halfHeight = widthHeightMaxRangeMinRange.y * 0.5f;
-            float maxRange = widthHeightMaxRangeMinRange.z;
-            float minRange = widthHeightMaxRangeMinRange.w;
+            var halfWidth = widthHeightMaxRangeMinRange.x * 0.5f;
+            var halfHeight = widthHeightMaxRangeMinRange.y * 0.5f;
+            var maxRange = widthHeightMaxRangeMinRange.z;
+            var minRange = widthHeightMaxRangeMinRange.w;
 
-            Vector3 sizeX = new Vector3(halfWidth, 0, 0);
-            Vector3 sizeY = new Vector3(0, halfHeight, 0);
-            Vector3 nearEnd = new Vector3(0, 0, minRange);
-            Vector3 farEnd = new Vector3(0, 0, maxRange);
+            var sizeX = new Vector3(halfWidth, 0, 0);
+            var sizeY = new Vector3(0, halfHeight, 0);
+            var nearEnd = new Vector3(0, 0, minRange);
+            var farEnd = new Vector3(0, 0, maxRange);
 
-            Vector3 s1 = nearEnd + sizeX + sizeY;
-            Vector3 s2 = nearEnd - sizeX + sizeY;
-            Vector3 s3 = nearEnd - sizeX - sizeY;
-            Vector3 s4 = nearEnd + sizeX - sizeY;
+            var s1 = nearEnd + sizeX + sizeY;
+            var s2 = nearEnd - sizeX + sizeY;
+            var s3 = nearEnd - sizeX - sizeY;
+            var s4 = nearEnd + sizeX - sizeY;
 
-            Vector3 e1 = farEnd + sizeX + sizeY;
-            Vector3 e2 = farEnd - sizeX + sizeY;
-            Vector3 e3 = farEnd - sizeX - sizeY;
-            Vector3 e4 = farEnd + sizeX - sizeY;
+            var e1 = farEnd + sizeX + sizeY;
+            var e2 = farEnd - sizeX + sizeY;
+            var e3 = farEnd - sizeX - sizeY;
+            var e4 = farEnd + sizeX - sizeY;
 
             Handles.DrawLine(s1, s2);
             Handles.DrawLine(s2, s3);
@@ -103,11 +103,11 @@ namespace Arycama.CustomRenderPipeline
 
             if (distanceTruncPlane > 0f)
             {
-                Vector3 truncPoint = new Vector3(0, 0, distanceTruncPlane);
-                Vector3 t1 = truncPoint + sizeX + sizeY;
-                Vector3 t2 = truncPoint - sizeX + sizeY;
-                Vector3 t3 = truncPoint - sizeX - sizeY;
-                Vector3 t4 = truncPoint + sizeX - sizeY;
+                var truncPoint = new Vector3(0, 0, distanceTruncPlane);
+                var t1 = truncPoint + sizeX + sizeY;
+                var t2 = truncPoint - sizeX + sizeY;
+                var t3 = truncPoint - sizeX - sizeY;
+                var t4 = truncPoint + sizeX - sizeY;
 
                 Handles.DrawLine(t1, t2);
                 Handles.DrawLine(t2, t3);
@@ -117,13 +117,13 @@ namespace Arycama.CustomRenderPipeline
         }
 
         //TODO: decompose arguments (or tuples) + put back to CoreLightEditorUtilities
-        static Vector4 DrawOrthoFrustumHandle(Vector4 widthHeightMaxRangeMinRange, bool useNearHandle)
+        private static Vector4 DrawOrthoFrustumHandle(Vector4 widthHeightMaxRangeMinRange, bool useNearHandle)
         {
-            float halfWidth = widthHeightMaxRangeMinRange.x * 0.5f;
-            float halfHeight = widthHeightMaxRangeMinRange.y * 0.5f;
-            float maxRange = widthHeightMaxRangeMinRange.z;
-            float minRange = widthHeightMaxRangeMinRange.w;
-            Vector3 farEnd = new Vector3(0, 0, maxRange);
+            var halfWidth = widthHeightMaxRangeMinRange.x * 0.5f;
+            var halfHeight = widthHeightMaxRangeMinRange.y * 0.5f;
+            var maxRange = widthHeightMaxRangeMinRange.z;
+            var minRange = widthHeightMaxRangeMinRange.w;
+            var farEnd = new Vector3(0, 0, maxRange);
 
             if (useNearHandle)
             {
@@ -152,11 +152,11 @@ namespace Arycama.CustomRenderPipeline
         }
 
         //copy of CoreLightEditorUtilities
-        static Vector3[] GetFrustrumProjectedRectAngles(float distance, float aspect, float tanFOV)
+        private static Vector3[] GetFrustrumProjectedRectAngles(float distance, float aspect, float tanFOV)
         {
             Vector3 sizeX;
             Vector3 sizeY;
-            float minXYTruncSize = distance * tanFOV;
+            var minXYTruncSize = distance * tanFOV;
             if (aspect >= 1.0f)
             {
                 sizeX = new Vector3(minXYTruncSize * aspect, 0, 0);
@@ -168,7 +168,7 @@ namespace Arycama.CustomRenderPipeline
                 sizeY = new Vector3(0, minXYTruncSize / aspect, 0);
             }
 
-            Vector3 center = new Vector3(0, 0, distance);
+            var center = new Vector3(0, 0, distance);
             Vector3[] angles =
             {
             center + sizeX + sizeY,
@@ -180,10 +180,10 @@ namespace Arycama.CustomRenderPipeline
             return angles;
         }
 
-        static Vector3[] GetSphericalProjectedRectAngles(float distance, float aspect, float tanFOV)
+        private static Vector3[] GetSphericalProjectedRectAngles(float distance, float aspect, float tanFOV)
         {
             var angles = GetFrustrumProjectedRectAngles(distance, aspect, tanFOV);
-            for (int index = 0; index < 4; ++index)
+            for (var index = 0; index < 4; ++index)
                 angles[index] = angles[index].normalized * distance;
             return angles;
         }
@@ -191,13 +191,13 @@ namespace Arycama.CustomRenderPipeline
         //TODO: decompose arguments (or tuples) + put back to CoreLightEditorUtilities
         // Same as Gizmo.DrawFrustum except that when aspect is below one, fov represent fovX instead of fovY
         // Use to match our light frustum pyramid behavior
-        static void DrawSpherePortionWireframe(Vector4 aspectFovMaxRangeMinRange, float distanceTruncPlane = 0f)
+        private static void DrawSpherePortionWireframe(Vector4 aspectFovMaxRangeMinRange, float distanceTruncPlane = 0f)
         {
-            float aspect = aspectFovMaxRangeMinRange.x;
-            float fov = aspectFovMaxRangeMinRange.y;
-            float maxRange = aspectFovMaxRangeMinRange.z;
-            float minRange = aspectFovMaxRangeMinRange.w;
-            float tanfov = Mathf.Tan(Mathf.Deg2Rad * fov * 0.5f);
+            var aspect = aspectFovMaxRangeMinRange.x;
+            var fov = aspectFovMaxRangeMinRange.y;
+            var maxRange = aspectFovMaxRangeMinRange.z;
+            var minRange = aspectFovMaxRangeMinRange.w;
+            var tanfov = Mathf.Tan(Mathf.Deg2Rad * fov * 0.5f);
 
             var startAngles = new Vector3[4];
             if (minRange > 0f)
@@ -221,7 +221,7 @@ namespace Arycama.CustomRenderPipeline
             var endAngles = GetSphericalProjectedRectAngles(maxRange, aspect, tanfov);
             var planProjectedCrossNormal0 = new Vector3(endAngles[0].y, -endAngles[0].x, 0).normalized;
             var planProjectedCrossNormal1 = new Vector3(endAngles[1].y, -endAngles[1].x, 0).normalized;
-            Vector3[] faceNormals = new[]
+            var faceNormals = new[]
             {
             Vector3.right - Vector3.Dot((endAngles[3] + endAngles[0]).normalized, Vector3.right) * (endAngles[3] + endAngles[0]).normalized,
             Vector3.up - Vector3.Dot((endAngles[0] + endAngles[1]).normalized, Vector3.up) * (endAngles[0] + endAngles[1]).normalized,
@@ -232,7 +232,7 @@ namespace Arycama.CustomRenderPipeline
             planProjectedCrossNormal1 - Vector3.Dot((endAngles[0] + endAngles[2]).normalized, planProjectedCrossNormal1) * (endAngles[0] + endAngles[2]).normalized,
         };
 
-            float[] faceAngles = new[]
+            var faceAngles = new[]
             {
             Vector3.Angle(endAngles[3], endAngles[0]),
             Vector3.Angle(endAngles[0], endAngles[1]),
@@ -257,11 +257,11 @@ namespace Arycama.CustomRenderPipeline
 
 
         //copy of CoreLightEditorUtilities
-        static Vector2 SliderPlaneHandle(Vector3 origin, Vector3 axis1, Vector3 axis2, Vector2 position)
+        private static Vector2 SliderPlaneHandle(Vector3 origin, Vector3 axis1, Vector3 axis2, Vector2 position)
         {
-            Vector3 pos = origin + position.x * axis1 + position.y * axis2;
-            float sizeHandle = HandleUtility.GetHandleSize(pos);
-            bool temp = GUI.changed;
+            var pos = origin + position.x * axis1 + position.y * axis2;
+            var sizeHandle = HandleUtility.GetHandleSize(pos);
+            var temp = GUI.changed;
             GUI.changed = false;
             pos = Handles.Slider2D(pos, Vector3.forward, axis1, axis2, sizeHandle * 0.03f, Handles.DotHandleCap, 0f);
             if (GUI.changed)
@@ -275,13 +275,13 @@ namespace Arycama.CustomRenderPipeline
 
 
         //TODO: decompose arguments (or tuples) + put back to CoreLightEditorUtilities
-        static Vector4 DrawSpherePortionHandle(Vector4 aspectFovMaxRangeMinRange, bool useNearPlane, float minAspect = 0.05f, float maxAspect = 20f, float minFov = 1f)
+        private static Vector4 DrawSpherePortionHandle(Vector4 aspectFovMaxRangeMinRange, bool useNearPlane, float minAspect = 0.05f, float maxAspect = 20f, float minFov = 1f)
         {
-            float aspect = aspectFovMaxRangeMinRange.x;
-            float fov = aspectFovMaxRangeMinRange.y;
-            float maxRange = aspectFovMaxRangeMinRange.z;
-            float minRange = aspectFovMaxRangeMinRange.w;
-            float tanfov = Mathf.Tan(Mathf.Deg2Rad * fov * 0.5f);
+            var aspect = aspectFovMaxRangeMinRange.x;
+            var fov = aspectFovMaxRangeMinRange.y;
+            var maxRange = aspectFovMaxRangeMinRange.z;
+            var minRange = aspectFovMaxRangeMinRange.w;
+            var tanfov = Mathf.Tan(Mathf.Deg2Rad * fov * 0.5f);
 
             var endAngles = GetSphericalProjectedRectAngles(maxRange, aspect, tanfov);
 
@@ -292,12 +292,12 @@ namespace Arycama.CustomRenderPipeline
 
             maxRange = SliderLineHandle(Vector3.zero, Vector3.forward, maxRange);
 
-            float distanceRight = HandleUtility.DistanceToLine(endAngles[0], endAngles[3]);
-            float distanceLeft = HandleUtility.DistanceToLine(endAngles[1], endAngles[2]);
-            float distanceUp = HandleUtility.DistanceToLine(endAngles[0], endAngles[1]);
-            float distanceDown = HandleUtility.DistanceToLine(endAngles[2], endAngles[3]);
+            var distanceRight = HandleUtility.DistanceToLine(endAngles[0], endAngles[3]);
+            var distanceLeft = HandleUtility.DistanceToLine(endAngles[1], endAngles[2]);
+            var distanceUp = HandleUtility.DistanceToLine(endAngles[0], endAngles[1]);
+            var distanceDown = HandleUtility.DistanceToLine(endAngles[2], endAngles[3]);
 
-            int pointIndex = 0;
+            int pointIndex;
             if (distanceRight < distanceLeft)
             {
                 if (distanceUp < distanceDown)
@@ -314,18 +314,18 @@ namespace Arycama.CustomRenderPipeline
             }
 
             Vector2 send = endAngles[pointIndex];
-            Vector3 farEnd = new Vector3(0, 0, endAngles[0].z);
+            var farEnd = new Vector3(0, 0, endAngles[0].z);
             EditorGUI.BeginChangeCheck();
-            Vector2 received = SliderPlaneHandle(farEnd, Vector3.right, Vector3.up, send);
+            var received = SliderPlaneHandle(farEnd, Vector3.right, Vector3.up, send);
             if (EditorGUI.EndChangeCheck())
             {
-                bool fixedFov = Event.current.control && !Event.current.shift;
-                bool fixedAspect = Event.current.shift && !Event.current.control;
+                var fixedFov = Event.current.control && !Event.current.shift;
+                var fixedAspect = Event.current.shift && !Event.current.control;
 
                 //work on positive quadrant
-                int xSign = send.x < 0f ? -1 : 1;
-                int ySign = send.y < 0f ? -1 : 1;
-                Vector2 corrected = new Vector2(received.x * xSign, received.y * ySign);
+                var xSign = send.x < 0f ? -1 : 1;
+                var ySign = send.y < 0f ? -1 : 1;
+                var corrected = new Vector2(received.x * xSign, received.y * ySign);
 
                 //fixed aspect correction
                 if (fixedAspect)
@@ -345,7 +345,7 @@ namespace Arycama.CustomRenderPipeline
                 }
 
                 //remove fov deadzone
-                float deadThresholdFoV = Mathf.Tan(Mathf.Deg2Rad * minFov * 0.5f) * maxRange;
+                var deadThresholdFoV = Mathf.Tan(Mathf.Deg2Rad * minFov * 0.5f) * maxRange;
                 corrected.x = Mathf.Max(corrected.x, deadThresholdFoV);
                 corrected.y = Mathf.Max(corrected.y, deadThresholdFoV, Mathf.Epsilon * 100); //prevent any division by zero
 
@@ -354,7 +354,7 @@ namespace Arycama.CustomRenderPipeline
                     aspect = corrected.x / corrected.y;
                 }
 
-                float min = Mathf.Min(corrected.x, corrected.y);
+                var min = Mathf.Min(corrected.x, corrected.y);
                 if (!fixedFov && maxRange > Mathf.Epsilon * 100)
                 {
                     fov = Mathf.Atan(min / maxRange) * 2f * Mathf.Rad2Deg;
@@ -394,7 +394,7 @@ namespace Arycama.CustomRenderPipeline
                                 case LightShape.Pyramid:
                                     using (new Handles.DrawingScope(Matrix4x4.TRS(light.transform.position, light.transform.rotation, Vector3.one)))
                                     {
-                                        Vector4 aspectFovMaxRangeMinRange = new Vector4(light.areaSize.x / light.areaSize.y, light.spotAngle, light.range);
+                                        var aspectFovMaxRangeMinRange = new Vector4(light.areaSize.x / light.areaSize.y, light.spotAngle, light.range);
                                         Handles.zTest = UnityEngine.Rendering.CompareFunction.Greater;
                                         Handles.color = light.color;
                                         DrawSpherePortionWireframe(aspectFovMaxRangeMinRange, light.shadowNearPlane);
@@ -425,7 +425,7 @@ namespace Arycama.CustomRenderPipeline
                                 case LightShape.Box:
                                     using (new Handles.DrawingScope(Matrix4x4.TRS(light.transform.position, light.transform.rotation, Vector3.one)))
                                     {
-                                        Vector4 widthHeightMaxRangeMinRange = new Vector4(light.areaSize.x, light.areaSize.y, light.range);
+                                        var widthHeightMaxRangeMinRange = new Vector4(light.areaSize.x, light.areaSize.y, light.range);
                                         Handles.zTest = UnityEngine.Rendering.CompareFunction.Greater;
                                         Handles.color = light.color;
                                         DrawOrthoFrustumWireframe(widthHeightMaxRangeMinRange, light.shadowNearPlane);
@@ -467,7 +467,7 @@ namespace Arycama.CustomRenderPipeline
         }
 
         [Flags]
-        enum HandleDirections
+        private enum HandleDirections
         {
             Left = 1 << 0,
             Up = 1 << 1,
@@ -476,7 +476,7 @@ namespace Arycama.CustomRenderPipeline
             All = Left | Up | Right | Down
         }
 
-        static readonly Vector3[] directionalLightHandlesRayPositions =
+        private static readonly Vector3[] directionalLightHandlesRayPositions =
         {
             new Vector3(1, 0, 0),
             new Vector3(-1, 0, 0),
@@ -495,22 +495,22 @@ namespace Arycama.CustomRenderPipeline
         public static void DrawDirectionalLightGizmo(Light light)
         {
             // Sets the color of the Gizmo.
-            Color outerColor = GetLightAboveObjectWireframeColor(light.color);
+            var outerColor = GetLightAboveObjectWireframeColor(light.color);
 
-            Vector3 lightPos = light.transform.position;
+            var lightPos = light.transform.position;
             float lightSize;
             using (new Handles.DrawingScope(Matrix4x4.identity))    //be sure no matrix affect the size computation
             {
                 lightSize = HandleUtility.GetHandleSize(lightPos);
             }
-            float radius = lightSize * 0.2f;
+            var radius = lightSize * 0.2f;
 
             using (new Handles.DrawingScope(outerColor))
             {
                 Handles.DrawWireDisc(Vector3.zero, Vector3.forward, radius);
-                foreach (Vector3 normalizedPos in directionalLightHandlesRayPositions)
+                foreach (var normalizedPos in directionalLightHandlesRayPositions)
                 {
-                    Vector3 pos = normalizedPos * radius;
+                    var pos = normalizedPos * radius;
                     Handles.DrawLine(pos, pos + new Vector3(0, 0, lightSize));
                 }
             }
@@ -523,7 +523,7 @@ namespace Arycama.CustomRenderPipeline
         public static void DrawPointLightGizmo(Light light)
         {
             // Sets the color of the Gizmo.
-            Color outerColor = GetLightAboveObjectWireframeColor(light.color);
+            var outerColor = GetLightAboveObjectWireframeColor(light.color);
 
             // Drawing the point light
             DrawPointLight(light, outerColor);
@@ -532,9 +532,9 @@ namespace Arycama.CustomRenderPipeline
             DrawPointHandlesAndLabels(light);
         }
 
-        static void DrawPointLight(Light light, Color outerColor)
+        private static void DrawPointLight(Light light, Color outerColor)
         {
-            float range = light.range;
+            var range = light.range;
 
             using (new Handles.DrawingScope(outerColor))
             {
@@ -549,7 +549,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        static void DrawPointHandlesAndLabels(Light light)
+        private static void DrawPointHandlesAndLabels(Light light)
         {
             // Getting the first control on point handle
             var firstControl = GUIUtility.GetControlID(s_PointLightHandle.GetHashCode(), FocusType.Passive) - 6; // BoxBoundsHandle allocates 6 control IDs
@@ -560,10 +560,11 @@ namespace Arycama.CustomRenderPipeline
             //                return;
 
             // Adding label /////////////////////////////////////
-            Vector3 labelPosition = Vector3.zero;
+            _ = Vector3.zero;
 
             if (GUIUtility.hotControl != 0)
             {
+                Vector3 labelPosition;
                 switch (GUIUtility.hotControl - firstControl)
                 {
                     case 0:
@@ -588,7 +589,7 @@ namespace Arycama.CustomRenderPipeline
                         return;
                 }
 
-                string labelText = FormattableString.Invariant($"Range: {light.range:0.00}");
+                var labelText = FormattableString.Invariant($"Range: {light.range:0.00}");
                 DrawHandleLabel(labelPosition, labelText);
             }
         }
@@ -600,7 +601,7 @@ namespace Arycama.CustomRenderPipeline
         public static void DrawRectangleLightGizmo(Light light)
         {
             // Color to use for gizmo drawing
-            Color outerColor = GetLightAboveObjectWireframeColor(light.color);
+            var outerColor = GetLightAboveObjectWireframeColor(light.color);
 
             // Drawing the gizmo
             DrawRectangleLight(light, outerColor);
@@ -609,9 +610,9 @@ namespace Arycama.CustomRenderPipeline
             DrawRectangleHandlesAndLabels(light);
         }
 
-        static void DrawRectangleLight(Light light, Color outerColor)
+        private static void DrawRectangleLight(Light light, Color outerColor)
         {
-            Vector2 size = light.areaSize;
+            var size = light.areaSize;
             var range = light.range;
             var innerColor = GetLightBehindObjectWireframeColor(light.color);
             DrawZTestedLine(range, outerColor, innerColor);
@@ -629,7 +630,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        static void DrawRectangleHandlesAndLabels(Light light)
+        private static void DrawRectangleHandlesAndLabels(Light light)
         {
             // Getting the first control on radius handle
             var firstControl = GUIUtility.GetControlID(s_AreaLightHandle.GetHashCode(), FocusType.Passive) - 6; // BoxBoundsHandle allocates 6 control IDs
@@ -637,10 +638,11 @@ namespace Arycama.CustomRenderPipeline
                 return;
 
             // Adding label /////////////////////////////////////
-            Vector3 labelPosition = Vector3.zero;
+            _ = Vector3.zero;
 
             if (GUIUtility.hotControl != 0)
             {
+                Vector3 labelPosition;
                 switch (GUIUtility.hotControl - firstControl)
                 {
                     case 0: // PositiveX
@@ -658,7 +660,7 @@ namespace Arycama.CustomRenderPipeline
                     default:
                         return;
                 }
-                string labelText = FormattableString.Invariant($"w:{light.areaSize.x:0.00} x h:{light.areaSize.y:0.00}");
+                var labelText = FormattableString.Invariant($"w:{light.areaSize.x:0.00} x h:{light.areaSize.y:0.00}");
                 DrawHandleLabel(labelPosition, labelText);
             }
         }
@@ -670,7 +672,7 @@ namespace Arycama.CustomRenderPipeline
         public static void DrawDiscLightGizmo(Light light)
         {
             // Color to use for gizmo drawing.
-            Color outerColor = GetLightAboveObjectWireframeColor(light.color);
+            var outerColor = GetLightAboveObjectWireframeColor(light.color);
 
             // Drawing before objects
             DrawDiscLight(light, outerColor);
@@ -679,9 +681,9 @@ namespace Arycama.CustomRenderPipeline
             DrawDiscHandlesAndLabels(light);
         }
 
-        static void DrawDiscLight(Light light, Color outerColor)
+        private static void DrawDiscLight(Light light, Color outerColor)
         {
-            float radius = light.areaSize.x;
+            var radius = light.areaSize.x;
             var range = light.range;
             var innerColor = GetLightBehindObjectWireframeColor(light.color);
             DrawZTestedLine(range, outerColor, innerColor);
@@ -699,17 +701,17 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        static void DrawDiscHandlesAndLabels(Light light)
+        private static void DrawDiscHandlesAndLabels(Light light)
         {
             // Getting the first control on radius handle
             var firstControl = GUIUtility.GetControlID(s_DiscLightHandle.GetHashCode(), FocusType.Passive) - 6; // BoxBoundsHandle allocates 6 control IDs
             if (Event.current.type != EventType.Repaint)
                 return;
-
-            Vector3 labelPosition = Vector3.zero;
+            _ = Vector3.zero;
 
             if (GUIUtility.hotControl != 0)
             {
+                Vector3 labelPosition;
                 switch (GUIUtility.hotControl - firstControl)
                 {
                     case 0: // PositiveX
@@ -727,12 +729,12 @@ namespace Arycama.CustomRenderPipeline
                     default:
                         return;
                 }
-                string labelText = FormattableString.Invariant($"Radius: {light.areaSize.x:0.00}");
+                var labelText = FormattableString.Invariant($"Radius: {light.areaSize.x:0.00}");
                 DrawHandleLabel(labelPosition, labelText);
             }
         }
 
-        static void DrawWithZTest(PrimitiveBoundsHandle primitiveHandle, float alpha = 0.2f)
+        private static void DrawWithZTest(PrimitiveBoundsHandle primitiveHandle, float alpha = 0.2f)
         {
             primitiveHandle.center = Vector3.zero;
 
@@ -751,7 +753,7 @@ namespace Arycama.CustomRenderPipeline
             primitiveHandle.DrawHandle();
         }
 
-        static void DrawZTestedLine(float range, Color outerColor, Color innerColor)
+        private static void DrawZTestedLine(float range, Color outerColor, Color innerColor)
         {
             using (new Handles.DrawingScope(outerColor))
             {
@@ -766,12 +768,10 @@ namespace Arycama.CustomRenderPipeline
             Handles.zTest = CompareFunction.Always;
         }
 
-
-
-        static readonly BoxBoundsHandle s_AreaLightHandle =
+        private static readonly BoxBoundsHandle s_AreaLightHandle =
             new BoxBoundsHandle { axes = PrimitiveBoundsHandle.Axes.X | PrimitiveBoundsHandle.Axes.Y };
 
-        static Vector2 DoRectHandles(Vector2 size)
+        private static Vector2 DoRectHandles(Vector2 size)
         {
             s_AreaLightHandle.center = Vector3.zero;
             s_AreaLightHandle.size = size;
@@ -780,9 +780,10 @@ namespace Arycama.CustomRenderPipeline
             return s_AreaLightHandle.size;
         }
 
-        static readonly SphereBoundsHandle s_DiscLightHandle =
+        private static readonly SphereBoundsHandle s_DiscLightHandle =
             new SphereBoundsHandle { axes = PrimitiveBoundsHandle.Axes.X | PrimitiveBoundsHandle.Axes.Y };
-        static float DoDiscHandles(float radius)
+
+        private static float DoDiscHandles(float radius)
         {
             s_DiscLightHandle.center = Vector3.zero;
             s_DiscLightHandle.radius = radius;
@@ -791,10 +792,10 @@ namespace Arycama.CustomRenderPipeline
             return s_DiscLightHandle.radius;
         }
 
-        static readonly SphereBoundsHandle s_PointLightHandle =
+        private static readonly SphereBoundsHandle s_PointLightHandle =
             new SphereBoundsHandle { axes = PrimitiveBoundsHandle.Axes.All };
 
-        static float DoPointHandles(float range)
+        private static float DoPointHandles(float range)
         {
             s_PointLightHandle.radius = range;
             DrawWithZTest(s_PointLightHandle);
@@ -802,7 +803,7 @@ namespace Arycama.CustomRenderPipeline
             return s_PointLightHandle.radius;
         }
 
-        static bool drawInnerConeAngle = true;
+        private static readonly bool drawInnerConeAngle = true;
 
         /// <summary>
         /// Draw a gizmo for a spot light.
@@ -815,16 +816,16 @@ namespace Arycama.CustomRenderPipeline
             var defZTest = Handles.zTest;
 
             // Default Color for outer cone will be Yellow if nothing has been provided.
-            Color outerColor = GetLightAboveObjectWireframeColor(light.color);
+            var outerColor = GetLightAboveObjectWireframeColor(light.color);
 
             // The default z-test outer color will be 20% opacity of the outer color
-            Color outerColorZTest = GetLightBehindObjectWireframeColor(outerColor);
+            var outerColorZTest = GetLightBehindObjectWireframeColor(outerColor);
 
             // Default Color for inner cone will be Yellow-ish if nothing has been provided.
-            Color innerColor = GetLightInnerConeColor(light.color);
+            var innerColor = GetLightInnerConeColor(light.color);
 
             // The default z-test outer color will be 20% opacity of the inner color
-            Color innerColorZTest = GetLightBehindObjectWireframeColor(innerColor);
+            var innerColorZTest = GetLightBehindObjectWireframeColor(innerColor);
 
             // Drawing before objects
             Handles.zTest = CompareFunction.LessEqual;
@@ -848,10 +849,10 @@ namespace Arycama.CustomRenderPipeline
             Handles.zTest = defZTest;
         }
 
-        static void DrawHandlesAndLabels(Light light, Color color)
+        private static void DrawHandlesAndLabels(Light light, Color color)
         {
             // Zero position vector3
-            Vector3 zeroPos = Vector3.zero;
+            var zeroPos = Vector3.zero;
 
             // Variable for which direction to draw the handles
             HandleDirections DrawHandleDirections;
@@ -860,7 +861,7 @@ namespace Arycama.CustomRenderPipeline
             Handles.color = color;
 
             // Draw Center Handle
-            float range = light.range;
+            var range = light.range;
             var id = GUIUtility.GetControlID(FocusType.Passive);
             EditorGUI.BeginChangeCheck();
             range = SliderLineHandle(id, Vector3.zero, Vector3.forward, range, "Range: ");
@@ -874,7 +875,7 @@ namespace Arycama.CustomRenderPipeline
             const string outerLabel = "Outer Angle: ";
 
             EditorGUI.BeginChangeCheck();
-            float outerAngle = DrawConeHandles(zeroPos, light.spotAngle, range, DrawHandleDirections, outerLabel);
+            var outerAngle = DrawConeHandles(zeroPos, light.spotAngle, range, DrawHandleDirections, outerLabel);
             if (EditorGUI.EndChangeCheck())
             {
                 Undo.RecordObjects(new[] { light }, "Undo outer angle change.");
@@ -895,7 +896,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Draw Near Plane Handle
-            float nearPlaneRange = light.shadowNearPlane;
+            var nearPlaneRange = light.shadowNearPlane;
             if (light.shadows != LightShadows.None && light.lightmapBakeType != LightmapBakeType.Baked)
             {
                 EditorGUI.BeginChangeCheck();
@@ -917,34 +918,34 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        static Color GetLightInnerConeColor(Color wireframeColor)
+        private static Color GetLightInnerConeColor(Color wireframeColor)
         {
-            Color color = wireframeColor;
+            var color = wireframeColor;
             color.a = 0.4f;
             return RemapLightColor(color.linear);
         }
 
-        static Color GetLightAboveObjectWireframeColor(Color wireframeColor)
+        private static Color GetLightAboveObjectWireframeColor(Color wireframeColor)
         {
-            Color color = wireframeColor;
+            var color = wireframeColor;
             color.a = 1f;
             return RemapLightColor(color.linear);
         }
 
-        static Color GetLightBehindObjectWireframeColor(Color wireframeColor)
+        private static Color GetLightBehindObjectWireframeColor(Color wireframeColor)
         {
-            Color color = wireframeColor;
+            var color = wireframeColor;
             color.a = 0.2f;
             return RemapLightColor(color.linear);
         }
 
-        static Color RemapLightColor(Color src)
+        private static Color RemapLightColor(Color src)
         {
-            Color color = src;
-            float max = Mathf.Max(Mathf.Max(color.r, color.g), color.b);
+            var color = src;
+            var max = Mathf.Max(Mathf.Max(color.r, color.g), color.b);
             if (max > 0f)
             {
-                float mult = 1f / max;
+                var mult = 1f / max;
                 color.r *= mult;
                 color.g *= mult;
                 color.b *= mult;
@@ -957,14 +958,14 @@ namespace Arycama.CustomRenderPipeline
             return color;
         }
 
-        static void DrawSpotlightWireframe(Light spotlight, Color outerColor, Color innerColor)
+        private static void DrawSpotlightWireframe(Light spotlight, Color outerColor, Color innerColor)
         {
             // Variable for which direction to draw the handles
             HandleDirections DrawHandleDirections;
 
-            float outerAngle = spotlight.spotAngle;
-            float innerAngle = spotlight.innerSpotAngle;
-            float range = spotlight.range;
+            var outerAngle = spotlight.spotAngle;
+            var innerAngle = spotlight.innerSpotAngle;
+            var range = spotlight.range;
 
             var outerDiscRadius = range * Mathf.Sin(outerAngle * Mathf.Deg2Rad * 0.5f);
             var outerDiscDistance = Mathf.Cos(Mathf.Deg2Rad * outerAngle * 0.5f) * range;
@@ -1006,9 +1007,9 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        static void DrawShadowNearPlane(Light spotlight, Color color)
+        private static void DrawShadowNearPlane(Light spotlight, Color color)
         {
-            Color previousColor = Handles.color;
+            var previousColor = Handles.color;
             Handles.color = color;
 
             var shadowDiscRadius = Mathf.Tan(spotlight.spotAngle * Mathf.Deg2Rad * 0.5f) * spotlight.shadowNearPlane;
@@ -1020,7 +1021,7 @@ namespace Arycama.CustomRenderPipeline
             Handles.color = previousColor;
         }
 
-        static void DrawConeWireframe(float radius, float height, HandleDirections handleDirections)
+        private static void DrawConeWireframe(float radius, float height, HandleDirections handleDirections)
         {
             var rangeCenter = Vector3.forward * height;
             if (handleDirections.HasFlag(HandleDirections.Up))
@@ -1051,7 +1052,7 @@ namespace Arycama.CustomRenderPipeline
             Handles.DrawWireDisc(rangeCenter, Vector3.forward, radius);
         }
 
-        static float DrawConeHandles(Vector3 position, float angle, float range, HandleDirections handleDirections, string controlName)
+        private static float DrawConeHandles(Vector3 position, float angle, float range, HandleDirections handleDirections, string controlName)
         {
             if (handleDirections.HasFlag(HandleDirections.Left))
             {
@@ -1072,15 +1073,13 @@ namespace Arycama.CustomRenderPipeline
             return angle;
         }
 
-       
-
-        static float SizeSliderSpotAngle(Vector3 position, Vector3 forward, Vector3 axis, float range, float spotAngle, string controlName)
+        private static float SizeSliderSpotAngle(Vector3 position, Vector3 forward, Vector3 axis, float range, float spotAngle, string controlName)
         {
             if (Math.Abs(spotAngle) <= 0.05f)
                 return spotAngle;
             var angledForward = Quaternion.AngleAxis(Mathf.Max(spotAngle, 0.05f) * 0.5f, axis) * forward;
             var centerToLeftOnSphere = (angledForward * range + position) - (position + forward * range);
-            bool temp = GUI.changed;
+            var temp = GUI.changed;
             GUI.changed = false;
             var handlePosition = position + forward * range;
             var id = GUIUtility.GetControlID(FocusType.Passive);
@@ -1098,7 +1097,7 @@ namespace Arycama.CustomRenderPipeline
             if (GUIUtility.hotControl == id)
             {
                 var pos = handlePosition + centerToLeftOnSphere.normalized * newMagnitude;
-                string labelText = FormattableString.Invariant($"{controlName} {spotAngle:0.00}");
+                var labelText = FormattableString.Invariant($"{controlName} {spotAngle:0.00}");
                 DrawHandleLabel(pos, labelText);
             }
 

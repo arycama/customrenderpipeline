@@ -22,7 +22,7 @@ public class ScreenSpaceShadows
     private readonly Material material;
     private readonly Settings settings;
     private readonly RayTracingShader shadowRaytracingShader;
-    private PersistentRTHandleCache temporalCache;
+    private readonly PersistentRTHandleCache temporalCache;
 
     public ScreenSpaceShadows(RenderGraph renderGraph, Settings settings)
     {

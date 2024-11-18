@@ -28,7 +28,7 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
         }
 
-        class Pass0Data
+        private class Pass0Data
         {
             public int tileSize;
             public float rcpClusterDepth;

@@ -1,7 +1,7 @@
-using UnityEngine;
-using UnityEditor;
-using UnityEngine.Rendering;
 using Arycama.CustomRenderPipeline;
+using UnityEditor;
+using UnityEngine;
+using UnityEngine.Rendering;
 
 public class UpdatePipelineMaterials
 {
@@ -13,11 +13,11 @@ public class UpdatePipelineMaterials
 
         var count = 0;
         var materialGuids = AssetDatabase.FindAssets("t:Material");
-        for (int i = 0; i < materialGuids.Length; i++)
+        for (var i = 0; i < materialGuids.Length; i++)
         {
             EditorUtility.DisplayProgressBar("Updating Materials", $"{i}/{materialGuids.Length}", (float)i / materialGuids.Length);
 
-            string guid = materialGuids[i];
+            var guid = materialGuids[i];
             var path = AssetDatabase.GUIDToAssetPath(guid);
             var material = AssetDatabase.LoadAssetAtPath<Material>(path);
 

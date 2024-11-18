@@ -50,7 +50,7 @@ namespace Arycama.CustomRenderPipeline
             textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Temporal AA");
         }
 
-        public struct TemporalAAData : IRenderPassData
+        public readonly struct TemporalAAData : IRenderPassData
         {
             private readonly Vector4 jitter;
             private readonly Vector4 previousJitter;
@@ -222,7 +222,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_SharpenStrength", settings.taaSharpenStrength);
                     pass.SetFloat(command, "_SpeedRejectionIntensity", data.motionRejectionMultiplier);
                     pass.SetFloat(command, "_BlendSharpness", settings.BlendSharpness);
-                    
+
                     pass.SetVector(command, "_HistoryScaleLimit", new Vector4(history.Scale.x, history.Scale.y, history.Limit.x, history.Limit.y));
 
                     pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
@@ -245,16 +245,16 @@ namespace Arycama.CustomRenderPipeline
                 data.maxHeight = Mathf.FloorToInt(camera.pixelHeight * scale) - 1;
                 data.maxResolution = new Vector2(camera.pixelWidth - 1, camera.pixelHeight - 1);
 
-                float minAntiflicker = 0.0f;
-                float maxAntiflicker = 3.5f;
+                var minAntiflicker = 0.0f;
+                var maxAntiflicker = 3.5f;
                 data.motionRejectionMultiplier = Mathf.Lerp(0.0f, 250.0f, settings.taaMotionVectorRejection * settings.taaMotionVectorRejection * settings.taaMotionVectorRejection);
 
                 // The anti flicker becomes much more aggressive on higher values
-                float temporalContrastForMaxAntiFlicker = 0.7f - Mathf.Lerp(0.0f, 0.3f, Mathf.SmoothStep(0.5f, 1.0f, settings.taaAntiFlicker));
+                var temporalContrastForMaxAntiFlicker = 0.7f - Mathf.Lerp(0.0f, 0.3f, Mathf.SmoothStep(0.5f, 1.0f, settings.taaAntiFlicker));
 
                 //float historySharpening = TAAU && postDoF ? 0.25f : settings.taaHistorySharpening;
 
-                float antiFlicker = Mathf.Lerp(minAntiflicker, maxAntiflicker, settings.taaAntiFlicker);
+                var antiFlicker = Mathf.Lerp(minAntiflicker, maxAntiflicker, settings.taaAntiFlicker);
                 const float historyContrastBlendStart = 0.51f;
                 data.historyContrastBlendLerp = Mathf.Clamp01((settings.taaAntiFlicker - historyContrastBlendStart) / (1.0f - historyContrastBlendStart));
 
@@ -271,21 +271,21 @@ namespace Arycama.CustomRenderPipeline
 
         public static float Halton(int index, int radix)
         {
-            float result = 0f;
-            float fraction = 1f / (float)radix;
+            var result = 0f;
+            var fraction = 1f / radix;
 
             while (index > 0)
             {
-                result += (float)(index % radix) * fraction;
+                result += index % radix * fraction;
 
                 index /= radix;
-                fraction /= (float)radix;
+                fraction /= radix;
             }
 
             return result;
         }
 
-        float Mitchell1D(float x)
+        private float Mitchell1D(float x)
         {
             var B = 1.0f / 3.0f;
             var C = 1.0f / 3.0f;

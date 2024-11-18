@@ -65,7 +65,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
-            switch(subElement)
+            switch (subElement)
             {
                 case RenderTextureSubElement.Depth:
                     propertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Depth);
@@ -123,10 +123,10 @@ namespace Arycama.CustomRenderPipeline
             }
 
             propertyBlock.SetVectorArray("_FrustumCorners", corners);
-           
+
             command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount, 1, propertyBlock);
 
-            if(!string.IsNullOrEmpty(Keyword))
+            if (!string.IsNullOrEmpty(Keyword))
             {
                 command.DisableShaderKeyword(Keyword);
                 Keyword = null;

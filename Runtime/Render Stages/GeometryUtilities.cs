@@ -22,9 +22,9 @@ namespace Arycama.CustomRenderPipeline
         // Ref: http://http.developer.nvidia.com/GPUGems/gpugems_ch19.html
         public static float IntersectRaySphereSimple(Vector3 start, Vector3 dir, float radius)
         {
-            float b = Vector3.Dot(dir, start) * 2.0f;
-            float c = Vector3.Dot(start, start) - radius * radius;
-            float discriminant = b * b - 4.0f * c;
+            var b = Vector3.Dot(dir, start) * 2.0f;
+            var c = Vector3.Dot(start, start) - radius * radius;
+            var discriminant = b * b - 4.0f * c;
 
             return Mathf.Abs(Mathf.Sqrt(discriminant) - b) * 0.5f;
         }
@@ -32,9 +32,9 @@ namespace Arycama.CustomRenderPipeline
         // Assume Sphere is at the origin (i.e start = position - spherePosition)
         public static bool IntersectRaySphere(Vector3 start, Vector3 dir, float radius, out Vector2 intersections)
         {
-            float a = Vector3.Dot(dir, dir);
-            float b = Vector3.Dot(dir, start) * 2.0f;
-            float c = Vector3.Dot(start, start) - radius * radius;
+            var a = Vector3.Dot(dir, dir);
+            var b = Vector3.Dot(dir, start) * 2.0f;
+            var c = Vector3.Dot(start, start) - radius * radius;
 
             return SolveQuadraticEquation(a, b, c, out intersections);
         }

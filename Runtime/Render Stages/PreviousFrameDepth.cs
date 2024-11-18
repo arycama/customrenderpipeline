@@ -3,9 +3,9 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public struct PreviousFrameDepth : IRenderPassData
+    public readonly struct PreviousFrameDepth : IRenderPassData
     {
-        private RTHandle previousDepth;
+        private readonly RTHandle previousDepth;
 
         public PreviousFrameDepth(RTHandle previousDepth)
         {

@@ -1,8 +1,5 @@
-﻿using System;
-using UnityEngine;
-
-namespace Arycama.CustomRenderPipeline
+﻿namespace Arycama.CustomRenderPipeline
 {
-    
+
 
 }

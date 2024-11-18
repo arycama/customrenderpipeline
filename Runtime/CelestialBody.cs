@@ -28,7 +28,7 @@ namespace Arycama.CustomRenderPipeline
 
         private void OnDisable()
         {
-            celestialBodies.Remove(this);
+            _ = celestialBodies.Remove(this);
         }
 
         public void Render(CommandBuffer command, Camera camera)

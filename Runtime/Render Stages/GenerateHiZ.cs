@@ -4,10 +4,10 @@ using UnityEngine.Experimental.Rendering;
 
 public class GenerateHiZ
 {
-    private RenderGraph renderGraph;
-    private IndexedShaderPropertyId resultIds = new("_Result");
-    private ComputeShader computeShader;
-    private HiZMode mode;
+    private readonly RenderGraph renderGraph;
+    private readonly IndexedShaderPropertyId resultIds = new("_Result");
+    private readonly ComputeShader computeShader;
+    private readonly HiZMode mode;
 
     public GenerateHiZ(RenderGraph renderGraph, HiZMode mode)
     {

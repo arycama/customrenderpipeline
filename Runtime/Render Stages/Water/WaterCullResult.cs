@@ -2,7 +2,7 @@
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public struct WaterCullResult
+    public readonly struct WaterCullResult
     {
         public BufferHandle IndirectArgsBuffer { get; }
         public BufferHandle PatchDataBuffer { get; }

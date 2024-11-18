@@ -1,5 +1,4 @@
 ﻿using System;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -183,7 +182,7 @@ namespace Arycama.CustomRenderPipeline
             internal float far;
         }
 
-        public struct Result : IRenderPassData
+        public readonly struct Result : IRenderPassData
         {
             private readonly RTHandle volumetricLighting;
 

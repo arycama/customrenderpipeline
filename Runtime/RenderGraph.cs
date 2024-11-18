@@ -166,7 +166,7 @@ namespace Arycama.CustomRenderPipeline
                                 continue;
 
                             // TODO: Use some enum instead?
-                            if(handle.IsExactSize)
+                            if (handle.IsExactSize)
                             {
                                 if (renderTexture.width != handle.Width || renderTexture.height != handle.Height)
                                     continue;
@@ -213,7 +213,7 @@ namespace Arycama.CustomRenderPipeline
                             }
 
                             result.name = $"{result.dimension} {(isDepth ? result.depthStencilFormat : result.graphicsFormat)} {width}x{height} {rtCount++}";
-                            result.Create();
+                            _ = result.Create();
 
                             //Debug.Log($"Allocating {result.name}");
 
@@ -358,7 +358,7 @@ namespace Arycama.CustomRenderPipeline
 
             // Ensure its created (Can happen with some RenderTextures that are imported as soon as created
             if (!renderTexture.IsCreated())
-                renderTexture.Create();
+                _ = renderTexture.Create();
 
             result = new RTHandle
             {
@@ -509,7 +509,7 @@ namespace Arycama.CustomRenderPipeline
             return buffer;
         }
 
-        class ConstantBufferPassData<T>
+        private class ConstantBufferPassData<T>
         {
             public T data;
             public BufferHandle buffer;

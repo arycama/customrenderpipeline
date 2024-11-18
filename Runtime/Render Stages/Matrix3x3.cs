@@ -5,7 +5,7 @@ namespace Arycama.CustomRenderPipeline
 {
     public struct Matrix3x3
     {
-        float m00, m01, m02, m10, m11, m12, m20, m21, m22;
+        private float m00, m01, m02, m10, m11, m12, m20, m21, m22;
 
         public float this[int index]
         {
@@ -28,7 +28,7 @@ namespace Arycama.CustomRenderPipeline
 
             set
             {
-                switch(index)
+                switch (index)
                 {
                     case 0:
                         m00 = value;

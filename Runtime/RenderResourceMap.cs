@@ -13,7 +13,7 @@ namespace Arycama.CustomRenderPipeline
         // TODO: Should have a tryget method which fails if not already initialized? (Thoguh we should keep this one so that types can prefetch handles out of order
         public RenderPassDataHandle GetResourceHandle<T>() where T : IRenderPassData
         {
-            if(!handleIndexMap.TryGetValue(typeof(T), out var handle))
+            if (!handleIndexMap.TryGetValue(typeof(T), out var handle))
             {
                 handle = new(handleIndexMap.Count);
                 handleIndexMap.Add(typeof(T), handle);
@@ -35,7 +35,7 @@ namespace Arycama.CustomRenderPipeline
         {
             var result = handleList[handle.Index];
 
-            if(frameIndex == result.Item2 && result.Item1 != null)
+            if (frameIndex == result.Item2 && result.Item1 != null)
             {
                 data = (T)result.Item1;
                 return true;

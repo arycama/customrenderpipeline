@@ -81,7 +81,7 @@ namespace Arycama.CustomRenderPipeline
             };
         }
 
-        public static Matrix4x4 OrthoOffCenter(float left, float right, float bottom, float top, float near, float far) => new ()
+        public static Matrix4x4 OrthoOffCenter(float left, float right, float bottom, float top, float near, float far) => new()
         {
             m00 = 2.0f / (right - left),
             m03 = (right + left) / (left - right),

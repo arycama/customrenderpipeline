@@ -23,7 +23,7 @@ public class BufferHandle
         Buffer = null;
     }
 
-    public BufferHandle(GraphicsBuffer graphicsBuffer) 
+    public BufferHandle(GraphicsBuffer graphicsBuffer)
     {
         Target = graphicsBuffer.target;
         Count = graphicsBuffer.count;

@@ -9,9 +9,9 @@ namespace Arycama.CustomRenderPipeline
     {
         private readonly Settings settings;
         private readonly Material material;
-        private RayTracingShader ambientOcclusionRaytracingShader;
+        private readonly RayTracingShader ambientOcclusionRaytracingShader;
 
-        private PersistentRTHandleCache temporalCache;
+        private readonly PersistentRTHandleCache temporalCache;
 
         public AmbientOcclusion(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
@@ -194,7 +194,7 @@ namespace Arycama.CustomRenderPipeline
         }
 
         // Only used for debugging as the result is combined into the bent normal texture
-        public struct Result : IRenderPassData
+        public readonly struct Result : IRenderPassData
         {
             public RTHandle AmbientOcclusion { get; }
 

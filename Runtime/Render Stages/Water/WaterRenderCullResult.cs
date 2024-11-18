@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public struct WaterRenderCullResult : IRenderPassData
+    public readonly struct WaterRenderCullResult : IRenderPassData
     {
         public BufferHandle IndirectArgsBuffer { get; }
         public BufferHandle PatchDataBuffer { get; }

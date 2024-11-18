@@ -48,12 +48,12 @@ public class LitData : IDisposable
             filterMode = FilterMode.Bilinear,
         };
 
-        int count = k_LtcLUTResolution * k_LtcLUTResolution;
-        Color[] pixels = new Color[count];
+        var count = k_LtcLUTResolution * k_LtcLUTResolution;
+        var pixels = new Color[count];
 
-        float clampValue = 65504.0f;
+        var clampValue = 65504.0f;
 
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
             // Both GGX and Disney Diffuse BRDFs have zero values in columns 1, 3, 5, 7.
             // Column 8 contains only ones.

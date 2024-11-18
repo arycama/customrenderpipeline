@@ -1,4 +1,3 @@
-using Arycama.CustomRenderPipeline;
 using System;
 using System.Collections.Generic;
 using Unity.Collections;
@@ -29,20 +28,20 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public int MaskResolution { get; private set; } = 512;
         }
 
-        private Settings settings;
-        private RenderGraph renderGraph;
+        private readonly Settings settings;
+        private readonly RenderGraph renderGraph;
         private GraphicsBuffer indexBuffer, terrainLayerData;
         private RTHandle minMaxHeight, heightmap, normalmap, idMap;
         private Terrain terrain;
-        private Material generateIdMapMaterial, screenSpaceTerrainMaterial;
+        private readonly Material generateIdMapMaterial, screenSpaceTerrainMaterial;
 
         private Texture2DArray diffuseArray, normalMapArray, maskMapArray;
         private int VerticesPerTileEdge => settings.PatchVertices + 1;
         private int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
         private TerrainData terrainData => terrain.terrainData;
 
-        private Dictionary<TerrainLayer, int> terrainLayers = new();
-        private Dictionary<TerrainLayer, int> terrainProceduralLayers = new();
+        private readonly Dictionary<TerrainLayer, int> terrainLayers = new();
+        private readonly Dictionary<TerrainLayer, int> terrainProceduralLayers = new();
 
         public TerrainSystem(RenderGraph renderGraph, Settings settings)
         {
@@ -380,7 +379,7 @@ namespace Arycama.CustomRenderPipeline
 
             var alphamapModifiers = terrain.GetComponents<ITerrainAlphamapModifier>();
             var needsUpdate = false;
-            foreach(var alphamapModifier in alphamapModifiers)
+            foreach (var alphamapModifier in alphamapModifiers)
             {
                 if (!alphamapModifier.NeedsUpdate)
                     continue;
@@ -389,7 +388,7 @@ namespace Arycama.CustomRenderPipeline
                 break;
             }
 
-            if(needsUpdate)
+            if (needsUpdate)
                 InitializeTerrain();
 
             // Set this every frame incase of changes..
@@ -423,7 +422,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        struct CullResult
+        private readonly struct CullResult
         {
             public BufferHandle IndirectArgsBuffer { get; }
             public BufferHandle PatchDataBuffer { get; }
@@ -744,7 +743,7 @@ namespace Arycama.CustomRenderPipeline
         }
     }
 
-    public struct TerrainRenderCullResult : IRenderPassData
+    public readonly struct TerrainRenderCullResult : IRenderPassData
     {
         public BufferHandle IndirectArgsBuffer { get; }
         public BufferHandle PatchDataBuffer { get; }
@@ -765,7 +764,7 @@ namespace Arycama.CustomRenderPipeline
         }
     }
 
-    public struct TerrainShadowCullResult : IRenderPassData
+    public readonly struct TerrainShadowCullResult : IRenderPassData
     {
         public BufferHandle IndirectArgsBuffer { get; }
         public BufferHandle PatchDataBuffer { get; }
@@ -786,7 +785,7 @@ namespace Arycama.CustomRenderPipeline
         }
     }
 
-    public struct TerrainLayerData
+    public readonly struct TerrainLayerData
     {
         private readonly float scale;
         private readonly float blending;

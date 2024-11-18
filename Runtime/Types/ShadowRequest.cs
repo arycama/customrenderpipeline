@@ -3,7 +3,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public struct ShadowRequest
+    public readonly struct ShadowRequest
     {
         public bool IsValid { get; }
         public int VisibleLightIndex { get; }

@@ -1,17 +1,16 @@
 ﻿using Arycama.CustomRenderPipeline;
-using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
 public struct TerrainRenderData : IRenderPassData
 {
-    Texture2DArray albedoSmoothness, normal, mask;
-    RTHandle terrainHeightmapTexture, terrainNormalMap, idMap;
-    Texture terrainHolesTexture;
-    Vector4 terrainRemapHalfTexel, terrainScaleOffset;
-    Vector3 terrainSize;
-    float terrainHeightScale, terrainHeightOffset, idMapResolution;
-    GraphicsBuffer terrainLayerData;
+    private readonly Texture2DArray albedoSmoothness, normal, mask;
+    private readonly RTHandle terrainHeightmapTexture, terrainNormalMap, idMap;
+    private readonly Texture terrainHolesTexture;
+    private Vector4 terrainRemapHalfTexel, terrainScaleOffset;
+    private Vector3 terrainSize;
+    private readonly float terrainHeightScale, terrainHeightOffset, idMapResolution;
+    private readonly GraphicsBuffer terrainLayerData;
 
     public TerrainRenderData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray mask, RTHandle terrainHeightmapTexture, RTHandle terrainNormalMap, RTHandle idMap, Texture terrainHolesTexture, Vector4 terrainRemapHalfTexel, Vector4 terrainScaleOffset, Vector3 terrainSize, float terrainHeightScale, float terrainHeightOffset, float idMapResolution, GraphicsBuffer terrainLayerData)
     {

@@ -3,9 +3,9 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public struct PreviousFrameVelocity : IRenderPassData
+    public readonly struct PreviousFrameVelocity : IRenderPassData
     {
-        private RTHandle previousVelocity;
+        private readonly RTHandle previousVelocity;
 
         public PreviousFrameVelocity(RTHandle previousVelocity)
         {

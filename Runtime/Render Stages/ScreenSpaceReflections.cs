@@ -18,12 +18,12 @@ public class ScreenSpaceReflections
         [field: SerializeField] public bool UseRaytracing { get; private set; } = true;
     }
 
-    private Material material;
-    private RenderGraph renderGraph;
-    private Settings settings;
+    private readonly Material material;
+    private readonly RenderGraph renderGraph;
+    private readonly Settings settings;
 
-    private PersistentRTHandleCache temporalCache;
-    private RayTracingShader raytracingShader;
+    private readonly PersistentRTHandleCache temporalCache;
+    private readonly RayTracingShader raytracingShader;
 
     public ScreenSpaceReflections(RenderGraph renderGraph, Settings settings)
     {
@@ -77,7 +77,7 @@ public class ScreenSpaceReflections
 
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<WaterPrepassResult>(true);
-                
+
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     commonPassData.SetProperties(pass, command);
@@ -185,15 +185,15 @@ public class ScreenSpaceReflections
         renderGraph.ResourceMap.SetRenderPassData(new ScreenSpaceReflectionResult(current, settings.Intensity), renderGraph.FrameIndex);
     }
 
-    class PassData
+    private class PassData
     {
     }
 }
 
-public struct ScreenSpaceReflectionResult : IRenderPassData
+public readonly struct ScreenSpaceReflectionResult : IRenderPassData
 {
     public RTHandle ScreenSpaceReflections { get; }
-    private float intensity;
+    private readonly float intensity;
 
     public ScreenSpaceReflectionResult(RTHandle screenSpaceReflections, float intensity)
     {

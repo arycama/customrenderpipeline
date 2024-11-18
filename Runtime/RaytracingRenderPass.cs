@@ -44,7 +44,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
-            if(subElement == RenderTextureSubElement.Depth || subElement == RenderTextureSubElement.Default)
+            if (subElement == RenderTextureSubElement.Depth || subElement == RenderTextureSubElement.Default)
                 command.SetRayTracingTextureParam(shader, propertyName, texture);
             else
                 command.SetGlobalTexture(propertyName, texture, subElement);
@@ -54,7 +54,7 @@ namespace Arycama.CustomRenderPipeline
         {
             // only way.. :( 
             command.SetGlobalBuffer(propertyName, buffer);
-           // command.SetRayTracingBufferParam(shader, propertyName, buffer);
+            // command.SetRayTracingBufferParam(shader, propertyName, buffer);
         }
 
         public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
@@ -89,12 +89,12 @@ namespace Arycama.CustomRenderPipeline
             command.SetRayTracingIntParam(shader, propertyName, value);
         }
 
-        static internal float GetPixelSpreadTangent(float fov, int width, int height)
+        internal static float GetPixelSpreadTangent(float fov, int width, int height)
         {
             return Mathf.Tan(fov * Mathf.Deg2Rad * 0.5f) * 2.0f / Mathf.Min(width, height);
         }
 
-        static internal float GetPixelSpreadAngle(float fov, int width, int height)
+        internal static float GetPixelSpreadAngle(float fov, int width, int height)
         {
             return Mathf.Atan(GetPixelSpreadTangent(fov, width, height));
         }

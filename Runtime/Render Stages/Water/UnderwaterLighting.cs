@@ -6,8 +6,8 @@ namespace Arycama.CustomRenderPipeline.Water
 {
     public class UnderwaterLighting : RenderFeature
     {
-        private WaterSystem.Settings settings;
-        private Material underwaterLightingMaterial;
+        private readonly WaterSystem.Settings settings;
+        private readonly Material underwaterLightingMaterial;
 
         public UnderwaterLighting(RenderGraph renderGraph, WaterSystem.Settings settings) : base(renderGraph)
         {

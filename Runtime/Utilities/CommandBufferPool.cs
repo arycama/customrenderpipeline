@@ -5,7 +5,7 @@ namespace Arycama.CustomRenderPipeline
 {
     public static class CommandBufferPool
     {
-        static readonly ObjectPool<CommandBuffer> bufferPool = new(() => new CommandBuffer(), x => x.Clear());
+        private static readonly ObjectPool<CommandBuffer> bufferPool = new(() => new CommandBuffer(), x => x.Clear());
 
         public static CommandBuffer Get(string name)
         {

@@ -1,8 +1,8 @@
 ﻿using Arycama.CustomRenderPipeline;
+using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using System;
 
 public class UIBlur
 {
@@ -13,9 +13,9 @@ public class UIBlur
         [field: SerializeField] public float BlurSigma { get; private set; } = 16.0f;
     }
 
-    private RenderGraph renderGraph;
-    private Settings settings;
-    private Material material;
+    private readonly RenderGraph renderGraph;
+    private readonly Settings settings;
+    private readonly Material material;
 
     public UIBlur(RenderGraph renderGraph, Settings settings)
     {

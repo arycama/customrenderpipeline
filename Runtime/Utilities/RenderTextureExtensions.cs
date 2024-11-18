@@ -37,7 +37,7 @@ namespace Arycama.CustomRenderPipeline
         {
             if (!renderTexture.IsCreated())
             {
-                renderTexture.Create();
+                _ = renderTexture.Create();
             }
 
             return renderTexture;
@@ -58,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 renderTexture.Release();
                 renderTexture.descriptor = descriptor;
-                renderTexture.Create();
+                _ = renderTexture.Create();
             }
         }
 
@@ -70,7 +70,7 @@ namespace Arycama.CustomRenderPipeline
                 renderTexture.width = width;
                 renderTexture.height = height;
                 renderTexture.volumeDepth = depth;
-                renderTexture.Create();
+                _ = renderTexture.Create();
                 hasChanged = true;
             }
             else

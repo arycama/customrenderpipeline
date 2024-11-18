@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public struct WaterShadowResult : IRenderPassData
+    public readonly struct WaterShadowResult : IRenderPassData
     {
         private readonly RTHandle waterShadowTexture;
         private readonly Matrix4x4 waterShadowMatrix;

@@ -45,7 +45,7 @@ public class DeferredLighting
             pass.AddRenderPassData<WaterPrepassResult>(true);
             pass.AddRenderPassData<LightingSetup.Result>();
             pass.AddRenderPassData<WaterShadowResult>(true);
-            
+
             var hasWaterShadow = renderGraph.ResourceMap.IsRenderPassDataValid<WaterShadowResult>(renderGraph.FrameIndex);
             pass.Keyword = hasWaterShadow ? "WATER_SHADOWS_ON" : string.Empty;
 

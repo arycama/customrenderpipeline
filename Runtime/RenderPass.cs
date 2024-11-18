@@ -1,6 +1,6 @@
-﻿using System;
+﻿using Arycama.CustomRenderPipeline;
+using System;
 using System.Collections.Generic;
-using Arycama.CustomRenderPipeline;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
@@ -16,7 +16,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<(string, BufferHandle)> readBuffers = new();
         private readonly List<(string, BufferHandle)> writeBuffers = new();
 
-        public List<(RenderPassDataHandle, bool)> RenderPassDataHandles { get; private set; } = new(); 
+        public List<(RenderPassDataHandle, bool)> RenderPassDataHandles { get; private set; } = new();
 
         public RenderGraph RenderGraph { get; set; }
         internal string Name { get; set; }
@@ -135,8 +135,8 @@ namespace Arycama.CustomRenderPipeline
             {
                 if (renderPassDataHandle.Item2)
                 {
-                    if(RenderGraph.ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, RenderGraph.FrameIndex, out var data))
-                       data.SetProperties(this, command);
+                    if (RenderGraph.ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, RenderGraph.FrameIndex, out var data))
+                        data.SetProperties(this, command);
                 }
                 else
                 {
@@ -167,7 +167,7 @@ namespace Arycama.CustomRenderPipeline
         }
 
         protected abstract void SetupTargets(CommandBuffer command);
-       
+
         void IDisposable.Dispose()
         {
             RenderGraph.AddRenderPassInternal(this);

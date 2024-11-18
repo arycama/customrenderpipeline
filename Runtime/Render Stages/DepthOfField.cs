@@ -28,7 +28,7 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Depth of Field")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        class PassData
+        private class PassData
         {
             internal float focalDistance, focalLength, apertureSize, maxCoc, sensorHeight, sampleRadius;
             internal int sampleCount;

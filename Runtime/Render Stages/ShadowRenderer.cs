@@ -123,7 +123,7 @@ namespace Arycama.CustomRenderPipeline
             internal int index;
         }
 
-        public struct Result : IRenderPassData
+        public readonly struct Result : IRenderPassData
         {
             private readonly RTHandle directionalShadows;
             private readonly RTHandle pointShadows;

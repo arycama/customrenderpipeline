@@ -27,12 +27,12 @@ namespace Arycama.CustomRenderPipeline
             material = new(Shader.Find("Hidden/Bloom")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        class Pass0Data
+        private class Pass0Data
         {
             public Vector2 rcpResolution;
         }
 
-        class Pass1Data
+        private class Pass1Data
         {
             public float strength;
             public Vector2 rcpResolution;

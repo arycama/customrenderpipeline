@@ -12,7 +12,7 @@ namespace Arycama.CustomRenderPipeline
         /// List of look at matrices for cubemap faces.
         /// Ref: https://msdn.microsoft.com/en-us/library/windows/desktop/bb204881(v=vs.85).aspx
         /// </summary>
-        static public readonly Vector3[] lookAtList =
+        public static readonly Vector3[] lookAtList =
         {
             new Vector3(1.0f, 0.0f, 0.0f),
             new Vector3(-1.0f, 0.0f, 0.0f),
@@ -26,7 +26,7 @@ namespace Arycama.CustomRenderPipeline
         /// List of up vectors for cubemap faces.
         /// Ref: https://msdn.microsoft.com/en-us/library/windows/desktop/bb204881(v=vs.85).aspx
         /// </summary>
-        static public readonly Vector3[] upVectorList =
+        public static readonly Vector3[] upVectorList =
         {
             new Vector3(0.0f, 1.0f, 0.0f),
             new Vector3(0.0f, 1.0f, 0.0f),
@@ -120,7 +120,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly RTHandle transmittance, multiScatter, groundAmbient, skyAmbient;
         private int version = -1;
 
-        private PersistentRTHandleCache textureCache;
+        private readonly PersistentRTHandleCache textureCache;
 
         public PhysicalSky(RenderGraph renderGraph, Settings settings, VolumetricClouds.Settings cloudSettings)
         {
@@ -188,7 +188,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_TransmittanceWidth", settings.TransmittanceWidth);
                     pass.SetFloat(command, "_TransmittanceHeight", settings.TransmittanceHeight);
                     pass.SetFloat(command, "_TransmittanceDepth", settings.TransmittanceDepth);
-                    
+
                 });
             }
 
@@ -305,7 +305,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            string keyword = string.Empty;
+            var keyword = string.Empty;
             var viewHeight = cameraPosition.y;
             if (viewHeight > cloudSettings.StartHeight)
             {
@@ -644,7 +644,7 @@ namespace Arycama.CustomRenderPipeline
     }
 }
 
-public struct SkyResultData : IRenderPassData
+public readonly struct SkyResultData : IRenderPassData
 {
     public RTHandle SkyTexture { get; }
 

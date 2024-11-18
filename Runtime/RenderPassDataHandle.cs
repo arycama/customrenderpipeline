@@ -1,6 +1,6 @@
 ﻿namespace Arycama.CustomRenderPipeline
 {
-    public struct RenderPassDataHandle
+    public readonly struct RenderPassDataHandle
     {
         public int Index { get; }
 

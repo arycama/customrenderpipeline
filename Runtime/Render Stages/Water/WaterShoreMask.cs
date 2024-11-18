@@ -14,12 +14,12 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public int Resolution = 512;
         }
 
-        private RenderGraph renderGraph;
-        private Settings settings;
+        private readonly RenderGraph renderGraph;
+        private readonly Settings settings;
         private Terrain terrain;
-        private Material material;
+        private readonly Material material;
         private RTHandle result;
-        private BufferHandle resultDataBuffer;
+        private readonly BufferHandle resultDataBuffer;
         private int version = 0, lastVersion = -1;
 
         public WaterShoreMask(RenderGraph renderGraph, Settings settings)
@@ -153,10 +153,10 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData<Result>(new Result(result, resultDataBuffer, scaleOffset, terrainSize, -terrainPosition.y, terrainSize.x), renderGraph.FrameIndex, true);
         }
 
-        struct ResultData
+        private readonly struct ResultData
         {
-            float minDist, maxDist, padding0, padding1;
-         
+            private readonly float minDist, maxDist, padding0, padding1;
+
             public ResultData(float minDist, float maxDist)
             {
                 this.minDist = minDist;
@@ -168,11 +168,11 @@ namespace Arycama.CustomRenderPipeline
 
         public struct Result : IRenderPassData
         {
-            RTHandle shoreDistance;
-            BufferHandle resultDataBuffer;
-            Vector4 scaleOffset;
-            Vector2 terrainSize;
-            float maxOceanDepth, maxTerrainDistance;
+            private readonly RTHandle shoreDistance;
+            private readonly BufferHandle resultDataBuffer;
+            private Vector4 scaleOffset;
+            private Vector2 terrainSize;
+            private readonly float maxOceanDepth, maxTerrainDistance;
 
             public Result(RTHandle shoreDistance, BufferHandle resultDataBuffer, Vector4 scaleOffset, Vector2 terrainSize, float maxOceanDepth, float maxTerrainDistance)
             {

@@ -1,17 +1,17 @@
 ﻿using System;
 using UnityEngine;
-using static System.MathF;
 using static Arycama.CustomRenderPipeline.MathUtils;
+using static System.MathF;
 
 namespace Arycama.CustomRenderPipeline
 {
     public class Aces
     {
-        const float MiddleGrey = 0.18f;
+        private const float MiddleGrey = 0.18f;
 
         // Precomputed curves
         // ODT_48nits
-        static SegmentedSplineParamsC9 ODT_48nits => new SegmentedSplineParamsC9
+        private static SegmentedSplineParamsC9 ODT_48nits => new SegmentedSplineParamsC9
         (
             new[] { -1.6989700043f, -1.6989700043f, -1.4779000000f, -1.2291000000f, -0.8648000000f, -0.4480000000f, 0.0051800000f, 0.4511080334f, 0.9113744414f, 0.9113744414f },
             new[] { 0.5154386965f, 0.8470437783f, 1.1358000000f, 1.3802000000f, 1.5197000000f, 1.5985000000f, 1.6467000000f, 1.6746091357f, 1.6878733390f, 1.6878733390f },
@@ -23,7 +23,7 @@ namespace Arycama.CustomRenderPipeline
         );
 
         // ODT_1000nits
-        static SegmentedSplineParamsC9 ODT_1000nits => new SegmentedSplineParamsC9
+        private static SegmentedSplineParamsC9 ODT_1000nits => new SegmentedSplineParamsC9
         (
             new[] { -2.3010299957f, -2.3010299957f, -1.9312000000f, -1.5205000000f, -1.0578000000f, -0.4668000000f, 0.1193800000f, 0.7088134201f, 1.2911865799f, 1.2911865799f },
             new[] { 0.8089132070f, 1.1910867930f, 1.5683000000f, 1.9483000000f, 2.3083000000f, 2.6384000000f, 2.8595000000f, 2.9872608805f, 3.0127391195f, 3.0127391195f },
@@ -35,7 +35,7 @@ namespace Arycama.CustomRenderPipeline
         );
 
         // ODT_2000nits
-        static SegmentedSplineParamsC9 ODT_2000nits => new SegmentedSplineParamsC9
+        private static SegmentedSplineParamsC9 ODT_2000nits => new SegmentedSplineParamsC9
         (
             new[] { -2.3010299957f, -2.3010299957f, -1.9312000000f, -1.5205000000f, -1.0578000000f, -0.4668000000f, 0.1193800000f, 0.7088134201f, 1.2911865799f, 1.2911865799f },
             new[] { 0.8019952042f, 1.1980047958f, 1.5943000000f, 1.9973000000f, 2.3783000000f, 2.7684000000f, 3.0515000000f, 3.2746293562f, 3.3274306351f, 3.3274306351f },
@@ -47,7 +47,7 @@ namespace Arycama.CustomRenderPipeline
         );
 
         // ODT_4000nits
-        static SegmentedSplineParamsC9 ODT_4000nits => new SegmentedSplineParamsC9
+        private static SegmentedSplineParamsC9 ODT_4000nits => new SegmentedSplineParamsC9
         (
             new[] { -2.3010299957f, -2.3010299957f, -1.9312000000f, -1.5205000000f, -1.0578000000f, -0.4668000000f, 0.1193800000f, 0.7088134201f, 1.2911865799f, 1.2911865799f },
             new[] { 0.7973186613f, 1.2026813387f, 1.6093000000f, 2.0108000000f, 2.4148000000f, 2.8179000000f, 3.1725000000f, 3.5344995451f, 3.6696204376f, 3.6696204376f },
@@ -58,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
             new Vector2(MiddleGrey * Exp2(-12.0f), MiddleGrey * Exp2(12.0f))
         );
 
-        struct SegmentedSplineParamsC5
+        private struct SegmentedSplineParamsC5
         {
             public float[] coefsLow;    // coefs for B-spline between minPoint and midPoint (units of log luminance)
             public float[] coefsHigh;   // coefs for B-spline between midPoint and maxPoint (units of log luminance)
@@ -103,7 +103,7 @@ namespace Arycama.CustomRenderPipeline
         };
 
         //  Spline function used by RRT
-        static float SegmentedSplineC5Fwd(float x)
+        private static float SegmentedSplineC5Fwd(float x)
         {
             // RRT_PARAMS
             SegmentedSplineParamsC5 C = new(
@@ -123,9 +123,9 @@ namespace Arycama.CustomRenderPipeline
 
             // Check for negatives or zero before taking the log. If negative or zero,
             // set to ACESMIN.1
-            float xCheck = x <= 0 ? Exp2(-14.0f) : x;
+            var xCheck = x <= 0 ? Exp2(-14.0f) : x;
 
-            float logx = Log10(xCheck);
+            var logx = Log10(xCheck);
             float logy;
 
             if (logx <= Log10(C.minPoint.x))
@@ -134,30 +134,30 @@ namespace Arycama.CustomRenderPipeline
             }
             else if ((logx > Log10(C.minPoint.x)) && (logx < Log10(C.midPoint.x)))
             {
-                float knot_coord = (N_KNOTS_LOW - 1) * (logx - Log10(C.minPoint.x)) / (Log10(C.midPoint.x) - Log10(C.minPoint.x));
-                int j = (int)(knot_coord);
-                float t = knot_coord - j;
+                var knot_coord = (N_KNOTS_LOW - 1) * (logx - Log10(C.minPoint.x)) / (Log10(C.midPoint.x) - Log10(C.minPoint.x));
+                var j = (int)(knot_coord);
+                var t = knot_coord - j;
 
                 Vector3 cf = new(C.coefsLow[j], C.coefsLow[j + 1], C.coefsLow[j + 2]);
 
                 Vector3 monomials = new(t * t, t, 1);
                 //logy = dot(monomials, Mul(cf, M));
                 //logy = Vector3.DotProduct(monomials, M.TransformVector(cf));
-                Vector3 basis = cf.x * M.GetRow(0) + cf.y * M.GetRow(1) + cf.z * M.GetRow(2);
+                var basis = cf.x * M.GetRow(0) + cf.y * M.GetRow(1) + cf.z * M.GetRow(2);
                 logy = Vector3.Dot(monomials, basis);
             }
             else if ((logx >= Log10(C.midPoint.x)) && (logx < Log10(C.maxPoint.x)))
             {
-                float knot_coord = (N_KNOTS_HIGH - 1) * (logx - Log10(C.midPoint.x)) / (Log10(C.maxPoint.x) - Log10(C.midPoint.x));
-                int j = (int)(knot_coord);
-                float t = knot_coord - j;
+                var knot_coord = (N_KNOTS_HIGH - 1) * (logx - Log10(C.midPoint.x)) / (Log10(C.maxPoint.x) - Log10(C.midPoint.x));
+                var j = (int)(knot_coord);
+                var t = knot_coord - j;
 
                 Vector3 cf = new(C.coefsHigh[j], C.coefsHigh[j + 1], C.coefsHigh[j + 2]);
 
                 Vector3 monomials = new(t * t, t, 1);
                 //logy = dot(monomials, Mul(cf, M));
                 //logy = Vector3.DotProduct(monomials, M.TransformVector(cf));
-                Vector3 basis = cf.x * M.GetRow(0) + cf.y * M.GetRow(1) + cf.z * M.GetRow(2);
+                var basis = cf.x * M.GetRow(0) + cf.y * M.GetRow(1) + cf.z * M.GetRow(2);
                 logy = Vector3.Dot(monomials, basis);
             }
             else
@@ -168,13 +168,13 @@ namespace Arycama.CustomRenderPipeline
             return Exp10(logy);
         }
 
-        static void mul3(out Vector3 res, Vector3 a, Matrix3x3 M)
+        private static void mul3(out Vector3 res, Vector3 a, Matrix3x3 M)
         {
             res = a.x * M.GetRow(0) + a.y * M.GetRow(1) + a.z * M.GetRow(2);
         }
 
         // Using a reference ODT spline, adjust middle gray and Max levels
-        static SegmentedSplineParamsC9 AdaptSpline(SegmentedSplineParamsC9 C, float minLuminance, float paperWhite, float maxLuminance, float outMax)
+        private static SegmentedSplineParamsC9 AdaptSpline(SegmentedSplineParamsC9 C, float minLuminance, float paperWhite, float maxLuminance, float outMax)
         {
             // Monomial and inverse monomial matrices
             var M = new Matrix3x3(0.5f, -1.0f, 0.5f, -1.0f, 1.0f, 0.5f, 0.5f, 0.0f, 0.0f);
@@ -183,7 +183,7 @@ namespace Arycama.CustomRenderPipeline
             const int N_KNOTS_LOW = 8;
             const int N_KNOTS_HIGH = 8;
 
-            SegmentedSplineParamsC9 C2 = C;
+            var C2 = C;
 
             // Set the new Max input and output levels
             C2.maxPoint.x = SegmentedSplineC5Fwd(maxLuminance * MiddleGrey);
@@ -201,9 +201,9 @@ namespace Arycama.CustomRenderPipeline
             C2.midPoint.y *= paperMiddleGrey / C2.midPoint.y;
 
             // compute and apply scale used to bring bottom segment of the transform to the level desired for middle gray
-            float scale = (Log10(C.midPoint[1]) - Log10(C.minPoint[1])) / (Log10(C2.midPoint[1]) - Log10(C2.minPoint[1]));
+            var scale = (Log10(C.midPoint[1]) - Log10(C.minPoint[1])) / (Log10(C2.midPoint[1]) - Log10(C2.minPoint[1]));
 
-            for (int j = 0; j < N_KNOTS_LOW + 2; j++)
+            for (var j = 0; j < N_KNOTS_LOW + 2; j++)
             {
                 C2.coefsLow[j] = (C2.coefsLow[j] - Log10(C2.minPoint[1])) / scale + Log10(C2.minPoint[1]);
             }
@@ -213,7 +213,7 @@ namespace Arycama.CustomRenderPipeline
 
             var target = new float[10]; // saves the "target" values, as we need to match/relax the spline to properly join the low segment
 
-            for (int j = 0; j < N_KNOTS_HIGH + 2; j++)
+            for (var j = 0; j < N_KNOTS_HIGH + 2; j++)
             {
                 C2.coefsHigh[j] = (C2.coefsHigh[j] - Log10(C.midPoint[1])) / scale + Log10(C2.midPoint[1]);
                 target[j] = C2.coefsHigh[j];
@@ -227,41 +227,39 @@ namespace Arycama.CustomRenderPipeline
             // Coeffiecients for the first segment of the high range
             Vector3 cfh = new(C2.coefsHigh[0], C2.coefsHigh[1], C2.coefsHigh[2]);
 
-            Vector3 cflt, cfht;
 
             // transform the coefficients by the monomial matrix
-            mul3(out cflt, cfl, M);
-            mul3(out cfht, cfh, M);
+            mul3(out var cflt, cfl, M);
+            mul3(out var cfht, cfh, M);
 
             // low and high curves cover different ranges, so compute scaling factor needed to match slopes at the join point
-            float scaleLow = 1.0f / (Log10(C2.midPoint[0]) - Log10(C2.minPoint[0]));
-            float scaleHigh = 1.0f / (Log10(C2.maxPoint[0]) - Log10(C2.midPoint[0]));
+            var scaleLow = 1.0f / (Log10(C2.midPoint[0]) - Log10(C2.minPoint[0]));
+            var scaleHigh = 1.0f / (Log10(C2.maxPoint[0]) - Log10(C2.midPoint[0]));
 
             // compute the targeted exit point for the segment 
-            float outRef = cfht[0] * 2.0f + cfht[1]; //slope at t == 1
+            var outRef = cfht[0] * 2.0f + cfht[1]; //slope at t == 1
 
             // match slopes and intersection
             cfht[2] = cflt[2];
             cfht[1] = (scaleLow * cflt[1]) / scaleHigh;
 
             // compute the exit point the segment has after the adjustment
-            float o = cfht[0] * 2.0f + cfht[1]; //result at t == 1
+            var o = cfht[0] * 2.0f + cfht[1]; //result at t == 1
 
             // ease spline toward target and adjust
-            float outTarget = (outRef * 7.0f + o * 1.0f) / 8.0f;
+            var outTarget = (outRef * 7.0f + o * 1.0f) / 8.0f;
             cfht[0] = (outTarget - cfht[1]) / 2.0f;
 
             // back-transform  the adjustments and save them
-            Vector3 acfh;
 
-            mul3(out acfh, cfht, iM);
+            mul3(out var acfh, cfht, iM);
 
             C2.coefsHigh[0] = acfh[0];
             C2.coefsHigh[1] = acfh[1];
             C2.coefsHigh[2] = acfh[2];
 
             // now correct the rest of the spline
-            for (int j = 1; j < N_KNOTS_HIGH; j++)
+            for (var j = 1; j < N_KNOTS_HIGH; j++)
             {
                 //  Original rescaled spline values for the segment (ideal "target")
                 Vector3 cfoh = new(target[j], target[j + 1], target[j + 2]);
@@ -269,23 +267,21 @@ namespace Arycama.CustomRenderPipeline
                 //  New spline values for the segment based on alterations to prior ranges
                 Vector3 cfh1 = new(C2.coefsHigh[j], C2.coefsHigh[j + 1], C2.coefsHigh[j + 2]);
 
-                Vector3 cfht1, cfoht1;
 
-                mul3(out cfht1, cfh1, M);
-                mul3(out cfoht1, cfoh, M);
+                mul3(out var cfht1, cfh1, M);
+                mul3(out var cfoht1, cfoh, M);
 
                 //Compute exit slope for segments
-                float o1 = cfht1[0] * 2.0f + cfht1[1]; //slope at t == 1
-                float outRef1 = cfoht1[0] * 2.0f + cfoht1[1]; //slope at t == 1
+                var o1 = cfht1[0] * 2.0f + cfht1[1]; //slope at t == 1
+                var outRef1 = cfoht1[0] * 2.0f + cfoht1[1]; //slope at t == 1
 
                 //Ease spline toward targetted slope
-                float outTarget1 = (outRef1 * (7.0f - j) + o1 * (1.0f + j)) / 8.0f;
+                var outTarget1 = (outRef1 * (7.0f - j) + o1 * (1.0f + j)) / 8.0f;
                 cfht1[0] = (outTarget1 - cfht1[1]) / 2.0f;
 
                 // Back transform and save
-                Vector3 acfh1;
 
-                mul3(out acfh1, cfht1, iM);
+                mul3(out var acfh1, cfht1, iM);
 
                 C2.coefsHigh[j] = acfh1[0];
                 C2.coefsHigh[j + 1] = acfh1[1];
@@ -295,7 +291,7 @@ namespace Arycama.CustomRenderPipeline
             return C2;
         }
 
-       
+
 
         public static SegmentedSplineParamsC9 GetAcesODTData(ODTCurve baseCurve, float minLuminance, float paperWhite, float maxLuminance, float outMax)
         {
