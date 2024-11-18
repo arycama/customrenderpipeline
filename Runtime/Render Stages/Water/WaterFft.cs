@@ -1,6 +1,3 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -12,10 +9,10 @@ namespace Arycama.CustomRenderPipeline.Water
         private const int CascadeCount = 4;
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
 
-        private WaterSystem.Settings settings;
-        private GraphicsBuffer spectrumBuffer, dispersionBuffer;
-        private RTHandle lengthToRoughness;
-        private bool disposedValue;
+        private readonly WaterSystem.Settings settings;
+        private readonly GraphicsBuffer spectrumBuffer, dispersionBuffer;
+        private readonly RTHandle lengthToRoughness;
+        private readonly bool disposedValue;
         private bool roughnessInitialized;
         private RTHandle displacementCurrent;
 
@@ -61,36 +58,38 @@ namespace Arycama.CustomRenderPipeline.Water
             }
 
             // Calculate constants
-            var rcpScales = new Vector4(1f / Mathf.Pow(Profile.CascadeScale, 0f), 1f / Mathf.Pow(Profile.CascadeScale, 1f), 1f / Mathf.Pow(Profile.CascadeScale, 2f), 1f / Mathf.Pow(Profile.CascadeScale, 3f));
             var patchSizes = new Vector4(Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 0f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 1f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 2f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 3f));
-            var spectrumStart = new Vector4(0, Profile.MaxWaveNumber * patchSizes.y / patchSizes.x, Profile.MaxWaveNumber * patchSizes.z / patchSizes.y, Profile.MaxWaveNumber * patchSizes.w / patchSizes.z);
-            var spectrumEnd = new Vector4(Profile.MaxWaveNumber, Profile.MaxWaveNumber, Profile.MaxWaveNumber, settings.Resolution);
-            var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
-            var rcpTexelSizes = new Vector4(settings.Resolution / patchSizes.x, settings.Resolution / patchSizes.y, settings.Resolution / patchSizes.z, settings.Resolution / patchSizes.w);
-            var texelSizes = patchSizes / settings.Resolution;
 
             // Load resources
             var computeShader = Resources.Load<ComputeShader>("OceanFFT");
-            var oceanBuffer = renderGraph.SetConstantBuffer((Profile.WindSpeed, Profile.WindAngle, Profile.Fetch, Profile.SpreadBlend, Profile.Swell, Profile.PeakEnhancement, Profile.ShortWavesFade));
+            var oceanBuffer = renderGraph.SetConstantBuffer((
+                Profile.WindSpeed,
+                Profile.WindAngle,
+                Profile.Fetch,
+                Profile.SpreadBlend,
+                Profile.Swell,
+                Profile.PeakEnhancement,
+                Profile.ShortWavesFade,
+                0f,
+                oceanScale: new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w),
+                spectrumStart: new Vector4(0, Profile.MaxWaveNumber * patchSizes.y / patchSizes.x, Profile.MaxWaveNumber * patchSizes.z / patchSizes.y, Profile.MaxWaveNumber * patchSizes.w / patchSizes.z),
+                spectrumEnd: new Vector4(Profile.MaxWaveNumber, Profile.MaxWaveNumber, Profile.MaxWaveNumber, settings.Resolution),
+                Profile.Gravity,
+                (float)time,
+                Profile.TimeScale,
+                Profile.SequenceLength
+            ));
 
             // Update spectrum (TODO: Only when properties change)
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Spectrum"))
             {
                 pass.Initialize(computeShader, 4, settings.Resolution, settings.Resolution, 4);
-                //pass.WriteBuffer("OceanSpectrum", spectrumBuffer);
                 pass.ReadBuffer("OceanData", oceanBuffer);
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
                     pass.SetBuffer(command, "OceanSpectrumWrite", spectrumBuffer);
                     pass.SetBuffer(command, "OceanDispersionWrite", dispersionBuffer);
-                    pass.SetVector(command, "_OceanScale", oceanScale);
-                    pass.SetVector(command, "SpectrumStart", spectrumStart);
-                    pass.SetVector(command, "SpectrumEnd", spectrumEnd);
-                    pass.SetFloat(command, "_OceanGravity", Profile.Gravity);
-                    pass.SetFloat(command, "_WindSpeed", Profile.WindSpeed);
-                    pass.SetFloat(command, "SequenceLength", Profile.SequenceLength);
-                    pass.SetFloat(command, "TimeScale", Profile.TimeScale);
                 });
             }
 
@@ -110,14 +109,6 @@ namespace Arycama.CustomRenderPipeline.Water
                 {
                     pass.SetBuffer(command, "OceanSpectrum", spectrumBuffer);
                     pass.SetBuffer(command, "OceanDispersion", dispersionBuffer);
-                    pass.SetVector(command, "_OceanScale", oceanScale);
-                    pass.SetVector(command, "SpectrumStart", spectrumStart);
-                    pass.SetVector(command, "SpectrumEnd", spectrumEnd);
-                    pass.SetFloat(command, "_OceanGravity", Profile.Gravity);
-                    pass.SetFloat(command, "_WindSpeed", Profile.WindSpeed);
-                    pass.SetFloat(command, "SequenceLength", Profile.SequenceLength);
-                    pass.SetFloat(command, "TimeScale", Profile.TimeScale);
-                    pass.SetFloat(command, "Time", (float)time);
                 });
             }
 
@@ -139,23 +130,25 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.ReadTexture("Displacement", displacementResult);
                 pass.ReadTexture("Slope", slopeResult);
                 pass.WriteTexture("DisplacementOutput", displacementCurrent);
-                pass.WriteTexture("OceanNormalFoamSmoothness", normalFoamSmoothness);
+                pass.WriteTexture("OceanNormalFoamSmoothnessWrite", normalFoamSmoothness);
+                pass.ReadBuffer("OceanData", oceanBuffer);
             }
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Calculate Normals"))
             {
                 pass.Initialize(computeShader, 2, settings.Resolution, settings.Resolution, 4);
                 pass.WriteTexture("DisplacementInput", displacementCurrent);
-                pass.WriteTexture("OceanNormalFoamSmoothness", normalFoamSmoothness);
+                pass.WriteTexture("OceanNormalFoamSmoothnessWrite", normalFoamSmoothness);
 
                 var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
                 {
-                    pass.SetVector(command, "_CascadeTexelSizes", texelSizes);
+                    pass.SetVector(command, "_CascadeTexelSizes", patchSizes / settings.Resolution);
                     pass.SetInt(command, "_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
                     pass.SetFloat(command, "Smoothness", settings.Material.GetFloat("_Smoothness"));
                     pass.SetFloat(command, "_FoamStrength", Profile.FoamStrength);
                     pass.SetFloat(command, "_FoamDecay", Profile.FoamDecay);
                     pass.SetFloat(command, "_FoamThreshold", Profile.FoamThreshold);
+                    pass.ReadBuffer("OceanData", oceanBuffer);
                 });
             }
 
@@ -163,6 +156,7 @@ namespace Arycama.CustomRenderPipeline.Water
             {
                 pass.Initialize(computeShader, 3, (settings.Resolution * 4) >> 2, (settings.Resolution) >> 2, 1);
                 pass.ReadTexture("_LengthToRoughness", lengthToRoughness);
+                pass.ReadBuffer("OceanData", oceanBuffer);
 
                 var mipCount = (int)Mathf.Log(settings.Resolution, 2) + 1;
                 for (var j = 0; j < mipCount; j++)
@@ -181,7 +175,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new OceanFftResult(displacementCurrent, displacementHistory, normalFoamSmoothness, lengthToRoughness), renderGraph.FrameIndex);
+            renderGraph.ResourceMap.SetRenderPassData(new OceanFftResult(displacementCurrent, displacementHistory, normalFoamSmoothness, lengthToRoughness, oceanBuffer), renderGraph.FrameIndex);
         }
     }
 }

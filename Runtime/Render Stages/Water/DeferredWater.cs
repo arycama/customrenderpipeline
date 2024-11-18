@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -8,10 +6,10 @@ namespace Arycama.CustomRenderPipeline.Water
 {
     public class DeferredWater : RenderFeature
     {
-        private WaterSystem.Settings settings;
-        private Material deferredWaterMaterial;
-        private PersistentRTHandleCache temporalCache;
-        private RayTracingShader raytracingShader;
+        private readonly WaterSystem.Settings settings;
+        private readonly Material deferredWaterMaterial;
+        private readonly PersistentRTHandleCache temporalCache;
+        private readonly RayTracingShader raytracingShader;
 
         public DeferredWater(RenderGraph renderGraph, WaterSystem.Settings settings) : base(renderGraph)
         {
@@ -23,15 +21,6 @@ namespace Arycama.CustomRenderPipeline.Water
 
         public void Render(RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, IRenderPassData commonPassData, Camera camera, int width, int height, RTHandle velocity)
         {
-            // Calculate constants
-            var rcpScales = new Vector4(1f / Mathf.Pow(settings.Profile.CascadeScale, 0f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 1f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 2f), 1f / Mathf.Pow(settings.Profile.CascadeScale, 3f));
-            var patchSizes = new Vector4(settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 0f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 1f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 2f), settings.Profile.PatchSize / Mathf.Pow(settings.Profile.CascadeScale, 3f));
-            var spectrumStart = new Vector4(0, settings.Profile.MaxWaveNumber * patchSizes.y / patchSizes.x, settings.Profile.MaxWaveNumber * patchSizes.z / patchSizes.y, settings.Profile.MaxWaveNumber * patchSizes.w / patchSizes.z);
-            var spectrumEnd = new Vector4(settings.Profile.MaxWaveNumber, settings.Profile.MaxWaveNumber, settings.Profile.MaxWaveNumber, settings.Resolution);
-            var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
-            var rcpTexelSizes = new Vector4(settings.Resolution / patchSizes.x, settings.Resolution / patchSizes.y, settings.Resolution / patchSizes.z, settings.Resolution / patchSizes.w);
-            var texelSizes = patchSizes / settings.Resolution;
-
             var refractionResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             var scatterResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
@@ -75,10 +64,6 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.SetFloat(command, "_RefractOffset", material.GetFloat("_RefractOffset"));
                     pass.SetFloat(command, "_Steps", material.GetFloat("_Steps"));
 
-                    pass.SetVector(command, "_OceanScale", oceanScale);
-
-                    pass.SetVector(command, "_RcpCascadeScales", rcpScales);
-
                     pass.SetFloat(command, "_WaveFoamStrength", settings.Material.GetFloat("_WaveFoamStrength"));
                     pass.SetFloat(command, "_WaveFoamFalloff", settings.Material.GetFloat("_WaveFoamFalloff"));
                     pass.SetFloat(command, "_FoamNormalScale", settings.Material.GetFloat("_FoamNormalScale"));
@@ -89,9 +74,6 @@ namespace Arycama.CustomRenderPipeline.Water
                     var foamOffset = settings.Material.GetTextureOffset("_FoamTex");
 
                     pass.SetVector(command, "_FoamTex_ST", new Vector4(foamScale.x, foamScale.y, foamOffset.x, foamOffset.y));
-                    pass.SetFloat(command, "_OceanGravity", settings.Profile.Gravity);
-                    pass.SetFloat(command, "_WindSpeed", settings.Profile.WindSpeed);
-
                     pass.SetTexture(command, "_FoamTex", settings.Material.GetTexture("_FoamTex"));
                     pass.SetTexture(command, "_FoamBump", settings.Material.GetTexture("_FoamBump"));
 

@@ -479,6 +479,19 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 	return attenuation;
 }
 
+
+float3 DiscLightApprox(float angularDiameter, float3 R, float3 L)
+{
+    // Disk light approximation based on angular diameter
+	float r = sin(radians(angularDiameter * 0.5)); // Disk radius
+	float d = cos(radians(angularDiameter * 0.5)); // Distance to disk
+
+    // Closest point to a disk (since the radius is small, this is a good approximation
+	float DdotR = dot(L, R);
+	float3 S = R - DdotR * L;
+	return DdotR < d ? normalize(d * L + normalize(S) * r) : R;
+}
+
 float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 {
 	#ifdef SCREENSPACE_REFLECTIONS_ON
@@ -502,13 +515,15 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
 		DirectionalLight light = _DirectionalLights[i];
+		
+		float3 L = light.direction;// DiscLightApprox(5.3, reflect(-V, input.normal), light.direction);
 
 		// Skip expensive shadow lookup if NdotL is negative
-		float NdotL = dot(input.normal, light.direction);
+		float NdotL = dot(input.normal, L);
 		if (!isVolumetric && NdotL <= 0.0 && all(input.translucency == 0.0))
 			continue;
 			
-		float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, -V.y, light.direction.y, length(input.worldPosition));
+		float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, -V.y, L.y, length(input.worldPosition));
 		
 		float attenuation = 1.0;
 		if(i == 0)
@@ -542,10 +557,10 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 		{
 			#ifdef WATER_SHADOW_ON
 			if(i == 0)
-				light.color *= WaterShadow(input.worldPosition, light.direction);
+				light.color *= WaterShadow(input.worldPosition, L);
 			#endif
 			
-			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, light.direction, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV) * light.color * lightTransmittance) * (abs(NdotL) * _Exposure * attenuation);
+			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV) * light.color * lightTransmittance) * (abs(NdotL) * _Exposure * attenuation);
 		}
 	}
 	

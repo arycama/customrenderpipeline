@@ -1,7 +1,5 @@
-﻿using Arycama.CustomRenderPipeline;
-using System;
+﻿using System;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 [CreateAssetMenu(menuName = "Data/Graphics/Water Profile New")]
 public class WaterProfile : ScriptableObject

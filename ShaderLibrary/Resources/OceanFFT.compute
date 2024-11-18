@@ -2,18 +2,13 @@
 #include "../Math.hlsl"
 #include "../Random.hlsl"
 #include "../Material.hlsl"
+#include "../WaterCommon.hlsl"
 
 #pragma kernel Dispersion
 #pragma kernel FftColumns
 #pragma kernel CalculateNormals
 #pragma kernel GenerateFilteredMips
 #pragma kernel Spectrum
-
-cbuffer InitSpectrumProperties
-{
-	float4 _OceanScale, SpectrumStart, SpectrumEnd;
-	float _OceanGravity, Time, TimeScale, SequenceLength;
-};
 
 RWBuffer<float> OceanDispersionWrite;
 RWBuffer<float4> OceanSpectrumWrite;
@@ -26,17 +21,6 @@ RWTexture2DArray<float4> DisplacementResult, SlopeResult;
 static const uint _Resolution = 128;
 static const uint Log2Resolution = log2(_Resolution);
 static const int HalfResolution = _Resolution >> 1;
-
-cbuffer OceanData
-{
-	float windSpeed0;
-	float windAngle0;
-	float fetch0;
-	float spreadBlend0;
-	float swell0;
-	float peakEnhancement0;
-	float shortWavesFade0;
-};
 
 float DispersionShallow(float kLength, float depth)
 {
@@ -65,7 +49,7 @@ float DispersionDeepDerivative(float kLength)
 
 float PiersonMoskowitzPeakAngularFrequency()
 {
-	return 0.877 * _OceanGravity * rcp(windSpeed0 * 1.026);
+	return 0.877 * _OceanGravity * rcp(OceanWindSpeed * 1.026);
 }
 
 // Source: https://wikiwaves.org/Ocean-Wave_Spectra#JONSWAP_Spectrum
@@ -87,20 +71,20 @@ float PhillipsSpectrum(float2 k, float kLength, float rcpPatchSize)
 	float philNorm = exp(1.0) * rcpPatchSize;
 	float a = Sq(fftNorm * philNorm);
 
-	float maxWaveHeight = Sq(windSpeed0 * 1.026) / _OceanGravity; // Largest possible waves arising from a continuous wind speed of V
+	float maxWaveHeight = Sq(OceanWindSpeed * 1.026) / _OceanGravity; // Largest possible waves arising from a continuous wind speed of V
 	
 	// Eq 40
-	float2 windDirection = float2(cos(windAngle0 * TwoPi), sin(windAngle0 * TwoPi));
+	float2 windDirection = float2(cos(OceanWindAngle * TwoPi), sin(OceanWindAngle * TwoPi));
 	float phillips = a * exp(-rcp(Sq(kLength * maxWaveHeight))) / pow(kLength, 4.0) * pow(dot(k, windDirection), 2.0);
 	
 	// Remove small wavelengths (eq 41)
-	//phillips *= exp(-Sq(kLength * shortWavesFade0));
+	//phillips *= exp(-Sq(kLength * OceanShortWavesFade));
 	
 	phillips = sqrt(phillips);
 	
 	// Move waves along wind direction
 	//if (dot(k, windDirection) < 0.0)
-	//	phillips *= -sqrt(1.0 - swell0);
+	//	phillips *= -sqrt(1.0 - OceanSwell);
 
 	return phillips;
 }
@@ -112,14 +96,14 @@ float PmSpectrum(float w, float w0, float alpha, float beta)
 
 float PmSpectrum(float w)
 {
-	float w0 = _OceanGravity / (windSpeed0 * 1.026);
+	float w0 = _OceanGravity / (OceanWindSpeed * 1.026);
 	return PmSpectrum(w, w0, 8.1e-3, 0.74);
 }
 
 float JonswapSpectrum(float w)
 {
-	float alpha = JonswapAlpha(windSpeed0 * 1.026, fetch0);
-	float wp = JonswapPeakAngularFrequency(windSpeed0 * 1.026, fetch0);
+	float alpha = JonswapAlpha(OceanWindSpeed * 1.026, OceanFetch);
+	float wp = JonswapPeakAngularFrequency(OceanWindSpeed * 1.026, OceanFetch);
 	float gamma = 3.3;
 	float sigma = w <= wp ? 0.07 : 0.09;
 	float r = exp(-Sq(w - wp) * rcp(2.0 * Sq(sigma) * Sq(wp)));
@@ -155,10 +139,10 @@ float HasselmannDirectionalSpread(float w, float wp, float wind_speed, float the
 	float sp = w >= wp ? 9.77 : 6.97;
 	
 	float s = sp * pow(abs(w / wp), (w >= wp) ? -2.33 - 1.45 * (wind_speed * wp / _OceanGravity - 1.17) : 4.06);
-	float s_xi = 16.0 * tanh(wp / w) * swell0 * swell0;
+	float s_xi = 16.0 * tanh(wp / w) * OceanSwell * OceanSwell;
 	s += s_xi;
 	
-	return LonguetHigginsNormalization(s) * pow(abs(cos((theta - windAngle0 * TwoPi) / 2.0)), 2.0 * s);
+	return LonguetHigginsNormalization(s) * pow(abs(cos((theta - OceanWindAngle * TwoPi) / 2.0)), 2.0 * s);
 }
 
 float GetSpectrumAmplitude(float2 k, float kLength, float rcpTileLength)
@@ -166,7 +150,7 @@ float GetSpectrumAmplitude(float2 k, float kLength, float rcpTileLength)
 	float w = DispersionDeep(kLength);
 	
 	#if 0
-		float wp = JonswapPeakAngularFrequency(windSpeed0 * 1.026, fetch0);
+		float wp = JonswapPeakAngularFrequency(OceanWindSpeed * 1.026, OceanFetch);
 		float s = JonswapSpectrum(w);
 	#else
 		float wp = PiersonMoskowitzPeakAngularFrequency();
@@ -177,15 +161,15 @@ float GetSpectrumAmplitude(float2 k, float kLength, float rcpTileLength)
 	float wNorm = DispersionDeepDerivative(kLength) / kLength * dk.x * dk.y;
 	
 	float theta = atan2(k.y, k.x);
-	float d = HasselmannDirectionalSpread(w, wp, windSpeed0 * 1.026, theta);
+	float d = HasselmannDirectionalSpread(w, wp, OceanWindSpeed * 1.026, theta);
 	//d = 1;
 	
 	float spectrum = sqrt(max(0, 4.0 * s * d * wNorm));
 	
 	// Move waves along wind direction
-	//float2 windDirection = float2(cos(windAngle0 * TwoPi), sin(windAngle0 * TwoPi));
+	//float2 windDirection = float2(cos(OceanWindAngle * TwoPi), sin(OceanWindAngle * TwoPi));
 	//if (dot(k, windDirection) < 0.0)
-	//	spectrum *= -sqrt(1.0 - swell0);
+	//	spectrum *= -sqrt(1.0 - OceanSwell);
 		
 	//spectrum = PhillipsSpectrum(k, kLength, rcpTileLength) * d;
 	
@@ -288,7 +272,7 @@ void Dispersion(uint3 id : SV_DispatchThreadID)
 	
 	// Eq 43
 	float4 h0 = OceanSpectrum[index];
-	float wtk = OceanDispersion[index] * Time * TimeScale;
+	float wtk = OceanDispersion[index] * OceanTime * TimeScale;
 	float2 h = cmul(h0.xy, cexp(cimg(wtk)));
 	h = cadd(h, cmul(h0.zw, cexp(-cimg(wtk))));
 	
@@ -314,7 +298,7 @@ void Dispersion(uint3 id : SV_DispatchThreadID)
 }
 
 RWTexture2DArray<float3> DisplacementOutput;
-RWTexture2DArray<float4> OceanNormalFoamSmoothness;
+RWTexture2DArray<float4> OceanNormalFoamSmoothnessWrite;
 Texture2DArray<float2> Height;
 Texture2DArray<float4> Displacement, Slope;
 
@@ -333,7 +317,7 @@ void FftColumns(uint3 id : SV_DispatchThreadID)
 	
 	float3 normal = normalize(float3(-slope.xz * sign, 1.0));
 	
-	OceanNormalFoamSmoothness[id.yxz] = float4(normal.xy, 0.0, 0.0); // Snorm texture, need to put smoothness into -1 to 1 range
+	OceanNormalFoamSmoothnessWrite[id.yxz] = float4(normal.xy, 0.0, 0.0); // Snorm texture, need to put smoothness into -1 to 1 range
 }
 
 cbuffer CalculateNormalsProperties
@@ -363,7 +347,7 @@ void CalculateNormals(uint3 id : SV_DispatchThreadID)
 	float2 normalGradients = float2(-dx.y, -dy.y);
 	
 	float3 normal = normalize(float3(normalGradients, 1.0));
-	normal.xy = OceanNormalFoamSmoothness[uint3(id.xy, id.z)].xy;
+	normal.xy = OceanNormalFoamSmoothnessWrite[uint3(id.xy, id.z)].xy;
 	float normalLength = SmoothnessToNormalLength(Smoothness);
 	normal *= normalLength;
 	
@@ -374,7 +358,7 @@ void CalculateNormals(uint3 id : SV_DispatchThreadID)
 	float jyx = dy.z;
 	
 	float jacobian = jxx * jyy - jxy * jyx;
-	OceanNormalFoamSmoothness[uint3(id.xy, id.z)] = float4(normal.xy, jacobian, Remap(normalLength, 2.0 / 3.0, 1.0, -1.0)); // Snorm texture, need to put smoothness into -1 to 1 range
+	OceanNormalFoamSmoothnessWrite[uint3(id.xy, id.z)] = float4(normal.xy, jacobian, Remap(normalLength, 2.0 / 3.0, 1.0, -1.0)); // Snorm texture, need to put smoothness into -1 to 1 range
 }
 
 RWTexture2DArray<float4> SmoothnessOutput0, SmoothnessOutput1, SmoothnessOutput2, SmoothnessOutput3, SmoothnessOutput4, SmoothnessOutput5, SmoothnessOutput6, SmoothnessOutput7;

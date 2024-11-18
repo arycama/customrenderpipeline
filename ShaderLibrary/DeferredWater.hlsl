@@ -86,7 +86,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		
 		float3 normal = UnpackNormalSNorm(cascadeData.rg);
 		normalData += normal.xy / normal.z;
-		foam += cascadeData.b * _RcpCascadeScales[i];
+		foam += cascadeData.b / _OceanScale[i];
 		smoothness += Remap(cascadeData.a, -1.0, 1.0, 2.0 / 3.0);
 	}
 	

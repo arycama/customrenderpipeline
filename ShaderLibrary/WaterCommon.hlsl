@@ -5,6 +5,20 @@
 #include "Samplers.hlsl"
 #include "Water/WaterShoreMask.hlsl"
 
+cbuffer OceanData
+{
+	float OceanWindSpeed;
+	float OceanWindAngle;
+	float OceanFetch;
+	float OceanSpreadBlend;
+	float OceanSwell;
+	float OceanPeakEnhancement;
+	float OceanShortWavesFade;
+	float padding;
+	float4 _OceanScale, SpectrumStart, SpectrumEnd;
+	float _OceanGravity, OceanTime, TimeScale, SequenceLength;
+};
+
 float4x4 _WaterShadowMatrix;
 
 Texture2DArray<float4> OceanNormalFoamSmoothness;
@@ -14,12 +28,9 @@ Texture2D<float3> _WaterNormals;
 Texture2D<float4> _FoamBump, _FoamTex, _OceanCausticsMap;
 
 float4 _OceanTerrainMask_ST;
-float4 _OceanScale, _OceanTerrainMask_TexelSize;
+float4 _OceanTerrainMask_TexelSize;
 float3 _TerrainSize;
-float _WindSpeed, _OceanGravity;
 float _MaxOceanDepth, _MaxShoreDistance, CausticsScale, _OceanCascadeScale;
-float4 _RcpCascadeScales;
-float4 _OceanTexelSize;
 float4 _PatchScaleOffset;
 
 float _RcpVerticesPerEdgeMinusOne;
@@ -85,7 +96,7 @@ void GerstnerWaves(float3 worldPosition, float time, out float3 displacement, ou
 	//}
 	
 	// Largest wave arising from a wind speed
-	float amplitude = 0.22 * Sq(_WindSpeed) / _OceanGravity;// _ShoreWaveHeight;
+	float amplitude = 0.22 * Sq(OceanWindSpeed) / _OceanGravity; // _ShoreWaveHeight;
 	float wavelength = 14.0 * amplitude;
 	float frequency = TwoPi / wavelength;
 	
