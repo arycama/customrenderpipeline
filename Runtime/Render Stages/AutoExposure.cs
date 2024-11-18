@@ -74,23 +74,8 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.Apply(false, false);
         }
 
-        private class Pass0Data
-        {
-            internal float minEv, maxEv, adaptationSpeed, exposureCompensation, iso, aperture, shutterSpeed, histogramMin, histogramMax;
-            internal Vector4 exposureCompensationRemap;
-            internal BufferHandle exposureBuffer;
-            internal Vector4 scaledResolution;
-        }
 
-        private class Pass1Data
-        {
-            internal Texture2D exposureTexture;
-            internal BufferHandle exposureBuffer;
-            internal ExposureMode mode;
-            internal bool isFirst;
-        }
-
-        private class Pass2Data
+        private struct Pass2Data
         {
             internal BufferHandle output;
         }
@@ -111,15 +96,13 @@ namespace Arycama.CustomRenderPipeline
                 // For first pass, set to 1.0f 
                 if (isFirst)
                 {
-                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                    pass.SetRenderFunction(bufferHandle, (command, pass, data) =>
                     {
                         var initialData = ArrayPool<Vector4>.Get(1);
                         initialData[0] = new Vector4(1.0f, 0.0f, 0.0f, 0.0f);
-                        command.SetBufferData(data.bufferHandle, initialData);
+                        command.SetBufferData(data, initialData);
                         ArrayPool<Vector4>.Release(initialData);
                     });
-
-                    data.bufferHandle = bufferHandle;
                 }
 
                 renderGraph.ResourceMap.SetRenderPassData(new AutoExposureData(bufferHandle, isFirst), renderGraph.FrameIndex);
@@ -149,7 +132,21 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("LuminanceHistogram", histogram);
                 pass.AddRenderPassData<AutoExposureData>();
 
-                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
+                pass.SetRenderFunction(
+                (
+                    minEv: settings.MinEv,
+                    maxEv: settings.MaxEv,
+                    adaptationSpeed: settings.AdaptationSpeed,
+                    exposureCompensation: settings.ExposureCompensation,
+                    iso: lensSettings.Iso,
+                    aperture: lensSettings.Aperture,
+                    shutterSpeed: lensSettings.ShutterSpeed,
+                    histogramMin: settings.HistogramMin,
+                    histogramMax: settings.HistogramMax,
+                    exposureCompensationRemap: GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1)
+                ),
+
+                (command, pass, data) => 
                 {
                     pass.SetFloat(command, "MinEv", data.minEv);
                     pass.SetFloat(command, "MaxEv", data.maxEv);
@@ -162,24 +159,10 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "HistogramMax", data.histogramMax);
                     pass.SetFloat(command, "MeteringMode", (float)settings.MeteringMode);
                     pass.SetVector(command, "_ExposureCompensationRemap", data.exposureCompensationRemap);
-                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                     pass.SetVector(command, "ProceduralCenter", settings.ProceduralCenter);
                     pass.SetVector(command, "ProceduralRadii", settings.ProceduralRadii);
                     pass.SetFloat(command, "ProceduralSoftness", settings.ProceduralSoftness);
                 });
-
-                // TODO: Put this in a common place, eg main pipeline
-                data.minEv = settings.MinEv;
-                data.maxEv = settings.MaxEv;
-                data.adaptationSpeed = settings.AdaptationSpeed;
-                data.exposureCompensation = settings.ExposureCompensation;
-                data.iso = lensSettings.Iso;
-                data.aperture = lensSettings.Aperture;
-                data.shutterSpeed = lensSettings.ShutterSpeed;
-                data.histogramMin = settings.HistogramMin;
-                data.histogramMax = settings.HistogramMax;
-                data.exposureCompensationRemap = GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1);
-                data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
             }
 
             var output = renderGraph.GetBuffer(1, 16, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
@@ -191,30 +174,25 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("LuminanceOutput", output);
                 pass.AddRenderPassData<AutoExposureData>();
 
-                var data = pass.SetRenderFunction<Pass1Data>((command, pass, data) =>
+                pass.SetRenderFunction((settings.ExposureMode, exposureTexture), (command, pass, data) =>
                 {
-                    pass.SetFloat(command, "Mode", (float)data.mode);
-                    pass.SetFloat(command, "IsFirst", data.isFirst ? 1.0f : 0.0f);
+                    pass.SetFloat(command, "Mode", (float)data.ExposureMode);
+                    pass.SetFloat(command, "IsFirst", 0.0f);
                     pass.SetTexture(command, "ExposureTexture", data.exposureTexture);
                 });
-
-                data.exposureTexture = exposureTexture;
-                data.mode = settings.ExposureMode;
             }
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Auto Exposure"))
             {
-                var data = pass.SetRenderFunction<Pass2Data>((command, pass, data) =>
+                pass.SetRenderFunction(output, (command, pass, data) =>
                 {
                     var exposureData = pass.RenderGraph.ResourceMap.GetRenderPassData<AutoExposureData>(renderGraph.FrameIndex);
-                    command.CopyBuffer(data.output, exposureData.exposureBuffer);
+                    command.CopyBuffer(data, exposureData.exposureBuffer);
                 });
-
-                data.output = output;
             }
         }
 
-        private class PassData
+        private struct PassData
         {
             internal bool isFirst;
             internal BufferHandle bufferHandle;

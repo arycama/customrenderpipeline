@@ -15,7 +15,7 @@ public class DeferredLighting
         material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public void RenderMainPass(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, Camera camera)
+    public void RenderMainPass(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, Camera camera)
     {
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting"))
         {
@@ -30,7 +30,6 @@ public class DeferredLighting
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
             pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
 
-            commonPassData.SetInputs(pass);
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
@@ -45,13 +44,13 @@ public class DeferredLighting
             pass.AddRenderPassData<WaterPrepassResult>(true);
             pass.AddRenderPassData<LightingSetup.Result>();
             pass.AddRenderPassData<WaterShadowResult>(true);
+            pass.AddRenderPassData<ICommonPassData>();
 
             var hasWaterShadow = renderGraph.ResourceMap.IsRenderPassDataValid<WaterShadowResult>(renderGraph.FrameIndex);
             pass.Keyword = hasWaterShadow ? "WATER_SHADOWS_ON" : string.Empty;
 
-            var data = pass.SetRenderFunction<Data>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
-                commonPassData.SetProperties(pass, command);
                 pass.SetFloat(command, "HasWaterShadow", hasWaterShadow ? 1.0f : 0.0f);
             });
         }
@@ -82,12 +81,9 @@ public class DeferredLighting
             pass.AddRenderPassData<ScreenSpaceShadows.Result>();
             pass.AddRenderPassData<DiffuseGlobalIllumination.Result>();
             pass.AddRenderPassData<AmbientOcclusion.Result>();
+            pass.AddRenderPassData<ICommonPassData>();
         }
 
         return result;
-    }
-
-    private class Data
-    {
     }
 }

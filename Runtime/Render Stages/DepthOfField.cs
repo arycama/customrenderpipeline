@@ -28,13 +28,6 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Depth of Field")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        private class PassData
-        {
-            internal float focalDistance, focalLength, apertureSize, maxCoc, sensorHeight, sampleRadius;
-            internal int sampleCount;
-            internal Vector4 scaledResolution;
-        }
-
         public RTHandle Render(int width, int height, float fieldOfView, RTHandle color, RTHandle depth)
         {
             var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
@@ -48,7 +41,23 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_Result", tempId);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
+                var focalLength = 0.5f * sensorSize / Mathf.Tan(fieldOfView * Mathf.Deg2Rad / 2.0f);
+                var F = focalLength;
+                var A = focalLength / lensSettings.Aperture;
+                var P = lensSettings.FocalDistance;
+                var maxCoC = (A * F) / Mathf.Max((P - F), 1e-6f);
+
+                pass.SetRenderFunction((
+                    focalDistance: lensSettings.FocalDistance,
+                    focalLength: focalLength,
+                    apertureSize: lensSettings.Aperture,
+                    maxCoc: maxCoC,
+                    sensorHeight: sensorSize,
+                    sampleRadius: settings.SampleRadius,
+                    sampleCount: settings.SampleCount
+                ), 
+                (command, pass, data) =>
                 {
                     pass.SetFloat(command, "_FocalDistance", data.focalDistance);
                     pass.SetFloat(command, "_FocalLength", data.focalLength);
@@ -58,25 +67,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetFloat(command, "_SampleRadius", data.sampleRadius);
                     pass.SetInt(command, "_SampleCount", data.sampleCount);
-                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                 });
-
-                var sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
-                var focalLength = 0.5f * sensorSize / Mathf.Tan(fieldOfView * Mathf.Deg2Rad / 2.0f);
-
-                var F = focalLength;
-                var A = focalLength / lensSettings.Aperture;
-                var P = lensSettings.FocalDistance;
-                var maxCoC = (A * F) / Mathf.Max((P - F), 1e-6f);
-
-                data.focalDistance = lensSettings.FocalDistance;
-                data.focalLength = focalLength;
-                data.apertureSize = lensSettings.Aperture;
-                data.maxCoc = maxCoC;
-                data.sensorHeight = sensorSize;
-                data.sampleRadius = settings.SampleRadius;
-                data.sampleCount = settings.SampleCount;
-                data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
             }
 
             return tempId;

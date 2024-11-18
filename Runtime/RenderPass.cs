@@ -9,7 +9,7 @@ namespace Arycama.CustomRenderPipeline
 {
     public abstract class RenderPass : IDisposable
     {
-        protected RenderGraphBuilder renderGraphBuilder;
+        protected IRenderGraphBuilder renderGraphBuilder;
 
         // TODO: Convert to handles and remove
         private readonly List<(int, RTHandle, int, RenderTextureSubElement)> readTextures = new();
@@ -157,7 +157,6 @@ namespace Arycama.CustomRenderPipeline
 
             if (renderGraphBuilder != null)
             {
-                RenderGraph.ReleaseRenderGraphBuilder(renderGraphBuilder);
                 renderGraphBuilder = null;
             }
 
@@ -173,39 +172,52 @@ namespace Arycama.CustomRenderPipeline
             RenderGraph.AddRenderPassInternal(this);
         }
 
-        public T SetRenderFunction<T>(Action<CommandBuffer, RenderPass, T> pass) where T : class, new()
+        public void SetRenderFunction(Action<CommandBuffer, RenderPass> pass)
         {
-            var result = RenderGraph.GetRenderGraphBuilder<T>();
+            var result = new RenderGraphBuilder();
             result.SetRenderFunction(pass);
             renderGraphBuilder = result;
-            return result.Data;
+        }
+
+        public void SetRenderFunction<T>(T data, Action<CommandBuffer, RenderPass, T> pass)
+        {
+            var result = new RenderGraphBuilder<T>();
+            result.Data = data;
+            result.SetRenderFunction(pass);
+            renderGraphBuilder = result;
         }
     }
 }
 
-public class RenderGraphBuilder
+public interface IRenderGraphBuilder
 {
-    private Action<CommandBuffer> pass;
+    void ClearRenderFunction();
+    void Execute(CommandBuffer command, RenderPass pass);
+}
 
-    public void SetRenderFunction(Action<CommandBuffer> pass)
+public struct RenderGraphBuilder : IRenderGraphBuilder
+{
+    private Action<CommandBuffer, RenderPass> pass;
+
+    public void SetRenderFunction(Action<CommandBuffer, RenderPass> pass)
     {
         this.pass = pass;
     }
 
-    public virtual void ClearRenderFunction()
+    public void ClearRenderFunction()
     {
         pass = null;
     }
 
-    public virtual void Execute(CommandBuffer command, RenderPass pass)
+    public void Execute(CommandBuffer command, RenderPass pass)
     {
-        this.pass?.Invoke(command);
+        this.pass?.Invoke(command, pass);
     }
 }
 
-public class RenderGraphBuilder<T> : RenderGraphBuilder where T : class, new()
+public struct RenderGraphBuilder<T> : IRenderGraphBuilder
 {
-    public T Data { get; } = new();
+    public T Data { get; set; }
     private Action<CommandBuffer, RenderPass, T> pass;
 
     public void SetRenderFunction(Action<CommandBuffer, RenderPass, T> pass)
@@ -213,12 +225,12 @@ public class RenderGraphBuilder<T> : RenderGraphBuilder where T : class, new()
         this.pass = pass;
     }
 
-    public override void ClearRenderFunction()
+    public void ClearRenderFunction()
     {
         pass = null;
     }
 
-    public override void Execute(CommandBuffer command, RenderPass pass)
+    public void Execute(CommandBuffer command, RenderPass pass)
     {
         this.pass?.Invoke(command, pass, Data);
     }

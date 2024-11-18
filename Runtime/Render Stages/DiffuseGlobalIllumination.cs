@@ -35,7 +35,7 @@ public class DiffuseGlobalIllumination
         raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Diffuse");
     }
 
-    public void Render(RTHandle depth, int width, int height, ICommonPassData commonPassData, Camera camera, RTHandle previousFrame, RTHandle velocity, RTHandle normalRoughness, RTHandle hiZDepth, RTHandle bentNormalOcclusion, float bias, float distantBias)
+    public void Render(RTHandle depth, int width, int height, Camera camera, RTHandle previousFrame, RTHandle velocity, RTHandle normalRoughness, RTHandle hiZDepth, RTHandle bentNormalOcclusion, float bias, float distantBias)
     {
         var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
         var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
@@ -52,12 +52,7 @@ public class DiffuseGlobalIllumination
                 pass.AddRenderPassData<TerrainRenderData>(true);
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
-                {
-                    commonPassData.SetProperties(pass, command);
-                });
+                pass.AddRenderPassData<ICommonPassData>();
             }
 
             using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Diffuse GI Raytrace"))
@@ -73,12 +68,7 @@ public class DiffuseGlobalIllumination
                 pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<Data>((command, pass, data) =>
-                {
-                    commonPassData.SetProperties(pass, command);
-                });
+                pass.AddRenderPassData<ICommonPassData>();
             }
         }
         else
@@ -95,6 +85,7 @@ public class DiffuseGlobalIllumination
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<ICommonPassData>();
 
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("PreviousFrame", previousFrame);
@@ -103,9 +94,7 @@ public class DiffuseGlobalIllumination
                 pass.ReadTexture("_HiZDepth", hiZDepth);
                 pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<Data>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetFloat(command, "_Intensity", settings.Intensity);
                     pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
@@ -115,8 +104,6 @@ public class DiffuseGlobalIllumination
 
                     var tanHalfFov = Mathf.Tan(0.5f * camera.fieldOfView * Mathf.Deg2Rad);
                     pass.SetFloat(command, "_ConeAngle", Mathf.Tan(0.5f * settings.ConeAngle * Mathf.Deg2Rad) * (height / tanHalfFov * 0.5f));
-
-                    commonPassData.SetProperties(pass, command);
                 });
             }
         }
@@ -138,15 +125,14 @@ public class DiffuseGlobalIllumination
             pass.ReadTexture("_NormalRoughness", normalRoughness);
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
-            commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+            pass.AddRenderPassData<ICommonPassData>();
 
-            var data = pass.SetRenderFunction<Data>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
-                commonPassData.SetProperties(pass, command);
                 pass.SetFloat(command, "_Intensity", settings.Intensity);
                 pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
                 pass.SetFloat(command, "_Thickness", settings.Thickness);
@@ -174,15 +160,14 @@ public class DiffuseGlobalIllumination
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
             pass.ReadTexture("RayDepth", rayDepth);
 
-            commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+            pass.AddRenderPassData<ICommonPassData>();
 
-            var data = pass.SetRenderFunction<Data>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
-                commonPassData.SetProperties(pass, command);
                 pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
                 pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
                 pass.SetFloat(command, "_Intensity", settings.Intensity);
@@ -192,10 +177,6 @@ public class DiffuseGlobalIllumination
         }
 
         renderGraph.ResourceMap.SetRenderPassData(new Result(current, settings.Intensity), renderGraph.FrameIndex);
-    }
-
-    private class Data
-    {
     }
 
     public readonly struct Result : IRenderPassData

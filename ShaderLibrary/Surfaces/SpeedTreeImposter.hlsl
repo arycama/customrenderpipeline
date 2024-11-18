@@ -43,6 +43,9 @@ cbuffer UnityPerMaterial
 
 static const float4 _HueVariationColor = float4(0.7, 0.25, 0.1, 0.2);
 
+// TODO: Implement
+matrix _ViewToClip;
+
 FragmentInput Vertex(VertexInput input)
 {
 	float3 worldPosition = ObjectToWorld(input.position, input.instanceID);

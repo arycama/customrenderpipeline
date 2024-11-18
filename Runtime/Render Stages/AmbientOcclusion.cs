@@ -21,13 +21,17 @@ namespace Arycama.CustomRenderPipeline
             ambientOcclusionRaytracingShader = Resources.Load<RayTracingShader>("Raytracing/AmbientOcclusion");
         }
 
-        public void Render(Camera camera, RTHandle depth, float scale, RTHandle normal, ICommonPassData commonPassData, RTHandle velocity, ref RTHandle bentNormalOcclusion, float bias, float distantBias)
+        public void Render(Camera camera, RTHandle depth, float scale, RTHandle normal, RTHandle velocity, ref RTHandle bentNormalOcclusion, float bias, float distantBias)
         {
             var width = (int)(camera.pixelWidth * scale);
             var height = (int)(camera.pixelHeight * scale);
 
             var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
             var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+
+            var tanHalfFov = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+            var falloffStart = settings.Radius * settings.Falloff;
+            var falloffEnd = settings.Radius;
 
             if (settings.UseRaytracing)
             {
@@ -40,12 +44,19 @@ namespace Arycama.CustomRenderPipeline
                     pass.WriteTexture(hitResult, "HitResult");
                     pass.ReadTexture("_Depth", depth);
                     pass.ReadTexture("_NormalRoughness", normal);
-                    commonPassData.SetInputs(pass);
+                    pass.AddRenderPassData<ICommonPassData>();
 
-                    var data = pass.SetRenderFunction<Pass1Data>((command, pass, data) =>
+                    pass.SetRenderFunction((
+                        rawRadius: settings.Radius,
+                        radius: height / tanHalfFov * 0.5f * settings.Radius,
+                        aoStrength: settings.Strength,
+                        falloffScale: settings.Falloff == 1.0f ? 0.0f : 1.0f / (falloffStart * falloffStart - falloffEnd * falloffEnd),
+                        falloffBias: settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff * settings.Falloff),
+                        sampleCount: settings.SampleCount
+                    ),
+
+                    (command, pass, data) =>
                     {
-                        commonPassData.SetProperties(pass, command);
-
                         pass.SetFloat(command, "_Radius", data.radius);
                         pass.SetFloat(command, "_RawRadius", data.rawRadius);
                         pass.SetFloat(command, "_AoStrength", data.aoStrength);
@@ -53,17 +64,6 @@ namespace Arycama.CustomRenderPipeline
                         pass.SetFloat(command, "_FalloffBias", data.falloffBias);
                         pass.SetFloat(command, "_SampleCount", data.sampleCount);
                     });
-
-                    var tanHalfFov = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
-                    var falloffStart = settings.Radius * settings.Falloff;
-                    var falloffEnd = settings.Radius;
-
-                    data.rawRadius = settings.Radius;
-                    data.radius = height / tanHalfFov * 0.5f * settings.Radius;
-                    data.aoStrength = settings.Strength;
-                    data.falloffScale = settings.Falloff == 1.0f ? 0.0f : 1.0f / (falloffStart * falloffStart - falloffEnd * falloffEnd);
-                    data.falloffBias = settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff * settings.Falloff);
-                    data.sampleCount = settings.SampleCount;
                 }
             }
             else
@@ -76,39 +76,35 @@ namespace Arycama.CustomRenderPipeline
                     pass.ReadTexture("_Depth", depth);
                     pass.ReadTexture("_NormalRoughness", normal);
                     pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
-                    commonPassData.SetInputs(pass);
+                    pass.AddRenderPassData<ICommonPassData>();
 
-                    var data = pass.SetRenderFunction<Pass1Data>((command, pass, data) =>
-                    {
-                        commonPassData.SetProperties(pass, command);
+                    pass.SetRenderFunction((
+                         rawRadius: settings.Radius,
+                         radius: height / tanHalfFov * 0.5f * settings.Radius,
+                         aoStrength: settings.Strength,
+                         falloffScale: settings.Falloff == 1.0f ? 0.0f : 1.0f / (falloffStart * falloffStart - falloffEnd * falloffEnd),
+                         falloffBias: settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff * settings.Falloff),
+                         sampleCount: settings.SampleCount,
+                         thinOccluderCompensation: settings.ThinOccluderCompensation
+                     ),
 
-                        pass.SetFloat(command, "_Radius", data.radius);
-                        pass.SetFloat(command, "_RawRadius", data.rawRadius);
-                        pass.SetFloat(command, "_AoStrength", data.aoStrength);
-                        pass.SetFloat(command, "_FalloffScale", data.falloffScale);
-                        pass.SetFloat(command, "_FalloffBias", data.falloffBias);
-                        pass.SetFloat(command, "_SampleCount", data.sampleCount);
-                        pass.SetFloat(command, "_ThinOccluderCompensation", data.thinOccluderCompensation);
+                     (command, pass, data) =>
+                     {
+                         pass.SetFloat(command, "_Radius", data.radius);
+                         pass.SetFloat(command, "_RawRadius", data.rawRadius);
+                         pass.SetFloat(command, "_AoStrength", data.aoStrength);
+                         pass.SetFloat(command, "_FalloffScale", data.falloffScale);
+                         pass.SetFloat(command, "_FalloffBias", data.falloffBias);
+                         pass.SetFloat(command, "_SampleCount", data.sampleCount);
+                         pass.SetFloat(command, "_ThinOccluderCompensation", data.thinOccluderCompensation);
 
-                        var thinOccStart = settings.ThinOccluderStart * settings.Radius;
-                        var thinOccEnd = settings.ThinOccluderEnd * settings.Radius;
+                         var thinOccStart = settings.ThinOccluderStart * settings.Radius;
+                         var thinOccEnd = settings.ThinOccluderEnd * settings.Radius;
 
-                        pass.SetFloat(command, "_ThinOccluderScale", settings.ThinOccluderFalloff / (0.5f * (thinOccEnd - thinOccStart)));
-                        pass.SetFloat(command, "_ThinOccluderOffset", settings.ThinOccluderFalloff * (thinOccStart + thinOccEnd) / (thinOccStart - thinOccEnd));
-                        pass.SetFloat(command, "_ThinOccluderFalloff", settings.ThinOccluderFalloff);
-                    });
-
-                    var tanHalfFov = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
-                    var falloffStart = settings.Radius * settings.Falloff;
-                    var falloffEnd = settings.Radius;
-
-                    data.rawRadius = settings.Radius;
-                    data.radius = height / tanHalfFov * 0.5f * settings.Radius;
-                    data.aoStrength = settings.Strength;
-                    data.falloffScale = settings.Falloff == 1.0f ? 0.0f : 1.0f / (falloffStart * falloffStart - falloffEnd * falloffEnd);
-                    data.falloffBias = settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff * settings.Falloff);
-                    data.sampleCount = settings.SampleCount;
-                    data.thinOccluderCompensation = settings.ThinOccluderCompensation;
+                         pass.SetFloat(command, "_ThinOccluderScale", settings.ThinOccluderFalloff / (0.5f * (thinOccEnd - thinOccStart)));
+                         pass.SetFloat(command, "_ThinOccluderOffset", settings.ThinOccluderFalloff * (thinOccStart + thinOccEnd) / (thinOccStart - thinOccEnd));
+                         pass.SetFloat(command, "_ThinOccluderFalloff", settings.ThinOccluderFalloff);
+                     });
                 }
             }
 
@@ -129,15 +125,14 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_NormalRoughness", normal);
                 pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
-                commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
                 pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
-                    commonPassData.SetProperties(pass, command);
                     //pass.SetFloat(command, "_Intensity", settings.Strength);
                     //pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
                     //pass.SetFloat(command, "_Thickness", settings.Thickness);
@@ -159,12 +154,11 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("Velocity", velocity);
 
-                commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<TemporalPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
-                    commonPassData.SetProperties(pass, command);
                     pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
                     pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
                 });
@@ -183,7 +177,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
 
-                var data = pass.SetRenderFunction<TemporalPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetFloat(command, "_AoStrength", settings.Strength);
                     pass.SetVector(command, "InputScaleLimit", current.ScaleLimit2D);
@@ -228,27 +222,6 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Range(0, 32)] public int ResolveSamples { get; private set; } = 8;
             [field: SerializeField, Min(0.0f)] public float ResolveSize { get; private set; } = 16.0f;
             [field: SerializeField] public bool UseRaytracing { get; private set; } = false;
-        }
-
-        private class Pass1Data
-        {
-            internal float radius;
-            internal float aoStrength;
-            internal float falloffScale;
-            internal float falloffBias;
-            internal int sampleCount;
-            internal float rawRadius;
-            internal float thinOccluderCompensation;
-        }
-
-        private class Pass2Data
-        {
-            internal VolumetricLighting.Result volumetricLightingResult;
-            internal Vector4 scaledResolution;
-        }
-
-        private class TemporalPassData
-        {
         }
     }
 }

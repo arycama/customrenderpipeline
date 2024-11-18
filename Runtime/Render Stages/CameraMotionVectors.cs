@@ -13,7 +13,7 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Camera Motion Vectors")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public RTHandle Render(RTHandle velocity, RTHandle cameraDepth, int width, int height, Camera camera, ICommonPassData commonPassData)
+        public RTHandle Render(RTHandle velocity, RTHandle cameraDepth, int width, int height, Camera camera)
         {
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Camera Velocity"))
             {
@@ -21,12 +21,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("Depth", cameraDepth);
                 pass.WriteTexture(velocity);
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
-                {
-                    commonPassData.SetProperties(pass, command);
-                });
+                pass.AddRenderPassData<ICommonPassData>();
             }
 
             var result = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16_SFloat);
@@ -36,19 +31,10 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("Depth", cameraDepth);
                 pass.ReadTexture("Velocity", velocity);
                 pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
-                {
-                    commonPassData.SetProperties(pass, command);
-                });
+                pass.AddRenderPassData<ICommonPassData>();
             }
 
             return result;
-        }
-
-        private class PassData
-        {
         }
     }
 }

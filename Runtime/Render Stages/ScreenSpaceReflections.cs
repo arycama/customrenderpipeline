@@ -35,7 +35,7 @@ public class ScreenSpaceReflections
         raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Specular");
     }
 
-    public void Render(RTHandle depth, RTHandle hiZDepth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, ICommonPassData commonPassData, int width, int height, RTHandle velocity, RTHandle bentNormalOcclusion, RTHandle albedoMetallic, float bias, float distantBias)
+    public void Render(RTHandle depth, RTHandle hiZDepth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, int width, int height, RTHandle velocity, RTHandle bentNormalOcclusion, RTHandle albedoMetallic, float bias, float distantBias)
     {
         // Must be screen texture since we use stencil to skip sky pixels
         var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
@@ -55,12 +55,7 @@ public class ScreenSpaceReflections
                 pass.AddRenderPassData<TerrainRenderData>(true);
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
-                {
-                    commonPassData.SetProperties(pass, command);
-                });
+                pass.AddRenderPassData<ICommonPassData>();
             }
 
             using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Specular GI Raytrace"))
@@ -73,15 +68,10 @@ public class ScreenSpaceReflections
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
                 pass.ReadTexture("PreviousFrame", previousFrameColor); // Temporary, cuz of leaks if we don't use it..
-                commonPassData.SetInputs(pass);
 
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<WaterPrepassResult>(true);
-
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
-                {
-                    commonPassData.SetProperties(pass, command);
-                });
+                pass.AddRenderPassData<ICommonPassData>();
             }
         }
         else
@@ -101,19 +91,18 @@ public class ScreenSpaceReflections
                 pass.ReadTexture("Velocity", velocity);
                 pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
-                commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
                 pass.AddRenderPassData<LitData.Result>();
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
                     pass.SetFloat(command, "_Thickness", settings.Thickness);
                     pass.SetFloat(command, "_MaxMip", Texture2DExtensions.MipCount(width, height) - 1);
                     pass.SetVector(command, "_PreviousColorScaleLimit", previousFrameColor.ScaleLimit2D);
-                    commonPassData.SetProperties(pass, command);
                 });
             }
         }
@@ -136,15 +125,14 @@ public class ScreenSpaceReflections
             pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
             pass.ReadTexture("AlbedoMetallic", albedoMetallic);
 
-            commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<WaterPrepassResult>(true);
+            pass.AddRenderPassData<ICommonPassData>();
 
-            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
-                commonPassData.SetProperties(pass, command);
                 pass.SetInt(command, "_ResolveSamples", settings.ResolveSamples);
                 pass.SetFloat(command, "_ResolveSize", settings.ResolveSize);
                 pass.SetFloat(command, "SpecularGiStrength", settings.Intensity);
@@ -168,25 +156,20 @@ public class ScreenSpaceReflections
             pass.ReadTexture("AlbedoMetallic", albedoMetallic);
             pass.ReadTexture("RayDepth", rayDepth);
 
-            commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<LitData.Result>();
+            pass.AddRenderPassData<ICommonPassData>();
 
-            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
-                commonPassData.SetProperties(pass, command);
                 pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
                 pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
             });
         }
 
         renderGraph.ResourceMap.SetRenderPassData(new ScreenSpaceReflectionResult(current, settings.Intensity), renderGraph.FrameIndex);
-    }
-
-    private class PassData
-    {
     }
 }
 

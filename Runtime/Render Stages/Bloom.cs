@@ -27,17 +27,6 @@ namespace Arycama.CustomRenderPipeline
             material = new(Shader.Find("Hidden/Bloom")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        private class Pass0Data
-        {
-            public Vector2 rcpResolution;
-        }
-
-        private class Pass1Data
-        {
-            public float strength;
-            public Vector2 rcpResolution;
-        }
-
         public RTHandle Render(Camera camera, RTHandle target)
         {
             var bloomIds = ListPool<RTHandle>.Get();
@@ -66,13 +55,11 @@ namespace Arycama.CustomRenderPipeline
                 var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
                 var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
 
-                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
+                pass.SetRenderFunction(new Vector2(1.0f / width, 1.0f / height), (command, pass, data) =>
                 {
-                    pass.SetVector(command, "_RcpResolution", data.rcpResolution);
+                    pass.SetVector(command, "_RcpResolution", data);
                     pass.SetVector(command, "_InputScaleLimit", input.ScaleLimit2D);
                 });
-
-                data.rcpResolution = new Vector2(1.0f / width, 1.0f / height);
             }
 
             // Upsample
@@ -88,15 +75,12 @@ namespace Arycama.CustomRenderPipeline
                 var width = Mathf.Max(1, camera.pixelWidth >> i);
                 var height = Mathf.Max(1, camera.pixelHeight >> i);
 
-                var data = pass.SetRenderFunction<Pass1Data>((command, pass, data) =>
+                pass.SetRenderFunction((settings.Strength, new Vector2(1f / width, 1f / height)), (command, pass, data) =>
                 {
-                    pass.SetFloat(command, "_Strength", data.strength);
-                    pass.SetVector(command, "_RcpResolution", data.rcpResolution);
+                    pass.SetFloat(command, "_Strength", data.Strength);
+                    pass.SetVector(command, "_RcpResolution", data.Item2);
                     pass.SetVector(command, "_InputScaleLimit", input.ScaleLimit2D);
                 });
-
-                data.strength = settings.Strength;
-                data.rcpResolution = new Vector2(1.0f / width, 1.0f / height);
             }
 
             var result = bloomIds[0];

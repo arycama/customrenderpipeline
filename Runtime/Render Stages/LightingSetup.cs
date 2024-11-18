@@ -367,7 +367,18 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Set Light Data"))
             {
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                pass.SetRenderFunction(
+                (
+                    directionalMatrixBuffer: directionalShadowMatricesBuffer,
+                    directionalShadowTexelSizes: directionalShadowTexelSizes,
+                    directionalShadowMatrices: directionalShadowMatrices,
+                    directionalTexelSizeBuffer: directionalShadowTexelSizesBuffer,
+                    directionalLightBuffer: directionalLightBuffer,
+                    directionalLightList: directionalLightList,
+                    lightList: lightList,
+                    pointLightBuffer: pointLightBuffer
+                ),
+                (command, pass, data) =>
                 {
                     command.SetBufferData(data.directionalMatrixBuffer, data.directionalShadowMatrices);
                     ListPool<Matrix4x4>.Release(data.directionalShadowMatrices);
@@ -381,32 +392,9 @@ namespace Arycama.CustomRenderPipeline
                     command.SetBufferData(data.pointLightBuffer, data.lightList);
                     ListPool<LightData>.Release(data.lightList);
                 });
-
-                data.directionalMatrixBuffer = directionalShadowMatricesBuffer;
-                data.directionalShadowTexelSizes = directionalShadowTexelSizes;
-                data.directionalShadowMatrices = directionalShadowMatrices;
-                data.directionalTexelSizeBuffer = directionalShadowTexelSizesBuffer;
-                data.directionalLightBuffer = directionalLightBuffer;
-                data.directionalLightList = directionalLightList;
-                data.lightList = lightList;
-                data.pointLightBuffer = pointLightBuffer;
             }
 
-            var result = new Result(directionalShadowMatricesBuffer, directionalShadowTexelSizesBuffer, directionalLightBuffer, pointLightBuffer, directionalLightList.Count, lightList.Count);
-
-            renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex);
-        }
-
-        private class PassData
-        {
-            internal List<DirectionalLightData> directionalLightList;
-            internal BufferHandle directionalLightBuffer;
-            internal List<LightData> lightList;
-            internal BufferHandle pointLightBuffer;
-            internal BufferHandle directionalMatrixBuffer;
-            internal List<Vector4> directionalShadowTexelSizes;
-            internal List<Matrix4x4> directionalShadowMatrices;
-            internal BufferHandle directionalTexelSizeBuffer;
+            renderGraph.ResourceMap.SetRenderPassData(new Result(directionalShadowMatricesBuffer, directionalShadowTexelSizesBuffer, directionalLightBuffer, pointLightBuffer, directionalLightList.Count, lightList.Count), renderGraph.FrameIndex);
         }
 
         public readonly struct Result : IRenderPassData

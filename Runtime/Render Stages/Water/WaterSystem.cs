@@ -94,7 +94,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 waterFft.Render(time);
         }
 
-        public void CullShadow(Vector3 viewPosition, CullingResults cullingResults, ICommonPassData commonPassData)
+        public void CullShadow(Vector3 viewPosition, CullingResults cullingResults)
         {
             if (!settings.IsEnabled)
                 return;
@@ -167,7 +167,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             ArrayPool<Plane>.Release(frustumPlanes);
 
-            var cullResult = Cull(viewPosition, cullingPlanes, commonPassData);
+            var cullResult = Cull(viewPosition, cullingPlanes);
 
             var vm = worldToLight;
             var shadowMatrix = new Matrix4x4
@@ -194,16 +194,16 @@ namespace Arycama.CustomRenderPipeline.Water
             renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewProjectionMatrix, shadowMatrix, cullingPlanes), renderGraph.FrameIndex);
         }
 
-        public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
+        public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes)
         {
             if (!settings.IsEnabled)
                 return;
 
-            var result = Cull(viewPosition, cullingPlanes, commonPassData);
+            var result = Cull(viewPosition, cullingPlanes);
             renderGraph.ResourceMap.SetRenderPassData(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer), renderGraph.FrameIndex);
         }
 
-        public void RenderShadow(Vector3 viewPosition, ICommonPassData commonPassData)
+        public void RenderShadow(Vector3 viewPosition)
         {
             if (!settings.IsEnabled)
                 return;
@@ -223,15 +223,13 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.WriteDepth(waterShadow);
                 pass.ConfigureClear(RTClearFlags.Depth);
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
-                commonPassData.SetInputs(pass);
 
                 pass.AddRenderPassData<OceanFftResult>();
                 pass.AddRenderPassData<WaterShoreMask.Result>();
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
-                    commonPassData.SetProperties(pass, command);
-
                     pass.SetMatrix(command, "_WaterShadowMatrix", passData.WorldToClip);
                     pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
                     pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
@@ -260,7 +258,7 @@ namespace Arycama.CustomRenderPipeline.Water
         }
 
 
-        public void RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, IRenderPassData commonPassData, CullingPlanes cullingPlanes)
+        public void RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, CullingPlanes cullingPlanes)
         {
             var viewPosition = camera.transform.position;
             if (!settings.IsEnabled)
@@ -291,16 +289,14 @@ namespace Arycama.CustomRenderPipeline.Water
 
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
 
-                commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<OceanFftResult>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
                 pass.AddRenderPassData<WaterShoreMask.Result>();
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
-                    commonPassData.SetProperties(pass, command);
-
                     pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
                     pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
                     pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
@@ -328,16 +324,16 @@ namespace Arycama.CustomRenderPipeline.Water
             renderGraph.ResourceMap.SetRenderPassData(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction")), renderGraph.FrameIndex);
         }
 
-        public void RenderWaterPost(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, Camera camera, RTHandle velocity)
+        public void RenderWaterPost(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, Camera camera, RTHandle velocity)
         {
             if (!settings.IsEnabled)
                 return;
 
-            underwaterLighting.Render(screenWidth, screenHeight, underwaterDepth, cameraDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive, commonPassData, camera);
-            deferredWater.Render(underwaterDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive, cameraDepth, commonPassData, camera, screenWidth, screenHeight, velocity);
+            underwaterLighting.Render(screenWidth, screenHeight, underwaterDepth, cameraDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive, camera);
+            deferredWater.Render(underwaterDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive, cameraDepth, camera, screenWidth, screenHeight, velocity);
         }
 
-        private WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
+        private WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
         {
             // TODO: Preload?
             var compute = Resources.Load<ComputeShader>("OceanQuadtreeCull");
@@ -369,9 +365,6 @@ namespace Arycama.CustomRenderPipeline.Water
             {
                 using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Quadtree Cull"))
                 {
-                    // I don't think this is required.
-                    commonPassData.SetInputs(pass);
-
                     var isFirstPass = i == 0; // Also indicates whether this is -not- the first pass
                     if (!isFirstPass)
                         pass.ReadTexture("_TempResult", tempIds[i - 1]);
@@ -402,8 +395,10 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.WriteBuffer("_IndirectArgs", indirectArgsBuffer);
                     pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
 
+                    pass.AddRenderPassData<ICommonPassData>();
+
                     var index = i;
-                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
                         // First pass sets the buffer contents
                         if (isFirstPass)
@@ -417,8 +412,6 @@ namespace Arycama.CustomRenderPipeline.Water
                             command.SetBufferData(indirectArgsBuffer, indirectArgs);
                             ListPool<int>.Release(indirectArgs);
                         }
-
-                        commonPassData.SetProperties(pass, command);
 
                         // Do up to 6 passes per dispatch.
                         pass.SetInt(command, "_PassCount", passCount);
@@ -466,7 +459,7 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.ReadTexture("_LodInput", tempLodId);
                     pass.ReadBuffer("_IndirectArgs", indirectArgsBuffer);
 
-                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
                         pass.SetInt(command, "_CellCount", settings.CellCount);
                     });

@@ -28,17 +28,6 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
         }
 
-        private class Pass0Data
-        {
-            public int tileSize;
-            public float rcpClusterDepth;
-            public BufferHandle counterBuffer;
-            internal Vector4 scaledResolution;
-            internal Matrix4x4 invVpMatrix;
-            internal float near;
-            internal float far;
-        }
-
         public readonly struct Result : IRenderPassData
         {
             private readonly RTHandle lightClusterIndices;
@@ -69,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void Render(int width, int height, float near, float far, Matrix4x4 invVpMatrix)
+        public void Render(int width, int height, float near, float far)
         {
             var clusterWidth = MathUtils.DivRoundUp(width, settings.TileSize);
             var clusterHeight = MathUtils.DivRoundUp(height, settings.TileSize);
@@ -92,25 +81,21 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("_LightClusterListWrite", lightList);
                 pass.WriteBuffer("_LightCounter", counterBuffer);
                 pass.WriteTexture("_LightClusterIndicesWrite", lightClusterIndices);
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
+                pass.SetRenderFunction(
+                (
+                    tileSize: settings.TileSize,
+                    rcpClusterDepth: 1.0f / settings.ClusterDepth,
+                    counterBuffer: counterBuffer
+                ),
+
+                (command, pass, data) =>
                 {
                     command.SetBufferData(data.counterBuffer, zeroArray);
                     pass.SetInt(command, "_TileSize", data.tileSize);
                     pass.SetFloat(command, "_RcpClusterDepth", data.rcpClusterDepth);
-                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                    pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
-                    pass.SetFloat(command, "_Near", data.near);
-                    pass.SetFloat(command, "_Far", data.far);
                 });
-
-                data.tileSize = settings.TileSize;
-                data.rcpClusterDepth = 1.0f / settings.ClusterDepth;
-                data.counterBuffer = counterBuffer;
-                data.scaledResolution = new Vector4(width, height, 1.0f / width, 1.0f / height);
-                data.invVpMatrix = invVpMatrix;
-                data.near = near;
-                data.far = far;
             }
 
             renderGraph.ResourceMap.SetRenderPassData(new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize), renderGraph.FrameIndex);

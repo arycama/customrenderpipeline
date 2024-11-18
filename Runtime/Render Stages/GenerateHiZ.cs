@@ -40,7 +40,7 @@ public class GenerateHiZ
                 pass.WriteTexture(resultIds.GetProperty(i), texture, mip);
             }
 
-            var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
                 pass.SetInt(command, "_Width", width);
                 pass.SetInt(command, "_Height", height);
@@ -66,7 +66,7 @@ public class GenerateHiZ
                     pass.WriteTexture(resultIds.GetProperty(i), texture, mip);
                 }
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetInt(command, "_Width", width >> (maxMipsPerPass - 1));
                     pass.SetInt(command, "_Height", height >> (maxMipsPerPass - 1));
@@ -83,10 +83,5 @@ public class GenerateHiZ
         Min,
         Max,
         CheckerMinMax
-    }
-
-    public class PassData
-    {
-
     }
 }

@@ -19,7 +19,7 @@ namespace Arycama.CustomRenderPipeline.Water
             raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Refraction");
         }
 
-        public void Render(RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, IRenderPassData commonPassData, Camera camera, int width, int height, RTHandle velocity)
+        public void Render(RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, Camera camera, int width, int height, RTHandle velocity)
         {
             var refractionResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             var scatterResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
@@ -49,14 +49,12 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.AddRenderPassData<UnderwaterLightingResult>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
 
-                commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<OceanFftResult>();
                 pass.AddRenderPassData<WaterShoreMask.Result>();
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
-                    commonPassData.SetProperties(pass, command);
-
                     var material = settings.Material;
                     pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
                     pass.SetVector(command, "_Extinction", material.GetColor("_Extinction"));
@@ -100,12 +98,10 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.AddRenderPassData<LitData.Result>();
                     pass.AddRenderPassData<WaterShadowResult>();
                     pass.AddRenderPassData<WaterPrepassResult>();
-                    commonPassData.SetInputs(pass);
+                    pass.AddRenderPassData<ICommonPassData>();
 
-                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
-                        commonPassData.SetProperties(pass, command);
-
                         //command.SetRenderTarget(refractionResult);
                         //command.ClearRenderTarget(false, true, Color.clear);
                         //command.SetRenderTarget(scatterResult);
@@ -127,15 +123,14 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.ReadTexture("_Stencil", cameraDepth, subElement: RenderTextureSubElement.Stencil);
                     pass.ReadTexture("_NormalRoughness", normalRoughness);
                     //pass.ReadTexture("PreviousFrame", previousFrameColor); // Temporary, cuz of leaks if we don't use it..
-                    commonPassData.SetInputs(pass);
 
                     pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<WaterShadowResult>();
                     pass.AddRenderPassData<DirectionalLightInfo>();
+                    pass.AddRenderPassData<ICommonPassData>();
 
-                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
-                        commonPassData.SetProperties(pass, command);
                         pass.SetVector(command, "_Extinction", settings.Material.GetColor("_Extinction"));
 
                         var material = settings.Material;
@@ -146,7 +141,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
                 using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Raytraced Refractions Setup"))
                 {
-                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
                         command.DisableShaderKeyword("WATER_SHADOW_ON");
                     });
@@ -182,15 +177,14 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
                 pass.ReadTexture("AlbedoMetallic", albedoMetallic);
 
-                commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
                 pass.AddRenderPassData<LitData.Result>();
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
-                    commonPassData.SetProperties(pass, command);
                     pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
                     pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
 

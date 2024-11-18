@@ -15,7 +15,7 @@ namespace Arycama.CustomRenderPipeline.Water
             underwaterLightingMaterial = new Material(Shader.Find("Hidden/Underwater Lighting 1")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public void Render(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, IRenderPassData commonPassData, Camera camera)
+        public void Render(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, Camera camera)
         {
             var underwaterResultId = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
@@ -40,10 +40,9 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.AddRenderPassData<LitData.Result>();
                 pass.AddRenderPassData<WaterShadowResult>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<ICommonPassData>();
 
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetVector(command, "_WaterExtinction", settings.Material.GetColor("_Extinction"));
                 });

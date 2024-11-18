@@ -56,6 +56,7 @@ cbuffer FrameData
 	float _TanHalfFov;
 };
 
+// Commented out matrices are unused, and not set by code
 cbuffer CameraData
 {
 	matrix _WorldToView;
@@ -64,24 +65,24 @@ cbuffer CameraData
 	matrix _WorldToPixel;
 	
 	matrix _ViewToWorld;
-	matrix _ViewToClip;
-	matrix _ViewToScreen;
-	matrix _ViewToPixel;
+	//matrix _ViewToClip;
+	//matrix _ViewToScreen;
+	//matrix _ViewToPixel;
 
 	matrix _ClipToWorld;
-	matrix _ClipToView;
-	matrix _ClipToScreen;
-	matrix _ClipToPixel;
+	//matrix _ClipToView;
+	//matrix _ClipToScreen;
+	//matrix _ClipToPixel;
 	
 	matrix _ScreenToWorld;
-	matrix _ScreenToView;
-	matrix _ScreenToClip;
-	matrix _ScreenToPixel;
+	//matrix _ScreenToView;
+	//matrix _ScreenToClip;
+	//matrix _ScreenToPixel;
 	
 	matrix _PixelToWorld;
 	matrix _PixelToView;
-	matrix _PixelToClip;
-	matrix _PixelToScreen;
+	//matrix _PixelToClip;
+	//matrix _PixelToScreen;
 	matrix _PixelToWorldDir;
 	
 	matrix _WorldToPreviousClip;

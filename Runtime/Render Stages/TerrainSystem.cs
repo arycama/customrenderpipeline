@@ -160,7 +160,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Generate Alphamap Callback"))
                 {
-                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
                         var tempArrayId = Shader.PropertyToID("_TempTerrainId");
                         command.GetTemporaryRTArray(tempArrayId, idMap.Width, idMap.Height, layerCount, 0, FilterMode.Bilinear, GraphicsFormat.R16_SFloat, 1, true);
@@ -190,7 +190,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Layer Data Init"))
             {
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     // Add to texture array
                     foreach (var layer in terrainLayers)
@@ -221,7 +221,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(computeShader, 0, resolution, resolution);
                 pass.WriteTexture("HeightmapResult", heightmap, 0);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     // Can't use pass.readTexture here since this comes from unity
                     pass.SetTexture(command, "HeightmapInput", terrainData.heightmapTexture);
@@ -234,7 +234,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Generate Heightmap Callback"))
                 {
-                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
                         foreach (var component in heightmapModifiers)
                         {
@@ -250,7 +250,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(computeShader, 1, resolution, resolution);
                 pass.WriteTexture("InitNormalMapOutput", normalmap, 0);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     // Can't use pass.readTexture here since this comes from unity
                     pass.SetTexture(command, "InitNormalMapInput", terrainData.heightmapTexture);
@@ -270,7 +270,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(computeShader, 2, resolution, resolution);
                 pass.WriteTexture("DepthCopyResult", minMaxHeight, 0);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetTexture(command, "DepthCopyInput", heightmap);
                 });
@@ -290,7 +290,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.WriteTexture("GenerateMinMaxHeightsResult", minMaxHeight, index);
                     pass.WriteTexture("GenerateMinMaxHeightsInput", minMaxHeight, index - 1);
 
-                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
                         var prevWidth = Mathf.Max(1, resolution >> (index - 1));
                         var prevHeight = Mathf.Max(1, resolution >> (index - 1));
@@ -334,7 +334,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("_ProceduralIndices", indicesBuffer);
                 pass.ReadBuffer("_ProceduralIndices", indicesBuffer);
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetInt(command, "LayerCount", terrainData.alphamapLayers);
                     pass.SetFloat(command, "_Resolution", idMapResolution);
@@ -415,7 +415,7 @@ namespace Arycama.CustomRenderPipeline
                 terrain.GetSplatMaterialPropertyBlock(propertyBlock);
                 pass.AddRenderPassData<TerrainRenderData>();
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     terrain.SetSplatMaterialPropertyBlock(propertyBlock);
                 });
@@ -434,7 +434,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        private CullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
+        private CullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
         {
             // TODO: Preload?
             var compute = Resources.Load<ComputeShader>("Terrain/TerrainQuadtreeCull");
@@ -466,9 +466,6 @@ namespace Arycama.CustomRenderPipeline
             {
                 using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Terrain Quadtree Cull"))
                 {
-                    // I don't think this is required.
-                    commonPassData.SetInputs(pass);
-
                     var isFirstPass = i == 0; // Also indicates whether this is -not- the first pass
                     if (!isFirstPass)
                         pass.ReadTexture("_TempResult", tempIds[i - 1]);
@@ -497,9 +494,10 @@ namespace Arycama.CustomRenderPipeline
                     pass.WriteBuffer("_IndirectArgs", indirectArgsBuffer);
                     pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
                     pass.ReadTexture("_TerrainHeights", minMaxHeight);
+                    pass.AddRenderPassData<ICommonPassData>();
 
                     var index = i;
-                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
                         // First pass sets the buffer contents
                         if (isFirstPass)
@@ -513,8 +511,6 @@ namespace Arycama.CustomRenderPipeline
                             command.SetBufferData(indirectArgsBuffer, indirectArgs);
                             ListPool<int>.Release(indirectArgs);
                         }
-
-                        commonPassData.SetProperties(pass, command);
 
                         // Do up to 6 passes per dispatch.
                         pass.SetInt(command, "_PassCount", passCount);
@@ -563,7 +559,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.ReadTexture("_LodInput", tempLodId);
                     pass.ReadBuffer("_IndirectArgs", indirectArgsBuffer);
 
-                    var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
                         pass.SetInt(command, "_CellCount", settings.CellCount);
                     });
@@ -575,25 +571,25 @@ namespace Arycama.CustomRenderPipeline
             return new(indirectArgsBuffer, patchDataBuffer);
         }
 
-        public void CullShadow(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
+        public void CullShadow(Vector3 viewPosition, CullingPlanes cullingPlanes)
         {
             if (terrain == null)
                 return;
 
-            var cullingResult = Cull(viewPosition, cullingPlanes, commonPassData);
+            var cullingResult = Cull(viewPosition, cullingPlanes);
             renderGraph.ResourceMap.SetRenderPassData(new TerrainShadowCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer), renderGraph.FrameIndex);
         }
 
-        public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes, ICommonPassData commonPassData)
+        public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes)
         {
             if (terrain == null)
                 return;
 
-            var cullingResult = Cull(viewPosition, cullingPlanes, commonPassData);
+            var cullingResult = Cull(viewPosition, cullingPlanes);
             renderGraph.ResourceMap.SetRenderPassData(new TerrainRenderCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer), renderGraph.FrameIndex);
         }
 
-        public void Render(string passName, Vector3 viewPosititon, RTHandle cameraDepth, CullingPlanes cullingPlanes, ICommonPassData commonPassData, ScriptableRenderContext context, Camera camera, CullingResults cullingResults)
+        public void Render(string passName, Vector3 viewPosititon, RTHandle cameraDepth, CullingPlanes cullingPlanes, ScriptableRenderContext context, Camera camera, CullingResults cullingResults)
         {
             if (terrain == null || settings.Material == null)
                 return;
@@ -614,12 +610,10 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TerrainRenderData>();
-                commonPassData.SetInputs(pass);
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
-                    commonPassData.SetProperties(pass, command);
-
                     pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
                     pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
                     pass.SetFloat(command, "_RcpVerticesPerEdge", 1f / VerticesPerTileEdge);
@@ -649,16 +643,11 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.Initialize("Terrain", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.None);
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
-                {
-                    commonPassData.SetProperties(pass, command);
-                });
+                pass.AddRenderPassData<ICommonPassData>();
             }
         }
 
-        public void RenderShadow(Vector3 viewPosition, RTHandle shadow, CullingPlanes cullingPlanes, ICommonPassData commonPassData, Matrix4x4 worldToClip, int cascadeIndex, float bias, float slopeBias)
+        public void RenderShadow(Vector3 viewPosition, RTHandle shadow, CullingPlanes cullingPlanes, Matrix4x4 worldToClip, int cascadeIndex, float bias, float slopeBias)
         {
             if (terrain == null || settings.Material == null)
                 return;
@@ -678,14 +667,12 @@ namespace Arycama.CustomRenderPipeline
                 pass.DepthSlice = cascadeIndex;
 
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
-                commonPassData.SetInputs(pass);
                 pass.AddRenderPassData<TerrainRenderData>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
-                    commonPassData.SetProperties(pass, command);
-
                     pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
                     pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
                     pass.SetFloat(command, "_RcpVerticesPerEdge", 1f / VerticesPerTileEdge);
@@ -714,7 +701,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void RenderTerrainScreenspace(Camera camera, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, IRenderPassData commonPassData)
+        public void RenderTerrainScreenspace(Camera camera, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion)
         {
             if (!renderGraph.ResourceMap.IsRenderPassDataValid<TerrainRenderData>(renderGraph.FrameIndex))
                 return;
@@ -727,19 +714,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(normalRoughness);
                 pass.WriteTexture(bentNormalOcclusion);
                 pass.ReadTexture("_Depth", cameraDepth);
-                commonPassData.SetInputs(pass);
-
+                pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<TerrainRenderData>();
-
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
-                {
-                    commonPassData.SetProperties(pass, command);
-                });
             }
-        }
-
-        private class PassData
-        {
         }
     }
 

@@ -16,7 +16,7 @@ namespace Arycama.CustomRenderPipeline
             colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", TextureDimension.Tex3D);
         }
 
-        public void Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, Texture2D blueNoise1D, Texture2D blueNoise2D, Matrix4x4 previousVpMatrix, Matrix4x4 invVpMatrix, Vector2 jitter, float viewHeight)
+        public void Render(int screenWidth, int screenHeight, float farClipPlane, Camera camera, Texture2D blueNoise1D, Texture2D blueNoise2D,Vector2 jitter)
         {
             var volumeWidth = Mathf.CeilToInt(screenWidth / (float)settings.TileSize);
             var volumeHeight = Mathf.CeilToInt(screenHeight / (float)settings.TileSize);
@@ -45,8 +45,22 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
+                pass.SetRenderFunction(
+                (
+                    nonLinearDepth: settings.NonLinearDepth ? 1.0f : 0.0f,
+                    volumeWidth: volumeWidth,
+                    volumeHeight: volumeHeight,
+                    volumeSlices: volumeDepth,
+                    blurSigma: settings.BlurSigma,
+                    volumeTileSize: settings.TileSize,
+                    blueNoise1D: blueNoise1D,
+                    blueNoise2D: blueNoise2D,
+                    history: textures.history,
+                    pixelToWorldViewDir: Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, camera.fieldOfView, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation), false, true)
+                ),
+                (command, pass, data) =>
                 {
                     pass.SetFloat(command, "_NonLinearDepth", data.nonLinearDepth);
                     pass.SetFloat(command, "_VolumeWidth", data.volumeWidth);
@@ -55,40 +69,13 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_BlurSigma", data.blurSigma);
                     pass.SetFloat(command, "_VolumeTileSize", data.volumeTileSize);
 
-                    pass.SetFloat(command, "_Near", data.near);
-                    pass.SetFloat(command, "_Far", data.far);
-                    pass.SetFloat(command, "_ViewHeight", viewHeight);
-
                     pass.SetTexture(command, "_BlueNoise1D", data.blueNoise1D);
                     pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2D);
 
-                    pass.SetVector(command, "_ViewPosition", camera.transform.position);
-                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
-                    pass.SetVector(command, "_CameraForward", camera.transform.forward);
-
-                    pass.SetVector(command, "_InputScale", textures.history.Scale);
-                    pass.SetVector(command, "_InputMax", textures.history.Limit);
-
-                    pass.SetMatrix(command, "_WorldToPreviousClip", data.previousVpMatrix);
-                    pass.SetMatrix(command, "_ClipToWorld", data.invVpMatrix);
-
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, camera.fieldOfView, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation), false, true));
+                    pass.SetVector(command, "_InputScale", data.history.Scale);
+                    pass.SetVector(command, "_InputMax", data.history.Limit);
+                    pass.SetMatrix(command, "_PixelToWorldViewDir", data.pixelToWorldViewDir);
                 });
-
-                data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;
-                data.volumeWidth = volumeWidth;
-                data.volumeHeight = volumeHeight;
-                data.volumeSlices = volumeDepth;
-                data.volumeDepth = farClipPlane;
-                data.blurSigma = settings.BlurSigma;
-                data.volumeTileSize = settings.TileSize;
-                data.blueNoise1D = blueNoise1D;
-                data.blueNoise2D = blueNoise2D;
-                data.scaledResolution = new Vector4(screenWidth, screenHeight, 1.0f / screenWidth, 1.0f / screenHeight);
-                data.previousVpMatrix = previousVpMatrix;
-                data.invVpMatrix = invVpMatrix;
-                data.near = camera.nearClipPlane;
-                data.far = camera.farClipPlane;
             }
 
             // Filter X
@@ -117,39 +104,35 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture("_Result", volumetricLight);
                 pass.AddRenderPassData<Result>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<ICommonPassData>();
 
-                var data = pass.SetRenderFunction<Pass0Data>((command, pass, data) =>
+                pass.SetRenderFunction(
+                (
+                    nonLinearDepth: settings.NonLinearDepth ? 1.0f : 0.0f,
+                    volumeWidth: volumeWidth,
+                    volumeHeight: volumeHeight,
+                    volumeSlices: volumeDepth,
+                    volumeDepth: farClipPlane,
+                    blurSigma: settings.BlurSigma,
+                    volumeTileSize: settings.TileSize,
+                    blueNoise1D: blueNoise1D,
+                    blueNoise2D: blueNoise2D,
+                    volumeDistancePerSlice: settings.MaxDistance / settings.DepthSlices,
+                    depthSlices: settings.DepthSlices,
+                    pixelToWorldViewDir: Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, camera.fieldOfView, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation), false, true)
+                ),
+                (command, pass, data) =>
                 {
                     pass.SetFloat(command, "_NonLinearDepth", data.nonLinearDepth);
                     pass.SetFloat(command, "_VolumeWidth", data.volumeWidth);
                     pass.SetFloat(command, "_VolumeHeight", data.volumeHeight);
                     pass.SetFloat(command, "_VolumeSlices", data.volumeSlices);
-                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
 
-                    pass.SetFloat(command, "_ViewHeight", viewHeight);
-                    pass.SetFloat(command, "_Near", data.near);
-                    pass.SetFloat(command, "_Far", data.far);
+                    pass.SetFloat(command, "_VolumeDistancePerSlice", data.volumeDistancePerSlice);
+                    pass.SetInt(command, "_VolumeSlicesInt", data.depthSlices);
 
-                    pass.SetFloat(command, "_VolumeDistancePerSlice", settings.MaxDistance / settings.DepthSlices);
-                    pass.SetInt(command, "_VolumeSlicesInt", settings.DepthSlices);
-
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, camera.fieldOfView, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation), false, true));
+                    pass.SetMatrix(command, "_PixelToWorldViewDir", data.pixelToWorldViewDir);
                 });
-
-                data.nonLinearDepth = settings.NonLinearDepth ? 1.0f : 0.0f;
-                data.volumeWidth = volumeWidth;
-                data.volumeHeight = volumeHeight;
-                data.volumeSlices = volumeDepth;
-                data.volumeDepth = farClipPlane;
-                data.blurSigma = settings.BlurSigma;
-                data.volumeTileSize = settings.TileSize;
-                data.blueNoise1D = blueNoise1D;
-                data.blueNoise2D = blueNoise2D;
-                data.scaledResolution = new Vector4(screenWidth, screenHeight, 1.0f / screenWidth, 1.0f / screenHeight);
-                data.previousVpMatrix = previousVpMatrix;
-                data.invVpMatrix = invVpMatrix;
-                data.near = camera.nearClipPlane;
-                data.far = camera.farClipPlane;
             }
 
         }
@@ -162,24 +145,6 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Range(0.0f, 2.0f)] public float BlurSigma { get; private set; } = 1.0f;
             [field: SerializeField] public bool NonLinearDepth { get; private set; } = false;
             [field: SerializeField] public float MaxDistance { get; private set; } = 512.0f;
-        }
-
-        private class Pass0Data
-        {
-            internal float nonLinearDepth;
-            internal float volumeWidth;
-            internal float volumeHeight;
-            internal float volumeSlices;
-            internal float volumeDepth;
-            internal float blurSigma;
-            internal float volumeTileSize;
-            internal Texture2D blueNoise1D;
-            internal Texture2D blueNoise2D;
-            internal Vector4 scaledResolution;
-            internal Matrix4x4 previousVpMatrix;
-            internal Matrix4x4 invVpMatrix;
-            internal float near;
-            internal float far;
         }
 
         public readonly struct Result : IRenderPassData

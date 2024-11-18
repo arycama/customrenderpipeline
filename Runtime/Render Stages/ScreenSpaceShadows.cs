@@ -33,7 +33,7 @@ public class ScreenSpaceShadows
         temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16_UNorm, renderGraph, "Screen Space Shadows");
     }
 
-    public void Render(RTHandle depth, RTHandle hiZDepth, int width, int height, ICommonPassData commonPassData, Camera camera, CullingResults cullingResults, float bias, float distantBias, RTHandle normalRoughness, RTHandle velocity)
+    public void Render(RTHandle depth, RTHandle hiZDepth, int width, int height, Camera camera, CullingResults cullingResults, float bias, float distantBias, RTHandle normalRoughness, RTHandle velocity)
     {
         var lightDirection = Vector3.up;
         for (var i = 0; i < cullingResults.visibleLights.Length; i++)
@@ -60,12 +60,7 @@ public class ScreenSpaceShadows
                 pass.AddRenderPassData<TerrainRenderData>(true);
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
-                {
-                    commonPassData.SetProperties(pass, command);
-                });
+                pass.AddRenderPassData<ICommonPassData>();
             }
 
             using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Raytraced Shadows"))
@@ -76,12 +71,10 @@ public class ScreenSpaceShadows
                 pass.WriteTexture(tempResult, "HitResult");
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
+                pass.AddRenderPassData<ICommonPassData>();
 
-                commonPassData.SetInputs(pass);
-
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
-                    commonPassData.SetProperties(pass, command);
                     pass.SetVector(command, "LightDirection", lightDirection);
                     pass.SetFloat(command, "LightCosTheta", Mathf.Cos(settings.LightAngularDiameter * Mathf.Deg2Rad * 0.5f));
                 });
@@ -105,15 +98,14 @@ public class ScreenSpaceShadows
                 pass.AddRenderPassData<TerrainRenderData>(true);
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
+                pass.AddRenderPassData<ICommonPassData>();
 
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_HiZDepth", hiZDepth);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
 
-                commonPassData.SetInputs(pass);
-                var data = pass.SetRenderFunction<Data>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
-                    commonPassData.SetProperties(pass, command);
                     pass.SetVector(command, "LightDirection", lightDirection);
                     pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
                     pass.SetFloat(command, "_Thickness", settings.Thickness);
@@ -136,15 +128,14 @@ public class ScreenSpaceShadows
             pass.ReadTexture("_Depth", depth);
             pass.ReadTexture("Velocity", velocity);
 
-            commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+            pass.AddRenderPassData<ICommonPassData>();
 
-            var data = pass.SetRenderFunction<Data>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
-                commonPassData.SetProperties(pass, command);
                 pass.SetFloat(command, "_Intensity", settings.Intensity);
                 pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
                 pass.SetFloat(command, "_Thickness", settings.Thickness);
@@ -176,15 +167,14 @@ public class ScreenSpaceShadows
             //pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
             //pass.ReadTexture("RayDepth", rayDepth);
 
-            commonPassData.SetInputs(pass);
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+            pass.AddRenderPassData<ICommonPassData>();
 
-            var data = pass.SetRenderFunction<Data>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
-                commonPassData.SetProperties(pass, command);
                 pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
                 pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
                 pass.SetFloat(command, "_Intensity", settings.Intensity);
@@ -196,11 +186,7 @@ public class ScreenSpaceShadows
         renderGraph.ResourceMap.SetRenderPassData(new Result(current), renderGraph.FrameIndex);
     }
 
-    private class Data
-    {
-    }
-
-    public class Result : IRenderPassData
+    public struct Result : IRenderPassData
     {
         public RTHandle ScreenSpaceShadows { get; }
 

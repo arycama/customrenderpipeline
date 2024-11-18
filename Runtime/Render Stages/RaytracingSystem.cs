@@ -79,9 +79,9 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("RTAS Update"))
             {
-                _ = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction(rtas, (command, pass, data) =>
                 {
-                    command.BuildRayTracingAccelerationStructure(rtas);
+                    command.BuildRayTracingAccelerationStructure(data);
                 });
             }
 

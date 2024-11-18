@@ -32,7 +32,7 @@ namespace Arycama.CustomRenderPipeline
             //}
             var hdrEnabled = hdrSettings.available && settings.HdrEnabled;
 
-            var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
                 pass.SetVector(command, "_Resolution", new Vector2(width, height));
                 pass.SetFloat(command, "_IsSceneView", isSceneView ? 1.0f : 0.0f);

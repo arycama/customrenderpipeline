@@ -12,7 +12,6 @@ namespace Arycama.CustomRenderPipeline
     public class RenderGraph : IDisposable
     {
         private readonly Dictionary<Type, Queue<RenderPass>> renderPassPool = new();
-        private readonly Dictionary<Type, Queue<RenderGraphBuilder>> builderPool = new();
         private readonly Dictionary<RenderTexture, RTHandle> importedTextures = new();
         private readonly Dictionary<GraphicsBuffer, BufferHandle> importedBuffers = new();
 
@@ -94,20 +93,6 @@ namespace Arycama.CustomRenderPipeline
         public void AddRenderPassInternal(RenderPass renderPass)
         {
             renderPasses.Add(renderPass);
-        }
-
-        public RenderGraphBuilder<T> GetRenderGraphBuilder<T>() where T : class, new()
-        {
-            var pool = builderPool.GetOrAdd(typeof(RenderGraphBuilder<T>));
-            if (!pool.TryDequeue(out var value))
-                value = new RenderGraphBuilder<T>();
-
-            return value as RenderGraphBuilder<T>;
-        }
-
-        public void ReleaseRenderGraphBuilder(RenderGraphBuilder builder)
-        {
-            builderPool[builder.GetType()].Enqueue(builder);
         }
 
         public void Execute(CommandBuffer command)
@@ -495,21 +480,18 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = AddRenderPass<GlobalRenderPass>("Set Constant Buffer"))
             {
-                var passData = pass.SetRenderFunction<ConstantBufferPassData<T>>((command, pass, data) =>
+                pass.SetRenderFunction((data, buffer), (command, pass, data) =>
                 {
-                    var bufferData = buffer.Buffer.LockBufferForWrite<T>(0, 1);
+                    var bufferData = data.buffer.Buffer.LockBufferForWrite<T>(0, 1);
                     bufferData[0] = data.data;
-                    buffer.Buffer.UnlockBufferAfterWrite<T>(1);
+                    data.buffer.Buffer.UnlockBufferAfterWrite<T>(1);
                 });
-
-                passData.data = data;
-                passData.buffer = buffer;
             }
 
             return buffer;
         }
 
-        private class ConstantBufferPassData<T>
+        private struct ConstantBufferPassData<T>
         {
             public T data;
             public BufferHandle buffer;
@@ -528,7 +510,7 @@ namespace Arycama.CustomRenderPipeline
         }
     }
 
-    public class EmptyPassData
+    public struct EmptyPassData
     {
     }
 }

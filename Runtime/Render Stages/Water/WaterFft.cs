@@ -47,7 +47,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
                     pass.WriteTexture("_LengthToRoughnessResult", lengthToRoughness);
 
-                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
                         pass.SetFloat(command, "_MaxIterations", 32);
                         pass.SetFloat(command, "_Resolution", 256);
@@ -86,7 +86,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.Initialize(computeShader, 4, settings.Resolution, settings.Resolution, 4);
                 pass.ReadBuffer("OceanData", oceanBuffer);
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetBuffer(command, "OceanSpectrumWrite", spectrumBuffer);
                     pass.SetBuffer(command, "OceanDispersionWrite", dispersionBuffer);
@@ -105,7 +105,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.WriteTexture("SlopeResult", slopeResult);
                 pass.ReadBuffer("OceanData", oceanBuffer);
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetBuffer(command, "OceanSpectrum", spectrumBuffer);
                     pass.SetBuffer(command, "OceanDispersion", dispersionBuffer);
@@ -140,7 +140,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.WriteTexture("DisplacementInput", displacementCurrent);
                 pass.WriteTexture("OceanNormalFoamSmoothnessWrite", normalFoamSmoothness);
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetVector(command, "_CascadeTexelSizes", patchSizes / settings.Resolution);
                     pass.SetInt(command, "_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
@@ -165,7 +165,7 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.WriteTexture(smoothnessId, normalFoamSmoothness, j);
                 }
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     // TODO: Do this manually? Since this will be compute shader anyway.. could do in same pass
                     command.GenerateMips(displacementCurrent);

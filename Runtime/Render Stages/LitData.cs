@@ -99,7 +99,7 @@ public class LitData : IDisposable
             pass.Initialize(computeShader, 0, settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution);
             pass.WriteTexture("_DirectionalAlbedoResult", directionalAlbedo);
 
-            var data = pass.SetRenderFunction<PassData>((command, renderPass, data) =>
+            pass.SetRenderFunction((command, renderPass) =>
             {
                 pass.SetVector(command, "_DirectionalAlbedoScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution));
                 pass.SetInt(command, "_DirectionalAlbedoSamples", (int)settings.DirectionalAlbedoSamples);
@@ -113,7 +113,7 @@ public class LitData : IDisposable
             pass.WriteTexture("_AverageAlbedoResult", averageAlbedo);
             result.SetInputs(pass);
 
-            var data = pass.SetRenderFunction<PassData>((command, renderPass, data) =>
+            pass.SetRenderFunction((command, renderPass) =>
             {
                 pass.SetFloat(command, "_AverageAlbedoScaleOffset", 1f / settings.AverageAlbedoResolution);
                 pass.SetInt(command, "_AverageAlbedoSamples", (int)settings.AverageAlbedoSamples);
@@ -129,7 +129,7 @@ public class LitData : IDisposable
             pass.WriteTexture("_DirectionalAlbedoMsResult", directionalAlbedoMs);
             result.SetInputs(pass);
 
-            var data = pass.SetRenderFunction<PassData>((command, renderPass, data) =>
+            pass.SetRenderFunction((command, renderPass) =>
             {
                 pass.SetVector(command, "_DirectionalAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution));
                 pass.SetInt(command, "_DirectionalAlbedoMsSamples", (int)settings.DirectionalAlbedoMSamples);
@@ -144,7 +144,7 @@ public class LitData : IDisposable
             pass.WriteTexture("_AverageAlbedoMsResult", averageAlbedoMs);
             result.SetInputs(pass);
 
-            var data = pass.SetRenderFunction<PassData>((command, renderPass, data) =>
+            pass.SetRenderFunction((command, renderPass) =>
             {
                 pass.SetVector(command, "_AverageAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution));
                 pass.SetInt(command, "_AverageAlbedoMsSamples", (int)settings.AverageAlbedoMsSamples);
@@ -160,7 +160,7 @@ public class LitData : IDisposable
             pass.WriteTexture("_SpecularOcclusionResult", specularOcclusion);
             result.SetInputs(pass);
 
-            var data = pass.SetRenderFunction<PassData>((command, renderPass, data) =>
+            pass.SetRenderFunction((command, renderPass) =>
             {
                 // Specular occlusion
                 pass.SetInt(command, "_SpecularOcclusionResolution", 32);
@@ -4317,10 +4317,6 @@ public class LitData : IDisposable
         {0.609037, 0, -0.053470, 0, 0.607151, 0, 0.031450, 0, 1}
     };
     private bool disposedValue;
-
-    private class PassData
-    {
-    }
 
     protected virtual void Dispose(bool disposing)
     {

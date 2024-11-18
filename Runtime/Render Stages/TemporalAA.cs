@@ -168,26 +168,6 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData<TemporalAAData>(result, renderGraph.FrameIndex);
         }
 
-        private class PassData
-        {
-            internal float sharpness;
-            internal float hasHistory;
-            internal float stationaryBlending;
-            internal float motionBlending;
-            internal float motionWeight;
-            internal float scale;
-            internal Vector4 scaledResolution;
-            internal Vector4 resolution;
-            internal int maxWidth;
-            internal int maxHeight;
-            internal Vector2 maxResolution;
-            internal float antiFlickerIntensity;
-            internal float contrastForMaxAntiFlicker;
-            internal float baseBlendFactor;
-            internal float historyContrastBlendLerp;
-            internal float motionRejectionMultiplier;
-        }
-
         public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
         {
             if (!settings.IsEnabled)
@@ -206,7 +186,33 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
                 pass.AddRenderPassData<TemporalAAData>();
 
-                var data = pass.SetRenderFunction<PassData>((command, pass, data) =>
+                var minAntiflicker = 0.0f;
+                var maxAntiflicker = 3.5f;
+
+                // The anti flicker becomes much more aggressive on higher values
+                var temporalContrastForMaxAntiFlicker = 0.7f - Mathf.Lerp(0.0f, 0.3f, Mathf.SmoothStep(0.5f, 1.0f, settings.taaAntiFlicker));
+
+                var antiFlicker = Mathf.Lerp(minAntiflicker, maxAntiflicker, settings.taaAntiFlicker);
+                const float historyContrastBlendStart = 0.51f;
+
+                pass.SetRenderFunction((
+                    sharpness: settings.Sharpness * 0.8f,
+                    hasHistory: wasCreated ? 0.0f : 1.0f,
+                    stationaryBlending: settings.StationaryBlending,
+                    motionBlending: settings.MotionBlending,
+                    motionWeight: settings.MotionWeight,
+                    scale: scale,
+                    resolution: new Vector4(camera.pixelWidth, camera.pixelHeight, 1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight),
+                    maxWidth: Mathf.FloorToInt(camera.pixelWidth * scale) - 1,
+                    maxHeight: Mathf.FloorToInt(camera.pixelHeight * scale) - 1,
+                    maxResolution: new Vector2(camera.pixelWidth - 1, camera.pixelHeight - 1),
+                    motionRejectionMultiplier: Mathf.Lerp(0.0f, 250.0f, settings.taaMotionVectorRejection * settings.taaMotionVectorRejection * settings.taaMotionVectorRejection),
+                    historyContrastBlendLerp: Mathf.Clamp01((settings.taaAntiFlicker - historyContrastBlendStart) / (1.0f - historyContrastBlendStart)),
+                    antiFlickerIntensity: antiFlicker,
+                    contrastForMaxAntiFlicker: temporalContrastForMaxAntiFlicker,
+                    baseBlendFactor: settings.taaBaseBlendFactor
+                ),
+                (command, pass, data) =>
                 {
                     pass.SetFloat(command, "_Sharpness", data.sharpness);
                     pass.SetFloat(command, "_HasHistory", data.hasHistory);
@@ -225,45 +231,12 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetVector(command, "_HistoryScaleLimit", new Vector4(history.Scale.x, history.Scale.y, history.Limit.x, history.Limit.y));
 
-                    pass.SetVector(command, "_ScaledResolution", data.scaledResolution);
                     pass.SetVector(command, "_Resolution", data.resolution);
                     pass.SetVector(command, "_MaxResolution", data.maxResolution);
 
                     pass.SetInt(command, "_MaxWidth", data.maxWidth);
                     pass.SetInt(command, "_MaxHeight", data.maxHeight);
                 });
-
-                data.sharpness = settings.Sharpness * 0.8f;
-                data.hasHistory = wasCreated ? 0.0f : 1.0f;
-                data.stationaryBlending = settings.StationaryBlending;
-                data.motionBlending = settings.MotionBlending;
-                data.motionWeight = settings.MotionWeight;
-                data.scale = scale;
-                data.scaledResolution = new Vector4(camera.pixelWidth * scale, camera.pixelHeight * scale, 1.0f / (camera.pixelWidth * scale), 1.0f / (camera.pixelHeight * scale));
-                data.resolution = new Vector4(camera.pixelWidth, camera.pixelHeight, 1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight);
-                data.maxWidth = Mathf.FloorToInt(camera.pixelWidth * scale) - 1;
-                data.maxHeight = Mathf.FloorToInt(camera.pixelHeight * scale) - 1;
-                data.maxResolution = new Vector2(camera.pixelWidth - 1, camera.pixelHeight - 1);
-
-                var minAntiflicker = 0.0f;
-                var maxAntiflicker = 3.5f;
-                data.motionRejectionMultiplier = Mathf.Lerp(0.0f, 250.0f, settings.taaMotionVectorRejection * settings.taaMotionVectorRejection * settings.taaMotionVectorRejection);
-
-                // The anti flicker becomes much more aggressive on higher values
-                var temporalContrastForMaxAntiFlicker = 0.7f - Mathf.Lerp(0.0f, 0.3f, Mathf.SmoothStep(0.5f, 1.0f, settings.taaAntiFlicker));
-
-                //float historySharpening = TAAU && postDoF ? 0.25f : settings.taaHistorySharpening;
-
-                var antiFlicker = Mathf.Lerp(minAntiflicker, maxAntiflicker, settings.taaAntiFlicker);
-                const float historyContrastBlendStart = 0.51f;
-                data.historyContrastBlendLerp = Mathf.Clamp01((settings.taaAntiFlicker - historyContrastBlendStart) / (1.0f - historyContrastBlendStart));
-
-                data.antiFlickerIntensity = antiFlicker;
-                data.contrastForMaxAntiFlicker = temporalContrastForMaxAntiFlicker;
-
-                // For post dof we can be a bit more agressive with the taa base blend factor, since most aliasing has already been taken care of in the first TAA pass.
-                // The following MAD operation expands the range to a new minimum (and keeps max the same).
-                data.baseBlendFactor = settings.taaBaseBlendFactor;
             }
 
             return current;

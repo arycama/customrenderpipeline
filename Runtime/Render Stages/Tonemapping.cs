@@ -99,7 +99,7 @@ namespace Arycama.CustomRenderPipeline
             //    maxNits = settings.HdrMaxNits;
             //}
 
-            var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
                 var offsetX = Random.value;
                 var offsetY = Random.value;

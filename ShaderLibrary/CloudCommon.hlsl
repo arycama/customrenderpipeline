@@ -87,6 +87,8 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 					float3 samplePos = worldPosition + _LightDirection0 * dist;
 					lightTransmittance *= exp2(-CloudExtinction(samplePos, lightHeightAtDistance, false) * lightDs);
 				}
+				
+				//lightTransmittance = CloudTransmittance(worldPosition);
 			
 				float asymmetry = lightTransmittance * transmittance;
 				float LdotV = _LightDirection0.y * viewCosAngle;

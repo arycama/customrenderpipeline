@@ -81,7 +81,7 @@ namespace Arycama.CustomRenderPipeline
             handleList[handle.Index] = (renderResource, frameIndex, isPersistent);
         }
 
-        public void SetRenderPassData<T>(T renderResource, int frameIndex, bool isPersistent = false) where T : IRenderPassData
+        public void SetRenderPassData<T>(in T renderResource, int frameIndex, bool isPersistent = false) where T : IRenderPassData
         {
             var handle = GetResourceHandle<T>();
             SetRenderPassData(handle, renderResource, frameIndex, isPersistent);

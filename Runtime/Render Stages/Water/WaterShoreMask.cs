@@ -73,7 +73,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(material);
                 pass.WriteTexture(src, RenderBufferLoadAction.DontCare);
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetFloat(command, "Cutoff", cutoff);
                     pass.SetFloat(command, "InvResolution", invResolution);
@@ -104,7 +104,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.WriteTexture(dst, RenderBufferLoadAction.DontCare);
 
                     var index = i;
-                    var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
                         pass.SetFloat(command, "Offset", offset);
                         pass.SetTexture(command, "Heightmap", terrainData.heightmapTexture);
@@ -139,7 +139,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(result);
                 pass.ReadBuffer("MinMaxValues", minMaxValues);
 
-                var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetTexture(command, "Heightmap", heightmapTexture);
                     pass.SetFloat(command, "Cutoff", cutoff);

@@ -10,20 +10,19 @@ public class CelestialBodyRenderer
         this.renderGraph = renderGraph;
     }
 
-    public void Render(Camera camera, RTHandle depth, RTHandle input, ICommonPassData commonPassData)
+    public void Render(Camera camera, RTHandle depth, RTHandle input)
     {
         using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Celestial Body"))
         {
             pass.WriteTexture(input);
             pass.WriteTexture(depth);
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
-            commonPassData.SetInputs(pass);
+            pass.AddRenderPassData<ICommonPassData>();
 
-            var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
                 command.SetRenderTarget(input, depth);
                 command.SetViewport(new Rect(0, 0, input.Width, input.Height));
-                commonPassData.SetProperties(pass, command);
 
                 foreach (var celestialBody in CelestialBody.CelestialBodies)
                     celestialBody.Render(command, camera);

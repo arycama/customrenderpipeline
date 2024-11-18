@@ -270,7 +270,7 @@ float4 FragmentResolve(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	ambientOcclusion.xyz = normalize(ambientOcclusion.xyz);
 	
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
-	return bentNormalOcclusion;
+	//return bentNormalOcclusion;
 	bentNormalOcclusion.rgb = normalize(2.0 * bentNormalOcclusion.rgb - 1.0);
 	
 	ambientOcclusion.a = pow(ambientOcclusion.a, _AoStrength);

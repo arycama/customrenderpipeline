@@ -36,7 +36,7 @@ public class UIBlur
             pass.WriteTexture(horizontalResult);
             pass.ReadTexture("Input0", input);
 
-            var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
                 pass.SetFloat(command, "BlurRadius", settings.BlurRadius);
                 pass.SetFloat(command, "BlurSigma", settings.BlurSigma);
@@ -52,7 +52,7 @@ public class UIBlur
             pass.WriteTexture(verticalResult);
             pass.ReadTexture("Input0", horizontalResult);
 
-            var data = pass.SetRenderFunction<EmptyPassData>((command, pass, data) =>
+            pass.SetRenderFunction((command, pass) =>
             {
                 pass.SetFloat(command, "BlurRadius", settings.BlurRadius);
                 pass.SetFloat(command, "BlurSigma", settings.BlurSigma);
