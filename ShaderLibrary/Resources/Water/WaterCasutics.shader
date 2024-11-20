@@ -15,6 +15,8 @@ Shader "Hidden/Water Caustics"
 
             HLSLPROGRAM
             #pragma vertex Vertex
+            #pragma hull Hull
+            #pragma domain Domain
             #pragma fragment Fragment
             #pragma target 5.0
             #include "WaterCaustics.hlsl"

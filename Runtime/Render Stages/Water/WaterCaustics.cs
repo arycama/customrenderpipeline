@@ -19,7 +19,7 @@ namespace Arycama.CustomRenderPipeline.Water
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Water Caustics")) { hideFlags = HideFlags.HideAndDontSave };
 
-            var count = 8;
+            var count = 128;
             var isQuad = false;
             var indicesPerQuad = isQuad ? 4 : 6;
             var bufferSize = count * count * indicesPerQuad;
