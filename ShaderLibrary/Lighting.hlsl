@@ -538,7 +538,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 		{
 			#ifdef UNDERWATER_LIGHTING_ON
 			if(i == 0)
-				light.color *= WaterShadow(input.worldPosition, L);
+				light.color *= WaterShadow(input.worldPosition, L) * GetCaustics(input.worldPosition + _ViewPosition, L);
 			#endif
 			
 			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV) * light.color * lightTransmittance) * (abs(NdotL) * _Exposure * attenuation);

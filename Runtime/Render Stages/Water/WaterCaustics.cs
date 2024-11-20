@@ -12,67 +12,33 @@ namespace Arycama.CustomRenderPipeline.Water
         private WaterSystem.Settings settings;
         private Material material;
         private Mesh causticsMesh;
+        private GraphicsBuffer indexBuffer;
 
         public WaterCaustics(RenderGraph renderGraph, WaterSystem.Settings settings) : base(renderGraph)
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Water Caustics")) { hideFlags = HideFlags.HideAndDontSave };
 
-            causticsMesh = GeneratePlane(new Vector3(0.5f, 0, 0.5f), 1, 128);
-        }
-
-        public static Mesh GeneratePlane(Vector3 origin, float size, int divisions)
-        {
-            var interval = size / divisions;
-            var offset = origin;// size / 2f;
-
-            var vertices = new Vector3[(divisions + 1) * (divisions + 1)];
-            var uvs = new Vector2[vertices.Length];
-            var normals = new Vector3[vertices.Length];
-            var tangents = new Vector4[vertices.Length];
-
-            for (int i = 0, z = 0; z <= divisions; z++)
-            {
-                for (int x = 0; x <= divisions; x++, i++)
-                {
-                    vertices[i] = new Vector3(x * interval - offset.x, 0, z * interval - offset.z);
-                    uvs[i] = new Vector2(x / (float)(divisions), z / (float)(divisions));
-                    normals[i] = new Vector3(0, 1, 0);
-                    tangents[i] = new Vector4(1, 0, 0, -1);
-                }
-            }
-
-            var triangles = new int[divisions * divisions * 6];
+            var divisions = 128;
+            var triangles = new ushort[divisions * divisions * 6];
             for (int ti = 0, vi = 0, y = 0; y < divisions; y++, vi++)
             {
                 for (int x = 0; x < divisions; x++, ti += 6, vi++)
                 {
-                    triangles[ti] = vi;
-                    triangles[ti + 3] = triangles[ti + 2] = vi + 1;
-                    triangles[ti + 4] = triangles[ti + 1] = vi + divisions + 1;
-                    triangles[ti + 5] = vi + divisions + 2;
+                    triangles[ti + 0] = (ushort)vi;
+                    triangles[ti + 1] = (ushort)(vi + divisions + 1);
+                    triangles[ti + 2] = (ushort)(vi + 1);
+                    triangles[ti + 3] = (ushort)(vi + 1);
+                    triangles[ti + 4] = (ushort)(vi + divisions + 1);
+                    triangles[ti + 5] = (ushort)(vi + divisions + 2);
                 }
             }
 
-            var halfSize = size / 2f;
-            var center = new Vector3(origin.x - halfSize, 0, origin.z - halfSize);
-            var sizeVector = new Vector3(size, 0, size);
-            var bounds = new Bounds(center, sizeVector);
+            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, divisions * divisions * 6, sizeof(ushort));
+            indexBuffer.SetData(triangles);
 
-            var mesh = new Mesh()
-            {
-                name = "Plane",
-                indexFormat = vertices.Length < ushort.MaxValue ? IndexFormat.UInt16 : IndexFormat.UInt32,
-                vertices = vertices,
-                normals = normals,
-                tangents = tangents,
-                uv = uvs,
-                bounds = bounds
-            };
+            //indexBuffer = GraphicsUtilities.GenerateGridIndexBuffer(divisions, false);
 
-            mesh.SetTriangles(triangles, 0, false);
-
-            return mesh;
         }
 
         public void Render()
@@ -101,9 +67,10 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.SetFloat(command, "_CausticsDepth", settings.CausticsDepth);
                     pass.SetFloat(command, "_CausticsCascade", settings.CasuticsCascade);
                     pass.SetFloat(command, "_CausticsSpacing", patchSize / 128f);
+                    pass.SetFloat(command, "_PatchSize", patchSize);
                     pass.SetVector(command, "_RefractiveIndex", Vector3.one * (1.0f / 1.34f));
 
-                    command.DrawMesh(causticsMesh, Matrix4x4.Scale(new Vector3(patchSize, patchSize, patchSize)), material, 0, 0);
+                    command.DrawProcedural(indexBuffer, Matrix4x4.identity, material, 0, MeshTopology.Triangles, indexBuffer.count);
                 });
             }
 

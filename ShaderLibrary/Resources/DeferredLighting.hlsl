@@ -1,3 +1,5 @@
+#define UNDERWATER_LIGHTING_ON
+
 #include "../Atmosphere.hlsl"
 #include "../GBuffer.hlsl"
 #include "../Lighting.hlsl"
@@ -66,14 +68,14 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		{
 			// We only want to blend with background if depth is not zero, eg a filled pixel (Could also use stecil, but we already have to sample depth
 			// Though that would allow us to save a depth sample+blend for non-filled pixels, hrm
-			result = _Input[position.xy] * cloudTransmittance;
+			result = _Input[position.xy];// * cloudTransmittance;
 	
 			float eyeDepth = LinearEyeDepth(depth);
 	
 			// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
 			float rcpVLength = RcpLength(worldDir);
 			float3 V = -worldDir * rcpVLength;
-			result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
+			//result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
 		}
 	}
 	
@@ -81,12 +83,12 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	// (Should we also do this for vol lighting?)
 	
 	// TODO: Would be better to use some kind of filter instead of bilinear
-	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit)).rgb;
+//	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit)).rgb;
 	
 	//if(position.x > _ScaledResolution.x / 2)
-		result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
+		//result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
 		
-	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
+	//result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
 	
 	float eyeDepth = LinearEyeDepth(depth);
 	
@@ -100,28 +102,40 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	{
 		float3 color = _DirectionalLights[0].color * _Exposure;
 		float3 transmittance = exp(-viewDistance * _WaterExtinction);
-		//result = result * transmittance;
+		result = result * transmittance;
 		
 		// Importance sample
 		float2 noise = Noise2D(position.xy);
 		uint channelIndex = (noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2));
 		
-		float xi = min(0.999, noise.x);
+		float3 L = _DirectionalLights[0].direction;
 		float a = -_ViewPosition.y;
-		float l = _DirectionalLights[0].direction.y;
+		float l = L.y;
 		float3 c = _WaterExtinction;
 		float v = V.y;
 		float b = viewDistance;
 		
-		float3 dist = -(l * log(exp(-a * c / l) * (xi * (exp(b * c * (-v / l - 1)) - 1) + 1)) + a * c) / (c * (l + v));
-		float t = channelIndex ? (channelIndex == 1 ? dist.y : dist.z) : dist.x;
-		float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
-		float weight = rcp(dot(pdf, rcp(3.0)));
+		float3 luminance = 0.0;
 		
-		float sunT = (-_ViewPosition.y - -V.y * t) / l;
-		float3 transmittance1 = exp(-(sunT + t) * c);
-		float shadow = GetShadow(-V * t, 0, false);
-		//result += transmittance1 * c * weight * shadow * _WaterAlbedo * RcpFourPi * color;
+		float samples = 1;
+		for (float i = 0.0; i < samples; i++)
+		{
+			float xi = min(0.999, (i + noise.x) / samples);
+		
+			float3 dist = -(l * log(exp(-a * c / l) * (xi * (exp(b * c * (-v / l - 1)) - 1) + 1)) + a * c) / (c * (l + v));
+			float t = channelIndex ? (channelIndex == 1 ? dist.y : dist.z) : dist.x;
+			float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
+			float weight = rcp(dot(pdf, rcp(3.0)));
+		
+			float sunT = (-_ViewPosition.y - -V.y * t) / l;
+			//sunT = WaterShadowDistance(-V * t, L);
+			
+			float3 transmittance1 = exp(-(sunT + t) * c);
+			float shadow = GetShadow(-V * t, 0, false);
+			luminance += transmittance1 * weight * shadow * GetCaustics(_ViewPosition - V * t, L);;
+		}
+		
+		result += c * _WaterAlbedo * RcpPi * color * luminance / samples;
 	}
 	
 	// Note this is already jittered so we can sample directly

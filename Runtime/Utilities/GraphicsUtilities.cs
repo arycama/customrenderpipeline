@@ -75,5 +75,44 @@ namespace Arycama.CustomRenderPipeline
         {
             return new Vector2(1f / (width - 1), 1f / (height - 1));
         }
+
+        public static GraphicsBuffer GenerateGridIndexBuffer(int count, bool alternateIndices = false)
+        {
+            var PatchVertices = count;
+            var VerticesPerTileEdge = count + 1;
+            var QuadListIndexCount = count * count * 4;
+
+            var indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort));
+
+            var pIndices = new ushort[QuadListIndexCount];
+            for (int y = 0, i = 0; y < count; y++)
+            {
+                var rowStart = y * VerticesPerTileEdge;
+
+                for (var x = 0; x < count; x++, i += 4)
+                {
+                    // Can do a checkerboard flip to avoid directioanl artifacts, but will mess with the tessellation code
+                    var flip = alternateIndices ? (x & 1) == (y & 1) : true;
+
+                    if (flip)
+                    {
+                        pIndices[i + 0] = (ushort)(rowStart + x);
+                        pIndices[i + 1] = (ushort)(rowStart + x + VerticesPerTileEdge);
+                        pIndices[i + 2] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
+                        pIndices[i + 3] = (ushort)(rowStart + x + 1);
+                    }
+                    else
+                    {
+                        pIndices[i + 0] = (ushort)(rowStart + x + VerticesPerTileEdge);
+                        pIndices[i + 1] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
+                        pIndices[i + 2] = (ushort)(rowStart + x + 1);
+                        pIndices[i + 3] = (ushort)(rowStart + x);
+                    }
+                }
+            }
+
+            indexBuffer.SetData(pIndices);
+            return indexBuffer;
+        }
     }
 }

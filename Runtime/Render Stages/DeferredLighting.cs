@@ -45,6 +45,7 @@ public class DeferredLighting
             pass.AddRenderPassData<LightingSetup.Result>();
             pass.AddRenderPassData<WaterShadowResult>(true);
             pass.AddRenderPassData<ICommonPassData>();
+            pass.AddRenderPassData<CausticsResult>();
 
             var hasWaterShadow = renderGraph.ResourceMap.IsRenderPassDataValid<WaterShadowResult>(renderGraph.FrameIndex);
             pass.Keyword = hasWaterShadow ? "WATER_SHADOWS_ON" : string.Empty;
@@ -82,6 +83,8 @@ public class DeferredLighting
             pass.AddRenderPassData<DiffuseGlobalIllumination.Result>();
             pass.AddRenderPassData<AmbientOcclusion.Result>();
             pass.AddRenderPassData<ICommonPassData>();
+            pass.AddRenderPassData<CausticsResult>();
+            pass.AddRenderPassData<WaterShadowResult>();
         }
 
         return result;

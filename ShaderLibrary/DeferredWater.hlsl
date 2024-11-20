@@ -176,7 +176,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 				
 				float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
 				float LdotV0 = dot(_LightDirection0, -underwaterV);
-				float phase = lerp(MiePhase(LdotV0, -0.3), MiePhase(LdotV0, 0.85), asymmetry);
+				float phase = RcpPi ;//lerp(MiePhase(LdotV0, -0.3), MiePhase(LdotV0, 0.85), asymmetry);
 				float3 lightColor0 = phase * _LightColor0 * TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
 				lightColor0 *= GetCaustics(P + _ViewPosition, _LightDirection0);
 				luminance += lightColor0 * attenuation * asymmetry;
@@ -223,6 +223,9 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			}
 		}
 	}
+	
+	if (!isFrontFace)
+		luminance = 0;
 	
 	// Apply roughness to transmission
 	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);

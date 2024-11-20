@@ -97,8 +97,8 @@ void GerstnerWaves(float3 worldPosition, float time, out float3 displacement, ou
 	GetShoreData(worldPosition, shoreDepth, shoreDistance, shoreDirection);
 	//if (shoreDistance < 0.0)
 	//{
-	//	scale = 1;
-	//	return;
+		scale = 0;
+		return;
 	//}
 	
 	// Largest wave arising from a wind speed
@@ -145,7 +145,7 @@ float3 GetCaustics(float3 worldPosition, float3 L, bool sampleLevel = false)
 	return lerp(caustics, 1.0, saturate(1.0 - -worldPosition.y / CausticsDepth));
 }
 
-float3 WaterShadow(float3 position, float3 L, bool sampleLevel = false)
+float WaterShadowDistance(float3 position, float3 L)
 {
 	float shadowDistance = max(0.0, -_ViewPosition.y - position.y) / max(1e-6, saturate(L.y));
 	float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, position);
@@ -155,7 +155,18 @@ float3 WaterShadow(float3 position, float3 L, bool sampleLevel = false)
 		shadowDistance = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
 	}
 	
-	return exp(-_WaterShadowExtinction * shadowDistance) * GetCaustics(position + _ViewPosition, L, sampleLevel);
+	return shadowDistance;
+}
+
+float3 WaterShadow(float3 position, float3 L)
+{
+	return exp(-_WaterShadowExtinction * WaterShadowDistance(position, L));
+}
+
+float3 WaterPhaseFunction(float LdotV, float opticalDepth)
+{
+	float3 asymmetry = exp(-_WaterShadowExtinction * opticalDepth);
+	return lerp(MiePhase(LdotV, -0.3), MiePhase(LdotV, 0.85), asymmetry);
 }
 
 #endif
