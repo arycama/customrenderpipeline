@@ -95,11 +95,11 @@ void GerstnerWaves(float3 worldPosition, float time, out float3 displacement, ou
 	float shoreDepth, shoreDistance;
 	float2 shoreDirection;
 	GetShoreData(worldPosition, shoreDepth, shoreDistance, shoreDirection);
-	//if (shoreDistance < 0.0)
-	//{
-		scale = 0;
+	if (shoreDistance < 0.0)
+	{
+		scale = 1;
 		return;
-	//}
+	}
 	
 	// Largest wave arising from a wind speed
 	float amplitude = 0.22 * Sq(OceanWindSpeed) / _OceanGravity; // _ShoreWaveHeight;

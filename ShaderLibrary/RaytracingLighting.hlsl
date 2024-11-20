@@ -70,7 +70,7 @@ float3 RaytracedLighting(float3 N, float3 f0, float perceptualRoughness, float o
 			
 		#ifdef UNDERWATER_LIGHTING_ON
 			if(i == 0)
-				light.color *= WaterShadow(worldPosition, light.direction) * GetCaustics(position + _ViewPosition, light.direction);
+				light.color *= WaterShadow(worldPosition, light.direction) * GetCaustics(worldPosition + _ViewPosition, light.direction);
 		#endif
 			
 		#if 0

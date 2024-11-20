@@ -119,7 +119,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float NdotV;
 	N = GetViewReflectedNormal(N, V, NdotV);
 	
-	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25;// / linearWaterDepth;
+	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25 / linearWaterDepth;
 	
 	float2 uvOffset = N.xz * distortion;
 	float2 refractionUv = uvOffset * _ScaledResolution.xy + position.xy;
@@ -177,14 +177,32 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 				float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
 				float LdotV0 = dot(_LightDirection0, -underwaterV);
 				float phase = RcpPi ;//lerp(MiePhase(LdotV0, -0.3), MiePhase(LdotV0, 0.85), asymmetry);
-				float3 lightColor0 = phase * _LightColor0 * TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
-				lightColor0 *= GetCaustics(P + _ViewPosition, _LightDirection0);
-				luminance += lightColor0 * attenuation * asymmetry;
+				luminance += attenuation * asymmetry * GetCaustics(P + _ViewPosition, _LightDirection0);
 			}
 		}
 	}
 	
-	luminance *= _Extinction * weight * _Exposure;
+	float3 L = _LightDirection0;
+	float samples = 16;
+	for (float i = 0.0; i < samples; i++)
+	{
+		float xi = min(0.999, (i + noise.x) / samples);
+		
+		float t = -(l * log((xi * (exp(b * cp * (-v / l - 1)) - 1) + 1))) / (cp * (l + v));
+		float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
+		float weight = rcp(dot(pdf, rcp(3.0)));
+		
+		float3 P = isFrontFace ? worldPosition + -underwaterV * t : -V * t;
+		float sunT = max(0.0, _ViewPosition.y - P.y) / l;
+		//sunT = WaterShadowDistance(-V * t, L);
+			
+		float3 transmittance1 = exp(-(sunT + t) * c);
+		float shadow = GetShadow(P, 0, false);
+		//luminance += transmittance1 * weight * shadow * GetCaustics(_ViewPosition + P, L) / samples;
+	}
+	
+	luminance *= _Extinction * _Exposure * RcpPi * _LightColor0 * TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
+		//result += c * _WaterAlbedo * RcpPi * color * luminance / samples;
 	
 	// Ambient 
 	float3 finalTransmittance = exp(-t * _Extinction);

@@ -24,7 +24,7 @@ namespace Arycama.CustomRenderPipeline.Water
             var alternateIndices = false;
             var indicesPerQuad = isQuad ? 4 : 6;
             var bufferSize = count * count * indicesPerQuad;
-            var triangles = new ushort[bufferSize];
+            var triangles = new uint[bufferSize];
             
             for (int y = 0, i = 0, vi = 0; y < count; y++, vi++)
             {
@@ -40,44 +40,44 @@ namespace Arycama.CustomRenderPipeline.Water
                     {
                         if (flip)
                         {
-                            triangles[i + 0] = (ushort)(columnStart);
-                            triangles[i + 1] = (ushort)(columnStart + count + 1);
-                            triangles[i + 2] = (ushort)(columnStart + count + 2);
-                            triangles[i + 3] = (ushort)(columnStart + 1);
+                            triangles[i + 0] = (uint)(columnStart);
+                            triangles[i + 1] = (uint)(columnStart + count + 1);
+                            triangles[i + 2] = (uint)(columnStart + count + 2);
+                            triangles[i + 3] = (uint)(columnStart + 1);
                         }
                         else
                         {
-                            triangles[i + 1] = (ushort)(columnStart + count + 1);
-                            triangles[i + 2] = (ushort)(columnStart + count + 2);
-                            triangles[i + 3] = (ushort)(columnStart + 1);
-                            triangles[i + 0] = (ushort)(columnStart);
+                            triangles[i + 1] = (uint)(columnStart + count + 1);
+                            triangles[i + 2] = (uint)(columnStart + count + 2);
+                            triangles[i + 3] = (uint)(columnStart + 1);
+                            triangles[i + 0] = (uint)(columnStart);
                         }
                     }
                     else
                     {
                         if (flip)
                         {
-                            triangles[i + 0] = (ushort)columnStart;
-                            triangles[i + 1] = (ushort)(columnStart + count + 1);
-                            triangles[i + 2] = (ushort)(columnStart + count + 2);
-                            triangles[i + 3] = (ushort)(columnStart + count + 2);
-                            triangles[i + 4] = (ushort)(columnStart + 1);
-                            triangles[i + 5] = (ushort)columnStart;
+                            triangles[i + 0] = (uint)columnStart;
+                            triangles[i + 1] = (uint)(columnStart + count + 1);
+                            triangles[i + 2] = (uint)(columnStart + count + 2);
+                            triangles[i + 3] = (uint)(columnStart + count + 2);
+                            triangles[i + 4] = (uint)(columnStart + 1);
+                            triangles[i + 5] = (uint)columnStart;
                         }
                         else
                         {
-                            triangles[i + 0] = (ushort)columnStart;
-                            triangles[i + 1] = (ushort)(columnStart + count + 1);
-                            triangles[i + 2] = (ushort)(columnStart + 1);
-                            triangles[i + 3] = (ushort)(columnStart + 1);
-                            triangles[i + 4] = (ushort)(columnStart + count + 1);
-                            triangles[i + 5] = (ushort)(columnStart + count + 2);
+                            triangles[i + 0] = (uint)columnStart;
+                            triangles[i + 1] = (uint)(columnStart + count + 1);
+                            triangles[i + 2] = (uint)(columnStart + 1);
+                            triangles[i + 3] = (uint)(columnStart + 1);
+                            triangles[i + 4] = (uint)(columnStart + count + 1);
+                            triangles[i + 5] = (uint)(columnStart + count + 2);
                         }
                     }
                 }
             }
 
-            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, bufferSize, sizeof(ushort));
+            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, bufferSize, sizeof(uint));
             indexBuffer.SetData(triangles);
         }
 
@@ -90,16 +90,31 @@ namespace Arycama.CustomRenderPipeline.Water
         {
             var Profile = settings.Profile;
             var patchSizes = new Vector4(Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 0f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 1f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 2f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 3f));
-
             var patchSize = patchSizes[settings.CasuticsCascade];
-            var tempResult = renderGraph.GetTexture(settings.CasuticsResolution * 2, settings.CasuticsResolution * 2, GraphicsFormat.R16G16B16A16_SFloat);
 
+            var temp0 = renderGraph.GetTexture(129, 129, GraphicsFormat.R32G32B32A32_SFloat);
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Caustics Blit"))
+            {
+                pass.Initialize(material, 2);
+                pass.WriteTexture(temp0, RenderBufferLoadAction.DontCare);
+
+                pass.SetRenderFunction((command, pass) =>
+                {
+                    pass.SetFloat(command, "_CausticsDepth", settings.CausticsDepth);
+                    pass.SetFloat(command, "_CausticsCascade", settings.CasuticsCascade);
+                    pass.SetFloat(command, "_PatchSize", patchSize);
+                    pass.SetVector(command, "_RefractiveIndex", Vector3.one * (1.0f / 1.34f));
+                });
+            }
+
+            var tempResult = renderGraph.GetTexture(settings.CasuticsResolution * 2, settings.CasuticsResolution * 2, GraphicsFormat.B10G11R11_UFloatPack32);
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Caustics Render"))
             {
                 pass.AddRenderPassData<DirectionalLightInfo>();
                 pass.AddRenderPassData<OceanFftResult>();
                 pass.WriteTexture(tempResult);
-
+                pass.ReadTexture("_Input", temp0);
+                
                 pass.SetRenderFunction((command, pass) =>
                 {
                     var viewMatrix = Matrix4x4.LookAt(Vector3.zero, Vector3.down, Vector3.forward).inverse;
@@ -111,7 +126,6 @@ namespace Arycama.CustomRenderPipeline.Water
 
                     pass.SetFloat(command, "_CausticsDepth", settings.CausticsDepth);
                     pass.SetFloat(command, "_CausticsCascade", settings.CasuticsCascade);
-                    pass.SetFloat(command, "_CausticsSpacing", patchSize / 128f);
                     pass.SetFloat(command, "_PatchSize", patchSize);
                     pass.SetVector(command, "_RefractiveIndex", Vector3.one * (1.0f / 1.34f));
 

@@ -75,7 +75,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
 			float rcpVLength = RcpLength(worldDir);
 			float3 V = -worldDir * rcpVLength;
-			//result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
+			result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
 		}
 	}
 	
@@ -83,12 +83,12 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	// (Should we also do this for vol lighting?)
 	
 	// TODO: Would be better to use some kind of filter instead of bilinear
-//	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit)).rgb;
+	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit)).rgb;
 	
 	//if(position.x > _ScaledResolution.x / 2)
-		//result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
+		result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
 		
-	//result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
+	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
 	
 	float eyeDepth = LinearEyeDepth(depth);
 	
@@ -100,15 +100,15 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	bool isWater = stencil & 4;
 	if (worldPosition.y < 0.1 || isWater)
 	{
-		float3 color = _DirectionalLights[0].color * _Exposure;
+		float3 L = _DirectionalLights[0].direction;
+		float3 color = _DirectionalLights[0].color * _Exposure * TransmittanceToAtmosphere(_ViewHeight, -V.y, L.y, viewDistance);
 		float3 transmittance = exp(-viewDistance * _WaterExtinction);
-		result = result * transmittance;
+		//result = result * transmittance;
 		
 		// Importance sample
 		float2 noise = Noise2D(position.xy);
 		uint channelIndex = (noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2));
 		
-		float3 L = _DirectionalLights[0].direction;
 		float a = -_ViewPosition.y;
 		float l = L.y;
 		float3 c = _WaterExtinction;
@@ -117,7 +117,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		
 		float3 luminance = 0.0;
 		
-		float samples = 1;
+		float samples = 16;
 		for (float i = 0.0; i < samples; i++)
 		{
 			float xi = min(0.999, (i + noise.x) / samples);
@@ -135,7 +135,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			luminance += transmittance1 * weight * shadow * GetCaustics(_ViewPosition - V * t, L);;
 		}
 		
-		result += c * _WaterAlbedo * RcpPi * color * luminance / samples;
+		//result += c * _WaterAlbedo * RcpPi * color * luminance / samples;
 	}
 	
 	// Note this is already jittered so we can sample directly
