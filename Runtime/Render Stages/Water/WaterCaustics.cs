@@ -19,26 +19,49 @@ namespace Arycama.CustomRenderPipeline.Water
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Water Caustics")) { hideFlags = HideFlags.HideAndDontSave };
 
-            var divisions = 128;
-            var triangles = new ushort[divisions * divisions * 6];
-            for (int ti = 0, vi = 0, y = 0; y < divisions; y++, vi++)
+            var count = 8;
+            var isQuad = false;
+            var indicesPerQuad = isQuad ? 4 : 6;
+            var bufferSize = count * count * indicesPerQuad;
+            var triangles = new ushort[bufferSize];
+            
+            for (int y = 0, i = 0, vi = 0; y < count; y++, vi++)
             {
-                for (int x = 0; x < divisions; x++, ti += 6, vi++)
+                var rowStart = y * (count + 1);
+
+                for (int x = 0; x < count; x++, i += indicesPerQuad, vi++)
                 {
-                    triangles[ti + 0] = (ushort)vi;
-                    triangles[ti + 1] = (ushort)(vi + divisions + 1);
-                    triangles[ti + 2] = (ushort)(vi + 1);
-                    triangles[ti + 3] = (ushort)(vi + 1);
-                    triangles[ti + 4] = (ushort)(vi + divisions + 1);
-                    triangles[ti + 5] = (ushort)(vi + divisions + 2);
+                    var columnStart = rowStart + x;
+
+                    if (isQuad)
+                    {
+                        triangles[i + 0] = (ushort)(columnStart);
+                        triangles[i + 1] = (ushort)(columnStart + count + 1);
+                        triangles[i + 2] = (ushort)(columnStart + count + 2);
+                        triangles[i + 3] = (ushort)(columnStart + 1);
+                    }
+                    else
+                    {
+                        triangles[i + 0] = (ushort)columnStart;
+                        triangles[i + 1] = (ushort)(columnStart + count + 1);
+                        triangles[i + 2] = (ushort)(columnStart + 1);
+                        triangles[i + 3] = (ushort)(columnStart + 1);
+                        triangles[i + 4] = (ushort)(columnStart + count + 1);
+                        triangles[i + 5] = (ushort)(columnStart + count + 2);
+                    }
                 }
             }
 
-            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, divisions * divisions * 6, sizeof(ushort));
+            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, bufferSize, sizeof(ushort));
             indexBuffer.SetData(triangles);
 
-            //indexBuffer = GraphicsUtilities.GenerateGridIndexBuffer(divisions, false);
+            //indexBuffer = GraphicsUtilities.GenerateGridIndexBuffer(count, false);
 
+        }
+
+        protected override void Cleanup(bool disposing)
+        {
+            indexBuffer.Dispose();
         }
 
         public void Render()
