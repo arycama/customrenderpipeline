@@ -20,7 +20,8 @@ namespace Arycama.CustomRenderPipeline.Water
             material = new Material(Shader.Find("Hidden/Water Caustics")) { hideFlags = HideFlags.HideAndDontSave };
 
             var count = 128;
-            var isQuad = false;
+            var isQuad = true;
+            var alternateIndices = false;
             var indicesPerQuad = isQuad ? 4 : 6;
             var bufferSize = count * count * indicesPerQuad;
             var triangles = new ushort[bufferSize];
@@ -33,21 +34,45 @@ namespace Arycama.CustomRenderPipeline.Water
                 {
                     var columnStart = rowStart + x;
 
+                    var flip = alternateIndices ? (x & 1) == (y & 1) : true;
+
                     if (isQuad)
                     {
-                        triangles[i + 0] = (ushort)(columnStart);
-                        triangles[i + 1] = (ushort)(columnStart + count + 1);
-                        triangles[i + 2] = (ushort)(columnStart + count + 2);
-                        triangles[i + 3] = (ushort)(columnStart + 1);
+                        if (flip)
+                        {
+                            triangles[i + 0] = (ushort)(columnStart);
+                            triangles[i + 1] = (ushort)(columnStart + count + 1);
+                            triangles[i + 2] = (ushort)(columnStart + count + 2);
+                            triangles[i + 3] = (ushort)(columnStart + 1);
+                        }
+                        else
+                        {
+                            triangles[i + 1] = (ushort)(columnStart + count + 1);
+                            triangles[i + 2] = (ushort)(columnStart + count + 2);
+                            triangles[i + 3] = (ushort)(columnStart + 1);
+                            triangles[i + 0] = (ushort)(columnStart);
+                        }
                     }
                     else
                     {
-                        triangles[i + 0] = (ushort)columnStart;
-                        triangles[i + 1] = (ushort)(columnStart + count + 1);
-                        triangles[i + 2] = (ushort)(columnStart + 1);
-                        triangles[i + 3] = (ushort)(columnStart + 1);
-                        triangles[i + 4] = (ushort)(columnStart + count + 1);
-                        triangles[i + 5] = (ushort)(columnStart + count + 2);
+                        if (flip)
+                        {
+                            triangles[i + 0] = (ushort)columnStart;
+                            triangles[i + 1] = (ushort)(columnStart + count + 1);
+                            triangles[i + 2] = (ushort)(columnStart + count + 2);
+                            triangles[i + 3] = (ushort)(columnStart + count + 2);
+                            triangles[i + 4] = (ushort)(columnStart + 1);
+                            triangles[i + 5] = (ushort)columnStart;
+                        }
+                        else
+                        {
+                            triangles[i + 0] = (ushort)columnStart;
+                            triangles[i + 1] = (ushort)(columnStart + count + 1);
+                            triangles[i + 2] = (ushort)(columnStart + 1);
+                            triangles[i + 3] = (ushort)(columnStart + 1);
+                            triangles[i + 4] = (ushort)(columnStart + count + 1);
+                            triangles[i + 5] = (ushort)(columnStart + count + 2);
+                        }
                     }
                 }
             }
@@ -55,7 +80,7 @@ namespace Arycama.CustomRenderPipeline.Water
             indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, bufferSize, sizeof(ushort));
             indexBuffer.SetData(triangles);
 
-            //indexBuffer = GraphicsUtilities.GenerateGridIndexBuffer(count, false);
+            indexBuffer = GraphicsUtilities.GenerateGridIndexBuffer(count, false);
 
         }
 
@@ -93,7 +118,7 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.SetFloat(command, "_PatchSize", patchSize);
                     pass.SetVector(command, "_RefractiveIndex", Vector3.one * (1.0f / 1.34f));
 
-                    command.DrawProcedural(indexBuffer, Matrix4x4.identity, material, 0, MeshTopology.Triangles, indexBuffer.count);
+                    command.DrawProcedural(indexBuffer, Matrix4x4.identity, material, 0, MeshTopology.Quads, indexBuffer.count);
                 });
             }
 

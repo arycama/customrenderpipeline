@@ -14,7 +14,7 @@ Shader "Hidden/Water Caustics"
             ZClip Off
 
             HLSLPROGRAM
-            #pragma vertex Vertex
+            #pragma vertex VertexNull
             #pragma hull Hull
             #pragma domain Domain
             #pragma fragment Fragment
