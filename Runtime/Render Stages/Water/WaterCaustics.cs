@@ -20,7 +20,7 @@ namespace Arycama.CustomRenderPipeline.Water
             material = new Material(Shader.Find("Hidden/Water Caustics")) { hideFlags = HideFlags.HideAndDontSave };
 
             var count = 128;
-            var isQuad = true;
+            var isQuad = false;
             var alternateIndices = false;
             var indicesPerQuad = isQuad ? 4 : 6;
             var bufferSize = count * count * indicesPerQuad;
@@ -79,9 +79,6 @@ namespace Arycama.CustomRenderPipeline.Water
 
             indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, bufferSize, sizeof(ushort));
             indexBuffer.SetData(triangles);
-
-            indexBuffer = GraphicsUtilities.GenerateGridIndexBuffer(count, false);
-
         }
 
         protected override void Cleanup(bool disposing)
@@ -118,7 +115,7 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.SetFloat(command, "_PatchSize", patchSize);
                     pass.SetVector(command, "_RefractiveIndex", Vector3.one * (1.0f / 1.34f));
 
-                    command.DrawProcedural(indexBuffer, Matrix4x4.identity, material, 0, MeshTopology.Quads, indexBuffer.count);
+                    command.DrawProcedural(indexBuffer, Matrix4x4.identity, material, 0, MeshTopology.Triangles, indexBuffer.count);
                 });
             }
 

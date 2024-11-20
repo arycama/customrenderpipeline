@@ -48,9 +48,12 @@ HullConstantOutputQuad HullConstantQuadOne()
 	return output;
 }
 
-void VertexNull()
-{
-}
+void VertexNull() { }
+
+float1 BarycentricInterpolate(float1 a, float1 b, float1 c, float3 w) {	return w.x * a + w.y * b + w.z * c; }
+float2 BarycentricInterpolate(float2 a, float2 b, float2 c, float3 w) {	return w.x * a + w.y * b + w.z * c; }
+float3 BarycentricInterpolate(float3 a, float3 b, float3 c, float3 w) {	return w.x * a + w.y * b + w.z * c; }
+float4 BarycentricInterpolate(float4 a, float4 b, float4 c, float3 w) {	return w.x * a + w.y * b + w.z * c; }
 
 float3 Bilerp(float3 v0, float3 v1, float3 v2, float3 v3, float2 i)
 {

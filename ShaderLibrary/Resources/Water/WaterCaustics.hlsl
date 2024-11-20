@@ -3,49 +3,37 @@
 #include "../../WaterCommon.hlsl"
 #include "../../Tessellation.hlsl"
 
-float _CausticsDepth, _CausticsSpacing, _CausticsCascade, _PatchSize;
-float3 _RefractiveIndex, _LightDirection0;
+struct HullInput
+{
+	float3 worldPosition : TEXCOORD0;
+	float3 refractedPosition : TEXCOORD1;
+};
 
 struct DomainInput
 {
-	float3 worldPosition : TEXCOORD1;
-	float3 refractedPosition : TEXCOORD2;
+	float4 positionRatio : TEXCOORD0;
 };
 
 struct FragmentInput
 {
 	float4 position : SV_POSITION;
-	float3 worldPosition : TEXCOORD1;
-	float3 refractedPosition : TEXCOORD2;
-	float value : COLOR;
+	float ratio : TEXCOORD;
 };
+
+float _CausticsDepth, _CausticsSpacing, _CausticsCascade, _PatchSize;
+float3 _RefractiveIndex, _LightDirection0;
 
 matrix unity_MatrixVP;
 
-[domain("quad")]
-[partitioning("fractional_odd")]
-[outputtopology("triangle_cw")]
-[patchconstantfunc("HullConstantQuadOne")]
-[outputcontrolpoints(4)]
-DomainInput Hull(uint id : SV_OutputControlPointID, uint primitiveId : SV_PrimitiveID)
+HullInput Vertex(uint vertexId : SV_VertexID)
 {
 	uint vertsPerRow = 128;
 	uint vertsPerRowPlusOne = vertsPerRow + 1;
-	
-	uint patchCol = id >> 1; // 0 0 1 1
-	uint patchRow = (id + patchCol) & 1; // 0 1 1 0
-	
-	uint primCol = primitiveId % vertsPerRow;
-	uint primRow = primitiveId / vertsPerRow;
-	
-	uint start = primRow * vertsPerRowPlusOne + primCol;
-	uint vertexId = start + patchCol + patchRow * vertsPerRowPlusOne;
-	
 	uint column = vertexId % vertsPerRowPlusOne;
 	uint row = vertexId / vertsPerRowPlusOne;
 	
+	HullInput output;
 	float3 displacement = OceanDisplacement[uint3(column % vertsPerRow, row % vertsPerRow, _CausticsCascade)];
-	DomainInput output;
 	output.worldPosition = (float3(column, 0, row) / vertsPerRow - float2(0.5, 0).xyx) * (float2(_PatchSize, 1).xyx) + displacement;
 	
 	float3 normal = UnpackNormalSNorm(OceanNormalFoamSmoothness[uint3(column % vertsPerRow, row % vertsPerRow, _CausticsCascade)].rg).xzy;
@@ -54,31 +42,35 @@ DomainInput Hull(uint id : SV_OutputControlPointID, uint primitiveId : SV_Primit
 	return output;
 }
 
-float CalculateArea(float3 p0, float3 p1, float3 p2, float3 p3)
+[domain("tri")]
+[partitioning("fractional_odd")]
+[outputtopology("triangle_ccw")]
+[patchconstantfunc("HullConstantTriOne")]
+[outputcontrolpoints(3)]
+DomainInput Hull(InputPatch<HullInput, 3> input, uint id : SV_OutputControlPointID)
 {
-	return abs((p1.z - p0.z) * (p2.x - p0.x) - (p1.x - p0.x) * (p2.z - p0.z)) +	abs((p2.z - p1.z) * (p3.x - p1.x) - (p2.x - p1.x) * (p3.z - p1.z));
+	float triangleArea = TriangleArea(input[0].worldPosition.xz, input[1].worldPosition.xz, input[2].worldPosition.xz);
+	float refractedArea = TriangleArea(input[0].refractedPosition.xz, input[1].refractedPosition.xz, input[2].refractedPosition.xz);
+
+	DomainInput output;
+	output.positionRatio = float4(input[id].refractedPosition, triangleArea / refractedArea);
+	return output;
 }
 
-[domain("quad")]
-FragmentInput Domain(HullConstantOutputQuad tessFactors, OutputPatch<DomainInput, 4> input, float2 weights : SV_DomainLocation)
+[domain("tri")]
+FragmentInput Domain(HullConstantOutputTri tessFactors, OutputPatch<DomainInput, 3> input, float3 weights : SV_DomainLocation)
 {
-	float oldArea = CalculateArea(input[0].worldPosition, input[1].worldPosition, input[2].worldPosition, input[3].worldPosition);
-	float newArea = CalculateArea(input[0].refractedPosition, input[1].refractedPosition, input[2].refractedPosition, input[3].refractedPosition);
+	float4 positionRatio = BarycentricInterpolate(input[0].positionRatio, input[1].positionRatio, input[2].positionRatio, weights);
 
 	FragmentInput output;
-	output.worldPosition = Bilerp(input[0].worldPosition, input[1].worldPosition, input[2].worldPosition, input[3].worldPosition, weights);
-	output.refractedPosition = Bilerp(input[0].refractedPosition, input[1].refractedPosition, input[2].refractedPosition, input[3].refractedPosition, weights);
-	output.position = mul(unity_MatrixVP, float4(output.refractedPosition, 1.0));
-	output.value = oldArea / newArea;
+	output.position = MultiplyPoint(unity_MatrixVP, positionRatio.xyz);
+	output.ratio = positionRatio.w;
 	return output;
 }
 
 float3 Fragment(FragmentInput input) : SV_Target
 {
-	return input.value;
-	float oldArea = length(ddx(input.worldPosition)) * length(ddy(input.worldPosition));
-	float newArea = length(ddx(input.refractedPosition)) * length(ddy(input.refractedPosition));
-	return oldArea / newArea;
+	return input.ratio;
 }
 
 Texture2D<float3> _MainTex;

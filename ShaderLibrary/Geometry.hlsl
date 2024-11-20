@@ -271,4 +271,9 @@ float3 BlendNormalRNM(float3 n1, float3 n2)
 	return FromToRotationZ(n1, n2);
 }
 
+float TriangleArea(float2 a, float2 b, float2 c)
+{
+	return 0.5 * abs(a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+}
+
 #endif
