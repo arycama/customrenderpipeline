@@ -286,6 +286,16 @@ namespace Arycama.CustomRenderPipeline.Water
             var profile = settings.Profile;
             var resolution = settings.Resolution;
 
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Clear Pass"))
+            {
+                pass.SetRenderFunction((command, pass) =>
+                {
+                    command.SetRenderTarget(waterTriangleNormal);
+                    command.ClearRenderTarget(false, true, Color.clear);
+                });
+            }
+
+
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Render"))
             {
                 var passData = renderGraph.ResourceMap.GetRenderPassData<WaterRenderCullResult>(renderGraph.FrameIndex);

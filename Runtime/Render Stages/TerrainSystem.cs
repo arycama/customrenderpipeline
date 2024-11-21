@@ -715,14 +715,14 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void RenderTerrainScreenspace(Camera camera, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion)
+        public void RenderTerrainScreenspace(RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion)
         {
             if (!renderGraph.ResourceMap.IsRenderPassDataValid<TerrainRenderData>(renderGraph.FrameIndex))
                 return;
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Terrain Screen Pass"))
             {
-                pass.Initialize(screenSpaceTerrainMaterial, 0, 1, null, camera);
+                pass.Initialize(screenSpaceTerrainMaterial);
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(albedoMetallic);
                 pass.WriteTexture(normalRoughness);

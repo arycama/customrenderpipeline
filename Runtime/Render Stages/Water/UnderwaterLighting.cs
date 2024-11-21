@@ -21,7 +21,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Underwater Lighting"))
             {
-                pass.Initialize(underwaterLightingMaterial, camera: camera);
+                pass.Initialize(underwaterLightingMaterial);
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(underwaterResultId, RenderBufferLoadAction.DontCare);
 

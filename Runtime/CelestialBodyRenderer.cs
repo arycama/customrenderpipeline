@@ -1,16 +1,13 @@
 ﻿using Arycama.CustomRenderPipeline;
 using UnityEngine;
 
-public class CelestialBodyRenderer
+public class CelestialBodyRenderer : RenderFeature
 {
-    private readonly RenderGraph renderGraph;
-
-    public CelestialBodyRenderer(RenderGraph renderGraph)
+    public CelestialBodyRenderer(RenderGraph renderGraph) : base(renderGraph)
     {
-        this.renderGraph = renderGraph;
     }
 
-    public void Render(Camera camera, RTHandle depth, RTHandle input)
+    public void Render(RTHandle depth, RTHandle input)
     {
         using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Celestial Body"))
         {
@@ -19,13 +16,15 @@ public class CelestialBodyRenderer
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<ICommonPassData>();
 
+            var viewPosition = renderGraph.ResourceMap.GetRenderPassData<ViewData>(renderGraph.FrameIndex).ViewPosition;
+
             pass.SetRenderFunction((command, pass) =>
             {
                 command.SetRenderTarget(input, depth);
                 command.SetViewport(new Rect(0, 0, input.Width, input.Height));
 
                 foreach (var celestialBody in CelestialBody.CelestialBodies)
-                    celestialBody.Render(command, camera);
+                    celestialBody.Render(command, viewPosition);
             });
         }
     }

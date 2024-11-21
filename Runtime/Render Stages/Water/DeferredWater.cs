@@ -26,7 +26,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water"))
             {
-                pass.Initialize(deferredWaterMaterial, camera: camera);
+                pass.Initialize(deferredWaterMaterial);
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(albedoMetallic);
                 pass.WriteTexture(normalRoughness);
@@ -163,7 +163,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 if (settings.RaytracedRefractions)
                     pass.Keyword = "RAYTRACED_REFRACTIONS_ON";
 
-                pass.Initialize(deferredWaterMaterial, 1, camera: camera);
+                pass.Initialize(deferredWaterMaterial, 1);
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.ReadTexture("_RefractionInput", refractionResult);
                 pass.ReadTexture("_ScatterInput", scatterResult);

@@ -46,8 +46,10 @@
 			Stencil
 			{
 				Ref 6
-				Pass Replace
 				WriteMask 6
+				PassBack Replace
+				PassFront Replace
+				//ZFailBack Replace
 			}
 
 			HLSLPROGRAM

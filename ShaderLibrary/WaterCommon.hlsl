@@ -136,13 +136,13 @@ float3 GetCaustics(float3 worldPosition, float3 L, bool sampleLevel = false)
 #ifdef SHADER_STAGE_RAYTRACING
 	float3 caustics = OceanCaustics.SampleLevel(_LinearRepeatSampler, causticsUv, 0.0);
 #else
-	//float3 caustics = OceanCaustics.Sample(_TrilinearRepeatSampler, causticsUv);
-	float3 caustics = OceanCaustics.SampleLevel(_LinearRepeatSampler, causticsUv, 0.0);
+	float3 caustics = OceanCaustics.Sample(_LinearRepeatSampler, causticsUv);
+	//float3 caustics = OceanCaustics.SampleLevel(_LinearRepeatSampler, causticsUv, 0.0);
 #endif
 	
 	//return caustics;
 	
-	return lerp(caustics, 1.0, saturate(1.0 - -worldPosition.y / CausticsDepth));
+	return lerp(caustics, 1.0, Sq(saturate(1.0 - -worldPosition.y / CausticsDepth)));
 }
 
 float WaterShadowDistance(float3 position, float3 L)

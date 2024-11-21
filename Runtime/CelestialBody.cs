@@ -31,7 +31,7 @@ namespace Arycama.CustomRenderPipeline
             _ = celestialBodies.Remove(this);
         }
 
-        public void Render(CommandBuffer command, Camera camera)
+        public void Render(CommandBuffer command, Vector3 viewPosition)
         {
             if (mesh == null || material == null)
                 return;
@@ -62,7 +62,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var scale = 2 * Mathf.Tan(0.5f * angularDiameter * Mathf.Deg2Rad);
-            var matrix = Matrix4x4.TRS(camera.transform.position - transform.forward, Quaternion.LookRotation(-transform.forward), Vector3.one * scale);
+            var matrix = Matrix4x4.TRS(viewPosition - transform.forward, Quaternion.LookRotation(-transform.forward), Vector3.one * scale);
 
             command.DrawMesh(mesh, matrix, material, 0, 0, propertyBlock);
             GenericPool<MaterialPropertyBlock>.Release(propertyBlock);

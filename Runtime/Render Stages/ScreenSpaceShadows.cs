@@ -84,7 +84,7 @@ public class ScreenSpaceShadows
         {
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows"))
             {
-                pass.Initialize(material, 0, 1, null, camera);
+                pass.Initialize(material, 0, 1);
                 pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
 
                 pass.AddRenderPassData<LightingSetup.Result>();
@@ -119,7 +119,7 @@ public class ScreenSpaceShadows
         var spatialResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16_UNorm, isScreenTexture: true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows Spatial"))
         {
-            pass.Initialize(material, 1, camera: camera);
+            pass.Initialize(material, 1);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
 
@@ -153,7 +153,7 @@ public class ScreenSpaceShadows
         var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows Temporal"))
         {
-            pass.Initialize(material, 2, camera: camera);
+            pass.Initialize(material, 2);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 

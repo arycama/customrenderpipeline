@@ -17,7 +17,7 @@ namespace Arycama.CustomRenderPipeline
         {
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Camera Velocity"))
             {
-                pass.Initialize(material, camera: camera);
+                pass.Initialize(material);
                 pass.ReadTexture("Depth", cameraDepth);
                 pass.WriteTexture(velocity);
                 pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
@@ -27,7 +27,7 @@ namespace Arycama.CustomRenderPipeline
             var result = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16_SFloat);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Dilate Velocity"))
             {
-                pass.Initialize(material, 1, camera: camera);
+                pass.Initialize(material, 1);
                 pass.ReadTexture("Depth", cameraDepth);
                 pass.ReadTexture("Velocity", velocity);
                 pass.WriteTexture(result, RenderBufferLoadAction.DontCare);

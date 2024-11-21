@@ -70,7 +70,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Trace"))
                 {
-                    pass.Initialize(material, 0, 1, null, camera);
+                    pass.Initialize(material);
                     pass.WriteTexture(tempResult);
                     pass.WriteTexture(hitResult);
                     pass.ReadTexture("_Depth", depth);
@@ -112,7 +112,7 @@ namespace Arycama.CustomRenderPipeline
             //var rayDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R16_SFloat, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
             {
-                pass.Initialize(material, 1, camera: camera);
+                pass.Initialize(material, 1);
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
                 //pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
@@ -144,7 +144,7 @@ namespace Arycama.CustomRenderPipeline
             var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Temporal"))
             {
-                pass.Initialize(material, 2, camera: camera);
+                pass.Initialize(material, 2);
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 

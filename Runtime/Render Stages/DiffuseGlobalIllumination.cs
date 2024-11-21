@@ -75,7 +75,7 @@ public class DiffuseGlobalIllumination
         {
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Trace"))
             {
-                pass.Initialize(material, 0, 1, null, camera);
+                pass.Initialize(material);
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(tempResult);
                 pass.WriteTexture(hitResult);
@@ -112,7 +112,7 @@ public class DiffuseGlobalIllumination
         var rayDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
         {
-            pass.Initialize(material, 1, camera: camera);
+            pass.Initialize(material, 1);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
@@ -146,7 +146,7 @@ public class DiffuseGlobalIllumination
         var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Temporal"))
         {
-            pass.Initialize(material, 2, camera: camera);
+            pass.Initialize(material, 2);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 

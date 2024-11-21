@@ -78,7 +78,7 @@ public class ScreenSpaceReflections
         {
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Trace"))
             {
-                pass.Initialize(material, camera: camera);
+                pass.Initialize(material);
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(hitResult, RenderBufferLoadAction.DontCare);
@@ -111,7 +111,7 @@ public class ScreenSpaceReflections
         var rayDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Specular GI Spatial"))
         {
-            pass.Initialize(material, 1, camera: camera);
+            pass.Initialize(material, 1);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
@@ -142,7 +142,7 @@ public class ScreenSpaceReflections
         var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Temporal"))
         {
-            pass.Initialize(material, 2, camera: camera);
+            pass.Initialize(material, 2);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 

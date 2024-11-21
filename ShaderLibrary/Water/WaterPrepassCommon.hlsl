@@ -14,4 +14,13 @@ float3 GetTriangleNormal(uint2 coord, float3 V, out bool isFrontFace)
 	return triangleNormal;
 }
 
+float3 GetTriangleNormal(uint2 coord, float3 V, out bool isFrontFace, out bool isValid)
+{
+	float2 data = _WaterTriangleNormal[coord];
+	float3 triangleNormal = UnpackNormalOctQuadEncode(2.0 * data - 1.0);
+	isFrontFace = dot(V, triangleNormal) >= 0.0;
+	isValid = any(data != 0.0);
+	return triangleNormal;
+}
+
 #endif

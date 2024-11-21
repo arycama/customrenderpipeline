@@ -92,7 +92,7 @@ namespace Arycama.CustomRenderPipeline.Water
             var patchSizes = new Vector4(Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 0f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 1f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 2f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 3f));
             var patchSize = patchSizes[settings.CasuticsCascade];
 
-            var temp0 = renderGraph.GetTexture(129, 129, GraphicsFormat.R32G32B32A32_SFloat);
+            var temp0 = renderGraph.GetTexture(129, 129, GraphicsFormat.R16G16B16A16_SFloat);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Caustics Blit"))
             {
                 pass.Initialize(material, 2);

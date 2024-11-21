@@ -19,7 +19,7 @@ public class DeferredLighting
     {
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting"))
         {
-            pass.Initialize(material, camera: camera);
+            pass.Initialize(material);
 
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(emissive);

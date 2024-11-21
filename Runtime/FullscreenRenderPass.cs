@@ -13,8 +13,6 @@ namespace Arycama.CustomRenderPipeline
         private int passIndex;
         private int primitiveCount;
 
-        private readonly Vector4[] corners = new Vector4[3];
-
         public string Keyword { get; set; }
 
         public FullscreenRenderPass()
@@ -27,40 +25,12 @@ namespace Arycama.CustomRenderPipeline
             return $"{Name} {material} {passIndex}";
         }
 
-        public void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, string keyword = null, Camera camera = null)
+        public void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, string keyword = null)
         {
             this.material = material;
             this.passIndex = passIndex;
             this.primitiveCount = primitiveCount;
             this.Keyword = keyword;
-
-            // Camera frustum rays
-            if (camera != null)
-            {
-                var aspect = camera.aspect;
-                var tanHalfFov = MathF.Tan(0.5f * Mathf.Deg2Rad * (float)camera.fieldOfView);
-
-                var temporalData = RenderGraph.ResourceMap.GetRenderPassData<TemporalAA.TemporalAAData>(RenderGraph.FrameIndex);
-                var jitterX = 2.0f * temporalData.Jitter.z * tanHalfFov;
-                var jitterY = 2.0f * temporalData.Jitter.w * tanHalfFov;
-
-                var corner0 = new Vector3((-tanHalfFov + jitterX) * aspect, tanHalfFov + jitterY, 1.0f);
-
-                Vector3 corner1;
-                corner1.x = aspect * (3.0f * tanHalfFov + jitterX);
-                corner1.y = tanHalfFov + jitterY;
-                corner1.z = 1.0f;
-
-                Vector3 corner2;
-                corner2.x = (-tanHalfFov + jitterX) * aspect;
-                corner2.y = -3.0f * tanHalfFov + jitterY;
-                corner2.z = 1.0f;
-
-                var rotation = camera.transform.rotation;
-                corners[0] = rotation * corner0;
-                corners[1] = rotation * corner1;
-                corners[2] = rotation * corner2;
-            }
         }
 
         public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -121,8 +91,6 @@ namespace Arycama.CustomRenderPipeline
                 //keyword = new LocalKeyword(material.shader, Keyword);
                 command.EnableShaderKeyword(Keyword);
             }
-
-            propertyBlock.SetVectorArray("_FrustumCorners", corners);
 
             command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount, 1, propertyBlock);
 

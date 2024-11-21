@@ -376,7 +376,7 @@ namespace Arycama.CustomRenderPipeline
                     keyword = "BELOW_CLOUD_LAYER";
                 }
 
-                pass.Initialize(material, 4, 1, keyword, camera);
+                pass.Initialize(material, 4, 1, keyword);
                 pass.WriteTexture(cloudLuminanceTemp, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(cloudTransmittanceTemp, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(cloudDepth, RenderBufferLoadAction.DontCare);
@@ -400,7 +400,7 @@ namespace Arycama.CustomRenderPipeline
             var (transmittanceCurrent, transmittanceHistory, transmittanceWasCreated) = cloudTransmittanceTextureCache.GetTextures(width, height, camera, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Temporal"))
             {
-                pass.Initialize(material, 5, camera: camera);
+                pass.Initialize(material, 5);
                 pass.WriteTexture(luminanceCurrent, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(transmittanceCurrent, RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_Input", cloudLuminanceTemp);

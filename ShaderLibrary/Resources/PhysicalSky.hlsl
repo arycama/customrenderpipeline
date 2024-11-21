@@ -181,9 +181,13 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	
 	rayLength = lerp(cloudDistance, rayLength, cloudTransmittance);
 	
-	float maxT = GetSkyCdf(_ViewHeight, rd.y, 1.0, colorIndex, rayIntersectsGround);
+	// The invCdf table stores between max distance, but non-sky objects will be closer. Therefore, truncate the cdf by calculating the target luminance at the distance,
+	// as well as max luminance along the ray, and divide to get a scale factor for the random number at the current point.
+	float3 maxLuminance = LuminanceToPoint(_ViewHeight, rd.y, maxRayLength, rayIntersectsGround);
+	float3 currentLuminance = LuminanceToPoint(_ViewHeight, rd.y, rayLength, rayIntersectsGround);
+	float xiScale = Select(currentLuminance / maxLuminance, colorIndex);
 	
-	float currentDistance = GetSkyCdf(_ViewHeight, rd.y, offsets.x, colorIndex, rayIntersectsGround) * saturate(rayLength / maxT);
+	float currentDistance = GetSkyCdf(_ViewHeight, rd.y, offsets.x * xiScale, colorIndex, rayIntersectsGround);
 	float4 scatter = AtmosphereScatter(_ViewHeight, rd.y, currentDistance);
 	
 	float3 viewTransmittance = TransmittanceToPoint(_ViewHeight, rd.y, currentDistance, rayIntersectsGround);
@@ -198,8 +202,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		lightTransmittance *= attenuation;
 	#endif
 	
-	float3 maxLuminance = LuminanceToPoint(_ViewHeight, rd.y, rayLength, rayIntersectsGround);
-	float3 pdf = lum / maxLuminance;
+	float3 pdf = lum / currentLuminance;
 	float LdotV = dot(_LightDirection0, rd);
 	luminance += (lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) + multiScatter) * viewTransmittance * rcp(dot(pdf, rcp(3.0)));
 	

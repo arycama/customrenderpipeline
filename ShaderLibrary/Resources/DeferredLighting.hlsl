@@ -68,7 +68,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		{
 			// We only want to blend with background if depth is not zero, eg a filled pixel (Could also use stecil, but we already have to sample depth
 			// Though that would allow us to save a depth sample+blend for non-filled pixels, hrm
-			result = _Input[position.xy];// * cloudTransmittance;
+			result = _Input[position.xy] * cloudTransmittance;
 	
 			float eyeDepth = LinearEyeDepth(depth);
 	
@@ -97,13 +97,17 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float viewDistance = eyeDepth * rcp(rcpLenV);
 	float3 worldPosition = -V * min(_Far, viewDistance) + _ViewPosition;
 	
+	bool isFrontFace, isValid;
+	float3 triangleNormal = GetTriangleNormal(position.xy, V, isFrontFace, isValid);
+	
 	bool isWater = stencil & 4;
-	if (worldPosition.y < 0.1 || isWater)
+	//if ((isWater && !isFrontFace) || (worldPosition.y < 0.0 && !isWater))
+	if(false)
 	{
 		float3 L = _DirectionalLights[0].direction;
 		float3 color = _DirectionalLights[0].color * _Exposure * TransmittanceToAtmosphere(_ViewHeight, -V.y, L.y, viewDistance);
 		float3 transmittance = exp(-viewDistance * _WaterExtinction);
-		//result = result * transmittance;
+		result = result * transmittance;
 		
 		// Importance sample
 		float2 noise = Noise2D(position.xy);
@@ -135,7 +139,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			luminance += transmittance1 * weight * shadow * GetCaustics(_ViewPosition - V * t, L);;
 		}
 		
-		//result += c * _WaterAlbedo * RcpPi * color * luminance / samples;
+		result += c * _WaterAlbedo * RcpPi * color * luminance / samples;
 	}
 	
 	// Note this is already jittered so we can sample directly

@@ -67,7 +67,7 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	FragmentInput output;
 	output.worldRefractedPosition = float4(worldPosition.xz, refractedPosition.xz);
 	output.position = mul(unity_MatrixVP, float4(refractedPosition, 1));
-	output.ratio = ratio;
+	output.ratio = RemoveNaN(ratio);
 	return output;
 }
 
