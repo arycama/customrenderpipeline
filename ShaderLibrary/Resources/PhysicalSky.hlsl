@@ -80,38 +80,6 @@ float FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	}
 	
 	return (a + b) * 0.5;
-	//return SampleAtmosphere(_ViewHeight, viewCosAngle, _LightDirection0.y, _Samples, rayLength, true, index, targetLuminance, 0.5, false, true, rayIntersectsGround).currentT;
-}
-
-float3 SampleAtmosphere1(float viewHeight, float viewCosAngle, float lightCosAngle, float samples, float rayLength, float sampleOffset, float LdotV, float3 rd, bool rayIntersectsGround)
-{
-	float dt = rayLength / samples;
-
-	float3 transmittance = 1.0, luminance = 0.0;
-	for (float i = 0.0; i < samples; i++)
-	{
-		float currentDistance = (i + sampleOffset) * dt;
-		
-		float3 opticalDepth = AtmosphereExtinction(viewHeight, viewCosAngle, currentDistance);
-		float3 extinction = exp(-opticalDepth * dt);
-		
-		float3 lightTransmittance = TransmittanceToAtmosphere(viewHeight, viewCosAngle, lightCosAngle, currentDistance);
-		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, currentDistance, rayIntersectsGround);
-		//viewTransmittance = transmittance;
-		
-		#ifndef REFLECTION_PROBE
-			float attenuation = CloudTransmittance(rd * currentDistance);
-			attenuation *= GetShadow(rd * currentDistance, 0, false);
-			lightTransmittance *= attenuation;
-		#endif
-		
-		float3 scatter = AtmosphereScatter(viewHeight, viewCosAngle, currentDistance, LdotV);
-		luminance += (scatter * lightTransmittance + GetMultiScatter(viewHeight, viewCosAngle, lightCosAngle, currentDistance)) * viewTransmittance * (1.0 - extinction) * rcp(opticalDepth);
-		
-		transmittance *= extinction;
-	}
-	
-	return luminance;
 }
 
 #ifdef REFLECTION_PROBE

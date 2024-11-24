@@ -206,35 +206,6 @@ float GetUnitRangeFromTextureCoord(float u, float texture_size)
 
 float ViewCosAngleFromUv(float uv, float viewHeight, bool rayIntersectsGround, float textureSize)
 {
-#if 0
-	// Distance to top atmosphere boundary for a horizontal ray at ground level.
-	float H = sqrt(_TopRadius * _TopRadius - _PlanetRadius * _PlanetRadius);
-	
-	// Distance to the horizon.
-	float rho = sqrt(max(0.0, Sq(viewHeight) - Sq(_PlanetRadius)));
-	//viewHeight = sqrt(rho * rho + _PlanetRadius * _PlanetRadius); // viewHeight
-
-	if (rayIntersectsGround)
-	{
-		// Distance to the ground for the ray (r,mu), and its minimum and maximum
-		// values over all mu - obtained for (r,-1) and (r,mu_horizon) - from which
-		// we can recover mu:
-		float d_min = viewHeight - _PlanetRadius;
-		float d_max = rho;
-		float d = d_min + (d_max - d_min) * GetUnitRangeFromTextureCoord(1.0 - 2.0 * uv, textureSize / 2.0);
-		return d == 0.0 ? -1.0 : clamp(-(rho * rho + d * d) / (2.0 * viewHeight * d), -1.0, 1.0);
-	}
-	else
-	{
-		// Distance to the top atmosphere boundary for the ray (r,mu), and its
-		// minimum and maximum values over all mu - obtained for (r,1) and
-		// (r,mu_horizon) - from which we can recover mu:
-		float d_min = _TopRadius - viewHeight;
-		float d_max = rho + H;
-		float d = d_min + (d_max - d_min) * GetUnitRangeFromTextureCoord(2.0 * uv - 1.0, textureSize / 2.0);
-		return d == 0.0 ? 1.0 : clamp((H * H - rho * rho - d * d) / (2.0 * viewHeight * d), -1.0, 1.0);
-	}
-	#else
 	float horizonDistance = HorizonDistanceFromViewHeight(viewHeight);
 	
 	if (rayIntersectsGround)
@@ -253,79 +224,37 @@ float ViewCosAngleFromUv(float uv, float viewHeight, bool rayIntersectsGround, f
 		float maxDist = lerp(minDist, dMax, uv);
 		return maxDist ? clamp((SqMaxAtmosphereDistance - Sq(horizonDistance) - Sq(maxDist)) / (2.0 * viewHeight * maxDist), -1.0, 1.0) : 1.0;
 	}
-#endif
-}
-
-float GetTextureCoordFromUnitRange(float x, float texture_size)
-{
-	return 0.5 / texture_size + x * (1.0 - 1.0 / texture_size);
 }
 
 float UvFromViewCosAngle(float viewHeight, float viewCosAngle, bool rayIntersectsGround, float textureSize)
 {
-	#if 0
-		// Distance to top atmosphere boundary for a horizontal ray at ground level.
-		float H = sqrt(_TopRadius * _TopRadius - _PlanetRadius * _PlanetRadius);
-
-		// Distance to the horizon.
-		float rho = sqrt(max(0.0, viewHeight * viewHeight - _PlanetRadius * _PlanetRadius));
-
-		// Discriminant of the quadratic equation for the intersections of the ray
-		// (viewHeight,viewCosAngle) with the ground (see RayIntersectsGround).
-		float r_mu = viewHeight * viewCosAngle;
-		float discriminant = r_mu * r_mu - viewHeight * viewHeight + _PlanetRadius * _PlanetRadius;
-		float u_mu;
-
-		if (rayIntersectsGround)
-		{
-			// Distance to the ground for the ray (viewHeight,viewCosAngle), and its minimum and maximum
-			// values over all viewCosAngle - obtained for (viewHeight,-1) and (viewHeight,mu_horizon).
-			float d = -r_mu - sqrt(max(0.0, discriminant));
-			float d_min = viewHeight - _PlanetRadius;
-			float d_max = rho;
-			u_mu = 0.5 - 0.5 * GetTextureCoordFromUnitRange(d_max == d_min ? 0.0 : (d - d_min) / (d_max - d_min), textureSize / 2.0);
-		}
-		else
-		{
-			// Distance to the top atmosphere boundary for the ray (viewHeight,viewCosAngle), and its
-			// minimum and maximum values over all viewCosAngle - obtained for (viewHeight,1) and
-			// (viewHeight,mu_horizon).
-			float d = -r_mu + sqrt(max(0.0, discriminant + H * H));
-			float d_min = _TopRadius - viewHeight;
-			float d_max = rho + H;
-			u_mu = 0.5 + 0.5 * GetTextureCoordFromUnitRange((d - d_min) / (d_max - d_min), textureSize / 2.0);
-		}
-
-		return u_mu;
-	#else
-		float horizonDistance = HorizonDistanceFromViewHeight(viewHeight);
+	float horizonDistance = HorizonDistanceFromViewHeight(viewHeight);
 	
-		// Discriminant of the quadratic equation for the intersections of the ray
-		float r_mu = viewHeight * viewCosAngle;
-		float discriminant = Sq(r_mu) - Sq(viewHeight) + Sq(_PlanetRadius);
-		if (rayIntersectsGround)
-		{
-			// Distance to the ground for the ray (viewHeight,cosAngle), and its minimum and maximum
-			// values over all cosAngle - obtained for (viewHeight,-1) and (viewHeight,mu_horizon).
-			float d = -r_mu - sqrt(max(0.0, discriminant));
-			float minDist = viewHeight - _PlanetRadius;
-			float maxDist = horizonDistance;
-			float uv = (maxDist == minDist ? 0.0 : Remap(d, minDist, maxDist));
+	// Discriminant of the quadratic equation for the intersections of the ray
+	float r_mu = viewHeight * viewCosAngle;
+	float discriminant = Sq(r_mu) - Sq(viewHeight) + Sq(_PlanetRadius);
+	if (rayIntersectsGround)
+	{
+		// Distance to the ground for the ray (viewHeight,cosAngle), and its minimum and maximum
+		// values over all cosAngle - obtained for (viewHeight,-1) and (viewHeight,mu_horizon).
+		float d = -r_mu - sqrt(max(0.0, discriminant));
+		float minDist = viewHeight - _PlanetRadius;
+		float maxDist = horizonDistance;
+		float uv = (maxDist == minDist ? 0.0 : Remap(d, minDist, maxDist));
 		
-			return 0.5 - 0.5 * Remap01ToHalfTexel(uv, textureSize / 2);
-		}
-		else
-		{
-			// Distance to the top atmosphere boundary for the ray (viewHeight,cosAngle), and its
-			// minimum and maximum values over all cosAngle - obtained for (viewHeight,1) and
-			// (viewHeight,mu_horizon).
-			float d = -r_mu + sqrt(max(0.0, discriminant + SqMaxAtmosphereDistance));
-			float minDist = _TopRadius - viewHeight;
-			float maxDist = horizonDistance + MaxHorizonDistance;
-			float uv = Remap(d, minDist, maxDist);
-			return 0.5 * Remap01ToHalfTexel(uv, textureSize / 2) + 0.5;
-		}
-	#endif
+		return 0.5 - 0.5 * Remap01ToHalfTexel(uv, textureSize / 2);
+	}
+	else
+	{
+		// Distance to the top atmosphere boundary for the ray (viewHeight,cosAngle), and its
+		// minimum and maximum values over all cosAngle - obtained for (viewHeight,1) and
+		// (viewHeight,mu_horizon).
+		float d = -r_mu + sqrt(max(0.0, discriminant + SqMaxAtmosphereDistance));
+		float minDist = _TopRadius - viewHeight;
+		float maxDist = horizonDistance + MaxHorizonDistance;
+		float uv = Remap(d, minDist, maxDist);
+		return 0.5 * Remap01ToHalfTexel(uv, textureSize / 2) + 0.5;
+	}
 }
 
 float2 AtmosphereUv(float viewHeight, float viewCosAngle, bool rayIntersectsGround)
