@@ -151,7 +151,7 @@ cbuffer UnityInstancing_PerDraw2
 {
 	struct
 	{
-		matrix unity_PrevObjectToWorldArray;//, unity_PrevWorldToObjectArray; // Don't know if we'll need this at all
+		matrix unity_PrevObjectToWorldArray; //, unity_PrevWorldToObjectArray; // Don't know if we'll need this at all
 	}
 	
 	unity_Builtins3Array[2];
@@ -200,29 +200,71 @@ float EyeToDeviceDepth(float eyeDepth)
 }
 
 // Normalize if bool is set to true
-float3 ConditionalNormalize(float3 input, bool doNormalize) { return doNormalize ? normalize(input) : input; }
+float3 ConditionalNormalize(float3 input, bool doNormalize)
+{
+	return doNormalize ? normalize(input) : input;
+}
 
 // Divides a 4-component vector by it's w component
-float4 PerspectiveDivide(float4 input) { return float4(input.xyz * rcp(input.w), input.w); }
+float4 PerspectiveDivide(float4 input)
+{
+	return float4(input.xyz * rcp(input.w), input.w);
+}
 
 const static float3x3 Identity3x3 = float3x3(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
 
 // Fast matrix muls (3 mads)
-float4 MultiplyPoint(float3 p, float4x4 mat) { return p.x * mat[0] + (p.y * mat[1] + (p.z * mat[2] + mat[3])); }
-float4 MultiplyPoint(float4x4 mat, float3 p) { return p.x * mat._m00_m10_m20_m30 + (p.y * mat._m01_m11_m21_m31 + (p.z * mat._m02_m12_m22_m32 + mat._m03_m13_m23_m33)); }
-float4 MultiplyPointProj(float4x4 mat, float3 p) { return PerspectiveDivide(MultiplyPoint(mat, p)); }
+float4 MultiplyPoint(float3 p, float4x4 mat)
+{
+	return p.x * mat[0] + (p.y * mat[1] + (p.z * mat[2] + mat[3]));
+}
+float4 MultiplyPoint(float4x4 mat, float3 p)
+{
+	return p.x * mat._m00_m10_m20_m30 + (p.y * mat._m01_m11_m21_m31 + (p.z * mat._m02_m12_m22_m32 + mat._m03_m13_m23_m33));
+}
+float4 MultiplyPointProj(float4x4 mat, float3 p)
+{
+	return PerspectiveDivide(MultiplyPoint(mat, p));
+}
 
 // 3x4, for non-projection matrices
-float3 MultiplyPoint3x4(float3 p, float4x3 mat) { return p.x * mat[0] + (p.y * mat[1] + (p.z * mat[2] + mat[3])); }
-float3 MultiplyPoint3x4(float4x4 mat, float3 p) { return p.x * mat._m00_m10_m20 + (p.y * mat._m01_m11_m21 + (p.z * mat._m02_m12_m22 + mat._m03_m13_m23)); }
-float3 MultiplyPoint3x4(float3x4 mat, float3 p) { return MultiplyPoint3x4(p, transpose(mat)); }
+float3 MultiplyPoint3x4(float3 p, float4x3 mat)
+{
+	return p.x * mat[0] + (p.y * mat[1] + (p.z * mat[2] + mat[3]));
+}
+float3 MultiplyPoint3x4(float4x4 mat, float3 p)
+{
+	return p.x * mat._m00_m10_m20 + (p.y * mat._m01_m11_m21 + (p.z * mat._m02_m12_m22 + mat._m03_m13_m23));
+}
+float3 MultiplyPoint3x4(float3x4 mat, float3 p)
+{
+	return MultiplyPoint3x4(p, transpose(mat));
+}
 
-float3 MultiplyVector(float3 v, float3x3 mat, bool doNormalize) { return ConditionalNormalize(v.x * mat[0] + v.y * mat[1] + v.z * mat[2], doNormalize); }
-float3 MultiplyVector(float3 v, float3x4 mat, bool doNormalize) { return MultiplyVector(v, (float3x3)mat, doNormalize); }
-float3 MultiplyVector(float3 v, float4x4 mat, bool doNormalize) { return MultiplyVector(v, (float3x3)mat, doNormalize); }
-float3 MultiplyVector(float3x3 mat, float3 v, bool doNormalize) { return ConditionalNormalize(v.x * mat._m00_m10_m20 + (v.y * mat._m01_m11_m21 + (v.z * mat._m02_m12_m22)), doNormalize); }
-float3 MultiplyVector(float4x4 mat, float3 v, bool doNormalize) { return MultiplyVector((float3x3) mat, v, doNormalize); }
-float3 MultiplyVector(float3x4 mat, float3 v, bool doNormalize) { return MultiplyVector((float3x3) mat, v, doNormalize); }
+float3 MultiplyVector(float3 v, float3x3 mat, bool doNormalize)
+{
+	return ConditionalNormalize(v.x * mat[0] + v.y * mat[1] + v.z * mat[2], doNormalize);
+}
+float3 MultiplyVector(float3 v, float3x4 mat, bool doNormalize)
+{
+	return MultiplyVector(v, (float3x3) mat, doNormalize);
+}
+float3 MultiplyVector(float3 v, float4x4 mat, bool doNormalize)
+{
+	return MultiplyVector(v, (float3x3) mat, doNormalize);
+}
+float3 MultiplyVector(float3x3 mat, float3 v, bool doNormalize)
+{
+	return ConditionalNormalize(v.x * mat._m00_m10_m20 + (v.y * mat._m01_m11_m21 + (v.z * mat._m02_m12_m22)), doNormalize);
+}
+float3 MultiplyVector(float4x4 mat, float3 v, bool doNormalize)
+{
+	return MultiplyVector((float3x3) mat, v, doNormalize);
+}
+float3 MultiplyVector(float3x4 mat, float3 v, bool doNormalize)
+{
+	return MultiplyVector((float3x3) mat, v, doNormalize);
+}
 
 float3x4 GetObjectToWorld(uint instanceId)
 {
@@ -235,11 +277,11 @@ float3x4 GetObjectToWorld(uint instanceId)
 
 float3x4 GetWorldToObject(uint instanceId)
 {
-	#ifdef INSTANCING_ON
+#ifdef INSTANCING_ON
 		return (float3x4)unity_Builtins1Array[unity_BaseInstanceID + instanceId].unity_WorldToObjectArray;
-	#else
-		return (float3x4)unity_WorldToObject;
-	#endif
+#else
+	return (float3x4) unity_WorldToObject;
+#endif
 }
 
 float3 ObjectToWorld(float3 position, uint instanceID)
@@ -255,19 +297,19 @@ float3 WorldToObject(float3 worldPosition, uint instanceID)
 	float4x4 mat = float4x4(worldToObject[0], worldToObject[1], worldToObject[2], float4(0, 0, 0, 1));
 	
     // To handle camera relative rendering we need to apply translation before converting to object space
-	float4x4 translationMatrix = { {1.0, 0.0, 0.0, _ViewPosition.x}, {0.0, 1.0, 0.0, _ViewPosition.y}, {0.0, 0.0, 1.0, _ViewPosition.z}, {0.0, 0.0, 0.0, 1.0}};
-	worldToObject = (float3x4)mul(worldToObject, translationMatrix);
+	float4x4 translationMatrix = { { 1.0, 0.0, 0.0, _ViewPosition.x }, { 0.0, 1.0, 0.0, _ViewPosition.y }, { 0.0, 0.0, 1.0, _ViewPosition.z }, { 0.0, 0.0, 0.0, 1.0 } };
+	worldToObject = (float3x4) mul(worldToObject, translationMatrix);
 	
 	return MultiplyPoint3x4(worldToObject, worldPosition);
 }
 
 float3 PreviousObjectToWorld(float3 position, uint instanceID)
 {
-	#ifdef INSTANCING_ON
+#ifdef INSTANCING_ON
 		float3x4 previousObjectToWorld = (float3x4)(_InPlayMode ? unity_Builtins3Array[unity_BaseInstanceID + instanceID].unity_PrevObjectToWorldArray : unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_ObjectToWorldArray);
-	#else
-		float3x4 previousObjectToWorld = _InPlayMode ? unity_MatrixPreviousM : unity_ObjectToWorld;
-	#endif
+#else
+	float3x4 previousObjectToWorld = _InPlayMode ? unity_MatrixPreviousM : unity_ObjectToWorld;
+#endif
 	
 	previousObjectToWorld._m03_m13_m23 -= _ViewPosition;
 	return MultiplyPoint3x4(previousObjectToWorld, position);
@@ -320,8 +362,14 @@ float3 PixelToWorldDir(float2 position, bool doNormalize)
 	return MultiplyVector(_PixelToWorldDir, float3(position, 1.0), doNormalize);
 }
 
-float4 WorldToClipNonJittered(float3 position) { return MultiplyPoint(_WorldToNonJitteredClip, position); }
-float4 WorldToClipPrevious(float3 position) { return MultiplyPoint(_WorldToPreviousClip, position); }
+float4 WorldToClipNonJittered(float3 position)
+{
+	return MultiplyPoint(_WorldToNonJitteredClip, position);
+}
+float4 WorldToClipPrevious(float3 position)
+{
+	return MultiplyPoint(_WorldToPreviousClip, position);
+}
 
 float2 MotionVectorFragment(float4 nonJitteredPositionCS, float4 previousPositionCS)
 {
@@ -393,9 +441,7 @@ struct GeometryVolumeRenderOutput
 	uint index : SV_RenderTargetArrayIndex;
 };
 
-[instance(32)]
-[maxvertexcount(3)]
-void GeometryVolumeRender(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryVolumeRenderOutput> stream, uint instanceId : SV_GSInstanceID)
+void FullscreenGeometryPassthrough(uint id[3], uint instanceId, inout TriangleStream<GeometryVolumeRenderOutput> stream)
 {
 	[unroll]
 	for (uint i = 0; i < 3; i++)
@@ -413,45 +459,32 @@ void GeometryVolumeRender(triangle uint id[3] : TEXCOORD, inout TriangleStream<G
 	}
 }
 
-[instance(3)]
+[instance(32)]
 [maxvertexcount(3)]
-void GeometryVolumeRender3(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryVolumeRenderOutput> stream, uint instanceId : SV_GSInstanceID)
+void GeometryVolumeRender(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryVolumeRenderOutput> stream, uint instanceId : SV_GSInstanceID)
 {
-	[unroll]
-	for (uint i = 0; i < 3; i++)
-	{
-		uint localId = id[i] % 3;
-		float2 uv = (localId << uint2(1, 0)) & 2;
-		
-		GeometryVolumeRenderOutput output;
-		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
-		uv.y = 1.0 - uv.y;
-		output.uv = uv;
-		output.worldDir = _FrustumCorners[localId].xyz;
-		output.index = id[i] / 3 * 32 + instanceId;
-		stream.Append(output);
-	}
+	FullscreenGeometryPassthrough(id, instanceId, stream);
 }
 
 [instance(6)]
 [maxvertexcount(3)]
 void GeometryCubemapRender(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryVolumeRenderOutput> stream, uint instanceId : SV_GSInstanceID)
 {
-	[unroll]
-	for (uint i = 0; i < 3; i++)
-	{
-		uint localId = id[i] % 3;
-		float2 uv = (localId << uint2(1, 0)) & 2;
-		
-		GeometryVolumeRenderOutput output;
-		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
-		uv.y = 1.0 - uv.y;
-		output.uv = uv;
-		output.worldDir = _FrustumCorners[localId].xyz;
-		
-		output.index = id[i] / 3 * 32 + instanceId;
-		stream.Append(output);
-	}
+	FullscreenGeometryPassthrough(id, instanceId, stream);
+}
+
+[instance(3)]
+[maxvertexcount(3)]
+void GeometryVolumeRender3(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryVolumeRenderOutput> stream, uint instanceId : SV_GSInstanceID)
+{
+	FullscreenGeometryPassthrough(id, instanceId, stream);
+}
+
+[instance(2)]
+[maxvertexcount(3)]
+void GeometryVolumeRender2(triangle uint id[3] : TEXCOORD, inout TriangleStream<GeometryVolumeRenderOutput> stream, uint instanceId : SV_GSInstanceID)
+{
+	FullscreenGeometryPassthrough(id, instanceId, stream);
 }
 
 float ComputeMipLevel(float3 dx, float3 dy, float3 scale, float3 resolution)

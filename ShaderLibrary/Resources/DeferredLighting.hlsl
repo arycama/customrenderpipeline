@@ -75,9 +75,11 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
 			float rcpVLength = RcpLength(worldDir);
 			float3 V = -worldDir * rcpVLength;
-			result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
+			result *= TransmittanceToPoint1(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
 		}
 	}
+	
+	//return result;
 	
 	// Sample the sky and clouds at the re-jittered coordinate, so that the final TAA resolve will not add further jitter. 
 	// (Should we also do this for vol lighting?)

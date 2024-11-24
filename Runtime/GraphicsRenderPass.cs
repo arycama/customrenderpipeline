@@ -16,7 +16,7 @@ namespace Arycama.CustomRenderPipeline
         private int clearStencil;
         private RenderTargetFlags renderTargetFlags;
 
-        public int DepthSlice { get; set; }
+        public int DepthSlice { get; set; } = -1;
         public int MipLevel { get; set; }
 
         public void ConfigureClear(RTClearFlags clearFlags, Color clearColor = default, float clearDepth = 1.0f, int clearStencil = 0)
@@ -132,7 +132,7 @@ namespace Arycama.CustomRenderPipeline
             clearDepth = 1.0f;
             clearStencil = 0;
             renderTargetFlags = RenderTargetFlags.None;
-            DepthSlice = 0;
+            DepthSlice = -1;
             MipLevel = 0;
         }
     }

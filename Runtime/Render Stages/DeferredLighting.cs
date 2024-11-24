@@ -76,6 +76,7 @@ public class DeferredLighting
             pass.AddRenderPassData<VolumetricLighting.Result>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<WaterPrepassResult>(true);
+            pass.AddRenderPassData<SkyTransmittanceData>();
 
             // Only for debugging 
             pass.AddRenderPassData<ScreenSpaceReflectionResult>();

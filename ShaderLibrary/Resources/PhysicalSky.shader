@@ -28,7 +28,7 @@ Shader "Hidden/Physical Sky"
 
             HLSLPROGRAM
             #pragma vertex VertexIdPassthrough
-            #pragma geometry GeometryVolumeRender3
+            #pragma geometry GeometryCubemapRender
             #pragma fragment FragmentCdfLookup
             #include "PhysicalSky.hlsl"
             ENDHLSL
@@ -88,7 +88,8 @@ Shader "Hidden/Physical Sky"
             Name "Luminance LUT"
 
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexIdPassthrough
+            #pragma geometry GeometryVolumeRender2
             #pragma fragment FragmentLuminance
             #include "PhysicalSky.hlsl"
             ENDHLSL
@@ -102,6 +103,18 @@ Shader "Hidden/Physical Sky"
             #pragma vertex VertexIdPassthrough
             #pragma geometry GeometryVolumeRender
             #pragma fragment FragmentTransmittanceDepthLut
+            #include "PhysicalSky.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "Transmittance Lookup 2"
+
+            HLSLPROGRAM
+            #pragma vertex VertexIdPassthrough
+            #pragma geometry GeometryVolumeRender2
+            #pragma fragment FragmentTransmittanceLut2
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }

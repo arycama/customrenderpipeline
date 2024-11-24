@@ -175,7 +175,6 @@ namespace Arycama.CustomRenderPipeline
                 var primitiveCount = MathUtils.DivRoundUp(settings.TransmittanceDepth, 32);
                 pass.Initialize(skyMaterial, 0, primitiveCount);
                 pass.WriteTexture(transmittance, RenderBufferLoadAction.DontCare);
-                pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
                 result.SetInputs(pass);
 
                 pass.SetRenderFunction((command, pass) =>
@@ -243,34 +242,62 @@ namespace Arycama.CustomRenderPipeline
 
         public void GenerateData(Vector3 viewPosition, CullingResults cullingResults, Vector3 cameraPosition)
         {
-            var skyLuminance = renderGraph.GetTexture(settings.LuminanceWidth, settings.LuminanceHeight, GraphicsFormat.B10G11R11_UFloatPack32);
+            // Sky transmittance
+            var skyTransmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, 2, TextureDimension.Tex2DArray);
+            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Transmittance"))
+            {
+                pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Lookup 2"));
+                pass.WriteTexture(skyTransmittance, RenderBufferLoadAction.DontCare);
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<DirectionalLightInfo>();
+                pass.AddRenderPassData<ICommonPassData>();
+
+                pass.SetRenderFunction((command, pass) =>
+                {
+                    pass.SetFloat(command, "_Samples", settings.TransmittanceSamples);
+                    var scaleOffset = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
+                    pass.SetVector(command, "_ScaleOffset", scaleOffset);
+                    pass.SetFloat(command, "_TransmittanceWidth", settings.TransmittanceWidth);
+                    pass.SetFloat(command, "_TransmittanceHeight", settings.TransmittanceHeight);
+                    pass.SetFloat(command, "_TransmittanceDepth", settings.TransmittanceDepth);
+                });
+            }
+
+            renderGraph.ResourceMap.SetRenderPassData(new SkyTransmittanceData(skyTransmittance, settings.TransmittanceWidth, settings.TransmittanceHeight), renderGraph.FrameIndex);
 
             // Sky luminance
+            var skyLuminance = renderGraph.GetTexture(settings.LuminanceWidth, settings.LuminanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, 2, TextureDimension.Tex2DArray);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Sky Luminance"))
             {
                 pass.Initialize(skyMaterial, skyMaterial.FindPass("Luminance LUT"));
                 pass.WriteTexture(skyLuminance, RenderBufferLoadAction.DontCare);
+                pass.ReadTexture("_SkyTransmittance", skyTransmittance);
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
+                pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<SkyTransmittanceData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetFloat(command, "_Samples", settings.LuminanceSamples);
                     var scaleOffset = GraphicsUtilities.HalfTexelRemap(settings.LuminanceWidth, settings.LuminanceHeight);
                     pass.SetVector(command, "_ScaleOffset", scaleOffset);
+                    pass.SetFloat(command, "_TransmittanceWidth", settings.TransmittanceWidth);
+                    pass.SetFloat(command, "_TransmittanceHeight", settings.TransmittanceHeight);
                 });
             }
 
-            var cdf = renderGraph.GetTexture(settings.CdfWidth, settings.CdfHeight, GraphicsFormat.R32_SFloat, dimension: TextureDimension.Tex2DArray, volumeDepth: 3);
+            var cdf = renderGraph.GetTexture(settings.CdfWidth, settings.CdfHeight, GraphicsFormat.R32_SFloat, dimension: TextureDimension.Tex2DArray, volumeDepth: 6);
 
             // CDF
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere CDF"))
             {
                 pass.Initialize(skyMaterial, 1);
-                pass.DepthSlice = -1;
                 pass.WriteTexture(cdf, RenderBufferLoadAction.DontCare);
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
+                pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<SkyTransmittanceData>();
                 pass.ReadTexture("SkyLuminance", skyLuminance);
 
                 pass.SetRenderFunction((command, pass) =>
@@ -283,13 +310,14 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var weightedDepth = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.R32_SFloat);
-
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere Transmittance"))
             {
                 pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Depth Lookup"));
                 pass.WriteTexture(weightedDepth, RenderBufferLoadAction.DontCare);
 
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<SkyTransmittanceData>();
+                pass.AddRenderPassData<ICommonPassData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -321,7 +349,6 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.Initialize(skyMaterial, 2, 1, keyword);
                 pass.WriteTexture(skyReflection, RenderBufferLoadAction.DontCare);
-                pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
 
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
@@ -330,6 +357,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<SkyTransmittanceData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -411,7 +439,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.Initialize(ggxConvolutionMaterial, 0);
                     pass.WriteTexture(reflectionProbe, RenderBufferLoadAction.DontCare);
                     pass.ReadTexture("_SkyReflection", skyReflection);
-                    pass.DepthSlice = RenderTargetIdentifier.AllDepthSlices;
                     pass.MipLevel = i;
                     var index = i;
 
@@ -466,6 +493,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<ReflectionAmbientData>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<SkyTransmittanceData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -647,5 +675,29 @@ public readonly struct SkyResultData : IRenderPassData
     public readonly void SetProperties(RenderPass pass, CommandBuffer command)
     {
         pass.SetVector(command, "SkyTextureScaleLimit", SkyTexture.ScaleLimit2D);
+    }
+}
+
+public readonly struct SkyTransmittanceData : IRenderPassData
+{
+    private readonly RTHandle skyTransmittance;
+    private readonly int width, height;
+
+    public SkyTransmittanceData(RTHandle skyTransmittance, int width, int height)
+    {
+        this.skyTransmittance = skyTransmittance ?? throw new ArgumentNullException(nameof(skyTransmittance));
+        this.width = width;
+        this.height = height;
+    }
+
+    public void SetInputs(RenderPass pass)
+    {
+        pass.ReadTexture("_SkyTransmittance", skyTransmittance);
+    }
+
+    public void SetProperties(RenderPass pass, CommandBuffer command)
+    {
+        pass.SetFloat(command, "_TransmittanceWidth", width);
+        pass.SetFloat(command, "_TransmittanceHeight", height);
     }
 }
