@@ -27,7 +27,7 @@ cbuffer AtmosphereProperties
 	float _CloudScatter;
 };
 
-Texture3D<float3> _Transmittance;
+Texture2D<float3> _Transmittance;
 Texture2D<float3> _MultiScatter;
 float4 _AtmosphereTransmittanceRemap, _MultiScatterRemap;
 
@@ -315,17 +315,9 @@ float UvFromViewCosAngle1(float viewHeight, float viewCosAngle, bool rayIntersec
 	return Remap01ToHalfTexel(uv, textureSize);
 }
 
-float2 AtmosphereUv(float viewHeight, float viewCosAngle, bool rayIntersectsGround)
-{
-	float viewHeightUv = UvFromViewHeight(viewHeight, _TransmittanceSize.x);
-	float viewCosAngleUv = UvFromViewCosAngle(viewHeight, viewCosAngle, rayIntersectsGround, _TransmittanceSize.y);
-	return float2(viewHeightUv, viewCosAngleUv);
-}
-
 float AtmosphereDepth(float viewHeight, float viewCosAngle, bool rayIntersectsGround)
 {
-	float2 uv = AtmosphereUv(viewHeight, viewCosAngle, rayIntersectsGround);
-	return _AtmosphereDepth.SampleLevel(_LinearClampSampler, float3(uv, 1), 0.0);
+	return _AtmosphereDepth.SampleLevel(_LinearClampSampler, 0.0, 0.0);
 }
 
 float3 TransmittanceToAtmosphere(float viewHeight, float viewCosAngle, float lightCosAngle, float distance)
@@ -335,8 +327,9 @@ float3 TransmittanceToAtmosphere(float viewHeight, float viewCosAngle, float lig
 
 	float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, distance);
 	float lightCosAngleAtDistance = LightCosAngleAtDistance(viewHeight, viewCosAngle, lightCosAngle, distance);
-	float2 uv = AtmosphereUv(heightAtDistance, lightCosAngleAtDistance, false);
-	return _Transmittance.SampleLevel(_LinearClampSampler, float3(uv, 1.0), 0.0);
+	float viewHeightUv = UvFromViewHeight(heightAtDistance, _TransmittanceSize.x);
+	float viewCosAngleUv = UvFromViewCosAngle(heightAtDistance, lightCosAngleAtDistance, false, _TransmittanceSize.y);
+	return _Transmittance.SampleLevel(_LinearClampSampler, float2(viewHeightUv, viewCosAngleUv), 0.0);
 }
 
 float3 TransmittanceToPoint(float viewHeight, float viewCosAngle, float distance, bool rayIntersectsGround)

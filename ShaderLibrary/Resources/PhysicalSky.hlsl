@@ -17,17 +17,14 @@ float4 CloudTextureScaleLimit, CloudTransmittanceTextureScaleLimit;
 float3 _CdfSize;
 float4 SkyLuminanceScaleLimit;
 
-float3 FragmentTransmittanceLut(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float3 FragmentTransmittanceLut(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float viewHeight = ViewHeightFromUv(uv.x, _TransmittanceWidth);
 	
-	bool rayIntersectsGround = uv.y < 0.5;
 	float rayLength;
-	float viewCosAngle = ViewCosAngleFromUv(uv.y, viewHeight, rayIntersectsGround, _TransmittanceHeight, rayLength);
+	float viewCosAngle = ViewCosAngleFromUv(uv.y, viewHeight, false, _TransmittanceHeight, rayLength);
 	
-	float uvz = index / (_TransmittanceDepth - 1.0);
-	
-	return SampleAtmosphere(viewHeight, viewCosAngle, 0.0, _Samples, rayLength * uvz, true, 0.5, true, rayIntersectsGround).transmittance;
+	return SampleAtmosphere(viewHeight, viewCosAngle, 0.0, _Samples, rayLength, true, 0.5, true, false).transmittance;
 }
 
 float3 FragmentTransmittanceLut2(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
