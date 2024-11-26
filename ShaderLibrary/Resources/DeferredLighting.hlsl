@@ -75,7 +75,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
 			float rcpVLength = RcpLength(worldDir);
 			float3 V = -worldDir * rcpVLength;
-			result *= TransmittanceToPoint1(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
+			result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
 		}
 	}
 	
@@ -85,10 +85,10 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	// (Should we also do this for vol lighting?)
 	
 	// TODO: Would be better to use some kind of filter instead of bilinear
-	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit)).rgb;
+	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw * 0, CloudTextureScaleLimit)).rgb;
 	
 	//if(position.x > _ScaledResolution.x / 2)
-		result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
+	result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw * 0, SkyTextureScaleLimit));
 		
 	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
 	

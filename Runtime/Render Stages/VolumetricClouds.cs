@@ -294,6 +294,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<CloudShadowDataResult>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<SkyTransmittanceData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -388,6 +389,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<SkyTransmittanceData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {

@@ -66,9 +66,6 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float3 rayX = QuadReadAcrossX(-V, position.xy);
 	float3 rayY = QuadReadAcrossY(-V, position.xy);
 	
-	rayX = -PixelToWorldDir(position.xy + float2(1.0, 0.0), true);
-	rayY = -PixelToWorldDir(position.xy + float2(0.0, 1.0), true);
-	
 	float3 positionX = IntersectRayPlane(0.0, rayX, worldPosition, triangleNormal);
 	float3 positionY = IntersectRayPlane(0.0, rayY, worldPosition, triangleNormal);
 	
@@ -177,29 +174,29 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 				float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
 				float LdotV0 = dot(_LightDirection0, -underwaterV);
 				float phase = RcpPi ;//lerp(MiePhase(LdotV0, -0.3), MiePhase(LdotV0, 0.85), asymmetry);
-				//luminance += attenuation * asymmetry * GetCaustics(P + _ViewPosition, _LightDirection0);
+				luminance += attenuation * asymmetry * GetCaustics(P + _ViewPosition, _LightDirection0);
 			}
 		}
 	}
 	
-	float3 L = _LightDirection0;
-	float samples = 16;
-	for (float i = 0.0; i < samples; i++)
-	{
-		float xi = min(0.999, (i + noise.x) / samples);
+	//float3 L = _LightDirection0;
+	//float samples = 16;
+	//for (float i = 0.0; i < samples; i++)
+	//{
+	//	float xi = min(0.999, (i + noise.x) / samples);
 		
-		float t = -(l * log((xi * (exp(b * cp * (-v / l - 1)) - 1) + 1))) / (cp * (l + v));
-		float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
-		float weight = rcp(dot(pdf, rcp(3.0)));
+	//	float t = -(l * log((xi * (exp(b * cp * (-v / l - 1)) - 1) + 1))) / (cp * (l + v));
+	//	float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
+	//	float weight = rcp(dot(pdf, rcp(3.0)));
 		
-		float3 P = isFrontFace ? worldPosition + -underwaterV * t : -V * t;
-		float sunT = max(0.0, _ViewPosition.y - P.y) / l;
-		//sunT = WaterShadowDistance(-V * t, L);
+	//	float3 P = isFrontFace ? worldPosition + -underwaterV * t : -V * t;
+	//	float sunT = max(0.0, _ViewPosition.y - P.y) / l;
+	//	//sunT = WaterShadowDistance(-V * t, L);
 			
-		float3 transmittance1 = exp(-(sunT + t) * c);
-		float shadow = GetShadow(P, 0, false);
-		luminance += transmittance1 * weight * shadow * GetCaustics(_ViewPosition + P, L) / samples;
-	}
+	//	float3 transmittance1 = exp(-(sunT + t) * c);
+	//	float shadow = GetShadow(P, 0, false);
+	//	luminance += transmittance1 * weight * shadow * GetCaustics(_ViewPosition + P, L) / samples;
+	//}
 	
 	luminance *= _Extinction * _Exposure * RcpPi * _LightColor0 * TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
 		//result += c * _WaterAlbedo * RcpPi * color * luminance / samples;
@@ -284,9 +281,10 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
-
+		
 	result = YCoCgToRgbFastTonemapInverse(result);
 		
+	result = RemoveNaN(result);
 	TemporalOutput output;
 	output.temporal = result;
 	

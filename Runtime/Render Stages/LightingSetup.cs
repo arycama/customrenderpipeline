@@ -18,7 +18,7 @@ namespace Arycama.CustomRenderPipeline
             this.renderGraph = renderGraph ?? throw new ArgumentNullException(nameof(renderGraph));
         }
 
-        public void Render(CullingResults cullingResults, Matrix4x4 clipToWorld, float near, float far, Camera camera, out List<ShadowRequest> directionalShadowRequests, out List<ShadowRequest> pointShadowRequests)
+        public void Render(CullingResults cullingResults, Matrix4x4 clipToWorld, Matrix4x4 jitteredClipToWorld, float near, float far, Camera camera, out List<ShadowRequest> directionalShadowRequests, out List<ShadowRequest> pointShadowRequests)
         {
             var directionalLightList = ListPool<DirectionalLightData>.Get();
             directionalShadowRequests = ListPool<ShadowRequest>.Get();
@@ -69,6 +69,8 @@ namespace Arycama.CustomRenderPipeline
                             var maxValue = Vector3.negativeInfinity;
                             var minValueRws = Vector3.positiveInfinity;
                             var maxValueRws = Vector3.negativeInfinity;
+                            var minValueJittered = Vector3.positiveInfinity;
+                            var maxValueJittered = Vector3.negativeInfinity;
                             for (var z = 0; z < 2; z++)
                             {
                                 for (var y = 0; y < 2; y++)
@@ -86,23 +88,32 @@ namespace Arycama.CustomRenderPipeline
                                             1.0f
                                         );
 
-                                        var worldPoint = clipToWorld * clipPoint;
-                                        var localPoint = worldToLight.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w);
+                                        {
+                                            var worldPoint = clipToWorld * clipPoint;
+                                            var localPoint = worldToLight.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w);
 
-                                        minValue = Vector3.Min(minValue, localPoint);
-                                        maxValue = Vector3.Max(maxValue, localPoint);
+                                            minValue = Vector3.Min(minValue, localPoint);
+                                            maxValue = Vector3.Max(maxValue, localPoint);
+                                        }
 
-                                        var localPointRws = worldToLight.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w - camera.transform.position);
+                                        {
+                                            var worldPoint = jitteredClipToWorld * clipPoint;
+                                            var localPointRws = worldToLight.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w - camera.transform.position);
 
-                                        minValueRws = Vector3.Min(minValueRws, localPointRws);
-                                        maxValueRws = Vector3.Max(maxValueRws, localPointRws);
+                                            minValueRws = Vector3.Min(minValueRws, localPointRws);
+                                            maxValueRws = Vector3.Max(maxValueRws, localPointRws);
+
+                                            var localPointJittered = worldToLight.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w);
+                                            minValueJittered = Vector3.Min(minValueJittered, localPointJittered);
+                                            maxValueJittered = Vector3.Max(maxValueJittered, localPointJittered);
+                                        }
                                     }
                                 }
                             }
 
                             // Calculate culling planes
                             // First get the planes from the view projection matrix
-                            var viewProjectionMatrix = Matrix4x4Extensions.OrthoOffCenter(minValue.x, maxValue.x, minValue.y, maxValue.y, minValue.z, maxValue.z) * worldToLight;
+                            var viewProjectionMatrix = Matrix4x4Extensions.OrthoOffCenter(minValueJittered.x, maxValueJittered.x, minValueJittered.y, maxValueJittered.y, minValueJittered.z, maxValueJittered.z) * worldToLight;
                             var frustumPlanes = ArrayPool<Plane>.Get(6);
                             GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrix, frustumPlanes);
 
@@ -146,7 +157,7 @@ namespace Arycama.CustomRenderPipeline
                             var shadowSplitData = new ShadowSplitData()
                             {
                                 cullingPlaneCount = cullingPlanes.Count,
-                                shadowCascadeBlendCullingFactor = 1
+                                shadowCascadeBlendCullingFactor = 1,
                             };
 
                             for (var k = 0; k < cullingPlanes.Count; k++)

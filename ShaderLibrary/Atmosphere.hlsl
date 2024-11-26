@@ -48,6 +48,9 @@ Texture3D<float> _AtmosphereDepth;
 Texture2D<float3> _MiePhaseTexture;
 Texture2DArray<float3> SkyLuminance;
 
+Texture2DArray<float3> _SkyTransmittance;
+float _TransmittanceWidth, _TransmittanceHeight, _TransmittanceDepth;
+
 // Todo: Move into cbuffer and precalculate
 static const float SqMaxAtmosphereDistance = Sq(_TopRadius) - Sq(_PlanetRadius);
 static const float RcpMaxHorizonDistance = rsqrt(SqMaxAtmosphereDistance);
@@ -338,10 +341,12 @@ float3 TransmittanceToAtmosphere(float viewHeight, float viewCosAngle, float lig
 
 float3 TransmittanceToPoint(float viewHeight, float viewCosAngle, float distance, bool rayIntersectsGround)
 {
-	float2 uv = AtmosphereUv(viewHeight, viewCosAngle, rayIntersectsGround);
 	float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
-	float uvz = Remap01ToHalfTexel(distance / maxDistance, _TransmittanceSize.z);
-	return _Transmittance.SampleLevel(_LinearClampSampler, float3(uv, uvz), 0.0);
+	
+	float2 uv;
+	uv.x = Remap01ToHalfTexel(distance / maxDistance, _TransmittanceWidth);
+	uv.y = UvFromViewCosAngle1(viewHeight, viewCosAngle, rayIntersectsGround, _TransmittanceHeight);
+	return _SkyTransmittance.Sample(_LinearClampSampler, float3(uv, rayIntersectsGround));
 }
 
 float3 TransmittanceToPoint(float viewHeight, float viewCosAngle, float distance)
@@ -452,30 +457,6 @@ AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float li
 	output.density = density;
 	output.weightedDepth = dot(weightedDepthSum / rayLength, transmittance) / dot(transmittance, 1.0);
 	return output;
-}
-
-Texture2DArray<float3> _SkyTransmittance;
-float _TransmittanceWidth, _TransmittanceHeight, _TransmittanceDepth;
-
-float3 TransmittanceToPoint1(float viewHeight, float viewCosAngle, float distance, bool rayIntersectsGround)
-{
-	float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
-	
-	float2 uv;
-	uv.x = Remap01ToHalfTexel(distance / maxDistance, _TransmittanceWidth);
-	uv.y = UvFromViewCosAngle1(viewHeight, viewCosAngle, rayIntersectsGround, _TransmittanceHeight);
-	return _SkyTransmittance.Sample(_LinearClampSampler, float3(uv, rayIntersectsGround));
-
-	//float2 uv = AtmosphereUv(viewHeight, viewCosAngle, rayIntersectsGround);
-	//float maxDistance = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
-	//float uvz = Remap01ToHalfTexel(distance / maxDistance, _TransmittanceSize.z);
-	//return _Transmittance.SampleLevel(_LinearClampSampler, float3(uv, uvz), 0.0);
-}
-
-float3 TransmittanceToPoint1(float viewHeight, float viewCosAngle, float distance)
-{
-	bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
-	return TransmittanceToPoint1(viewHeight, viewCosAngle, distance, rayIntersectsGround);
 }
 
 #endif

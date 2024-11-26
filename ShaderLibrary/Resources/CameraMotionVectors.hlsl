@@ -15,8 +15,7 @@ float2 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float4x4 clipToPreviousClip = mul(_WorldToPreviousClip, _ClipToWorld);
 	float4 previousPositionCS = mul(clipToPreviousClip, clipPosition);
 	
-	float2 previousPosition = PerspectiveDivide(previousPositionCS).xy * 0.5 + 0.5;
-	return uv + _Jitter.zw - previousPosition;
+	return CalculateVelocity(uv, previousPositionCS);
 }
 
 float2 FragmentPreDilate(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target

@@ -55,6 +55,14 @@ float2 BarycentricInterpolate(float2 a, float2 b, float2 c, float3 w) {	return w
 float3 BarycentricInterpolate(float3 a, float3 b, float3 c, float3 w) {	return w.x * a + w.y * b + w.z * c; }
 float4 BarycentricInterpolate(float4 a, float4 b, float4 c, float3 w) {	return w.x * a + w.y * b + w.z * c; }
 
+
+float Bilerp(float4 y, float2 i)
+{
+	float bottom = lerp(y.x, y.w, i.x);
+	float top = lerp(y.y, y.z, i.x);
+	return lerp(bottom, top, i.y);
+}
+
 float3 Bilerp(float3 v0, float3 v1, float3 v2, float3 v3, float2 i)
 {
 	float3 bottom = lerp(v0, v3, i.x);

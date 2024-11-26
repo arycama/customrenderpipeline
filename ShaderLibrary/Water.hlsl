@@ -5,6 +5,7 @@
 #include "Packing.hlsl"
 #include "Samplers.hlsl"
 #include "Temporal.hlsl"
+#include "Tessellation.hlsl"
 #include "WaterCommon.hlsl"
 #include "Water/WaterShoreMask.hlsl"
 
@@ -193,20 +194,6 @@ DomainInput Hull(InputPatch<HullInput, 4> input, uint id : SV_OutputControlPoint
 	DomainInput output;
 	output.position = input[id].position;
 	return output;
-}
-
-float Bilerp(float4 y, float2 i)
-{
-	float bottom = lerp(y.x, y.w, i.x);
-	float top = lerp(y.y, y.z, i.x);
-	return lerp(bottom, top, i.y);
-}
-
-float3 Bilerp(float3 v0, float3 v1, float3 v2, float3 v3, float2 i)
-{
-	float3 bottom = lerp(v0, v3, i.x);
-	float3 top = lerp(v1, v2, i.x);
-	return lerp(bottom, top, i.y);
 }
 
 [domain("quad")]

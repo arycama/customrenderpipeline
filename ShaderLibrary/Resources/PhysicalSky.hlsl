@@ -169,7 +169,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	float currentDistance = GetSkyCdf(_ViewHeight, rd.y, offsets.x * xiScale, colorIndex, rayIntersectsGround);
 	float4 scatter = AtmosphereScatter(_ViewHeight, rd.y, currentDistance);
 	
-	float3 viewTransmittance = TransmittanceToPoint1(_ViewHeight, rd.y, currentDistance, rayIntersectsGround);
+	float3 viewTransmittance = TransmittanceToPoint(_ViewHeight, rd.y, currentDistance, rayIntersectsGround);
 	float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
 	
 	float3 multiScatter = GetMultiScatter(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
@@ -199,7 +199,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		float lightCosAngleAtMaxDistance = LightCosAngleAtDistance(_ViewHeight, rd.y, _LightDirection0.y, maxRayLength);
 		surface += sunTransmittanceAtMaxDistance * saturate(lightCosAngleAtMaxDistance) * RcpPi;
 		
-		float3 transmittanceAtMaxDistance = TransmittanceToPoint1(_ViewHeight, rd.y, maxRayLength, true);
+		float3 transmittanceAtMaxDistance = TransmittanceToPoint(_ViewHeight, rd.y, maxRayLength, true);
 		surface *= _GroundColor * transmittanceAtMaxDistance;
 		
 		// Clouds block out surface

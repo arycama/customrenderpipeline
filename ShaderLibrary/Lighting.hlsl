@@ -476,7 +476,7 @@ float3 DiscLightApprox(float angularDiameter, float3 R, float3 L)
 float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 {
 	#ifdef SCREENSPACE_REFLECTIONS_ON
-		float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit));
+		float3 radiance = ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw * 0, ScreenSpaceReflectionsScaleLimit));
 	#else
 		float3 radiance = IndirectSpecular(input.normal, V, input.f0, input.NdotV, input.perceptualRoughness, input.isWater, _SkyReflection);
 	#endif
@@ -486,7 +486,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 	radiance *= IndirectSpecularFactor(input.NdotV, input.perceptualRoughness, input.f0) * SpecularOcclusion(input.NdotV, input.perceptualRoughness, input.occlusion, BdotR);
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-		float3 irradiance = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit));
+		float3 irradiance = ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw * 0, ScreenSpaceGlobalIlluminationScaleLimit));
 	#else
 		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
 	#endif

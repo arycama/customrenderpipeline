@@ -266,11 +266,11 @@ float4 InputScaleLimit;
 float4 FragmentResolve(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	//return _BentNormalOcclusion[position.xy];
-	float4 ambientOcclusion = _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, InputScaleLimit));
+	float4 ambientOcclusion = _Input.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw * 0, InputScaleLimit));
 	ambientOcclusion.xyz = normalize(ambientOcclusion.xyz);
 	
 	float4 bentNormalOcclusion = _BentNormalOcclusion[position.xy];
-	//return bentNormalOcclusion;
+	return bentNormalOcclusion;
 	bentNormalOcclusion.rgb = normalize(2.0 * bentNormalOcclusion.rgb - 1.0);
 	
 	ambientOcclusion.a = pow(ambientOcclusion.a, _AoStrength);

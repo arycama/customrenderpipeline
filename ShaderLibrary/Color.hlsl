@@ -446,6 +446,11 @@ float3 FastTonemap(float3 color)
 	return FastTonemap(color, Luminance(color));
 }
 
+float4 FastTonemap(float4 color)
+{
+	return float4(FastTonemap(color.rgb), color.a);
+}
+
 float3 FastTonemapInverse(float3 color, float luminance)
 {
 	return color * rcp(1.0 - luminance);
@@ -454,6 +459,11 @@ float3 FastTonemapInverse(float3 color, float luminance)
 float3 FastTonemapInverse(float3 color)
 {
 	return FastTonemapInverse(color, Luminance(color));
+}
+
+float4 FastTonemapInverse(float4 color)
+{
+	return float4(FastTonemapInverse(color.rgb), color.a);
 }
 
 float3 FastTonemapYCoCg(float3 yCoCg)

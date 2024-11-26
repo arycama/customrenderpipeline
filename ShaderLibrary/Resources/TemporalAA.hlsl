@@ -43,7 +43,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	float2 historyUv = uv - velocity;
 	
 	float2 f = frac(historyUv * _ScaledResolution.xy - 0.5);
-	float sharpness = 1.0;
+	float sharpness = 0.5;
 	float2 w = (f * f - f) * 0.8 * sharpness;
 	
 	float historyWeights[9] =
@@ -59,9 +59,8 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	   0.0
 	};
 	
-	float3 current = 0.0, mean = 0.0, stdDev = 0.0, minValue, maxValue;
-	float4 history = 0.0;
-	float maxWeight = 0.0, weightSum = 0.0;
+	float4 result = 0.0, history = 0.0;
+	float3 minValue, maxValue, mean = 0.0, stdDev = 0.0;
 	
 	[unroll]
 	for (int y = -1, i = 0; y <= 1; y++)
@@ -69,79 +68,50 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 		[unroll]
 		for(int x = -1; x <= 1; x++, i++)
 		{
-			float3 color = _Input[position.xy + int2(x, y)];
+			float3 color = _Input[clamp(position.xy + int2(x, y), 0, _Resolution.xy - 1.0)];
+			color = FastTonemap(color);
+			
+			float2 delta = float2(x, y) + _Jitter.xy;
+			float weight = Mitchell1D(delta.x * (4.0 / 3.0), 0.0, 0.5) * Mitchell1D(delta.y * (4.0 / 3.0), 0.0, 0.5);
+			result += float4(color, 1.0) * weight;
+			
+			history.rgb += color * historyWeights[i];
+			
+			color = RgbToYCoCg(color);
 			
 			minValue = i ? min(minValue, color) : color;
 			maxValue = i ? max(maxValue, color) : color;
 			
-			float2 delta = float2(x, y) + _Jitter.xy;
-			
-			float2 weights;// = saturate(1.0 - abs(delta) * _BlendSharpness);
-			weights.x = Mitchell1D(delta.x * 2.0, 0.0, 1.0);
-			weights.y = Mitchell1D(delta.y * 2.0, 0.0, 1.0);
-			float weight = weights.x * weights.y;
-			
-			current += color * weight;
-			history.rgb += color *historyWeights[i];
-			color = RgbToYCoCgFastTonemap(color);
-			
 			mean += color;
 			stdDev += color * color;
-			
-			weightSum += weight;
-			maxWeight = max(maxWeight, weight);
 		}
 	}
 	
-	if (weightSum)
-		current *= rcp(weightSum);
+	history.rgb *= rcp(w.x + w.y + 1.0);
+	history += FastTonemap(_History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit)) * float2(_PreviousToCurrentExposure, 1.0).xxxy);
+	
+	mean *= rcp(9.0);
+	stdDev = sqrt(abs(stdDev * rcp(9.0) - mean * mean));
+	
+	minValue = max(minValue, mean - stdDev);
+	maxValue = min(maxValue, mean + stdDev);
+	
+	if (all(saturate(historyUv) == historyUv))
+	{
+		history.rgb = RgbToYCoCg(history.rgb);
+		history.rgb = ClipToAABB(history.rgb, RgbToYCoCg(result.rgb / result.a), minValue, maxValue);
+		history.rgb = YCoCgToRgb(history.rgb);
 		
-	current = RgbToYCoCgFastTonemap(current);
+		// Filmic SMAA Slide 76
+		float wk = abs(stdDev.r);
+		float kLow = 10, kHigh = 100;
+		float weight = saturate(rcp(lerp(kLow, kHigh, wk)));
+		
+		result = lerp(float4(history.rgb, 1.0) * history.a, result, weight);
+	}
 	
-	mean /= 9.0;
-	stdDev = sqrt(abs(stdDev / 9.0 - mean * mean));
-	
-	history *= rcp(w.x + w.y + 1.0);
-
-	history += _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
-	history.rgb = RgbToYCoCgFastTonemap(history.rgb);
-	
-	minValue = mean - stdDev;
-	maxValue = mean + stdDev;
-	
-	history.rgb = ClipToAABB(history.rgb, current, minValue, maxValue);
-	
-	float4 result = history;
-	
-	// Decrease weight of previous frames
-	float temporalWeight = (1.0 - _StationaryBlending);
-	
-	
-	// Filmic SMAA Slide 76
-	float wk = abs(stdDev.r);
-	float kLow = 10, kHigh = 100;
-	float weight = saturate(rcp(lerp(kLow, kHigh, wk)));
-	
-	result = lerp(history, float4(current, 1), weight * maxWeight);
-	
-	// Un-weigh history (Eg recover total sum of accumulated frames)
-	//result = lerp(float4(current, 1.0) * weightSum, float4(result.rgb, 1.0) * result.a, _StationaryBlending);
-	//result.rgb /= result.a;
-	
-	// Decrease weight of previous frames
-	//float temporalWeight = weightSum * (1.0 - _StationaryBlending);
-	
-	//float4 result;
-	
-	////return float4(current, 1);
-	
-	//// Un-weigh history (Eg recover total sum of accumulated frames)
-	//result = lerp(float4(history.rgb, 1.0) * history.a, float4(current, 1.0), temporalWeight);
-	
-	////result = lerp(history.rgb, current, 0.05);
-	
-	//result.rgb /= result.a;
-	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
-	
-	return result;
+	if(result.a)
+		result.rgb /= result.a;
+		
+	return RemoveNaN(FastTonemapInverse(result));
 }
