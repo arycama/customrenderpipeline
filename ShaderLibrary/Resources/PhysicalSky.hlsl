@@ -19,20 +19,24 @@ float4 SkyLuminanceScaleLimit;
 
 float3 FragmentTransmittanceLut(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float viewHeight = ViewHeightFromUv(uv.x, _TransmittanceWidth);
+	uv = RemapHalfTexelTo01(uv, float2(_TransmittanceWidth, _TransmittanceHeight));
+	
+	float viewHeight = ViewHeightFromUv(uv.x);
 	
 	float rayLength;
-	float viewCosAngle = ViewCosAngleFromUv(uv.y, viewHeight, false, _TransmittanceHeight, rayLength);
+	float viewCosAngle = ViewCosAngleFromUv(uv.y, viewHeight, false, rayLength);
 	
 	return SampleAtmosphere(viewHeight, viewCosAngle, 0.0, _Samples, rayLength, true, 0.5, true, false).transmittance;
 }
 
 float3 FragmentTransmittanceLut2(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
+	uv.y = RemapHalfTexelTo01(uv.y, _TransmittanceHeight);
+	
 	bool rayIntersectsGround = index == 1;
 	
 	float rayLength;
-	float viewCosAngle = ViewCosAngleFromUv1(uv.y, _ViewHeight, rayIntersectsGround, _TransmittanceHeight, rayLength);
+	float viewCosAngle = ViewCosAngleFromUv(uv.y, _ViewHeight, rayIntersectsGround, rayLength);
 	rayLength *= RemapHalfTexelTo01(uv.x, _TransmittanceWidth.x);
 	
 	return SampleAtmosphere(_ViewHeight, viewCosAngle, 0.0, _Samples, rayLength, true, 0.5, true, rayIntersectsGround).transmittance;
@@ -45,23 +49,26 @@ float FragmentTransmittanceDepthLut(float4 position : SV_Position, float2 uv : T
 
 float3 FragmentLuminance(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
+	uv = RemapHalfTexelTo01(uv, SkyLuminanceSize);
+	
 	bool rayIntersectsGround = index == 1;
 	float rayLength;
-	float viewCosAngle = ViewCosAngleFromUv1(uv.y, _ViewHeight, rayIntersectsGround, SkyLuminanceSize.y, rayLength);
-	rayLength *= RemapHalfTexelTo01(uv.x, SkyLuminanceSize.x);
+	float viewCosAngle = ViewCosAngleFromUv(uv.y, _ViewHeight, rayIntersectsGround, rayLength);
+	rayLength *= uv.x;
 	
 	return SampleAtmosphere(_ViewHeight, viewCosAngle, _LightDirection0.y, _Samples, rayLength, true, 0.5, false, rayIntersectsGround).luminance;
 }
 
 float FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
+	uv = RemapHalfTexelTo01(uv, _CdfSize.xy);
+
 	bool rayIntersectsGround = index > 2;
 	float rayLength;
-	float viewCosAngle = ViewCosAngleFromUv1(uv.y, _ViewHeight, rayIntersectsGround, _SkyCdfSize.y, rayLength);
+	float viewCosAngle = ViewCosAngleFromUv(uv.y, _ViewHeight, rayIntersectsGround, rayLength);
 	
-	float3 maxLuminance = LuminanceToPoint(_ViewHeight, viewCosAngle, rayLength, rayIntersectsGround);
-	float xi = RemapHalfTexelTo01(uv.x, _CdfSize.x);
-	float targetLuminance = maxLuminance[index % 3] * xi;
+	float3 maxLuminance = LuminanceToPoint(_ViewHeight, viewCosAngle, rayLength, rayIntersectsGround, rayLength);
+	float targetLuminance = maxLuminance[index % 3] * uv.x;
 	
 	float a = 0.0;
 	float b = rayLength;
@@ -71,12 +78,12 @@ float FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	for (float i = 0.0; i < _Samples; i++)
 	{
 		c = (a + b) * 0.5;
-		float fc = LuminanceToPoint(_ViewHeight, viewCosAngle, c, rayIntersectsGround)[index % 3] - targetLuminance;
+		float fc = LuminanceToPoint(_ViewHeight, viewCosAngle, c, rayIntersectsGround, rayLength)[index % 3] - targetLuminance;
 		
 		if (fc == 0.0)
 			break;
 		
-		float fa = LuminanceToPoint(_ViewHeight, viewCosAngle, a, rayIntersectsGround)[index % 3] - targetLuminance;
+		float fa = LuminanceToPoint(_ViewHeight, viewCosAngle, a, rayIntersectsGround, rayLength)[index % 3] - targetLuminance;
 		if (sign(fc) == sign(fa))
 		{
 			a = c;
@@ -159,14 +166,14 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	
 	// The invCdf table stores between max distance, but non-sky objects will be closer. Therefore, truncate the cdf by calculating the target luminance at the distance,
 	// as well as max luminance along the ray, and divide to get a scale factor for the random number at the current point.
-	float3 maxLuminance = LuminanceToPoint(_ViewHeight, rd.y, maxRayLength, rayIntersectsGround);
-	float3 currentLuminance = LuminanceToPoint(_ViewHeight, rd.y, rayLength, rayIntersectsGround);
+	float3 maxLuminance = LuminanceToPoint(_ViewHeight, rd.y, maxRayLength, rayIntersectsGround, maxRayLength);
+	float3 currentLuminance = LuminanceToPoint(_ViewHeight, rd.y, rayLength, rayIntersectsGround, maxRayLength);
 	float xiScale = Select(currentLuminance / maxLuminance, colorIndex);
 	
 	float currentDistance = GetSkyCdf(_ViewHeight, rd.y, offsets.x * xiScale, colorIndex, rayIntersectsGround);
 	float4 scatter = AtmosphereScatter(_ViewHeight, rd.y, currentDistance);
 	
-	float3 viewTransmittance = TransmittanceToPoint(_ViewHeight, rd.y, currentDistance, rayIntersectsGround);
+	float3 viewTransmittance = TransmittanceToPoint(_ViewHeight, rd.y, currentDistance, rayIntersectsGround, maxRayLength);
 	float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
 	
 	float3 multiScatter = GetMultiScatter(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
@@ -196,7 +203,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		float lightCosAngleAtMaxDistance = LightCosAngleAtDistance(_ViewHeight, rd.y, _LightDirection0.y, maxRayLength);
 		surface += sunTransmittanceAtMaxDistance * saturate(lightCosAngleAtMaxDistance) * RcpPi;
 		
-		float3 transmittanceAtMaxDistance = TransmittanceToPoint(_ViewHeight, rd.y, maxRayLength, true);
+		float3 transmittanceAtMaxDistance = TransmittanceToPoint(_ViewHeight, rd.y, maxRayLength, true, maxRayLength);
 		surface *= _GroundColor * transmittanceAtMaxDistance;
 		
 		// Clouds block out surface
