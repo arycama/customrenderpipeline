@@ -110,15 +110,10 @@ struct TemporalOutput
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	int2 pixelId = (int2) position.xy;
-	float3 rd = worldDir * RcpLength(worldDir);
+	float rcpRdLength = RcpLength(worldDir);
 	
 	float cloudDistance = CloudDepthTexture[pixelId].r;
-
-	float3 worldPosition = rd * cloudDistance;
-	float4 previousClip = WorldToClipPrevious(worldPosition);
-	
-	float4 nonJitteredClip = WorldToClipNonJittered(worldPosition);
-	float2 motion = MotionVectorFragment(nonJitteredClip, previousClip);
+	float2 motion = CalculateVelocity(uv, cloudDistance * rcp(rcpRdLength));
 	
 	float2 historyUv = uv - motion;
 	

@@ -25,6 +25,25 @@ float2 CalculateVelocity(float2 screenUv, float4 previousClipPosition)
 	return screenUv + _Jitter.zw - previousPosition;
 }
 
+// Calculate from uv, depth and linearDepth
+float2 CalculateVelocity(float2 uv, float depth, float linearDepth)
+{
+	float4 clipPosition = float4(uv * 2 - 1, depth, linearDepth);
+	clipPosition.xyz *= linearDepth;
+	
+	float4x4 clipToPreviousClip = mul(_WorldToPreviousClip, _ClipToWorld);
+	float4 previousPositionCS = mul(clipToPreviousClip, clipPosition);
+	
+	return CalculateVelocity(uv, previousPositionCS);
+}
+
+// Calculate only from uv and linearDepth
+float2 CalculateVelocity(float2 uv, float linearDepth)
+{
+	float depth = EyeToDeviceDepth(linearDepth);
+	return CalculateVelocity(uv, depth, linearDepth);
+}
+
 void TemporalNeighborhood(Texture2D<float4> input, int2 coord, out float4 minValue, out float4 maxValue, out float4 result, bool useYCoCg = true)
 {
 	float4 mean = 0.0, stdDev = 0.0;

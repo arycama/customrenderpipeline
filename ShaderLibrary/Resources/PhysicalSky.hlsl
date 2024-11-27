@@ -163,31 +163,59 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	#endif
 	
 	rayLength = lerp(cloudDistance, rayLength, cloudTransmittance);
+	//rayLength = cloudTransmittance < 1.0 ? cloudDistance : rayLength;
+	//rayLength = cloudDistance;
 	
 	// The invCdf table stores between max distance, but non-sky objects will be closer. Therefore, truncate the cdf by calculating the target luminance at the distance,
 	// as well as max luminance along the ray, and divide to get a scale factor for the random number at the current point.
 	float3 maxLuminance = LuminanceToPoint(_ViewHeight, rd.y, maxRayLength, rayIntersectsGround, maxRayLength);
-	float3 currentLuminance = LuminanceToPoint(_ViewHeight, rd.y, rayLength, rayIntersectsGround, maxRayLength);
-	float xiScale = Select(currentLuminance / maxLuminance, colorIndex);
-	
-	float currentDistance = GetSkyCdf(_ViewHeight, rd.y, offsets.x * xiScale, colorIndex, rayIntersectsGround);
-	float4 scatter = AtmosphereScatter(_ViewHeight, rd.y, currentDistance);
-	
-	float3 viewTransmittance = TransmittanceToPoint(_ViewHeight, rd.y, currentDistance, rayIntersectsGround, maxRayLength);
-	float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
-	
-	float3 multiScatter = GetMultiScatter(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
-	float3 lum = viewTransmittance * (multiScatter + lightTransmittance * (scatter.xyz + scatter.w) * RcpFourPi);
-	
-	#ifndef REFLECTION_PROBE
-		float attenuation = CloudTransmittance(rd * currentDistance);
-		attenuation *= GetShadow(rd * currentDistance, 0, false);
-		lightTransmittance *= attenuation;
-	#endif
-	
-	float3 pdf = lum / currentLuminance;
 	float LdotV = dot(_LightDirection0, rd);
-	luminance += (lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) + multiScatter) * viewTransmittance * rcp(dot(pdf, rcp(3.0)));
+	float3 currentLuminance = LuminanceToPoint(_ViewHeight, rd.y, rayLength, rayIntersectsGround, maxRayLength);
+	float3 luminanceRatio = currentLuminance / maxLuminance;
+	float xiScale = Select(luminanceRatio, colorIndex);
+	
+	{
+		float currentDistance = GetSkyCdf(_ViewHeight, rd.y, offsets.x * xiScale, colorIndex, rayIntersectsGround);
+		float4 scatter = AtmosphereScatter(_ViewHeight, rd.y, currentDistance);
+	
+		float3 viewTransmittance = TransmittanceToPoint(_ViewHeight, rd.y, currentDistance, rayIntersectsGround, maxRayLength);
+		float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
+	
+		float3 multiScatter = GetMultiScatter(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
+		float3 lum = viewTransmittance * (multiScatter + lightTransmittance * (scatter.xyz + scatter.w) * RcpFourPi);
+	
+		#ifndef REFLECTION_PROBE
+			float attenuation = CloudTransmittance(rd * currentDistance);
+			attenuation *= GetShadow(rd * currentDistance, 0, false);
+			lightTransmittance *= attenuation;
+		#endif
+	
+		float3 pdf = lum / currentLuminance;
+		luminance += (lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) + multiScatter) * viewTransmittance * rcp(dot(pdf, rcp(3.0)));
+		//luminance += (lightTransmittance * (scatter.xyz + scatter.w) * RcpFourPi + multiScatter) * viewTransmittance * rcp(dot(pdf, rcp(3.0)));
+	}
+	
+	// Cloud lighting
+	if (cloudTransmittance > 0.0 && cloudTransmittance < 1.0)
+	{
+		// should offsets.x be 1
+		float offset = Remap(offsets.x, 0.0, 1.0, xiScale, 1.0);
+		
+		float currentDistance = GetSkyCdf(_ViewHeight, rd.y, offsets.x, colorIndex, rayIntersectsGround);
+		float4 scatter = AtmosphereScatter(_ViewHeight, rd.y, currentDistance);
+	
+		float3 viewTransmittance = TransmittanceToPoint(_ViewHeight, rd.y, currentDistance, rayIntersectsGround, maxRayLength);
+		float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
+	
+		float3 multiScatter = GetMultiScatter(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
+		float3 lum = viewTransmittance * (multiScatter + lightTransmittance * (scatter.xyz + scatter.w) * RcpFourPi);
+		float3 pdf = lum / maxLuminance;
+	
+		float3 maxLum = (lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) + multiScatter) * viewTransmittance * rcp(dot(pdf, rcp(3.0)));
+	
+		float3 C = maxLum - luminance;
+		//luminance += maxLum * cloudTransmittance;
+	}
 	
 	// Account for bounced light off the earth
 	if (rayIntersectsGround && !hasSceneHit)
@@ -258,20 +286,20 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	}
 	else
 	{
+		// If cloud transmittance is 1, then it is completely opaque, so use the cloud distance
 		sceneDistance = cloudDistance;
 	}
 	
+	sceneDistance = DistanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
+	
 	// TODO: Use velocity for non background pixels as this will account for movement
-	float3 worldPosition = rd * sceneDistance;
-	float4 previousClip = WorldToClipPrevious(worldPosition);
-	float4 nonJitteredClip = WorldToClipNonJittered(worldPosition);
-	float2 motion = MotionVectorFragment(nonJitteredClip, previousClip);
+	float2 motion = CalculateVelocity(uv, sceneDistance * rcp(rcpRdLength));
 	
 	float3 minValue, maxValue, result;
 	TemporalNeighborhood(_SkyInput, position.xy, minValue, maxValue, result, true, true, 1);
 
 	float2 historyUv = uv - motion;
-	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, min(historyUv * _SkyHistoryScaleLimit.xy, _SkyHistoryScaleLimit.zw)) * _PreviousToCurrentExposure);
+	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _SkyHistoryScaleLimit)) * _PreviousToCurrentExposure);
 	
 	float previousDepth = LinearEyeDepth(PreviousDepth[historyUv * _ScaledResolution.xy]);
 	float2 previousVelocity = PreviousVelocity[historyUv * _ScaledResolution.xy];
@@ -285,8 +313,8 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float velocityWeight = velLenSqr ? saturate(1.0 - sqrt(velLenSqr) * _MotionFactor) : 1.0;
 	float3 window = velocityWeight * (maxValue - minValue);
 	
-	minValue -= _ClampWindow * window;
-	maxValue += _ClampWindow * window;
+	//minValue -= _ClampWindow * window;
+	//maxValue += _ClampWindow * window;
 	
 	// Clamp clip etc
 	history = ClipToAABB(history, result, minValue, maxValue);

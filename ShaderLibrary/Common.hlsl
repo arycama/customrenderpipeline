@@ -371,11 +371,6 @@ float4 WorldToClipPrevious(float3 position)
 	return MultiplyPoint(_WorldToPreviousClip, position);
 }
 
-float2 MotionVectorFragment(float4 nonJitteredPositionCS, float4 previousPositionCS)
-{
-	return (PerspectiveDivide(nonJitteredPositionCS).xy * 0.5 + 0.5) - (PerspectiveDivide(previousPositionCS).xy * 0.5 + 0.5);
-}
-
 float CameraDepthToDistance(float depth, float3 V)
 {
 	return LinearEyeDepth(depth) * rcp(dot(-V, _CameraForward));

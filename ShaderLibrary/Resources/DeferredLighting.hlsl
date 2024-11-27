@@ -1,4 +1,4 @@
-#define UNDERWATER_LIGHTING_ON
+//#define UNDERWATER_LIGHTING_ON
 
 #include "../Atmosphere.hlsl"
 #include "../GBuffer.hlsl"

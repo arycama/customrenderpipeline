@@ -186,7 +186,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	bool isFrontFace;
 	float3 triangleNormal = GetTriangleNormal(position.xy, V, isFrontFace);
 	
-	if (!isFrontFace)
+	if (isWater && !isFrontFace)
 	{
 		// Should do a 2nd trace thing here
 		radiance = _WaterAlbedo * 0;

@@ -8,14 +8,7 @@ float2 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 {
 	float depth = Depth[position.xy];
 	float eyeDepth = LinearEyeDepth(depth);
-	
-	float4 clipPosition = float4(uv * 2 - 1, depth, eyeDepth);
-	clipPosition.xyz *= eyeDepth;
-	
-	float4x4 clipToPreviousClip = mul(_WorldToPreviousClip, _ClipToWorld);
-	float4 previousPositionCS = mul(clipToPreviousClip, clipPosition);
-	
-	return CalculateVelocity(uv, previousPositionCS);
+	return CalculateVelocity(uv, depth, eyeDepth);
 }
 
 float2 FragmentPreDilate(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
