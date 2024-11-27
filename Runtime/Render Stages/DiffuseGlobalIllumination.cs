@@ -79,6 +79,7 @@ public class DiffuseGlobalIllumination
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(tempResult);
                 pass.WriteTexture(hitResult);
+                pass.ConfigureClear(RTClearFlags.Color);
 
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();

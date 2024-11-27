@@ -111,6 +111,10 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		float2 coord = clamp(floor(position.xy + u), 0.0, _ScaledResolution.xy - 1.0) + 0.5;
 		float4 hitData = _HitResult[coord];
 		
+		// Out of bounds hit data will be all zeros (Eg for sky pixels)
+		if (all(hitData == 0.0))
+			continue;
+		
 		// For misses, we just store the ray direction, since it represents a hit at an infinite distance (eg probe)
 		bool hasHit = hitData.w;
 		float3 L = hitData.xyz;

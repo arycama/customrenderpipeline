@@ -82,6 +82,7 @@ public class ScreenSpaceReflections
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(hitResult, RenderBufferLoadAction.DontCare);
+                pass.ConfigureClear(RTClearFlags.Color);
 
                 pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
