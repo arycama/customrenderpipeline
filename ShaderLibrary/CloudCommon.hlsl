@@ -91,7 +91,7 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 				//lightTransmittance = CloudTransmittance(worldPosition);
 			
 				float asymmetry = lightTransmittance * transmittance;
-				float LdotV = _LightDirection0.y * viewCosAngle;
+				float LdotV = dot(rd, _LightDirection0);
 				float phase = lerp(MiePhase(LdotV, _BackScatterPhase) * _BackScatterScale, MiePhase(LdotV, _ForwardScatterPhase) * _ForwardScatterScale, asymmetry);
 				light0 += phase * asymmetry * (1.0 - sampleTransmittance);
 			}

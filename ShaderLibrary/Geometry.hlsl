@@ -271,6 +271,11 @@ float3 BlendNormalRNM(float3 n1, float3 n2)
 	return FromToRotationZ(n1, n2);
 }
 
+float3 BlendNormalDerivative(float3 baseNormal, float3 detailNormal, float scale = 1.0)
+{
+	return float3(baseNormal.xy * detailNormal.z + detailNormal.xy * (baseNormal.z * scale), baseNormal.z * detailNormal.z);
+}
+
 float TriangleArea(float2 a, float2 b, float2 c)
 {
 	return 0.5 * abs(a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));

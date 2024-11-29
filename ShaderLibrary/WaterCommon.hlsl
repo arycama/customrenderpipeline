@@ -142,7 +142,9 @@ float3 GetCaustics(float3 worldPosition, float3 L, bool sampleLevel = false)
 	
 	//return caustics;
 	
-	return lerp(caustics, 1.0, Sq(saturate(1.0 - -worldPosition.y / CausticsDepth)));
+	float t = Sq(saturate(1.0 - -worldPosition.y / CausticsDepth));
+	float3 result = lerp(caustics, float3(1.0, 1.0, 1.0), t);
+	return result;
 }
 
 float WaterShadowDistance(float3 position, float3 L)

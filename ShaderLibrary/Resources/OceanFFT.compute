@@ -146,7 +146,7 @@ float GetSpectrumAmplitude(float2 k, float kLength, float rcpTileLength)
 {
 	float w = DispersionDeep(kLength);
 	
-	#if 0
+	#if 1
 		float wp = JonswapPeakAngularFrequency(OceanWindSpeed * 1.026, OceanFetch);
 		float s = JonswapSpectrum(w);
 	#else

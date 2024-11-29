@@ -43,8 +43,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	float2 historyUv = uv - velocity;
 	
 	float2 f = frac(historyUv * _ScaledResolution.xy - 0.5);
-	float sharpness = 0.5;
-	float2 w = (f * f - f) * 0.8 * sharpness;
+	float2 w = (f * f - f) * _Sharpness;
 	
 	float historyWeights[9] =
 	{
@@ -72,7 +71,8 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 			color = FastTonemap(color);
 			
 			float2 delta = float2(x, y) + _Jitter.xy;
-			float weight = Mitchell1D(delta.x * (4.0 / 3.0), 0.0, 0.5) * Mitchell1D(delta.y * (4.0 / 3.0), 0.0, 0.5);
+			float filterSize = 4.0 / 3.0;
+			float weight = Mitchell1D(delta.x * filterSize, 0.0, _BlendSharpness) * Mitchell1D(delta.y * filterSize, 0.0, _BlendSharpness);
 			result += float4(color, 1.0) * weight;
 			
 			history.rgb += color * historyWeights[i];
@@ -107,7 +107,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 		float kLow = 10, kHigh = 100;
 		float weight = saturate(rcp(lerp(kLow, kHigh, wk)));
 		
-		result = lerp(float4(history.rgb, 1.0) * history.a, result, weight);
+		result = lerp(float4(history.rgb, 1.0) * history.a, result, 1.0 - _BaseBlendFactor);
 	}
 	
 	if(result.a)

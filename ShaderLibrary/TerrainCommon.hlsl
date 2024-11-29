@@ -104,8 +104,8 @@ void SampleTerrain(float3 worldPosition, float3 terrainNormal, out float4 albedo
 	}
 	
 	albedoSmoothness = 0.0, mask = 0.0;
-	float3 normalSum = 0.0;
 	float2 derivativeSum = 0.0;
+	normal = float3(0.0, 0.0, 1.0);
 	
 	[unroll]
 	for(uint i = 0; i < 6; i++)
@@ -175,21 +175,12 @@ void SampleTerrain(float3 worldPosition, float3 terrainNormal, out float4 albedo
 		
 		float4 normalData = (sampleMip0 ? Normal.SampleLevel(_TrilinearRepeatSampler, sampleUv, ComputeTextureLOD(Normal_TexelSize.zw, terrainNormal, coneWidth, scale)) : Normal.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy));
 		float3 unpackedNormal = UnpackNormalAG(normalData);
-		
-		float2 d0 = unpackedNormal.xy / unpackedNormal.z;
-		float2 derivative = mul(d0, rotationMatrix);
-		
 		unpackedNormal.xy = mul(unpackedNormal.xy, rotationMatrix);
-		normalSum += unpackedNormal * layerWeight;
-		
-		derivativeSum += derivative * layerWeight;
+		unpackedNormal.z = max(1e-6, unpackedNormal.z);
+		normal = BlendNormalDerivative(normal, unpackedNormal, layerWeight);
 	}
 	
-	float3 tangentNormal = normalize(float3(derivativeSum, 1.0));
-	
-	tangentNormal = normalize(normalSum);
-	
-	normal = BlendNormalRNM(terrainNormal.xzy, tangentNormal).xzy;
+	normal = BlendNormalRNM(terrainNormal.xzy, normalize(normal)).xzy;
 }
 
 void SampleTerrain(float3 worldPosition, out float4 albedoSmoothness, out float3 normal, out float4 mask, bool sampleMip0 = false, float coneWidth = 0.0)
