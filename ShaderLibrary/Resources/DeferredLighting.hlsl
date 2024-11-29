@@ -85,10 +85,10 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	// (Should we also do this for vol lighting?)
 	
 	// TODO: Would be better to use some kind of filter instead of bilinear
-	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw * 0, CloudTextureScaleLimit)).rgb;
+	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit)).rgb;
 	
 	//if(position.x > _ScaledResolution.x / 2)
-	result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw * 0, SkyTextureScaleLimit));
+	result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
 		
 	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
 	

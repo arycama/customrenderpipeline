@@ -63,7 +63,7 @@ float4 SampleTexture(Texture2D<float4> tex, float2 uv, float2 texelSize, bool is
 	}
 	else
 		return tex.SampleBias(_TrilinearRepeatAniso16Sampler, uv, _MipBias);
-}
+	}
 
 float3 SampleTexture(Texture2D<float3> tex, float2 uv, float2 texelSize, bool isRaytracing = false, float3 worldNormal = 0, float coneWidth = 0, float scale = 1)
 {
@@ -159,7 +159,7 @@ SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false
 	float3 emission = SampleTexture(_EmissionMap, uv, _EmissionMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth) * _EmissionColor;
 	result.emission = ApplyEmissiveExposureWeight(emission, _EmissiveExposureWeight);
 
-	result.occlusion = SampleTexture(_OcclusionMap, _OcclusionMap_TexelSize.zw, uv, isRaytracing, worldNormal, coneWidth).g;
+	result.occlusion = SampleTexture(_OcclusionMap, uv, _OcclusionMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth).r;
 	return result;
 }
 
