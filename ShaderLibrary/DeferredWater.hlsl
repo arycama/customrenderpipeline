@@ -146,6 +146,21 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float v = underwaterV.y;
 	float b = underwaterDistance;
 		
+	float roughness = perceptualRoughness * perceptualRoughness;
+	float3 L = _LightDirection0;
+	float3 Vt = L;
+	float3 Nt = -N * float2(-1, 1).xyx;
+	float ni = 1.34, no = 1.0;
+	float3 Ht = normalize(-Vt * ni - l * no);
+	float NdotHt = dot(Nt, Ht);
+	float LdotHt = dot(L, Ht);
+	float VdotHt = dot(Vt, Ht);
+	
+	float mt = GgxTransmission(roughness, dot(Nt, L), dot(Nt, Vt), NdotHt, LdotHt, VdotHt, ni, no);
+	float fd1 = Fresnel(VdotHt, ni, no);
+	float factor = mt * (1.0 - fd1) * saturate(-dot(Nt, L));
+	factor = 1;
+	
 	float3 luminance = 0.0;
 	float samples = 1;
 	for (float i = 0.0; i < samples; i++)
@@ -161,7 +176,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		
 		float3 transmittance = exp(-_Extinction * (sunT + t));
 		float shadow = GetShadow(P, 0, false) * CloudTransmittance(P);
-		luminance += transmittance * weight * shadow * GetCaustics(_ViewPosition + P, _LightDirection0) / samples;
+		luminance += factor * transmittance * weight * shadow * GetCaustics(_ViewPosition + P, _LightDirection0) / samples;
 	}
 	
 	luminance *= _Extinction * _Exposure * RcpPi * _LightColor0 * TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
@@ -170,7 +185,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float3 finalTransmittance = exp(-underwaterDistance * _Extinction);
 	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
 	luminance *= _Color;
-
+	
 	// TODO: Stencil? Or hw blend?
 	float3 underwater = 0.0;
 	if (underwaterDepth != 0.0 || !isFrontFace)
@@ -195,68 +210,17 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			}
 			else
 			{
-				//if (!underwaterDepth)
-				//	underwater = _SkyReflection.SampleLevel(_LinearClampSampler, refractV, 0.0);
+				if (!underwaterDepth)
+					underwater = _SkyReflection.SampleLevel(_LinearClampSampler, refractV, 0.0);
 					
-				//underwater *= exp(-_Extinction * waterDistance);
+				underwater *= exp(-_Extinction * waterDistance);
 			}
 		}
 	}
 	
 	if (!isFrontFace)
 		luminance = 0;
-	
-	#if 0
-	float alpha = perceptualRoughness * perceptualRoughness;
-	
-	// Apply roughness to transmission
-	//float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
-	//float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
-	//underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
-	
-	float3 l1 = _LightDirection0;
-	float3 n1 = N;// * float2(-1, 1).xyx;
-	float3 v1 = V;//-_LightDirection0;
-	//float3 lp = reflect(_LightDirection0, -flippedN);
-	
-	float ni = 1.34, no = 1;
-	float3 ht = normalize(-v1 * ni - l * no);
-	float cosThetaT = dot(v1, ht);
-	
-	float f0 = Sq((ni - no) * rcp(ni + no));
-	
-	float d = GgxDistribution(alpha, dot(ht, n1));
-	float g = GgxShadowingMasking(alpha, dot(n1, v1), dot(n1, l1));
-	
-	// Eq 24: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html#components/core/dielectricbsdffortransparentsurfaces
-	float mt = abs(dot(l1, ht)) * abs(dot(v1, ht)) * rcp(abs(dot(l1, n1)) * abs(dot(v1, n1))) * (Sq(no) * d * g * rcp(Sq(ni * dot(v1, ht) + no * dot(l1, ht))));
-	
-	
-	// Eq 34
-	float cosTheta = cosThetaT;
-	float cosTheta2 = cosTheta * cosTheta;
-	float sinTheta2 = Sq(ni * rcp(no)) * (1.0 - cosTheta2);
-	float cosThetaO = sqrt(1.0 - sinTheta2);
-	float fd = no >= ni ? Fresnel(cosTheta, f0) : (sinTheta2 < 1.0 ? Fresnel(cosThetaO, f0) : 1.0);
-	
-	// Eq 9: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html#components/core/dielectricbsdffortransparentsurfaces
-	float p = 1, s = 1; // p is albedo, but we already apply this elsewhere
-	float bsdf = p * mt * (1.0 - s * fd);
-	
-	
-	//float cosThetaRPrime = dot(V1, hrp);
-	
-	
-	//float LdotV1 = dot(L, V);
-	
-	
-	//float brdf = GGX(roughness, f0, NdotL, NdotV, LdotV);
-	
-	
-	//underwater = bsdf;
-	//underwater = 0;
-	#endif
-	
+		
 	FragmentOutput output;
 	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);
 	output.luminance = luminance;
