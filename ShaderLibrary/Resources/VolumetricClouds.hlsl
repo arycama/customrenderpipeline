@@ -82,7 +82,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	float cloudDepth;
 	float rayLength = rayEnd - rayStart;
-	float4 result = EvaluateCloud(rayStart, rayLength, sampleCount, rd, _ViewHeight, viewCosAngle, offsets, P, isShadow, cloudDepth, false);
+	float4 result = EvaluateCloud(rayStart, rayLength, sampleCount, rd, _ViewHeight, viewCosAngle, offsets, P, isShadow, cloudDepth, true);
 	float totalRayLength = rayEnd - cloudDepth;
 	
 	#ifdef CLOUD_SHADOW
@@ -162,6 +162,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
 	
 	result.rgb = RemoveNaN(result.rgb);
+	
+	result = float4(_Input[pixelId], _InputTransmittance[pixelId]);
 	
 	TemporalOutput output;
 	output.luminance = result.rgb;

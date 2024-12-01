@@ -79,15 +79,12 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		}
 	}
 	
-	//return result;
-	
 	// Sample the sky and clouds at the re-jittered coordinate, so that the final TAA resolve will not add further jitter. 
 	// (Should we also do this for vol lighting?)
 	
 	// TODO: Would be better to use some kind of filter instead of bilinear
 	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit)).rgb;
 	
-	//if(position.x > _ScaledResolution.x / 2)
 	result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
 		
 	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
@@ -104,7 +101,12 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	bool isWater = stencil & 4;
 	//if ((isWater && !isFrontFace) || (worldPosition.y < 0.0 && !isWater))
-	if(false)
+	
+	//return !(isWater && !isValid && worldPosition.y < 0.0);
+	
+	//return ((worldPosition.y < 0.0 && ((isWater && isValid && !isFrontFace))));
+	
+	if (false)
 	{
 		float3 L = _DirectionalLights[0].direction;
 		float3 color = _DirectionalLights[0].color * _Exposure * TransmittanceToAtmosphere(_ViewHeight, -V.y, L.y, viewDistance);

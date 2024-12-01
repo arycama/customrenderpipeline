@@ -280,7 +280,7 @@ namespace Arycama.CustomRenderPipeline
             var cloudCoverageBufferTemp = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
             var cloudCoverageBuffer = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
 
-            var result = new CloudShadowDataResult(cloudShadow, depth, worldToShadow, settings.Density, cloudCoverageBuffer, planetRadius, planetRadius + settings.StartHeight + settings.LayerThickness);
+            var result = new CloudShadowDataResult(cloudShadow, depth, worldToShadow, settings.Density, cloudCoverageBuffer, 0.0f, settings.StartHeight + settings.LayerThickness);
             renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex);
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Cloud Coverage"))

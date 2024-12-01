@@ -55,6 +55,41 @@ float CloudExtinction(float3 worldPosition, float height, bool useDetail)
 	return max(0.0, density * _Density);
 }
 
+float3 AtmosphereTransmittance(float height, float cosAngle)
+{
+	float2 uv = float2(UvFromViewHeight(height), UvFromViewCosAngle(height, cosAngle, false));
+	return _Transmittance.SampleLevel(_LinearClampSampler, Remap01ToHalfTexel(uv, _TransmittanceSize), 0.0) / HalfMax;
+}
+
+float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float cosAngle1)
+{
+	float3 lowTransmittance, highTransmittance;
+	if (cosAngle0 <= 0.0)
+	{
+		lowTransmittance = AtmosphereTransmittance(radius1, -cosAngle1);
+		highTransmittance = AtmosphereTransmittance(radius0, -cosAngle0);
+	}
+	else
+	{
+		lowTransmittance = AtmosphereTransmittance(radius0, cosAngle0);
+		highTransmittance = AtmosphereTransmittance(radius1, cosAngle1);
+	}
+		
+	return highTransmittance == 0.0 ? 0.0 : lowTransmittance * rcp(highTransmittance);
+}
+
+float CosAngleAtDistance(float viewHeight, float cosAngle, float distance, float heightAtDistance)
+{
+	return (viewHeight * cosAngle + distance) / heightAtDistance;
+}
+
+float3 TransmittanceToPoint1(float viewHeight, float cosAngle, float distance)
+{
+	float heightAtDistance = HeightAtDistance(viewHeight, cosAngle, distance);
+	float cosAngleAtDistance = CosAngleAtDistance(viewHeight, cosAngle, distance, heightAtDistance);
+	return TransmittanceToPoint(viewHeight, cosAngle, heightAtDistance, cosAngleAtDistance);
+}
+
 float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 rd, float viewHeight, float viewCosAngle, float2 offsets, float3 P, bool isShadow, out float cloudDepth, bool sunShadow = false)
 {
 	float dt = rayLength / sampleCount;
@@ -93,7 +128,7 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 				float asymmetry = lightTransmittance * transmittance;
 				float LdotV = dot(rd, _LightDirection0);
 				float phase = lerp(MiePhase(LdotV, _BackScatterPhase) * _BackScatterScale, MiePhase(LdotV, _ForwardScatterPhase) * _ForwardScatterScale, asymmetry);
-				light0 += phase * asymmetry * (1.0 - sampleTransmittance);
+				light0 += phase * lightTransmittance * (1.0 - sampleTransmittance);
 			}
 			
 			transmittance *= sampleTransmittance;
@@ -121,9 +156,15 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		
 		float3 ambient = GetSkyAmbient(viewHeight, viewCosAngle, _LightDirection0.y, cloudDepth) * _LightColor0 * _Exposure;
 		result.rgb += ambient * (1.0 - result.a);
-			
-		float3 viewTransmittance = TransmittanceToPoint(viewHeight, viewCosAngle, cloudDepth);
-		result.rgb *= viewTransmittance;
+		
+		if (sunShadow)
+		{
+			result.rgb *= TransmittanceToPoint(viewHeight, viewCosAngle, cloudDepth);
+		}
+		else
+		{
+			result.rgb *= TransmittanceToPoint1(viewHeight, viewCosAngle, cloudDepth);
+		}
 	}
 	
 	return result;

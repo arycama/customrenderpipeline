@@ -50,6 +50,7 @@
 				PassBack Replace
 				PassFront Replace
 				//ZFailBack Replace
+				//ZFailFront Replace
 			}
 
 			HLSLPROGRAM

@@ -1,4 +1,8 @@
-﻿#include "../Common.hlsl"
+﻿#ifdef __INTELLISENSE__
+	#define REFLECTION_PROBE
+#endif
+
+#include "../Common.hlsl"
 #include "../Atmosphere.hlsl"
 #include "../Lighting.hlsl"
 #include "../CloudCommon.hlsl"
@@ -141,11 +145,11 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		#endif
 	
 		float cloudDistance = 0;
-		float4 clouds = evaluateCloud ? EvaluateCloud(rayStart, rayEnd - rayStart, 12, rd, _ViewHeight, rd.y, offsets, 0.0, false, cloudDistance) : float2(0.0, 1.0).xxxy;
+		float4 clouds = evaluateCloud ? EvaluateCloud(rayStart, rayEnd - rayStart, 12, rd, _ViewHeight, rd.y, offsets, 0.0, false, cloudDistance, false) : float2(0.0, 1.0).xxxy;
 		float cloudOpticalDepth = -log2(clouds.a) * rcp(rayEnd - rayStart);
 		float3 cloudLuminance = clouds.rgb;
 		luminance += cloudLuminance;
-	
+		
 		float cloudTransmittance = clouds.a;
 	#else
 		float cloudTransmittance = CloudTransmittanceTexture[position.xy];
@@ -183,7 +187,15 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
 	
 		float3 multiScatter = GetMultiScatter(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
-		float3 lum = viewTransmittance * (multiScatter + lightTransmittance * (scatter.xyz + scatter.w) * RcpFourPi);
+		float3 lum = viewTransmittance * (multiScatter + lightTransmittance * RcpFourPi) * (scatter.xyz + scatter.w);
+		
+		// Apply cloud coverage only to multi scatter, since single scatter is already shadowed by clouds
+		float heightAtDistance = HeightAtDistance(_ViewHeight, rd.y, currentDistance) - _PlanetRadius;
+		float cloudFactor = saturate(heightAtDistance * heightAtDistance * _CloudCoverageScale + _CloudCoverageOffset);
+		//multiScatter = multiScatter * _CloudCoverage.a + _CloudCoverage.rgb;
+		multiScatter = lerp(multiScatter * _CloudCoverage.a, _CloudCoverage.rgb, cloudFactor);
+		multiScatter *= scatter.xyz + scatter.w;
+		
 	
 		#ifndef REFLECTION_PROBE
 			float attenuation = CloudTransmittance(rd * currentDistance);
@@ -192,7 +204,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		#endif
 	
 		float3 pdf = lum / currentLuminance;
-		luminance += (lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) + multiScatter) * viewTransmittance * rcp(dot(pdf, rcp(3.0)));
+		luminance += (lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) + multiScatter) * viewTransmittance * rcp(dot(pdf, rcp(3.0))) * _LightColor0 * _Exposure;
 	}
 	
 	// Cloud lighting
@@ -208,19 +220,27 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
 	
 		float3 multiScatter = GetMultiScatter(_ViewHeight, rd.y, _LightDirection0.y, currentDistance);
-		float3 lum = viewTransmittance * (multiScatter + lightTransmittance * (scatter.xyz + scatter.w) * RcpFourPi);
+		float3 lum = viewTransmittance * (multiScatter + lightTransmittance * RcpFourPi) * (scatter.xyz + scatter.w);
+		
+		// Apply cloud coverage only to multi scatter, since single scatter is already shadowed by clouds
+		float heightAtDistance = HeightAtDistance(_ViewHeight, rd.y, currentDistance) - _PlanetRadius;
+		float cloudFactor = saturate(heightAtDistance * heightAtDistance * _CloudCoverageScale + _CloudCoverageOffset);
+		//multiScatter = multiScatter * _CloudCoverage.a + _CloudCoverage.rgb;
+		multiScatter = lerp(multiScatter * _CloudCoverage.a, _CloudCoverage.rgb, cloudFactor);
+		multiScatter *= scatter.xyz + scatter.w;
 		
 		#ifndef REFLECTION_PROBE
+			// Get cloud shadow, important when looking down at clodus from above
 			float attenuation = CloudTransmittance(rd * currentDistance);
-			attenuation *= GetShadow(rd * currentDistance, 0, false);
+			//attenuation *= GetShadow(rd * currentDistance, 0, false);
 			lightTransmittance *= attenuation;
 		#endif
 		
-		float3 pdf = lum / (hasSceneHit ? currentLuminance : (maxLuminance - currentLuminance));
+		float3 pdf = lum / ((maxLuminance - currentLuminance));
 		float3 maxLum = (lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) + multiScatter) * viewTransmittance * rcp(dot(pdf, rcp(3.0)));
 	
 		float3 C = maxLum - luminance * viewTransmittance;
-		luminance += C * cloudTransmittance;
+		luminance += maxLum * cloudTransmittance * _LightColor0 * _Exposure;
 	}
 	
 	// Account for bounced light off the earth
@@ -242,12 +262,10 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		
 		// Clouds block out surface
 		surface *= cloudTransmittance;
-		luminance += surface;
+		luminance += surface * _LightColor0 * _Exposure;
 	}
 	
-	luminance *= _LightColor0 * _Exposure;
-
-	return luminance;
+	return RemoveNaN(luminance);
 }
 
 float4 _SkyHistoryScaleLimit;

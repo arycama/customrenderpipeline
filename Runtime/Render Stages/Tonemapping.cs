@@ -118,7 +118,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "Tonemap", settings.Tonemap ? 1.0f : 0.0f);
 
                 pass.SetFloat(command, "MaxLuminance", hdrEnabled ? maxNits : 100);
-                pass.SetFloat(command, "PaperWhiteLuminance", hdrEnabled ? settings.PaperWhite : 100.0f); // Todo: Brightness setting
+                pass.SetFloat(command, "PaperWhiteLuminance", settings.PaperWhite); // Todo: Brightness setting
                 pass.SetFloat(command, "PaperWhiteBoost", settings.GreyLuminanceBoost);
                 pass.SetFloat(command, "Contrast", settings.Contrast);
                 pass.SetFloat(command, "Toe", settings.Toe);

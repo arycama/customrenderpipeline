@@ -271,7 +271,7 @@ float3 TransmittanceToPoint(float viewHeight, float viewCosAngle, float distance
 	float2 uv;
 	uv.x = distance / maxDistance;
 	uv.y = UvFromViewCosAngle(viewHeight, viewCosAngle, rayIntersectsGround);
-	return _SkyTransmittance.Sample(_LinearClampSampler, float3(Remap01ToHalfTexel(uv, _TransmittanceSize), rayIntersectsGround));
+	return _SkyTransmittance.SampleLevel(_LinearClampSampler, float3(Remap01ToHalfTexel(uv, _TransmittanceSize), rayIntersectsGround), 0.0);
 }
 
 float3 TransmittanceToPoint(float viewHeight, float viewCosAngle, float distance)
@@ -304,7 +304,7 @@ float3 GetSkyAmbient(float viewHeight, float viewCosAngle, float lightCosAngle, 
 	float viewHeightUv = (heightAtDistance - _PlanetRadius) / _AtmosphereHeight;
 	float lightUv = 0.5 * lightCosAngleAtDistance + 0.5;
 	float2 uv = ApplyScaleOffset(float2(viewHeightUv, lightUv), _SkyAmbientRemap);
-	return _SkyAmbient.Sample(_LinearClampSampler, uv);
+	return _SkyAmbient.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
 float GetSkyCdf(float viewHeight, float viewCosAngle, float xi, float colorIndex, bool rayIntersectsGround)
@@ -322,9 +322,7 @@ float3 GetMultiScatter(float viewHeight, float viewCosAngle, float lightCosAngle
 	float lightUv = 0.5 * lightCosAngleAtDistance + 0.5;
 
 	float2 uv = ApplyScaleOffset(float2(viewHeightUv, lightUv), _MultiScatterRemap);
-	float3 ms = _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
-	float4 scatter = AtmosphereScatter(viewHeight, viewCosAngle, distance);
-	return ms * (scatter.xyz + scatter.w);
+	return _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
 }
 
 struct AtmosphereResult
@@ -349,10 +347,10 @@ AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float li
 		
 		float3 throughput = transmittance * (1.0 - extinction) * rcp(opticalDepth);
 		
-		if (applyMultiScatter)
-			luminance += throughput * GetMultiScatter(viewHeight, viewCosAngle, lightCosAngle, currentDistance);
-		
 		float4 scatter = AtmosphereScatter(viewHeight, viewCosAngle, currentDistance);
+		if (applyMultiScatter)
+			luminance += throughput * GetMultiScatter(viewHeight, viewCosAngle, lightCosAngle, currentDistance) * (scatter.xyz + scatter.w);
+		
 		float3 currentScatter = throughput * (scatter.xyz * RcpFourPi + scatter.w * RcpFourPi);
 		density += currentScatter;
 		

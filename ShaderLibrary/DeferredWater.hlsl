@@ -133,76 +133,41 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		refractedPositionSS = position.xy;
 	}
 	
+	float3 underwaterPositionWS = PixelToWorld(float3(refractedPositionSS, underwaterDepth));
+	underwaterDistance = distance(worldPosition, underwaterPositionWS);
+	float3 underwaterV = isFrontFace ? normalize(worldPosition - underwaterPositionWS) : V;
+	
 	// Select random channel
 	float2 noise = Noise2D(position.xy);
 	uint channelIndex = noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2);
-	float xi = min(noise.x, 0.999); // xi of 1 maps to infinity, so clamp
 	float3 c = _Extinction;
 	float3 cp = Select(_Extinction, channelIndex);
-	float l = _DirectionalLights[0].direction.y;
-	float v = V.y;
+	float l = _LightDirection0.y;
+	float v = underwaterV.y;
 	float b = underwaterDistance;
 		
-	float t = -(l * log((xi * (exp(b * cp * (-v / l - 1)) - 1) + 1))) / (cp * (l + v));
-	float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
-	float weight = rcp(dot(pdf, rcp(3.0)));
-
-	float3 underwaterPositionWS = PixelToWorld(float3(refractedPositionSS, underwaterDepth));
-	float3 underwaterV = isFrontFace ? normalize(worldPosition - underwaterPositionWS) : V;
-	float3 P = isFrontFace ? worldPosition + -underwaterV * t : -V * t;
-	
 	float3 luminance = 0.0;
-	float planetDistance = DistanceToNearestAtmosphereBoundary(_ViewHeight, -V.y);
-	
-	float LdotV = dot(_LightDirection0, -V);
-	if (_LightDirection0.y > 0.0)
+	float samples = 1;
+	for (float i = 0.0; i < samples; i++)
 	{
-		float attenuation = GetShadow(P, 0, false);
-		if (attenuation > 0.0)
-		{
-			attenuation *= CloudTransmittance(P);
-			if (attenuation > 0.0)
-			{
-				float shadowDistance0 = max(0.0, worldPosition.y - P.y) / max(1e-6, saturate(_LightDirection0.y));
-				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, P);
-				if (all(saturate(shadowPosition.xyz) == shadowPosition.xyz))
-				{
-					float shadowDepth = _WaterShadows.Sample(_LinearClampSampler, shadowPosition.xy);
-					shadowDistance0 = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
-				}
-				
-				float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
-				float LdotV0 = dot(_LightDirection0, -underwaterV);
-				float phase = RcpPi ;//lerp(MiePhase(LdotV0, -0.3), MiePhase(LdotV0, 0.85), asymmetry);
-				luminance += attenuation * asymmetry * GetCaustics(P + _ViewPosition, _LightDirection0);
-			}
-		}
+		float xi = min(0.999, (i + noise.x) / samples);
+		
+		float t = -(l * log((xi * (exp(b * cp * (-v / l - 1)) - 1) + 1))) / (cp * (l + v));
+		float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
+		float weight = rcp(dot(pdf, rcp(3.0)));
+		
+		float3 P = isFrontFace ? worldPosition + -underwaterV * t : -underwaterV * t;
+		float sunT = WaterShadowDistance(P, _LightDirection0);
+		
+		float3 transmittance = exp(-_Extinction * (sunT + t));
+		float shadow = GetShadow(P, 0, false) * CloudTransmittance(P);
+		luminance += transmittance * weight * shadow * GetCaustics(_ViewPosition + P, _LightDirection0) / samples;
 	}
 	
-	//float3 L = _LightDirection0;
-	//float samples = 16;
-	//for (float i = 0.0; i < samples; i++)
-	//{
-	//	float xi = min(0.999, (i + noise.x) / samples);
-		
-	//	float t = -(l * log((xi * (exp(b * cp * (-v / l - 1)) - 1) + 1))) / (cp * (l + v));
-	//	float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
-	//	float weight = rcp(dot(pdf, rcp(3.0)));
-		
-	//	float3 P = isFrontFace ? worldPosition + -underwaterV * t : -V * t;
-	//	float sunT = max(0.0, _ViewPosition.y - P.y) / l;
-	//	//sunT = WaterShadowDistance(-V * t, L);
-			
-	//	float3 transmittance1 = exp(-(sunT + t) * c);
-	//	float shadow = GetShadow(P, 0, false);
-	//	luminance += transmittance1 * weight * shadow * GetCaustics(_ViewPosition + P, L) / samples;
-	//}
-	
 	luminance *= _Extinction * _Exposure * RcpPi * _LightColor0 * TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
-		//result += c * _WaterAlbedo * RcpPi * color * luminance / samples;
 	
 	// Ambient 
-	float3 finalTransmittance = exp(-t * _Extinction);
+	float3 finalTransmittance = exp(-underwaterDistance * _Extinction);
 	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
 	luminance *= _Color;
 
@@ -222,7 +187,6 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			if(underwaterDepth)
 			{
 				underwater = _UnderwaterResult.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit));
-				//underwater *= GetCaustics(underwaterPositionWS + _ViewPosition);
 			}
 		
 			if (isFrontFace)
@@ -231,10 +195,10 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			}
 			else
 			{
-				if (!underwaterDepth)
-					underwater = _SkyReflection.SampleLevel(_LinearClampSampler, refractV, 0.0);
+				//if (!underwaterDepth)
+				//	underwater = _SkyReflection.SampleLevel(_LinearClampSampler, refractV, 0.0);
 					
-				underwater *= exp(-_Extinction * waterDistance);
+				//underwater *= exp(-_Extinction * waterDistance);
 			}
 		}
 	}
@@ -249,7 +213,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	FragmentOutput output;
 	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);
-	output.luminance = luminance;// * (1.0 - foamFactor) * (1.0 - FssEss);
+	output.luminance = luminance;
 	return output;
 }
 

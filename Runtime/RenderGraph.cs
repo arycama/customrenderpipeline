@@ -443,7 +443,7 @@ namespace Arycama.CustomRenderPipeline
                 availableRtSlots.Enqueue(i);
             }
 
-            //if (!FrameDebugger.enabled)
+            if (!FrameDebugger.enabled)
                 FrameIndex++;
         }
 
