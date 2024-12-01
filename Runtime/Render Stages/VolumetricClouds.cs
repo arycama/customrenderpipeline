@@ -63,7 +63,7 @@ namespace Arycama.CustomRenderPipeline
                 // TODO: Make this a render pass data?
                 pass.SetFloat(command, "_WeatherMapStrength", WeatherMapStrength);
                 pass.SetFloat(command, "_WeatherMapScale", MathUtils.Rcp(WeatherMapScale));
-                pass.SetVector(command, "_WeatherMapOffset", WeatherMapSpeed * Time.time / WeatherMapScale);
+                pass.SetVector(command, "_WeatherMapOffset", WeatherMapSpeed * (1.0f) / WeatherMapScale);
                 pass.SetVector(command, "_WeatherMapSpeed", WeatherMapSpeed);
 
                 pass.SetFloat(command, "_NoiseScale", MathUtils.Rcp(NoiseScale));
@@ -354,7 +354,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void Render(RTHandle cameraDepth, int width, int height, Vector2 jitter, float fov, float aspect, Matrix4x4 viewToWorld, Camera camera, CullingResults cullingResults, float viewHeight)
+        public void Render(RTHandle cameraDepth, int width, int height, Camera camera, CullingResults cullingResults)
         {
             var cloudLuminanceTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             var cloudTransmittanceTemp = renderGraph.GetTexture(width, height, GraphicsFormat.R8_UNorm, isScreenTexture: true);
@@ -365,7 +365,7 @@ namespace Arycama.CustomRenderPipeline
                 // Determine pass
                 var keyword = string.Empty;
                 var viewHeight1 = camera.transform.position.y;
-                if (viewHeight > settings.StartHeight)
+                if (viewHeight1 > settings.StartHeight)
                 {
                     if (viewHeight1 > settings.StartHeight + settings.LayerThickness)
                     {

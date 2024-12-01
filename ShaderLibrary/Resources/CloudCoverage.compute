@@ -25,10 +25,10 @@ void CSMain (uint groupIndex : SV_GroupIndex)
 	
 	// Divide result by the pdf
 	float uniformHemispherePdf = rcp(TwoPi);
-	clouds /= uniformHemispherePdf;
+	clouds.rgb /= uniformHemispherePdf;
 	
 	// Since this is replacing a sphere phase function, apply uniform phase function
-	clouds *= RcpFourPi;
+	clouds.rgb *= RcpFourPi;
 	
 	_SharedLuminanceExtinction[groupIndex] = clouds;
 	

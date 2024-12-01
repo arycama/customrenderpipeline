@@ -86,8 +86,8 @@ float3 FragmentDetailNoise(float4 position : SV_Position, float2 uv : TEXCOORD0,
 	{
 		float freq = _DetailNoiseFrequency * exp2(i);
 		float amp = pow(freq, -_DetailNoiseH);// * smoothstep(1.0, 0.5, w * freq);
-		result += saturate(1.0 - CellularNoise(samplePosition * freq, freq)) * amp;
-		//result += SimplexNoise(samplePosition * freq, freq) * amp;
+		//result += saturate(1.0 - CellularNoise(samplePosition * freq, freq)) * amp;
+		result += SimplexNoise(samplePosition * freq, freq) * amp;
 		sum += amp;
 	}
 
