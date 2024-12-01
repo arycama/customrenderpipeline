@@ -86,7 +86,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 
         // float PDF = D * NdotH * Jacobian, where Jacobian = 1 / (4 * LdotH).
         // Since (N == V), NdotH == LdotH.
-		float pdf = 0.25 * D_GGX(NdotH, roughness);
+		float pdf = 0.25 * GgxDistribution(roughness, NdotH);
 		
         // TODO: improve the accuracy of the sample's solid angle fit for GGX.
 		float omegaS = rcp(pdf) / _Samples;
@@ -112,7 +112,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 
         // The choice of the Fresnel factor does not appear to affect the result.
 		float F = 1; // F_Schlick(F0, LdotH);
-		float G = V_SmithJointGGX(NdotL, NdotV, roughness) * NdotL * NdotV; // 4 cancels out
+		float G = GgxVisibility(roughness, NdotL, NdotV) * NdotL * NdotV; // 4 cancels out
 
 		result += float4(val, 1.0) * F * G;
 	}

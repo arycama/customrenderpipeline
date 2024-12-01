@@ -15,90 +15,76 @@ Texture2D<float2> _GGXDirectionalAlbedo;
 Texture2D<float> _GGXAverageAlbedo, _GGXAverageAlbedoMS;
 Texture3D<float> _GGXSpecularOcclusion;
 
+float GgxDistribution(float roughness, float NdotH)
+{
+	// Eq 31: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html
+	float a2 = Sq(roughness);
+	return RcpPi * a2 * rcp(Sq(Sq(NdotH) * (a2 - 1.0) + 1.0));
+}
+
 float Lambda(float NdotV, float roughness)
 {
-	return 0.5 * sqrt(1.0 + roughness * roughness * (rcp(Sq(NdotV)) - 1.0)) - 0.5;
+	// Eq 29: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html
+	return (-1.0 + sqrt(1.0 + Sq(roughness) * (rcp(Sq(NdotV)) - 1.0))) / 2.0;
 }
 
-float G1(float NdotV, float roughness)
+float GgxShadowingMasking(float roughness, float NdotV, float NdotL)
 {
-	return rcp(1.0 + Lambda(NdotV, roughness));
-}
-
-float G2(float NdotV, float NdotL, float roughness)
-{
+	// Eq 28: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html
 	return rcp(1.0 + Lambda(NdotV, roughness) + Lambda(NdotL, roughness));
 }
 
-float3 Fresnel(float VdotH, float3 f0)
+float GgxShadowingMasking(float roughness, float NdotV, float NdotL, float LdotH, float VdotH)
 {
-	return lerp(f0, 1.0, pow(1.0 - VdotH, 5.0));
+	// Eq 28: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html
+	return (LdotH > 0 && VdotH > 0) ? GgxShadowingMasking(roughness, NdotV, NdotL) : 0.0;
 }
 
-float GGX_DV(float roughness, float NdotL, float NdotV, float NdotH)
-{
-	float a2 = Sq(roughness);
-	float s = (NdotH * a2 - NdotH) * NdotH + 1.0;
-
-	float lambdaV = NdotL * sqrt((-NdotV * a2 + NdotV) * NdotV + a2);
-	float lambdaL = NdotV * sqrt((-NdotL * a2 + NdotL) * NdotL + a2);
-
-	// This function is only used for direct lighting.
-	// If roughness is 0, the probability of hitting a punctual or directional light is also 0.
-	// Therefore, we return 0. The most efficient way to do it is with a max().
-	return rcp(Pi) * 0.5 * a2 * rcp(max(Sq(s) * (lambdaV + lambdaL), HalfMin));
-}
-
-float D_GGX(float NdotH, float roughness)
-{
-	float a2 = Sq(roughness);
-	float s = (NdotH * a2 * NdotH - NdotH * NdotH) + 1.0;
-
-    // If roughness is 0, returns (NdotH == 1 ? 1 : 0).
-    // That is, it returns 1 for perfect mirror reflection, and 0 otherwise.
-	return a2 == 0.0 ? NdotH == 1.0 : (a2 * rcp(Sq(s))) * RcpPi;
-}
-
-float3 GGX(float roughness, float3 specular, float NdotL, float NdotV, float LdotV)
-{
-	// Optimized math. Ref: PBR Diffuse Lighting for GGX + Smith Microsurfaces (slide 114), assuming |L|=1 and |V|=1
-	float invLenLV = max(FloatEps, rsqrt(2.0 * LdotV + 2.0));
-	float NdotH = saturate((NdotL + NdotV) * invLenLV);
-	float LdotH = saturate(invLenLV * LdotV + invLenLV);
-
-	return Fresnel(LdotH, specular) * GGX_DV(roughness, NdotL, NdotV, NdotH);
-}
-
-// Note: V = G / (4 * NdotL * NdotV)
 // Ref: http://jcgt.org/published/0003/02/03/paper.pdf
-float V_SmithJointGGX(float NdotL, float NdotV, float roughness, float partLambdaV)
+float GgxVisibility(float roughness, float NdotL, float NdotV)
 {
-	float a2 = Sq(roughness);
-
-    // Original formulation:
-    // lambda_v = (-1 + sqrt(a2 * (1 - NdotL2) / NdotL2 + 1)) * 0.5
-    // lambda_l = (-1 + sqrt(a2 * (1 - NdotV2) / NdotV2 + 1)) * 0.5
-    // G        = 1 / (1 + lambda_v + lambda_l);
-
-    // Reorder code to be more optimal:
-	float lambdaV = NdotL * partLambdaV;
-	float lambdaL = NdotV * sqrt((-NdotL * a2 + NdotL) * NdotL + a2);
-
-    // Simplify visibility term: (2.0 * NdotL * NdotV) /  ((4.0 * NdotL * NdotV) * (lambda_v + lambda_l))
-	return 0.5 / max(lambdaV + lambdaL, FloatMin);
+	float g = GgxShadowingMasking(roughness, NdotV, NdotL);
+	
+	// Eq 23: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html
+	return g * rcp(4.0 * abs(NdotV) * abs(NdotL)); // Unsure about the abs
 }
 
-// Precompute part of lambdaV
-float GetSmithJointGGXPartLambdaV(float NdotV, float roughness)
+float GgxReflection(float roughness, float NdotL, float NdotV, float NdotH)
 {
-	float a2 = Sq(roughness);
-	return sqrt((-NdotV * a2 + NdotV) * NdotV + a2);
+	float d = GgxDistribution(roughness, NdotH);
+	float v = GgxVisibility(roughness, NdotV, NdotL);
+	return d * v;
 }
 
-float V_SmithJointGGX(float NdotL, float NdotV, float roughness)
+float3 GgxTransmission(float roughness, float NdotL, float NdotV, float NdotHt, float LdotHt, float VdotHt, float3 ni, float3 no)
 {
-	float partLambdaV = GetSmithJointGGXPartLambdaV(NdotV, roughness);
-	return V_SmithJointGGX(NdotL, NdotV, roughness, partLambdaV);
+	float d = GgxDistribution(roughness, NdotHt);
+	//float g = GgxShadowingMasking(roughness, NdotV, NdotL, LdotHt, VdotHt);
+	float g = GgxShadowingMasking(roughness, NdotV, NdotL);
+	return abs(LdotHt) * abs(VdotHt) * rcp(abs(NdotL) * abs(NdotV)) * (Sq(no) * d * g * rcp(Sq(ni * VdotHt + no * LdotHt)));
+}
+
+float3 Fresnel(float LdotH, float3 f0)
+{
+	return lerp(f0, 1.0, pow(1.0 - LdotH, 5.0));
+}
+
+// Includes handling for TIR
+float3 Fresnel(float LdotH, float ni, float no)
+{
+	if (ni > no)
+	{
+		float3 invEta = no / ni;
+		float sinTheta2 = Sq(invEta) * (1.0 - Sq(LdotH));
+	
+		if (sinTheta2 > 1.0)
+			return 1.0; // TIR
+		
+		LdotH = sqrt(1.0 - sinTheta2);
+	}
+	
+	float3 f0 = Sq((ni - no) * rcp(ni + no));
+	return Fresnel(LdotH, f0);
 }
 
 float3 AverageFresnel(float3 f0)

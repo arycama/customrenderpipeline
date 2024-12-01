@@ -31,6 +31,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.isWater = false;
 	lightingInput.uv = uv;
 	lightingInput.NdotV = NdotV;
+	lightingInput.isVolumetric = false;
+	lightingInput.isThinSurface = false;
 	
 	return GetLighting(lightingInput, V) + _Emissive[position.xy];
 }

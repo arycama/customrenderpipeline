@@ -45,6 +45,11 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.uv = uv;
 	lightingInput.translucency = isTranslucent ? albedoMetallic.rgb * albedoMetallic.a : 0.0;
 	lightingInput.NdotV = NdotV;
+	lightingInput.isThinSurface = isTranslucent;
+	
+	bool isFrontFace;
+	GetTriangleNormal(position.xy, V, isFrontFace);
+	lightingInput.isVolumetric = lightingInput.isWater && !isFrontFace;
 	
 	return GetLighting(lightingInput, V);
 }
@@ -87,7 +92,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
 		
-	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
+	//result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
 	
 	float eyeDepth = LinearEyeDepth(depth);
 	

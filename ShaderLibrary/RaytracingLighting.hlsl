@@ -33,6 +33,8 @@ float3 RaytracedLighting(float3 N, float3 f0, float perceptualRoughness, float o
 		input.isWater = false; // TODO: Implement when raytraced water is added
 		input.uv = clipPosition.xy * 0.5 + 0.5;
 		input.NdotV = NdotV;
+		input.isVolumetric = false;
+		input.isThinSurface = false;
 		return GetLighting(input, V);
 	}
 	

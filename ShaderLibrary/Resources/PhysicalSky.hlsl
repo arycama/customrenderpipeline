@@ -271,7 +271,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 float4 _SkyHistoryScaleLimit;
 Texture2D<float3> _SkyInput, _SkyHistory;
 Texture2D<float> PreviousDepth;
-Texture2D<float2> PreviousVelocity;
+Texture2D<float2> PreviousVelocity, Velocity;
 float _IsFirst, _ClampWindow, _DepthFactor, _MotionFactor;
 
 float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
@@ -289,6 +289,7 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		cloudDistance = CloudDepthTexture[position.xy].r;
 	}
 	
+	float2 motion;
 	float sceneDistance;
 	if(cloudTransmittance > 0.0)
 	{
@@ -299,25 +300,27 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		
 			//if(!RayIntersectsGround(_ViewHeight, rd.y))
 			//	sceneDistance *= AtmosphereDepth(_ViewHeight, rd.y);
+			motion = CalculateVelocity(uv, sceneDistance * rcp(rcpRdLength));
 		}
 		else
 		{
 			sceneDistance = LinearEyeDepth(depth) * rcp(rcpRdLength);
+			motion = Velocity[position.xy];
 		}
 		
 		if(cloudTransmittance < 1.0)
+		{
 			sceneDistance = lerp(cloudDistance, sceneDistance, cloudTransmittance);
+			motion = CalculateVelocity(uv, sceneDistance * rcp(rcpRdLength));
+		}
 	}
 	else
 	{
 		// If cloud transmittance is 1, then it is completely opaque, so use the cloud distance
 		sceneDistance = cloudDistance;
+		motion = CalculateVelocity(uv, sceneDistance * rcp(rcpRdLength));
 	}
 	
-	sceneDistance = DistanceToNearestAtmosphereBoundary(_ViewHeight, rd.y);
-	
-	// TODO: Use velocity for non background pixels as this will account for movement
-	float2 motion = CalculateVelocity(uv, sceneDistance * rcp(rcpRdLength));
 	
 	float3 minValue, maxValue, result;
 	TemporalNeighborhood(_SkyInput, position.xy, minValue, maxValue, result, true, true, 1);

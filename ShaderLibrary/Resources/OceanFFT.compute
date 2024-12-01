@@ -101,7 +101,7 @@ float JonswapSpectrum(float w)
 {
 	float alpha = JonswapAlpha(OceanWindSpeed * 1.026, OceanFetch);
 	float wp = JonswapPeakAngularFrequency(OceanWindSpeed * 1.026, OceanFetch);
-	float gamma = 3.3;
+	float gamma = OceanPeakEnhancement;
 	float sigma = w <= wp ? 0.07 : 0.09;
 	float r = exp(-Sq(w - wp) * rcp(2.0 * Sq(sigma) * Sq(wp)));
 	float beta = 5.0 / 4.0;

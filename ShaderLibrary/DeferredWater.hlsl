@@ -206,10 +206,56 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	if (!isFrontFace)
 		luminance = 0;
 	
+	#if 0
+	float alpha = perceptualRoughness * perceptualRoughness;
+	
 	// Apply roughness to transmission
-	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
-	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
-	underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
+	//float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
+	//float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
+	//underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
+	
+	float3 l1 = _LightDirection0;
+	float3 n1 = N;// * float2(-1, 1).xyx;
+	float3 v1 = V;//-_LightDirection0;
+	//float3 lp = reflect(_LightDirection0, -flippedN);
+	
+	float ni = 1.34, no = 1;
+	float3 ht = normalize(-v1 * ni - l * no);
+	float cosThetaT = dot(v1, ht);
+	
+	float f0 = Sq((ni - no) * rcp(ni + no));
+	
+	float d = GgxDistribution(alpha, dot(ht, n1));
+	float g = GgxShadowingMasking(alpha, dot(n1, v1), dot(n1, l1));
+	
+	// Eq 24: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html#components/core/dielectricbsdffortransparentsurfaces
+	float mt = abs(dot(l1, ht)) * abs(dot(v1, ht)) * rcp(abs(dot(l1, n1)) * abs(dot(v1, n1))) * (Sq(no) * d * g * rcp(Sq(ni * dot(v1, ht) + no * dot(l1, ht))));
+	
+	
+	// Eq 34
+	float cosTheta = cosThetaT;
+	float cosTheta2 = cosTheta * cosTheta;
+	float sinTheta2 = Sq(ni * rcp(no)) * (1.0 - cosTheta2);
+	float cosThetaO = sqrt(1.0 - sinTheta2);
+	float fd = no >= ni ? Fresnel(cosTheta, f0) : (sinTheta2 < 1.0 ? Fresnel(cosThetaO, f0) : 1.0);
+	
+	// Eq 9: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html#components/core/dielectricbsdffortransparentsurfaces
+	float p = 1, s = 1; // p is albedo, but we already apply this elsewhere
+	float bsdf = p * mt * (1.0 - s * fd);
+	
+	
+	//float cosThetaRPrime = dot(V1, hrp);
+	
+	
+	//float LdotV1 = dot(L, V);
+	
+	
+	//float brdf = GGX(roughness, f0, NdotL, NdotV, LdotV);
+	
+	
+	//underwater = bsdf;
+	//underwater = 0;
+	#endif
 	
 	FragmentOutput output;
 	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);

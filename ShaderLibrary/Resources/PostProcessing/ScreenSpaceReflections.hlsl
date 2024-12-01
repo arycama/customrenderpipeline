@@ -150,7 +150,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		float invLenLV = max(FloatEps, rsqrt(2.0 * LdotV + 2.0));
 		float NdotH = saturate((NdotL + NdotV) * invLenLV);
 		float LdotH = saturate(invLenLV * LdotV + invLenLV);
-		float weight = D_GGX(NdotH, max(1e-3, roughness)) * V_SmithJointGGX(NdotL, NdotV, roughness) * Fresnel(LdotH, Max3(f0)).r * NdotL;
+		float weight = GgxDistribution(max(1e-3, roughness), NdotH) * GgxVisibility(roughness, NdotL, NdotV) * Fresnel(LdotH, Max3(f0)).r * NdotL;
 		
 		float4 hitColor = _Input[coord];
 		float weightOverPdf = weight * hitColor.w;

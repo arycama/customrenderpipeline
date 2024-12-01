@@ -240,7 +240,7 @@ void ImportanceSampleGGX(float2 u, float3 V, float3x3 localToWorld, float roughn
     // Remind (L.H) == (V.H)
     // F is apply outside the function
 
-	float Vis = V_SmithJointGGX(NdotL, NdotV, roughness);
+	float Vis = GgxVisibility(roughness, NdotL, NdotV);
 	weightOverPdf = 4.0 * Vis * NdotL * VdotH / NdotH;
 }
 

@@ -159,7 +159,9 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 			lightingInput.isWater = false;
 			lightingInput.uv = input.position.xy * _ScaledResolution.zw;
 			lightingInput.NdotV = NdotV;
-		
+			lightingInput.isVolumetric = false;
+			lightingInput.isThinSurface = true;
+			
 			float3 lighting = GetLighting(lightingInput, V) + surface.emission;
 
 			lighting.rgb = ApplyVolumetricLight(lighting.rgb, input.position.xy, input.position.w);

@@ -98,8 +98,8 @@ void DirectionalAlbedoMs(uint3 id : SV_DispatchThreadID)
 		if (NdotL > 0.0)
 		{
 			float F = Fresnel(VdotH, f0).r;
-			float D = D_GGX(NdotH, roughness);
-			float V = V_SmithJointGGX(NdotL, NdotV, roughness);
+			float D = GgxDistribution(roughness, NdotH);
+			float V = GgxVisibility(roughness, NdotL, NdotV);
 			float ms = GGXMultiScatter(NdotV, NdotL, perceptualRoughness, f0).r;
 
 			float weightOverPdf = 4.0 * NdotL * VdotH * (F * D * V + ms) / (D * NdotH);

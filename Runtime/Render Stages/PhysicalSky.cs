@@ -469,7 +469,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(new ReflectionAmbientData(ambientBuffer, reflectionProbe, cdf, skyLuminance, weightedDepth, new Vector2(settings.LuminanceWidth, settings.LuminanceHeight), new Vector2(settings.CdfWidth, settings.CdfHeight)), renderGraph.FrameIndex);
         }
 
-        public void Render(RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector2 jitter, Camera camera, CullingResults cullingResults)
+        public void Render(RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector2 jitter, Camera camera, CullingResults cullingResults, RTHandle velocity)
         {
             var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
@@ -521,7 +521,6 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-
             // Reprojection
             var skyColor = textureCache.GetTextures(width, height, camera, true);
 
@@ -532,6 +531,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_SkyInput", skyTemp2);
                 pass.ReadTexture("_SkyHistory", skyColor.history);
                 pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("Velocity", velocity);
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
                 pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();

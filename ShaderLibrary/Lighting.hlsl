@@ -146,31 +146,61 @@ struct LightingInput
 	bool isWater;
 	float2 uv;
 	float NdotV;
+	bool isThinSurface;
+	bool isVolumetric;
 };
 
-float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, float3 L, float3 V, float3 N, float3 bentNormal, float occlusion, float3 translucency, float NdotV)
+float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, float3 L, float3 V, float3 N, float3 bentNormal, float occlusion, float3 translucency, float NdotV, bool isVolumetric = false, bool isBackface = false, bool isThinSurface = false)
 {
+	float microShadow = saturate(Sq(abs(dot(bentNormal, L)) * rsqrt(saturate(1.0 - occlusion))));
+
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 
 	float NdotL = dot(N, L);
+	float3 b = albedo * GGXDiffuse(saturate(NdotL), saturate(NdotV), perceptualRoughness, f0);
 	
-	float3 diffuse = GGXDiffuse(abs(NdotL), abs(NdotV), perceptualRoughness, f0);
-	float3 lighting = NdotL > 0.0 ? albedo * diffuse : translucency * diffuse;
+	// Optimized math. Ref: PBR Diffuse Lighting for GGX + Smith Microsurfaces (slide 114), assuming |L|=1 and |V|=1
+	float LdotV = dot(L, V);
+	float invLenLV = max(FloatEps, rsqrt(2.0 * LdotV + 2.0));
+	float NdotH = saturate((NdotL + NdotV) * invLenLV);
+	float LdotH = saturate(invLenLV * LdotV + invLenLV);
 	
-	if(NdotL > 0.0)
-	{
-		float LdotV = dot(L, V);
-		lighting += GGX(roughness, f0, NdotL, NdotV, LdotV);
-		lighting += GGXMultiScatter(saturate(NdotV), saturate(NdotL), perceptualRoughness, f0);
-	}
+	// For thin surface
+	float3 Lr = reflect(L, -N);
+	float3 Hr = normalize(V + Lr);
+	float cosThetaR = dot(V, Hr);
+	float NdotHr = dot(N, Hr);
+	float NdotLr = dot(N, Lr);
 	
-	// TODO: BTDF
+	// Hardcoded to water IoR for now since thats the only thing that needs this
+	float ni = isBackface ? 1.34 : 1.0;
+	float no = isBackface ? 1.0 : 1.34;
 	
-	float microShadow = saturate(Sq(abs(dot(bentNormal, L)) * rsqrt(saturate(1.0 - occlusion))));
+	float3 fd = Fresnel(isThinSurface ? cosThetaR : LdotH, f0);
+	float mr = GgxReflection(roughness, isThinSurface ? NdotLr : NdotL, NdotV, isThinSurface ? NdotHr : NdotH);
 	
-	return lighting * microShadow;
+	float3 mrMs = GGXMultiScatter(saturate(NdotV), saturate(NdotL), perceptualRoughness, f0);
+	
+	if (NdotL > 0.0)
+		return (b + mr * fd + mrMs) * NdotL * microShadow;
+	
+	if (isThinSurface)
+		return translucency * mr * (1.0 - fd) * -NdotL;
+	
+	float3 Ht = normalize(-V * ni - L * no);
+	float NdotHt = dot(N, Ht);
+	float LdotHt = dot(L, Ht);
+	float VdotHt = dot(V, Ht);
+	
+	// Eq 24: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html#components/core/dielectricbsdffortransparentsurfaces
+	float mt = GgxTransmission(roughness, NdotL, NdotV, NdotHt, LdotHt, VdotHt, ni, no);
+	float fd1 = Fresnel(VdotHt, ni, no);
+	
+	if (isVolumetric)
+		return mt * (1.0 - fd1) * -NdotL;
+			
+	return 0.0;
 }
-
 
 // Important: call Orthonormalize() on the tangent and recompute the bitangent afterwards.
 float3 GetViewReflectedNormal(float3 N, float3 V, out float NdotV)
@@ -500,9 +530,9 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 		float3 L = light.direction;// DiscLightApprox(5.3, reflect(-V, input.normal), light.direction);
 
 		// Skip expensive shadow lookup if NdotL is negative
-		float NdotL = dot(input.normal, L);
-		if (!isVolumetric && NdotL <= 0.0 && all(input.translucency == 0.0))
-			continue;
+		//float NdotL = dot(input.normal, L);
+		//if (!isVolumetric && (!input.isVolumetric) && NdotL <= 0.0 && all(input.translucency == 0.0))
+		//	continue;
 			
 		float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, -V.y, L.y, length(input.worldPosition));
 		
@@ -541,7 +571,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 				light.color *= WaterShadow(input.worldPosition, L) * GetCaustics(input.worldPosition + _ViewPosition, L);
 			#endif
 			
-			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV) * light.color * lightTransmittance) * (abs(NdotL) * _Exposure * attenuation);
+			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV, input.isVolumetric, input.isVolumetric, input.isThinSurface) * light.color * lightTransmittance) * (_Exposure * attenuation);
 		}
 	}
 	
@@ -566,9 +596,9 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 		
 		float rcpLightDist = rsqrt(sqrLightDist);
 		float3 L = lightVector * rcpLightDist;
-		float NdotL = dot(input.normal, L);
-		if (!isVolumetric && NdotL <= 0.0)
-			continue;
+		//float NdotL = dot(input.normal, L);
+		//if (!isVolumetric && NdotL <= 0.0)
+		//	continue;
 		
 		float attenuation = GetLightAttenuation(light, input.worldPosition, 0.5, false);
 		if (!attenuation)
@@ -591,8 +621,8 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 			luminance += light.color * _Exposure * attenuation;
 		else
 		{
-			if (NdotL > 0.0)
-				luminance += CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV) * NdotL * attenuation * light.color * _Exposure;
+			//if (NdotL > 0.0)
+				luminance += CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV, input.isWater, input.isVolumetric, input.isThinSurface) * attenuation * light.color * _Exposure;
 		}
 	}
 	
