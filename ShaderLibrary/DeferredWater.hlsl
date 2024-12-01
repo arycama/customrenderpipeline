@@ -158,8 +158,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	float mt = GgxTransmission(roughness, dot(Nt, L), dot(Nt, Vt), NdotHt, LdotHt, VdotHt, ni, no);
 	float fd1 = Fresnel(VdotHt, ni, no);
-	float factor = mt * (1.0 - fd1) * saturate(-dot(Nt, L));
-	factor = 1;
+	float factor = (1.0 - fd1) * saturate(-dot(Nt, L));
 	
 	float3 luminance = 0.0;
 	float samples = 1;

@@ -173,8 +173,8 @@ float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, fl
 	float NdotLr = dot(N, Lr);
 	
 	// Hardcoded to water IoR for now since thats the only thing that needs this
-	float ni = isBackface ? 1.34 : 1.0;
-	float no = isBackface ? 1.0 : 1.34;
+	float ni = isBackface ? 1.0 : 1.34;
+	float no = isBackface ? 1.34 : 1.0;
 	
 	float3 fd = Fresnel(isThinSurface ? cosThetaR : LdotH, f0);
 	float mr = GgxReflection(roughness, isThinSurface ? NdotLr : NdotL, NdotV, isThinSurface ? NdotHr : NdotH);
@@ -187,14 +187,14 @@ float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, fl
 	if (isThinSurface)
 		return translucency * mr * (1.0 - fd) * -NdotL;
 	
-	float3 Ht = normalize(-V * ni - L * no);
+	float3 Ht = normalize(-(ni * L + no * V));
 	float NdotHt = dot(N, Ht);
 	float LdotHt = dot(L, Ht);
 	float VdotHt = dot(V, Ht);
 	
 	// Eq 24: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html#components/core/dielectricbsdffortransparentsurfaces
 	float mt = GgxTransmission(roughness, NdotL, NdotV, NdotHt, LdotHt, VdotHt, ni, no);
-	float fd1 = Fresnel(VdotHt, ni, no);
+	float fd1 = Fresnel(LdotHt, ni, no);
 	
 	if (isVolumetric)
 		return mt * (1.0 - fd1) * -NdotL;

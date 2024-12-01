@@ -61,7 +61,7 @@ float3 GgxTransmission(float roughness, float NdotL, float NdotV, float NdotHt, 
 	float d = GgxDistribution(roughness, NdotHt);
 	//float g = GgxShadowingMasking(roughness, NdotV, NdotL, LdotHt, VdotHt);
 	float g = GgxShadowingMasking(roughness, NdotV, NdotL);
-	return abs(LdotHt) * abs(VdotHt) * rcp(abs(NdotL) * abs(NdotV)) * (Sq(no) * d * g * rcp(Sq(ni * VdotHt + no * LdotHt)));
+	return abs(LdotHt) * abs(VdotHt) * rcp(abs(NdotL) * abs(NdotV)) * (Sq(no) * d * g * rcp(Sq(ni * LdotHt + no * VdotHt)));
 }
 
 float3 Fresnel(float LdotH, float3 f0)
