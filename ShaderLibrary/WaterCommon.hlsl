@@ -97,7 +97,7 @@ void GerstnerWaves(float3 worldPosition, float time, out float3 displacement, ou
 	GetShoreData(worldPosition, shoreDepth, shoreDistance, shoreDirection);
 	if (shoreDistance < 0.0)
 	{
-		scale = 1;
+		scale = 0.95;
 		return;
 	}
 	

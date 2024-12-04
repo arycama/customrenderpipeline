@@ -11,32 +11,15 @@ namespace Arycama.CustomRenderPipeline
         public class Settings
         {
             [field: SerializeField] public bool IsEnabled { get; private set; } = true;
-            [field: SerializeField, Range(1, 32)] public int SampleCount { get; private set; } = 8;
             [field: SerializeField, Range(0.0f, 1.0f)] public float JitterSpread { get; private set; } = 1.0f;
-            [field: SerializeField, Range(0f, 1f)] public float Sharpness { get; private set; } = 0.5f;
+            [field: SerializeField, Range(0f, 2f)] public float SpatialSharpness { get; private set; } = 0.5f;
+            [field: SerializeField, Range(0f, 1f)] public float MotionSharpness { get; private set; } = 0.5f;
             [field: SerializeField, Range(0f, 0.99f)] public float StationaryBlending { get; private set; } = 0.95f;
             [field: SerializeField, Range(0f, 0.99f)] public float MotionBlending { get; private set; } = 0.85f;
+            [field: SerializeField, Range(1, 32)] public int SampleCount { get; private set; } = 8;
             [field: SerializeField] public float MotionWeight { get; private set; } = 6000f;
             [field: SerializeField] public bool JitterOverride { get; private set; } = false;
             [field: SerializeField] public Vector2 JitterOverrideValue { get; private set; } = Vector2.zero;
-            [field: SerializeField, Range(0.0f, 8.0f)] public float BlendSharpness { get; private set; } = 1.0f;
-
-
-            [Range(0, 2)]
-            public float taaSharpenStrength = 0.5f;
-
-            /// <summary>Larger is this value, more likely history will be rejected when current and reprojected history motion vector differ by a substantial amount.
-            /// Larger values can decrease ghosting but will also reintroduce aliasing on the aforementioned cases.</summary>
-            [Range(0.0f, 1.0f)]
-            public float taaMotionVectorRejection = 0.0f;
-
-            /// <summary>Drive the anti-flicker mechanism. With high values flickering might be reduced, but it can lead to more ghosting or disocclusion artifacts.</summary>
-            [Range(0.0f, 1.0f)]
-            public float taaAntiFlicker = 0.5f;
-
-            /// <summary> Determines how much the history buffer is blended together with current frame result. Higher values means more history contribution. </summary>
-            [Range(0.6f, 0.95f)]
-            public float taaBaseBlendFactor = 0.875f;
         }
 
         private readonly Settings settings;
@@ -186,17 +169,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
                 pass.AddRenderPassData<TemporalAAData>();
 
-                var minAntiflicker = 0.0f;
-                var maxAntiflicker = 3.5f;
-
-                // The anti flicker becomes much more aggressive on higher values
-                var temporalContrastForMaxAntiFlicker = 0.7f - Mathf.Lerp(0.0f, 0.3f, Mathf.SmoothStep(0.5f, 1.0f, settings.taaAntiFlicker));
-
-                var antiFlicker = Mathf.Lerp(minAntiflicker, maxAntiflicker, settings.taaAntiFlicker);
-                const float historyContrastBlendStart = 0.51f;
-
                 pass.SetRenderFunction((
-                    sharpness: settings.Sharpness * 0.8f,
+                    spatialSharpness: settings.SpatialSharpness,
+                    motionSharpness: settings.MotionSharpness * 0.8f,
                     hasHistory: wasCreated ? 0.0f : 1.0f,
                     stationaryBlending: settings.StationaryBlending,
                     motionBlending: settings.MotionBlending,
@@ -205,29 +180,17 @@ namespace Arycama.CustomRenderPipeline
                     resolution: new Vector4(camera.pixelWidth, camera.pixelHeight, 1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight),
                     maxWidth: Mathf.FloorToInt(camera.pixelWidth * scale) - 1,
                     maxHeight: Mathf.FloorToInt(camera.pixelHeight * scale) - 1,
-                    maxResolution: new Vector2(camera.pixelWidth - 1, camera.pixelHeight - 1),
-                    motionRejectionMultiplier: Mathf.Lerp(0.0f, 250.0f, settings.taaMotionVectorRejection * settings.taaMotionVectorRejection * settings.taaMotionVectorRejection),
-                    historyContrastBlendLerp: Mathf.Clamp01((settings.taaAntiFlicker - historyContrastBlendStart) / (1.0f - historyContrastBlendStart)),
-                    antiFlickerIntensity: antiFlicker,
-                    contrastForMaxAntiFlicker: temporalContrastForMaxAntiFlicker,
-                    baseBlendFactor: settings.taaBaseBlendFactor
+                    maxResolution: new Vector2(camera.pixelWidth - 1, camera.pixelHeight - 1)
                 ),
                 (command, pass, data) =>
                 {
-                    pass.SetFloat(command, "_Sharpness", data.sharpness);
+                    pass.SetFloat(command, "_SpatialSharpness", data.spatialSharpness);
+                    pass.SetFloat(command, "_MotionSharpness", data.motionSharpness);
                     pass.SetFloat(command, "_HasHistory", data.hasHistory);
                     pass.SetFloat(command, "_StationaryBlending", data.stationaryBlending);
                     pass.SetFloat(command, "_VelocityBlending", data.motionBlending);
                     pass.SetFloat(command, "_VelocityWeight", data.motionWeight);
                     pass.SetFloat(command, "_Scale", data.scale);
-
-                    pass.SetFloat(command, "_AntiFlickerIntensity", data.antiFlickerIntensity);
-                    pass.SetFloat(command, "_ContrastForMaxAntiFlicker", data.contrastForMaxAntiFlicker);
-                    pass.SetFloat(command, "_BaseBlendFactor", data.baseBlendFactor);
-                    pass.SetFloat(command, "_HistoryContrastBlendLerp", data.historyContrastBlendLerp);
-                    pass.SetFloat(command, "_SharpenStrength", settings.taaSharpenStrength);
-                    pass.SetFloat(command, "_SpeedRejectionIntensity", data.motionRejectionMultiplier);
-                    pass.SetFloat(command, "_BlendSharpness", settings.BlendSharpness);
 
                     pass.SetVector(command, "_HistoryScaleLimit", new Vector4(history.Scale.x, history.Scale.y, history.Limit.x, history.Limit.y));
 

@@ -321,12 +321,11 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		motion = CalculateVelocity(uv, sceneDistance * rcp(rcpRdLength));
 	}
 	
-	
 	float3 minValue, maxValue, result;
-	TemporalNeighborhood(_SkyInput, position.xy, minValue, maxValue, result, true, true, 1);
+	TemporalNeighborhood(_SkyInput, position.xy, minValue, maxValue, result);
 
 	float2 historyUv = uv - motion;
-	float3 history = RgbToYCoCgFastTonemap(_SkyHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _SkyHistoryScaleLimit)) * _PreviousToCurrentExposure);
+	float3 history = Rec709ToICtCp(_SkyHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _SkyHistoryScaleLimit)) * _PreviousToCurrentExposure);
 	
 	float previousDepth = LinearEyeDepth(PreviousDepth[historyUv * _ScaledResolution.xy]);
 	float2 previousVelocity = PreviousVelocity[historyUv * _ScaledResolution.xy];
@@ -351,7 +350,7 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 		
-	return RemoveNaN(YCoCgToRgbFastTonemapInverse(result));
+	return RemoveNaN(ICtCpToRec709(result));
 }
 
 float _SpatialSamples, _SpatialDepthFactor, _BlurSigma;
@@ -371,8 +370,8 @@ float3 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
 	
-	float _ResolveSize = 8;
-	float _ResolveSamples = 64;
+	float _ResolveSize = 16;
+	float _ResolveSamples = 8;
 	float rcpSigma2 = rcp(Sq(8));
 	
 	float centerDepth = LinearEyeDepth(_Depth[position.xy]);
@@ -382,7 +381,10 @@ float3 FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	for (uint i = 0; i <= _ResolveSamples; i++)
 	{
 		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
-		float2 coord = clamp(floor(position.xy + u), 0.0, _ScaledResolution.xy - 1.0) + 0.5;
+		float2 coord = floor(position.xy + u);
+		if (any(coord < 0 || coord > _ScaledResolution.xy - 1.0))
+			continue;
+		
 		float3 input = _SkyInput[coord];
 		float weight = exp2(-SqrLength(u) * rcpSigma2);
 		

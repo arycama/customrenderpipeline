@@ -89,6 +89,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	// Convert normal length back to smoothness
 	smoothness = lerp(LengthToSmoothness(smoothness * 0.25), _Smoothness, shoreScale);
+	smoothness = _Smoothness;
 	
 	// Our normals contain partial derivatives, and since we add the height field with the shore waves, we can simply sum the partial derivatives and renormalize
 	float3 N = normalize(float3(normalData * (1.0 - shoreScale), 1.0).xzy + shoreNormal);
@@ -172,7 +173,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		
 		float3 P = isFrontFace ? worldPosition + -underwaterV * t : -underwaterV * t;
 		float sunT = WaterShadowDistance(P, _LightDirection0);
-		
+
 		float3 transmittance = exp(-_Extinction * (sunT + t));
 		float shadow = GetShadow(P, 0, false) * CloudTransmittance(P);
 		luminance += factor * transmittance * weight * shadow * GetCaustics(_ViewPosition + P, _LightDirection0) / samples;
@@ -239,23 +240,22 @@ struct TemporalOutput
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	// Note: Not using yCoCg or tonemapping gives less noisy results here
 	float3 minValue, maxValue, result;
-	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result, true, true);
+	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
 	float3 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history *= _PreviousToCurrentExposure;
-	history = RgbToYCoCgFastTonemap(history);
+	history = Rec709ToICtCp(history);
 	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 		
-	result = YCoCgToRgbFastTonemapInverse(result);
+	result = ICtCpToRec709(result);
 		
 	result = RemoveNaN(result);
 	TemporalOutput output;

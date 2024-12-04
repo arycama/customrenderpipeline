@@ -121,7 +121,7 @@ float3 LinearToST2084(float3 rec2020, float maxValue = ST2084Max)
 
 float3 ST2084ToLinear(float3 linearCol, float maxValue = ST2084Max)
 {
-	float3 colToPow = pow(linearCol, 1.0 / ST2084_M2);
+	float3 colToPow = pow(max(0, linearCol), 1.0 / ST2084_M2);
 	float3 numerator = max(colToPow - ST2084_C1, 0.0);
 	float3 denominator = ST2084_C2 - (ST2084_C3 * colToPow);
 	float3 linearColor = pow(numerator / denominator, 1.0 / ST2084_M1);
@@ -279,6 +279,35 @@ float Luminance(float3 color, Chromaticities chromacity = REC709_PRI)
 	return mul(RGBtoXYZ(REC709_PRI), color).y;
 }
 
+// Rec 2020
+float3 XYZToRec2020(float3 XYZ)
+{
+	return mul(XYZtoRGB(REC2020_PRI), XYZ);
+}
+
+float3 XyyToRec2020(float3 xyY)
+{
+	return XYZToRec2020(XyyToXYZ(xyY));
+}
+
+float3 Rec709ToRec2020(float3 rec709)
+{
+	return XYZToRec2020(Rec709ToXYZ(rec709));
+}
+
+float3 LMSToRec2020(float3 lms)
+{
+	float3 xyz = LMSToXYZ(lms);
+	return XYZToRec2020(xyz);
+}
+
+float3 ICtCpToRec2020(float3 iCtCp, float maxValue)
+{
+	float3 pqLms = ICtCpToPQLMS(iCtCp);
+	float3 lms = ST2084ToLinear(pqLms, maxValue);
+	return LMSToRec2020(lms);
+}
+
 // Rec 709
 float3 GammaToLinear(float3 c)
 {
@@ -312,39 +341,8 @@ float3 P3D65ToRec709(float3 p3d65)
 
 float3 ICtCpToRec709(float3 iCtCp, float maxValue = ST2084Max)
 {
-	float3 pqLms = ICtCpToPQLMS(iCtCp);
-	float3 lms = ST2084ToLinear(pqLms, maxValue);
-	float3 xyz = LMSToXYZ(lms);
-	return XYZToRec709(xyz);
-}
-
-// Rec 2020
-float3 XYZToRec2020(float3 XYZ)
-{
-	return mul(XYZtoRGB(REC2020_PRI), XYZ);
-}
-
-float3 XyyToRec2020(float3 xyY)
-{
-	return XYZToRec2020(XyyToXYZ(xyY));
-}
-
-float3 Rec709ToRec2020(float3 rec709)
-{
-	return XYZToRec2020(Rec709ToXYZ(rec709));
-}
-
-float3 LMSToRec2020(float3 iCtCp)
-{
-	return XYZToRec2020(ICtCpToXYZ(iCtCp));
-}
-
-float3 ICtCpToRec2020(float3 iCtCp, float maxValue)
-{
-	float3 pqLms = ICtCpToPQLMS(iCtCp);
-	float3 lms = ST2084ToLinear(pqLms, maxValue);
-	float3 xyz = LMSToXYZ(lms);
-	return XYZToRec2020(xyz);
+	float3 rec2020 = ICtCpToRec2020(iCtCp, maxValue);
+	return Rec2020ToRec709(rec2020);
 }
 
 // To gamma-sRGB
@@ -402,20 +400,17 @@ float3 PQLMSToICtCp(float3 lms)
 	return mul(mat, lms);
 }
 
-float3 Rec709ToICtCp(float3 rec709, float maxValue = ST2084Max)
+float3 Rec2020ToICtCp(float3 rec2020, float maxValue = ST2084Max)
 {
-	float3 xyz = Rec709ToXYZ(rec709);
-	float3 lms = XYZToLMS(xyz);
+	float3 lms = Rec2020ToLMS(rec2020);
 	float3 lmsPq = LinearToST2084(lms, maxValue);
 	return PQLMSToICtCp(lmsPq);
 }
 
-float3 Rec2020ToICtCp(float3 rec2020, float maxValue = ST2084Max)
+float3 Rec709ToICtCp(float3 rec709, float maxValue = ST2084Max)
 {
-	float3 xyz = Rec2020ToXYZ(rec2020);
-	float3 lms = XYZToLMS(xyz);
-	float3 lmsPq = LinearToST2084(lms, maxValue);
-	return PQLMSToICtCp(lmsPq);
+	float3 rec2020 = Rec709ToRec2020(rec709);
+	return Rec2020ToICtCp(rec2020, maxValue);
 }
 
 float3 RgbToYCoCg(float3 rgb)

@@ -126,7 +126,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 		for(int x = -1; x <= 1; x++, i++)
 		{
 			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
-			float4 color = RgbToYCoCgFastTonemap(float4(_Input[pixelId + int2(x, y)], _InputTransmittance[pixelId + int2(x, y)]));
+			float4 color = float4(Rec709ToICtCp(_Input[pixelId + int2(x, y)]), _InputTransmittance[pixelId + int2(x, y)]);
 			result = i == 0 ? color * weight : result + color * weight;
 			mean += color;
 			stdDev += color * color;
@@ -146,7 +146,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	history.a = _TransmittanceHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _TransmittanceHistoryScaleLimit));
 	
 	history.rgb *= _PreviousToCurrentExposure;
-	history.rgb = RgbToYCoCgFastTonemap(history.rgb);
+	history.rgb = Rec709ToICtCp(history.rgb);
 	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
 	
 	// Not sure what best way to handle is, not clamping reduces flicker which is the main issue
@@ -158,7 +158,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
-	result.rgb = YCoCgToRgbFastTonemapInverse(result.rgb);
+	result.rgb = ICtCpToRec709(result.rgb);
 	
 	result.rgb = RemoveNaN(result.rgb);
 	

@@ -1,0 +1,67 @@
+#pragma kernel GenerateLengthToSmoothness
+#pragma kernel ShortenNormal
+#pragma kernel MipNormalAndSmoothness
+
+#include "../../Color.hlsl"
+#include "../../Material.hlsl"
+#include "../../Packing.hlsl"
+
+RWTexture2D<float4> _NormalResult, _SmoothnessResult;
+RWTexture2D<float> _LengthToRoughnessResult;
+Texture2D<float4> _NormalInput, _SmoothnessInput;
+float _IsSrgb;
+uint _Mip;
+float _Resolution, _MaxIterations;
+
+float4 PackNormalDxt(float3 normal)
+{
+    return float4(1.0, normal.y * 0.5 + 0.5, 0.0, normal.x * 0.5 + 0.5);
+}
+
+[numthreads(8, 8, 1)]
+void GenerateLengthToSmoothness(uint2 id : SV_DispatchThreadID)
+{
+    float uv = id.x / (_Resolution - 1.0);
+	float target = Remap(uv, 0.0, 1.0, 2.0 / 3.0, 1.0); // Remap target
+    
+	float t = 0; //xi;
+	float minDelta = FloatMax;
+
+    for (float i = 0; i < 256.0; i++)
+    {
+		float xi = i / (256.0 - 1.0);
+        float currentLength = RoughnessToNormalLength(xi);
+
+		float delta = abs(currentLength - target);
+		if (delta < minDelta)
+		{
+			minDelta = delta;
+			t = xi;
+		}
+	}
+
+	_LengthToRoughnessResult[id] = t;
+}
+
+[numthreads(8, 8, 1)]
+void ShortenNormal(uint2 id : SV_DispatchThreadID)
+{
+    float smoothness = _SmoothnessInput[id].a;
+    float3 normal = UnpackNormalAG(_NormalInput[id]);
+    float len = SmoothnessToNormalLength(smoothness);
+    _NormalResult[id] = float4(normal * len, 1.0);
+}
+
+[numthreads(8, 8, 1)]
+void MipNormalAndSmoothness(uint2 id : SV_DispatchThreadID)
+{
+    float3 shortenedNormal = _NormalInput.mips[_Mip][id].rgb;
+    float smoothness = LengthToSmoothness(length(shortenedNormal));
+    float3 smoothnessInput = _SmoothnessInput.mips[_Mip][id].rgb;
+
+    if (_IsSrgb)
+        smoothnessInput = LinearToGamma(smoothnessInput);
+
+    _SmoothnessResult[id] = float4(smoothnessInput, smoothness);
+    _NormalResult[id] = PackNormalDxt(normalize(shortenedNormal));
+}

@@ -139,7 +139,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		
 		if(hasHit)
 		{
-			result.rgb += RgbToYCoCgFastTonemap(hitColor.rgb) * weightOverPdf;
+			result.rgb += Rec709ToICtCp(hitColor.rgb) * weightOverPdf;
 			result.a += weightOverPdf;
 			avgRayLength += rcp(rcpRayLength) * weightOverPdf;
 		}
@@ -151,7 +151,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 
 	// Normalize color and result by total hitweight
 	result = AlphaPremultiply(result);
-	result = YCoCgToRgbFastTonemapInverse(result);
+	result.rgb = ICtCpToRec709(result.rgb);
 	
 	avgRayLength *= result.a ? rcp(result.a) : 0.0;
 	
@@ -186,14 +186,14 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
 	float3 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history *= _PreviousToCurrentExposure;
-	history = RgbToYCoCgFastTonemap(history);
+	history = Rec709ToICtCp(history);
 
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
-	result = YCoCgToRgbFastTonemapInverse(result);
+	result = ICtCpToRec709(result);
 	result = RemoveNaN(result);
 	
 	return result;
