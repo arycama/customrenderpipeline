@@ -13,7 +13,7 @@ Shader "Hidden/Bloom"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentDownsample
-            #define KARIS_AVERAGE
+            //#define KARIS_AVERAGE
             #include "Bloom.hlsl"
             ENDHLSL
         }

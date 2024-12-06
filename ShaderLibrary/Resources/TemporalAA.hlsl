@@ -28,7 +28,13 @@ float Mitchell1D(float x, float B, float C)
 		return 0.0f;
 }
 
-float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target0
+struct FragmentOutput
+{
+	float4 history : SV_Target0;
+	float3 result : SV_Target1;
+};
+
+FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 {
 	float2 velocity = _Velocity[position.xy];
 	float2 historyUv = uv - velocity;
@@ -56,10 +62,9 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	for (int y = -1, i = 0; y <= 1; y++)
 	{
 		[unroll]
-		for(int x = -1; x <= 1; x++, i++)
+		for (int x = -1; x <= 1; x++, i++)
 		{
 			float3 color = _Input[clamp(position.xy + int2(x, y), 0, _Resolution.xy - 1.0)];
-			color = Rec709ToICtCp(color);
 			
 			history.rgb += color * historyWeights[i];
 			
@@ -78,21 +83,20 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 	
 	history.rgb *= rcp(w.x + w.y + 1.0);
 	float4 historySample = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit)) * float2(_PreviousToCurrentExposure, 1.0).xxxy;
-	historySample.rgb = Rec709ToICtCp(historySample.rgb);
 	history += historySample;
 	
 	mean *= rcp(9.0);
-	stdDev = sqrt(abs(stdDev * rcp(9.0) - mean * mean)) * 1.5;
+	stdDev = sqrt(abs(stdDev * rcp(9.0) - mean * mean));
 	
-	//minValue = max(minValue, mean - stdDev);
-	//maxValue = min(maxValue, mean + stdDev);
-	
-	minValue = mean - stdDev;
-	maxValue = mean + stdDev;
+	minValue = max(minValue, mean - stdDev);
+	maxValue = min(maxValue, mean + stdDev);
 	
 	// Normalize before clamp/lerps
 	if (result.a)
 		result.rgb /= result.a;
+		
+	if (history.a)
+		history.rgb /= history.a;
 	
 	result.rgb = clamp(result.rgb, minValue, maxValue);
 	
@@ -100,11 +104,13 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD) : SV_Target
 		
 	result.rgb = lerp(history.rgb * history.a, result.rgb * result.a, 1.0 - _StationaryBlending);
 	result.a = lerp(history.a, result.a, 1.0 - _StationaryBlending);
-		
+
+	FragmentOutput output;
+	output.history = result;
+	
 	if (result.a)
 		result.rgb /= result.a;
-		
-	result.rgb = ICtCpToRec709(result.rgb);
-		
-	return result;
+	
+	output.result = result.rgb;
+	return output;
 }

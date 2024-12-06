@@ -301,7 +301,7 @@ float3 LMSToRec2020(float3 lms)
 	return XYZToRec2020(xyz);
 }
 
-float3 ICtCpToRec2020(float3 iCtCp, float maxValue)
+float3 ICtCpToRec2020(float3 iCtCp, float maxValue = ST2084Max)
 {
 	float3 pqLms = ICtCpToPQLMS(iCtCp);
 	float3 lms = ST2084ToLinear(pqLms, maxValue);

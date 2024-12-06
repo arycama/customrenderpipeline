@@ -1,6 +1,6 @@
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Core.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/MatrixUtils.hlsl"
-#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Packing.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Core.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/MatrixUtils.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 
 Texture2D<float4> _MainTex, _BumpMap;
 Texture2D<float3> _ExtraTex, _SubsurfaceTex;

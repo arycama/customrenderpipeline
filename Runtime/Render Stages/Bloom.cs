@@ -38,7 +38,7 @@ namespace Arycama.CustomRenderPipeline
                 var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
                 var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
 
-                var resultId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32);
+                var resultId = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32);
                 bloomIds.Add(resultId);
             }
 

@@ -11,7 +11,7 @@ Texture2D<float> _GrainTexture;
 float4 _GrainTextureParams, _Resolution, _BloomScaleLimit, _Bloom_TexelSize;
 float _IsSceneView, _BloomStrength;
 uint ColorGamut;
-float Tonemap, HdrMaxNits, HdrEnabled;
+float Tonemap, HdrEnabled;
 
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {
@@ -30,15 +30,16 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Targe
 	bloom += _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(1, -1), _BloomScaleLimit)) * 0.0625;
 	
 	color = lerp(color, bloom, _BloomStrength);
+	
+	color.gb -= 0.5;
+	
+	color = ICtCpToRec2020(color);
 
-	// Convert into display gamut
-	if (HdrEnabled)
-		color = Rec709ToRec2020(color);
-		
 	if (Tonemap)
 		color = OpenDRT(color);
-	
-	color = RemoveNaN(color);
+		
+	// Since UI/blur is authored in sRGB/rec709, convert to that first
+	color = LinearToGamma(Rec2020ToRec709(color));
 
 	return color;
 }
@@ -53,11 +54,16 @@ float3 FragmentComposite(float4 position : SV_Position) : SV_Target
 	float4 ui = UITexture[position.xy];
 	
 	// Convert scene to sRGB and blend "incorrectly" which matches image-editing programs
-	//color = LinearToGamma(color);
-	//color = color * (1.0 - ui.a) + ui.rgb;
+	if (ColorGamut == ColorGamutHDR10)
+	{
+		ui.rgb *= PaperWhiteLuminance;
+		ui.rgb /= MaxLuminance;
+	}
+	
+	color = color * (1.0 - ui.a) + ui.rgb;
 	
 	// Convert blended result back to linear for OEFT
-	//color = GammaToLinear(color);
+	color = GammaToLinear(color);
 	
 	// OETF
 	switch (ColorGamut)
@@ -67,11 +73,12 @@ float3 FragmentComposite(float4 position : SV_Position) : SV_Target
 			break;
 		
 		case ColorGamutRec709:
-			color *= HdrMaxNits;
+			color *= MaxLuminance;
 			color = color / kReferenceLuminanceWhiteForRec709;
 			break;
 		
 		case ColorGamutRec2020:
+			color = Rec709ToRec2020(color);
 			break;
 			
 		case ColorGamutDisplayP3:
@@ -79,8 +86,8 @@ float3 FragmentComposite(float4 position : SV_Position) : SV_Target
 		
 		case ColorGamutHDR10:
 		{
-			color *= HdrMaxNits;
-			//color = Rec709ToRec2020(color);
+			color *= MaxLuminance;
+			color = Rec709ToRec2020(color);
 			color = LinearToST2084(color);
 			break;
 		}
@@ -94,7 +101,7 @@ float3 FragmentComposite(float4 position : SV_Position) : SV_Target
 				color = Rec709ToP3D65(color);
 			
 				// Apply gamma 2.2
-				color = pow(color / HdrMaxNits, rcp(2.2));
+				color = pow(color / MaxLuminance, rcp(2.2));
 				break;
 			}
 	}

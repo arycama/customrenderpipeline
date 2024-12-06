@@ -31,6 +31,7 @@ namespace Arycama.CustomRenderPipeline
             //    maxNits = settings.HdrMaxNits;
             //}
             var hdrEnabled = hdrSettings.available && settings.HdrEnabled;
+            var maxNits = hdrEnabled ? hdrSettings.maxToneMapLuminance : 100.0f;
 
             pass.SetRenderFunction((command, pass) =>
             {
@@ -38,7 +39,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "_IsSceneView", isSceneView ? 1.0f : 0.0f);
                 var colorGamut = hdrEnabled ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
                 pass.SetInt(command, "ColorGamut", (int)colorGamut);
-                pass.SetFloat(command, "HdrMaxNits", settings.Tonemap && hdrSettings.available && hdrSettings.active ? hdrSettings.maxToneMapLuminance : 100.0f);
+                pass.SetFloat(command, "MaxLuminance", hdrEnabled ? maxNits : settings.PaperWhite);
+                pass.SetFloat(command, "PaperWhiteLuminance", settings.PaperWhite); // Todo: Brightness setting
             });
         }
     }

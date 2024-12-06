@@ -31,7 +31,7 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle Render(int width, int height, float fieldOfView, RTHandle color, RTHandle depth)
         {
             var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
-            var tempId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32);
+            var tempId = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Depth of Field"))
             {
