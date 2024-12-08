@@ -30,10 +30,6 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Targe
 	bloom += _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(1, -1), _BloomScaleLimit)) * 0.0625;
 	
 	color = lerp(color, bloom, _BloomStrength);
-	
-	color.gb -= 0.5;
-	
-	color = ICtCpToRec2020(color);
 
 	if (Tonemap)
 		color = OpenDRT(color);

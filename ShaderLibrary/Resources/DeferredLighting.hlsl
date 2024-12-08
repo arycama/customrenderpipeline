@@ -51,7 +51,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	GetTriangleNormal(position.xy, V, isFrontFace);
 	lightingInput.isVolumetric = lightingInput.isWater && !isFrontFace;
 	
-	return GetLighting(lightingInput, V);
+	return Rec709ToRec2020(GetLighting(lightingInput, V));
 }
 
 Texture2D<float4> CloudTexture;
@@ -73,14 +73,14 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		{
 			// We only want to blend with background if depth is not zero, eg a filled pixel (Could also use stecil, but we already have to sample depth
 			// Though that would allow us to save a depth sample+blend for non-filled pixels, hrm
-			result = _Input[position.xy] * cloudTransmittance;
+			result = _Input[position.xy];// * cloudTransmittance;
 	
 			float eyeDepth = LinearEyeDepth(depth);
 	
 			// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
 			float rcpVLength = RcpLength(worldDir);
 			float3 V = -worldDir * rcpVLength;
-			result *= TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
+			//result *= Rec709ToRec2020(TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength)));
 		}
 	}
 	
@@ -88,9 +88,9 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	// (Should we also do this for vol lighting?)
 	
 	// TODO: Would be better to use some kind of filter instead of bilinear
-	result += CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit)).rgb;
+	result += ICtCpToRec2020(CloudTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, CloudTextureScaleLimit)).rgb);
 	
-	result += SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit));
+	result += ICtCpToRec2020(SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit)));
 		
 	//result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
 	

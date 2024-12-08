@@ -41,7 +41,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 		if (RayIntersectsGround(_ViewHeight, viewCosAngle))
 		{
-			output.luminance = 0.0;
+			output.luminance = Rec709ToICtCp(0.0);
 			output.transmittance = 1.0;
 			output.depth = 0.0;
 			return output;
@@ -62,7 +62,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			float sceneDistance = LinearEyeDepth(sceneDepth) * rcp(rcpRdLength);
 			if (sceneDistance < rayStart)
 			{
-				output.luminance = 0.0;
+				output.luminance = Rec709ToICtCp(0.0);
 				output.transmittance = 1.0;
 				output.depth = 0.0;
 				return output;
@@ -87,7 +87,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	#ifdef CLOUD_SHADOW
 		output.result = float3(cloudDepth * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a);
 	#else
-		output.luminance = result.rgb;
+		output.luminance = Rec709ToICtCp(result.rgb);
 		output.transmittance = result.a;
 		output.depth = float2(cloudDepth, -(result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) : 0.0);
 	#endif
@@ -126,7 +126,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 		for(int x = -1; x <= 1; x++, i++)
 		{
 			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
-			float4 color = float4(Rec709ToICtCp(_Input[pixelId + int2(x, y)]), _InputTransmittance[pixelId + int2(x, y)]);
+			float4 color = float4(_Input[pixelId + int2(x, y)], _InputTransmittance[pixelId + int2(x, y)]);
 			result = i == 0 ? color * weight : result + color * weight;
 			mean += color;
 			stdDev += color * color;
@@ -143,11 +143,10 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 
 	float4 history;
 	history.rgb = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
-	history.a = _TransmittanceHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _TransmittanceHistoryScaleLimit));
-	
-	history.rgb *= _PreviousToCurrentExposure;
-	history.rgb = Rec709ToICtCp(history.rgb);
 	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
+	history.rgb *= _PreviousToCurrentExposure;
+	
+	history.a = _TransmittanceHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _TransmittanceHistoryScaleLimit));
 	
 	// Not sure what best way to handle is, not clamping reduces flicker which is the main issue
 	history.a = clamp(history.a, minValue.a, maxValue.a);
@@ -157,8 +156,6 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
-	
-	result.rgb = ICtCpToRec709(result.rgb);
 	
 	result.rgb = RemoveNaN(result.rgb);
 	

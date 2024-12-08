@@ -74,6 +74,6 @@ void RayGeneration()
 		outDepth = 0.0;
 	}
 	
-	HitColor[position] = float4(color, rcpPdf);
+	HitColor[position] = float4(Rec709ToICtCp(color), rcpPdf);
 	HitResult[position] = float4(hitRay, outDepth);
 }

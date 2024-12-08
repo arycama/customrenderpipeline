@@ -72,7 +72,7 @@ void TemporalNeighborhood(Texture2D<float4> input, int2 coord, out float4 minVal
 	maxValue = min(maxValue, mean + stdDev);
 }
 
-void TemporalNeighborhood(Texture2D<float3> input, int2 coord, out float3 minValue, out float3 maxValue, out float3 result, bool useICtCp = true)
+void TemporalNeighborhood(Texture2D<float3> input, int2 coord, out float3 minValue, out float3 maxValue, out float3 result)
 {
 	float3 mean = 0.0, stdDev = 0.0;
 	
@@ -84,7 +84,6 @@ void TemporalNeighborhood(Texture2D<float3> input, int2 coord, out float3 minVal
 		{
 			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
 			float3 color = input[coord + int2(x, y)];
-			color = useICtCp ? Rec709ToICtCp(color) : color;
 			result = i == 0 ? color * weight : result + color * weight;
 			mean += color;
 			stdDev += color * color;

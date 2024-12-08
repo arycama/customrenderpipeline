@@ -223,7 +223,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		
 	FragmentOutput output;
 	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);
-	output.luminance = luminance;
+	output.luminance = Rec709ToICtCp(luminance);
 	return output;
 }
 
@@ -248,18 +248,18 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
 	float3 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history *= _PreviousToCurrentExposure;
-	history = Rec709ToICtCp(history);
 	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 		
-	result = ICtCpToRec709(result);
-		
 	result = RemoveNaN(result);
+	
 	TemporalOutput output;
 	output.temporal = result;
+	
+	result = ICtCpToRec2020(result);
 	
 	result += _RefractionInput[position.xy];
 	

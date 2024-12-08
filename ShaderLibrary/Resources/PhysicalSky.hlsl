@@ -265,7 +265,11 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		luminance += surface * _LightColor0 * _Exposure;
 	}
 	
-	return RemoveNaN(luminance);
+	#ifndef REFLECTION_PROBE
+		luminance = Rec709ToICtCp(luminance);
+	#endif
+	
+	return luminance;
 }
 
 float4 _SkyHistoryScaleLimit;
@@ -276,8 +280,6 @@ float _IsFirst, _ClampWindow, _DepthFactor, _MotionFactor;
 
 float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	//return _SkyInput[position.xy];
-
 	float cloudTransmittance = CloudTransmittanceTexture[position.xy];
 	
 	float rcpRdLength = RcpLength(worldDir);
@@ -325,7 +327,7 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	TemporalNeighborhood(_SkyInput, position.xy, minValue, maxValue, result);
 
 	float2 historyUv = uv - motion;
-	float3 history = Rec709ToICtCp(_SkyHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _SkyHistoryScaleLimit)) * _PreviousToCurrentExposure);
+	float3 history = _SkyHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _SkyHistoryScaleLimit)) * _PreviousToCurrentExposure;
 	
 	float previousDepth = LinearEyeDepth(PreviousDepth[historyUv * _ScaledResolution.xy]);
 	float2 previousVelocity = PreviousVelocity[historyUv * _ScaledResolution.xy];
@@ -350,7 +352,7 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 		
-	return RemoveNaN(ICtCpToRec709(result));
+	return result;
 }
 
 float _SpatialSamples, _SpatialDepthFactor, _BlurSigma;

@@ -303,6 +303,7 @@ float3 LMSToRec2020(float3 lms)
 
 float3 ICtCpToRec2020(float3 iCtCp, float maxValue = ST2084Max)
 {
+	iCtCp.gb -= 0.5;
 	float3 pqLms = ICtCpToPQLMS(iCtCp);
 	float3 lms = ST2084ToLinear(pqLms, maxValue);
 	return LMSToRec2020(lms);
@@ -404,7 +405,9 @@ float3 Rec2020ToICtCp(float3 rec2020, float maxValue = ST2084Max)
 {
 	float3 lms = Rec2020ToLMS(rec2020);
 	float3 lmsPq = LinearToST2084(lms, maxValue);
-	return PQLMSToICtCp(lmsPq);
+	float3 result = PQLMSToICtCp(lmsPq);
+	result.gb += 0.5;
+	return result;
 }
 
 float3 Rec709ToICtCp(float3 rec709, float maxValue = ST2084Max)

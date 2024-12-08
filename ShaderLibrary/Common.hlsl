@@ -366,6 +366,12 @@ float4 WorldToClipNonJittered(float3 position)
 {
 	return MultiplyPoint(_WorldToNonJitteredClip, position);
 }
+
+float4 ObjectToClipNonJittered(float3 position, uint instanceID)
+{
+	return WorldToClipNonJittered(ObjectToWorld(position, instanceID));
+}
+
 float4 WorldToClipPrevious(float3 position)
 {
 	return MultiplyPoint(_WorldToPreviousClip, position);

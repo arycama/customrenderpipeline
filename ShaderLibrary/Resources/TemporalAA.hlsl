@@ -111,6 +111,6 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	if (result.a)
 		result.rgb /= result.a;
 	
-	output.result = result.rgb;
+	output.result = ICtCpToRec2020(result.rgb);
 	return output;
 }

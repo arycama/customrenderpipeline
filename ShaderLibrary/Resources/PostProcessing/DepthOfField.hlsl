@@ -16,8 +16,7 @@ float CalculateCoC(float depth)
 
 float3 Fragment(float4 position : SV_Position) : SV_Target
 {
-	float3 result = Rec709ToICtCp(_Input[position.xy]);
-	result.gb += 0.5;
+	float3 result = Rec2020ToICtCp(_Input[position.xy]);
 	return result;
 	
 	//_FocalDistance = LinearEyeDepth(_Depth[_ScaledResolution.xy / 2]);

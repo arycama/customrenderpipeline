@@ -157,7 +157,7 @@ namespace Arycama.CustomRenderPipeline
                 return input;
 
             var (current, history, wasCreated) = textureCache.GetTextures(camera.pixelWidth, camera.pixelHeight, camera);
-            var result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32);
+            var result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA"))
             {
                 var keyword = scale < 1.0f ? "UPSCALE" : null;

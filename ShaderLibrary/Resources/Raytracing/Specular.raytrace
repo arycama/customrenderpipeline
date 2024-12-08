@@ -87,6 +87,6 @@ void RayGeneration()
 		color *= exp(-payload.hitDistance * _WaterExtinction);
 	}
 	
-	HitColor[position] = float4(color, rcpPdf);
+	HitColor[position] = float4(Rec709ToICtCp(color), rcpPdf);
 	HitResult[position] = float4(hitRay, outDepth);
 }

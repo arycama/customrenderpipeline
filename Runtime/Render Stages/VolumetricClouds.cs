@@ -105,7 +105,7 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };
 
-            cloudLuminanceTextureCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Cloud Luminance");
+            cloudLuminanceTextureCache = new(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Cloud Luminance");
             cloudTransmittanceTextureCache = new(GraphicsFormat.R8_UNorm, renderGraph, "Cloud Transmittance");
 
             weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, GraphicsFormat.R8_UNorm, isPersistent: true);
@@ -356,7 +356,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(RTHandle cameraDepth, int width, int height, Camera camera, CullingResults cullingResults)
         {
-            var cloudLuminanceTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            var cloudLuminanceTemp = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
             var cloudTransmittanceTemp = renderGraph.GetTexture(width, height, GraphicsFormat.R8_UNorm, isScreenTexture: true);
             var cloudDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R32G32_SFloat, isScreenTexture: true);
 

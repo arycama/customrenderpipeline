@@ -129,7 +129,7 @@ namespace Arycama.CustomRenderPipeline
 
             skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
             ggxConvolutionMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
-            textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Physical Sky");
+            textureCache = new(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Physical Sky");
 
             transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
             multiScatter = renderGraph.GetTexture(settings.MultiScatterWidth, settings.MultiScatterHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
@@ -471,7 +471,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void Render(RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector2 jitter, Camera camera, CullingResults cullingResults, RTHandle velocity)
         {
-            var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
             {
@@ -497,7 +497,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Spatial
-            var skyTemp2 = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            var skyTemp2 = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Spatial"))
             {
                 pass.Initialize(skyMaterial, 5);

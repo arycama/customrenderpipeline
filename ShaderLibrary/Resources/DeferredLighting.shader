@@ -26,7 +26,7 @@ Shader "Hidden/Deferred Lighting"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
-			#define SCREENSPACE_REFLECTIONS_ON
+    		#define SCREENSPACE_REFLECTIONS_ON
             #define SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
             //#define SCREEN_SPACE_SHADOWS_ON
            // #define UNDERWATER_LIGHTING_ON

@@ -84,7 +84,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	}
 	
     TraceResult output;
-	output.color = float4(color, rcpPdf);
+	output.color = float4(Rec709ToICtCp(color), rcpPdf);
 	output.hit = float4(hitRay, outDepth);
     return output;
 }
@@ -157,7 +157,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		
 		if(hasHit)
 		{
-			result.rgb += Rec709ToICtCp(hitColor.rgb) * weightOverPdf;
+			result.rgb += hitColor.rgb * weightOverPdf;
 			result.a += weightOverPdf;
 			avgRayLength += rcp(rcpRayLength) * weightOverPdf;
 		}
@@ -169,7 +169,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	
 	// Normalize color and result by total hitweight
 	result = AlphaPremultiply(result);
-	result.rgb = ICtCpToRec709(result.rgb);
+	result.rgb = ICtCpToRec2020(result.rgb);
 	
 	avgRayLength *= result.a ? rcp(result.a) : 0.0;
 	
@@ -193,7 +193,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	}
 	
 	SpatialResult output;
-	output.result = lerp(radiance, result.rgb, result.a * SpecularGiStrength);
+	output.result = Rec2020ToICtCp(lerp(Rec709ToRec2020(radiance), result.rgb, result.a * SpecularGiStrength));
 	output.rayLength = avgRayLength;
 	return output;
 }
@@ -213,14 +213,12 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
 	float3 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history *= _PreviousToCurrentExposure;
-	history = Rec709ToICtCp(history);
 	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
 		result = lerp(history, result, 0.05 * _MaxBoxWeight);
 	
-	result = ICtCpToRec709(result);
 	result = RemoveNaN(result);
 	
 	return result;

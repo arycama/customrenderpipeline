@@ -31,7 +31,7 @@ public class DiffuseGlobalIllumination
         material = new Material(Shader.Find("Hidden/ScreenSpaceGlobalIllumination")) { hideFlags = HideFlags.HideAndDontSave };
         this.settings = settings;
 
-        temporalCache = new PersistentRTHandleCache(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Screen Space Reflections");
+        temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Screen Space Reflections");
         raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Diffuse");
     }
 
@@ -109,7 +109,7 @@ public class DiffuseGlobalIllumination
             }
         }
 
-        var spatialResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+        var spatialResult = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
         var rayDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
         {
