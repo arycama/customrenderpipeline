@@ -37,8 +37,8 @@ namespace Arycama.CustomRenderPipeline
         {
             private readonly Vector4 jitter;
             private readonly Vector4 previousJitter;
-            private readonly float maxCrossWeight;
-            private readonly float maxBoxWeight;
+            private readonly float crossWeightSum;
+            private readonly float boxWeightSum;
             private readonly float centerCrossFilterWeight;
             private readonly float centerBoxFilterWeight;
             private readonly Vector4 crossFilterWeights;
@@ -47,12 +47,12 @@ namespace Arycama.CustomRenderPipeline
 
             public readonly Vector4 Jitter => jitter;
 
-            public TemporalAAData(Vector4 jitter, Vector4 previousJitter, float maxCrossWeight, float maxBoxWeight, float centerCrossFilterWeight, float centerBoxFilterWeight, Vector4 crossFilterWeights, Vector4 boxFilterWeights0, Vector4 boxFilterWeights1)
+            public TemporalAAData(Vector4 jitter, Vector4 previousJitter, float crossWeightSum, float boxWeightSum, float centerCrossFilterWeight, float centerBoxFilterWeight, Vector4 crossFilterWeights, Vector4 boxFilterWeights0, Vector4 boxFilterWeights1)
             {
                 this.jitter = jitter;
                 this.previousJitter = previousJitter;
-                this.maxCrossWeight = maxCrossWeight;
-                this.maxBoxWeight = maxBoxWeight;
+                this.crossWeightSum = crossWeightSum;
+                this.boxWeightSum = boxWeightSum;
                 this.centerCrossFilterWeight = centerCrossFilterWeight;
                 this.centerBoxFilterWeight = centerBoxFilterWeight;
                 this.crossFilterWeights = crossFilterWeights;
@@ -68,8 +68,8 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.SetVector(command, "_Jitter", jitter);
                 pass.SetVector(command, "_PreviousJitter", previousJitter);
-                pass.SetFloat(command, "_MaxCrossWeight", maxCrossWeight);
-                pass.SetFloat(command, "_MaxBoxWeight", maxBoxWeight);
+                pass.SetFloat(command, "_CrossWeightSum", crossWeightSum);
+                pass.SetFloat(command, "_BoxWeightSum", boxWeightSum);
                 pass.SetFloat(command, "_CenterCrossFilterWeight", centerCrossFilterWeight);
                 pass.SetFloat(command, "_CenterBoxFilterWeight", centerBoxFilterWeight);
                 pass.SetVector(command, "_CrossFilterWeights", crossFilterWeights);
@@ -111,9 +111,6 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var weight = Mitchell(x + jitter.x, y + jitter.y);
 
-                    //weight = Mathf.Clamp01(1.0f - Mathf.Abs(x + jitter.x));
-                    //weight *= Mathf.Clamp01(1.0f - Mathf.Abs(y + jitter.y));
-
                     if (!settings.IsEnabled)
                         weight = (x == 0 && y == 0) ? 1.0f : 0.0f;
 
@@ -137,8 +134,8 @@ namespace Arycama.CustomRenderPipeline
             (
                 jitter: new Vector4(jitter.x, jitter.y, jitter.x / scaledWidth, jitter.y / scaledHeight),
                 previousJitter: new Vector4(previousJitter.x, previousJitter.y, previousJitter.x / scaledWidth, previousJitter.y / scaledHeight), // TODO: previous width/height?
-                maxCrossWeight: maxCrossWeight,
-                maxBoxWeight: maxBoxWeight,
+                boxWeightSum: boxWeightSum,
+                crossWeightSum: crossWeightSum,
                 centerCrossFilterWeight: weights[4] * rcpCrossWeightSum,
                 centerBoxFilterWeight: weights[4] * rcpBoxWeightSum,
                 crossFilterWeights: new Vector4(weights[1], weights[3], weights[5], weights[7]) * rcpCrossWeightSum,
@@ -224,9 +221,9 @@ namespace Arycama.CustomRenderPipeline
 
         private float Mitchell1D(float x)
         {
-            var B = 1.0f / 3.0f;
-            var C = 1.0f / 3.0f;
-            x = Mathf.Abs(x);
+            var B = 0.0f;
+            var C = settings.SpatialSharpness;
+            x = Mathf.Abs(x) * (4.0f / 3.0f);
 
             if (x <= 1.0f)
                 return ((12 - 9 * B - 6 * C) * x * x * x + (-18 + 12 * B + 6 * C) * x * x + (6 - 2 * B)) * (1.0f / 6.0f);

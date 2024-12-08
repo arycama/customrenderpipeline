@@ -123,7 +123,7 @@ float FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	history = clamp(history, minValue, maxValue);
 	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
-		result = lerp(history, result, 0.05 * _MaxBoxWeight);
+		result = lerp(history, result, 0.05 * _BoxWeightSum);
 	
 	return result;
 }

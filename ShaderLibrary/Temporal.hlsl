@@ -9,8 +9,8 @@ cbuffer TemporalProperties
 	float4 _Jitter;
 	float4 _PreviousJitter;
 	
-	float _MaxCrossWeight;
-	float _MaxBoxWeight;
+	float _CrossWeightSum;
+	float _BoxWeightSum;
 	float _CenterCrossFilterWeight;
 	float _CenterBoxFilterWeight;
 	

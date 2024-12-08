@@ -55,7 +55,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	   0.0
 	};
 	
-	float4 result = 0.0, history = 0.0;
+	float3 result = 0.0, history = 0.0;
 	float3 minValue, maxValue, mean = 0.0, stdDev = 0.0;
 	
 	[unroll]
@@ -66,12 +66,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 		{
 			float3 color = _Input[clamp(position.xy + int2(x, y), 0, _Resolution.xy - 1.0)];
 			
-			history.rgb += color * historyWeights[i];
-			
 			float2 delta = float2(x, y) + _Jitter.xy;
 			float filterSize = 4.0 / 3.0;
-			float weight = Mitchell1D(delta.x * filterSize, 0.0, _SpatialSharpness) * Mitchell1D(delta.y * filterSize, 0.0, _SpatialSharpness);
-			result += float4(color, 1.0) * weight;
+			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
+			result += color * weight;
+			history += color * historyWeights[i];
 			
 			minValue = i ? min(minValue, color) : color;
 			maxValue = i ? max(maxValue, color) : color;
@@ -81,9 +80,10 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 		}
 	}
 	
-	history.rgb *= rcp(w.x + w.y + 1.0);
-	float4 historySample = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit)) * float2(_PreviousToCurrentExposure, 1.0).xxxy;
-	history += historySample;
+	history *= rcp(w.x + w.y + 1.0);
+	float4 historySample = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
+	history += historySample.rgb * _PreviousToCurrentExposure;
+	float historyWeight = historySample.a;
 	
 	mean *= rcp(9.0);
 	stdDev = sqrt(abs(stdDev * rcp(9.0) - mean * mean));
@@ -91,26 +91,21 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	minValue = max(minValue, mean - stdDev);
 	maxValue = min(maxValue, mean + stdDev);
 	
-	// Normalize before clamp/lerps
-	if (result.a)
-		result.rgb /= result.a;
-		
-	if (history.a)
-		history.rgb /= history.a;
+	history = ClipToAABB(history, result, minValue, maxValue);
 	
-	result.rgb = clamp(result.rgb, minValue, maxValue);
+	// Weight result and history
+	result *= _BoxWeightSum;
+	history *= historyWeight;
 	
-	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue, maxValue);
-		
-	result.rgb = lerp(history.rgb * history.a, result.rgb * result.a, 1.0 - _StationaryBlending);
-	result.a = lerp(history.a, result.a, 1.0 - _StationaryBlending);
+	result = lerp(result, history, _StationaryBlending);
+	float weight = lerp(_BoxWeightSum, historyWeight, _StationaryBlending);
 
 	FragmentOutput output;
-	output.history = result;
 	
-	if (result.a)
-		result.rgb /= result.a;
+	if (weight)
+		result.rgb *= rcp(weight);
 	
-	output.result = ICtCpToRec2020(result.rgb);
+	output.history = float4(result, weight);
+	output.result = ICtCpToRec2020(result);
 	return output;
 }

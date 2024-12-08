@@ -207,10 +207,10 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	//	history /= historyWeight;
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
-		result = lerp(history, result, 0.05 * _MaxBoxWeight);
+		result = lerp(history, result, 0.05 * _BoxWeightSum);
 		
 	// Reapply weights
-	//result *= lerp(historyWeight, aoWeight, 0.05 * _MaxBoxWeight);
+	//result *= lerp(historyWeight, aoWeight, 0.05 * _BoxWeightSum);
 	
 	return RemoveNaN(result);
 }
