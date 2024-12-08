@@ -18,7 +18,7 @@ Texture2D<float3> _WaterEmission, _UnderwaterResult;
 Texture2D<float> _Depth, _UnderwaterDepth;
 
 float4 _UnderwaterResultScaleLimit;
-float3 _Extinction, _Color, _LightColor0, _LightDirection0, _LightColor1, _LightDirection1;
+float3 _Extinction, _Color;
 float _RefractOffset, _Steps;
 
 // Fragment
@@ -74,6 +74,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	oceanUv += _ViewPosition.xz;
 	
+	float3 N = float3(0, 1, 0) + shoreNormal;
+	
 	[unroll]
 	for (uint i = 0; i < 4; i++)
 	{
@@ -85,14 +87,12 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		normalData += normal.xy / normal.z;
 		foam += cascadeData.b / _OceanScale[i];
 		smoothness += Remap(cascadeData.a, -1.0, 1.0, 2.0 / 3.0);
+		
+		N = BlendNormalDerivative(N.xzy, normal).xzy;
 	}
 	
 	// Convert normal length back to smoothness
 	smoothness = lerp(LengthToSmoothness(smoothness * 0.25), _Smoothness, shoreScale);
-	smoothness = _Smoothness;
-	
-	// Our normals contain partial derivatives, and since we add the height field with the shore waves, we can simply sum the partial derivatives and renormalize
-	float3 N = normalize(float3(normalData * (1.0 - shoreScale), 1.0).xzy + shoreNormal);
 	
 	if (!isFrontFace)
 		N = -N;
@@ -146,21 +146,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float l = _LightDirection0.y;
 	float v = underwaterV.y;
 	float b = underwaterDistance;
-		
-	float roughness = perceptualRoughness * perceptualRoughness;
-	float3 L = _LightDirection0;
-	float3 Vt = L;
-	float3 Nt = -N * float2(-1, 1).xyx;
-	float ni = 1.34, no = 1.0;
-	float3 Ht = normalize(-Vt * ni - l * no);
-	float NdotHt = dot(Nt, Ht);
-	float LdotHt = dot(L, Ht);
-	float VdotHt = dot(Vt, Ht);
-	
-	float mt = GgxTransmission(roughness, dot(Nt, L), dot(Nt, Vt), NdotHt, LdotHt, VdotHt, ni, no);
-	float fd1 = Fresnel(VdotHt, ni, no);
-	float factor = (1.0 - fd1) * saturate(-dot(Nt, L));
-	
+
 	float3 luminance = 0.0;
 	float samples = 1;
 	for (float i = 0.0; i < samples; i++)
@@ -171,14 +157,21 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
 		float weight = rcp(dot(pdf, rcp(3.0)));
 		
+		// Not sure why this is happening
+		weight = max(0, weight);
+		
 		float3 P = isFrontFace ? worldPosition + -underwaterV * t : -underwaterV * t;
 		float sunT = WaterShadowDistance(P, _LightDirection0);
 
 		float3 transmittance = exp(-_Extinction * (sunT + t));
 		float shadow = GetShadow(P, 0, false) * CloudTransmittance(P);
-		luminance += factor * transmittance * weight * shadow * GetCaustics(_ViewPosition + P, _LightDirection0) / samples;
+		float factor = GetWaterIlluminance(P);
+		if (factor == 1)
+			factor = dot(float3(0, 1, 0), _LightDirection0);
+		//luminance += factor * transmittance * weight * shadow * GetCaustics(_ViewPosition + P, _LightDirection0) / samples;
+		luminance += factor * transmittance * weight * shadow / samples;
 	}
-	
+		
 	luminance *= _Extinction * _Exposure * RcpPi * _LightColor0 * TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
 	
 	// Ambient 
@@ -221,9 +214,14 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	if (!isFrontFace)
 		luminance = 0;
 		
+	// Apply roughness to transmission
+	float2 f_ab = DirectionalAlbedo(NdotV, perceptualRoughness);
+	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
+	underwater *= (1.0 - foamFactor) * (1.0 - FssEss); // TODO: Diffuse transmittance?
+		
 	FragmentOutput output;
-	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, underwater);
-	output.luminance = Rec709ToICtCp(luminance);
+	output.gbuffer = OutputGBuffer(foamFactor, 0.0, N, perceptualRoughness, N, 1.0, max(0, underwater));
+	output.luminance = Rec709ToICtCp(max(0, luminance));
 	return output;
 }
 

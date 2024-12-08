@@ -6,6 +6,7 @@
 #include "Samplers.hlsl"
 #include "Temporal.hlsl"
 #include "Tessellation.hlsl"
+#include "Lighting.hlsl"
 #include "WaterCommon.hlsl"
 #include "Water/WaterShoreMask.hlsl"
 
@@ -246,7 +247,48 @@ FragmentInput Domain(HullConstantOutput tessFactors, OutputPatch<DomainInput, 4>
 	return output;
 }
 
-void FragmentShadow() { }
+float FragmentShadow(FragmentInput input) : SV_Target
+{
+	float2 oceanUv = input.worldPosition.xz - input.delta;
+
+	// Gerstner normals + foam
+	float shoreScale;
+	float3 shoreNormal, displacement;
+	GerstnerWaves(float3(oceanUv, 0.0).xzy, _Time, displacement, shoreNormal, shoreScale);
+	
+	// Normal + Foam data
+	float2 normalData = 0.0;
+	float foam = 0.0;
+	float smoothness = 0.0;
+
+	oceanUv += _ViewPosition.xz;
+	
+	float3 N = float3(0, 1, 0);//	+shoreNormal;
+	
+	[unroll]
+	for (uint i = 0; i < 4; i++)
+	{
+		float scale = _OceanScale[i];
+		float3 uv = float3(oceanUv * scale, i);
+		float4 cascadeData = OceanNormalFoamSmoothness.Sample(_TrilinearRepeatSampler, uv);
+		
+		float3 normal = UnpackNormalSNorm(cascadeData.rg);
+		normalData += normal.xy / normal.z;
+		foam += cascadeData.b / _OceanScale[i];
+		smoothness += Remap(cascadeData.a, -1.0, 1.0, 2.0 / 3.0);
+		
+		N = BlendNormalDerivative(N.xzy, normal).xzy;
+	}
+	
+	// Convert normal length back to smoothness
+	smoothness = lerp(LengthToSmoothness(smoothness * 0.25), _Smoothness, shoreScale);
+
+	float NdotL = saturate(dot(N, _LightDirection0));
+	
+	float2 f_ab = DirectionalAlbedo(NdotL, 1.0 - smoothness);
+	float3 FssEss = lerp(f_ab.x, f_ab.y, 0.02);
+	return (1.0 - FssEss) * NdotL;
+}
 
 FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 {

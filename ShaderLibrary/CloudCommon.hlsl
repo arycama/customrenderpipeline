@@ -18,7 +18,6 @@ float _NoiseScale, _NoiseStrength, _DetailNoiseStrength, _DetailNoiseScale;
 float2 _WeatherMapSpeed, _WeatherMapOffset;
 float _Samples, _LightSamples, _LightDistance;
 float _TransmittanceThreshold;
-float3 _LightColor0, _LightColor1, _LightDirection0, _LightDirection1;
 float _BackScatterPhase, _ForwardScatterPhase, _BackScatterScale, _ForwardScatterScale;
 
 Texture2D<float2> CloudDepthTexture;

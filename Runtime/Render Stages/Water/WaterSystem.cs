@@ -218,6 +218,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 return;
 
             var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.D16_UNorm);
+            var waterIlluminance = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.R16_UNorm);
 
             var passIndex = settings.Material.FindPass("WaterShadow");
             Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");
@@ -230,12 +231,14 @@ namespace Arycama.CustomRenderPipeline.Water
             {
                 pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
                 pass.WriteDepth(waterShadow);
+                pass.WriteTexture(waterIlluminance, RenderBufferLoadAction.DontCare);
                 pass.ConfigureClear(RTClearFlags.Depth);
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
 
                 pass.AddRenderPassData<OceanFftResult>();
                 pass.AddRenderPassData<WaterShoreMask.Result>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<DirectionalLightInfo>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -263,7 +266,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction")), renderGraph.FrameIndex);
+            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction"), waterIlluminance), renderGraph.FrameIndex);
         }
 
 

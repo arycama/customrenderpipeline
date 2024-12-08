@@ -17,7 +17,7 @@ Texture2D<uint2> _Stencil;
 
 float3 _Extinction;
 float _RaytracingBias, _RaytracingDistantBias;
-float3 _LightDirection0, _LightColor0, _Color;
+float3 _Color;
 
 [shader("miss")]
 void MissShader(inout RayPayload payload : SV_RayPayload)

@@ -6,23 +6,25 @@ namespace Arycama.CustomRenderPipeline.Water
 {
     public readonly struct WaterShadowResult : IRenderPassData
     {
-        private readonly RTHandle waterShadowTexture;
+        private readonly RTHandle waterShadowTexture, waterIlluminance;
         private readonly Matrix4x4 waterShadowMatrix;
         private readonly float waterShadowNear, waterShadowFar;
         private readonly Vector3 waterShadowExtinction;
 
-        public WaterShadowResult(RTHandle waterShadowTexture, Matrix4x4 waterShadowMatrix, float waterShadowNear, float waterShadowFar, Vector3 waterShadowExtinction)
+        public WaterShadowResult(RTHandle waterShadowTexture, Matrix4x4 waterShadowMatrix, float waterShadowNear, float waterShadowFar, Vector3 waterShadowExtinction, RTHandle waterIlluminance)
         {
             this.waterShadowTexture = waterShadowTexture ?? throw new ArgumentNullException(nameof(waterShadowTexture));
             this.waterShadowMatrix = waterShadowMatrix;
             this.waterShadowNear = waterShadowNear;
             this.waterShadowFar = waterShadowFar;
             this.waterShadowExtinction = waterShadowExtinction;
+            this.waterIlluminance = waterIlluminance;
         }
 
         public readonly void SetInputs(RenderPass pass)
         {
             pass.ReadTexture("_WaterShadows", waterShadowTexture);
+            pass.ReadTexture("WaterIlluminance", waterIlluminance);
         }
 
         public readonly void SetProperties(RenderPass pass, CommandBuffer command)

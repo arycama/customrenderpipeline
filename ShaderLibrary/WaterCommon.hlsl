@@ -26,7 +26,7 @@ float4x4 _WaterShadowMatrix;
 
 Texture2DArray<float4> OceanNormalFoamSmoothness;
 Texture2DArray<float3> OceanDisplacement, OceanDisplacementHistory;
-Texture2D<float> _OceanTerrainMask;
+Texture2D<float> _OceanTerrainMask, WaterIlluminance;
 Texture2D<float3> _WaterNormals;
 Texture2D<float4> _FoamBump, _FoamTex, _OceanCausticsMap;
 
@@ -84,7 +84,7 @@ bool CheckTerrainMask(float3 p0, float3 p1, float3 p2, float3 p3)
 
 void GerstnerWaves(float3 worldPosition, float time, out float3 displacement, out float3 normal, out float scale)
 {
-	displacement = normal = 0;
+	displacement = normal = float3(0, 1, 0);
 	scale = 0;
 	
 	// Early exit if out of bounds
@@ -95,11 +95,11 @@ void GerstnerWaves(float3 worldPosition, float time, out float3 displacement, ou
 	float shoreDepth, shoreDistance;
 	float2 shoreDirection;
 	GetShoreData(worldPosition, shoreDepth, shoreDistance, shoreDirection);
-	if (shoreDistance < 0.0)
-	{
-		scale = 0.95;
-		return;
-	}
+	//if (shoreDistance < 0.0)
+	//{
+	//	scale = 0.95;
+	//	return;
+	//}
 	
 	// Largest wave arising from a wind speed
 	float amplitude = 0.22 * Sq(OceanWindSpeed) / _OceanGravity; // _ShoreWaveHeight;
@@ -169,6 +169,18 @@ float3 WaterPhaseFunction(float LdotV, float opticalDepth)
 {
 	float3 asymmetry = exp(-_WaterShadowExtinction * opticalDepth);
 	return lerp(MiePhase(LdotV, -0.3), MiePhase(LdotV, 0.85), asymmetry);
+}
+
+float GetWaterIlluminance(float3 position)
+{
+	float illuminance = 1.0;;
+	float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, position);
+	if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
+	{
+		illuminance = WaterIlluminance.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);
+	}
+	
+	return illuminance;
 }
 
 #endif

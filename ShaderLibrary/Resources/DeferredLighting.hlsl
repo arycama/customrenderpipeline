@@ -73,14 +73,14 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		{
 			// We only want to blend with background if depth is not zero, eg a filled pixel (Could also use stecil, but we already have to sample depth
 			// Though that would allow us to save a depth sample+blend for non-filled pixels, hrm
-			result = _Input[position.xy];// * cloudTransmittance;
+			result = _Input[position.xy] * cloudTransmittance;
 	
 			float eyeDepth = LinearEyeDepth(depth);
 	
 			// Maybe better to do all this in some kind of post deferred pass to reduce register pressure? (Should also apply clouds, sky etc)
 			float rcpVLength = RcpLength(worldDir);
 			float3 V = -worldDir * rcpVLength;
-			//result *= Rec709ToRec2020(TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength)));
+			result *= Rec709ToRec2020(TransmittanceToPoint(_ViewHeight, -V.y, eyeDepth * rcp(rcpVLength)));
 		}
 	}
 	
@@ -92,7 +92,7 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	result += ICtCpToRec2020(SkyTexture.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Jitter.zw, SkyTextureScaleLimit)));
 		
-	//result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
+	result += ApplyVolumetricLight(0.0, position.xy, LinearEyeDepth(depth));
 	
 	float eyeDepth = LinearEyeDepth(depth);
 	

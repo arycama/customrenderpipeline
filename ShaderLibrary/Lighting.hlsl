@@ -19,6 +19,8 @@ Texture2D<float> ScreenSpaceShadows;
 float4 ScreenSpaceGlobalIlluminationScaleLimit, ScreenSpaceShadowsScaleLimit;
 float DiffuseGiStrength, SpecularGiStrength;
 
+float3 _LightColor0, _LightColor1, _LightDirection0, _LightDirection1;
+
 cbuffer AmbientSh
 {
 	float4 _AmbientSh[7];

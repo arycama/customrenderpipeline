@@ -69,7 +69,6 @@
 
 		Pass
 		{
-			ColorMask 0
 			ZClip Off
 
 			Name "WaterShadow"
