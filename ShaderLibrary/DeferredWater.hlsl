@@ -147,7 +147,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float v = underwaterV.y;
 	float b = underwaterDistance;
 
-	float3 luminance = 0.0;
+	float3 luminance = 0.0, ambient = AmbientLight(float3(0.0, 1.0, 0.0));
+	float3 atmosphereTransmittance = TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
 	float samples = 1;
 	for (float i = 0.0; i < samples; i++)
 	{
@@ -169,15 +170,10 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		if (factor == 1)
 			factor = dot(float3(0, 1, 0), _LightDirection0);
 		//luminance += factor * transmittance * weight * shadow * GetCaustics(_ViewPosition + P, _LightDirection0) / samples;
-		luminance += factor * transmittance * weight * shadow / samples;
+		luminance += factor * transmittance * weight * (shadow * _LightColor0 * atmosphereTransmittance * RcpPi * _Exposure + ambient) / samples;
 	}
 		
-	luminance *= _Extinction * _Exposure * RcpPi * _LightColor0 * TransmittanceToAtmosphere(_ViewHeight, -V.y, _LightDirection0.y, waterDistance);
-	
-	// Ambient 
-	float3 finalTransmittance = exp(-underwaterDistance * _Extinction);
-	luminance += AmbientLight(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
-	luminance *= _Color;
+	luminance *= _Extinction * _Color;
 	
 	// TODO: Stencil? Or hw blend?
 	float3 underwater = 0.0;
