@@ -56,6 +56,16 @@ float GgxReflection(float roughness, float NdotL, float NdotV, float NdotH)
 	return d * v;
 }
 
+float GgxReflection(float roughness, float NdotL, float NdotV, float NdotH, float LdotH, float VdotH)
+{
+	if(LdotH <= 0.0 || VdotH <= 0.0 || NdotH <= 0.0)
+		return 0.0;
+		
+	float d = GgxDistribution(roughness, NdotH);
+	float v = GgxVisibility(roughness, NdotV, NdotL);
+	return d * v;
+}
+
 float3 GgxTransmission(float roughness, float NdotL, float NdotV, float NdotHt, float LdotHt, float VdotHt, float3 ni, float3 no)
 {
 	float d = GgxDistribution(roughness, NdotHt);
@@ -100,6 +110,9 @@ float3 AverageFresnel(float3 f0)
 
 float2 DirectionalAlbedo(float NdotV, float perceptualRoughness)
 {
+	if(NdotV <= 0.0)
+		return 0.0;
+		
 	float2 uv = float2(sqrt(NdotV), perceptualRoughness) * _GGXDirectionalAlbedoRemap.xy + _GGXDirectionalAlbedoRemap.zw;
 	return _GGXDirectionalAlbedo.SampleLevel(_LinearClampSampler, uv, 0);
 }
@@ -124,13 +137,19 @@ float AverageAlbedoMs(float perceptualRoughness, float3 f0)
 
 float3 GGXMultiScatter(float NdotV, float NdotL, float perceptualRoughness, float3 f0)
 {
-	float Ewi = DirectionalAlbedo(NdotV, perceptualRoughness).g;
-	float Ewo = DirectionalAlbedo(NdotL, perceptualRoughness).g;
-	float Eavg = AverageAlbedo(perceptualRoughness);
-	float3 FAvg = AverageFresnel(f0);
+	if (NdotV <= 0 || NdotL <= 0.0)
+		return 0.0;
+
+	float Ewo = DirectionalAlbedo(NdotV, perceptualRoughness).g;
+	float Ewi = DirectionalAlbedo(NdotL, perceptualRoughness).g;
+	float Emavg = AverageAlbedo(perceptualRoughness);
 	
-	float ms = RcpPi * (1.0 - Ewi) * (1.0 - Ewo) * rcp(max(HalfEps, 1.0 - Eavg));
-	float3 f = Sq(FAvg) * Eavg * rcp(max(HalfEps, 1.0 - FAvg * (1.0 - Eavg)));
+	// Multiple-scattering ggx
+	float ms = (1.0 - Ewo) * (1.0 - Ewi) * rcp(max(HalfEps, Pi * (1.0 - Emavg)));
+	
+	// Multiple-scattering Fresnsel
+	float3 FAvg = AverageFresnel(f0);
+	float3 f = Sq(FAvg) * Emavg * rcp(max(HalfEps, 1.0 - FAvg * (1.0 - Emavg)));
 	return ms * f;
 }
 

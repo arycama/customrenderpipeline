@@ -1,4 +1,4 @@
-﻿Shader"Surface/Nature/SpeedTree 8 Imposter"
+﻿Shader "Surface/SpeedTree Imposter"
 {
     Properties
     {
@@ -42,9 +42,8 @@
 
             Stencil
             {
-                Ref 1
+                Ref 17
                 Pass Replace
-                WriteMask 1
             }
 
             HLSLPROGRAM

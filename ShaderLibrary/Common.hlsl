@@ -131,6 +131,7 @@ cbuffer UnityInstancing_PerDraw0
 	struct
 	{
 		matrix unity_ObjectToWorldArray;
+		float2 unity_LODFadeArray; // Will need this for lod fade support with instancing
 	}
 	
 	unity_Builtins0Array[2];
@@ -140,7 +141,6 @@ cbuffer UnityInstancing_PerDraw1
 {
 	struct
 	{
-		// float unity_LODFadeArray; // Will need this for lod fade support with instancing
 		matrix unity_WorldToObjectArray;
 	}
 	
@@ -516,6 +516,21 @@ float2 ParallaxOffset1Step(float height, float strength, float3 viewDir, float b
 	half3 v = normalize(viewDir);
 	v.z += bias;
 	return height * (v.xy / v.z);
+}
+
+float2 GetLodFade(uint instanceID)
+{
+	#ifdef INDIRECT_RENDERING
+		uint instanceIndex = instanceID + _RendererInstanceIndexOffsets[RendererOffset];
+		uint index = _VisibleRendererInstanceIndices[instanceIndex];
+		return _InstanceLodFades[index].xx;
+	#else
+		#ifdef INSTANCING_ON
+			return unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_LODFadeArray;
+		#else
+			return unity_LODFade.xy;
+		#endif
+	#endif
 }
 
 #endif

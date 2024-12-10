@@ -167,11 +167,11 @@ FRAGMENT_OUTPUT Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 		unity_WorldTransformParams = 1;
 	#endif
 
-	//#ifdef LOD_FADE_CROSSFADE
-	//	float dither = InterleavedGradientNoise(input.positionCS.xy, 0);
-	//	float fade = GetLodFade(input.instanceID).x;
-	//	clip(fade + (fade < 0.0 ? dither : -dither));
-	//#endif
+	#ifdef LOD_FADE_CROSSFADE
+		float dither = InterleavedGradientNoise(input.positionCS.xy, 0);
+		float fade = GetLodFade(input.instanceID).x;
+		clip(fade + (fade < 0.0 ? dither : -dither));
+	#endif
 
 	FragmentData fragmentData = (FragmentData)0;
 	fragmentData.instanceID = input.instanceID;

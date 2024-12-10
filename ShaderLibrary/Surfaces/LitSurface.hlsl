@@ -9,9 +9,9 @@
 #include "LitSurfaceCommon.hlsl"
 
 #ifdef __INTELLISENSE__
-	#define UNITY_PASS_DEFERRED
-	#define MOTION_VECTORS_ON
-	#define RAYTRACING_ON
+	//#define UNITY_PASS_DEFERRED
+	//#define MOTION_VECTORS_ON
+	//#define RAYTRACING_ON
 #endif
 
 #define REQUIRES_UV !defined(UNITY_PASS_SHADOWCASTER) || defined(MODE_CUTOUT) || defined(MODE_FADE) || defined(MODE_TRANSPARENT)
@@ -125,6 +125,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 
 	#if defined(UNITY_PASS_SHADOWCASTER) 
 		#if defined(MODE_FADE) || defined(MODE_TRANSPARENT)
+			discard;
 			clip(surface.alpha - Noise1D(input.position.xy));
 		#endif
 	#else
@@ -137,10 +138,6 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 				output.velocity = CalculateVelocity(input.position.xy * _ScaledResolution.zw, input.previousPositionCS);
 			#endif
 		#else
-			#ifdef MODE_TRANSPARENT
-				albedo *= alpha;
-			#endif
-		
 			float NdotV;
 			float3 V = normalize(-input.worldPosition);
 			float3 N = GetViewReflectedNormal(surface.normal, V, NdotV);
@@ -154,7 +151,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 			lightingInput.f0 = lerp(0.04, surface.albedo, surface.metallic);
 			lightingInput.perceptualRoughness = surface.roughness;
 			lightingInput.occlusion = surface.occlusion;
-			lightingInput.translucency = 0.0; // Todo: support?
+			lightingInput.translucency = surface.albedo * (1.0 - surface.alpha); // Todo: support?
 			lightingInput.bentNormal = surface.bentNormal;
 			lightingInput.isWater = false;
 			lightingInput.uv = input.position.xy * _ScaledResolution.zw;
@@ -162,11 +159,21 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 			lightingInput.isVolumetric = false;
 			lightingInput.isThinSurface = true;
 			
-			float3 lighting = GetLighting(lightingInput, V) + surface.emission;
+			#ifdef MODE_TRANSPARENT
+				lightingInput.albedo *= surface.alpha;
+			#endif
+			
+			float3 lighting = Rec709ToRec2020(GetLighting(lightingInput, V) + surface.emission);
 
 			lighting.rgb = ApplyVolumetricLight(lighting.rgb, input.position.xy, input.position.w);
 			output.color.rgb = lighting;
-			output.color.a = surface.alpha;
+			
+			// Ref https://jcgt.org/published/0008/01/03/
+			float2 f_ab = DirectionalAlbedo(NdotV, surface.roughness);
+			float FssEss = lerp(f_ab.x, f_ab.y, lightingInput.f0.r);
+			
+			// Since we use one minus alpha, we need to reformulate to achieve dest * (1 - alpha) * (1 - FssEss)
+			output.color.a = surface.alpha * (1.0 - FssEss) + FssEss;
 		#endif
 	#endif
 	

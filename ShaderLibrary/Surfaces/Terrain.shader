@@ -26,7 +26,6 @@ Shader "Lit Terrain"
                 // Bit 3 = terrain, 1 = non background
                 Ref 9
                 Pass Replace
-                WriteMask 9
             }
 
             HLSLPROGRAM

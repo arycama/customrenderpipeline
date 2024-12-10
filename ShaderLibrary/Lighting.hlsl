@@ -158,36 +158,45 @@ float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, fl
 
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 
+	float3 pd = albedo;
+	float3 pt = translucency;
 	float NdotL = dot(N, L);
-	float3 b = albedo * GGXDiffuse(saturate(NdotL), saturate(NdotV), perceptualRoughness, f0);
+	float3 T = dot(N, V) * dot(N, L) > 0 ? albedo : translucency;
+	float3 b = GGXDiffuse(saturate(NdotL), saturate(NdotV), perceptualRoughness, f0) * T;
 	
-	// Optimized math. Ref: PBR Diffuse Lighting for GGX + Smith Microsurfaces (slide 114), assuming |L|=1 and |V|=1
-	float LdotV = dot(L, V);
-	float invLenLV = max(FloatEps, rsqrt(2.0 * LdotV + 2.0));
-	float NdotH = saturate((NdotL + NdotV) * invLenLV);
-	float LdotH = saturate(invLenLV * LdotV + invLenLV);
+	float3 H = normalize(V + L);
+	float NdotH = dot(N, H);
+	float VdotH = dot(H, V);
+	float LdotH = dot(L, H);
 	
-	// For thin surface
-	float3 Lr = reflect(L, -N);
-	float3 Hr = normalize(V + Lr);
-	float cosThetaR = dot(V, Hr);
-	float NdotHr = dot(N, Hr);
-	float NdotLr = dot(N, Lr);
+	float3 F = Fresnel(VdotH, f0);
+	float Mr = GgxReflection(roughness, NdotL, NdotV, NdotH, LdotH, VdotH);
+	float3 result = Mr * F;
+	
+	float3 MrMsFs = GGXMultiScatter(NdotV, NdotL, perceptualRoughness, f0); // Unsure about saturate
+	result += MrMsFs;
+	
+	result += pd * b; // * microShadow;
+	
+	if (isThinSurface)
+	{
+		float3 p = albedo;
+		float3 Lp = reflect(L, -N);
+		float3 Hp = normalize(V + Lp);
+		float VdotHp = dot(V, Hp);
+		float NdotLp = dot(N, Lp);
+		float NdotHp = dot(N, Hp);
+		float LpdotHp = dot(Lp, Hp);
+		
+		float Mtp = GgxReflection(roughness, NdotLp, NdotV, NdotHp, LpdotHp, VdotHp);
+		float3 F = Fresnel(VdotHp, f0);
+		
+		result += p * Mtp * (1.0 - F);
+	}
 	
 	// Hardcoded to water IoR for now since thats the only thing that needs this
 	float ni = isBackface ? 1.0 : 1.34;
 	float no = isBackface ? 1.34 : 1.0;
-	
-	float3 fd = Fresnel(isThinSurface ? cosThetaR : LdotH, f0);
-	float mr = GgxReflection(roughness, isThinSurface ? NdotLr : NdotL, NdotV, isThinSurface ? NdotHr : NdotH);
-	
-	float3 mrMs = GGXMultiScatter(saturate(NdotV), saturate(NdotL), perceptualRoughness, f0);
-	
-	if (NdotL > 0.0)
-		return (b + mr * fd + mrMs) * NdotL * microShadow;
-	
-	if (isThinSurface)
-		return translucency * mr * (1.0 - fd) * -NdotL;
 	
 	float3 Ht = normalize(-(ni * L + no * V));
 	float NdotHt = dot(N, Ht);
@@ -198,10 +207,10 @@ float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, fl
 	float3 mt = GgxTransmission(roughness, NdotL, NdotV, NdotHt, LdotHt, VdotHt, ni, no);
 	float fd1 = Fresnel(LdotHt, ni, no);
 	
-	if (isVolumetric)
-		return mt * (1.0 - fd1) * -NdotL;
+	//if (isVolumetric)
+	//	result += mt * (1.0 - fd1);
 			
-	return 0.0;
+	return result * abs(NdotL);
 }
 
 // Important: call Orthonormalize() on the tangent and recompute the bitangent afterwards.

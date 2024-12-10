@@ -101,6 +101,7 @@
             #pragma fragment Fragment
             #pragma multi_compile_instancing
 			#pragma shader_feature_local TRIPLANAR_ON
+            #pragma shader_feature_local MODE_FADE MODE_TRANSPARENT
 
             #include "LitSurface.hlsl"
             ENDHLSL

@@ -43,9 +43,6 @@ cbuffer UnityPerMaterial
 
 static const float4 _HueVariationColor = float4(0.7, 0.25, 0.1, 0.2);
 
-// TODO: Implement
-matrix _ViewToClip;
-
 FragmentInput Vertex(VertexInput input)
 {
 	float3 worldPosition = ObjectToWorld(input.position, input.instanceID);
@@ -55,7 +52,7 @@ FragmentInput Vertex(VertexInput input)
 	output.positionCS = WorldToClip(worldPosition);
 	
 	#ifdef UNITY_PASS_SHADOWCASTER
-		float3 viewDirOS = WorldToObjectDirection(-_WorldToView[2].xyz, input.instanceID);
+		float3 viewDirOS = WorldToObjectDirection(_WorldToView[2].xyz, input.instanceID);
 		float3 view = viewDirOS;
 	#else
 		float3 view = WorldToObject(0.0, input.instanceID);
@@ -136,20 +133,20 @@ FragmentOutput Fragment(FragmentInput input)
 	FragmentOutput output;
 	
 #ifdef UNITY_PASS_SHADOWCASTER
-	output.depth = -_ViewToClip._m22 * depth + input.positionCS.z;
+	output.depth = (_Near / (_Far - _Near)) * depth + input.positionCS.z;
 #else
-	output.depth = (-_ViewToClip._m22 * depth + input.positionCS.z) * rcp(1.0 - depth);
+	output.depth = ((_Near / (_Far - _Near)) * depth + input.positionCS.z) * rcp(1.0 - depth);
 	
 	float3 normal = ObjectToWorldNormal(normalSmoothness.rgb * 2 - 1, input.instanceID, true);
 	float perceptualRoughness = SmoothnessToPerceptualRoughness(normalSmoothness.a);
 	
 	// Hue varation
-	float3 shiftedColor = lerp(color.rgb, _HueVariationColor.rgb, input.hueVariation);
-	color.rgb = saturate(shiftedColor * (Max3(color.rgb) * rcp(Max3(shiftedColor)) * 0.5 + 0.5));
+	//float3 shiftedColor = lerp(color.rgb, _HueVariationColor.rgb, input.hueVariation);
+	//color.rgb = saturate(shiftedColor * (Max3(color.rgb) * rcp(Max3(shiftedColor)) * 0.5 + 0.5));
 	
-	shiftedColor = lerp(subsurfaceOcclusion.rgb, _HueVariationColor.rgb, input.hueVariation);
-	subsurfaceOcclusion.rgb = saturate(shiftedColor * (Max3(subsurfaceOcclusion.rgb) * rcp(Max3(shiftedColor)) * 0.5 + 0.5));
-	float translucency = Max3(color.rgb * subsurfaceOcclusion.rgb ? color.rgb * rcp(subsurfaceOcclusion.rgb) : 0.0);
+	//shiftedColor = lerp(subsurfaceOcclusion.rgb, _HueVariationColor.rgb, input.hueVariation);
+	//subsurfaceOcclusion.rgb = saturate(shiftedColor * (Max3(subsurfaceOcclusion.rgb) * rcp(Max3(shiftedColor)) * 0.5 + 0.5));
+	float translucency = Max3(subsurfaceOcclusion.rgb ? color.rgb * rcp(subsurfaceOcclusion.rgb) : 0.0);
 	
 	output.gbufferOut = OutputGBuffer(color.rgb, translucency, normal, perceptualRoughness, normal, subsurfaceOcclusion.a, 0.0);
 #endif
