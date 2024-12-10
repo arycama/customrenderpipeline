@@ -236,7 +236,7 @@ float3 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 			lightTransmittance *= attenuation;
 		#endif
 		
-		float3 pdf = lum / ((maxLuminance - currentLuminance));
+		float3 pdf = lum / max(1e-6, maxLuminance - currentLuminance);
 		float3 maxLum = (lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase)) + multiScatter) * viewTransmittance * rcp(dot(pdf, rcp(3.0)));
 	
 		float3 C = maxLum - luminance * viewTransmittance;
