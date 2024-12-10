@@ -61,7 +61,7 @@ float3 Fragment(FragmentInput input) : SV_Target
 
     // Sample Textures
 	float3 albedo = _MainTex.Sample(_TrilinearClampSampler, input.uv).rgb * _Color.rgb;
-	float3 normalTS = UnpackNormalAG(_BumpMap.Sample(_TrilinearClampSampler, input.uv));
+	float3 normalTS = UnpackNormal(_BumpMap.Sample(_TrilinearClampSampler, input.uv));
 
     // 1. Considering the sun as a perfect disk, evaluate  it's solid angle (Could be precomputed)
 	float solidAngle = TwoPi * (1.0 - cos(0.5 * radians(_AngularDiameter)));

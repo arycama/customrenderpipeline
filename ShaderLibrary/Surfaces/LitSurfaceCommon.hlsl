@@ -99,9 +99,9 @@ SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false
 		albedoAlpha += SampleTexture(_MainTex, triplanarUvY, _MainTex_TexelSize.zw, isRaytracing, worldNormal, coneWidth) * triplanarWeights.y;
 		albedoAlpha += SampleTexture(_MainTex, triplanarUvZ, _MainTex_TexelSize.zw, isRaytracing, worldNormal, coneWidth) * triplanarWeights.z;
 		
-		float3 tnormalX = UnpackNormalAG(SampleTexture(_BumpMap, triplanarUvX, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
-		float3 tnormalY = UnpackNormalAG(SampleTexture(_BumpMap, triplanarUvY, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
-		float3 tnormalZ = UnpackNormalAG(SampleTexture(_BumpMap, triplanarUvZ, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
+		float3 tnormalX = UnpackNormal(SampleTexture(_BumpMap, triplanarUvX, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
+		float3 tnormalY = UnpackNormal(SampleTexture(_BumpMap, triplanarUvY, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
+		float3 tnormalZ = UnpackNormal(SampleTexture(_BumpMap, triplanarUvZ, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
 		
 		// minor optimization of sign(). prevents return value of 0
 		float3 axisSign = vertexNormal < 0 ? -1 : 1;
@@ -124,10 +124,10 @@ SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false
 		float4 detail = SampleTexture(_DetailAlbedoMap, detailUv, _DetailAlbedoMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth);
 		albedoAlpha.rgb = albedoAlpha.rgb * detail.rgb * 2;
 		
-		float3 normalTS = UnpackNormalAG(SampleTexture(_BumpMap, uv, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
+		float3 normalTS = UnpackNormal(SampleTexture(_BumpMap, uv, _BumpMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _BumpScale);
 	
 		// Detail Normal Map
-		float3 detailNormalTangent = UnpackNormalAG(SampleTexture(_DetailNormalMap, detailUv, _DetailNormalMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _DetailNormalMapScale);
+		float3 detailNormalTangent = UnpackNormal(SampleTexture(_DetailNormalMap, detailUv, _DetailNormalMap_TexelSize.zw, isRaytracing, worldNormal, coneWidth), _DetailNormalMapScale);
 		normalTS = BlendNormalRNM(normalTS, detailNormalTangent);
 		
 		float3x3 tangentToWorld = TangentToWorldMatrix(vertexNormal, input.vertexTangent, input.tangentSign);
@@ -136,7 +136,7 @@ SurfaceOutput GetSurfaceAttributes(SurfaceInput input, bool isRaytracing = false
 		
 		if(BentNormal)
 		{
-			float3 bentNormalTS = UnpackNormalAG(SampleTexture(_BentNormal, uv, _BentNormal_TexelSize.zw, isRaytracing, worldNormal, coneWidth));
+			float3 bentNormalTS = UnpackNormal(SampleTexture(_BentNormal, uv, _BentNormal_TexelSize.zw, isRaytracing, worldNormal, coneWidth));
 			result.bentNormal = normalize(mul(bentNormalTS, tangentToWorld));
 		}
 	#endif

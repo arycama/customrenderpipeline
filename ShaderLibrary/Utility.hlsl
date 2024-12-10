@@ -17,7 +17,7 @@ float3 UnpackNormalUNorm(float2 packedNormal, float scale = 1.0)
 	return UnpackNormalSNorm(packedNormal, scale);
 }
 
-float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
+float3 UnpackNormal(float4 packedNormal, float scale = 1.0)
 {
 	packedNormal.a *= packedNormal.r;
 	return UnpackNormalUNorm(packedNormal.ag, scale);

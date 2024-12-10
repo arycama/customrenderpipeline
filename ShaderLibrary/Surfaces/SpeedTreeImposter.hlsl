@@ -74,6 +74,7 @@ FragmentInput Vertex(VertexInput input)
 	float2 offsets[3] = { float2(0, 1), mask, float2(1, 0) };
 	float3 weights = float3(min(1.0 - localUv, localUv.yx), abs(localUv.x + localUv.y - 1.0)).xzy;
 
+	[unroll]
 	for (uint i = 0; i < 3; i++)
 	{
 		float2 localCell = cell + offsets[i];
@@ -112,6 +113,7 @@ FragmentOutput Fragment(FragmentInput input)
 	float4 color = 0.0, normalSmoothness = 0.0, subsurfaceOcclusion = 0.0;
 	float depth = 0.0;
 	
+	[unroll]
 	for (uint i = 0; i < 3; i++)
 	{
 		float3 uv = input.uvWeights[i].xyz;

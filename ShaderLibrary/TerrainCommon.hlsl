@@ -174,7 +174,7 @@ void SampleTerrain(float3 worldPosition, float3 terrainNormal, out float4 albedo
 		mask += (sampleMip0 ? Mask.SampleLevel(_TrilinearRepeatSampler, sampleUv, ComputeTextureLOD(Mask_TexelSize.zw, terrainNormal, coneWidth, scale)) : Mask.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy)) * layerWeight;
 		
 		float4 normalData = (sampleMip0 ? Normal.SampleLevel(_TrilinearRepeatSampler, sampleUv, ComputeTextureLOD(Normal_TexelSize.zw, terrainNormal, coneWidth, scale)) : Normal.SampleGrad(_TrilinearRepeatSampler, sampleUv, localDx, localDy));
-		float3 unpackedNormal = UnpackNormalAG(normalData);
+		float3 unpackedNormal = UnpackNormal(normalData);
 		unpackedNormal.xy = mul(unpackedNormal.xy, rotationMatrix);
 		unpackedNormal.z = max(1e-6, unpackedNormal.z);
 		normal = BlendNormalDerivative(normal, unpackedNormal, layerWeight);

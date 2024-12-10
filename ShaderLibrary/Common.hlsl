@@ -509,4 +509,13 @@ float2 ClampScaleTextureUv(float2 uv, float4 scaleLimit)
 	return min(uv * scaleLimit.xy, scaleLimit.zw);
 }
 
+// TODO: Move
+float2 ParallaxOffset1Step(float height, float strength, float3 viewDir, float bias = 0.42)
+{
+	height = (height - 0.5) * strength;
+	half3 v = normalize(viewDir);
+	v.z += bias;
+	return height * (v.xy / v.z);
+}
+
 #endif

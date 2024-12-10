@@ -106,7 +106,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		foamFactor *= _FoamTex.Sample(_TrilinearRepeatAniso16Sampler, foamUv).r;
 		
 		// Sample/unpack normal, reconstruct partial derivatives, scale these by foam factor and normal scale and add.
-		float3 foamNormal = UnpackNormalAG(_FoamBump.Sample(_TrilinearRepeatAniso16Sampler, foamUv));
+		float3 foamNormal = UnpackNormal(_FoamBump.Sample(_TrilinearRepeatAniso16Sampler, foamUv));
 		float2 foamDerivs = foamNormal.xy / foamNormal.z;
 		//oceanN.xy += foamDerivs * _FoamNormalScale * foamFactor;
 		//smoothness = lerp(smoothness, _FoamSmoothness, foamFactor);

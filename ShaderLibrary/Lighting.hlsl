@@ -195,7 +195,7 @@ float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, fl
 	float VdotHt = dot(V, Ht);
 	
 	// Eq 24: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html#components/core/dielectricbsdffortransparentsurfaces
-	float mt = GgxTransmission(roughness, NdotL, NdotV, NdotHt, LdotHt, VdotHt, ni, no);
+	float3 mt = GgxTransmission(roughness, NdotL, NdotV, NdotHt, LdotHt, VdotHt, ni, no);
 	float fd1 = Fresnel(LdotHt, ni, no);
 	
 	if (isVolumetric)

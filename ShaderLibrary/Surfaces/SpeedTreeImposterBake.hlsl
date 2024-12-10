@@ -1,5 +1,4 @@
-#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Core.hlsl"
-#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/MatrixUtils.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 
 Texture2D<float4> _MainTex, _BumpMap;
@@ -53,7 +52,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	    clip(color.a - 1.0 / 3.0);
     #endif
 	
-	float3 normal = UnpackNormalAG(_BumpMap.Sample(_TrilinearRepeatAniso16Sampler, input.uv));
+	float3 normal = UnpackNormal(_BumpMap.Sample(_TrilinearRepeatAniso16Sampler, input.uv));
 	float3 extra = _ExtraTex.Sample(_TrilinearRepeatAniso16Sampler, input.uv);
 	float3 translucency = _Subsurface ? _SubsurfaceTex.Sample(_TrilinearRepeatAniso16Sampler, input.uv) : 0.0;
 	

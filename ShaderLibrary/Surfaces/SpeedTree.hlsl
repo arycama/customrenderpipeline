@@ -87,7 +87,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 
 	FragmentOutput output;
 #ifndef UNITY_PASS_SHADOWCASTER
-	float3 normal = UnpackNormalAG(_BumpMap.Sample(_TrilinearRepeatAniso4Sampler, input.uv));
+	float3 normal = UnpackNormal(_BumpMap.Sample(_TrilinearRepeatAniso4Sampler, input.uv));
 	float3 extra = _ExtraTex.Sample(_TrilinearRepeatAniso4Sampler, input.uv);
 
 	// Hue varation

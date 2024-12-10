@@ -64,17 +64,23 @@ float3 GgxTransmission(float roughness, float NdotL, float NdotV, float NdotHt, 
 	return abs(LdotHt) * abs(VdotHt) * rcp(abs(NdotL) * abs(NdotV)) * (Sq(no) * d * g * rcp(Sq(ni * LdotHt + no * VdotHt)));
 }
 
+
+float Fresnel(float LdotH, float f0)
+{
+	return lerp(f0, 1.0, pow(1.0 - LdotH, 5.0));
+}
+
 float3 Fresnel(float LdotH, float3 f0)
 {
 	return lerp(f0, 1.0, pow(1.0 - LdotH, 5.0));
 }
 
 // Includes handling for TIR
-float3 Fresnel(float LdotH, float ni, float no)
+float Fresnel(float LdotH, float ni, float no)
 {
 	if (ni > no)
 	{
-		float3 invEta = no / ni;
+		float invEta = no / ni;
 		float sinTheta2 = Sq(invEta) * (1.0 - Sq(LdotH));
 	
 		if (sinTheta2 > 1.0)
@@ -83,7 +89,7 @@ float3 Fresnel(float LdotH, float ni, float no)
 		LdotH = sqrt(1.0 - sinTheta2);
 	}
 	
-	float3 f0 = Sq((ni - no) * rcp(ni + no));
+	float f0 = Sq((ni - no) * rcp(ni + no));
 	return Fresnel(LdotH, f0);
 }
 
