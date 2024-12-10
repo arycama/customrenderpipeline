@@ -152,17 +152,27 @@ struct LightingInput
 	bool isVolumetric;
 };
 
-float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, float3 L, float3 V, float3 N, float3 bentNormal, float occlusion, float3 translucency, float NdotV, bool isVolumetric = false, bool isBackface = false, bool isThinSurface = false)
+float3 CalculateLighting(float3 albedo, float metallic, float perceptualRoughness, float3 L, float3 V, float3 N, float3 bentNormal, float occlusion, float3 translucency, float NdotV, bool isVolumetric = false, bool isBackface = false, bool isThinSurface = false, float opacity = 1.0)
 {
-	float microShadow = saturate(Sq(abs(dot(bentNormal, L)) * rsqrt(saturate(1.0 - occlusion))));
+	float3 f0 = lerp(0.04, albedo, metallic);
+	
+	float3 p = albedo;
+	float s = 1;
+	float ps = 1;
+	float l = translucency.r;
+	float m = metallic;
+	float t = 1.0 - opacity;
+	float3 psr0 = (1 - m) * (0.04) * ps + m * p; // lerp(f0, p, metallic), replace with f0
+	float3 psr90 = (1 - m) * s + m; // == 1, replace with 1
+	float3 pt = p * (1 - m) * t; // albedo * (1 - metallic) * (1 - opacity)?
+	float3 pd = p * (1 - m) * (1 - t); // albedo * opacity * (1 - metlalic)
 
+	float microShadow = saturate(Sq(abs(dot(bentNormal, L)) * rsqrt(saturate(1.0 - occlusion))));
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 
-	float3 pd = albedo;
-	float3 pt = translucency;
 	float NdotL = dot(N, L);
-	float3 T = dot(N, V) * dot(N, L) > 0 ? albedo : translucency;
-	float3 b = GGXDiffuse(saturate(NdotL), saturate(NdotV), perceptualRoughness, f0) * T;
+	float3 T = dot(N, V) * dot(N, L) > 0 ? (1 - l) : l;
+	float3 b = GGXDiffuse(NdotL, NdotV, perceptualRoughness, f0) * T;
 	
 	float3 H = normalize(V + L);
 	float NdotH = dot(N, H);
@@ -191,7 +201,7 @@ float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, fl
 		float Mtp = GgxReflection(roughness, NdotLp, NdotV, NdotHp, LpdotHp, VdotHp);
 		float3 F = Fresnel(VdotHp, f0);
 		
-		result += p * Mtp * (1.0 - F);
+		result += pt * Mtp * (1.0 - F);
 	}
 	
 	// Hardcoded to water IoR for now since thats the only thing that needs this
@@ -207,8 +217,8 @@ float3 CalculateLighting(float3 albedo, float3 f0, float perceptualRoughness, fl
 	float3 mt = GgxTransmission(roughness, NdotL, NdotV, NdotHt, LdotHt, VdotHt, ni, no);
 	float fd1 = Fresnel(LdotHt, ni, no);
 	
-	//if (isVolumetric)
-	//	result += mt * (1.0 - fd1);
+	if (isVolumetric)
+		result += mt * (1.0 - fd1);
 			
 	return result * abs(NdotL);
 }
@@ -514,25 +524,27 @@ float3 DiscLightApprox(float angularDiameter, float3 R, float3 L)
 	return DdotR < d ? normalize(d * L + normalize(S) * r) : R;
 }
 
-float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
+float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false, float opacity = 1.0)
 {
+	float3 f0 = lerp(0.04, input.albedo * opacity, input.f0);
+
 	#ifdef SCREENSPACE_REFLECTIONS_ON
 		float3 radiance = ICtCpToRec2020(ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit)));
 	#else
-		float3 radiance = IndirectSpecular(input.normal, V, input.f0, input.NdotV, input.perceptualRoughness, input.isWater, _SkyReflection);
+		float3 radiance = IndirectSpecular(input.normal, V, f0, input.NdotV, input.perceptualRoughness, input.isWater, _SkyReflection);
 	#endif
 	
 	float3 R = reflect(-V, input.normal);
 	float BdotR = dot(input.bentNormal, R);
-	radiance *= IndirectSpecularFactor(input.NdotV, input.perceptualRoughness, input.f0) * SpecularOcclusion(input.NdotV, input.perceptualRoughness, input.occlusion, BdotR);
+	radiance *= IndirectSpecularFactor(input.NdotV, input.perceptualRoughness, f0) * SpecularOcclusion(input.NdotV, input.perceptualRoughness, input.occlusion, BdotR);
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float3 irradiance = ICtCpToRec2020(ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit)));
 	#else
-		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo);
+		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo* opacity);
 	#endif
 	
-	float3 luminance = Rec2020ToRec709(radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, input.f0, input.albedo, input.translucency));
+	float3 luminance = Rec2020ToRec709(radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, f0, input.albedo * opacity, input.translucency));
 	
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{
@@ -582,7 +594,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 				light.color *= WaterShadow(input.worldPosition, L) * GetCaustics(input.worldPosition + _ViewPosition, L);
 			#endif
 			
-			luminance += (CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV, input.isVolumetric, input.isVolumetric, input.isThinSurface) * light.color * lightTransmittance) * (_Exposure * attenuation);
+			luminance += (CalculateLighting(input.albedo, input.f0.r, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV, input.isVolumetric, input.isVolumetric, input.isThinSurface, opacity) * light.color * lightTransmittance) * (_Exposure * attenuation);
 		}
 	}
 	
@@ -633,7 +645,7 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false)
 		else
 		{
 			//if (NdotL > 0.0)
-				luminance += CalculateLighting(input.albedo, input.f0, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV, input.isWater, input.isVolumetric, input.isThinSurface) * attenuation * light.color * _Exposure;
+			luminance += CalculateLighting(input.albedo, input.f0.r, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV, input.isWater, input.isVolumetric, input.isThinSurface, opacity) * attenuation * light.color * _Exposure;
 		}
 	}
 	

@@ -147,6 +147,7 @@ FragmentOutput Fragment(FragmentInput input)
 	//shiftedColor = lerp(subsurfaceOcclusion.rgb, _HueVariationColor.rgb, input.hueVariation);
 	//subsurfaceOcclusion.rgb = saturate(shiftedColor * (Max3(subsurfaceOcclusion.rgb) * rcp(Max3(shiftedColor)) * 0.5 + 0.5));
 	float translucency = Max3(subsurfaceOcclusion.rgb ? color.rgb * rcp(subsurfaceOcclusion.rgb) : 0.0);
+	translucency = Luminance(subsurfaceOcclusion.rgb);
 	
 	output.gbufferOut = OutputGBuffer(color.rgb, translucency, normal, perceptualRoughness, normal, subsurfaceOcclusion.a, 0.0);
 #endif

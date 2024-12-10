@@ -103,7 +103,8 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 		
 		// Translucency factor is albedo/translucency.. translucency is recovered as albedo * translucencyFactor
 
-		translucency = Max3(translucentColor ? albedoTransparency.rgb * rcp(translucentColor) : 0.0);
+		//translucency = Max3(translucentColor ? albedoTransparency.rgb * rcp(translucentColor) : 0.0);
+		translucency = Luminance(translucentColor);
 	}
 
 	// Flip normal on backsides

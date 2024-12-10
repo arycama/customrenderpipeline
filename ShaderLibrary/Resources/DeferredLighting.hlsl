@@ -36,14 +36,13 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.pixelPosition = position.xy;
 	lightingInput.eyeDepth = eyeDepth;
 	lightingInput.albedo = isTranslucent ? albedoMetallic.rgb : lerp(albedoMetallic.rgb, 0.0, albedoMetallic.a);
-	lightingInput.f0 = isTranslucent ? 0.04 : lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
+	lightingInput.f0 = isTranslucent ? 0.0 : albedoMetallic.a; // Actually metallic
 	lightingInput.perceptualRoughness = normalRoughness.a;
 	lightingInput.occlusion = bentNormalOcclusion.a;
-	lightingInput.translucency = 0.0;
 	lightingInput.bentNormal = normalize(2.0 * bentNormalOcclusion.rgb - 1.0);
 	lightingInput.isWater = (stencil & 4) != 0;
 	lightingInput.uv = uv;
-	lightingInput.translucency = isTranslucent ? albedoMetallic.rgb * albedoMetallic.a : 0.0;
+	lightingInput.translucency = isTranslucent ? albedoMetallic.a : 0.0;
 	lightingInput.NdotV = NdotV;
 	lightingInput.isThinSurface = isTranslucent;
 	

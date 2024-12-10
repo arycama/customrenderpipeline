@@ -155,8 +155,8 @@ float3 GGXMultiScatter(float NdotV, float NdotL, float perceptualRoughness, floa
 
 float GGXDiffuse(float NdotL, float NdotV, float perceptualRoughness, float3 f0)
 {
-	float Ewi = DirectionalAlbedoMs(NdotL, perceptualRoughness, f0);
-	float Ewo = DirectionalAlbedoMs(NdotV, perceptualRoughness, f0);
+	float Ewi = DirectionalAlbedoMs(abs(NdotL), perceptualRoughness, f0);
+	float Ewo = DirectionalAlbedoMs(abs(NdotV), perceptualRoughness, f0);
 	float Eavg = AverageAlbedoMs(perceptualRoughness, f0);
 	return (1.0 - Eavg) ? RcpPi * (1.0 - Ewo) * (1.0 - Ewi) * rcp(1.0 - Eavg) : 0.0;
 }

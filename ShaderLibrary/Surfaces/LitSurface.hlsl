@@ -147,11 +147,11 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 			lightingInput.worldPosition = input.worldPosition;
 			lightingInput.pixelPosition = input.position.xy;
 			lightingInput.eyeDepth = input.position.w;
-			lightingInput.albedo = lerp(surface.albedo, 0.0, surface.metallic);
-			lightingInput.f0 = lerp(0.04, surface.albedo, surface.metallic);
+			lightingInput.albedo = surface.albedo;
+			lightingInput.f0 = surface.metallic;// lerp(0.04, surface.albedo, surface.metallic);
 			lightingInput.perceptualRoughness = surface.roughness;
 			lightingInput.occlusion = surface.occlusion;
-			lightingInput.translucency = surface.albedo * (1.0 - surface.alpha); // Todo: support?
+			lightingInput.translucency = 0;// surface.albedo * (1.0 - surface.alpha); // Todo: support?
 			lightingInput.bentNormal = surface.bentNormal;
 			lightingInput.isWater = false;
 			lightingInput.uv = input.position.xy * _ScaledResolution.zw;
@@ -160,10 +160,10 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 			lightingInput.isThinSurface = true;
 			
 			#ifdef MODE_TRANSPARENT
-				lightingInput.albedo *= surface.alpha;
+				//lightingInput.albedo *= surface.alpha;
 			#endif
 			
-			float3 lighting = Rec709ToRec2020(GetLighting(lightingInput, V) + surface.emission);
+			float3 lighting = Rec709ToRec2020(GetLighting(lightingInput, V, false, surface.alpha) + surface.emission);
 
 			lighting.rgb = ApplyVolumetricLight(lighting.rgb, input.position.xy, input.position.w);
 			output.color.rgb = lighting;
