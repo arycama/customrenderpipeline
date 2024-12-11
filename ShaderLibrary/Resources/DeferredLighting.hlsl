@@ -35,7 +35,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	lightingInput.worldPosition = worldDir * eyeDepth;
 	lightingInput.pixelPosition = position.xy;
 	lightingInput.eyeDepth = eyeDepth;
-	lightingInput.albedo = isTranslucent ? albedoMetallic.rgb : lerp(albedoMetallic.rgb, 0.0, albedoMetallic.a);
+	lightingInput.albedo = albedoMetallic.rgb;
 	lightingInput.f0 = isTranslucent ? 0.0 : albedoMetallic.a; // Actually metallic
 	lightingInput.perceptualRoughness = normalRoughness.a;
 	lightingInput.occlusion = bentNormalOcclusion.a;

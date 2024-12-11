@@ -28,53 +28,20 @@ float RoughnessToSmoothness(float roughness)
     return 1.0 - sqrt(roughness);
 }
 
-// Move into material? 
-// Return modified smoothness based on provided variance (get from GeometricNormalVariance + TextureNormalVariance)
-float NormalFiltering(float perceptualRoughness, float variance, float threshold)
+float SpecularAntiAliasing(float perceptualRoughness, float3 worldNormal, float variance, float threshold)
 {
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
-    // Ref: Geometry into Shading - http://graphics.pixar.com/library/BumpRoughness/paper.pdf - equation (3)
-    float squaredRoughness = saturate(roughness * roughness + min(2.0 * variance, threshold * threshold)); // threshold can be really low, square the value for easier control
+	float roughness2 = Sq(roughness);
 
-    return RoughnessToPerceptualRoughness(sqrt(squaredRoughness));
-}
-
-float ProjectedSpaceNormalFiltering(float perceptualRoughness, float variance, float threshold)
-{
-	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
-    // Ref: Stable Geometric Specular Antialiasing with Projected-Space NDF Filtering - https://yusuketokuyoshi.com/papers/2021/Tokuyoshi2021SAA.pdf
-    float squaredRoughness = roughness * roughness;
-    float projRoughness2 = squaredRoughness / (1.0 - squaredRoughness);
-    float filteredProjRoughness2 = saturate(projRoughness2 + min(2.0 * variance, threshold * threshold));
-    squaredRoughness = filteredProjRoughness2 / (filteredProjRoughness2 + 1.0f);
-
-    return RoughnessToPerceptualRoughness(sqrt(squaredRoughness));
-}
-
-// Reference: Error Reduction and Simplification for Shading Anti-Aliasing
-// Specular antialiasing for geometry-induced normal (and NDF) variations: Tokuyoshi / Kaplanyan et al.'s method.
-// This is the deferred approximation, which works reasonably well so we keep it for forward too for now.
-// screenSpaceVariance should be at most 0.5^2 = 0.25, as that corresponds to considering
-// a gaussian pixel reconstruction kernel with a standard deviation of 0.5 of a pixel, thus 2 sigma covering the whole pixel.
-float GeometricNormalVariance(float3 geometricNormalWS, float screenSpaceVariance)
-{
-    float3 deltaU = ddx(geometricNormalWS);
-    float3 deltaV = ddy(geometricNormalWS);
-
-    return screenSpaceVariance * (dot(deltaU, deltaU) + dot(deltaV, deltaV));
-}
-
-// Return modified smoothness
-float GeometricNormalFiltering(float perceptualRoughness, float3 geometricNormalWS, float screenSpaceVariance, float threshold)
-{
-    float variance = GeometricNormalVariance(geometricNormalWS, screenSpaceVariance);
-	return NormalFiltering(perceptualRoughness, variance, threshold);
-}
-
-float ProjectedSpaceGeometricNormalFiltering(float perceptualRoughness, float3 geometricNormalWS, float screenSpaceVariance, float threshold)
-{
-    float variance = GeometricNormalVariance(geometricNormalWS, screenSpaceVariance);
-	return ProjectedSpaceNormalFiltering(perceptualRoughness, variance, threshold);
+	float SIGMA2 = variance; //2.0 * 0.15915494;
+	float KAPPA = threshold;//0.18;
+	float3 dndu = ddx(worldNormal);
+	float3 dndv = ddy(worldNormal);
+	float kernelRoughness2 = SIGMA2 * (dot(dndu, dndu) + dot(dndv, dndv));
+	float clampedKernelRoughness2 = min(kernelRoughness2, KAPPA);
+	float filteredRoughness2 = saturate(roughness2 + clampedKernelRoughness2);
+	float filteredRoughness = sqrt(filteredRoughness2);
+	return RoughnessToPerceptualRoughness(filteredRoughness);
 }
 
 float LengthToRoughness(float len)

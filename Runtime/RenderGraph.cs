@@ -11,6 +11,8 @@ namespace Arycama.CustomRenderPipeline
 {
     public class RenderGraph : IDisposable
     {
+        const int swapChainCount = 3;
+
         private readonly Dictionary<Type, Queue<RenderPass>> renderPassPool = new();
         private readonly Dictionary<Type, Queue<RenderGraphBuilder>> builderPool = new();
         private readonly Dictionary<RenderTexture, RTHandle> importedTextures = new();
@@ -24,7 +26,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<(RenderTexture renderTexture, int lastFrameUsed, bool isAvailable, bool isPersistent)> availableRenderTextures = new();
 
         private readonly List<BufferHandle> bufferHandlesToCreate = new();
-        private readonly List<BufferHandle> availableBufferHandles = new();
+        private readonly List<(BufferHandle handle, int lastFrameUsed)> availableBufferHandles = new();
         private readonly List<BufferHandle> usedBufferHandles = new();
 
         private readonly Dictionary<int, List<RTHandle>> lastPassOutputs = new();
@@ -326,28 +328,33 @@ namespace Arycama.CustomRenderPipeline
             {
                 var handle = availableBufferHandles[i];
 
-                if (handle.Target != target)
+                // If this buffer can be written to directly, it must have been unused for at least two frames, otherwise it will write to a temp buffer and results
+                // will not be visible until the next frame.
+                if (usageFlags == GraphicsBuffer.UsageFlags.LockBufferForWrite && handle.lastFrameUsed + (swapChainCount - 1) >= FrameIndex)
                     continue;
 
-                if (handle.Stride != stride)
+                 if (handle.handle.Target != target)
                     continue;
 
-                if (handle.UsageFlags != usageFlags)
+                if (handle.handle.Stride != stride)
                     continue;
 
-                if (handle.Target.HasFlag(GraphicsBuffer.Target.Constant))
+                if (handle.handle.UsageFlags != usageFlags)
+                    continue;
+
+                if (handle.handle.Target.HasFlag(GraphicsBuffer.Target.Constant))
                 {
                     // Constant buffers must have exact size
-                    if (handle.Count != count)
+                    if (handle.handle.Count != count)
                         continue;
                 }
-                else if (handle.Count < count)
+                else if (handle.handle.Count < count)
                     continue;
 
-                handle.Size = count * stride;
+                handle.handle.Size = count * stride;
                 availableBufferHandles.RemoveAt(i);
-                usedBufferHandles.Add(handle);
-                return handle;
+                usedBufferHandles.Add(handle.handle);
+                return handle.handle;
             }
 
             // If no handle was found, create a new one, and assign it as one to be created. 
@@ -410,13 +417,18 @@ namespace Arycama.CustomRenderPipeline
 
         public void ReleaseHandles()
         {
+
             // Any handles that were not used this frame can be removed
             foreach (var bufferHandle in availableBufferHandles)
-                bufferHandle.Release();
+            {
+                // Keep buffers available for at least two frames
+                if(bufferHandle.lastFrameUsed + (swapChainCount - 1) < FrameIndex)
+                    bufferHandle.handle.Release();
+            }
             availableBufferHandles.Clear();
 
             foreach (var handle in usedBufferHandles)
-                availableBufferHandles.Add(handle);
+                availableBufferHandles.Add((handle, FrameIndex));
             usedBufferHandles.Clear();
 
             // Release any render textures that have not been used for at least a frame
@@ -489,7 +501,7 @@ namespace Arycama.CustomRenderPipeline
                 }
 
                 foreach (var bufferHandle in availableBufferHandles)
-                    bufferHandle.Release();
+                    bufferHandle.handle.Release();
 
                 foreach (var importedRT in importedTextures)
                     Object.DestroyImmediate(importedRT.Key);

@@ -246,6 +246,8 @@ FRAGMENT_OUTPUT Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 		float3x3 tangentToWorld = float3x3(fragmentData.tangent, fragmentData.binormal, fragmentData.normal);
 		surface.Normal = normalize(mul(surface.Normal, tangentToWorld));
 		surface.bentNormal = normalize(mul(surface.bentNormal, tangentToWorld));
+		
+		surface.PerceptualRoughness = SpecularAntiAliasing(surface.PerceptualRoughness, surface.Normal, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
 	
 		#if defined(UNITY_PASS_DEFERRED) || defined(MOTION_VECTORS_ON)
 			return OutputGBuffer(surface.Albedo, surface.Metallic, surface.Normal, surface.PerceptualRoughness, surface.bentNormal, surface.Occlusion, surface.Emission);

@@ -13,6 +13,9 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float4 albedoSmoothness, mask;
 	float3 normal;
 	SampleTerrain(worldPosition, albedoSmoothness, normal, mask);
+	
+	float roughness = SmoothnessToPerceptualRoughness(albedoSmoothness.a);
+	roughness = SpecularAntiAliasing(roughness, normal, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
 
-	return OutputGBuffer(albedoSmoothness.rgb, mask.r, normal, 1.0 - albedoSmoothness.a, normal, mask.g, 0.0);
+	return OutputGBuffer(albedoSmoothness.rgb, mask.r, normal, roughness, normal, mask.g, 0.0);
 }

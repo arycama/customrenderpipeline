@@ -5,23 +5,8 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class TemporalAA : RenderFeature
+    public partial class TemporalAA : RenderFeature
     {
-        [Serializable]
-        public class Settings
-        {
-            [field: SerializeField] public bool IsEnabled { get; private set; } = true;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float JitterSpread { get; private set; } = 1.0f;
-            [field: SerializeField, Range(0f, 2f)] public float SpatialSharpness { get; private set; } = 0.5f;
-            [field: SerializeField, Range(0f, 1f)] public float MotionSharpness { get; private set; } = 0.5f;
-            [field: SerializeField, Range(0f, 0.99f)] public float StationaryBlending { get; private set; } = 0.95f;
-            [field: SerializeField, Range(0f, 0.99f)] public float MotionBlending { get; private set; } = 0.85f;
-            [field: SerializeField, Range(1, 32)] public int SampleCount { get; private set; } = 8;
-            [field: SerializeField] public float MotionWeight { get; private set; } = 6000f;
-            [field: SerializeField] public bool JitterOverride { get; private set; } = false;
-            [field: SerializeField] public Vector2 JitterOverrideValue { get; private set; } = Vector2.zero;
-        }
-
         private readonly Settings settings;
         private readonly PersistentRTHandleCache textureCache;
         private readonly Material material;
@@ -33,52 +18,14 @@ namespace Arycama.CustomRenderPipeline
             textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Temporal AA");
         }
 
-        public readonly struct TemporalAAData : IRenderPassData
+        public class TemporalAAData : ConstantBufferData
         {
-            private readonly Vector4 jitter;
-            private readonly Vector4 previousJitter;
-            private readonly float crossWeightSum;
-            private readonly float boxWeightSum;
-            private readonly float centerCrossFilterWeight;
-            private readonly float centerBoxFilterWeight;
-            private readonly Vector4 crossFilterWeights;
-            private readonly Vector4 boxFilterWeights0;
-            private readonly Vector4 boxFilterWeights1;
-
-            public readonly Vector4 Jitter => jitter;
-
-            public TemporalAAData(Vector4 jitter, Vector4 previousJitter, float crossWeightSum, float boxWeightSum, float centerCrossFilterWeight, float centerBoxFilterWeight, Vector4 crossFilterWeights, Vector4 boxFilterWeights0, Vector4 boxFilterWeights1)
+            public TemporalAAData(BufferHandle buffer) : base(buffer, "TemporalProperties")
             {
-                this.jitter = jitter;
-                this.previousJitter = previousJitter;
-                this.crossWeightSum = crossWeightSum;
-                this.boxWeightSum = boxWeightSum;
-                this.centerCrossFilterWeight = centerCrossFilterWeight;
-                this.centerBoxFilterWeight = centerBoxFilterWeight;
-                this.crossFilterWeights = crossFilterWeights;
-                this.boxFilterWeights0 = boxFilterWeights0;
-                this.boxFilterWeights1 = boxFilterWeights1;
-            }
-
-            public readonly void SetInputs(RenderPass pass)
-            {
-            }
-
-            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
-            {
-                pass.SetVector(command, "_Jitter", jitter);
-                pass.SetVector(command, "_PreviousJitter", previousJitter);
-                pass.SetFloat(command, "_CrossWeightSum", crossWeightSum);
-                pass.SetFloat(command, "_BoxWeightSum", boxWeightSum);
-                pass.SetFloat(command, "_CenterCrossFilterWeight", centerCrossFilterWeight);
-                pass.SetFloat(command, "_CenterBoxFilterWeight", centerBoxFilterWeight);
-                pass.SetVector(command, "_CrossFilterWeights", crossFilterWeights);
-                pass.SetVector(command, "_BoxFilterWeights0", boxFilterWeights0);
-                pass.SetVector(command, "_BoxFilterWeights1", boxFilterWeights1);
             }
         }
 
-        public void OnPreRender(int scaledWidth, int scaledHeight)
+        public void OnPreRender(int scaledWidth, int scaledHeight, out Vector4 jitterVec)
         {
             var sampleIndex = renderGraph.FrameIndex % settings.SampleCount + 1;
 
@@ -101,6 +48,8 @@ namespace Arycama.CustomRenderPipeline
 
             if (!settings.IsEnabled)
                 jitter = previousJitter = Vector2.zero;
+
+            jitterVec = new Vector4(jitter.x, jitter.y, jitter.x / scaledWidth, jitter.y / scaledHeight);
 
             var weights = ArrayPool<float>.Get(9);
             float boxWeightSum = 0.0f, crossWeightSum = 0.0f;
@@ -130,22 +79,22 @@ namespace Arycama.CustomRenderPipeline
             var rcpCrossWeightSum = 1.0f / crossWeightSum;
             var rcpBoxWeightSum = 1.0f / boxWeightSum;
 
-            var result = new TemporalAAData
+
+            renderGraph.ResourceMap.SetRenderPassData(new TemporalAAData
             (
-                jitter: new Vector4(jitter.x, jitter.y, jitter.x / scaledWidth, jitter.y / scaledHeight),
-                previousJitter: new Vector4(previousJitter.x, previousJitter.y, previousJitter.x / scaledWidth, previousJitter.y / scaledHeight), // TODO: previous width/height?
-                boxWeightSum: boxWeightSum,
-                crossWeightSum: crossWeightSum,
-                centerCrossFilterWeight: weights[4] * rcpCrossWeightSum,
-                centerBoxFilterWeight: weights[4] * rcpBoxWeightSum,
-                crossFilterWeights: new Vector4(weights[1], weights[3], weights[5], weights[7]) * rcpCrossWeightSum,
-                boxFilterWeights0: new Vector4(weights[0], weights[1], weights[2], weights[3]) * rcpBoxWeightSum,
-                boxFilterWeights1: new Vector4(weights[5], weights[6], weights[7], weights[8]) * rcpBoxWeightSum
-            );
+                renderGraph.SetConstantBuffer((
+                    new Vector4(jitter.x, jitter.y, jitter.x / scaledWidth, jitter.y / scaledHeight),
+                    new Vector4(previousJitter.x, previousJitter.y, previousJitter.x / scaledWidth, previousJitter.y / scaledHeight),
+                    crossWeightSum,
+                    boxWeightSum,
+                    weights[4] * rcpCrossWeightSum,
+                    weights[4] * rcpBoxWeightSum,
+                    new Vector4(weights[1], weights[3], weights[5], weights[7]) * rcpCrossWeightSum,
+                    new Vector4(weights[0], weights[1], weights[2], weights[3]) * rcpBoxWeightSum,
+                    new Vector4(weights[5], weights[6], weights[7], weights[8]) * rcpBoxWeightSum))
+            ), renderGraph.FrameIndex);
 
             ArrayPool<float>.Release(weights);
-
-            renderGraph.ResourceMap.SetRenderPassData<TemporalAAData>(result, renderGraph.FrameIndex);
         }
 
         public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
