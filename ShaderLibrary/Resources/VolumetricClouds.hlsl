@@ -155,7 +155,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float blend = lerp(_StationaryBlend, _MotionBlend, motionLength);
 	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
-		result = lerp(history, result, 0.05 * _BoxWeightSum);
+		result = lerp(history, result, 0.05);
 	
 	result.rgb = RemoveNaN(result.rgb);
 	

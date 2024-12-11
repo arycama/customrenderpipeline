@@ -4,6 +4,34 @@ namespace Arycama.CustomRenderPipeline
 {
     public static class GraphicsUtilities
     {
+        /// <summary>
+        /// List of look at matrices for cubemap faces.
+        /// Ref: https://msdn.microsoft.com/en-us/library/windows/desktop/bb204881(v=vs.85).aspx
+        /// </summary>
+        public static readonly Vector3[] lookAtList =
+        {
+            new Vector3(1.0f, 0.0f, 0.0f),
+            new Vector3(-1.0f, 0.0f, 0.0f),
+            new Vector3(0.0f, 1.0f, 0.0f),
+            new Vector3(0.0f, -1.0f, 0.0f),
+            new Vector3(0.0f, 0.0f, 1.0f),
+            new Vector3(0.0f, 0.0f, -1.0f),
+        };
+
+        /// <summary>
+        /// List of up vectors for cubemap faces.
+        /// Ref: https://msdn.microsoft.com/en-us/library/windows/desktop/bb204881(v=vs.85).aspx
+        /// </summary>
+        public static readonly Vector3[] upVectorList =
+        {
+            new Vector3(0.0f, 1.0f, 0.0f),
+            new Vector3(0.0f, 1.0f, 0.0f),
+            new Vector3(0.0f, 0.0f, -1.0f),
+            new Vector3(0.0f, 0.0f, 1.0f),
+            new Vector3(0.0f, 1.0f, 0.0f),
+            new Vector3(0.0f, 1.0f, 0.0f),
+        };
+
         public static Vector4 ThreadIdScaleOffset(int width, int height)
         {
             return new Vector4((float)(1.0 / width), (float)(1.0 / height), (float)(0.5 / width), (float)(0.5 / height));

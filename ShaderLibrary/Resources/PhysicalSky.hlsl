@@ -347,10 +347,10 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	// Clamp clip etc
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
-	//float weight = lerp(1.0, 0.05, depthWeight) * _BoxWeightSum;
+	//float weight = lerp(1.0, 0.05, depthWeight);
 	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
-		result = lerp(history, result, 0.05 * _BoxWeightSum);
+		result = lerp(history, result, 0.05);
 		
 	return result;
 }

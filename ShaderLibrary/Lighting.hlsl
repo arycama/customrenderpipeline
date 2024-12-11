@@ -171,7 +171,8 @@ float3 CalculateLighting(float3 albedo, float metallic, float perceptualRoughnes
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 
 	float NdotL = dot(N, L);
-	float3 T = dot(N, V) * dot(N, L) > 0 ? (1 - l) : l;
+	//float3 T = dot(N, V) * dot(N, L) > 0 ? (1 - l) * pd : l * pd;
+	float3 T = dot(N, V) * dot(N, L) > 0 ? pd : pd * l;
 	float3 b = GGXDiffuse(NdotL, NdotV, perceptualRoughness, f0) * T;
 	
 	float3 H = normalize(V + L);
@@ -186,7 +187,7 @@ float3 CalculateLighting(float3 albedo, float metallic, float perceptualRoughnes
 	float3 MrMsFs = GGXMultiScatter(NdotV, NdotL, perceptualRoughness, f0); // Unsure about saturate
 	result += MrMsFs;
 	
-	result += pd * b; // * microShadow;
+	result += b; // * microShadow;
 	
 	if (isThinSurface)
 	{

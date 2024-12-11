@@ -190,7 +190,7 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	history = ClipToAABB(history, result, minValue, maxValue);
 	
 	if(!_IsFirst && all(saturate(historyUv) == historyUv))
-		result = lerp(history, result, 0.05 * _BoxWeightSum);
+		result = lerp(history, result, 0.05);
 	
 	result = RemoveNaN(result);
 	
