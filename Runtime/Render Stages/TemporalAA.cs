@@ -25,11 +25,10 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void OnPreRender(int scaledWidth, int scaledHeight, out Vector4 jitterVec)
+        public void OnPreRender(int scaledWidth, int scaledHeight, out Vector2 jitter)
         {
             var sampleIndex = renderGraph.FrameIndex % settings.SampleCount + 1;
 
-            Vector2 jitter;
             jitter.x = Halton(sampleIndex, 2) - 0.5f;
             jitter.y = Halton(sampleIndex, 3) - 0.5f;
 
@@ -48,8 +47,6 @@ namespace Arycama.CustomRenderPipeline
 
             if (!settings.IsEnabled)
                 jitter = previousJitter = Vector2.zero;
-
-            jitterVec = new Vector4(jitter.x, jitter.y, jitter.x / scaledWidth, jitter.y / scaledHeight);
 
             var weights = ArrayPool<float>.Get(9);
             float boxWeightSum = 0.0f, crossWeightSum = 0.0f;
@@ -78,7 +75,6 @@ namespace Arycama.CustomRenderPipeline
             // Normalize weights
             var rcpCrossWeightSum = 1.0f / crossWeightSum;
             var rcpBoxWeightSum = 1.0f / boxWeightSum;
-
 
             renderGraph.ResourceMap.SetRenderPassData(new TemporalAAData
             (

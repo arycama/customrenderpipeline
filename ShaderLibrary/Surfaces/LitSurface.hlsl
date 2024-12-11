@@ -129,7 +129,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 			clip(surface.alpha - Noise1D(input.position.xy));
 		#endif
 	#else
-		surface.roughness = SpecularAntiAliasing(surface.roughness, input.normal, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
+		surface.roughness = SpecularAntiAliasing(surface.roughness, surface.normal, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
 	
 		#if defined(UNITY_PASS_DEFERRED) || defined(MOTION_VECTORS_ON)
 			output.gbuffer = OutputGBuffer(surface.albedo, surface.metallic, surface.normal, surface.roughness, surface.bentNormal, surface.occlusion, surface.emission);

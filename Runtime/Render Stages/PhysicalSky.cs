@@ -134,7 +134,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex, true);
         }
 
-        public void GenerateData(Vector3 viewPosition, CullingResults cullingResults, Vector3 cameraPosition)
+        public void GenerateData(Vector3 viewPosition, Vector3 cameraPosition)
         {
             // Sky transmittance
             var skyTransmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, 2, TextureDimension.Tex2DArray);
@@ -366,7 +366,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(new ReflectionAmbientData(ambientBuffer, reflectionProbe, cdf, skyLuminance, weightedDepth, new Vector2(settings.LuminanceWidth, settings.LuminanceHeight), new Vector2(settings.CdfWidth, settings.CdfHeight)), renderGraph.FrameIndex);
         }
 
-        public void Render(RTHandle depth, int width, int height, float fov, float aspect, Matrix4x4 viewToWorld, Vector2 jitter, Camera camera, CullingResults cullingResults, RTHandle velocity)
+        public void Render(RTHandle depth, int width, int height, Camera camera, RTHandle velocity)
         {
             var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
 

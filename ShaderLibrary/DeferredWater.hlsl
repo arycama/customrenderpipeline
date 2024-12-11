@@ -117,7 +117,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float NdotV;
 	N = GetViewReflectedNormal(N, V, NdotV);
 	
-	perceptualRoughness = SpecularAntiAliasing(perceptualRoughness, N, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
+	//perceptualRoughness = SpecularAntiAliasing(perceptualRoughness, N, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
 	
 	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25 / linearWaterDepth;
 	

@@ -91,7 +91,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	minValue = max(minValue, mean - stdDev);
 	maxValue = min(maxValue, mean + stdDev);
 	
-	history = ClipToAABB(history, result, minValue, maxValue);
+	history = ClipToAABB(history, mean, minValue, maxValue);
 	
 	// Weight result and history
 	result *= _BoxWeightSum;
