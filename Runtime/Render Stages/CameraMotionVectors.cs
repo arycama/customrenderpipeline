@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class CameraMotionVectors : RenderFeature
+    public class CameraMotionVectors : RenderFeature<(RTHandle velocity, RTHandle cameraDepth, int width, int height)>
     {
         private readonly Material material;
 
@@ -13,29 +13,29 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Camera Motion Vectors")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public RTHandle Render(RTHandle velocity, RTHandle cameraDepth, int width, int height, Camera camera)
+        public override void Render((RTHandle velocity, RTHandle cameraDepth, int width, int height) data)
         {
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Camera Velocity"))
             {
                 pass.Initialize(material);
-                pass.ReadTexture("Depth", cameraDepth);
-                pass.WriteTexture(velocity);
-                pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.ReadTexture("Depth", data.cameraDepth);
+                pass.WriteTexture(data.velocity);
+                pass.WriteDepth(data.cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             }
 
-            var result = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16_SFloat);
+            var result = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.R16G16_SFloat);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Dilate Velocity"))
             {
                 pass.Initialize(material, 1);
-                pass.ReadTexture("Depth", cameraDepth);
-                pass.ReadTexture("Velocity", velocity);
+                pass.ReadTexture("Depth", data.cameraDepth);
+                pass.ReadTexture("Velocity", data.velocity);
                 pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
                 pass.AddRenderPassData<ICommonPassData>();
             }
 
-            return result;
+            renderGraph.ResourceMap.SetRenderPassData<VelocityData>(new VelocityData(result), renderGraph.FrameIndex);
         }
     }
 }

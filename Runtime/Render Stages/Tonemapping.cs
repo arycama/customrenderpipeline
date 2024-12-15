@@ -1,47 +1,16 @@
-﻿using System;
-using UnityEditor;
+﻿using UnityEditor;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using Random = UnityEngine.Random;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class Tonemapping : RenderFeature
+    public partial class Tonemapping : RenderFeature<(int width, int height)>
     {
         private readonly Settings settings;
         private readonly Bloom.Settings bloomSettings;
         private readonly LensSettings lensSettings;
         private readonly Material material;
-
-        [Serializable]
-        public class Settings
-        {
-            [field: Header("Tonemapping")]
-            [field: SerializeField] public bool Tonemap { get; private set; } = true;
-
-            [field: Header("Tonescale Parameters")]
-            [field: SerializeField, Range(80, 480)] public float PaperWhite { get; private set; } = 203;
-            [field: SerializeField, Range(0, 0.5f)] public float GreyLuminanceBoost { get; private set; } = 0.12f;
-            [field: SerializeField, Range(1.0f, 2.0f)] public float Contrast { get; private set; } = 1.4f;
-            [field: SerializeField, Range(0, 0.02f)] public float Toe { get; private set; } = 0.001f;
-
-            [field: Header("Color Parameters")]
-            [field: SerializeField, Range(0, 1)] public float PurityCompress { get; private set; } = 0.3f;
-            [field: SerializeField, Range(0, 1)] public float PurityBoost { get; private set; } = 0.3f;
-            [field: SerializeField, Range(-1, 1)] public float HueshiftR { get; private set; } = 0.3f;
-            [field: SerializeField, Range(-1, 1)] public float HueshiftG { get; private set; } = 0;
-            [field: SerializeField, Range(-1, 1)] public float HueshiftB { get; private set; } = -0.3f;
-
-            [field: Header("Hdr Output")]
-            [field: SerializeField] public bool HdrEnabled { get; private set; } = true;
-            [field: SerializeField] public HDRDisplayBitDepth BitDepth { get; private set; } = HDRDisplayBitDepth.BitDepth10;
-
-            // TODO: Move to lens settings or something?
-            [field: Header("Film Grain")]
-            [field: SerializeField, Range(0.0f, 1.0f)] public float NoiseIntensity { get; private set; } = 0.5f;
-            [field: SerializeField, Range(0.0f, 1.0f)] public float NoiseResponse { get; private set; } = 0.8f;
-            [field: SerializeField] public Texture2D FilmGrainTexture { get; private set; } = null;
-        }
 
         public Tonemapping(Settings settings, Bloom.Settings bloomSettings, LensSettings lensSettings, RenderGraph renderGraph) : base(renderGraph)
         {
@@ -75,16 +44,16 @@ namespace Arycama.CustomRenderPipeline
             return MathUtils.Exp2(ev100) * (ReflectedLightMeterConstant / Sensitivity);
         }
 
-        public RTHandle Render(RTHandle input, RTHandle bloom, int width, int height)
+        public override void Render((int width, int height) data)
         {
-            var result = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32);
+            var result = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.B10G11R11_UFloatPack32);
 
             using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Tonemapping");
             pass.Initialize(material);
             pass.WriteTexture(result);
-            pass.ReadTexture("_MainTex", input);
-            pass.ReadTexture("_Bloom", bloom);
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+            pass.AddRenderPassData<CameraTargetData>();
+            pass.AddRenderPassData<BloomData>();
 
 #if UNITY_EDITOR
             PlayerSettings.hdrBitDepth = settings.BitDepth;
@@ -103,8 +72,8 @@ namespace Arycama.CustomRenderPipeline
             {
                 var offsetX = Random.value;
                 var offsetY = Random.value;
-                var uvScaleX = settings.FilmGrainTexture ? width / (float)settings.FilmGrainTexture.width : 1.0f;
-                var uvScaleY = settings.FilmGrainTexture ? height / (float)settings.FilmGrainTexture.height : 1.0f;
+                var uvScaleX = settings.FilmGrainTexture ? data.width / (float)settings.FilmGrainTexture.width : 1.0f;
+                var uvScaleY = settings.FilmGrainTexture ? data.height / (float)settings.FilmGrainTexture.height : 1.0f;
 
                 var hdrEnabled = hdrSettings.available && settings.HdrEnabled;
                 var maxNits = hdrEnabled ? hdrSettings.maxToneMapLuminance : 100.0f;
@@ -129,9 +98,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
                 pass.SetFloat(command, "Aperture", lensSettings.Aperture);
                 pass.SetVector(command, "_GrainTextureParams", new Vector4(uvScaleX, uvScaleY, offsetX, offsetY));
-                pass.SetVector(command, "_Resolution", new Vector4(width, height, 1.0f / width, 1.0f / height));
-
-                pass.SetVector(command, "_BloomScaleLimit", new Vector4(bloom.Scale.x, bloom.Scale.y, bloom.Limit.x, bloom.Limit.y));
+                pass.SetVector(command, "_Resolution", new Vector4(data.width, data.height, 1.0f / data.width, 1.0f / data.height));
 
                 var colorGamut = hdrSettings.available ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
                 pass.SetInt(command, "ColorGamut", (int)colorGamut);
@@ -139,7 +106,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat(command, "_BloomStrength", bloomSettings.Strength);
             });
 
-            return result;
+            renderGraph.ResourceMap.SetRenderPassData(new CameraTargetData(result), renderGraph.FrameIndex);
         }
     }
 }

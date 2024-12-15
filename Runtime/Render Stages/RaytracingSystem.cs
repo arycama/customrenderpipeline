@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class RaytracingSystem : IDisposable
+    public class RaytracingSystem : RenderFeature
     {
         [Serializable]
         public class Settings
@@ -16,15 +16,13 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public LayerMask RaytracingLayers { get; private set; } = 0;
         }
 
-        private readonly RenderGraph renderGraph;
         private RayTracingAccelerationStructure rtas;
         private RayTracingInstanceCullingConfig config;
         private readonly Settings settings;
 
-        public RaytracingSystem(RenderGraph renderGraph, Settings settings)
+        public RaytracingSystem(RenderGraph renderGraph, Settings settings) : base(renderGraph)
         {
             this.settings = settings;
-            this.renderGraph = renderGraph;
 
             var rasSettings = new RayTracingAccelerationStructure.RASSettings
             {
@@ -69,7 +67,7 @@ namespace Arycama.CustomRenderPipeline
             };
         }
 
-        public void Build()
+        public override void Render()
         {
             if (!settings.Enabled)
                 return;
@@ -88,19 +86,9 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(new RaytracingResult(rtas), renderGraph.FrameIndex);
         }
 
-        ~RaytracingSystem()
+        protected override void Cleanup(bool disposing)
         {
-            DisposeInternal();
-        }
-
-        public void Dispose()
-        {
-            DisposeInternal();
-            GC.SuppressFinalize(this);
-        }
-
-        private void DisposeInternal()
-        {
+            // Disposing seems to crash for some reason, maybe only from a destructor?
             //if (rtas != null)
             //    rtas.Dispose();
 

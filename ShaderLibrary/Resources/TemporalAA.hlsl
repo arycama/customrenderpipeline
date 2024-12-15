@@ -7,7 +7,7 @@
 
 Texture2D<float4> _History;
 Texture2D<float3> _Input;
-Texture2D<float2> _Velocity;
+Texture2D<float2> Velocity;
 Texture2D<float> _InputVelocityMagnitudeHistory;
 
 cbuffer Properties
@@ -36,7 +36,7 @@ struct FragmentOutput
 
 FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 {
-	float2 velocity = _Velocity[position.xy];
+	float2 velocity = Velocity[position.xy];
 	float2 historyUv = uv - velocity;
 	
 	float2 f = frac(historyUv * _ScaledResolution.xy - 0.5);

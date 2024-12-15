@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class ShadowRenderer : RenderFeature
+    public class ShadowRenderer : RenderFeature<(ScriptableRenderContext context, CullingResults cullingResults, List<ShadowRequest> directionalShadowRequests, List<ShadowRequest> pointShadowRequests, Vector3 viewPosition)>
     {
         private readonly ShadowSettings settings;
         private readonly TerrainSystem terrainSystem;
@@ -18,32 +18,32 @@ namespace Arycama.CustomRenderPipeline
             this.terrainSystem = terrainSystem;
         }
 
-        public void Render(ScriptableRenderContext context, CullingResults cullingResults, Camera camera, List<ShadowRequest> directionalShadowRequests, List<ShadowRequest> pointShadowRequests, Vector3 viewPosition)
+        public override void Render((ScriptableRenderContext context, CullingResults cullingResults, List<ShadowRequest> directionalShadowRequests, List<ShadowRequest> pointShadowRequests, Vector3 viewPosition) data)
         {
             // Render Shadows
             RTHandle directionalShadows;
-            if (directionalShadowRequests.Count == 0)
+            if (data.directionalShadowRequests.Count == 0)
             {
                 directionalShadows = renderGraph.EmptyTextureArray;
             }
             else
             {
-                directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, directionalShadowRequests.Count, TextureDimension.Tex2DArray);
+                directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, data.directionalShadowRequests.Count, TextureDimension.Tex2DArray);
 
-                for (var i = 0; i < directionalShadowRequests.Count; i++)
+                for (var i = 0; i < data.directionalShadowRequests.Count; i++)
                 {
-                    var shadowRequest = directionalShadowRequests[i];
+                    var shadowRequest = data.directionalShadowRequests[i];
                     var splitData = shadowRequest.ShadowSplitData;
 
                     using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Directional Light Shadows"))
                     {
-                        pass.Initialize(context, cullingResults, shadowRequest.VisibleLightIndex, BatchCullingProjectionType.Orthographic, splitData, settings.ShadowBias, settings.ShadowSlopeBias, false);
+                        pass.Initialize(data.context, data.cullingResults, shadowRequest.VisibleLightIndex, BatchCullingProjectionType.Orthographic, splitData, settings.ShadowBias, settings.ShadowSlopeBias, false);
 
                         // Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
                         pass.WriteTexture(directionalShadows);
 
                         pass.SetRenderFunction((
-                            viewPosition: camera.transform.position,
+                            viewPosition: data.viewPosition,
                             worldToView: shadowRequest.ViewMatrix,
                             worldToClip: shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix,
                             target: directionalShadows,
@@ -61,38 +61,38 @@ namespace Arycama.CustomRenderPipeline
                         });
                     }
 
-                    terrainSystem.CullShadow(viewPosition, shadowRequest.CullingPlanes);
-                    terrainSystem.RenderShadow(viewPosition, directionalShadows, shadowRequest.CullingPlanes, shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix, i, settings.ShadowBias, settings.ShadowSlopeBias);
+                    terrainSystem.CullShadow(data.viewPosition, shadowRequest.CullingPlanes);
+                    terrainSystem.RenderShadow(data.viewPosition, directionalShadows, shadowRequest.CullingPlanes, shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix, i, settings.ShadowBias, settings.ShadowSlopeBias);
                 }
             }
 
-            ListPool<ShadowRequest>.Release(directionalShadowRequests);
+            ListPool<ShadowRequest>.Release(data.directionalShadowRequests);
 
             // Process point shadows 
             RTHandle pointShadows;
-            if (pointShadowRequests.Count == 0)
+            if (data.pointShadowRequests.Count == 0)
             {
                 pointShadows = renderGraph.EmptyCubemapArray;
             }
             else
             {
-                pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D32_SFloat, pointShadowRequests.Count, TextureDimension.CubeArray);
+                pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D32_SFloat, data.pointShadowRequests.Count, TextureDimension.CubeArray);
 
-                for (var i = 0; i < pointShadowRequests.Count; i++)
+                for (var i = 0; i < data.pointShadowRequests.Count; i++)
                 {
-                    var shadowRequest = pointShadowRequests[i];
+                    var shadowRequest = data.pointShadowRequests[i];
                     if (!shadowRequest.IsValid)
                         continue;
 
                     using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Point Light Shadows"))
                     {
-                        pass.Initialize(context, cullingResults, shadowRequest.VisibleLightIndex, BatchCullingProjectionType.Perspective, shadowRequest.ShadowSplitData, settings.PointShadowBias, settings.PointShadowSlopeBias, true);
+                        pass.Initialize(data.context, data.cullingResults, shadowRequest.VisibleLightIndex, BatchCullingProjectionType.Perspective, shadowRequest.ShadowSplitData, settings.PointShadowBias, settings.PointShadowSlopeBias, true);
 
                         // Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
                         pass.WriteTexture(pointShadows);
 
                         pass.SetRenderFunction((
-                            viewPosition: camera.transform.position,
+                            viewPosition: data.viewPosition,
                             worldToView: shadowRequest.ViewMatrix,
                             worldToClip: GL.GetGPUProjectionMatrix(shadowRequest.ProjectionMatrix, true) * shadowRequest.ViewMatrix,
                             target: pointShadows,
@@ -112,7 +112,7 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            ListPool<ShadowRequest>.Release(pointShadowRequests);
+            ListPool<ShadowRequest>.Release(data.pointShadowRequests);
 
             var result = new Result(directionalShadows, pointShadows, settings.DirectionalShadowResolution, 1.0f / settings.DirectionalShadowResolution, settings.PcfFilterRadius, settings.PcfFilterSigma);
             renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex);

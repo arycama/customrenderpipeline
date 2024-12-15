@@ -245,7 +245,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<VolumetricClouds.CloudData>();
-                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
                 pass.AddRenderPassData<ICommonPassData>();
@@ -366,7 +365,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ResourceMap.SetRenderPassData(new ReflectionAmbientData(ambientBuffer, reflectionProbe, cdf, skyLuminance, weightedDepth, new Vector2(settings.LuminanceWidth, settings.LuminanceHeight), new Vector2(settings.CdfWidth, settings.CdfHeight)), renderGraph.FrameIndex);
         }
 
-        public void Render(RTHandle depth, int width, int height, Camera camera, RTHandle velocity)
+        public void Render(RTHandle depth, int width, int height, Camera camera)
         {
             var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
 
@@ -428,7 +427,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_SkyInput", skyTemp2);
                 pass.ReadTexture("_SkyHistory", skyColor.history);
                 pass.ReadTexture("_Depth", depth);
-                pass.ReadTexture("Velocity", velocity);
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
                 pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
@@ -436,6 +434,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<PreviousFrameDepth>();
                 pass.AddRenderPassData<PreviousFrameVelocity>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<VelocityData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {

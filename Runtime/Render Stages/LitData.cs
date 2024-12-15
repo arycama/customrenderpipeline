@@ -5,220 +5,205 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
-public class LitData : IDisposable
+namespace Arycama.CustomRenderPipeline
 {
-    [Serializable]
-    public class Settings
+    public partial class LitData : RenderFeature
     {
-        [field: SerializeField] public int DirectionalAlbedoResolution { get; private set; } = 32;
-        [field: SerializeField] public uint DirectionalAlbedoSamples { get; private set; } = 4096;
-        [field: SerializeField] public int AverageAlbedoResolution { get; private set; } = 16;
-        [field: SerializeField] public uint AverageAlbedoSamples { get; private set; } = 4096;
-        [field: SerializeField] public int DirectionalAlbedoMsResolution { get; private set; } = 16;
-        [field: SerializeField] public uint DirectionalAlbedoMSamples { get; private set; } = 4096;
-        [field: SerializeField] public int AverageAlbedoMsResolution { get; private set; } = 16;
-        [field: SerializeField] public uint AverageAlbedoMsSamples { get; private set; } = 4096;
+        private readonly Settings settings;
 
-        public int Version { get; private set; }
-    }
-
-    private readonly Settings settings;
-    private readonly RenderGraph renderGraph;
-
-    private readonly RTHandle directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
-    private readonly Texture2D ltcData;
-
-    private int version = -1;
-
-    public LitData(Settings settings, RenderGraph renderGraph)
-    {
-        this.settings = settings;
-        this.renderGraph = renderGraph;
-
-        directionalAlbedo = renderGraph.GetTexture(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution, GraphicsFormat.R16G16_UNorm, isPersistent: true);
-        averageAlbedo = renderGraph.GetTexture(settings.AverageAlbedoResolution, 1, GraphicsFormat.R16_UNorm, isPersistent: true);
-        directionalAlbedoMs = renderGraph.GetTexture(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, GraphicsFormat.R16_UNorm, settings.DirectionalAlbedoMsResolution, TextureDimension.Tex3D, isPersistent: true);
-        averageAlbedoMs = renderGraph.GetTexture(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution, GraphicsFormat.R16_UNorm, isPersistent: true);
-        specularOcclusion = renderGraph.GetTexture(32, 32, GraphicsFormat.R16_UNorm, 32 * 32, TextureDimension.Tex3D, isPersistent: true);
-
-        ltcData = new Texture2D(k_LtcLUTResolution, k_LtcLUTResolution, TextureFormat.RGBAHalf, false /*mipmap*/, true /* linear */)
-        {
-            hideFlags = HideFlags.HideAndDontSave,
-            wrapMode = TextureWrapMode.Clamp,
-            filterMode = FilterMode.Bilinear,
-        };
-
-        var count = k_LtcLUTResolution * k_LtcLUTResolution;
-        var pixels = new Color[count];
-
-        var clampValue = 65504.0f;
-
-        for (var i = 0; i < count; i++)
-        {
-            // Both GGX and Disney Diffuse BRDFs have zero values in columns 1, 3, 5, 7.
-            // Column 8 contains only ones.
-            pixels[i] = new Color(Mathf.Min(clampValue, (float)s_LtcGGXMatrixData[i, 0]),
-                Mathf.Min(clampValue, (float)s_LtcGGXMatrixData[i, 2]),
-                Mathf.Min(clampValue, (float)s_LtcGGXMatrixData[i, 4]),
-                Mathf.Min(clampValue, (float)s_LtcGGXMatrixData[i, 6]));
-        }
-
-        ltcData.SetPixels(pixels);
-        ltcData.Apply();
-    }
-
-    public void Render()
-    {
-        var computeShader = Resources.Load<ComputeShader>("LitData");
-
-        var ggxDirectionalAlbedoRemap = GraphicsUtilities.HalfTexelRemap(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution);
-        var ggxAverageAlbedoRemap = GraphicsUtilities.HalfTexelRemap(settings.AverageAlbedoResolution);
-        var ggxDirectionalAlbedoMSScaleOffset = GraphicsUtilities.HalfTexelRemap(settings.DirectionalAlbedoMsResolution);
-        var ggxAverageAlbedoMSRemap = GraphicsUtilities.HalfTexelRemap(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution);
-
-        var result = new Result
-        (
-            directionalAlbedo: directionalAlbedo,
-            averageAlbedo: averageAlbedo,
-            directionalAlbedoMs: directionalAlbedoMs,
-            averageAlbedoMs: averageAlbedoMs,
-            specularOcclusion: specularOcclusion,
-            ggxDirectionalAlbedoRemap: ggxDirectionalAlbedoRemap,
-            ggxAverageAlbedoRemap: ggxAverageAlbedoRemap,
-            ggxDirectionalAlbedoMSScaleOffset: ggxDirectionalAlbedoMSScaleOffset,
-            ggxAverageAlbedoMSRemap: ggxAverageAlbedoMSRemap
-        );
-
-        if (version == settings.Version)
-            return;
-
-        version = settings.Version;
-
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Directional Albedo"))
-        {
-            pass.Initialize(computeShader, 0, settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution);
-            pass.WriteTexture("_DirectionalAlbedoResult", directionalAlbedo);
-
-            pass.SetRenderFunction((command, renderPass) =>
-            {
-                pass.SetVector(command, "_DirectionalAlbedoScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution));
-                pass.SetInt(command, "_DirectionalAlbedoSamples", (int)settings.DirectionalAlbedoSamples);
-                pass.SetFloat(command, "_DirectionalAlbedoSamplesRcp", 1f / settings.DirectionalAlbedoSamples);
-            });
-        }
-
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Average Albedo"))
-        {
-            pass.Initialize(computeShader, 1, settings.AverageAlbedoResolution);
-            pass.WriteTexture("_AverageAlbedoResult", averageAlbedo);
-            result.SetInputs(pass);
-
-            pass.SetRenderFunction((command, renderPass) =>
-            {
-                pass.SetFloat(command, "_AverageAlbedoScaleOffset", 1f / settings.AverageAlbedoResolution);
-                pass.SetInt(command, "_AverageAlbedoSamples", (int)settings.AverageAlbedoSamples);
-                pass.SetFloat(command, "_AverageAlbedoSamplesRcp", 1f / settings.AverageAlbedoSamples);
-                pass.SetFloat(command, "_AverageAlbedoSamplesMinusOneRcp", 1f / (settings.AverageAlbedoSamples - 1));
-                result.SetProperties(pass, command);
-            });
-        }
-
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Directional Albedo Ms"))
-        {
-            pass.Initialize(computeShader, 2, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution);
-            pass.WriteTexture("_DirectionalAlbedoMsResult", directionalAlbedoMs);
-            result.SetInputs(pass);
-
-            pass.SetRenderFunction((command, renderPass) =>
-            {
-                pass.SetVector(command, "_DirectionalAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution));
-                pass.SetInt(command, "_DirectionalAlbedoMsSamples", (int)settings.DirectionalAlbedoMSamples);
-                pass.SetFloat(command, "_DirectionalAlbedoMsSamplesRcp", 1f / settings.DirectionalAlbedoMSamples);
-                result.SetProperties(pass, command);
-            });
-        }
-
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Average Albedo Ms"))
-        {
-            pass.Initialize(computeShader, 3, settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution);
-            pass.WriteTexture("_AverageAlbedoMsResult", averageAlbedoMs);
-            result.SetInputs(pass);
-
-            pass.SetRenderFunction((command, renderPass) =>
-            {
-                pass.SetVector(command, "_AverageAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution));
-                pass.SetInt(command, "_AverageAlbedoMsSamples", (int)settings.AverageAlbedoMsSamples);
-                pass.SetFloat(command, "_AverageAlbedoMsSamplesRcp", 1f / settings.AverageAlbedoMsSamples);
-                pass.SetFloat(command, "_AverageAlbedoMsSamplesMinusOneRcp", 1f / (settings.AverageAlbedoMsSamples - 1));
-                result.SetProperties(pass, command);
-            });
-        }
-
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Specular Occlusion"))
-        {
-            pass.Initialize(computeShader, 4, 32, 32, 32 * 32);
-            pass.WriteTexture("_SpecularOcclusionResult", specularOcclusion);
-            result.SetInputs(pass);
-
-            pass.SetRenderFunction((command, renderPass) =>
-            {
-                // Specular occlusion
-                pass.SetInt(command, "_SpecularOcclusionResolution", 32);
-                result.SetProperties(pass, command);
-            });
-        }
-
-        renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex, true);
-    }
-
-    public struct Result : IRenderPassData
-    {
         private readonly RTHandle directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
-        private Vector4 ggxDirectionalAlbedoRemap, ggxAverageAlbedoMSRemap;
-        private Vector2 ggxAverageAlbedoRemap, ggxDirectionalAlbedoMSScaleOffset;
+        private readonly Texture2D ltcData;
 
-        public Result(RTHandle directionalAlbedo, RTHandle averageAlbedo, RTHandle directionalAlbedoMs, RTHandle averageAlbedoMs, RTHandle specularOcclusion, Vector4 ggxDirectionalAlbedoRemap, Vector4 ggxAverageAlbedoMSRemap, Vector2 ggxAverageAlbedoRemap, Vector2 ggxDirectionalAlbedoMSScaleOffset)
+        private int version = -1;
+
+        public LitData(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
-            this.directionalAlbedo = directionalAlbedo;
-            this.averageAlbedo = averageAlbedo;
-            this.directionalAlbedoMs = directionalAlbedoMs;
-            this.averageAlbedoMs = averageAlbedoMs;
-            this.specularOcclusion = specularOcclusion;
-            this.ggxDirectionalAlbedoRemap = ggxDirectionalAlbedoRemap;
-            this.ggxAverageAlbedoMSRemap = ggxAverageAlbedoMSRemap;
-            this.ggxAverageAlbedoRemap = ggxAverageAlbedoRemap;
-            this.ggxDirectionalAlbedoMSScaleOffset = ggxDirectionalAlbedoMSScaleOffset;
+            this.settings = settings;
+
+            directionalAlbedo = renderGraph.GetTexture(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution, GraphicsFormat.R16G16_UNorm, isPersistent: true);
+            averageAlbedo = renderGraph.GetTexture(settings.AverageAlbedoResolution, 1, GraphicsFormat.R16_UNorm, isPersistent: true);
+            directionalAlbedoMs = renderGraph.GetTexture(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, GraphicsFormat.R16_UNorm, settings.DirectionalAlbedoMsResolution, TextureDimension.Tex3D, isPersistent: true);
+            averageAlbedoMs = renderGraph.GetTexture(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution, GraphicsFormat.R16_UNorm, isPersistent: true);
+            specularOcclusion = renderGraph.GetTexture(32, 32, GraphicsFormat.R16_UNorm, 32 * 32, TextureDimension.Tex3D, isPersistent: true);
+
+            ltcData = new Texture2D(k_LtcLUTResolution, k_LtcLUTResolution, TextureFormat.RGBAHalf, false /*mipmap*/, true /* linear */)
+            {
+                hideFlags = HideFlags.HideAndDontSave,
+                wrapMode = TextureWrapMode.Clamp,
+                filterMode = FilterMode.Bilinear,
+            };
+
+            var count = k_LtcLUTResolution * k_LtcLUTResolution;
+            var pixels = new Color[count];
+
+            var clampValue = 65504.0f;
+
+            for (var i = 0; i < count; i++)
+            {
+                // Both GGX and Disney Diffuse BRDFs have zero values in columns 1, 3, 5, 7.
+                // Column 8 contains only ones.
+                pixels[i] = new Color(Mathf.Min(clampValue, (float)s_LtcGGXMatrixData[i, 0]),
+                    Mathf.Min(clampValue, (float)s_LtcGGXMatrixData[i, 2]),
+                    Mathf.Min(clampValue, (float)s_LtcGGXMatrixData[i, 4]),
+                    Mathf.Min(clampValue, (float)s_LtcGGXMatrixData[i, 6]));
+            }
+
+            ltcData.SetPixels(pixels);
+            ltcData.Apply();
         }
 
-        public readonly void SetInputs(RenderPass pass)
+        public override void Render()
         {
-            pass.ReadTexture("_GGXDirectionalAlbedo", directionalAlbedo);
-            pass.ReadTexture("_GGXAverageAlbedo", averageAlbedo);
-            pass.ReadTexture("_GGXDirectionalAlbedoMS", directionalAlbedoMs);
-            pass.ReadTexture("_GGXAverageAlbedoMS", averageAlbedoMs);
-            pass.ReadTexture("_GGXSpecularOcclusion", specularOcclusion);
+            var computeShader = Resources.Load<ComputeShader>("LitData");
+
+            var ggxDirectionalAlbedoRemap = GraphicsUtilities.HalfTexelRemap(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution);
+            var ggxAverageAlbedoRemap = GraphicsUtilities.HalfTexelRemap(settings.AverageAlbedoResolution);
+            var ggxDirectionalAlbedoMSScaleOffset = GraphicsUtilities.HalfTexelRemap(settings.DirectionalAlbedoMsResolution);
+            var ggxAverageAlbedoMSRemap = GraphicsUtilities.HalfTexelRemap(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution);
+
+            var result = new Result
+            (
+                directionalAlbedo: directionalAlbedo,
+                averageAlbedo: averageAlbedo,
+                directionalAlbedoMs: directionalAlbedoMs,
+                averageAlbedoMs: averageAlbedoMs,
+                specularOcclusion: specularOcclusion,
+                ggxDirectionalAlbedoRemap: ggxDirectionalAlbedoRemap,
+                ggxAverageAlbedoRemap: ggxAverageAlbedoRemap,
+                ggxDirectionalAlbedoMSScaleOffset: ggxDirectionalAlbedoMSScaleOffset,
+                ggxAverageAlbedoMSRemap: ggxAverageAlbedoMSRemap
+            );
+
+            if (version == settings.Version)
+                return;
+
+            version = settings.Version;
+
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Directional Albedo"))
+            {
+                pass.Initialize(computeShader, 0, settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution);
+                pass.WriteTexture("_DirectionalAlbedoResult", directionalAlbedo);
+
+                pass.SetRenderFunction((command, renderPass) =>
+                {
+                    pass.SetVector(command, "_DirectionalAlbedoScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution));
+                    pass.SetInt(command, "_DirectionalAlbedoSamples", (int)settings.DirectionalAlbedoSamples);
+                    pass.SetFloat(command, "_DirectionalAlbedoSamplesRcp", 1f / settings.DirectionalAlbedoSamples);
+                });
+            }
+
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Average Albedo"))
+            {
+                pass.Initialize(computeShader, 1, settings.AverageAlbedoResolution);
+                pass.WriteTexture("_AverageAlbedoResult", averageAlbedo);
+                result.SetInputs(pass);
+
+                pass.SetRenderFunction((command, renderPass) =>
+                {
+                    pass.SetFloat(command, "_AverageAlbedoScaleOffset", 1f / settings.AverageAlbedoResolution);
+                    pass.SetInt(command, "_AverageAlbedoSamples", (int)settings.AverageAlbedoSamples);
+                    pass.SetFloat(command, "_AverageAlbedoSamplesRcp", 1f / settings.AverageAlbedoSamples);
+                    pass.SetFloat(command, "_AverageAlbedoSamplesMinusOneRcp", 1f / (settings.AverageAlbedoSamples - 1));
+                    result.SetProperties(pass, command);
+                });
+            }
+
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Directional Albedo Ms"))
+            {
+                pass.Initialize(computeShader, 2, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution);
+                pass.WriteTexture("_DirectionalAlbedoMsResult", directionalAlbedoMs);
+                result.SetInputs(pass);
+
+                pass.SetRenderFunction((command, renderPass) =>
+                {
+                    pass.SetVector(command, "_DirectionalAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution));
+                    pass.SetInt(command, "_DirectionalAlbedoMsSamples", (int)settings.DirectionalAlbedoMSamples);
+                    pass.SetFloat(command, "_DirectionalAlbedoMsSamplesRcp", 1f / settings.DirectionalAlbedoMSamples);
+                    result.SetProperties(pass, command);
+                });
+            }
+
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Average Albedo Ms"))
+            {
+                pass.Initialize(computeShader, 3, settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution);
+                pass.WriteTexture("_AverageAlbedoMsResult", averageAlbedoMs);
+                result.SetInputs(pass);
+
+                pass.SetRenderFunction((command, renderPass) =>
+                {
+                    pass.SetVector(command, "_AverageAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution));
+                    pass.SetInt(command, "_AverageAlbedoMsSamples", (int)settings.AverageAlbedoMsSamples);
+                    pass.SetFloat(command, "_AverageAlbedoMsSamplesRcp", 1f / settings.AverageAlbedoMsSamples);
+                    pass.SetFloat(command, "_AverageAlbedoMsSamplesMinusOneRcp", 1f / (settings.AverageAlbedoMsSamples - 1));
+                    result.SetProperties(pass, command);
+                });
+            }
+
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Specular Occlusion"))
+            {
+                pass.Initialize(computeShader, 4, 32, 32, 32 * 32);
+                pass.WriteTexture("_SpecularOcclusionResult", specularOcclusion);
+                result.SetInputs(pass);
+
+                pass.SetRenderFunction((command, renderPass) =>
+                {
+                    // Specular occlusion
+                    pass.SetInt(command, "_SpecularOcclusionResolution", 32);
+                    result.SetProperties(pass, command);
+                });
+            }
+
+            renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex, true);
         }
 
-        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
+        public struct Result : IRenderPassData
         {
-            pass.SetVector(command, "_GGXDirectionalAlbedoRemap", ggxDirectionalAlbedoRemap);
-            pass.SetVector(command, "_GGXAverageAlbedoRemap", ggxAverageAlbedoRemap);
-            pass.SetVector(command, "_GGXDirectionalAlbedoMSScaleOffset", ggxDirectionalAlbedoMSScaleOffset);
-            pass.SetVector(command, "_GGXAverageAlbedoMSRemap", ggxAverageAlbedoMSRemap);
+            private readonly RTHandle directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
+            private Vector4 ggxDirectionalAlbedoRemap, ggxAverageAlbedoMSRemap;
+            private Vector2 ggxAverageAlbedoRemap, ggxDirectionalAlbedoMSScaleOffset;
+
+            public Result(RTHandle directionalAlbedo, RTHandle averageAlbedo, RTHandle directionalAlbedoMs, RTHandle averageAlbedoMs, RTHandle specularOcclusion, Vector4 ggxDirectionalAlbedoRemap, Vector4 ggxAverageAlbedoMSRemap, Vector2 ggxAverageAlbedoRemap, Vector2 ggxDirectionalAlbedoMSScaleOffset)
+            {
+                this.directionalAlbedo = directionalAlbedo;
+                this.averageAlbedo = averageAlbedo;
+                this.directionalAlbedoMs = directionalAlbedoMs;
+                this.averageAlbedoMs = averageAlbedoMs;
+                this.specularOcclusion = specularOcclusion;
+                this.ggxDirectionalAlbedoRemap = ggxDirectionalAlbedoRemap;
+                this.ggxAverageAlbedoMSRemap = ggxAverageAlbedoMSRemap;
+                this.ggxAverageAlbedoRemap = ggxAverageAlbedoRemap;
+                this.ggxDirectionalAlbedoMSScaleOffset = ggxDirectionalAlbedoMSScaleOffset;
+            }
+
+            public readonly void SetInputs(RenderPass pass)
+            {
+                pass.ReadTexture("_GGXDirectionalAlbedo", directionalAlbedo);
+                pass.ReadTexture("_GGXAverageAlbedo", averageAlbedo);
+                pass.ReadTexture("_GGXDirectionalAlbedoMS", directionalAlbedoMs);
+                pass.ReadTexture("_GGXAverageAlbedoMS", averageAlbedoMs);
+                pass.ReadTexture("_GGXSpecularOcclusion", specularOcclusion);
+            }
+
+            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
+            {
+                pass.SetVector(command, "_GGXDirectionalAlbedoRemap", ggxDirectionalAlbedoRemap);
+                pass.SetVector(command, "_GGXAverageAlbedoRemap", ggxAverageAlbedoRemap);
+                pass.SetVector(command, "_GGXDirectionalAlbedoMSScaleOffset", ggxDirectionalAlbedoMSScaleOffset);
+                pass.SetVector(command, "_GGXAverageAlbedoMSRemap", ggxAverageAlbedoMSRemap);
+            }
         }
-    }
 
-    private const int k_LtcLUTMatrixDim = 3; // size of the matrix (3x3)
-    private const int k_LtcLUTResolution = 64;
+        private const int k_LtcLUTMatrixDim = 3; // size of the matrix (3x3)
+        private const int k_LtcLUTResolution = 64;
 
-    //-------------------------------------------------------------------------------------------
-    // LTC area light Look up table (fit for GGX with height-correlated Smith's visibility term)
-    //-------------------------------------------------------------------------------------------
+        //-------------------------------------------------------------------------------------------
+        // LTC area light Look up table (fit for GGX with height-correlated Smith's visibility term)
+        //-------------------------------------------------------------------------------------------
 
-    // This table is precomputed for sqrt(roughness) and normalized so that last entry
-    // is 1 and thus does not need to be store in a texture.
-    public static double[,] s_LtcGGXMatrixData = new double[k_LtcLUTResolution * k_LtcLUTResolution, k_LtcLUTMatrixDim * k_LtcLUTMatrixDim]
-    {
+        // This table is precomputed for sqrt(roughness) and normalized so that last entry
+        // is 1 and thus does not need to be store in a texture.
+        public static double[,] s_LtcGGXMatrixData = new double[k_LtcLUTResolution * k_LtcLUTResolution, k_LtcLUTMatrixDim * k_LtcLUTMatrixDim]
+        {
         {499.999756, 0, 0.000000, 0, 499.999756, 0, 0.000000, 0, 1},
         {499.999756, 0, 0.000000, 0, 499.999756, 0, 0.000000, 0, 1},
         {496.124756, 0, 0.000000, 0, 496.124756, 0, 0.000000, 0, 1},
@@ -4315,37 +4300,38 @@ public class LitData : IDisposable
         {0.649300, 0, -0.095341, 0, 0.658064, 0, 0.086197, 0, 1},
         {0.623254, 0, -0.074271, 0, 0.630556, 0, 0.058888, 0, 1},
         {0.609037, 0, -0.053470, 0, 0.607151, 0, 0.031450, 0, 1}
-    };
-    private bool disposedValue;
+        };
+        private bool disposedValue;
 
-    protected virtual void Dispose(bool disposing)
-    {
-        if (!disposedValue)
+        protected virtual void Dispose(bool disposing)
         {
-            if (disposing)
+            if (!disposedValue)
             {
-                // TODO: dispose managed state (managed objects)
+                if (disposing)
+                {
+                    // TODO: dispose managed state (managed objects)
+                }
+
+                // TODO: free unmanaged resources (unmanaged objects) and override finalizer
+                // TODO: set large fields to null
+                disposedValue = true;
             }
-
-            // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-            // TODO: set large fields to null
-            disposedValue = true;
         }
-    }
 
-    // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-    ~LitData()
-    {
-        Object.DestroyImmediate(ltcData);
+        // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
+        ~LitData()
+        {
+            Object.DestroyImmediate(ltcData);
 
-        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-        Dispose(disposing: false);
-    }
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: false);
+        }
 
-    public void Dispose()
-    {
-        // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-        Dispose(disposing: true);
-        GC.SuppressFinalize(this);
+        public void Dispose()
+        {
+            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
     }
 }

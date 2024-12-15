@@ -6,7 +6,7 @@
 #include "../Samplers.hlsl"
 
 Texture2D<float4> UITexture;
-Texture2D<float3> _MainTex, _Bloom;
+Texture2D<float3> _Bloom, _Input;
 Texture2D<float> _GrainTexture;
 float4 _GrainTextureParams, _Resolution, _BloomScaleLimit, _Bloom_TexelSize;
 float _IsSceneView, _BloomStrength;
@@ -15,7 +15,7 @@ float Tonemap, HdrEnabled;
 
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {
-	float3 color = _MainTex[position.xy];
+	float3 color = _Input[position.xy];
 	
 	float3 bloom = _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(-1, 1), _BloomScaleLimit)) * 0.0625;
 	bloom += _Bloom.Sample(_LinearClampSampler, ClampScaleTextureUv(uv + _Bloom_TexelSize.xy * float2(0, 1), _BloomScaleLimit)) * 0.125;
@@ -46,7 +46,7 @@ float3 FragmentComposite(float4 position : SV_Position) : SV_Target
 	if (!_IsSceneView)
 		position.y = _Resolution.y - position.y;
 		
-	float3 color = _MainTex[position.xy];
+	float3 color = _Input[position.xy];
 	float4 ui = UITexture[position.xy];
 	
 	// Convert scene to sRGB and blend "incorrectly" which matches image-editing programs

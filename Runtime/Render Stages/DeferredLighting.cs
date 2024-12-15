@@ -15,7 +15,7 @@ public class DeferredLighting
         material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public void RenderMainPass(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, Camera camera)
+    public void RenderMainPass(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle emissive)
     {
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting"))
         {
@@ -27,7 +27,6 @@ public class DeferredLighting
             pass.ReadTexture("_Depth", depth);
             pass.ReadTexture("_AlbedoMetallic", albedoMetallic);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
-            pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
             pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
 
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
@@ -46,6 +45,7 @@ public class DeferredLighting
             pass.AddRenderPassData<WaterShadowResult>(true);
             pass.AddRenderPassData<ICommonPassData>();
             pass.AddRenderPassData<CausticsResult>();
+            pass.AddRenderPassData<BentNormalOcclusionData>();
 
             var hasWaterShadow = renderGraph.ResourceMap.IsRenderPassDataValid<WaterShadowResult>(renderGraph.FrameIndex);
             pass.Keyword = hasWaterShadow ? "WATER_SHADOWS_ON" : string.Empty;

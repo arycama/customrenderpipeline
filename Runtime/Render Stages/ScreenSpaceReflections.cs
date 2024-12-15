@@ -35,7 +35,7 @@ public class ScreenSpaceReflections
         raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Specular");
     }
 
-    public void Render(RTHandle depth, RTHandle hiZDepth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, int width, int height, RTHandle velocity, RTHandle bentNormalOcclusion, RTHandle albedoMetallic, float bias, float distantBias)
+    public void Render(RTHandle depth, RTHandle hiZDepth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, int width, int height, RTHandle albedoMetallic, float bias, float distantBias)
     {
         // Must be screen texture since we use stencil to skip sky pixels
         var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
@@ -89,14 +89,14 @@ public class ScreenSpaceReflections
                 pass.ReadTexture("PreviousFrame", previousFrameColor);
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_HiZDepth", hiZDepth);
-                pass.ReadTexture("Velocity", velocity);
-                pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
                 pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
                 pass.AddRenderPassData<LitData.Result>();
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<BentNormalOcclusionData>();
+                pass.AddRenderPassData<VelocityData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -120,10 +120,8 @@ public class ScreenSpaceReflections
             pass.ReadTexture("_Input", tempResult);
             pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Depth", depth);
-            pass.ReadTexture("Velocity", velocity);
             pass.ReadTexture("_HitResult", hitResult);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
-            pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
             pass.ReadTexture("AlbedoMetallic", albedoMetallic);
 
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
@@ -131,6 +129,8 @@ public class ScreenSpaceReflections
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<WaterPrepassResult>(true);
             pass.AddRenderPassData<ICommonPassData>();
+            pass.AddRenderPassData<BentNormalOcclusionData>();
+            pass.AddRenderPassData<VelocityData>();
 
             pass.SetRenderFunction((command, pass) =>
             {
@@ -151,9 +151,7 @@ public class ScreenSpaceReflections
             pass.ReadTexture("_History", history);
             pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Depth", depth);
-            pass.ReadTexture("Velocity", velocity);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
-            pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
             pass.ReadTexture("AlbedoMetallic", albedoMetallic);
             pass.ReadTexture("RayDepth", rayDepth);
 
@@ -162,6 +160,8 @@ public class ScreenSpaceReflections
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<LitData.Result>();
             pass.AddRenderPassData<ICommonPassData>();
+            pass.AddRenderPassData<BentNormalOcclusionData>();
+            pass.AddRenderPassData<VelocityData>();
 
             pass.SetRenderFunction((command, pass) =>
             {

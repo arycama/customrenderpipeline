@@ -533,4 +533,14 @@ float2 GetLodFade(uint instanceID)
 	#endif
 }
 
+// Source: https://www.shadertoy.com/view/3s33zj
+float3x3 adjoint(in float4x4 m)
+{
+	return float3x3(
+		cross(m[1].xyz, m[2].xyz),
+		cross(m[2].xyz, m[0].xyz),
+		cross(m[0].xyz, m[1].xyz)
+	);
+}
+
 #endif

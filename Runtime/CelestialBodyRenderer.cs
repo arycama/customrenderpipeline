@@ -1,30 +1,30 @@
 ﻿using Arycama.CustomRenderPipeline;
 using UnityEngine;
 
-public class CelestialBodyRenderer : RenderFeature
+public class CelestialBodyRenderer : RenderFeature<(RTHandle Depth, RTHandle Input)>
 {
     public CelestialBodyRenderer(RenderGraph renderGraph) : base(renderGraph)
     {
     }
 
-    public void Render(RTHandle depth, RTHandle input)
+    public override void Render((RTHandle Depth, RTHandle Input) data)
     {
         using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Celestial Body"))
         {
-            pass.WriteTexture(input);
-            pass.WriteTexture(depth);
+            pass.WriteTexture(data.Input);
+            pass.WriteTexture(data.Depth);
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<ICommonPassData>();
 
             var viewPosition = renderGraph.ResourceMap.GetRenderPassData<ViewData>(renderGraph.FrameIndex).ViewPosition;
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction((data, viewPosition), (command, pass, data) =>
             {
-                command.SetRenderTarget(input, depth);
-                command.SetViewport(new Rect(0, 0, input.Width, input.Height));
+                command.SetRenderTarget(data.data.Input, data.data.Depth);
+                command.SetViewport(new Rect(0, 0, data.data.Input.Width, data.data.Input.Height));
 
                 foreach (var celestialBody in CelestialBody.CelestialBodies)
-                    celestialBody.Render(command, viewPosition);
+                    celestialBody.Render(command, data.viewPosition);
             });
         }
     }

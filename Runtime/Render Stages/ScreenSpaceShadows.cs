@@ -33,7 +33,7 @@ public class ScreenSpaceShadows
         temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16_UNorm, renderGraph, "Screen Space Shadows");
     }
 
-    public void Render(RTHandle depth, RTHandle hiZDepth, int width, int height, Camera camera, CullingResults cullingResults, float bias, float distantBias, RTHandle normalRoughness, RTHandle velocity)
+    public void Render(RTHandle depth, RTHandle hiZDepth, int width, int height, Camera camera, CullingResults cullingResults, float bias, float distantBias, RTHandle normalRoughness)
     {
         var lightDirection = Vector3.up;
         for (var i = 0; i < cullingResults.visibleLights.Length; i++)
@@ -126,13 +126,13 @@ public class ScreenSpaceShadows
             pass.ReadTexture("_Input", tempResult);
             pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Depth", depth);
-            pass.ReadTexture("Velocity", velocity);
 
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
             pass.AddRenderPassData<ICommonPassData>();
+            pass.AddRenderPassData<VelocityData>();
 
             pass.SetRenderFunction((command, pass) =>
             {
@@ -161,7 +161,6 @@ public class ScreenSpaceShadows
             pass.ReadTexture("_History", history);
             pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Depth", depth);
-            pass.ReadTexture("Velocity", velocity);
             //pass.ReadTexture("_HitResult", hitResult);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
             //pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
@@ -172,6 +171,7 @@ public class ScreenSpaceShadows
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<ICommonPassData>();
+            pass.AddRenderPassData<VelocityData>();
 
             pass.SetRenderFunction((command, pass) =>
             {

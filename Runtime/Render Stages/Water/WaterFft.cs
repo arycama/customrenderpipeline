@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public class WaterFft : RenderFeature
+    public class WaterFft : RenderFeature<double>
     {
         private const int CascadeCount = 4;
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
@@ -33,7 +33,7 @@ namespace Arycama.CustomRenderPipeline.Water
             dispersionBuffer.Dispose();
         }
 
-        public void Render(double time)
+        public override void Render(double time)
         {
             // Todo: Should this happen in constructor?
             if (!roughnessInitialized)

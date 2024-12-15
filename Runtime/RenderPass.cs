@@ -59,7 +59,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void ReadTexture(string propertyName, RTHandle texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
-            ReadTexture(Shader.PropertyToID(propertyName), texture, 0, subElement);
+            ReadTexture(Shader.PropertyToID(propertyName), texture, mip, subElement);
         }
 
         protected void SetTextureWrite(RTHandle texture)
@@ -83,8 +83,19 @@ namespace Arycama.CustomRenderPipeline
             writeBuffers.Add((propertyName, buffer));
         }
 
-        public void AddRenderPassData(RenderPassDataHandle handle, bool isOptional)
+        private void AddRenderPassData<T>(RenderPassDataHandle handle, bool isOptional) where T : IRenderPassData
         {
+            if (isOptional)
+            {
+                if (RenderGraph.ResourceMap.TryGetRenderPassData<T>(handle, RenderGraph.FrameIndex, out var data))
+                    data.SetInputs(this);
+            }
+            else
+            {
+                var data = RenderGraph.ResourceMap.GetRenderPassData<T>(handle, RenderGraph.FrameIndex);
+                data.SetInputs(this);
+            }
+
             RenderPassDataHandles.Add((handle, isOptional));
         }
 
@@ -92,7 +103,7 @@ namespace Arycama.CustomRenderPipeline
         {
             Assert.IsFalse(RenderGraph.IsExecuting);
             var handle = RenderGraph.ResourceMap.GetResourceHandle<T>();
-            AddRenderPassData(handle, isOptional);
+            AddRenderPassData<T>(handle, isOptional);
         }
 
         public void Run(CommandBuffer command)

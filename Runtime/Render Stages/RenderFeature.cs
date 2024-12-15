@@ -2,12 +2,12 @@
 
 namespace Arycama.CustomRenderPipeline
 {
-    public abstract class RenderFeature : IDisposable
+    public abstract class RenderFeatureBase : IDisposable
     {
-        protected RenderGraph renderGraph;
+        protected readonly RenderGraph renderGraph;
         private bool disposedValue;
 
-        public RenderFeature(RenderGraph renderGraph)
+        public RenderFeatureBase(RenderGraph renderGraph)
         {
             this.renderGraph = renderGraph ?? throw new ArgumentNullException(nameof(renderGraph));
         }
@@ -26,7 +26,7 @@ namespace Arycama.CustomRenderPipeline
             disposedValue = true;
         }
 
-        ~RenderFeature()
+        ~RenderFeatureBase()
         {
             Dispose(disposing: false);
         }
@@ -36,5 +36,29 @@ namespace Arycama.CustomRenderPipeline
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
+    }
+
+    public abstract class RenderFeature : RenderFeatureBase
+    {
+        protected RenderFeature(RenderGraph renderGraph) : base(renderGraph)
+        {
+        }
+
+        /// <summary>
+        /// Render logic goes here
+        /// </summary>
+        public abstract void Render();
+    }
+
+    public abstract class RenderFeature<T> : RenderFeatureBase
+    {
+        protected RenderFeature(RenderGraph renderGraph) : base(renderGraph)
+        {
+        }
+
+        /// <summary>
+        /// Render logic goes here
+        /// </summary>
+        public abstract void Render(T data);
     }
 }

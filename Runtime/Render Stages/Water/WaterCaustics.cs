@@ -86,7 +86,7 @@ namespace Arycama.CustomRenderPipeline.Water
             indexBuffer.Dispose();
         }
 
-        public void Render()
+        public override void Render()
         {
             var Profile = settings.Profile;
             var patchSizes = new Vector4(Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 0f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 1f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 2f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 3f));

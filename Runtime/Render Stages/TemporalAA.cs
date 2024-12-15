@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public partial class TemporalAA : RenderFeature
+    public partial class TemporalAA : RenderFeature<(Camera camera, float scale)>
     {
         private readonly Settings settings;
         private readonly PersistentRTHandleCache textureCache;
@@ -93,24 +93,24 @@ namespace Arycama.CustomRenderPipeline
             ArrayPool<float>.Release(weights);
         }
 
-        public RTHandle Render(Camera camera, RTHandle input, RTHandle motion, float scale)
+        public override void Render((Camera camera,float scale) data)
         {
             if (!settings.IsEnabled)
-                return input;
+                return;
 
-            var (current, history, wasCreated) = textureCache.GetTextures(camera.pixelWidth, camera.pixelHeight, camera);
-            var result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
+            var (current, history, wasCreated) = textureCache.GetTextures(data.camera.pixelWidth, data.camera.pixelHeight, data.camera);
+            var result = renderGraph.GetTexture(data.camera.pixelWidth, data.camera.pixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA"))
             {
-                var keyword = scale < 1.0f ? "UPSCALE" : null;
+                var keyword = data.scale < 1.0f ? "UPSCALE" : null;
                 pass.Initialize(material, 0, 1, keyword);
 
-                pass.ReadTexture("_Input", input);
-                pass.ReadTexture("_Velocity", motion);
                 pass.ReadTexture("_History", history);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
                 pass.AddRenderPassData<TemporalAAData>();
+                pass.AddRenderPassData<CameraTargetData>();
+                pass.AddRenderPassData<VelocityData>();
 
                 pass.SetRenderFunction((
                     spatialSharpness: settings.SpatialSharpness,
@@ -119,11 +119,11 @@ namespace Arycama.CustomRenderPipeline
                     stationaryBlending: settings.StationaryBlending,
                     motionBlending: settings.MotionBlending,
                     motionWeight: settings.MotionWeight,
-                    scale: scale,
-                    resolution: new Vector4(camera.pixelWidth, camera.pixelHeight, 1.0f / camera.pixelWidth, 1.0f / camera.pixelHeight),
-                    maxWidth: Mathf.FloorToInt(camera.pixelWidth * scale) - 1,
-                    maxHeight: Mathf.FloorToInt(camera.pixelHeight * scale) - 1,
-                    maxResolution: new Vector2(camera.pixelWidth - 1, camera.pixelHeight - 1)
+                    scale: data.scale,
+                    resolution: new Vector4(data.camera.pixelWidth, data.camera.pixelHeight, 1.0f / data.camera.pixelWidth, 1.0f / data.camera.pixelHeight),
+                    maxWidth: Mathf.FloorToInt(data.camera.pixelWidth * data.scale) - 1,
+                    maxHeight: Mathf.FloorToInt(data.camera.pixelHeight * data.scale) - 1,
+                    maxResolution: new Vector2(data.camera.pixelWidth - 1, data.camera.pixelHeight - 1)
                 ),
                 (command, pass, data) =>
                 {
@@ -143,9 +143,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_MaxWidth", data.maxWidth);
                     pass.SetInt(command, "_MaxHeight", data.maxHeight);
                 });
-            }
 
-            return result;
+                renderGraph.ResourceMap.SetRenderPassData(new CameraTargetData(result), renderGraph.FrameIndex);
+            }
         }
 
         public static float Halton(int index, int radix)

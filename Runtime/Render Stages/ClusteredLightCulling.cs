@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class ClusteredLightCulling : RenderFeature
+    public class ClusteredLightCulling : RenderFeature<(int width, int height, float near, float far)>
     {
         [Serializable]
         public class Settings
@@ -58,14 +58,14 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void Render(int width, int height, float near, float far)
+        public override void Render((int width, int height, float near, float far) data)
         {
-            var clusterWidth = MathUtils.DivRoundUp(width, settings.TileSize);
-            var clusterHeight = MathUtils.DivRoundUp(height, settings.TileSize);
+            var clusterWidth = MathUtils.DivRoundUp(data.width, settings.TileSize);
+            var clusterHeight = MathUtils.DivRoundUp(data.height, settings.TileSize);
             var clusterCount = clusterWidth * clusterHeight * settings.ClusterDepth;
 
-            var clusterScale = settings.ClusterDepth / Mathf.Log(far / near, 2f);
-            var clusterBias = -(settings.ClusterDepth * Mathf.Log(near, 2f) / Mathf.Log(far / near, 2f));
+            var clusterScale = settings.ClusterDepth / Mathf.Log(data.far / data.near, 2f);
+            var clusterBias = -(settings.ClusterDepth * Mathf.Log(data.near, 2f) / Mathf.Log(data.far / data.near, 2f));
 
             var computeShader = Resources.Load<ComputeShader>("ClusteredLightCulling");
             var lightClusterIndices = renderGraph.GetTexture(clusterWidth, clusterHeight, GraphicsFormat.R32G32_SInt, settings.ClusterDepth, TextureDimension.Tex3D);

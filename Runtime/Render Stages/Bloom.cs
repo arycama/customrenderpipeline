@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class Bloom : RenderFeature
+    public class Bloom : RenderFeature<Camera>
     {
         [Serializable]
         public class Settings
@@ -27,7 +27,7 @@ namespace Arycama.CustomRenderPipeline
             material = new(Shader.Find("Hidden/Bloom")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public RTHandle Render(Camera camera, RTHandle target)
+        public override void Render(Camera camera)
         {
             var bloomIds = ListPool<RTHandle>.Get();
 
@@ -45,20 +45,21 @@ namespace Arycama.CustomRenderPipeline
             // Downsample
             for (var i = 0; i < mipCount; i++)
             {
-                var input = i == 0 ? target : bloomIds[i - 1];
 
                 using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Bloom");
                 pass.Initialize(material, i == 0 ? 0 : 1);
                 pass.WriteTexture(bloomIds[i], RenderBufferLoadAction.DontCare);
-                pass.ReadTexture("_Input", input);
+
+                var rt = i > 0 ? bloomIds[i - 1] : renderGraph.ResourceMap.GetRenderPassData<CameraTargetData>(renderGraph.FrameIndex).Handle;
+                pass.ReadTexture("_Input", rt);
 
                 var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
                 var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
 
-                pass.SetRenderFunction(new Vector2(1.0f / width, 1.0f / height), (command, pass, data) =>
+                pass.SetRenderFunction((new Vector2(1.0f / width, 1.0f / height), rt), (command, pass, data) =>
                 {
-                    pass.SetVector(command, "_RcpResolution", data);
-                    pass.SetVector(command, "_InputScaleLimit", input.ScaleLimit2D);
+                    pass.SetVector(command, "_RcpResolution", data.Item1);
+                    pass.SetVector(command, "_InputScaleLimit", rt.ScaleLimit2D);
                 });
             }
 
@@ -85,7 +86,8 @@ namespace Arycama.CustomRenderPipeline
 
             var result = bloomIds[0];
             ListPool<RTHandle>.Release(bloomIds);
-            return result;
+
+            renderGraph.ResourceMap.SetRenderPassData<BloomData>(new BloomData(result), renderGraph.FrameIndex);
         }
     }
 }

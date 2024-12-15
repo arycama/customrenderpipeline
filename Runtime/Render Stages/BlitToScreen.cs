@@ -2,7 +2,7 @@
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class BlitToScreen : RenderFeature
+    public class BlitToScreen : RenderFeature<(RTHandle uITexture, bool isSceneView, int width, int height)>
     {
         private readonly Material material;
         private readonly RenderGraph rendergraph;
@@ -14,13 +14,13 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
         }
 
-        public void Render(RTHandle input, RTHandle uITexture, bool isSceneView, int width, int height)
+        public override void Render((RTHandle uITexture, bool isSceneView, int width, int height) data)
         {
             using var pass = renderGraph.AddRenderPass<BlitToScreenPass>("Tonemapping");
             pass.Initialize(material, 1);
-            pass.ReadTexture("_MainTex", input);
-            pass.ReadTexture("UITexture", uITexture);
+            pass.ReadTexture("UITexture", data.uITexture);
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+            pass.AddRenderPassData<CameraTargetData>();
 
             var hdrSettings = HDROutputSettings.main;
             //var minNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.minToneMapLuminance : settings.HdrMinNits;
@@ -35,8 +35,8 @@ namespace Arycama.CustomRenderPipeline
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetVector(command, "_Resolution", new Vector2(width, height));
-                pass.SetFloat(command, "_IsSceneView", isSceneView ? 1.0f : 0.0f);
+                pass.SetVector(command, "_Resolution", new Vector2(data.width, data.height));
+                pass.SetFloat(command, "_IsSceneView", data.isSceneView ? 1.0f : 0.0f);
                 var colorGamut = hdrEnabled ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
                 pass.SetInt(command, "ColorGamut", (int)colorGamut);
                 pass.SetFloat(command, "MaxLuminance", hdrEnabled ? maxNits : settings.PaperWhite);

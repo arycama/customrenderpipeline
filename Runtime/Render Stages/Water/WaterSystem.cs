@@ -100,6 +100,10 @@ namespace Arycama.CustomRenderPipeline.Water
                 return;
 
             waterFft.Render(time);
+        }
+
+        public void UpdateCaustics()
+        {
             caustics.Render();
         }
 
@@ -346,13 +350,13 @@ namespace Arycama.CustomRenderPipeline.Water
             renderGraph.ResourceMap.SetRenderPassData(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction")), renderGraph.FrameIndex);
         }
 
-        public void RenderWaterPost(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, Camera camera, RTHandle velocity)
+        public void RenderWaterPost(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, Camera camera)
         {
             if (!settings.IsEnabled)
                 return;
 
-            underwaterLighting.Render(screenWidth, screenHeight, underwaterDepth, cameraDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive, camera);
-            deferredWater.Render(underwaterDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive, cameraDepth, camera, screenWidth, screenHeight, velocity);
+            underwaterLighting.Render((screenWidth, screenHeight, underwaterDepth, cameraDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive));
+            deferredWater.Render((underwaterDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive, cameraDepth, camera, screenWidth, screenHeight));
         }
 
         private WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)

@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public class UnderwaterLighting : RenderFeature
+    public class UnderwaterLighting : RenderFeature<(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive)>
     {
         private readonly WaterSystem.Settings settings;
         private readonly Material underwaterLightingMaterial;
@@ -15,21 +15,21 @@ namespace Arycama.CustomRenderPipeline.Water
             underwaterLightingMaterial = new Material(Shader.Find("Hidden/Underwater Lighting 1")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public void Render(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, Camera camera)
+        public override void Render((int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive) data)
         {
-            var underwaterResultId = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            var underwaterResultId = renderGraph.GetTexture(data.screenWidth, data.screenHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Underwater Lighting"))
             {
                 pass.Initialize(underwaterLightingMaterial);
-                pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(data.cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(underwaterResultId, RenderBufferLoadAction.DontCare);
 
-                pass.ReadTexture("_Depth", underwaterDepth);
-                pass.ReadTexture("_AlbedoMetallic", albedoMetallic);
-                pass.ReadTexture("_NormalRoughness", normalRoughness);
-                pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
-                pass.ReadTexture("_Emissive", emissive);
+                pass.ReadTexture("_Depth", data.underwaterDepth);
+                pass.ReadTexture("_AlbedoMetallic", data.albedoMetallic);
+                pass.ReadTexture("_NormalRoughness", data.normalRoughness);
+                pass.ReadTexture("_BentNormalOcclusion", data.bentNormalOcclusion);
+                pass.ReadTexture("_Emissive", data.emissive);
 
                 pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();

@@ -47,12 +47,13 @@ namespace Arycama.CustomRenderPipeline
 
         public int FrameIndex { get; private set; }
 
-        public RenderResourceMap ResourceMap { get; } = new();
+        public RenderResourceMap ResourceMap { get; }
 
         private int rtHandleCount;
         private int rtCount;
         private int screenWidth, screenHeight;
         private bool disposedValue;
+        public bool HasSucceeded { get; private set; }
 
         public RenderGraph()
         {
@@ -63,6 +64,8 @@ namespace Arycama.CustomRenderPipeline
             Empty3DTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
             EmptyCubemap = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave });
             EmptyCubemapArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
+
+            ResourceMap = new(this);
         }
 
         public void SetScreenWidth(int width)
@@ -123,26 +126,28 @@ namespace Arycama.CustomRenderPipeline
 
         public void Execute(CommandBuffer command)
         {
+            HasSucceeded = false;
+
             foreach (var bufferHandle in bufferHandlesToCreate)
                 bufferHandle.Create();
             bufferHandlesToCreate.Clear();
 
-            foreach (var renderPass in renderPasses)
-            {
-                foreach (var renderPassDataHandle in renderPass.RenderPassDataHandles)
-                {
-                    if (renderPassDataHandle.Item2)
-                    {
-                        if (ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, FrameIndex, out var data))
-                            data.SetInputs(renderPass);
-                    }
-                    else
-                    {
-                        var data = ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, FrameIndex);
-                        data.SetInputs(renderPass);
-                    }
-                }
-            }
+            //foreach (var renderPass in renderPasses)
+            //{
+            //    foreach (var renderPassDataHandle in renderPass.RenderPassDataHandles)
+            //    {
+            //        if (renderPassDataHandle.Item2)
+            //        {
+            //            if (ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, FrameIndex, out var data))
+            //                data.SetInputs(renderPass);
+            //        }
+            //        else
+            //        {
+            //            var data = ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, FrameIndex);
+            //            data.SetInputs(renderPass);
+            //        }
+            //    }
+            //}
 
             // Build mapping from pass index to rt handles that can be freed
             foreach (var input in lastRtHandleRead)
@@ -269,19 +274,7 @@ namespace Arycama.CustomRenderPipeline
 
             IsExecuting = false;
 
-            // Release all pooled passes
-            foreach (var pass in renderPasses)
-                renderPassPool[pass.GetType()].Enqueue(pass);
-
-            renderPasses.Clear();
-            lastRtHandleRead.Clear();
-            writtenRTHandles.Clear();
-
-            foreach (var list in passRTHandleOutputs)
-                list.Value.Clear();
-
-            foreach (var output in lastPassOutputs)
-                output.Value.Clear();
+            HasSucceeded = true;
         }
 
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
@@ -415,8 +408,21 @@ namespace Arycama.CustomRenderPipeline
             Assert.IsTrue(wasRemoved, "Trying to release a non-imported buffer");
         }
 
-        public void ReleaseHandles()
+        public void CleanupCurrentFrame()
         {
+            // Release all pooled passes
+            foreach (var pass in renderPasses)
+                renderPassPool[pass.GetType()].Enqueue(pass);
+
+            renderPasses.Clear();
+            lastRtHandleRead.Clear();
+            writtenRTHandles.Clear();
+
+            foreach (var list in passRTHandleOutputs)
+                list.Value.Clear();
+
+            foreach (var output in lastPassOutputs)
+                output.Value.Clear();
 
             // Any handles that were not used this frame can be removed
             foreach (var bufferHandle in availableBufferHandles)

@@ -9,13 +9,19 @@ namespace Arycama.CustomRenderPipeline
         private readonly Dictionary<Type, RenderPassDataHandle> handleIndexMap = new();
         private readonly List<(IRenderPassData data, int frameIndex, bool isPersistent)> handleList = new();
         private bool disposedValue;
+        private RenderGraph renderGraph;
+
+        public RenderResourceMap(RenderGraph renderGraph)
+        {
+            this.renderGraph = renderGraph;
+        }
 
         // TODO: Should have a tryget method which fails if not already initialized? (Thoguh we should keep this one so that types can prefetch handles out of order
         public RenderPassDataHandle GetResourceHandle<T>() where T : IRenderPassData
         {
             if (!handleIndexMap.TryGetValue(typeof(T), out var handle))
             {
-                handle = new(handleIndexMap.Count);
+                handle = new(handleIndexMap.Count, typeof(T));
                 handleIndexMap.Add(typeof(T), handle);
                 handleList.Add((null, 0, false));
             }
@@ -26,7 +32,11 @@ namespace Arycama.CustomRenderPipeline
         public T GetRenderPassData<T>(RenderPassDataHandle handle, int frameIndex) where T : IRenderPassData
         {
             var result = handleList[handle.Index];
-            Assert.IsNotNull(result.Item1, "Data has not been set for type");
+
+            if (result.Item1 == null)
+                throw new InvalidOperationException($"Data has not been set for type {typeof(T)}");
+
+            //Assert.IsNotNull(result.Item1, "Data has not been set for type");
             Assert.IsTrue(result.isPersistent || (result.Item2 == frameIndex), "Getting non-persistent renderdata for a previous frame");
             return (T)result.Item1;
         }
@@ -78,6 +88,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetRenderPassData(RenderPassDataHandle handle, IRenderPassData renderResource, int frameIndex, bool isPersistent = false)
         {
+            Assert.IsFalse(renderGraph.IsExecuting);
             handleList[handle.Index] = (renderResource, frameIndex, isPersistent);
         }
 

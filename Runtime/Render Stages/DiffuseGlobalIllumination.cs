@@ -35,7 +35,7 @@ public class DiffuseGlobalIllumination
         raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Diffuse");
     }
 
-    public void Render(RTHandle depth, int width, int height, Camera camera, RTHandle previousFrame, RTHandle velocity, RTHandle normalRoughness, RTHandle hiZDepth, RTHandle bentNormalOcclusion, float bias, float distantBias)
+    public void Render(RTHandle depth, int width, int height, Camera camera, RTHandle previousFrame, RTHandle normalRoughness, RTHandle hiZDepth, float bias, float distantBias)
     {
         var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
         var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
@@ -87,13 +87,13 @@ public class DiffuseGlobalIllumination
                 pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<BentNormalOcclusionData>();
+                pass.AddRenderPassData<VelocityData>();
 
                 pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("PreviousFrame", previousFrame);
-                pass.ReadTexture("Velocity", velocity);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
                 pass.ReadTexture("_HiZDepth", hiZDepth);
-                pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -121,16 +121,16 @@ public class DiffuseGlobalIllumination
             pass.ReadTexture("_Input", tempResult);
             pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Depth", depth);
-            pass.ReadTexture("Velocity", velocity);
             pass.ReadTexture("_HitResult", hitResult);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
-            pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
             pass.AddRenderPassData<ICommonPassData>();
+            pass.AddRenderPassData<BentNormalOcclusionData>();
+            pass.AddRenderPassData<VelocityData>();
 
             pass.SetRenderFunction((command, pass) =>
             {
@@ -155,10 +155,8 @@ public class DiffuseGlobalIllumination
             pass.ReadTexture("_History", history);
             pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Depth", depth);
-            pass.ReadTexture("Velocity", velocity);
             pass.ReadTexture("_HitResult", hitResult);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
-            pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
             pass.ReadTexture("RayDepth", rayDepth);
 
             pass.AddRenderPassData<TemporalAA.TemporalAAData>();
@@ -166,6 +164,8 @@ public class DiffuseGlobalIllumination
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<ICommonPassData>();
+            pass.AddRenderPassData<BentNormalOcclusionData>();
+            pass.AddRenderPassData<VelocityData>();
 
             pass.SetRenderFunction((command, pass) =>
             {

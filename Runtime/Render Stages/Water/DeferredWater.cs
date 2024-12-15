@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public class DeferredWater : RenderFeature
+    public class DeferredWater : RenderFeature<(RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, Camera camera, int width, int height)>
     {
         private readonly WaterSystem.Settings settings;
         private readonly Material deferredWaterMaterial;
@@ -19,24 +19,24 @@ namespace Arycama.CustomRenderPipeline.Water
             raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Refraction");
         }
 
-        public void Render(RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, Camera camera, int width, int height, RTHandle velocity)
+        public override void Render((RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, Camera camera, int width, int height) data)
         {
-            var refractionResult = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-            var scatterResult = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+            var refractionResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            var scatterResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water"))
             {
                 pass.Initialize(deferredWaterMaterial);
-                pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
-                pass.WriteTexture(albedoMetallic);
-                pass.WriteTexture(normalRoughness);
-                pass.WriteTexture(bentNormalOcclusion);
+                pass.WriteDepth(data.cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteTexture(data.albedoMetallic);
+                pass.WriteTexture(data.normalRoughness);
+                pass.WriteTexture(data.bentNormalOcclusion);
                 pass.WriteTexture(refractionResult);
                 pass.WriteTexture(scatterResult);
 
-                pass.ReadTexture("_UnderwaterDepth", underwaterDepth);
-                pass.ReadTexture("_Depth", cameraDepth, subElement: RenderTextureSubElement.Depth);
-                pass.ReadTexture("_Stencil", cameraDepth, subElement: RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_UnderwaterDepth", data.underwaterDepth);
+                pass.ReadTexture("_Depth", data.cameraDepth, subElement: RenderTextureSubElement.Depth);
+                pass.ReadTexture("_Stencil", data.cameraDepth, subElement: RenderTextureSubElement.Stencil);
 
                 pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
@@ -117,14 +117,14 @@ namespace Arycama.CustomRenderPipeline.Water
                 {
                     var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
 
-                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, width, height, 1, 0.1f, 0.1f, camera.fieldOfView);
+                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, data.width, data.height, 1, 0.1f, 0.1f, data.camera.fieldOfView);
                     pass.WriteTexture(refractionResult, "RefractionResult");
                     pass.WriteTexture(scatterResult, "ScatterResult");
                     //pass.WriteTexture(tempResult, "HitColor");
                     //pass.WriteTexture(hitResult, "HitResult");
-                    pass.ReadTexture("_Depth", cameraDepth, subElement: RenderTextureSubElement.Depth);
-                    pass.ReadTexture("_Stencil", cameraDepth, subElement: RenderTextureSubElement.Stencil);
-                    pass.ReadTexture("_NormalRoughness", normalRoughness);
+                    pass.ReadTexture("_Depth", data.cameraDepth, subElement: RenderTextureSubElement.Depth);
+                    pass.ReadTexture("_Stencil", data.cameraDepth, subElement: RenderTextureSubElement.Stencil);
+                    pass.ReadTexture("_NormalRoughness", data.normalRoughness);
                     //pass.ReadTexture("PreviousFrame", previousFrameColor); // Temporary, cuz of leaks if we don't use it..
 
                     pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
@@ -157,36 +157,36 @@ namespace Arycama.CustomRenderPipeline.Water
 
             }
 
-            var (current, history, wasCreated) = temporalCache.GetTextures(width, height, camera, true);
+            var (current, history, wasCreated) = temporalCache.GetTextures(data.width, data.height, data.camera, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water Temporal"))
             {
                 if (settings.RaytracedRefractions)
                     pass.Keyword = "RAYTRACED_REFRACTIONS_ON";
 
                 pass.Initialize(deferredWaterMaterial, 1);
-                pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(data.cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.ReadTexture("_RefractionInput", refractionResult);
                 pass.ReadTexture("_ScatterInput", scatterResult);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
-                pass.WriteTexture(emissive);
+                pass.WriteTexture(data.emissive);
 
-                pass.ReadTexture("_UnderwaterDepth", underwaterDepth);
-                pass.ReadTexture("_Depth", cameraDepth, subElement: RenderTextureSubElement.Depth);
-                pass.ReadTexture("_Stencil", cameraDepth, subElement: RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_UnderwaterDepth", data.underwaterDepth);
+                pass.ReadTexture("_Depth", data.cameraDepth, subElement: RenderTextureSubElement.Depth);
+                pass.ReadTexture("_Stencil", data.cameraDepth, subElement: RenderTextureSubElement.Stencil);
 
                 pass.ReadTexture("_History", history);
-                pass.ReadTexture("_Stencil", cameraDepth, subElement: RenderTextureSubElement.Stencil);
-                pass.ReadTexture("_Depth", cameraDepth);
-                pass.ReadTexture("Velocity", velocity);
-                pass.ReadTexture("_NormalRoughness", normalRoughness);
-                pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
-                pass.ReadTexture("AlbedoMetallic", albedoMetallic);
+                pass.ReadTexture("_Stencil", data.cameraDepth, subElement: RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_Depth", data.cameraDepth);
+                pass.ReadTexture("_NormalRoughness", data.normalRoughness);
+                pass.ReadTexture("_BentNormalOcclusion", data.bentNormalOcclusion);
+                pass.ReadTexture("AlbedoMetallic", data.albedoMetallic);
 
                 pass.AddRenderPassData<TemporalAA.TemporalAAData>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
                 pass.AddRenderPassData<LitData.Result>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<VelocityData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {

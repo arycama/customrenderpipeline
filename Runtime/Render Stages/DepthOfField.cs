@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class DepthOfField : RenderFeature
+    public class DepthOfField : RenderFeature<(int width, int height, float fieldOfView, RTHandle color, RTHandle depth)>
     {
         [Serializable]
         public class Settings
@@ -28,21 +28,21 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/Depth of Field")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public RTHandle Render(int width, int height, float fieldOfView, RTHandle color, RTHandle depth)
+        public override void Render((int width, int height, float fieldOfView, RTHandle color, RTHandle depth) data)
         {
             var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
-            var tempId = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32);
+            var tempId = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.A2B10G10R10_UNormPack32);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Depth of Field"))
             {
                 pass.Initialize(material);
                 pass.WriteTexture(tempId, RenderBufferLoadAction.DontCare);
-                pass.ReadTexture("_Input", color);
-                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_Input", data.color);
+                pass.ReadTexture("_Depth", data.depth);
                 pass.ReadTexture("_Result", tempId);
 
                 var sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
-                var focalLength = 0.5f * sensorSize / Mathf.Tan(fieldOfView * Mathf.Deg2Rad / 2.0f);
+                var focalLength = 0.5f * sensorSize / Mathf.Tan(data.fieldOfView * Mathf.Deg2Rad / 2.0f);
                 var F = focalLength;
                 var A = focalLength / lensSettings.Aperture;
                 var P = lensSettings.FocalDistance;
@@ -68,9 +68,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat(command, "_SampleRadius", data.sampleRadius);
                     pass.SetInt(command, "_SampleCount", data.sampleCount);
                 });
-            }
 
-            return tempId;
+                renderGraph.ResourceMap.SetRenderPassData(new CameraTargetData(tempId), renderGraph.FrameIndex);
+            }
         }
     }
 }

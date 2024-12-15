@@ -225,6 +225,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 
 Texture2D<float4> _NormalRoughness;
 Texture2D<float3> _RefractionInput, _ScatterInput, _History;
+Texture2D<float2> Velocity;
 float4 _HistoryScaleLimit;
 float _IsFirst;
 
@@ -241,6 +242,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(_Depth[position.xy]);
 	
+	// TODO: Velocity?
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
 	float3 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 	history *= _PreviousToCurrentExposure;

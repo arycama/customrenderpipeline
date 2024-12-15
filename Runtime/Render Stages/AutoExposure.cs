@@ -20,7 +20,7 @@ namespace Arycama.CustomRenderPipeline
         Procedural
     }
 
-    public class AutoExposure : RenderFeature
+    public class AutoExposure : RenderFeature<(RTHandle input, int width, int height)>
     {
         [Serializable]
         public class Settings
@@ -109,7 +109,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void Render(RTHandle input, int width, int height)
+        public override void Render((RTHandle input, int width, int height) data)
         {
             var exposurePixels = exposureTexture.GetRawTextureData<float>();
 
@@ -127,8 +127,8 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Auto Exposure"))
             {
-                pass.Initialize(computeShader, 0, width, height);
-                pass.ReadTexture("Input", input);
+                pass.Initialize(computeShader, 0, data.width, data.height);
+                pass.ReadTexture("Input", data.input);
                 pass.WriteBuffer("LuminanceHistogram", histogram);
                 pass.AddRenderPassData<AutoExposureData>();
 

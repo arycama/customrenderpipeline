@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class UIBlur
+public class UIBlur : RenderFeature<(int width, int height)>
 {
     [Serializable]
     public class Settings
@@ -17,47 +17,46 @@ public class UIBlur
     private readonly Settings settings;
     private readonly Material material;
 
-    public UIBlur(RenderGraph renderGraph, Settings settings)
+    public UIBlur(RenderGraph renderGraph, Settings settings) : base(renderGraph)
     {
         this.renderGraph = renderGraph;
         this.settings = settings;
         this.material = new Material(Shader.Find("Hidden/Gaussian Blur")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public void Render(RTHandle input)
+    public override void Render((int width, int height) data)
     {
-        var width = input.Width;
-        var height = input.Height;
+        var width = data.width;
+        var height = data.height;
 
-        var horizontalResult = renderGraph.GetTexture(input.Width, input.Height, GraphicsFormat.B10G11R11_UFloatPack32);
+        var horizontalResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.B10G11R11_UFloatPack32);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("UI Blur Horizontal"))
         {
             pass.Initialize(material, 0);
             pass.WriteTexture(horizontalResult);
-            pass.ReadTexture("Input0", input);
+            pass.AddRenderPassData<CameraTargetData>();
 
             pass.SetRenderFunction((command, pass) =>
             {
                 pass.SetFloat(command, "BlurRadius", settings.BlurRadius);
                 pass.SetFloat(command, "BlurSigma", settings.BlurSigma);
                 pass.SetVector(command, "TexelSize", new Vector4(1f / width, 1f / height, width, height));
-                pass.SetVector(command, "Input0ScaleLimit", input.ScaleLimit2D);
             });
         }
 
-        var verticalResult = renderGraph.GetTexture(input.Width, input.Height, GraphicsFormat.B10G11R11_UFloatPack32);
+        var verticalResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.B10G11R11_UFloatPack32);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("UI Blur Vertical"))
         {
             pass.Initialize(material, 1);
             pass.WriteTexture(verticalResult);
-            pass.ReadTexture("Input0", horizontalResult);
+            pass.ReadTexture("_Input", horizontalResult);
 
             pass.SetRenderFunction((command, pass) =>
             {
                 pass.SetFloat(command, "BlurRadius", settings.BlurRadius);
                 pass.SetFloat(command, "BlurSigma", settings.BlurSigma);
                 pass.SetVector(command, "TexelSize", new Vector4(1f / width, 1f / height, width, height));
-                pass.SetVector(command, "Input0ScaleLimit", horizontalResult.ScaleLimit2D);
+                pass.SetVector(command, "_InputScaleLimit", horizontalResult.ScaleLimit2D);
             });
         }
 

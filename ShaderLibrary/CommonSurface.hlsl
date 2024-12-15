@@ -247,7 +247,7 @@ FRAGMENT_OUTPUT Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 		surface.Normal = normalize(mul(surface.Normal, tangentToWorld));
 		surface.bentNormal = normalize(mul(surface.bentNormal, tangentToWorld));
 		
-		surface.PerceptualRoughness = SpecularAntiAliasing(surface.PerceptualRoughness, surface.Normal, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
+		surface.PerceptualRoughness = SpecularAntiAliasing(surface.PerceptualRoughness.r, surface.Normal, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
 	
 		#if defined(UNITY_PASS_DEFERRED) || defined(MOTION_VECTORS_ON)
 			return OutputGBuffer(surface.Albedo, surface.Metallic, surface.Normal, surface.PerceptualRoughness, surface.bentNormal, surface.Occlusion, surface.Emission);
@@ -268,7 +268,7 @@ FRAGMENT_OUTPUT Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 				lightingInput.eyeDepth = input.positionCS.w;
 				lightingInput.albedo = lerp(surface.Albedo, 0.0, surface.Metallic);
 				lightingInput.f0 = lerp(0.04, surface.Albedo, surface.Metallic);
-				lightingInput.perceptualRoughness = surface.PerceptualRoughness;
+				lightingInput.perceptualRoughness = surface.PerceptualRoughness.r;
 				lightingInput.occlusion = surface.Occlusion;
 				lightingInput.translucency = 0.0; // Todo: support?
 				lightingInput.bentNormal = surface.bentNormal;
