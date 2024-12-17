@@ -8,7 +8,7 @@
 #include "../../ScreenSpaceRaytracing.hlsl"
 
 Texture2D<float4> _NormalRoughness;
-Texture2D<float> _HiZDepth, _Depth;
+Texture2D<float> _HiZMinDepth, _Depth;
 
 cbuffer Properties
 {
@@ -18,7 +18,7 @@ cbuffer Properties
 
 float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float depth = _HiZDepth[position.xy];
+	float depth = _HiZMinDepth[position.xy];
 	float3 V = -normalize(worldDir);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
@@ -34,7 +34,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float3 L = LightDirection;//FromToRotationZ(LightDirection, localL);
 
 	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZDepth, _MaxMip, validHit, float3(position.xy, depth));
+	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZMinDepth, _MaxMip, validHit, float3(position.xy, depth));
 	
 	float outDepth;
 	float3 hitRay;

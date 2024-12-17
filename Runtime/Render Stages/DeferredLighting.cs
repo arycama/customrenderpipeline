@@ -4,30 +4,33 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class DeferredLighting
+public class DeferredLighting : RenderFeature<(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle emissive)>
 {
-    private readonly RenderGraph renderGraph;
     private readonly Material material;
 
-    public DeferredLighting(RenderGraph renderGraph)
+    public DeferredLighting(RenderGraph renderGraph) : base(renderGraph)
     {
-        this.renderGraph = renderGraph;
         material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public void RenderMainPass(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle emissive)
+    protected override void Cleanup(bool disposing)
+    {
+        Object.DestroyImmediate(material);
+    }
+
+    public override void Render((RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle emissive) data)
     {
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting"))
         {
             pass.Initialize(material);
 
-            pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(emissive);
+            pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteTexture(data.emissive);
 
-            pass.ReadTexture("_Depth", depth);
-            pass.ReadTexture("_AlbedoMetallic", albedoMetallic);
-            pass.ReadTexture("_NormalRoughness", normalRoughness);
-            pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+            pass.ReadTexture("_Depth", data.depth);
+            pass.ReadTexture("_AlbedoMetallic", data.albedoMetallic);
+            pass.ReadTexture("_NormalRoughness", data.normalRoughness);
+            pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
 
             pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();

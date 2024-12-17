@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class ShadowRenderer : RenderFeature<(ScriptableRenderContext context, CullingResults cullingResults, List<ShadowRequest> directionalShadowRequests, List<ShadowRequest> pointShadowRequests, Vector3 viewPosition)>
+    public class ShadowRenderer : RenderFeature<(ScriptableRenderContext context, CullingResults cullingResults, Vector3 viewPosition)>
     {
         private readonly ShadowSettings settings;
         private readonly TerrainSystem terrainSystem;
@@ -18,21 +18,24 @@ namespace Arycama.CustomRenderPipeline
             this.terrainSystem = terrainSystem;
         }
 
-        public override void Render((ScriptableRenderContext context, CullingResults cullingResults, List<ShadowRequest> directionalShadowRequests, List<ShadowRequest> pointShadowRequests, Vector3 viewPosition) data)
+        public override void Render((ScriptableRenderContext context, CullingResults cullingResults, Vector3 viewPosition) data)
         {
+            var requestData = renderGraph.ResourceMap.GetRenderPassData<ShadowRequestsData>(renderGraph.FrameIndex);
+
+
             // Render Shadows
             RTHandle directionalShadows;
-            if (data.directionalShadowRequests.Count == 0)
+            if (requestData.DirectionalShadowRequests.Count == 0)
             {
                 directionalShadows = renderGraph.EmptyTextureArray;
             }
             else
             {
-                directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, data.directionalShadowRequests.Count, TextureDimension.Tex2DArray);
+                directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, requestData.DirectionalShadowRequests.Count, TextureDimension.Tex2DArray);
 
-                for (var i = 0; i < data.directionalShadowRequests.Count; i++)
+                for (var i = 0; i < requestData.DirectionalShadowRequests.Count; i++)
                 {
-                    var shadowRequest = data.directionalShadowRequests[i];
+                    var shadowRequest = requestData.DirectionalShadowRequests[i];
                     var splitData = shadowRequest.ShadowSplitData;
 
                     using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Directional Light Shadows"))
@@ -66,21 +69,21 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            ListPool<ShadowRequest>.Release(data.directionalShadowRequests);
+            ListPool<ShadowRequest>.Release(requestData.DirectionalShadowRequests);
 
             // Process point shadows 
             RTHandle pointShadows;
-            if (data.pointShadowRequests.Count == 0)
+            if (requestData.PointShadowRequests.Count == 0)
             {
                 pointShadows = renderGraph.EmptyCubemapArray;
             }
             else
             {
-                pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D32_SFloat, data.pointShadowRequests.Count, TextureDimension.CubeArray);
+                pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D32_SFloat, requestData.PointShadowRequests.Count, TextureDimension.CubeArray);
 
-                for (var i = 0; i < data.pointShadowRequests.Count; i++)
+                for (var i = 0; i < requestData.PointShadowRequests.Count; i++)
                 {
-                    var shadowRequest = data.pointShadowRequests[i];
+                    var shadowRequest = requestData.PointShadowRequests[i];
                     if (!shadowRequest.IsValid)
                         continue;
 
@@ -112,7 +115,7 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            ListPool<ShadowRequest>.Release(data.pointShadowRequests);
+            ListPool<ShadowRequest>.Release(requestData.PointShadowRequests);
 
             var result = new Result(directionalShadows, pointShadows, settings.DirectionalShadowResolution, 1.0f / settings.DirectionalShadowResolution, settings.PcfFilterRadius, settings.PcfFilterSigma);
             renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex);

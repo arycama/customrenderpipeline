@@ -11,7 +11,7 @@ namespace Arycama.CustomRenderPipeline.Water
         private readonly Settings settings;
         private readonly GraphicsBuffer indexBuffer;
 
-        private readonly WaterFft waterFft;
+        public WaterFft WaterFft { get; }
         private readonly UnderwaterLighting underwaterLighting;
         private readonly DeferredWater deferredWater;
         private readonly WaterCaustics caustics;
@@ -55,7 +55,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             indexBuffer.SetData(pIndices);
 
-            waterFft = new(renderGraph, settings);
+            WaterFft = new(renderGraph, settings);
             underwaterLighting = new(renderGraph, settings);
             deferredWater = new(renderGraph, settings);
             caustics = new(renderGraph, settings);
@@ -65,18 +65,10 @@ namespace Arycama.CustomRenderPipeline.Water
         {
             indexBuffer.Dispose();
 
-            waterFft.Dispose();
+            WaterFft.Dispose();
             underwaterLighting.Dispose();
             deferredWater.Dispose();
             caustics.Dispose();
-        }
-
-        public void UpdateFft(double time)
-        {
-            if (!settings.IsEnabled)
-                return;
-
-            waterFft.Render(time);
         }
 
         public void UpdateCaustics()

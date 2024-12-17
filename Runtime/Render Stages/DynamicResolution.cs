@@ -1,9 +1,10 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Profiling;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class DynamicResolution
+    public class DynamicResolution : RenderFeature
     {
         [Serializable]
         public class Settings
@@ -19,17 +20,28 @@ namespace Arycama.CustomRenderPipeline
             public float Damping => damping;
         }
 
+        public CustomSampler FrameTimeSampler { get; }
         private readonly Settings settings;
+        private readonly Recorder frameTimeRecorder;
 
-        public DynamicResolution(Settings settings)
+        public DynamicResolution(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
+
+            FrameTimeSampler = CustomSampler.Create("Frame Time", true);
+            frameTimeRecorder = FrameTimeSampler.GetRecorder();
+        }
+
+        protected override void Cleanup(bool disposing)
+        {
+            ScaleFactor = 1.0f;
         }
 
         public float ScaleFactor { get; private set; } = 1.0f;
 
-        public void Update(float timing)
+        public override void Render()
         {
+            var timing = frameTimeRecorder.gpuElapsedNanoseconds;
             var desiredFrameTime = 1000.0f / settings.TargetFrameRate;
             var gpuTimeMs = timing / 1000.0f / 1000.0f;
 
@@ -45,11 +57,15 @@ namespace Arycama.CustomRenderPipeline
 
             if (float.IsNaN(ScaleFactor))
                 ScaleFactor = 1.0f;
-        }
 
-        private void ResetScale()
-        {
-            ScaleFactor = 1.0f;
+            // TODO: On DX12 we don't need this
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Dynamic Resolution Begin"))
+            {
+                pass.SetRenderFunction((command, pass) =>
+                {
+                    command.BeginSample(FrameTimeSampler);
+                });
+            }
         }
     }
 }

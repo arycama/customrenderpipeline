@@ -3,24 +3,22 @@ using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Object = UnityEngine.Object;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public partial class PhysicalSky
+    public partial class PhysicalSky : RenderFeature
     {
-        private readonly RenderGraph renderGraph;
         private readonly Settings settings;
         private readonly VolumetricClouds.Settings cloudSettings;
-        private readonly Material skyMaterial;
-        private readonly Material ggxConvolutionMaterial;
+        private readonly Material skyMaterial, ggxConvolutionMaterial;
         private readonly RTHandle transmittance, multiScatter, groundAmbient, skyAmbient;
         private int version = -1;
 
         private readonly PersistentRTHandleCache textureCache;
 
-        public PhysicalSky(RenderGraph renderGraph, Settings settings, VolumetricClouds.Settings cloudSettings)
+        public PhysicalSky(RenderGraph renderGraph, Settings settings, VolumetricClouds.Settings cloudSettings) : base(renderGraph)
         {
-            this.renderGraph = renderGraph;
             this.settings = settings;
             this.cloudSettings = cloudSettings;
 
@@ -34,7 +32,20 @@ namespace Arycama.CustomRenderPipeline
             skyAmbient = renderGraph.GetTexture(settings.AmbientSkyWidth, settings.AmbientSkyHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
         }
 
-        public void GenerateLookupTables()
+        protected override void Cleanup(bool disposing)
+        {
+            transmittance.IsPersistent = false;
+            multiScatter.IsPersistent = false;
+            groundAmbient.IsPersistent = false;
+            skyAmbient.IsPersistent = false;
+
+            Object.DestroyImmediate(skyMaterial);
+            Object.DestroyImmediate(ggxConvolutionMaterial);
+
+            textureCache.Dispose();
+        }
+
+        public override void Render()
         {
             var atmospherePropertiesBuffer = renderGraph.SetConstantBuffer((
                     rayleighScatter: settings.RayleighScatter / settings.EarthScale,

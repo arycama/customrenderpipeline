@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public class WaterFft : RenderFeature<double>
+    public class WaterFft : RenderFeature
     {
         private const int CascadeCount = 4;
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
@@ -33,7 +33,7 @@ namespace Arycama.CustomRenderPipeline.Water
             dispersionBuffer.Dispose();
         }
 
-        public override void Render(double time)
+        public override void Render()
         {
             // Todo: Should this happen in constructor?
             if (!roughnessInitialized)
@@ -59,6 +59,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             // Calculate constants
             var patchSizes = new Vector4(Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 0f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 1f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 2f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 3f));
+            var timeData = renderGraph.ResourceMap.GetRenderPassData<TimeData>(renderGraph.FrameIndex);
 
             // Load resources
             var computeShader = Resources.Load<ComputeShader>("OceanFFT");
@@ -75,7 +76,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 spectrumStart: new Vector4(0, Profile.MaxWaveNumber * patchSizes.y / patchSizes.x, Profile.MaxWaveNumber * patchSizes.z / patchSizes.y, Profile.MaxWaveNumber * patchSizes.w / patchSizes.z),
                 spectrumEnd: new Vector4(Profile.MaxWaveNumber, Profile.MaxWaveNumber, Profile.MaxWaveNumber, settings.Resolution),
                 Profile.Gravity,
-                (float)time,
+                (float)timeData.Time,
                 Profile.TimeScale,
                 Profile.SequenceLength
             ));

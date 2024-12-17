@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class PersistentRTHandleCache
+    public class PersistentRTHandleCache : IDisposable
     {
         private readonly Dictionary<Camera, RTHandle> textureCache = new();
 
@@ -17,6 +17,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly string name;
 
         public RenderGraph renderGraph;
+        private bool disposedValue;
 
         public PersistentRTHandleCache(GraphicsFormat format, RenderGraph renderGraph, string name = "", TextureDimension dimension = TextureDimension.Tex2D, bool hasMips = false)
         {
@@ -61,6 +62,31 @@ namespace Arycama.CustomRenderPipeline
             textureCache[camera] = current;
 
             return (current, history, wasCreated);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposedValue)
+                return;
+
+            foreach (var texture in textureCache)
+                texture.Value.IsPersistent = false;
+
+            if (disposing)
+                textureCache.Clear();
+
+            disposedValue = true;
+        }
+
+        ~PersistentRTHandleCache()
+        {
+            Dispose(false);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
         }
     }
 }

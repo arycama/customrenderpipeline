@@ -13,7 +13,7 @@
 Texture2D<float4> _NormalRoughness, _BentNormalOcclusion, AlbedoMetallic;
 Texture2D<float3> PreviousFrame;
 Texture2D<float2> Velocity;
-Texture2D<float> _HiZDepth, _Depth;
+Texture2D<float> _HiZMinDepth, _Depth;
 Texture2D<uint2> _Stencil;
 
 cbuffer Properties
@@ -31,7 +31,7 @@ struct TraceResult
 
 TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float depth = _HiZDepth[position.xy];
+	float depth = _HiZMinDepth[position.xy];
 	float3 V = -worldDir * RcpLength(worldDir);
 	
 	float2 u = Noise2D(position.xy);
@@ -52,7 +52,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	worldPosition = worldPosition * (1 - 0.001 * rcp(max(NdotV, FloatEps)));
 	
 	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZDepth, _MaxMip, validHit, float3(position.xy, depth));
+	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZMinDepth, _MaxMip, validHit, float3(position.xy, depth));
 	
 	float outDepth;
 	float3 color, hitRay;

@@ -7,30 +7,31 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class LightingSetup
+    public class LightingSetup : RenderFeature<(Matrix4x4 clipToWorld, Matrix4x4 jitteredClipToWorld, float near, float far, Camera camera)>
     {
         private readonly ShadowSettings settings;
-        private readonly RenderGraph renderGraph;
 
-        public LightingSetup(ShadowSettings settings, RenderGraph renderGraph)
+        public LightingSetup(ShadowSettings settings, RenderGraph renderGraph) : base(renderGraph)
         {
-            this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            this.renderGraph = renderGraph ?? throw new ArgumentNullException(nameof(renderGraph));
+            this.settings = settings;
         }
 
-        public void Render(CullingResults cullingResults, Matrix4x4 clipToWorld, Matrix4x4 jitteredClipToWorld, float near, float far, Camera camera, out List<ShadowRequest> directionalShadowRequests, out List<ShadowRequest> pointShadowRequests)
+        public override void Render((Matrix4x4 clipToWorld, Matrix4x4 jitteredClipToWorld, float near, float far, Camera camera) data)
         {
             var directionalLightList = ListPool<DirectionalLightData>.Get();
-            directionalShadowRequests = ListPool<ShadowRequest>.Get();
+            var directionalShadowRequests = ListPool<ShadowRequest>.Get();
             var directionalShadowMatrices = ListPool<Matrix4x4>.Get();
             var directionalShadowTexelSizes = ListPool<Vector4>.Get();
             var lightList = ListPool<LightData>.Get();
-            pointShadowRequests = ListPool<ShadowRequest>.Get();
+            var pointShadowRequests = ListPool<ShadowRequest>.Get();
 
             // Find first 2 directional lights
             Color lightColor0 = Color.clear, lightColor1 = Color.clear;
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
             var dirLightCount = 0;
+
+            var cullingResultsData = renderGraph.ResourceMap.GetRenderPassData<CullingResultsData>(renderGraph.FrameIndex);
+            var cullingResults = cullingResultsData.CullingResults;
 
             // Setup lights/shadows
             for (var i = 0; i < cullingResults.visibleLights.Length; i++)
@@ -61,8 +62,8 @@ namespace Arycama.CustomRenderPipeline
                     {
                         for (var j = 0; j < settings.ShadowCascades; j++)
                         {
-                            var cascadeStart = j == 0 ? near : (settings.ShadowDistance - near) * settings.ShadowCascadeSplits[j - 1];
-                            var cascadeEnd = (j == settings.ShadowCascades - 1) ? settings.ShadowDistance : (settings.ShadowDistance - near) * settings.ShadowCascadeSplits[j];
+                            var cascadeStart = j == 0 ? data.near : (settings.ShadowDistance - data.near) * settings.ShadowCascadeSplits[j - 1];
+                            var cascadeEnd = (j == settings.ShadowCascades - 1) ? settings.ShadowDistance : (settings.ShadowDistance - data.near) * settings.ShadowCascadeSplits[j];
 
                             // Transform camera bounds to light space
                             var minValue = Vector3.positiveInfinity;
@@ -78,7 +79,7 @@ namespace Arycama.CustomRenderPipeline
                                     for (var x = 0; x < 2; x++)
                                     {
                                         var eyeDepth = z == 0 ? cascadeStart : cascadeEnd;
-                                        var clipDepth = (1.0f - eyeDepth / far) / (eyeDepth * (1.0f / near - 1.0f / far));
+                                        var clipDepth = (1.0f - eyeDepth / data.far) / (eyeDepth * (1.0f / data.near - 1.0f / data.far));
 
                                         var clipPoint = new Vector4
                                         (
@@ -89,7 +90,7 @@ namespace Arycama.CustomRenderPipeline
                                         );
 
                                         {
-                                            var worldPoint = clipToWorld * clipPoint;
+                                            var worldPoint = data.clipToWorld * clipPoint;
                                             var localPoint = worldToLight.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w);
 
                                             minValue = Vector3.Min(minValue, localPoint);
@@ -97,8 +98,8 @@ namespace Arycama.CustomRenderPipeline
                                         }
 
                                         {
-                                            var worldPoint = jitteredClipToWorld * clipPoint;
-                                            var localPointRws = worldToLight.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w - camera.transform.position);
+                                            var worldPoint = data.jitteredClipToWorld * clipPoint;
+                                            var localPointRws = worldToLight.MultiplyPoint3x4((Vector3)worldPoint / worldPoint.w - data.camera.transform.position);
 
                                             minValueRws = Vector3.Min(minValueRws, localPointRws);
                                             maxValueRws = Vector3.Max(maxValueRws, localPointRws);
@@ -145,7 +146,7 @@ namespace Arycama.CustomRenderPipeline
 
                             // Add any planes that face away from the light direction. This avoids rendering shadowcasters that can never cast a visible shadow
                             var lightDirection = -visibleLight.localToWorldMatrix.Forward();
-                            GeometryUtility.CalculateFrustumPlanes(camera, frustumPlanes);
+                            GeometryUtility.CalculateFrustumPlanes(data.camera, frustumPlanes);
                             for (var k = 0; k < 6; k++)
                             {
                                 var plane = frustumPlanes[k];
@@ -182,7 +183,7 @@ namespace Arycama.CustomRenderPipeline
                                 m33 = 1.0f
                             };
 
-                            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(-camera.transform.position, lightRotation);
+                            var viewMatrixRWS = Matrix4x4Extensions.WorldToLocal(-data.camera.transform.position, lightRotation);
                             var vm = viewMatrixRWS;
                             var shadowMatrix = new Matrix4x4
                             {
@@ -219,6 +220,8 @@ namespace Arycama.CustomRenderPipeline
                         if (cascadeCount > 0)
                             shadowIndex = (uint)(directionalShadowRequests.Count - cascadeCount);
                     }
+
+                    renderGraph.ResourceMap.SetRenderPassData(new ShadowRequestsData(directionalShadowRequests, pointShadowRequests), renderGraph.FrameIndex);
 
                     Vector3 color = (Vector4)light.color.linear;
 
@@ -259,7 +262,7 @@ namespace Arycama.CustomRenderPipeline
                                     isValid = true;
                                 }
 
-                                viewMatrix = Matrix4x4.TRS(light.transform.position - camera.transform.position, viewMatrix.inverse.rotation, Vector3.one).inverse;
+                                viewMatrix = Matrix4x4.TRS(light.transform.position - data.camera.transform.position, viewMatrix.inverse.rotation, Vector3.one).inverse;
 
                                 // To undo unity's builtin inverted culling for point shadows, flip the y axis.
                                 // Y also needs to be done in the shader
@@ -351,7 +354,7 @@ namespace Arycama.CustomRenderPipeline
 
                     var lightToWorld = visibleLight.localToWorldMatrix;
                     var pointLightData = new LightData(
-                        lightToWorld.GetPosition() - camera.transform.position,
+                        lightToWorld.GetPosition() - data.camera.transform.position,
                         light.range,
                         (Vector4)light.color.linear * light.intensity,
                         lightType,
