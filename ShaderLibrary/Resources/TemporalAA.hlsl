@@ -1,3 +1,7 @@
+#ifdef __INTELLISENSE__
+	#define UPSCALE
+#endif
+
 #include "../Common.hlsl"
 #include "../Exposure.hlsl"
 #include "../Utility.hlsl"
@@ -36,7 +40,13 @@ struct FragmentOutput
 
 FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 {
-	float2 velocity = Velocity[position.xy];
+	#ifdef UPSCALE
+		uint2 centerCoord = (uint2)(position.xy * _Scale - _Jitter.xy);
+	#else
+		uint2 centerCoord = (uint2)position.xy;
+	#endif
+
+	float2 velocity = Velocity[centerCoord];
 	float2 historyUv = uv - velocity;
 	
 	float2 f = frac(historyUv * _ScaledResolution.xy - 0.5);
@@ -55,8 +65,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	   0.0
 	};
 	
+	float filterWeights[9] = { _BoxFilterWeights0[0], _BoxFilterWeights0[1], _BoxFilterWeights0[2], _BoxFilterWeights0[3], _CenterBoxFilterWeight, _BoxFilterWeights1[0], _BoxFilterWeights1[1], _BoxFilterWeights1[2], _BoxFilterWeights1[3] };
+	
 	float3 result = 0.0, history = 0.0;
 	float3 minValue, maxValue, mean = 0.0, stdDev = 0.0;
+	float totalWeight = 0.0;
 	
 	[unroll]
 	for (int y = -1, i = 0; y <= 1; y++)
@@ -64,13 +77,24 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 		[unroll]
 		for (int x = -1; x <= 1; x++, i++)
 		{
-			float3 color = _Input[clamp(position.xy + int2(x, y), 0, _Resolution.xy - 1.0)];
+			float3 color = _Input[clamp(centerCoord + int2(x, y), 0, _Resolution.xy - 1.0)];
 			
-			float2 delta = float2(x, y) + _Jitter.xy;
-			float filterSize = 4.0 / 3.0;
-			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
+			#ifdef UPSCALE
+				float _BlendSharpness = 0.5;
+				float filterSize = 4.0 / 3.0;
+				float2 delta = (floor(position.xy * _Scale - _Jitter.xy) + 0.5 + float2(x, y) + _Jitter.xy) / _Scale - position.xy;
+				float weight = Mitchell1D(delta.x * filterSize, 0.0, _BlendSharpness) * Mitchell1D(delta.y * filterSize, 0.0, _BlendSharpness);
+				totalWeight += weight;
+			#else
+				float weight = filterWeights[i];
+			#endif
+			
 			result += color * weight;
-			history += color * historyWeights[i];
+			
+			// Can't use history sampling with dynamic res
+			#ifndef UPSCALE
+				history += color * historyWeights[i];
+			#endif
 			
 			minValue = i ? min(minValue, color) : color;
 			maxValue = i ? max(maxValue, color) : color;
@@ -80,8 +104,17 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 		}
 	}
 	
+	// Only needed for upscale, since full res weights are normalized
+	#ifdef UPSCALE
+		if(totalWeight)
+			result *= rcp(totalWeight);
+	#else
+		totalWeight = _BoxWeightSum;
+	#endif
+	
 	history *= rcp(w.x + w.y + 1.0);
 	float4 historySample = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
+	
 	history += historySample.rgb * _PreviousToCurrentExposure;
 	float historyWeight = historySample.a;
 	
@@ -94,11 +127,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	history = ClipToAABB(history, mean, minValue, maxValue);
 	
 	// Weight result and history
-	result *= _BoxWeightSum;
+	result *= totalWeight;
 	history *= historyWeight;
 	
 	result = lerp(result, history, _StationaryBlending);
-	float weight = lerp(_BoxWeightSum, historyWeight, _StationaryBlending);
+	float weight = lerp(totalWeight, historyWeight, _StationaryBlending);
 
 	FragmentOutput output;
 	
