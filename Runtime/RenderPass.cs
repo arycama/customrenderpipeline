@@ -83,8 +83,11 @@ namespace Arycama.CustomRenderPipeline
             writeBuffers.Add((propertyName, buffer));
         }
 
-        private void AddRenderPassData<T>(RenderPassDataHandle handle, bool isOptional) where T : IRenderPassData
+        public void AddRenderPassData<T>(bool isOptional = false) where T : IRenderPassData
         {
+            Assert.IsFalse(RenderGraph.IsExecuting);
+            var handle = RenderGraph.ResourceMap.GetResourceHandle<T>();
+
             if (isOptional)
             {
                 if (RenderGraph.ResourceMap.TryGetRenderPassData<T>(handle, RenderGraph.FrameIndex, out var data))
@@ -99,13 +102,6 @@ namespace Arycama.CustomRenderPipeline
             RenderPassDataHandles.Add((handle, isOptional));
         }
 
-        public void AddRenderPassData<T>(bool isOptional = false) where T : IRenderPassData
-        {
-            Assert.IsFalse(RenderGraph.IsExecuting);
-            var handle = RenderGraph.ResourceMap.GetResourceHandle<T>();
-            AddRenderPassData<T>(handle, isOptional);
-        }
-
         public void Run(CommandBuffer command)
         {
             command.BeginSample(Name);
@@ -113,7 +109,7 @@ namespace Arycama.CustomRenderPipeline
             // Set render pass data
             //foreach(var renderPassDataHandle in renderPassDataHandles)
             //{
-            //    var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle);
+            //    var data = RenderGraph.GetResource<IRenderPassData>(renderPassDataHandle);
             //    data.SetInputs(this);
             //}
 

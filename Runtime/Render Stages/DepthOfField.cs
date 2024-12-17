@@ -69,7 +69,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_SampleCount", data.sampleCount);
                 });
 
-                renderGraph.ResourceMap.SetRenderPassData(new CameraTargetData(tempId), renderGraph.FrameIndex);
+                renderGraph.SetResource(new CameraTargetData(tempId));;
             }
         }
     }

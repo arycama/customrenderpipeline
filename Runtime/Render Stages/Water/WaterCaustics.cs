@@ -143,7 +143,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new CausticsResult(result, settings.CasuticsCascade, settings.CausticsDepth), renderGraph.FrameIndex);
+            renderGraph.SetResource(new CausticsResult(result, settings.CasuticsCascade, settings.CausticsDepth));;
         }
     }
 }

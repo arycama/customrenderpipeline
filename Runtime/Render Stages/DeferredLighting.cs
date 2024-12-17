@@ -50,7 +50,7 @@ public class DeferredLighting : RenderFeature<(RTHandle depth, RTHandle albedoMe
             pass.AddRenderPassData<CausticsResult>();
             pass.AddRenderPassData<BentNormalOcclusionData>();
 
-            var hasWaterShadow = renderGraph.ResourceMap.IsRenderPassDataValid<WaterShadowResult>(renderGraph.FrameIndex);
+            var hasWaterShadow = renderGraph.IsRenderPassDataValid<WaterShadowResult>();
             pass.Keyword = hasWaterShadow ? "WATER_SHADOWS_ON" : string.Empty;
 
             pass.SetRenderFunction((command, pass) =>

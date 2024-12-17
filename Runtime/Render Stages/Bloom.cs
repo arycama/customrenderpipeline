@@ -50,7 +50,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(material, i == 0 ? 0 : 1);
                 pass.WriteTexture(bloomIds[i], RenderBufferLoadAction.DontCare);
 
-                var rt = i > 0 ? bloomIds[i - 1] : renderGraph.ResourceMap.GetRenderPassData<CameraTargetData>(renderGraph.FrameIndex).Handle;
+                var rt = i > 0 ? bloomIds[i - 1] : renderGraph.GetResource<CameraTargetData>().Handle;
                 pass.ReadTexture("_Input", rt);
 
                 var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
@@ -87,7 +87,7 @@ namespace Arycama.CustomRenderPipeline
             var result = bloomIds[0];
             ListPool<RTHandle>.Release(bloomIds);
 
-            renderGraph.ResourceMap.SetRenderPassData<BloomData>(new BloomData(result), renderGraph.FrameIndex);
+            renderGraph.SetResource<BloomData>(new BloomData(result));;
         }
     }
 }

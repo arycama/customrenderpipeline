@@ -118,7 +118,7 @@ namespace Arycama.CustomRenderPipeline
                     });
                 }
 
-                renderGraph.ResourceMap.SetRenderPassData(new AutoExposureData(bufferHandle, isFirst), renderGraph.FrameIndex);
+                renderGraph.SetResource(new AutoExposureData(bufferHandle, isFirst));;
             }
         }
 
@@ -199,7 +199,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.SetRenderFunction(output, (command, pass, data) =>
                 {
-                    var exposureData = pass.RenderGraph.ResourceMap.GetRenderPassData<AutoExposureData>(renderGraph.FrameIndex);
+                    var exposureData = pass.RenderGraph.GetResource<AutoExposureData>();
                     command.CopyBuffer(data, exposureData.exposureBuffer);
                 });
             }

@@ -60,7 +60,7 @@ public class UIBlur : RenderFeature<(int width, int height)>
             });
         }
 
-        renderGraph.ResourceMap.SetRenderPassData(new UIBlurResult(verticalResult), renderGraph.FrameIndex);
+        renderGraph.SetResource(new UIBlurResult(verticalResult));;
     }
 
     public readonly struct UIBlurResult : IRenderPassData

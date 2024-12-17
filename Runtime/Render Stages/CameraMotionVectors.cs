@@ -35,7 +35,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<ICommonPassData>();
             }
 
-            renderGraph.ResourceMap.SetRenderPassData<VelocityData>(new VelocityData(result), renderGraph.FrameIndex);
+            renderGraph.SetResource<VelocityData>(new VelocityData(result));;
         }
     }
 }

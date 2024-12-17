@@ -98,7 +98,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize), renderGraph.FrameIndex);
+            renderGraph.SetResource(new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize));;
         }
     }
 }

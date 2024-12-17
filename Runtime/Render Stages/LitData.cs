@@ -153,7 +153,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex, true);
+            renderGraph.SetResource(result, true);
         }
 
         public struct Result : IRenderPassData

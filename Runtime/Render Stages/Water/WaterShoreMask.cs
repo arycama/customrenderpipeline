@@ -148,7 +148,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var scaleOffset = new Vector4(1f / terrainSize.x, 1f / terrainSize.z, -terrainPosition.x / terrainSize.x, -terrainPosition.z / terrainSize.z);
-            renderGraph.ResourceMap.SetRenderPassData<Result>(new Result(result, resultDataBuffer, scaleOffset, terrainSize, -terrainPosition.y, terrainSize.x), renderGraph.FrameIndex, true);
+            renderGraph.SetResource<Result>(new Result(result, resultDataBuffer, scaleOffset, terrainSize, -terrainPosition.y, terrainSize.x), true);
         }
 
         private readonly struct ResultData

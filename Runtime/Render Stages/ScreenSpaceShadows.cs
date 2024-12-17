@@ -33,7 +33,7 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
 
     public override void Render((RTHandle depth, int width, int height, Camera camera, float bias, float distantBias, RTHandle normalRoughness) data)
     {
-        var cullingResultsData = renderGraph.ResourceMap.GetRenderPassData<CullingResultsData>(renderGraph.FrameIndex);
+        var cullingResultsData = renderGraph.GetResource<CullingResultsData>();
         var cullingResults = cullingResultsData.CullingResults;
 
         var lightDirection = Vector3.up;
@@ -66,7 +66,7 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
 
             using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Raytraced Shadows"))
             {
-                var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
+                var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
                 pass.Initialize(shadowRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, data.width, data.height, 1, data.bias, data.distantBias, data.camera.fieldOfView);
                 pass.WriteTexture(tempResult, "HitResult");
@@ -184,7 +184,7 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
             });
         }
 
-        renderGraph.ResourceMap.SetRenderPassData(new Result(current), renderGraph.FrameIndex);
+        renderGraph.SetResource(new Result(current));;
     }
 
     public struct Result : IRenderPassData

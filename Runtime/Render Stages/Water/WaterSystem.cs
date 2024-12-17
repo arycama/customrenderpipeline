@@ -173,7 +173,7 @@ namespace Arycama.CustomRenderPipeline.Water
             };
 
             // TODO: Change to near/far
-            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewProjectionMatrix, shadowMatrix, cullingPlanes), renderGraph.FrameIndex);
+            renderGraph.SetResource(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewProjectionMatrix, shadowMatrix, cullingPlanes));;
         }
 
         public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes)
@@ -182,7 +182,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 return;
 
             var result = Cull(viewPosition, cullingPlanes);
-            renderGraph.ResourceMap.SetRenderPassData(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer), renderGraph.FrameIndex);
+            renderGraph.SetResource(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer));;
         }
 
         public void RenderShadow(Vector3 viewPosition)
@@ -199,7 +199,7 @@ namespace Arycama.CustomRenderPipeline.Water
             var profile = settings.Profile;
             var resolution = settings.Resolution;
 
-            var passData = renderGraph.ResourceMap.GetRenderPassData<WaterShadowCullResult>(renderGraph.FrameIndex);
+            var passData = renderGraph.GetResource<WaterShadowCullResult>();
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Shadow"))
             {
                 pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
@@ -239,7 +239,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction"), waterIlluminance), renderGraph.FrameIndex);
+            renderGraph.SetResource(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction"), waterIlluminance));;
         }
 
 
@@ -274,7 +274,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Render"))
             {
-                var passData = renderGraph.ResourceMap.GetRenderPassData<WaterRenderCullResult>(renderGraph.FrameIndex);
+                var passData = renderGraph.GetResource<WaterRenderCullResult>();
                 pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
 
                 pass.WriteDepth(data.cameraDepth);
@@ -316,7 +316,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction")), renderGraph.FrameIndex);
+            renderGraph.SetResource(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction")));;
         }
 
         public void RenderWaterPost(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, Camera camera)

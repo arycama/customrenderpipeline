@@ -66,7 +66,7 @@ namespace Arycama.CustomRenderPipeline
             Empty3DTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
             EmptyCubemap = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave });
             EmptyCubemapArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
-           
+
             ResourceMap = new(this);
 
             allRenderTextures.Add(EmptyTexture.RenderTexture);
@@ -140,23 +140,6 @@ namespace Arycama.CustomRenderPipeline
             foreach (var bufferHandle in bufferHandlesToCreate)
                 bufferHandle.Create();
             bufferHandlesToCreate.Clear();
-
-            //foreach (var renderPass in renderPasses)
-            //{
-            //    foreach (var renderPassDataHandle in renderPass.RenderPassDataHandles)
-            //    {
-            //        if (renderPassDataHandle.Item2)
-            //        {
-            //            if (ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, FrameIndex, out var data))
-            //                data.SetInputs(renderPass);
-            //        }
-            //        else
-            //        {
-            //            var data = ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, FrameIndex);
-            //            data.SetInputs(renderPass);
-            //        }
-            //    }
-            //}
 
             // Build mapping from pass index to rt handles that can be freed
             foreach (var input in lastRtHandleRead)
@@ -501,6 +484,21 @@ namespace Arycama.CustomRenderPipeline
             lastRtHandleRead[handle] = passIndex;
         }
 
+        public void SetResource<T>(T resource, bool isPersistent = false) where T : IRenderPassData
+        {
+            ResourceMap.SetRenderPassData(resource, FrameIndex, isPersistent);
+        }
+
+        public bool IsRenderPassDataValid<T>() where T: IRenderPassData
+        {
+            return ResourceMap.IsRenderPassDataValid<T>(FrameIndex);
+        }
+
+        public T GetResource<T>() where T : IRenderPassData
+        {
+            return ResourceMap.GetRenderPassData<T>(FrameIndex);
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (disposedValue)
@@ -510,6 +508,8 @@ namespace Arycama.CustomRenderPipeline
             {
                 // TODO: dispose managed state (managed objects)
             }
+
+            ResourceMap.Dispose();
 
             foreach (var rt in allRenderTextures)
             {
@@ -550,12 +550,6 @@ namespace Arycama.CustomRenderPipeline
             return buffer;
         }
 
-        private struct ConstantBufferPassData<T>
-        {
-            public T data;
-            public BufferHandle buffer;
-        }
-
         ~RenderGraph()
         {
             Dispose(disposing: false);
@@ -567,9 +561,5 @@ namespace Arycama.CustomRenderPipeline
             Dispose(disposing: true);
             GC.SuppressFinalize(this);
         }
-    }
-
-    public struct EmptyPassData
-    {
     }
 }

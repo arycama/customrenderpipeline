@@ -49,7 +49,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new UnderwaterLightingResult(underwaterResultId), renderGraph.FrameIndex);
+            renderGraph.SetResource(new UnderwaterLightingResult(underwaterResultId));;
         }
     }
 }

@@ -44,7 +44,7 @@ namespace Arycama.CustomRenderPipeline
 
                 using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Diffuse GI Raytrace"))
                 {
-                    var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
+                    var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
                     pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, data.width, data.height, 1, data.bias, data.distantBias, data.camera.fieldOfView);
                     pass.WriteTexture(tempResult, "HitColor");
@@ -164,7 +164,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new Result(current, settings.Intensity), renderGraph.FrameIndex);
+            renderGraph.SetResource(new Result(current, settings.Intensity));;
         }
 
         public readonly struct Result : IRenderPassData

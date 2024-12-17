@@ -20,7 +20,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void Render((ScriptableRenderContext context, CullingResults cullingResults, Vector3 viewPosition) data)
         {
-            var requestData = renderGraph.ResourceMap.GetRenderPassData<ShadowRequestsData>(renderGraph.FrameIndex);
+            var requestData = renderGraph.GetResource<ShadowRequestsData>();
 
 
             // Render Shadows
@@ -118,7 +118,7 @@ namespace Arycama.CustomRenderPipeline
             ListPool<ShadowRequest>.Release(requestData.PointShadowRequests);
 
             var result = new Result(directionalShadows, pointShadows, settings.DirectionalShadowResolution, 1.0f / settings.DirectionalShadowResolution, settings.PcfFilterRadius, settings.PcfFilterSigma);
-            renderGraph.ResourceMap.SetRenderPassData(result, renderGraph.FrameIndex);
+            renderGraph.SetResource(result);;
         }
 
         public readonly struct Result : IRenderPassData

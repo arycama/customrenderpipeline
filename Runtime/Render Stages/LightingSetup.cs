@@ -30,7 +30,7 @@ namespace Arycama.CustomRenderPipeline
             Vector3 lightDirection0 = Vector3.up, lightDirection1 = Vector3.up;
             var dirLightCount = 0;
 
-            var cullingResultsData = renderGraph.ResourceMap.GetRenderPassData<CullingResultsData>(renderGraph.FrameIndex);
+            var cullingResultsData = renderGraph.GetResource<CullingResultsData>();
             var cullingResults = cullingResultsData.CullingResults;
 
             // Setup lights/shadows
@@ -221,7 +221,7 @@ namespace Arycama.CustomRenderPipeline
                             shadowIndex = (uint)(directionalShadowRequests.Count - cascadeCount);
                     }
 
-                    renderGraph.ResourceMap.SetRenderPassData(new ShadowRequestsData(directionalShadowRequests, pointShadowRequests), renderGraph.FrameIndex);
+                    renderGraph.SetResource(new ShadowRequestsData(directionalShadowRequests, pointShadowRequests));;
 
                     Vector3 color = (Vector4)light.color.linear;
 
@@ -371,7 +371,7 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new DirectionalLightInfo(lightDirection0, (Vector4)lightColor0, lightDirection1, (Vector4)lightColor1, dirLightCount), renderGraph.FrameIndex);
+            renderGraph.SetResource(new DirectionalLightInfo(lightDirection0, (Vector4)lightColor0, lightDirection1, (Vector4)lightColor1, dirLightCount));;
 
             var directionalLightBuffer = directionalLightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(directionalLightList.Count, UnsafeUtility.SizeOf<DirectionalLightData>());
             var directionalShadowMatricesBuffer = directionalShadowRequests.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(directionalShadowMatrices.Count, UnsafeUtility.SizeOf<Matrix4x4>());
@@ -408,7 +408,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new Result(directionalShadowMatricesBuffer, directionalShadowTexelSizesBuffer, directionalLightBuffer, pointLightBuffer, directionalLightList.Count, lightList.Count), renderGraph.FrameIndex);
+            renderGraph.SetResource(new Result(directionalShadowMatricesBuffer, directionalShadowTexelSizesBuffer, directionalLightBuffer, pointLightBuffer, directionalLightList.Count, lightList.Count));;
         }
 
         public readonly struct Result : IRenderPassData

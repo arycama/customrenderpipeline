@@ -115,7 +115,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
                 using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Water Raytraced Refractions"))
                 {
-                    var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
+                    var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
                     pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, data.width, data.height, 1, 0.1f, 0.1f, data.camera.fieldOfView);
                     pass.WriteTexture(refractionResult, "RefractionResult");

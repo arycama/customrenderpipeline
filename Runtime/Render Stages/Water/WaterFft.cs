@@ -59,7 +59,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             // Calculate constants
             var patchSizes = new Vector4(Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 0f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 1f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 2f), Profile.PatchSize / Mathf.Pow(Profile.CascadeScale, 3f));
-            var timeData = renderGraph.ResourceMap.GetRenderPassData<TimeData>(renderGraph.FrameIndex);
+            var timeData = renderGraph.GetResource<TimeData>();
 
             // Load resources
             var computeShader = Resources.Load<ComputeShader>("OceanFFT");
@@ -176,7 +176,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new OceanFftResult(displacementCurrent, displacementHistory, normalFoamSmoothness, lengthToRoughness, oceanBuffer), renderGraph.FrameIndex);
+            renderGraph.SetResource(new OceanFftResult(displacementCurrent, displacementHistory, normalFoamSmoothness, lengthToRoughness, oceanBuffer));;
         }
     }
 }

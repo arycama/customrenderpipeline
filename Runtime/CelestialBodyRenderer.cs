@@ -16,7 +16,7 @@ public class CelestialBodyRenderer : RenderFeature<(RTHandle Depth, RTHandle Inp
             pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<ICommonPassData>();
 
-            var viewPosition = renderGraph.ResourceMap.GetRenderPassData<ViewData>(renderGraph.FrameIndex).ViewPosition;
+            var viewPosition = renderGraph.GetResource<ViewData>().ViewPosition;
 
             pass.SetRenderFunction((data, viewPosition), (command, pass, data) =>
             {

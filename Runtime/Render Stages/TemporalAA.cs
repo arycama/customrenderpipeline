@@ -76,7 +76,7 @@ namespace Arycama.CustomRenderPipeline
             var rcpCrossWeightSum = 1.0f / crossWeightSum;
             var rcpBoxWeightSum = 1.0f / boxWeightSum;
 
-            renderGraph.ResourceMap.SetRenderPassData(new TemporalAAData
+            renderGraph.SetResource(new TemporalAAData
             (
                 renderGraph.SetConstantBuffer((
                     new Vector4(jitter.x, jitter.y, jitter.x / scaledWidth, jitter.y / scaledHeight),
@@ -88,7 +88,7 @@ namespace Arycama.CustomRenderPipeline
                     new Vector4(weights[1], weights[3], weights[5], weights[7]) * rcpCrossWeightSum,
                     new Vector4(weights[0], weights[1], weights[2], weights[3]) * rcpBoxWeightSum,
                     new Vector4(weights[5], weights[6], weights[7], weights[8]) * rcpBoxWeightSum))
-            ), renderGraph.FrameIndex);
+            ));;
 
             ArrayPool<float>.Release(weights);
         }
@@ -144,7 +144,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt(command, "_MaxHeight", data.maxHeight);
                 });
 
-                renderGraph.ResourceMap.SetRenderPassData(new CameraTargetData(result), renderGraph.FrameIndex);
+                renderGraph.SetResource(new CameraTargetData(result));;
             }
         }
 

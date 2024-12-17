@@ -37,7 +37,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Raytraced Ambient Occlusion"))
                 {
-                    var raytracingData = renderGraph.ResourceMap.GetRenderPassData<RaytracingResult>(renderGraph.FrameIndex);
+                    var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
                     pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, width, height, 1, data.bias, data.distantBias, data.camera.fieldOfView);
                     pass.WriteTexture(tempResult, "HitColor");
@@ -163,7 +163,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new Result(current), renderGraph.FrameIndex);
+            renderGraph.SetResource(new Result(current));;
 
             var newBentNormalOcclusion = renderGraph.GetTexture(width, height, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Resolve"))
@@ -184,7 +184,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.ResourceMap.SetRenderPassData(new BentNormalOcclusionData(newBentNormalOcclusion), renderGraph.FrameIndex);
+            renderGraph.SetResource(new BentNormalOcclusionData(newBentNormalOcclusion));;
         }
 
         // Only used for debugging as the result is combined into the bent normal texture

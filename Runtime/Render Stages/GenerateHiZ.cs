@@ -73,7 +73,7 @@ public class GenerateHiZ : RenderFeature<(RTHandle input, int width, int height)
             }
         }
 
-        renderGraph.ResourceMap.SetRenderPassData(new HiZMinDepthData(result), renderGraph.FrameIndex);
+        renderGraph.SetResource(new HiZMinDepthData(result));;
     }
 
     public enum HiZMode
