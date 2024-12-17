@@ -1,5 +1,3 @@
-using Arycama.CustomRenderPipeline;
-using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -167,7 +165,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.SetResource(new SkyTransmittanceData(skyTransmittance, settings.TransmittanceWidth, settings.TransmittanceHeight));;
+            renderGraph.SetResource(new SkyTransmittanceData(skyTransmittance, settings.TransmittanceWidth, settings.TransmittanceHeight)); ;
 
             // Sky luminance
             var skyLuminance = renderGraph.GetTexture(settings.LuminanceWidth, settings.LuminanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, 2, TextureDimension.Tex2DArray);
@@ -263,7 +261,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    cloudSettings.SetCloudPassData(command, pass);
+                    cloudSettings.SetCloudPassData(pass);
                     pass.SetFloat("_Samples", settings.ReflectionSamples);
 
                     var array = ArrayPool<Matrix4x4>.Get(6);
@@ -373,7 +371,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Specular convolution
-            renderGraph.SetResource(new ReflectionAmbientData(ambientBuffer, reflectionProbe, cdf, skyLuminance, weightedDepth, new Vector2(settings.LuminanceWidth, settings.LuminanceHeight), new Vector2(settings.CdfWidth, settings.CdfHeight)));;
+            renderGraph.SetResource(new SkyReflectionAmbientData(ambientBuffer, reflectionProbe, cdf, skyLuminance, weightedDepth, new Vector2(settings.LuminanceWidth, settings.LuminanceHeight), new Vector2(settings.CdfWidth, settings.CdfHeight))); ;
         }
 
         public void Render(RTHandle depth, int width, int height, Camera camera)
@@ -386,13 +384,13 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(skyTemp, RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_Depth", depth);
 
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
-                pass.AddRenderPassData<ReflectionAmbientData>();
+                pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<SkyTransmittanceData>();
@@ -438,8 +436,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_SkyInput", skyTemp2);
                 pass.ReadTexture("_SkyHistory", skyColor.history);
                 pass.ReadTexture("_Depth", depth);
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<PreviousFrameDepth>();
@@ -465,141 +463,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.SetResource(new SkyResultData(skyColor.current));;
+            renderGraph.SetResource(new SkyResultData(skyColor.current)); ;
         }
-
-        public void Cleanup()
-        {
-        }
-
-        public struct AtmospherePropertiesAndTables : IRenderPassData
-        {
-            private readonly BufferHandle atmospherePropertiesBuffer;
-            private readonly RTHandle transmittance;
-            private readonly RTHandle multiScatter;
-            private readonly RTHandle groundAmbient;
-            private readonly RTHandle skyAmbient;
-
-            private Vector4 transmittanceRemap;
-            private Vector4 multiScatterRemap;
-            private Vector4 skyAmbientRemap;
-            private Vector2 groundAmbientRemap;
-            private Vector2 transmittanceSize;
-
-            public AtmospherePropertiesAndTables(BufferHandle atmospherePropertiesBuffer, RTHandle transmittance, RTHandle multiScatter, RTHandle groundAmbient, RTHandle skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector2 transmittanceSize)
-            {
-                this.atmospherePropertiesBuffer = atmospherePropertiesBuffer ?? throw new ArgumentNullException(nameof(atmospherePropertiesBuffer));
-                this.transmittance = transmittance ?? throw new ArgumentNullException(nameof(transmittance));
-                this.multiScatter = multiScatter ?? throw new ArgumentNullException(nameof(multiScatter));
-                this.groundAmbient = groundAmbient ?? throw new ArgumentNullException(nameof(groundAmbient));
-                this.skyAmbient = skyAmbient ?? throw new ArgumentNullException(nameof(skyAmbient));
-                this.transmittanceRemap = transmittanceRemap;
-                this.multiScatterRemap = multiScatterRemap;
-                this.skyAmbientRemap = skyAmbientRemap;
-                this.groundAmbientRemap = groundAmbientRemap;
-                this.transmittanceSize = transmittanceSize;
-            }
-
-            public readonly void SetInputs(RenderPass pass)
-            {
-                pass.ReadBuffer("AtmosphereProperties", atmospherePropertiesBuffer);
-                pass.ReadTexture("_Transmittance", transmittance);
-                pass.ReadTexture("_MultiScatter", multiScatter);
-                pass.ReadTexture("_SkyAmbient", skyAmbient);
-                pass.ReadTexture("_GroundAmbient", groundAmbient);
-            }
-
-            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
-            {
-                pass.SetVector("_AtmosphereTransmittanceRemap", transmittanceRemap);
-                pass.SetVector("_MultiScatterRemap", multiScatterRemap);
-                pass.SetVector("_SkyAmbientRemap", skyAmbientRemap);
-                pass.SetVector("_GroundAmbientRemap", groundAmbientRemap);
-                pass.SetVector("_TransmittanceSize", transmittanceSize);
-            }
-        }
-
-        public struct ReflectionAmbientData : IRenderPassData
-        {
-            private readonly RTHandle reflectionProbe, skyCdf;
-            private readonly BufferHandle ambientBuffer;
-            private readonly RTHandle skyLuminance;
-            private readonly RTHandle weightedDepth;
-            private Vector2 skyLuminanceSize;
-            private Vector2 cdfLookupSize;
-
-            public ReflectionAmbientData(BufferHandle ambientBuffer, RTHandle reflectionProbe, RTHandle skyCdf, RTHandle skyLuminance, RTHandle weightedDepth, Vector2 skyLuminanceSize, Vector2 cdfLookupSize)
-            {
-                this.ambientBuffer = ambientBuffer;
-                this.reflectionProbe = reflectionProbe;
-                this.skyCdf = skyCdf;
-                this.skyLuminance = skyLuminance;
-                this.weightedDepth = weightedDepth;
-                this.skyLuminanceSize = skyLuminanceSize;
-                this.cdfLookupSize = cdfLookupSize;
-            }
-
-            public readonly void SetInputs(RenderPass pass)
-            {
-                pass.ReadTexture("_SkyReflection", reflectionProbe);
-                pass.ReadTexture("_SkyCdf", skyCdf);
-                pass.ReadBuffer("AmbientSh", ambientBuffer);
-                pass.ReadTexture("SkyLuminance", skyLuminance);
-                pass.ReadTexture("_SkyCdf", skyCdf);
-                pass.ReadTexture("_AtmosphereDepth", weightedDepth);
-            }
-
-            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
-            {
-                pass.SetVector("_SkyCdfSize", new Vector2(skyCdf.Width, skyCdf.Height));
-                pass.SetVector("SkyLuminanceScaleLimit", skyLuminance.ScaleLimit2D);
-                pass.SetVector("SkyLuminanceSize", skyLuminanceSize);
-                pass.SetVector("_SkyCdfSize", cdfLookupSize);
-            }
-        }
-    }
-}
-
-public readonly struct SkyResultData : IRenderPassData
-{
-    public RTHandle SkyTexture { get; }
-
-    public SkyResultData(RTHandle skyTexture)
-    {
-        SkyTexture = skyTexture ?? throw new ArgumentNullException(nameof(skyTexture));
-    }
-
-    public readonly void SetInputs(RenderPass pass)
-    {
-        pass.ReadTexture("SkyTexture", SkyTexture);
-    }
-
-    public readonly void SetProperties(RenderPass pass, CommandBuffer command)
-    {
-        pass.SetVector("SkyTextureScaleLimit", SkyTexture.ScaleLimit2D);
-    }
-}
-
-public readonly struct SkyTransmittanceData : IRenderPassData
-{
-    private readonly RTHandle skyTransmittance;
-    private readonly int width, height;
-
-    public SkyTransmittanceData(RTHandle skyTransmittance, int width, int height)
-    {
-        this.skyTransmittance = skyTransmittance ?? throw new ArgumentNullException(nameof(skyTransmittance));
-        this.width = width;
-        this.height = height;
-    }
-
-    public void SetInputs(RenderPass pass)
-    {
-        pass.ReadTexture("_SkyTransmittance", skyTransmittance);
-    }
-
-    public void SetProperties(RenderPass pass, CommandBuffer command)
-    {
-        pass.SetFloat("_TransmittanceWidth", width);
-        pass.SetFloat("_TransmittanceHeight", height);
     }
 }

@@ -37,10 +37,10 @@ namespace Arycama.CustomRenderPipeline
                 // Need to set some things as globals so that hit shaders can access them..
                 using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Specular GI Raytrace Setup"))
                 {
-                    pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                    pass.AddRenderPassData<SkyReflectionAmbientData>();
                     pass.AddRenderPassData<LightingSetup.Result>();
                     pass.AddRenderPassData<AutoExposure.AutoExposureData>();
-                    pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                    pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<TerrainRenderData>(true);
                     pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                     pass.AddRenderPassData<ShadowRenderer.Result>();
@@ -58,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.ReadTexture("_NormalRoughness", data.normalRoughness);
                     pass.ReadTexture("PreviousFrame", data.previousFrameColor); // Temporary, cuz of leaks if we don't use it..
 
-                    pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                    pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<WaterPrepassResult>(true);
                     pass.AddRenderPassData<ICommonPassData>();
                 }
@@ -78,9 +78,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.ReadTexture("PreviousFrame", data.previousFrameColor);
                     pass.ReadTexture("_Depth", data.depth);
 
-                    pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                    pass.AddRenderPassData<SkyReflectionAmbientData>();
                     pass.AddRenderPassData<LitData.Result>();
-                    pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                    pass.AddRenderPassData<TemporalAAData>();
                     pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                     pass.AddRenderPassData<ICommonPassData>();
                     pass.AddRenderPassData<BentNormalOcclusionData>();
@@ -113,9 +113,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_NormalRoughness", data.normalRoughness);
                 pass.ReadTexture("AlbedoMetallic", data.albedoMetallic);
 
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
-                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<TemporalAAData>();
+                pass.AddRenderPassData<SkyReflectionAmbientData>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<WaterPrepassResult>(true);
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<BentNormalOcclusionData>();
@@ -144,9 +144,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("AlbedoMetallic", data.albedoMetallic);
                 pass.ReadTexture("RayDepth", rayDepth);
 
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
-                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LitData.Result>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<BentNormalOcclusionData>();

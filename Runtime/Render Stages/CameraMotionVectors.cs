@@ -22,7 +22,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(data.velocity);
                 pass.WriteDepth(data.cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.AddRenderPassData<ICommonPassData>();
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<TemporalAAData>();
             }
 
             var result = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.R16G16_SFloat);

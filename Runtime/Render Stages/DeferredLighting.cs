@@ -32,14 +32,14 @@ public class DeferredLighting : RenderFeature<(RTHandle depth, RTHandle albedoMe
             pass.ReadTexture("_NormalRoughness", data.normalRoughness);
             pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
 
-            pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
-            pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+            pass.AddRenderPassData<SkyReflectionAmbientData>();
+            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
             pass.AddRenderPassData<LightingSetup.Result>();
             pass.AddRenderPassData<ShadowRenderer.Result>();
             pass.AddRenderPassData<LitData.Result>();
             pass.AddRenderPassData<ScreenSpaceReflectionResult>();
-            pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+            pass.AddRenderPassData<TemporalAAData>();
             pass.AddRenderPassData<WaterShadowResult>(true);
             pass.AddRenderPassData<ScreenSpaceShadows.Result>();
             pass.AddRenderPassData<DiffuseGlobalIllumination.Result>();
@@ -74,10 +74,10 @@ public class DeferredLighting : RenderFeature<(RTHandle depth, RTHandle albedoMe
             pass.ReadTexture("_Input", input);
 
             pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
-            pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+            pass.AddRenderPassData<TemporalAAData>();
             pass.AddRenderPassData<SkyResultData>();
             pass.AddRenderPassData<VolumetricLighting.Result>();
-            pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<WaterPrepassResult>(true);
             pass.AddRenderPassData<SkyTransmittanceData>();
 

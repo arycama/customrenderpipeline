@@ -88,11 +88,6 @@ namespace Arycama.CustomRenderPipeline
             Object.DestroyImmediate(exposureTexture);
         }
 
-        private struct Pass2Data
-        {
-            internal BufferHandle output;
-        }
-
         public void OnPreRender(Camera camera)
         {
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Auto Exposure"))
@@ -203,12 +198,6 @@ namespace Arycama.CustomRenderPipeline
                     command.CopyBuffer(data, exposureData.exposureBuffer);
                 });
             }
-        }
-
-        private struct PassData
-        {
-            internal bool isFirst;
-            internal BufferHandle bufferHandle;
         }
 
         public readonly struct AutoExposureData : IRenderPassData

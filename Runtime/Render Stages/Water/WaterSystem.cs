@@ -285,8 +285,8 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
 
                 pass.AddRenderPassData<OceanFftResult>();
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<WaterShoreMask.Result>();
                 pass.AddRenderPassData<ICommonPassData>();
 

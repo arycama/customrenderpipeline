@@ -40,7 +40,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.AddRenderPassData<ClusteredLightCulling.Result>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<Result>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
@@ -103,7 +103,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Input", filterY);
                 pass.WriteTexture("_Result", volumetricLight);
                 pass.AddRenderPassData<Result>();
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<ICommonPassData>();
 
                 pass.SetRenderFunction(

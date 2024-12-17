@@ -54,10 +54,10 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
             // Need to set some things as globals so that hit shaders can access them..
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Raytraced Shadows Setup"))
             {
-                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TerrainRenderData>(true);
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
@@ -90,12 +90,12 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
 
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<TemporalAAData>();
 
-                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
+                pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TerrainRenderData>(true);
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
@@ -128,9 +128,9 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
             pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Depth", data.depth);
 
-            pass.AddRenderPassData<TemporalAA.TemporalAAData>();
-            pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
-            pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+            pass.AddRenderPassData<TemporalAAData>();
+            pass.AddRenderPassData<SkyReflectionAmbientData>();
+            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
             pass.AddRenderPassData<ICommonPassData>();
             pass.AddRenderPassData<VelocityData>();
@@ -167,10 +167,10 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
             //pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
             //pass.ReadTexture("RayDepth", rayDepth);
 
-            pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+            pass.AddRenderPassData<TemporalAAData>();
             pass.AddRenderPassData<AutoExposure.AutoExposureData>();
-            pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
-            pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+            pass.AddRenderPassData<SkyReflectionAmbientData>();
+            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<ICommonPassData>();
             pass.AddRenderPassData<VelocityData>();
 

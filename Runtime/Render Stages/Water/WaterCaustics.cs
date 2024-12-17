@@ -12,7 +12,6 @@ namespace Arycama.CustomRenderPipeline.Water
     {
         private WaterSystem.Settings settings;
         private Material material;
-        private Mesh causticsMesh;
         private GraphicsBuffer indexBuffer;
 
         public WaterCaustics(RenderGraph renderGraph, WaterSystem.Settings settings) : base(renderGraph)
@@ -85,7 +84,6 @@ namespace Arycama.CustomRenderPipeline.Water
         protected override void Cleanup(bool disposing)
         {
             indexBuffer.Dispose();
-            Object.DestroyImmediate(causticsMesh);
         }
 
         public override void Render()

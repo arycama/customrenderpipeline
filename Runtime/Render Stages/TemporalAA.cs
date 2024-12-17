@@ -18,13 +18,6 @@ namespace Arycama.CustomRenderPipeline
             textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Temporal AA");
         }
 
-        public class TemporalAAData : ConstantBufferData
-        {
-            public TemporalAAData(BufferHandle buffer) : base(buffer, "TemporalProperties")
-            {
-            }
-        }
-
         public void OnPreRender(int scaledWidth, int scaledHeight, out Vector2 jitter)
         {
             var sampleIndex = renderGraph.FrameIndex % settings.SampleCount + 1;

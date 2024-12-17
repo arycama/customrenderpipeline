@@ -31,8 +31,8 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.ReadTexture("_BentNormalOcclusion", data.bentNormalOcclusion);
                 pass.ReadTexture("_Emissive", data.emissive);
 
-                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<SkyReflectionAmbientData>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<VolumetricLighting.Result>();
                 pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();

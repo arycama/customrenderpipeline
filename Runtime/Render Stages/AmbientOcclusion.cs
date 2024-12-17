@@ -124,18 +124,15 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_NormalRoughness", data.normal);
                 pass.ReadTexture("_BentNormalOcclusion", data.bentNormalOcclusion);
 
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
-                pass.AddRenderPassData<PhysicalSky.ReflectionAmbientData>();
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<TemporalAAData>();
+                pass.AddRenderPassData<SkyReflectionAmbientData>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<VelocityData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    //pass.SetFloat("_Intensity", settings.Strength);
-                    //pass.SetFloat("_MaxSteps", settings.MaxSamples);
-                    //pass.SetFloat("_Thickness", settings.Thickness);
                     pass.SetInt("_ResolveSamples", settings.ResolveSamples);
                     pass.SetFloat("_ResolveSize", settings.ResolveSize);
                 });
@@ -153,7 +150,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
                 pass.ReadTexture("_Depth", data.depth);
 
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<ICommonPassData>();
 
                 pass.SetRenderFunction((command, pass) =>
@@ -174,7 +171,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.ReadTexture("_Input", current);
                 pass.ReadTexture("_BentNormalOcclusion", data.bentNormalOcclusion);
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<TemporalAAData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {

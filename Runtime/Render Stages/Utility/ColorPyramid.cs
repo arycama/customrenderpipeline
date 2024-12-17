@@ -11,7 +11,7 @@ public class ColorPyramid
         this.renderGraph = renderGraph;
     }
 
-    public RTHandle Render(RTHandle input, int width, int height)
+    public RTHandle Render(int width, int height)
     {
         var mipCount = Texture2DExtensions.MipCount(width, height) + 1;
         var texture = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true);

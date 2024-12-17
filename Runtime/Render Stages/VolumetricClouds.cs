@@ -58,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
 
             [field: NonSerialized] public int Version { get; private set; }
 
-            public void SetCloudPassData(CommandBuffer command, RenderPass pass)
+            public void SetCloudPassData(RenderPass pass)
             {
                 // TODO: Make this a render pass data?
                 pass.SetFloat("_WeatherMapStrength", WeatherMapStrength);
@@ -272,7 +272,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    settings.SetCloudPassData(command, pass);
+                    settings.SetCloudPassData(pass);
                 });
             }
 
@@ -288,7 +288,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(cloudCoverageComputeShader, 0, 1);
 
                 pass.AddRenderPassData<CloudData>();
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.WriteBuffer("_Result", cloudCoverageBufferTemp);
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<CloudShadowDataResult>();
@@ -298,7 +298,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    settings.SetCloudPassData(command, pass);
+                    settings.SetCloudPassData(pass);
                 });
             }
 
@@ -384,7 +384,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.ReadTexture("_Depth", data.cameraDepth);
                 pass.AddRenderPassData<CloudData>();
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<CloudShadowDataResult>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
@@ -393,7 +393,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    settings.SetCloudPassData(command, pass);
+                    settings.SetCloudPassData(pass);
                 });
             }
 
@@ -411,7 +411,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_TransmittanceHistory", transmittanceHistory);
                 pass.ReadTexture("CloudDepthTexture", cloudDepth);
                 pass.ReadTexture("_Depth", data.cameraDepth);
-                pass.AddRenderPassData<TemporalAA.TemporalAAData>();
+                pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<AutoExposure.AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
 
@@ -428,7 +428,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt("_MaxWidth", data.width - 1);
                     pass.SetInt("_MaxHeight", data.height - 1);
 
-                    settings.SetCloudPassData(command, pass);
+                    settings.SetCloudPassData(pass);
                 });
             }
 

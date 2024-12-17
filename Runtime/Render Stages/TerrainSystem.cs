@@ -620,7 +620,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
 
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TerrainRenderData>();
                 pass.AddRenderPassData<ICommonPassData>();
 
@@ -680,7 +680,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
                 pass.AddRenderPassData<TerrainRenderData>();
-                pass.AddRenderPassData<PhysicalSky.AtmospherePropertiesAndTables>();
+                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<ICommonPassData>();
 
                 pass.SetRenderFunction((command, pass) =>
