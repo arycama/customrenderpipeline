@@ -440,8 +440,8 @@ namespace Arycama.CustomRenderPipeline
 
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetInt(command, "_DirectionalLightCount", directionalLightCount);
-                pass.SetInt(command, "_PointLightCount", pointLightCount);
+                pass.SetInt("_DirectionalLightCount", directionalLightCount);
+                pass.SetInt("_PointLightCount", pointLightCount);
             }
         }
     }

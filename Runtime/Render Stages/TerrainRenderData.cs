@@ -39,20 +39,20 @@ public struct TerrainRenderData : IRenderPassData
 
     public readonly void SetProperties(RenderPass pass, CommandBuffer command)
     {
-        pass.SetBuffer(command, "TerrainLayerData", terrainLayerData);
+        pass.SetBuffer("TerrainLayerData", terrainLayerData);
 
-        pass.SetTexture(command, "_TerrainHolesTexture", terrainHolesTexture);
+        pass.SetTexture("_TerrainHolesTexture", terrainHolesTexture);
 
-        pass.SetTexture(command, "AlbedoSmoothness", albedoSmoothness);
-        pass.SetTexture(command, "Normal", normal);
-        pass.SetTexture(command, "Mask", mask);
+        pass.SetTexture("AlbedoSmoothness", albedoSmoothness);
+        pass.SetTexture("Normal", normal);
+        pass.SetTexture("Mask", mask);
 
-        pass.SetVector(command, "TerrainSize", terrainSize);
-        pass.SetVector(command, "_TerrainRemapHalfTexel", terrainRemapHalfTexel);
-        pass.SetVector(command, "_TerrainScaleOffset", terrainScaleOffset);
+        pass.SetVector("TerrainSize", terrainSize);
+        pass.SetVector("_TerrainRemapHalfTexel", terrainRemapHalfTexel);
+        pass.SetVector("_TerrainScaleOffset", terrainScaleOffset);
 
-        pass.SetFloat(command, "IdMapResolution", idMapResolution);
-        pass.SetFloat(command, "_TerrainHeightScale", terrainHeightScale);
-        pass.SetFloat(command, "_TerrainHeightOffset", terrainHeightOffset);
+        pass.SetFloat("IdMapResolution", idMapResolution);
+        pass.SetFloat("_TerrainHeightScale", terrainHeightScale);
+        pass.SetFloat("_TerrainHeightOffset", terrainHeightOffset);
     }
 }

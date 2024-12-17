@@ -19,7 +19,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
         public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector(command, "_UnderwaterResultScaleLimit", underwaterLighting.ScaleLimit2D);
+            pass.SetVector("_UnderwaterResultScaleLimit", underwaterLighting.ScaleLimit2D);
         }
     }
 }

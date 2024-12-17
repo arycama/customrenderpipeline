@@ -20,7 +20,7 @@ namespace Arycama.CustomRenderPipeline
             this.normalizedDispatch = normalizedDispatch;
         }
 
-        protected override void Execute(CommandBuffer command)
+        protected override void Execute()
         {
             foreach (var keyword in keywords)
                 command.EnableKeyword(computeShader, new LocalKeyword(computeShader, keyword));

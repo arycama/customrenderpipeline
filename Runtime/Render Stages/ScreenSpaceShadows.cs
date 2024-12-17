@@ -76,8 +76,8 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetVector(command, "LightDirection", lightDirection);
-                    pass.SetFloat(command, "LightCosTheta", Mathf.Cos(settings.LightAngularDiameter * Mathf.Deg2Rad * 0.5f));
+                    pass.SetVector("LightDirection", lightDirection);
+                    pass.SetFloat("LightCosTheta", Mathf.Cos(settings.LightAngularDiameter * Mathf.Deg2Rad * 0.5f));
                 });
             }
         }
@@ -107,12 +107,12 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetVector(command, "LightDirection", lightDirection);
-                    pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
-                    pass.SetFloat(command, "_Thickness", settings.Thickness);
-                    pass.SetFloat(command, "_Intensity", settings.Intensity);
-                    pass.SetFloat(command, "_MaxMip", Texture2DExtensions.MipCount(data.width, data.height) - 1);
-                    pass.SetFloat(command, "LightCosTheta", Mathf.Cos(settings.LightAngularDiameter * Mathf.Deg2Rad * 0.5f));
+                    pass.SetVector("LightDirection", lightDirection);
+                    pass.SetFloat("_MaxSteps", settings.MaxSamples);
+                    pass.SetFloat("_Thickness", settings.Thickness);
+                    pass.SetFloat("_Intensity", settings.Intensity);
+                    pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.width, data.height) - 1);
+                    pass.SetFloat("LightCosTheta", Mathf.Cos(settings.LightAngularDiameter * Mathf.Deg2Rad * 0.5f));
                 });
             }
         }
@@ -137,16 +137,16 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetFloat(command, "_Intensity", settings.Intensity);
-                pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
-                pass.SetFloat(command, "_Thickness", settings.Thickness);
-                pass.SetInt(command, "_ResolveSamples", settings.ResolveSamples);
-                pass.SetFloat(command, "_ResolveSize", settings.ResolveSize);
-                pass.SetFloat(command, "DiffuseGiStrength", settings.Intensity);
+                pass.SetFloat("_Intensity", settings.Intensity);
+                pass.SetFloat("_MaxSteps", settings.MaxSamples);
+                pass.SetFloat("_Thickness", settings.Thickness);
+                pass.SetInt("_ResolveSamples", settings.ResolveSamples);
+                pass.SetFloat("_ResolveSize", settings.ResolveSize);
+                pass.SetFloat("DiffuseGiStrength", settings.Intensity);
 
                 var lightCosTheta = Mathf.Cos(settings.LightAngularDiameter * Mathf.Deg2Rad * 0.5f);
-                pass.SetFloat(command, "LightCosTheta", lightCosTheta);
-                pass.SetVector(command, "LightDirection", lightDirection);
+                pass.SetFloat("LightCosTheta", lightCosTheta);
+                pass.SetVector("LightDirection", lightDirection);
             });
         }
 
@@ -176,11 +176,11 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
-                pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
-                pass.SetFloat(command, "_Intensity", settings.Intensity);
-                pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
-                pass.SetFloat(command, "_Thickness", settings.Thickness);
+                pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
+                pass.SetVector("_HistoryScaleLimit", history.ScaleLimit2D);
+                pass.SetFloat("_Intensity", settings.Intensity);
+                pass.SetFloat("_MaxSteps", settings.MaxSamples);
+                pass.SetFloat("_Thickness", settings.Thickness);
             });
         }
 
@@ -203,7 +203,7 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
 
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector(command, "ScreenSpaceShadowsScaleLimit", ScreenSpaceShadows.ScaleLimit2D);
+            pass.SetVector("ScreenSpaceShadowsScaleLimit", ScreenSpaceShadows.ScaleLimit2D);
         }
     }
 }

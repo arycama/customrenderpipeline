@@ -215,27 +215,27 @@ namespace Arycama.CustomRenderPipeline.Water
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetMatrix(command, "_WaterShadowMatrix", passData.WorldToClip);
-                    pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
-                    pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
-                    pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
+                    pass.SetMatrix("_WaterShadowMatrix", passData.WorldToClip);
+                    pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
+                    pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
+                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;
                     var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
                     var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
-                    pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
+                    pass.SetVector("_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
                     var cullingPlanesArray = ArrayPool<Vector4>.Get(passData.CullingPlanes.Count);
                     for (var i = 0; i < passData.CullingPlanes.Count; i++)
                         cullingPlanesArray[i] = passData.CullingPlanes.GetCullingPlaneVector4(i);
 
-                    pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                    pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
                     ArrayPool<Vector4>.Release(cullingPlanesArray);
 
-                    pass.SetInt(command, "_CullingPlanesCount", passData.CullingPlanes.Count);
-                    pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
-                    pass.SetFloat(command, "_ShoreWaveWindAngle", settings.Profile.WindAngle);
+                    pass.SetInt("_CullingPlanesCount", passData.CullingPlanes.Count);
+                    pass.SetFloat("_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
+                    pass.SetFloat("_ShoreWaveWindAngle", settings.Profile.WindAngle);
                 });
             }
 
@@ -292,27 +292,27 @@ namespace Arycama.CustomRenderPipeline.Water
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
-                    pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
-                    pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
-                    pass.SetInt(command, "_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
+                    pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
+                    pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
+                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
+                    pass.SetInt("_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;
                     var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
                     var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
-                    pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
+                    pass.SetVector("_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
-                    pass.SetInt(command, "_CullingPlanesCount", data.cullingPlanes.Count);
+                    pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
                     var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
                     for (var i = 0; i < data.cullingPlanes.Count; i++)
                         cullingPlanesArray[i] = data.cullingPlanes.GetCullingPlaneVector4(i);
 
-                    pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                    pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
                     ArrayPool<Vector4>.Release(cullingPlanesArray);
 
-                    pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
-                    pass.SetFloat(command, "_ShoreWaveWindAngle", settings.Profile.WindAngle);
+                    pass.SetFloat("_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
+                    pass.SetFloat("_ShoreWaveWindAngle", settings.Profile.WindAngle);
                 });
             }
 
@@ -409,15 +409,15 @@ namespace Arycama.CustomRenderPipeline.Water
                         }
 
                         // Do up to 6 passes per dispatch.
-                        pass.SetInt(command, "_PassCount", passCount);
-                        pass.SetInt(command, "_PassOffset", 6 * index);
-                        pass.SetInt(command, "_TotalPassCount", totalPassCount);
+                        pass.SetInt("_PassCount", passCount);
+                        pass.SetInt("_PassOffset", 6 * index);
+                        pass.SetInt("_TotalPassCount", totalPassCount);
 
                         var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
                         for (var i = 0; i < cullingPlanes.Count; i++)
                             cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
 
-                        pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                        pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
                         ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                         // Snap to quad-sized increments on largest cell
@@ -426,11 +426,11 @@ namespace Arycama.CustomRenderPipeline.Water
                         var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
 
                         var positionOffset = new Vector4(settings.Size, settings.Size, positionX, positionZ);
-                        pass.SetVector(command, "_TerrainPositionOffset", positionOffset);
+                        pass.SetVector("_TerrainPositionOffset", positionOffset);
 
-                        pass.SetFloat(command, "_EdgeLength", (float)settings.EdgeLength * settings.PatchVertices);
-                        pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
-                        pass.SetFloat(command, "MaxWaterHeight", settings.Profile.MaxWaterHeight);
+                        pass.SetFloat("_EdgeLength", (float)settings.EdgeLength * settings.PatchVertices);
+                        pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
+                        pass.SetFloat("MaxWaterHeight", settings.Profile.MaxWaterHeight);
                     });
                 }
             }
@@ -456,7 +456,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
                     pass.SetRenderFunction((command, pass) =>
                     {
-                        pass.SetInt(command, "_CellCount", settings.CellCount);
+                        pass.SetInt("_CellCount", settings.CellCount);
                     });
                 }
             }

@@ -52,9 +52,9 @@ namespace Arycama.CustomRenderPipeline
 
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetFloat(command, "_ClusterScale", clusterScale);
-                pass.SetFloat(command, "_ClusterBias", clusterBias);
-                pass.SetInt(command, "_TileSize", tileSize);
+                pass.SetFloat("_ClusterScale", clusterScale);
+                pass.SetFloat("_ClusterBias", clusterBias);
+                pass.SetInt("_TileSize", tileSize);
             }
         }
 
@@ -93,8 +93,8 @@ namespace Arycama.CustomRenderPipeline
                 (command, pass, data) =>
                 {
                     command.SetBufferData(data.counterBuffer, zeroArray);
-                    pass.SetInt(command, "_TileSize", data.tileSize);
-                    pass.SetFloat(command, "_RcpClusterDepth", data.rcpClusterDepth);
+                    pass.SetInt("_TileSize", data.tileSize);
+                    pass.SetFloat("_RcpClusterDepth", data.rcpClusterDepth);
                 });
             }
 

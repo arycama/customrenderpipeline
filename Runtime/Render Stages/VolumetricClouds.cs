@@ -61,35 +61,35 @@ namespace Arycama.CustomRenderPipeline
             public void SetCloudPassData(CommandBuffer command, RenderPass pass)
             {
                 // TODO: Make this a render pass data?
-                pass.SetFloat(command, "_WeatherMapStrength", WeatherMapStrength);
-                pass.SetFloat(command, "_WeatherMapScale", MathUtils.Rcp(WeatherMapScale));
-                pass.SetVector(command, "_WeatherMapOffset", WeatherMapSpeed * (1.0f) / WeatherMapScale);
-                pass.SetVector(command, "_WeatherMapSpeed", WeatherMapSpeed);
+                pass.SetFloat("_WeatherMapStrength", WeatherMapStrength);
+                pass.SetFloat("_WeatherMapScale", MathUtils.Rcp(WeatherMapScale));
+                pass.SetVector("_WeatherMapOffset", WeatherMapSpeed * (1.0f) / WeatherMapScale);
+                pass.SetVector("_WeatherMapSpeed", WeatherMapSpeed);
 
-                pass.SetFloat(command, "_NoiseScale", MathUtils.Rcp(NoiseScale));
-                pass.SetFloat(command, "_NoiseStrength", NoiseStrength);
+                pass.SetFloat("_NoiseScale", MathUtils.Rcp(NoiseScale));
+                pass.SetFloat("_NoiseStrength", NoiseStrength);
 
-                pass.SetFloat(command, "_DetailNoiseScale", MathUtils.Rcp(DetailScale));
-                pass.SetFloat(command, "_DetailNoiseStrength", DetailStrength);
+                pass.SetFloat("_DetailNoiseScale", MathUtils.Rcp(DetailScale));
+                pass.SetFloat("_DetailNoiseStrength", DetailStrength);
 
-                pass.SetFloat(command, "_StartHeight", StartHeight);
-                pass.SetFloat(command, "_LayerThickness", LayerThickness);
-                pass.SetFloat(command, "_LightDistance", LightDistance);
-                pass.SetFloat(command, "_Density", Density * MathUtils.Log2e);
+                pass.SetFloat("_StartHeight", StartHeight);
+                pass.SetFloat("_LayerThickness", LayerThickness);
+                pass.SetFloat("_LightDistance", LightDistance);
+                pass.SetFloat("_Density", Density * MathUtils.Log2e);
 
-                pass.SetFloat(command, "_TransmittanceThreshold", TransmittanceThreshold);
+                pass.SetFloat("_TransmittanceThreshold", TransmittanceThreshold);
 
-                pass.SetFloat(command, "_Samples", RaySamples);
-                pass.SetFloat(command, "_LightSamples", LightSamples);
+                pass.SetFloat("_Samples", RaySamples);
+                pass.SetFloat("_LightSamples", LightSamples);
 
-                pass.SetVector(command, "_NoiseResolution", (Vector3)NoiseResolution);
-                pass.SetVector(command, "_DetailNoiseResolution", (Vector3)DetailNoiseResolution);
-                pass.SetVector(command, "_WeatherMapResolution", (Vector2)WeatherMapResolution);
+                pass.SetVector("_NoiseResolution", (Vector3)NoiseResolution);
+                pass.SetVector("_DetailNoiseResolution", (Vector3)DetailNoiseResolution);
+                pass.SetVector("_WeatherMapResolution", (Vector2)WeatherMapResolution);
 
-                pass.SetFloat(command, "_BackScatterPhase", BackScatterPhase);
-                pass.SetFloat(command, "_ForwardScatterPhase", ForwardScatterPhase);
-                pass.SetFloat(command, "_BackScatterScale", BackScatterScale);
-                pass.SetFloat(command, "_ForwardScatterScale", ForwardScatterScale);
+                pass.SetFloat("_BackScatterPhase", BackScatterPhase);
+                pass.SetFloat("_ForwardScatterPhase", ForwardScatterPhase);
+                pass.SetFloat("_BackScatterScale", BackScatterScale);
+                pass.SetFloat("_ForwardScatterScale", ForwardScatterScale);
             }
         }
 
@@ -131,11 +131,11 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetFloat(command, "_WeatherMapFrequency", settings.WeatherMapNoiseParams.Frequency);
-                    pass.SetFloat(command, "_WeatherMapH", settings.WeatherMapNoiseParams.H);
-                    pass.SetFloat(command, "_WeatherMapOctaves", settings.WeatherMapNoiseParams.Octaves);
-                    pass.SetFloat(command, "_WeatherMapFactor", settings.WeatherMapNoiseParams.FractalBound);
-                    pass.SetVector(command, "_WeatherMapResolution", (Vector2)settings.WeatherMapResolution);
+                    pass.SetFloat("_WeatherMapFrequency", settings.WeatherMapNoiseParams.Frequency);
+                    pass.SetFloat("_WeatherMapH", settings.WeatherMapNoiseParams.H);
+                    pass.SetFloat("_WeatherMapOctaves", settings.WeatherMapNoiseParams.Octaves);
+                    pass.SetFloat("_WeatherMapFactor", settings.WeatherMapNoiseParams.FractalBound);
+                    pass.SetVector("_WeatherMapResolution", (Vector2)settings.WeatherMapResolution);
                 });
             }
 
@@ -150,15 +150,15 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetFloat(command, "_NoiseFrequency", settings.NoiseParams.Frequency);
-                    pass.SetFloat(command, "_NoiseH", settings.NoiseParams.H);
-                    pass.SetFloat(command, "_NoiseOctaves", settings.NoiseParams.Octaves);
-                    pass.SetFloat(command, "_NoiseFactor", settings.NoiseParams.FractalBound);
-                    pass.SetVector(command, "_NoiseResolution", (Vector3)settings.NoiseResolution);
+                    pass.SetFloat("_NoiseFrequency", settings.NoiseParams.Frequency);
+                    pass.SetFloat("_NoiseH", settings.NoiseParams.H);
+                    pass.SetFloat("_NoiseOctaves", settings.NoiseParams.Octaves);
+                    pass.SetFloat("_NoiseFactor", settings.NoiseParams.FractalBound);
+                    pass.SetVector("_NoiseResolution", (Vector3)settings.NoiseResolution);
 
-                    pass.SetFloat(command, "_CellularNoiseFrequency", settings.CellularNoiseParams.Frequency);
-                    pass.SetFloat(command, "_CellularNoiseH", settings.CellularNoiseParams.H);
-                    pass.SetFloat(command, "_CellularNoiseOctaves", settings.CellularNoiseParams.Octaves);
+                    pass.SetFloat("_CellularNoiseFrequency", settings.CellularNoiseParams.Frequency);
+                    pass.SetFloat("_CellularNoiseH", settings.CellularNoiseParams.H);
+                    pass.SetFloat("_CellularNoiseOctaves", settings.CellularNoiseParams.Octaves);
                 });
             }
 
@@ -172,11 +172,11 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetFloat(command, "_DetailNoiseFrequency", settings.DetailNoiseParams.Frequency);
-                    pass.SetFloat(command, "_DetailNoiseH", settings.DetailNoiseParams.H);
-                    pass.SetFloat(command, "_DetailNoiseOctaves", settings.DetailNoiseParams.Octaves);
-                    pass.SetFloat(command, "_DetailNoiseFactor", settings.DetailNoiseParams.FractalBound);
-                    pass.SetVector(command, "_DetailNoiseResolution", (Vector3)settings.DetailNoiseResolution);
+                    pass.SetFloat("_DetailNoiseFrequency", settings.DetailNoiseParams.Frequency);
+                    pass.SetFloat("_DetailNoiseH", settings.DetailNoiseParams.H);
+                    pass.SetFloat("_DetailNoiseOctaves", settings.DetailNoiseParams.Octaves);
+                    pass.SetFloat("_DetailNoiseFactor", settings.DetailNoiseParams.FractalBound);
+                    pass.SetVector("_DetailNoiseResolution", (Vector3)settings.DetailNoiseResolution);
                 });
             }
 
@@ -338,19 +338,19 @@ namespace Arycama.CustomRenderPipeline
 
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetMatrix(command, "_WorldToCloudShadow", worldToCloudShadow);
-                pass.SetFloat(command, "_CloudShadowDepthInvScale", cloudDepthInvScale);
-                pass.SetFloat(command, "_CloudShadowExtinctionInvScale", cloudShadowExtinctionInvScale);
-                pass.SetFloat(command, "_CloudCoverageStart", cloudShadowExtinctionInvScale);
-                pass.SetFloat(command, "_CloudShadowExtinctionInvScale", cloudShadowExtinctionInvScale);
+                pass.SetMatrix("_WorldToCloudShadow", worldToCloudShadow);
+                pass.SetFloat("_CloudShadowDepthInvScale", cloudDepthInvScale);
+                pass.SetFloat("_CloudShadowExtinctionInvScale", cloudShadowExtinctionInvScale);
+                pass.SetFloat("_CloudCoverageStart", cloudShadowExtinctionInvScale);
+                pass.SetFloat("_CloudShadowExtinctionInvScale", cloudShadowExtinctionInvScale);
 
                 // This is used to scale a smooth falloff that uses distance^2
                 var cloudCoverageScale = 1.0f / (startHeight * startHeight - endHeight * endHeight);
                 var cloudCoverageOffset = -endHeight * endHeight / (startHeight * startHeight - endHeight * endHeight);
-                pass.SetFloat(command, "_CloudCoverageScale", cloudCoverageScale);
-                pass.SetFloat(command, "_CloudCoverageOffset", cloudCoverageOffset);
+                pass.SetFloat("_CloudCoverageScale", cloudCoverageScale);
+                pass.SetFloat("_CloudCoverageOffset", cloudCoverageOffset);
 
-                pass.SetVector(command, "_CloudShadowScaleLimit", cloudShadow.ScaleLimit2D);
+                pass.SetVector("_CloudShadowScaleLimit", cloudShadow.ScaleLimit2D);
             }
         }
 
@@ -417,16 +417,16 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetFloat(command, "_IsFirst", luminanceWasCreated ? 1.0f : 0.0f);
-                    pass.SetFloat(command, "_StationaryBlend", settings.StationaryBlend);
-                    pass.SetFloat(command, "_MotionBlend", settings.MotionBlend);
-                    pass.SetFloat(command, "_MotionFactor", settings.MotionFactor);
+                    pass.SetFloat("_IsFirst", luminanceWasCreated ? 1.0f : 0.0f);
+                    pass.SetFloat("_StationaryBlend", settings.StationaryBlend);
+                    pass.SetFloat("_MotionBlend", settings.MotionBlend);
+                    pass.SetFloat("_MotionFactor", settings.MotionFactor);
 
-                    pass.SetVector(command, "_HistoryScaleLimit", luminanceHistory.ScaleLimit2D);
-                    pass.SetVector(command, "_TransmittanceHistoryScaleLimit", transmittanceHistory.ScaleLimit2D);
+                    pass.SetVector("_HistoryScaleLimit", luminanceHistory.ScaleLimit2D);
+                    pass.SetVector("_TransmittanceHistoryScaleLimit", transmittanceHistory.ScaleLimit2D);
 
-                    pass.SetInt(command, "_MaxWidth", data.width - 1);
-                    pass.SetInt(command, "_MaxHeight", data.height - 1);
+                    pass.SetInt("_MaxWidth", data.width - 1);
+                    pass.SetInt("_MaxHeight", data.height - 1);
 
                     settings.SetCloudPassData(command, pass);
                 });
@@ -478,8 +478,8 @@ namespace Arycama.CustomRenderPipeline
 
             public void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetVector(command, "CloudTextureScaleLimit", cloudTexture.ScaleLimit2D);
-                pass.SetVector(command, "CloudTransmittanceTextureScaleLimit", cloudTransmittanceTexture.ScaleLimit2D);
+                pass.SetVector("CloudTextureScaleLimit", cloudTexture.ScaleLimit2D);
+                pass.SetVector("CloudTransmittanceTextureScaleLimit", cloudTransmittanceTexture.ScaleLimit2D);
             }
         }
     }

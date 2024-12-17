@@ -57,12 +57,12 @@ namespace Arycama.CustomRenderPipeline
 
                     (command, pass, data) =>
                     {
-                        pass.SetFloat(command, "_Radius", data.radius);
-                        pass.SetFloat(command, "_RawRadius", data.rawRadius);
-                        pass.SetFloat(command, "_AoStrength", data.aoStrength);
-                        pass.SetFloat(command, "_FalloffScale", data.falloffScale);
-                        pass.SetFloat(command, "_FalloffBias", data.falloffBias);
-                        pass.SetFloat(command, "_SampleCount", data.sampleCount);
+                        pass.SetFloat("_Radius", data.radius);
+                        pass.SetFloat("_RawRadius", data.rawRadius);
+                        pass.SetFloat("_AoStrength", data.aoStrength);
+                        pass.SetFloat("_FalloffScale", data.falloffScale);
+                        pass.SetFloat("_FalloffBias", data.falloffBias);
+                        pass.SetFloat("_SampleCount", data.sampleCount);
                     });
                 }
             }
@@ -90,20 +90,20 @@ namespace Arycama.CustomRenderPipeline
 
                      (command, pass, data) =>
                      {
-                         pass.SetFloat(command, "_Radius", data.radius);
-                         pass.SetFloat(command, "_RawRadius", data.rawRadius);
-                         pass.SetFloat(command, "_AoStrength", data.aoStrength);
-                         pass.SetFloat(command, "_FalloffScale", data.falloffScale);
-                         pass.SetFloat(command, "_FalloffBias", data.falloffBias);
-                         pass.SetFloat(command, "_SampleCount", data.sampleCount);
-                         pass.SetFloat(command, "_ThinOccluderCompensation", data.thinOccluderCompensation);
+                         pass.SetFloat("_Radius", data.radius);
+                         pass.SetFloat("_RawRadius", data.rawRadius);
+                         pass.SetFloat("_AoStrength", data.aoStrength);
+                         pass.SetFloat("_FalloffScale", data.falloffScale);
+                         pass.SetFloat("_FalloffBias", data.falloffBias);
+                         pass.SetFloat("_SampleCount", data.sampleCount);
+                         pass.SetFloat("_ThinOccluderCompensation", data.thinOccluderCompensation);
 
                          var thinOccStart = settings.ThinOccluderStart * settings.Radius;
                          var thinOccEnd = settings.ThinOccluderEnd * settings.Radius;
 
-                         pass.SetFloat(command, "_ThinOccluderScale", settings.ThinOccluderFalloff / (0.5f * (thinOccEnd - thinOccStart)));
-                         pass.SetFloat(command, "_ThinOccluderOffset", settings.ThinOccluderFalloff * (thinOccStart + thinOccEnd) / (thinOccStart - thinOccEnd));
-                         pass.SetFloat(command, "_ThinOccluderFalloff", settings.ThinOccluderFalloff);
+                         pass.SetFloat("_ThinOccluderScale", settings.ThinOccluderFalloff / (0.5f * (thinOccEnd - thinOccStart)));
+                         pass.SetFloat("_ThinOccluderOffset", settings.ThinOccluderFalloff * (thinOccStart + thinOccEnd) / (thinOccStart - thinOccEnd));
+                         pass.SetFloat("_ThinOccluderFalloff", settings.ThinOccluderFalloff);
                      });
                 }
             }
@@ -133,11 +133,11 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    //pass.SetFloat(command, "_Intensity", settings.Strength);
-                    //pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
-                    //pass.SetFloat(command, "_Thickness", settings.Thickness);
-                    pass.SetInt(command, "_ResolveSamples", settings.ResolveSamples);
-                    pass.SetFloat(command, "_ResolveSize", settings.ResolveSize);
+                    //pass.SetFloat("_Intensity", settings.Strength);
+                    //pass.SetFloat("_MaxSteps", settings.MaxSamples);
+                    //pass.SetFloat("_Thickness", settings.Thickness);
+                    pass.SetInt("_ResolveSamples", settings.ResolveSamples);
+                    pass.SetFloat("_ResolveSize", settings.ResolveSize);
                 });
             }
 
@@ -158,8 +158,8 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
-                    pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
+                    pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
+                    pass.SetVector("_HistoryScaleLimit", history.ScaleLimit2D);
                 });
             }
 
@@ -178,8 +178,8 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetFloat(command, "_AoStrength", settings.Strength);
-                    pass.SetVector(command, "InputScaleLimit", current.ScaleLimit2D);
+                    pass.SetFloat("_AoStrength", settings.Strength);
+                    pass.SetVector("InputScaleLimit", current.ScaleLimit2D);
 
                 });
             }

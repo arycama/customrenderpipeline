@@ -35,12 +35,12 @@ namespace Arycama.CustomRenderPipeline
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetVector(command, "_Resolution", new Vector2(data.width, data.height));
-                pass.SetFloat(command, "_IsSceneView", data.isSceneView ? 1.0f : 0.0f);
+                pass.SetVector("_Resolution", new Vector2(data.width, data.height));
+                pass.SetFloat("_IsSceneView", data.isSceneView ? 1.0f : 0.0f);
                 var colorGamut = hdrEnabled ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
-                pass.SetInt(command, "ColorGamut", (int)colorGamut);
-                pass.SetFloat(command, "MaxLuminance", hdrEnabled ? maxNits : settings.PaperWhite);
-                pass.SetFloat(command, "PaperWhiteLuminance", settings.PaperWhite); // Todo: Brightness setting
+                pass.SetInt("ColorGamut", (int)colorGamut);
+                pass.SetFloat("MaxLuminance", hdrEnabled ? maxNits : settings.PaperWhite);
+                pass.SetFloat("PaperWhiteLuminance", settings.PaperWhite); // Todo: Brightness setting
             });
         }
     }

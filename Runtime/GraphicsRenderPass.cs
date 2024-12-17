@@ -39,7 +39,7 @@ namespace Arycama.CustomRenderPipeline
             this.renderTargetFlags = renderTargetFlags;
             depthBuffer = (rtHandle, loadAction, storeAction);
         }
-        protected override void SetupTargets(CommandBuffer command)
+        protected override void SetupTargets()
         {
             int width = 0, height = 0, targetWidth = 0, targetHeight = 0;
 
@@ -116,7 +116,7 @@ namespace Arycama.CustomRenderPipeline
             ArrayPool<RenderBufferStoreAction>.Release(stores);
         }
 
-        protected sealed override void PostExecute(CommandBuffer command)
+        protected sealed override void PostExecute()
         {
             foreach (var colorTarget in colorTargets)
             {

@@ -57,30 +57,30 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.SetRenderFunction((command, pass) =>
                 {
                     var material = settings.Material;
-                    pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
-                    pass.SetVector(command, "_Extinction", material.GetColor("_Extinction"));
+                    pass.SetVector("_Color", material.GetColor("_Color").linear);
+                    pass.SetVector("_Extinction", material.GetColor("_Extinction"));
 
-                    pass.SetFloat(command, "_RefractOffset", material.GetFloat("_RefractOffset"));
-                    pass.SetFloat(command, "_Steps", material.GetFloat("_Steps"));
+                    pass.SetFloat("_RefractOffset", material.GetFloat("_RefractOffset"));
+                    pass.SetFloat("_Steps", material.GetFloat("_Steps"));
 
-                    pass.SetFloat(command, "_WaveFoamStrength", settings.Material.GetFloat("_WaveFoamStrength"));
-                    pass.SetFloat(command, "_WaveFoamFalloff", settings.Material.GetFloat("_WaveFoamFalloff"));
-                    pass.SetFloat(command, "_FoamNormalScale", settings.Material.GetFloat("_FoamNormalScale"));
-                    pass.SetFloat(command, "_FoamSmoothness", settings.Material.GetFloat("_FoamSmoothness"));
-                    pass.SetFloat(command, "_Smoothness", settings.Material.GetFloat("_Smoothness"));
+                    pass.SetFloat("_WaveFoamStrength", settings.Material.GetFloat("_WaveFoamStrength"));
+                    pass.SetFloat("_WaveFoamFalloff", settings.Material.GetFloat("_WaveFoamFalloff"));
+                    pass.SetFloat("_FoamNormalScale", settings.Material.GetFloat("_FoamNormalScale"));
+                    pass.SetFloat("_FoamSmoothness", settings.Material.GetFloat("_FoamSmoothness"));
+                    pass.SetFloat("_Smoothness", settings.Material.GetFloat("_Smoothness"));
 
                     var foamScale = settings.Material.GetTextureScale("_FoamTex");
                     var foamOffset = settings.Material.GetTextureOffset("_FoamTex");
 
-                    pass.SetVector(command, "_FoamTex_ST", new Vector4(foamScale.x, foamScale.y, foamOffset.x, foamOffset.y));
-                    pass.SetTexture(command, "_FoamTex", settings.Material.GetTexture("_FoamTex"));
-                    pass.SetTexture(command, "_FoamBump", settings.Material.GetTexture("_FoamBump"));
+                    pass.SetVector("_FoamTex_ST", new Vector4(foamScale.x, foamScale.y, foamOffset.x, foamOffset.y));
+                    pass.SetTexture("_FoamTex", settings.Material.GetTexture("_FoamTex"));
+                    pass.SetTexture("_FoamBump", settings.Material.GetTexture("_FoamBump"));
 
-                    pass.SetFloat(command, "_ShoreWaveLength", material.GetFloat("_ShoreWaveLength"));
-                    pass.SetFloat(command, "_ShoreWaveHeight", material.GetFloat("_ShoreWaveHeight"));
-                    pass.SetFloat(command, "_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
-                    pass.SetFloat(command, "_ShoreWaveWindAngle", settings.Profile.WindAngle);
-                    pass.SetFloat(command, "_ShoreWaveSteepness", material.GetFloat("_ShoreWaveSteepness"));
+                    pass.SetFloat("_ShoreWaveLength", material.GetFloat("_ShoreWaveLength"));
+                    pass.SetFloat("_ShoreWaveHeight", material.GetFloat("_ShoreWaveHeight"));
+                    pass.SetFloat("_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
+                    pass.SetFloat("_ShoreWaveWindAngle", settings.Profile.WindAngle);
+                    pass.SetFloat("_ShoreWaveSteepness", material.GetFloat("_ShoreWaveSteepness"));
                 });
             }
 
@@ -136,11 +136,11 @@ namespace Arycama.CustomRenderPipeline.Water
 
                     pass.SetRenderFunction((command, pass) =>
                     {
-                        pass.SetVector(command, "_Extinction", settings.Material.GetColor("_Extinction"));
+                        pass.SetVector("_Extinction", settings.Material.GetColor("_Extinction"));
 
                         var material = settings.Material;
-                        pass.SetVector(command, "_Color", material.GetColor("_Color").linear);
-                        pass.SetVector(command, "_Extinction", material.GetColor("_Extinction"));
+                        pass.SetVector("_Color", material.GetColor("_Color").linear);
+                        pass.SetVector("_Extinction", material.GetColor("_Extinction"));
                     });
                 }
 
@@ -190,11 +190,11 @@ namespace Arycama.CustomRenderPipeline.Water
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
-                    pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
+                    pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
+                    pass.SetVector("_HistoryScaleLimit", history.ScaleLimit2D);
 
-                    pass.SetVector(command, "_Color", settings.Material.GetColor("_Color").linear);
-                    pass.SetVector(command, "_Extinction", settings.Material.GetColor("_Extinction"));
+                    pass.SetVector("_Color", settings.Material.GetColor("_Color").linear);
+                    pass.SetVector("_Extinction", settings.Material.GetColor("_Extinction"));
                 });
             }
         }

@@ -55,7 +55,7 @@ public class DeferredLighting : RenderFeature<(RTHandle depth, RTHandle albedoMe
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetFloat(command, "HasWaterShadow", hasWaterShadow ? 1.0f : 0.0f);
+                pass.SetFloat("HasWaterShadow", hasWaterShadow ? 1.0f : 0.0f);
             });
         }
     }

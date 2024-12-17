@@ -62,19 +62,19 @@ namespace Arycama.CustomRenderPipeline
                 ),
                 (command, pass, data) =>
                 {
-                    pass.SetFloat(command, "_NonLinearDepth", data.nonLinearDepth);
-                    pass.SetFloat(command, "_VolumeWidth", data.volumeWidth);
-                    pass.SetFloat(command, "_VolumeHeight", data.volumeHeight);
-                    pass.SetFloat(command, "_VolumeSlices", data.volumeSlices);
-                    pass.SetFloat(command, "_BlurSigma", data.blurSigma);
-                    pass.SetFloat(command, "_VolumeTileSize", data.volumeTileSize);
+                    pass.SetFloat("_NonLinearDepth", data.nonLinearDepth);
+                    pass.SetFloat("_VolumeWidth", data.volumeWidth);
+                    pass.SetFloat("_VolumeHeight", data.volumeHeight);
+                    pass.SetFloat("_VolumeSlices", data.volumeSlices);
+                    pass.SetFloat("_BlurSigma", data.blurSigma);
+                    pass.SetFloat("_VolumeTileSize", data.volumeTileSize);
 
-                    pass.SetTexture(command, "_BlueNoise1D", data.blueNoise1D);
-                    pass.SetTexture(command, "_BlueNoise2D", data.blueNoise2D);
+                    pass.SetTexture("_BlueNoise1D", data.blueNoise1D);
+                    pass.SetTexture("_BlueNoise2D", data.blueNoise2D);
 
-                    pass.SetVector(command, "_InputScale", data.history.Scale);
-                    pass.SetVector(command, "_InputMax", data.history.Limit);
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", data.pixelToWorldViewDir);
+                    pass.SetVector("_InputScale", data.history.Scale);
+                    pass.SetVector("_InputMax", data.history.Limit);
+                    pass.SetMatrix("_PixelToWorldViewDir", data.pixelToWorldViewDir);
                 });
             }
 
@@ -123,15 +123,15 @@ namespace Arycama.CustomRenderPipeline
                 ),
                 (command, pass, data) =>
                 {
-                    pass.SetFloat(command, "_NonLinearDepth", data.nonLinearDepth);
-                    pass.SetFloat(command, "_VolumeWidth", data.volumeWidth);
-                    pass.SetFloat(command, "_VolumeHeight", data.volumeHeight);
-                    pass.SetFloat(command, "_VolumeSlices", data.volumeSlices);
+                    pass.SetFloat("_NonLinearDepth", data.nonLinearDepth);
+                    pass.SetFloat("_VolumeWidth", data.volumeWidth);
+                    pass.SetFloat("_VolumeHeight", data.volumeHeight);
+                    pass.SetFloat("_VolumeSlices", data.volumeSlices);
 
-                    pass.SetFloat(command, "_VolumeDistancePerSlice", data.volumeDistancePerSlice);
-                    pass.SetInt(command, "_VolumeSlicesInt", data.depthSlices);
+                    pass.SetFloat("_VolumeDistancePerSlice", data.volumeDistancePerSlice);
+                    pass.SetInt("_VolumeSlicesInt", data.depthSlices);
 
-                    pass.SetMatrix(command, "_PixelToWorldViewDir", data.pixelToWorldViewDir);
+                    pass.SetMatrix("_PixelToWorldViewDir", data.pixelToWorldViewDir);
                 });
             }
 
@@ -180,15 +180,15 @@ namespace Arycama.CustomRenderPipeline
 
             public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetVector(command, "_VolumetricLightScale", volumetricLighting.Scale);
-                pass.SetFloat(command, "_VolumetricLightNear", volumetricLightNear);
+                pass.SetVector("_VolumetricLightScale", volumetricLighting.Scale);
+                pass.SetFloat("_VolumetricLightNear", volumetricLightNear);
 
-                pass.SetVector(command, "_VolumetricLightMax", volumetricLighting.Limit);
-                pass.SetFloat(command, "_VolumetricLightFar", volumetricLightFar);
+                pass.SetVector("_VolumetricLightMax", volumetricLighting.Limit);
+                pass.SetFloat("_VolumetricLightFar", volumetricLightFar);
 
-                pass.SetVector(command, "_RcpVolumetricLightResolution", rcpVolumetricLightResolution);
-                pass.SetFloat(command, "_VolumeSlices", volumeSlices);
-                pass.SetFloat(command, "_NonLinearDepth", nonLinearDepth);
+                pass.SetVector("_RcpVolumetricLightResolution", rcpVolumetricLightResolution);
+                pass.SetFloat("_VolumeSlices", volumeSlices);
+                pass.SetFloat("_NonLinearDepth", nonLinearDepth);
             }
         }
     }

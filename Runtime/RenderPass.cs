@@ -1,5 +1,4 @@
-﻿using Arycama.CustomRenderPipeline;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Assertions;
@@ -18,35 +17,37 @@ namespace Arycama.CustomRenderPipeline
 
         public List<(RenderPassDataHandle, bool)> RenderPassDataHandles { get; private set; } = new();
 
+        protected CommandBuffer command;
+
         public RenderGraph RenderGraph { get; set; }
         internal string Name { get; set; }
         internal int Index { get; set; }
 
-        public abstract void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
+        public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
 
-        public abstract void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer);
-        public abstract void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer);
-        public abstract void SetVector(CommandBuffer command, string propertyName, Vector4 value);
-        public abstract void SetVectorArray(CommandBuffer command, string propertyName, Vector4[] value);
-        public abstract void SetFloat(CommandBuffer command, string propertyName, float value);
-        public abstract void SetFloatArray(CommandBuffer command, string propertyName, float[] value);
-        public abstract void SetInt(CommandBuffer command, string propertyName, int value);
-        public abstract void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value);
-        public abstract void SetMatrixArray(CommandBuffer command, string propertyName, Matrix4x4[] value);
-        public abstract void SetConstantBuffer(CommandBuffer command, string propertyName, BufferHandle value);
+        public abstract void SetBuffer(string propertyName, BufferHandle buffer);
+        public abstract void SetBuffer(string propertyName, GraphicsBuffer buffer);
+        public abstract void SetVector(string propertyName, Vector4 value);
+        public abstract void SetVectorArray(string propertyName, Vector4[] value);
+        public abstract void SetFloat(string propertyName, float value);
+        public abstract void SetFloatArray(string propertyName, float[] value);
+        public abstract void SetInt(string propertyName, int value);
+        public abstract void SetMatrix(string propertyName, Matrix4x4 value);
+        public abstract void SetMatrixArray(string propertyName, Matrix4x4[] value);
+        public abstract void SetConstantBuffer(string propertyName, BufferHandle value);
 
-        protected abstract void Execute(CommandBuffer command);
+        protected abstract void Execute();
 
-        protected virtual void PostExecute(CommandBuffer command) { }
+        protected virtual void PostExecute() { }
 
         public override string ToString()
         {
             return Name;
         }
 
-        public void SetTexture(CommandBuffer command, string propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+        public void SetTexture(string propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
-            SetTexture(command, Shader.PropertyToID(propertyName), texture, mip, subElement);
+            SetTexture(Shader.PropertyToID(propertyName), texture, mip, subElement);
         }
 
         public void ReadTexture(int propertyId, RTHandle texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -104,7 +105,10 @@ namespace Arycama.CustomRenderPipeline
 
         public void Run(CommandBuffer command)
         {
+            // TODO: Make configurable
             command.BeginSample(Name);
+
+            this.command = command;
 
             // Set render pass data
             //foreach(var renderPassDataHandle in renderPassDataHandles)
@@ -117,7 +121,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var texture in readTextures)
             {
                 var handle = texture.Item2;
-                SetTexture(command, texture.Item1, handle, texture.Item3, texture.Item4);
+                SetTexture(texture.Item1, handle, texture.Item3, texture.Item4);
             }
 
             readTextures.Clear();
@@ -125,17 +129,17 @@ namespace Arycama.CustomRenderPipeline
             foreach (var buffer in readBuffers)
             {
                 if (buffer.Item2.Target.HasFlag(GraphicsBuffer.Target.Constant))
-                    SetConstantBuffer(command, buffer.Item1, buffer.Item2);
+                    SetConstantBuffer(buffer.Item1, buffer.Item2);
                 else
-                    SetBuffer(command, buffer.Item1, buffer.Item2);
+                    SetBuffer(buffer.Item1, buffer.Item2);
             }
             readBuffers.Clear();
 
             foreach (var buffer in writeBuffers)
-                SetBuffer(command, buffer.Item1, buffer.Item2);
+                SetBuffer(buffer.Item1, buffer.Item2);
             writeBuffers.Clear();
 
-            SetupTargets(command);
+            SetupTargets();
 
             // Set any data from each pass
             foreach (var renderPassDataHandle in RenderPassDataHandles)
@@ -158,9 +162,9 @@ namespace Arycama.CustomRenderPipeline
                 renderGraphBuilder.ClearRenderFunction();
             }
 
-            Execute(command);
+            Execute();
 
-            PostExecute(command);
+            PostExecute();
 
             if (renderGraphBuilder != null)
             {
@@ -171,9 +175,11 @@ namespace Arycama.CustomRenderPipeline
             RenderPassDataHandles.Clear();
 
             command.EndSample(Name);
+
+            command = null;
         }
 
-        protected abstract void SetupTargets(CommandBuffer command);
+        protected abstract void SetupTargets();
 
         void IDisposable.Dispose()
         {
@@ -194,52 +200,5 @@ namespace Arycama.CustomRenderPipeline
             result.SetRenderFunction(pass);
             renderGraphBuilder = result;
         }
-    }
-}
-
-//public interface IRenderGraphBuilder
-//{
-//    void ClearRenderFunction();
-//    void Execute(CommandBuffer command, RenderPass pass);
-//}
-
-public class RenderGraphBuilder //: IRenderGraphBuilder
-{
-    private Action<CommandBuffer, RenderPass> pass;
-
-    public void SetRenderFunction(Action<CommandBuffer, RenderPass> pass)
-    {
-        this.pass = pass;
-    }
-
-    public virtual void ClearRenderFunction()
-    {
-        pass = null;
-    }
-
-    public virtual void Execute(CommandBuffer command, RenderPass pass)
-    {
-        this.pass?.Invoke(command, pass);
-    }
-}
-
-public class RenderGraphBuilder<T> : RenderGraphBuilder
-{
-    public T Data { get; set; }
-    private Action<CommandBuffer, RenderPass, T> pass;
-
-    public void SetRenderFunction(Action<CommandBuffer, RenderPass, T> pass)
-    {
-        this.pass = pass;
-    }
-
-    public override void ClearRenderFunction()
-    {
-        pass = null;
-    }
-
-    public override void Execute(CommandBuffer command, RenderPass pass)
-    {
-        this.pass?.Invoke(command, pass, Data);
     }
 }

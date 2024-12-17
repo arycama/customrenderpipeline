@@ -127,21 +127,21 @@ namespace Arycama.CustomRenderPipeline
                 ),
                 (command, pass, data) =>
                 {
-                    pass.SetFloat(command, "_SpatialSharpness", data.spatialSharpness);
-                    pass.SetFloat(command, "_MotionSharpness", data.motionSharpness);
-                    pass.SetFloat(command, "_HasHistory", data.hasHistory);
-                    pass.SetFloat(command, "_StationaryBlending", data.stationaryBlending);
-                    pass.SetFloat(command, "_VelocityBlending", data.motionBlending);
-                    pass.SetFloat(command, "_VelocityWeight", data.motionWeight);
-                    pass.SetFloat(command, "_Scale", data.scale);
+                    pass.SetFloat("_SpatialSharpness", data.spatialSharpness);
+                    pass.SetFloat("_MotionSharpness", data.motionSharpness);
+                    pass.SetFloat("_HasHistory", data.hasHistory);
+                    pass.SetFloat("_StationaryBlending", data.stationaryBlending);
+                    pass.SetFloat("_VelocityBlending", data.motionBlending);
+                    pass.SetFloat("_VelocityWeight", data.motionWeight);
+                    pass.SetFloat("_Scale", data.scale);
 
-                    pass.SetVector(command, "_HistoryScaleLimit", new Vector4(history.Scale.x, history.Scale.y, history.Limit.x, history.Limit.y));
+                    pass.SetVector("_HistoryScaleLimit", new Vector4(history.Scale.x, history.Scale.y, history.Limit.x, history.Limit.y));
 
-                    pass.SetVector(command, "_Resolution", data.resolution);
-                    pass.SetVector(command, "_MaxResolution", data.maxResolution);
+                    pass.SetVector("_Resolution", data.resolution);
+                    pass.SetVector("_MaxResolution", data.maxResolution);
 
-                    pass.SetInt(command, "_MaxWidth", data.maxWidth);
-                    pass.SetInt(command, "_MaxHeight", data.maxHeight);
+                    pass.SetInt("_MaxWidth", data.maxWidth);
+                    pass.SetInt("_MaxHeight", data.maxHeight);
                 });
 
                 renderGraph.SetResource(new CameraTargetData(result));;

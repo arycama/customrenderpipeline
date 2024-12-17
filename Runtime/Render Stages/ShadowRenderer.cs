@@ -58,9 +58,9 @@ namespace Arycama.CustomRenderPipeline
                             command.ClearRenderTarget(true, false, Color.clear);
 
                             // TODO: Use different matrices for shadows?
-                            pass.SetMatrix(command, "_WorldToView", data.worldToView);
-                            pass.SetMatrix(command, "_WorldToClip", data.worldToClip);
-                            pass.SetVector(command, "_ViewPosition", data.viewPosition);
+                            pass.SetMatrix("_WorldToView", data.worldToView);
+                            pass.SetMatrix("_WorldToClip", data.worldToClip);
+                            pass.SetVector("_ViewPosition", data.viewPosition);
                         });
                     }
 
@@ -106,9 +106,9 @@ namespace Arycama.CustomRenderPipeline
                             command.SetRenderTarget(data.target, data.target, 0, CubemapFace.Unknown, data.index);
                             command.ClearRenderTarget(true, false, Color.clear);
 
-                            pass.SetVector(command, "_ViewPosition", data.viewPosition);
-                            pass.SetMatrix(command, "_WorldToView", data.worldToView);
-                            pass.SetMatrix(command, "_WorldToClip", data.worldToClip);
+                            pass.SetVector("_ViewPosition", data.viewPosition);
+                            pass.SetMatrix("_WorldToView", data.worldToView);
+                            pass.SetMatrix("_WorldToClip", data.worldToClip);
                         });
 
                     }
@@ -148,10 +148,10 @@ namespace Arycama.CustomRenderPipeline
 
             public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetFloat(command, "ShadowMapResolution", shadowMapResolution);
-                pass.SetFloat(command, "RcpShadowMapResolution", rcpShadowMapResolution);
-                pass.SetFloat(command, "ShadowFilterRadius", shadowFilterRadius);
-                pass.SetFloat(command, "ShadowFilterSigma", shadowFilterSigma);
+                pass.SetFloat("ShadowMapResolution", shadowMapResolution);
+                pass.SetFloat("RcpShadowMapResolution", rcpShadowMapResolution);
+                pass.SetFloat("ShadowFilterRadius", shadowFilterRadius);
+                pass.SetFloat("ShadowFilterSigma", shadowFilterSigma);
             }
         }
     }

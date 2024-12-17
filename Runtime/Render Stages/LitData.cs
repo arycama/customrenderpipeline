@@ -86,9 +86,9 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, renderPass) =>
                 {
-                    pass.SetVector(command, "_DirectionalAlbedoScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution));
-                    pass.SetInt(command, "_DirectionalAlbedoSamples", (int)settings.DirectionalAlbedoSamples);
-                    pass.SetFloat(command, "_DirectionalAlbedoSamplesRcp", 1f / settings.DirectionalAlbedoSamples);
+                    pass.SetVector("_DirectionalAlbedoScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoResolution, settings.DirectionalAlbedoResolution));
+                    pass.SetInt("_DirectionalAlbedoSamples", (int)settings.DirectionalAlbedoSamples);
+                    pass.SetFloat("_DirectionalAlbedoSamplesRcp", 1f / settings.DirectionalAlbedoSamples);
                 });
             }
 
@@ -100,10 +100,10 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, renderPass) =>
                 {
-                    pass.SetFloat(command, "_AverageAlbedoScaleOffset", 1f / settings.AverageAlbedoResolution);
-                    pass.SetInt(command, "_AverageAlbedoSamples", (int)settings.AverageAlbedoSamples);
-                    pass.SetFloat(command, "_AverageAlbedoSamplesRcp", 1f / settings.AverageAlbedoSamples);
-                    pass.SetFloat(command, "_AverageAlbedoSamplesMinusOneRcp", 1f / (settings.AverageAlbedoSamples - 1));
+                    pass.SetFloat("_AverageAlbedoScaleOffset", 1f / settings.AverageAlbedoResolution);
+                    pass.SetInt("_AverageAlbedoSamples", (int)settings.AverageAlbedoSamples);
+                    pass.SetFloat("_AverageAlbedoSamplesRcp", 1f / settings.AverageAlbedoSamples);
+                    pass.SetFloat("_AverageAlbedoSamplesMinusOneRcp", 1f / (settings.AverageAlbedoSamples - 1));
                     result.SetProperties(pass, command);
                 });
             }
@@ -116,9 +116,9 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, renderPass) =>
                 {
-                    pass.SetVector(command, "_DirectionalAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution));
-                    pass.SetInt(command, "_DirectionalAlbedoMsSamples", (int)settings.DirectionalAlbedoMSamples);
-                    pass.SetFloat(command, "_DirectionalAlbedoMsSamplesRcp", 1f / settings.DirectionalAlbedoMSamples);
+                    pass.SetVector("_DirectionalAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution, settings.DirectionalAlbedoMsResolution));
+                    pass.SetInt("_DirectionalAlbedoMsSamples", (int)settings.DirectionalAlbedoMSamples);
+                    pass.SetFloat("_DirectionalAlbedoMsSamplesRcp", 1f / settings.DirectionalAlbedoMSamples);
                     result.SetProperties(pass, command);
                 });
             }
@@ -131,10 +131,10 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, renderPass) =>
                 {
-                    pass.SetVector(command, "_AverageAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution));
-                    pass.SetInt(command, "_AverageAlbedoMsSamples", (int)settings.AverageAlbedoMsSamples);
-                    pass.SetFloat(command, "_AverageAlbedoMsSamplesRcp", 1f / settings.AverageAlbedoMsSamples);
-                    pass.SetFloat(command, "_AverageAlbedoMsSamplesMinusOneRcp", 1f / (settings.AverageAlbedoMsSamples - 1));
+                    pass.SetVector("_AverageAlbedoMsScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AverageAlbedoMsResolution, settings.AverageAlbedoMsResolution));
+                    pass.SetInt("_AverageAlbedoMsSamples", (int)settings.AverageAlbedoMsSamples);
+                    pass.SetFloat("_AverageAlbedoMsSamplesRcp", 1f / settings.AverageAlbedoMsSamples);
+                    pass.SetFloat("_AverageAlbedoMsSamplesMinusOneRcp", 1f / (settings.AverageAlbedoMsSamples - 1));
                     result.SetProperties(pass, command);
                 });
             }
@@ -148,7 +148,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetRenderFunction((command, renderPass) =>
                 {
                     // Specular occlusion
-                    pass.SetInt(command, "_SpecularOcclusionResolution", 32);
+                    pass.SetInt("_SpecularOcclusionResolution", 32);
                     result.SetProperties(pass, command);
                 });
             }
@@ -186,10 +186,10 @@ namespace Arycama.CustomRenderPipeline
 
             public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetVector(command, "_GGXDirectionalAlbedoRemap", ggxDirectionalAlbedoRemap);
-                pass.SetVector(command, "_GGXAverageAlbedoRemap", ggxAverageAlbedoRemap);
-                pass.SetVector(command, "_GGXDirectionalAlbedoMSScaleOffset", ggxDirectionalAlbedoMSScaleOffset);
-                pass.SetVector(command, "_GGXAverageAlbedoMSRemap", ggxAverageAlbedoMSRemap);
+                pass.SetVector("_GGXDirectionalAlbedoRemap", ggxDirectionalAlbedoRemap);
+                pass.SetVector("_GGXAverageAlbedoRemap", ggxAverageAlbedoRemap);
+                pass.SetVector("_GGXDirectionalAlbedoMSScaleOffset", ggxDirectionalAlbedoMSScaleOffset);
+                pass.SetVector("_GGXAverageAlbedoMSRemap", ggxAverageAlbedoMSRemap);
             }
         }
 

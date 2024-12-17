@@ -25,8 +25,8 @@ namespace Arycama.CustomRenderPipeline.Water
 
         public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector(command, "_WaterAlbedo", albedo);
-            pass.SetVector(command, "_WaterExtinction", extinction);
+            pass.SetVector("_WaterAlbedo", albedo);
+            pass.SetVector("_WaterExtinction", extinction);
         }
     }
 }

@@ -102,10 +102,10 @@ namespace Arycama.CustomRenderPipeline.Water
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetFloat(command, "_CausticsDepth", settings.CausticsDepth);
-                    pass.SetFloat(command, "_CausticsCascade", settings.CasuticsCascade);
-                    pass.SetFloat(command, "_PatchSize", patchSize);
-                    pass.SetVector(command, "_RefractiveIndex", Vector3.one * (1.0f / 1.34f));
+                    pass.SetFloat("_CausticsDepth", settings.CausticsDepth);
+                    pass.SetFloat("_CausticsCascade", settings.CasuticsCascade);
+                    pass.SetFloat("_PatchSize", patchSize);
+                    pass.SetVector("_RefractiveIndex", Vector3.one * (1.0f / 1.34f));
                 });
             }
 
@@ -126,10 +126,10 @@ namespace Arycama.CustomRenderPipeline.Water
                     command.SetRenderTarget(tempResult);
                     command.ClearRenderTarget(false, true, Color.clear);
 
-                    pass.SetFloat(command, "_CausticsDepth", settings.CausticsDepth);
-                    pass.SetFloat(command, "_CausticsCascade", settings.CasuticsCascade);
-                    pass.SetFloat(command, "_PatchSize", patchSize);
-                    pass.SetVector(command, "_RefractiveIndex", Vector3.one * (1.0f / 1.34f));
+                    pass.SetFloat("_CausticsDepth", settings.CausticsDepth);
+                    pass.SetFloat("_CausticsCascade", settings.CasuticsCascade);
+                    pass.SetFloat("_PatchSize", patchSize);
+                    pass.SetVector("_RefractiveIndex", Vector3.one * (1.0f / 1.34f));
 
                     command.DrawProcedural(indexBuffer, Matrix4x4.identity, material, 0, MeshTopology.Triangles, indexBuffer.count);
                 });

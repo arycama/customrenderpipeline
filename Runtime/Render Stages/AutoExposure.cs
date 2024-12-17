@@ -161,20 +161,20 @@ namespace Arycama.CustomRenderPipeline
 
                 (command, pass, data) => 
                 {
-                    pass.SetFloat(command, "MinEv", data.minEv);
-                    pass.SetFloat(command, "MaxEv", data.maxEv);
-                    pass.SetFloat(command, "AdaptationSpeed", data.adaptationSpeed);
-                    pass.SetFloat(command, "ExposureCompensation", data.exposureCompensation);
-                    pass.SetFloat(command, "Iso", data.iso);
-                    pass.SetFloat(command, "Aperture", data.aperture);
-                    pass.SetFloat(command, "ShutterSpeed", data.shutterSpeed);
-                    pass.SetFloat(command, "HistogramMin", data.histogramMin);
-                    pass.SetFloat(command, "HistogramMax", data.histogramMax);
-                    pass.SetFloat(command, "MeteringMode", (float)settings.MeteringMode);
-                    pass.SetVector(command, "_ExposureCompensationRemap", data.exposureCompensationRemap);
-                    pass.SetVector(command, "ProceduralCenter", settings.ProceduralCenter);
-                    pass.SetVector(command, "ProceduralRadii", settings.ProceduralRadii);
-                    pass.SetFloat(command, "ProceduralSoftness", settings.ProceduralSoftness);
+                    pass.SetFloat("MinEv", data.minEv);
+                    pass.SetFloat("MaxEv", data.maxEv);
+                    pass.SetFloat("AdaptationSpeed", data.adaptationSpeed);
+                    pass.SetFloat("ExposureCompensation", data.exposureCompensation);
+                    pass.SetFloat("Iso", data.iso);
+                    pass.SetFloat("Aperture", data.aperture);
+                    pass.SetFloat("ShutterSpeed", data.shutterSpeed);
+                    pass.SetFloat("HistogramMin", data.histogramMin);
+                    pass.SetFloat("HistogramMax", data.histogramMax);
+                    pass.SetFloat("MeteringMode", (float)settings.MeteringMode);
+                    pass.SetVector("_ExposureCompensationRemap", data.exposureCompensationRemap);
+                    pass.SetVector("ProceduralCenter", settings.ProceduralCenter);
+                    pass.SetVector("ProceduralRadii", settings.ProceduralRadii);
+                    pass.SetFloat("ProceduralSoftness", settings.ProceduralSoftness);
                 });
             }
 
@@ -189,9 +189,9 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((settings.ExposureMode, exposureTexture), (command, pass, data) =>
                 {
-                    pass.SetFloat(command, "Mode", (float)data.ExposureMode);
-                    pass.SetFloat(command, "IsFirst", 0.0f);
-                    pass.SetTexture(command, "ExposureTexture", data.exposureTexture);
+                    pass.SetFloat("Mode", (float)data.ExposureMode);
+                    pass.SetFloat("IsFirst", 0.0f);
+                    pass.SetTexture("ExposureTexture", data.exposureTexture);
                 });
             }
 

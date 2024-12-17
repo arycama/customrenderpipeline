@@ -45,7 +45,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetVector(command, "_WaterExtinction", settings.Material.GetColor("_Extinction"));
+                    pass.SetVector("_WaterExtinction", settings.Material.GetColor("_Extinction"));
                 });
             }
 

@@ -78,32 +78,32 @@ namespace Arycama.CustomRenderPipeline
                 var hdrEnabled = hdrSettings.available && settings.HdrEnabled;
                 var maxNits = hdrEnabled ? hdrSettings.maxToneMapLuminance : 100.0f;
 
-                pass.SetFloat(command, "HdrEnabled", hdrEnabled ? 1.0f : 0.0f);
-                pass.SetTexture(command, "_GrainTexture", settings.FilmGrainTexture);
+                pass.SetFloat("HdrEnabled", hdrEnabled ? 1.0f : 0.0f);
+                pass.SetTexture("_GrainTexture", settings.FilmGrainTexture);
 
-                pass.SetFloat(command, "NoiseIntensity", settings.NoiseIntensity);
-                pass.SetFloat(command, "NoiseResponse", settings.NoiseResponse);
+                pass.SetFloat("NoiseIntensity", settings.NoiseIntensity);
+                pass.SetFloat("NoiseResponse", settings.NoiseResponse);
 
-                pass.SetFloat(command, "Tonemap", settings.Tonemap ? 1.0f : 0.0f);
+                pass.SetFloat("Tonemap", settings.Tonemap ? 1.0f : 0.0f);
 
-                pass.SetFloat(command, "MaxLuminance", hdrEnabled ? maxNits : 100);
-                pass.SetFloat(command, "PaperWhiteLuminance", settings.PaperWhite); // Todo: Brightness setting
-                pass.SetFloat(command, "PaperWhiteBoost", settings.GreyLuminanceBoost);
-                pass.SetFloat(command, "Contrast", settings.Contrast);
-                pass.SetFloat(command, "Toe", settings.Toe);
-                pass.SetFloat(command, "PurityCompress", settings.PurityCompress);
-                pass.SetFloat(command, "PurityBoost", settings.PurityBoost);
-                pass.SetVector(command, "Hueshift", new Vector3(settings.HueshiftR, settings.HueshiftG, settings.HueshiftB));
+                pass.SetFloat("MaxLuminance", hdrEnabled ? maxNits : 100);
+                pass.SetFloat("PaperWhiteLuminance", settings.PaperWhite); // Todo: Brightness setting
+                pass.SetFloat("PaperWhiteBoost", settings.GreyLuminanceBoost);
+                pass.SetFloat("Contrast", settings.Contrast);
+                pass.SetFloat("Toe", settings.Toe);
+                pass.SetFloat("PurityCompress", settings.PurityCompress);
+                pass.SetFloat("PurityBoost", settings.PurityBoost);
+                pass.SetVector("Hueshift", new Vector3(settings.HueshiftR, settings.HueshiftG, settings.HueshiftB));
 
-                pass.SetFloat(command, "ShutterSpeed", lensSettings.ShutterSpeed);
-                pass.SetFloat(command, "Aperture", lensSettings.Aperture);
-                pass.SetVector(command, "_GrainTextureParams", new Vector4(uvScaleX, uvScaleY, offsetX, offsetY));
-                pass.SetVector(command, "_Resolution", new Vector4(data.width, data.height, 1.0f / data.width, 1.0f / data.height));
+                pass.SetFloat("ShutterSpeed", lensSettings.ShutterSpeed);
+                pass.SetFloat("Aperture", lensSettings.Aperture);
+                pass.SetVector("_GrainTextureParams", new Vector4(uvScaleX, uvScaleY, offsetX, offsetY));
+                pass.SetVector("_Resolution", new Vector4(data.width, data.height, 1.0f / data.width, 1.0f / data.height));
 
                 var colorGamut = hdrSettings.available ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
-                pass.SetInt(command, "ColorGamut", (int)colorGamut);
+                pass.SetInt("ColorGamut", (int)colorGamut);
 
-                pass.SetFloat(command, "_BloomStrength", bloomSettings.Strength);
+                pass.SetFloat("_BloomStrength", bloomSettings.Strength);
             });
 
             renderGraph.SetResource(new CameraTargetData(result));;

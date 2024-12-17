@@ -40,10 +40,10 @@ public class GenerateHiZ : RenderFeature<(RTHandle input, int width, int height)
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetInt(command, "_Width", data.width);
-                pass.SetInt(command, "_Height", data.height);
-                pass.SetInt(command, "_MaxMip", hasSecondPass ? maxMipsPerPass : mipCount);
-                pass.SetVector(command, "_InputScaleLimit", data.input.ScaleLimit2D);
+                pass.SetInt("_Width", data.width);
+                pass.SetInt("_Height", data.height);
+                pass.SetInt("_MaxMip", hasSecondPass ? maxMipsPerPass : mipCount);
+                pass.SetVector("_InputScaleLimit", data.input.ScaleLimit2D);
             });
         }
 
@@ -66,9 +66,9 @@ public class GenerateHiZ : RenderFeature<(RTHandle input, int width, int height)
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetInt(command, "_Width", data.width >> (maxMipsPerPass - 1));
-                    pass.SetInt(command, "_Height", data.height >> (maxMipsPerPass - 1));
-                    pass.SetInt(command, "_MaxMip", mipCount - maxMipsPerPass);
+                    pass.SetInt("_Width", data.width >> (maxMipsPerPass - 1));
+                    pass.SetInt("_Height", data.height >> (maxMipsPerPass - 1));
+                    pass.SetInt("_MaxMip", mipCount - maxMipsPerPass);
                 });
             }
         }

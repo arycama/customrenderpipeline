@@ -24,7 +24,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector(command, scaleLimitPropertyName, Handle.ScaleLimit2D);
+            pass.SetVector(scaleLimitPropertyName, Handle.ScaleLimit2D);
         }
     }
 }

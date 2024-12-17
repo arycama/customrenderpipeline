@@ -42,7 +42,7 @@ namespace Arycama.CustomRenderPipeline
             WriteTexture(texture, Shader.PropertyToID(propertyName));
         }
 
-        public override void SetTexture(CommandBuffer command, int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+        public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
             if (subElement == RenderTextureSubElement.Depth || subElement == RenderTextureSubElement.Default)
                 command.SetRayTracingTextureParam(shader, propertyName, texture);
@@ -50,41 +50,41 @@ namespace Arycama.CustomRenderPipeline
                 command.SetGlobalTexture(propertyName, texture, subElement);
         }
 
-        public override void SetBuffer(CommandBuffer command, string propertyName, BufferHandle buffer)
+        public override void SetBuffer(string propertyName, BufferHandle buffer)
         {
             // only way.. :( 
             command.SetGlobalBuffer(propertyName, buffer);
             // command.SetRayTracingBufferParam(shader, propertyName, buffer);
         }
 
-        public override void SetBuffer(CommandBuffer command, string propertyName, GraphicsBuffer buffer)
+        public override void SetBuffer(string propertyName, GraphicsBuffer buffer)
         {
             // only way.. :( 
             command.SetGlobalBuffer(propertyName, buffer);
             //command.SetRayTracingBufferParam.SetBuffer(propertyName, buffer);
         }
 
-        public override void SetVector(CommandBuffer command, string propertyName, Vector4 value)
+        public override void SetVector(string propertyName, Vector4 value)
         {
             command.SetRayTracingVectorParam(shader, propertyName, value);
         }
 
-        public override void SetVectorArray(CommandBuffer command, string propertyName, Vector4[] value)
+        public override void SetVectorArray(string propertyName, Vector4[] value)
         {
             command.SetRayTracingVectorArrayParam(shader, propertyName, value);
         }
 
-        public override void SetFloat(CommandBuffer command, string propertyName, float value)
+        public override void SetFloat(string propertyName, float value)
         {
             command.SetRayTracingFloatParam(shader, propertyName, value);
         }
 
-        public override void SetFloatArray(CommandBuffer command, string propertyName, float[] value)
+        public override void SetFloatArray(string propertyName, float[] value)
         {
             command.SetRayTracingFloatParams(shader, propertyName, value);
         }
 
-        public override void SetInt(CommandBuffer command, string propertyName, int value)
+        public override void SetInt(string propertyName, int value)
         {
             command.SetRayTracingIntParam(shader, propertyName, value);
         }
@@ -99,7 +99,7 @@ namespace Arycama.CustomRenderPipeline
             return Mathf.Atan(GetPixelSpreadTangent(fov, width, height));
         }
 
-        protected override void Execute(CommandBuffer command)
+        protected override void Execute()
         {
             Assert.IsNotNull(rtas);
 
@@ -113,28 +113,28 @@ namespace Arycama.CustomRenderPipeline
             command.DispatchRays(shader, rayGenName, (uint)width, (uint)height, (uint)depth);
         }
 
-        protected override void SetupTargets(CommandBuffer command)
+        protected override void SetupTargets()
         {
             for (var i = 0; i < colorBindings.Count; i++)
                 command.SetRayTracingTextureParam(shader, colorBindings[i].Item2, colorBindings[i].Item1);
         }
 
-        public override void SetMatrix(CommandBuffer command, string propertyName, Matrix4x4 value)
+        public override void SetMatrix(string propertyName, Matrix4x4 value)
         {
             command.SetRayTracingMatrixParam(shader, propertyName, value);
         }
 
-        public override void SetConstantBuffer(CommandBuffer command, string propertyName, BufferHandle value)
+        public override void SetConstantBuffer(string propertyName, BufferHandle value)
         {
             command.SetRayTracingConstantBufferParam(shader, propertyName, value, 0, value.Size);
         }
 
-        public override void SetMatrixArray(CommandBuffer command, string propertyName, Matrix4x4[] value)
+        public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
         {
             command.SetRayTracingMatrixArrayParam(shader, propertyName, value);
         }
 
-        protected sealed override void PostExecute(CommandBuffer command)
+        protected sealed override void PostExecute()
         {
             foreach (var colorTarget in colorBindings)
             {

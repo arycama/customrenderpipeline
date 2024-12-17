@@ -23,11 +23,11 @@ namespace Arycama.CustomRenderPipeline
 
         void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector(command, "_LightDirection0", lightDirection0);
-            pass.SetVector(command, "_LightColor0", lightColor0);
-            pass.SetVector(command, "_LightDirection1", lightDirection1);
-            pass.SetVector(command, "_LightColor1", lightColor1);
-            pass.SetInt(command, "_LightCount", LightCount);
+            pass.SetVector("_LightDirection0", lightDirection0);
+            pass.SetVector("_LightColor0", lightColor0);
+            pass.SetVector("_LightDirection1", lightDirection1);
+            pass.SetVector("_LightColor1", lightColor1);
+            pass.SetInt("_LightCount", LightCount);
         }
     }
 }

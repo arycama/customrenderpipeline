@@ -29,10 +29,10 @@ namespace Arycama.CustomRenderPipeline.Water
 
         public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetMatrix(command, "_WaterShadowMatrix1", waterShadowMatrix);
-            pass.SetFloat(command, "_WaterShadowNear", waterShadowNear);
-            pass.SetFloat(command, "_WaterShadowFar", waterShadowFar);
-            pass.SetVector(command, "_WaterShadowExtinction", waterShadowExtinction);
+            pass.SetMatrix("_WaterShadowMatrix1", waterShadowMatrix);
+            pass.SetFloat("_WaterShadowNear", waterShadowNear);
+            pass.SetFloat("_WaterShadowFar", waterShadowFar);
+            pass.SetVector("_WaterShadowExtinction", waterShadowExtinction);
         }
     }
 }

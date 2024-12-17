@@ -22,8 +22,8 @@ namespace Arycama.CustomRenderPipeline.Water
 
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetFloat(command, "CausticsCascade", cascade);
-            pass.SetFloat(command, "CausticsDepth", depth);
+            pass.SetFloat("CausticsCascade", cascade);
+            pass.SetFloat("CausticsDepth", depth);
         }
     }
 }

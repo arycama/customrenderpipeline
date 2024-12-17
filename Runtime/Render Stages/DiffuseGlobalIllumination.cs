@@ -84,14 +84,14 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetRenderFunction((command, pass) =>
                     {
-                        pass.SetFloat(command, "_Intensity", settings.Intensity);
-                        pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
-                        pass.SetFloat(command, "_Thickness", settings.Thickness);
-                        pass.SetFloat(command, "_MaxMip", Texture2DExtensions.MipCount(data.width, data.height) - 1);
-                        pass.SetVector(command, "_PreviousColorScaleLimit", data.previousFrame.ScaleLimit2D);
+                        pass.SetFloat("_Intensity", settings.Intensity);
+                        pass.SetFloat("_MaxSteps", settings.MaxSamples);
+                        pass.SetFloat("_Thickness", settings.Thickness);
+                        pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.width, data.height) - 1);
+                        pass.SetVector("_PreviousColorScaleLimit", data.previousFrame.ScaleLimit2D);
 
                         var tanHalfFov = Mathf.Tan(0.5f * data.camera.fieldOfView * Mathf.Deg2Rad);
-                        pass.SetFloat(command, "_ConeAngle", Mathf.Tan(0.5f * settings.ConeAngle * Mathf.Deg2Rad) * (data.height / tanHalfFov * 0.5f));
+                        pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * settings.ConeAngle * Mathf.Deg2Rad) * (data.height / tanHalfFov * 0.5f));
                     });
                 }
             }
@@ -121,12 +121,12 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetFloat(command, "_Intensity", settings.Intensity);
-                    pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
-                    pass.SetFloat(command, "_Thickness", settings.Thickness);
-                    pass.SetInt(command, "_ResolveSamples", settings.ResolveSamples);
-                    pass.SetFloat(command, "_ResolveSize", settings.ResolveSize);
-                    pass.SetFloat(command, "DiffuseGiStrength", settings.Intensity);
+                    pass.SetFloat("_Intensity", settings.Intensity);
+                    pass.SetFloat("_MaxSteps", settings.MaxSamples);
+                    pass.SetFloat("_Thickness", settings.Thickness);
+                    pass.SetInt("_ResolveSamples", settings.ResolveSamples);
+                    pass.SetFloat("_ResolveSize", settings.ResolveSize);
+                    pass.SetFloat("DiffuseGiStrength", settings.Intensity);
                 });
             }
 
@@ -156,11 +156,11 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetFloat(command, "_IsFirst", wasCreated ? 1.0f : 0.0f);
-                    pass.SetVector(command, "_HistoryScaleLimit", history.ScaleLimit2D);
-                    pass.SetFloat(command, "_Intensity", settings.Intensity);
-                    pass.SetFloat(command, "_MaxSteps", settings.MaxSamples);
-                    pass.SetFloat(command, "_Thickness", settings.Thickness);
+                    pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
+                    pass.SetVector("_HistoryScaleLimit", history.ScaleLimit2D);
+                    pass.SetFloat("_Intensity", settings.Intensity);
+                    pass.SetFloat("_MaxSteps", settings.MaxSamples);
+                    pass.SetFloat("_Thickness", settings.Thickness);
                 });
             }
 
@@ -185,8 +185,8 @@ namespace Arycama.CustomRenderPipeline
 
             public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetVector(command, "ScreenSpaceGlobalIlluminationScaleLimit", ScreenSpaceGlobalIllumination.ScaleLimit2D);
-                pass.SetFloat(command, "DiffuseGiStrength", intensity);
+                pass.SetVector("ScreenSpaceGlobalIlluminationScaleLimit", ScreenSpaceGlobalIllumination.ScaleLimit2D);
+                pass.SetFloat("DiffuseGiStrength", intensity);
             }
         }
     }

@@ -73,10 +73,10 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetFloat(command, "Cutoff", cutoff);
-                    pass.SetFloat(command, "InvResolution", invResolution);
-                    pass.SetFloat(command, "Resolution", heightmapResolution);
-                    pass.SetTexture(command, "Heightmap", terrainData.heightmapTexture);
+                    pass.SetFloat("Cutoff", cutoff);
+                    pass.SetFloat("InvResolution", invResolution);
+                    pass.SetFloat("Resolution", heightmapResolution);
+                    pass.SetTexture("Heightmap", terrainData.heightmapTexture);
                 });
             }
 
@@ -104,11 +104,11 @@ namespace Arycama.CustomRenderPipeline
                     var index = i;
                     pass.SetRenderFunction((command, pass) =>
                     {
-                        pass.SetFloat(command, "Offset", offset);
-                        pass.SetTexture(command, "Heightmap", terrainData.heightmapTexture);
-                        pass.SetFloat(command, "InvResolution", invResolution);
-                        pass.SetFloat(command, "Resolution", heightmapResolution);
-                        pass.SetFloat(command, "Cutoff", cutoff);
+                        pass.SetFloat("Offset", offset);
+                        pass.SetTexture("Heightmap", terrainData.heightmapTexture);
+                        pass.SetFloat("InvResolution", invResolution);
+                        pass.SetFloat("Resolution", heightmapResolution);
+                        pass.SetFloat("Cutoff", cutoff);
 
                         if (index == passes - 1)
                         {
@@ -139,11 +139,11 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetTexture(command, "Heightmap", heightmapTexture);
-                    pass.SetFloat(command, "Cutoff", cutoff);
-                    pass.SetFloat(command, "InvResolution", invResolution);
+                    pass.SetTexture("Heightmap", heightmapTexture);
+                    pass.SetFloat("Cutoff", cutoff);
+                    pass.SetFloat("InvResolution", invResolution);
                     command.CopyBuffer(minMaxValues, resultDataBuffer);
-                    pass.SetFloat(command, "Resolution", heightmapResolution);
+                    pass.SetFloat("Resolution", heightmapResolution);
                 });
             }
 
@@ -189,11 +189,11 @@ namespace Arycama.CustomRenderPipeline
 
             void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetConstantBuffer(command, "WaterShoreMaskProperties", resultDataBuffer);
-                pass.SetVector(command, "ShoreScaleOffset", scaleOffset);
-                pass.SetVector(command, "ShoreTerrainSize", terrainSize);
-                pass.SetFloat(command, "ShoreMaxOceanDepth", maxOceanDepth);
-                pass.SetFloat(command, "ShoreMaxTerrainDistance", maxTerrainDistance);
+                pass.SetConstantBuffer("WaterShoreMaskProperties", resultDataBuffer);
+                pass.SetVector("ShoreScaleOffset", scaleOffset);
+                pass.SetVector("ShoreTerrainSize", terrainSize);
+                pass.SetFloat("ShoreMaxOceanDepth", maxOceanDepth);
+                pass.SetFloat("ShoreMaxTerrainDistance", maxTerrainDistance);
             }
         }
     }

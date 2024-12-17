@@ -222,7 +222,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetRenderFunction((command, pass) =>
                 {
                     // Can't use pass.readTexture here since this comes from unity
-                    pass.SetTexture(command, "HeightmapInput", terrainData.heightmapTexture);
+                    pass.SetTexture("HeightmapInput", terrainData.heightmapTexture);
                 });
             }
 
@@ -251,13 +251,13 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetRenderFunction((command, pass) =>
                 {
                     // Can't use pass.readTexture here since this comes from unity
-                    pass.SetTexture(command, "InitNormalMapInput", terrainData.heightmapTexture);
+                    pass.SetTexture("InitNormalMapInput", terrainData.heightmapTexture);
 
                     var scale = terrainData.heightmapScale;
                     var height = terrainData.size.y;
-                    pass.SetInt(command, "MaxWidth", terrainData.heightmapResolution - 1);
-                    pass.SetInt(command, "MaxHeight", terrainData.heightmapResolution - 1);
-                    pass.SetVector(command, "Scale", new Vector2(height / (8f * scale.x), height / (8f * scale.z)));
+                    pass.SetInt("MaxWidth", terrainData.heightmapResolution - 1);
+                    pass.SetInt("MaxHeight", terrainData.heightmapResolution - 1);
+                    pass.SetVector("Scale", new Vector2(height / (8f * scale.x), height / (8f * scale.z)));
                 });
             }
 
@@ -270,7 +270,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetTexture(command, "DepthCopyInput", heightmap);
+                    pass.SetTexture("DepthCopyInput", heightmap);
                 });
             }
 
@@ -293,8 +293,8 @@ namespace Arycama.CustomRenderPipeline
                         var prevWidth = Mathf.Max(1, resolution >> (index - 1));
                         var prevHeight = Mathf.Max(1, resolution >> (index - 1));
 
-                        pass.SetInt(command, "_Width", prevWidth);
-                        pass.SetInt(command, "_Height", prevHeight);
+                        pass.SetInt("_Width", prevWidth);
+                        pass.SetInt("_Height", prevHeight);
                     });
                 }
             }
@@ -334,18 +334,18 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetInt(command, "LayerCount", terrainData.alphamapLayers);
-                    pass.SetFloat(command, "_Resolution", idMapResolution);
-                    pass.SetBuffer(command, "TerrainLayerData", terrainLayerData);
-                    pass.SetVector(command, "TerrainSize", terrain.terrainData.size);
-                    pass.SetInt(command, "_TotalLayers", terrainLayers.Count);
-                    pass.SetInt(command, "_TextureCount", terrainData.alphamapLayers);
+                    pass.SetInt("LayerCount", terrainData.alphamapLayers);
+                    pass.SetFloat("_Resolution", idMapResolution);
+                    pass.SetBuffer("TerrainLayerData", terrainLayerData);
+                    pass.SetVector("TerrainSize", terrain.terrainData.size);
+                    pass.SetInt("_TotalLayers", terrainLayers.Count);
+                    pass.SetInt("_TextureCount", terrainData.alphamapLayers);
 
                     // Shader supports up to 8 layers. Can easily be increased by modifying shader though
                     for (var i = 0; i < 8; i++)
                     {
                         var texture = i < terrainData.alphamapTextureCount ? terrainData.alphamapTextures[i] : Texture2D.blackTexture;
-                        pass.SetTexture(command, $"_Input{i}", texture);
+                        pass.SetTexture($"_Input{i}", texture);
                     }
 
                     // Need to build buffer of layer to array index
@@ -525,29 +525,29 @@ namespace Arycama.CustomRenderPipeline
                         }
 
                         // Do up to 6 passes per dispatch.
-                        pass.SetInt(command, "_PassCount", data.passCount);
-                        pass.SetInt(command, "_PassOffset", 6 * data.index);
-                        pass.SetInt(command, "_TotalPassCount", data.totalPassCount);
+                        pass.SetInt("_PassCount", data.passCount);
+                        pass.SetInt("_PassOffset", 6 * data.index);
+                        pass.SetInt("_TotalPassCount", data.totalPassCount);
 
                         var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
                         for (var i = 0; i < data.cullingPlanes.Count; i++)
                             cullingPlanesArray[i] = data.cullingPlanes.GetCullingPlaneVector4(i);
 
-                        pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                        pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
                         ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                         // Snap to quad-sized increments on largest cell
                         var position = data.terrain.GetPosition() - data.viewPosition;
                         var positionOffset = new Vector4(data.terrainData.size.x, data.terrainData.size.z, position.x, position.z);
-                        pass.SetVector(command, "_TerrainPositionOffset", positionOffset);
+                        pass.SetVector("_TerrainPositionOffset", positionOffset);
 
-                        pass.SetFloat(command, "_EdgeLength", (float)data.settings.EdgeLength * data.settings.PatchVertices);
-                        pass.SetInt(command, "_CullingPlanesCount", data.cullingPlanes.Count);
+                        pass.SetFloat("_EdgeLength", (float)data.settings.EdgeLength * data.settings.PatchVertices);
+                        pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
 
-                        pass.SetFloat(command, "_InputScale", data.terrainData.size.y);
-                        pass.SetFloat(command, "_InputOffset", position.y);
+                        pass.SetFloat("_InputScale", data.terrainData.size.y);
+                        pass.SetFloat("_InputOffset", position.y);
 
-                        pass.SetInt(command, "_MipCount", Texture2DExtensions.MipCount(data.terrainData.heightmapResolution) - 1);
+                        pass.SetInt("_MipCount", Texture2DExtensions.MipCount(data.terrainData.heightmapResolution) - 1);
                     });
                 }
             }
@@ -573,7 +573,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetRenderFunction((command, pass) =>
                     {
-                        pass.SetInt(command, "_CellCount", settings.CellCount);
+                        pass.SetInt("_CellCount", settings.CellCount);
                     });
                 }
             }
@@ -626,27 +626,27 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
-                    pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
-                    pass.SetFloat(command, "_RcpVerticesPerEdge", 1f / VerticesPerTileEdge);
-                    pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
+                    pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
+                    pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
+                    pass.SetFloat("_RcpVerticesPerEdge", 1f / VerticesPerTileEdge);
+                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
 
                     var scaleOffset = new Vector4(size.x / settings.CellCount, size.z / settings.CellCount, position.x, position.z);
-                    pass.SetVector(command, "_PatchScaleOffset", scaleOffset);
-                    pass.SetVector(command, "_SpacingScale", new Vector4(size.x / settings.CellCount / settings.PatchVertices, size.z / settings.CellCount / settings.PatchVertices, position.x, position.z));
-                    pass.SetFloat(command, "_PatchUvScale", 1f / settings.CellCount);
+                    pass.SetVector("_PatchScaleOffset", scaleOffset);
+                    pass.SetVector("_SpacingScale", new Vector4(size.x / settings.CellCount / settings.PatchVertices, size.z / settings.CellCount / settings.PatchVertices, position.x, position.z));
+                    pass.SetFloat("_PatchUvScale", 1f / settings.CellCount);
 
-                    pass.SetFloat(command, "_HeightUvScale", 1f / settings.CellCount * (1.0f - 1f / terrainData.heightmapResolution));
-                    pass.SetFloat(command, "_HeightUvOffset", 0.5f / terrainData.heightmapResolution);
+                    pass.SetFloat("_HeightUvScale", 1f / settings.CellCount * (1.0f - 1f / terrainData.heightmapResolution));
+                    pass.SetFloat("_HeightUvOffset", 0.5f / terrainData.heightmapResolution);
 
-                    pass.SetFloat(command, "_MaxLod", Mathf.Log(settings.CellCount, 2));
+                    pass.SetFloat("_MaxLod", Mathf.Log(settings.CellCount, 2));
 
-                    pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
+                    pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
                     var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
                     for (var i = 0; i < cullingPlanes.Count; i++)
                         cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
 
-                    pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                    pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
                     ArrayPool<Vector4>.Release(cullingPlanesArray);
                 });
             }
@@ -685,30 +685,30 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetInt(command, "_VerticesPerEdge", VerticesPerTileEdge);
-                    pass.SetInt(command, "_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
-                    pass.SetFloat(command, "_RcpVerticesPerEdge", 1f / VerticesPerTileEdge);
-                    pass.SetFloat(command, "_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
+                    pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
+                    pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
+                    pass.SetFloat("_RcpVerticesPerEdge", 1f / VerticesPerTileEdge);
+                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
 
                     var scaleOffset = new Vector4(size.x / settings.CellCount, size.z / settings.CellCount, position.x, position.z);
-                    pass.SetVector(command, "_PatchScaleOffset", scaleOffset);
-                    pass.SetVector(command, "_SpacingScale", new Vector4(size.x / settings.CellCount / settings.PatchVertices, size.z / settings.CellCount / settings.PatchVertices, position.x, position.z));
-                    pass.SetFloat(command, "_PatchUvScale", 1f / settings.CellCount);
+                    pass.SetVector("_PatchScaleOffset", scaleOffset);
+                    pass.SetVector("_SpacingScale", new Vector4(size.x / settings.CellCount / settings.PatchVertices, size.z / settings.CellCount / settings.PatchVertices, position.x, position.z));
+                    pass.SetFloat("_PatchUvScale", 1f / settings.CellCount);
 
-                    pass.SetFloat(command, "_HeightUvScale", 1f / settings.CellCount * (1.0f - 1f / terrainData.heightmapResolution));
-                    pass.SetFloat(command, "_HeightUvOffset", 0.5f / terrainData.heightmapResolution);
+                    pass.SetFloat("_HeightUvScale", 1f / settings.CellCount * (1.0f - 1f / terrainData.heightmapResolution));
+                    pass.SetFloat("_HeightUvOffset", 0.5f / terrainData.heightmapResolution);
 
-                    pass.SetFloat(command, "_MaxLod", Mathf.Log(settings.CellCount, 2));
-                    pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
+                    pass.SetFloat("_MaxLod", Mathf.Log(settings.CellCount, 2));
+                    pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
 
                     var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
                     for (var i = 0; i < cullingPlanes.Count; i++)
                         cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
 
-                    pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
+                    pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
                     ArrayPool<Vector4>.Release(cullingPlanesArray);
 
-                    pass.SetMatrix(command, "_WorldToClip", worldToClip);
+                    pass.SetMatrix("_WorldToClip", worldToClip);
                 });
             }
         }

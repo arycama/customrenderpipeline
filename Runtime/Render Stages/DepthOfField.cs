@@ -59,14 +59,14 @@ namespace Arycama.CustomRenderPipeline
                 ), 
                 (command, pass, data) =>
                 {
-                    pass.SetFloat(command, "_FocalDistance", data.focalDistance);
-                    pass.SetFloat(command, "_FocalLength", data.focalLength);
-                    pass.SetFloat(command, "_ApertureSize", data.apertureSize);
-                    pass.SetFloat(command, "_MaxCoC", data.maxCoc);
-                    pass.SetFloat(command, "_SensorHeight", data.sensorHeight);
+                    pass.SetFloat("_FocalDistance", data.focalDistance);
+                    pass.SetFloat("_FocalLength", data.focalLength);
+                    pass.SetFloat("_ApertureSize", data.apertureSize);
+                    pass.SetFloat("_MaxCoC", data.maxCoc);
+                    pass.SetFloat("_SensorHeight", data.sensorHeight);
 
-                    pass.SetFloat(command, "_SampleRadius", data.sampleRadius);
-                    pass.SetInt(command, "_SampleCount", data.sampleCount);
+                    pass.SetFloat("_SampleRadius", data.sampleRadius);
+                    pass.SetInt("_SampleCount", data.sampleCount);
                 });
 
                 renderGraph.SetResource(new CameraTargetData(tempId));;

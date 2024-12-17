@@ -38,9 +38,9 @@ public class UIBlur : RenderFeature<(int width, int height)>
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetFloat(command, "BlurRadius", settings.BlurRadius);
-                pass.SetFloat(command, "BlurSigma", settings.BlurSigma);
-                pass.SetVector(command, "TexelSize", new Vector4(1f / width, 1f / height, width, height));
+                pass.SetFloat("BlurRadius", settings.BlurRadius);
+                pass.SetFloat("BlurSigma", settings.BlurSigma);
+                pass.SetVector("TexelSize", new Vector4(1f / width, 1f / height, width, height));
             });
         }
 
@@ -53,10 +53,10 @@ public class UIBlur : RenderFeature<(int width, int height)>
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetFloat(command, "BlurRadius", settings.BlurRadius);
-                pass.SetFloat(command, "BlurSigma", settings.BlurSigma);
-                pass.SetVector(command, "TexelSize", new Vector4(1f / width, 1f / height, width, height));
-                pass.SetVector(command, "_InputScaleLimit", horizontalResult.ScaleLimit2D);
+                pass.SetFloat("BlurRadius", settings.BlurRadius);
+                pass.SetFloat("BlurSigma", settings.BlurSigma);
+                pass.SetVector("TexelSize", new Vector4(1f / width, 1f / height, width, height));
+                pass.SetVector("_InputScaleLimit", horizontalResult.ScaleLimit2D);
             });
         }
 
@@ -79,7 +79,7 @@ public class UIBlur : RenderFeature<(int width, int height)>
 
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector(command, "UIBlurTextureScaleLimit", uiBlurTexture.ScaleLimit2D);
+            pass.SetVector("UIBlurTextureScaleLimit", uiBlurTexture.ScaleLimit2D);
         }
     }
 }
