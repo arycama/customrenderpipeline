@@ -1,5 +1,4 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
@@ -7,34 +6,9 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public class WaterSystem
+    public partial class WaterSystem : RenderFeature<(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, CullingPlanes cullingPlanes)>
     {
-        [Serializable]
-        public class Settings
-        {
-            [field: SerializeField, Tooltip("Whether water is enabled or not by default. (Can be overridden in scene")] public bool IsEnabled { get; private set; } = true;
-            [field: SerializeField, Tooltip("The resolution of the simulation, higher numbers give more detail but are more expensive")] public int Resolution { get; private set; } = 128;
-            [field: SerializeField] public Material Material { get; private set; }
-            [field: SerializeField] public WaterProfile Profile { get; private set; }
-            [field: SerializeField] public float ShadowRadius { get; private set; } = 8192;
-            [field: SerializeField] public float ShadowBias { get; private set; } = 0;
-            [field: SerializeField] public float ShadowSlopeBias { get; private set; } = 0;
-            [field: SerializeField] public int ShadowResolution { get; private set; } = 512;
-            [field: SerializeField] public bool RaytracedRefractions { get; private set; } = false;
-
-            [field: Header("Rendering")]
-            [field: SerializeField] public int CellCount { get; private set; } = 32;
-            [field: SerializeField, Tooltip("Size of the Mesh in World Space")] public int Size { get; private set; } = 256;
-            [field: SerializeField] public int PatchVertices { get; private set; } = 32;
-            [field: SerializeField, Range(1, 128)] public float EdgeLength { get; private set; } = 64;
-            [field: SerializeField] public int CasuticsResolution { get; private set; } = 256;
-            [field: SerializeField, Range(0, 3)] public int CasuticsCascade { get; private set; } = 0;
-            [field: SerializeField, Min(0)] public float CausticsDepth { get; private set; } = 10;
-
-        }
-
         private readonly Settings settings;
-        private readonly RenderGraph renderGraph;
         private readonly GraphicsBuffer indexBuffer;
 
         private readonly WaterFft waterFft;
@@ -45,11 +19,9 @@ namespace Arycama.CustomRenderPipeline.Water
         private int VerticesPerTileEdge => settings.PatchVertices + 1;
         private int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
 
-        public WaterSystem(RenderGraph renderGraph, Settings settings)
+        public WaterSystem(RenderGraph renderGraph, Settings settings) : base(renderGraph)
         {
-            this.renderGraph = renderGraph;
             this.settings = settings;
-
 
             indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
 
@@ -89,9 +61,14 @@ namespace Arycama.CustomRenderPipeline.Water
             caustics = new(renderGraph, settings);
         }
 
-        ~WaterSystem()
+        protected override void Cleanup(bool disposing)
         {
             indexBuffer.Dispose();
+
+            waterFft.Dispose();
+            underwaterLighting.Dispose();
+            deferredWater.Dispose();
+            caustics.Dispose();
         }
 
         public void UpdateFft(double time)
@@ -274,18 +251,18 @@ namespace Arycama.CustomRenderPipeline.Water
         }
 
 
-        public void RenderWater(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, CullingPlanes cullingPlanes)
+        public override void Render((Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, CullingPlanes cullingPlanes) data)
         {
-            var viewPosition = camera.transform.position;
+            var viewPosition = data.camera.transform.position;
             if (!settings.IsEnabled)
                 return;
 
             // Writes (worldPos - displacementPos).xz. Uv coord is reconstructed later from delta and worldPosition (reconstructed from depth)
-            var oceanRenderResult = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);
+            var oceanRenderResult = renderGraph.GetTexture(data.screenWidth, data.screenHeight, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);
 
             // Also write triangleNormal to another texture with oct encoding. This allows reconstructing the derivative correctly to avoid mip issues on edges,
             // As well as backfacing triangle detection for rendering under the surface
-            var waterTriangleNormal = renderGraph.GetTexture(screenWidth, screenHeight, GraphicsFormat.R16G16_UNorm, isScreenTexture: true);
+            var waterTriangleNormal = renderGraph.GetTexture(data.screenWidth, data.screenHeight, GraphicsFormat.R16G16_UNorm, isScreenTexture: true);
 
             var passIndex = settings.Material.FindPass("Water");
             Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
@@ -308,9 +285,9 @@ namespace Arycama.CustomRenderPipeline.Water
                 var passData = renderGraph.ResourceMap.GetRenderPassData<WaterRenderCullResult>(renderGraph.FrameIndex);
                 pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
 
-                pass.WriteDepth(cameraDepth);
+                pass.WriteDepth(data.cameraDepth);
                 pass.WriteTexture(oceanRenderResult, RenderBufferLoadAction.DontCare);
-                pass.WriteTexture(velocity);
+                pass.WriteTexture(data.velocity);
                 pass.WriteTexture(waterTriangleNormal, RenderBufferLoadAction.DontCare);
 
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
@@ -334,10 +311,10 @@ namespace Arycama.CustomRenderPipeline.Water
                     var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
                     pass.SetVector(command, "_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
-                    pass.SetInt(command, "_CullingPlanesCount", cullingPlanes.Count);
-                    var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
-                    for (var i = 0; i < cullingPlanes.Count; i++)
-                        cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
+                    pass.SetInt(command, "_CullingPlanesCount", data.cullingPlanes.Count);
+                    var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
+                    for (var i = 0; i < data.cullingPlanes.Count; i++)
+                        cullingPlanesArray[i] = data.cullingPlanes.GetCullingPlaneVector4(i);
 
                     pass.SetVectorArray(command, "_CullingPlanes", cullingPlanesArray);
                     ArrayPool<Vector4>.Release(cullingPlanesArray);

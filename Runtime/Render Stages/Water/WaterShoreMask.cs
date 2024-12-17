@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class WaterShoreMask
+    public class WaterShoreMask : RenderFeature
     {
         [Serializable]
         public class Settings
@@ -14,7 +14,6 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public int Resolution = 512;
         }
 
-        private readonly RenderGraph renderGraph;
         private readonly Settings settings;
         private Terrain terrain;
         private readonly Material material;
@@ -22,9 +21,8 @@ namespace Arycama.CustomRenderPipeline
         private readonly BufferHandle resultDataBuffer;
         private int version = 0, lastVersion = -1;
 
-        public WaterShoreMask(RenderGraph renderGraph, Settings settings)
+        public WaterShoreMask(RenderGraph renderGraph, Settings settings) : base(renderGraph)
         {
-            this.renderGraph = renderGraph;
             this.settings = settings;
             this.material = new Material(Shader.Find("Hidden/WaterShoreMask")) { hideFlags = HideFlags.HideAndDontSave };
             resultDataBuffer = renderGraph.ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 1, UnsafeUtility.SizeOf<ResultData>()));
@@ -32,7 +30,7 @@ namespace Arycama.CustomRenderPipeline
             TerrainCallbacks.heightmapChanged += TerrainHeightmapChanged;
         }
 
-        ~WaterShoreMask()
+        protected override void Cleanup(bool disposing)
         {
             TerrainCallbacks.heightmapChanged -= TerrainHeightmapChanged;
         }
@@ -43,7 +41,7 @@ namespace Arycama.CustomRenderPipeline
                 version++;
         }
 
-        public void Render()
+        public override void Render()
         {
             // TODO: Also check if properties have changed such as size etc.
             if ((Terrain.activeTerrain == terrain && version == lastVersion) || Terrain.activeTerrain == null)

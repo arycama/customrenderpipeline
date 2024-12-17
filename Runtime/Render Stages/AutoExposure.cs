@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Object = UnityEngine.Object;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -74,6 +75,18 @@ namespace Arycama.CustomRenderPipeline
             exposureTexture.Apply(false, false);
         }
 
+        protected override void Cleanup(bool disposing)
+        {
+            foreach(var buffer in exposureBuffers)
+            {
+                if (buffer.Value != null)
+                {
+                    buffer.Value.Dispose();
+                }
+            }
+
+            Object.DestroyImmediate(exposureTexture);
+        }
 
         private struct Pass2Data
         {

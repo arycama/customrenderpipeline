@@ -37,6 +37,8 @@ namespace Arycama.CustomRenderPipeline
         private readonly Dictionary<int, List<RTHandle>> passRTHandleOutputs = new();
         private readonly HashSet<RTHandle> writtenRTHandles = new();
 
+        private readonly HashSet<RenderTexture> allRenderTextures = new();
+
         public BufferHandle EmptyBuffer { get; }
         public RTHandle EmptyTexture { get; }
         public RTHandle EmptyUavTexture { get; }
@@ -64,8 +66,15 @@ namespace Arycama.CustomRenderPipeline
             Empty3DTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
             EmptyCubemap = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave });
             EmptyCubemapArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
-
+           
             ResourceMap = new(this);
+
+            allRenderTextures.Add(EmptyTexture.RenderTexture);
+            allRenderTextures.Add(EmptyUavTexture.RenderTexture);
+            allRenderTextures.Add(EmptyTextureArray.RenderTexture);
+            allRenderTextures.Add(Empty3DTexture.RenderTexture);
+            allRenderTextures.Add(EmptyCubemap.RenderTexture);
+            allRenderTextures.Add(EmptyCubemapArray.RenderTexture);
         }
 
         public void SetScreenWidth(int width)
@@ -219,6 +228,7 @@ namespace Arycama.CustomRenderPipeline
                             var height = handle.IsScreenTexture ? screenHeight : handle.Height;
 
                             result = new RenderTexture(width, height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite, stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None, hideFlags = HideFlags.HideAndDontSave };
+                            allRenderTextures.Add(result);
 
                             if (handle.VolumeDepth > 0)
                             {
@@ -429,7 +439,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 // Keep buffers available for at least two frames
                 if(bufferHandle.lastFrameUsed + (swapChainCount - 1) < FrameIndex)
-                    bufferHandle.handle.Release();
+                    bufferHandle.handle.Dispose();
             }
             availableBufferHandles.Clear();
 
@@ -454,6 +464,7 @@ namespace Arycama.CustomRenderPipeline
                 if (renderTexture.lastFrameUsed == FrameIndex)
                     continue;
 
+                allRenderTextures.Remove(renderTexture.renderTexture);
                 Object.DestroyImmediate(renderTexture.renderTexture);
 
                 // Fill this with a null, unavailable RT and add the index to a list
@@ -492,28 +503,34 @@ namespace Arycama.CustomRenderPipeline
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposedValue)
+            if (disposedValue)
+                return;
+
+            if (disposing)
             {
-                if (disposing)
-                {
-                    // TODO: dispose managed state (managed objects)
-                }
-
-                foreach (var rt in availableRenderTextures)
-                {
-                    // Since we don't remove null entries, but rather leave them as "empty", they could be null
-                    if (rt.renderTexture != null)
-                        Object.DestroyImmediate(rt.renderTexture);
-                }
-
-                foreach (var bufferHandle in availableBufferHandles)
-                    bufferHandle.handle.Release();
-
-                foreach (var importedRT in importedTextures)
-                    Object.DestroyImmediate(importedRT.Key);
-
-                disposedValue = true;
+                // TODO: dispose managed state (managed objects)
             }
+
+            foreach (var rt in allRenderTextures)
+            {
+                // Since we don't remove null entries, but rather leave them as "empty", they could be null
+                if (rt != null)
+                    Object.DestroyImmediate(rt);
+            }
+
+            foreach (var bufferHandle in availableBufferHandles)
+                bufferHandle.handle.Dispose();
+
+            foreach(var handle in importedBuffers)
+            {
+                if (handle.Value != null)
+                    handle.Value.Dispose();
+            }
+
+            foreach (var importedRT in importedTextures)
+                Object.DestroyImmediate(importedRT.Key);
+
+            disposedValue = true;
         }
 
         public BufferHandle SetConstantBuffer<T>(in T data) where T : struct

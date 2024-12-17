@@ -1,8 +1,11 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Assertions;
 
-public class BufferHandle
+public class BufferHandle : IDisposable
 {
+    private bool disposedValue;
+
     public int Size { get; set; }
     public GraphicsBuffer Buffer { get; private set; }
 
@@ -41,13 +44,30 @@ public class BufferHandle
         };
     }
 
-    public void Release()
-    {
-        Buffer.Release();
-    }
-
     public static implicit operator GraphicsBuffer(BufferHandle bufferHandle)
     {
         return bufferHandle.Buffer;
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposedValue)
+            return;
+
+        if (Buffer != null)
+            Buffer.Release();
+
+        disposedValue = true;
+    }
+
+    ~BufferHandle()
+    {
+        Dispose(disposing: false);
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
     }
 }

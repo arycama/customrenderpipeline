@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Object = UnityEngine.Object;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
@@ -84,6 +85,7 @@ namespace Arycama.CustomRenderPipeline.Water
         protected override void Cleanup(bool disposing)
         {
             indexBuffer.Dispose();
+            Object.DestroyImmediate(causticsMesh);
         }
 
         public override void Render()

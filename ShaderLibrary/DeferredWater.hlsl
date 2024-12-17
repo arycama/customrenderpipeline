@@ -51,9 +51,9 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 oceanUv = worldPosition.xz - waterNormalFoamRoughness.xy ;
 	
 	// Gerstner normals + foam
-	float shoreScale;
-	float3 shoreNormal, displacement;
-	GerstnerWaves(float3(oceanUv, 0.0).xzy, _Time, displacement, shoreNormal, shoreScale);
+	//float shoreScale;
+	//float3 shoreNormal, displacement;
+	//GerstnerWaves(float3(oceanUv, 0.0).xzy, _Time, displacement, shoreNormal, shoreScale);
 	
 	// Normal + Foam data
 	float2 normalData = 0.0;
@@ -74,7 +74,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	oceanUv += _ViewPosition.xz;
 	
-	float3 N = float3(0, 1, 0) + shoreNormal;
+	float3 N = float3(0, 1, 0);//	+shoreNormal;
 	
 	[unroll]
 	for (uint i = 0; i < 4; i++)
@@ -92,7 +92,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	}
 	
 	// Convert normal length back to smoothness
-	smoothness = lerp(LengthToSmoothness(smoothness * 0.25), _Smoothness, shoreScale);
+	//smoothness = lerp(LengthToSmoothness(smoothness * 0.25), _Smoothness, shoreScale);
+	smoothness = LengthToSmoothness(smoothness * 0.25);
 	
 	if (!isFrontFace)
 		N = -N;
@@ -117,7 +118,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float NdotV;
 	N = GetViewReflectedNormal(N, V, NdotV);
 	
-	//perceptualRoughness = SpecularAntiAliasing(perceptualRoughness, N, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
+	perceptualRoughness = SpecularAntiAliasing(perceptualRoughness, N, _SpecularAAScreenSpaceVariance, _SpecularAAThreshold);
 	
 	float distortion = _RefractOffset * _ScaledResolution.y * abs(_CameraAspect) * 0.25 / linearWaterDepth;
 	

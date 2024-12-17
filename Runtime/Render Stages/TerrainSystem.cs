@@ -11,25 +11,9 @@ using Object = UnityEngine.Object;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class TerrainSystem
+    public partial class TerrainSystem : RenderFeature
     {
-        [Serializable]
-        public class Settings
-        {
-            [field: SerializeField] public Material Material { get; private set; } = null;
-            [field: SerializeField] public int CellCount { get; private set; } = 32;
-            [field: SerializeField] public int PatchVertices { get; private set; } = 32;
-            [field: SerializeField] public float EdgeLength { get; private set; } = 64;
-            [field: SerializeField] public GraphicsFormat DiffuseFormat { get; private set; } = GraphicsFormat.RGBA_DXT5_SRGB;
-            [field: SerializeField] public int DiffuseResolution { get; private set; } = 512;
-            [field: SerializeField] public GraphicsFormat NormalFormat { get; private set; } = GraphicsFormat.RGBA_DXT5_UNorm;
-            [field: SerializeField] public int NormalResolution { get; private set; } = 512;
-            [field: SerializeField] public GraphicsFormat MaskFormat { get; private set; } = GraphicsFormat.RGBA_DXT5_UNorm;
-            [field: SerializeField] public int MaskResolution { get; private set; } = 512;
-        }
-
         private readonly Settings settings;
-        private readonly RenderGraph renderGraph;
         private GraphicsBuffer indexBuffer, terrainLayerData;
         private RTHandle minMaxHeight, heightmap, normalmap, idMap;
         private Terrain terrain;
@@ -43,9 +27,8 @@ namespace Arycama.CustomRenderPipeline
         private readonly Dictionary<TerrainLayer, int> terrainLayers = new();
         private readonly Dictionary<TerrainLayer, int> terrainProceduralLayers = new();
 
-        public TerrainSystem(RenderGraph renderGraph, Settings settings)
+        public TerrainSystem(RenderGraph renderGraph, Settings settings) : base(renderGraph)
         {
-            this.renderGraph = renderGraph;
             this.settings = settings;
 
             generateIdMapMaterial = new Material(Shader.Find("Hidden/Terrain Id Map")) { hideFlags = HideFlags.HideAndDontSave };
@@ -55,10 +38,25 @@ namespace Arycama.CustomRenderPipeline
             TerrainCallbacks.heightmapChanged += TerrainCallbacks_heightmapChanged;
         }
 
-        ~TerrainSystem()
+        protected override void Cleanup(bool disposing)
         {
             TerrainCallbacks.textureChanged -= TerrainCallbacks_textureChanged;
             TerrainCallbacks.heightmapChanged -= TerrainCallbacks_heightmapChanged;
+
+            if (indexBuffer != null)
+                indexBuffer.Dispose();
+
+            if (terrainLayerData != null)
+                terrainLayerData.Dispose();
+
+            if (diffuseArray != null)
+                Object.DestroyImmediate(diffuseArray);
+
+            if (normalMapArray != null)
+                Object.DestroyImmediate(normalMapArray);
+
+            if (maskMapArray != null)
+                Object.DestroyImmediate(maskMapArray);
         }
 
         private void TerrainCallbacks_heightmapChanged(Terrain terrain, RectInt heightRegion, bool synched)
@@ -368,7 +366,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public void Update()
+        public override void Render()
         {
             // TODO: Logic here seems a bit off
             if (terrain != Terrain.activeTerrain)
