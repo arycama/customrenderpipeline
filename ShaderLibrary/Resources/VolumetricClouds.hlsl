@@ -144,7 +144,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float4 history;
 	history.rgb = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
 	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
-	history.rgb *= _PreviousToCurrentExposure;
+	//history.rgb *= _PreviousToCurrentExposure; // History is in ICtCp, so can't re-expose
 	
 	history.a = _TransmittanceHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _TransmittanceHistoryScaleLimit));
 	

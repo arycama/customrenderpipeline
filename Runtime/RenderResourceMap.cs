@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.Assertions;
 
 namespace Arycama.CustomRenderPipeline
@@ -100,16 +101,18 @@ namespace Arycama.CustomRenderPipeline
 
         protected virtual void Dispose(bool disposing)
         {
-            if (!disposedValue)
-            {
-                if (disposing)
-                {
-                    handleIndexMap.Clear();
-                    handleList.Clear();
-                }
+            if (disposedValue)
+                return;
 
-                disposedValue = true;
+            if (disposing)
+            {
+                handleIndexMap.Clear();
+                handleList.Clear();
             }
+            else
+                Debug.LogError("Render Resource Map not disposed correctly");
+
+            disposedValue = true;
         }
 
         public void Dispose()

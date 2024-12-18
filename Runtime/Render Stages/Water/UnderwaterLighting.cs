@@ -34,12 +34,12 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<VolumetricLighting.Result>();
-                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<CloudShadowDataResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<LitData.Result>();
                 pass.AddRenderPassData<WaterShadowResult>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<CausticsResult>();
 

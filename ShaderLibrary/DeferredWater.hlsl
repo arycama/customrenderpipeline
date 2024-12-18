@@ -246,7 +246,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	// TODO: Velocity?
 	float2 historyUv = PerspectiveDivide(WorldToClipPrevious(worldPosition)).xy * 0.5 + 0.5;
 	float3 history = _History.Sample(_LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
-	history *= _PreviousToCurrentExposure;
+	//history *= _PreviousToCurrentExposure; // History is in ICtCp space, so cant re-expose
 	
 	history = ClipToAABB(history, result, minValue, maxValue);
 	

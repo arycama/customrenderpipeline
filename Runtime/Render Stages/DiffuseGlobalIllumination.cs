@@ -18,8 +18,13 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/ScreenSpaceGlobalIllumination")) { hideFlags = HideFlags.HideAndDontSave };
             this.settings = settings;
 
-            temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Screen Space Reflections");
+            temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Screen Space Diffuse");
             raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Diffuse");
+        }
+
+        protected override void Cleanup(bool disposing)
+        {
+            temporalCache.Dispose();
         }
 
         public override void Render((RTHandle depth, int width, int height, Camera camera, RTHandle previousFrame, RTHandle normalRoughness, float bias, float distantBias) data)
@@ -34,10 +39,10 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.AddRenderPassData<SkyReflectionAmbientData>();
                     pass.AddRenderPassData<LightingSetup.Result>();
-                    pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                    pass.AddRenderPassData<AutoExposureData>();
                     pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<TerrainRenderData>(true);
-                    pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                    pass.AddRenderPassData<CloudShadowDataResult>();
                     pass.AddRenderPassData<ShadowRenderer.Result>();
                     pass.AddRenderPassData<ICommonPassData>();
                 }
@@ -54,7 +59,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.ReadTexture("PreviousFrame", data.previousFrame); // Temporary, cuz of leaks if we don't use it..
                     pass.AddRenderPassData<SkyReflectionAmbientData>();
                     pass.AddRenderPassData<LightingSetup.Result>();
-                    pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                    pass.AddRenderPassData<AutoExposureData>();
                     pass.AddRenderPassData<ICommonPassData>();
                 }
             }
@@ -70,7 +75,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.AddRenderPassData<LightingSetup.Result>();
                     pass.AddRenderPassData<TemporalAAData>();
-                    pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                    pass.AddRenderPassData<AutoExposureData>();
                     pass.AddRenderPassData<SkyReflectionAmbientData>();
                     pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<ICommonPassData>();
@@ -114,7 +119,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<BentNormalOcclusionData>();
                 pass.AddRenderPassData<VelocityData>();
@@ -147,7 +152,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("RayDepth", rayDepth);
 
                 pass.AddRenderPassData<TemporalAAData>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<ICommonPassData>();

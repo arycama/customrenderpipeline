@@ -1,4 +1,5 @@
 ﻿using System;
+using UnityEngine;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -21,6 +22,9 @@ namespace Arycama.CustomRenderPipeline
         {
             if (disposedValue)
                 return;
+
+            if (!disposing)
+                Debug.LogError($"Render Feature [{GetType()}] not disposed correctly");
 
             Cleanup(disposing);
             disposedValue = true;

@@ -17,8 +17,13 @@ namespace Arycama.CustomRenderPipeline
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
-            temporalCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Physical Sky");
+            temporalCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Ambient Occlusion");
             ambientOcclusionRaytracingShader = Resources.Load<RayTracingShader>("Raytracing/AmbientOcclusion");
+        }
+
+        protected override void Cleanup(bool disposing)
+        {
+            temporalCache.Dispose();
         }
 
         public override void Render((Camera camera, RTHandle depth, float scale, RTHandle normal, RTHandle bentNormalOcclusion, float bias, float distantBias) data)
@@ -127,7 +132,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<VelocityData>();
 

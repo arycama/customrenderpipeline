@@ -16,6 +16,11 @@ namespace Arycama.CustomRenderPipeline
             colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", TextureDimension.Tex3D);
         }
 
+        protected override void Cleanup(bool disposing)
+        {
+            colorHistory.Dispose();
+        }
+
         public override void Render((int screenWidth, int screenHeight, float farClipPlane, Camera camera, Texture2D blueNoise1D, Texture2D blueNoise2D, Vector2 jitter) data)
         {
             var volumeWidth = Mathf.CeilToInt(data.screenWidth / (float)settings.TileSize);
@@ -39,12 +44,12 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Input", textures.history);
 
                 pass.AddRenderPassData<ClusteredLightCulling.Result>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<Result>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
-                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<CloudShadowDataResult>();
                 pass.AddRenderPassData<ICommonPassData>();
 
                 pass.SetRenderFunction(

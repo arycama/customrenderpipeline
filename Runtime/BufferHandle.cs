@@ -55,7 +55,13 @@ public class BufferHandle : IDisposable
             return;
 
         if (Buffer != null)
+        {
             Buffer.Release();
+            Buffer = null;
+        }
+
+        if(!disposing)
+            Debug.LogError("Buffer Handle not disposed correctly");
 
         disposedValue = true;
     }

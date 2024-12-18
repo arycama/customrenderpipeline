@@ -34,7 +34,7 @@ public class DeferredLighting : RenderFeature<(RTHandle depth, RTHandle albedoMe
 
             pass.AddRenderPassData<SkyReflectionAmbientData>();
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-            pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+            pass.AddRenderPassData<CloudShadowDataResult>();
             pass.AddRenderPassData<LightingSetup.Result>();
             pass.AddRenderPassData<ShadowRenderer.Result>();
             pass.AddRenderPassData<LitData.Result>();
@@ -73,7 +73,7 @@ public class DeferredLighting : RenderFeature<(RTHandle depth, RTHandle albedoMe
             pass.ReadTexture("_Stencil", depth, 0, RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Input", input);
 
-            pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
+            pass.AddRenderPassData<CloudRenderResult>();
             pass.AddRenderPassData<TemporalAAData>();
             pass.AddRenderPassData<SkyResultData>();
             pass.AddRenderPassData<VolumetricLighting.Result>();

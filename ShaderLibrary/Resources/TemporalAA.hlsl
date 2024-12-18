@@ -16,7 +16,7 @@ Texture2D<float> _InputVelocityMagnitudeHistory;
 
 cbuffer Properties
 {
-	float4 _Resolution, _HistoryScaleLimit;
+	float4 _HistoryScaleLimit;
 	float _HasHistory, _SpatialSharpness, _MotionSharpness, _StationaryBlending, _Scale;
 };
 
@@ -77,7 +77,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 		[unroll]
 		for (int x = -1; x <= 1; x++, i++)
 		{
-			float3 color = _Input[clamp(centerCoord + int2(x, y), 0, _Resolution.xy - 1.0)];
+			float3 color = _Input[clamp(centerCoord + int2(x, y), 0, _ScreenResolution.xy - 1.0)];
 			
 			#ifdef UPSCALE
 				float _BlendSharpness = 0.5;
@@ -115,7 +115,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	history *= rcp(w.x + w.y + 1.0);
 	float4 historySample = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
 	
-	history += historySample.rgb * _PreviousToCurrentExposure;
+	history += historySample.rgb;// * _PreviousToCurrentExposure;
 	float historyWeight = historySample.a;
 	
 	mean *= rcp(9.0);

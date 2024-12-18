@@ -133,6 +133,7 @@ namespace Arycama.CustomRenderPipeline
                 else
                     SetBuffer(buffer.Item1, buffer.Item2);
             }
+
             readBuffers.Clear();
 
             foreach (var buffer in writeBuffers)

@@ -5,7 +5,7 @@ using Random = UnityEngine.Random;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public partial class Tonemapping : RenderFeature<(int width, int height)>
+    public partial class Tonemapping : RenderFeature
     {
         private readonly Settings settings;
         private readonly Bloom.Settings bloomSettings;
@@ -44,14 +44,15 @@ namespace Arycama.CustomRenderPipeline
             return MathUtils.Exp2(ev100) * (ReflectedLightMeterConstant / Sensitivity);
         }
 
-        public override void Render((int width, int height) data)
+        public override void Render()
         {
-            var result = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.B10G11R11_UFloatPack32);
+            var viewData = renderGraph.GetResource<ViewData>();
+            var result = renderGraph.GetTexture(viewData.PixelWidth, viewData.PixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
 
             using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Tonemapping");
             pass.Initialize(material);
             pass.WriteTexture(result);
-            pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+            pass.AddRenderPassData<AutoExposureData>();
             pass.AddRenderPassData<CameraTargetData>();
             pass.AddRenderPassData<BloomData>();
 
@@ -72,8 +73,8 @@ namespace Arycama.CustomRenderPipeline
             {
                 var offsetX = Random.value;
                 var offsetY = Random.value;
-                var uvScaleX = settings.FilmGrainTexture ? data.width / (float)settings.FilmGrainTexture.width : 1.0f;
-                var uvScaleY = settings.FilmGrainTexture ? data.height / (float)settings.FilmGrainTexture.height : 1.0f;
+                var uvScaleX = settings.FilmGrainTexture ? viewData.PixelWidth / (float)settings.FilmGrainTexture.width : 1.0f;
+                var uvScaleY = settings.FilmGrainTexture ? viewData.PixelHeight / (float)settings.FilmGrainTexture.height : 1.0f;
 
                 var hdrEnabled = hdrSettings.available && settings.HdrEnabled;
                 var maxNits = hdrEnabled ? hdrSettings.maxToneMapLuminance : 100.0f;
@@ -98,7 +99,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat("ShutterSpeed", lensSettings.ShutterSpeed);
                 pass.SetFloat("Aperture", lensSettings.Aperture);
                 pass.SetVector("_GrainTextureParams", new Vector4(uvScaleX, uvScaleY, offsetX, offsetY));
-                pass.SetVector("_Resolution", new Vector4(data.width, data.height, 1.0f / data.width, 1.0f / data.height));
 
                 var colorGamut = hdrSettings.available ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
                 pass.SetInt("ColorGamut", (int)colorGamut);

@@ -19,6 +19,11 @@ namespace Arycama.CustomRenderPipeline.Water
             raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Refraction");
         }
 
+        protected override void Cleanup(bool disposing)
+        {
+            temporalCache.Dispose();
+        }
+
         public override void Render((RTHandle underwaterDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, RTHandle cameraDepth, Camera camera, int width, int height) data)
         {
             var refractionResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
@@ -39,12 +44,12 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.ReadTexture("_Stencil", data.cameraDepth, subElement: RenderTextureSubElement.Stencil);
 
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<WaterShadowResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<LitData.Result>();
-                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<CloudShadowDataResult>();
                 pass.AddRenderPassData<WaterPrepassResult>();
                 pass.AddRenderPassData<UnderwaterLightingResult>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
@@ -91,10 +96,10 @@ namespace Arycama.CustomRenderPipeline.Water
                 {
                     pass.AddRenderPassData<SkyReflectionAmbientData>();
                     pass.AddRenderPassData<LightingSetup.Result>();
-                    pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                    pass.AddRenderPassData<AutoExposureData>();
                     pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<TerrainRenderData>(true);
-                    pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                    pass.AddRenderPassData<CloudShadowDataResult>();
                     pass.AddRenderPassData<ShadowRenderer.Result>();
                     pass.AddRenderPassData<LitData.Result>();
                     pass.AddRenderPassData<WaterShadowResult>();
@@ -182,7 +187,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.ReadTexture("AlbedoMetallic", data.albedoMetallic);
 
                 pass.AddRenderPassData<TemporalAAData>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LitData.Result>();
                 pass.AddRenderPassData<ICommonPassData>();

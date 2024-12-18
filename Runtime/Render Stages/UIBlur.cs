@@ -1,35 +1,24 @@
 ﻿using Arycama.CustomRenderPipeline;
-using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class UIBlur : RenderFeature<(int width, int height)>
+public partial class UIBlur : RenderFeature
 {
-    [Serializable]
-    public class Settings
-    {
-        [field: SerializeField, Range(0, 32)] public int BlurRadius { get; private set; } = 16;
-        [field: SerializeField] public float BlurSigma { get; private set; } = 16.0f;
-    }
-
-    private readonly RenderGraph renderGraph;
     private readonly Settings settings;
     private readonly Material material;
 
     public UIBlur(RenderGraph renderGraph, Settings settings) : base(renderGraph)
     {
-        this.renderGraph = renderGraph;
         this.settings = settings;
         this.material = new Material(Shader.Find("Hidden/Gaussian Blur")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public override void Render((int width, int height) data)
+    public override void Render()
     {
-        var width = data.width;
-        var height = data.height;
+        var viewData = renderGraph.GetResource<ViewData>();
 
-        var horizontalResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.B10G11R11_UFloatPack32);
+        var horizontalResult = renderGraph.GetTexture(viewData.PixelWidth, viewData.PixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("UI Blur Horizontal"))
         {
             pass.Initialize(material, 0);
@@ -40,11 +29,11 @@ public class UIBlur : RenderFeature<(int width, int height)>
             {
                 pass.SetFloat("BlurRadius", settings.BlurRadius);
                 pass.SetFloat("BlurSigma", settings.BlurSigma);
-                pass.SetVector("TexelSize", new Vector4(1f / width, 1f / height, width, height));
+                pass.SetVector("TexelSize", new Vector4(1f / viewData.PixelWidth, 1f / viewData.PixelHeight, viewData.PixelWidth, viewData.PixelHeight));
             });
         }
 
-        var verticalResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.B10G11R11_UFloatPack32);
+        var verticalResult = renderGraph.GetTexture(viewData.PixelWidth, viewData.PixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("UI Blur Vertical"))
         {
             pass.Initialize(material, 1);
@@ -55,7 +44,7 @@ public class UIBlur : RenderFeature<(int width, int height)>
             {
                 pass.SetFloat("BlurRadius", settings.BlurRadius);
                 pass.SetFloat("BlurSigma", settings.BlurSigma);
-                pass.SetVector("TexelSize", new Vector4(1f / width, 1f / height, width, height));
+                pass.SetVector("TexelSize", new Vector4(1f / viewData.PixelWidth, 1f / viewData.PixelHeight, viewData.PixelWidth, viewData.PixelHeight));
                 pass.SetVector("_InputScaleLimit", horizontalResult.ScaleLimit2D);
             });
         }

@@ -50,8 +50,6 @@ namespace Arycama.CustomRenderPipeline
             if (terrain != null)
                 result.IsPersistent = false;
 
-            Debug.Log("Updating Shore Mask");
-
             lastVersion = version;
             terrain = Terrain.activeTerrain;
 

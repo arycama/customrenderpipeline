@@ -1,6 +1,4 @@
-﻿using Arycama.CustomRenderPipeline;
-using System;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
@@ -50,6 +48,17 @@ namespace Arycama.CustomRenderPipeline
 
             ltcData.SetPixels(pixels);
             ltcData.Apply();
+        }
+
+        protected override void Cleanup(bool disposing)
+        {
+            directionalAlbedo.IsPersistent = false;
+            averageAlbedo.IsPersistent = false;
+            directionalAlbedoMs.IsPersistent = false;
+            averageAlbedoMs.IsPersistent = false;
+            specularOcclusion.IsPersistent = false;
+
+            Object.DestroyImmediate(ltcData);
         }
 
         public override void Render()
@@ -4301,37 +4310,5 @@ namespace Arycama.CustomRenderPipeline
         {0.623254, 0, -0.074271, 0, 0.630556, 0, 0.058888, 0, 1},
         {0.609037, 0, -0.053470, 0, 0.607151, 0, 0.031450, 0, 1}
         };
-        private bool disposedValue;
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!disposedValue)
-            {
-                if (disposing)
-                {
-                    // TODO: dispose managed state (managed objects)
-                }
-
-                // TODO: free unmanaged resources (unmanaged objects) and override finalizer
-                // TODO: set large fields to null
-                disposedValue = true;
-            }
-        }
-
-        // // TODO: override finalizer only if 'Dispose(bool disposing)' has code to free unmanaged resources
-        ~LitData()
-        {
-            Object.DestroyImmediate(ltcData);
-
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-            Dispose(disposing: false);
-        }
-
-        public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
-        }
     }
 }

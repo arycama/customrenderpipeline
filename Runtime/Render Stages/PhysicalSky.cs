@@ -252,8 +252,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(skyReflection, RenderBufferLoadAction.DontCare);
 
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
-                pass.AddRenderPassData<VolumetricClouds.CloudData>();
+                pass.AddRenderPassData<AutoExposureData>();
+                pass.AddRenderPassData<CloudData>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<DirectionalLightInfo>();
                 pass.AddRenderPassData<ICommonPassData>();
@@ -385,9 +385,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Depth", depth);
 
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
-                pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
-                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<AutoExposureData>();
+                pass.AddRenderPassData<CloudRenderResult>();
+                pass.AddRenderPassData<CloudShadowDataResult>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
@@ -409,8 +409,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(skyTemp2, RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_SkyInput", skyTemp);
                 pass.ReadTexture("_Depth", depth);
-                pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<CloudRenderResult>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
 
                 pass.SetRenderFunction((command, pass) =>
@@ -438,8 +438,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_Depth", depth);
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TemporalAAData>();
-                pass.AddRenderPassData<VolumetricClouds.CloudRenderResult>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<CloudRenderResult>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<PreviousFrameDepth>();
                 pass.AddRenderPassData<PreviousFrameVelocity>();
                 pass.AddRenderPassData<ICommonPassData>();

@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public partial class TemporalAA : RenderFeature<(Camera camera, float scale)>
+    public partial class TemporalAA : RenderFeature<Camera>
     {
         private readonly Settings settings;
         private readonly PersistentRTHandleCache textureCache;
@@ -16,6 +16,11 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Temporal AA")) { hideFlags = HideFlags.HideAndDontSave };
             textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Temporal AA");
+        }
+
+        protected override void Cleanup(bool disposing)
+        {
+            textureCache.Dispose();
         }
 
         public void OnPreRender(int scaledWidth, int scaledHeight, out Vector2 jitter)
@@ -86,16 +91,17 @@ namespace Arycama.CustomRenderPipeline
             ArrayPool<float>.Release(weights);
         }
 
-        public override void Render((Camera camera,float scale) data)
+        public override void Render(Camera camera)
         {
             if (!settings.IsEnabled)
                 return;
 
-            var (current, history, wasCreated) = textureCache.GetTextures(data.camera.pixelWidth, data.camera.pixelHeight, data.camera);
-            var result = renderGraph.GetTexture(data.camera.pixelWidth, data.camera.pixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
+            var viewData = renderGraph.GetResource<ViewData>();
+            var (current, history, wasCreated) = textureCache.GetTextures(viewData.PixelWidth, viewData.PixelHeight, camera);
+            var result = renderGraph.GetTexture(viewData.PixelWidth, viewData.PixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA"))
             {
-                var keyword = data.scale < 1.0f ? "UPSCALE" : null;
+                var keyword = viewData.Scale < 1.0f ? "UPSCALE" : null;
                 pass.Initialize(material, 0, 1, keyword);
 
                 pass.ReadTexture("_History", history);
@@ -112,11 +118,10 @@ namespace Arycama.CustomRenderPipeline
                     stationaryBlending: settings.StationaryBlending,
                     motionBlending: settings.MotionBlending,
                     motionWeight: settings.MotionWeight,
-                    scale: data.scale,
-                    resolution: new Vector4(data.camera.pixelWidth, data.camera.pixelHeight, 1.0f / data.camera.pixelWidth, 1.0f / data.camera.pixelHeight),
-                    maxWidth: Mathf.FloorToInt(data.camera.pixelWidth * data.scale) - 1,
-                    maxHeight: Mathf.FloorToInt(data.camera.pixelHeight * data.scale) - 1,
-                    maxResolution: new Vector2(data.camera.pixelWidth - 1, data.camera.pixelHeight - 1)
+                    scale: viewData.Scale,
+                    maxWidth: viewData.ScaledWidth - 1,
+                    maxHeight: viewData.ScaledHeight - 1,
+                    maxResolution: new Vector2(viewData.PixelWidth - 1, viewData.PixelHeight - 1)
                 ),
                 (command, pass, data) =>
                 {
@@ -130,7 +135,6 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetVector("_HistoryScaleLimit", new Vector4(history.Scale.x, history.Scale.y, history.Limit.x, history.Limit.y));
 
-                    pass.SetVector("_Resolution", data.resolution);
                     pass.SetVector("_MaxResolution", data.maxResolution);
 
                     pass.SetInt("_MaxWidth", data.maxWidth);

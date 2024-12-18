@@ -89,6 +89,9 @@ namespace Arycama.CustomRenderPipeline
         protected override void Cleanup(bool disposing)
         {
             // Disposing seems to crash for some reason, maybe only from a destructor?
+            if (renderGraph.RenderPipeline.IsDisposingFromRenderDoc)
+                return;
+
             //if (rtas != null)
             //    rtas.Dispose();
 

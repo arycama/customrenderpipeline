@@ -4,15 +4,8 @@
 #include "../Material.hlsl"
 #include "../Samplers.hlsl"
 #include "../VolumetricLight.hlsl"
-#include "../Temporal.hlsl"
 #include "../Random.hlsl"
 #include "LitSurfaceCommon.hlsl"
-
-#ifdef __INTELLISENSE__
-	//#define UNITY_PASS_DEFERRED
-	//#define MOTION_VECTORS_ON
-	//#define RAYTRACING_ON
-#endif
 
 #define REQUIRES_UV !defined(UNITY_PASS_SHADOWCASTER) || defined(MODE_CUTOUT) || defined(MODE_FADE) || defined(MODE_TRANSPARENT)
 

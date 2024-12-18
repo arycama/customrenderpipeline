@@ -327,7 +327,8 @@ float3 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	TemporalNeighborhood(_SkyInput, position.xy, minValue, maxValue, result);
 
 	float2 historyUv = uv - motion;
-	float3 history = _SkyHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _SkyHistoryScaleLimit)) * _PreviousToCurrentExposure;
+	float3 history = _SkyHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _SkyHistoryScaleLimit));
+	//history *= _PreviousToCurrentExposure; // History is in ICtCp space, so cant re-expose
 	
 	float previousDepth = LinearEyeDepth(PreviousDepth[historyUv * _ScaledResolution.xy]);
 	float2 previousVelocity = PreviousVelocity[historyUv * _ScaledResolution.xy];

@@ -65,7 +65,7 @@ cbuffer CameraData
 	matrix _WorldToPixel;
 	
 	matrix _ViewToWorld;
-	//matrix _ViewToClip;
+	matrix _ViewToClip;
 	//matrix _ViewToScreen;
 	//matrix _ViewToPixel;
 
@@ -91,6 +91,7 @@ cbuffer CameraData
 	float3 _ViewPosition;
 	float _Near;
 	
+	float4 _ScreenResolution;
 	float4 _ScaledResolution;
 	
 	float3 _CameraForward;

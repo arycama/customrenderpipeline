@@ -153,6 +153,7 @@ namespace Arycama.CustomRenderPipeline
                                 if (Vector3.Dot(plane.normal, lightDirection) > 0.0f)
                                     cullingPlanes.Add(plane);
                             }
+
                             ArrayPool<Plane>.Release(frustumPlanes);
 
                             var shadowSplitData = new ShadowSplitData()

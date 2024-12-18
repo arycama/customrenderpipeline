@@ -50,6 +50,7 @@ namespace Arycama.CustomRenderPipeline
         public int FrameIndex { get; private set; }
 
         public RenderResourceMap ResourceMap { get; }
+        public CustomRenderPipeline RenderPipeline { get; }
 
         private int rtHandleCount;
         private int rtCount;
@@ -57,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
         private bool disposedValue;
         public bool HasSucceeded { get; private set; }
 
-        public RenderGraph()
+        public RenderGraph(CustomRenderPipeline renderPipeline)
         {
             EmptyBuffer = ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" });
             EmptyTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
@@ -68,6 +69,7 @@ namespace Arycama.CustomRenderPipeline
             EmptyCubemapArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
 
             ResourceMap = new(this);
+            RenderPipeline = renderPipeline;
 
             allRenderTextures.Add(EmptyTexture.RenderTexture);
             allRenderTextures.Add(EmptyUavTexture.RenderTexture);
@@ -424,6 +426,7 @@ namespace Arycama.CustomRenderPipeline
                 if(bufferHandle.lastFrameUsed + (swapChainCount - 1) < FrameIndex)
                     bufferHandle.handle.Dispose();
             }
+
             availableBufferHandles.Clear();
 
             foreach (var handle in usedBufferHandles)
@@ -504,10 +507,8 @@ namespace Arycama.CustomRenderPipeline
             if (disposedValue)
                 return;
 
-            if (disposing)
-            {
-                // TODO: dispose managed state (managed objects)
-            }
+            if (!disposing)
+                Debug.LogError("Render Graph not disposed correctly");
 
             ResourceMap.Dispose();
 

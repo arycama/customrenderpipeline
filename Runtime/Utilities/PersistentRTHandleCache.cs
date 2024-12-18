@@ -72,8 +72,8 @@ namespace Arycama.CustomRenderPipeline
             foreach (var texture in textureCache)
                 texture.Value.IsPersistent = false;
 
-            if (disposing)
-                textureCache.Clear();
+            if (!disposing)
+                Debug.LogError($"Persistent RT Handle Cache [{name}] not disposed correctly");
 
             disposedValue = true;
         }

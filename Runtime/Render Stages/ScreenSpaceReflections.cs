@@ -24,6 +24,11 @@ namespace Arycama.CustomRenderPipeline
             raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Specular");
         }
 
+        protected override void Cleanup(bool disposing)
+        {
+            temporalCache.Dispose();
+        }
+
         public override void Render((RTHandle depth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, int width, int height, RTHandle albedoMetallic, float bias, float distantBias) data)
         {
             // Must be screen texture since we use stencil to skip sky pixels
@@ -39,10 +44,10 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.AddRenderPassData<SkyReflectionAmbientData>();
                     pass.AddRenderPassData<LightingSetup.Result>();
-                    pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                    pass.AddRenderPassData<AutoExposureData>();
                     pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<TerrainRenderData>(true);
-                    pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                    pass.AddRenderPassData<CloudShadowDataResult>();
                     pass.AddRenderPassData<ShadowRenderer.Result>();
                     pass.AddRenderPassData<ICommonPassData>();
                 }
@@ -81,7 +86,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.AddRenderPassData<SkyReflectionAmbientData>();
                     pass.AddRenderPassData<LitData.Result>();
                     pass.AddRenderPassData<TemporalAAData>();
-                    pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                    pass.AddRenderPassData<AutoExposureData>();
                     pass.AddRenderPassData<ICommonPassData>();
                     pass.AddRenderPassData<BentNormalOcclusionData>();
                     pass.AddRenderPassData<VelocityData>();
@@ -145,7 +150,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("RayDepth", rayDepth);
 
                 pass.AddRenderPassData<TemporalAAData>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LitData.Result>();
                 pass.AddRenderPassData<ICommonPassData>();

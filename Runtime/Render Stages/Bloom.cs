@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class Bloom : RenderFeature<Camera>
+    public class Bloom : RenderFeature
     {
         [Serializable]
         public class Settings
@@ -27,16 +27,17 @@ namespace Arycama.CustomRenderPipeline
             material = new(Shader.Find("Hidden/Bloom")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public override void Render(Camera camera)
+        public override void Render()
         {
             var bloomIds = ListPool<RTHandle>.Get();
+            var viewData = renderGraph.GetResource<ViewData>();
 
             // Need to queue up all the textures first
-            var mipCount = Mathf.Min(settings.MaxMips, (int)Mathf.Log(Mathf.Max(camera.pixelWidth, camera.pixelHeight), 2));
+            var mipCount = Mathf.Min(settings.MaxMips, (int)Mathf.Log(Mathf.Max(viewData.PixelWidth, viewData.PixelHeight), 2));
             for (var i = 0; i < mipCount; i++)
             {
-                var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
-                var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
+                var width = Mathf.Max(1, viewData.PixelWidth >> (i + 1));
+                var height = Mathf.Max(1, viewData.PixelHeight >> (i + 1));
 
                 var resultId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32);
                 bloomIds.Add(resultId);
@@ -53,8 +54,8 @@ namespace Arycama.CustomRenderPipeline
                 var rt = i > 0 ? bloomIds[i - 1] : renderGraph.GetResource<CameraTargetData>().Handle;
                 pass.ReadTexture("_Input", rt);
 
-                var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
-                var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
+                var width = Mathf.Max(1, viewData.PixelWidth >> (i + 1));
+                var height = Mathf.Max(1, viewData.PixelHeight >> (i + 1));
 
                 pass.SetRenderFunction((new Vector2(1.0f / width, 1.0f / height), rt), (command, pass, data) =>
                 {
@@ -73,8 +74,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(bloomIds[i - 1]);
                 pass.ReadTexture("_Input", input);
 
-                var width = Mathf.Max(1, camera.pixelWidth >> i);
-                var height = Mathf.Max(1, camera.pixelHeight >> i);
+                var width = Mathf.Max(1, viewData.PixelWidth >> i);
+                var height = Mathf.Max(1, viewData.PixelHeight >> i);
 
                 pass.SetRenderFunction((settings.Strength, new Vector2(1f / width, 1f / height)), (command, pass, data) =>
                 {

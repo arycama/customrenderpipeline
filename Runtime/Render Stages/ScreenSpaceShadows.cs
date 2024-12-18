@@ -31,6 +31,12 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
         temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16_UNorm, renderGraph, "Screen Space Shadows");
     }
 
+    protected override void Cleanup(bool disposing)
+    {
+        temporalCache.Dispose();
+    }
+
+
     public override void Render((RTHandle depth, int width, int height, Camera camera, float bias, float distantBias, RTHandle normalRoughness) data)
     {
         var cullingResultsData = renderGraph.GetResource<CullingResultsData>();
@@ -56,10 +62,10 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
             {
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LightingSetup.Result>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TerrainRenderData>(true);
-                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<CloudShadowDataResult>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<ICommonPassData>();
             }
@@ -94,10 +100,10 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
 
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LightingSetup.Result>();
-                pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+                pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TerrainRenderData>(true);
-                pass.AddRenderPassData<VolumetricClouds.CloudShadowDataResult>();
+                pass.AddRenderPassData<CloudShadowDataResult>();
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<HiZMinDepthData>();
@@ -131,7 +137,7 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
             pass.AddRenderPassData<TemporalAAData>();
             pass.AddRenderPassData<SkyReflectionAmbientData>();
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-            pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+            pass.AddRenderPassData<AutoExposureData>();
             pass.AddRenderPassData<ICommonPassData>();
             pass.AddRenderPassData<VelocityData>();
 
@@ -168,7 +174,7 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
             //pass.ReadTexture("RayDepth", rayDepth);
 
             pass.AddRenderPassData<TemporalAAData>();
-            pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+            pass.AddRenderPassData<AutoExposureData>();
             pass.AddRenderPassData<SkyReflectionAmbientData>();
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<ICommonPassData>();

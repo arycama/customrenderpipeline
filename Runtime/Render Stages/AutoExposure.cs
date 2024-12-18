@@ -1,56 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public enum ExposureMode
+    public partial class AutoExposure : RenderFeature
     {
-        Automatic,
-        Manual
-    }
-
-    public enum MeteringMode
-    {
-        Uniform,
-        Spot,
-        Center,
-        Mask,
-        Procedural
-    }
-
-    public class AutoExposure : RenderFeature<(RTHandle input, int width, int height)>
-    {
-        [Serializable]
-        public class Settings
-        {
-            [field: SerializeField] public ExposureMode ExposureMode { get; private set; } = ExposureMode.Automatic;
-            [field: SerializeField] public float AdaptationSpeed { get; private set; } = 1.1f;
-            [field: SerializeField, Range(0.0f, 100.0f)] public float HistogramMin { get; private set; } = 40.0f;
-            [field: SerializeField, Range(0.0f, 100.0f)] public float HistogramMax { get; private set; } = 90.0f;
-            [field: SerializeField] public float MinEv { get; private set; } = -10f;
-            [field: SerializeField] public float MaxEv { get; private set; } = 18f;
-
-            [field: Header("Metering")]
-            [field: SerializeField] public MeteringMode MeteringMode { get; private set; } = MeteringMode.Center;
-            [field: SerializeField] public Vector2 ProceduralCenter { get; private set; } = new(0.5f, 0.5f);
-            [field: SerializeField] public Vector2 ProceduralRadii { get; private set; } = new(0.2f, 0.3f);
-            [field: SerializeField, Min(0.0f)] public float ProceduralSoftness { get; private set; } = 0.5f;
-
-
-            [field: Header("Exposure Compensation")]
-            [field: SerializeField] public float ExposureCompensation { get; private set; } = 0.0f;
-            [field: SerializeField] public int ExposureResolution { get; private set; } = 128;
-            [field: SerializeField] public AnimationCurve ExposureCurve { get; private set; } = AnimationCurve.Linear(0.0f, 1.0f, 1.0f, 1.0f);
-        }
-
         private readonly Settings settings;
         private readonly LensSettings lensSettings;
         private readonly ComputeShader computeShader;
         private readonly Dictionary<Camera, GraphicsBuffer> exposureBuffers = new();
-
         private readonly Texture2D exposureTexture;
 
         public AutoExposure(Settings settings, LensSettings lensSettings, RenderGraph renderGraph) : base(renderGraph)
@@ -78,12 +37,7 @@ namespace Arycama.CustomRenderPipeline
         protected override void Cleanup(bool disposing)
         {
             foreach(var buffer in exposureBuffers)
-            {
-                if (buffer.Value != null)
-                {
-                    buffer.Value.Dispose();
-                }
-            }
+                buffer.Value.Dispose();
 
             Object.DestroyImmediate(exposureTexture);
         }
@@ -117,10 +71,9 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public override void Render((RTHandle input, int width, int height) data)
+        public override void Render()
         {
             var exposurePixels = exposureTexture.GetRawTextureData<float>();
-
             for (var i = 0; i < settings.ExposureResolution; i++)
             {
                 var uv = i / (settings.ExposureResolution - 1f);
@@ -128,15 +81,16 @@ namespace Arycama.CustomRenderPipeline
                 var exposure = settings.ExposureCurve.Evaluate(t);
                 exposurePixels[i] = exposure;
             }
+
             exposureTexture.SetPixelData(exposurePixels, 0);
             exposureTexture.Apply(false, false);
 
             var histogram = renderGraph.GetBuffer(256);
-
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Auto Exposure"))
             {
-                pass.Initialize(computeShader, 0, data.width, data.height);
-                pass.ReadTexture("Input", data.input);
+                var viewData = renderGraph.GetResource<ViewData>();
+                pass.Initialize(computeShader, 0, viewData.ScaledWidth, viewData.ScaledHeight);
+                pass.ReadTexture("Input", renderGraph.GetResource<CameraTargetData>().Handle);
                 pass.WriteBuffer("LuminanceHistogram", histogram);
                 pass.AddRenderPassData<AutoExposureData>();
 
@@ -174,7 +128,6 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var output = renderGraph.GetBuffer(1, 16, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
-
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Auto Exposure"))
             {
                 pass.Initialize(computeShader, 1, 1);
@@ -197,27 +150,6 @@ namespace Arycama.CustomRenderPipeline
                     var exposureData = pass.RenderGraph.GetResource<AutoExposureData>();
                     command.CopyBuffer(data, exposureData.exposureBuffer);
                 });
-            }
-        }
-
-        public readonly struct AutoExposureData : IRenderPassData
-        {
-            public BufferHandle exposureBuffer { get; }
-            public bool IsFirst { get; }
-
-            public AutoExposureData(BufferHandle exposureBuffer, bool isFirst)
-            {
-                this.exposureBuffer = exposureBuffer ?? throw new ArgumentNullException(nameof(exposureBuffer));
-                IsFirst = isFirst;
-            }
-
-            public readonly void SetInputs(RenderPass pass)
-            {
-                pass.ReadBuffer("Exposure", exposureBuffer);
-            }
-
-            public readonly void SetProperties(RenderPass pass, CommandBuffer command)
-            {
             }
         }
     }

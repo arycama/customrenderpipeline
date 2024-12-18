@@ -2,7 +2,7 @@
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class BlitToScreen : RenderFeature<(RTHandle uITexture, bool isSceneView, int width, int height)>
+    public class BlitToScreen : RenderFeature<(RTHandle uITexture, bool isSceneView)>
     {
         private readonly Material material;
         private readonly RenderGraph rendergraph;
@@ -14,12 +14,12 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
         }
 
-        public override void Render((RTHandle uITexture, bool isSceneView, int width, int height) data)
+        public override void Render((RTHandle uITexture, bool isSceneView) data)
         {
             using var pass = renderGraph.AddRenderPass<BlitToScreenPass>("Tonemapping");
             pass.Initialize(material, 1);
             pass.ReadTexture("UITexture", data.uITexture);
-            pass.AddRenderPassData<AutoExposure.AutoExposureData>();
+            pass.AddRenderPassData<AutoExposureData>();
             pass.AddRenderPassData<CameraTargetData>();
 
             var hdrSettings = HDROutputSettings.main;
@@ -35,7 +35,6 @@ namespace Arycama.CustomRenderPipeline
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetVector("_Resolution", new Vector2(data.width, data.height));
                 pass.SetFloat("_IsSceneView", data.isSceneView ? 1.0f : 0.0f);
                 var colorGamut = hdrEnabled ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
                 pass.SetInt("ColorGamut", (int)colorGamut);

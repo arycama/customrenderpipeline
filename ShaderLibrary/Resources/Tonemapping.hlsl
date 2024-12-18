@@ -8,7 +8,7 @@
 Texture2D<float4> UITexture;
 Texture2D<float3> _Bloom, _Input;
 Texture2D<float> _GrainTexture;
-float4 _GrainTextureParams, _Resolution, _BloomScaleLimit, _Bloom_TexelSize;
+float4 _GrainTextureParams, _BloomScaleLimit, _Bloom_TexelSize;
 float _IsSceneView, _BloomStrength;
 uint ColorGamut;
 float Tonemap, HdrEnabled;
@@ -35,7 +35,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Targe
 		color = OpenDRT(color);
 		
 	// Since UI/blur is authored in sRGB/rec709, convert to that first
-	color = LinearToGamma(Rec2020ToRec709(color));
+	color = Rec2020ToRec709(color);
+	color = LinearToGamma(color);
 
 	return color;
 }
@@ -44,7 +45,7 @@ float3 FragmentComposite(float4 position : SV_Position) : SV_Target
 {
 	// Need to flip for game view
 	if (!_IsSceneView)
-		position.y = _Resolution.y - position.y;
+		position.y = _ScreenResolution.y - position.y;
 		
 	float3 color = _Input[position.xy];
 	float4 ui = UITexture[position.xy];
@@ -82,8 +83,8 @@ float3 FragmentComposite(float4 position : SV_Position) : SV_Target
 		
 		case ColorGamutHDR10:
 		{
-			color *= MaxLuminance;
 			color = Rec709ToRec2020(color);
+			color *= MaxLuminance;
 			color = LinearToST2084(color);
 			break;
 		}

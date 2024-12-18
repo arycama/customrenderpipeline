@@ -5,44 +5,36 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class DepthOfField : RenderFeature<(int width, int height, float fieldOfView, RTHandle color, RTHandle depth)>
+    public partial class DepthOfField : RenderFeature
     {
-        [Serializable]
-        public class Settings
-        {
-            [SerializeField, Min(0f)] private float sampleRadius = 8f;
-            [SerializeField, Range(1, 128)] private int sampleCount = 8;
-
-            public float SampleRadius => sampleRadius;
-            public int SampleCount => sampleCount;
-        }
-
         private readonly Settings settings;
         private readonly LensSettings lensSettings;
         private readonly Material material;
 
         public DepthOfField(Settings settings, LensSettings lensSettings, RenderGraph renderGraph) : base(renderGraph)
         {
-            this.settings = settings ?? throw new ArgumentNullException(nameof(settings));
-            this.lensSettings = lensSettings ?? throw new ArgumentNullException(nameof(lensSettings));
+            this.settings = settings;
+            this.lensSettings = lensSettings;
             material = new Material(Shader.Find("Hidden/Depth of Field")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public override void Render((int width, int height, float fieldOfView, RTHandle color, RTHandle depth) data)
+        public override void Render()
         {
             var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
-            var tempId = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.A2B10G10R10_UNormPack32);
+            var viewData = renderGraph.GetResource<ViewData>();
+
+            var tempId = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.A2B10G10R10_UNormPack32);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Depth of Field"))
             {
                 pass.Initialize(material);
                 pass.WriteTexture(tempId, RenderBufferLoadAction.DontCare);
-                pass.ReadTexture("_Input", data.color);
-                pass.ReadTexture("_Depth", data.depth);
+                pass.ReadTexture("_Input", renderGraph.GetResource<CameraTargetData>().Handle);
+                pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>().Handle);
                 pass.ReadTexture("_Result", tempId);
 
                 var sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
-                var focalLength = 0.5f * sensorSize / Mathf.Tan(data.fieldOfView * Mathf.Deg2Rad / 2.0f);
+                var focalLength = 0.5f * sensorSize / Mathf.Tan(viewData.FieldOfView * Mathf.Deg2Rad / 2.0f);
                 var F = focalLength;
                 var A = focalLength / lensSettings.Aperture;
                 var P = lensSettings.FocalDistance;
