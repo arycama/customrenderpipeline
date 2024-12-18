@@ -8,7 +8,7 @@ namespace Arycama.CustomRenderPipeline
 {
     public class PersistentRTHandleCache : IDisposable
     {
-        private readonly Dictionary<Camera, RTHandle> textureCache = new();
+        private readonly Dictionary<int, RTHandle> textureCache = new();
 
         private readonly GraphicsFormat format;
         private readonly TextureDimension dimension;
@@ -29,9 +29,9 @@ namespace Arycama.CustomRenderPipeline
         }
 
         // Gets current texture and marks history as non-persistent
-        public (RTHandle current, RTHandle history, bool wasCreated) GetTextures(int width, int height, Camera camera, bool isScreenTexture = true, int depth = 1)
+        public (RTHandle current, RTHandle history, bool wasCreated) GetTextures(int width, int height, int viewIndex, bool isScreenTexture = true, int depth = 1)
         {
-            var wasCreated = !textureCache.TryGetValue(camera, out var history);
+            var wasCreated = !textureCache.TryGetValue(viewIndex, out var history);
             if (wasCreated)
             {
                 switch (dimension)
@@ -59,7 +59,7 @@ namespace Arycama.CustomRenderPipeline
                 history.IsPersistent = false;
 
             var current = renderGraph.GetTexture(width, height, format, depth, dimension, isScreenTexture, hasMips, isPersistent: true);
-            textureCache[camera] = current;
+            textureCache[viewIndex] = current;
 
             return (current, history, wasCreated);
         }

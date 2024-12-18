@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class VolumetricLighting : RenderFeature<(int screenWidth, int screenHeight, float farClipPlane, Camera camera, Texture2D blueNoise1D, Texture2D blueNoise2D, Vector2 jitter)>
+    public class VolumetricLighting : RenderFeature
     {
         private readonly Settings settings;
         private readonly PersistentRTHandleCache colorHistory;
@@ -21,20 +21,23 @@ namespace Arycama.CustomRenderPipeline
             colorHistory.Dispose();
         }
 
-        public override void Render((int screenWidth, int screenHeight, float farClipPlane, Camera camera, Texture2D blueNoise1D, Texture2D blueNoise2D, Vector2 jitter) data)
+        public override void Render()
         {
-            var volumeWidth = Mathf.CeilToInt(data.screenWidth / (float)settings.TileSize);
-            var volumeHeight = Mathf.CeilToInt(data.screenHeight / (float)settings.TileSize);
+            var viewData = renderGraph.GetResource<ViewData>();
+            var volumeWidth = Mathf.CeilToInt(viewData.ScaledWidth / (float)settings.TileSize);
+            var volumeHeight = Mathf.CeilToInt(viewData.ScaledHeight / (float)settings.TileSize);
             var volumeDepth = settings.DepthSlices;
-            var textures = colorHistory.GetTextures(volumeWidth, volumeHeight, data.camera, false, volumeDepth);
+            var textures = colorHistory.GetTextures(volumeWidth, volumeHeight, viewData.ViewIndex, false, volumeDepth);
 
             var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
 
             // Can allocate this later but will need to put the data in a cbuffer to avoid too much setting.
             var volumetricLight = renderGraph.GetTexture(volumeWidth, volumeHeight, GraphicsFormat.R16G16B16A16_SFloat, volumeDepth, TextureDimension.Tex3D);
 
-            var result = new Result(volumetricLight, /*volumetricLight.Scale, */data.camera.nearClipPlane, /*volumetricLight.Limit, */settings.MaxDistance, new Vector2(1.0f / data.camera.pixelWidth, 1.0f / data.camera.pixelHeight), settings.DepthSlices, settings.NonLinearDepth ? 1.0f : 0.0f);
-            renderGraph.SetResource(result);;
+            var result = new Result(volumetricLight, /*volumetricLight.Scale, */viewData.Near, /*volumetricLight.Limit, */settings.MaxDistance, new Vector2(1.0f / viewData.ScaledWidth, 1.0f / viewData.ScaledHeight), settings.DepthSlices, settings.NonLinearDepth ? 1.0f : 0.0f);
+            renderGraph.SetResource(result);
+
+            var pixelToWorldViewDir = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, viewData.Jitter, viewData.FieldOfView, viewData.Aspect, Matrix4x4.Rotate(viewData.ViewRotation), false, true);
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
             {
@@ -60,10 +63,8 @@ namespace Arycama.CustomRenderPipeline
                     volumeSlices: volumeDepth,
                     blurSigma: settings.BlurSigma,
                     volumeTileSize: settings.TileSize,
-                    blueNoise1D: data.blueNoise1D,
-                    blueNoise2D: data.blueNoise2D,
                     history: textures.history,
-                    pixelToWorldViewDir: Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, data.jitter, data.camera.fieldOfView, data.camera.aspect, Matrix4x4.Rotate(data.camera.transform.rotation), false, true)
+                    pixelToWorldViewDir: pixelToWorldViewDir
                 ),
                 (command, pass, data) =>
                 {
@@ -73,10 +74,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat("_VolumeSlices", data.volumeSlices);
                     pass.SetFloat("_BlurSigma", data.blurSigma);
                     pass.SetFloat("_VolumeTileSize", data.volumeTileSize);
-
-                    pass.SetTexture("_BlueNoise1D", data.blueNoise1D);
-                    pass.SetTexture("_BlueNoise2D", data.blueNoise2D);
-
                     pass.SetVector("_InputScale", data.history.Scale);
                     pass.SetVector("_InputMax", data.history.Limit);
                     pass.SetMatrix("_PixelToWorldViewDir", data.pixelToWorldViewDir);
@@ -117,14 +114,12 @@ namespace Arycama.CustomRenderPipeline
                     volumeWidth: volumeWidth,
                     volumeHeight: volumeHeight,
                     volumeSlices: volumeDepth,
-                    volumeDepth: data.farClipPlane,
+                    volumeDepth: viewData.Far,
                     blurSigma: settings.BlurSigma,
                     volumeTileSize: settings.TileSize,
-                    blueNoise1D: data.blueNoise1D,
-                    blueNoise2D: data.blueNoise2D,
                     volumeDistancePerSlice: settings.MaxDistance / settings.DepthSlices,
                     depthSlices: settings.DepthSlices,
-                    pixelToWorldViewDir: Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, data.jitter, data.camera.fieldOfView, data.camera.aspect, Matrix4x4.Rotate(data.camera.transform.rotation), false, true)
+                    pixelToWorldViewDir: pixelToWorldViewDir
                 ),
                 (command, pass, data) =>
                 {

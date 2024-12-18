@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public partial class TemporalAA : RenderFeature<Camera>
+    public partial class TemporalAA : RenderFeature
     {
         private readonly Settings settings;
         private readonly PersistentRTHandleCache textureCache;
@@ -91,13 +91,13 @@ namespace Arycama.CustomRenderPipeline
             ArrayPool<float>.Release(weights);
         }
 
-        public override void Render(Camera camera)
+        public override void Render()
         {
             if (!settings.IsEnabled)
                 return;
 
             var viewData = renderGraph.GetResource<ViewData>();
-            var (current, history, wasCreated) = textureCache.GetTextures(viewData.PixelWidth, viewData.PixelHeight, camera);
+            var (current, history, wasCreated) = textureCache.GetTextures(viewData.PixelWidth, viewData.PixelHeight, viewData.ViewIndex);
             var result = renderGraph.GetTexture(viewData.PixelWidth, viewData.PixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA"))
             {

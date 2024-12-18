@@ -143,6 +143,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.SetResource(result, true);
         }
 
+        // TODO: Seperate into sky reflection pass or somethin
         public void GenerateData(Vector3 viewPosition, Vector3 cameraPosition)
         {
             // Sky transmittance
@@ -374,15 +375,16 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.SetResource(new SkyReflectionAmbientData(ambientBuffer, reflectionProbe, cdf, skyLuminance, weightedDepth, new Vector2(settings.LuminanceWidth, settings.LuminanceHeight), new Vector2(settings.CdfWidth, settings.CdfHeight))); ;
         }
 
-        public void Render(RTHandle depth, int width, int height, Camera camera)
+        public void Render1()
         {
-            var skyTemp = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+            var viewData = renderGraph.GetResource<ViewData>();
+            var skyTemp = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky"))
             {
                 pass.Initialize(skyMaterial, 3);
                 pass.WriteTexture(skyTemp, RenderBufferLoadAction.DontCare);
-                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>().Handle);
 
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposureData>();
@@ -402,13 +404,13 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Spatial
-            var skyTemp2 = renderGraph.GetTexture(width, height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+            var skyTemp2 = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Spatial"))
             {
                 pass.Initialize(skyMaterial, 5);
                 pass.WriteTexture(skyTemp2, RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_SkyInput", skyTemp);
-                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>().Handle);
                 pass.AddRenderPassData<CloudRenderResult>();
                 pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
@@ -421,21 +423,20 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat("_SpatialBlurFrames", settings.SpatialBlurFrames);
                     pass.SetFloat("_MaxFrameCount", settings.MaxFrameCount);
 
-                    pass.SetInt("_MaxWidth", width - 1);
-                    pass.SetInt("_MaxHeight", height - 1);
+                    pass.SetInt("_MaxWidth", viewData.ScaledWidth - 1);
+                    pass.SetInt("_MaxHeight", viewData.ScaledHeight - 1);
                 });
             }
 
             // Reprojection
-            var skyColor = textureCache.GetTextures(width, height, camera, true);
-
+            var skyColor = textureCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Temporal"))
             {
                 pass.Initialize(skyMaterial, 4);
                 pass.WriteTexture(skyColor.current, RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_SkyInput", skyTemp2);
                 pass.ReadTexture("_SkyHistory", skyColor.history);
-                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>().Handle);
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<CloudRenderResult>();
@@ -458,8 +459,8 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetFloat("_MaxFrameCount", settings.MaxFrameCount);
 
-                    pass.SetInt("_MaxWidth", width - 1);
-                    pass.SetInt("_MaxHeight", height - 1);
+                    pass.SetInt("_MaxWidth", viewData.ScaledWidth - 1);
+                    pass.SetInt("_MaxHeight", viewData.ScaledHeight - 1);
                 });
             }
 

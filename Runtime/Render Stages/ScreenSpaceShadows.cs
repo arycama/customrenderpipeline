@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int height, Camera camera, float bias, float distantBias, RTHandle normalRoughness)>
+public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, float bias, float distantBias, RTHandle normalRoughness)>
 {
     [Serializable]
     public class Settings
@@ -37,7 +37,7 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
     }
 
 
-    public override void Render((RTHandle depth, int width, int height, Camera camera, float bias, float distantBias, RTHandle normalRoughness) data)
+    public override void Render((RTHandle depth, float bias, float distantBias, RTHandle normalRoughness) data)
     {
         var cullingResultsData = renderGraph.GetResource<CullingResultsData>();
         var cullingResults = cullingResultsData.CullingResults;
@@ -53,7 +53,8 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
             break;
         }
 
-        var tempResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.R16G16B16A16_SFloat);
+        var viewData = renderGraph.GetResource<ViewData>();
+        var tempResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat);
 
         if (settings.UseRaytracing)
         {
@@ -74,7 +75,7 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
             {
                 var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                pass.Initialize(shadowRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, data.width, data.height, 1, data.bias, data.distantBias, data.camera.fieldOfView);
+                pass.Initialize(shadowRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, data.bias, data.distantBias, viewData.FieldOfView);
                 pass.WriteTexture(tempResult, "HitResult");
                 pass.ReadTexture("_Depth", data.depth);
                 pass.ReadTexture("_NormalRoughness", data.normalRoughness);
@@ -117,13 +118,13 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
                     pass.SetFloat("_MaxSteps", settings.MaxSamples);
                     pass.SetFloat("_Thickness", settings.Thickness);
                     pass.SetFloat("_Intensity", settings.Intensity);
-                    pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.width, data.height) - 1);
+                    pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight) - 1);
                     pass.SetFloat("LightCosTheta", Mathf.Cos(settings.LightAngularDiameter * Mathf.Deg2Rad * 0.5f));
                 });
             }
         }
 
-        var spatialResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.R16_UNorm, isScreenTexture: true);
+        var spatialResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16_UNorm, isScreenTexture: true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows Spatial"))
         {
             pass.Initialize(material, 1);
@@ -157,7 +158,7 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, int width, int 
         }
 
         // Write final temporal result out to rgba16 (color+weight) and rgb111110 for final ambient composition
-        var (current, history, wasCreated) = temporalCache.GetTextures(data.width, data.height, data.camera, true);
+        var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex, true);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows Temporal"))
         {
             pass.Initialize(material, 2);

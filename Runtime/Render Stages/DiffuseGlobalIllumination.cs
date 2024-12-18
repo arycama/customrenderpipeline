@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public partial class DiffuseGlobalIllumination : RenderFeature<(RTHandle depth, int width, int height, Camera camera, RTHandle previousFrame, RTHandle normalRoughness, float bias, float distantBias)>
+    public partial class DiffuseGlobalIllumination : RenderFeature<(RTHandle depth, RTHandle previousFrame, RTHandle normalRoughness, float bias, float distantBias)>
     {
         private readonly Material material;
         private readonly Settings settings;
@@ -27,10 +27,11 @@ namespace Arycama.CustomRenderPipeline
             temporalCache.Dispose();
         }
 
-        public override void Render((RTHandle depth, int width, int height, Camera camera, RTHandle previousFrame, RTHandle normalRoughness, float bias, float distantBias) data)
+        public override void Render((RTHandle depth, RTHandle previousFrame, RTHandle normalRoughness, float bias, float distantBias) data)
         {
-            var tempResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-            var hitResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var viewData = renderGraph.GetResource<ViewData>();
+            var tempResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var hitResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
             if (settings.UseRaytracing)
             {
@@ -51,7 +52,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, data.width, data.height, 1, data.bias, data.distantBias, data.camera.fieldOfView);
+                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, data.bias, data.distantBias, viewData.FieldOfView);
                     pass.WriteTexture(tempResult, "HitColor");
                     pass.WriteTexture(hitResult, "HitResult");
                     pass.ReadTexture("_Depth", data.depth);
@@ -92,17 +93,17 @@ namespace Arycama.CustomRenderPipeline
                         pass.SetFloat("_Intensity", settings.Intensity);
                         pass.SetFloat("_MaxSteps", settings.MaxSamples);
                         pass.SetFloat("_Thickness", settings.Thickness);
-                        pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.width, data.height) - 1);
+                        pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight) - 1);
                         pass.SetVector("_PreviousColorScaleLimit", data.previousFrame.ScaleLimit2D);
 
-                        var tanHalfFov = Mathf.Tan(0.5f * data.camera.fieldOfView * Mathf.Deg2Rad);
-                        pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * settings.ConeAngle * Mathf.Deg2Rad) * (data.height / tanHalfFov * 0.5f));
+                        var tanHalfFov = Mathf.Tan(0.5f * viewData.FieldOfView * Mathf.Deg2Rad);
+                        pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * settings.ConeAngle * Mathf.Deg2Rad) * (viewData.ScaledHeight / tanHalfFov * 0.5f));
                     });
                 }
             }
 
-            var spatialResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
-            var rayDepth = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.R16_SFloat, isScreenTexture: true);
+            var spatialResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+            var rayDepth = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16_SFloat, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
             {
                 pass.Initialize(material, 1);
@@ -136,7 +137,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Write final temporal result out to rgba16 (color+weight) and rgb111110 for final ambient composition
-            var (current, history, wasCreated) = temporalCache.GetTextures(data.width, data.height, data.camera, true);
+            var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Temporal"))
             {
                 pass.Initialize(material, 2);

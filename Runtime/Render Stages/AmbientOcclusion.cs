@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class AmbientOcclusion : RenderFeature<(Camera camera, RTHandle depth, float scale, RTHandle normal, RTHandle bentNormalOcclusion, float bias, float distantBias)>
+    public class AmbientOcclusion : RenderFeature<(RTHandle depth, RTHandle normal, RTHandle bentNormalOcclusion, float bias, float distantBias)>
     {
         private readonly Settings settings;
         private readonly Material material;
@@ -26,15 +26,14 @@ namespace Arycama.CustomRenderPipeline
             temporalCache.Dispose();
         }
 
-        public override void Render((Camera camera, RTHandle depth, float scale, RTHandle normal, RTHandle bentNormalOcclusion, float bias, float distantBias) data)
+        public override void Render((RTHandle depth, RTHandle normal, RTHandle bentNormalOcclusion, float bias, float distantBias) data)
         {
-            var width = (int)(data.camera.pixelWidth * data.scale);
-            var height = (int)(data.camera.pixelHeight * data.scale);
+            var viewData = renderGraph.GetResource<ViewData>();
 
-            var tempResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-            var hitResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var tempResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var hitResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
-            var tanHalfFov = Mathf.Tan(data.camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+            var tanHalfFov = Mathf.Tan(viewData.FieldOfView * Mathf.Deg2Rad * 0.5f);
             var falloffStart = settings.Radius * settings.Falloff;
             var falloffEnd = settings.Radius;
 
@@ -44,7 +43,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                    pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, width, height, 1, data.bias, data.distantBias, data.camera.fieldOfView);
+                    pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, data.bias, data.distantBias, viewData.FieldOfView);
                     pass.WriteTexture(tempResult, "HitColor");
                     pass.WriteTexture(hitResult, "HitResult");
                     pass.ReadTexture("_Depth", data.depth);
@@ -53,7 +52,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetRenderFunction((
                         rawRadius: settings.Radius,
-                        radius: height / tanHalfFov * 0.5f * settings.Radius,
+                        radius: viewData.ScaledHeight / tanHalfFov * 0.5f * settings.Radius,
                         aoStrength: settings.Strength,
                         falloffScale: settings.Falloff == 1.0f ? 0.0f : 1.0f / (falloffStart * falloffStart - falloffEnd * falloffEnd),
                         falloffBias: settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff * settings.Falloff),
@@ -85,7 +84,7 @@ namespace Arycama.CustomRenderPipeline
 
                     pass.SetRenderFunction((
                          rawRadius: settings.Radius,
-                         radius: height / tanHalfFov * 0.5f * settings.Radius,
+                         radius: viewData.ScaledHeight / tanHalfFov * 0.5f * settings.Radius,
                          aoStrength: settings.Strength,
                          falloffScale: settings.Falloff == 1.0f ? 0.0f : 1.0f / (falloffStart * falloffStart - falloffEnd * falloffEnd),
                          falloffBias: settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff * settings.Falloff),
@@ -113,7 +112,7 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            var spatialResult = renderGraph.GetTexture(width, height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var spatialResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
             //var rayDepth = renderGraph.GetTexture(width, height, GraphicsFormat.R16_SFloat, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
             {
@@ -143,7 +142,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            var (current, history, wasCreated) = temporalCache.GetTextures(width, height, data.camera, true);
+            var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Temporal"))
             {
                 pass.Initialize(material, 2);
@@ -167,7 +166,7 @@ namespace Arycama.CustomRenderPipeline
 
             renderGraph.SetResource(new Result(current));;
 
-            var newBentNormalOcclusion = renderGraph.GetTexture(width, height, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
+            var newBentNormalOcclusion = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Resolve"))
             {
                 pass.Initialize(material, 3);

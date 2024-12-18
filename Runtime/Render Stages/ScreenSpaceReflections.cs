@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public partial class ScreenSpaceReflections : RenderFeature<(RTHandle depth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, int width, int height, RTHandle albedoMetallic, float bias, float distantBias)>
+    public partial class ScreenSpaceReflections : RenderFeature<(RTHandle depth, RTHandle previousFrameColor, RTHandle normalRoughness, RTHandle albedoMetallic, float bias, float distantBias)>
     {
         private readonly Material material;
         private readonly Settings settings;
@@ -29,13 +29,15 @@ namespace Arycama.CustomRenderPipeline
             temporalCache.Dispose();
         }
 
-        public override void Render((RTHandle depth, RTHandle previousFrameColor, RTHandle normalRoughness, Camera camera, int width, int height, RTHandle albedoMetallic, float bias, float distantBias) data)
+        public override void Render((RTHandle depth, RTHandle previousFrameColor, RTHandle normalRoughness, RTHandle albedoMetallic, float bias, float distantBias) data)
         {
+            var viewData = renderGraph.GetResource<ViewData>();
+
             // Must be screen texture since we use stencil to skip sky pixels
-            var tempResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var tempResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
             // Slight fuzzyness with 16 bits, probably due to depth.. would like to investigate
-            var hitResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
+            var hitResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
 
             if (settings.UseRaytracing)
             {
@@ -56,7 +58,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, data.width, data.height, 1, data.bias, data.distantBias, data.camera.fieldOfView);
+                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, data.bias, data.distantBias, viewData.FieldOfView);
                     pass.WriteTexture(tempResult, "HitColor");
                     pass.WriteTexture(hitResult, "HitResult");
                     pass.ReadTexture("_Depth", data.depth);
@@ -96,14 +98,14 @@ namespace Arycama.CustomRenderPipeline
                     {
                         pass.SetFloat("_MaxSteps", settings.MaxSamples);
                         pass.SetFloat("_Thickness", settings.Thickness);
-                        pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.width, data.height) - 1);
+                        pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight) - 1);
                         pass.SetVector("_PreviousColorScaleLimit", data.previousFrameColor.ScaleLimit2D);
                     });
                 }
             }
 
-            var spatialResult = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
-            var rayDepth = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.R16_SFloat, isScreenTexture: true);
+            var spatialResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+            var rayDepth = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16_SFloat, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Specular GI Spatial"))
             {
                 pass.Initialize(material, 1);
@@ -134,7 +136,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            var (current, history, wasCreated) = temporalCache.GetTextures(data.width, data.height, data.camera, true);
+            var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex, true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Temporal"))
             {
                 pass.Initialize(material, 2);

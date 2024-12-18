@@ -319,13 +319,13 @@ namespace Arycama.CustomRenderPipeline.Water
             renderGraph.SetResource(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction")));;
         }
 
-        public void RenderWaterPost(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive, Camera camera)
+        public void RenderWaterPost(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive)
         {
             if (!settings.IsEnabled)
                 return;
 
             underwaterLighting.Render((screenWidth, screenHeight, underwaterDepth, cameraDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive));
-            deferredWater.Render((underwaterDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive, cameraDepth, camera, screenWidth, screenHeight));
+            deferredWater.Render((underwaterDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive));
         }
 
         private WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
