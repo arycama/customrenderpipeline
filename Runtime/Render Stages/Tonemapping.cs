@@ -106,7 +106,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetFloat("_BloomStrength", bloomSettings.Strength);
             });
 
-            renderGraph.SetResource(new CameraTargetData(result));;
+            renderGraph.SetResource(new CameraTargetData(result)); ;
         }
     }
 }

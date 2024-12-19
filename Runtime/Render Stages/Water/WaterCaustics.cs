@@ -1,10 +1,6 @@
-using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using Object = UnityEngine.Object;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
@@ -25,7 +21,7 @@ namespace Arycama.CustomRenderPipeline.Water
             var indicesPerQuad = isQuad ? 4 : 6;
             var bufferSize = count * count * indicesPerQuad;
             var triangles = new uint[bufferSize];
-            
+
             for (int y = 0, i = 0, vi = 0; y < count; y++, vi++)
             {
                 var rowStart = y * (count + 1);
@@ -114,7 +110,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.AddRenderPassData<OceanFftResult>();
                 pass.WriteTexture(tempResult);
                 pass.ReadTexture("_Input", temp0);
-                
+
                 pass.SetRenderFunction((command, pass) =>
                 {
                     var viewMatrix = Matrix4x4.LookAt(Vector3.zero, Vector3.down, Vector3.forward).inverse;
@@ -141,7 +137,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
             }
 
-            renderGraph.SetResource(new CausticsResult(result, settings.CasuticsCascade, settings.CausticsDepth));;
+            renderGraph.SetResource(new CausticsResult(result, settings.CasuticsCascade, settings.CausticsDepth)); ;
         }
     }
 }

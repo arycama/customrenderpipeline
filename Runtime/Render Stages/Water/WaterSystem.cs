@@ -173,7 +173,7 @@ namespace Arycama.CustomRenderPipeline.Water
             };
 
             // TODO: Change to near/far
-            renderGraph.SetResource(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewProjectionMatrix, shadowMatrix, cullingPlanes));;
+            renderGraph.SetResource(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewProjectionMatrix, shadowMatrix, cullingPlanes)); ;
         }
 
         public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes)
@@ -182,7 +182,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 return;
 
             var result = Cull(viewPosition, cullingPlanes);
-            renderGraph.SetResource(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer));;
+            renderGraph.SetResource(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer)); ;
         }
 
         public void RenderShadow(Vector3 viewPosition)
@@ -239,7 +239,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 });
             }
 
-            renderGraph.SetResource(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction"), waterIlluminance));;
+            renderGraph.SetResource(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction"), waterIlluminance)); ;
         }
 
 
@@ -318,16 +318,16 @@ namespace Arycama.CustomRenderPipeline.Water
                 });
             }
 
-            renderGraph.SetResource(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction")));;
+            renderGraph.SetResource(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction"))); ;
         }
 
-        public void RenderWaterPost(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive)
+        public void RenderWaterPost()
         {
             if (!settings.IsEnabled)
                 return;
 
-            underwaterLighting.Render((screenWidth, screenHeight, underwaterDepth, cameraDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive));
-            deferredWater.Render((underwaterDepth, albedoMetallic, normalRoughness, bentNormalOcclusion, emissive));
+            underwaterLighting.Render();
+            deferredWater.Render();
         }
 
         private WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)

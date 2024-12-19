@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class AmbientOcclusion : RenderFeature<(RTHandle depth, RTHandle normal, RTHandle bentNormalOcclusion, float bias, float distantBias)>
+    public class AmbientOcclusion : RenderFeature
     {
         private readonly Settings settings;
         private readonly Material material;
@@ -26,9 +26,12 @@ namespace Arycama.CustomRenderPipeline
             temporalCache.Dispose();
         }
 
-        public override void Render((RTHandle depth, RTHandle normal, RTHandle bentNormalOcclusion, float bias, float distantBias) data)
+        public override void Render()
         {
             var viewData = renderGraph.GetResource<ViewData>();
+            var depth = renderGraph.GetResource<CameraDepthData>().Handle;
+            var normalRoughness = renderGraph.GetResource<NormalRoughnessData>().Handle;
+            var bentNormalOcclusion = renderGraph.GetResource<BentNormalOcclusionData>().Handle;
 
             var tempResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
             var hitResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
@@ -43,11 +46,11 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                    pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, data.bias, data.distantBias, viewData.FieldOfView);
+                    pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, raytracingData.Bias, raytracingData.DistantBias, viewData.FieldOfView);
                     pass.WriteTexture(tempResult, "HitColor");
                     pass.WriteTexture(hitResult, "HitResult");
-                    pass.ReadTexture("_Depth", data.depth);
-                    pass.ReadTexture("_NormalRoughness", data.normal);
+                    pass.ReadTexture("_Depth", depth);
+                    pass.ReadTexture("_NormalRoughness", normalRoughness);
                     pass.AddRenderPassData<ICommonPassData>();
 
                     pass.SetRenderFunction((
@@ -77,9 +80,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.Initialize(material);
                     pass.WriteTexture(tempResult);
                     pass.WriteTexture(hitResult);
-                    pass.ReadTexture("_Depth", data.depth);
-                    pass.ReadTexture("_NormalRoughness", data.normal);
-                    pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                    pass.ReadTexture("_Depth", depth);
+                    pass.ReadTexture("_NormalRoughness", normalRoughness);
+                    pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                     pass.AddRenderPassData<ICommonPassData>();
 
                     pass.SetRenderFunction((
@@ -117,16 +120,16 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
             {
                 pass.Initialize(material, 1);
-                pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
                 //pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
 
                 pass.ReadTexture("_Input", tempResult);
                 pass.ReadTexture("_HitResult", hitResult);
-                pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
-                pass.ReadTexture("_Depth", data.depth);
-                pass.ReadTexture("_NormalRoughness", data.normal);
-                pass.ReadTexture("_BentNormalOcclusion", data.bentNormalOcclusion);
+                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_NormalRoughness", normalRoughness);
+                pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
                 pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
@@ -146,13 +149,13 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Temporal"))
             {
                 pass.Initialize(material, 2);
-                pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 
                 pass.ReadTexture("_Input", spatialResult);
                 pass.ReadTexture("_History", history);
-                pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
-                pass.ReadTexture("_Depth", data.depth);
+                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_Depth", depth);
 
                 pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<ICommonPassData>();
@@ -164,17 +167,17 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.SetResource(new Result(current));;
+            renderGraph.SetResource(new Result(current)); ;
 
             var newBentNormalOcclusion = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Resolve"))
             {
                 pass.Initialize(material, 3);
-                pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(newBentNormalOcclusion, RenderBufferLoadAction.DontCare);
 
                 pass.ReadTexture("_Input", current);
-                pass.ReadTexture("_BentNormalOcclusion", data.bentNormalOcclusion);
+                pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
                 pass.AddRenderPassData<TemporalAAData>();
 
                 pass.SetRenderFunction((command, pass) =>
@@ -185,7 +188,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.SetResource(new BentNormalOcclusionData(newBentNormalOcclusion));;
+            renderGraph.SetResource(new BentNormalOcclusionData(newBentNormalOcclusion)); ;
         }
 
         // Only used for debugging as the result is combined into the bent normal texture

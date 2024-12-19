@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class ClusteredLightCulling : RenderFeature<(int width, int height, float near, float far)>
+    public class ClusteredLightCulling : RenderFeature
     {
         [Serializable]
         public class Settings
@@ -58,14 +58,16 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public override void Render((int width, int height, float near, float far) data)
+        public override void Render()
         {
-            var clusterWidth = MathUtils.DivRoundUp(data.width, settings.TileSize);
-            var clusterHeight = MathUtils.DivRoundUp(data.height, settings.TileSize);
+            var viewData = renderGraph.GetResource<ViewData>();
+
+            var clusterWidth = MathUtils.DivRoundUp(viewData.ScaledWidth, settings.TileSize);
+            var clusterHeight = MathUtils.DivRoundUp(viewData.ScaledHeight, settings.TileSize);
             var clusterCount = clusterWidth * clusterHeight * settings.ClusterDepth;
 
-            var clusterScale = settings.ClusterDepth / Mathf.Log(data.far / data.near, 2f);
-            var clusterBias = -(settings.ClusterDepth * Mathf.Log(data.near, 2f) / Mathf.Log(data.far / data.near, 2f));
+            var clusterScale = settings.ClusterDepth / Mathf.Log(viewData.Far / viewData.Near, 2f);
+            var clusterBias = -(settings.ClusterDepth * Mathf.Log(viewData.Near, 2f) / Mathf.Log(viewData.Far / viewData.Near, 2f));
 
             var computeShader = Resources.Load<ComputeShader>("ClusteredLightCulling");
             var lightClusterIndices = renderGraph.GetTexture(clusterWidth, clusterHeight, GraphicsFormat.R32G32_SInt, settings.ClusterDepth, TextureDimension.Tex3D);
@@ -98,7 +100,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.SetResource(new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize));;
+            renderGraph.SetResource(new Result(lightClusterIndices, lightList, clusterScale, clusterBias, settings.TileSize)); ;
         }
     }
 }

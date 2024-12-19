@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class DeferredLighting : RenderFeature<(RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle emissive)>
+public class DeferredLighting : RenderFeature
 {
     private readonly Material material;
 
@@ -18,19 +18,17 @@ public class DeferredLighting : RenderFeature<(RTHandle depth, RTHandle albedoMe
         Object.DestroyImmediate(material);
     }
 
-    public override void Render((RTHandle depth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle emissive) data)
+    public override void Render()
     {
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting"))
         {
             pass.Initialize(material);
 
-            pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(data.emissive);
+            var depth = renderGraph.GetResource<CameraDepthData>().Handle;
+            pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);
 
-            pass.ReadTexture("_Depth", data.depth);
-            pass.ReadTexture("_AlbedoMetallic", data.albedoMetallic);
-            pass.ReadTexture("_NormalRoughness", data.normalRoughness);
-            pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
+            pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
 
             pass.AddRenderPassData<SkyReflectionAmbientData>();
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
@@ -49,6 +47,9 @@ public class DeferredLighting : RenderFeature<(RTHandle depth, RTHandle albedoMe
             pass.AddRenderPassData<ICommonPassData>();
             pass.AddRenderPassData<CausticsResult>();
             pass.AddRenderPassData<BentNormalOcclusionData>();
+            pass.AddRenderPassData<CameraDepthData>();
+            pass.AddRenderPassData<AlbedoMetallicData>();
+            pass.AddRenderPassData<NormalRoughnessData>();
 
             var hasWaterShadow = renderGraph.IsRenderPassDataValid<WaterShadowResult>();
             pass.Keyword = hasWaterShadow ? "WATER_SHADOWS_ON" : string.Empty;

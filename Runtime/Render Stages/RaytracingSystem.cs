@@ -83,7 +83,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.SetResource(new RaytracingResult(rtas));;
+            renderGraph.SetResource(new RaytracingResult(rtas, settings.RaytracingBias, settings.RaytracingDistantBias));
         }
 
         protected override void Cleanup(bool disposing)

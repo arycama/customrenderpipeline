@@ -1,5 +1,4 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -48,7 +47,7 @@ namespace Arycama.CustomRenderPipeline
                     sensorHeight: sensorSize,
                     sampleRadius: settings.SampleRadius,
                     sampleCount: settings.SampleCount
-                ), 
+                ),
                 (command, pass, data) =>
                 {
                     pass.SetFloat("_FocalDistance", data.focalDistance);
@@ -61,7 +60,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt("_SampleCount", data.sampleCount);
                 });
 
-                renderGraph.SetResource(new CameraTargetData(tempId));;
+                renderGraph.SetResource(new CameraTargetData(tempId)); ;
             }
         }
     }

@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, float bias, float distantBias, RTHandle normalRoughness)>
+public class ScreenSpaceShadows : RenderFeature
 {
     [Serializable]
     public class Settings
@@ -37,7 +37,7 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, float bias, flo
     }
 
 
-    public override void Render((RTHandle depth, float bias, float distantBias, RTHandle normalRoughness) data)
+    public override void Render()
     {
         var cullingResultsData = renderGraph.GetResource<CullingResultsData>();
         var cullingResults = cullingResultsData.CullingResults;
@@ -55,6 +55,8 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, float bias, flo
 
         var viewData = renderGraph.GetResource<ViewData>();
         var tempResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat);
+        var depth = renderGraph.GetResource<CameraDepthData>().Handle;
+        var normalRoughness = renderGraph.GetResource<NormalRoughnessData>().Handle;
 
         if (settings.UseRaytracing)
         {
@@ -75,10 +77,10 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, float bias, flo
             {
                 var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                pass.Initialize(shadowRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, data.bias, data.distantBias, viewData.FieldOfView);
+                pass.Initialize(shadowRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, raytracingData.Bias, raytracingData.DistantBias, viewData.FieldOfView);
                 pass.WriteTexture(tempResult, "HitResult");
-                pass.ReadTexture("_Depth", data.depth);
-                pass.ReadTexture("_NormalRoughness", data.normalRoughness);
+                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_NormalRoughness", normalRoughness);
                 pass.AddRenderPassData<ICommonPassData>();
 
                 pass.SetRenderFunction((command, pass) =>
@@ -109,8 +111,8 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, float bias, flo
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<HiZMinDepthData>();
 
-                pass.ReadTexture("_Depth", data.depth);
-                pass.ReadTexture("_NormalRoughness", data.normalRoughness);
+                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_NormalRoughness", normalRoughness);
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -128,12 +130,12 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, float bias, flo
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows Spatial"))
         {
             pass.Initialize(material, 1);
-            pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
 
             pass.ReadTexture("_Input", tempResult);
-            pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
-            pass.ReadTexture("_Depth", data.depth);
+            pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+            pass.ReadTexture("_Depth", depth);
 
             pass.AddRenderPassData<TemporalAAData>();
             pass.AddRenderPassData<SkyReflectionAmbientData>();
@@ -162,15 +164,15 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, float bias, flo
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows Temporal"))
         {
             pass.Initialize(material, 2);
-            pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 
             pass.ReadTexture("_TemporalInput", spatialResult);
             pass.ReadTexture("_History", history);
-            pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
-            pass.ReadTexture("_Depth", data.depth);
+            pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+            pass.ReadTexture("_Depth", depth);
             //pass.ReadTexture("_HitResult", hitResult);
-            pass.ReadTexture("_NormalRoughness", data.normalRoughness);
+            pass.ReadTexture("_NormalRoughness", normalRoughness);
             //pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
             //pass.ReadTexture("RayDepth", rayDepth);
 
@@ -191,7 +193,7 @@ public class ScreenSpaceShadows : RenderFeature<(RTHandle depth, float bias, flo
             });
         }
 
-        renderGraph.SetResource(new Result(current));;
+        renderGraph.SetResource(new Result(current)); ;
     }
 
     public struct Result : IRenderPassData

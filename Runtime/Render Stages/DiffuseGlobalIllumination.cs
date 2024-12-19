@@ -1,11 +1,10 @@
-﻿using Arycama.CustomRenderPipeline;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public partial class DiffuseGlobalIllumination : RenderFeature<(RTHandle depth, RTHandle previousFrame, RTHandle normalRoughness, float bias, float distantBias)>
+    public partial class DiffuseGlobalIllumination : RenderFeature
     {
         private readonly Material material;
         private readonly Settings settings;
@@ -27,12 +26,15 @@ namespace Arycama.CustomRenderPipeline
             temporalCache.Dispose();
         }
 
-        public override void Render((RTHandle depth, RTHandle previousFrame, RTHandle normalRoughness, float bias, float distantBias) data)
+        public override void Render()
         {
             var viewData = renderGraph.GetResource<ViewData>();
             var tempResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
             var hitResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+            var previousFrame = renderGraph.GetResource<PreviousFrameColorData>().Handle;
 
+            var depth = renderGraph.GetResource<CameraDepthData>().Handle;
+            var normalRoughness = renderGraph.GetResource<NormalRoughnessData>().Handle;
             if (settings.UseRaytracing)
             {
                 // Need to set some things as globals so that hit shaders can access them..
@@ -47,17 +49,16 @@ namespace Arycama.CustomRenderPipeline
                     pass.AddRenderPassData<ShadowRenderer.Result>();
                     pass.AddRenderPassData<ICommonPassData>();
                 }
-
                 using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Diffuse GI Raytrace"))
                 {
                     var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, data.bias, data.distantBias, viewData.FieldOfView);
+                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, raytracingData.Bias, raytracingData.DistantBias, viewData.FieldOfView);
                     pass.WriteTexture(tempResult, "HitColor");
                     pass.WriteTexture(hitResult, "HitResult");
-                    pass.ReadTexture("_Depth", data.depth);
-                    pass.ReadTexture("_NormalRoughness", data.normalRoughness);
-                    pass.ReadTexture("PreviousFrame", data.previousFrame); // Temporary, cuz of leaks if we don't use it..
+                    pass.ReadTexture("_Depth", depth);
+                    pass.ReadTexture("_NormalRoughness", normalRoughness);
+                    pass.ReadTexture("PreviousFrame", previousFrame); // Temporary, cuz of leaks if we don't use it..
                     pass.AddRenderPassData<SkyReflectionAmbientData>();
                     pass.AddRenderPassData<LightingSetup.Result>();
                     pass.AddRenderPassData<AutoExposureData>();
@@ -69,7 +70,7 @@ namespace Arycama.CustomRenderPipeline
                 using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Trace"))
                 {
                     pass.Initialize(material);
-                    pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                    pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                     pass.WriteTexture(tempResult);
                     pass.WriteTexture(hitResult);
                     pass.ConfigureClear(RTClearFlags.Color);
@@ -84,9 +85,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.AddRenderPassData<VelocityData>();
                     pass.AddRenderPassData<HiZMinDepthData>();
 
-                    pass.ReadTexture("_Depth", data.depth);
-                    pass.ReadTexture("PreviousFrame", data.previousFrame);
-                    pass.ReadTexture("_NormalRoughness", data.normalRoughness);
+                    pass.ReadTexture("_Depth", depth);
+                    pass.ReadTexture("PreviousFrame", previousFrame);
+                    pass.ReadTexture("_NormalRoughness", normalRoughness);
 
                     pass.SetRenderFunction((command, pass) =>
                     {
@@ -94,7 +95,7 @@ namespace Arycama.CustomRenderPipeline
                         pass.SetFloat("_MaxSteps", settings.MaxSamples);
                         pass.SetFloat("_Thickness", settings.Thickness);
                         pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight) - 1);
-                        pass.SetVector("_PreviousColorScaleLimit", data.previousFrame.ScaleLimit2D);
+                        pass.SetVector("_PreviousColorScaleLimit", previousFrame.ScaleLimit2D);
 
                         var tanHalfFov = Mathf.Tan(0.5f * viewData.FieldOfView * Mathf.Deg2Rad);
                         pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * settings.ConeAngle * Mathf.Deg2Rad) * (viewData.ScaledHeight / tanHalfFov * 0.5f));
@@ -107,15 +108,15 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
             {
                 pass.Initialize(material, 1);
-                pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
 
                 pass.ReadTexture("_Input", tempResult);
-                pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
-                pass.ReadTexture("_Depth", data.depth);
+                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_HitResult", hitResult);
-                pass.ReadTexture("_NormalRoughness", data.normalRoughness);
+                pass.ReadTexture("_NormalRoughness", normalRoughness);
 
                 pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
@@ -141,15 +142,15 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Temporal"))
             {
                 pass.Initialize(material, 2);
-                pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 
                 pass.ReadTexture("_TemporalInput", spatialResult);
                 pass.ReadTexture("_History", history);
-                pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
-                pass.ReadTexture("_Depth", data.depth);
+                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_HitResult", hitResult);
-                pass.ReadTexture("_NormalRoughness", data.normalRoughness);
+                pass.ReadTexture("_NormalRoughness", normalRoughness);
                 pass.ReadTexture("RayDepth", rayDepth);
 
                 pass.AddRenderPassData<TemporalAAData>();
@@ -170,7 +171,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.SetResource(new Result(current, settings.Intensity));;
+            renderGraph.SetResource(new Result(current, settings.Intensity)); ;
         }
 
         public readonly struct Result : IRenderPassData

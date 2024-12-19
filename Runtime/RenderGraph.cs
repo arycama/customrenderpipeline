@@ -56,7 +56,6 @@ namespace Arycama.CustomRenderPipeline
         private int rtCount;
         private int screenWidth, screenHeight;
         private bool disposedValue;
-        public bool HasSucceeded { get; private set; }
 
         public RenderGraph(CustomRenderPipeline renderPipeline)
         {
@@ -137,11 +136,8 @@ namespace Arycama.CustomRenderPipeline
 
         public void Execute(CommandBuffer command)
         {
-            HasSucceeded = false;
-
             foreach (var bufferHandle in bufferHandlesToCreate)
                 bufferHandle.Create();
-            bufferHandlesToCreate.Clear();
 
             // Build mapping from pass index to rt handles that can be freed
             foreach (var input in lastRtHandleRead)
@@ -268,8 +264,6 @@ namespace Arycama.CustomRenderPipeline
                 renderPass.Run(command);
 
             IsExecuting = false;
-
-            HasSucceeded = true;
         }
 
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
@@ -321,7 +315,7 @@ namespace Arycama.CustomRenderPipeline
                 if (usageFlags == GraphicsBuffer.UsageFlags.LockBufferForWrite && handle.lastFrameUsed + (swapChainCount - 1) >= FrameIndex)
                     continue;
 
-                 if (handle.handle.Target != target)
+                if (handle.handle.Target != target)
                     continue;
 
                 if (handle.handle.Stride != stride)
@@ -409,6 +403,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var pass in renderPasses)
                 renderPassPool[pass.GetType()].Enqueue(pass);
 
+            bufferHandlesToCreate.Clear();
             renderPasses.Clear();
             lastRtHandleRead.Clear();
             writtenRTHandles.Clear();
@@ -423,7 +418,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var bufferHandle in availableBufferHandles)
             {
                 // Keep buffers available for at least two frames
-                if(bufferHandle.lastFrameUsed + (swapChainCount - 1) < FrameIndex)
+                if (bufferHandle.lastFrameUsed + (swapChainCount - 1) < FrameIndex)
                     bufferHandle.handle.Dispose();
             }
 
@@ -492,7 +487,7 @@ namespace Arycama.CustomRenderPipeline
             ResourceMap.SetRenderPassData(resource, FrameIndex, isPersistent);
         }
 
-        public bool IsRenderPassDataValid<T>() where T: IRenderPassData
+        public bool IsRenderPassDataValid<T>() where T : IRenderPassData
         {
             return ResourceMap.IsRenderPassDataValid<T>(FrameIndex);
         }
@@ -522,7 +517,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var bufferHandle in availableBufferHandles)
                 bufferHandle.handle.Dispose();
 
-            foreach(var handle in importedBuffers)
+            foreach (var handle in importedBuffers)
             {
                 if (handle.Value != null)
                     handle.Value.Dispose();

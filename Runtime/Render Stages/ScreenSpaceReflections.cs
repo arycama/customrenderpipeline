@@ -1,4 +1,3 @@
-using Arycama.CustomRenderPipeline;
 using Arycama.CustomRenderPipeline.Water;
 using System;
 using UnityEngine;
@@ -7,7 +6,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public partial class ScreenSpaceReflections : RenderFeature<(RTHandle depth, RTHandle previousFrameColor, RTHandle normalRoughness, RTHandle albedoMetallic, float bias, float distantBias)>
+    public partial class ScreenSpaceReflections : RenderFeature
     {
         private readonly Material material;
         private readonly Settings settings;
@@ -29,7 +28,7 @@ namespace Arycama.CustomRenderPipeline
             temporalCache.Dispose();
         }
 
-        public override void Render((RTHandle depth, RTHandle previousFrameColor, RTHandle normalRoughness, RTHandle albedoMetallic, float bias, float distantBias) data)
+        public override void Render()
         {
             var viewData = renderGraph.GetResource<ViewData>();
 
@@ -38,6 +37,11 @@ namespace Arycama.CustomRenderPipeline
 
             // Slight fuzzyness with 16 bits, probably due to depth.. would like to investigate
             var hitResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
+
+            var depth = renderGraph.GetResource<CameraDepthData>().Handle;
+            var normalRoughness = renderGraph.GetResource<NormalRoughnessData>().Handle;
+            var previousFrame = renderGraph.GetResource<PreviousFrameColorData>().Handle;
+            var albedoMetallic = renderGraph.GetResource<AlbedoMetallicData>().Handle;
 
             if (settings.UseRaytracing)
             {
@@ -58,12 +62,12 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, data.bias, data.distantBias, viewData.FieldOfView);
+                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, raytracingData.Bias, raytracingData.DistantBias, viewData.FieldOfView);
                     pass.WriteTexture(tempResult, "HitColor");
                     pass.WriteTexture(hitResult, "HitResult");
-                    pass.ReadTexture("_Depth", data.depth);
-                    pass.ReadTexture("_NormalRoughness", data.normalRoughness);
-                    pass.ReadTexture("PreviousFrame", data.previousFrameColor); // Temporary, cuz of leaks if we don't use it..
+                    pass.ReadTexture("_Depth", depth);
+                    pass.ReadTexture("_NormalRoughness", normalRoughness);
+                    pass.ReadTexture("PreviousFrame", previousFrame); // Temporary, cuz of leaks if we don't use it..
 
                     pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<WaterPrepassResult>(true);
@@ -75,15 +79,15 @@ namespace Arycama.CustomRenderPipeline
                 using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Trace"))
                 {
                     pass.Initialize(material);
-                    pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                    pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                     pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
                     pass.WriteTexture(hitResult, RenderBufferLoadAction.DontCare);
                     pass.ConfigureClear(RTClearFlags.Color);
 
-                    pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
-                    pass.ReadTexture("_NormalRoughness", data.normalRoughness);
-                    pass.ReadTexture("PreviousFrame", data.previousFrameColor);
-                    pass.ReadTexture("_Depth", data.depth);
+                    pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+                    pass.ReadTexture("_NormalRoughness", normalRoughness);
+                    pass.ReadTexture("PreviousFrame", previousFrame);
+                    pass.ReadTexture("_Depth", depth);
 
                     pass.AddRenderPassData<SkyReflectionAmbientData>();
                     pass.AddRenderPassData<LitData.Result>();
@@ -99,7 +103,7 @@ namespace Arycama.CustomRenderPipeline
                         pass.SetFloat("_MaxSteps", settings.MaxSamples);
                         pass.SetFloat("_Thickness", settings.Thickness);
                         pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight) - 1);
-                        pass.SetVector("_PreviousColorScaleLimit", data.previousFrameColor.ScaleLimit2D);
+                        pass.SetVector("_PreviousColorScaleLimit", previousFrame.ScaleLimit2D);
                     });
                 }
             }
@@ -109,16 +113,16 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Specular GI Spatial"))
             {
                 pass.Initialize(material, 1);
-                pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
 
                 pass.ReadTexture("_Input", tempResult);
-                pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
-                pass.ReadTexture("_Depth", data.depth);
+                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_HitResult", hitResult);
-                pass.ReadTexture("_NormalRoughness", data.normalRoughness);
-                pass.ReadTexture("AlbedoMetallic", data.albedoMetallic);
+                pass.ReadTexture("_NormalRoughness", normalRoughness);
+                pass.ReadTexture("AlbedoMetallic", albedoMetallic);
 
                 pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
@@ -140,15 +144,15 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Temporal"))
             {
                 pass.Initialize(material, 2);
-                pass.WriteDepth(data.depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 
                 pass.ReadTexture("_TemporalInput", spatialResult);
                 pass.ReadTexture("_History", history);
-                pass.ReadTexture("_Stencil", data.depth, subElement: RenderTextureSubElement.Stencil);
-                pass.ReadTexture("_Depth", data.depth);
-                pass.ReadTexture("_NormalRoughness", data.normalRoughness);
-                pass.ReadTexture("AlbedoMetallic", data.albedoMetallic);
+                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
+                pass.ReadTexture("_Depth", depth);
+                pass.ReadTexture("_NormalRoughness", normalRoughness);
+                pass.ReadTexture("AlbedoMetallic", albedoMetallic);
                 pass.ReadTexture("RayDepth", rayDepth);
 
                 pass.AddRenderPassData<TemporalAAData>();
@@ -166,7 +170,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.SetResource(new ScreenSpaceReflectionResult(current, settings.Intensity));;
+            renderGraph.SetResource(new ScreenSpaceReflectionResult(current, settings.Intensity)); ;
         }
     }
 

@@ -404,7 +404,7 @@ namespace Arycama.CustomRenderPipeline
             var terrainScaleOffset = new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z);
             var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainData.heightmapResolution);
             var terrainHeightOffset = position.y;
-            renderGraph.SetResource(new TerrainRenderData(diffuseArray, normalMapArray, maskMapArray, heightmap, normalmap, idMap, terrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainData.alphamapResolution, terrainLayerData));;
+            renderGraph.SetResource(new TerrainRenderData(diffuseArray, normalMapArray, maskMapArray, heightmap, normalmap, idMap, terrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainData.alphamapResolution, terrainLayerData)); ;
 
             // This sets raytracing data on the terrain's material property block
             using (var pass = renderGraph.AddRenderPass<SetPropertyBlockPass>("Terrain Data Property Block Update"))
@@ -589,7 +589,7 @@ namespace Arycama.CustomRenderPipeline
                 return;
 
             var cullingResult = Cull(viewPosition, cullingPlanes);
-            renderGraph.SetResource(new TerrainShadowCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer));;
+            renderGraph.SetResource(new TerrainShadowCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer)); ;
         }
 
         public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes)
@@ -598,7 +598,7 @@ namespace Arycama.CustomRenderPipeline
                 return;
 
             var cullingResult = Cull(viewPosition, cullingPlanes);
-            renderGraph.SetResource(new TerrainRenderCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer));;
+            renderGraph.SetResource(new TerrainRenderCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer)); ;
         }
 
         public void Render(string passName, Vector3 viewPosititon, RTHandle cameraDepth, CullingPlanes cullingPlanes, ScriptableRenderContext context, Camera camera, CullingResults cullingResults)

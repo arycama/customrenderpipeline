@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public class UnderwaterLighting : RenderFeature<(int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive)>
+    public class UnderwaterLighting : RenderFeature
     {
         private readonly WaterSystem.Settings settings;
         private readonly Material underwaterLightingMaterial;
@@ -15,21 +15,22 @@ namespace Arycama.CustomRenderPipeline.Water
             underwaterLightingMaterial = new Material(Shader.Find("Hidden/Underwater Lighting 1")) { hideFlags = HideFlags.HideAndDontSave };
         }
 
-        public override void Render((int screenWidth, int screenHeight, RTHandle underwaterDepth, RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion, RTHandle emissive) data)
+        public override void Render()
         {
-            var underwaterResultId = renderGraph.GetTexture(data.screenWidth, data.screenHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+            var viewData = renderGraph.GetResource<ViewData>();
+            var underwaterResultId = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Underwater Lighting"))
             {
                 pass.Initialize(underwaterLightingMaterial);
-                pass.WriteDepth(data.cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(renderGraph.GetResource<CameraDepthData>().Handle, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(underwaterResultId, RenderBufferLoadAction.DontCare);
 
-                pass.ReadTexture("_Depth", data.underwaterDepth);
-                pass.ReadTexture("_AlbedoMetallic", data.albedoMetallic);
-                pass.ReadTexture("_NormalRoughness", data.normalRoughness);
-                pass.ReadTexture("_BentNormalOcclusion", data.bentNormalOcclusion);
-                pass.ReadTexture("_Emissive", data.emissive);
+                pass.ReadTexture("_Depth", renderGraph.GetResource<DepthCopyData>().Handle);
+                pass.ReadTexture("_AlbedoMetallic", renderGraph.GetResource<AlbedoMetallicData>().Handle);
+                pass.ReadTexture("_NormalRoughness", renderGraph.GetResource<NormalRoughnessData>().Handle);
+                pass.ReadTexture("_BentNormalOcclusion", renderGraph.GetResource<BentNormalOcclusionData>().Handle);
+                pass.ReadTexture("_Emissive", renderGraph.GetResource<CameraTargetData>().Handle);
 
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
@@ -49,7 +50,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 });
             }
 
-            renderGraph.SetResource(new UnderwaterLightingResult(underwaterResultId));;
+            renderGraph.SetResource(new UnderwaterLightingResult(underwaterResultId)); ;
         }
     }
 }

@@ -86,7 +86,7 @@ namespace Arycama.CustomRenderPipeline
                     new Vector4(weights[1], weights[3], weights[5], weights[7]) * rcpCrossWeightSum,
                     new Vector4(weights[0], weights[1], weights[2], weights[3]) * rcpBoxWeightSum,
                     new Vector4(weights[5], weights[6], weights[7], weights[8]) * rcpBoxWeightSum))
-            ));;
+            )); ;
 
             ArrayPool<float>.Release(weights);
         }
@@ -141,7 +141,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetInt("_MaxHeight", data.maxHeight);
                 });
 
-                renderGraph.SetResource(new CameraTargetData(result));;
+                renderGraph.SetResource(new CameraTargetData(result)); ;
             }
         }
 

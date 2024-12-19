@@ -2,7 +2,7 @@
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 
-public class GenerateHiZ : RenderFeature<(RTHandle input, int width, int height)>
+public class GenerateHiZ : RenderFeature
 {
     private readonly IndexedShaderPropertyId resultIds = new("_Result");
     private readonly ComputeShader computeShader;
@@ -14,22 +14,24 @@ public class GenerateHiZ : RenderFeature<(RTHandle input, int width, int height)
         this.mode = mode;
     }
 
-    public override void Render((RTHandle input, int width, int height) data)
+    public override void Render()
     {
+        var viewData = renderGraph.GetResource<ViewData>();
         var kernel = (int)mode * 2;
 
-        var mipCount = Texture2DExtensions.MipCount(data.width, data.height);
+        var mipCount = Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight);
         var maxMipsPerPass = 6;
         var hasSecondPass = mipCount > maxMipsPerPass;
 
         // Set is screen to true to get exact fit
-        var result = renderGraph.GetTexture(data.width, data.height, GraphicsFormat.R32_SFloat, hasMips: true, isScreenTexture: true);
+        var result = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R32_SFloat, hasMips: true, isScreenTexture: true);
 
         // First pass
         using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Hi Z First Pass"))
         {
-            pass.Initialize(computeShader, kernel, data.width, data.height);
-            pass.ReadTexture("_Input", data.input);
+            pass.Initialize(computeShader, kernel, viewData.ScaledWidth, viewData.ScaledHeight);
+            var depth = renderGraph.GetResource<CameraDepthData>().Handle;
+            pass.ReadTexture("_Input", depth);
 
             for (var i = 0; i < maxMipsPerPass; i++)
             {
@@ -40,10 +42,10 @@ public class GenerateHiZ : RenderFeature<(RTHandle input, int width, int height)
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetInt("_Width", data.width);
-                pass.SetInt("_Height", data.height);
+                pass.SetInt("_Width", viewData.ScaledWidth);
+                pass.SetInt("_Height", viewData.ScaledHeight);
                 pass.SetInt("_MaxMip", hasSecondPass ? maxMipsPerPass : mipCount);
-                pass.SetVector("_InputScaleLimit", data.input.ScaleLimit2D);
+                pass.SetVector("_InputScaleLimit", depth.ScaleLimit2D);
             });
         }
 
@@ -52,7 +54,7 @@ public class GenerateHiZ : RenderFeature<(RTHandle input, int width, int height)
         {
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Hi Z Second Pass"))
             {
-                pass.Initialize(computeShader, kernel + 1, data.width >> (maxMipsPerPass - 1), data.height >> (maxMipsPerPass - 1));
+                pass.Initialize(computeShader, kernel + 1, viewData.ScaledWidth >> (maxMipsPerPass - 1), viewData.ScaledHeight >> (maxMipsPerPass - 1));
 
                 for (var i = 0; i < maxMipsPerPass; i++)
                 {
@@ -66,14 +68,14 @@ public class GenerateHiZ : RenderFeature<(RTHandle input, int width, int height)
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetInt("_Width", data.width >> (maxMipsPerPass - 1));
-                    pass.SetInt("_Height", data.height >> (maxMipsPerPass - 1));
+                    pass.SetInt("_Width", viewData.ScaledWidth >> (maxMipsPerPass - 1));
+                    pass.SetInt("_Height", viewData.ScaledHeight >> (maxMipsPerPass - 1));
                     pass.SetInt("_MaxMip", mipCount - maxMipsPerPass);
                 });
             }
         }
 
-        renderGraph.SetResource(new HiZMinDepthData(result));;
+        renderGraph.SetResource(new HiZMinDepthData(result)); ;
     }
 
     public enum HiZMode

@@ -60,7 +60,7 @@ public class BufferHandle : IDisposable
             Buffer = null;
         }
 
-        if(!disposing)
+        if (!disposing)
             Debug.LogError("Buffer Handle not disposed correctly");
 
         disposedValue = true;

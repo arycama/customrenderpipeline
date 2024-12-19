@@ -55,7 +55,7 @@ public class EnvironmentProbe : MonoBehaviour
     private void Update()
     {
         // Todo: Editor only
-        if(transform.hasChanged)
+        if (transform.hasChanged)
         {
             IsDirty = true;
             transform.hasChanged = false;
@@ -96,5 +96,5 @@ public class EnvironmentProbe : MonoBehaviour
     {
         InfluenceSize = projectionSize;
         influenceOffset = projectionOffset;
-    }    
+    }
 }

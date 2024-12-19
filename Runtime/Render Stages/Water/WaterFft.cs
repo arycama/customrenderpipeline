@@ -176,7 +176,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 });
             }
 
-            renderGraph.SetResource(new OceanFftResult(displacementCurrent, displacementHistory, normalFoamSmoothness, lengthToRoughness, oceanBuffer));;
+            renderGraph.SetResource(new OceanFftResult(displacementCurrent, displacementHistory, normalFoamSmoothness, lengthToRoughness, oceanBuffer)); ;
         }
     }
 }

@@ -49,7 +49,7 @@ public partial class UIBlur : RenderFeature
             });
         }
 
-        renderGraph.SetResource(new UIBlurResult(verticalResult));;
+        renderGraph.SetResource(new UIBlurResult(verticalResult)); ;
     }
 
     public readonly struct UIBlurResult : IRenderPassData

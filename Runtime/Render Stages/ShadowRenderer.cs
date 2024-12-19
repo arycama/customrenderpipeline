@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
@@ -120,7 +119,7 @@ namespace Arycama.CustomRenderPipeline
             ListPool<ShadowRequest>.Release(requestData.PointShadowRequests);
 
             var result = new Result(directionalShadows, pointShadows, settings.DirectionalShadowResolution, 1.0f / settings.DirectionalShadowResolution, settings.PcfFilterRadius, settings.PcfFilterSigma);
-            renderGraph.SetResource(result);;
+            renderGraph.SetResource(result); ;
         }
 
         public readonly struct Result : IRenderPassData

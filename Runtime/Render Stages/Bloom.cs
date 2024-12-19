@@ -88,7 +88,7 @@ namespace Arycama.CustomRenderPipeline
             var result = bloomIds[0];
             ListPool<RTHandle>.Release(bloomIds);
 
-            renderGraph.SetResource<BloomData>(new BloomData(result));;
+            renderGraph.SetResource<BloomData>(new BloomData(result)); ;
         }
     }
 }

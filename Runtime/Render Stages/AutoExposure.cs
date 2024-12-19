@@ -74,7 +74,7 @@ namespace Arycama.CustomRenderPipeline
                     exposureCompensationRemap: GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1)
                 ),
 
-                (command, pass, data) => 
+                (command, pass, data) =>
                 {
                     pass.SetFloat("MinEv", data.minEv);
                     pass.SetFloat("MaxEv", data.maxEv);
