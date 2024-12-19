@@ -394,12 +394,13 @@ namespace Arycama.CustomRenderPipeline
             FillLayerData();
         }
 
-        public void SetupRenderData(Vector3 viewPosition)
+        public void SetupRenderData()
         {
             if (terrain == null)
                 return;
 
-            var position = terrain.GetPosition() - viewPosition;
+            var viewData = renderGraph.GetResource<ViewData>();
+            var position = terrain.GetPosition() - viewData.ViewPosition;
             var size = terrainData.size;
             var terrainScaleOffset = new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z);
             var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainData.heightmapResolution);

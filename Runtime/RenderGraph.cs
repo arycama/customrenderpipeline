@@ -484,6 +484,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetResource<T>(T resource, bool isPersistent = false) where T : IRenderPassData
         {
+            Assert.IsFalse(IsExecuting);
             ResourceMap.SetRenderPassData(resource, FrameIndex, isPersistent);
         }
 
@@ -494,6 +495,7 @@ namespace Arycama.CustomRenderPipeline
 
         public T GetResource<T>() where T : IRenderPassData
         {
+            Assert.IsFalse(IsExecuting);
             return ResourceMap.GetRenderPassData<T>(FrameIndex);
         }
 

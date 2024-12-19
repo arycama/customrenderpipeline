@@ -76,11 +76,12 @@ namespace Arycama.CustomRenderPipeline.Water
             caustics.Render();
         }
 
-        public void CullShadow(Vector3 viewPosition, CullingResults cullingResults)
+        public void CullShadow()
         {
             if (!settings.IsEnabled)
                 return;
 
+            var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
             var lightRotation = Quaternion.identity;
             for (var i = 0; i < cullingResults.visibleLights.Length; i++)
             {
@@ -92,14 +93,16 @@ namespace Arycama.CustomRenderPipeline.Water
                 break;
             }
 
+            var viewData = renderGraph.GetResource<ViewData>();
+
             // TODO: Should be able to simply just define a box and not even worry about view position since we translate it anyway
             var size = new Vector3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
-            var min = new Vector3(-settings.ShadowRadius, -settings.Profile.MaxWaterHeight - viewPosition.y, -settings.ShadowRadius);
+            var min = new Vector3(-settings.ShadowRadius, -settings.Profile.MaxWaterHeight - viewData.ViewPosition.y, -settings.ShadowRadius);
 
             var texelSize = settings.ShadowRadius * 2.0f / settings.ShadowResolution;
 
-            var snappedViewPositionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x;
-            var snappedViewPositionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z;
+            var snappedViewPositionX = MathUtils.Snap(viewData.ViewPosition.x, texelSize) - viewData.ViewPosition.x;
+            var snappedViewPositionZ = MathUtils.Snap(viewData.ViewPosition.z, texelSize) - viewData.ViewPosition.z;
 
             var worldToLight = Matrix4x4.Rotate(Quaternion.Inverse(lightRotation));
             Vector3 minValue = Vector3.positiveInfinity, maxValue = Vector3.negativeInfinity;
@@ -149,7 +152,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             ArrayPool<Plane>.Release(frustumPlanes);
 
-            var cullResult = Cull(viewPosition, cullingPlanes);
+            var cullResult = Cull(viewData.ViewPosition, cullingPlanes);
 
             var vm = worldToLight;
             var shadowMatrix = new Matrix4x4
@@ -176,16 +179,16 @@ namespace Arycama.CustomRenderPipeline.Water
             renderGraph.SetResource(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewProjectionMatrix, shadowMatrix, cullingPlanes)); ;
         }
 
-        public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes)
+        public void CullRender()
         {
             if (!settings.IsEnabled)
                 return;
 
-            var result = Cull(viewPosition, cullingPlanes);
+            var result = Cull(renderGraph.GetResource<ViewData>().ViewPosition, renderGraph.GetResource<CullingPlanesData>().CullingPlanes);
             renderGraph.SetResource(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer)); ;
         }
 
-        public void RenderShadow(Vector3 viewPosition)
+        public void RenderShadow()
         {
             if (!settings.IsEnabled)
                 return;
@@ -200,6 +203,8 @@ namespace Arycama.CustomRenderPipeline.Water
             var resolution = settings.Resolution;
 
             var passData = renderGraph.GetResource<WaterShadowCullResult>();
+            var viewData = renderGraph.GetResource<ViewData>();
+
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Shadow"))
             {
                 pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
@@ -222,8 +227,8 @@ namespace Arycama.CustomRenderPipeline.Water
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;
-                    var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
-                    var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
+                    var positionX = MathUtils.Snap(viewData.ViewPosition.x, texelSize) - viewData.ViewPosition.x - settings.Size * 0.5f;
+                    var positionZ = MathUtils.Snap(viewData.ViewPosition.z, texelSize) - viewData.ViewPosition.z - settings.Size * 0.5f;
                     pass.SetVector("_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
                     var cullingPlanesArray = ArrayPool<Vector4>.Get(passData.CullingPlanes.Count);
