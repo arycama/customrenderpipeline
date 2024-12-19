@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using Object = UnityEngine.Object;
 
 namespace Arycama.CustomRenderPipeline
@@ -9,7 +8,6 @@ namespace Arycama.CustomRenderPipeline
         private readonly Settings settings;
         private readonly LensSettings lensSettings;
         private readonly ComputeShader computeShader;
-        private readonly Dictionary<Camera, GraphicsBuffer> exposureBuffers = new();
         private readonly Texture2D exposureTexture;
 
         public AutoExposure(Settings settings, LensSettings lensSettings, RenderGraph renderGraph) : base(renderGraph)
@@ -36,39 +34,7 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Cleanup(bool disposing)
         {
-            foreach(var buffer in exposureBuffers)
-                buffer.Value.Dispose();
-
             Object.DestroyImmediate(exposureTexture);
-        }
-
-        public void OnPreRender(Camera camera)
-        {
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Auto Exposure"))
-            {
-                var isFirst = !exposureBuffers.TryGetValue(camera, out var exposureBuffer);
-                if (isFirst)
-                {
-                    exposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 4, sizeof(float)) { name = "Auto Exposure Buffer" };
-                    exposureBuffers.Add(camera, exposureBuffer);
-                }
-
-                var bufferHandle = renderGraph.ImportBuffer(exposureBuffer);
-
-                // For first pass, set to 1.0f 
-                if (isFirst)
-                {
-                    pass.SetRenderFunction(bufferHandle, (command, pass, data) =>
-                    {
-                        var initialData = ArrayPool<Vector4>.Get(1);
-                        initialData[0] = new Vector4(1.0f, 0.0f, 0.0f, 0.0f);
-                        command.SetBufferData(data, initialData);
-                        ArrayPool<Vector4>.Release(initialData);
-                    });
-                }
-
-                renderGraph.SetResource(new AutoExposureData(bufferHandle, isFirst));;
-            }
         }
 
         public override void Render()

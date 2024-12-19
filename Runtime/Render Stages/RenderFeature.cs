@@ -53,16 +53,4 @@ namespace Arycama.CustomRenderPipeline
         /// </summary>
         public abstract void Render();
     }
-
-    public abstract class RenderFeature<T> : RenderFeatureBase
-    {
-        protected RenderFeature(RenderGraph renderGraph) : base(renderGraph)
-        {
-        }
-
-        /// <summary>
-        /// Render logic goes here
-        /// </summary>
-        public abstract void Render(T data);
-    }
 }

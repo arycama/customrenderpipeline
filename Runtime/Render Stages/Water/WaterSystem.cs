@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public partial class WaterSystem : RenderFeature<(Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, CullingPlanes cullingPlanes)>
+    public partial class WaterSystem : RenderFeature
     {
         private readonly Settings settings;
         private readonly GraphicsBuffer indexBuffer;
@@ -243,18 +243,19 @@ namespace Arycama.CustomRenderPipeline.Water
         }
 
 
-        public override void Render((Camera camera, RTHandle cameraDepth, int screenWidth, int screenHeight, RTHandle velocity, CullingPlanes cullingPlanes) data)
+        public override void Render()
         {
-            var viewPosition = data.camera.transform.position;
             if (!settings.IsEnabled)
                 return;
 
+            var viewData = renderGraph.GetResource<ViewData>();
+
             // Writes (worldPos - displacementPos).xz. Uv coord is reconstructed later from delta and worldPosition (reconstructed from depth)
-            var oceanRenderResult = renderGraph.GetTexture(data.screenWidth, data.screenHeight, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);
+            var oceanRenderResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);
 
             // Also write triangleNormal to another texture with oct encoding. This allows reconstructing the derivative correctly to avoid mip issues on edges,
             // As well as backfacing triangle detection for rendering under the surface
-            var waterTriangleNormal = renderGraph.GetTexture(data.screenWidth, data.screenHeight, GraphicsFormat.R16G16_UNorm, isScreenTexture: true);
+            var waterTriangleNormal = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16_UNorm, isScreenTexture: true);
 
             var passIndex = settings.Material.FindPass("Water");
             Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
@@ -271,15 +272,14 @@ namespace Arycama.CustomRenderPipeline.Water
                 });
             }
 
-
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Render"))
             {
                 var passData = renderGraph.GetResource<WaterRenderCullResult>();
                 pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
 
-                pass.WriteDepth(data.cameraDepth);
+                pass.WriteDepth(renderGraph.GetResource<CameraDepthData>().Handle);
                 pass.WriteTexture(oceanRenderResult, RenderBufferLoadAction.DontCare);
-                pass.WriteTexture(data.velocity);
+                pass.WriteTexture(renderGraph.GetResource<VelocityData>().Handle);
                 pass.WriteTexture(waterTriangleNormal, RenderBufferLoadAction.DontCare);
 
                 pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
@@ -290,6 +290,8 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.AddRenderPassData<WaterShoreMask.Result>();
                 pass.AddRenderPassData<ICommonPassData>();
 
+                var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
+
                 pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
@@ -299,14 +301,14 @@ namespace Arycama.CustomRenderPipeline.Water
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;
-                    var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
-                    var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
+                    var positionX = MathUtils.Snap(viewData.ViewPosition.x, texelSize) - viewData.ViewPosition.x - settings.Size * 0.5f;
+                    var positionZ = MathUtils.Snap(viewData.ViewPosition.z, texelSize) - viewData.ViewPosition.z - settings.Size * 0.5f;
                     pass.SetVector("_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
-                    pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
-                    var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
-                    for (var i = 0; i < data.cullingPlanes.Count; i++)
-                        cullingPlanesArray[i] = data.cullingPlanes.GetCullingPlaneVector4(i);
+                    pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
+                    var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
+                    for (var i = 0; i < cullingPlanes.Count; i++)
+                        cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
 
                     pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
                     ArrayPool<Vector4>.Release(cullingPlanesArray);

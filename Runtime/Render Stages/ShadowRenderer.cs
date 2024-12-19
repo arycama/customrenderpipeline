@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class ShadowRenderer : RenderFeature<(ScriptableRenderContext context, CullingResults cullingResults, Vector3 viewPosition)>
+    public class ShadowRenderer : RenderFeature
     {
         private readonly ShadowSettings settings;
         private readonly TerrainSystem terrainSystem;
@@ -18,10 +18,12 @@ namespace Arycama.CustomRenderPipeline
             this.terrainSystem = terrainSystem;
         }
 
-        public override void Render((ScriptableRenderContext context, CullingResults cullingResults, Vector3 viewPosition) data)
+        public override void Render()
         {
             var requestData = renderGraph.GetResource<ShadowRequestsData>();
-
+            var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+            var context = renderGraph.GetResource<RenderContextData>().Context;
+            var viewData = renderGraph.GetResource<ViewData>();
 
             // Render Shadows
             RTHandle directionalShadows;
@@ -40,13 +42,13 @@ namespace Arycama.CustomRenderPipeline
 
                     using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Directional Light Shadows"))
                     {
-                        pass.Initialize(data.context, data.cullingResults, shadowRequest.VisibleLightIndex, BatchCullingProjectionType.Orthographic, splitData, settings.ShadowBias, settings.ShadowSlopeBias, false);
+                        pass.Initialize(context, cullingResults, shadowRequest.VisibleLightIndex, BatchCullingProjectionType.Orthographic, splitData, settings.ShadowBias, settings.ShadowSlopeBias, false);
 
                         // Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
                         pass.WriteTexture(directionalShadows);
 
                         pass.SetRenderFunction((
-                            viewPosition: data.viewPosition,
+                            viewPosition: viewData.ViewPosition,
                             worldToView: shadowRequest.ViewMatrix,
                             worldToClip: shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix,
                             target: directionalShadows,
@@ -60,12 +62,12 @@ namespace Arycama.CustomRenderPipeline
                             // TODO: Use different matrices for shadows?
                             pass.SetMatrix("_WorldToView", data.worldToView);
                             pass.SetMatrix("_WorldToClip", data.worldToClip);
-                            pass.SetVector("_ViewPosition", data.viewPosition);
+                            pass.SetVector("_ViewPosition", viewData.ViewPosition);
                         });
                     }
 
-                    terrainSystem.CullShadow(data.viewPosition, shadowRequest.CullingPlanes);
-                    terrainSystem.RenderShadow(data.viewPosition, directionalShadows, shadowRequest.CullingPlanes, shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix, i, settings.ShadowBias, settings.ShadowSlopeBias);
+                    terrainSystem.CullShadow(viewData.ViewPosition, shadowRequest.CullingPlanes);
+                    terrainSystem.RenderShadow(viewData.ViewPosition, directionalShadows, shadowRequest.CullingPlanes, shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix, i, settings.ShadowBias, settings.ShadowSlopeBias);
                 }
             }
 
@@ -89,13 +91,13 @@ namespace Arycama.CustomRenderPipeline
 
                     using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Point Light Shadows"))
                     {
-                        pass.Initialize(data.context, data.cullingResults, shadowRequest.VisibleLightIndex, BatchCullingProjectionType.Perspective, shadowRequest.ShadowSplitData, settings.PointShadowBias, settings.PointShadowSlopeBias, true);
+                        pass.Initialize(context, cullingResults, shadowRequest.VisibleLightIndex, BatchCullingProjectionType.Perspective, shadowRequest.ShadowSplitData, settings.PointShadowBias, settings.PointShadowSlopeBias, true);
 
                         // Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
                         pass.WriteTexture(pointShadows);
 
                         pass.SetRenderFunction((
-                            viewPosition: data.viewPosition,
+                            viewPosition: viewData.ViewPosition,
                             worldToView: shadowRequest.ViewMatrix,
                             worldToClip: GL.GetGPUProjectionMatrix(shadowRequest.ProjectionMatrix, true) * shadowRequest.ViewMatrix,
                             target: pointShadows,
@@ -106,7 +108,7 @@ namespace Arycama.CustomRenderPipeline
                             command.SetRenderTarget(data.target, data.target, 0, CubemapFace.Unknown, data.index);
                             command.ClearRenderTarget(true, false, Color.clear);
 
-                            pass.SetVector("_ViewPosition", data.viewPosition);
+                            pass.SetVector("_ViewPosition", viewData.ViewPosition);
                             pass.SetMatrix("_WorldToView", data.worldToView);
                             pass.SetMatrix("_WorldToClip", data.worldToClip);
                         });
