@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
@@ -14,25 +13,26 @@ namespace Arycama.CustomRenderPipeline
     public partial class TerrainSystem : RenderFeature
     {
         private readonly Settings settings;
-        private GraphicsBuffer indexBuffer, terrainLayerData;
+        private GraphicsBuffer terrainLayerData;
         private RTHandle minMaxHeight, heightmap, normalmap, idMap;
-        private Terrain terrain;
-        private readonly Material generateIdMapMaterial, screenSpaceTerrainMaterial;
-
-        private Texture2DArray diffuseArray, normalMapArray, maskMapArray;
-        private int VerticesPerTileEdge => settings.PatchVertices + 1;
-        private int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
-        private TerrainData terrainData => terrain.terrainData;
-
+        private readonly Material generateIdMapMaterial;
         private readonly Dictionary<TerrainLayer, int> terrainLayers = new();
         private readonly Dictionary<TerrainLayer, int> terrainProceduralLayers = new();
+
+        private Texture2DArray diffuseArray, normalMapArray, maskMapArray;
+
+        public Terrain terrain { get; private set; }
+        public GraphicsBuffer indexBuffer { get; private set; }
+
+        public int VerticesPerTileEdge => settings.PatchVertices + 1;
+        public int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
+        public TerrainData terrainData => terrain.terrainData;
 
         public TerrainSystem(RenderGraph renderGraph, Settings settings) : base(renderGraph)
         {
             this.settings = settings;
 
             generateIdMapMaterial = new Material(Shader.Find("Hidden/Terrain Id Map")) { hideFlags = HideFlags.HideAndDontSave };
-            screenSpaceTerrainMaterial = new Material(Shader.Find("Hidden/Screen Space Terrain")) { hideFlags = HideFlags.HideAndDontSave };
 
             TerrainCallbacks.textureChanged += TerrainCallbacks_textureChanged;
             TerrainCallbacks.heightmapChanged += TerrainCallbacks_heightmapChanged;
@@ -600,206 +600,5 @@ namespace Arycama.CustomRenderPipeline
             var cullingResult = Cull(viewPosition, cullingPlanes);
             renderGraph.SetResource(new TerrainRenderCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer)); ;
         }
-
-        public void Render(string passName, Vector3 viewPosititon, RTHandle cameraDepth, CullingPlanes cullingPlanes, ScriptableRenderContext context, Camera camera, CullingResults cullingResults)
-        {
-            if (terrain == null || settings.Material == null)
-                return;
-
-            var passIndex = settings.Material.FindPass(passName);
-            Assert.IsFalse(passIndex == -1, "Terrain Material has no Terrain Pass");
-
-            var size = terrainData.size;
-            var position = terrain.GetPosition() - viewPosititon;
-            var passData = renderGraph.GetResource<TerrainRenderCullResult>();
-
-            using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
-            {
-                pass.WriteDepth(cameraDepth, RenderTargetFlags.None, RenderBufferLoadAction.DontCare);
-
-                pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
-                pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
-
-                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<TerrainRenderData>();
-                pass.AddRenderPassData<ICommonPassData>();
-
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
-                    pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
-                    pass.SetFloat("_RcpVerticesPerEdge", 1f / VerticesPerTileEdge);
-                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
-
-                    var scaleOffset = new Vector4(size.x / settings.CellCount, size.z / settings.CellCount, position.x, position.z);
-                    pass.SetVector("_PatchScaleOffset", scaleOffset);
-                    pass.SetVector("_SpacingScale", new Vector4(size.x / settings.CellCount / settings.PatchVertices, size.z / settings.CellCount / settings.PatchVertices, position.x, position.z));
-                    pass.SetFloat("_PatchUvScale", 1f / settings.CellCount);
-
-                    pass.SetFloat("_HeightUvScale", 1f / settings.CellCount * (1.0f - 1f / terrainData.heightmapResolution));
-                    pass.SetFloat("_HeightUvOffset", 0.5f / terrainData.heightmapResolution);
-
-                    pass.SetFloat("_MaxLod", Mathf.Log(settings.CellCount, 2));
-
-                    pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
-                    var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
-                    for (var i = 0; i < cullingPlanes.Count; i++)
-                        cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
-
-                    pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
-                    ArrayPool<Vector4>.Release(cullingPlanesArray);
-                });
-            }
-
-            using (var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Render Terrain Replacement"))
-            {
-                pass.Initialize("Terrain", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
-                pass.WriteDepth(cameraDepth, RenderTargetFlags.None);
-                pass.AddRenderPassData<ICommonPassData>();
-            }
-        }
-
-        public void RenderShadow(Vector3 viewPosition, RTHandle shadow, CullingPlanes cullingPlanes, Matrix4x4 worldToClip, int cascadeIndex, float bias, float slopeBias)
-        {
-            if (terrain == null || settings.Material == null)
-                return;
-
-            var passIndex = settings.Material.FindPass("ShadowCaster");
-            Assert.IsFalse(passIndex == -1, "Terrain Material has no ShadowCaster Pass");
-
-            var size = terrainData.size;
-            var position = terrain.GetPosition() - viewPosition;
-            var passData = renderGraph.GetResource<TerrainShadowCullResult>();
-
-            using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
-            {
-                pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, null, bias, slopeBias, false);
-
-                pass.WriteTexture(shadow);
-                pass.DepthSlice = cascadeIndex;
-
-                pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
-                pass.AddRenderPassData<TerrainRenderData>();
-                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<ICommonPassData>();
-
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
-                    pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
-                    pass.SetFloat("_RcpVerticesPerEdge", 1f / VerticesPerTileEdge);
-                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
-
-                    var scaleOffset = new Vector4(size.x / settings.CellCount, size.z / settings.CellCount, position.x, position.z);
-                    pass.SetVector("_PatchScaleOffset", scaleOffset);
-                    pass.SetVector("_SpacingScale", new Vector4(size.x / settings.CellCount / settings.PatchVertices, size.z / settings.CellCount / settings.PatchVertices, position.x, position.z));
-                    pass.SetFloat("_PatchUvScale", 1f / settings.CellCount);
-
-                    pass.SetFloat("_HeightUvScale", 1f / settings.CellCount * (1.0f - 1f / terrainData.heightmapResolution));
-                    pass.SetFloat("_HeightUvOffset", 0.5f / terrainData.heightmapResolution);
-
-                    pass.SetFloat("_MaxLod", Mathf.Log(settings.CellCount, 2));
-                    pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
-
-                    var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
-                    for (var i = 0; i < cullingPlanes.Count; i++)
-                        cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
-
-                    pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
-                    ArrayPool<Vector4>.Release(cullingPlanesArray);
-
-                    pass.SetMatrix("_WorldToClip", worldToClip);
-                });
-            }
-        }
-
-        public void RenderTerrainScreenspace(RTHandle cameraDepth, RTHandle albedoMetallic, RTHandle normalRoughness, RTHandle bentNormalOcclusion)
-        {
-            if (!renderGraph.IsRenderPassDataValid<TerrainRenderData>())
-                return;
-
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Terrain Screen Pass"))
-            {
-                pass.Initialize(screenSpaceTerrainMaterial);
-                pass.WriteDepth(cameraDepth, RenderTargetFlags.ReadOnlyDepthStencil);
-                pass.WriteTexture(albedoMetallic);
-                pass.WriteTexture(normalRoughness);
-                pass.WriteTexture(bentNormalOcclusion);
-                pass.ReadTexture("_Depth", cameraDepth);
-                pass.AddRenderPassData<ICommonPassData>();
-                pass.AddRenderPassData<TerrainRenderData>();
-            }
-        }
-    }
-
-    public readonly struct TerrainRenderCullResult : IRenderPassData
-    {
-        public BufferHandle IndirectArgsBuffer { get; }
-        public BufferHandle PatchDataBuffer { get; }
-
-        public TerrainRenderCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
-        {
-            IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
-            PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
-        }
-
-        public readonly void SetInputs(RenderPass pass)
-        {
-            pass.ReadBuffer("_PatchData", PatchDataBuffer);
-        }
-
-        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
-        {
-        }
-    }
-
-    public readonly struct TerrainShadowCullResult : IRenderPassData
-    {
-        public BufferHandle IndirectArgsBuffer { get; }
-        public BufferHandle PatchDataBuffer { get; }
-
-        public TerrainShadowCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
-        {
-            IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
-            PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
-        }
-
-        public readonly void SetInputs(RenderPass pass)
-        {
-            pass.ReadBuffer("_PatchData", PatchDataBuffer);
-        }
-
-        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
-        {
-        }
-    }
-
-    public readonly struct TerrainLayerData
-    {
-        private readonly float scale;
-        private readonly float blending;
-        private readonly float stochastic;
-        private readonly float rotation;
-
-        public TerrainLayerData(float scale, float blending, float stochastic, float rotation)
-        {
-            this.scale = scale;
-            this.blending = blending;
-            this.stochastic = stochastic;
-            this.rotation = rotation;
-        }
-    }
-
-    public interface ITerrainHeightmapModifier
-    {
-        void Generate(CommandBuffer command, RTHandle targetHeightmap, RenderTexture originalHeightmap);
-    }
-
-    public interface ITerrainAlphamapModifier
-    {
-        bool NeedsUpdate { get; }
-        // TODO: Encapsulate arguments in some kind of terrain layer data struct
-        void PreGenerate(Dictionary<TerrainLayer, int> terrainLayers, Dictionary<TerrainLayer, int> proceduralLayers);
-        void Generate(CommandBuffer command, Dictionary<TerrainLayer, int> terrainLayers, Dictionary<TerrainLayer, int> proceduralLayers, RenderTexture idMap);
     }
 }

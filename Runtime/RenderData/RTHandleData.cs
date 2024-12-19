@@ -17,6 +17,8 @@ namespace Arycama.CustomRenderPipeline
             this.scaleLimitPropertyName = propertyName + "ScaleLimit";
         }
 
+        public static implicit operator RTHandle(RTHandleData data) => data.Handle;
+
         public void SetInputs(RenderPass pass)
         {
             pass.ReadTexture(propertyName, Handle);

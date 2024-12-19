@@ -3,19 +3,32 @@ using UnityEngine;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public abstract class RenderFeatureBase : IDisposable
+    public abstract class RenderFeature : IDisposable
     {
         protected readonly RenderGraph renderGraph;
         private bool disposedValue;
 
-        public RenderFeatureBase(RenderGraph renderGraph)
+        public RenderFeature(RenderGraph renderGraph)
         {
             this.renderGraph = renderGraph ?? throw new ArgumentNullException(nameof(renderGraph));
         }
 
+        ~RenderFeature()
+        {
+            Dispose(disposing: false);
+        }
+
+        public abstract void Render();
+
+        public void Dispose()
+        {
+            Dispose(disposing: true);
+            GC.SuppressFinalize(this);
+        }
+
+        // Override in derived classes and put any cleanup code here (Eg free buffers, RT handles etc)
         protected virtual void Cleanup(bool disposing)
         {
-            // Override in derived classes and put any cleanup code here (Eg free buffers, RT handles etc)
         }
 
         private void Dispose(bool disposing)
@@ -29,28 +42,5 @@ namespace Arycama.CustomRenderPipeline
             Cleanup(disposing);
             disposedValue = true;
         }
-
-        ~RenderFeatureBase()
-        {
-            Dispose(disposing: false);
-        }
-
-        public void Dispose()
-        {
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
-        }
-    }
-
-    public abstract class RenderFeature : RenderFeatureBase
-    {
-        protected RenderFeature(RenderGraph renderGraph) : base(renderGraph)
-        {
-        }
-
-        /// <summary>
-        /// Render logic goes here
-        /// </summary>
-        public abstract void Render();
     }
 }

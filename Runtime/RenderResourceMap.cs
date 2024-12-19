@@ -10,7 +10,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly Dictionary<Type, RenderPassDataHandle> handleIndexMap = new();
         private readonly List<(IRenderPassData data, int frameIndex, bool isPersistent)> handleList = new();
         private bool disposedValue;
-        private RenderGraph renderGraph;
+        private readonly RenderGraph renderGraph;
 
         public RenderResourceMap(RenderGraph renderGraph)
         {

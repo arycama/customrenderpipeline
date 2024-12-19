@@ -4,9 +4,9 @@ namespace Arycama.CustomRenderPipeline.Water
 {
     public struct CausticsResult : IRenderPassData
     {
-        private RTHandle caustics;
-        private int cascade;
-        private float depth;
+        private readonly RTHandle caustics;
+        private readonly int cascade;
+        private readonly float depth;
 
         public CausticsResult(RTHandle caustics, int cascade, float depth)
         {

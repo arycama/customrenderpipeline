@@ -6,9 +6,9 @@ namespace Arycama.CustomRenderPipeline.Water
 {
     public class WaterCaustics : RenderFeature
     {
-        private WaterSystem.Settings settings;
-        private Material material;
-        private GraphicsBuffer indexBuffer;
+        private readonly WaterSystem.Settings settings;
+        private readonly Material material;
+        private readonly GraphicsBuffer indexBuffer;
 
         public WaterCaustics(RenderGraph renderGraph, WaterSystem.Settings settings) : base(renderGraph)
         {

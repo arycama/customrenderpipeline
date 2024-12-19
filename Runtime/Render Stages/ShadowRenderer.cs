@@ -9,12 +9,12 @@ namespace Arycama.CustomRenderPipeline
     public class ShadowRenderer : RenderFeature
     {
         private readonly ShadowSettings settings;
-        private readonly TerrainSystem terrainSystem;
+        private readonly TerrainShadowRenderer terrainShadowRenderer;
 
-        public ShadowRenderer(ShadowSettings settings, RenderGraph renderGraph, TerrainSystem terrainSystem) : base(renderGraph)
+        public ShadowRenderer(ShadowSettings settings, RenderGraph renderGraph, TerrainShadowRenderer terrainShadowRenderer) : base(renderGraph)
         {
             this.settings = settings;
-            this.terrainSystem = terrainSystem;
+            this.terrainShadowRenderer = terrainShadowRenderer;
         }
 
         public override void Render()
@@ -65,8 +65,8 @@ namespace Arycama.CustomRenderPipeline
                         });
                     }
 
-                    terrainSystem.CullShadow(viewData.ViewPosition, shadowRequest.CullingPlanes);
-                    terrainSystem.RenderShadow(viewData.ViewPosition, directionalShadows, shadowRequest.CullingPlanes, shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix, i, settings.ShadowBias, settings.ShadowSlopeBias);
+                    renderGraph.SetResource(new ShadowRequestData(shadowRequest, settings.ShadowBias, settings.ShadowSlopeBias, directionalShadows, i));
+                    terrainShadowRenderer.Render();
                 }
             }
 
