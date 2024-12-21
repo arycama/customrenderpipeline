@@ -24,7 +24,7 @@ namespace Arycama.CustomRenderPipeline
         public WaterShoreMask(RenderGraph renderGraph, Settings settings) : base(renderGraph)
         {
             this.settings = settings;
-            this.material = new Material(Shader.Find("Hidden/WaterShoreMask")) { hideFlags = HideFlags.HideAndDontSave };
+            material = new Material(Shader.Find("Hidden/WaterShoreMask")) { hideFlags = HideFlags.HideAndDontSave };
             resultDataBuffer = renderGraph.ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 1, UnsafeUtility.SizeOf<ResultData>()));
 
             TerrainCallbacks.heightmapChanged += TerrainHeightmapChanged;
@@ -157,8 +157,8 @@ namespace Arycama.CustomRenderPipeline
             {
                 this.minDist = minDist;
                 this.maxDist = maxDist;
-                this.padding0 = 0;
-                this.padding1 = 0;
+                padding0 = 0;
+                padding1 = 0;
             }
         }
 

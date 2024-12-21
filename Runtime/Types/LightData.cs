@@ -20,7 +20,7 @@ namespace Arycama.CustomRenderPipeline
 
         public LightData(Vector3 positionWS, float range, Vector3 color, uint lightType, Vector3 right, float angleScale, Vector3 up, float angleOffset, Vector3 forward, uint shadowIndex, Vector2 size, float depthRemapScale, float depthRemapOffset) : this()
         {
-            this.position = positionWS;
+            position = positionWS;
             this.range = range;
             this.color = color;
             this.lightType = lightType; // (uint)LightingUtils.GetLightType(light);

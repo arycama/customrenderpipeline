@@ -9,7 +9,7 @@ namespace Arycama.CustomRenderPipeline
 
         public CloudRenderResult(RTHandle cloudLuminanceTexture, RTHandle cloudTransmittanceTexture, RTHandle cloudDepth)
         {
-            this.cloudTexture = cloudLuminanceTexture ?? throw new ArgumentNullException(nameof(cloudLuminanceTexture));
+            cloudTexture = cloudLuminanceTexture ?? throw new ArgumentNullException(nameof(cloudLuminanceTexture));
             this.cloudTransmittanceTexture = cloudTransmittanceTexture;
             this.cloudDepth = cloudDepth ?? throw new ArgumentNullException(nameof(cloudDepth));
         }

@@ -12,9 +12,9 @@ namespace Arycama.CustomRenderPipeline
 
         public RTHandleData(RTHandle handle, string propertyName)
         {
-            this.Handle = handle;
+            Handle = handle;
             this.propertyName = propertyName;
-            this.scaleLimitPropertyName = propertyName + "ScaleLimit";
+            scaleLimitPropertyName = propertyName + "ScaleLimit";
         }
 
         public static implicit operator RTHandle(RTHandleData data) => data.Handle;

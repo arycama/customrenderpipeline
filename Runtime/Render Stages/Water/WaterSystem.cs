@@ -17,7 +17,7 @@ namespace Arycama.CustomRenderPipeline.Water
         public WaterSystem(RenderGraph renderGraph, WaterSettings settings)
         {
             this.renderGraph = renderGraph;
-            this.Settings = settings;
+            Settings = settings;
 
             IndexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
 
@@ -150,16 +150,16 @@ namespace Arycama.CustomRenderPipeline.Water
                         ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                         // Snap to quad-sized increments on largest cell
-                        var texelSize = this.Settings.Size / (float)this.Settings.PatchVertices;
-                        var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - this.Settings.Size * 0.5f;
-                        var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - this.Settings.Size * 0.5f;
+                        var texelSize = Settings.Size / (float)Settings.PatchVertices;
+                        var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - Settings.Size * 0.5f;
+                        var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - Settings.Size * 0.5f;
 
-                        var positionOffset = new Vector4((float)this.Settings.Size, (float)this.Settings.Size, positionX, positionZ);
+                        var positionOffset = new Vector4((float)Settings.Size, (float)Settings.Size, positionX, positionZ);
                         pass.SetVector("_TerrainPositionOffset", positionOffset);
 
-                        pass.SetFloat("_EdgeLength", (float)this.Settings.EdgeLength * this.Settings.PatchVertices);
+                        pass.SetFloat("_EdgeLength", (float)Settings.EdgeLength * Settings.PatchVertices);
                         pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
-                        pass.SetFloat("MaxWaterHeight", this.Settings.Profile.MaxWaterHeight);
+                        pass.SetFloat("MaxWaterHeight", Settings.Profile.MaxWaterHeight);
                     }));
                 }
             }
@@ -185,7 +185,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
                     pass.SetRenderFunction((System.Action<CommandBuffer, RenderPass>)((command, pass) =>
                     {
-                        pass.SetInt("_CellCount", (int)this.Settings.CellCount);
+                        pass.SetInt("_CellCount", (int)Settings.CellCount);
                     }));
                 }
             }

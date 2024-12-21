@@ -11,7 +11,7 @@ public partial class UIBlur : RenderFeature
     public UIBlur(RenderGraph renderGraph, Settings settings) : base(renderGraph)
     {
         this.settings = settings;
-        this.material = new Material(Shader.Find("Hidden/Gaussian Blur")) { hideFlags = HideFlags.HideAndDontSave };
+        material = new Material(Shader.Find("Hidden/Gaussian Blur")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
     public override void Render()

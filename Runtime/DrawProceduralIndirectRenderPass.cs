@@ -30,7 +30,7 @@ namespace Arycama.CustomRenderPipeline
         {
             this.material = material;
             this.passIndex = passIndex;
-            this.Keyword = keyword;
+            Keyword = keyword;
             this.indexBuffer = indexBuffer;
             this.indirectArgsBuffer = indirectArgsBuffer;
             this.topology = topology;

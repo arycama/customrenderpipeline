@@ -29,7 +29,7 @@ namespace Arycama.CustomRenderPipeline
             this.material = material;
             this.passIndex = passIndex;
             this.primitiveCount = primitiveCount;
-            this.Keyword = keyword;
+            Keyword = keyword;
         }
 
         public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
