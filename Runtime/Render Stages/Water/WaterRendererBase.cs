@@ -5,21 +5,17 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public partial class WaterSystem
+    public abstract class WaterRendererBase : RenderFeature
     {
-        private RenderGraph renderGraph;
+        protected GraphicsBuffer indexBuffer;
+        protected WaterSettings settings;
+        protected int VerticesPerTileEdge => settings.PatchVertices + 1;
+        protected int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
 
-        public GraphicsBuffer IndexBuffer { get; }
-        public WaterSettings Settings { get; }
-        public int VerticesPerTileEdge => Settings.PatchVertices + 1;
-        private int QuadListIndexCount => Settings.PatchVertices * Settings.PatchVertices * 4;
-
-        public WaterSystem(RenderGraph renderGraph, WaterSettings settings)
+        public WaterRendererBase(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
         {
-            this.renderGraph = renderGraph;
-            Settings = settings;
-
-            IndexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
+            this.settings = settings;
+            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
 
             var index = 0;
             var pIndices = new ushort[QuadListIndexCount];
@@ -49,24 +45,24 @@ namespace Arycama.CustomRenderPipeline.Water
                 }
             }
 
-            IndexBuffer.SetData(pIndices);
+            indexBuffer.SetData(pIndices);
         }
 
-        public void Cleanup()
+        protected override void Cleanup(bool disposing)
         {
-            IndexBuffer.Dispose();
+            indexBuffer.Dispose();
         }
 
-        public WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
+        protected WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
         {
             // TODO: Preload?
             var compute = Resources.Load<ComputeShader>("OceanQuadtreeCull");
             var indirectArgsBuffer = renderGraph.GetBuffer(5, target: GraphicsBuffer.Target.IndirectArguments);
-            var patchDataBuffer = renderGraph.GetBuffer(Settings.CellCount * Settings.CellCount, target: GraphicsBuffer.Target.Structured);
+            var patchDataBuffer = renderGraph.GetBuffer(settings.CellCount * settings.CellCount, target: GraphicsBuffer.Target.Structured);
 
             // We can do 32x32 cells in a single pass, larger counts need to be broken up into several passes
             var maxPassesPerDispatch = 6;
-            var totalPassCount = (int)Mathf.Log(Settings.CellCount, 2f) + 1;
+            var totalPassCount = (int)Mathf.Log(settings.CellCount, 2f) + 1;
             var dispatchCount = Mathf.Ceil(totalPassCount / (float)maxPassesPerDispatch);
 
             RTHandle tempLodId = null;
@@ -74,7 +70,7 @@ namespace Arycama.CustomRenderPipeline.Water
             if (dispatchCount > 1)
             {
                 // If more than one dispatch, we need to write lods out to a temp texture first. Otherwise they are done via shared memory so no texture is needed
-                tempLodId = renderGraph.GetTexture(Settings.CellCount, Settings.CellCount, GraphicsFormat.R16_UInt);
+                tempLodId = renderGraph.GetTexture(settings.CellCount, settings.CellCount, GraphicsFormat.R16_UInt);
                 lodIndirectArgsBuffer = renderGraph.GetBuffer(3, target: GraphicsBuffer.Target.IndirectArguments);
             }
 
@@ -150,16 +146,16 @@ namespace Arycama.CustomRenderPipeline.Water
                         ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                         // Snap to quad-sized increments on largest cell
-                        var texelSize = Settings.Size / (float)Settings.PatchVertices;
-                        var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - Settings.Size * 0.5f;
-                        var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - Settings.Size * 0.5f;
+                        var texelSize = settings.Size / (float)settings.PatchVertices;
+                        var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
+                        var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
 
-                        var positionOffset = new Vector4((float)Settings.Size, (float)Settings.Size, positionX, positionZ);
+                        var positionOffset = new Vector4((float)settings.Size, (float)settings.Size, positionX, positionZ);
                         pass.SetVector("_TerrainPositionOffset", positionOffset);
 
-                        pass.SetFloat("_EdgeLength", (float)Settings.EdgeLength * Settings.PatchVertices);
+                        pass.SetFloat("_EdgeLength", (float)settings.EdgeLength * settings.PatchVertices);
                         pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
-                        pass.SetFloat("MaxWaterHeight", Settings.Profile.MaxWaterHeight);
+                        pass.SetFloat("MaxWaterHeight", settings.Profile.MaxWaterHeight);
                     }));
                 }
             }
@@ -185,13 +181,12 @@ namespace Arycama.CustomRenderPipeline.Water
 
                     pass.SetRenderFunction((System.Action<CommandBuffer, RenderPass>)((command, pass) =>
                     {
-                        pass.SetInt("_CellCount", (int)Settings.CellCount);
+                        pass.SetInt("_CellCount", (int)settings.CellCount);
                     }));
                 }
             }
 
             ListPool<RTHandle>.Release(tempIds);
-
             return new(indirectArgsBuffer, patchDataBuffer);
         }
     }

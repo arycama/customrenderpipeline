@@ -5,18 +5,14 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public class WaterShadowRenderer : RenderFeature
+    public class WaterShadowRenderer : WaterRendererBase
     {
-        private WaterSystem waterSystem;
-
-        public WaterShadowRenderer(WaterSystem waterSystem, RenderGraph renderGraph) : base(renderGraph)
+        public WaterShadowRenderer(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph, settings)
         {
-            this.waterSystem = waterSystem;
         }
 
         public override void Render()
         {
-            var settings = waterSystem.Settings;
             if (!settings.IsEnabled)
                 return;
 
@@ -91,7 +87,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             ArrayPool<Plane>.Release(frustumPlanes);
 
-            var cullResult = waterSystem.Cull(viewData.ViewPosition, cullingPlanes);
+            var cullResult = Cull(viewData.ViewPosition, cullingPlanes);
 
             var vm = worldToLight;
             var shadowMatrix = new Matrix4x4
@@ -125,7 +121,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Shadow"))
             {
-                pass.Initialize(settings.Material, waterSystem.IndexBuffer, cullResult.IndirectArgsBuffer, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
+                pass.Initialize(settings.Material, indexBuffer, cullResult.IndirectArgsBuffer, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
                 pass.WriteDepth(waterShadow);
                 pass.WriteTexture(waterIlluminance, RenderBufferLoadAction.DontCare);
                 pass.ConfigureClear(RTClearFlags.Depth);
@@ -139,9 +135,9 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetMatrix("_WaterShadowMatrix", viewProjectionMatrix);
-                    pass.SetInt("_VerticesPerEdge", waterSystem.VerticesPerTileEdge);
-                    pass.SetInt("_VerticesPerEdgeMinusOne", waterSystem.VerticesPerTileEdge - 1);
-                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (waterSystem.VerticesPerTileEdge - 1));
+                    pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
+                    pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
+                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
 
                     // Snap to quad-sized increments on largest cell
                     var texelSize = settings.Size / (float)settings.PatchVertices;

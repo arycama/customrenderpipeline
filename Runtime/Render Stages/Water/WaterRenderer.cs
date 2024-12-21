@@ -5,22 +5,18 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public class WaterRenderer : RenderFeature
+    public class WaterRenderer : WaterRendererBase
     {
-        private readonly WaterSystem waterSystem;
-
-        public WaterRenderer(RenderGraph renderGraph , WaterSystem waterSystem) : base(renderGraph)
+        public WaterRenderer(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph, settings)
         {
-            this.waterSystem = waterSystem;
         }
 
         public override void Render()
         {
-            var Settings = waterSystem.Settings;
-            if (!Settings.IsEnabled)
+            if (!settings.IsEnabled)
                 return;
 
-            var passData = waterSystem.Cull(renderGraph.GetResource<ViewData>().ViewPosition, renderGraph.GetResource<CullingPlanesData>().CullingPlanes);
+            var passData = Cull(renderGraph.GetResource<ViewData>().ViewPosition, renderGraph.GetResource<CullingPlanesData>().CullingPlanes);
             var viewData = renderGraph.GetResource<ViewData>();
 
             // Writes (worldPos - displacementPos).xz. Uv coord is reconstructed later from delta and worldPosition (reconstructed from depth)
@@ -30,11 +26,11 @@ namespace Arycama.CustomRenderPipeline.Water
             // As well as backfacing triangle detection for rendering under the surface
             var waterTriangleNormal = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16_UNorm, isScreenTexture: true);
 
-            var passIndex = Settings.Material.FindPass("Water");
+            var passIndex = settings.Material.FindPass("Water");
             Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
 
-            var profile = Settings.Profile;
-            var resolution = Settings.Resolution;
+            var profile = settings.Profile;
+            var resolution = settings.Resolution;
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Clear Pass"))
             {
@@ -47,7 +43,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Render"))
             {
-                pass.Initialize(Settings.Material, waterSystem.IndexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
+                pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
 
                 pass.WriteDepth(renderGraph.GetResource<CameraDepthData>().Handle);
                 pass.WriteTexture(oceanRenderResult, RenderBufferLoadAction.DontCare);
@@ -66,16 +62,16 @@ namespace Arycama.CustomRenderPipeline.Water
 
                 pass.SetRenderFunction((System.Action<CommandBuffer, RenderPass>)((command, pass) =>
                 {
-                    pass.SetInt("_VerticesPerEdge", waterSystem.VerticesPerTileEdge);
-                    pass.SetInt("_VerticesPerEdgeMinusOne", waterSystem.VerticesPerTileEdge - 1);
-                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (waterSystem.VerticesPerTileEdge - 1));
+                    pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
+                    pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
+                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
                     pass.SetInt("_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
 
                     // Snap to quad-sized increments on largest cell
-                    var texelSize = Settings.Size / (float)Settings.PatchVertices;
-                    var positionX = MathUtils.Snap(viewData.ViewPosition.x, texelSize) - viewData.ViewPosition.x - Settings.Size * 0.5f;
-                    var positionZ = MathUtils.Snap(viewData.ViewPosition.z, texelSize) - viewData.ViewPosition.z - Settings.Size * 0.5f;
-                    pass.SetVector("_PatchScaleOffset", new Vector4(Settings.Size / (float)Settings.CellCount, Settings.Size / (float)Settings.CellCount, positionX, positionZ));
+                    var texelSize = settings.Size / (float)settings.PatchVertices;
+                    var positionX = MathUtils.Snap(viewData.ViewPosition.x, texelSize) - viewData.ViewPosition.x - settings.Size * 0.5f;
+                    var positionZ = MathUtils.Snap(viewData.ViewPosition.z, texelSize) - viewData.ViewPosition.z - settings.Size * 0.5f;
+                    pass.SetVector("_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
 
                     pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
                     var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
@@ -85,12 +81,12 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
                     ArrayPool<Vector4>.Release(cullingPlanesArray);
 
-                    pass.SetFloat("_ShoreWaveWindSpeed", Settings.Profile.WindSpeed);
-                    pass.SetFloat("_ShoreWaveWindAngle", Settings.Profile.WindAngle);
+                    pass.SetFloat("_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
+                    pass.SetFloat("_ShoreWaveWindAngle", settings.Profile.WindAngle);
                 }));
             }
 
-            renderGraph.SetResource(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)Settings.Material.GetColor("_Color").linear, (Vector4)Settings.Material.GetColor("_Extinction")));
+            renderGraph.SetResource(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction")));
         }
     }
 }

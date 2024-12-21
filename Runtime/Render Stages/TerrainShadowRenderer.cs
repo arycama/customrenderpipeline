@@ -3,30 +3,27 @@ using UnityEngine.Assertions;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class TerrainShadowRenderer : RenderFeature
+    public class TerrainShadowRenderer : TerrainRendererBase
     {
-        private readonly TerrainSystem.Settings settings;
-        private readonly TerrainSystem terrainSystem;
-
-        public TerrainShadowRenderer(RenderGraph renderGraph, TerrainSystem.Settings settings, TerrainSystem terrainSystem) : base(renderGraph)
+        public TerrainShadowRenderer(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph, settings)
         {
-            this.settings = settings;
-            this.terrainSystem = terrainSystem;
         }
 
         public override void Render()
         {
-            var terrain = terrainSystem.terrain;
-            var terrainData = terrainSystem.terrainData;
+            var terrainSystemData = renderGraph.GetResource<TerrainSystemData>();
 
-            if (terrainSystem.terrain == null || settings.Material == null)
+            var terrain = terrainSystemData.Terrain;
+            var terrainData = terrainSystemData.TerrainData;
+
+            if (terrainSystemData.Terrain == null || settings.Material == null)
                 return;
 
             var viewData = renderGraph.GetResource<ViewData>();
             var shadowRequestData = renderGraph.GetResource<ShadowRequestData>();
             var shadowRequest = shadowRequestData.ShadowRequest;
 
-            var passData = terrainSystem.Cull(viewData.ViewPosition, shadowRequest.CullingPlanes);
+            var passData = Cull(viewData.ViewPosition, shadowRequest.CullingPlanes);
 
             var passIndex = settings.Material.FindPass("ShadowCaster");
             Assert.IsFalse(passIndex == -1, "Terrain Material has no ShadowCaster Pass");
@@ -36,7 +33,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
             {
-                pass.Initialize(settings.Material, terrainSystem.indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, null, shadowRequestData.Bias, shadowRequestData.SlopeBias, false);
+                pass.Initialize(settings.Material, terrainSystemData.IndexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, null, shadowRequestData.Bias, shadowRequestData.SlopeBias, false);
 
                 pass.WriteTexture(shadowRequestData.Shadow);
                 pass.DepthSlice = shadowRequestData.CascadeIndex;
@@ -48,7 +45,6 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    var VerticesPerTileEdge = terrainSystem.VerticesPerTileEdge;
                     pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
                     pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
                     pass.SetFloat("_RcpVerticesPerEdge", 1f / VerticesPerTileEdge);

@@ -13,8 +13,8 @@ namespace Arycama.CustomRenderPipeline
 {
     public partial class TerrainSystem : RenderFeature
     {
-        private readonly Settings settings;
-        private GraphicsBuffer terrainLayerData;
+        private readonly TerrainSettings settings;
+        private GraphicsBuffer terrainLayerData, indexBuffer;
         private RTHandle minMaxHeight, heightmap, normalmap, idMap;
         private readonly Material generateIdMapMaterial;
         private readonly Dictionary<TerrainLayer, int> terrainLayers = new();
@@ -23,13 +23,11 @@ namespace Arycama.CustomRenderPipeline
         private Texture2DArray diffuseArray, normalMapArray, maskMapArray;
 
         public Terrain terrain { get; private set; }
-        public GraphicsBuffer indexBuffer { get; private set; }
-
-        public int VerticesPerTileEdge => settings.PatchVertices + 1;
-        public int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
         public TerrainData terrainData => terrain.terrainData;
+        protected int VerticesPerTileEdge => settings.PatchVertices + 1;
+        protected int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
 
-        public TerrainSystem(RenderGraph renderGraph, Settings settings) : base(renderGraph)
+        public TerrainSystem(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
         {
             this.settings = settings;
 
@@ -44,11 +42,11 @@ namespace Arycama.CustomRenderPipeline
             TerrainCallbacks.textureChanged -= TerrainCallbacks_textureChanged;
             TerrainCallbacks.heightmapChanged -= TerrainCallbacks_heightmapChanged;
 
-            if (indexBuffer != null)
-                indexBuffer.Dispose();
-
             if (terrainLayerData != null)
                 terrainLayerData.Dispose();
+
+            if (indexBuffer != null)
+                indexBuffer.Dispose();
 
             if (diffuseArray != null)
                 Object.DestroyImmediate(diffuseArray);
@@ -207,6 +205,8 @@ namespace Arycama.CustomRenderPipeline
             FillLayerData();
 
             InitializeIdMap();
+
+            renderGraph.SetResource(new TerrainSystemData(minMaxHeight, terrain, terrainData, indexBuffer), true);
         }
 
         private void InitializeHeightmap()
@@ -393,12 +393,6 @@ namespace Arycama.CustomRenderPipeline
             // Set this every frame incase of changes..
             // TODO: Only do when data changed?
             FillLayerData();
-        }
-
-        public void SetupRenderData()
-        {
-            if (terrain == null)
-                return;
 
             var viewData = renderGraph.GetResource<ViewData>();
             var position = terrain.GetPosition() - viewData.ViewPosition;
@@ -420,169 +414,6 @@ namespace Arycama.CustomRenderPipeline
                     terrain.SetSplatMaterialPropertyBlock(propertyBlock);
                 });
             }
-        }
-
-        public readonly struct CullResult
-        {
-            public BufferHandle IndirectArgsBuffer { get; }
-            public BufferHandle PatchDataBuffer { get; }
-
-            public CullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
-            {
-                IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
-                PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
-            }
-        }
-
-        public CullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
-        {
-            // TODO: Preload?
-            var compute = Resources.Load<ComputeShader>("Terrain/TerrainQuadtreeCull");
-            var indirectArgsBuffer = renderGraph.GetBuffer(5, target: GraphicsBuffer.Target.IndirectArguments);
-            var patchDataBuffer = renderGraph.GetBuffer(settings.CellCount * settings.CellCount, target: GraphicsBuffer.Target.Structured);
-
-            // We can do 32x32 cells in a single pass, larger counts need to be broken up into several passes
-            var maxPassesPerDispatch = 6;
-            var totalPassCount = (int)Mathf.Log(settings.CellCount, 2f) + 1;
-            var dispatchCount = Mathf.Ceil(totalPassCount / (float)maxPassesPerDispatch);
-
-            RTHandle tempLodId = null;
-            BufferHandle lodIndirectArgsBuffer = null;
-            if (dispatchCount > 1)
-            {
-                // If more than one dispatch, we need to write lods out to a temp texture first. Otherwise they are done via shared memory so no texture is needed
-                tempLodId = renderGraph.GetTexture(settings.CellCount, settings.CellCount, GraphicsFormat.R16_UInt);
-                lodIndirectArgsBuffer = renderGraph.GetBuffer(3, target: GraphicsBuffer.Target.IndirectArguments);
-            }
-
-            var tempIds = ListPool<RTHandle>.Get();
-            for (var i = 0; i < dispatchCount - 1; i++)
-            {
-                var tempResolution = 1 << ((i + 1) * (maxPassesPerDispatch - 1));
-                tempIds.Add(renderGraph.GetTexture(tempResolution, tempResolution, GraphicsFormat.R16_UInt));
-            }
-
-            for (var i = 0; i < dispatchCount; i++)
-            {
-                using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Terrain Quadtree Cull"))
-                {
-                    var isFirstPass = i == 0; // Also indicates whether this is -not- the first pass
-                    if (!isFirstPass)
-                        pass.ReadTexture("_TempResult", tempIds[i - 1]);
-
-                    var isFinalPass = i == dispatchCount - 1; // Also indicates whether this is -not- the final pass
-
-                    var passCount = Mathf.Min(maxPassesPerDispatch, totalPassCount - i * maxPassesPerDispatch);
-                    var threadCount = 1 << (i * 6 + passCount - 1);
-                    pass.Initialize(compute, 0, threadCount, threadCount);
-
-                    if (isFirstPass)
-                        pass.AddKeyword("FIRST");
-
-                    if (isFinalPass)
-                        pass.AddKeyword("FINAL");
-
-                    if (isFinalPass && !isFirstPass)
-                    {
-                        // Final pass writes out lods to a temp texture if more than one pass was used
-                        pass.WriteTexture("_LodResult", tempLodId);
-                    }
-
-                    if (!isFinalPass)
-                        pass.WriteTexture("_TempResultWrite", tempIds[i]);
-
-                    pass.WriteBuffer("_IndirectArgs", indirectArgsBuffer);
-                    pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
-                    pass.ReadTexture("_TerrainHeights", minMaxHeight);
-                    pass.AddRenderPassData<ICommonPassData>();
-
-                    var index = i;
-                    pass.SetRenderFunction(
-                    (
-                        viewPosition,
-                        cullingPlanes,
-                        indirectArgsBuffer,
-                        totalPassCount,
-                        isFirstPass,
-                        passCount,
-                        index,
-                        QuadListIndexCount,
-                        terrain,
-                        terrainData,
-                        settings
-                    ),
-                    (command, pass, data) =>
-                    {
-                        // First pass sets the buffer contents
-                        if (data.isFirstPass)
-                        {
-                            var indirectArgs = ListPool<int>.Get();
-                            indirectArgs.Add(data.QuadListIndexCount); // index count per instance
-                            indirectArgs.Add(0); // instance count (filled in later)
-                            indirectArgs.Add(0); // start index location
-                            indirectArgs.Add(0); // base vertex location
-                            indirectArgs.Add(0); // start instance location
-                            command.SetBufferData(data.indirectArgsBuffer, indirectArgs);
-                            ListPool<int>.Release(indirectArgs);
-                        }
-
-                        // Do up to 6 passes per dispatch.
-                        pass.SetInt("_PassCount", data.passCount);
-                        pass.SetInt("_PassOffset", 6 * data.index);
-                        pass.SetInt("_TotalPassCount", data.totalPassCount);
-
-                        var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
-                        for (var i = 0; i < data.cullingPlanes.Count; i++)
-                            cullingPlanesArray[i] = data.cullingPlanes.GetCullingPlaneVector4(i);
-
-                        pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
-                        ArrayPool<Vector4>.Release(cullingPlanesArray);
-
-                        // Snap to quad-sized increments on largest cell
-                        var position = data.terrain.GetPosition() - data.viewPosition;
-                        var positionOffset = new Vector4(data.terrainData.size.x, data.terrainData.size.z, position.x, position.z);
-                        pass.SetVector("_TerrainPositionOffset", positionOffset);
-
-                        pass.SetFloat("_EdgeLength", (float)data.settings.EdgeLength * data.settings.PatchVertices);
-                        pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
-
-                        pass.SetFloat("_InputScale", data.terrainData.size.y);
-                        pass.SetFloat("_InputOffset", position.y);
-
-                        pass.SetInt("_MipCount", Texture2DExtensions.MipCount(data.terrainData.heightmapResolution) - 1);
-                    });
-                }
-            }
-
-            if (dispatchCount > 1)
-            {
-                using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Terrain Quadtree Cull"))
-                {
-                    pass.Initialize(compute, 1, normalizedDispatch: false);
-                    pass.WriteBuffer("_IndirectArgs", lodIndirectArgsBuffer);
-
-                    // If more than one pass needed, we need a second pass to write out lod deltas to the patch data
-                    // Copy count from indirect draw args so we only dispatch as many threads as needed
-                    pass.ReadBuffer("_IndirectArgsInput", indirectArgsBuffer);
-                }
-
-                using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Terrain Quadtree Cull"))
-                {
-                    pass.Initialize(compute, lodIndirectArgsBuffer, 2);
-                    pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
-                    pass.ReadTexture("_LodInput", tempLodId);
-                    pass.ReadBuffer("_IndirectArgs", indirectArgsBuffer);
-
-                    pass.SetRenderFunction((command, pass) =>
-                    {
-                        pass.SetInt("_CellCount", settings.CellCount);
-                    });
-                }
-            }
-
-            ListPool<RTHandle>.Release(tempIds);
-
-            return new(indirectArgsBuffer, patchDataBuffer);
         }
     }
 }
