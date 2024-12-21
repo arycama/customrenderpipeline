@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CustomRenderPipeline.Editor
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CustomRenderPipeline.ShaderLibrary", "..\..\CustomRenderPipeline.ShaderLibrary.csproj", "{292CA460-9504-1628-4246-7B77399C3465}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CustomRenderPipeline.Git", "CustomRenderPipeline.Git.csproj", "{C6C748BD-C35D-41D1-A09D-215DCD7C1813}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{292CA460-9504-1628-4246-7B77399C3465}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{292CA460-9504-1628-4246-7B77399C3465}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{292CA460-9504-1628-4246-7B77399C3465}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6C748BD-C35D-41D1-A09D-215DCD7C1813}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6C748BD-C35D-41D1-A09D-215DCD7C1813}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6C748BD-C35D-41D1-A09D-215DCD7C1813}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6C748BD-C35D-41D1-A09D-215DCD7C1813}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
