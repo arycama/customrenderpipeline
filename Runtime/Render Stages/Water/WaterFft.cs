@@ -9,7 +9,7 @@ namespace Arycama.CustomRenderPipeline.Water
         private const int CascadeCount = 4;
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
 
-        private readonly WaterSystem.Settings settings;
+        private readonly WaterSettings settings;
         private readonly GraphicsBuffer spectrumBuffer, dispersionBuffer;
         private readonly RTHandle lengthToRoughness;
         private readonly bool disposedValue;
@@ -18,7 +18,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
         private WaterProfile Profile => settings.Profile;
 
-        public WaterFft(RenderGraph renderGraph, WaterSystem.Settings settings) : base(renderGraph)
+        public WaterFft(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
         {
             this.settings = settings;
             spectrumBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, settings.Resolution * settings.Resolution * CascadeCount, sizeof(float) * 4) { name = "Ocean Spectrum" };

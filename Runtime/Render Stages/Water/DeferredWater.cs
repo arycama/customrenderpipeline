@@ -6,12 +6,12 @@ namespace Arycama.CustomRenderPipeline.Water
 {
     public class DeferredWater : RenderFeature
     {
-        private readonly WaterSystem.Settings settings;
+        private readonly WaterSettings settings;
         private readonly Material deferredWaterMaterial;
         private readonly PersistentRTHandleCache temporalCache;
         private readonly RayTracingShader raytracingShader;
 
-        public DeferredWater(RenderGraph renderGraph, WaterSystem.Settings settings) : base(renderGraph)
+        public DeferredWater(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
         {
             this.settings = settings;
             deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water 1")) { hideFlags = HideFlags.HideAndDontSave };

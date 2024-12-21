@@ -26,14 +26,13 @@ namespace Arycama.CustomRenderPipeline
             var shadowRequestData = renderGraph.GetResource<ShadowRequestData>();
             var shadowRequest = shadowRequestData.ShadowRequest;
 
-            terrainSystem.CullShadow(viewData.ViewPosition, shadowRequest.CullingPlanes);
+            var passData = terrainSystem.Cull(viewData.ViewPosition, shadowRequest.CullingPlanes);
 
             var passIndex = settings.Material.FindPass("ShadowCaster");
             Assert.IsFalse(passIndex == -1, "Terrain Material has no ShadowCaster Pass");
 
             var size = terrainData.size;
             var position = terrain.GetPosition() - viewData.ViewPosition;
-            var passData = renderGraph.GetResource<TerrainShadowCullResult>();
 
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
             {

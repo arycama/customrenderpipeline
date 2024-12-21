@@ -1,3 +1,4 @@
+
 using System;
 using System.Collections.Generic;
 using Unity.Collections;
@@ -421,7 +422,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        private readonly struct CullResult
+        public readonly struct CullResult
         {
             public BufferHandle IndirectArgsBuffer { get; }
             public BufferHandle PatchDataBuffer { get; }
@@ -433,7 +434,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        private CullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
+        public CullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
         {
             // TODO: Preload?
             var compute = Resources.Load<ComputeShader>("Terrain/TerrainQuadtreeCull");
@@ -582,24 +583,6 @@ namespace Arycama.CustomRenderPipeline
             ListPool<RTHandle>.Release(tempIds);
 
             return new(indirectArgsBuffer, patchDataBuffer);
-        }
-
-        public void CullShadow(Vector3 viewPosition, CullingPlanes cullingPlanes)
-        {
-            if (terrain == null)
-                return;
-
-            var cullingResult = Cull(viewPosition, cullingPlanes);
-            renderGraph.SetResource(new TerrainShadowCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer)); ;
-        }
-
-        public void CullRender(Vector3 viewPosition, CullingPlanes cullingPlanes)
-        {
-            if (terrain == null)
-                return;
-
-            var cullingResult = Cull(viewPosition, cullingPlanes);
-            renderGraph.SetResource(new TerrainRenderCullResult(cullingResult.IndirectArgsBuffer, cullingResult.PatchDataBuffer)); ;
         }
     }
 }

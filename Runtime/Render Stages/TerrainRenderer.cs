@@ -24,14 +24,12 @@ namespace Arycama.CustomRenderPipeline
             var viewData = renderGraph.GetResource<ViewData>();
             var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
 
-            terrainSystem.CullRender(viewData.ViewPosition, cullingPlanes);
-
+            var passData = terrainSystem.Cull(viewData.ViewPosition, cullingPlanes);
             var passIndex = settings.Material.FindPass("Terrain");
             Assert.IsFalse(passIndex == -1, "Terrain Material has no Terrain Pass");
 
             var size = terrainSystem.terrainData.size;
             var position = terrainSystem.terrain.GetPosition() - viewData.ViewPosition;
-            var passData = renderGraph.GetResource<TerrainRenderCullResult>();
 
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
             {

@@ -6,11 +6,11 @@ namespace Arycama.CustomRenderPipeline.Water
 {
     public class WaterCaustics : RenderFeature
     {
-        private readonly WaterSystem.Settings settings;
+        private readonly WaterSettings settings;
         private readonly Material material;
         private readonly GraphicsBuffer indexBuffer;
 
-        public WaterCaustics(RenderGraph renderGraph, WaterSystem.Settings settings) : base(renderGraph)
+        public WaterCaustics(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Water Caustics")) { hideFlags = HideFlags.HideAndDontSave };

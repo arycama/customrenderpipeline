@@ -6,10 +6,10 @@ namespace Arycama.CustomRenderPipeline.Water
 {
     public class UnderwaterLighting : RenderFeature
     {
-        private readonly WaterSystem.Settings settings;
+        private readonly WaterSettings settings;
         private readonly Material underwaterLightingMaterial;
 
-        public UnderwaterLighting(RenderGraph renderGraph, WaterSystem.Settings settings) : base(renderGraph)
+        public UnderwaterLighting(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
         {
             this.settings = settings;
             underwaterLightingMaterial = new Material(Shader.Find("Hidden/Underwater Lighting 1")) { hideFlags = HideFlags.HideAndDontSave };

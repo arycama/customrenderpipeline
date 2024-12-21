@@ -1,29 +1,25 @@
 ﻿using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
-    public partial class WaterSystem : RenderFeature
+    public partial class WaterSystem
     {
-        private readonly Settings settings;
-        private readonly GraphicsBuffer indexBuffer;
+        private RenderGraph renderGraph;
 
-        public WaterFft WaterFft { get; }
-        private readonly UnderwaterLighting underwaterLighting;
-        private readonly DeferredWater deferredWater;
-        private readonly WaterCaustics caustics;
+        public GraphicsBuffer IndexBuffer { get; }
+        public WaterSettings Settings { get; }
+        public int VerticesPerTileEdge => Settings.PatchVertices + 1;
+        private int QuadListIndexCount => Settings.PatchVertices * Settings.PatchVertices * 4;
 
-        private int VerticesPerTileEdge => settings.PatchVertices + 1;
-        private int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
-
-        public WaterSystem(RenderGraph renderGraph, Settings settings) : base(renderGraph)
+        public WaterSystem(RenderGraph renderGraph, WaterSettings settings)
         {
-            this.settings = settings;
+            this.renderGraph = renderGraph;
+            this.Settings = settings;
 
-            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
+            IndexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
 
             var index = 0;
             var pIndices = new ushort[QuadListIndexCount];
@@ -53,289 +49,24 @@ namespace Arycama.CustomRenderPipeline.Water
                 }
             }
 
-            indexBuffer.SetData(pIndices);
-
-            WaterFft = new(renderGraph, settings);
-            underwaterLighting = new(renderGraph, settings);
-            deferredWater = new(renderGraph, settings);
-            caustics = new(renderGraph, settings);
+            IndexBuffer.SetData(pIndices);
         }
 
-        protected override void Cleanup(bool disposing)
+        public void Cleanup()
         {
-            indexBuffer.Dispose();
-
-            WaterFft.Dispose();
-            underwaterLighting.Dispose();
-            deferredWater.Dispose();
-            caustics.Dispose();
+            IndexBuffer.Dispose();
         }
 
-        public void UpdateCaustics()
-        {
-            caustics.Render();
-        }
-
-        public void CullShadow()
-        {
-            if (!settings.IsEnabled)
-                return;
-
-            var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
-            var lightRotation = Quaternion.identity;
-            for (var i = 0; i < cullingResults.visibleLights.Length; i++)
-            {
-                var visibleLight = cullingResults.visibleLights[i];
-                if (visibleLight.lightType != LightType.Directional)
-                    continue;
-
-                lightRotation = visibleLight.localToWorldMatrix.rotation;
-                break;
-            }
-
-            var viewData = renderGraph.GetResource<ViewData>();
-
-            // TODO: Should be able to simply just define a box and not even worry about view position since we translate it anyway
-            var size = new Vector3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
-            var min = new Vector3(-settings.ShadowRadius, -settings.Profile.MaxWaterHeight - viewData.ViewPosition.y, -settings.ShadowRadius);
-
-            var texelSize = settings.ShadowRadius * 2.0f / settings.ShadowResolution;
-
-            var snappedViewPositionX = MathUtils.Snap(viewData.ViewPosition.x, texelSize) - viewData.ViewPosition.x;
-            var snappedViewPositionZ = MathUtils.Snap(viewData.ViewPosition.z, texelSize) - viewData.ViewPosition.z;
-
-            var worldToLight = Matrix4x4.Rotate(Quaternion.Inverse(lightRotation));
-            Vector3 minValue = Vector3.positiveInfinity, maxValue = Vector3.negativeInfinity;
-
-            for (var z = 0; z < 2; z++)
-            {
-                for (var y = 0; y < 2; y++)
-                {
-                    for (var x = 0; x < 2; x++)
-                    {
-                        var worldPosition = min + Vector3.Scale(size, new Vector3(x, y, z));
-                        worldPosition.x += snappedViewPositionX;
-                        worldPosition.z += snappedViewPositionZ;
-
-                        var localPosition = worldToLight.MultiplyPoint3x4(worldPosition);
-                        minValue = Vector3.Min(minValue, localPosition);
-                        maxValue = Vector3.Max(maxValue, localPosition);
-                    }
-                }
-            }
-
-            // Calculate culling planes
-            var width = maxValue.x - minValue.x;
-            var height = maxValue.y - minValue.y;
-            var depth = maxValue.z - minValue.z;
-            var projectionMatrix = new Matrix4x4
-            {
-                m00 = 2.0f / width,
-                m03 = (maxValue.x + minValue.x) / -width,
-                m11 = -2.0f / height,
-                m13 = -(maxValue.y + minValue.y) / -height,
-                m22 = 1.0f / (minValue.z - maxValue.z),
-                m23 = maxValue.z / depth,
-                m33 = 1.0f
-            };
-
-            var viewProjectionMatrix = projectionMatrix * worldToLight;
-
-            var frustumPlanes = ArrayPool<Plane>.Get(6);
-            GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrix, frustumPlanes);
-
-            var cullingPlanes = new CullingPlanes() { Count = 6 };
-            for (var j = 0; j < 6; j++)
-            {
-                cullingPlanes.SetCullingPlane(j, frustumPlanes[j]);
-            }
-
-            ArrayPool<Plane>.Release(frustumPlanes);
-
-            var cullResult = Cull(viewData.ViewPosition, cullingPlanes);
-
-            var vm = worldToLight;
-            var shadowMatrix = new Matrix4x4
-            {
-                m00 = vm.m00 / width,
-                m01 = vm.m01 / width,
-                m02 = vm.m02 / width,
-                m03 = (vm.m03 - 0.5f * (maxValue.x + minValue.x)) / width + 0.5f,
-
-                m10 = vm.m10 / height,
-                m11 = vm.m11 / height,
-                m12 = vm.m12 / height,
-                m13 = (vm.m13 - 0.5f * (maxValue.y + minValue.y)) / height + 0.5f,
-
-                m20 = -vm.m20 / depth,
-                m21 = -vm.m21 / depth,
-                m22 = -vm.m22 / depth,
-                m23 = (-vm.m23 + 0.5f * (maxValue.z + minValue.z)) / depth + 0.5f,
-
-                m33 = 1.0f
-            };
-
-            // TODO: Change to near/far
-            renderGraph.SetResource(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewProjectionMatrix, shadowMatrix, cullingPlanes)); ;
-        }
-
-        public void RenderShadow()
-        {
-            if (!settings.IsEnabled)
-                return;
-
-            var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.D16_UNorm);
-            var waterIlluminance = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.R16_UNorm);
-
-            var passIndex = settings.Material.FindPass("WaterShadow");
-            Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");
-
-            var profile = settings.Profile;
-            var resolution = settings.Resolution;
-
-            var passData = renderGraph.GetResource<WaterShadowCullResult>();
-            var viewData = renderGraph.GetResource<ViewData>();
-
-            using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Shadow"))
-            {
-                pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
-                pass.WriteDepth(waterShadow);
-                pass.WriteTexture(waterIlluminance, RenderBufferLoadAction.DontCare);
-                pass.ConfigureClear(RTClearFlags.Depth);
-                pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
-
-                pass.AddRenderPassData<OceanFftResult>();
-                pass.AddRenderPassData<WaterShoreMask.Result>();
-                pass.AddRenderPassData<ICommonPassData>();
-                pass.AddRenderPassData<DirectionalLightInfo>();
-
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    pass.SetMatrix("_WaterShadowMatrix", passData.WorldToClip);
-                    pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
-                    pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
-                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
-
-                    // Snap to quad-sized increments on largest cell
-                    var texelSize = settings.Size / (float)settings.PatchVertices;
-                    var positionX = MathUtils.Snap(viewData.ViewPosition.x, texelSize) - viewData.ViewPosition.x - settings.Size * 0.5f;
-                    var positionZ = MathUtils.Snap(viewData.ViewPosition.z, texelSize) - viewData.ViewPosition.z - settings.Size * 0.5f;
-                    pass.SetVector("_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
-
-                    var cullingPlanesArray = ArrayPool<Vector4>.Get(passData.CullingPlanes.Count);
-                    for (var i = 0; i < passData.CullingPlanes.Count; i++)
-                        cullingPlanesArray[i] = passData.CullingPlanes.GetCullingPlaneVector4(i);
-
-                    pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
-                    ArrayPool<Vector4>.Release(cullingPlanesArray);
-
-                    pass.SetInt("_CullingPlanesCount", passData.CullingPlanes.Count);
-                    pass.SetFloat("_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
-                    pass.SetFloat("_ShoreWaveWindAngle", settings.Profile.WindAngle);
-                });
-            }
-
-            renderGraph.SetResource(new WaterShadowResult(waterShadow, passData.ShadowMatrix, passData.Near, passData.Far, settings.Material.GetVector("_Extinction"), waterIlluminance)); ;
-        }
-
-
-        public override void Render()
-        {
-            if (!settings.IsEnabled)
-                return;
-
-            var passData = Cull(renderGraph.GetResource<ViewData>().ViewPosition, renderGraph.GetResource<CullingPlanesData>().CullingPlanes);
-            var viewData = renderGraph.GetResource<ViewData>();
-
-            // Writes (worldPos - displacementPos).xz. Uv coord is reconstructed later from delta and worldPosition (reconstructed from depth)
-            var oceanRenderResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);
-
-            // Also write triangleNormal to another texture with oct encoding. This allows reconstructing the derivative correctly to avoid mip issues on edges,
-            // As well as backfacing triangle detection for rendering under the surface
-            var waterTriangleNormal = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16_UNorm, isScreenTexture: true);
-
-            var passIndex = settings.Material.FindPass("Water");
-            Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
-
-            var profile = settings.Profile;
-            var resolution = settings.Resolution;
-
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Ocean Clear Pass"))
-            {
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    command.SetRenderTarget(waterTriangleNormal);
-                    command.ClearRenderTarget(false, true, Color.clear);
-                });
-            }
-
-            using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Render"))
-            {
-                pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
-
-                pass.WriteDepth(renderGraph.GetResource<CameraDepthData>().Handle);
-                pass.WriteTexture(oceanRenderResult, RenderBufferLoadAction.DontCare);
-                pass.WriteTexture(renderGraph.GetResource<VelocityData>().Handle);
-                pass.WriteTexture(waterTriangleNormal, RenderBufferLoadAction.DontCare);
-
-                pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
-
-                pass.AddRenderPassData<OceanFftResult>();
-                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<TemporalAAData>();
-                pass.AddRenderPassData<WaterShoreMask.Result>();
-                pass.AddRenderPassData<ICommonPassData>();
-
-                var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
-
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
-                    pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
-                    pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (VerticesPerTileEdge - 1));
-                    pass.SetInt("_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
-
-                    // Snap to quad-sized increments on largest cell
-                    var texelSize = settings.Size / (float)settings.PatchVertices;
-                    var positionX = MathUtils.Snap(viewData.ViewPosition.x, texelSize) - viewData.ViewPosition.x - settings.Size * 0.5f;
-                    var positionZ = MathUtils.Snap(viewData.ViewPosition.z, texelSize) - viewData.ViewPosition.z - settings.Size * 0.5f;
-                    pass.SetVector("_PatchScaleOffset", new Vector4(settings.Size / (float)settings.CellCount, settings.Size / (float)settings.CellCount, positionX, positionZ));
-
-                    pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
-                    var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
-                    for (var i = 0; i < cullingPlanes.Count; i++)
-                        cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
-
-                    pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
-                    ArrayPool<Vector4>.Release(cullingPlanesArray);
-
-                    pass.SetFloat("_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
-                    pass.SetFloat("_ShoreWaveWindAngle", settings.Profile.WindAngle);
-                });
-            }
-
-            renderGraph.SetResource(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction"))); ;
-        }
-
-        public void RenderWaterPost()
-        {
-            if (!settings.IsEnabled)
-                return;
-
-            underwaterLighting.Render();
-            deferredWater.Render();
-        }
-
-        private WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
+        public WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
         {
             // TODO: Preload?
             var compute = Resources.Load<ComputeShader>("OceanQuadtreeCull");
             var indirectArgsBuffer = renderGraph.GetBuffer(5, target: GraphicsBuffer.Target.IndirectArguments);
-            var patchDataBuffer = renderGraph.GetBuffer(settings.CellCount * settings.CellCount, target: GraphicsBuffer.Target.Structured);
+            var patchDataBuffer = renderGraph.GetBuffer(Settings.CellCount * Settings.CellCount, target: GraphicsBuffer.Target.Structured);
 
             // We can do 32x32 cells in a single pass, larger counts need to be broken up into several passes
             var maxPassesPerDispatch = 6;
-            var totalPassCount = (int)Mathf.Log(settings.CellCount, 2f) + 1;
+            var totalPassCount = (int)Mathf.Log(Settings.CellCount, 2f) + 1;
             var dispatchCount = Mathf.Ceil(totalPassCount / (float)maxPassesPerDispatch);
 
             RTHandle tempLodId = null;
@@ -343,7 +74,7 @@ namespace Arycama.CustomRenderPipeline.Water
             if (dispatchCount > 1)
             {
                 // If more than one dispatch, we need to write lods out to a temp texture first. Otherwise they are done via shared memory so no texture is needed
-                tempLodId = renderGraph.GetTexture(settings.CellCount, settings.CellCount, GraphicsFormat.R16_UInt);
+                tempLodId = renderGraph.GetTexture(Settings.CellCount, Settings.CellCount, GraphicsFormat.R16_UInt);
                 lodIndirectArgsBuffer = renderGraph.GetBuffer(3, target: GraphicsBuffer.Target.IndirectArguments);
             }
 
@@ -391,7 +122,7 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.AddRenderPassData<ICommonPassData>();
 
                     var index = i;
-                    pass.SetRenderFunction((command, pass) =>
+                    pass.SetRenderFunction((System.Action<CommandBuffer, RenderPass>)((command, pass) =>
                     {
                         // First pass sets the buffer contents
                         if (isFirstPass)
@@ -407,9 +138,9 @@ namespace Arycama.CustomRenderPipeline.Water
                         }
 
                         // Do up to 6 passes per dispatch.
-                        pass.SetInt("_PassCount", passCount);
+                        pass.SetInt("_PassCount", (int)passCount);
                         pass.SetInt("_PassOffset", 6 * index);
-                        pass.SetInt("_TotalPassCount", totalPassCount);
+                        pass.SetInt("_TotalPassCount", (int)totalPassCount);
 
                         var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
                         for (var i = 0; i < cullingPlanes.Count; i++)
@@ -419,17 +150,17 @@ namespace Arycama.CustomRenderPipeline.Water
                         ArrayPool<Vector4>.Release(cullingPlanesArray);
 
                         // Snap to quad-sized increments on largest cell
-                        var texelSize = settings.Size / (float)settings.PatchVertices;
-                        var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
-                        var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
+                        var texelSize = this.Settings.Size / (float)this.Settings.PatchVertices;
+                        var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - this.Settings.Size * 0.5f;
+                        var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - this.Settings.Size * 0.5f;
 
-                        var positionOffset = new Vector4(settings.Size, settings.Size, positionX, positionZ);
+                        var positionOffset = new Vector4((float)this.Settings.Size, (float)this.Settings.Size, positionX, positionZ);
                         pass.SetVector("_TerrainPositionOffset", positionOffset);
 
-                        pass.SetFloat("_EdgeLength", (float)settings.EdgeLength * settings.PatchVertices);
+                        pass.SetFloat("_EdgeLength", (float)this.Settings.EdgeLength * this.Settings.PatchVertices);
                         pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
-                        pass.SetFloat("MaxWaterHeight", settings.Profile.MaxWaterHeight);
-                    });
+                        pass.SetFloat("MaxWaterHeight", this.Settings.Profile.MaxWaterHeight);
+                    }));
                 }
             }
 
@@ -452,10 +183,10 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.ReadTexture("_LodInput", tempLodId);
                     pass.ReadBuffer("_IndirectArgs", indirectArgsBuffer);
 
-                    pass.SetRenderFunction((command, pass) =>
+                    pass.SetRenderFunction((System.Action<CommandBuffer, RenderPass>)((command, pass) =>
                     {
-                        pass.SetInt("_CellCount", settings.CellCount);
-                    });
+                        pass.SetInt("_CellCount", (int)this.Settings.CellCount);
+                    }));
                 }
             }
 
@@ -463,6 +194,5 @@ namespace Arycama.CustomRenderPipeline.Water
 
             return new(indirectArgsBuffer, patchDataBuffer);
         }
-
     }
 }
