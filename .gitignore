@@ -1,1 +1,5 @@
 ﻿**/.vs
+/bin
+/obj
+/bin.meta
+/obj.meta
