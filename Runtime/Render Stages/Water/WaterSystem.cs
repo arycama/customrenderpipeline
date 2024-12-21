@@ -179,15 +179,6 @@ namespace Arycama.CustomRenderPipeline.Water
             renderGraph.SetResource(new WaterShadowCullResult(cullResult.IndirectArgsBuffer, cullResult.PatchDataBuffer, 0.0f, maxValue.z - minValue.z, viewProjectionMatrix, shadowMatrix, cullingPlanes)); ;
         }
 
-        public void CullRender()
-        {
-            if (!settings.IsEnabled)
-                return;
-
-            var result = Cull(renderGraph.GetResource<ViewData>().ViewPosition, renderGraph.GetResource<CullingPlanesData>().CullingPlanes);
-            renderGraph.SetResource(new WaterRenderCullResult(result.IndirectArgsBuffer, result.PatchDataBuffer)); ;
-        }
-
         public void RenderShadow()
         {
             if (!settings.IsEnabled)
@@ -253,6 +244,7 @@ namespace Arycama.CustomRenderPipeline.Water
             if (!settings.IsEnabled)
                 return;
 
+            var passData = Cull(renderGraph.GetResource<ViewData>().ViewPosition, renderGraph.GetResource<CullingPlanesData>().CullingPlanes);
             var viewData = renderGraph.GetResource<ViewData>();
 
             // Writes (worldPos - displacementPos).xz. Uv coord is reconstructed later from delta and worldPosition (reconstructed from depth)
@@ -279,7 +271,6 @@ namespace Arycama.CustomRenderPipeline.Water
 
             using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Render"))
             {
-                var passData = renderGraph.GetResource<WaterRenderCullResult>();
                 pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
 
                 pass.WriteDepth(renderGraph.GetResource<CameraDepthData>().Handle);
