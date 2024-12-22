@@ -267,22 +267,77 @@ float3 MultiplyVector(float3x4 mat, float3 v, bool doNormalize)
 	return MultiplyVector((float3x3) mat, v, doNormalize);
 }
 
+//#define INDIRECT_RENDERING
+
+// InstancedIndirect
+StructuredBuffer<uint> _RendererInstanceIndexOffsets;
+uint RendererOffset;
+StructuredBuffer<uint> _VisibleRendererInstanceIndices;
+StructuredBuffer<float3x4> _InstancePositions;
+StructuredBuffer<float> _InstanceLodFades;
+float4x4 _LocalToWorld;
+
 float3x4 GetObjectToWorld(uint instanceId)
 {
-#ifdef INSTANCING_ON
-	return (float3x4)unity_Builtins0Array[unity_BaseInstanceID + instanceId].unity_ObjectToWorldArray;
-#else
-	return (float3x4) unity_ObjectToWorld;
-#endif
+	#ifdef INDIRECT_RENDERING
+		uint instanceIndex = instanceId + _RendererInstanceIndexOffsets[RendererOffset];
+		uint index = _VisibleRendererInstanceIndices[instanceIndex];
+	
+		float3x4 objectToWorld = _InstancePositions[index];
+		float4x4 _InstanceToWorld = float4x4(objectToWorld[0], objectToWorld[1], objectToWorld[2], float4(0, 0, 0, 1));
+	
+		return (float3x4)mul(_InstanceToWorld, _LocalToWorld);
+	#else
+		#ifdef INSTANCING_ON
+			return (float3x4) unity_Builtins0Array[unity_BaseInstanceID + instanceId].unity_ObjectToWorldArray;
+		#else
+			return (float3x4) unity_ObjectToWorld;
+		#endif
+	#endif
 }
 
+float4x4 FastInverse(float4x4 m)
+{
+	float4 c0 = m._m00_m10_m20_m30;
+	float4 c1 = m._m01_m11_m21_m31;
+	float4 c2 = m._m02_m12_m22_m32;
+	float4 pos = m._m03_m13_m23_m33;
+
+	float4 t0 = float4(c0.x, c2.x, c0.y, c2.y);
+	float4 t1 = float4(c1.x, 0.0, c1.y, 0.0);
+	float4 t2 = float4(c0.z, c2.z, c0.w, c2.w);
+	float4 t3 = float4(c1.z, 0.0, c1.w, 0.0);
+
+	float4 r0 = float4(t0.x, t1.x, t0.y, t1.y);
+	float4 r1 = float4(t0.z, t1.z, t0.w, t1.w);
+	float4 r2 = float4(t2.x, t3.x, t2.y, t3.y);
+
+	pos = -(r0 * pos.x + r1 * pos.y + r2 * pos.z);
+	pos.w = 1.0f;
+
+	return transpose(float4x4(r0, r1, r2, pos));
+}
+
+// TODO: Adjoint matrix?
 float3x4 GetWorldToObject(uint instanceId)
 {
-#ifdef INSTANCING_ON
-		return (float3x4)unity_Builtins1Array[unity_BaseInstanceID + instanceId].unity_WorldToObjectArray;
-#else
-	return (float3x4) unity_WorldToObject;
-#endif
+	#ifdef INDIRECT_RENDERING
+		uint instanceIndex = instanceId + _RendererInstanceIndexOffsets[RendererOffset];
+		uint index = _VisibleRendererInstanceIndices[instanceIndex];
+	
+		float3x4 objectToWorld = _InstancePositions[index];
+		float4x4 _InstanceToWorld = float4x4(objectToWorld[0], objectToWorld[1], objectToWorld[2], float4(0, 0, 0, 1));
+	
+		float4x4 localToWorld = mul(_InstanceToWorld, _LocalToWorld);
+		localToWorld[3] = float4(0, 0, 0, 1);
+		return (float3x4) FastInverse(localToWorld);
+	#else
+		#ifdef INSTANCING_ON
+			return (float3x4)unity_Builtins1Array[unity_BaseInstanceID + instanceId].unity_WorldToObjectArray;
+		#else
+			return (float3x4) unity_WorldToObject;
+		#endif
+	#endif
 }
 
 float3 ObjectToWorld(float3 position, uint instanceID)
@@ -306,13 +361,19 @@ float3 WorldToObject(float3 worldPosition, uint instanceID)
 
 float3 PreviousObjectToWorld(float3 position, uint instanceID)
 {
-#ifdef INSTANCING_ON
-		float3x4 previousObjectToWorld = (float3x4)(_InPlayMode ? unity_Builtins3Array[unity_BaseInstanceID + instanceID].unity_PrevObjectToWorldArray : unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_ObjectToWorldArray);
-#else
-	float3x4 previousObjectToWorld = _InPlayMode ? unity_MatrixPreviousM : unity_ObjectToWorld;
-#endif
+	#ifdef INDIRECT_RENDERING
+		// No dynamic object support currently
+		float3x4 previousObjectToWorld = GetObjectToWorld(instanceID);
+	#else
+		#ifdef INSTANCING_ON
+			float3x4 previousObjectToWorld = (float3x4)(_InPlayMode ? unity_Builtins3Array[unity_BaseInstanceID + instanceID].unity_PrevObjectToWorldArray : unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_ObjectToWorldArray);
+		#else
+			float3x4 previousObjectToWorld = _InPlayMode ? unity_MatrixPreviousM : unity_ObjectToWorld;
+		#endif
+		
+		previousObjectToWorld._m03_m13_m23 -= _ViewPosition;
+	#endif
 	
-	previousObjectToWorld._m03_m13_m23 -= _ViewPosition;
 	return MultiplyPoint3x4(previousObjectToWorld, position);
 }
 

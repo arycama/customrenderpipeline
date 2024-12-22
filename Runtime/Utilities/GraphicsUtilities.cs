@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -141,6 +143,61 @@ namespace Arycama.CustomRenderPipeline
 
             indexBuffer.SetData(pIndices);
             return indexBuffer;
+        }
+
+        public static void SafeDestroy(ref ComputeBuffer buffer)
+        {
+            if (buffer != null)
+            {
+                buffer.Release();
+                buffer = null;
+            }
+        }
+
+        public static void SafeDestroy(ref GraphicsBuffer buffer)
+        {
+            if (buffer != null)
+            {
+                buffer.Release();
+                buffer = null;
+            }
+        }
+
+        public static void SafeDestroy<T>(ref T buffer) where T : Object
+        {
+            if (buffer != null)
+            {
+                Object.DestroyImmediate(buffer);
+                buffer = null;
+            }
+        }
+
+        public static void SafeResize(ref ComputeBuffer computeBuffer, int size = 1, int stride = sizeof(int), ComputeBufferType type = ComputeBufferType.Default)
+        {
+            if (computeBuffer == null || computeBuffer.count != size)
+            {
+                if (computeBuffer != null)
+                {
+                    computeBuffer.Release();
+                    computeBuffer = null;
+                }
+
+                if (size > 0)
+                    computeBuffer = new ComputeBuffer(size, stride, type);
+            }
+        }
+
+        public static void SafeExpand(ref ComputeBuffer computeBuffer, int size = 1, int stride = sizeof(int), ComputeBufferType type = ComputeBufferType.Default)
+        {
+            size = Mathf.Max(size, 1);
+
+            if (computeBuffer == null || computeBuffer.count < size)
+            {
+                if (computeBuffer != null)
+                    computeBuffer.Release();
+
+                computeBuffer = new ComputeBuffer(size, stride, type);
+            }
         }
     }
 }

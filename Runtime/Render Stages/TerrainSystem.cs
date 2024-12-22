@@ -262,6 +262,23 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
+            // Hrm, just used for node graphs..
+            var terrainRenderers = terrain.GetComponents<ITerrainRenderer>();
+            if (terrainRenderers.Length > 0)
+            {
+                using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Generate Heightmap Callback"))
+                {
+                    pass.SetRenderFunction((command, pass) =>
+                    {
+                        foreach (var component in terrainRenderers)
+                        {
+                            component.Heightmap = heightmap;
+                            component.NormalMap = normalmap;
+                        }
+                    });
+                }
+            }
+
             // Generate min/max for terrain.
             // Todo: Could generate this as part of heightmap pass using LDS
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Terrain Min Max Height Init"))

@@ -1,18 +1,7 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class GpuDrivenRendering : RenderFeature
-    {
-        public GpuDrivenRendering(RenderGraph renderGraph) : base(renderGraph)
-        {
-        }
-
-        public override void Render()
-        {
-        }
-    }
-
     public struct InstanceRendererData
     {
         public GameObject[] GameObjects { get; private set; }

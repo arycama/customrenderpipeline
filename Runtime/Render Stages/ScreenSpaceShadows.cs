@@ -54,7 +54,7 @@ public class ScreenSpaceShadows : RenderFeature
         }
 
         var viewData = renderGraph.GetResource<ViewData>();
-        var tempResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat);
+        var tempResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
         var depth = renderGraph.GetResource<CameraDepthData>().Handle;
         var normalRoughness = renderGraph.GetResource<NormalRoughnessData>().Handle;
 
