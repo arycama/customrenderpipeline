@@ -22,8 +22,6 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<RenderPass> renderPasses = new();
 
         // Maybe encapsulate these in a thing so it can also be used for buffers
-        private readonly Queue<int> availableRtSlots = new();
-        private readonly List<(RenderTexture renderTexture, int lastFrameUsed, bool isAvailable, bool isPersistent)> availableRenderTextures = new();
 
         private readonly List<BufferHandle> bufferHandlesToCreate = new();
         private readonly List<(BufferHandle handle, int lastFrameUsed)> availableBufferHandles = new();
@@ -36,8 +34,6 @@ namespace Arycama.CustomRenderPipeline
         private readonly Dictionary<RTHandle, int> lastRtHandleRead = new();
         private readonly Dictionary<int, List<RTHandle>> passRTHandleOutputs = new();
         private readonly HashSet<RTHandle> writtenRTHandles = new();
-
-        private readonly HashSet<RenderTexture> allRenderTextures = new();
 
         public BufferHandle EmptyBuffer { get; }
         public RTHandle EmptyTexture { get; }
@@ -52,7 +48,6 @@ namespace Arycama.CustomRenderPipeline
         public RenderResourceMap ResourceMap { get; }
         public CustomRenderPipeline RenderPipeline { get; }
 
-        private int rtCount;
         private int screenWidth, screenHeight;
         private bool disposedValue;
 
@@ -70,13 +65,6 @@ namespace Arycama.CustomRenderPipeline
 
             ResourceMap = new(this);
             RenderPipeline = renderPipeline;
-
-            allRenderTextures.Add(EmptyTexture.RenderTexture);
-            allRenderTextures.Add(EmptyUavTexture.RenderTexture);
-            allRenderTextures.Add(EmptyTextureArray.RenderTexture);
-            allRenderTextures.Add(Empty3DTexture.RenderTexture);
-            allRenderTextures.Add(EmptyCubemap.RenderTexture);
-            allRenderTextures.Add(EmptyCubemapArray.RenderTexture);
         }
 
         public void SetScreenWidth(int width)
@@ -158,90 +146,7 @@ namespace Arycama.CustomRenderPipeline
                         if (handle.IsImported)
                             continue;
 
-                        // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
-                        RenderTexture result = null;
-                        for (var j = 0; j < availableRenderTextures.Count; j++)
-                        {
-                            var (renderTexture, lastFrameUsed, isAvailable, isPersistent) = availableRenderTextures[j];
-                            if (!isAvailable)
-                                continue;
-
-                            var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-                            Assert.IsNotNull(handle, "Handle is null in pass");
-                            Assert.IsNotNull(renderTexture, "renderTexture is null in pass");
-                            if ((isDepth && handle.Format != renderTexture.depthStencilFormat) || (!isDepth && handle.Format != renderTexture.graphicsFormat))
-                                continue;
-
-                            // TODO: Use some enum instead?
-                            if (handle.IsExactSize)
-                            {
-                                if (renderTexture.width != handle.Width || renderTexture.height != handle.Height)
-                                    continue;
-                            }
-                            else if (handle.IsScreenTexture)
-                            {
-                                // For screen textures, ensure we get a rendertexture that is the actual screen width/height
-                                if (renderTexture.width != screenWidth || renderTexture.height != screenHeight)
-                                    continue;
-                            }
-                            else if (renderTexture.width < handle.Width || renderTexture.height < handle.Height)
-                                continue;
-
-                            if (renderTexture.enableRandomWrite == handle.EnableRandomWrite && renderTexture.dimension == handle.Dimension && renderTexture.useMipMap == handle.HasMips)
-                            {
-                                if (handle.Dimension != TextureDimension.Tex2D && renderTexture.volumeDepth < handle.VolumeDepth)
-                                    continue;
-
-                                result = renderTexture;
-                                Assert.IsNotNull(renderTexture);
-                                Assert.IsTrue(renderTexture.IsCreated());
-                                availableRenderTextures[j] = (renderTexture, lastFrameUsed, false, handle.IsPersistent);
-                                handle.RenderTextureIndex = j;
-                                break;
-                            }
-                        }
-
-                        if (result == null)
-                        {
-                            var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-                            var isStencil = handle.Format == GraphicsFormat.D32_SFloat_S8_UInt || handle.Format == GraphicsFormat.D24_UNorm_S8_UInt;
-
-                            var width = handle.IsScreenTexture ? screenWidth : handle.Width;
-                            var height = handle.IsScreenTexture ? screenHeight : handle.Height;
-
-                            result = new RenderTexture(width, height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite, stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None, hideFlags = HideFlags.HideAndDontSave };
-                            allRenderTextures.Add(result);
-
-                            if (handle.VolumeDepth > 0)
-                            {
-                                result.dimension = handle.Dimension;
-                                result.volumeDepth = handle.VolumeDepth;
-                                result.useMipMap = handle.HasMips;
-                                result.autoGenerateMips = false; // Always false, we manually handle mip generation if needed
-                            }
-
-                            result.name = $"{result.dimension} {(isDepth ? result.depthStencilFormat : result.graphicsFormat)} {width}x{height} {rtCount++}";
-                            _ = result.Create();
-
-                            //Debug.Log($"Allocating {result.name}");
-
-                            // Get a slot for this render texture if possible
-                            if (!availableRtSlots.TryDequeue(out var slot))
-                            {
-                                slot = availableRenderTextures.Count;
-                                Assert.IsNotNull(result);
-                                availableRenderTextures.Add((result, FrameIndex, false, handle.IsPersistent));
-                            }
-                            else
-                            {
-                                Assert.IsNotNull(result);
-                                availableRenderTextures[slot] = (result, FrameIndex, false, handle.IsPersistent);
-                            }
-
-                            handle.RenderTextureIndex = slot;
-                        }
-
-                        handle.RenderTexture = result;
+                        handle.RenderTexture = rtHandleSystem.GetTexture(handle, FrameIndex, screenWidth, screenHeight);
                     }
                 }
 
@@ -254,8 +159,7 @@ namespace Arycama.CustomRenderPipeline
                     if (output.IsImported)
                         continue;
 
-                    availableRenderTextures[output.RenderTextureIndex] = (output.RenderTexture, FrameIndex, true, false);
-                    rtHandleSystem.MakeTextureAvailable(output);
+                    rtHandleSystem.MakeTextureAvailable(output, FrameIndex);
                 }
             }
 
@@ -369,30 +273,7 @@ namespace Arycama.CustomRenderPipeline
                 availableBufferHandles.Add((handle, FrameIndex));
             usedBufferHandles.Clear();
 
-            // Release any render textures that have not been used for at least a frame
-            for (var i = 0; i < availableRenderTextures.Count; i++)
-            {
-                var renderTexture = availableRenderTextures[i];
-
-                // This indicates it is empty
-                if (renderTexture.renderTexture == null)
-                    continue;
-
-                if (renderTexture.isPersistent)
-                    continue;
-
-                // Don't free textures that were used in the last frame
-                // TODO: Make this a configurable number of frames to avoid rapid re-allocations
-                if (renderTexture.lastFrameUsed == FrameIndex)
-                    continue;
-
-                allRenderTextures.Remove(renderTexture.renderTexture);
-                Object.DestroyImmediate(renderTexture.renderTexture);
-
-                // Fill this with a null, unavailable RT and add the index to a list
-                availableRenderTextures[i] = (null, renderTexture.lastFrameUsed, false, false);
-                availableRtSlots.Enqueue(i);
-            }
+            rtHandleSystem.FreeThisFramesTextures(FrameIndex);
 
             if (!FrameDebugger.enabled)
                 FrameIndex++;
@@ -449,13 +330,7 @@ namespace Arycama.CustomRenderPipeline
                 Debug.LogError("Render Graph not disposed correctly");
 
             ResourceMap.Dispose();
-
-            foreach (var rt in allRenderTextures)
-            {
-                // Since we don't remove null entries, but rather leave them as "empty", they could be null
-                if (rt != null)
-                    Object.DestroyImmediate(rt);
-            }
+            rtHandleSystem.Dispose();
 
             foreach (var bufferHandle in availableBufferHandles)
                 bufferHandle.handle.Dispose();
@@ -465,8 +340,6 @@ namespace Arycama.CustomRenderPipeline
                 if (handle.Value != null)
                     handle.Value.Dispose();
             }
-
-            rtHandleSystem.Dispose();
 
             disposedValue = true;
         }
