@@ -11,15 +11,17 @@ namespace Arycama.CustomRenderPipeline
 {
     public class RenderGraph : IDisposable
     {
+        private bool disposedValue;
+        private readonly List<RenderPass> renderPasses = new();
+        private readonly HashSet<RTHandle> createdTextures = new();
+
+        private List<List<RTHandle>> texturesToCreate = new();
+        private List<List<RTHandle>> textureToFree = new();
+
         public RTHandleSystem RtHandleSystem { get; }
         public BufferHandleSystem BufferHandleSystem { get; }
-
-        private readonly List<RenderPass> renderPasses = new();
-
-        public bool IsExecuting { get; private set; }
-
-        private readonly Dictionary<RTHandle, int> lastRtHandleRead = new();
-        private readonly HashSet<RTHandle> createdTextures = new();
+        public RenderResourceMap ResourceMap { get; }
+        public CustomRenderPipeline RenderPipeline { get; }
 
         public BufferHandle EmptyBuffer { get; }
         public RTHandle EmptyTexture { get; }
@@ -30,11 +32,7 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle EmptyCubemapArray { get; }
 
         public int FrameIndex { get; private set; }
-
-        public RenderResourceMap ResourceMap { get; }
-        public CustomRenderPipeline RenderPipeline { get; }
-
-        private bool disposedValue;
+        public bool IsExecuting { get; private set; }
 
         public RenderGraph(CustomRenderPipeline renderPipeline)
         {
@@ -62,13 +60,11 @@ namespace Arycama.CustomRenderPipeline
                 Index = renderPasses.Count
             };
 
-            AddRenderPassInternal(result);
-            return result;
-        }
+            renderPasses.Add(result);
+            texturesToCreate.Add(new());
+            textureToFree.Add(new());
 
-        public void AddRenderPassInternal(RenderPass renderPass)
-        {
-            renderPasses.Add(renderPass);
+            return result;
         }
 
         public void Execute(CommandBuffer command)
@@ -77,21 +73,21 @@ namespace Arycama.CustomRenderPipeline
             
             // We track the last pass index that an RThandle is read, so tell each render pass to release the texture at the end
             // TODO: Change to a system where we simply store the release pass index in each RTHandle?
-            foreach (var input in lastRtHandleRead)
+            foreach (var input in RtHandleSystem.lastRtHandleRead)
             {
-                renderPasses[input.Value].textureToFree.Add(input.Key);
+                textureToFree[input.Value].Add(input.Key);
             }
 
             for (var i = 0; i < renderPasses.Count; i++)
             {
                 // Assign or create any RTHandles that are written to by this pass
-                foreach (var handle in renderPasses[i].texturesToCreate)
+                foreach (var handle in texturesToCreate[i])
                 {
                     handle.RenderTexture = RtHandleSystem.GetTexture(handle, FrameIndex);
                 }
 
                 // Now mark any textures that need to be released at the end of this pass as available
-                foreach (var output in renderPasses[i].textureToFree)
+                foreach (var output in textureToFree[i])
                 {
                     RtHandleSystem.MakeTextureAvailable(output, FrameIndex);
                 }
@@ -115,19 +111,6 @@ namespace Arycama.CustomRenderPipeline
             return BufferHandleSystem.GetBuffer(FrameIndex, count, stride, target, usageFlags);
         }
 
-        public void CleanupCurrentFrame()
-        {
-            renderPasses.Clear();
-            lastRtHandleRead.Clear();
-            createdTextures.Clear();
-
-            BufferHandleSystem.CleanupCurrentFrame(FrameIndex);
-            RtHandleSystem.FreeThisFramesTextures(FrameIndex);
-
-            if (!FrameDebugger.enabled)
-                FrameIndex++;
-        }
-
         public void SetRTHandleWrite(RTHandle handle, int passIndex)
         {
             if (handle.IsImported)
@@ -135,24 +118,26 @@ namespace Arycama.CustomRenderPipeline
 
             // If this texture has not been created already, add it to a list to be created
             if (createdTextures.Add(handle))
-                renderPasses[passIndex].texturesToCreate.Add(handle);
+                texturesToCreate[passIndex].Add(handle);
 
             // Also set this as read.. incase the texture never gets used, this will ensure it at least doesn't cause leaks
             // TODO: Better approach would be to not render passes whose outputs don't get used.. though I guess its possible that some outputs will get used, but not others
-            SetLastRTHandleRead(handle, passIndex);
+            RtHandleSystem.SetLastRTHandleRead(handle, passIndex);
         }
 
-        public void SetLastRTHandleRead(RTHandle handle, int passIndex)
+        public void CleanupCurrentFrame()
         {
-            // Persistent handles must be freed using release persistent texture
-            if (handle.IsPersistent)
-                return;
+            renderPasses.Clear();
+            createdTextures.Clear();
 
-            // Also don't add imported textures since they don't need to be allocated/released this way
-            if (handle.IsImported)
-                return;
+            BufferHandleSystem.CleanupCurrentFrame(FrameIndex);
+            RtHandleSystem.FreeThisFramesTextures(FrameIndex);
 
-            lastRtHandleRead[handle] = passIndex;
+            texturesToCreate.Clear();
+            textureToFree.Clear();
+
+            if (!FrameDebugger.enabled)
+                FrameIndex++;
         }
 
         public void SetResource<T>(T resource, bool isPersistent = false) where T : IRenderPassData

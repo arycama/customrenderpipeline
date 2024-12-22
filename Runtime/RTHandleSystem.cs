@@ -21,6 +21,8 @@ public class RTHandleSystem : IDisposable
     private int rtCount;
     private int screenWidth, screenHeight;
 
+    public readonly Dictionary<RTHandle, int> lastRtHandleRead = new();
+
     public RTHandleSystem(RenderGraph renderGraph)
     {
         this.renderGraph = renderGraph;
@@ -206,6 +208,21 @@ public class RTHandleSystem : IDisposable
             availableRenderTextures[i] = (null, renderTexture.lastFrameUsed, false, false);
             availableRtSlots.Enqueue(i);
         }
+
+        lastRtHandleRead.Clear();
+    }
+
+    public void SetLastRTHandleRead(RTHandle handle, int passIndex)
+    {
+        // Persistent handles must be freed using release persistent texture
+        if (handle.IsPersistent)
+            return;
+
+        // Also don't add imported textures since they don't need to be allocated/released this way
+        if (handle.IsImported)
+            return;
+
+        lastRtHandleRead[handle] = passIndex;
     }
 
     protected virtual void Dispose(bool disposing)

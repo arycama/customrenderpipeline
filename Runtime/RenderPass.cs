@@ -15,9 +15,6 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<(string, BufferHandle)> readBuffers = new();
         private readonly List<(string, BufferHandle)> writeBuffers = new();
 
-        public List<RTHandle> texturesToCreate = new();
-        public List<RTHandle> textureToFree = new();
-
         public List<(RenderPassDataHandle, bool)> RenderPassDataHandles { get; private set; } = new();
 
         protected CommandBuffer command;
@@ -58,7 +55,7 @@ namespace Arycama.CustomRenderPipeline
             Assert.IsFalse(RenderGraph.IsExecuting);
             Assert.IsNotNull(texture);
             readTextures.Add((propertyId, texture, mip, subElement));
-            RenderGraph.SetLastRTHandleRead(texture, Index);
+            RenderGraph.RtHandleSystem.SetLastRTHandleRead(texture, Index);
         }
 
         public void ReadTexture(string propertyName, RTHandle texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
