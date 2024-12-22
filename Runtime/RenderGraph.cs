@@ -15,12 +15,11 @@ namespace Arycama.CustomRenderPipeline
         public BufferHandleSystem BufferHandleSystem { get; }
 
         private readonly List<RenderPass> renderPasses = new();
-        private readonly Dictionary<int, List<RTHandle>> lastPassOutputs = new();
 
         public bool IsExecuting { get; private set; }
 
         private readonly Dictionary<RTHandle, int> lastRtHandleRead = new();
-        private readonly HashSet<RTHandle> writtenRTHandles = new();
+        private readonly HashSet<RTHandle> createdTextures = new();
 
         public BufferHandle EmptyBuffer { get; }
         public RTHandle EmptyTexture { get; }
@@ -76,35 +75,24 @@ namespace Arycama.CustomRenderPipeline
         {
             BufferHandleSystem.CreateBuffers();
             
-            // Build mapping from pass index to rt handles that can be freed
+            // We track the last pass index that an RThandle is read, so tell each render pass to release the texture at the end
+            // TODO: Change to a system where we simply store the release pass index in each RTHandle?
             foreach (var input in lastRtHandleRead)
             {
-                var list = lastPassOutputs.GetOrAdd(input.Value);
-                list.Add(input.Key);
+                renderPasses[input.Value].textureToFree.Add(input.Key);
             }
 
             for (var i = 0; i < renderPasses.Count; i++)
             {
                 // Assign or create any RTHandles that are written to by this pass
-                var outputs = renderPasses[i].passRTHandleOutputs;
-                foreach (var handle in outputs)
+                foreach (var handle in renderPasses[i].texturesToCreate)
                 {
-                    // Ignore imported textures
-                    if (handle.IsImported)
-                        continue;
-
                     handle.RenderTexture = RtHandleSystem.GetTexture(handle, FrameIndex);
                 }
 
-                // Release any textures if this was their final read
-                if (!lastPassOutputs.TryGetValue(i, out var outputsToFree))
-                    continue;
-
-                foreach (var output in outputsToFree)
+                // Now mark any textures that need to be released at the end of this pass as available
+                foreach (var output in renderPasses[i].textureToFree)
                 {
-                    if (output.IsImported)
-                        continue;
-
                     RtHandleSystem.MakeTextureAvailable(output, FrameIndex);
                 }
             }
@@ -131,13 +119,9 @@ namespace Arycama.CustomRenderPipeline
         {
             renderPasses.Clear();
             lastRtHandleRead.Clear();
-            writtenRTHandles.Clear();
-
-            foreach (var output in lastPassOutputs)
-                output.Value.Clear();
+            createdTextures.Clear();
 
             BufferHandleSystem.CleanupCurrentFrame(FrameIndex);
-
             RtHandleSystem.FreeThisFramesTextures(FrameIndex);
 
             if (!FrameDebugger.enabled)
@@ -149,10 +133,9 @@ namespace Arycama.CustomRenderPipeline
             if (handle.IsImported)
                 return;
 
-            if (!writtenRTHandles.Add(handle))
-                return;
-
-            renderPasses[passIndex].passRTHandleOutputs.Add(handle);
+            // If this texture has not been created already, add it to a list to be created
+            if (createdTextures.Add(handle))
+                renderPasses[passIndex].texturesToCreate.Add(handle);
 
             // Also set this as read.. incase the texture never gets used, this will ensure it at least doesn't cause leaks
             // TODO: Better approach would be to not render passes whose outputs don't get used.. though I guess its possible that some outputs will get used, but not others
@@ -163,6 +146,10 @@ namespace Arycama.CustomRenderPipeline
         {
             // Persistent handles must be freed using release persistent texture
             if (handle.IsPersistent)
+                return;
+
+            // Also don't add imported textures since they don't need to be allocated/released this way
+            if (handle.IsImported)
                 return;
 
             lastRtHandleRead[handle] = passIndex;

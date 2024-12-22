@@ -15,7 +15,8 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<(string, BufferHandle)> readBuffers = new();
         private readonly List<(string, BufferHandle)> writeBuffers = new();
 
-        public List<RTHandle> passRTHandleOutputs = new();
+        public List<RTHandle> texturesToCreate = new();
+        public List<RTHandle> textureToFree = new();
 
         public List<(RenderPassDataHandle, bool)> RenderPassDataHandles { get; private set; } = new();
 
@@ -67,13 +68,13 @@ namespace Arycama.CustomRenderPipeline
 
         protected void SetTextureWrite(RTHandle texture)
         {
-            if (!texture.IsPersistent || !texture.IsAssigned)
-            {
-                if (texture.IsPersistent)
-                    texture.IsAssigned = true;
+            if (texture.IsPersistent && texture.IsAssigned)
+                return;
 
-                RenderGraph.SetRTHandleWrite(texture, Index);
-            }
+            if (texture.IsPersistent)
+                texture.IsAssigned = true;
+
+            RenderGraph.SetRTHandleWrite(texture, Index);
         }
 
         public void ReadBuffer(string propertyName, BufferHandle buffer)
