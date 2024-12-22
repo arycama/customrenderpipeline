@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Assertions;
-using UnityEngine.Experimental.AI;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
@@ -16,9 +15,6 @@ namespace Arycama.CustomRenderPipeline
         public BufferHandleSystem BufferHandleSystem { get; }
 
         private readonly List<RenderPass> renderPasses = new();
-
-        private readonly Dictionary<Type, Queue<RenderPass>> renderPassPool = new();
-        private readonly Dictionary<Type, Queue<RenderGraphBuilder>> builderPool = new();
         private readonly Dictionary<int, List<RTHandle>> lastPassOutputs = new();
 
         public bool IsExecuting { get; private set; }
@@ -61,48 +57,17 @@ namespace Arycama.CustomRenderPipeline
 
         public T AddRenderPass<T>(string name) where T : RenderPass, new()
         {
-            var pool = renderPassPool.GetOrAdd(typeof(T));
-
-            if (!pool.TryDequeue(out var pass))
+            return new T
             {
-                pass = new T
-                {
-                    RenderGraph = this
-                };
-            }
-
-            pass.Name = name;
-            pass.Index = renderPasses.Count;
-
-            return pass as T;
+                RenderGraph = this,
+                Name = name,
+                Index = renderPasses.Count
+            };
         }
 
         public void AddRenderPassInternal(RenderPass renderPass)
         {
             renderPasses.Add(renderPass);
-        }
-
-        public RenderGraphBuilder GetRenderGraphBuilder()
-        {
-            var pool = builderPool.GetOrAdd(typeof(RenderGraphBuilder));
-            if (!pool.TryDequeue(out var value))
-                value = new RenderGraphBuilder();
-
-            return value;
-        }
-
-        public RenderGraphBuilder<T> GetRenderGraphBuilder<T>()
-        {
-            var pool = builderPool.GetOrAdd(typeof(RenderGraphBuilder<T>));
-            if (!pool.TryDequeue(out var value))
-                value = new RenderGraphBuilder<T>();
-
-            return value as RenderGraphBuilder<T>;
-        }
-
-        public void ReleaseRenderGraphBuilder(RenderGraphBuilder builder)
-        {
-            builderPool[builder.GetType()].Enqueue(builder);
         }
 
         public void Execute(CommandBuffer command)
@@ -164,10 +129,6 @@ namespace Arycama.CustomRenderPipeline
 
         public void CleanupCurrentFrame()
         {
-            // Release all pooled passes
-            foreach (var pass in renderPasses)
-                renderPassPool[pass.GetType()].Enqueue(pass);
-
             renderPasses.Clear();
             lastRtHandleRead.Clear();
             writtenRTHandles.Clear();

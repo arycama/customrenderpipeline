@@ -107,15 +107,7 @@ namespace Arycama.CustomRenderPipeline
         {
             // TODO: Make configurable
             command.BeginSample(Name);
-
             this.command = command;
-
-            // Set render pass data
-            //foreach(var renderPassDataHandle in renderPassDataHandles)
-            //{
-            //    var data = RenderGraph.GetResource<IRenderPassData>(renderPassDataHandle);
-            //    data.SetInputs(this);
-            //}
 
             // Move into some OnPreRender thing in buffer/RTHandles? 
             foreach (var texture in readTextures)
@@ -164,20 +156,8 @@ namespace Arycama.CustomRenderPipeline
             }
 
             Execute();
-
             PostExecute();
-
-            if (renderGraphBuilder != null)
-            {
-                RenderGraph.ReleaseRenderGraphBuilder(renderGraphBuilder);
-                renderGraphBuilder = null;
-            }
-
-            RenderPassDataHandles.Clear();
-
             command.EndSample(Name);
-
-            command = null;
         }
 
         protected abstract void SetupTargets();
@@ -189,14 +169,14 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetRenderFunction(Action<CommandBuffer, RenderPass> pass)
         {
-            var result = RenderGraph.GetRenderGraphBuilder();
+            var result = new RenderGraphBuilder();
             result.SetRenderFunction(pass);
             renderGraphBuilder = result;
         }
 
         public void SetRenderFunction<T>(T data, Action<CommandBuffer, RenderPass, T> pass)
         {
-            var result = RenderGraph.GetRenderGraphBuilder<T>();
+            var result = new RenderGraphBuilder<T>();
             result.Data = data;
             result.SetRenderFunction(pass);
             renderGraphBuilder = result;
