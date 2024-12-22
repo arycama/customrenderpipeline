@@ -25,7 +25,7 @@ namespace Arycama.CustomRenderPipeline
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/WaterShoreMask")) { hideFlags = HideFlags.HideAndDontSave };
-            resultDataBuffer = renderGraph.ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 1, UnsafeUtility.SizeOf<ResultData>()));
+            resultDataBuffer = renderGraph.BufferHandleSystem.ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 1, UnsafeUtility.SizeOf<ResultData>()));
 
             TerrainCallbacks.heightmapChanged += TerrainHeightmapChanged;
         }

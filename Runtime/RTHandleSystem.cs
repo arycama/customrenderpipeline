@@ -1,3 +1,4 @@
+using Arycama.CustomRenderPipeline;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -8,6 +9,7 @@ using Object = UnityEngine.Object;
 
 public class RTHandleSystem : IDisposable
 {
+    private RenderGraph renderGraph;
     private readonly Dictionary<RenderTexture, RTHandle> importedTextures = new();
     private int rtHandleCount;
     private bool disposedValue;
@@ -16,11 +18,17 @@ public class RTHandleSystem : IDisposable
     private readonly HashSet<RenderTexture> allRenderTextures = new();
     private readonly Queue<int> availableRtSlots = new();
     private int rtCount;
+    private int screenWidth, screenHeight;
+
+    public RTHandleSystem(RenderGraph renderGraph)
+    {
+        this.renderGraph = renderGraph;
+    }
 
     public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
     {
         // Ensure we're not getting a texture during execution, this must be done in the setup
-
+        Assert.IsFalse(renderGraph.IsExecuting);
         if (!availableRtHandles.TryDequeue(out var result))
         {
             result = new RTHandle
@@ -45,6 +53,12 @@ public class RTHandleSystem : IDisposable
         result.EnableRandomWrite = false;
 
         return result;
+    }
+
+    public void SetScreenSize(int width, int height)
+    {
+        screenWidth = Mathf.Max(width, screenWidth);
+        screenHeight = Mathf.Max(height, screenHeight);
     }
 
     public RTHandle ImportRenderTexture(RenderTexture renderTexture, bool autoGenerateMips = false)
@@ -92,7 +106,7 @@ public class RTHandleSystem : IDisposable
         availableRtHandles.Enqueue(handle);
     }
 
-    public RenderTexture GetTexture(RTHandle handle, int FrameIndex, int screenWidth, int screenHeight)
+    public RenderTexture GetTexture(RTHandle handle, int FrameIndex)
     {
         // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
         RenderTexture result = null;

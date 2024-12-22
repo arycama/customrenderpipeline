@@ -12,8 +12,8 @@ namespace Arycama.CustomRenderPipeline
 {
     public class RenderGraph : IDisposable
     {
-        private readonly RTHandleSystem rtHandleSystem;
-        private readonly BufferHandleSystem bufferHandleSystem;
+        public RTHandleSystem RtHandleSystem { get; }
+        public BufferHandleSystem BufferHandleSystem { get; }
 
         private readonly List<RenderPass> renderPasses = new();
 
@@ -40,39 +40,23 @@ namespace Arycama.CustomRenderPipeline
         public RenderResourceMap ResourceMap { get; }
         public CustomRenderPipeline RenderPipeline { get; }
 
-        private int screenWidth, screenHeight;
         private bool disposedValue;
 
         public RenderGraph(CustomRenderPipeline renderPipeline)
         {
-            rtHandleSystem = new();
-            bufferHandleSystem = new();
+            RtHandleSystem = new(this);
+            BufferHandleSystem = new(this);
 
-            EmptyBuffer = bufferHandleSystem.ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" });
-            EmptyTexture = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
-            EmptyUavTexture = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, enableRandomWrite = true });
-            EmptyTextureArray = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
-            Empty3DTexture = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
-            EmptyCubemap = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave });
-            EmptyCubemapArray = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
+            EmptyBuffer = BufferHandleSystem.ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" });
+            EmptyTexture = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
+            EmptyUavTexture = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, enableRandomWrite = true });
+            EmptyTextureArray = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
+            Empty3DTexture = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
+            EmptyCubemap = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave });
+            EmptyCubemapArray = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
 
             ResourceMap = new(this);
             RenderPipeline = renderPipeline;
-        }
-
-        public BufferHandle ImportBuffer(GraphicsBuffer buffer)
-        {
-            return bufferHandleSystem.ImportBuffer(buffer);
-        }
-
-        public void SetScreenWidth(int width)
-        {
-            screenWidth = Mathf.Max(width, screenWidth);
-        }
-
-        public void SetScreenHeight(int height)
-        {
-            screenHeight = Mathf.Max(height, screenHeight);
         }
 
         public T AddRenderPass<T>(string name) where T : RenderPass, new()
@@ -123,7 +107,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void Execute(CommandBuffer command)
         {
-            bufferHandleSystem.CreateBuffers();
+            BufferHandleSystem.CreateBuffers();
             
             // Build mapping from pass index to rt handles that can be freed
             foreach (var input in lastRtHandleRead)
@@ -143,7 +127,7 @@ namespace Arycama.CustomRenderPipeline
                         if (handle.IsImported)
                             continue;
 
-                        handle.RenderTexture = rtHandleSystem.GetTexture(handle, FrameIndex, screenWidth, screenHeight);
+                        handle.RenderTexture = RtHandleSystem.GetTexture(handle, FrameIndex);
                     }
                 }
 
@@ -156,7 +140,7 @@ namespace Arycama.CustomRenderPipeline
                     if (output.IsImported)
                         continue;
 
-                    rtHandleSystem.MakeTextureAvailable(output, FrameIndex);
+                    RtHandleSystem.MakeTextureAvailable(output, FrameIndex);
                 }
             }
 
@@ -170,16 +154,12 @@ namespace Arycama.CustomRenderPipeline
 
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
         {
-            Assert.IsFalse(IsExecuting);
-            return rtHandleSystem.GetTexture(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isPersistent, isExactSize);
+            return RtHandleSystem.GetTexture(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isPersistent, isExactSize);
         }
 
         public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None)
         {
-            // Ensure we're not getting a texture during execution, this must be done in the setup
-            Assert.IsFalse(IsExecuting);
-
-            return bufferHandleSystem.GetBuffer(FrameIndex, count, stride, target, usageFlags);
+            return BufferHandleSystem.GetBuffer(FrameIndex, count, stride, target, usageFlags);
         }
 
         public void CleanupCurrentFrame()
@@ -198,9 +178,9 @@ namespace Arycama.CustomRenderPipeline
             foreach (var output in lastPassOutputs)
                 output.Value.Clear();
 
-            bufferHandleSystem.CleanupCurrentFrame(FrameIndex);
+            BufferHandleSystem.CleanupCurrentFrame(FrameIndex);
 
-            rtHandleSystem.FreeThisFramesTextures(FrameIndex);
+            RtHandleSystem.FreeThisFramesTextures(FrameIndex);
 
             if (!FrameDebugger.enabled)
                 FrameIndex++;
@@ -248,24 +228,9 @@ namespace Arycama.CustomRenderPipeline
             return ResourceMap.GetRenderPassData<T>(FrameIndex);
         }
 
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposedValue)
-                return;
-
-            if (!disposing)
-                Debug.LogError("Render Graph not disposed correctly");
-
-            ResourceMap.Dispose();
-            rtHandleSystem.Dispose();
-            bufferHandleSystem.Dispose();
-            disposedValue = true;
-        }
-
         public BufferHandle SetConstantBuffer<T>(in T data) where T : struct
         {
-            var buffer = GetBuffer(1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite);
-
+            var buffer = BufferHandleSystem.GetBuffer(FrameIndex, 1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite);
             using (var pass = AddRenderPass<GlobalRenderPass>("Set Constant Buffer"))
             {
                 pass.SetRenderFunction((data, buffer), (command, pass, data) =>
@@ -277,6 +242,21 @@ namespace Arycama.CustomRenderPipeline
             }
 
             return buffer;
+        }
+
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposedValue)
+                return;
+
+            if (!disposing)
+                Debug.LogError("Render Graph not disposed correctly");
+
+            ResourceMap.Dispose();
+            RtHandleSystem.Dispose();
+            BufferHandleSystem.Dispose();
+            disposedValue = true;
         }
 
         ~RenderGraph()

@@ -1,3 +1,4 @@
+using Arycama.CustomRenderPipeline;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -12,6 +13,12 @@ public class BufferHandleSystem : IDisposable
     private readonly List<(BufferHandle handle, int lastFrameUsed)> availableBufferHandles = new();
     private readonly List<BufferHandle> usedBufferHandles = new();
     private bool disposedValue;
+    private readonly RenderGraph renderGraph;
+
+    public BufferHandleSystem(RenderGraph renderGraph)
+    {
+        this.renderGraph = renderGraph;
+    }
 
     public void CleanupCurrentFrame(int frameIndex)
     {
@@ -50,6 +57,8 @@ public class BufferHandleSystem : IDisposable
 
     public BufferHandle GetBuffer(int frameIndex, int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None)
     {
+        Assert.IsFalse(renderGraph.IsExecuting);
+
         Assert.IsTrue(count > 0);
         Assert.IsTrue(stride > 0);
 

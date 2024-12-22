@@ -29,7 +29,7 @@ namespace Arycama.CustomRenderPipeline
                     exposureBuffers.Add(viewData.ViewIndex, exposureBuffer);
                 }
 
-                var bufferHandle = renderGraph.ImportBuffer(exposureBuffer);
+                var bufferHandle = renderGraph.BufferHandleSystem.ImportBuffer(exposureBuffer);
 
                 // For first pass, set to 1.0f 
                 if (isFirst)
