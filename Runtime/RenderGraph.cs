@@ -13,15 +13,15 @@ namespace Arycama.CustomRenderPipeline
     {
         const int swapChainCount = 3;
 
+        private readonly RTHandleSystem rtHandleSystem;
+
         private readonly Dictionary<Type, Queue<RenderPass>> renderPassPool = new();
         private readonly Dictionary<Type, Queue<RenderGraphBuilder>> builderPool = new();
-        private readonly Dictionary<RenderTexture, RTHandle> importedTextures = new();
         private readonly Dictionary<GraphicsBuffer, BufferHandle> importedBuffers = new();
 
         private readonly List<RenderPass> renderPasses = new();
 
         // Maybe encapsulate these in a thing so it can also be used for buffers
-        private readonly Queue<RTHandle> availableRtHandles = new();
         private readonly Queue<int> availableRtSlots = new();
         private readonly List<(RenderTexture renderTexture, int lastFrameUsed, bool isAvailable, bool isPersistent)> availableRenderTextures = new();
 
@@ -52,20 +52,21 @@ namespace Arycama.CustomRenderPipeline
         public RenderResourceMap ResourceMap { get; }
         public CustomRenderPipeline RenderPipeline { get; }
 
-        private int rtHandleCount;
         private int rtCount;
         private int screenWidth, screenHeight;
         private bool disposedValue;
 
         public RenderGraph(CustomRenderPipeline renderPipeline)
         {
+            rtHandleSystem = new();
+
             EmptyBuffer = ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" });
-            EmptyTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
-            EmptyUavTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, enableRandomWrite = true });
-            EmptyTextureArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
-            Empty3DTexture = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
-            EmptyCubemap = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave });
-            EmptyCubemapArray = ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
+            EmptyTexture = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
+            EmptyUavTexture = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, enableRandomWrite = true });
+            EmptyTextureArray = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
+            Empty3DTexture = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
+            EmptyCubemap = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave });
+            EmptyCubemapArray = rtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
 
             ResourceMap = new(this);
             RenderPipeline = renderPipeline;
@@ -254,7 +255,7 @@ namespace Arycama.CustomRenderPipeline
                         continue;
 
                     availableRenderTextures[output.RenderTextureIndex] = (output.RenderTexture, FrameIndex, true, false);
-                    availableRtHandles.Enqueue(output);
+                    rtHandleSystem.MakeTextureAvailable(output);
                 }
             }
 
@@ -268,33 +269,8 @@ namespace Arycama.CustomRenderPipeline
 
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
         {
-            // Ensure we're not getting a texture during execution, this must be done in the setup
             Assert.IsFalse(IsExecuting);
-
-            if (!availableRtHandles.TryDequeue(out var result))
-            {
-                result = new RTHandle
-                {
-                    Id = rtHandleCount++
-                };
-            }
-
-            result.Width = width;
-            result.Height = height;
-            result.Format = format;
-            result.VolumeDepth = volumeDepth;
-            result.Dimension = dimension;
-            result.IsScreenTexture = isScreenTexture;
-            result.HasMips = hasMips;
-            result.AutoGenerateMips = autoGenerateMips;
-            result.IsPersistent = isPersistent;
-            result.IsAssigned = isPersistent ? false : true;
-            result.IsExactSize = isExactSize;
-
-            // This gets set automatically if a texture is written to by a compute shader
-            result.EnableRandomWrite = false;
-
-            return result;
+            return rtHandleSystem.GetTexture(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isPersistent, isExactSize);
         }
 
         public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None)
@@ -349,42 +325,7 @@ namespace Arycama.CustomRenderPipeline
             return result;
         }
 
-        public RTHandle ImportRenderTexture(RenderTexture renderTexture, bool autoGenerateMips = false)
-        {
-            if (importedTextures.TryGetValue(renderTexture, out var result))
-                return result;
 
-            // Ensure its created (Can happen with some RenderTextures that are imported as soon as created
-            if (!renderTexture.IsCreated())
-                _ = renderTexture.Create();
-
-            result = new RTHandle
-            {
-                Width = renderTexture.width,
-                Height = renderTexture.height,
-                Format = renderTexture.graphicsFormat,
-                EnableRandomWrite = renderTexture.enableRandomWrite,
-                VolumeDepth = renderTexture.volumeDepth,
-                Dimension = renderTexture.dimension,
-                RenderTexture = renderTexture,
-                HasMips = renderTexture.useMipMap,
-                AutoGenerateMips = autoGenerateMips,
-                Id = rtHandleCount++
-            };
-            importedTextures.Add(renderTexture, result);
-            result.IsImported = true;
-            result.IsScreenTexture = false;
-            result.IsAssigned = true;
-            result.IsExactSize = true;
-
-            return result;
-        }
-
-        public void ReleaseImportedTexture(RenderTexture texture)
-        {
-            var wasRemoved = importedTextures.Remove(texture);
-            Assert.IsTrue(wasRemoved, "Trying to release a non-imported texture");
-        }
 
         public BufferHandle ImportBuffer(GraphicsBuffer buffer)
         {
@@ -525,8 +466,7 @@ namespace Arycama.CustomRenderPipeline
                     handle.Value.Dispose();
             }
 
-            foreach (var importedRT in importedTextures)
-                Object.DestroyImmediate(importedRT.Key);
+            rtHandleSystem.Dispose();
 
             disposedValue = true;
         }
