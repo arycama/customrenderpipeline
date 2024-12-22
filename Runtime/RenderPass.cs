@@ -15,6 +15,8 @@ namespace Arycama.CustomRenderPipeline
         private readonly List<(string, BufferHandle)> readBuffers = new();
         private readonly List<(string, BufferHandle)> writeBuffers = new();
 
+        public List<RTHandle> passRTHandleOutputs = new();
+
         public List<(RenderPassDataHandle, bool)> RenderPassDataHandles { get; private set; } = new();
 
         protected CommandBuffer command;
@@ -164,7 +166,6 @@ namespace Arycama.CustomRenderPipeline
 
         void IDisposable.Dispose()
         {
-            RenderGraph.AddRenderPassInternal(this);
         }
 
         public void SetRenderFunction(Action<CommandBuffer, RenderPass> pass)

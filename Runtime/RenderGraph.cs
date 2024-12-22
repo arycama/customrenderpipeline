@@ -20,7 +20,6 @@ namespace Arycama.CustomRenderPipeline
         public bool IsExecuting { get; private set; }
 
         private readonly Dictionary<RTHandle, int> lastRtHandleRead = new();
-        private readonly Dictionary<int, List<RTHandle>> passRTHandleOutputs = new();
         private readonly HashSet<RTHandle> writtenRTHandles = new();
 
         public BufferHandle EmptyBuffer { get; }
@@ -57,12 +56,15 @@ namespace Arycama.CustomRenderPipeline
 
         public T AddRenderPass<T>(string name) where T : RenderPass, new()
         {
-            return new T
+            var result = new T
             {
                 RenderGraph = this,
                 Name = name,
                 Index = renderPasses.Count
             };
+
+            AddRenderPassInternal(result);
+            return result;
         }
 
         public void AddRenderPassInternal(RenderPass renderPass)
@@ -84,16 +86,14 @@ namespace Arycama.CustomRenderPipeline
             for (var i = 0; i < renderPasses.Count; i++)
             {
                 // Assign or create any RTHandles that are written to by this pass
-                if (passRTHandleOutputs.TryGetValue(i, out var outputs))
+                var outputs = renderPasses[i].passRTHandleOutputs;
+                foreach (var handle in outputs)
                 {
-                    foreach (var handle in outputs)
-                    {
-                        // Ignore imported textures
-                        if (handle.IsImported)
-                            continue;
+                    // Ignore imported textures
+                    if (handle.IsImported)
+                        continue;
 
-                        handle.RenderTexture = RtHandleSystem.GetTexture(handle, FrameIndex);
-                    }
+                    handle.RenderTexture = RtHandleSystem.GetTexture(handle, FrameIndex);
                 }
 
                 // Release any textures if this was their final read
@@ -132,7 +132,6 @@ namespace Arycama.CustomRenderPipeline
             renderPasses.Clear();
             lastRtHandleRead.Clear();
             writtenRTHandles.Clear();
-            passRTHandleOutputs.Clear();
 
             foreach (var output in lastPassOutputs)
                 output.Value.Clear();
@@ -153,8 +152,7 @@ namespace Arycama.CustomRenderPipeline
             if (!writtenRTHandles.Add(handle))
                 return;
 
-            var outputs = passRTHandleOutputs.GetOrAdd(passIndex);
-            outputs.Add(handle);
+            renderPasses[passIndex].passRTHandleOutputs.Add(handle);
 
             // Also set this as read.. incase the texture never gets used, this will ensure it at least doesn't cause leaks
             // TODO: Better approach would be to not render passes whose outputs don't get used.. though I guess its possible that some outputs will get used, but not others
