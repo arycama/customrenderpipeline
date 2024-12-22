@@ -117,9 +117,9 @@ namespace Arycama.CustomRenderPipeline
             IsExecuting = false;
         }
 
-        public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
+        public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
         {
-            return RtHandleSystem.GetTexture(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isPersistent, isExactSize);
+            return RtHandleSystem.GetTexture(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isPersistent);
         }
 
         public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None)
@@ -132,9 +132,7 @@ namespace Arycama.CustomRenderPipeline
             renderPasses.Clear();
             lastRtHandleRead.Clear();
             writtenRTHandles.Clear();
-
-            foreach (var list in passRTHandleOutputs)
-                list.Value.Clear();
+            passRTHandleOutputs.Clear();
 
             foreach (var output in lastPassOutputs)
                 output.Value.Clear();
