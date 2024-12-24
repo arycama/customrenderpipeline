@@ -25,7 +25,7 @@ public class RTHandleSystem : IDisposable
 
     public List<RTHandle> persistentRtHandles = new();
     public Queue<int> availablePersistentHandleIndices = new();
-    public readonly Dictionary<RTHandle, int> persistentRtHandleEndPasses = new();
+    public readonly List<int> persistentRtHandleEndPasses = new();
 
     public RTHandleSystem(RenderGraph renderGraph)
     {
@@ -45,6 +45,7 @@ public class RTHandleSystem : IDisposable
             {
                 index = persistentRtHandles.Count;
                 persistentRtHandles.Add(null); // TODO: Not sure if I like this. This is because we're adding an index that doesn't currently exist. 
+                persistentRtHandleEndPasses.Add(-1);
             }
         }
 
@@ -124,6 +125,7 @@ public class RTHandleSystem : IDisposable
         if(handle.IsPersistentInternal)
         {
             availablePersistentHandleIndices.Enqueue(handle.Index);
+            persistentRtHandleEndPasses[handle.Index] = -1;
         }
     }
 
@@ -229,7 +231,6 @@ public class RTHandleSystem : IDisposable
         }
 
         rtHandleEndPasses.Clear();
-        persistentRtHandleEndPasses.Clear();
         rtHandles.Clear();
     }
 
@@ -245,7 +246,7 @@ public class RTHandleSystem : IDisposable
 
         // Handles that were persistent but not anymore use a different index
         if (handle.IsPersistentInternal)
-            persistentRtHandleEndPasses[handle] = passIndex;
+            persistentRtHandleEndPasses[handle.Index] = passIndex;
         else
             rtHandleEndPasses[handle.Index] = passIndex;
     }

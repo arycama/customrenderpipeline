@@ -86,9 +86,21 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Also add any passes that need to free persistent rt handles
-            foreach (var input in RtHandleSystem.persistentRtHandleEndPasses)
+            //foreach (var input in RtHandleSystem.persistentRtHandleEndPasses)
+            //{
+            //    textureToFree[input.Value].Add(input.Key);
+            //}
+
+            for (var i = 0; i < RtHandleSystem.persistentRtHandleEndPasses.Count; i++)
             {
-                textureToFree[input.Value].Add(input.Key);
+                var lastReadPassIndex = RtHandleSystem.persistentRtHandleEndPasses[i];
+
+                // TODO: Assert? Result is never read
+                if (lastReadPassIndex == -1)
+                    continue;
+
+                var handle = RtHandleSystem.persistentRtHandles[i];
+                textureToFree[lastReadPassIndex].Add(handle);
             }
 
             for (var i = 0; i < renderPasses.Count; i++)
