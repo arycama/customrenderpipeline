@@ -9,46 +9,48 @@ using Object = UnityEngine.Object;
 
 public class RTHandleSystem : IDisposable
 {
-    private readonly RenderGraph renderGraph;
+    private RenderGraph renderGraph;
     private readonly Dictionary<RenderTexture, RTHandle> importedTextures = new();
-
+    private int rtHandleCount;
+    private bool disposedValue;
+    private readonly Queue<RTHandle> availableRtHandles = new();
     private readonly List<(RenderTexture renderTexture, int lastFrameUsed, bool isAvailable, bool isPersistent)> availableRenderTextures = new();
     private readonly HashSet<RenderTexture> allRenderTextures = new();
     private readonly Queue<int> availableRtSlots = new();
-
-    private int rtHandleCount;
-    private bool disposedValue;
     private int rtCount;
     private int screenWidth, screenHeight;
-
-    public readonly Dictionary<RTHandle, int> lastRtHandleRead = new();
 
     public RTHandleSystem(RenderGraph renderGraph)
     {
         this.renderGraph = renderGraph;
     }
 
-    public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
+    public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
     {
         // Ensure we're not getting a texture during execution, this must be done in the setup
         Assert.IsFalse(renderGraph.IsExecuting);
-
-        var result = new RTHandle
+        if (!availableRtHandles.TryDequeue(out var result))
         {
-            Id = rtHandleCount++,
-            Width = width,
-            Height = height,
-            Format = format,
-            VolumeDepth = volumeDepth,
-            Dimension = dimension,
-            IsScreenTexture = isScreenTexture,
-            HasMips = hasMips,
-            AutoGenerateMips = autoGenerateMips,
-            IsPersistent = isPersistent,
-            IsAssigned = isPersistent ? false : true,
-            // This gets set automatically if a texture is written to by a compute shader
-            EnableRandomWrite = false
-        };
+            result = new RTHandle
+            {
+                Id = rtHandleCount++
+            };
+        }
+
+        result.Width = width;
+        result.Height = height;
+        result.Format = format;
+        result.VolumeDepth = volumeDepth;
+        result.Dimension = dimension;
+        result.IsScreenTexture = isScreenTexture;
+        result.HasMips = hasMips;
+        result.AutoGenerateMips = autoGenerateMips;
+        result.IsPersistent = isPersistent;
+        result.IsAssigned = isPersistent ? false : true;
+        result.IsExactSize = isExactSize;
+
+        // This gets set automatically if a texture is written to by a compute shader
+        result.EnableRandomWrite = false;
 
         return result;
     }
@@ -79,13 +81,14 @@ public class RTHandleSystem : IDisposable
             RenderTexture = renderTexture,
             HasMips = renderTexture.useMipMap,
             AutoGenerateMips = autoGenerateMips,
-            Id = rtHandleCount++,
-            IsImported = true,
-            IsScreenTexture = false,
-            IsAssigned = true,
+            Id = rtHandleCount++
         };
-
         importedTextures.Add(renderTexture, result);
+        result.IsImported = true;
+        result.IsScreenTexture = false;
+        result.IsAssigned = true;
+        result.IsExactSize = true;
+
         allRenderTextures.Add(result);
 
         return result;
@@ -100,6 +103,7 @@ public class RTHandleSystem : IDisposable
     public void MakeTextureAvailable(RTHandle handle, int frameIndex)
     {
         availableRenderTextures[handle.RenderTextureIndex] = (handle.RenderTexture, frameIndex, true, false);
+        availableRtHandles.Enqueue(handle);
     }
 
     public RenderTexture GetTexture(RTHandle handle, int FrameIndex)
@@ -118,7 +122,13 @@ public class RTHandleSystem : IDisposable
             if ((isDepth && handle.Format != renderTexture.depthStencilFormat) || (!isDepth && handle.Format != renderTexture.graphicsFormat))
                 continue;
 
-           if (handle.IsScreenTexture)
+            // TODO: Use some enum instead?
+            if (handle.IsExactSize)
+            {
+                if (renderTexture.width != handle.Width || renderTexture.height != handle.Height)
+                    continue;
+            }
+            else if (handle.IsScreenTexture)
             {
                 // For screen textures, ensure we get a rendertexture that is the actual screen width/height
                 if (renderTexture.width != screenWidth || renderTexture.height != screenHeight)
@@ -162,6 +172,8 @@ public class RTHandleSystem : IDisposable
 
             result.name = $"{result.dimension} {(isDepth ? result.depthStencilFormat : result.graphicsFormat)} {width}x{height} {rtCount++}";
             _ = result.Create();
+
+            //Debug.Log($"Allocating {result.name}");
 
             // Get a slot for this render texture if possible
             if (!availableRtSlots.TryDequeue(out var slot))
@@ -208,21 +220,6 @@ public class RTHandleSystem : IDisposable
             availableRenderTextures[i] = (null, renderTexture.lastFrameUsed, false, false);
             availableRtSlots.Enqueue(i);
         }
-
-        lastRtHandleRead.Clear();
-    }
-
-    public void SetLastRTHandleRead(RTHandle handle, int passIndex)
-    {
-        // Persistent handles must be freed using release persistent texture
-        if (handle.IsPersistent)
-            return;
-
-        // Also don't add imported textures since they don't need to be allocated/released this way
-        if (handle.IsImported)
-            return;
-
-        lastRtHandleRead[handle] = passIndex;
     }
 
     protected virtual void Dispose(bool disposing)

@@ -55,7 +55,7 @@ namespace Arycama.CustomRenderPipeline
             Assert.IsFalse(RenderGraph.IsExecuting);
             Assert.IsNotNull(texture);
             readTextures.Add((propertyId, texture, mip, subElement));
-            RenderGraph.RtHandleSystem.SetLastRTHandleRead(texture, Index);
+            RenderGraph.SetLastRTHandleRead(texture, Index);
         }
 
         public void ReadTexture(string propertyName, RTHandle texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -65,13 +65,13 @@ namespace Arycama.CustomRenderPipeline
 
         protected void SetTextureWrite(RTHandle texture)
         {
-            if (texture.IsPersistent && texture.IsAssigned)
-                return;
+            if (!texture.IsPersistent || !texture.IsAssigned)
+            {
+                if (texture.IsPersistent)
+                    texture.IsAssigned = true;
 
-            if (texture.IsPersistent)
-                texture.IsAssigned = true;
-
-            RenderGraph.SetRTHandleWrite(texture, Index);
+                RenderGraph.SetRTHandleWrite(texture, Index);
+            }
         }
 
         public void ReadBuffer(string propertyName, BufferHandle buffer)
@@ -164,6 +164,7 @@ namespace Arycama.CustomRenderPipeline
 
         void IDisposable.Dispose()
         {
+            RenderGraph.AddRenderPassInternal(this);
         }
 
         public void SetRenderFunction(Action<CommandBuffer, RenderPass> pass)
