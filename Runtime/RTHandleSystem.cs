@@ -20,12 +20,12 @@ public class RTHandleSystem : IDisposable
     private int rtCount;
     private int screenWidth, screenHeight;
 
-    public readonly List<int> lastRtHandleRead = new();
     public List<RTHandle> rtHandles = new();
+    public readonly List<int> rtHandleEndPasses = new();
 
     public List<RTHandle> persistentRtHandles = new();
-    public Queue<int> persistentRtHandleFreeIndices = new();
-    public readonly Dictionary<RTHandle, int> lastPersistentRtHandleRead = new();
+    public Queue<int> availablePersistentHandleIndices = new();
+    public readonly Dictionary<RTHandle, int> persistentRtHandleEndPasses = new();
 
     public RTHandleSystem(RenderGraph renderGraph)
     {
@@ -41,7 +41,7 @@ public class RTHandleSystem : IDisposable
         }
         else
         {
-            if (!persistentRtHandleFreeIndices.TryDequeue(out index))
+            if (!availablePersistentHandleIndices.TryDequeue(out index))
             {
                 index = persistentRtHandles.Count;
                 persistentRtHandles.Add(null); // TODO: Not sure if I like this. This is because we're adding an index that doesn't currently exist. 
@@ -67,7 +67,7 @@ public class RTHandleSystem : IDisposable
         if (!isPersistent)
         {
             rtHandles.Add(result);
-            lastRtHandleRead.Add(-1);
+            rtHandleEndPasses.Add(-1);
         }
         else
         {
@@ -123,7 +123,7 @@ public class RTHandleSystem : IDisposable
         // If non persistent, no additional logic required since it will be re-created, but persistent needs to free its index
         if(handle.IsPersistentInternal)
         {
-            persistentRtHandleFreeIndices.Enqueue(handle.Index);
+            availablePersistentHandleIndices.Enqueue(handle.Index);
         }
     }
 
@@ -228,8 +228,8 @@ public class RTHandleSystem : IDisposable
             availableRtSlots.Enqueue(i);
         }
 
-        lastRtHandleRead.Clear();
-        lastPersistentRtHandleRead.Clear();
+        rtHandleEndPasses.Clear();
+        persistentRtHandleEndPasses.Clear();
         rtHandles.Clear();
     }
 
@@ -245,9 +245,9 @@ public class RTHandleSystem : IDisposable
 
         // Handles that were persistent but not anymore use a different index
         if (handle.IsPersistentInternal)
-            lastPersistentRtHandleRead[handle] = passIndex;
+            persistentRtHandleEndPasses[handle] = passIndex;
         else
-            lastRtHandleRead[handle.Index] = passIndex;
+            rtHandleEndPasses[handle.Index] = passIndex;
     }
 
     protected virtual void Dispose(bool disposing)

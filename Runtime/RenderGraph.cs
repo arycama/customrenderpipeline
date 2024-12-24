@@ -73,9 +73,9 @@ namespace Arycama.CustomRenderPipeline
 
             // We track the last pass index that an RThandle is read, so tell each render pass to release the texture at the end
             // TODO: Change to a system where we simply store the release pass index in each RTHandle?
-            for (var i = 0; i < RtHandleSystem.lastRtHandleRead.Count; i++)
+            for (var i = 0; i < RtHandleSystem.rtHandleEndPasses.Count; i++)
             {
-                var lastReadPassIndex = RtHandleSystem.lastRtHandleRead[i];
+                var lastReadPassIndex = RtHandleSystem.rtHandleEndPasses[i];
 
                 // TODO: Assert? Result is never read
                 if (lastReadPassIndex == -1)
@@ -86,7 +86,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Also add any passes that need to free persistent rt handles
-            foreach (var input in RtHandleSystem.lastPersistentRtHandleRead)
+            foreach (var input in RtHandleSystem.persistentRtHandleEndPasses)
             {
                 textureToFree[input.Value].Add(input.Key);
             }
