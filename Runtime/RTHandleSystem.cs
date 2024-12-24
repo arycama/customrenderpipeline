@@ -20,7 +20,7 @@ public class RTHandleSystem : IDisposable
     private int rtCount;
     private int screenWidth, screenHeight;
 
-    public readonly Dictionary<RTHandle, int> lastRtHandleRead = new();
+    public readonly List<int> lastRtHandleRead = new();
     public List<RTHandle> rtHandles = new();
 
     public List<RTHandle> persistentRtHandles = new();
@@ -67,6 +67,7 @@ public class RTHandleSystem : IDisposable
         if (!isPersistent)
         {
             rtHandles.Add(result);
+            lastRtHandleRead.Add(-1);
         }
         else
         {
@@ -246,7 +247,7 @@ public class RTHandleSystem : IDisposable
         if (handle.IsPersistentInternal)
             lastPersistentRtHandleRead[handle] = passIndex;
         else
-            lastRtHandleRead[handle] = passIndex;
+            lastRtHandleRead[handle.Index] = passIndex;
     }
 
     protected virtual void Dispose(bool disposing)
