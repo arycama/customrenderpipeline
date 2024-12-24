@@ -78,6 +78,12 @@ namespace Arycama.CustomRenderPipeline
                 textureToFree[input.Value].Add(input.Key);
             }
 
+            // Also add any passes that need to free persistent rt handles
+            foreach (var input in RtHandleSystem.lastPersistentRtHandleRead)
+            {
+                textureToFree[input.Value].Add(input.Key);
+            }
+
             for (var i = 0; i < renderPasses.Count; i++)
             {
                 // Assign or create any RTHandles that are written to by this pass

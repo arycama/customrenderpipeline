@@ -25,6 +25,7 @@ public class RTHandleSystem : IDisposable
 
     public List<RTHandle> persistentRtHandles = new();
     public Queue<int> persistentRtHandleFreeIndices = new();
+    public readonly Dictionary<RTHandle, int> lastPersistentRtHandleRead = new();
 
     public RTHandleSystem(RenderGraph renderGraph)
     {
@@ -64,9 +65,13 @@ public class RTHandleSystem : IDisposable
         };
 
         if (!isPersistent)
+        {
             rtHandles.Add(result);
+        }
         else
+        {
             persistentRtHandles[index] = result;
+        }
 
         return result;
     }
@@ -223,6 +228,7 @@ public class RTHandleSystem : IDisposable
         }
 
         lastRtHandleRead.Clear();
+        lastPersistentRtHandleRead.Clear();
         rtHandles.Clear();
     }
 
@@ -236,7 +242,11 @@ public class RTHandleSystem : IDisposable
         if (handle.IsImported)
             return;
 
-        lastRtHandleRead[handle] = passIndex;
+        // Handles that were persistent but not anymore use a different index
+        if (handle.IsPersistentInternal)
+            lastPersistentRtHandleRead[handle] = passIndex;
+        else
+            lastRtHandleRead[handle] = passIndex;
     }
 
     protected virtual void Dispose(bool disposing)
