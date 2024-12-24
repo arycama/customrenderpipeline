@@ -31,9 +31,14 @@ public class RTHandle
     public RenderTexture RenderTexture { get; set; }
     public int Index { get; }
 
-    public RTHandle(int index)
+    // Set for persistent RTs but cant be changed..
+    public bool IsPersistentInternal { get; }
+
+    public RTHandle(int index, bool isPersistent)
     {
         Index = index;
+        IsPersistentInternal = isPersistent;
+        IsPersistent = isPersistent;
     }
 
     public static implicit operator RenderTexture(RTHandle rtHandle)

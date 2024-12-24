@@ -23,6 +23,9 @@ public class RTHandleSystem : IDisposable
     public readonly Dictionary<RTHandle, int> lastRtHandleRead = new();
     public List<RTHandle> rtHandles = new();
 
+    public List<RTHandle> persistentRtHandles = new();
+    public Queue<int> persistentRtHandleFreeIndices = new();
+
     public RTHandleSystem(RenderGraph renderGraph)
     {
         this.renderGraph = renderGraph;
@@ -30,7 +33,21 @@ public class RTHandleSystem : IDisposable
 
     public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
     {
-        var result = new RTHandle(rtHandles.Count)
+        int index;
+        if(!isPersistent)
+        {
+            index = rtHandles.Count;
+        }
+        else
+        {
+            if (!persistentRtHandleFreeIndices.TryDequeue(out index))
+            {
+                index = persistentRtHandles.Count;
+                persistentRtHandles.Add(null); // TODO: Not sure if I like this. This is because we're adding an index that doesn't currently exist. 
+            }
+        }
+
+        var result = new RTHandle(index, isPersistent)
         {
             Id = rtHandleCount++,
             Width = width,
@@ -41,13 +58,15 @@ public class RTHandleSystem : IDisposable
             IsScreenTexture = isScreenTexture,
             HasMips = hasMips,
             AutoGenerateMips = autoGenerateMips,
-            IsPersistent = isPersistent,
-            IsAssigned = isPersistent ? false : true,
+            IsAssigned = !isPersistent,
             // This gets set automatically if a texture is written to by a compute shader
             EnableRandomWrite = false
         };
 
-        rtHandles.Add(result);
+        if (!isPersistent)
+            rtHandles.Add(result);
+        else
+            persistentRtHandles[index] = result;
 
         return result;
     }
@@ -67,7 +86,7 @@ public class RTHandleSystem : IDisposable
         if (!renderTexture.IsCreated())
             _ = renderTexture.Create();
 
-        result = new RTHandle(-1)
+        result = new RTHandle(-1, true)
         {
             Width = renderTexture.width,
             Height = renderTexture.height,
@@ -93,6 +112,13 @@ public class RTHandleSystem : IDisposable
     public void MakeTextureAvailable(RTHandle handle, int frameIndex)
     {
         availableRenderTextures[handle.RenderTextureIndex] = (handle.RenderTexture, frameIndex, true, false);
+
+        // Hrm
+        // If non persistent, no additional logic required since it will be re-created, but persistent needs to free its index
+        if(handle.IsPersistentInternal)
+        {
+            persistentRtHandleFreeIndices.Enqueue(handle.Index);
+        }
     }
 
     public RenderTexture GetTexture(RTHandle handle, int FrameIndex)
