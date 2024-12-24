@@ -126,7 +126,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Final combination pass
-            result = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R16G16B16A16_UNorm, isExactSize: true, isPersistent: true);
+            result = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R16G16B16A16_UNorm, isPersistent: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Water Shore Final Combine"))
             {
