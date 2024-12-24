@@ -2,7 +2,6 @@ using Arycama.CustomRenderPipeline;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
@@ -22,6 +21,7 @@ public class RTHandleSystem : IDisposable
     private int screenWidth, screenHeight;
 
     public readonly Dictionary<RTHandle, int> lastRtHandleRead = new();
+    public List<RTHandle> rtHandles = new();
 
     public RTHandleSystem(RenderGraph renderGraph)
     {
@@ -30,10 +30,7 @@ public class RTHandleSystem : IDisposable
 
     public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
     {
-        // Ensure we're not getting a texture during execution, this must be done in the setup
-        Assert.IsFalse(renderGraph.IsExecuting);
-
-        var result = new RTHandle
+        var result = new RTHandle(rtHandles.Count)
         {
             Id = rtHandleCount++,
             Width = width,
@@ -49,6 +46,8 @@ public class RTHandleSystem : IDisposable
             // This gets set automatically if a texture is written to by a compute shader
             EnableRandomWrite = false
         };
+
+        rtHandles.Add(result);
 
         return result;
     }
@@ -68,7 +67,7 @@ public class RTHandleSystem : IDisposable
         if (!renderTexture.IsCreated())
             _ = renderTexture.Create();
 
-        result = new RTHandle
+        result = new RTHandle(-1)
         {
             Width = renderTexture.width,
             Height = renderTexture.height,
@@ -91,12 +90,6 @@ public class RTHandleSystem : IDisposable
         return result;
     }
 
-    public void ReleaseImportedTexture(RenderTexture texture)
-    {
-        var wasRemoved = importedTextures.Remove(texture);
-        Assert.IsTrue(wasRemoved, "Trying to release a non-imported texture");
-    }
-
     public void MakeTextureAvailable(RTHandle handle, int frameIndex)
     {
         availableRenderTextures[handle.RenderTextureIndex] = (handle.RenderTexture, frameIndex, true, false);
@@ -113,8 +106,6 @@ public class RTHandleSystem : IDisposable
                 continue;
 
             var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-            Assert.IsNotNull(handle, "Handle is null in pass");
-            Assert.IsNotNull(renderTexture, "renderTexture is null in pass");
             if ((isDepth && handle.Format != renderTexture.depthStencilFormat) || (!isDepth && handle.Format != renderTexture.graphicsFormat))
                 continue;
 
@@ -133,8 +124,6 @@ public class RTHandleSystem : IDisposable
                     continue;
 
                 result = renderTexture;
-                Assert.IsNotNull(renderTexture);
-                Assert.IsTrue(renderTexture.IsCreated());
                 availableRenderTextures[j] = (renderTexture, lastFrameUsed, false, handle.IsPersistent);
                 handle.RenderTextureIndex = j;
                 break;
@@ -167,12 +156,10 @@ public class RTHandleSystem : IDisposable
             if (!availableRtSlots.TryDequeue(out var slot))
             {
                 slot = availableRenderTextures.Count;
-                Assert.IsNotNull(result);
                 availableRenderTextures.Add((result, FrameIndex, false, handle.IsPersistent));
             }
             else
             {
-                Assert.IsNotNull(result);
                 availableRenderTextures[slot] = (result, FrameIndex, false, handle.IsPersistent);
             }
 
@@ -210,6 +197,7 @@ public class RTHandleSystem : IDisposable
         }
 
         lastRtHandleRead.Clear();
+        rtHandles.Clear();
     }
 
     public void SetLastRTHandleRead(RTHandle handle, int passIndex)

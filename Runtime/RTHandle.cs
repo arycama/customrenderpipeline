@@ -29,6 +29,12 @@ public class RTHandle
     public bool IsAssigned { get; set; }
 
     public RenderTexture RenderTexture { get; set; }
+    public int Index { get; }
+
+    public RTHandle(int index)
+    {
+        Index = index;
+    }
 
     public static implicit operator RenderTexture(RTHandle rtHandle)
     {
