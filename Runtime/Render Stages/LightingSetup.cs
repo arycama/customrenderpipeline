@@ -383,6 +383,11 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Set Light Data"))
             {
+                pass.WriteBuffer("", directionalLightBuffer);
+                pass.WriteBuffer("", directionalShadowMatricesBuffer);
+                pass.WriteBuffer("", directionalShadowTexelSizesBuffer);
+                pass.WriteBuffer("", pointLightBuffer);
+
                 pass.SetRenderFunction(
                 (
                     directionalMatrixBuffer: directionalShadowMatricesBuffer,
@@ -396,16 +401,20 @@ namespace Arycama.CustomRenderPipeline
                 ),
                 (command, pass, data) =>
                 {
-                    command.SetBufferData(data.directionalMatrixBuffer, data.directionalShadowMatrices);
+                    //if (directionalShadowRequests.Count > 0)
+                    {
+                        command.SetBufferData(data.directionalMatrixBuffer, data.directionalShadowMatrices);
+                        command.SetBufferData(data.directionalTexelSizeBuffer, data.directionalShadowTexelSizes);
+                        command.SetBufferData(data.directionalLightBuffer, data.directionalLightList);
+                    }
+
                     ListPool<Matrix4x4>.Release(data.directionalShadowMatrices);
-
-                    command.SetBufferData(data.directionalTexelSizeBuffer, data.directionalShadowTexelSizes);
                     ListPool<Vector4>.Release(data.directionalShadowTexelSizes);
-
-                    command.SetBufferData(data.directionalLightBuffer, data.directionalLightList);
                     ListPool<DirectionalLightData>.Release(data.directionalLightList);
 
-                    command.SetBufferData(data.pointLightBuffer, data.lightList);
+                   // if(lightList.Count > 0)
+                        command.SetBufferData(data.pointLightBuffer, data.lightList);
+
                     ListPool<LightData>.Release(data.lightList);
                 });
             }

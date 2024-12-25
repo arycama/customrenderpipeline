@@ -192,6 +192,7 @@ namespace Arycama.CustomRenderPipeline
             var ambientBuffer = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Atmosphere Ambient Probe Copy"))
             {
+                pass.WriteBuffer("", ambientBuffer);
                 pass.SetRenderFunction((command, pass) =>
                 {
                     command.CopyBuffer(ambientBufferTemp, ambientBuffer);

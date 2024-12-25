@@ -33,7 +33,7 @@ namespace Arycama.CustomRenderPipeline
         public RenderGraph(CustomRenderPipeline renderPipeline)
         {
             RtHandleSystem = new();
-            BufferHandleSystem = new(this);
+            BufferHandleSystem = new();
 
             EmptyBuffer = BufferHandleSystem.ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" });
             EmptyTexture = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
@@ -60,7 +60,7 @@ namespace Arycama.CustomRenderPipeline
             if (!disposing)
                 Debug.LogError("Render Graph not disposed correctly");
 
-            EmptyBuffer.Dispose();
+            EmptyBuffer.Buffer.Dispose();
             Object.DestroyImmediate(EmptyTexture.RenderTexture);
             Object.DestroyImmediate(EmptyUavTexture.RenderTexture);
             Object.DestroyImmediate(EmptyTextureArray.RenderTexture);
@@ -95,8 +95,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void Execute(CommandBuffer command)
         {
-            BufferHandleSystem.CreateBuffers();
-
+            BufferHandleSystem.AllocateFrameTextures(renderPasses.Count, FrameIndex);
             RtHandleSystem.AllocateFrameTextures(renderPasses.Count, FrameIndex);
 
             IsExecuting = true;
@@ -109,17 +108,14 @@ namespace Arycama.CustomRenderPipeline
 
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
         {
+            Assert.IsFalse(IsExecuting);
             return RtHandleSystem.GetTexture(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isPersistent);
         }
 
-        public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None)
+        public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)
         {
-            return BufferHandleSystem.GetBuffer(FrameIndex, count, stride, target, usageFlags);
-        }
-
-        public void WriteTexture(RTHandle handle, int passIndex)
-        {
-            RtHandleSystem.WriteTexture(handle, passIndex);
+            Assert.IsFalse(IsExecuting);
+            return BufferHandleSystem.GetBuffer(FrameIndex, count, stride, target, usageFlags, isPersistent);
         }
 
         public void CleanupCurrentFrame()
@@ -155,6 +151,7 @@ namespace Arycama.CustomRenderPipeline
             var buffer = BufferHandleSystem.GetBuffer(FrameIndex, 1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite);
             using (var pass = AddRenderPass<GlobalRenderPass>("Set Constant Buffer"))
             {
+                pass.WriteBuffer("", buffer);
                 pass.SetRenderFunction((data, buffer), (command, pass, data) =>
                 {
                     var bufferData = data.buffer.Buffer.LockBufferForWrite<T>(0, 1);

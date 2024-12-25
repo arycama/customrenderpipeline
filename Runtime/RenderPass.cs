@@ -63,18 +63,15 @@ namespace Arycama.CustomRenderPipeline
             ReadTexture(Shader.PropertyToID(propertyName), texture, mip, subElement);
         }
 
-        protected void SetTextureWrite(RTHandle texture)
-        {
-            RenderGraph.WriteTexture(texture, Index);
-        }
-
         public void ReadBuffer(string propertyName, BufferHandle buffer)
         {
+            RenderGraph.BufferHandleSystem.ReadBuffer(buffer, Index);
             readBuffers.Add((propertyName, buffer));
         }
 
         public void WriteBuffer(string propertyName, BufferHandle buffer)
         {
+            RenderGraph.BufferHandleSystem.WriteBuffer(buffer, Index);
             writeBuffers.Add((propertyName, buffer));
         }
 

@@ -29,13 +29,13 @@ namespace Arycama.CustomRenderPipeline
 
         public void WriteTexture(RTHandle rtHandle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
         {
-            SetTextureWrite(rtHandle);
+            RenderGraph.RtHandleSystem.WriteTexture(rtHandle, Index);
             colorTargets.Add((rtHandle, loadAction, storeAction));
         }
 
         public void WriteDepth(RTHandle rtHandle, RenderTargetFlags renderTargetFlags = RenderTargetFlags.None, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
         {
-            SetTextureWrite(rtHandle);
+            RenderGraph.RtHandleSystem.WriteTexture(rtHandle, Index);
             this.renderTargetFlags = renderTargetFlags;
             depthBuffer = (rtHandle, loadAction, storeAction);
         }

@@ -146,6 +146,7 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Cloud Coverage Copy"))
             {
+                pass.WriteBuffer("", cloudCoverageBuffer);
                 pass.SetRenderFunction((command, pass) =>
                 {
                     command.CopyBuffer(cloudCoverageBufferTemp, cloudCoverageBuffer);

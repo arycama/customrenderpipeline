@@ -25,7 +25,7 @@ public class RTHandle
 
     // For persistent RT handles, they may get written to in some frames but not others, but we want to avoid re-allocating them
     // So set a flag to indicate they are already assigned
-    public bool IsCreated { get; set; }
+    public bool IsCreated { get; set; } = false;
 
     public RenderTexture RenderTexture { get; set; }
     public int Index { get; }

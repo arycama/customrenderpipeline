@@ -2,19 +2,23 @@
 using UnityEngine;
 using UnityEngine.Assertions;
 
-public class BufferHandle : IDisposable
+public class BufferHandle
 {
-    private bool disposedValue;
-
     public int Size { get; set; }
-    public GraphicsBuffer Buffer { get; private set; }
+    public GraphicsBuffer Buffer { get; set; }
 
     public GraphicsBuffer.Target Target { get; }
     public int Count { get; }
     public int Stride { get; }
     public GraphicsBuffer.UsageFlags UsageFlags { get; }
+    public bool IsPersistent { get; }
+    public bool IsNotReleasable { get; }
+    public bool IsCreated { get; set; }
+    public bool IsImported { get; }
+    public int Index { get; set; }
+    public int BufferIndex { get; set; }
 
-    public BufferHandle(GraphicsBuffer.Target target, int count, int stride, GraphicsBuffer.UsageFlags usageFlags)
+    public BufferHandle(GraphicsBuffer.Target target, int count, int stride, GraphicsBuffer.UsageFlags usageFlags, bool isPersistent)
     {
         Assert.IsTrue(count > 0);
         Assert.IsTrue(stride > 0);
@@ -24,6 +28,10 @@ public class BufferHandle : IDisposable
         Stride = stride;
         UsageFlags = usageFlags;
         Buffer = null;
+        IsPersistent = isPersistent;
+        IsNotReleasable = isPersistent;
+        IsCreated = false;
+        IsImported = false;
     }
 
     public BufferHandle(GraphicsBuffer graphicsBuffer)
@@ -33,47 +41,12 @@ public class BufferHandle : IDisposable
         Stride = graphicsBuffer.stride;
         Buffer = graphicsBuffer;
         Size = graphicsBuffer.count * graphicsBuffer.stride;
-    }
-
-    public void Create()
-    {
-        Assert.IsNull(Buffer);
-        Buffer = new GraphicsBuffer(Target, UsageFlags, Count, Stride)
-        {
-            name = $"BufferHandle {Target} {Count} {Stride}"
-        };
+        IsCreated = true;
+        IsImported = true;
     }
 
     public static implicit operator GraphicsBuffer(BufferHandle bufferHandle)
     {
         return bufferHandle.Buffer;
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposedValue)
-            return;
-
-        if (Buffer != null)
-        {
-            Buffer.Release();
-            Buffer = null;
-        }
-
-        if (!disposing)
-            Debug.LogError("Buffer Handle not disposed correctly");
-
-        disposedValue = true;
-    }
-
-    ~BufferHandle()
-    {
-        Dispose(disposing: false);
-    }
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
     }
 }

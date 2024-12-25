@@ -92,7 +92,6 @@ public class RTHandleSystem : IDisposable
             IsScreenTexture = isScreenTexture,
             HasMips = hasMips,
             AutoGenerateMips = autoGenerateMips,
-            IsCreated = false,
             // This gets set automatically if a texture is written to by a compute shader
             EnableRandomWrite = false
         };
@@ -160,7 +159,7 @@ public class RTHandleSystem : IDisposable
     public void ReadTexture(RTHandle handle, int passIndex)
     {
         // Ignore imported textures
-        if (handle.Index == -1)
+        if (handle.IsImported)
             return;
 
         // Do nothing for non-releasable persistent textures
@@ -173,7 +172,7 @@ public class RTHandleSystem : IDisposable
         list[handle.Index] = currentIndex;
     }
 
-    public RenderTexture AssignTexture(RTHandle handle, int FrameIndex)
+    private RenderTexture AssignTexture(RTHandle handle, int frameIndex)
     {
         // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
         RenderTexture result = null;
@@ -233,11 +232,11 @@ public class RTHandleSystem : IDisposable
             if (!availableRtSlots.TryDequeue(out var slot))
             {
                 slot = renderTextures.Count;
-                renderTextures.Add((result, FrameIndex, false, handle.IsNotReleasable));
+                renderTextures.Add((result, frameIndex, false, handle.IsNotReleasable));
             }
             else
             {
-                renderTextures[slot] = (result, FrameIndex, false, handle.IsNotReleasable);
+                renderTextures[slot] = (result, frameIndex, false, handle.IsNotReleasable);
             }
 
             handle.RenderTextureIndex = slot;

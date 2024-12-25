@@ -7,7 +7,7 @@ namespace Arycama.CustomRenderPipeline
     {
         public void WriteTexture(RTHandle rtHandle)
         {
-            SetTextureWrite(rtHandle);
+            RenderGraph.RtHandleSystem.WriteTexture(rtHandle, Index);
         }
 
         public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
