@@ -288,7 +288,6 @@ namespace Arycama.CustomRenderPipeline
         private static readonly Dictionary<LODGroup, LOD[]> lodCache = new();
         private static readonly Dictionary<GameObject, int> instanceTypeIdCache = new();
 
-
         private static List<InstanceRendererData> pendingInstanceData = new();
 
         private ComputeShader fillInstanceTypeIdShader;

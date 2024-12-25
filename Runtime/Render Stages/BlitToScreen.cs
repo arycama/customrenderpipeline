@@ -23,7 +23,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<CameraTargetData>();
 
-
                 var hdrSettings = HDROutputSettings.main;
                 //var minNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.minToneMapLuminance : settings.HdrMinNits;
                 //var maxNits = hdrSettings.available && settings.AutoDetectValues ? hdrSettings.maxToneMapLuminance : settings.HdrMaxNits;

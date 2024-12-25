@@ -16,7 +16,6 @@ namespace Arycama.CustomRenderPipeline
             this.lensSettings = lensSettings;
             computeShader = Resources.Load<ComputeShader>("PostProcessing/AutoExposure");
 
-
             var exposurePixels = ArrayPool<float>.Get(settings.ExposureResolution);
             for (var i = 0; i < settings.ExposureResolution; i++)
             {

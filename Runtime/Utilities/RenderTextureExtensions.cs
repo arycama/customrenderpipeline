@@ -84,7 +84,6 @@ namespace Arycama.CustomRenderPipeline
             Resize(renderTexture, width, height, depth, out _);
         }
 
-
         public static void Resize(this RenderTexture renderTexture, int width, int height, out bool hasChanged)
         {
             Resize(renderTexture, width, height, 1, out hasChanged);

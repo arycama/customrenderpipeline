@@ -10,7 +10,6 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle Shadow { get; }
         public int CascadeIndex { get; }
 
-
         public ShadowRequestData(ShadowRequest shadowRequest, float bias, float slopBias, RTHandle shadow, int cascadeIndex)
         {
             ShadowRequest = shadowRequest;

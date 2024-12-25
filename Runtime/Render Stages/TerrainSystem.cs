@@ -72,10 +72,10 @@ namespace Arycama.CustomRenderPipeline
 
         private void CleanupResources()
         {
-            minMaxHeight.IsReleasable = false;
-            heightmap.IsReleasable = false;
-            normalmap.IsReleasable = false;
-            idMap.IsReleasable = false;
+            minMaxHeight.IsNotReleasable = false;
+            heightmap.IsNotReleasable = false;
+            normalmap.IsNotReleasable = false;
+            idMap.IsNotReleasable = false;
             Object.DestroyImmediate(diffuseArray);
             Object.DestroyImmediate(normalMapArray);
             Object.DestroyImmediate(maskMapArray);

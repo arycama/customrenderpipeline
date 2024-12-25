@@ -158,7 +158,6 @@ namespace Arycama.CustomRenderPipeline
 
         void IDisposable.Dispose()
         {
-            RenderGraph.AddRenderPassInternal(this);
         }
 
         public void SetRenderFunction(Action<CommandBuffer, RenderPass> pass)

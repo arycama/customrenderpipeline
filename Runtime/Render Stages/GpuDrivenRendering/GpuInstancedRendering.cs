@@ -62,7 +62,6 @@ namespace Arycama.CustomRenderPipeline
                         command.DispatchNormalized(clearShader, 0, gpuInstanceBuffers.visibleRendererInstanceIndicesBuffer.count, 1, 1);
                     }
 
-
                     // Culling shader
                     //using (var profilerScope = command.ProfilerScope("Instance Cull"))
                     var isShadow = false; // TODO: Support?

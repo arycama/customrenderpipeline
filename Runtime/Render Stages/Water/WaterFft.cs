@@ -28,7 +28,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
         protected override void Cleanup(bool disposing)
         {
-            lengthToRoughness.IsReleasable = false;
+            lengthToRoughness.IsNotReleasable = false;
             spectrumBuffer.Dispose();
             dispersionBuffer.Dispose();
         }
@@ -118,7 +118,7 @@ namespace Arycama.CustomRenderPipeline.Water
             var hasDisplacementHistory = displacementHistory != null;
             displacementCurrent = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R16G16B16A16_SFloat, 4, TextureDimension.Tex2DArray, hasMips: true, isPersistent: true);
             if (hasDisplacementHistory)
-                displacementHistory.IsReleasable = false;
+                displacementHistory.IsNotReleasable = false;
             else
                 displacementHistory = displacementCurrent;
 

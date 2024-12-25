@@ -48,7 +48,6 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField, Range(-1.0f, 1.0f)] public float ForwardScatterPhase { get; private set; } = 0.8f;
             [field: SerializeField, Range(0.0f, 10.0f)] public float ForwardScatterScale { get; private set; } = 1.0f;
 
-
             [field: Header("Temporal")]
             [field: SerializeField, Range(0.0f, 1.0f)] public float StationaryBlend { get; private set; } = 0.95f;
             [field: SerializeField, Range(0.0f, 1.0f)] public float MotionBlend { get; private set; } = 0.0f;

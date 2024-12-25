@@ -16,7 +16,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly HashSet<RTHandle> createdTextures = new();
 
         private List<List<RTHandle>> texturesToCreate = new();
-        private List<List<RTHandle>> textureToFree = new();
+        private List<List<RTHandle>> texturesToFree = new();
 
         public RTHandleSystem RtHandleSystem { get; }
         public BufferHandleSystem BufferHandleSystem { get; }
@@ -62,7 +62,7 @@ namespace Arycama.CustomRenderPipeline
 
             renderPasses.Add(result);
             texturesToCreate.Add(new());
-            textureToFree.Add(new());
+            texturesToFree.Add(new());
 
             return result;
         }
@@ -71,30 +71,43 @@ namespace Arycama.CustomRenderPipeline
         {
             BufferHandleSystem.CreateBuffers();
 
-            // We track the last pass index that an RThandle is read, so tell each render pass to release the texture at the end
-            // TODO: Change to a system where we simply store the release pass index in each RTHandle?
-            for (var i = 0; i < RtHandleSystem.rtHandleEndPasses.Count; i++)
+            // Non-persistent create/free requests
+            for(var i = 0; i < RtHandleSystem.createList.Count; i++)
             {
-                var lastReadPassIndex = RtHandleSystem.rtHandleEndPasses[i];
-
-                // TODO: Assert? Result is never read
-                if (lastReadPassIndex == -1)
-                    continue;
-
-                var handle = RtHandleSystem.rtHandles[i];
-                textureToFree[lastReadPassIndex].Add(handle);
+                var passIndex = RtHandleSystem.createList[i];
+                texturesToCreate[passIndex].Add(RtHandleSystem.rtHandles[i]);
             }
 
-            for (var i = 0; i < RtHandleSystem.persistentRtHandleEndPasses.Count; i++)
+            for (var i = 0; i < RtHandleSystem.freeList.Count; i++)
             {
-                var lastReadPassIndex = RtHandleSystem.persistentRtHandleEndPasses[i];
+                var passIndex = RtHandleSystem.freeList[i];
 
-                // TODO: Assert? Result is never read
-                if (lastReadPassIndex == -1)
+                if (passIndex == -1)
+                {
+                    Debug.LogWarning($"Pass at index {passIndex} not read by any passes");
+                    continue;
+                }
+
+                texturesToFree[passIndex].Add(RtHandleSystem.rtHandles[i]);
+            }
+
+            // Persistent create/free requests
+            for (var i = 0; i < RtHandleSystem.persistentCreateList.Count; i++)
+            {
+                var passIndex = RtHandleSystem.persistentCreateList[i];
+                if (passIndex == -1)
                     continue;
 
-                var handle = RtHandleSystem.persistentRtHandles[i];
-                textureToFree[lastReadPassIndex].Add(handle);
+                texturesToCreate[passIndex].Add(RtHandleSystem.persistentRtHandles[i]);
+            }
+
+            for (var i = 0; i < RtHandleSystem.persistentFreeList.Count; i++)
+            {
+                var passIndex = RtHandleSystem.persistentFreeList[i];
+                if (passIndex == -1)
+                    continue;
+
+                texturesToFree[passIndex].Add(RtHandleSystem.persistentRtHandles[i]);
             }
 
             for (var i = 0; i < renderPasses.Count; i++)
@@ -102,13 +115,13 @@ namespace Arycama.CustomRenderPipeline
                 // Assign or create any RTHandles that are written to by this pass
                 foreach (var handle in texturesToCreate[i])
                 {
-                    handle.RenderTexture = RtHandleSystem.GetTexture(handle, FrameIndex);
+                    handle.RenderTexture = RtHandleSystem.AssignTexture(handle, FrameIndex);
                 }
 
                 // Now mark any textures that need to be released at the end of this pass as available
-                foreach (var output in textureToFree[i])
+                foreach (var output in texturesToFree[i])
                 {
-                    RtHandleSystem.MakeTextureAvailable(output, FrameIndex);
+                    RtHandleSystem.FreeTexture(output, FrameIndex);
                 }
             }
 
@@ -144,7 +157,7 @@ namespace Arycama.CustomRenderPipeline
             RtHandleSystem.FreeThisFramesTextures(FrameIndex);
 
             texturesToCreate.Clear();
-            textureToFree.Clear();
+            texturesToFree.Clear();
 
             if (!FrameDebugger.enabled)
                 FrameIndex++;
@@ -182,7 +195,6 @@ namespace Arycama.CustomRenderPipeline
 
             return buffer;
         }
-
 
         protected virtual void Dispose(bool disposing)
         {

@@ -227,7 +227,6 @@ namespace Arycama.CustomRenderPipeline
             // Coeffiecients for the first segment of the high range
             Vector3 cfh = new(C2.coefsHigh[0], C2.coefsHigh[1], C2.coefsHigh[2]);
 
-
             // transform the coefficients by the monomial matrix
             mul3(out var cflt, cfl, M);
             mul3(out var cfht, cfh, M);
@@ -267,7 +266,6 @@ namespace Arycama.CustomRenderPipeline
                 //  New spline values for the segment based on alterations to prior ranges
                 Vector3 cfh1 = new(C2.coefsHigh[j], C2.coefsHigh[j + 1], C2.coefsHigh[j + 2]);
 
-
                 mul3(out var cfht1, cfh1, M);
                 mul3(out var cfoht1, cfoh, M);
 
@@ -290,8 +288,6 @@ namespace Arycama.CustomRenderPipeline
 
             return C2;
         }
-
-
 
         public static SegmentedSplineParamsC9 GetAcesODTData(ODTCurve baseCurve, float minLuminance, float paperWhite, float maxLuminance, float outMax)
         {

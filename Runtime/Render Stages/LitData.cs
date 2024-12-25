@@ -52,11 +52,11 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Cleanup(bool disposing)
         {
-            directionalAlbedo.IsReleasable = false;
-            averageAlbedo.IsReleasable = false;
-            directionalAlbedoMs.IsReleasable = false;
-            averageAlbedoMs.IsReleasable = false;
-            specularOcclusion.IsReleasable = false;
+            directionalAlbedo.IsNotReleasable = false;
+            averageAlbedo.IsNotReleasable = false;
+            directionalAlbedoMs.IsNotReleasable = false;
+            averageAlbedoMs.IsNotReleasable = false;
+            specularOcclusion.IsNotReleasable = false;
 
             Object.DestroyImmediate(ltcData);
         }

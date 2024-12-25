@@ -22,7 +22,6 @@ namespace Arycama.CustomRenderPipeline
             [field: SerializeField] public Vector2 ProceduralRadii { get; private set; } = new(0.2f, 0.3f);
             [field: SerializeField, Min(0.0f)] public float ProceduralSoftness { get; private set; } = 0.5f;
 
-
             [field: Header("Exposure Compensation")]
             [field: SerializeField] public float ExposureCompensation { get; private set; } = 0.0f;
             [field: SerializeField] public int ExposureResolution { get; private set; } = 128;

@@ -24,10 +24,10 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Cleanup(bool disposing)
         {
-            transmittance.IsReleasable = false;
-            multiScatter.IsReleasable = false;
-            groundAmbient.IsReleasable = false;
-            skyAmbient.IsReleasable = false;
+            transmittance.IsNotReleasable = false;
+            multiScatter.IsNotReleasable = false;
+            groundAmbient.IsNotReleasable = false;
+            skyAmbient.IsNotReleasable = false;
         }
 
         public override void Render()

@@ -12,7 +12,7 @@ public class RTHandle
     public int VolumeDepth { get; set; }
     public TextureDimension Dimension { get; set; }
     internal bool IsImported { get; set; }
-    public bool IsReleasable { get; set; }
+    public bool IsNotReleasable { get; set; }
 
     public Vector3 Scale => new Vector3((float)Width / RenderTexture.width, (float)Height / RenderTexture.height, (float)VolumeDepth / RenderTexture.volumeDepth);
     public Vector3 Limit => new Vector3((Mathf.Floor(RenderTexture.width * Scale.x) - 0.5f) / RenderTexture.width, (Mathf.Floor(RenderTexture.height * Scale.y) - 0.5f) / RenderTexture.height, (Mathf.Floor(RenderTexture.volumeDepth * Scale.z) - 0.5f) / RenderTexture.volumeDepth);
@@ -38,7 +38,7 @@ public class RTHandle
     {
         Index = index;
         IsPersistent = isPersistent;
-        IsReleasable = isPersistent;
+        IsNotReleasable = isPersistent;
     }
 
     public static implicit operator RenderTexture(RTHandle rtHandle)

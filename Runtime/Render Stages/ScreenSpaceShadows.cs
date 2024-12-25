@@ -36,7 +36,6 @@ public class ScreenSpaceShadows : RenderFeature
         temporalCache.Dispose();
     }
 
-
     public override void Render()
     {
         var cullingResultsData = renderGraph.GetResource<CullingResultsData>();
