@@ -85,12 +85,6 @@ namespace Arycama.CustomRenderPipeline
                 textureToFree[lastReadPassIndex].Add(handle);
             }
 
-            // Also add any passes that need to free persistent rt handles
-            //foreach (var input in RtHandleSystem.persistentRtHandleEndPasses)
-            //{
-            //    textureToFree[input.Value].Add(input.Key);
-            //}
-
             for (var i = 0; i < RtHandleSystem.persistentRtHandleEndPasses.Count; i++)
             {
                 var lastReadPassIndex = RtHandleSystem.persistentRtHandleEndPasses[i];
@@ -136,18 +130,9 @@ namespace Arycama.CustomRenderPipeline
             return BufferHandleSystem.GetBuffer(FrameIndex, count, stride, target, usageFlags);
         }
 
-        public void SetRTHandleWrite(RTHandle handle, int passIndex)
+        public void WriteTexture(RTHandle handle, int passIndex)
         {
-            if (handle.IsImported)
-                return;
-
-            // If this texture has not been created already, add it to a list to be created
-            if (createdTextures.Add(handle))
-                texturesToCreate[passIndex].Add(handle);
-
-            // Also set this as read.. incase the texture never gets used, this will ensure it at least doesn't cause leaks
-            // TODO: Better approach would be to not render passes whose outputs don't get used.. though I guess its possible that some outputs will get used, but not others
-            RtHandleSystem.SetLastRTHandleRead(handle, passIndex);
+            RtHandleSystem.WriteTexture(handle, passIndex);
         }
 
         public void CleanupCurrentFrame()

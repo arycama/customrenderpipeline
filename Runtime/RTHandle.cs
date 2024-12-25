@@ -12,7 +12,7 @@ public class RTHandle
     public int VolumeDepth { get; set; }
     public TextureDimension Dimension { get; set; }
     internal bool IsImported { get; set; }
-    public bool IsPersistent { get; set; }
+    public bool IsReleasable { get; set; }
 
     public Vector3 Scale => new Vector3((float)Width / RenderTexture.width, (float)Height / RenderTexture.height, (float)VolumeDepth / RenderTexture.volumeDepth);
     public Vector3 Limit => new Vector3((Mathf.Floor(RenderTexture.width * Scale.x) - 0.5f) / RenderTexture.width, (Mathf.Floor(RenderTexture.height * Scale.y) - 0.5f) / RenderTexture.height, (Mathf.Floor(RenderTexture.volumeDepth * Scale.z) - 0.5f) / RenderTexture.volumeDepth);
@@ -26,19 +26,19 @@ public class RTHandle
 
     // For persistent RT handles, they may get written to in some frames but not others, but we want to avoid re-allocating them
     // So set a flag to indicate they are already assigned
-    public bool IsAssigned { get; set; }
+    public bool IsCreated { get; set; }
 
     public RenderTexture RenderTexture { get; set; }
     public int Index { get; }
 
     // Set for persistent RTs but cant be changed..
-    public bool IsPersistentInternal { get; }
+    public bool IsPersistent { get; }
 
     public RTHandle(int index, bool isPersistent)
     {
         Index = index;
-        IsPersistentInternal = isPersistent;
         IsPersistent = isPersistent;
+        IsReleasable = isPersistent;
     }
 
     public static implicit operator RenderTexture(RTHandle rtHandle)

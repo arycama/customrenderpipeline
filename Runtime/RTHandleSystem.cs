@@ -21,11 +21,11 @@ public class RTHandleSystem : IDisposable
     private int screenWidth, screenHeight;
 
     public List<RTHandle> rtHandles = new();
-    public readonly List<int> rtHandleEndPasses = new();
-
     public List<RTHandle> persistentRtHandles = new();
     public Queue<int> availablePersistentHandleIndices = new();
-    public readonly List<int> persistentRtHandleEndPasses = new();
+
+    public List<int> createList = new(), freeList = new();
+    public List<int> persistentCreateList = new(), persistentFreeList = new();
 
     public RTHandleSystem(RenderGraph renderGraph)
     {
@@ -45,7 +45,6 @@ public class RTHandleSystem : IDisposable
             {
                 index = persistentRtHandles.Count;
                 persistentRtHandles.Add(null); // TODO: Not sure if I like this. This is because we're adding an index that doesn't currently exist. 
-                persistentRtHandleEndPasses.Add(-1);
             }
         }
 
@@ -60,7 +59,7 @@ public class RTHandleSystem : IDisposable
             IsScreenTexture = isScreenTexture,
             HasMips = hasMips,
             AutoGenerateMips = autoGenerateMips,
-            IsAssigned = !isPersistent,
+            IsCreated = !isPersistent,
             // This gets set automatically if a texture is written to by a compute shader
             EnableRandomWrite = false
         };
@@ -68,11 +67,14 @@ public class RTHandleSystem : IDisposable
         if (!isPersistent)
         {
             rtHandles.Add(result);
-            rtHandleEndPasses.Add(-1);
+            createList.Add(-1);
+            freeList.Add(-1);
         }
         else
         {
             persistentRtHandles[index] = result;
+            persistentCreateList.Add(-1);
+            persistentFreeList.Add(-1);
         }
 
         return result;
@@ -107,7 +109,7 @@ public class RTHandleSystem : IDisposable
             Id = rtHandleCount++,
             IsImported = true,
             IsScreenTexture = false,
-            IsAssigned = true,
+            IsCreated = true,
         };
 
         importedTextures.Add(renderTexture, result);
@@ -122,10 +124,10 @@ public class RTHandleSystem : IDisposable
 
         // Hrm
         // If non persistent, no additional logic required since it will be re-created, but persistent needs to free its index
-        if(handle.IsPersistentInternal)
+        if(handle.IsPersistent)
         {
             availablePersistentHandleIndices.Enqueue(handle.Index);
-            persistentRtHandleEndPasses[handle.Index] = -1;
+            persistentFreeList[handle.Index] = -1; // Set to -1 to indicate this doesn't need to be freed again
         }
     }
 
@@ -158,7 +160,7 @@ public class RTHandleSystem : IDisposable
                     continue;
 
                 result = renderTexture;
-                availableRenderTextures[j] = (renderTexture, lastFrameUsed, false, handle.IsPersistent);
+                availableRenderTextures[j] = (renderTexture, lastFrameUsed, false, handle.IsReleasable);
                 handle.RenderTextureIndex = j;
                 break;
             }
@@ -190,11 +192,11 @@ public class RTHandleSystem : IDisposable
             if (!availableRtSlots.TryDequeue(out var slot))
             {
                 slot = availableRenderTextures.Count;
-                availableRenderTextures.Add((result, FrameIndex, false, handle.IsPersistent));
+                availableRenderTextures.Add((result, FrameIndex, false, handle.IsReleasable));
             }
             else
             {
-                availableRenderTextures[slot] = (result, FrameIndex, false, handle.IsPersistent);
+                availableRenderTextures[slot] = (result, FrameIndex, false, handle.IsReleasable);
             }
 
             handle.RenderTextureIndex = slot;
@@ -230,25 +232,54 @@ public class RTHandleSystem : IDisposable
             availableRtSlots.Enqueue(i);
         }
 
-        rtHandleEndPasses.Clear();
         rtHandles.Clear();
+
+        createList.Clear();
+        freeList.Clear();
+        persistentCreateList.Clear();
+        persistentFreeList.Clear();
     }
 
-    public void SetLastRTHandleRead(RTHandle handle, int passIndex)
+    public void ReadTexture(RTHandle handle, int passIndex)
     {
-        // Persistent handles must be freed using release persistent texture
         if (handle.IsPersistent)
-            return;
+        {
+            // If still marked as persistent
+            if(handle.IsReleasable)
+            {
+                var currentIndex = persistentFreeList[handle.Index];
+                persistentFreeList[handle.Index] = Math.Max(currentIndex, passIndex);
+            }
+        }
+        else
+        {
+            // We want to keep the latest index
+            var currentIndex = freeList[handle.Index];
+            freeList[handle.Index] = Math.Max(currentIndex, passIndex);
+        }
+    }
 
-        // Also don't add imported textures since they don't need to be allocated/released this way
+    public void WriteTexture(RTHandle handle, int passIndex)
+    {
+        // Imported handles don't need create/free logic
         if (handle.IsImported)
             return;
 
-        // Handles that were persistent but not anymore use a different index
-        if (handle.IsPersistentInternal)
-            persistentRtHandleEndPasses[handle.Index] = passIndex;
+        if (handle.IsPersistent)
+        {
+            if (!handle.IsCreated)
+            {
+                var createIndex = persistentCreateList[handle.Index];
+                createIndex = createIndex == -1 ? passIndex : Math.Min(passIndex, createIndex);
+                persistentCreateList[handle.Index] = createIndex;
+            }
+        }
         else
-            rtHandleEndPasses[handle.Index] = passIndex;
+        {
+            var createIndex = createList[handle.Index];
+            createIndex = createIndex == -1 ? passIndex : Math.Min(passIndex, createIndex);
+            createList[handle.Index] = createIndex;
+        }
     }
 
     protected virtual void Dispose(bool disposing)

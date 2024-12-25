@@ -48,7 +48,7 @@ namespace Arycama.CustomRenderPipeline
                 return;
 
             if (terrain != null)
-                result.IsPersistent = false;
+                result.IsReleasable = false;
 
             lastVersion = version;
             terrain = Terrain.activeTerrain;
@@ -126,7 +126,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Final combination pass
-            result = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R16G16B16A16_UNorm, isPersistent: true);
+            result = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R16G16B16A16_UNorm, isExactSize: true, isPersistent: true);
 
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Water Shore Final Combine"))
             {
