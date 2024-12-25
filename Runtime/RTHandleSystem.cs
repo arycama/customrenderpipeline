@@ -15,21 +15,53 @@ public class RTHandleSystem : IDisposable
     private readonly HashSet<RenderTexture> allRenderTextures = new();
     private readonly Queue<int> availableRtSlots = new();
 
-    private int rtHandleCount;
     private bool disposedValue;
     private int rtCount;
     private int screenWidth, screenHeight;
 
-    public List<RTHandle> rtHandles = new();
-    public List<RTHandle> persistentRtHandles = new();
-    public Queue<int> availablePersistentHandleIndices = new();
+    private readonly List<RTHandle> rtHandles = new();
+    private readonly List<int> createList = new(), freeList = new();
 
-    public List<int> createList = new(), freeList = new();
-    public List<int> persistentCreateList = new(), persistentFreeList = new();
+    private readonly List<RTHandle> persistentRtHandles = new();
+    private readonly Queue<int> availablePersistentHandleIndices = new();
+    private readonly List<int> persistentCreateList = new(), persistentFreeList = new();
 
     public RTHandleSystem(RenderGraph renderGraph)
     {
         this.renderGraph = renderGraph;
+    }
+
+    ~RTHandleSystem()
+    {
+        Dispose(false);
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+        if (disposedValue)
+        {
+            Debug.LogError("Disposing an already disposed RTHandleSystem");
+            return;
+        }
+
+        if (!disposing)
+            Debug.LogError("RT Handle System not disposed correctly");
+
+        foreach (var rt in allRenderTextures)
+        {
+            // Since we don't remove null entries, but rather leave them as "empty", they could be null
+            // Also because of the above thing destroying imported textures.. which doesn't really make as much sense, but eh
+            if (rt != null)
+                Object.DestroyImmediate(rt);
+        }
+
+        disposedValue = true;
     }
 
     public void SetScreenSize(int width, int height)
@@ -48,6 +80,8 @@ public class RTHandleSystem : IDisposable
                 index = persistentRtHandles.Count;
                 // TODO: Not sure if I like this. This is because we're adding an index that doesn't currently exist. 
                 persistentRtHandles.Add(null);
+                persistentCreateList.Add(-1);
+                persistentFreeList.Add(-1);
             }
         }
         else
@@ -57,7 +91,6 @@ public class RTHandleSystem : IDisposable
 
         var result = new RTHandle(index, isPersistent)
         {
-            Id = rtHandleCount++,
             Width = width,
             Height = height,
             Format = format,
@@ -74,8 +107,6 @@ public class RTHandleSystem : IDisposable
         if (isPersistent)
         {
             persistentRtHandles[index] = result;
-            persistentCreateList.Add(-1);
-            persistentFreeList.Add(-1);
         }
         else
         {
@@ -107,15 +138,12 @@ public class RTHandleSystem : IDisposable
             RenderTexture = renderTexture,
             HasMips = renderTexture.useMipMap,
             AutoGenerateMips = autoGenerateMips,
-            Id = rtHandleCount++,
             IsImported = true,
             IsScreenTexture = false,
             IsCreated = true,
         };
 
         importedTextures.Add(renderTexture, result);
-        allRenderTextures.Add(result);
-
         return result;
     }
 
@@ -246,7 +274,64 @@ public class RTHandleSystem : IDisposable
         }
     }
 
-    public void FreeThisFramesTextures(int frameIndex)
+    public void AllocateFrameTextures(int renderPassCount, int frameIndex)
+    {
+        List<List<RTHandle>> texturesToCreate = new();
+        List<List<RTHandle>> texturesToFree = new();
+
+        for(var i = 0; i < renderPassCount; i++)
+        {
+            texturesToCreate.Add(new());
+            texturesToFree.Add(new());
+        }
+
+        // Non-persistent create/free requests
+        for (var i = 0; i < createList.Count; i++)
+        {
+            var passIndex = createList[i];
+            if (passIndex != -1)
+                texturesToCreate[passIndex].Add(rtHandles[i]);
+        }
+
+        for (var i = 0; i < freeList.Count; i++)
+        {
+            var passIndex = freeList[i];
+            if (passIndex != -1)
+                texturesToFree[passIndex].Add(rtHandles[i]);
+        }
+
+        // Persistent create/free requests
+        for (var i = 0; i < persistentCreateList.Count; i++)
+        {
+            var passIndex = persistentCreateList[i];
+            if (passIndex != -1)
+                texturesToCreate[passIndex].Add(persistentRtHandles[i]);
+        }
+
+        for (var i = 0; i < persistentFreeList.Count; i++)
+        {
+            var passIndex = persistentFreeList[i];
+            if (passIndex != -1)
+                texturesToFree[passIndex].Add(persistentRtHandles[i]);
+        }
+
+        for (var i = 0; i < renderPassCount; i++)
+        {
+            // Assign or create any RTHandles that are written to by this pass
+            foreach (var handle in texturesToCreate[i])
+            {
+                handle.RenderTexture = AssignTexture(handle, frameIndex);
+            }
+
+            // Now mark any textures that need to be released at the end of this pass as available
+            foreach (var output in texturesToFree[i])
+            {
+                FreeTexture(output, frameIndex);
+            }
+        }
+    }
+
+    public void CleanupCurrentFrame(int frameIndex)
     {
         // Release any render textures that have not been used for at least a frame
         for (var i = 0; i < availableRenderTextures.Count; i++)
@@ -274,44 +359,7 @@ public class RTHandleSystem : IDisposable
         }
 
         rtHandles.Clear();
-
         createList.Clear();
         freeList.Clear();
-    }
-
-    protected virtual void Dispose(bool disposing)
-    {
-        if (disposedValue)
-        {
-            Debug.LogError("Disposing an already disposed RTHandleSystem");
-            return;
-        }
-
-        if (!disposing)
-            Debug.LogError("RT Handle System not disposed correctly");
-
-        foreach (var importedRT in importedTextures)
-            Object.DestroyImmediate(importedRT.Key);
-
-        foreach (var rt in allRenderTextures)
-        {
-            // Since we don't remove null entries, but rather leave them as "empty", they could be null
-            // Also because of the above thing destroying imported textures.. which doesn't really make as much sense, but eh
-            if (rt != null)
-                Object.DestroyImmediate(rt);
-        }
-
-        disposedValue = true;
-    }
-
-    ~RTHandleSystem()
-    {
-        Dispose(false);
-    }
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
     }
 }

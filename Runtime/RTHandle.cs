@@ -4,7 +4,6 @@ using UnityEngine.Rendering;
 
 public class RTHandle
 {
-    public int Id { get; set; }
     public int Width { get; set; }
     public int Height { get; set; }
     public GraphicsFormat Format { get; set; }
@@ -53,6 +52,6 @@ public class RTHandle
 
     public override string ToString()
     {
-        return $"RTHandle {Id} {Dimension} {Format} {Width}x{Height} ";
+        return $"RTHandle {Dimension} {Format} {Width}x{Height} ";
     }
 }

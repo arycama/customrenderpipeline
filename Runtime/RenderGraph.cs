@@ -13,10 +13,6 @@ namespace Arycama.CustomRenderPipeline
     {
         private bool disposedValue;
         private readonly List<RenderPass> renderPasses = new();
-        private readonly HashSet<RTHandle> createdTextures = new();
-
-        private List<List<RTHandle>> texturesToCreate = new();
-        private List<List<RTHandle>> texturesToFree = new();
 
         public RTHandleSystem RtHandleSystem { get; }
         public BufferHandleSystem BufferHandleSystem { get; }
@@ -51,6 +47,39 @@ namespace Arycama.CustomRenderPipeline
             RenderPipeline = renderPipeline;
         }
 
+        ~RenderGraph()
+        {
+            Dispose(false);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (disposedValue)
+                return;
+
+            if (!disposing)
+                Debug.LogError("Render Graph not disposed correctly");
+
+            EmptyBuffer.Dispose();
+            Object.DestroyImmediate(EmptyTexture.RenderTexture);
+            Object.DestroyImmediate(EmptyUavTexture.RenderTexture);
+            Object.DestroyImmediate(EmptyTextureArray.RenderTexture);
+            Object.DestroyImmediate(Empty3DTexture.RenderTexture);
+            Object.DestroyImmediate(EmptyCubemap.RenderTexture);
+            Object.DestroyImmediate(EmptyCubemapArray.RenderTexture);
+
+            ResourceMap.Dispose();
+            RtHandleSystem.Dispose();
+            BufferHandleSystem.Dispose();
+            disposedValue = true;
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
         public T AddRenderPass<T>(string name) where T : RenderPass, new()
         {
             var result = new T
@@ -61,9 +90,6 @@ namespace Arycama.CustomRenderPipeline
             };
 
             renderPasses.Add(result);
-            texturesToCreate.Add(new());
-            texturesToFree.Add(new());
-
             return result;
         }
 
@@ -71,59 +97,7 @@ namespace Arycama.CustomRenderPipeline
         {
             BufferHandleSystem.CreateBuffers();
 
-            // Non-persistent create/free requests
-            for(var i = 0; i < RtHandleSystem.createList.Count; i++)
-            {
-                var passIndex = RtHandleSystem.createList[i];
-                texturesToCreate[passIndex].Add(RtHandleSystem.rtHandles[i]);
-            }
-
-            for (var i = 0; i < RtHandleSystem.freeList.Count; i++)
-            {
-                var passIndex = RtHandleSystem.freeList[i];
-
-                if (passIndex == -1)
-                {
-                    Debug.LogWarning($"Pass at index {passIndex} not read by any passes");
-                    continue;
-                }
-
-                texturesToFree[passIndex].Add(RtHandleSystem.rtHandles[i]);
-            }
-
-            // Persistent create/free requests
-            for (var i = 0; i < RtHandleSystem.persistentCreateList.Count; i++)
-            {
-                var passIndex = RtHandleSystem.persistentCreateList[i];
-                if (passIndex == -1)
-                    continue;
-
-                texturesToCreate[passIndex].Add(RtHandleSystem.persistentRtHandles[i]);
-            }
-
-            for (var i = 0; i < RtHandleSystem.persistentFreeList.Count; i++)
-            {
-                var passIndex = RtHandleSystem.persistentFreeList[i];
-                if (passIndex == -1)
-                    continue;
-
-                texturesToFree[passIndex].Add(RtHandleSystem.persistentRtHandles[i]);
-            }
-
-            for (var i = 0; i < renderPasses.Count; i++)
-            {
-                // Assign or create any RTHandles that are written to by this pass
-                foreach (var handle in texturesToCreate[i])
-                {
-                    handle.RenderTexture = RtHandleSystem.AssignTexture(handle, FrameIndex);
-                }
-
-                // Now mark any textures that need to be released at the end of this pass as available
-                foreach (var output in texturesToFree[i])
-                {
-                    RtHandleSystem.FreeTexture(output, FrameIndex);
-                }
-            }
+            RtHandleSystem.AllocateFrameTextures(renderPasses.Count, FrameIndex);
 
             IsExecuting = true;
 
@@ -151,13 +125,9 @@ namespace Arycama.CustomRenderPipeline
         public void CleanupCurrentFrame()
         {
             renderPasses.Clear();
-            createdTextures.Clear();
 
             BufferHandleSystem.CleanupCurrentFrame(FrameIndex);
-            RtHandleSystem.FreeThisFramesTextures(FrameIndex);
-
-            texturesToCreate.Clear();
-            texturesToFree.Clear();
+            RtHandleSystem.CleanupCurrentFrame(FrameIndex);
 
             if (!FrameDebugger.enabled)
                 FrameIndex++;
@@ -194,32 +164,6 @@ namespace Arycama.CustomRenderPipeline
             }
 
             return buffer;
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposedValue)
-                return;
-
-            if (!disposing)
-                Debug.LogError("Render Graph not disposed correctly");
-
-            ResourceMap.Dispose();
-            RtHandleSystem.Dispose();
-            BufferHandleSystem.Dispose();
-            disposedValue = true;
-        }
-
-        ~RenderGraph()
-        {
-            Dispose(disposing: false);
-        }
-
-        public void Dispose()
-        {
-            // Do not change this code. Put cleanup code in 'Dispose(bool disposing)' method
-            Dispose(disposing: true);
-            GC.SuppressFinalize(this);
         }
     }
 }
