@@ -1,4 +1,3 @@
-using Arycama.CustomRenderPipeline;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -8,11 +7,9 @@ using Object = UnityEngine.Object;
 
 public class RTHandleSystem : IDisposable
 {
-    private readonly RenderGraph renderGraph;
     private readonly Dictionary<RenderTexture, RTHandle> importedTextures = new();
 
-    private readonly List<(RenderTexture renderTexture, int lastFrameUsed, bool isAvailable, bool isPersistent)> availableRenderTextures = new();
-    private readonly HashSet<RenderTexture> allRenderTextures = new();
+    private readonly List<(RenderTexture renderTexture, int lastFrameUsed, bool isAvailable, bool isPersistent)> renderTextures = new();
     private readonly Queue<int> availableRtSlots = new();
 
     private bool disposedValue;
@@ -25,11 +22,6 @@ public class RTHandleSystem : IDisposable
     private readonly List<RTHandle> persistentRtHandles = new();
     private readonly Queue<int> availablePersistentHandleIndices = new();
     private readonly List<int> persistentCreateList = new(), persistentFreeList = new();
-
-    public RTHandleSystem(RenderGraph renderGraph)
-    {
-        this.renderGraph = renderGraph;
-    }
 
     ~RTHandleSystem()
     {
@@ -53,14 +45,15 @@ public class RTHandleSystem : IDisposable
         if (!disposing)
             Debug.LogError("RT Handle System not disposed correctly");
 
-        foreach (var rt in allRenderTextures)
+        foreach (var rt in renderTextures)
         {
             // Since we don't remove null entries, but rather leave them as "empty", they could be null
             // Also because of the above thing destroying imported textures.. which doesn't really make as much sense, but eh
-            if (rt != null)
-                Object.DestroyImmediate(rt);
+            if (rt.renderTexture != null)
+                Object.DestroyImmediate(rt.renderTexture);
         }
 
+        renderTextures.Clear();
         disposedValue = true;
     }
 
@@ -184,9 +177,9 @@ public class RTHandleSystem : IDisposable
     {
         // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
         RenderTexture result = null;
-        for (var j = 0; j < availableRenderTextures.Count; j++)
+        for (var j = 0; j < renderTextures.Count; j++)
         {
-            var (renderTexture, lastFrameUsed, isAvailable, isPersistent) = availableRenderTextures[j];
+            var (renderTexture, lastFrameUsed, isAvailable, isPersistent) = renderTextures[j];
             if (!isAvailable)
                 continue;
 
@@ -209,7 +202,7 @@ public class RTHandleSystem : IDisposable
                     continue;
 
                 result = renderTexture;
-                availableRenderTextures[j] = (renderTexture, lastFrameUsed, false, handle.IsNotReleasable);
+                renderTextures[j] = (renderTexture, lastFrameUsed, false, handle.IsNotReleasable);
                 handle.RenderTextureIndex = j;
                 break;
             }
@@ -224,7 +217,6 @@ public class RTHandleSystem : IDisposable
             var height = handle.IsScreenTexture ? screenHeight : handle.Height;
 
             result = new RenderTexture(width, height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite, stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None, hideFlags = HideFlags.HideAndDontSave };
-            allRenderTextures.Add(result);
 
             if (handle.VolumeDepth > 0)
             {
@@ -240,12 +232,12 @@ public class RTHandleSystem : IDisposable
             // Get a slot for this render texture if possible
             if (!availableRtSlots.TryDequeue(out var slot))
             {
-                slot = availableRenderTextures.Count;
-                availableRenderTextures.Add((result, FrameIndex, false, handle.IsNotReleasable));
+                slot = renderTextures.Count;
+                renderTextures.Add((result, FrameIndex, false, handle.IsNotReleasable));
             }
             else
             {
-                availableRenderTextures[slot] = (result, FrameIndex, false, handle.IsNotReleasable);
+                renderTextures[slot] = (result, FrameIndex, false, handle.IsNotReleasable);
             }
 
             handle.RenderTextureIndex = slot;
@@ -263,7 +255,7 @@ public class RTHandleSystem : IDisposable
 
     public void FreeTexture(RTHandle handle, int frameIndex)
     {
-        availableRenderTextures[handle.RenderTextureIndex] = (handle.RenderTexture, frameIndex, true, false);
+        renderTextures[handle.RenderTextureIndex] = (handle.RenderTexture, frameIndex, true, false);
 
         // Hrm
         // If non persistent, no additional logic required since it will be re-created, but persistent needs to free its index
@@ -334,9 +326,9 @@ public class RTHandleSystem : IDisposable
     public void CleanupCurrentFrame(int frameIndex)
     {
         // Release any render textures that have not been used for at least a frame
-        for (var i = 0; i < availableRenderTextures.Count; i++)
+        for (var i = 0; i < renderTextures.Count; i++)
         {
-            var renderTexture = availableRenderTextures[i];
+            var renderTexture = renderTextures[i];
 
             // This indicates it is empty
             if (renderTexture.renderTexture == null)
@@ -350,11 +342,10 @@ public class RTHandleSystem : IDisposable
             if (renderTexture.lastFrameUsed == frameIndex)
                 continue;
 
-            allRenderTextures.Remove(renderTexture.renderTexture);
             Object.DestroyImmediate(renderTexture.renderTexture);
 
             // Fill this with a null, unavailable RT and add the index to a list
-            availableRenderTextures[i] = (null, renderTexture.lastFrameUsed, false, false);
+            renderTextures[i] = (null, renderTexture.lastFrameUsed, false, false);
             availableRtSlots.Enqueue(i);
         }
 

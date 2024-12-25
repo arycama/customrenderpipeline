@@ -32,7 +32,7 @@ namespace Arycama.CustomRenderPipeline
 
         public RenderGraph(CustomRenderPipeline renderPipeline)
         {
-            RtHandleSystem = new(this);
+            RtHandleSystem = new();
             BufferHandleSystem = new(this);
 
             EmptyBuffer = BufferHandleSystem.ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" });
