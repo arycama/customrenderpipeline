@@ -11,7 +11,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void WriteTexture(RTHandle rtHandle)
         {
-            RenderGraph.RtHandleSystem.WriteTexture(rtHandle, Index);
+            RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
         }
 
         public void Initialize(ScriptableRenderContext context, CullingResults cullingResults, int lightIndex, BatchCullingProjectionType projectionType, ShadowSplitData shadowSplitData, float bias, float slopeBias, bool zClip)

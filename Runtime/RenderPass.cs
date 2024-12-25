@@ -55,7 +55,7 @@ namespace Arycama.CustomRenderPipeline
             Assert.IsFalse(RenderGraph.IsExecuting);
             Assert.IsNotNull(texture);
             readTextures.Add((propertyId, texture, mip, subElement));
-            RenderGraph.RtHandleSystem.ReadTexture(texture, Index);
+            RenderGraph.RtHandleSystem.ReadResource(texture, Index);
         }
 
         public void ReadTexture(string propertyName, RTHandle texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -65,13 +65,13 @@ namespace Arycama.CustomRenderPipeline
 
         public void ReadBuffer(string propertyName, BufferHandle buffer)
         {
-            RenderGraph.BufferHandleSystem.ReadBuffer(buffer, Index);
+            RenderGraph.BufferHandleSystem.ReadResource(buffer, Index);
             readBuffers.Add((propertyName, buffer));
         }
 
         public void WriteBuffer(string propertyName, BufferHandle buffer)
         {
-            RenderGraph.BufferHandleSystem.WriteBuffer(buffer, Index);
+            RenderGraph.BufferHandleSystem.WriteResource(buffer, Index);
             writeBuffers.Add((propertyName, buffer));
         }
 

@@ -32,7 +32,7 @@ namespace Arycama.CustomRenderPipeline
 
         public void WriteTexture(RTHandle rtHandle, int propertyId)
         {
-            RenderGraph.RtHandleSystem.WriteTexture(rtHandle, Index);
+            RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
             rtHandle.EnableRandomWrite = true;
             colorBindings.Add((rtHandle, propertyId));
         }

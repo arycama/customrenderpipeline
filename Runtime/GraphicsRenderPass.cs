@@ -29,13 +29,13 @@ namespace Arycama.CustomRenderPipeline
 
         public void WriteTexture(RTHandle rtHandle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
         {
-            RenderGraph.RtHandleSystem.WriteTexture(rtHandle, Index);
+            RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
             colorTargets.Add((rtHandle, loadAction, storeAction));
         }
 
         public void WriteDepth(RTHandle rtHandle, RenderTargetFlags renderTargetFlags = RenderTargetFlags.None, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
         {
-            RenderGraph.RtHandleSystem.WriteTexture(rtHandle, Index);
+            RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
             this.renderTargetFlags = renderTargetFlags;
             depthBuffer = (rtHandle, loadAction, storeAction);
         }
@@ -60,8 +60,8 @@ namespace Arycama.CustomRenderPipeline
                 {
                     for (var i = 0; i < colorTargets.Count; i++)
                     {
-                        Assert.IsTrue(targetWidth == 0 || targetWidth == colorTargets[i].Item1.RenderTexture.width, Name);
-                        Assert.IsTrue(targetHeight == 0 || targetHeight == colorTargets[i].Item1.RenderTexture.height, Name);
+                        Assert.IsTrue(targetWidth == 0 || targetWidth == colorTargets[i].Item1.Resource.width, Name);
+                        Assert.IsTrue(targetHeight == 0 || targetHeight == colorTargets[i].Item1.Resource.height, Name);
 
                         width = colorTargets[i].Item1.Width;
                         height = colorTargets[i].Item1.Height;
@@ -78,8 +78,8 @@ namespace Arycama.CustomRenderPipeline
             {
                 width = depthBuffer.Item1.Width;
                 height = depthBuffer.Item1.Height;
-                targetWidth = depthBuffer.Item1.RenderTexture.width;
-                targetHeight = depthBuffer.Item1.RenderTexture.height;
+                targetWidth = depthBuffer.Item1.Resource.width;
+                targetHeight = depthBuffer.Item1.Resource.height;
 
                 if (colorTargets.Count == 0)
                 {
@@ -89,8 +89,8 @@ namespace Arycama.CustomRenderPipeline
                 {
                     for (var i = 0; i < colorTargets.Count; i++)
                     {
-                        Assert.IsTrue(targetWidth == 0 || targetWidth == colorTargets[i].Item1.RenderTexture.width, Name);
-                        Assert.IsTrue(targetHeight == 0 || targetHeight == colorTargets[i].Item1.RenderTexture.height, Name);
+                        Assert.IsTrue(targetWidth == 0 || targetWidth == colorTargets[i].Item1.Resource.width, Name);
+                        Assert.IsTrue(targetHeight == 0 || targetHeight == colorTargets[i].Item1.Resource.height, Name);
 
                         width = colorTargets[i].Item1.Width;
                         height = colorTargets[i].Item1.Height;

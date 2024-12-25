@@ -35,13 +35,13 @@ namespace Arycama.CustomRenderPipeline
             RtHandleSystem = new();
             BufferHandleSystem = new();
 
-            EmptyBuffer = BufferHandleSystem.ImportBuffer(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" });
-            EmptyTexture = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
-            EmptyUavTexture = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, enableRandomWrite = true });
-            EmptyTextureArray = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
-            Empty3DTexture = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
-            EmptyCubemap = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave });
-            EmptyCubemapArray = RtHandleSystem.ImportRenderTexture(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
+            EmptyBuffer = BufferHandleSystem.ImportResource(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" });
+            EmptyTexture = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
+            EmptyUavTexture = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, enableRandomWrite = true });
+            EmptyTextureArray = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
+            Empty3DTexture = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
+            EmptyCubemap = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave });
+            EmptyCubemapArray = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
 
             ResourceMap = new(this);
             RenderPipeline = renderPipeline;
@@ -60,13 +60,13 @@ namespace Arycama.CustomRenderPipeline
             if (!disposing)
                 Debug.LogError("Render Graph not disposed correctly");
 
-            EmptyBuffer.Buffer.Dispose();
-            Object.DestroyImmediate(EmptyTexture.RenderTexture);
-            Object.DestroyImmediate(EmptyUavTexture.RenderTexture);
-            Object.DestroyImmediate(EmptyTextureArray.RenderTexture);
-            Object.DestroyImmediate(Empty3DTexture.RenderTexture);
-            Object.DestroyImmediate(EmptyCubemap.RenderTexture);
-            Object.DestroyImmediate(EmptyCubemapArray.RenderTexture);
+            EmptyBuffer.Resource.Dispose();
+            Object.DestroyImmediate(EmptyTexture.Resource);
+            Object.DestroyImmediate(EmptyUavTexture.Resource);
+            Object.DestroyImmediate(EmptyTextureArray.Resource);
+            Object.DestroyImmediate(Empty3DTexture.Resource);
+            Object.DestroyImmediate(EmptyCubemap.Resource);
+            Object.DestroyImmediate(EmptyCubemapArray.Resource);
 
             ResourceMap.Dispose();
             RtHandleSystem.Dispose();
@@ -95,8 +95,8 @@ namespace Arycama.CustomRenderPipeline
 
         public void Execute(CommandBuffer command)
         {
-            BufferHandleSystem.AllocateFrameTextures(renderPasses.Count, FrameIndex);
-            RtHandleSystem.AllocateFrameTextures(renderPasses.Count, FrameIndex);
+            BufferHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
+            RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 
             IsExecuting = true;
 
@@ -109,13 +109,13 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
         {
             Assert.IsFalse(IsExecuting);
-            return RtHandleSystem.GetTexture(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isPersistent);
+            return RtHandleSystem.GetResourceHandle(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isPersistent);
         }
 
         public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)
         {
             Assert.IsFalse(IsExecuting);
-            return BufferHandleSystem.GetBuffer(FrameIndex, count, stride, target, usageFlags, isPersistent);
+            return BufferHandleSystem.GetResourceHandle(FrameIndex, count, stride, target, usageFlags, isPersistent);
         }
 
         public void CleanupCurrentFrame()
@@ -148,15 +148,15 @@ namespace Arycama.CustomRenderPipeline
 
         public BufferHandle SetConstantBuffer<T>(in T data) where T : struct
         {
-            var buffer = BufferHandleSystem.GetBuffer(FrameIndex, 1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite);
+            var buffer = BufferHandleSystem.GetResourceHandle(FrameIndex, 1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite);
             using (var pass = AddRenderPass<GlobalRenderPass>("Set Constant Buffer"))
             {
                 pass.WriteBuffer("", buffer);
                 pass.SetRenderFunction((data, buffer), (command, pass, data) =>
                 {
-                    var bufferData = data.buffer.Buffer.LockBufferForWrite<T>(0, 1);
+                    var bufferData = data.buffer.Resource.LockBufferForWrite<T>(0, 1);
                     bufferData[0] = data.data;
-                    data.buffer.Buffer.UnlockBufferAfterWrite<T>(1);
+                    data.buffer.Resource.UnlockBufferAfterWrite<T>(1);
                 });
             }
 
