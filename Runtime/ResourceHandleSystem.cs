@@ -49,9 +49,55 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
         disposedValue = true;
     }
 
-    protected abstract T AssignResource(K handle, int frameIndex);
+    protected abstract bool DoesResourceMatchHandle(T resource, K handle, int frameIndex, int lastFrameUsed);
+    protected abstract T CreateResource(K handle);
     protected abstract K CreateHandleFromResource(T resource);
     protected abstract void DestroyResource(T resource);
+
+    private T AssignResource(K handle, int frameIndex)
+    {
+        // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
+        int slot = -1;
+        T result = null;
+        for (var j = 0; j < resources.Count; j++)
+        {
+            var (resource, lastFrameUsed, isAvailable) = resources[j];
+            if (!isAvailable)
+                continue;
+
+            if (!DoesResourceMatchHandle(resource, handle, frameIndex, lastFrameUsed))
+                continue;
+
+            result = resource;
+            slot = j;
+            break;
+        }
+
+        if (result == null)
+        {
+            result = CreateResource(handle);
+
+            // Get a slot for this render texture if possible
+            if (!availableSlots.TryDequeue(out slot))
+            {
+                slot = resources.Count;
+                resources.Add(default);
+            }
+        }
+
+        handle.ResourceIndex = slot;
+
+        // Persistent handle no longer needs to be created or cleared. (Non-persistent create list gets cleared every frame)
+        if (handle.IsPersistent)
+        {
+            handle.IsCreated = true;
+            persistentCreateList[handle.HandleIndex] = -1;
+        }
+
+        resources[slot] = (result, frameIndex, false);
+        return result;
+    }
+
 
     public K ImportResource(T resource)
     {

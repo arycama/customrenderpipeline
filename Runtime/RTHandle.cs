@@ -37,6 +37,6 @@ public class RTHandle : ResourceHandle<RenderTexture>
 
     public override string ToString()
     {
-        return $"RTHandle {Dimension} {Format} {Width}x{Height} ";
+        return $"{Dimension} {Format} {Width}x{Height} ";
     }
 }

@@ -15,6 +15,8 @@ namespace Arycama.CustomRenderPipeline
             this.kernelIndex = kernelIndex;
             this.indirectBuffer = indirectBuffer;
             this.argsOffset = argsOffset;
+
+            ReadBuffer("_IndirectArgsInput", indirectBuffer);
         }
 
         protected override void Execute()

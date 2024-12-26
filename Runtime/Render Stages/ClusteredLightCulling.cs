@@ -82,6 +82,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.WriteBuffer("_LightClusterListWrite", lightList);
                 pass.WriteBuffer("_LightCounter", counterBuffer);
+                pass.ReadBuffer("_LightCounter", counterBuffer);
                 pass.WriteTexture("_LightClusterIndicesWrite", lightClusterIndices);
                 pass.AddRenderPassData<ICommonPassData>();
 

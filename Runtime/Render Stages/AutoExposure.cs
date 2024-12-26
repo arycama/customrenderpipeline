@@ -111,6 +111,10 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Auto Exposure"))
             {
                 var exposureBuffer = pass.RenderGraph.GetResource<AutoExposureData>().exposureBuffer;
+
+                pass.ReadBuffer("", output);
+                pass.WriteBuffer("", exposureBuffer);
+
                 pass.SetRenderFunction((output, exposureBuffer), (command, pass, data) =>
                 {
                     command.CopyBuffer(data.output, data.exposureBuffer);

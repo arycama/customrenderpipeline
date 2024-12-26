@@ -45,72 +45,6 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
         return result;
     }
 
-    protected override GraphicsBuffer AssignResource(BufferHandle handle, int frameIndex)
-    {
-        // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
-        int slot = -1;
-        GraphicsBuffer result = null;
-        for (var j = 0; j < resources.Count; j++)
-        {
-            var (buffer, lastFrameUsed, isAvailable) = resources[j];
-            if (!isAvailable)
-                continue;
-
-            // If this buffer can be written to directly, it must have been unused for at least two frames, otherwise it will write to a temp buffer and results
-            // will not be visible until the next frame.
-            if (handle.UsageFlags == GraphicsBuffer.UsageFlags.LockBufferForWrite && lastFrameUsed + (swapChainCount - 1) >= frameIndex)
-                continue;
-
-            if (handle.Target != buffer.target)
-                continue;
-
-            if (handle.Stride != buffer.stride)
-                continue;
-
-            if (handle.UsageFlags != buffer.usageFlags)
-                continue;
-
-            if (handle.Target.HasFlag(GraphicsBuffer.Target.Constant))
-            {
-                // Constant buffers must have exact size
-                if (handle.Count != buffer.count)
-                    continue;
-            }
-            else if (handle.Count >= buffer.count)
-                continue;
-
-            result = buffer;
-            slot = j;
-            break;
-        }
-
-        if (result == null)
-        {
-            result = new GraphicsBuffer(handle.Target, handle.UsageFlags, handle.Count, handle.Stride)
-            {
-                name = $"{handle.Target} {handle.UsageFlags} {handle.Stride} {handle.Count} {resourceCount++}"
-            };
-
-            // Get a slot for this render texture if possible
-            if (!availableSlots.TryDequeue(out slot))
-            {
-                slot = resources.Count;
-                resources.Add(default);
-            }
-        }
-
-        // Persistent handle no longer needs to be created or cleared. (Non-persistent create list gets cleared every frame)
-        if (handle.IsPersistent)
-        {
-            handle.IsCreated = true;
-            persistentCreateList[handle.HandleIndex] = -1;
-        }
-
-        resources[slot] = (result, frameIndex, false);
-
-        return result;
-    }
-
     protected override void DestroyResource(GraphicsBuffer resource)
     {
         resource.Dispose();
@@ -119,5 +53,45 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
     protected override BufferHandle CreateHandleFromResource(GraphicsBuffer resource)
     {
         return new BufferHandle(resource);
+    }
+
+    protected override bool DoesResourceMatchHandle(GraphicsBuffer resource, BufferHandle handle, int frameIndex, int lastFrameUsed)
+    {
+        // If this buffer can be written to directly, it must have been unused for at least two frames, otherwise it will write to a temp buffer and results
+        // will not be visible until the next frame.
+        //if (handle.UsageFlags == GraphicsBuffer.UsageFlags.LockBufferForWrite && lastFrameUsed + (swapChainCount - 1) >= frameIndex)
+        //    return false;
+
+        if (handle.Target != resource.target)
+            return false;
+
+        if (handle.Stride != resource.stride)
+            return false;
+
+        if (handle.UsageFlags != resource.usageFlags)
+            return false;
+
+        if(handle.Target.HasFlag(GraphicsBuffer.Target.CopySource) || handle.Target.HasFlag(GraphicsBuffer.Target.CopyDestination) || handle.Target.HasFlag(GraphicsBuffer.Target.Constant))
+        {
+            // Copy source/dest sizes must be exact matches
+            if (handle.Count != resource.count)
+                return false;
+
+        }
+        else if (handle.Count >= resource.count)
+        {
+            // Other buffers can use smaller sizes than what is actually available
+            return false;
+        }
+
+        return true;
+    }
+
+    protected override GraphicsBuffer CreateResource(BufferHandle handle)
+    {
+        return new GraphicsBuffer(handle.Target, handle.UsageFlags, handle.Count, handle.Stride)
+        {
+            name = $"{handle.Target} {handle.UsageFlags} {handle.Stride} {handle.Count} {resourceCount++}"
+        };
     }
 }
