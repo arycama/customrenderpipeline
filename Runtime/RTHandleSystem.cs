@@ -16,13 +16,12 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
 
     public RTHandle GetResourceHandle(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
     {
-        int index;
+        int handleIndex;
         if (isPersistent)
         {
-            if (!availablePersistentHandleIndices.TryDequeue(out index))
+            if (!availablePersistentHandleIndices.TryDequeue(out handleIndex))
             {
-                index = persistentHandles.Count;
-                // TODO: Not sure if I like this. This is because we're adding an index that doesn't currently exist. 
+                handleIndex = persistentHandles.Count;
                 persistentHandles.Add(null);
                 persistentCreateList.Add(-1);
                 persistentFreeList.Add(-1);
@@ -30,10 +29,10 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
         }
         else
         {
-            index = handles.Count;
+            handleIndex = handles.Count;
         }
 
-        var result = new RTHandle(index, isPersistent)
+        var result = new RTHandle(handleIndex, false, isPersistent)
         {
             Width = width,
             Height = height,
@@ -49,7 +48,7 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
 
         if (isPersistent)
         {
-            persistentHandles[index] = result;
+            persistentHandles[handleIndex] = result;
         }
         else
         {
@@ -67,7 +66,7 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
         if (!resource.IsCreated())
             _ = resource.Create();
 
-        return new RTHandle(-1, true)
+        return new RTHandle(-1, true, true)
         {
             Width = resource.width,
             Height = resource.height,
@@ -78,9 +77,7 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
             Resource = resource,
             HasMips = resource.useMipMap,
             AutoGenerateMips = resource.autoGenerateMips,
-            IsImported = true,
             IsScreenTexture = false,
-            IsCreated = true,
         };
     }
 

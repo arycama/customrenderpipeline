@@ -11,7 +11,7 @@ public class BufferHandle : ResourceHandle<GraphicsBuffer>
 
     public int Size => Stride * Count;
     
-    public BufferHandle(GraphicsBuffer.Target target, int count, int stride, GraphicsBuffer.UsageFlags usageFlags, bool isPersistent)
+    public BufferHandle(int handleIndex, bool isImported, bool isPersistent, GraphicsBuffer.Target target, int count, int stride, GraphicsBuffer.UsageFlags usageFlags) : base(handleIndex, isImported, isPersistent)
     {
         Assert.IsTrue(count > 0);
         Assert.IsTrue(stride > 0);
@@ -21,20 +21,14 @@ public class BufferHandle : ResourceHandle<GraphicsBuffer>
         Stride = stride;
         UsageFlags = usageFlags;
         Resource = null;
-        IsPersistent = isPersistent;
-        IsNotReleasable = isPersistent;
-        IsCreated = false;
-        IsImported = false;
     }
 
-    public BufferHandle(GraphicsBuffer graphicsBuffer)
+    public BufferHandle(GraphicsBuffer graphicsBuffer, int handleIndex, bool isImported, bool isPersistent) : base(handleIndex, isImported, isPersistent)
     {
         Target = graphicsBuffer.target;
         Count = graphicsBuffer.count;
         Stride = graphicsBuffer.stride;
         Resource = graphicsBuffer;
-        IsCreated = true;
-        IsImported = true;
     }
 
     public static implicit operator GraphicsBuffer(BufferHandle bufferHandle)

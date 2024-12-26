@@ -53,6 +53,7 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
     protected abstract T CreateResource(K handle);
     protected abstract K CreateHandleFromResource(T resource);
     protected abstract void DestroyResource(T resource);
+    protected virtual int ExtraFramesToKeepResource(T resource) => 0;
 
     private T AssignResource(K handle, int frameIndex)
     {
@@ -195,7 +196,7 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             // Now mark any textures that need to be released at the end of this pass as available
             foreach (var handle in handlesToFree[i])
             {
-                resources[handle.ResourceIndex] = (handle.Resource, frameIndex, true);
+                resources[handle.ResourceIndex] = (handle.Resource, frameIndex + ExtraFramesToKeepResource(handle.Resource), true);
 
                 // If non persistent, no additional logic required since it will be re-created, but persistent needs to free its index
                 if (handle.IsPersistent)
@@ -207,29 +208,27 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
         }
     }
 
-    public void CleanupCurrentFrame(int frameIndex)
+    public virtual void CleanupCurrentFrame(int frameIndex)
     {
         // Release any render textures that have not been used for at least a frame
         for (var i = 0; i < resources.Count; i++)
         {
             var resource = resources[i];
 
-            // This indicates it is empty
-            if (resource.resource == null)
-                continue;
-
             if (!resource.isAvailable)
                 continue;
 
             // Don't free textures that were used in the last frame
             // TODO: Make this a configurable number of frames to avoid rapid re-allocations
-            if (resource.lastFrameUsed == frameIndex)
+            if (resource.lastFrameUsed >= frameIndex)
                 continue;
 
             DestroyResource(resource.resource);
 
+            Debug.LogWarning($"Destroying resource at index {i}");
+
             // Fill this with a null, unavailable RT and add the index to a list
-            resources[i] = (null, resource.lastFrameUsed, false);
+            resources[i] = (null, -1, false);
             availableSlots.Enqueue(i);
         }
 

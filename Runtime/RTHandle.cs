@@ -18,11 +18,8 @@ public class RTHandle : ResourceHandle<RenderTexture>
     public bool HasMips { get; set; }
     public bool AutoGenerateMips { get; set; }
 
-    public RTHandle(int index, bool isPersistent)
+    public RTHandle(int handleIndex, bool isImported, bool isPersistent) : base(handleIndex, isImported, isPersistent)
     {
-        HandleIndex = index;
-        IsPersistent = isPersistent;
-        IsNotReleasable = isPersistent;
     }
 
     public static implicit operator RenderTexture(RTHandle rtHandle)

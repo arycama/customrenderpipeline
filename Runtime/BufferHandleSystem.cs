@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Assertions;
 
@@ -8,16 +9,12 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
 
     public BufferHandle GetResourceHandle(int frameIndex, int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)
     {
-        Assert.IsTrue(count > 0);
-        Assert.IsTrue(stride > 0);
-
-        int index;
+        int handleIndex;
         if (isPersistent)
         {
-            if (!availablePersistentHandleIndices.TryDequeue(out index))
+            if (!availablePersistentHandleIndices.TryDequeue(out handleIndex))
             {
-                index = persistentHandles.Count;
-                // TODO: Not sure if I like this. This is because we're adding an index that doesn't currently exist. 
+                handleIndex = persistentHandles.Count;
                 persistentHandles.Add(null);
                 persistentCreateList.Add(-1);
                 persistentFreeList.Add(-1);
@@ -25,15 +22,14 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
         }
         else
         {
-            index = handles.Count;
+            handleIndex = handles.Count;
         }
 
-        var result = new BufferHandle(target, count, stride, usageFlags, isPersistent);
-        result.HandleIndex = index;
+        var result = new BufferHandle(handleIndex, false, isPersistent, target, count, stride, usageFlags);
 
         if (isPersistent)
         {
-            persistentHandles[index] = result;
+            persistentHandles[handleIndex] = result;
         }
         else
         {
@@ -52,14 +48,14 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
 
     protected override BufferHandle CreateHandleFromResource(GraphicsBuffer resource)
     {
-        return new BufferHandle(resource);
+        return new BufferHandle(resource, -1, true, true);
     }
 
     protected override bool DoesResourceMatchHandle(GraphicsBuffer resource, BufferHandle handle, int frameIndex, int lastFrameUsed)
     {
         // If this buffer can be written to directly, it must have been unused for at least two frames, otherwise it will write to a temp buffer and results
         // will not be visible until the next frame.
-        //if (handle.UsageFlags == GraphicsBuffer.UsageFlags.LockBufferForWrite && lastFrameUsed + (swapChainCount - 1) >= frameIndex)
+       //if (handle.UsageFlags == GraphicsBuffer.UsageFlags.LockBufferForWrite && lastFrameUsed + (swapChainCount - 1) >= frameIndex)
         //    return false;
 
         if (handle.Target != resource.target)
@@ -71,18 +67,21 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
         if (handle.UsageFlags != resource.usageFlags)
             return false;
 
-        if(handle.Target.HasFlag(GraphicsBuffer.Target.CopySource) || handle.Target.HasFlag(GraphicsBuffer.Target.CopyDestination) || handle.Target.HasFlag(GraphicsBuffer.Target.Constant))
-        {
-            // Copy source/dest sizes must be exact matches
-            if (handle.Count != resource.count)
-                return false;
-
-        }
-        else if (handle.Count >= resource.count)
-        {
-            // Other buffers can use smaller sizes than what is actually available
+        if (handle.Count != resource.count)
             return false;
-        }
+
+        //if (handle.Target.HasFlag(GraphicsBuffer.Target.CopySource) || handle.Target.HasFlag(GraphicsBuffer.Target.CopyDestination) || handle.Target.HasFlag(GraphicsBuffer.Target.Constant))
+        //{
+        //    // Copy source/dest sizes must be exact matches
+        //    if (handle.Count != resource.count)
+        //        return false;
+
+        //}
+        //else if (handle.Count >= resource.count)
+        //{
+        //    // Other buffers can use smaller sizes than what is actually available
+        //    return false;
+        //}
 
         return true;
     }
@@ -93,5 +92,10 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
         {
             name = $"{handle.Target} {handle.UsageFlags} {handle.Stride} {handle.Count} {resourceCount++}"
         };
+    }
+
+    protected override int ExtraFramesToKeepResource(GraphicsBuffer resource)
+    {
+        return resource.usageFlags.HasFlag(GraphicsBuffer.UsageFlags.LockBufferForWrite) ? 3 : 0;
     }
 }
