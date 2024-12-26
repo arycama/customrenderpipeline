@@ -24,7 +24,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var keyword in keywords)
                 command.EnableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
 
-            command.DispatchCompute(computeShader, kernelIndex, indirectBuffer, argsOffset);
+            command.DispatchCompute(computeShader, kernelIndex, indirectBuffer.Resource, argsOffset);
 
             foreach (var keyword in keywords)
                 command.DisableKeyword(computeShader, new LocalKeyword(computeShader, keyword));

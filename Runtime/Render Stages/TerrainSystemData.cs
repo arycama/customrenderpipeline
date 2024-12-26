@@ -9,9 +9,9 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle MinMaxHeights { get; }
         public Terrain Terrain { get; }
         public TerrainData TerrainData { get; }
-        public GraphicsBuffer IndexBuffer { get; }
+        public BufferHandle IndexBuffer { get; }
 
-        public TerrainSystemData(RTHandle minMaxHeights, Terrain terrain, TerrainData terrainData, GraphicsBuffer indexBuffer)
+        public TerrainSystemData(RTHandle minMaxHeights, Terrain terrain, TerrainData terrainData, BufferHandle indexBuffer)
         {
             MinMaxHeights = minMaxHeights ?? throw new ArgumentNullException(nameof(minMaxHeights));
             Terrain = terrain ?? throw new ArgumentNullException(nameof(terrain));
@@ -21,6 +21,7 @@ namespace Arycama.CustomRenderPipeline
 
         void IRenderPassData.SetInputs(RenderPass pass)
         {
+            pass.ReadBuffer("", IndexBuffer);
         }
 
         void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)

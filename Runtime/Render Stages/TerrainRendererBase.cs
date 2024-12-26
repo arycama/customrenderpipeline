@@ -105,7 +105,7 @@ namespace Arycama.CustomRenderPipeline
                             indirectArgs.Add(0); // start index location
                             indirectArgs.Add(0); // base vertex location
                             indirectArgs.Add(0); // start instance location
-                            command.SetBufferData(data.indirectArgsBuffer, indirectArgs);
+                            command.SetBufferData(data.indirectArgsBuffer.Resource, indirectArgs);
                             ListPool<int>.Release(indirectArgs);
                         }
 

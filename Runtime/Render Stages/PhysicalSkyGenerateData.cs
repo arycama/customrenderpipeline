@@ -196,7 +196,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("", ambientBuffer);
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    command.CopyBuffer(ambientBufferTemp, ambientBuffer);
+                    command.CopyBuffer(ambientBufferTemp.Resource, ambientBuffer.Resource);
                 });
             }
 

@@ -35,7 +35,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetBuffer(string propertyName, BufferHandle buffer)
         {
-            command.SetGlobalBuffer(propertyName, buffer);
+            command.SetGlobalBuffer(propertyName, buffer.Resource);
         }
 
         public override void SetBuffer(string propertyName, GraphicsBuffer buffer)
@@ -84,7 +84,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetConstantBuffer(string propertyName, BufferHandle value)
         {
-            command.SetGlobalConstantBuffer(value, propertyName, 0, value.Size);
+            command.SetGlobalConstantBuffer(value.Resource, propertyName, 0, value.Size);
         }
 
         public override void SetMatrixArray(string propertyName, Matrix4x4[] value)

@@ -10,9 +10,9 @@ public struct TerrainRenderData : IRenderPassData
     private Vector4 terrainRemapHalfTexel, terrainScaleOffset;
     private Vector3 terrainSize;
     private readonly float terrainHeightScale, terrainHeightOffset, idMapResolution;
-    private readonly GraphicsBuffer terrainLayerData;
+    private readonly BufferHandle terrainLayerData;
 
-    public TerrainRenderData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray mask, RTHandle terrainHeightmapTexture, RTHandle terrainNormalMap, RTHandle idMap, Texture terrainHolesTexture, Vector4 terrainRemapHalfTexel, Vector4 terrainScaleOffset, Vector3 terrainSize, float terrainHeightScale, float terrainHeightOffset, float idMapResolution, GraphicsBuffer terrainLayerData)
+    public TerrainRenderData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray mask, RTHandle terrainHeightmapTexture, RTHandle terrainNormalMap, RTHandle idMap, Texture terrainHolesTexture, Vector4 terrainRemapHalfTexel, Vector4 terrainScaleOffset, Vector3 terrainSize, float terrainHeightScale, float terrainHeightOffset, float idMapResolution, BufferHandle terrainLayerData)
     {
         this.albedoSmoothness = albedoSmoothness;
         this.normal = normal;
@@ -35,12 +35,11 @@ public struct TerrainRenderData : IRenderPassData
         pass.ReadTexture("_TerrainHeightmapTexture", terrainHeightmapTexture);
         pass.ReadTexture("_TerrainNormalMap", terrainNormalMap);
         pass.ReadTexture("IdMap", idMap);
+        pass.ReadBuffer("TerrainLayerData", terrainLayerData);
     }
 
     public readonly void SetProperties(RenderPass pass, CommandBuffer command)
     {
-        pass.SetBuffer("TerrainLayerData", terrainLayerData);
-
         pass.SetTexture("_TerrainHolesTexture", terrainHolesTexture);
 
         pass.SetTexture("AlbedoSmoothness", albedoSmoothness);

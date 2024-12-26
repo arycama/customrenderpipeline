@@ -150,7 +150,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("", cloudCoverageBuffer);
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    command.CopyBuffer(cloudCoverageBufferTemp, cloudCoverageBuffer);
+                    command.CopyBuffer(cloudCoverageBufferTemp.Resource, cloudCoverageBuffer.Resource);
                 });
             }
         }

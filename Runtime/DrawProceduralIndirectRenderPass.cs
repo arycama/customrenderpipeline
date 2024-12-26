@@ -8,7 +8,7 @@ namespace Arycama.CustomRenderPipeline
         public readonly MaterialPropertyBlock propertyBlock;
         private Material material;
         private int passIndex;
-        private GraphicsBuffer indexBuffer;
+        private BufferHandle indexBuffer;
         private BufferHandle indirectArgsBuffer;
         private MeshTopology topology;
         private float depthBias, slopeDepthBias;
@@ -26,7 +26,7 @@ namespace Arycama.CustomRenderPipeline
             return $"{Name} {material} {passIndex}";
         }
 
-        public void Initialize(Material material, GraphicsBuffer indexBuffer, BufferHandle indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, string keyword = null, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true)
+        public void Initialize(Material material, BufferHandle indexBuffer, BufferHandle indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, string keyword = null, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true)
         {
             this.material = material;
             this.passIndex = passIndex;
@@ -37,6 +37,9 @@ namespace Arycama.CustomRenderPipeline
             this.depthBias = depthBias;
             this.slopeDepthBias = slopeDepthBias;
             this.zClip = zClip;
+
+            ReadBuffer("", indexBuffer);
+            ReadBuffer("", indirectArgsBuffer);
         }
 
         public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -46,7 +49,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetBuffer(string propertyName, BufferHandle buffer)
         {
-            propertyBlock.SetBuffer(propertyName, buffer);
+            propertyBlock.SetBuffer(propertyName, buffer.Resource);
         }
 
         public override void SetBuffer(string propertyName, GraphicsBuffer buffer)
@@ -90,7 +93,7 @@ namespace Arycama.CustomRenderPipeline
                 command.SetGlobalDepthBias(depthBias, slopeDepthBias);
 
             command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
-            command.DrawProceduralIndirect(indexBuffer, Matrix4x4.identity, material, passIndex, topology, indirectArgsBuffer, 0, propertyBlock);
+            command.DrawProceduralIndirect(indexBuffer.Resource, Matrix4x4.identity, material, passIndex, topology, indirectArgsBuffer.Resource, 0, propertyBlock);
             command.SetGlobalFloat("_ZClip", 1.0f);
 
             if (depthBias != 0.0f || slopeDepthBias != 0.0f)
@@ -115,7 +118,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetConstantBuffer(string propertyName, BufferHandle value)
         {
-            propertyBlock.SetConstantBuffer(propertyName, value, 0, value.Size);
+            propertyBlock.SetConstantBuffer(propertyName, value.Resource, 0, value.Size);
         }
 
         public override void SetMatrixArray(string propertyName, Matrix4x4[] value)

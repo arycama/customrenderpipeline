@@ -53,7 +53,7 @@ namespace Arycama.CustomRenderPipeline
         public override void SetBuffer(string propertyName, BufferHandle buffer)
         {
             // only way.. :( 
-            command.SetGlobalBuffer(propertyName, buffer);
+            command.SetGlobalBuffer(propertyName, buffer.Resource);
             // command.SetRayTracingBufferParam(shader, propertyName, buffer);
         }
 
@@ -126,7 +126,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetConstantBuffer(string propertyName, BufferHandle value)
         {
-            command.SetRayTracingConstantBufferParam(shader, propertyName, value, 0, value.Size);
+            command.SetRayTracingConstantBufferParam(shader, propertyName, value.Resource, 0, value.Size);
         }
 
         public override void SetMatrixArray(string propertyName, Matrix4x4[] value)

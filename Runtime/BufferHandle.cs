@@ -31,11 +31,6 @@ public class BufferHandle : ResourceHandle<GraphicsBuffer>
         Resource = graphicsBuffer;
     }
 
-    public static implicit operator GraphicsBuffer(BufferHandle bufferHandle)
-    {
-        return bufferHandle.Resource;
-    }
-
     public override string ToString()
     {
         return $"{Target} {UsageFlags} {Stride}x{Count}";

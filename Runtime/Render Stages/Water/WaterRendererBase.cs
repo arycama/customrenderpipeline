@@ -7,7 +7,7 @@ namespace Arycama.CustomRenderPipeline.Water
 {
     public abstract class WaterRendererBase : RenderFeature
     {
-        protected GraphicsBuffer indexBuffer;
+        protected BufferHandle indexBuffer;
         protected WaterSettings settings;
         protected int VerticesPerTileEdge => settings.PatchVertices + 1;
         protected int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
@@ -15,7 +15,7 @@ namespace Arycama.CustomRenderPipeline.Water
         public WaterRendererBase(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
         {
             this.settings = settings;
-            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
+            indexBuffer = renderGraph.BufferHandleSystem.ImportResource(new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" });
 
             var index = 0;
             var pIndices = new ushort[QuadListIndexCount];
@@ -45,12 +45,12 @@ namespace Arycama.CustomRenderPipeline.Water
                 }
             }
 
-            indexBuffer.SetData(pIndices);
+            indexBuffer.Resource.SetData(pIndices);
         }
 
         protected override void Cleanup(bool disposing)
         {
-            indexBuffer.Dispose();
+            indexBuffer.Resource.Dispose();
         }
 
         protected WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
@@ -129,7 +129,7 @@ namespace Arycama.CustomRenderPipeline.Water
                             indirectArgs.Add(0); // start index location
                             indirectArgs.Add(0); // base vertex location
                             indirectArgs.Add(0); // start instance location
-                            command.SetBufferData(indirectArgsBuffer, indirectArgs);
+                            command.SetBufferData(indirectArgsBuffer.Resource, indirectArgs);
                             ListPool<int>.Release(indirectArgs);
                         }
 

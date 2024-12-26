@@ -14,7 +14,7 @@ namespace Arycama.CustomRenderPipeline
     public partial class TerrainSystem : RenderFeature
     {
         private readonly TerrainSettings settings;
-        private GraphicsBuffer terrainLayerData, indexBuffer;
+        private BufferHandle terrainLayerData, indexBuffer;
         private RTHandle minMaxHeight, heightmap, normalmap, idMap;
         private readonly Material generateIdMapMaterial;
         private readonly Dictionary<TerrainLayer, int> terrainLayers = new();
@@ -41,12 +41,6 @@ namespace Arycama.CustomRenderPipeline
         {
             TerrainCallbacks.textureChanged -= TerrainCallbacks_textureChanged;
             TerrainCallbacks.heightmapChanged -= TerrainCallbacks_heightmapChanged;
-
-            if (terrainLayerData != null)
-                terrainLayerData.Dispose();
-
-            if (indexBuffer != null)
-                indexBuffer.Dispose();
 
             if (diffuseArray != null)
                 Object.DestroyImmediate(diffuseArray);
@@ -79,7 +73,7 @@ namespace Arycama.CustomRenderPipeline
             Object.DestroyImmediate(diffuseArray);
             Object.DestroyImmediate(normalMapArray);
             Object.DestroyImmediate(maskMapArray);
-            terrainLayerData.Dispose();
+            terrainLayerData.IsNotReleasable = false;
         }
 
         private void InitializeTerrain()
@@ -96,36 +90,43 @@ namespace Arycama.CustomRenderPipeline
             heightmap = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R16_UNorm, isPersistent: true);
             normalmap = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R8G8_SNorm, autoGenerateMips: true, hasMips: true, isPersistent: true);
 
-            indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Terrain System Index Buffer" };
+            indexBuffer = renderGraph.GetBuffer(QuadListIndexCount, sizeof(ushort), GraphicsBuffer.Target.Index, GraphicsBuffer.UsageFlags.LockBufferForWrite, true);
 
-            var pIndices = new ushort[QuadListIndexCount];
-            for (int y = 0, i = 0; y < settings.PatchVertices; y++)
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Set Index Data"))
             {
-                var rowStart = y * VerticesPerTileEdge;
-
-                for (var x = 0; x < settings.PatchVertices; x++, i += 4)
+                pass.WriteBuffer("", indexBuffer);
+                pass.SetRenderFunction((command, pass) =>
                 {
-                    // Can do a checkerboard flip to avoid directioanl artifacts, but will mess with the tessellation code
-                    //var flip = (x & 1) == (y & 1);
+                    var pIndices = indexBuffer.Resource.LockBufferForWrite<ushort>(0, QuadListIndexCount);
+                    for (int y = 0, i = 0; y < settings.PatchVertices; y++)
+                    {
+                        var rowStart = y * VerticesPerTileEdge;
 
-                    //if(flip)
-                    //{
-                    pIndices[i + 0] = (ushort)(rowStart + x);
-                    pIndices[i + 1] = (ushort)(rowStart + x + VerticesPerTileEdge);
-                    pIndices[i + 2] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
-                    pIndices[i + 3] = (ushort)(rowStart + x + 1);
-                    //}
-                    //else
-                    //{
-                    //    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge);
-                    //    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
-                    //    pIndices[index++] = (ushort)(rowStart + x + 1);
-                    //    pIndices[index++] = (ushort)(rowStart + x);
-                    //}
-                }
+                        for (var x = 0; x < settings.PatchVertices; x++, i += 4)
+                        {
+                            // Can do a checkerboard flip to avoid directioanl artifacts, but will mess with the tessellation code
+                            //var flip = (x & 1) == (y & 1);
+
+                            //if(flip)
+                            //{
+                            pIndices[i + 0] = (ushort)(rowStart + x);
+                            pIndices[i + 1] = (ushort)(rowStart + x + VerticesPerTileEdge);
+                            pIndices[i + 2] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
+                            pIndices[i + 3] = (ushort)(rowStart + x + 1);
+                            //}
+                            //else
+                            //{
+                            //    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge);
+                            //    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
+                            //    pIndices[index++] = (ushort)(rowStart + x + 1);
+                            //    pIndices[index++] = (ushort)(rowStart + x);
+                            //}
+                        }
+                    }
+
+                    indexBuffer.Resource.UnlockBufferAfterWrite<ushort>(QuadListIndexCount);
+                });
             }
-
-            indexBuffer.SetData(pIndices);
 
             InitializeHeightmap();
 
@@ -183,7 +184,7 @@ namespace Arycama.CustomRenderPipeline
             // Graph doesn't support persistent buffers yet
             // TODO: Add persistent buffer support 
             //var layerDataBuffer = renderGraph.GetBuffer(layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>(), GraphicsBuffer.Target.Structured);
-            terrainLayerData = new GraphicsBuffer(GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.LockBufferForWrite, arraySize, UnsafeUtility.SizeOf<TerrainLayerData>()) { name = "Terrain Layer Data" };
+            terrainLayerData = renderGraph.GetBuffer(arraySize, UnsafeUtility.SizeOf<TerrainLayerData>(), GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.LockBufferForWrite, true);
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Layer Data Init"))
             {
@@ -324,14 +325,21 @@ namespace Arycama.CustomRenderPipeline
             if (count == 0)
                 return;
 
-            var layerData = terrainLayerData.LockBufferForWrite<TerrainLayerData>(0, count);
-            foreach (var layer in terrainLayers)
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Terrain Layer Data Init"))
             {
-                var index = layer.Value;
-                layerData[index] = new TerrainLayerData(layer.Key.tileSize.x, Mathf.Max(1e-3f, layer.Key.smoothness), layer.Key.normalScale, 1.0f - layer.Key.metallic);
-            }
+                pass.WriteBuffer("", terrainLayerData);
+                pass.SetRenderFunction((command, pass) =>
+                {
+                    var layerData = terrainLayerData.Resource.LockBufferForWrite<TerrainLayerData>(0, count);
+                    foreach (var layer in terrainLayers)
+                    {
+                        var index = layer.Value;
+                        layerData[index] = new TerrainLayerData(layer.Key.tileSize.x, Mathf.Max(1e-3f, layer.Key.smoothness), layer.Key.normalScale, 1.0f - layer.Key.metallic);
+                    }
 
-            terrainLayerData.UnlockBufferAfterWrite<TerrainLayerData>(count);
+                    terrainLayerData.Resource.UnlockBufferAfterWrite<TerrainLayerData>(count);
+                });
+            }
         }
 
         private void InitializeIdMap()
@@ -377,7 +385,7 @@ namespace Arycama.CustomRenderPipeline
                         }
                     }
 
-                    command.SetBufferData(indicesBuffer, layers);
+                    command.SetBufferData(indicesBuffer.Resource, layers);
                     var tempArrayId = Shader.PropertyToID("_TempTerrainId");
                     command.SetGlobalTexture("_ExtraLayers", tempArrayId);
                 });
@@ -417,7 +425,7 @@ namespace Arycama.CustomRenderPipeline
             var terrainScaleOffset = new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z);
             var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainData.heightmapResolution);
             var terrainHeightOffset = position.y;
-            renderGraph.SetResource(new TerrainRenderData(diffuseArray, normalMapArray, maskMapArray, heightmap, normalmap, idMap, terrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainData.alphamapResolution, terrainLayerData)); ;
+            renderGraph.SetResource(new TerrainRenderData(diffuseArray, normalMapArray, maskMapArray, heightmap, normalmap, idMap, terrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainData.alphamapResolution, terrainLayerData));
 
             // This sets raytracing data on the terrain's material property block
             using (var pass = renderGraph.AddRenderPass<SetPropertyBlockPass>("Terrain Data Property Block Update"))

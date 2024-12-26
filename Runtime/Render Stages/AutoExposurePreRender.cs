@@ -5,16 +5,10 @@ namespace Arycama.CustomRenderPipeline
 {
     public class AutoExposurePreRender : RenderFeature
     {
-        private readonly Dictionary<int, GraphicsBuffer> exposureBuffers = new();
+        private readonly Dictionary<int, BufferHandle> exposureBuffers = new();
 
         public AutoExposurePreRender(RenderGraph renderGraph) : base(renderGraph)
         {
-        }
-
-        protected override void Cleanup(bool disposing)
-        {
-            foreach (var buffer in exposureBuffers)
-                buffer.Value.Dispose();
         }
 
         public override void Render()
@@ -25,25 +19,23 @@ namespace Arycama.CustomRenderPipeline
                 var isFirst = !exposureBuffers.TryGetValue(viewData.ViewIndex, out var exposureBuffer);
                 if (isFirst)
                 {
-                    exposureBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 4, sizeof(float)) { name = "Auto Exposure Buffer" };
+                    exposureBuffer = renderGraph.GetBuffer(1, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, GraphicsBuffer.UsageFlags.None, true);
                     exposureBuffers.Add(viewData.ViewIndex, exposureBuffer);
                 }
-
-                var bufferHandle = renderGraph.BufferHandleSystem.ImportResource(exposureBuffer);
 
                 // For first pass, set to 1.0f 
                 if (isFirst)
                 {
-                    pass.SetRenderFunction(bufferHandle, (command, pass, data) =>
+                    pass.SetRenderFunction(exposureBuffer, (command, pass, data) =>
                     {
                         var initialData = ArrayPool<Vector4>.Get(1);
                         initialData[0] = new Vector4(1.0f, 0.0f, 0.0f, 0.0f);
-                        command.SetBufferData(data, initialData);
+                        command.SetBufferData(data.Resource, initialData);
                         ArrayPool<Vector4>.Release(initialData);
                     });
                 }
 
-                renderGraph.SetResource(new AutoExposureData(bufferHandle, isFirst)); ;
+                renderGraph.SetResource(new AutoExposureData(exposureBuffer, isFirst)); ;
             }
         }
     }

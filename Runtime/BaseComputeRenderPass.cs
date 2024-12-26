@@ -30,7 +30,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetBuffer(string propertyName, BufferHandle buffer)
         {
-            command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, buffer);
+            command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, buffer.Resource);
         }
 
         public override void SetBuffer(string propertyName, GraphicsBuffer buffer)
@@ -76,7 +76,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetConstantBuffer(string propertyName, BufferHandle value)
         {
-            command.SetComputeConstantBufferParam(computeShader, propertyName, value, 0, value.Size);
+            command.SetComputeConstantBufferParam(computeShader, propertyName, value.Resource, 0, value.Size);
         }
 
         public override void SetMatrixArray(string propertyName, Matrix4x4[] value)

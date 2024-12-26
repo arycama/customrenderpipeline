@@ -115,8 +115,8 @@ namespace Arycama.CustomRenderPipeline
                             testData[1] = 0;
                             testData[2] = 0;
                             testData[3] = 0;
-                            command.SetBufferData(minMaxValues, testData);
-                            command.SetRandomWriteTarget(1, minMaxValues);
+                            command.SetBufferData(minMaxValues.Resource, testData);
+                            command.SetRandomWriteTarget(1, minMaxValues.Resource);
                             ArrayPool<int>.Release(testData);
                         }
                     });
@@ -134,13 +134,14 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("JumpFloodInput", src);
                 pass.WriteTexture(result);
                 pass.ReadBuffer("MinMaxValues", minMaxValues);
+                pass.WriteBuffer("", resultDataBuffer);
 
                 pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetTexture("Heightmap", heightmapTexture);
                     pass.SetFloat("Cutoff", cutoff);
                     pass.SetFloat("InvResolution", invResolution);
-                    command.CopyBuffer(minMaxValues, resultDataBuffer);
+                    command.CopyBuffer(minMaxValues.Resource, resultDataBuffer.Resource);
                     pass.SetFloat("Resolution", heightmapResolution);
                 });
             }
