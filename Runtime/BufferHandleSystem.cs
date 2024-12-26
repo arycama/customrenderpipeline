@@ -51,13 +51,8 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
         return new BufferHandle(resource, -1, true, true);
     }
 
-    protected override bool DoesResourceMatchHandle(GraphicsBuffer resource, BufferHandle handle, int frameIndex, int lastFrameUsed)
+    protected override bool DoesResourceMatchHandle(GraphicsBuffer resource, BufferHandle handle)
     {
-        // If this buffer can be written to directly, it must have been unused for at least two frames, otherwise it will write to a temp buffer and results
-        // will not be visible until the next frame.
-       //if (handle.UsageFlags == GraphicsBuffer.UsageFlags.LockBufferForWrite && lastFrameUsed + (swapChainCount - 1) >= frameIndex)
-        //    return false;
-
         if (handle.Target != resource.target)
             return false;
 

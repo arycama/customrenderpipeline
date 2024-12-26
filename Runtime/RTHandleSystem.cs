@@ -81,7 +81,7 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
         };
     }
 
-    protected override bool DoesResourceMatchHandle(RenderTexture resource, RTHandle handle, int frameIndex, int lastFrameUsed)
+    protected override bool DoesResourceMatchHandle(RenderTexture resource, RTHandle handle)
     {
         var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
         if ((isDepth && handle.Format != resource.depthStencilFormat) || (!isDepth && handle.Format != resource.graphicsFormat))

@@ -49,7 +49,7 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
         disposedValue = true;
     }
 
-    protected abstract bool DoesResourceMatchHandle(T resource, K handle, int frameIndex, int lastFrameUsed);
+    protected abstract bool DoesResourceMatchHandle(T resource, K handle);
     protected abstract T CreateResource(K handle);
     protected abstract K CreateHandleFromResource(T resource);
     protected abstract void DestroyResource(T resource);
@@ -66,7 +66,7 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             if (!isAvailable)
                 continue;
 
-            if (!DoesResourceMatchHandle(resource, handle, frameIndex, lastFrameUsed))
+            if (!DoesResourceMatchHandle(resource, handle))
                 continue;
 
             result = resource;
