@@ -5,7 +5,9 @@ using UnityEngine;
 public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class where K : ResourceHandle<T>
 {
     protected readonly Dictionary<T, K> importedResources = new();
-    protected readonly List<(T resource, int lastFrameUsed, bool isAvailable)> resources = new();
+    protected readonly List<T> resources = new();
+    protected readonly List<int> lastFrameUsed = new();
+    protected readonly List<bool> isAvailable = new();
     protected readonly Queue<int> availableSlots = new();
 
     protected readonly List<K> handles = new();
@@ -39,7 +41,7 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
 
         if (!disposing)
             Debug.LogError("ResourceHandleSystem not disposed correctly");
-        foreach (var (resource, _, _) in resources)
+        foreach (var resource in resources)
         {
             // Since we don't remove null entries, but rather leave them as "empty", they could be null
             if (resource != null)
@@ -62,10 +64,10 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
         T result = null;
         for (var j = 0; j < resources.Count; j++)
         {
-            var (resource, lastFrameUsed, isAvailable) = resources[j];
-            if (!isAvailable)
+            if (!isAvailable[j])
                 continue;
 
+            var resource = resources[j];
             if (!DoesResourceMatchHandle(resource, handle))
                 continue;
 
@@ -83,6 +85,8 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             {
                 slot = resources.Count;
                 resources.Add(default);
+                lastFrameUsed.Add(frameIndex);
+                isAvailable.Add(false);
             }
         }
 
@@ -95,7 +99,9 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             persistentCreateList[handle.HandleIndex] = -1;
         }
 
-        resources[slot] = (result, frameIndex, false);
+        resources[slot] = result;
+        lastFrameUsed[slot] = frameIndex;
+        isAvailable[slot] = false;
         return result;
     }
 
@@ -196,7 +202,9 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             // Now mark any textures that need to be released at the end of this pass as available
             foreach (var handle in handlesToFree[i])
             {
-                resources[handle.ResourceIndex] = (handle.Resource, frameIndex + ExtraFramesToKeepResource(handle.Resource), true);
+                resources[handle.ResourceIndex] = handle.Resource;
+                lastFrameUsed[handle.ResourceIndex] = frameIndex + ExtraFramesToKeepResource(handle.Resource);
+                isAvailable[handle.ResourceIndex] = true;
 
                 // If non persistent, no additional logic required since it will be re-created, but persistent needs to free its index
                 if (handle.IsPersistent)
@@ -213,22 +221,23 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
         // Release any render textures that have not been used for at least a frame
         for (var i = 0; i < resources.Count; i++)
         {
-            var resource = resources[i];
-
-            if (!resource.isAvailable)
+            if (!isAvailable[i])
                 continue;
 
             // Don't free textures that were used in the last frame
             // TODO: Make this a configurable number of frames to avoid rapid re-allocations
-            if (resource.lastFrameUsed >= frameIndex)
+            if (lastFrameUsed[i] >= frameIndex)
                 continue;
 
-            DestroyResource(resource.resource);
+            var resource = resources[i];
+            DestroyResource(resource);
 
             Debug.LogWarning($"Destroying resource at index {i}");
 
             // Fill this with a null, unavailable RT and add the index to a list
-            resources[i] = (null, -1, false);
+            resources[i] = null;
+            lastFrameUsed[i] = -1;
+            isAvailable[i] = false;
             availableSlots.Enqueue(i);
         }
 
