@@ -4,7 +4,7 @@
     public int ResourceIndex { get; set; }
     public int HandleIndex { get; }
     public bool IsPersistent { get; }
-    public bool IsCreated { get; set; }
+    public bool IsAssigned { get; set; }
     public bool IsImported { get; }
     public bool IsNotReleasable { get; set; }
 
@@ -14,7 +14,7 @@
         IsImported = isImported;
         IsPersistent = isPersistent;
         IsNotReleasable = isPersistent;
-        IsCreated = isImported; // Imported textures are already created
+        IsAssigned = isImported; // Imported textures are already created
 
     }
 }

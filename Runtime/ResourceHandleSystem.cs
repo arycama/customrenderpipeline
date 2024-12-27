@@ -84,10 +84,21 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             if (!availableSlots.TryDequeue(out slot))
             {
                 slot = resources.Count;
-                resources.Add(default);
-                lastFrameUsed.Add(frameIndex);
+                resources.Add(result);
+                lastFrameUsed.Add(frameIndex + ExtraFramesToKeepResource(result));
                 isAvailable.Add(false);
             }
+            else
+            {
+                resources[slot] = result;
+                lastFrameUsed[slot] = frameIndex + ExtraFramesToKeepResource(result);
+                isAvailable[slot] = false; // Already false 
+            }
+        }
+        else
+        {
+            lastFrameUsed[slot] = frameIndex + ExtraFramesToKeepResource(result);
+            isAvailable[slot] = false;
         }
 
         handle.ResourceIndex = slot;
@@ -95,13 +106,10 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
         // Persistent handle no longer needs to be created or cleared. (Non-persistent create list gets cleared every frame)
         if (handle.IsPersistent)
         {
-            handle.IsCreated = true;
+            handle.IsAssigned = true;
             persistentCreateList[handle.HandleIndex] = -1;
         }
 
-        resources[slot] = result;
-        lastFrameUsed[slot] = frameIndex;
-        isAvailable[slot] = false;
         return result;
     }
 
@@ -124,7 +132,7 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             return;
 
         // Persistent handles that have already been created don't need to write a create-index
-        if (handle.IsPersistent && handle.IsCreated)
+        if (handle.IsPersistent && handle.IsAssigned)
             return;
 
         // Select list based on persistent or non-persistent, and initialize or update the index
@@ -202,8 +210,6 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             // Now mark any textures that need to be released at the end of this pass as available
             foreach (var handle in handlesToFree[i])
             {
-                resources[handle.ResourceIndex] = handle.Resource;
-                lastFrameUsed[handle.ResourceIndex] = frameIndex + ExtraFramesToKeepResource(handle.Resource);
                 isAvailable[handle.ResourceIndex] = true;
 
                 // If non persistent, no additional logic required since it will be re-created, but persistent needs to free its index
@@ -216,7 +222,7 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
         }
     }
 
-    public virtual void CleanupCurrentFrame(int frameIndex)
+    public void CleanupCurrentFrame(int frameIndex)
     {
         // Release any render textures that have not been used for at least a frame
         for (var i = 0; i < resources.Count; i++)
@@ -229,14 +235,10 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             if (lastFrameUsed[i] >= frameIndex)
                 continue;
 
-            var resource = resources[i];
-            DestroyResource(resource);
+            DestroyResource(resources[i]);
 
             Debug.LogWarning($"Destroying resource at index {i}");
 
-            // Fill this with a null, unavailable RT and add the index to a list
-            resources[i] = null;
-            lastFrameUsed[i] = -1;
             isAvailable[i] = false;
             availableSlots.Enqueue(i);
         }
