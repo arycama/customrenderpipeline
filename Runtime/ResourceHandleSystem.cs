@@ -4,20 +4,21 @@ using UnityEngine;
 
 public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class where K : ResourceHandle<T>
 {
-    protected readonly Dictionary<T, K> importedResources = new();
-    protected readonly List<T> resources = new();
-    protected readonly List<int> lastFrameUsed = new();
-    protected readonly List<bool> isAvailable = new();
-    protected readonly Queue<int> availableSlots = new();
-
     protected readonly List<K> handles = new();
     protected readonly List<int> createList = new(), freeList = new();
 
     protected readonly List<K> persistentHandles = new();
     protected readonly Queue<int> availablePersistentHandleIndices = new();
     protected readonly List<int> persistentCreateList = new(), persistentFreeList = new();
+    protected readonly List<int> resourceIndices = new(), persistentResourceIndices = new();
 
     protected int resourceCount;
+
+    private readonly Dictionary<T, K> importedResources = new();
+    private readonly List<T> resources = new();
+    private readonly List<int> lastFrameUsed = new();
+    private readonly List<bool> isAvailable = new();
+    private readonly Queue<int> availableSlots = new();
     private bool disposedValue;
 
     ~ResourceHandleSystem()
@@ -31,7 +32,7 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
         GC.SuppressFinalize(this);
     }
 
-    protected virtual void Dispose(bool disposing)
+    private void Dispose(bool disposing)
     {
         if (disposedValue)
         {
@@ -101,13 +102,16 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             isAvailable[slot] = false;
         }
 
-        handle.ResourceIndex = slot;
-
         // Persistent handle no longer needs to be created or cleared. (Non-persistent create list gets cleared every frame)
         if (handle.IsPersistent)
         {
             handle.IsAssigned = true;
             persistentCreateList[handle.HandleIndex] = -1;
+            persistentResourceIndices[handle.HandleIndex] = slot;
+        }
+        else
+        {
+            resourceIndices[handle.HandleIndex] = slot;
         }
 
         return result;
@@ -210,7 +214,9 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             // Now mark any textures that need to be released at the end of this pass as available
             foreach (var handle in handlesToFree[i])
             {
-                isAvailable[handle.ResourceIndex] = true;
+                // Todo: too much indirection?
+                var resourceIndex = handle.IsPersistent ? persistentResourceIndices[handle.HandleIndex] : resourceIndices[handle.HandleIndex];
+                isAvailable[resourceIndex] = true;
 
                 // If non persistent, no additional logic required since it will be re-created, but persistent needs to free its index
                 if (handle.IsPersistent)
@@ -244,6 +250,7 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
         }
 
         handles.Clear();
+        resourceIndices.Clear();
         createList.Clear();
         freeList.Clear();
     }

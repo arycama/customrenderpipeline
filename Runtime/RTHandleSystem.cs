@@ -23,6 +23,7 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
             {
                 handleIndex = persistentHandles.Count;
                 persistentHandles.Add(null);
+                persistentResourceIndices.Add(-1);
                 persistentCreateList.Add(-1);
                 persistentFreeList.Add(-1);
             }
@@ -53,6 +54,7 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
         else
         {
             handles.Add(result);
+            resourceIndices.Add(-1);
             createList.Add(-1);
             freeList.Add(-1);
         }
