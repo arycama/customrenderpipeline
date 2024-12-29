@@ -184,11 +184,11 @@ namespace Arycama.CustomRenderPipeline
             void IRenderPassData.SetInputs(RenderPass pass)
             {
                 pass.ReadTexture("ShoreDistance", shoreDistance);
+                pass.ReadBuffer("WaterShoreMaskProperties", resultDataBuffer);
             }
 
             void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetConstantBuffer("WaterShoreMaskProperties", resultDataBuffer);
                 pass.SetVector("ShoreScaleOffset", scaleOffset);
                 pass.SetVector("ShoreTerrainSize", terrainSize);
                 pass.SetFloat("ShoreMaxOceanDepth", maxOceanDepth);

@@ -11,6 +11,14 @@ namespace Arycama.CustomRenderPipeline
         {
         }
 
+        protected override void Cleanup(bool disposing)
+        {
+            foreach(var buffer in exposureBuffers.Values)
+            {
+                buffer.IsNotReleasable = false;
+            }
+        }
+
         public override void Render()
         {
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Auto Exposure"))

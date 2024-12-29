@@ -46,10 +46,6 @@ namespace Arycama.CustomRenderPipeline
             propertyBlock.SetBuffer(propertyName, buffer.Resource);
         }
 
-        public override void SetBuffer(string propertyName, GraphicsBuffer buffer)
-        {
-            propertyBlock.SetBuffer(propertyName, buffer);
-        }
 
         public override void SetVector(string propertyName, Vector4 value)
         {

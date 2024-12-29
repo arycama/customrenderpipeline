@@ -357,12 +357,12 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_TerrainNormalMap", normalmap);
                 pass.WriteBuffer("_ProceduralIndices", indicesBuffer);
                 pass.ReadBuffer("_ProceduralIndices", indicesBuffer);
+                pass.ReadBuffer("TerrainLayerData", terrainLayerData);
 
                 pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetInt("LayerCount", terrainData.alphamapLayers);
                     pass.SetFloat("_Resolution", idMapResolution);
-                    pass.SetBuffer("TerrainLayerData", terrainLayerData);
                     pass.SetVector("TerrainSize", terrain.terrainData.size);
                     pass.SetInt("_TotalLayers", terrainLayers.Count);
                     pass.SetInt("_TextureCount", terrainData.alphamapLayers);

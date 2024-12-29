@@ -10,9 +10,8 @@ namespace Arycama.CustomRenderPipeline.Water
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
 
         private readonly WaterSettings settings;
-        private readonly GraphicsBuffer spectrumBuffer, dispersionBuffer;
+        private readonly BufferHandle spectrumBuffer, dispersionBuffer;
         private readonly RTHandle lengthToRoughness;
-        private readonly bool disposedValue;
         private bool roughnessInitialized;
         private RTHandle displacementCurrent;
 
@@ -21,16 +20,16 @@ namespace Arycama.CustomRenderPipeline.Water
         public WaterFft(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
         {
             this.settings = settings;
-            spectrumBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, settings.Resolution * settings.Resolution * CascadeCount, sizeof(float) * 4) { name = "Ocean Spectrum" };
-            dispersionBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, settings.Resolution * settings.Resolution * CascadeCount, sizeof(float)) { name = "Ocean Spectrum" };
+            spectrumBuffer = renderGraph.GetBuffer(settings.Resolution * settings.Resolution * CascadeCount, sizeof(float) * 4, GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, true);
+            dispersionBuffer = renderGraph.GetBuffer(settings.Resolution * settings.Resolution * CascadeCount, sizeof(float), GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, true);
             lengthToRoughness = renderGraph.GetTexture(256, 1, GraphicsFormat.R16_UNorm, isPersistent: true);
         }
 
         protected override void Cleanup(bool disposing)
         {
             lengthToRoughness.IsNotReleasable = false;
-            spectrumBuffer.Dispose();
-            dispersionBuffer.Dispose();
+            spectrumBuffer.IsNotReleasable = false;
+            dispersionBuffer.IsNotReleasable = false;
         }
 
         public override void Render()
@@ -86,12 +85,8 @@ namespace Arycama.CustomRenderPipeline.Water
             {
                 pass.Initialize(computeShader, 4, settings.Resolution, settings.Resolution, 4);
                 pass.ReadBuffer("OceanData", oceanBuffer);
-
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    pass.SetBuffer("OceanSpectrumWrite", spectrumBuffer);
-                    pass.SetBuffer("OceanDispersionWrite", dispersionBuffer);
-                });
+                pass.WriteBuffer("OceanSpectrumWrite", spectrumBuffer);
+                pass.WriteBuffer("OceanDispersionWrite", dispersionBuffer);
             }
 
             var heightResult = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32_SFloat, 4, TextureDimension.Tex2DArray);
@@ -105,12 +100,8 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.WriteTexture("DisplacementResult", displacementResult);
                 pass.WriteTexture("SlopeResult", slopeResult);
                 pass.ReadBuffer("OceanData", oceanBuffer);
-
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    pass.SetBuffer("OceanSpectrum", spectrumBuffer);
-                    pass.SetBuffer("OceanDispersion", dispersionBuffer);
-                });
+                pass.ReadBuffer("OceanSpectrum", spectrumBuffer);
+                pass.ReadBuffer("OceanDispersion", dispersionBuffer);
             }
 
             // TODO: Why can't this use persistent texture cache

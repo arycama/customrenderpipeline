@@ -5,7 +5,6 @@ namespace Arycama.CustomRenderPipeline
     public class BlitToScreen : RenderFeature
     {
         private readonly Material material;
-        private readonly RenderGraph rendergraph;
         private readonly Tonemapping.Settings settings;
 
         public BlitToScreen(RenderGraph renderGraph, Tonemapping.Settings settings) : base(renderGraph)

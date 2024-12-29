@@ -21,16 +21,6 @@ namespace Arycama.CustomRenderPipeline
         public Color Color => color.linear * intensity;
         public Vector3 Direction => -transform.forward;
 
-        private void OnEnable()
-        {
-            celestialBodies.Add(this);
-        }
-
-        private void OnDisable()
-        {
-            _ = celestialBodies.Remove(this);
-        }
-
         public void Render(CommandBuffer command, Vector3 viewPosition)
         {
             if (mesh == null || material == null)

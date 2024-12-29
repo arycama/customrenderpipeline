@@ -5,8 +5,6 @@ using UnityEngine.Assertions;
 
 public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHandle>
 {
-    const int swapChainCount = 3;
-
     public BufferHandle GetResourceHandle(int frameIndex, int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)
     {
         int handleIndex;

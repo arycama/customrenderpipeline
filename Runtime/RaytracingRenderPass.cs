@@ -57,13 +57,6 @@ namespace Arycama.CustomRenderPipeline
             // command.SetRayTracingBufferParam(shader, propertyName, buffer);
         }
 
-        public override void SetBuffer(string propertyName, GraphicsBuffer buffer)
-        {
-            // only way.. :( 
-            command.SetGlobalBuffer(propertyName, buffer);
-            //command.SetRayTracingBufferParam.SetBuffer(propertyName, buffer);
-        }
-
         public override void SetVector(string propertyName, Vector4 value)
         {
             command.SetRayTracingVectorParam(shader, propertyName, value);

@@ -35,33 +35,6 @@ public class EnvironmentProbe : MonoBehaviour
         IsDirty = false;
     }
 
-    [InitializeOnLoadMethod]
-    private static void Initialize()
-    {
-        SceneView.beforeSceneGui += OnPreSceneGUICallback;
-    }
-
-    private void OnEnable()
-    {
-        reflectionProbes.Add(this, reflectionProbes.Count);
-        IsDirty = true;
-    }
-
-    private void OnDisable()
-    {
-        reflectionProbes.Remove(this);
-    }
-
-    private void Update()
-    {
-        // Todo: Editor only
-        if (transform.hasChanged)
-        {
-            IsDirty = true;
-            transform.hasChanged = false;
-        }
-    }
-
     private static void OnPreSceneGUICallback(SceneView sceneView)
     {
         if (!UnityEditor.Handles.ShouldRenderGizmos())
@@ -89,12 +62,5 @@ public class EnvironmentProbe : MonoBehaviour
             var objectToWorld = Matrix4x4.TRS(probe.Key.transform.position, Quaternion.identity, Vector3.one * scale);
             Graphics.DrawMesh(previewMesh, objectToWorld, previewMaterial, 0, SceneView.currentDrawingSceneView.camera, 0, propertyBlock);
         }
-    }
-
-    [ContextMenu("Set Influence Bounds to Projection Bounds")]
-    private void SetInfluenceBoundsToProjectionBounds()
-    {
-        InfluenceSize = projectionSize;
-        influenceOffset = projectionOffset;
     }
 }

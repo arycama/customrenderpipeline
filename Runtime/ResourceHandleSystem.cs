@@ -42,11 +42,19 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
 
         if (!disposing)
             Debug.LogError("ResourceHandleSystem not disposed correctly");
-        foreach (var resource in resources)
+
+        for (var i = 0; i < resources.Count; i++)
         {
+            var resource = resources[i];
             // Since we don't remove null entries, but rather leave them as "empty", they could be null
             if (resource != null)
+            {
+                // Persistent resources should be freed first
+                if (!isAvailable[i])
+                    Debug.LogError($"Resource at index {i} was not made availalble");
+
                 DestroyResource(resource);
+            }
         }
 
         disposedValue = true;
