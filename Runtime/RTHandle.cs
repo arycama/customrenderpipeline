@@ -1,23 +1,17 @@
-﻿using UnityEngine.Experimental.Rendering;
+﻿using System.ComponentModel.Design.Serialization;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 public class RTHandle : IResourceHandle
 {
     public int HandleIndex { get; }
     public bool IsPersistent { get; }
-    public int Width { get; set; }
-    public int Height { get; set; }
-    public GraphicsFormat Format { get; set; }
-    public bool EnableRandomWrite { get; set; }
-    public int VolumeDepth { get; set; }
-    public TextureDimension Dimension { get; set; }
-    public bool IsScreenTexture { get; set; }
-    public bool HasMips { get; set; }
-    public bool AutoGenerateMips { get; set; }
+    public RtHandleDescriptor Descriptor { get; set; }
 
-    public RTHandle(int handleIndex, bool isPersistent)
+    public RTHandle(int handleIndex, bool isPersistent, RtHandleDescriptor descriptor)
     {
         HandleIndex = handleIndex;
         IsPersistent = isPersistent;
+        Descriptor = descriptor;
     }
 }

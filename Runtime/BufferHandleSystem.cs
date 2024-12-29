@@ -9,21 +9,22 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
 
     protected override BufferHandle CreateHandleFromResource(GraphicsBuffer resource, int index)
     {
-        return new BufferHandle(resource, index, true);
+        var descriptor = new BufferHandleDescriptor(resource.count, resource.stride, resource.target, resource.usageFlags);
+        return new BufferHandle(index, true, descriptor);
     }
 
     protected override bool DoesResourceMatchHandle(GraphicsBuffer resource, BufferHandle handle)
     {
-        if (handle.Target != resource.target)
+        if (handle.Descriptor.Target != resource.target)
             return false;
 
-        if (handle.Stride != resource.stride)
+        if (handle.Descriptor.Stride != resource.stride)
             return false;
 
-        if (handle.UsageFlags != resource.usageFlags)
+        if (handle.Descriptor.UsageFlags != resource.usageFlags)
             return false;
 
-        if (handle.Count != resource.count)
+        if (handle.Descriptor.Count != resource.count)
             return false;
 
         //if (handle.Target.HasFlag(GraphicsBuffer.Target.CopySource) || handle.Target.HasFlag(GraphicsBuffer.Target.CopyDestination) || handle.Target.HasFlag(GraphicsBuffer.Target.Constant))
@@ -44,10 +45,7 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
 
     protected override GraphicsBuffer CreateResource(BufferHandle handle)
     {
-        return new GraphicsBuffer(handle.Target, handle.UsageFlags, handle.Count, handle.Stride)
-        {
-            name = $"{handle.Target} {handle.UsageFlags} {handle.Stride} {handle.Count} {resourceCount++}"
-        };
+        return new GraphicsBuffer(handle.Descriptor.Target, handle.Descriptor.UsageFlags, handle.Descriptor.Count, handle.Descriptor.Stride);
     }
 
     protected override int ExtraFramesToKeepResource(GraphicsBuffer resource)
@@ -57,6 +55,6 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
 
     protected override BufferHandle CreateHandleFromDescriptor(BufferHandleDescriptor descriptor, bool isPersistent, int handleIndex)
     {
-        return new BufferHandle(handleIndex, isPersistent, descriptor.Target, descriptor.Count, descriptor.Stride, descriptor.UsageFlags);
+        return new BufferHandle(handleIndex, isPersistent, descriptor);
     }
 }

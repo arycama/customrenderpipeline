@@ -33,7 +33,8 @@ namespace Arycama.CustomRenderPipeline
         public void WriteTexture(RTHandle rtHandle, int propertyId)
         {
             RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
-            rtHandle.EnableRandomWrite = true;
+            var descriptor = rtHandle.Descriptor;
+            rtHandle.Descriptor = new RtHandleDescriptor(descriptor.Width, descriptor.Height, descriptor.Format, descriptor.VolumeDepth, descriptor.Dimension, descriptor.IsScreenTexture, descriptor.HasMips, descriptor.AutoGenerateMips, true);
             colorBindings.Add((rtHandle, propertyId));
         }
 
@@ -131,7 +132,7 @@ namespace Arycama.CustomRenderPipeline
         {
             foreach (var colorTarget in colorBindings)
             {
-                if (colorTarget.Item1.AutoGenerateMips)
+                if (colorTarget.Item1.Descriptor.AutoGenerateMips)
                     command.GenerateMips(GetRenderTexture(colorTarget.Item1));
             }
 

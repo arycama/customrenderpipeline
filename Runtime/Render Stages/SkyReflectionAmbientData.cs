@@ -35,7 +35,7 @@ namespace Arycama.CustomRenderPipeline
 
         public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector("_SkyCdfSize", new Vector2(skyCdf.Width, skyCdf.Height));
+            pass.SetVector("_SkyCdfSize", new Vector2(skyCdf.Descriptor.Width, skyCdf.Descriptor.Height));
             pass.SetVector("SkyLuminanceScaleLimit", pass.GetScaleLimit2D(skyLuminance));
             pass.SetVector("SkyLuminanceSize", skyLuminanceSize);
             pass.SetVector("_SkyCdfSize", cdfLookupSize);

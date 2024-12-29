@@ -11,8 +11,9 @@ public readonly struct RtHandleDescriptor
     public bool IsScreenTexture { get; }
     public bool HasMips { get; }
     public bool AutoGenerateMips { get; }
+    public bool EnableRandomWrite { get; }
 
-    public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false)
+    public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false)
     {
         Width = width;
         Height = height;
@@ -22,5 +23,6 @@ public readonly struct RtHandleDescriptor
         IsScreenTexture = isScreenTexture;
         HasMips = hasMips;
         AutoGenerateMips = autoGenerateMips;
+        EnableRandomWrite = enableRandomWrite;
     }
 }

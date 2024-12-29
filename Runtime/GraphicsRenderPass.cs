@@ -51,8 +51,8 @@ namespace Arycama.CustomRenderPipeline
             {
                 if (colorTargets.Count == 1)
                 {
-                    width = colorTargets[0].Item1.Width;
-                    height = colorTargets[0].Item1.Height;
+                    width = colorTargets[0].Item1.Descriptor.Width;
+                    height = colorTargets[0].Item1.Descriptor.Height;
 
                     command.SetRenderTarget(GetRenderTexture(colorTargets[0].Item1), MipLevel, CubemapFace.Unknown, DepthSlice);
                 }
@@ -60,8 +60,8 @@ namespace Arycama.CustomRenderPipeline
                 {
                     for (var i = 0; i < colorTargets.Count; i++)
                     {
-                        width = colorTargets[i].Item1.Width;
-                        height = colorTargets[i].Item1.Height;
+                        width = colorTargets[i].Item1.Descriptor.Width;
+                        height = colorTargets[i].Item1.Descriptor.Height;
 
                         targets[i] = GetRenderTexture(colorTargets[i].Item1);
                         loads[i] = colorTargets[i].Item2;
@@ -73,8 +73,8 @@ namespace Arycama.CustomRenderPipeline
             }
             else
             {
-                width = depthBuffer.Item1.Width;
-                height = depthBuffer.Item1.Height;
+                width = depthBuffer.Item1.Descriptor.Width;
+                height = depthBuffer.Item1.Descriptor.Height;
                 targetWidth = GetRenderTexture(depthBuffer.Item1).width;
                 targetHeight = GetRenderTexture(depthBuffer.Item1).height;
 
@@ -86,8 +86,8 @@ namespace Arycama.CustomRenderPipeline
                 {
                     for (var i = 0; i < colorTargets.Count; i++)
                     {
-                        width = colorTargets[i].Item1.Width;
-                        height = colorTargets[i].Item1.Height;
+                        width = colorTargets[i].Item1.Descriptor.Width;
+                        height = colorTargets[i].Item1.Descriptor.Height;
 
                         targets[i] = GetRenderTexture(colorTargets[i].Item1);
                         loads[i] = colorTargets[i].Item2;
@@ -114,7 +114,7 @@ namespace Arycama.CustomRenderPipeline
         {
             foreach (var colorTarget in colorTargets)
             {
-                if (colorTarget.Item1.AutoGenerateMips)
+                if (colorTarget.Item1.Descriptor.AutoGenerateMips)
                     command.GenerateMips(GetRenderTexture(colorTarget.Item1));
             }
 

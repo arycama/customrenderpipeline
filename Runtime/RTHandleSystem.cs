@@ -19,38 +19,28 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHa
         if (!resource.IsCreated())
             _ = resource.Create();
 
-        return new RTHandle(index, true)
-        {
-            Width = resource.width,
-            Height = resource.height,
-            Format = resource.graphicsFormat,
-            EnableRandomWrite = resource.enableRandomWrite,
-            VolumeDepth = resource.volumeDepth,
-            Dimension = resource.dimension,
-            HasMips = resource.useMipMap,
-            AutoGenerateMips = resource.autoGenerateMips,
-            IsScreenTexture = false,
-        };
+        var descriptor = new RtHandleDescriptor(resource.width, resource.height, resource.graphicsFormat, resource.volumeDepth, resource.dimension, false, resource.useMipMap, resource.autoGenerateMips);
+        return new RTHandle(index, true, descriptor);
     }
 
     protected override bool DoesResourceMatchHandle(RenderTexture resource, RTHandle handle)
     {
-        var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-        if ((isDepth && handle.Format != resource.depthStencilFormat) || (!isDepth && handle.Format != resource.graphicsFormat))
+        var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Descriptor.Format);
+        if ((isDepth && handle.Descriptor.Format != resource.depthStencilFormat) || (!isDepth && handle.Descriptor.Format != resource.graphicsFormat))
             return false;
 
-        if (handle.IsScreenTexture)
+        if (handle.Descriptor.IsScreenTexture)
         {
             // For screen textures, ensure we get a rendertexture that is the actual screen width/height
             if (resource.width != screenWidth || resource.height != screenHeight)
                 return false;
         }
-        else if (resource.width < handle.Width || resource.height < handle.Height)
+        else if (resource.width < handle.Descriptor.Width || resource.height < handle.Descriptor.Height)
             return false;
 
-        if (resource.enableRandomWrite == handle.EnableRandomWrite && resource.dimension == handle.Dimension && resource.useMipMap == handle.HasMips)
+        if (resource.enableRandomWrite == handle.Descriptor.EnableRandomWrite && resource.dimension == handle.Descriptor.Dimension && resource.useMipMap == handle.Descriptor.HasMips)
         {
-            if (handle.Dimension != TextureDimension.Tex2D && resource.volumeDepth < handle.VolumeDepth)
+            if (handle.Descriptor.Dimension != TextureDimension.Tex2D && resource.volumeDepth < handle.Descriptor.VolumeDepth)
                 return false;
 
             return true;
@@ -61,26 +51,25 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHa
 
     protected override RenderTexture CreateResource(RTHandle handle)
     {
-        var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Format);
-        var isStencil = handle.Format == GraphicsFormat.D32_SFloat_S8_UInt || handle.Format == GraphicsFormat.D24_UNorm_S8_UInt;
+        var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Descriptor.Format);
+        var isStencil = handle.Descriptor.Format == GraphicsFormat.D32_SFloat_S8_UInt || handle.Descriptor.Format == GraphicsFormat.D24_UNorm_S8_UInt;
 
-        var width = handle.IsScreenTexture ? screenWidth : handle.Width;
-        var height = handle.IsScreenTexture ? screenHeight : handle.Height;
+        var width = handle.Descriptor.IsScreenTexture ? screenWidth : handle.Descriptor.Width;
+        var height = handle.Descriptor.IsScreenTexture ? screenHeight : handle.Descriptor.Height;
 
-        var graphicsFormat = isDepth ? GraphicsFormat.None : handle.Format;
-        var depthFormat = isDepth ? handle.Format : GraphicsFormat.None;
+        var graphicsFormat = isDepth ? GraphicsFormat.None : handle.Descriptor.Format;
+        var depthFormat = isDepth ? handle.Descriptor.Format : GraphicsFormat.None;
         var stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None;
 
-        var result = new RenderTexture(width, height, graphicsFormat, depthFormat) 
-        { 
+        var result = new RenderTexture(width, height, graphicsFormat, depthFormat)
+        {
             autoGenerateMips = false, // Always false, we manually handle mip generation if needed
-            dimension = handle.Dimension,
-            enableRandomWrite = handle.EnableRandomWrite, 
+            dimension = handle.Descriptor.Dimension,
+            enableRandomWrite = handle.Descriptor.EnableRandomWrite,
             hideFlags = HideFlags.HideAndDontSave,
-            name = $"{handle.Dimension} {handle.Format} {width}x{height} {resourceCount++}",
             stencilFormat = stencilFormat,
-            useMipMap = handle.HasMips,
-            volumeDepth = handle.VolumeDepth,
+            useMipMap = handle.Descriptor.HasMips,
+            volumeDepth = handle.Descriptor.VolumeDepth,
         };
 
         _ = result.Create();
@@ -95,18 +84,6 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHa
 
     protected override RTHandle CreateHandleFromDescriptor(RtHandleDescriptor descriptor, bool isPersistent, int handleIndex)
     {
-        return new RTHandle(handleIndex, isPersistent)
-        {
-            Width = descriptor.Width,
-            Height = descriptor.Height,
-            Format = descriptor.Format,
-            VolumeDepth = descriptor.VolumeDepth,
-            Dimension = descriptor.Dimension,
-            IsScreenTexture = descriptor.IsScreenTexture,
-            HasMips = descriptor.HasMips,
-            AutoGenerateMips = descriptor.AutoGenerateMips,
-            // This gets set automatically if a texture is written to by a compute shader
-            EnableRandomWrite = false
-        };
+        return new RTHandle(handleIndex, isPersistent, descriptor);
     }
 }
