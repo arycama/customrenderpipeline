@@ -1,10 +1,11 @@
-﻿namespace Arycama.CustomRenderPipeline
+﻿using UnityEngine;
+
+namespace Arycama.CustomRenderPipeline
 {
     public class VelocityData : RTHandleData
     {
-        public VelocityData(RTHandle handle) : base(handle, "Velocity")
+        public VelocityData(ResourceHandle<RenderTexture> handle) : base(handle, "Velocity")
         {
         }
     }
-
 }

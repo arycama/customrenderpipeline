@@ -1,13 +1,14 @@
 ﻿using Arycama.CustomRenderPipeline;
 using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 public readonly struct SkyTransmittanceData : IRenderPassData
 {
-    private readonly RTHandle skyTransmittance;
+    private readonly ResourceHandle<RenderTexture> skyTransmittance;
     private readonly int width, height;
 
-    public SkyTransmittanceData(RTHandle skyTransmittance, int width, int height)
+    public SkyTransmittanceData(ResourceHandle<RenderTexture> skyTransmittance, int width, int height)
     {
         this.skyTransmittance = skyTransmittance;
         this.width = width;

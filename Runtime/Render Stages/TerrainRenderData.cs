@@ -5,14 +5,14 @@ using UnityEngine.Rendering;
 public struct TerrainRenderData : IRenderPassData
 {
     private readonly Texture2DArray albedoSmoothness, normal, mask;
-    private readonly RTHandle terrainHeightmapTexture, terrainNormalMap, idMap;
+    private readonly ResourceHandle<RenderTexture> terrainHeightmapTexture, terrainNormalMap, idMap;
     private readonly Texture terrainHolesTexture;
     private Vector4 terrainRemapHalfTexel, terrainScaleOffset;
     private Vector3 terrainSize;
     private readonly float terrainHeightScale, terrainHeightOffset, idMapResolution;
-    private readonly BufferHandle terrainLayerData;
+    private readonly ResourceHandle<GraphicsBuffer> terrainLayerData;
 
-    public TerrainRenderData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray mask, RTHandle terrainHeightmapTexture, RTHandle terrainNormalMap, RTHandle idMap, Texture terrainHolesTexture, Vector4 terrainRemapHalfTexel, Vector4 terrainScaleOffset, Vector3 terrainSize, float terrainHeightScale, float terrainHeightOffset, float idMapResolution, BufferHandle terrainLayerData)
+    public TerrainRenderData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray mask, ResourceHandle<RenderTexture> terrainHeightmapTexture, ResourceHandle<RenderTexture> terrainNormalMap, ResourceHandle<RenderTexture> idMap, Texture terrainHolesTexture, Vector4 terrainRemapHalfTexel, Vector4 terrainScaleOffset, Vector3 terrainSize, float terrainHeightScale, float terrainHeightOffset, float idMapResolution, ResourceHandle<GraphicsBuffer> terrainLayerData)
     {
         this.albedoSmoothness = albedoSmoothness;
         this.normal = normal;

@@ -1,17 +1,18 @@
 ﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
     public readonly struct OceanFftResult : IRenderPassData
     {
-        private readonly RTHandle oceanDisplacement;
-        private readonly RTHandle oceanDisplacementHistory;
-        private readonly RTHandle oceanNormalFoamSmoothness;
-        private readonly RTHandle lengthToRoughness;
-        private readonly BufferHandle oceanBuffer;
+        private readonly ResourceHandle<RenderTexture> oceanDisplacement;
+        private readonly ResourceHandle<RenderTexture> oceanDisplacementHistory;
+        private readonly ResourceHandle<RenderTexture> oceanNormalFoamSmoothness;
+        private readonly ResourceHandle<RenderTexture> lengthToRoughness;
+        private readonly ResourceHandle<GraphicsBuffer> oceanBuffer;
 
-        public OceanFftResult(RTHandle oceanDisplacement, RTHandle oceanDisplacementHistory, RTHandle oceanNormalFoamSmoothness, RTHandle lengthToRoughness, BufferHandle oceanBuffer)
+        public OceanFftResult(ResourceHandle<RenderTexture> oceanDisplacement, ResourceHandle<RenderTexture> oceanDisplacementHistory, ResourceHandle<RenderTexture> oceanNormalFoamSmoothness, ResourceHandle<RenderTexture> lengthToRoughness, ResourceHandle<GraphicsBuffer> oceanBuffer)
         {
             this.oceanDisplacement = oceanDisplacement;
             this.oceanDisplacementHistory = oceanDisplacementHistory;

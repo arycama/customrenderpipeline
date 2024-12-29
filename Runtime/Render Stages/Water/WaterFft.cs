@@ -10,10 +10,10 @@ namespace Arycama.CustomRenderPipeline.Water
         private static readonly IndexedShaderPropertyId smoothnessMapIds = new("SmoothnessOutput");
 
         private readonly WaterSettings settings;
-        private readonly BufferHandle spectrumBuffer, dispersionBuffer;
-        private readonly RTHandle lengthToRoughness;
+        private readonly ResourceHandle<GraphicsBuffer> spectrumBuffer, dispersionBuffer;
+        private readonly ResourceHandle<RenderTexture> lengthToRoughness;
         private bool roughnessInitialized;
-        private RTHandle displacementCurrent = new RTHandle(-1, false);
+        private ResourceHandle<RenderTexture> displacementCurrent = new ResourceHandle<RenderTexture>(-1, false);
 
         private WaterProfile Profile => settings.Profile;
 

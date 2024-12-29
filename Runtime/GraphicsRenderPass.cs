@@ -7,8 +7,8 @@ namespace Arycama.CustomRenderPipeline
 {
     public abstract class GraphicsRenderPass : RenderPass
     {
-        private readonly List<(RTHandle, RenderBufferLoadAction, RenderBufferStoreAction)> colorTargets = new();
-        private (RTHandle, RenderBufferLoadAction, RenderBufferStoreAction) depthBuffer = (new RTHandle(-1, false), RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
+        private readonly List<(ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction)> colorTargets = new();
+        private (ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction) depthBuffer = (new ResourceHandle<RenderTexture>(-1, false), RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
 
         private RTClearFlags clearFlags;
         private Color clearColor;
@@ -27,13 +27,13 @@ namespace Arycama.CustomRenderPipeline
             this.clearStencil = clearStencil;
         }
 
-        public void WriteTexture(RTHandle rtHandle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
+        public void WriteTexture(ResourceHandle<RenderTexture> rtHandle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
         {
             RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
             colorTargets.Add((rtHandle, loadAction, storeAction));
         }
 
-        public void WriteDepth(RTHandle rtHandle, RenderTargetFlags renderTargetFlags = RenderTargetFlags.None, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
+        public void WriteDepth(ResourceHandle<RenderTexture> rtHandle, RenderTargetFlags renderTargetFlags = RenderTargetFlags.None, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
         {
             RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
             this.renderTargetFlags = renderTargetFlags;

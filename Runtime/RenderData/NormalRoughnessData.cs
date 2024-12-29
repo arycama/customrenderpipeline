@@ -1,8 +1,9 @@
-﻿namespace Arycama.CustomRenderPipeline
+﻿using UnityEngine;
+namespace Arycama.CustomRenderPipeline
 {
     public class NormalRoughnessData : RTHandleData
     {
-        public NormalRoughnessData(RTHandle handle) : base(handle, "_NormalRoughness")
+        public NormalRoughnessData(ResourceHandle<RenderTexture> handle) : base(handle, "_NormalRoughness")
         {
         }
     }

@@ -1,8 +1,10 @@
-﻿namespace Arycama.CustomRenderPipeline
+﻿using UnityEngine;
+
+namespace Arycama.CustomRenderPipeline
 {
     public class BentNormalOcclusionData : RTHandleData
     {
-        public BentNormalOcclusionData(RTHandle handle) : base(handle, "_BentNormalOcclusion")
+        public BentNormalOcclusionData(ResourceHandle<RenderTexture> handle) : base(handle, "_BentNormalOcclusion")
         {
         }
     }

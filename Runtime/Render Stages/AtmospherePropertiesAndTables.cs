@@ -6,11 +6,11 @@ namespace Arycama.CustomRenderPipeline
 {
     public struct AtmospherePropertiesAndTables : IRenderPassData
     {
-        private readonly BufferHandle atmospherePropertiesBuffer;
-        private readonly RTHandle transmittance;
-        private readonly RTHandle multiScatter;
-        private readonly RTHandle groundAmbient;
-        private readonly RTHandle skyAmbient;
+        private readonly ResourceHandle<GraphicsBuffer> atmospherePropertiesBuffer;
+        private readonly ResourceHandle<RenderTexture> transmittance;
+        private readonly ResourceHandle<RenderTexture> multiScatter;
+        private readonly ResourceHandle<RenderTexture> groundAmbient;
+        private readonly ResourceHandle<RenderTexture> skyAmbient;
 
         private Vector4 transmittanceRemap;
         private Vector4 multiScatterRemap;
@@ -18,7 +18,7 @@ namespace Arycama.CustomRenderPipeline
         private Vector2 groundAmbientRemap;
         private Vector2 transmittanceSize;
 
-        public AtmospherePropertiesAndTables(BufferHandle atmospherePropertiesBuffer, RTHandle transmittance, RTHandle multiScatter, RTHandle groundAmbient, RTHandle skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector2 transmittanceSize)
+        public AtmospherePropertiesAndTables(ResourceHandle<GraphicsBuffer> atmospherePropertiesBuffer, ResourceHandle<RenderTexture> transmittance, ResourceHandle<RenderTexture> multiScatter, ResourceHandle<RenderTexture> groundAmbient, ResourceHandle<RenderTexture> skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector2 transmittanceSize)
         {
             this.atmospherePropertiesBuffer = atmospherePropertiesBuffer;
             this.transmittance = transmittance;

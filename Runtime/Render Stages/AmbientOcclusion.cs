@@ -194,9 +194,9 @@ namespace Arycama.CustomRenderPipeline
         // Only used for debugging as the result is combined into the bent normal texture
         public readonly struct Result : IRenderPassData
         {
-            public RTHandle AmbientOcclusion { get; }
+            public ResourceHandle<RenderTexture> AmbientOcclusion { get; }
 
-            public Result(RTHandle ambientOcclusion)
+            public Result(ResourceHandle<RenderTexture> ambientOcclusion)
             {
                 AmbientOcclusion = ambientOcclusion;
             }

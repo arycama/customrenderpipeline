@@ -1,8 +1,10 @@
-﻿namespace Arycama.CustomRenderPipeline
+﻿using UnityEngine;
+
+namespace Arycama.CustomRenderPipeline
 {
     public class HiZMinDepthData : RTHandleData
     {
-        public HiZMinDepthData(RTHandle handle) : base(handle, "_HiZMinDepth")
+        public HiZMinDepthData(ResourceHandle<RenderTexture> handle) : base(handle, "_HiZMinDepth")
         {
         }
     }

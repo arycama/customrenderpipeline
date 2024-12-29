@@ -1,10 +1,11 @@
-﻿namespace Arycama.CustomRenderPipeline
+﻿using UnityEngine;
+
+namespace Arycama.CustomRenderPipeline
 {
     public class BloomData : RTHandleData
     {
-        public BloomData(RTHandle handle) : base(handle, "_Bloom")
+        public BloomData(ResourceHandle<RenderTexture> handle) : base(handle, "_Bloom")
         {
         }
     }
-
 }

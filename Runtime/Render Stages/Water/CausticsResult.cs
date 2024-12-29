@@ -1,14 +1,15 @@
-﻿using UnityEngine.Rendering;
+﻿using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
     public struct CausticsResult : IRenderPassData
     {
-        private readonly RTHandle caustics;
+        private readonly ResourceHandle<RenderTexture> caustics;
         private readonly int cascade;
         private readonly float depth;
 
-        public CausticsResult(RTHandle caustics, int cascade, float depth)
+        public CausticsResult(ResourceHandle<RenderTexture> caustics, int cascade, float depth)
         {
             this.caustics = caustics;
             this.cascade = cascade;

@@ -1,9 +1,11 @@
-﻿namespace Arycama.CustomRenderPipeline
+﻿using UnityEngine;
+
+namespace Arycama.CustomRenderPipeline
 {
     public class CameraTargetData : RTHandleData
     {
         // TODO: Rename to CameraTarget?
-        public CameraTargetData(RTHandle handle) : base(handle, "_Input")
+        public CameraTargetData(ResourceHandle<RenderTexture> handle) : base(handle, "_Input")
         {
         }
     }

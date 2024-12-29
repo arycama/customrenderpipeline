@@ -14,7 +14,7 @@ namespace Arycama.CustomRenderPipeline
         private RayTracingAccelerationStructure rtas;
         private float bias, distantBias, fieldOfView;
 
-        protected readonly List<(RTHandle, int)> colorBindings = new();
+        protected readonly List<(ResourceHandle<RenderTexture>, int)> colorBindings = new();
 
         public void Initialize(RayTracingShader shader, string rayGenName, string shaderPassName, RayTracingAccelerationStructure rtas, int width = 1, int height = 1, int depth = 1, float bias = 0.01f, float distantBias = 0.01f, float fieldOfView = 0)
         {
@@ -30,7 +30,7 @@ namespace Arycama.CustomRenderPipeline
             this.fieldOfView = fieldOfView;
         }
 
-        public void WriteTexture(RTHandle rtHandle, int propertyId)
+        public void WriteTexture(ResourceHandle<RenderTexture> rtHandle, int propertyId)
         {
             RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
 
@@ -40,7 +40,7 @@ namespace Arycama.CustomRenderPipeline
             RenderGraph.RtHandleSystem.SetDescriptor(rtHandle, descriptor);
         }
 
-        public void WriteTexture(RTHandle texture, string propertyName)
+        public void WriteTexture(ResourceHandle<RenderTexture> texture, string propertyName)
         {
             WriteTexture(texture, Shader.PropertyToID(propertyName));
         }
@@ -53,7 +53,7 @@ namespace Arycama.CustomRenderPipeline
                 command.SetGlobalTexture(propertyName, texture, subElement);
         }
 
-        public override void SetBuffer(string propertyName, BufferHandle buffer)
+        public override void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
         {
             // only way.. :( 
             command.SetGlobalBuffer(propertyName, GetBuffer(buffer));
@@ -120,7 +120,7 @@ namespace Arycama.CustomRenderPipeline
             command.SetRayTracingMatrixParam(shader, propertyName, value);
         }
 
-        public override void SetConstantBuffer(string propertyName, BufferHandle value)
+        public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value)
         {
             var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
             var size = descriptor.Count * descriptor.Stride; 

@@ -197,9 +197,9 @@ public class ScreenSpaceShadows : RenderFeature
 
     public struct Result : IRenderPassData
     {
-        public RTHandle ScreenSpaceShadows { get; }
+        public ResourceHandle<RenderTexture> ScreenSpaceShadows { get; }
 
-        public Result(RTHandle screenSpaceShadows)
+        public Result(ResourceHandle<RenderTexture> screenSpaceShadows)
         {
             ScreenSpaceShadows = screenSpaceShadows;
         }

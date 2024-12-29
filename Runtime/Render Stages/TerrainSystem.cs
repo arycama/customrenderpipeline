@@ -11,8 +11,8 @@ namespace Arycama.CustomRenderPipeline
     public partial class TerrainSystem : RenderFeature
     {
         private readonly TerrainSettings settings;
-        private BufferHandle terrainLayerData, indexBuffer;
-        private RTHandle minMaxHeight, heightmap, normalmap, idMap;
+        private ResourceHandle<GraphicsBuffer> terrainLayerData, indexBuffer;
+        private ResourceHandle<RenderTexture> minMaxHeight, heightmap, normalmap, idMap;
         private readonly Material generateIdMapMaterial;
         private readonly Dictionary<TerrainLayer, int> terrainLayers = new();
         private readonly Dictionary<TerrainLayer, int> terrainProceduralLayers = new();

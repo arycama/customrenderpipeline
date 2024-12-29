@@ -9,7 +9,7 @@ namespace Arycama.CustomRenderPipeline
         private readonly PhysicalSky.Settings settings;
         private readonly Material skyMaterial;
         private int version = -1;
-        private readonly RTHandle transmittance, multiScatter, groundAmbient, skyAmbient;
+        private readonly ResourceHandle<RenderTexture> transmittance, multiScatter, groundAmbient, skyAmbient;
 
         public PhysicalSkyLookupTables(PhysicalSky.Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {

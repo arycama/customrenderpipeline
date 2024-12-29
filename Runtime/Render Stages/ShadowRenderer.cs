@@ -25,7 +25,7 @@ namespace Arycama.CustomRenderPipeline
             var viewData = renderGraph.GetResource<ViewData>();
 
             // Render Shadows
-            RTHandle directionalShadows;
+            ResourceHandle<RenderTexture> directionalShadows;
             if (requestData.DirectionalShadowRequests.Count == 0)
             {
                 directionalShadows = renderGraph.EmptyTextureArray;
@@ -73,7 +73,7 @@ namespace Arycama.CustomRenderPipeline
             ListPool<ShadowRequest>.Release(requestData.DirectionalShadowRequests);
 
             // Process point shadows 
-            RTHandle pointShadows;
+            ResourceHandle<RenderTexture> pointShadows;
             if (requestData.PointShadowRequests.Count == 0)
             {
                 pointShadows = renderGraph.EmptyCubemapArray;
@@ -124,14 +124,14 @@ namespace Arycama.CustomRenderPipeline
 
         public readonly struct Result : IRenderPassData
         {
-            private readonly RTHandle directionalShadows;
-            private readonly RTHandle pointShadows;
+            private readonly ResourceHandle<RenderTexture> directionalShadows;
+            private readonly ResourceHandle<RenderTexture> pointShadows;
             private readonly int shadowMapResolution;
             private readonly float rcpShadowMapResolution;
             private readonly float shadowFilterRadius;
             private readonly float shadowFilterSigma;
 
-            public Result(RTHandle directionalShadows, RTHandle pointShadows, int shadowMapResolution, float rcpShadowMapResolution, float shadowFilterRadius, float shadowFilterSigma)
+            public Result(ResourceHandle<RenderTexture> directionalShadows, ResourceHandle<RenderTexture> pointShadows, int shadowMapResolution, float rcpShadowMapResolution, float shadowFilterRadius, float shadowFilterSigma)
             {
                 this.directionalShadows = directionalShadows;
                 this.pointShadows = pointShadows;

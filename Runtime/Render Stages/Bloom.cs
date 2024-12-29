@@ -29,7 +29,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void Render()
         {
-            var bloomIds = ListPool<RTHandle>.Get();
+            var bloomIds = ListPool<ResourceHandle<RenderTexture>>.Get();
             var viewData = renderGraph.GetResource<ViewData>();
 
             // Need to queue up all the textures first
@@ -86,7 +86,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             var result = bloomIds[0];
-            ListPool<RTHandle>.Release(bloomIds);
+            ListPool<ResourceHandle<RenderTexture>>.Release(bloomIds);
 
             renderGraph.SetResource<BloomData>(new BloomData(result)); ;
         }

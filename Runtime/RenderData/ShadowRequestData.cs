@@ -1,4 +1,5 @@
-﻿using UnityEngine.Rendering;
+﻿using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -7,10 +8,10 @@ namespace Arycama.CustomRenderPipeline
         public ShadowRequest ShadowRequest { get; }
         public float Bias { get; }
         public float SlopeBias { get; }
-        public RTHandle Shadow { get; }
+        public ResourceHandle<RenderTexture> Shadow { get; }
         public int CascadeIndex { get; }
 
-        public ShadowRequestData(ShadowRequest shadowRequest, float bias, float slopBias, RTHandle shadow, int cascadeIndex)
+        public ShadowRequestData(ShadowRequest shadowRequest, float bias, float slopBias, ResourceHandle<RenderTexture> shadow, int cascadeIndex)
         {
             ShadowRequest = shadowRequest;
             Bias = bias;

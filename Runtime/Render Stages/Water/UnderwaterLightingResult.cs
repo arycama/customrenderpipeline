@@ -1,13 +1,14 @@
 ﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
     public readonly struct UnderwaterLightingResult : IRenderPassData
     {
-        private readonly RTHandle underwaterLighting;
+        private readonly ResourceHandle<RenderTexture> underwaterLighting;
 
-        public UnderwaterLightingResult(RTHandle waterNormalFoam)
+        public UnderwaterLightingResult(ResourceHandle<RenderTexture> waterNormalFoam)
         {
             underwaterLighting = waterNormalFoam;
         }

@@ -1,22 +1,23 @@
 ﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
     public readonly struct AutoExposureData : IRenderPassData
     {
-        public BufferHandle exposureBuffer { get; }
+        public ResourceHandle<GraphicsBuffer> ExposureBuffer { get; }
         public bool IsFirst { get; }
 
-        public AutoExposureData(BufferHandle exposureBuffer, bool isFirst)
+        public AutoExposureData(ResourceHandle<GraphicsBuffer> exposureBuffer, bool isFirst)
         {
-            this.exposureBuffer = exposureBuffer;
+            this.ExposureBuffer = exposureBuffer;
             IsFirst = isFirst;
         }
 
         public readonly void SetInputs(RenderPass pass)
         {
-            pass.ReadBuffer("Exposure", exposureBuffer);
+            pass.ReadBuffer("Exposure", ExposureBuffer);
         }
 
         public readonly void SetProperties(RenderPass pass, CommandBuffer command)

@@ -5,14 +5,14 @@ namespace Arycama.CustomRenderPipeline
 {
     public struct SkyReflectionAmbientData : IRenderPassData
     {
-        private readonly RTHandle reflectionProbe, skyCdf;
-        private readonly BufferHandle ambientBuffer;
-        private readonly RTHandle skyLuminance;
-        private readonly RTHandle weightedDepth;
+        private readonly ResourceHandle<RenderTexture> reflectionProbe, skyCdf;
+        private readonly ResourceHandle<GraphicsBuffer> ambientBuffer;
+        private readonly ResourceHandle<RenderTexture> skyLuminance;
+        private readonly ResourceHandle<RenderTexture> weightedDepth;
         private Vector2 skyLuminanceSize;
         private Vector2 cdfLookupSize;
 
-        public SkyReflectionAmbientData(BufferHandle ambientBuffer, RTHandle reflectionProbe, RTHandle skyCdf, RTHandle skyLuminance, RTHandle weightedDepth, Vector2 skyLuminanceSize, Vector2 cdfLookupSize)
+        public SkyReflectionAmbientData(ResourceHandle<GraphicsBuffer> ambientBuffer, ResourceHandle<RenderTexture> reflectionProbe, ResourceHandle<RenderTexture> skyCdf, ResourceHandle<RenderTexture> skyLuminance, ResourceHandle<RenderTexture> weightedDepth, Vector2 skyLuminanceSize, Vector2 cdfLookupSize)
         {
             this.ambientBuffer = ambientBuffer;
             this.reflectionProbe = reflectionProbe;

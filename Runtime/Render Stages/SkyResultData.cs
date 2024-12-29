@@ -1,12 +1,13 @@
 ﻿using Arycama.CustomRenderPipeline;
 using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 public readonly struct SkyResultData : IRenderPassData
 {
-    public RTHandle SkyTexture { get; }
+    public ResourceHandle<RenderTexture> SkyTexture { get; }
 
-    public SkyResultData(RTHandle skyTexture)
+    public SkyResultData(ResourceHandle<RenderTexture> skyTexture)
     {
         SkyTexture = skyTexture;
     }

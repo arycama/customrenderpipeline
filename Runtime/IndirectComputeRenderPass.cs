@@ -7,9 +7,9 @@ namespace Arycama.CustomRenderPipeline
     public class IndirectComputeRenderPass : BaseComputeRenderPass
     {
         private uint argsOffset;
-        private BufferHandle indirectBuffer;
+        private ResourceHandle<GraphicsBuffer> indirectBuffer;
 
-        public void Initialize(ComputeShader computeShader, BufferHandle indirectBuffer, int kernelIndex = 0, uint argsOffset = 0)
+        public void Initialize(ComputeShader computeShader, ResourceHandle<GraphicsBuffer> indirectBuffer, int kernelIndex = 0, uint argsOffset = 0)
         {
             this.computeShader = computeShader ?? throw new ArgumentNullException(nameof(computeShader));
             this.kernelIndex = kernelIndex;

@@ -1,8 +1,10 @@
-﻿namespace Arycama.CustomRenderPipeline
+﻿using UnityEngine;
+
+namespace Arycama.CustomRenderPipeline
 {
     public class CameraDepthData : RTHandleData
     {
-        public CameraDepthData(RTHandle handle) : base(handle, "_Depth")
+        public CameraDepthData(ResourceHandle<RenderTexture> handle) : base(handle, "_Depth")
         {
         }
     }

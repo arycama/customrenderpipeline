@@ -1,23 +1,24 @@
-﻿using UnityEngine.Rendering;
+﻿using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
     /// <summary>
-    /// Utility class for an IRenderPassData that contains a single RTHandle
+    /// Utility class for an IRenderPassData that contains a single ResourceHandle<RenderTexture>
     /// </summary>
     public class RTHandleData : IRenderPassData
     {
-        public RTHandle Handle { get; }
+        public ResourceHandle<RenderTexture> Handle { get; }
         private readonly string propertyName, scaleLimitPropertyName;
 
-        public RTHandleData(RTHandle handle, string propertyName)
+        public RTHandleData(ResourceHandle<RenderTexture> handle, string propertyName)
         {
             Handle = handle;
             this.propertyName = propertyName;
             scaleLimitPropertyName = propertyName + "ScaleLimit";
         }
 
-        public static implicit operator RTHandle(RTHandleData data) => data.Handle;
+        public static implicit operator ResourceHandle<RenderTexture>(RTHandleData data) => data.Handle;
 
         public void SetInputs(RenderPass pass)
         {

@@ -1,13 +1,14 @@
 ﻿using System;
+using UnityEngine;
 
 namespace Arycama.CustomRenderPipeline.Water
 {
     public readonly struct WaterCullResult
     {
-        public BufferHandle IndirectArgsBuffer { get; }
-        public BufferHandle PatchDataBuffer { get; }
+        public ResourceHandle<GraphicsBuffer> IndirectArgsBuffer { get; }
+        public ResourceHandle<GraphicsBuffer> PatchDataBuffer { get; }
 
-        public WaterCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
+        public WaterCullResult(ResourceHandle<GraphicsBuffer> indirectArgsBuffer, ResourceHandle<GraphicsBuffer> patchDataBuffer)
         {
             IndirectArgsBuffer = indirectArgsBuffer;
             PatchDataBuffer = patchDataBuffer;

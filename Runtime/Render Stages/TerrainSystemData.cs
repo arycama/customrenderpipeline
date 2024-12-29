@@ -6,12 +6,12 @@ namespace Arycama.CustomRenderPipeline
 {
     public class TerrainSystemData : IRenderPassData
     {
-        public RTHandle MinMaxHeights { get; }
+        public ResourceHandle<RenderTexture> MinMaxHeights { get; }
         public Terrain Terrain { get; }
         public TerrainData TerrainData { get; }
-        public BufferHandle IndexBuffer { get; }
+        public ResourceHandle<GraphicsBuffer> IndexBuffer { get; }
 
-        public TerrainSystemData(RTHandle minMaxHeights, Terrain terrain, TerrainData terrainData, BufferHandle indexBuffer)
+        public TerrainSystemData(ResourceHandle<RenderTexture> minMaxHeights, Terrain terrain, TerrainData terrainData, ResourceHandle<GraphicsBuffer> indexBuffer)
         {
             MinMaxHeights = minMaxHeights;
             Terrain = terrain;

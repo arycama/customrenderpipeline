@@ -1,9 +1,10 @@
-﻿namespace Arycama.CustomRenderPipeline
+﻿using UnityEngine;
+
+namespace Arycama.CustomRenderPipeline
 {
     public class DepthCopyData : RTHandleData
     {
-        // TODO: Rename to CameraTarget?
-        public DepthCopyData(RTHandle handle) : base(handle, "_DepthCopy")
+        public DepthCopyData(ResourceHandle<RenderTexture> handle) : base(handle, "_DepthCopy")
         {
         }
     }

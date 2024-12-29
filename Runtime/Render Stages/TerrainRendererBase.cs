@@ -27,8 +27,8 @@ namespace Arycama.CustomRenderPipeline
             var totalPassCount = (int)Mathf.Log(settings.CellCount, 2f) + 1;
             var dispatchCount = Mathf.Ceil(totalPassCount / (float)maxPassesPerDispatch);
 
-            RTHandle tempLodId = default;
-            BufferHandle lodIndirectArgsBuffer = default;
+            ResourceHandle<RenderTexture> tempLodId = default;
+            ResourceHandle<GraphicsBuffer> lodIndirectArgsBuffer = default;
             if (dispatchCount > 1)
             {
                 // If more than one dispatch, we need to write lods out to a temp texture first. Otherwise they are done via shared memory so no texture is needed
@@ -36,7 +36,7 @@ namespace Arycama.CustomRenderPipeline
                 lodIndirectArgsBuffer = renderGraph.GetBuffer(3, target: GraphicsBuffer.Target.IndirectArguments);
             }
 
-            var tempIds = ListPool<RTHandle>.Get();
+            var tempIds = ListPool<ResourceHandle<RenderTexture>>.Get();
             for (var i = 0; i < dispatchCount - 1; i++)
             {
                 var tempResolution = 1 << ((i + 1) * (maxPassesPerDispatch - 1));
@@ -163,7 +163,7 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
 
-            ListPool<RTHandle>.Release(tempIds);
+            ListPool<ResourceHandle<RenderTexture>>.Release(tempIds);
 
             return new(indirectArgsBuffer, patchDataBuffer);
         }

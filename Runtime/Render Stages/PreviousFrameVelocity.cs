@@ -1,13 +1,14 @@
 ﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
     public readonly struct PreviousFrameVelocity : IRenderPassData
     {
-        private readonly RTHandle previousVelocity;
+        private readonly ResourceHandle<RenderTexture> previousVelocity;
 
-        public PreviousFrameVelocity(RTHandle previousVelocity)
+        public PreviousFrameVelocity(ResourceHandle<RenderTexture> previousVelocity)
         {
             this.previousVelocity = previousVelocity;
         }

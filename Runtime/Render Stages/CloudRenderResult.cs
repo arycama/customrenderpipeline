@@ -1,13 +1,14 @@
 ﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
     public readonly struct CloudRenderResult : IRenderPassData
     {
-        private readonly RTHandle cloudTexture, cloudTransmittanceTexture, cloudDepth;
+        private readonly ResourceHandle<RenderTexture> cloudTexture, cloudTransmittanceTexture, cloudDepth;
 
-        public CloudRenderResult(RTHandle cloudLuminanceTexture, RTHandle cloudTransmittanceTexture, RTHandle cloudDepth)
+        public CloudRenderResult(ResourceHandle<RenderTexture> cloudLuminanceTexture, ResourceHandle<RenderTexture> cloudTransmittanceTexture, ResourceHandle<RenderTexture> cloudDepth)
         {
             cloudTexture = cloudLuminanceTexture;
             this.cloudTransmittanceTexture = cloudTransmittanceTexture;

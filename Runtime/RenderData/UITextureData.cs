@@ -1,8 +1,10 @@
-﻿namespace Arycama.CustomRenderPipeline
+﻿using UnityEngine;
+
+namespace Arycama.CustomRenderPipeline
 {
     public class UITextureData : RTHandleData
     {
-        public UITextureData(RTHandle handle) : base(handle, "UITexture")
+        public UITextureData(ResourceHandle<RenderTexture> handle) : base(handle, "UITexture")
         {
         }
     }

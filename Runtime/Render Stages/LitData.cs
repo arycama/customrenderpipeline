@@ -9,7 +9,7 @@ namespace Arycama.CustomRenderPipeline
     {
         private readonly Settings settings;
 
-        private readonly RTHandle directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
+        private readonly ResourceHandle<RenderTexture> directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
         private readonly Texture2D ltcData;
 
         private int version = -1;
@@ -167,11 +167,11 @@ namespace Arycama.CustomRenderPipeline
 
         public struct Result : IRenderPassData
         {
-            private readonly RTHandle directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
+            private readonly ResourceHandle<RenderTexture> directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
             private Vector4 ggxDirectionalAlbedoRemap, ggxAverageAlbedoMSRemap;
             private Vector2 ggxAverageAlbedoRemap, ggxDirectionalAlbedoMSScaleOffset;
 
-            public Result(RTHandle directionalAlbedo, RTHandle averageAlbedo, RTHandle directionalAlbedoMs, RTHandle averageAlbedoMs, RTHandle specularOcclusion, Vector4 ggxDirectionalAlbedoRemap, Vector4 ggxAverageAlbedoMSRemap, Vector2 ggxAverageAlbedoRemap, Vector2 ggxDirectionalAlbedoMSScaleOffset)
+            public Result(ResourceHandle<RenderTexture> directionalAlbedo, ResourceHandle<RenderTexture> averageAlbedo, ResourceHandle<RenderTexture> directionalAlbedoMs, ResourceHandle<RenderTexture> averageAlbedoMs, ResourceHandle<RenderTexture> specularOcclusion, Vector4 ggxDirectionalAlbedoRemap, Vector4 ggxAverageAlbedoMSRemap, Vector2 ggxAverageAlbedoRemap, Vector2 ggxDirectionalAlbedoMSScaleOffset)
             {
                 this.directionalAlbedo = directionalAlbedo;
                 this.averageAlbedo = averageAlbedo;

@@ -6,7 +6,7 @@ namespace Arycama.CustomRenderPipeline
 {
     public class VolumetricCloudsSetup : RenderFeature
     {
-        private readonly RTHandle weatherMap, noiseTexture, detailNoiseTexture;
+        private readonly ResourceHandle<RenderTexture> weatherMap, noiseTexture, detailNoiseTexture;
         private readonly VolumetricClouds.Settings settings;
         private readonly Material material;
 

@@ -54,9 +54,9 @@ public partial class UIBlur : RenderFeature
 
     public readonly struct UIBlurResult : IRenderPassData
     {
-        private readonly RTHandle uiBlurTexture;
+        private readonly ResourceHandle<RenderTexture> uiBlurTexture;
 
-        public UIBlurResult(RTHandle uiBlurTexture)
+        public UIBlurResult(ResourceHandle<RenderTexture> uiBlurTexture)
         {
             this.uiBlurTexture = uiBlurTexture;
         }

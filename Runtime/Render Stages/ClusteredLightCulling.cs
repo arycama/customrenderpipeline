@@ -30,12 +30,12 @@ namespace Arycama.CustomRenderPipeline
 
         public readonly struct Result : IRenderPassData
         {
-            private readonly RTHandle lightClusterIndices;
-            private readonly BufferHandle lightList;
+            private readonly ResourceHandle<RenderTexture> lightClusterIndices;
+            private readonly ResourceHandle<GraphicsBuffer> lightList;
             private readonly float clusterScale, clusterBias;
             private readonly int tileSize;
 
-            public Result(RTHandle lightClusterIndices, BufferHandle lightList, float clusterScale, float clusterBias, int tileSize)
+            public Result(ResourceHandle<RenderTexture> lightClusterIndices, ResourceHandle<GraphicsBuffer> lightList, float clusterScale, float clusterBias, int tileSize)
             {
                 this.lightClusterIndices = lightClusterIndices;
                 this.lightList = lightList;

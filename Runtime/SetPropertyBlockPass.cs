@@ -28,7 +28,7 @@ namespace Arycama.CustomRenderPipeline
             }
         }
 
-        public override void SetBuffer(string propertyName, BufferHandle buffer)
+        public override void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
         {
             propertyBlock.SetBuffer(propertyName, GetBuffer(buffer));
         }
@@ -67,7 +67,7 @@ namespace Arycama.CustomRenderPipeline
             propertyBlock.SetMatrix(propertyName, value);
         }
 
-        public override void SetConstantBuffer(string propertyName, BufferHandle value)
+        public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value)
         {
             var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
             var size = descriptor.Count * descriptor.Stride;

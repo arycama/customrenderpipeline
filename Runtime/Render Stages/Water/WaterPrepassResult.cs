@@ -6,10 +6,10 @@ namespace Arycama.CustomRenderPipeline.Water
 {
     public struct WaterPrepassResult : IRenderPassData
     {
-        private readonly RTHandle waterNormalFoam, waterTriangleNormal;
+        private readonly ResourceHandle<RenderTexture> waterNormalFoam, waterTriangleNormal;
         private Vector3 albedo, extinction;
 
-        public WaterPrepassResult(RTHandle waterNormalFoam, RTHandle waterTriangleNormal, Vector3 albedo, Vector3 extinction)
+        public WaterPrepassResult(ResourceHandle<RenderTexture> waterNormalFoam, ResourceHandle<RenderTexture> waterTriangleNormal, Vector3 albedo, Vector3 extinction)
         {
             this.waterNormalFoam = waterNormalFoam;
             this.waterTriangleNormal = waterTriangleNormal;

@@ -1,13 +1,14 @@
 ﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
     public readonly struct PreviousFrameDepth : IRenderPassData
     {
-        private readonly RTHandle previousDepth;
+        private readonly ResourceHandle<RenderTexture> previousDepth;
 
-        public PreviousFrameDepth(RTHandle previousDepth)
+        public PreviousFrameDepth(ResourceHandle<RenderTexture> previousDepth)
         {
             this.previousDepth = previousDepth;
         }

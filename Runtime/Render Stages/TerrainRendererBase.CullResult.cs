@@ -1,4 +1,5 @@
 ﻿using System;
+using UnityEngine;
 
 namespace Arycama.CustomRenderPipeline
 {
@@ -6,10 +7,10 @@ namespace Arycama.CustomRenderPipeline
     {
         public readonly struct CullResult
         {
-            public BufferHandle IndirectArgsBuffer { get; }
-            public BufferHandle PatchDataBuffer { get; }
+            public ResourceHandle<GraphicsBuffer> IndirectArgsBuffer { get; }
+            public ResourceHandle<GraphicsBuffer> PatchDataBuffer { get; }
 
-            public CullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
+            public CullResult(ResourceHandle<GraphicsBuffer> indirectArgsBuffer, ResourceHandle<GraphicsBuffer> patchDataBuffer)
             {
                 IndirectArgsBuffer = indirectArgsBuffer;
                 PatchDataBuffer = patchDataBuffer;

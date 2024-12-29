@@ -22,13 +22,13 @@ namespace Arycama.CustomRenderPipeline
         public RenderResourceMap ResourceMap { get; }
         public CustomRenderPipeline RenderPipeline { get; }
 
-        public BufferHandle EmptyBuffer { get; }
-        public RTHandle EmptyTexture { get; }
-        public RTHandle EmptyUavTexture { get; }
-        public RTHandle EmptyTextureArray { get; }
-        public RTHandle Empty3DTexture { get; }
-        public RTHandle EmptyCubemap { get; }
-        public RTHandle EmptyCubemapArray { get; }
+        public ResourceHandle<GraphicsBuffer> EmptyBuffer { get; }
+        public ResourceHandle<RenderTexture> EmptyTexture { get; }
+        public ResourceHandle<RenderTexture> EmptyUavTexture { get; }
+        public ResourceHandle<RenderTexture> EmptyTextureArray { get; }
+        public ResourceHandle<RenderTexture> Empty3DTexture { get; }
+        public ResourceHandle<RenderTexture> EmptyCubemap { get; }
+        public ResourceHandle<RenderTexture> EmptyCubemapArray { get; }
 
         public int FrameIndex { get; private set; }
         public bool IsExecuting { get; private set; }
@@ -117,13 +117,13 @@ namespace Arycama.CustomRenderPipeline
             IsExecuting = false;
         }
 
-        public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
+        public ResourceHandle<RenderTexture> GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
         {
             Assert.IsFalse(IsExecuting);
             return RtHandleSystem.GetResourceHandle(new RtHandleDescriptor(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips), isPersistent);
         }
 
-        public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)
+        public ResourceHandle<GraphicsBuffer> GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)
         {
             Assert.IsFalse(IsExecuting);
             return BufferHandleSystem.GetResourceHandle(new BufferHandleDescriptor(count, stride, target, usageFlags), isPersistent);
@@ -157,7 +157,7 @@ namespace Arycama.CustomRenderPipeline
             return ResourceMap.GetRenderPassData<T>(FrameIndex);
         }
 
-        public BufferHandle SetConstantBuffer<T>(in T data) where T : struct
+        public ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(in T data) where T : struct
         {
             var buffer = BufferHandleSystem.GetResourceHandle(new BufferHandleDescriptor(1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite));
             using (var pass = AddRenderPass<GlobalRenderPass>("Set Constant Buffer"))
@@ -174,12 +174,12 @@ namespace Arycama.CustomRenderPipeline
             return buffer;
         }
 
-        public void ReleasePersistentResource(BufferHandle handle)
+        public void ReleasePersistentResource(ResourceHandle<GraphicsBuffer> handle)
         {
             BufferHandleSystem.ReleasePersistentResource(handle);
         }
 
-        public void ReleasePersistentResource(RTHandle handle)
+        public void ReleasePersistentResource(ResourceHandle<RenderTexture> handle)
         {
             RtHandleSystem.ReleasePersistentResource(handle);
         }

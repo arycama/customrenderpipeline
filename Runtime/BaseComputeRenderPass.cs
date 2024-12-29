@@ -8,10 +8,10 @@ namespace Arycama.CustomRenderPipeline
     {
         protected ComputeShader computeShader;
         protected int kernelIndex;
-        protected readonly List<(RTHandle, int, int)> colorBindings = new();
+        protected readonly List<(ResourceHandle<RenderTexture>, int, int)> colorBindings = new();
         protected readonly List<string> keywords = new();
 
-        public void WriteTexture(int propertyId, RTHandle rtHandle, int mip = 0)
+        public void WriteTexture(int propertyId, ResourceHandle<RenderTexture> rtHandle, int mip = 0)
         {
             RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
             colorBindings.Add(new(rtHandle, propertyId, mip));
@@ -21,7 +21,7 @@ namespace Arycama.CustomRenderPipeline
             RenderGraph.RtHandleSystem.SetDescriptor(rtHandle, descriptor);
         }
 
-        public void WriteTexture(string propertyName, RTHandle texture, int mip = 0)
+        public void WriteTexture(string propertyName, ResourceHandle<RenderTexture> texture, int mip = 0)
         {
             WriteTexture(Shader.PropertyToID(propertyName), texture, mip);
         }
@@ -31,7 +31,7 @@ namespace Arycama.CustomRenderPipeline
             command.SetComputeTextureParam(computeShader, kernelIndex, propertyName, texture, mip, subElement);
         }
 
-        public override void SetBuffer(string propertyName, BufferHandle buffer)
+        public override void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
         {
             command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, GetBuffer(buffer));
         }
@@ -72,7 +72,7 @@ namespace Arycama.CustomRenderPipeline
             command.SetComputeMatrixParam(computeShader, propertyName, value);
         }
 
-        public override void SetConstantBuffer(string propertyName, BufferHandle value)
+        public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value)
         {
             var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
             var size = descriptor.Count * descriptor.Stride;

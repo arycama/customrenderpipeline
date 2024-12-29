@@ -17,8 +17,8 @@ namespace Arycama.CustomRenderPipeline
         private readonly Settings settings;
         private Terrain terrain;
         private readonly Material material;
-        private RTHandle result;
-        private readonly BufferHandle resultDataBuffer;
+        private ResourceHandle<RenderTexture> result;
+        private readonly ResourceHandle<GraphicsBuffer> resultDataBuffer;
         private int version = 0, lastVersion = -1;
 
         public WaterShoreMask(RenderGraph renderGraph, Settings settings) : base(renderGraph)
@@ -165,13 +165,13 @@ namespace Arycama.CustomRenderPipeline
 
         public struct Result : IRenderPassData
         {
-            private readonly RTHandle shoreDistance;
-            private readonly BufferHandle resultDataBuffer;
+            private readonly ResourceHandle<RenderTexture> shoreDistance;
+            private readonly ResourceHandle<GraphicsBuffer> resultDataBuffer;
             private Vector4 scaleOffset;
             private Vector2 terrainSize;
             private readonly float maxOceanDepth, maxTerrainDistance;
 
-            public Result(RTHandle shoreDistance, BufferHandle resultDataBuffer, Vector4 scaleOffset, Vector2 terrainSize, float maxOceanDepth, float maxTerrainDistance)
+            public Result(ResourceHandle<RenderTexture> shoreDistance, ResourceHandle<GraphicsBuffer> resultDataBuffer, Vector4 scaleOffset, Vector2 terrainSize, float maxOceanDepth, float maxTerrainDistance)
             {
                 this.shoreDistance = shoreDistance;
                 this.resultDataBuffer = resultDataBuffer;

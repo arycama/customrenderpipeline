@@ -5,6 +5,6 @@ namespace Arycama.CustomRenderPipeline
 {
     public interface ITerrainHeightmapModifier
     {
-        void Generate(CommandBuffer command, RTHandle targetHeightmap, RenderTexture originalHeightmap);
+        void Generate(CommandBuffer command, ResourceHandle<RenderTexture> targetHeightmap, RenderTexture originalHeightmap);
     }
 }

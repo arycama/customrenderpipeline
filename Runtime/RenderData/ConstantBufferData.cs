@@ -1,13 +1,14 @@
+using UnityEngine;
 using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
     public abstract class ConstantBufferData : IRenderPassData
     {
-        private readonly BufferHandle buffer;
+        private readonly ResourceHandle<GraphicsBuffer> buffer;
         private readonly string propertyName;
 
-        public ConstantBufferData(BufferHandle buffer, string propertyName)
+        public ConstantBufferData(ResourceHandle<GraphicsBuffer> buffer, string propertyName)
         {
             this.buffer = buffer;
             this.propertyName = propertyName;

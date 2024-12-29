@@ -11,9 +11,9 @@ namespace Arycama.CustomRenderPipeline
         protected RenderGraphBuilder renderGraphBuilder;
 
         // TODO: Convert to handles and remove
-        private readonly List<(int, RTHandle, int, RenderTextureSubElement)> readTextures = new();
-        private readonly List<(string, BufferHandle)> readBuffers = new();
-        private readonly List<(string, BufferHandle)> writeBuffers = new();
+        private readonly List<(int, ResourceHandle<RenderTexture>, int, RenderTextureSubElement)> readTextures = new();
+        private readonly List<(string, ResourceHandle<GraphicsBuffer>)> readBuffers = new();
+        private readonly List<(string, ResourceHandle<GraphicsBuffer>)> writeBuffers = new();
 
         public List<(RenderPassDataHandle, bool)> RenderPassDataHandles { get; private set; } = new();
 
@@ -25,7 +25,7 @@ namespace Arycama.CustomRenderPipeline
 
         public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
 
-        public abstract void SetBuffer(string propertyName, BufferHandle buffer);
+        public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);
         public abstract void SetVector(string propertyName, Vector4 value);
         public abstract void SetVectorArray(string propertyName, Vector4[] value);
         public abstract void SetFloat(string propertyName, float value);
@@ -33,7 +33,7 @@ namespace Arycama.CustomRenderPipeline
         public abstract void SetInt(string propertyName, int value);
         public abstract void SetMatrix(string propertyName, Matrix4x4 value);
         public abstract void SetMatrixArray(string propertyName, Matrix4x4[] value);
-        public abstract void SetConstantBuffer(string propertyName, BufferHandle value);
+        public abstract void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value);
 
         protected abstract void Execute();
 
@@ -49,25 +49,25 @@ namespace Arycama.CustomRenderPipeline
             SetTexture(Shader.PropertyToID(propertyName), texture, mip, subElement);
         }
 
-        public void ReadTexture(int propertyId, RTHandle texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+        public void ReadTexture(int propertyId, ResourceHandle<RenderTexture> texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
             Assert.IsFalse(RenderGraph.IsExecuting);
             readTextures.Add((propertyId, texture, mip, subElement));
             RenderGraph.RtHandleSystem.ReadResource(texture, Index);
         }
 
-        public void ReadTexture(string propertyName, RTHandle texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+        public void ReadTexture(string propertyName, ResourceHandle<RenderTexture> texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
             ReadTexture(Shader.PropertyToID(propertyName), texture, mip, subElement);
         }
 
-        public void ReadBuffer(string propertyName, BufferHandle buffer)
+        public void ReadBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
         {
             RenderGraph.BufferHandleSystem.ReadResource(buffer, Index);
             readBuffers.Add((propertyName, buffer));
         }
 
-        public void WriteBuffer(string propertyName, BufferHandle buffer)
+        public void WriteBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
         {
             RenderGraph.BufferHandleSystem.WriteResource(buffer, Index);
             writeBuffers.Add((propertyName, buffer));
@@ -171,17 +171,17 @@ namespace Arycama.CustomRenderPipeline
             renderGraphBuilder = result;
         }
 
-        public GraphicsBuffer GetBuffer(BufferHandle handle)
+        public GraphicsBuffer GetBuffer(ResourceHandle<GraphicsBuffer> handle)
         {
             return RenderGraph.BufferHandleSystem.GetResource(handle);
         }
 
-        public RenderTexture GetRenderTexture(RTHandle handle)
+        public RenderTexture GetRenderTexture(ResourceHandle<RenderTexture> handle)
         {
             return RenderGraph.RtHandleSystem.GetResource(handle);
         }
 
-        public Vector4 GetScaleLimit2D(RTHandle handle)
+        public Vector4 GetScaleLimit2D(ResourceHandle<RenderTexture> handle)
         {
             var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
             var resource = GetRenderTexture(handle);
@@ -194,7 +194,7 @@ namespace Arycama.CustomRenderPipeline
             return new Vector4(scaleX, scaleY, limitX, limitY);
         }
 
-        public Vector3 GetScale3D(RTHandle handle)
+        public Vector3 GetScale3D(ResourceHandle<RenderTexture> handle)
         {
             var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
             var resource = GetRenderTexture(handle);
@@ -206,7 +206,7 @@ namespace Arycama.CustomRenderPipeline
             return new Vector3(scaleX, scaleY, scaleZ);
         }
 
-        public Vector3 GetLimit3D(RTHandle handle)
+        public Vector3 GetLimit3D(ResourceHandle<RenderTexture> handle)
         {
             var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
             var resource = GetRenderTexture(handle);

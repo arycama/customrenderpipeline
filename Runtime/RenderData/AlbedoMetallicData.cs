@@ -1,8 +1,10 @@
-﻿namespace Arycama.CustomRenderPipeline
+﻿using UnityEngine;
+
+namespace Arycama.CustomRenderPipeline
 {
     public class AlbedoMetallicData : RTHandleData
     {
-        public AlbedoMetallicData(RTHandle handle) : base(handle, "_AlbedoMetallic")
+        public AlbedoMetallicData(ResourceHandle<RenderTexture> handle) : base(handle, "_AlbedoMetallic")
         {
         }
     }

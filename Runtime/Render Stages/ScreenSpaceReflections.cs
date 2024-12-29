@@ -176,10 +176,10 @@ namespace Arycama.CustomRenderPipeline
 
     public readonly struct ScreenSpaceReflectionResult : IRenderPassData
     {
-        public RTHandle ScreenSpaceReflections { get; }
+        public ResourceHandle<RenderTexture> ScreenSpaceReflections { get; }
         private readonly float intensity;
 
-        public ScreenSpaceReflectionResult(RTHandle screenSpaceReflections, float intensity)
+        public ScreenSpaceReflectionResult(ResourceHandle<RenderTexture> screenSpaceReflections, float intensity)
         {
             ScreenSpaceReflections = screenSpaceReflections;
             this.intensity = intensity;

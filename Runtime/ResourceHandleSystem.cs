@@ -2,19 +2,19 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : class where K : IResourceHandle
+public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class
 {
-    private readonly List<K> handles = new();
+    private readonly List<ResourceHandle<T>> handles = new();
     private readonly List<int> createList = new(), freeList = new();
     private readonly List<V> descriptors = new();
 
-    private readonly List<K> persistentHandles = new();
+    private readonly List<ResourceHandle<T>> persistentHandles = new();
     private readonly Queue<int> availablePersistentHandleIndices = new();
     private readonly List<int> persistentCreateList = new(), persistentFreeList = new();
     private readonly List<int> resourceIndices = new(), persistentResourceIndices = new();
     private readonly List<V> persistentDescriptors = new();
 
-    private readonly Dictionary<T, K> importedResourceLookup = new();
+    private readonly Dictionary<T, ResourceHandle<T>> importedResourceLookup = new();
     private readonly List<T> importedResources = new();
     private readonly List<V> importedDescriptors = new();
 
@@ -70,10 +70,10 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
     protected abstract T CreateResource(V descriptor);
     protected abstract void DestroyResource(T resource);
     protected virtual int ExtraFramesToKeepResource(T resource) => 0;
-    protected abstract K CreateHandleFromDescriptor(V descriptor, bool isPersistent, int handleIndex);
+    protected abstract ResourceHandle<T> CreateHandle(int handleIndex, bool isPersistent);
     protected abstract V CreateDescriptorFromResource(T resource);
 
-    private void AssignResource(K handle)
+    private void AssignResource(ResourceHandle<T> handle)
     {
         var descriptor = GetDescriptor(handle);
 
@@ -128,7 +128,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
     }
 
 
-    public K ImportResource(T resource)
+    public ResourceHandle<T> ImportResource(T resource)
     {
         if (!importedResourceLookup.TryGetValue(resource, out var result))
         {
@@ -138,14 +138,14 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
             var descriptor = CreateDescriptorFromResource(resource);
             importedDescriptors.Add(descriptor);
 
-            result = CreateHandleFromDescriptor(descriptor, true, -index);
+            result = CreateHandle(-index, true);
             importedResourceLookup.Add(resource, result);
         }
 
         return result;
     }
 
-    public void WriteResource(K handle, int passIndex)
+    public void WriteResource(ResourceHandle<T> handle, int passIndex)
     {
         // Imported handles don't need create/free logic
         if (handle.Index < 0) // Negative 
@@ -162,7 +162,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
         list[handle.Index] = createIndex;
     }
 
-    public void ReadResource(K handle, int passIndex)
+    public void ReadResource(ResourceHandle<T> handle, int passIndex)
     {
         // Ignore imported textures
         if (handle.Index < 0)
@@ -180,8 +180,8 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
 
     public void AllocateFrameResources(int renderPassCount, int frameIndex)
     {
-        List<List<K>> handlesToCreate = new();
-        List<List<K>> handlesToFree = new();
+        List<List<ResourceHandle<T>>> handlesToCreate = new();
+        List<List<ResourceHandle<T>>> handlesToFree = new();
 
         for (var i = 0; i < renderPassCount; i++)
         {
@@ -273,7 +273,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
         freeList.Clear();
     }
 
-    public K GetResourceHandle(V descriptor, bool isPersistent = false)
+    public ResourceHandle<T> GetResourceHandle(V descriptor, bool isPersistent = false)
     {
         int handleIndex;
         if (isPersistent)
@@ -301,7 +301,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
             handleIndex = handles.Count;
         }
 
-        var result = CreateHandleFromDescriptor(descriptor, isPersistent, handleIndex);
+        var result = CreateHandle(handleIndex, isPersistent);
 
         if (isPersistent)
         {
@@ -319,7 +319,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
         return result;
     }
 
-    public T GetResource(K handle)
+    public T GetResource(ResourceHandle<T> handle)
     {
         if (handle.Index < 0)
             return importedResources[-handle.Index];
@@ -329,12 +329,12 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
         return resources[resourceIndex];
     }
 
-    public void ReleasePersistentResource(K handle)
+    public void ReleasePersistentResource(ResourceHandle<T> handle)
     {
         isNotReleasable[handle.Index] = false;
     }
 
-    public V GetDescriptor(K handle)
+    public V GetDescriptor(ResourceHandle<T> handle)
     {
         if (handle.Index < 0)
             return importedDescriptors[-handle.Index];
@@ -343,7 +343,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
         return descriptors[handle.Index];
     }
 
-    public void SetDescriptor(K handle, V descriptor)
+    public void SetDescriptor(ResourceHandle<T> handle, V descriptor)
     {
         if (handle.Index < 0)
         {

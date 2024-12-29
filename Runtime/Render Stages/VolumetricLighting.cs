@@ -149,7 +149,7 @@ namespace Arycama.CustomRenderPipeline
 
         public readonly struct Result : IRenderPassData
         {
-            private readonly RTHandle volumetricLighting;
+            private readonly ResourceHandle<RenderTexture> volumetricLighting;
 
             //private readonly Vector3 volumetricLightScale;
             private readonly float volumetricLightNear;
@@ -161,7 +161,7 @@ namespace Arycama.CustomRenderPipeline
             private readonly float volumeSlices;
             private readonly float nonLinearDepth;
 
-            public Result(RTHandle volumetricLighting, /*Vector3 volumetricLightScale,*/ float volumetricLightNear, /*Vector3 volumetricLightMax, */float volumetricLightFar, Vector2 rcpVolumetricLightResolution, float volumeSlices, float nonLinearDepth)
+            public Result(ResourceHandle<RenderTexture> volumetricLighting, /*Vector3 volumetricLightScale,*/ float volumetricLightNear, /*Vector3 volumetricLightMax, */float volumetricLightFar, Vector2 rcpVolumetricLightResolution, float volumeSlices, float nonLinearDepth)
             {
                 this.volumetricLighting = volumetricLighting;
                 //this.volumetricLightScale = volumetricLightScale;

@@ -9,7 +9,7 @@ namespace Arycama.CustomRenderPipeline
         private float bias, slopeBias;
         private bool zClip;
 
-        public void WriteTexture(RTHandle rtHandle)
+        public void WriteTexture(ResourceHandle<RenderTexture> rtHandle)
         {
             RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
         }
@@ -33,7 +33,7 @@ namespace Arycama.CustomRenderPipeline
             command.SetGlobalTexture(propertyName, texture);
         }
 
-        public override void SetBuffer(string propertyName, BufferHandle buffer)
+        public override void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
         {
             command.SetGlobalBuffer(propertyName, GetBuffer(buffer));
         }
@@ -77,7 +77,7 @@ namespace Arycama.CustomRenderPipeline
             command.SetGlobalMatrix(propertyName, value);
         }
 
-        public override void SetConstantBuffer(string propertyName, BufferHandle value)
+        public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value)
         {
             var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
             var size = descriptor.Count * descriptor.Stride;

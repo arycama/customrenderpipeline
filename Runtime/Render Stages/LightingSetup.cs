@@ -424,14 +424,14 @@ namespace Arycama.CustomRenderPipeline
 
         public readonly struct Result : IRenderPassData
         {
-            private readonly BufferHandle directionalMatrices;
-            private readonly BufferHandle directionalShadowTexelSizes;
-            private readonly BufferHandle directionalLights;
-            private readonly BufferHandle pointLights;
+            private readonly ResourceHandle<GraphicsBuffer> directionalMatrices;
+            private readonly ResourceHandle<GraphicsBuffer> directionalShadowTexelSizes;
+            private readonly ResourceHandle<GraphicsBuffer> directionalLights;
+            private readonly ResourceHandle<GraphicsBuffer> pointLights;
             private readonly int directionalLightCount;
             private readonly int pointLightCount;
 
-            public Result(BufferHandle directionalMatrices, BufferHandle directionalShadowTexelSizes, BufferHandle directionalLights, BufferHandle pointLights, int directionalLightCount, int pointLightCount)
+            public Result(ResourceHandle<GraphicsBuffer> directionalMatrices, ResourceHandle<GraphicsBuffer> directionalShadowTexelSizes, ResourceHandle<GraphicsBuffer> directionalLights, ResourceHandle<GraphicsBuffer> pointLights, int directionalLightCount, int pointLightCount)
             {
                 this.directionalMatrices = directionalMatrices;
                 this.directionalShadowTexelSizes = directionalShadowTexelSizes;

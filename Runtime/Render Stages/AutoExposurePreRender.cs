@@ -5,7 +5,7 @@ namespace Arycama.CustomRenderPipeline
 {
     public class AutoExposurePreRender : RenderFeature
     {
-        private readonly Dictionary<int, BufferHandle> exposureBuffers = new();
+        private readonly Dictionary<int, ResourceHandle<GraphicsBuffer>> exposureBuffers = new();
 
         public AutoExposurePreRender(RenderGraph renderGraph) : base(renderGraph)
         {

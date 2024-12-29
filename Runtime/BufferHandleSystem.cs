@@ -1,7 +1,15 @@
 using UnityEngine;
 
-public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHandle, BufferHandleDescriptor>
+public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHandleDescriptor>
 {
+    protected override GraphicsBuffer CreateResource(BufferHandleDescriptor descriptor) => new(descriptor.Target, descriptor.UsageFlags, descriptor.Count, descriptor.Stride);
+
+    protected override int ExtraFramesToKeepResource(GraphicsBuffer resource) => resource.usageFlags.HasFlag(GraphicsBuffer.UsageFlags.LockBufferForWrite) ? 3 : 0;
+
+    protected override ResourceHandle<GraphicsBuffer> CreateHandle(int handleIndex, bool isPersistent) => new(handleIndex, isPersistent);
+
+    protected override BufferHandleDescriptor CreateDescriptorFromResource(GraphicsBuffer resource) => new(resource.count, resource.stride, resource.target, resource.usageFlags);
+
     protected override void DestroyResource(GraphicsBuffer resource)
     {
         resource.Dispose();
@@ -35,25 +43,5 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
         //}
 
         return true;
-    }
-
-    protected override GraphicsBuffer CreateResource(BufferHandleDescriptor descriptor)
-    {
-        return new GraphicsBuffer(descriptor.Target, descriptor.UsageFlags, descriptor.Count, descriptor.Stride);
-    }
-
-    protected override int ExtraFramesToKeepResource(GraphicsBuffer resource)
-    {
-        return resource.usageFlags.HasFlag(GraphicsBuffer.UsageFlags.LockBufferForWrite) ? 3 : 0;
-    }
-
-    protected override BufferHandle CreateHandleFromDescriptor(BufferHandleDescriptor descriptor, bool isPersistent, int handleIndex)
-    {
-        return new BufferHandle(handleIndex, isPersistent);
-    }
-
-    protected override BufferHandleDescriptor CreateDescriptorFromResource(GraphicsBuffer resource)
-    {
-        return new BufferHandleDescriptor(resource.count, resource.stride, resource.target, resource.usageFlags);
     }
 }

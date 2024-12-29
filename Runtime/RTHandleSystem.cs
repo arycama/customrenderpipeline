@@ -3,7 +3,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
-public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHandleDescriptor>
+public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescriptor>
 {
     private int screenWidth, screenHeight;
 
@@ -12,6 +12,12 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHa
         screenWidth = Mathf.Max(width, screenWidth);
         screenHeight = Mathf.Max(height, screenHeight);
     }
+
+    protected override void DestroyResource(RenderTexture resource) => Object.DestroyImmediate(resource);
+
+    protected override ResourceHandle<RenderTexture> CreateHandle(int handleIndex, bool isPersistent) => new(handleIndex, isPersistent);
+
+    protected override RtHandleDescriptor CreateDescriptorFromResource(RenderTexture resource) => new(resource.width, resource.height, resource.graphicsFormat, resource.volumeDepth, resource.dimension, false, resource.useMipMap, resource.autoGenerateMips);
 
     protected override bool DoesResourceMatchDescriptor(RenderTexture resource, RtHandleDescriptor descriptor)
     {
@@ -65,20 +71,5 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHa
         _ = result.Create();
 
         return result;
-    }
-
-    protected override void DestroyResource(RenderTexture resource)
-    {
-        Object.DestroyImmediate(resource);
-    }
-
-    protected override RTHandle CreateHandleFromDescriptor(RtHandleDescriptor descriptor, bool isPersistent, int handleIndex)
-    {
-        return new RTHandle(handleIndex, isPersistent);
-    }
-
-    protected override RtHandleDescriptor CreateDescriptorFromResource(RenderTexture resource)
-    {
-        return new RtHandleDescriptor(resource.width, resource.height, resource.graphicsFormat, resource.volumeDepth, resource.dimension, false, resource.useMipMap, resource.autoGenerateMips);
     }
 }

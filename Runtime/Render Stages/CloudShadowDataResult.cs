@@ -5,13 +5,13 @@ namespace Arycama.CustomRenderPipeline
 {
     public readonly struct CloudShadowDataResult : IRenderPassData
     {
-        private readonly RTHandle cloudShadow;
+        private readonly ResourceHandle<RenderTexture> cloudShadow;
         private readonly float cloudDepthInvScale, cloudShadowExtinctionInvScale;
         private readonly Matrix4x4 worldToCloudShadow;
-        private readonly BufferHandle cloudCoverageBuffer;
+        private readonly ResourceHandle<GraphicsBuffer> cloudCoverageBuffer;
         private readonly float startHeight, endHeight;
 
-        public CloudShadowDataResult(RTHandle cloudShadow, float cloudDepthInvScale, Matrix4x4 worldToCloudShadow, float cloudShadowExtinctionInvScale, BufferHandle cloudCoverageBuffer, float startHeight, float endHeight)
+        public CloudShadowDataResult(ResourceHandle<RenderTexture> cloudShadow, float cloudDepthInvScale, Matrix4x4 worldToCloudShadow, float cloudShadowExtinctionInvScale, ResourceHandle<GraphicsBuffer> cloudCoverageBuffer, float startHeight, float endHeight)
         {
             this.cloudShadow = cloudShadow;
             this.cloudDepthInvScale = cloudDepthInvScale;

@@ -1,12 +1,13 @@
-﻿using UnityEngine.Rendering;
+﻿using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
     public readonly struct CloudData : IRenderPassData
     {
-        private readonly RTHandle weatherMap, noiseTexture, detailNoiseTexture;
+        private readonly ResourceHandle<RenderTexture> weatherMap, noiseTexture, detailNoiseTexture;
 
-        public CloudData(RTHandle weatherMap, RTHandle noiseTexture, RTHandle detailNoiseTexture)
+        public CloudData(ResourceHandle<RenderTexture> weatherMap, ResourceHandle<RenderTexture> noiseTexture, ResourceHandle<RenderTexture> detailNoiseTexture)
         {
             this.weatherMap = weatherMap;
             this.noiseTexture = noiseTexture;

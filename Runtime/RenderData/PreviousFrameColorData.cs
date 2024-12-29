@@ -1,8 +1,10 @@
-﻿namespace Arycama.CustomRenderPipeline
+﻿using UnityEngine;
+
+namespace Arycama.CustomRenderPipeline
 {
     public class PreviousFrameColorData : RTHandleData
     {
-        public PreviousFrameColorData(RTHandle handle) : base(handle, "PreviousFrame")
+        public PreviousFrameColorData(ResourceHandle<RenderTexture> handle) : base(handle, "PreviousFrame")
         {
         }
     }
