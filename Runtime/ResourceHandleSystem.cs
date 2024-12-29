@@ -9,7 +9,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
     private readonly List<V> descriptors = new();
 
     private readonly List<ResourceHandle<T>> persistentHandles = new();
-    private readonly Queue<int> availablePersistentHandleIndices = new();
+    private readonly Stack<int> availablePersistentHandleIndices = new();
     private readonly List<int> persistentCreateList = new(), persistentFreeList = new();
     private readonly List<int> resourceIndices = new(), persistentResourceIndices = new();
     private readonly List<V> persistentDescriptors = new();
@@ -22,7 +22,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
     private readonly List<int> lastFrameUsed = new();
     private readonly List<bool> isAvailable = new();
     private readonly List<bool> isAssigned = new();
-    private readonly List<bool> isNotReleasable = new();
+    private readonly List<bool> isReleasable = new();
     private readonly Stack<int> availableSlots = new();
 
     private bool disposedValue;
@@ -31,46 +31,6 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
     {
         Dispose(false);
     }
-
-    public void Dispose()
-    {
-        Dispose(true);
-        GC.SuppressFinalize(this);
-    }
-
-    private void Dispose(bool disposing)
-    {
-        if (disposedValue)
-        {
-            Debug.LogError("Disposing an already disposed ResourceHandleSystem");
-            return;
-        }
-
-        if (!disposing)
-            Debug.LogError("ResourceHandleSystem not disposed correctly");
-
-        for (var i = 0; i < resources.Count; i++)
-        {
-            var resource = resources[i];
-            // Since we don't remove null entries, but rather leave them as "empty", they could be null
-            if (resource != null)
-            {
-                // Persistent resources should be freed first
-                if (!isAvailable[i])
-                    Debug.LogError($"Resource at index {i} was not made availalble");
-
-                DestroyResource(resource);
-            }
-        }
-
-        disposedValue = true;
-    }
-
-    protected abstract bool DoesResourceMatchDescriptor(T resource, V descriptor);
-    protected abstract void DestroyResource(T resource);
-    protected virtual int ExtraFramesToKeepResource(T resource) => 0;
-    protected abstract V CreateDescriptorFromResource(T resource);
-
     public ResourceHandle<T> ImportResource(T resource)
     {
         if (!importedResourceLookup.TryGetValue(resource, out var result))
@@ -112,7 +72,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
             return;
 
         // Do nothing for non-releasable persistent textures
-        if (handle.IsPersistent && isNotReleasable[handle.Index])
+        if (handle.IsPersistent && !isReleasable[handle.Index])
             return;
 
         var list = handle.IsPersistent ? persistentFreeList : freeList;
@@ -231,7 +191,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
                 // If non persistent, no additional logic required since it will be re-created, but persistent needs to free its index
                 if (handle.IsPersistent)
                 {
-                    availablePersistentHandleIndices.Enqueue(handle.Index);
+                    availablePersistentHandleIndices.Push(handle.Index);
                     persistentFreeList[handle.Index] = -1; // Set to -1 to indicate this doesn't need to be freed again
                 }
             }
@@ -247,7 +207,6 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
                 continue;
 
             // Don't free textures that were used in the last frame
-            // TODO: Make this a configurable number of frames to avoid rapid re-allocations
             if (lastFrameUsed[i] >= frameIndex)
                 continue;
 
@@ -268,42 +227,43 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
     public ResourceHandle<T> GetResourceHandle(V descriptor, bool isPersistent = false)
     {
-        int handleIndex;
+        ResourceHandle<T> result;
         if (isPersistent)
         {
-            if (!availablePersistentHandleIndices.TryDequeue(out handleIndex))
+            if (availablePersistentHandleIndices.TryPop(out var handleIndex))
             {
-                handleIndex = persistentHandles.Count;
-                persistentHandles.Add(default);
-                persistentResourceIndices.Add(-1);
-                persistentCreateList.Add(-1);
-                persistentFreeList.Add(-1);
-                isAssigned.Add(false);
-                isNotReleasable.Add(true);
-                persistentDescriptors.Add(descriptor);
+                result = new ResourceHandle<T>(handleIndex, isPersistent);
+                persistentHandles[handleIndex] = result;
+
+                isAssigned[handleIndex] = false;
+                isReleasable[handleIndex] = false;
+                persistentDescriptors[handleIndex] = descriptor;
+
+                persistentResourceIndices[handleIndex] = -1;
+                persistentCreateList[handleIndex] = -1;
+                persistentFreeList[handleIndex] = -1;
             }
             else
             {
-                isAssigned[handleIndex] = false;
-                isNotReleasable[handleIndex] = true;
-                persistentDescriptors[handleIndex] = descriptor;
+                handleIndex = persistentHandles.Count;
+                result = new ResourceHandle<T>(handleIndex, isPersistent);
+                persistentHandles.Add(result);
+
+                isAssigned.Add(false);
+                isReleasable.Add(false);
+                persistentDescriptors.Add(descriptor);
+
+                persistentResourceIndices.Add(-1);
+                persistentCreateList.Add(-1);
+                persistentFreeList.Add(-1);
             }
         }
         else
         {
-            handleIndex = handles.Count;
-        }
-
-        var result = new ResourceHandle<T>(handleIndex, isPersistent);
-
-        if (isPersistent)
-        {
-            persistentHandles[handleIndex] = result;
-        }
-        else
-        {
+            result = new ResourceHandle<T>(handles.Count, isPersistent);
             handles.Add(result);
             descriptors.Add(descriptor);
+
             resourceIndices.Add(-1);
             createList.Add(-1);
             freeList.Add(-1);
@@ -324,7 +284,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
     public void ReleasePersistentResource(ResourceHandle<T> handle)
     {
-        isNotReleasable[handle.Index] = false;
+        isReleasable[handle.Index] = true;
     }
 
     public V GetDescriptor(ResourceHandle<T> handle)
@@ -346,5 +306,44 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
         var descriptors = handle.IsPersistent ? persistentDescriptors : this.descriptors;
         descriptors[handle.Index] = descriptor;
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    protected abstract bool DoesResourceMatchDescriptor(T resource, V descriptor);
+    protected abstract void DestroyResource(T resource);
+    protected virtual int ExtraFramesToKeepResource(T resource) => 0;
+    protected abstract V CreateDescriptorFromResource(T resource);
+
+    private void Dispose(bool disposing)
+    {
+        if (disposedValue)
+        {
+            Debug.LogError("Disposing an already disposed ResourceHandleSystem");
+            return;
+        }
+
+        if (!disposing)
+            Debug.LogError("ResourceHandleSystem not disposed correctly");
+
+        for (var i = 0; i < resources.Count; i++)
+        {
+            var resource = resources[i];
+            // Since we don't remove null entries, but rather leave them as "empty", they could be null
+            if (resource != null)
+            {
+                // Persistent resources should be freed first
+                //if (!isAvailable[i])
+                    //Debug.LogError($"Resource at index {i} was not made availalble");
+
+                DestroyResource(resource);
+            }
+        }
+
+        disposedValue = true;
     }
 }
