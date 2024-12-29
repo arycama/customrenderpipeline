@@ -1,4 +1,4 @@
-﻿public class RTHandle : IResourceHandle
+﻿public struct RTHandle : IResourceHandle
 {
     public int Index { get; }
     public bool IsPersistent { get; }

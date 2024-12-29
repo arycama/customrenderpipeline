@@ -8,7 +8,7 @@ public readonly struct SkyResultData : IRenderPassData
 
     public SkyResultData(RTHandle skyTexture)
     {
-        SkyTexture = skyTexture ?? throw new ArgumentNullException(nameof(skyTexture));
+        SkyTexture = skyTexture;
     }
 
     public readonly void SetInputs(RenderPass pass)

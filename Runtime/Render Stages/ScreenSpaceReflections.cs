@@ -181,7 +181,7 @@ namespace Arycama.CustomRenderPipeline
 
         public ScreenSpaceReflectionResult(RTHandle screenSpaceReflections, float intensity)
         {
-            ScreenSpaceReflections = screenSpaceReflections ?? throw new ArgumentNullException(nameof(screenSpaceReflections));
+            ScreenSpaceReflections = screenSpaceReflections;
             this.intensity = intensity;
         }
 

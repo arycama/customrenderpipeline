@@ -20,11 +20,11 @@ namespace Arycama.CustomRenderPipeline
 
         public AtmospherePropertiesAndTables(BufferHandle atmospherePropertiesBuffer, RTHandle transmittance, RTHandle multiScatter, RTHandle groundAmbient, RTHandle skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector2 transmittanceSize)
         {
-            this.atmospherePropertiesBuffer = atmospherePropertiesBuffer ?? throw new ArgumentNullException(nameof(atmospherePropertiesBuffer));
-            this.transmittance = transmittance ?? throw new ArgumentNullException(nameof(transmittance));
-            this.multiScatter = multiScatter ?? throw new ArgumentNullException(nameof(multiScatter));
-            this.groundAmbient = groundAmbient ?? throw new ArgumentNullException(nameof(groundAmbient));
-            this.skyAmbient = skyAmbient ?? throw new ArgumentNullException(nameof(skyAmbient));
+            this.atmospherePropertiesBuffer = atmospherePropertiesBuffer;
+            this.transmittance = transmittance;
+            this.multiScatter = multiScatter;
+            this.groundAmbient = groundAmbient;
+            this.skyAmbient = skyAmbient;
             this.transmittanceRemap = transmittanceRemap;
             this.multiScatterRemap = multiScatterRemap;
             this.skyAmbientRemap = skyAmbientRemap;

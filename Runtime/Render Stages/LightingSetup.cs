@@ -433,10 +433,10 @@ namespace Arycama.CustomRenderPipeline
 
             public Result(BufferHandle directionalMatrices, BufferHandle directionalShadowTexelSizes, BufferHandle directionalLights, BufferHandle pointLights, int directionalLightCount, int pointLightCount)
             {
-                this.directionalMatrices = directionalMatrices ?? throw new ArgumentNullException(nameof(directionalMatrices));
-                this.directionalShadowTexelSizes = directionalShadowTexelSizes ?? throw new ArgumentNullException(nameof(directionalShadowTexelSizes));
-                this.directionalLights = directionalLights ?? throw new ArgumentNullException(nameof(directionalLights));
-                this.pointLights = pointLights ?? throw new ArgumentNullException(nameof(pointLights));
+                this.directionalMatrices = directionalMatrices;
+                this.directionalShadowTexelSizes = directionalShadowTexelSizes;
+                this.directionalLights = directionalLights;
+                this.pointLights = pointLights;
                 this.directionalLightCount = directionalLightCount;
                 this.pointLightCount = pointLightCount;
             }

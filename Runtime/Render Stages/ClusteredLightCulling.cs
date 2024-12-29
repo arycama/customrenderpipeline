@@ -37,8 +37,8 @@ namespace Arycama.CustomRenderPipeline
 
             public Result(RTHandle lightClusterIndices, BufferHandle lightList, float clusterScale, float clusterBias, int tileSize)
             {
-                this.lightClusterIndices = lightClusterIndices ?? throw new ArgumentNullException(nameof(lightClusterIndices));
-                this.lightList = lightList ?? throw new ArgumentNullException(nameof(lightList));
+                this.lightClusterIndices = lightClusterIndices;
+                this.lightList = lightList;
                 this.clusterScale = clusterScale;
                 this.clusterBias = clusterBias;
                 this.tileSize = tileSize;

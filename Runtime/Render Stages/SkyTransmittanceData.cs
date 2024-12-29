@@ -9,7 +9,7 @@ public readonly struct SkyTransmittanceData : IRenderPassData
 
     public SkyTransmittanceData(RTHandle skyTransmittance, int width, int height)
     {
-        this.skyTransmittance = skyTransmittance ?? throw new ArgumentNullException(nameof(skyTransmittance));
+        this.skyTransmittance = skyTransmittance;
         this.width = width;
         this.height = height;
     }

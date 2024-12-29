@@ -9,7 +9,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
         public UnderwaterLightingResult(RTHandle waterNormalFoam)
         {
-            underwaterLighting = waterNormalFoam ?? throw new ArgumentNullException(nameof(waterNormalFoam));
+            underwaterLighting = waterNormalFoam;
         }
 
         public readonly void SetInputs(RenderPass pass)

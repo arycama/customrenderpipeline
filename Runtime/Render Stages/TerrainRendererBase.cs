@@ -27,8 +27,8 @@ namespace Arycama.CustomRenderPipeline
             var totalPassCount = (int)Mathf.Log(settings.CellCount, 2f) + 1;
             var dispatchCount = Mathf.Ceil(totalPassCount / (float)maxPassesPerDispatch);
 
-            RTHandle tempLodId = null;
-            BufferHandle lodIndirectArgsBuffer = null;
+            RTHandle tempLodId = default;
+            BufferHandle lodIndirectArgsBuffer = default;
             if (dispatchCount > 1)
             {
                 // If more than one dispatch, we need to write lods out to a temp texture first. Otherwise they are done via shared memory so no texture is needed

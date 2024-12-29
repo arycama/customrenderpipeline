@@ -13,9 +13,9 @@ namespace Arycama.CustomRenderPipeline
 
         public TerrainSystemData(RTHandle minMaxHeights, Terrain terrain, TerrainData terrainData, BufferHandle indexBuffer)
         {
-            MinMaxHeights = minMaxHeights ?? throw new ArgumentNullException(nameof(minMaxHeights));
-            Terrain = terrain ?? throw new ArgumentNullException(nameof(terrain));
-            TerrainData = terrainData ?? throw new ArgumentNullException(nameof(terrainData));
+            MinMaxHeights = minMaxHeights;
+            Terrain = terrain;
+            TerrainData = terrainData;
             IndexBuffer = indexBuffer;
         }
 

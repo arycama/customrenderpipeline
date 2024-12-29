@@ -9,7 +9,7 @@ namespace Arycama.CustomRenderPipeline
 
         public PreviousFrameDepth(RTHandle previousDepth)
         {
-            this.previousDepth = previousDepth ?? throw new ArgumentNullException(nameof(previousDepth));
+            this.previousDepth = previousDepth;
         }
 
         public void SetInputs(RenderPass pass)

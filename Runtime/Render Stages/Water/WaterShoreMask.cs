@@ -173,7 +173,7 @@ namespace Arycama.CustomRenderPipeline
 
             public Result(RTHandle shoreDistance, BufferHandle resultDataBuffer, Vector4 scaleOffset, Vector2 terrainSize, float maxOceanDepth, float maxTerrainDistance)
             {
-                this.shoreDistance = shoreDistance ?? throw new ArgumentNullException(nameof(shoreDistance));
+                this.shoreDistance = shoreDistance;
                 this.resultDataBuffer = resultDataBuffer;
                 this.scaleOffset = scaleOffset;
                 this.terrainSize = terrainSize;

@@ -10,7 +10,7 @@ namespace Arycama.CustomRenderPipeline
 
         public AutoExposureData(BufferHandle exposureBuffer, bool isFirst)
         {
-            this.exposureBuffer = exposureBuffer ?? throw new ArgumentNullException(nameof(exposureBuffer));
+            this.exposureBuffer = exposureBuffer;
             IsFirst = isFirst;
         }
 

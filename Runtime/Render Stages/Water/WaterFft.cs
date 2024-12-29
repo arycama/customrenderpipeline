@@ -13,7 +13,7 @@ namespace Arycama.CustomRenderPipeline.Water
         private readonly BufferHandle spectrumBuffer, dispersionBuffer;
         private readonly RTHandle lengthToRoughness;
         private bool roughnessInitialized;
-        private RTHandle displacementCurrent;
+        private RTHandle displacementCurrent = new RTHandle(-1, false);
 
         private WaterProfile Profile => settings.Profile;
 
@@ -106,7 +106,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             // TODO: Why can't this use persistent texture cache
             var displacementHistory = displacementCurrent;
-            var hasDisplacementHistory = displacementHistory != null;
+            var hasDisplacementHistory = displacementHistory.Index != -1;
             displacementCurrent = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R16G16B16A16_SFloat, 4, TextureDimension.Tex2DArray, hasMips: true, isPersistent: true);
             if (hasDisplacementHistory)
                 renderGraph.ReleasePersistentResource(displacementHistory);

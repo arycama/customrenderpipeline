@@ -11,8 +11,8 @@ namespace Arycama.CustomRenderPipeline.Water
 
         public WaterPrepassResult(RTHandle waterNormalFoam, RTHandle waterTriangleNormal, Vector3 albedo, Vector3 extinction)
         {
-            this.waterNormalFoam = waterNormalFoam ?? throw new ArgumentNullException(nameof(waterNormalFoam));
-            this.waterTriangleNormal = waterTriangleNormal ?? throw new ArgumentNullException(nameof(waterTriangleNormal));
+            this.waterNormalFoam = waterNormalFoam;
+            this.waterTriangleNormal = waterTriangleNormal;
             this.albedo = albedo;
             this.extinction = extinction;
         }

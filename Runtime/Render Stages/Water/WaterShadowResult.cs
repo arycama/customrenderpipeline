@@ -13,7 +13,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
         public WaterShadowResult(RTHandle waterShadowTexture, Matrix4x4 waterShadowMatrix, float waterShadowNear, float waterShadowFar, Vector3 waterShadowExtinction, RTHandle waterIlluminance)
         {
-            this.waterShadowTexture = waterShadowTexture ?? throw new ArgumentNullException(nameof(waterShadowTexture));
+            this.waterShadowTexture = waterShadowTexture;
             this.waterShadowMatrix = waterShadowMatrix;
             this.waterShadowNear = waterShadowNear;
             this.waterShadowFar = waterShadowFar;

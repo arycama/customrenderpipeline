@@ -1,4 +1,4 @@
-﻿public class BufferHandle : IResourceHandle
+﻿public struct BufferHandle : IResourceHandle
 {
     public int Index { get; }
     public bool IsPersistent { get; }

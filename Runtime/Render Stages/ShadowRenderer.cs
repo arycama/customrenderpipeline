@@ -133,8 +133,8 @@ namespace Arycama.CustomRenderPipeline
 
             public Result(RTHandle directionalShadows, RTHandle pointShadows, int shadowMapResolution, float rcpShadowMapResolution, float shadowFilterRadius, float shadowFilterSigma)
             {
-                this.directionalShadows = directionalShadows ?? throw new ArgumentNullException(nameof(directionalShadows));
-                this.pointShadows = pointShadows ?? throw new ArgumentNullException(nameof(pointShadows));
+                this.directionalShadows = directionalShadows;
+                this.pointShadows = pointShadows;
                 this.shadowMapResolution = shadowMapResolution;
                 this.rcpShadowMapResolution = rcpShadowMapResolution;
                 this.shadowFilterRadius = shadowFilterRadius;

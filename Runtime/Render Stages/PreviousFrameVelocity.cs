@@ -9,7 +9,7 @@ namespace Arycama.CustomRenderPipeline
 
         public PreviousFrameVelocity(RTHandle previousVelocity)
         {
-            this.previousVelocity = previousVelocity ?? throw new ArgumentNullException(nameof(previousVelocity));
+            this.previousVelocity = previousVelocity;
         }
 
         public void SetInputs(RenderPass pass)

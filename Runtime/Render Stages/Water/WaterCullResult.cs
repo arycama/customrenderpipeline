@@ -9,8 +9,8 @@ namespace Arycama.CustomRenderPipeline.Water
 
         public WaterCullResult(BufferHandle indirectArgsBuffer, BufferHandle patchDataBuffer)
         {
-            IndirectArgsBuffer = indirectArgsBuffer ?? throw new ArgumentNullException(nameof(indirectArgsBuffer));
-            PatchDataBuffer = patchDataBuffer ?? throw new ArgumentNullException(nameof(patchDataBuffer));
+            IndirectArgsBuffer = indirectArgsBuffer;
+            PatchDataBuffer = patchDataBuffer;
         }
     }
 }

@@ -13,9 +13,9 @@ namespace Arycama.CustomRenderPipeline.Water
 
         public OceanFftResult(RTHandle oceanDisplacement, RTHandle oceanDisplacementHistory, RTHandle oceanNormalFoamSmoothness, RTHandle lengthToRoughness, BufferHandle oceanBuffer)
         {
-            this.oceanDisplacement = oceanDisplacement ?? throw new ArgumentNullException(nameof(oceanDisplacement));
-            this.oceanDisplacementHistory = oceanDisplacementHistory ?? throw new ArgumentNullException(nameof(oceanDisplacementHistory));
-            this.oceanNormalFoamSmoothness = oceanNormalFoamSmoothness ?? throw new ArgumentNullException(nameof(oceanNormalFoamSmoothness));
+            this.oceanDisplacement = oceanDisplacement;
+            this.oceanDisplacementHistory = oceanDisplacementHistory;
+            this.oceanNormalFoamSmoothness = oceanNormalFoamSmoothness;
             this.lengthToRoughness = lengthToRoughness;
             this.oceanBuffer = oceanBuffer;
         }

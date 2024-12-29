@@ -198,7 +198,7 @@ namespace Arycama.CustomRenderPipeline
 
             public Result(RTHandle ambientOcclusion)
             {
-                AmbientOcclusion = ambientOcclusion ?? throw new ArgumentNullException(nameof(ambientOcclusion));
+                AmbientOcclusion = ambientOcclusion;
             }
 
             public readonly void SetInputs(RenderPass pass)
