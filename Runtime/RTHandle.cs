@@ -14,7 +14,7 @@ public class RTHandle : ResourceHandle<RenderTexture>
     public bool HasMips { get; set; }
     public bool AutoGenerateMips { get; set; }
 
-    public RTHandle(int handleIndex, bool isImported, bool isPersistent) : base(handleIndex, isImported, isPersistent)
+    public RTHandle(int handleIndex, bool isPersistent) : base(handleIndex, isPersistent)
     {
     }
 

@@ -19,7 +19,7 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHa
         if (!resource.IsCreated())
             _ = resource.Create();
 
-        return new RTHandle(index, true, true)
+        return new RTHandle(index, true)
         {
             Width = resource.width,
             Height = resource.height,
@@ -95,7 +95,7 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHa
 
     protected override RTHandle CreateHandleFromDescriptor(RtHandleDescriptor descriptor, bool isPersistent, int handleIndex)
     {
-        return new RTHandle(handleIndex, false, isPersistent)
+        return new RTHandle(handleIndex, isPersistent)
         {
             Width = descriptor.Width,
             Height = descriptor.Height,

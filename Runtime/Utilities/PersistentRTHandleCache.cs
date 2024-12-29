@@ -56,7 +56,7 @@ namespace Arycama.CustomRenderPipeline
                 }
             }
             else
-                history.IsNotReleasable = false;
+                renderGraph.ReleasePersistentResource(history);
 
             var current = renderGraph.GetTexture(width, height, format, depth, dimension, isScreenTexture, hasMips, isPersistent: true);
             textureCache[viewIndex] = current;
@@ -70,7 +70,7 @@ namespace Arycama.CustomRenderPipeline
                 return;
 
             foreach (var texture in textureCache)
-                texture.Value.IsNotReleasable = false;
+                renderGraph.ReleasePersistentResource(texture.Value);
 
             if (!disposing)
                 Debug.LogError($"Persistent RT Handle Cache [{name}] not disposed correctly");

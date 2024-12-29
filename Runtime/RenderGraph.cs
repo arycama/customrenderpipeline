@@ -173,5 +173,15 @@ namespace Arycama.CustomRenderPipeline
 
             return buffer;
         }
+
+        public void ReleasePersistentResource(BufferHandle handle)
+        {
+            BufferHandleSystem.ReleasePersistentResource(handle);
+        }
+
+        public void ReleasePersistentResource(RTHandle handle)
+        {
+            RtHandleSystem.ReleasePersistentResource(handle);
+        }
     }
 }

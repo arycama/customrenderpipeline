@@ -15,7 +15,7 @@ namespace Arycama.CustomRenderPipeline
         {
             foreach(var buffer in exposureBuffers.Values)
             {
-                buffer.IsNotReleasable = false;
+                renderGraph.ReleasePersistentResource(buffer);
             }
         }
 

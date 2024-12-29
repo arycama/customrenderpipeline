@@ -48,7 +48,7 @@ namespace Arycama.CustomRenderPipeline
                 return;
 
             if (terrain != null)
-                result.IsNotReleasable = false;
+                renderGraph.ReleasePersistentResource(result);
 
             lastVersion = version;
             terrain = Terrain.activeTerrain;

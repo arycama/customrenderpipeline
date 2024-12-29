@@ -20,6 +20,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
     private readonly List<int> lastFrameUsed = new();
     private readonly List<bool> isAvailable = new();
     private readonly List<bool> isAssigned = new();
+    private readonly List<bool> isNotReleasable = new();
     private readonly Queue<int> availableSlots = new();
     private bool disposedValue;
 
@@ -129,7 +130,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
             var index = importedResources.Count;
             importedResources.Add(resource);
 
-            result = CreateHandleFromResource(resource, index);
+            result = CreateHandleFromResource(resource, -index);
             importedResourceLookup.Add(resource, result);
         }
 
@@ -139,7 +140,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
     public void WriteResource(K handle, int passIndex)
     {
         // Imported handles don't need create/free logic
-        if (handle.IsImported)
+        if (handle.HandleIndex < 0) // Negative 
             return;
 
         // Persistent handles that have already been created don't need to write a create-index
@@ -156,11 +157,11 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
     public void ReadResource(K handle, int passIndex)
     {
         // Ignore imported textures
-        if (handle.IsImported)
+        if (handle.HandleIndex < 0)
             return;
 
         // Do nothing for non-releasable persistent textures
-        if (handle.IsPersistent && handle.IsNotReleasable)
+        if (handle.IsPersistent && isNotReleasable[handle.HandleIndex])
             return;
 
         var list = handle.IsPersistent ? persistentFreeList : freeList;
@@ -276,6 +277,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
                 persistentCreateList.Add(-1);
                 persistentFreeList.Add(-1);
                 isAssigned.Add(false);
+                isNotReleasable.Add(true);
             }
         }
         else
@@ -289,6 +291,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
         {
             persistentHandles[handleIndex] = result;
             isAssigned[handleIndex] = false;
+            isNotReleasable[handleIndex] = true;
         }
         else
         {
@@ -303,11 +306,16 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
 
     public T GetResource(K handle)
     {
-        if (handle.IsImported)
-            return importedResources[handle.HandleIndex];
+        if (handle.HandleIndex < 0)
+            return importedResources[-handle.HandleIndex];
 
         var indexList = handle.IsPersistent ? persistentResourceIndices : resourceIndices;
         var resourceIndex = indexList[handle.HandleIndex];
         return resources[resourceIndex];
+    }
+
+    public void ReleasePersistentResource(K handle)
+    {
+        isNotReleasable[handle.HandleIndex] = false;
     }
 }

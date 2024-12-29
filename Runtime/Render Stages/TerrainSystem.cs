@@ -63,14 +63,14 @@ namespace Arycama.CustomRenderPipeline
 
         private void CleanupResources()
         {
-            minMaxHeight.IsNotReleasable = false;
-            heightmap.IsNotReleasable = false;
-            normalmap.IsNotReleasable = false;
-            idMap.IsNotReleasable = false;
+            renderGraph.ReleasePersistentResource(minMaxHeight);
+            renderGraph.ReleasePersistentResource(heightmap);
+            renderGraph.ReleasePersistentResource(normalmap);
+            renderGraph.ReleasePersistentResource(idMap);
             Object.DestroyImmediate(diffuseArray);
             Object.DestroyImmediate(normalMapArray);
             Object.DestroyImmediate(maskMapArray);
-            terrainLayerData.IsNotReleasable = false;
+            renderGraph.ReleasePersistentResource(terrainLayerData);
         }
 
         private void InitializeTerrain()

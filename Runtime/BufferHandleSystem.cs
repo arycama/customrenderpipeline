@@ -9,7 +9,7 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
 
     protected override BufferHandle CreateHandleFromResource(GraphicsBuffer resource, int index)
     {
-        return new BufferHandle(resource, index, true, true);
+        return new BufferHandle(resource, index, true);
     }
 
     protected override bool DoesResourceMatchHandle(GraphicsBuffer resource, BufferHandle handle)
@@ -57,6 +57,6 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
 
     protected override BufferHandle CreateHandleFromDescriptor(BufferHandleDescriptor descriptor, bool isPersistent, int handleIndex)
     {
-        return new BufferHandle(handleIndex, false, isPersistent, descriptor.Target, descriptor.Count, descriptor.Stride, descriptor.UsageFlags);
+        return new BufferHandle(handleIndex, isPersistent, descriptor.Target, descriptor.Count, descriptor.Stride, descriptor.UsageFlags);
     }
 }

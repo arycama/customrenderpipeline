@@ -10,7 +10,7 @@ public class BufferHandle : ResourceHandle<GraphicsBuffer>
 
     public int Size => Stride * Count;
     
-    public BufferHandle(int handleIndex, bool isImported, bool isPersistent, GraphicsBuffer.Target target, int count, int stride, GraphicsBuffer.UsageFlags usageFlags) : base(handleIndex, isImported, isPersistent)
+    public BufferHandle(int handleIndex, bool isPersistent, GraphicsBuffer.Target target, int count, int stride, GraphicsBuffer.UsageFlags usageFlags) : base(handleIndex, isPersistent)
     {
         Assert.IsTrue(count > 0);
         Assert.IsTrue(stride > 0);
@@ -21,7 +21,7 @@ public class BufferHandle : ResourceHandle<GraphicsBuffer>
         UsageFlags = usageFlags;
     }
 
-    public BufferHandle(GraphicsBuffer graphicsBuffer, int handleIndex, bool isImported, bool isPersistent) : base(handleIndex, isImported, isPersistent)
+    public BufferHandle(GraphicsBuffer graphicsBuffer, int handleIndex, bool isPersistent) : base(handleIndex, isPersistent)
     {
         Target = graphicsBuffer.target;
         Count = graphicsBuffer.count;
