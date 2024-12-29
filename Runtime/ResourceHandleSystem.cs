@@ -48,6 +48,53 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
         return result;
     }
 
+    public ResourceHandle<T> GetResourceHandle(V descriptor, bool isPersistent = false)
+    {
+        ResourceHandle<T> result;
+        if (isPersistent)
+        {
+            if (availablePersistentHandleIndices.TryPop(out var handleIndex))
+            {
+                result = new ResourceHandle<T>(handleIndex, isPersistent);
+                persistentHandles[handleIndex] = result;
+
+                isAssigned[handleIndex] = false;
+                isReleasable[handleIndex] = false;
+                persistentDescriptors[handleIndex] = descriptor;
+
+                persistentResourceIndices[handleIndex] = -1;
+                persistentCreateList[handleIndex] = -1;
+                persistentFreeList[handleIndex] = -1;
+            }
+            else
+            {
+                handleIndex = persistentHandles.Count;
+                result = new ResourceHandle<T>(handleIndex, isPersistent);
+                persistentHandles.Add(result);
+
+                isAssigned.Add(false);
+                isReleasable.Add(false);
+                persistentDescriptors.Add(descriptor);
+
+                persistentResourceIndices.Add(-1);
+                persistentCreateList.Add(-1);
+                persistentFreeList.Add(-1);
+            }
+        }
+        else
+        {
+            result = new ResourceHandle<T>(handles.Count, isPersistent);
+            handles.Add(result);
+            descriptors.Add(descriptor);
+
+            resourceIndices.Add(-1);
+            createList.Add(-1);
+            freeList.Add(-1);
+        }
+
+        return result;
+    }
+
     public void WriteResource(ResourceHandle<T> handle, int passIndex)
     {
         // Imported handles don't need create/free logic
@@ -79,6 +126,42 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
         var currentIndex = list[handle.Index];
         currentIndex = currentIndex == -1 ? passIndex : Math.Max(currentIndex, passIndex);
         list[handle.Index] = currentIndex;
+    }
+
+    public T GetResource(ResourceHandle<T> handle)
+    {
+        if (handle.Index < 0)
+            return importedResources[-handle.Index];
+
+        var indexList = handle.IsPersistent ? persistentResourceIndices : resourceIndices;
+        var resourceIndex = indexList[handle.Index];
+        return resources[resourceIndex];
+    }
+
+    public void ReleasePersistentResource(ResourceHandle<T> handle)
+    {
+        isReleasable[handle.Index] = true;
+    }
+
+    public V GetDescriptor(ResourceHandle<T> handle)
+    {
+        if (handle.Index < 0)
+            return importedDescriptors[-handle.Index];
+
+        var descriptors = handle.IsPersistent ? persistentDescriptors : this.descriptors;
+        return descriptors[handle.Index];
+    }
+
+    public void SetDescriptor(ResourceHandle<T> handle, V descriptor)
+    {
+        if (handle.Index < 0)
+        {
+            importedDescriptors[-handle.Index] = descriptor;
+            return;
+        }
+
+        var descriptors = handle.IsPersistent ? persistentDescriptors : this.descriptors;
+        descriptors[handle.Index] = descriptor;
     }
 
     public void AllocateFrameResources(int renderPassCount, int frameIndex)
@@ -223,89 +306,6 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
         resourceIndices.Clear();
         createList.Clear();
         freeList.Clear();
-    }
-
-    public ResourceHandle<T> GetResourceHandle(V descriptor, bool isPersistent = false)
-    {
-        ResourceHandle<T> result;
-        if (isPersistent)
-        {
-            if (availablePersistentHandleIndices.TryPop(out var handleIndex))
-            {
-                result = new ResourceHandle<T>(handleIndex, isPersistent);
-                persistentHandles[handleIndex] = result;
-
-                isAssigned[handleIndex] = false;
-                isReleasable[handleIndex] = false;
-                persistentDescriptors[handleIndex] = descriptor;
-
-                persistentResourceIndices[handleIndex] = -1;
-                persistentCreateList[handleIndex] = -1;
-                persistentFreeList[handleIndex] = -1;
-            }
-            else
-            {
-                handleIndex = persistentHandles.Count;
-                result = new ResourceHandle<T>(handleIndex, isPersistent);
-                persistentHandles.Add(result);
-
-                isAssigned.Add(false);
-                isReleasable.Add(false);
-                persistentDescriptors.Add(descriptor);
-
-                persistentResourceIndices.Add(-1);
-                persistentCreateList.Add(-1);
-                persistentFreeList.Add(-1);
-            }
-        }
-        else
-        {
-            result = new ResourceHandle<T>(handles.Count, isPersistent);
-            handles.Add(result);
-            descriptors.Add(descriptor);
-
-            resourceIndices.Add(-1);
-            createList.Add(-1);
-            freeList.Add(-1);
-        }
-
-        return result;
-    }
-
-    public T GetResource(ResourceHandle<T> handle)
-    {
-        if (handle.Index < 0)
-            return importedResources[-handle.Index];
-
-        var indexList = handle.IsPersistent ? persistentResourceIndices : resourceIndices;
-        var resourceIndex = indexList[handle.Index];
-        return resources[resourceIndex];
-    }
-
-    public void ReleasePersistentResource(ResourceHandle<T> handle)
-    {
-        isReleasable[handle.Index] = true;
-    }
-
-    public V GetDescriptor(ResourceHandle<T> handle)
-    {
-        if (handle.Index < 0)
-            return importedDescriptors[-handle.Index];
-
-        var descriptors = handle.IsPersistent ? persistentDescriptors : this.descriptors;
-        return descriptors[handle.Index];
-    }
-
-    public void SetDescriptor(ResourceHandle<T> handle, V descriptor)
-    {
-        if (handle.Index < 0)
-        {
-            importedDescriptors[-handle.Index] = descriptor;
-            return;
-        }
-
-        var descriptors = handle.IsPersistent ? persistentDescriptors : this.descriptors;
-        descriptors[handle.Index] = descriptor;
     }
 
     public void Dispose()
