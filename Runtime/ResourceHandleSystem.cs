@@ -19,6 +19,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
     private readonly List<T> resources = new();
     private readonly List<int> lastFrameUsed = new();
     private readonly List<bool> isAvailable = new();
+    private readonly List<bool> isAssigned = new();
     private readonly Queue<int> availableSlots = new();
     private bool disposedValue;
 
@@ -110,7 +111,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
         // Persistent handle no longer needs to be created or cleared. (Non-persistent create list gets cleared every frame)
         if (handle.IsPersistent)
         {
-            handle.IsAssigned = true;
+            isAssigned[handle.HandleIndex] = true;
             persistentCreateList[handle.HandleIndex] = -1;
             persistentResourceIndices[handle.HandleIndex] = resourceIndex;
         }
@@ -142,7 +143,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
             return;
 
         // Persistent handles that have already been created don't need to write a create-index
-        if (handle.IsPersistent && handle.IsAssigned)
+        if (handle.IsPersistent && isAssigned[handle.HandleIndex])
             return;
 
         // Select list based on persistent or non-persistent, and initialize or update the index
@@ -274,6 +275,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
                 persistentResourceIndices.Add(-1);
                 persistentCreateList.Add(-1);
                 persistentFreeList.Add(-1);
+                isAssigned.Add(false);
             }
         }
         else
@@ -286,6 +288,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
         if (isPersistent)
         {
             persistentHandles[handleIndex] = result;
+            isAssigned[handleIndex] = false;
         }
         else
         {
