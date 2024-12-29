@@ -56,6 +56,8 @@ namespace Arycama.CustomRenderPipeline
 
             var result = new AtmospherePropertiesAndTables(atmospherePropertiesBuffer, transmittance, multiScatter, groundAmbient, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap, new Vector3(settings.TransmittanceWidth, settings.TransmittanceHeight));
 
+            renderGraph.SetResource(result, true);
+
             if (version >= settings.Version)
                 return;
 
@@ -126,8 +128,6 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AmbientSkyWidth, settings.AmbientSkyHeight));
                 });
             }
-
-            renderGraph.SetResource(result, true);
         }
     }
 }
