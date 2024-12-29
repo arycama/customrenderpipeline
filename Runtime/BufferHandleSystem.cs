@@ -7,9 +7,9 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
         resource.Dispose();
     }
 
-    protected override BufferHandle CreateHandleFromResource(GraphicsBuffer resource)
+    protected override BufferHandle CreateHandleFromResource(GraphicsBuffer resource, int index)
     {
-        return new BufferHandle(resource, -1, true, true);
+        return new BufferHandle(resource, index, true, true);
     }
 
     protected override bool DoesResourceMatchHandle(GraphicsBuffer resource, BufferHandle handle)

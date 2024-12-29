@@ -14,7 +14,8 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
 
     protected int resourceCount;
 
-    private readonly Dictionary<T, K> importedResources = new();
+    private readonly Dictionary<T, K> importedResourceLookup = new();
+    private readonly List<T> importedResources = new();
     private readonly List<T> resources = new();
     private readonly List<int> lastFrameUsed = new();
     private readonly List<bool> isAvailable = new();
@@ -62,7 +63,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
 
     protected abstract bool DoesResourceMatchHandle(T resource, K handle);
     protected abstract T CreateResource(K handle);
-    protected abstract K CreateHandleFromResource(T resource);
+    protected abstract K CreateHandleFromResource(T resource, int index);
     protected abstract void DestroyResource(T resource);
     protected virtual int ExtraFramesToKeepResource(T resource) => 0;
     protected abstract K CreateHandleFromDescriptor(V descriptor, bool isPersistent, int handleIndex);
@@ -122,10 +123,13 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
 
     public K ImportResource(T resource)
     {
-        if (!importedResources.TryGetValue(resource, out var result))
+        if (!importedResourceLookup.TryGetValue(resource, out var result))
         {
-            result = CreateHandleFromResource(resource);
-            importedResources.Add(resource, result);
+            var index = importedResources.Count;
+            importedResources.Add(resource);
+
+            result = CreateHandleFromResource(resource, index);
+            importedResourceLookup.Add(resource, result);
         }
 
         return result;
@@ -297,7 +301,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
     public T GetResource(K handle)
     {
         if (handle.IsImported)
-            return handle.Resource;
+            return importedResources[handle.HandleIndex];
 
         var indexList = handle.IsPersistent ? persistentResourceIndices : resourceIndices;
         var resourceIndex = indexList[handle.HandleIndex];

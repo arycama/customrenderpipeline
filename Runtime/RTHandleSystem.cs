@@ -13,13 +13,13 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHa
         screenHeight = Mathf.Max(height, screenHeight);
     }
 
-    protected override RTHandle CreateHandleFromResource(RenderTexture resource)
+    protected override RTHandle CreateHandleFromResource(RenderTexture resource, int index)
     {
         // Ensure its created (Can happen with some RenderTextures that are imported as soon as created
         if (!resource.IsCreated())
             _ = resource.Create();
 
-        return new RTHandle(-1, true, true)
+        return new RTHandle(index, true, true)
         {
             Width = resource.width,
             Height = resource.height,
@@ -27,7 +27,6 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHa
             EnableRandomWrite = resource.enableRandomWrite,
             VolumeDepth = resource.volumeDepth,
             Dimension = resource.dimension,
-            Resource = resource,
             HasMips = resource.useMipMap,
             AutoGenerateMips = resource.autoGenerateMips,
             IsScreenTexture = false,

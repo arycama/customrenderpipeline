@@ -26,7 +26,6 @@ public class BufferHandle : ResourceHandle<GraphicsBuffer>
         Target = graphicsBuffer.target;
         Count = graphicsBuffer.count;
         Stride = graphicsBuffer.stride;
-        Resource = graphicsBuffer;
     }
 
     public override string ToString()
