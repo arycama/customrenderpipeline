@@ -23,7 +23,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class
     private readonly List<bool> isAvailable = new();
     private readonly List<bool> isAssigned = new();
     private readonly List<bool> isNotReleasable = new();
-    private readonly Queue<int> availableSlots = new();
+    private readonly Stack<int> availableSlots = new();
 
     private bool disposedValue;
 
@@ -70,7 +70,6 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class
     protected abstract T CreateResource(V descriptor);
     protected abstract void DestroyResource(T resource);
     protected virtual int ExtraFramesToKeepResource(T resource) => 0;
-    protected abstract ResourceHandle<T> CreateHandle(int handleIndex, bool isPersistent);
     protected abstract V CreateDescriptorFromResource(T resource);
 
     private void AssignResource(ResourceHandle<T> handle)
@@ -97,7 +96,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class
             var result = CreateResource(descriptor);
 
             // Get a slot for this render texture if possible
-            if (!availableSlots.TryDequeue(out resourceIndex))
+            if (!availableSlots.TryPop(out resourceIndex))
             {
                 resourceIndex = resources.Count;
                 resources.Add(result);
@@ -138,7 +137,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class
             var descriptor = CreateDescriptorFromResource(resource);
             importedDescriptors.Add(descriptor);
 
-            result = CreateHandle(-index, true);
+            result = new ResourceHandle<T>(-index, true);
             importedResourceLookup.Add(resource, result);
         }
 
@@ -263,7 +262,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class
             DestroyResource(resources[i]);
 
             isAvailable[i] = false;
-            availableSlots.Enqueue(i);
+            availableSlots.Push(i);
         }
 
         handles.Clear();
@@ -301,7 +300,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class
             handleIndex = handles.Count;
         }
 
-        var result = CreateHandle(handleIndex, isPersistent);
+        var result = new ResourceHandle<T>(handleIndex, isPersistent);
 
         if (isPersistent)
         {
