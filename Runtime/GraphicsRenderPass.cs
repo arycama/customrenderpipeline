@@ -51,21 +51,27 @@ namespace Arycama.CustomRenderPipeline
             {
                 if (colorTargets.Count == 1)
                 {
-                    width = colorTargets[0].Item1.Descriptor.Width;
-                    height = colorTargets[0].Item1.Descriptor.Height;
+                    var handle = colorTargets[0].Item1;
+                    var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
+                    width = descriptor.Width;
+                    height = descriptor.Height;
 
-                    command.SetRenderTarget(GetRenderTexture(colorTargets[0].Item1), MipLevel, CubemapFace.Unknown, DepthSlice);
+                    command.SetRenderTarget(GetRenderTexture(handle), MipLevel, CubemapFace.Unknown, DepthSlice);
                 }
                 else
                 {
                     for (var i = 0; i < colorTargets.Count; i++)
                     {
-                        width = colorTargets[i].Item1.Descriptor.Width;
-                        height = colorTargets[i].Item1.Descriptor.Height;
+                        var item = colorTargets[i];
+                        var handle = item.Item1;
+                        var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
 
-                        targets[i] = GetRenderTexture(colorTargets[i].Item1);
-                        loads[i] = colorTargets[i].Item2;
-                        stores[i] = colorTargets[i].Item3;
+                        width = descriptor.Width;
+                        height = descriptor.Height;
+
+                        targets[i] = GetRenderTexture(handle);
+                        loads[i] = item.Item2;
+                        stores[i] = item.Item3;
                     }
 
                     command.SetRenderTarget(targets, targets[0]);
@@ -73,28 +79,36 @@ namespace Arycama.CustomRenderPipeline
             }
             else
             {
-                width = depthBuffer.Item1.Descriptor.Width;
-                height = depthBuffer.Item1.Descriptor.Height;
-                targetWidth = GetRenderTexture(depthBuffer.Item1).width;
-                targetHeight = GetRenderTexture(depthBuffer.Item1).height;
+                var depthHandle = depthBuffer.Item1;
+                var depthDescriptor = RenderGraph.RtHandleSystem.GetDescriptor(depthHandle);
+                width = depthDescriptor.Width;
+                height = depthDescriptor.Height;
+
+                var depthTarget = GetRenderTexture(depthHandle);
+                targetWidth = depthTarget.width;
+                targetHeight = depthTarget.height;
 
                 if (colorTargets.Count == 0)
                 {
-                    command.SetRenderTarget(GetRenderTexture(depthBuffer.Item1), RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare, GetRenderTexture(depthBuffer.Item1), depthBuffer.Item2, depthBuffer.Item3);
+                    command.SetRenderTarget(depthTarget, depthBuffer.Item2, depthBuffer.Item3, depthTarget, depthBuffer.Item2, depthBuffer.Item3);
                 }
                 else
                 {
                     for (var i = 0; i < colorTargets.Count; i++)
                     {
-                        width = colorTargets[i].Item1.Descriptor.Width;
-                        height = colorTargets[i].Item1.Descriptor.Height;
+                        var item = colorTargets[i];
+                        var handle = item.Item1;
+                        var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
 
-                        targets[i] = GetRenderTexture(colorTargets[i].Item1);
-                        loads[i] = colorTargets[i].Item2;
-                        stores[i] = colorTargets[i].Item3;
+                        width = descriptor.Width;
+                        height = descriptor.Height;
+
+                        targets[i] = GetRenderTexture(handle);
+                        loads[i] = item.Item2;
+                        stores[i] = item.Item3;
                     }
 
-                    var binding = new RenderTargetBinding(targets, loads, stores, GetRenderTexture(depthBuffer.Item1), depthBuffer.Item2, depthBuffer.Item3) { flags = renderTargetFlags };
+                    var binding = new RenderTargetBinding(targets, loads, stores, depthTarget, depthBuffer.Item2, depthBuffer.Item3) { flags = renderTargetFlags };
                     command.SetRenderTarget(binding);
 
                 }
@@ -114,8 +128,10 @@ namespace Arycama.CustomRenderPipeline
         {
             foreach (var colorTarget in colorTargets)
             {
-                if (colorTarget.Item1.Descriptor.AutoGenerateMips)
-                    command.GenerateMips(GetRenderTexture(colorTarget.Item1));
+                var handle = colorTarget.Item1;
+                var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
+                if (descriptor.AutoGenerateMips)
+                    command.GenerateMips(GetRenderTexture(handle));
             }
 
             // Reset all properties

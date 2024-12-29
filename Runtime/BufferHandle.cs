@@ -1,13 +1,11 @@
-﻿public class BufferHandle : IResourceHandle<BufferHandleDescriptor>
+﻿public class BufferHandle : IResourceHandle
 {
     public int Index { get; }
     public bool IsPersistent { get; }
-    public BufferHandleDescriptor Descriptor { get;  }
 
-    public BufferHandle(int index, bool isPersistent, BufferHandleDescriptor descriptor)
+    public BufferHandle(int index, bool isPersistent)
     {
         Index = index;
         IsPersistent = isPersistent;
-        Descriptor = descriptor; ;
     }
 }

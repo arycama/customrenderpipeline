@@ -1,13 +1,11 @@
-﻿public class RTHandle : IResourceHandle<RtHandleDescriptor>
+﻿public class RTHandle : IResourceHandle
 {
     public int Index { get; }
     public bool IsPersistent { get; }
-    public RtHandleDescriptor Descriptor { get; }
 
-    public RTHandle(int index, bool isPersistent, RtHandleDescriptor descriptor)
+    public RTHandle(int index, bool isPersistent)
     {
         Index = index;
         IsPersistent = isPersistent;
-        Descriptor = descriptor;
     }
 }

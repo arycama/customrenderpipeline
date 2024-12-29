@@ -158,7 +158,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetRenderFunction((command, pass) =>
                     {
                         var tempArrayId = Shader.PropertyToID("_TempTerrainId");
-                        command.GetTemporaryRTArray(tempArrayId, idMap.Descriptor.Width, idMap.Descriptor.Height, layerCount, 0, FilterMode.Bilinear, GraphicsFormat.R16_SFloat, 1, true);
+                        command.GetTemporaryRTArray(tempArrayId, idMapResolution, idMapResolution, layerCount, 0, FilterMode.Bilinear, GraphicsFormat.R16_SFloat, 1, true);
 
                         foreach (var component in alphamapModifiers)
                         {

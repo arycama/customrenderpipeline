@@ -74,7 +74,7 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHa
 
     protected override RTHandle CreateHandleFromDescriptor(RtHandleDescriptor descriptor, bool isPersistent, int handleIndex)
     {
-        return new RTHandle(handleIndex, isPersistent, descriptor);
+        return new RTHandle(handleIndex, isPersistent);
     }
 
     protected override RtHandleDescriptor CreateDescriptorFromResource(RenderTexture resource)

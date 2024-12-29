@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : class where K : IResourceHandle<V>
+public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : class where K : IResourceHandle
 {
     private readonly List<K> handles = new();
     private readonly List<int> createList = new(), freeList = new();
@@ -346,7 +346,10 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
     public void SetDescriptor(K handle, V descriptor)
     {
         if (handle.Index < 0)
+        {
             importedDescriptors[-handle.Index] = descriptor;
+            return;
+        }
 
         var descriptors = handle.IsPersistent ? persistentDescriptors : this.descriptors;
         descriptors[handle.Index] = descriptor;

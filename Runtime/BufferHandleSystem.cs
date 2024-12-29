@@ -49,7 +49,7 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
 
     protected override BufferHandle CreateHandleFromDescriptor(BufferHandleDescriptor descriptor, bool isPersistent, int handleIndex)
     {
-        return new BufferHandle(handleIndex, isPersistent, descriptor);
+        return new BufferHandle(handleIndex, isPersistent);
     }
 
     protected override BufferHandleDescriptor CreateDescriptorFromResource(GraphicsBuffer resource)

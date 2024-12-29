@@ -184,10 +184,11 @@ namespace Arycama.CustomRenderPipeline
 
         public Vector4 GetScaleLimit2D(RTHandle handle)
         {
+            var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
             var resource = GetRenderTexture(handle);
 
-            var scaleX = (float)handle.Descriptor.Width / resource.width;
-            var scaleY = (float)handle.Descriptor.Height / resource.height;
+            var scaleX = (float)descriptor.Width / resource.width;
+            var scaleY = (float)descriptor.Height / resource.height;
             var limitX = MathF.Floor(resource.width * scaleX);
             var limitY = MathF.Floor(resource.height * scaleY);
 
@@ -196,22 +197,24 @@ namespace Arycama.CustomRenderPipeline
 
         public Vector3 GetScale3D(RTHandle handle)
         {
+            var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
             var resource = GetRenderTexture(handle);
 
-            var scaleX = (float)handle.Descriptor.Width / resource.width;
-            var scaleY = (float)handle.Descriptor.Height / resource.height;
-            var scaleZ = (float)handle.Descriptor.VolumeDepth / resource.volumeDepth;
+            var scaleX = (float)descriptor.Width / resource.width;
+            var scaleY = (float)descriptor.Height / resource.height;
+            var scaleZ = (float)descriptor.VolumeDepth / resource.volumeDepth;
 
             return new Vector3(scaleX, scaleY, scaleZ);
         }
 
         public Vector3 GetLimit3D(RTHandle handle)
         {
+            var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
             var resource = GetRenderTexture(handle);
 
-            var scaleX = (float)handle.Descriptor.Width / resource.width;
-            var scaleY = (float)handle.Descriptor.Height / resource.height;
-            var scaleZ = (float)handle.Descriptor.VolumeDepth / resource.volumeDepth;
+            var scaleX = (float)descriptor.Width / resource.width;
+            var scaleY = (float)descriptor.Height / resource.height;
+            var scaleZ = (float)descriptor.VolumeDepth / resource.volumeDepth;
 
             var limitX = MathF.Floor(resource.width * scaleX);
             var limitY = MathF.Floor(resource.height * scaleY);
