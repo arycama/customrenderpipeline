@@ -36,7 +36,7 @@ namespace Arycama.CustomRenderPipeline.Water
             {
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    command.SetRenderTarget(waterTriangleNormal);
+                    command.SetRenderTarget(pass.GetRenderTexture(waterTriangleNormal));
                     command.ClearRenderTarget(false, true, Color.clear);
                 });
             }

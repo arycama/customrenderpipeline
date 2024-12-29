@@ -403,9 +403,9 @@ namespace Arycama.CustomRenderPipeline
                 {
                     //if (directionalShadowRequests.Count > 0)
                     {
-                        command.SetBufferData(data.directionalMatrixBuffer.Resource, data.directionalShadowMatrices);
-                        command.SetBufferData(data.directionalTexelSizeBuffer.Resource, data.directionalShadowTexelSizes);
-                        command.SetBufferData(data.directionalLightBuffer.Resource, data.directionalLightList);
+                        command.SetBufferData(pass.GetBuffer(data.directionalMatrixBuffer), data.directionalShadowMatrices);
+                        command.SetBufferData(pass.GetBuffer(data.directionalTexelSizeBuffer), data.directionalShadowTexelSizes);
+                        command.SetBufferData(pass.GetBuffer(data.directionalLightBuffer), data.directionalLightList);
                     }
 
                     ListPool<Matrix4x4>.Release(data.directionalShadowMatrices);
@@ -413,7 +413,7 @@ namespace Arycama.CustomRenderPipeline
                     ListPool<DirectionalLightData>.Release(data.directionalLightList);
 
                    // if(lightList.Count > 0)
-                        command.SetBufferData(data.pointLightBuffer.Resource, data.lightList);
+                        command.SetBufferData(pass.GetBuffer(data.pointLightBuffer), data.lightList);
 
                     ListPool<LightData>.Release(data.lightList);
                 });

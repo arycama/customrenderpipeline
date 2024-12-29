@@ -49,7 +49,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetBuffer(string propertyName, BufferHandle buffer)
         {
-            propertyBlock.SetBuffer(propertyName, buffer.Resource);
+            propertyBlock.SetBuffer(propertyName, GetBuffer(buffer));
         }
 
         public override void SetVector(string propertyName, Vector4 value)
@@ -88,7 +88,7 @@ namespace Arycama.CustomRenderPipeline
                 command.SetGlobalDepthBias(depthBias, slopeDepthBias);
 
             command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
-            command.DrawProceduralIndirect(indexBuffer.Resource, Matrix4x4.identity, material, passIndex, topology, indirectArgsBuffer.Resource, 0, propertyBlock);
+            command.DrawProceduralIndirect(GetBuffer(indexBuffer), Matrix4x4.identity, material, passIndex, topology, GetBuffer(indirectArgsBuffer), 0, propertyBlock);
             command.SetGlobalFloat("_ZClip", 1.0f);
 
             if (depthBias != 0.0f || slopeDepthBias != 0.0f)
@@ -113,7 +113,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetConstantBuffer(string propertyName, BufferHandle value)
         {
-            propertyBlock.SetConstantBuffer(propertyName, value.Resource, 0, value.Size);
+            propertyBlock.SetConstantBuffer(propertyName, GetBuffer(value), 0, value.Size);
         }
 
         public override void SetMatrixArray(string propertyName, Matrix4x4[] value)

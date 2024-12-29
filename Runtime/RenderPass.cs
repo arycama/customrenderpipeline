@@ -103,7 +103,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var texture in readTextures)
             {
                 var handle = texture.Item2;
-                SetTexture(texture.Item1, handle, texture.Item3, texture.Item4);
+                SetTexture(texture.Item1, GetRenderTexture(handle), texture.Item3, texture.Item4);
             }
 
             readTextures.Clear();
@@ -169,6 +169,54 @@ namespace Arycama.CustomRenderPipeline
             result.Data = data;
             result.SetRenderFunction(pass);
             renderGraphBuilder = result;
+        }
+
+        public GraphicsBuffer GetBuffer(BufferHandle handle)
+        {
+            return RenderGraph.BufferHandleSystem.GetResource(handle);
+        }
+
+        public RenderTexture GetRenderTexture(RTHandle handle)
+        {
+            return RenderGraph.RtHandleSystem.GetResource(handle);
+        }
+
+        public Vector4 GetScaleLimit2D(RTHandle handle)
+        {
+            var resource = GetRenderTexture(handle);
+
+            var scaleX = (float)handle.Width / resource.width;
+            var scaleY = (float)handle.Height / resource.height;
+            var limitX = MathF.Floor(resource.width * scaleX);
+            var limitY = MathF.Floor(resource.height * scaleY);
+
+            return new Vector4(scaleX, scaleY, limitX, limitY);
+        }
+
+        public Vector3 GetScale3D(RTHandle handle)
+        {
+            var resource = GetRenderTexture(handle);
+
+            var scaleX = (float)handle.Width / resource.width;
+            var scaleY = (float)handle.Height / resource.height;
+            var scaleZ = (float)handle.VolumeDepth / resource.volumeDepth;
+
+            return new Vector3(scaleX, scaleY, scaleZ);
+        }
+
+        public Vector3 GetLimit3D(RTHandle handle)
+        {
+            var resource = GetRenderTexture(handle);
+
+            var scaleX = (float)handle.Width / resource.width;
+            var scaleY = (float)handle.Height / resource.height;
+            var scaleZ = (float)handle.VolumeDepth / resource.volumeDepth;
+
+            var limitX = MathF.Floor(resource.width * scaleX);
+            var limitY = MathF.Floor(resource.height * scaleY);
+            var limitZ = MathF.Floor(resource.volumeDepth * scaleZ);
+
+            return new Vector3(limitX, limitY, limitZ);
         }
     }
 }

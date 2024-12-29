@@ -38,7 +38,7 @@ namespace Arycama.CustomRenderPipeline
                     {
                         var initialData = ArrayPool<Vector4>.Get(1);
                         initialData[0] = new Vector4(1.0f, 0.0f, 0.0f, 0.0f);
-                        command.SetBufferData(data.Resource, initialData);
+                        command.SetBufferData(pass.GetBuffer(data), initialData);
                         ArrayPool<Vector4>.Release(initialData);
                     });
                 }

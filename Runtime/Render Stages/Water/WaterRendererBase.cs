@@ -12,10 +12,12 @@ namespace Arycama.CustomRenderPipeline.Water
         protected int VerticesPerTileEdge => settings.PatchVertices + 1;
         protected int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
 
+        private GraphicsBuffer indexBufferInternal;
+
         public WaterRendererBase(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
         {
             this.settings = settings;
-            indexBuffer = renderGraph.BufferHandleSystem.ImportResource(new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" });
+            indexBufferInternal = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
 
             var index = 0;
             var pIndices = new ushort[QuadListIndexCount];
@@ -45,12 +47,13 @@ namespace Arycama.CustomRenderPipeline.Water
                 }
             }
 
-            indexBuffer.Resource.SetData(pIndices);
+            indexBufferInternal.SetData(pIndices);
+            indexBuffer = renderGraph.BufferHandleSystem.ImportResource(indexBufferInternal);
         }
 
         protected override void Cleanup(bool disposing)
         {
-            indexBuffer.Resource.Dispose();
+            indexBufferInternal.Dispose();
         }
 
         protected WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
@@ -129,7 +132,7 @@ namespace Arycama.CustomRenderPipeline.Water
                             indirectArgs.Add(0); // start index location
                             indirectArgs.Add(0); // base vertex location
                             indirectArgs.Add(0); // start instance location
-                            command.SetBufferData(indirectArgsBuffer.Resource, indirectArgs);
+                            command.SetBufferData(pass.GetBuffer(indirectArgsBuffer), indirectArgs);
                             ListPool<int>.Release(indirectArgs);
                         }
 

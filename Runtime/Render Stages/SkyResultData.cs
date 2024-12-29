@@ -18,6 +18,6 @@ public readonly struct SkyResultData : IRenderPassData
 
     public readonly void SetProperties(RenderPass pass, CommandBuffer command)
     {
-        pass.SetVector("SkyTextureScaleLimit", SkyTexture.ScaleLimit2D);
+        pass.SetVector("SkyTextureScaleLimit", pass.GetScaleLimit2D(SkyTexture));
     }
 }

@@ -94,7 +94,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("", indexBuffer);
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    var pIndices = indexBuffer.Resource.LockBufferForWrite<ushort>(0, QuadListIndexCount);
+                    var pIndices = pass.GetBuffer(indexBuffer).LockBufferForWrite<ushort>(0, QuadListIndexCount);
                     for (int y = 0, i = 0; y < settings.PatchVertices; y++)
                     {
                         var rowStart = y * VerticesPerTileEdge;
@@ -121,7 +121,7 @@ namespace Arycama.CustomRenderPipeline
                         }
                     }
 
-                    indexBuffer.Resource.UnlockBufferAfterWrite<ushort>(QuadListIndexCount);
+                    pass.GetBuffer(indexBuffer).UnlockBufferAfterWrite<ushort>(QuadListIndexCount);
                 });
             }
 
@@ -162,7 +162,7 @@ namespace Arycama.CustomRenderPipeline
 
                         foreach (var component in alphamapModifiers)
                         {
-                            component.Generate(command, terrainLayers, terrainProceduralLayers, idMap);
+                            component.Generate(command, terrainLayers, terrainProceduralLayers, pass.GetRenderTexture(idMap));
                         }
                     });
                 }
@@ -270,8 +270,8 @@ namespace Arycama.CustomRenderPipeline
                     {
                         foreach (var component in terrainRenderers)
                         {
-                            component.Heightmap = heightmap;
-                            component.NormalMap = normalmap;
+                            component.Heightmap = pass.GetRenderTexture(heightmap);
+                            component.NormalMap = pass.GetRenderTexture(normalmap);
                         }
                     });
                 }
@@ -283,11 +283,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.Initialize(computeShader, 2, resolution, resolution);
                 pass.WriteTexture("DepthCopyResult", minMaxHeight, 0);
-
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    pass.SetTexture("DepthCopyInput", heightmap);
-                });
+                pass.ReadTexture("DepthCopyInput", heightmap);
             }
 
             var mipCount = Texture2DExtensions.MipCount(resolution, resolution);
@@ -327,14 +323,14 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("", terrainLayerData);
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    var layerData = terrainLayerData.Resource.LockBufferForWrite<TerrainLayerData>(0, count);
+                    var layerData = pass.GetBuffer(terrainLayerData).LockBufferForWrite<TerrainLayerData>(0, count);
                     foreach (var layer in terrainLayers)
                     {
                         var index = layer.Value;
                         layerData[index] = new TerrainLayerData(layer.Key.tileSize.x, Mathf.Max(1e-3f, layer.Key.smoothness), layer.Key.normalScale, 1.0f - layer.Key.metallic);
                     }
 
-                    terrainLayerData.Resource.UnlockBufferAfterWrite<TerrainLayerData>(count);
+                    pass.GetBuffer(terrainLayerData).UnlockBufferAfterWrite<TerrainLayerData>(count);
                 });
             }
         }
@@ -382,7 +378,7 @@ namespace Arycama.CustomRenderPipeline
                         }
                     }
 
-                    command.SetBufferData(indicesBuffer.Resource, layers);
+                    command.SetBufferData(pass.GetBuffer(indicesBuffer), layers);
                     var tempArrayId = Shader.PropertyToID("_TempTerrainId");
                     command.SetGlobalTexture("_ExtraLayers", tempArrayId);
                 });

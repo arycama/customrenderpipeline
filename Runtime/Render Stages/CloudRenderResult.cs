@@ -23,8 +23,8 @@ namespace Arycama.CustomRenderPipeline
 
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector("CloudTextureScaleLimit", cloudTexture.ScaleLimit2D);
-            pass.SetVector("CloudTransmittanceTextureScaleLimit", cloudTransmittanceTexture.ScaleLimit2D);
+            pass.SetVector("CloudTextureScaleLimit", pass.GetScaleLimit2D(cloudTexture));
+            pass.SetVector("CloudTransmittanceTextureScaleLimit", pass.GetScaleLimit2D(cloudTransmittanceTexture));
         }
     }
 }

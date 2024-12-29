@@ -67,11 +67,10 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
     protected virtual int ExtraFramesToKeepResource(T resource) => 0;
     protected abstract K CreateHandleFromDescriptor(V descriptor, bool isPersistent, int handleIndex);
 
-    private T AssignResource(K handle)
+    private void AssignResource(K handle)
     {
         // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
         int resourceIndex = -1;
-        T result = null;
         for (var i = 0; i < resources.Count; i++)
         {
             if (!isAvailable[i])
@@ -81,14 +80,13 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
             if (!DoesResourceMatchHandle(resource, handle))
                 continue;
 
-            result = resource;
             resourceIndex = i;
             break;
         }
 
-        if (result == null)
+        if (resourceIndex == -1)
         {
-            result = CreateResource(handle);
+            var result = CreateResource(handle);
 
             // Get a slot for this render texture if possible
             if (!availableSlots.TryDequeue(out resourceIndex))
@@ -101,7 +99,6 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
             else
             {
                 resources[resourceIndex] = result;
-                isAvailable[resourceIndex] = false; // Already false 
             }
         }
         else
@@ -120,8 +117,6 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
         {
             resourceIndices[handle.HandleIndex] = resourceIndex;
         }
-
-        return result;
     }
 
 
@@ -215,7 +210,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
             // Assign or create any RTHandles that are written to by this pass
             foreach (var handle in handlesToCreate[i])
             {
-                handle.Resource = AssignResource(handle);
+                AssignResource(handle);
             }
 
             // Now mark any textures that need to be released at the end of this pass as available
@@ -297,5 +292,15 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
         }
 
         return result;
+    }
+
+    public T GetResource(K handle)
+    {
+        if (handle.IsImported)
+            return handle.Resource;
+
+        var indexList = handle.IsPersistent ? persistentResourceIndices : resourceIndices;
+        var resourceIndex = indexList[handle.HandleIndex];
+        return resources[resourceIndex];
     }
 }

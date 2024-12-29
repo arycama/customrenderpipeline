@@ -185,7 +185,7 @@ public class ScreenSpaceShadows : RenderFeature
             pass.SetRenderFunction((command, pass) =>
             {
                 pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
-                pass.SetVector("_HistoryScaleLimit", history.ScaleLimit2D);
+                pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(history));
                 pass.SetFloat("_Intensity", settings.Intensity);
                 pass.SetFloat("_MaxSteps", settings.MaxSamples);
                 pass.SetFloat("_Thickness", settings.Thickness);
@@ -211,7 +211,7 @@ public class ScreenSpaceShadows : RenderFeature
 
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector("ScreenSpaceShadowsScaleLimit", ScreenSpaceShadows.ScaleLimit2D);
+            pass.SetVector("ScreenSpaceShadowsScaleLimit", pass.GetScaleLimit2D(ScreenSpaceShadows));
         }
     }
 }

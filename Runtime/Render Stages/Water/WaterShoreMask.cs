@@ -115,8 +115,8 @@ namespace Arycama.CustomRenderPipeline
                             testData[1] = 0;
                             testData[2] = 0;
                             testData[3] = 0;
-                            command.SetBufferData(minMaxValues.Resource, testData);
-                            command.SetRandomWriteTarget(1, minMaxValues.Resource);
+                            command.SetBufferData(pass.GetBuffer(minMaxValues), testData);
+                            command.SetRandomWriteTarget(1, pass.GetBuffer(minMaxValues));
                             ArrayPool<int>.Release(testData);
                         }
                     });
@@ -141,7 +141,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetTexture("Heightmap", heightmapTexture);
                     pass.SetFloat("Cutoff", cutoff);
                     pass.SetFloat("InvResolution", invResolution);
-                    command.CopyBuffer(minMaxValues.Resource, resultDataBuffer.Resource);
+                    command.CopyBuffer(pass.GetBuffer(minMaxValues), pass.GetBuffer(resultDataBuffer));
                     pass.SetFloat("Resolution", heightmapResolution);
                 });
             }

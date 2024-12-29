@@ -30,7 +30,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetBuffer(string propertyName, BufferHandle buffer)
         {
-            command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, buffer.Resource);
+            command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, GetBuffer(buffer));
         }
 
         public override void SetVector(string propertyName, Vector4 value)
@@ -61,7 +61,7 @@ namespace Arycama.CustomRenderPipeline
         protected override void SetupTargets()
         {
             for (var i = 0; i < colorBindings.Count; i++)
-                command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].Item2, colorBindings[i].Item1, colorBindings[i].Item3);
+                command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].Item2, GetRenderTexture(colorBindings[i].Item1), colorBindings[i].Item3);
         }
 
         public override void SetMatrix(string propertyName, Matrix4x4 value)
@@ -71,7 +71,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetConstantBuffer(string propertyName, BufferHandle value)
         {
-            command.SetComputeConstantBufferParam(computeShader, propertyName, value.Resource, 0, value.Size);
+            command.SetComputeConstantBufferParam(computeShader, propertyName, GetBuffer(value), 0, value.Size);
         }
 
         public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
@@ -89,7 +89,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var colorTarget in colorBindings)
             {
                 if (colorTarget.Item1.AutoGenerateMips)
-                    command.GenerateMips(colorTarget.Item1);
+                    command.GenerateMips(GetRenderTexture(colorTarget.Item1));
             }
 
             colorBindings.Clear();

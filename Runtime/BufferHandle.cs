@@ -19,7 +19,6 @@ public class BufferHandle : ResourceHandle<GraphicsBuffer>
         Count = count;
         Stride = stride;
         UsageFlags = usageFlags;
-        Resource = null;
     }
 
     public BufferHandle(GraphicsBuffer graphicsBuffer, int handleIndex, bool isImported, bool isPersistent) : base(handleIndex, isImported, isPersistent)

@@ -53,7 +53,7 @@ namespace Arycama.CustomRenderPipeline
         public override void SetBuffer(string propertyName, BufferHandle buffer)
         {
             // only way.. :( 
-            command.SetGlobalBuffer(propertyName, buffer.Resource);
+            command.SetGlobalBuffer(propertyName, GetBuffer(buffer));
             // command.SetRayTracingBufferParam(shader, propertyName, buffer);
         }
 
@@ -109,7 +109,7 @@ namespace Arycama.CustomRenderPipeline
         protected override void SetupTargets()
         {
             for (var i = 0; i < colorBindings.Count; i++)
-                command.SetRayTracingTextureParam(shader, colorBindings[i].Item2, colorBindings[i].Item1);
+                command.SetRayTracingTextureParam(shader, colorBindings[i].Item2, GetRenderTexture(colorBindings[i].Item1));
         }
 
         public override void SetMatrix(string propertyName, Matrix4x4 value)
@@ -119,7 +119,7 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetConstantBuffer(string propertyName, BufferHandle value)
         {
-            command.SetRayTracingConstantBufferParam(shader, propertyName, value.Resource, 0, value.Size);
+            command.SetRayTracingConstantBufferParam(shader, propertyName, GetBuffer(value), 0, value.Size);
         }
 
         public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
@@ -132,7 +132,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var colorTarget in colorBindings)
             {
                 if (colorTarget.Item1.AutoGenerateMips)
-                    command.GenerateMips(colorTarget.Item1);
+                    command.GenerateMips(GetRenderTexture(colorTarget.Item1));
             }
 
             colorBindings.Clear();

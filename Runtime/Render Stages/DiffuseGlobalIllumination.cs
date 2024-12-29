@@ -95,7 +95,7 @@ namespace Arycama.CustomRenderPipeline
                         pass.SetFloat("_MaxSteps", settings.MaxSamples);
                         pass.SetFloat("_Thickness", settings.Thickness);
                         pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight) - 1);
-                        pass.SetVector("_PreviousColorScaleLimit", previousFrame.ScaleLimit2D);
+                        pass.SetVector("_PreviousColorScaleLimit", pass.GetScaleLimit2D(previousFrame));
 
                         var tanHalfFov = Mathf.Tan(0.5f * viewData.FieldOfView * Mathf.Deg2Rad);
                         pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * settings.ConeAngle * Mathf.Deg2Rad) * (viewData.ScaledHeight / tanHalfFov * 0.5f));
@@ -164,7 +164,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
-                    pass.SetVector("_HistoryScaleLimit", history.ScaleLimit2D);
+                    pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(history));
                     pass.SetFloat("_Intensity", settings.Intensity);
                     pass.SetFloat("_MaxSteps", settings.MaxSamples);
                     pass.SetFloat("_Thickness", settings.Thickness);
@@ -192,7 +192,7 @@ namespace Arycama.CustomRenderPipeline
 
             public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetVector("ScreenSpaceGlobalIlluminationScaleLimit", ScreenSpaceGlobalIllumination.ScaleLimit2D);
+                pass.SetVector("ScreenSpaceGlobalIlluminationScaleLimit", pass.GetScaleLimit2D(ScreenSpaceGlobalIllumination));
                 pass.SetFloat("DiffuseGiStrength", intensity);
             }
         }

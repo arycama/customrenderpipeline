@@ -95,7 +95,7 @@ namespace Arycama.CustomRenderPipeline
 
                 (command, pass, data) =>
                 {
-                    command.SetBufferData(data.counterBuffer.Resource, zeroArray);
+                    command.SetBufferData(pass.GetBuffer(data.counterBuffer), zeroArray);
                     pass.SetInt("_TileSize", data.tileSize);
                     pass.SetFloat("_RcpClusterDepth", data.rcpClusterDepth);
                 });

@@ -94,8 +94,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat("_MotionBlend", settings.MotionBlend);
                     pass.SetFloat("_MotionFactor", settings.MotionFactor);
 
-                    pass.SetVector("_HistoryScaleLimit", luminanceHistory.ScaleLimit2D);
-                    pass.SetVector("_TransmittanceHistoryScaleLimit", transmittanceHistory.ScaleLimit2D);
+                    pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(luminanceHistory));
+                    pass.SetVector("_TransmittanceHistoryScaleLimit", pass.GetScaleLimit2D(transmittanceHistory));
 
                     pass.SetInt("_MaxWidth", viewData.ScaledWidth - 1);
                     pass.SetInt("_MaxHeight", viewData.ScaledHeight - 1);

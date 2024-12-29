@@ -117,7 +117,7 @@ namespace Arycama.CustomRenderPipeline.Water
                     var projectionMatrix = Matrix4x4.Ortho(-patchSize, patchSize, -patchSize, patchSize, 0, settings.CausticsDepth * 2);
                     command.SetViewProjectionMatrices(viewMatrix, projectionMatrix);
 
-                    command.SetRenderTarget(tempResult);
+                    command.SetRenderTarget(pass.GetRenderTexture(tempResult));
                     command.ClearRenderTarget(false, true, Color.clear);
 
                     pass.SetFloat("_CausticsDepth", settings.CausticsDepth);

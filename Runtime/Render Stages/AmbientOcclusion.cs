@@ -163,7 +163,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
-                    pass.SetVector("_HistoryScaleLimit", history.ScaleLimit2D);
+                    pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(history));
                 });
             }
 
@@ -183,7 +183,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetFloat("_AoStrength", settings.Strength);
-                    pass.SetVector("InputScaleLimit", current.ScaleLimit2D);
+                    pass.SetVector("InputScaleLimit", pass.GetScaleLimit2D(current));
 
                 });
             }

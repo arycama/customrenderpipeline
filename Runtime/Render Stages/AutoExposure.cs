@@ -117,7 +117,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((output, exposureBuffer), (command, pass, data) =>
                 {
-                    command.CopyBuffer(data.output.Resource, data.exposureBuffer.Resource);
+                    command.CopyBuffer(pass.GetBuffer(data.output), pass.GetBuffer(data.exposureBuffer));
                 });
             }
         }

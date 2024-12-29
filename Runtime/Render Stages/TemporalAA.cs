@@ -64,7 +64,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat("_VelocityWeight", data.motionWeight);
                     pass.SetFloat("_Scale", data.scale);
 
-                    pass.SetVector("_HistoryScaleLimit", new Vector4(history.Scale.x, history.Scale.y, history.Limit.x, history.Limit.y));
+                    pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(history));
 
                     pass.SetVector("_MaxResolution", data.maxResolution);
 

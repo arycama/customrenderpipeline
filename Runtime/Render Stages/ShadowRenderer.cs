@@ -55,7 +55,7 @@ namespace Arycama.CustomRenderPipeline
                         ),
                         (command, pass, data) =>
                         {
-                            command.SetRenderTarget(data.target, 0, CubemapFace.Unknown, data.index);
+                            command.SetRenderTarget(pass.GetRenderTexture(data.target), 0, CubemapFace.Unknown, data.index);
                             command.ClearRenderTarget(true, false, Color.clear);
 
                             // TODO: Use different matrices for shadows?
@@ -104,7 +104,7 @@ namespace Arycama.CustomRenderPipeline
                         ),
                         (command, pass, data) =>
                         {
-                            command.SetRenderTarget(data.target, data.target, 0, CubemapFace.Unknown, data.index);
+                            command.SetRenderTarget(pass.GetRenderTexture(data.target), pass.GetRenderTexture(data.target), 0, CubemapFace.Unknown, data.index);
                             command.ClearRenderTarget(true, false, Color.clear);
 
                             pass.SetVector("_ViewPosition", viewData.ViewPosition);

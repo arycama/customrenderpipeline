@@ -202,7 +202,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
-                    pass.SetVector("_HistoryScaleLimit", history.ScaleLimit2D);
+                    pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(history));
 
                     pass.SetVector("_Color", settings.Material.GetColor("_Color").linear);
                     pass.SetVector("_Extinction", settings.Material.GetColor("_Extinction"));

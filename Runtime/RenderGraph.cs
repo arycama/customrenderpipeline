@@ -14,6 +14,9 @@ namespace Arycama.CustomRenderPipeline
         private bool disposedValue;
         private readonly List<RenderPass> renderPasses = new();
 
+        private GraphicsBuffer emptyBuffer;
+        public RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
+
         public RTHandleSystem RtHandleSystem { get; }
         public BufferHandleSystem BufferHandleSystem { get; }
         public RenderResourceMap ResourceMap { get; }
@@ -35,13 +38,21 @@ namespace Arycama.CustomRenderPipeline
             RtHandleSystem = new();
             BufferHandleSystem = new();
 
-            EmptyBuffer = BufferHandleSystem.ImportResource(new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" });
-            EmptyTexture = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave });
-            EmptyUavTexture = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, enableRandomWrite = true });
-            EmptyTextureArray = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
-            Empty3DTexture = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave });
-            EmptyCubemap = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave });
-            EmptyCubemapArray = RtHandleSystem.ImportResource(new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave });
+            emptyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" };
+            emptyTexture = new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave };
+            emptyUavTexture = new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, enableRandomWrite = true };
+            emptyTextureArray = new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave };
+            empty3DTexture = new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave };
+            emptyCubemap = new RenderTexture(1, 1, 0) { dimension = TextureDimension.Cube, hideFlags = HideFlags.HideAndDontSave };
+            emptyCubemapArray = new RenderTexture(1, 1, 0) { dimension = TextureDimension.CubeArray, volumeDepth = 6, hideFlags = HideFlags.HideAndDontSave };
+
+            EmptyBuffer = BufferHandleSystem.ImportResource(emptyBuffer);
+            EmptyTexture = RtHandleSystem.ImportResource(emptyTexture);
+            EmptyUavTexture = RtHandleSystem.ImportResource(emptyUavTexture);
+            EmptyTextureArray = RtHandleSystem.ImportResource(emptyTextureArray);
+            Empty3DTexture = RtHandleSystem.ImportResource(empty3DTexture);
+            EmptyCubemap = RtHandleSystem.ImportResource(emptyCubemap);
+            EmptyCubemapArray = RtHandleSystem.ImportResource(emptyCubemapArray);
 
             ResourceMap = new(this);
             RenderPipeline = renderPipeline;
@@ -60,13 +71,13 @@ namespace Arycama.CustomRenderPipeline
             if (!disposing)
                 Debug.LogError("Render Graph not disposed correctly");
 
-            EmptyBuffer.Resource.Dispose();
-            Object.DestroyImmediate(EmptyTexture.Resource);
-            Object.DestroyImmediate(EmptyUavTexture.Resource);
-            Object.DestroyImmediate(EmptyTextureArray.Resource);
-            Object.DestroyImmediate(Empty3DTexture.Resource);
-            Object.DestroyImmediate(EmptyCubemap.Resource);
-            Object.DestroyImmediate(EmptyCubemapArray.Resource);
+            emptyBuffer.Dispose();
+            Object.DestroyImmediate(emptyTexture);
+            Object.DestroyImmediate(emptyUavTexture);
+            Object.DestroyImmediate(emptyTextureArray);
+            Object.DestroyImmediate(empty3DTexture);
+            Object.DestroyImmediate(emptyCubemap);
+            Object.DestroyImmediate(emptyCubemapArray);
 
             ResourceMap.Dispose();
             RtHandleSystem.Dispose();
@@ -154,9 +165,9 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("", buffer);
                 pass.SetRenderFunction((data, buffer), (command, pass, data) =>
                 {
-                    var bufferData = data.buffer.Resource.LockBufferForWrite<T>(0, 1);
+                    var bufferData = BufferHandleSystem.GetResource(data.buffer).LockBufferForWrite<T>(0, 1);
                     bufferData[0] = data.data;
-                    data.buffer.Resource.UnlockBufferAfterWrite<T>(1);
+                    BufferHandleSystem.GetResource(data.buffer).UnlockBufferAfterWrite<T>(1);
                 });
             }
 

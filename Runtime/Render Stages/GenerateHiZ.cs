@@ -45,7 +45,7 @@ public class GenerateHiZ : RenderFeature
                 pass.SetInt("_Width", viewData.ScaledWidth);
                 pass.SetInt("_Height", viewData.ScaledHeight);
                 pass.SetInt("_MaxMip", hasSecondPass ? maxMipsPerPass : mipCount);
-                pass.SetVector("_InputScaleLimit", depth.ScaleLimit2D);
+                pass.SetVector("_InputScaleLimit", pass.GetScaleLimit2D(depth));
             });
         }
 

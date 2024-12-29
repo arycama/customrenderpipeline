@@ -196,7 +196,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("", ambientBuffer);
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    command.CopyBuffer(ambientBufferTemp.Resource, ambientBuffer.Resource);
+                    command.CopyBuffer(pass.GetBuffer(ambientBufferTemp), pass.GetBuffer(ambientBuffer));
                 });
             }
 
@@ -209,7 +209,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    command.CopyTexture(skyReflection, reflectionProbe);
+                    command.CopyTexture(pass.GetRenderTexture(skyReflection), pass.GetRenderTexture(reflectionProbe));
                 });
             }
 

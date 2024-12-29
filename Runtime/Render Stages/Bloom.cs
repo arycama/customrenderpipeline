@@ -60,7 +60,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetRenderFunction((new Vector2(1.0f / width, 1.0f / height), rt), (command, pass, data) =>
                 {
                     pass.SetVector("_RcpResolution", data.Item1);
-                    pass.SetVector("_InputScaleLimit", rt.ScaleLimit2D);
+                    pass.SetVector("_InputScaleLimit", pass.GetScaleLimit2D(rt));
                 });
             }
 
@@ -81,7 +81,7 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.SetFloat("_Strength", data.Strength);
                     pass.SetVector("_RcpResolution", data.Item2);
-                    pass.SetVector("_InputScaleLimit", input.ScaleLimit2D);
+                    pass.SetVector("_InputScaleLimit", pass.GetScaleLimit2D(input));
                 });
             }
 

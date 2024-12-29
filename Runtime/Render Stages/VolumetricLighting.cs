@@ -74,8 +74,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.SetFloat("_VolumeSlices", data.volumeSlices);
                     pass.SetFloat("_BlurSigma", data.blurSigma);
                     pass.SetFloat("_VolumeTileSize", data.volumeTileSize);
-                    pass.SetVector("_InputScale", data.history.Scale);
-                    pass.SetVector("_InputMax", data.history.Limit);
+                    pass.SetVector("_InputScale", pass.GetScale3D(data.history));
+                    pass.SetVector("_InputMax", pass.GetLimit3D(data.history));
                     pass.SetMatrix("_PixelToWorldViewDir", data.pixelToWorldViewDir);
                 });
             }
@@ -180,10 +180,10 @@ namespace Arycama.CustomRenderPipeline
 
             public readonly void SetProperties(RenderPass pass, CommandBuffer command)
             {
-                pass.SetVector("_VolumetricLightScale", volumetricLighting.Scale);
+                pass.SetVector("_VolumetricLightScale", pass.GetScale3D(volumetricLighting));
                 pass.SetFloat("_VolumetricLightNear", volumetricLightNear);
 
-                pass.SetVector("_VolumetricLightMax", volumetricLighting.Limit);
+                pass.SetVector("_VolumetricLightMax", pass.GetLimit3D(volumetricLighting));
                 pass.SetFloat("_VolumetricLightFar", volumetricLightFar);
 
                 pass.SetVector("_RcpVolumetricLightResolution", rcpVolumetricLightResolution);

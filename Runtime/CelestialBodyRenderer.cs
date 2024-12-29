@@ -22,7 +22,7 @@ public class CelestialBodyRenderer : RenderFeature
 
             pass.SetRenderFunction((cameraTarget, cameraDepth, viewData.ViewPosition, viewData.ScaledWidth, viewData.ScaledHeight), (command, pass, data) =>
             {
-                command.SetRenderTarget(data.cameraTarget, data.cameraDepth);
+                command.SetRenderTarget(pass.GetRenderTexture(data.cameraTarget), pass.GetRenderTexture(data.cameraDepth));
                 command.SetViewport(new Rect(0, 0, data.ScaledWidth, data.ScaledHeight));
 
                 foreach (var celestialBody in CelestialBody.CelestialBodies)

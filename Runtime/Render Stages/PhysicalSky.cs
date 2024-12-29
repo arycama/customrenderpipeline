@@ -100,7 +100,7 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetVector("_SkyHistoryScaleLimit", skyColor.history.ScaleLimit2D);
+                    pass.SetVector("_SkyHistoryScaleLimit", pass.GetScaleLimit2D(skyColor.history));
 
                     pass.SetFloat("_IsFirst", skyColor.wasCreated ? 1.0f : 0.0f);
                     pass.SetFloat("_StationaryBlend", settings.StationaryBlend);

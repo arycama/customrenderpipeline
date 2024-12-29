@@ -45,7 +45,7 @@ public partial class UIBlur : RenderFeature
                 pass.SetFloat("BlurRadius", settings.BlurRadius);
                 pass.SetFloat("BlurSigma", settings.BlurSigma);
                 pass.SetVector("TexelSize", new Vector4(1f / viewData.PixelWidth, 1f / viewData.PixelHeight, viewData.PixelWidth, viewData.PixelHeight));
-                pass.SetVector("_InputScaleLimit", horizontalResult.ScaleLimit2D);
+                pass.SetVector("_InputScaleLimit", pass.GetScaleLimit2D(horizontalResult));
             });
         }
 
@@ -68,7 +68,7 @@ public partial class UIBlur : RenderFeature
 
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector("UIBlurTextureScaleLimit", uiBlurTexture.ScaleLimit2D);
+            pass.SetVector("UIBlurTextureScaleLimit", pass.GetScaleLimit2D(uiBlurTexture));
         }
     }
 }

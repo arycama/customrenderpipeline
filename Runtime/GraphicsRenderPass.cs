@@ -54,19 +54,16 @@ namespace Arycama.CustomRenderPipeline
                     width = colorTargets[0].Item1.Width;
                     height = colorTargets[0].Item1.Height;
 
-                    command.SetRenderTarget(colorTargets[0].Item1, MipLevel, CubemapFace.Unknown, DepthSlice);
+                    command.SetRenderTarget(GetRenderTexture(colorTargets[0].Item1), MipLevel, CubemapFace.Unknown, DepthSlice);
                 }
                 else
                 {
                     for (var i = 0; i < colorTargets.Count; i++)
                     {
-                        Assert.IsTrue(targetWidth == 0 || targetWidth == colorTargets[i].Item1.Resource.width, Name);
-                        Assert.IsTrue(targetHeight == 0 || targetHeight == colorTargets[i].Item1.Resource.height, Name);
-
                         width = colorTargets[i].Item1.Width;
                         height = colorTargets[i].Item1.Height;
 
-                        targets[i] = colorTargets[i].Item1;
+                        targets[i] = GetRenderTexture(colorTargets[i].Item1);
                         loads[i] = colorTargets[i].Item2;
                         stores[i] = colorTargets[i].Item3;
                     }
@@ -78,29 +75,26 @@ namespace Arycama.CustomRenderPipeline
             {
                 width = depthBuffer.Item1.Width;
                 height = depthBuffer.Item1.Height;
-                targetWidth = depthBuffer.Item1.Resource.width;
-                targetHeight = depthBuffer.Item1.Resource.height;
+                targetWidth = GetRenderTexture(depthBuffer.Item1).width;
+                targetHeight = GetRenderTexture(depthBuffer.Item1).height;
 
                 if (colorTargets.Count == 0)
                 {
-                    command.SetRenderTarget(depthBuffer.Item1, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare, depthBuffer.Item1, depthBuffer.Item2, depthBuffer.Item3);
+                    command.SetRenderTarget(GetRenderTexture(depthBuffer.Item1), RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare, GetRenderTexture(depthBuffer.Item1), depthBuffer.Item2, depthBuffer.Item3);
                 }
                 else
                 {
                     for (var i = 0; i < colorTargets.Count; i++)
                     {
-                        Assert.IsTrue(targetWidth == 0 || targetWidth == colorTargets[i].Item1.Resource.width, Name);
-                        Assert.IsTrue(targetHeight == 0 || targetHeight == colorTargets[i].Item1.Resource.height, Name);
-
                         width = colorTargets[i].Item1.Width;
                         height = colorTargets[i].Item1.Height;
 
-                        targets[i] = colorTargets[i].Item1;
+                        targets[i] = GetRenderTexture(colorTargets[i].Item1);
                         loads[i] = colorTargets[i].Item2;
                         stores[i] = colorTargets[i].Item3;
                     }
 
-                    var binding = new RenderTargetBinding(targets, loads, stores, depthBuffer.Item1, depthBuffer.Item2, depthBuffer.Item3) { flags = renderTargetFlags };
+                    var binding = new RenderTargetBinding(targets, loads, stores, GetRenderTexture(depthBuffer.Item1), depthBuffer.Item2, depthBuffer.Item3) { flags = renderTargetFlags };
                     command.SetRenderTarget(binding);
 
                 }
@@ -121,7 +115,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var colorTarget in colorTargets)
             {
                 if (colorTarget.Item1.AutoGenerateMips)
-                    command.GenerateMips(colorTarget.Item1);
+                    command.GenerateMips(GetRenderTexture(colorTarget.Item1));
             }
 
             // Reset all properties

@@ -160,7 +160,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.SetRenderFunction((command, pass) =>
                 {
                     // TODO: Do this manually? Since this will be compute shader anyway.. could do in same pass
-                    command.GenerateMips(displacementCurrent);
+                    command.GenerateMips(pass.GetRenderTexture(displacementCurrent));
 
                     pass.SetInt("Size", settings.Resolution >> 2);
                     pass.SetFloat("Smoothness", settings.Material.GetFloat("_Smoothness"));

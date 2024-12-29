@@ -83,7 +83,7 @@ namespace Arycama.CustomRenderPipeline
                         command.SetComputeBufferParam(cullingShader, 0, "_InstanceTypeData", gpuInstanceBuffers.instanceTypeDataBuffer);
                         command.SetComputeBufferParam(cullingShader, 0, "_InstanceTypeLodData", gpuInstanceBuffers.instanceTypeLodDataBuffer);
 
-                        command.SetComputeTextureParam(cullingShader, 0, "_CameraMaxZTexture", hiZTexture);
+                        command.SetComputeTextureParam(cullingShader, 0, "_CameraMaxZTexture", pass.GetRenderTexture(hiZTexture));
 
                         command.SetComputeMatrixParam(cullingShader, "_ScreenMatrix", screenMatrix);
                         command.SetComputeVectorArrayParam(cullingShader, "_CullingPlanes", cullingPlanesArray);
@@ -161,14 +161,14 @@ namespace Arycama.CustomRenderPipeline
                     {
                         var rtis = new RenderTargetIdentifier[5]
                         {
-                            albedoMetallic,
-                            normalRoughness,
-                            bentNormalOcclusion,
-                            cameraTarget,
-                            velocity
+                            pass.GetRenderTexture(albedoMetallic),
+                            pass.GetRenderTexture(normalRoughness),
+                            pass.GetRenderTexture(bentNormalOcclusion),
+                            pass.GetRenderTexture(cameraTarget),
+                            pass.GetRenderTexture(velocity)
                         };
 
-                        command.SetRenderTarget(rtis, depth);
+                        command.SetRenderTarget(rtis, pass.GetRenderTexture(depth));
                         command.EnableShaderKeyword("INDIRECT_RENDERING");
 
                         foreach (var draw in drawList)

@@ -103,7 +103,7 @@ namespace Arycama.CustomRenderPipeline
                         pass.SetFloat("_MaxSteps", settings.MaxSamples);
                         pass.SetFloat("_Thickness", settings.Thickness);
                         pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight) - 1);
-                        pass.SetVector("_PreviousColorScaleLimit", previousFrame.ScaleLimit2D);
+                        pass.SetVector("_PreviousColorScaleLimit", pass.GetScaleLimit2D(previousFrame));
                     });
                 }
             }
@@ -166,7 +166,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
-                    pass.SetVector("_HistoryScaleLimit", history.ScaleLimit2D);
+                    pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(history));
                 });
             }
 
@@ -192,7 +192,7 @@ namespace Arycama.CustomRenderPipeline
 
         public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector("ScreenSpaceReflectionsScaleLimit", ScreenSpaceReflections.ScaleLimit2D);
+            pass.SetVector("ScreenSpaceReflectionsScaleLimit", pass.GetScaleLimit2D(ScreenSpaceReflections));
             pass.SetFloat("SpecularGiStrength", intensity);
         }
     }
