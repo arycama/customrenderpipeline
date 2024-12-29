@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class
+public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class where V : IResourceDescriptor<T>
 {
     private readonly List<ResourceHandle<T>> handles = new();
     private readonly List<int> createList = new(), freeList = new();
@@ -67,65 +67,9 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class
     }
 
     protected abstract bool DoesResourceMatchDescriptor(T resource, V descriptor);
-    protected abstract T CreateResource(V descriptor);
     protected abstract void DestroyResource(T resource);
     protected virtual int ExtraFramesToKeepResource(T resource) => 0;
     protected abstract V CreateDescriptorFromResource(T resource);
-
-    private void AssignResource(ResourceHandle<T> handle)
-    {
-        var descriptor = GetDescriptor(handle);
-
-        // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
-        var resourceIndex = -1;
-        for (var i = 0; i < resources.Count; i++)
-        {
-            if (!isAvailable[i])
-                continue;
-
-            var resource = resources[i];
-            if (!DoesResourceMatchDescriptor(resource, descriptor))
-                continue;
-
-            resourceIndex = i;
-            break;
-        }
-
-        if (resourceIndex == -1)
-        {
-            var result = CreateResource(descriptor);
-
-            // Get a slot for this render texture if possible
-            if (!availableSlots.TryPop(out resourceIndex))
-            {
-                resourceIndex = resources.Count;
-                resources.Add(result);
-                lastFrameUsed.Add(-1);
-                isAvailable.Add(false);
-            }
-            else
-            {
-                resources[resourceIndex] = result;
-            }
-        }
-        else
-        {
-            isAvailable[resourceIndex] = false;
-        }
-
-        // Persistent handle no longer needs to be created or cleared. (Non-persistent create list gets cleared every frame)
-        if (handle.IsPersistent)
-        {
-            isAssigned[handle.Index] = true;
-            persistentCreateList[handle.Index] = -1;
-            persistentResourceIndices[handle.Index] = resourceIndex;
-        }
-        else
-        {
-            resourceIndices[handle.Index] = resourceIndex;
-        }
-    }
-
 
     public ResourceHandle<T> ImportResource(T resource)
     {
@@ -223,7 +167,57 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class
             // Assign or create any RTHandles that are written to by this pass
             foreach (var handle in handlesToCreate[i])
             {
-                AssignResource(handle);
+                var descriptor = GetDescriptor(handle);
+                var resourceIndex = -1;
+                for (var j = 0; j < resources.Count; j++)
+                {
+                    if (!isAvailable[j])
+                        continue;
+
+                    if (lastFrameUsed[j] > frameIndex)
+                        continue;
+
+                    var resource = resources[j];
+                    if (!DoesResourceMatchDescriptor(resource, descriptor))
+                        continue;
+
+                    resourceIndex = j;
+                    break;
+                }
+
+                if (resourceIndex == -1)
+                {
+                    var result = descriptor.CreateResource();
+
+                    // Get a slot for this render texture if possible
+                    if (!availableSlots.TryPop(out resourceIndex))
+                    {
+                        resourceIndex = resources.Count;
+                        resources.Add(result);
+                        lastFrameUsed.Add(-1);
+                        isAvailable.Add(false);
+                    }
+                    else
+                    {
+                        resources[resourceIndex] = result;
+                    }
+                }
+                else
+                {
+                    isAvailable[resourceIndex] = false;
+                }
+
+                // Persistent handle no longer needs to be created or cleared. (Non-persistent create list gets cleared every frame)
+                if (handle.IsPersistent)
+                {
+                    isAssigned[handle.Index] = true;
+                    persistentCreateList[handle.Index] = -1;
+                    persistentResourceIndices[handle.Index] = resourceIndex;
+                }
+                else
+                {
+                    resourceIndices[handle.Index] = resourceIndex;
+                }
             }
 
             // Now mark any textures that need to be released at the end of this pass as available

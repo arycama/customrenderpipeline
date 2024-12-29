@@ -2,8 +2,6 @@ using UnityEngine;
 
 public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHandleDescriptor>
 {
-    protected override GraphicsBuffer CreateResource(BufferHandleDescriptor descriptor) => new(descriptor.Target, descriptor.UsageFlags, descriptor.Count, descriptor.Stride);
-
     protected override BufferHandleDescriptor CreateDescriptorFromResource(GraphicsBuffer resource) => new(resource.count, resource.stride, resource.target, resource.usageFlags);
 
     protected override int ExtraFramesToKeepResource(GraphicsBuffer resource) => resource.usageFlags.HasFlag(GraphicsBuffer.UsageFlags.LockBufferForWrite) ? 3 : 0;
@@ -24,14 +22,14 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
         if (descriptor.Count != resource.count)
             return false;
 
-        //if (handle.Target.HasFlag(GraphicsBuffer.Target.CopySource) || handle.Target.HasFlag(GraphicsBuffer.Target.CopyDestination) || handle.Target.HasFlag(GraphicsBuffer.Target.Constant))
+        //if (descriptor.Target.HasFlag(GraphicsBuffer.Target.CopySource) || descriptor.Target.HasFlag(GraphicsBuffer.Target.CopyDestination) || descriptor.Target.HasFlag(GraphicsBuffer.Target.Constant))
         //{
         //    // Copy source/dest sizes must be exact matches
-        //    if (handle.Count != resource.count)
+        //    if (descriptor.Count != resource.count)
         //        return false;
 
         //}
-        //else if (handle.Count >= resource.count)
+        //else if (descriptor.Count >= resource.count)
         //{
         //    // Other buffers can use smaller sizes than what is actually available
         //    return false;

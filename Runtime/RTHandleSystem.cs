@@ -42,32 +42,4 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
 
         return false;
     }
-
-    protected override RenderTexture CreateResource(RtHandleDescriptor descriptor)
-    {
-        var isDepth = GraphicsFormatUtility.IsDepthFormat(descriptor.Format);
-        var isStencil = descriptor.Format == GraphicsFormat.D32_SFloat_S8_UInt || descriptor.Format == GraphicsFormat.D24_UNorm_S8_UInt;
-
-        var width = descriptor.IsScreenTexture ? screenWidth : descriptor.Width;
-        var height = descriptor.IsScreenTexture ? screenHeight : descriptor.Height;
-
-        var graphicsFormat = isDepth ? GraphicsFormat.None : descriptor.Format;
-        var depthFormat = isDepth ? descriptor.Format : GraphicsFormat.None;
-        var stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None;
-
-        var result = new RenderTexture(width, height, graphicsFormat, depthFormat)
-        {
-            autoGenerateMips = false, // Always false, we manually handle mip generation if needed
-            dimension = descriptor.Dimension,
-            enableRandomWrite = descriptor.EnableRandomWrite,
-            hideFlags = HideFlags.HideAndDontSave,
-            stencilFormat = stencilFormat,
-            useMipMap = descriptor.HasMips,
-            volumeDepth = descriptor.VolumeDepth,
-        };
-
-        _ = result.Create();
-
-        return result;
-    }
 }

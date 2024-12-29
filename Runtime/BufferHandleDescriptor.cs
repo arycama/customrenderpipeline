@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-public readonly struct BufferHandleDescriptor
+public readonly struct BufferHandleDescriptor : IResourceDescriptor<GraphicsBuffer>
 {
     public int Count { get; }
     public int Stride { get; }
@@ -13,5 +13,10 @@ public readonly struct BufferHandleDescriptor
         Stride = stride;
         Target = target;
         UsageFlags = usageFlags;
+    }
+
+    public GraphicsBuffer CreateResource()
+    {
+        return new GraphicsBuffer(Target, UsageFlags, Count, Stride);
     }
 }

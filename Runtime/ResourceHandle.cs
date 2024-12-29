@@ -8,4 +8,6 @@
         Index = index;
         IsPersistent = isPersistent;
     }
+
+    public override string ToString() => $"{Index} {IsPersistent}";
 }

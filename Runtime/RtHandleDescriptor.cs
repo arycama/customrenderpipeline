@@ -1,7 +1,8 @@
-﻿using UnityEngine.Experimental.Rendering;
+﻿using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public readonly struct RtHandleDescriptor
+public readonly struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 {
     public int Width { get; }
     public int Height { get; }
@@ -24,5 +25,29 @@ public readonly struct RtHandleDescriptor
         HasMips = hasMips;
         AutoGenerateMips = autoGenerateMips;
         EnableRandomWrite = enableRandomWrite;
+    }
+
+    public RenderTexture CreateResource()
+    {
+        var isDepth = GraphicsFormatUtility.IsDepthFormat(Format);
+        var isStencil = GraphicsFormatUtility.IsStencilFormat(Format);
+        var graphicsFormat = isDepth ? GraphicsFormat.None : Format;
+        var depthFormat = isDepth ? Format : GraphicsFormat.None;
+        var stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None;
+
+        var result = new RenderTexture(Width, Height, graphicsFormat, depthFormat)
+        {
+            autoGenerateMips = false, // Always false, we manually handle mip generation if needed
+            dimension = Dimension,
+            enableRandomWrite = EnableRandomWrite,
+            hideFlags = HideFlags.HideAndDontSave,
+            stencilFormat = stencilFormat,
+            useMipMap = HasMips,
+            volumeDepth = VolumeDepth,
+        };
+
+        _ = result.Create();
+
+        return result;
     }
 }
