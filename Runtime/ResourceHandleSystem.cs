@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class where K : ResourceHandle<T>
+public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : class where K : ResourceHandle<T>
 {
     protected readonly List<K> handles = new();
     protected readonly List<int> createList = new(), freeList = new();
@@ -65,23 +65,24 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
     protected abstract K CreateHandleFromResource(T resource);
     protected abstract void DestroyResource(T resource);
     protected virtual int ExtraFramesToKeepResource(T resource) => 0;
+    protected abstract K CreateHandleFromDescriptor(V descriptor, bool isPersistent, int handleIndex);
 
-    private T AssignResource(K handle, int frameIndex)
+    private T AssignResource(K handle)
     {
         // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
-        int slot = -1;
+        int resourceIndex = -1;
         T result = null;
-        for (var j = 0; j < resources.Count; j++)
+        for (var i = 0; i < resources.Count; i++)
         {
-            if (!isAvailable[j])
+            if (!isAvailable[i])
                 continue;
 
-            var resource = resources[j];
+            var resource = resources[i];
             if (!DoesResourceMatchHandle(resource, handle))
                 continue;
 
             result = resource;
-            slot = j;
+            resourceIndex = i;
             break;
         }
 
@@ -90,24 +91,22 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             result = CreateResource(handle);
 
             // Get a slot for this render texture if possible
-            if (!availableSlots.TryDequeue(out slot))
+            if (!availableSlots.TryDequeue(out resourceIndex))
             {
-                slot = resources.Count;
+                resourceIndex = resources.Count;
                 resources.Add(result);
-                lastFrameUsed.Add(frameIndex + ExtraFramesToKeepResource(result));
+                lastFrameUsed.Add(-1);
                 isAvailable.Add(false);
             }
             else
             {
-                resources[slot] = result;
-                lastFrameUsed[slot] = frameIndex + ExtraFramesToKeepResource(result);
-                isAvailable[slot] = false; // Already false 
+                resources[resourceIndex] = result;
+                isAvailable[resourceIndex] = false; // Already false 
             }
         }
         else
         {
-            lastFrameUsed[slot] = frameIndex + ExtraFramesToKeepResource(result);
-            isAvailable[slot] = false;
+            isAvailable[resourceIndex] = false;
         }
 
         // Persistent handle no longer needs to be created or cleared. (Non-persistent create list gets cleared every frame)
@@ -115,11 +114,11 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
         {
             handle.IsAssigned = true;
             persistentCreateList[handle.HandleIndex] = -1;
-            persistentResourceIndices[handle.HandleIndex] = slot;
+            persistentResourceIndices[handle.HandleIndex] = resourceIndex;
         }
         else
         {
-            resourceIndices[handle.HandleIndex] = slot;
+            resourceIndices[handle.HandleIndex] = resourceIndex;
         }
 
         return result;
@@ -216,7 +215,7 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             // Assign or create any RTHandles that are written to by this pass
             foreach (var handle in handlesToCreate[i])
             {
-                handle.Resource = AssignResource(handle, frameIndex);
+                handle.Resource = AssignResource(handle);
             }
 
             // Now mark any textures that need to be released at the end of this pass as available
@@ -224,6 +223,7 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             {
                 // Todo: too much indirection?
                 var resourceIndex = handle.IsPersistent ? persistentResourceIndices[handle.HandleIndex] : resourceIndices[handle.HandleIndex];
+                lastFrameUsed[resourceIndex] = frameIndex + ExtraFramesToKeepResource(resources[resourceIndex]);
                 isAvailable[resourceIndex] = true;
 
                 // If non persistent, no additional logic required since it will be re-created, but persistent needs to free its index
@@ -249,9 +249,9 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
             if (lastFrameUsed[i] >= frameIndex)
                 continue;
 
-            DestroyResource(resources[i]);
+            Debug.LogWarning($"Destroying resource {resources[i]} at index {i}");
 
-            Debug.LogWarning($"Destroying resource at index {i}");
+            DestroyResource(resources[i]);
 
             isAvailable[i] = false;
             availableSlots.Enqueue(i);
@@ -261,5 +261,41 @@ public abstract class ResourceHandleSystem<T, K> : IDisposable where T : class w
         resourceIndices.Clear();
         createList.Clear();
         freeList.Clear();
+    }
+
+    public K GetResourceHandle(V descriptor, bool isPersistent = false)
+    {
+        int handleIndex;
+        if (isPersistent)
+        {
+            if (!availablePersistentHandleIndices.TryDequeue(out handleIndex))
+            {
+                handleIndex = persistentHandles.Count;
+                persistentHandles.Add(null);
+                persistentResourceIndices.Add(-1);
+                persistentCreateList.Add(-1);
+                persistentFreeList.Add(-1);
+            }
+        }
+        else
+        {
+            handleIndex = handles.Count;
+        }
+
+        var result = CreateHandleFromDescriptor(descriptor, isPersistent, handleIndex);
+
+        if (isPersistent)
+        {
+            persistentHandles[handleIndex] = result;
+        }
+        else
+        {
+            handles.Add(result);
+            resourceIndices.Add(-1);
+            createList.Add(-1);
+            freeList.Add(-1);
+        }
+
+        return result;
     }
 }

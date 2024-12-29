@@ -1,10 +1,9 @@
-using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
-public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
+public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHandleDescriptor>
 {
     private int screenWidth, screenHeight;
 
@@ -12,54 +11,6 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
     {
         screenWidth = Mathf.Max(width, screenWidth);
         screenHeight = Mathf.Max(height, screenHeight);
-    }
-
-    public RTHandle GetResourceHandle(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
-    {
-        int handleIndex;
-        if (isPersistent)
-        {
-            if (!availablePersistentHandleIndices.TryDequeue(out handleIndex))
-            {
-                handleIndex = persistentHandles.Count;
-                persistentHandles.Add(null);
-                persistentResourceIndices.Add(-1);
-                persistentCreateList.Add(-1);
-                persistentFreeList.Add(-1);
-            }
-        }
-        else
-        {
-            handleIndex = handles.Count;
-        }
-
-        var result = new RTHandle(handleIndex, false, isPersistent)
-        {
-            Width = width,
-            Height = height,
-            Format = format,
-            VolumeDepth = volumeDepth,
-            Dimension = dimension,
-            IsScreenTexture = isScreenTexture,
-            HasMips = hasMips,
-            AutoGenerateMips = autoGenerateMips,
-            // This gets set automatically if a texture is written to by a compute shader
-            EnableRandomWrite = false
-        };
-
-        if (isPersistent)
-        {
-            persistentHandles[handleIndex] = result;
-        }
-        else
-        {
-            handles.Add(result);
-            resourceIndices.Add(-1);
-            createList.Add(-1);
-            freeList.Add(-1);
-        }
-
-        return result;
     }
 
     protected override RTHandle CreateHandleFromResource(RenderTexture resource)
@@ -117,17 +68,22 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
         var width = handle.IsScreenTexture ? screenWidth : handle.Width;
         var height = handle.IsScreenTexture ? screenHeight : handle.Height;
 
-        var result = new RenderTexture(width, height, isDepth ? GraphicsFormat.None : handle.Format, isDepth ? handle.Format : GraphicsFormat.None) { enableRandomWrite = handle.EnableRandomWrite, stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None, hideFlags = HideFlags.HideAndDontSave };
+        var graphicsFormat = isDepth ? GraphicsFormat.None : handle.Format;
+        var depthFormat = isDepth ? handle.Format : GraphicsFormat.None;
+        var stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None;
 
-        if (handle.VolumeDepth > 0)
-        {
-            result.dimension = handle.Dimension;
-            result.volumeDepth = handle.VolumeDepth;
-            result.useMipMap = handle.HasMips;
-            result.autoGenerateMips = false; // Always false, we manually handle mip generation if needed
-        }
+        var result = new RenderTexture(width, height, graphicsFormat, depthFormat) 
+        { 
+            autoGenerateMips = false, // Always false, we manually handle mip generation if needed
+            dimension = handle.Dimension,
+            enableRandomWrite = handle.EnableRandomWrite, 
+            hideFlags = HideFlags.HideAndDontSave,
+            name = $"{handle.Dimension} {handle.Format} {width}x{height} {resourceCount++}",
+            stencilFormat = stencilFormat,
+            useMipMap = handle.HasMips,
+            volumeDepth = handle.VolumeDepth,
+        };
 
-        result.name = $"{result.dimension} {(isDepth ? result.depthStencilFormat : result.graphicsFormat)} {width}x{height} {resourceCount++}";
         _ = result.Create();
 
         return result;
@@ -136,5 +92,22 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle>
     protected override void DestroyResource(RenderTexture resource)
     {
         Object.DestroyImmediate(resource);
+    }
+
+    protected override RTHandle CreateHandleFromDescriptor(RtHandleDescriptor descriptor, bool isPersistent, int handleIndex)
+    {
+        return new RTHandle(handleIndex, false, isPersistent)
+        {
+            Width = descriptor.Width,
+            Height = descriptor.Height,
+            Format = descriptor.Format,
+            VolumeDepth = descriptor.VolumeDepth,
+            Dimension = descriptor.Dimension,
+            IsScreenTexture = descriptor.IsScreenTexture,
+            HasMips = descriptor.HasMips,
+            AutoGenerateMips = descriptor.AutoGenerateMips,
+            // This gets set automatically if a texture is written to by a compute shader
+            EnableRandomWrite = false
+        };
     }
 }

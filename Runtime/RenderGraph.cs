@@ -109,13 +109,13 @@ namespace Arycama.CustomRenderPipeline
         public RTHandle GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
         {
             Assert.IsFalse(IsExecuting);
-            return RtHandleSystem.GetResourceHandle(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isPersistent);
+            return RtHandleSystem.GetResourceHandle(new RtHandleDescriptor(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips), isPersistent);
         }
 
         public BufferHandle GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)
         {
             Assert.IsFalse(IsExecuting);
-            return BufferHandleSystem.GetResourceHandle(FrameIndex, count, stride, target, usageFlags, isPersistent);
+            return BufferHandleSystem.GetResourceHandle(new BufferHandleDescriptor(count, stride, target, usageFlags), isPersistent);
         }
 
         public void CleanupCurrentFrame()
@@ -148,7 +148,7 @@ namespace Arycama.CustomRenderPipeline
 
         public BufferHandle SetConstantBuffer<T>(in T data) where T : struct
         {
-            var buffer = BufferHandleSystem.GetResourceHandle(FrameIndex, 1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite);
+            var buffer = BufferHandleSystem.GetResourceHandle(new BufferHandleDescriptor(1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite));
             using (var pass = AddRenderPass<GlobalRenderPass>("Set Constant Buffer"))
             {
                 pass.WriteBuffer("", buffer);
