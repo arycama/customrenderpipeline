@@ -7,12 +7,6 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
         resource.Dispose();
     }
 
-    protected override BufferHandle CreateHandleFromResource(GraphicsBuffer resource, int index)
-    {
-        var descriptor = new BufferHandleDescriptor(resource.count, resource.stride, resource.target, resource.usageFlags);
-        return new BufferHandle(index, true, descriptor);
-    }
-
     protected override bool DoesResourceMatchDescriptor(GraphicsBuffer resource, BufferHandleDescriptor descriptor)
     {
         if (descriptor.Target != resource.target)
@@ -43,9 +37,9 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
         return true;
     }
 
-    protected override GraphicsBuffer CreateResource(BufferHandle handle)
+    protected override GraphicsBuffer CreateResource(BufferHandleDescriptor descriptor)
     {
-        return new GraphicsBuffer(handle.Descriptor.Target, handle.Descriptor.UsageFlags, handle.Descriptor.Count, handle.Descriptor.Stride);
+        return new GraphicsBuffer(descriptor.Target, descriptor.UsageFlags, descriptor.Count, descriptor.Stride);
     }
 
     protected override int ExtraFramesToKeepResource(GraphicsBuffer resource)
@@ -56,5 +50,10 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
     protected override BufferHandle CreateHandleFromDescriptor(BufferHandleDescriptor descriptor, bool isPersistent, int handleIndex)
     {
         return new BufferHandle(handleIndex, isPersistent, descriptor);
+    }
+
+    protected override BufferHandleDescriptor CreateDescriptorFromResource(GraphicsBuffer resource)
+    {
+        return new BufferHandleDescriptor(resource.count, resource.stride, resource.target, resource.usageFlags);
     }
 }

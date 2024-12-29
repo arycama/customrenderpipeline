@@ -17,7 +17,8 @@ namespace Arycama.CustomRenderPipeline
             colorBindings.Add(new(rtHandle, propertyId, mip));
 
             var descriptor = rtHandle.Descriptor;
-            rtHandle.Descriptor = new RtHandleDescriptor(descriptor.Width, descriptor.Height, descriptor.Format, descriptor.VolumeDepth, descriptor.Dimension, descriptor.IsScreenTexture, descriptor.HasMips, descriptor.AutoGenerateMips, true);
+            descriptor = new RtHandleDescriptor(descriptor.Width, descriptor.Height, descriptor.Format, descriptor.VolumeDepth, descriptor.Dimension, descriptor.IsScreenTexture, descriptor.HasMips, descriptor.AutoGenerateMips, true);
+            RenderGraph.RtHandleSystem.SetDescriptor(rtHandle, descriptor);
         }
 
         public void WriteTexture(string propertyName, RTHandle texture, int mip = 0)
@@ -73,7 +74,9 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetConstantBuffer(string propertyName, BufferHandle value)
         {
-            command.SetComputeConstantBufferParam(computeShader, propertyName, GetBuffer(value), 0, value.Size);
+            var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
+            var size = descriptor.Count * descriptor.Stride;
+            command.SetComputeConstantBufferParam(computeShader, propertyName, GetBuffer(value), 0, size);
         }
 
         public override void SetMatrixArray(string propertyName, Matrix4x4[] value)

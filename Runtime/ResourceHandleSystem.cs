@@ -67,23 +67,25 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
     }
 
     protected abstract bool DoesResourceMatchDescriptor(T resource, V descriptor);
-    protected abstract T CreateResource(K handle);
-    protected abstract K CreateHandleFromResource(T resource, int index);
+    protected abstract T CreateResource(V descriptor);
     protected abstract void DestroyResource(T resource);
     protected virtual int ExtraFramesToKeepResource(T resource) => 0;
     protected abstract K CreateHandleFromDescriptor(V descriptor, bool isPersistent, int handleIndex);
+    protected abstract V CreateDescriptorFromResource(T resource);
 
     private void AssignResource(K handle)
     {
+        var descriptor = GetDescriptor(handle);
+
         // Find first handle that matches width, height and format (TODO: Allow returning a texture with larger width or height, plus a scale factor)
-        int resourceIndex = -1;
+        var resourceIndex = -1;
         for (var i = 0; i < resources.Count; i++)
         {
             if (!isAvailable[i])
                 continue;
 
             var resource = resources[i];
-            if (!DoesResourceMatchDescriptor(resource, GetDescriptor(handle)))
+            if (!DoesResourceMatchDescriptor(resource, descriptor))
                 continue;
 
             resourceIndex = i;
@@ -92,7 +94,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
 
         if (resourceIndex == -1)
         {
-            var result = CreateResource(handle);
+            var result = CreateResource(descriptor);
 
             // Get a slot for this render texture if possible
             if (!availableSlots.TryDequeue(out resourceIndex))
@@ -133,9 +135,11 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
             var index = importedResources.Count;
             importedResources.Add(resource);
 
-            result = CreateHandleFromResource(resource, -index);
+            var descriptor = CreateDescriptorFromResource(resource);
+            importedDescriptors.Add(descriptor);
+
+            result = CreateHandleFromDescriptor(descriptor, true, -index);
             importedResourceLookup.Add(resource, result);
-            importedDescriptors.Add(result.Descriptor);
         }
 
         return result;
@@ -337,5 +341,14 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
 
         var descriptors = handle.IsPersistent ? persistentDescriptors : this.descriptors;
         return descriptors[handle.Index];
+    }
+
+    public void SetDescriptor(K handle, V descriptor)
+    {
+        if (handle.Index < 0)
+            importedDescriptors[-handle.Index] = descriptor;
+
+        var descriptors = handle.IsPersistent ? persistentDescriptors : this.descriptors;
+        descriptors[handle.Index] = descriptor;
     }
 }

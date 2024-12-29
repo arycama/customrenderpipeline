@@ -79,7 +79,9 @@ namespace Arycama.CustomRenderPipeline
 
         public override void SetConstantBuffer(string propertyName, BufferHandle value)
         {
-            command.SetGlobalConstantBuffer(GetBuffer(value), propertyName, 0, value.Size);
+            var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
+            var size = descriptor.Count * descriptor.Stride;
+            command.SetGlobalConstantBuffer(GetBuffer(value), propertyName, 0, size);
         }
 
         public override void SetMatrixArray(string propertyName, Matrix4x4[] value)

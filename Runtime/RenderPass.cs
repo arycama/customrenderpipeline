@@ -110,7 +110,8 @@ namespace Arycama.CustomRenderPipeline
 
             foreach (var buffer in readBuffers)
             {
-                if (buffer.Item2.Descriptor.Target.HasFlag(GraphicsBuffer.Target.Constant))
+                var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(buffer.Item2);
+                if (descriptor.Target.HasFlag(GraphicsBuffer.Target.Constant))
                     SetConstantBuffer(buffer.Item1, buffer.Item2);
                 else
                     SetBuffer(buffer.Item1, buffer.Item2);
