@@ -15,8 +15,6 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
     private readonly List<V> persistentDescriptors = new();
 
     private readonly Dictionary<T, ResourceHandle<T>> importedResourceLookup = new();
-    private readonly List<T> importedResources = new();
-    private readonly List<V> importedDescriptors = new();
 
     private readonly List<T> resources = new();
     private readonly List<int> lastFrameUsed = new();
@@ -35,13 +33,41 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
     {
         if (!importedResourceLookup.TryGetValue(resource, out var result))
         {
-            var index = importedResources.Count;
-            importedResources.Add(resource);
-
             var descriptor = CreateDescriptorFromResource(resource);
-            importedDescriptors.Add(descriptor);
 
-            result = new ResourceHandle<T>(-index, true);
+            var resourceIndex = resources.Count;
+            resources.Add(resource);
+            lastFrameUsed.Add(-1);
+            isAvailable.Add(false);
+
+            if (availablePersistentHandleIndices.TryPop(out var handleIndex))
+            {
+                result = new ResourceHandle<T>(handleIndex, true);
+                persistentHandles[handleIndex] = result;
+
+                isAssigned[handleIndex] = false;
+                isReleasable[handleIndex] = false;
+                persistentDescriptors[handleIndex] = descriptor;
+
+                persistentResourceIndices[handleIndex] = resourceIndex;
+                persistentCreateList[handleIndex] = -1;
+                persistentFreeList[handleIndex] = -1;
+            }
+            else
+            {
+                handleIndex = persistentHandles.Count;
+                result = new ResourceHandle<T>(handleIndex, true);
+                persistentHandles.Add(result);
+
+                isAssigned.Add(false);
+                isReleasable.Add(false);
+                persistentDescriptors.Add(descriptor);
+
+                persistentResourceIndices.Add(resourceIndex);
+                persistentCreateList.Add(-1);
+                persistentFreeList.Add(-1);
+            }
+
             importedResourceLookup.Add(resource, result);
         }
 
@@ -130,9 +156,6 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
     public T GetResource(ResourceHandle<T> handle)
     {
-        if (handle.Index < 0)
-            return importedResources[-handle.Index];
-
         var indexList = handle.IsPersistent ? persistentResourceIndices : resourceIndices;
         var resourceIndex = indexList[handle.Index];
         return resources[resourceIndex];
@@ -145,21 +168,12 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
     public V GetDescriptor(ResourceHandle<T> handle)
     {
-        if (handle.Index < 0)
-            return importedDescriptors[-handle.Index];
-
         var descriptors = handle.IsPersistent ? persistentDescriptors : this.descriptors;
         return descriptors[handle.Index];
     }
 
     public void SetDescriptor(ResourceHandle<T> handle, V descriptor)
     {
-        if (handle.Index < 0)
-        {
-            importedDescriptors[-handle.Index] = descriptor;
-            return;
-        }
-
         var descriptors = handle.IsPersistent ? persistentDescriptors : this.descriptors;
         descriptors[handle.Index] = descriptor;
     }
