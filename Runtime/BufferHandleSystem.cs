@@ -13,18 +13,18 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
         return new BufferHandle(index, true, descriptor);
     }
 
-    protected override bool DoesResourceMatchHandle(GraphicsBuffer resource, BufferHandle handle)
+    protected override bool DoesResourceMatchDescriptor(GraphicsBuffer resource, BufferHandleDescriptor descriptor)
     {
-        if (handle.Descriptor.Target != resource.target)
+        if (descriptor.Target != resource.target)
             return false;
 
-        if (handle.Descriptor.Stride != resource.stride)
+        if (descriptor.Stride != resource.stride)
             return false;
 
-        if (handle.Descriptor.UsageFlags != resource.usageFlags)
+        if (descriptor.UsageFlags != resource.usageFlags)
             return false;
 
-        if (handle.Descriptor.Count != resource.count)
+        if (descriptor.Count != resource.count)
             return false;
 
         //if (handle.Target.HasFlag(GraphicsBuffer.Target.CopySource) || handle.Target.HasFlag(GraphicsBuffer.Target.CopyDestination) || handle.Target.HasFlag(GraphicsBuffer.Target.Constant))

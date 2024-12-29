@@ -1,5 +1,6 @@
-﻿public interface IResourceHandle
+﻿public interface IResourceHandle<K>
 {
-    int HandleIndex { get; }
+    int Index { get; }
     bool IsPersistent { get; }
+    K Descriptor { get; }
 }

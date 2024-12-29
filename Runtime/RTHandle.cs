@@ -1,16 +1,12 @@
-﻿using System.ComponentModel.Design.Serialization;
-using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering;
-
-public class RTHandle : IResourceHandle
+﻿public class RTHandle : IResourceHandle<RtHandleDescriptor>
 {
-    public int HandleIndex { get; }
+    public int Index { get; }
     public bool IsPersistent { get; }
     public RtHandleDescriptor Descriptor { get; set; }
 
-    public RTHandle(int handleIndex, bool isPersistent, RtHandleDescriptor descriptor)
+    public RTHandle(int index, bool isPersistent, RtHandleDescriptor descriptor)
     {
-        HandleIndex = handleIndex;
+        Index = index;
         IsPersistent = isPersistent;
         Descriptor = descriptor;
     }

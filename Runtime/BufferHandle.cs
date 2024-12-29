@@ -1,16 +1,14 @@
-﻿using UnityEngine;
-
-public class BufferHandle : IResourceHandle
+﻿public class BufferHandle : IResourceHandle<BufferHandleDescriptor>
 {
-    public int HandleIndex { get; }
+    public int Index { get; }
     public bool IsPersistent { get; }
     public BufferHandleDescriptor Descriptor { get;  }
 
     public int Size => Descriptor.Stride * Descriptor.Count;
     
-    public BufferHandle(int handleIndex, bool isPersistent, BufferHandleDescriptor descriptor)
+    public BufferHandle(int index, bool isPersistent, BufferHandleDescriptor descriptor)
     {
-        HandleIndex = handleIndex;
+        Index = index;
         IsPersistent = isPersistent;
         Descriptor = descriptor; ;
     }

@@ -23,24 +23,24 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RTHandle, RtHa
         return new RTHandle(index, true, descriptor);
     }
 
-    protected override bool DoesResourceMatchHandle(RenderTexture resource, RTHandle handle)
+    protected override bool DoesResourceMatchDescriptor(RenderTexture resource, RtHandleDescriptor descriptor)
     {
-        var isDepth = GraphicsFormatUtility.IsDepthFormat(handle.Descriptor.Format);
-        if ((isDepth && handle.Descriptor.Format != resource.depthStencilFormat) || (!isDepth && handle.Descriptor.Format != resource.graphicsFormat))
+        var isDepth = GraphicsFormatUtility.IsDepthFormat(descriptor.Format);
+        if ((isDepth && descriptor.Format != resource.depthStencilFormat) || (!isDepth && descriptor.Format != resource.graphicsFormat))
             return false;
 
-        if (handle.Descriptor.IsScreenTexture)
+        if (descriptor.IsScreenTexture)
         {
             // For screen textures, ensure we get a rendertexture that is the actual screen width/height
             if (resource.width != screenWidth || resource.height != screenHeight)
                 return false;
         }
-        else if (resource.width < handle.Descriptor.Width || resource.height < handle.Descriptor.Height)
+        else if (resource.width < descriptor.Width || resource.height < descriptor.Height)
             return false;
 
-        if (resource.enableRandomWrite == handle.Descriptor.EnableRandomWrite && resource.dimension == handle.Descriptor.Dimension && resource.useMipMap == handle.Descriptor.HasMips)
+        if (resource.enableRandomWrite == descriptor.EnableRandomWrite && resource.dimension == descriptor.Dimension && resource.useMipMap == descriptor.HasMips)
         {
-            if (handle.Descriptor.Dimension != TextureDimension.Tex2D && resource.volumeDepth < handle.Descriptor.VolumeDepth)
+            if (descriptor.Dimension != TextureDimension.Tex2D && resource.volumeDepth < descriptor.VolumeDepth)
                 return false;
 
             return true;
