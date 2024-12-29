@@ -8,7 +8,7 @@ namespace Arycama.CustomRenderPipeline
     public abstract class GraphicsRenderPass : RenderPass
     {
         private readonly List<(ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction)> colorTargets = new();
-        private (ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction) depthBuffer = (new ResourceHandle<RenderTexture>(-1, false), RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
+        private (ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction) depthBuffer = (new ResourceHandle<RenderTexture>(-1), RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
 
         private RTClearFlags clearFlags;
         private Color clearColor;

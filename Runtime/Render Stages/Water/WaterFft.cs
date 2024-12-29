@@ -13,7 +13,7 @@ namespace Arycama.CustomRenderPipeline.Water
         private readonly ResourceHandle<GraphicsBuffer> spectrumBuffer, dispersionBuffer;
         private readonly ResourceHandle<RenderTexture> lengthToRoughness;
         private bool roughnessInitialized;
-        private ResourceHandle<RenderTexture> displacementCurrent = new ResourceHandle<RenderTexture>(-1, false);
+        private ResourceHandle<RenderTexture> displacementCurrent = new ResourceHandle<RenderTexture>(-1);
 
         private WaterProfile Profile => settings.Profile;
 
