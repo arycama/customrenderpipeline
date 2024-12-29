@@ -1,9 +1,10 @@
-﻿using UnityEngine;
-using UnityEngine.Experimental.Rendering;
+﻿using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class RTHandle : ResourceHandle<RenderTexture>
+public class RTHandle : IResourceHandle
 {
+    public int HandleIndex { get; }
+    public bool IsPersistent { get; }
     public int Width { get; set; }
     public int Height { get; set; }
     public GraphicsFormat Format { get; set; }
@@ -14,12 +15,9 @@ public class RTHandle : ResourceHandle<RenderTexture>
     public bool HasMips { get; set; }
     public bool AutoGenerateMips { get; set; }
 
-    public RTHandle(int handleIndex, bool isPersistent) : base(handleIndex, isPersistent)
+    public RTHandle(int handleIndex, bool isPersistent)
     {
-    }
-
-    public override string ToString()
-    {
-        return $"{Dimension} {Format} {Width}x{Height} ";
+        HandleIndex = handleIndex;
+        IsPersistent = isPersistent;
     }
 }

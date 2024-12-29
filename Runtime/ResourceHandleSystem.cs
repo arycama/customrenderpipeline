@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : class where K : ResourceHandle<T>
+public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : class where K : IResourceHandle
 {
     protected readonly List<K> handles = new();
     protected readonly List<int> createList = new(), freeList = new();
@@ -272,7 +272,7 @@ public abstract class ResourceHandleSystem<T, K, V> : IDisposable where T : clas
             if (!availablePersistentHandleIndices.TryDequeue(out handleIndex))
             {
                 handleIndex = persistentHandles.Count;
-                persistentHandles.Add(null);
+                persistentHandles.Add(default);
                 persistentResourceIndices.Add(-1);
                 persistentCreateList.Add(-1);
                 persistentFreeList.Add(-1);
