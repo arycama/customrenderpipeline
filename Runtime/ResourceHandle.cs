@@ -6,4 +6,9 @@
     {
         Index = index;
     }
+
+    public override int GetHashCode()
+    {
+        return Index;
+    }
 }

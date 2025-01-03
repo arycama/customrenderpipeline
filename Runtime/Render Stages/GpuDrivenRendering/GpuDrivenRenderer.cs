@@ -5,9 +5,31 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class GpuDrivenRendering : RenderFeature
+
+    public interface IGpuProceduralGenerator
     {
-        public GpuDrivenRendering(RenderGraph renderGraph) : base(renderGraph)
+        int Version { get; }
+        void Generate(CommandBuffer command, RenderGraph renderGraph);
+    }
+
+    public class GpuDrivenRenderer : RenderFeature
+    {
+        private static readonly Dictionary<LODGroup, LOD[]> lodCache = new();
+        private static readonly Dictionary<GameObject, int> instanceTypeIdCache = new();
+
+        private static List<InstanceRendererData> pendingInstanceData = new();
+
+        private ComputeShader fillInstanceTypeIdShader;
+        private ComputeBuffer rendererBoundsBuffer, rendererCountsBuffer, finalRendererCountsBuffer, submeshOffsetLengthsBuffer, lodSizesBuffer, rendererInstanceIDsBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, rendererInstanceIndexOffsetsBuffer, visibleRendererInstanceIndicesBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer;
+
+        private List<InstanceRendererData> dataToDelete = new();
+        private List<InstanceRendererData> readyInstanceData = new();
+        private Dictionary<string, List<RendererDrawCallData>> passDrawList = new();
+
+        public static event Action<CommandBuffer, RenderGraph> OnWillRender;
+        private static bool needsRebuild;
+
+        public GpuDrivenRenderer(RenderGraph renderGraph) : base(renderGraph)
         {
             fillInstanceTypeIdShader = Resources.Load<ComputeShader>("GpuInstancedRendering/FillInstanceTypeId");
         }
@@ -17,13 +39,13 @@ namespace Arycama.CustomRenderPipeline
             // Delete any pending data
             foreach (var data in pendingInstanceData)
             {
-                data.Clear();
+                data.Clear(renderGraph);
             }
 
             // Delete all ready data
             foreach (var data in readyInstanceData)
             {
-                data.Clear();
+                data.Clear(renderGraph);
             }
 
             instanceTypeIdCache.Clear();
@@ -49,7 +71,7 @@ namespace Arycama.CustomRenderPipeline
         {
             // Used to  be done in FrameRenderComplete, now just do it next frame
             foreach (var data in dataToDelete)
-                data.Clear();
+                data.Clear(renderGraph);
             dataToDelete.Clear();
 
             // Update any data sources
@@ -57,7 +79,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    OnWillRender?.Invoke(command);
+                    OnWillRender?.Invoke(command, renderGraph);
                 });
             }
 
@@ -69,7 +91,37 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.SetRenderFunction((command, pass) =>
                     {
-                        FillBuffers(command);
+                        // Fill instanceId buffer. (Should be done when the object is assigned)
+                        // This buffer contains the type at each index. (Eg 0, 1, 2)
+                        var positionCountSum = 0;
+                        foreach (var data in pendingInstanceData)
+                            positionCountSum += data.Count;
+
+                        GraphicsUtilities.SafeResize(ref instanceTypeIdsBuffer, positionCountSum);
+                        GraphicsUtilities.SafeResize(ref positionsBuffer, positionCountSum, sizeof(float) * 12);
+                        GraphicsUtilities.SafeResize(ref lodFadesBuffer, positionCountSum);
+
+                        readyInstanceData.Clear();
+                        int positionOffset = 0;
+                        foreach (var data in pendingInstanceData)
+                        {
+                            command.SetComputeIntParam(fillInstanceTypeIdShader, "_Offset", positionOffset);
+                            command.SetComputeIntParam(fillInstanceTypeIdShader, "_Count", data.Count);
+
+                            command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_InstanceTypeIds", instanceTypeIdsBuffer);
+                            command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_PositionsResult", positionsBuffer);
+                            command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_LodFadesResult", lodFadesBuffer);
+                            command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_PositionsInput", renderGraph.BufferHandleSystem.GetResource(data.PositionBuffer));
+                            command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_InstanceTypeIdsInput", renderGraph.BufferHandleSystem.GetResource(data.InstanceTypeIdBuffer));
+                            command.DispatchNormalized(fillInstanceTypeIdShader, 0, data.Count, 1, 1);
+                            positionOffset += data.Count;
+
+                            // Schedule the original buffer for deletion (Immediately releasing can cause errors, eg we might release to pool, then it might get unpooled and used elsewhere before this command executes)
+                            dataToDelete.Add(data);
+                            readyInstanceData.Add(data);
+                        }
+
+                        pendingInstanceData.Clear();
                     });
                 }
 
@@ -285,21 +337,6 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.SetResource(new GpuInstanceBuffersData(gpuInstanceBuffers));
         }
 
-        private static readonly Dictionary<LODGroup, LOD[]> lodCache = new();
-        private static readonly Dictionary<GameObject, int> instanceTypeIdCache = new();
-
-        private static List<InstanceRendererData> pendingInstanceData = new();
-
-        private ComputeShader fillInstanceTypeIdShader;
-        private ComputeBuffer rendererBoundsBuffer, rendererCountsBuffer, finalRendererCountsBuffer, submeshOffsetLengthsBuffer, lodSizesBuffer, rendererInstanceIDsBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, rendererInstanceIndexOffsetsBuffer, visibleRendererInstanceIndicesBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer;
-
-        private List<InstanceRendererData> dataToDelete = new();
-        private List<InstanceRendererData> readyInstanceData = new();
-        private Dictionary<string, List<RendererDrawCallData>> passDrawList = new();
-
-        public static event Action<CommandBuffer> OnWillRender;
-        private static bool needsRebuild;
-
         /// <summary>
         /// Gets typeId for a prefab. Adds it to the cache if needed
         /// </summary>
@@ -322,42 +359,6 @@ namespace Arycama.CustomRenderPipeline
         public static void BeginFillBuffers()
         {
             needsRebuild = true;
-        }
-
-        private void FillBuffers(CommandBuffer command)
-        {
-            // Fill instanceId buffer. (Should be done when the object is assigned)
-            // This buffer contains the type at each index. (Eg 0, 1, 2)
-            var positionCountSum = 0;
-            foreach (var data in pendingInstanceData)
-                positionCountSum += data.Count;
-
-            GraphicsUtilities.SafeResize(ref instanceTypeIdsBuffer, positionCountSum);
-            GraphicsUtilities.SafeResize(ref positionsBuffer, positionCountSum, sizeof(float) * 12);
-            GraphicsUtilities.SafeResize(ref lodFadesBuffer, positionCountSum);
-
-            readyInstanceData.Clear();
-            int positionOffset = 0;
-            foreach (var data in pendingInstanceData)
-            {
-                command.SetComputeIntParam(fillInstanceTypeIdShader, "_Offset", positionOffset);
-                command.SetComputeIntParam(fillInstanceTypeIdShader, "_Count", data.Count);
-
-                command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_InstanceTypeIds", instanceTypeIdsBuffer);
-                command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_PositionsResult", positionsBuffer);
-                command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_LodFadesResult", lodFadesBuffer);
-                command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_PositionsInput", data.PositionBuffer);
-                command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_InstanceTypeIdsInput", data.InstanceTypeIdBuffer);
-                command.DispatchNormalized(fillInstanceTypeIdShader, 0, data.Count, 1, 1);
-                positionOffset += data.Count;
-
-                // Schedule the original buffer for deletion (Immediately releasing can cause errors, eg we might release to pool, then it might get unpooled and used elsewhere before this command executes)
-                dataToDelete.Add(data);
-
-                readyInstanceData.Add(data);
-            }
-
-            pendingInstanceData.Clear();
         }
     }
 }
