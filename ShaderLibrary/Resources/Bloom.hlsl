@@ -57,7 +57,7 @@ float3 FragmentDownsample(float4 position : SV_Position, float2 uv : TEXCOORD0) 
 	float3 groups[5];
 	float3 color;
 	
-	#ifdef KARIS_AVERAGE
+	#if 0
     // We are writing to mip 0, so we need to apply Karis average to each block
     // of 4 samples to prevent fireflies (very bright subpixels, leads to pulsating
     // artifacts).

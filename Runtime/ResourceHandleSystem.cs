@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Assertions;
 
 public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class where V : IResourceDescriptor<T>
 {
@@ -123,10 +124,6 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
     public void ReadResource(ResourceHandle<T> handle, int passIndex)
     {
-        // Do nothing for non-releasable persistent textures
-        if (isPersistent[handle.Index] && !isReleasable[handle.Index])
-            return;
-
         var currentIndex = freeList[handle.Index];
         currentIndex = currentIndex == -1 ? passIndex : Math.Max(currentIndex, passIndex);
         freeList[handle.Index] = currentIndex;
@@ -140,6 +137,8 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
     public void ReleasePersistentResource(ResourceHandle<T> handle)
     {
+        // TODO: This can trigger from gpu instaned rendere data which can be readback while cleanup is occuring, resulting in two releases.
+        //Assert.IsFalse(isReleasable[handle.Index], "Trying to release a non persistent resource");
         isReleasable[handle.Index] = true;
     }
 
@@ -175,8 +174,21 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
         for (var i = 0; i < freeList.Count; i++)
         {
             var passIndex = freeList[i];
-            if (passIndex != -1)
-                handlesToFree[passIndex].Add(i);
+            if (passIndex == -1)
+            {
+                if (isPersistent[i] && isReleasable[i])
+                    passIndex = 0;
+                else
+                    continue;
+            }
+            else
+            {
+                // Do nothing for non-releasable persistent textures
+                if (isPersistent[i] && !isReleasable[i])
+                    continue;
+            }
+
+            handlesToFree[passIndex].Add(i);
         }
 
         for (var i = 0; i < renderPassCount; i++)
@@ -230,6 +242,13 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
             // Now mark any textures that need to be released at the end of this pass as available
             foreach (var handle in handlesToFree[i])
             {
+                // Free some handle-related variables
+                isPersistent[handle] = false;
+                isReleasable[handle] = false;
+                isAssigned[handle] = false;
+                createList[handle] = -1;
+                freeList[handle] = -1;
+
                 // Todo: too much indirection?
                 var resourceIndex = resourceIndices[handle];
                 lastFrameUsed[resourceIndex] = frameIndex + ExtraFramesToKeepResource(resources[resourceIndex]);
@@ -254,7 +273,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
             Debug.LogWarning($"Destroying resource {resources[i]} at index {i}");
 
             DestroyResource(resources[i]);
-
+            resources[i] = null;
             isAvailable[i] = false;
             availableResourceSlots.Push(i);
         }

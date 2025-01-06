@@ -5,14 +5,7 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-
-    public interface IGpuProceduralGenerator
-    {
-        int Version { get; }
-        void Generate(CommandBuffer command, RenderGraph renderGraph);
-    }
-
-    public class GpuDrivenRenderer : RenderFeature
+    public class GpuDrivenRenderingSetup : RenderFeature
     {
         private static readonly Dictionary<LODGroup, LOD[]> lodCache = new();
         private static readonly Dictionary<GameObject, int> instanceTypeIdCache = new();
@@ -26,31 +19,15 @@ namespace Arycama.CustomRenderPipeline
         private List<InstanceRendererData> readyInstanceData = new();
         private Dictionary<string, List<RendererDrawCallData>> passDrawList = new();
 
-        public static event Action<CommandBuffer, RenderGraph> OnWillRender;
         private static bool needsRebuild;
 
-        public GpuDrivenRenderer(RenderGraph renderGraph) : base(renderGraph)
+        public GpuDrivenRenderingSetup(RenderGraph renderGraph) : base(renderGraph)
         {
             fillInstanceTypeIdShader = Resources.Load<ComputeShader>("GpuInstancedRendering/FillInstanceTypeId");
         }
 
         protected override void Cleanup(bool disposing)
         {
-            // Delete any pending data
-            foreach (var data in pendingInstanceData)
-            {
-                data.Clear(renderGraph);
-            }
-
-            // Delete all ready data
-            foreach (var data in readyInstanceData)
-            {
-                data.Clear(renderGraph);
-            }
-
-            instanceTypeIdCache.Clear();
-            needsRebuild = false;
-
             GraphicsUtilities.SafeDestroy(ref drawCallArgsBuffer);
             GraphicsUtilities.SafeDestroy(ref rendererInstanceIndexOffsetsBuffer);
             GraphicsUtilities.SafeDestroy(ref rendererBoundsBuffer);
@@ -73,15 +50,6 @@ namespace Arycama.CustomRenderPipeline
             foreach (var data in dataToDelete)
                 data.Clear(renderGraph);
             dataToDelete.Clear();
-
-            // Update any data sources
-            using(var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Gpu Driven Rendering OnWillRender"))
-            {
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    OnWillRender?.Invoke(command, renderGraph);
-                });
-            }
 
             // Clear some buffers. We should be able to mostly avoid this by resetting values in the compute shaders.
             // Only if changed?
@@ -129,11 +97,10 @@ namespace Arycama.CustomRenderPipeline
                 needsRebuild = false;
             }
 
-            //if (readyInstanceData.Count == 0)
-            //{
-            //    gpuInstanceBuffers = default;
-            //    return;
-            //}
+            if (readyInstanceData.Count == 0)
+            {
+                return;
+            }
 
             // Build mesh rendering data
             using var sharedMaterials = ScopedPooledList<Material>.Get();
@@ -314,15 +281,22 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Gpu Driven Rendering Fill Buffers"))
             {
+                GraphicsUtilities.SafeResize(ref submeshOffsetLengthsBuffer, submeshOffsetLengths.Value.Count);
+                GraphicsUtilities.SafeResize(ref lodSizesBuffer, lodSizes.Value.Count);
+                GraphicsUtilities.SafeResize(ref rendererBoundsBuffer, rendererBounds.Value.Count);
+                GraphicsUtilities.SafeResize(ref instanceTypeDataBuffer, instanceTypeDatas.Value.Count);
+                GraphicsUtilities.SafeResize(ref drawCallArgsBuffer, drawCallArgs.Value.Count, 4, ComputeBufferType.IndirectArguments);
+                GraphicsUtilities.SafeResize(ref instanceTypeLodDataBuffer, instanceTypeLodDatas.Value.Count);
+
                 pass.SetRenderFunction((command, pass) =>
                 {
                     // TODO: Use lockbuffer?
-                    command.ExpandAndSetComputeBufferData(ref submeshOffsetLengthsBuffer, submeshOffsetLengths.Value);
-                    command.ExpandAndSetComputeBufferData(ref lodSizesBuffer, lodSizes.Value);
-                    command.ExpandAndSetComputeBufferData(ref rendererBoundsBuffer, rendererBounds.Value);
-                    command.ExpandAndSetComputeBufferData(ref instanceTypeDataBuffer, instanceTypeDatas.Value);
-                    command.ExpandAndSetComputeBufferData(ref drawCallArgsBuffer, drawCallArgs.Value, ComputeBufferType.IndirectArguments);
-                    command.ExpandAndSetComputeBufferData(ref instanceTypeLodDataBuffer, instanceTypeLodDatas.Value);
+                    command.SetBufferData(submeshOffsetLengthsBuffer, submeshOffsetLengths.Value);
+                    command.SetBufferData(lodSizesBuffer, lodSizes.Value);
+                    command.SetBufferData(rendererBoundsBuffer, rendererBounds.Value);
+                    command.SetBufferData(instanceTypeDataBuffer, instanceTypeDatas.Value);
+                    command.SetBufferData(drawCallArgsBuffer, drawCallArgs.Value);
+                    command.SetBufferData(instanceTypeLodDataBuffer, instanceTypeLodDatas.Value);
                 });
             }
 
@@ -334,7 +308,7 @@ namespace Arycama.CustomRenderPipeline
 
             var gpuInstanceBuffers = new GpuInstanceBuffers(rendererInstanceIDsBuffer, rendererInstanceIndexOffsetsBuffer, rendererCountsBuffer, finalRendererCountsBuffer, visibleRendererInstanceIndicesBuffer, positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, readyInstanceData, passDrawList);
 
-            renderGraph.SetResource(new GpuInstanceBuffersData(gpuInstanceBuffers));
+            renderGraph.SetResource(new GpuInstanceBuffersData(gpuInstanceBuffers), true);
         }
 
         /// <summary>

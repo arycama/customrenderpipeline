@@ -75,7 +75,7 @@ public class GenerateHiZ : RenderFeature
             }
         }
 
-        renderGraph.SetResource(new HiZMinDepthData(result)); ;
+        renderGraph.SetResource(new HiZMinDepthData(result));
     }
 
     public enum HiZMode

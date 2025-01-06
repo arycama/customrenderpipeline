@@ -71,17 +71,11 @@ namespace Arycama.CustomRenderPipeline
             Object.DestroyImmediate(normalMapArray);
             Object.DestroyImmediate(maskMapArray);
             renderGraph.ReleasePersistentResource(terrainLayerData);
+            renderGraph.ReleasePersistentResource(indexBuffer);
         }
 
         private void InitializeTerrain()
         {
-            if (terrain != null)
-                CleanupResources();
-
-            terrain = Terrain.activeTerrain;
-            if (terrain == null)
-                return;
-
             var resolution = terrainData.heightmapResolution;
             minMaxHeight = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R16G16_UNorm, hasMips: true, isPersistent: true);
             heightmap = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R16_UNorm, isPersistent: true);
@@ -389,28 +383,45 @@ namespace Arycama.CustomRenderPipeline
         {
             // TODO: Logic here seems a bit off
             if (terrain != Terrain.activeTerrain)
-                InitializeTerrain();
-
-            if (terrain == null)
-                return;
-
-            var alphamapModifiers = terrain.GetComponents<ITerrainAlphamapModifier>();
-            var needsUpdate = false;
-            foreach (var alphamapModifier in alphamapModifiers)
             {
-                if (!alphamapModifier.NeedsUpdate)
-                    continue;
+                if (terrain != null)
+                    CleanupResources();
 
-                needsUpdate = true;
-                break;
-            }
+                terrain = Terrain.activeTerrain;
+                if (terrain == null)
+                    return;
 
-            if (needsUpdate)
                 InitializeTerrain();
+            }
+            else
+            {
+                if (terrain == null)
+                    return;
 
-            // Set this every frame incase of changes..
-            // TODO: Only do when data changed?
-            FillLayerData();
+                var alphamapModifiers = terrain.GetComponents<ITerrainAlphamapModifier>();
+                var needsUpdate = false;
+                foreach (var alphamapModifier in alphamapModifiers)
+                {
+                    if (!alphamapModifier.NeedsUpdate)
+                        continue;
+
+                    needsUpdate = true;
+                    break;
+                }
+
+                if (needsUpdate)
+                {
+                    CleanupResources();
+                    InitializeTerrain();
+                }
+                else
+                {
+                    // Set this every frame incase of changes..
+                    // TODO: Only do when data changed?
+                    // Only do this if terrain wasn't initialized, 
+                    FillLayerData();
+                }
+            }
 
             var viewData = renderGraph.GetResource<ViewData>();
             var position = terrain.GetPosition() - viewData.ViewPosition;

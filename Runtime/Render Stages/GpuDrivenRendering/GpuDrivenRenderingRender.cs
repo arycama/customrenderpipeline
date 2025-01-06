@@ -3,15 +3,15 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public class GpuInstancedRendering : RenderFeature
+    public class GpuDrivenRenderingRender : RenderFeature
     {
         private static readonly uint[] emptyCounter = new uint[1];
 
-        private ComputeShader clearShader, cullingShader, scanShader, compactShader;
+        private readonly ComputeShader clearShader, cullingShader, scanShader, compactShader;
         private ComputeBuffer memoryCounterBuffer;
         private MaterialPropertyBlock propertyBlock;
 
-        public GpuInstancedRendering(RenderGraph renderGraph) : base(renderGraph)
+        public GpuDrivenRenderingRender(RenderGraph renderGraph) : base(renderGraph)
         {
             clearShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceClear");
             cullingShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceRendererCull");
@@ -30,8 +30,11 @@ namespace Arycama.CustomRenderPipeline
         public override void Render()
         {
             var camera = renderGraph.GetResource<ViewData>().Camera;
-            var gpuInstanceBuffers = renderGraph.GetResource<GpuInstanceBuffersData>().Data;
+            var handle = renderGraph.ResourceMap.GetResourceHandle<GpuInstanceBuffersData>();
+            if (!renderGraph.ResourceMap.TryGetRenderPassData<GpuInstanceBuffersData>(handle, renderGraph.FrameIndex, out var gpuInstanceBuffersData))
+                return;
 
+            var gpuInstanceBuffers = gpuInstanceBuffersData.Data;
             if ((camera.cameraType != CameraType.SceneView && camera.cameraType != CameraType.Game && camera.cameraType != CameraType.Reflection) || gpuInstanceBuffers.rendererInstanceIDsBuffer == null)
                 return;
 
@@ -149,13 +152,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.AddRenderPassData<ICommonPassData>();
 
                     // Render instances
-                    propertyBlock.Clear();
 
-                    propertyBlock.SetBuffer("_RendererInstanceIndexOffsets", gpuInstanceBuffers.rendererInstanceIndexOffsetsBuffer);
-                    propertyBlock.SetBuffer("_VisibleRendererInstanceIndices", gpuInstanceBuffers.visibleRendererInstanceIndicesBuffer);
-
-                    propertyBlock.SetBuffer("_InstancePositions", gpuInstanceBuffers.positionsBuffer);
-                    propertyBlock.SetBuffer("_InstanceLodFades", gpuInstanceBuffers.lodFadesBuffer);
 
                     pass.SetRenderFunction((command, pass) =>
                     {
@@ -171,6 +168,7 @@ namespace Arycama.CustomRenderPipeline
                         command.SetRenderTarget(rtis, pass.GetRenderTexture(depth));
                         command.EnableShaderKeyword("INDIRECT_RENDERING");
 
+                        var ind = 0;
                         foreach (var draw in drawList)
                         {
                             var renderQueueMin = 0;
@@ -179,12 +177,17 @@ namespace Arycama.CustomRenderPipeline
                             if (draw.renderQueue < renderQueueMin || draw.renderQueue > renderQueueMax)
                                 continue;
 
+                            propertyBlock.Clear();
+                            propertyBlock.SetBuffer("_RendererInstanceIndexOffsets", gpuInstanceBuffers.rendererInstanceIndexOffsetsBuffer);
+                            propertyBlock.SetBuffer("_VisibleRendererInstanceIndices", gpuInstanceBuffers.visibleRendererInstanceIndicesBuffer);
+
+                            propertyBlock.SetBuffer("_InstancePositions", gpuInstanceBuffers.positionsBuffer);
+                            propertyBlock.SetBuffer("_InstanceLodFades", gpuInstanceBuffers.lodFadesBuffer);
+
                             propertyBlock.SetInt("RendererOffset", draw.rendererOffset);
                             propertyBlock.SetVector("unity_WorldTransformParams", Vector4.one);
                             propertyBlock.SetMatrix("_LocalToWorld", draw.localToWorld);
-                            command.DrawMeshInstancedIndirect(draw.mesh, draw.submeshIndex, draw.material, draw.passIndex, gpuInstanceBuffers.drawCallArgsBuffer, draw.indirectArgsOffset, propertyBlock);
-
-                            break;
+                            //command.DrawMeshInstancedIndirect(draw.mesh, draw.submeshIndex, draw.material, draw.passIndex, gpuInstanceBuffers.drawCallArgsBuffer, draw.indirectArgsOffset, propertyBlock);
                         }
                     });
                 }

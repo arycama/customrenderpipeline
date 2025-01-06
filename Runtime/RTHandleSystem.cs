@@ -23,6 +23,18 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
         if ((isDepth && descriptor.Format != resource.depthStencilFormat) || (!isDepth && descriptor.Format != resource.graphicsFormat))
             return false;
 
+        if (resource.dimension != descriptor.Dimension)
+            return false;
+
+        if (resource.enableRandomWrite != descriptor.EnableRandomWrite)
+            return false;
+
+        if (resource.useMipMap != descriptor.HasMips)
+            return false;
+
+        if (resource.volumeDepth < descriptor.VolumeDepth)
+            return false;
+
         if (descriptor.IsScreenTexture)
         {
             // For screen textures, ensure we get a rendertexture that is the actual screen width/height
@@ -32,14 +44,6 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
         else if (resource.width < descriptor.Width || resource.height < descriptor.Height)
             return false;
 
-        if (resource.enableRandomWrite == descriptor.EnableRandomWrite && resource.dimension == descriptor.Dimension && resource.useMipMap == descriptor.HasMips)
-        {
-            if (descriptor.Dimension != TextureDimension.Tex2D && resource.volumeDepth < descriptor.VolumeDepth)
-                return false;
-
-            return true;
-        }
-
-        return false;
+        return true;
     }
 }

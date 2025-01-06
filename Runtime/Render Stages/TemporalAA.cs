@@ -29,7 +29,7 @@ namespace Arycama.CustomRenderPipeline
 
             var viewData = renderGraph.GetResource<ViewData>();
             var (current, history, wasCreated) = textureCache.GetTextures(viewData.PixelWidth, viewData.PixelHeight, viewData.ViewIndex);
-            var result = renderGraph.GetTexture(viewData.PixelWidth, viewData.PixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
+            var result = renderGraph.GetTexture(viewData.PixelWidth, viewData.PixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA"))
             {
                 var keyword = viewData.Scale < 1.0f ? "UPSCALE" : null;
