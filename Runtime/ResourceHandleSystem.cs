@@ -1,7 +1,41 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Assertions;
+
+public class FreeList<T>
+{
+    private readonly Stack<int> availableIndices = new();
+    private readonly List<T> items = new();
+
+    public int Count => items.Count;
+
+    public T this[int i]
+    {
+        get => items[i];
+        set => items[i] = value;
+    }
+
+    public int Add(T item)
+    {
+        if (availableIndices.TryPop(out var index))
+        {
+            items[index] = item;
+        }
+        else
+        {
+            index = items.Count;
+            items.Add(item);
+        }
+
+        return index;
+    }
+
+    public void Free(int index)
+    {
+        items[index] = default;
+        availableIndices.Push(index);
+    }
+}
 
 public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class where V : IResourceDescriptor<T>
 {
@@ -17,11 +51,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
     private readonly Dictionary<T, ResourceHandle<T>> importedResourceLookup = new();
 
     // Per resource
-    private readonly List<T> resources = new();
-    private readonly List<int> lastFrameUsed = new();
-    private readonly List<bool> isAvailable = new();
-
-    private readonly Stack<int> availableResourceSlots = new();
+    private readonly FreeList<(T resource, int lastFrameUsed, bool isAvailable)> resources = new();
 
     private bool disposedValue;
 
@@ -71,9 +101,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
             var descriptor = CreateDescriptorFromResource(resource);
 
             var resourceIndex = resources.Count;
-            resources.Add(resource);
-            lastFrameUsed.Add(-1);
-            isAvailable.Add(false);
+            resources.Add((resource, -1, false));
 
             if (availableHandleIndices.TryPop(out var handleIndex))
             {
@@ -132,7 +160,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
     public T GetResource(ResourceHandle<T> handle)
     {
         var resourceIndex = resourceIndices[handle.Index];
-        return resources[resourceIndex];
+        return resources[resourceIndex].resource;
     }
 
     public void ReleasePersistentResource(ResourceHandle<T> handle)
@@ -200,37 +228,28 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
                 var resourceIndex = -1;
                 for (var j = 0; j < resources.Count; j++)
                 {
-                    if (!isAvailable[j])
-                        continue;
-
-                    if (lastFrameUsed[j] > frameIndex)
-                        continue;
-
                     var resource = resources[j];
-                    if (!DoesResourceMatchDescriptor(resource, descriptor))
+
+                    if (!resource.isAvailable)
+                        continue;
+
+                    if (resource.lastFrameUsed > frameIndex)
+                        continue;
+
+                    if (!DoesResourceMatchDescriptor(resource.resource, descriptor))
                         continue;
 
                     resourceIndex = j;
-                    isAvailable[resourceIndex] = false;
+
+                    // TODO: This should always already be false?
+                    resources[resourceIndex] = (resource.resource, resource.lastFrameUsed, false);
                     break;
                 }
 
                 if (resourceIndex == -1)
                 {
                     var result = descriptor.CreateResource();
-
-                    // Get a slot for this render texture if possible
-                    if (availableResourceSlots.TryPop(out resourceIndex))
-                    {
-                        resources[resourceIndex] = result;
-                    }
-                    else
-                    {
-                        resourceIndex = resources.Count;
-                        resources.Add(result);
-                        lastFrameUsed.Add(-1);
-                        isAvailable.Add(false);
-                    }
+                    resourceIndex = resources.Add((result, -1, false));
                 }
 
                 isAssigned[handle] = true;
@@ -251,8 +270,8 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
                 // Todo: too much indirection?
                 var resourceIndex = resourceIndices[handle];
-                lastFrameUsed[resourceIndex] = frameIndex + ExtraFramesToKeepResource(resources[resourceIndex]);
-                isAvailable[resourceIndex] = true;
+                var resource = resources[resourceIndex];
+                resources[resourceIndex] = (resource.resource, frameIndex, true);
                 availableHandleIndices.Push(handle);
             }
         }
@@ -263,19 +282,18 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
         // Release any render textures that have not been used for at least a frame
         for (var i = 0; i < resources.Count; i++)
         {
-            if (!isAvailable[i])
+            var resource = resources[i];
+            if (!resource.isAvailable)
                 continue;
 
             // Don't free textures that were used in the last frame
-            if (lastFrameUsed[i] >= frameIndex)
+            if (resource.lastFrameUsed + ExtraFramesToKeepResource(resource.resource) >= frameIndex)
                 continue;
 
             Debug.LogWarning($"Destroying resource {resources[i]} at index {i}");
 
-            DestroyResource(resources[i]);
-            resources[i] = null;
-            isAvailable[i] = false;
-            availableResourceSlots.Push(i);
+            DestroyResource(resource.resource);
+            resources.Free(i);
         }
     }
 
@@ -305,13 +323,13 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
         {
             var resource = resources[i];
             // Since we don't remove null entries, but rather leave them as "empty", they could be null
-            if (resource != null)
+            if (resource.resource != null)
             {
                 // Persistent resources should be freed first
                 //if (!isAvailable[i])
                     //Debug.LogError($"Resource at index {i} was not made availalble");
 
-                DestroyResource(resource);
+                DestroyResource(resource.resource);
             }
         }
 
