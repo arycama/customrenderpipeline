@@ -1,6 +1,9 @@
 ﻿#pragma kernel Scan
 
-RWBuffer<uint> _MemoryCounter, _RendererInstanceIndexOffsets, _DrawCallArgs, _RendererCounts;
+#pragma enable_d3d11_debug_symbols
+
+RWBuffer<uint> _MemoryCounter, _RendererInstanceIndexOffsets, _DrawCallArgs;
+Buffer<uint> _RendererCounts;
 Buffer<uint2> _SubmeshOffsetLengths;
 uint _Count;
 
@@ -10,9 +13,7 @@ uint _Count;
 void Scan(uint id : SV_DispatchThreadID)
 {
 	if (id >= _Count)
-	{
 		return;
-	}
 	
 	// Get the number of visible instances of this renderer
 	uint instanceCount = _RendererCounts[id];

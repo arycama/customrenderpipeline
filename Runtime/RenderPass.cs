@@ -105,8 +105,6 @@ namespace Arycama.CustomRenderPipeline
                 SetTexture(texture.Item1, GetRenderTexture(handle), texture.Item3, texture.Item4);
             }
 
-            readTextures.Clear();
-
             foreach (var buffer in readBuffers)
             {
                 var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(buffer.Item2);
@@ -116,11 +114,8 @@ namespace Arycama.CustomRenderPipeline
                     SetBuffer(buffer.Item1, buffer.Item2);
             }
 
-            readBuffers.Clear();
-
             foreach (var buffer in writeBuffers)
                 SetBuffer(buffer.Item1, buffer.Item2);
-            writeBuffers.Clear();
 
             SetupTargets();
 
@@ -144,6 +139,10 @@ namespace Arycama.CustomRenderPipeline
                 renderGraphBuilder.Execute(command, this);
                 renderGraphBuilder.ClearRenderFunction();
             }
+
+            readTextures.Clear();
+            readBuffers.Clear();
+            writeBuffers.Clear();
 
             Execute();
             PostExecute();
@@ -173,11 +172,13 @@ namespace Arycama.CustomRenderPipeline
 
         public GraphicsBuffer GetBuffer(ResourceHandle<GraphicsBuffer> handle)
         {
+            Assert.IsTrue(RenderGraph.IsExecuting);
             return RenderGraph.BufferHandleSystem.GetResource(handle);
         }
 
         public RenderTexture GetRenderTexture(ResourceHandle<RenderTexture> handle)
         {
+            Assert.IsTrue(RenderGraph.IsExecuting);
             return RenderGraph.RtHandleSystem.GetResource(handle);
         }
 

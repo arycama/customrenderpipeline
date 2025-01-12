@@ -46,7 +46,7 @@ namespace Arycama.CustomRenderPipeline
         {
             var result = handleList[handle.Index];
 
-            if (frameIndex == result.Item2 && result.Item1 != null)
+            if ((result.isPersistent || frameIndex == result.Item2) && result.Item1 != null)
             {
                 data = (T)result.Item1;
                 return true;

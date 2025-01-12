@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Assertions;
 
 public readonly struct BufferHandleDescriptor : IResourceDescriptor<GraphicsBuffer>
 {
@@ -9,6 +10,9 @@ public readonly struct BufferHandleDescriptor : IResourceDescriptor<GraphicsBuff
 
     public BufferHandleDescriptor(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None)
     {
+        Assert.AreNotEqual(count, 0);
+        Assert.AreNotEqual(stride, 0);
+
         Count = count;
         Stride = stride;
         Target = target;

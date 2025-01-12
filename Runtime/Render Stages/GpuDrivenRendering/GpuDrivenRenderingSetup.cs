@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -7,110 +8,95 @@ namespace Arycama.CustomRenderPipeline
 {
     public class GpuDrivenRenderingSetup : RenderFeature
     {
-        private static readonly Dictionary<LODGroup, LOD[]> lodCache = new();
-        private static readonly Dictionary<GameObject, int> instanceTypeIdCache = new();
+        private readonly ComputeShader fillInstanceTypeIdShader;
+        private ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, rendererCountsBuffer, finalRendererCountsBuffer, submeshOffsetLengthsBuffer, lodSizesBuffer, rendererInstanceIDsBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, rendererInstanceIndexOffsetsBuffer, visibleRendererInstanceIndicesBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer;
 
-        private static List<InstanceRendererData> pendingInstanceData = new();
-
-        private ComputeShader fillInstanceTypeIdShader;
-        private ComputeBuffer rendererBoundsBuffer, rendererCountsBuffer, finalRendererCountsBuffer, submeshOffsetLengthsBuffer, lodSizesBuffer, rendererInstanceIDsBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, rendererInstanceIndexOffsetsBuffer, visibleRendererInstanceIndicesBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer;
-
-        private List<InstanceRendererData> dataToDelete = new();
-        private List<InstanceRendererData> readyInstanceData = new();
         private Dictionary<string, List<RendererDrawCallData>> passDrawList = new();
 
-        private static bool needsRebuild;
+        private readonly ProceduralGenerationController proceduralGenerationController;
+        private bool hasGenerated;
 
-        public GpuDrivenRenderingSetup(RenderGraph renderGraph) : base(renderGraph)
+        public GpuDrivenRenderingSetup(RenderGraph renderGraph, ProceduralGenerationController proceduralGenerationController) : base(renderGraph)
         {
             fillInstanceTypeIdShader = Resources.Load<ComputeShader>("GpuInstancedRendering/FillInstanceTypeId");
+            this.proceduralGenerationController = proceduralGenerationController;
         }
 
         protected override void Cleanup(bool disposing)
         {
-            GraphicsUtilities.SafeDestroy(ref drawCallArgsBuffer);
-            GraphicsUtilities.SafeDestroy(ref rendererInstanceIndexOffsetsBuffer);
-            GraphicsUtilities.SafeDestroy(ref rendererBoundsBuffer);
-            GraphicsUtilities.SafeDestroy(ref rendererCountsBuffer);
-            GraphicsUtilities.SafeDestroy(ref finalRendererCountsBuffer);
-            GraphicsUtilities.SafeDestroy(ref submeshOffsetLengthsBuffer);
-            GraphicsUtilities.SafeDestroy(ref lodSizesBuffer);
-            GraphicsUtilities.SafeDestroy(ref rendererInstanceIDsBuffer);
-            GraphicsUtilities.SafeDestroy(ref visibleRendererInstanceIndicesBuffer);
-            GraphicsUtilities.SafeDestroy(ref instanceTypeIdsBuffer);
-            GraphicsUtilities.SafeDestroy(ref lodFadesBuffer);
-            GraphicsUtilities.SafeDestroy(ref positionsBuffer);
-            GraphicsUtilities.SafeDestroy(ref instanceTypeDataBuffer);
-            GraphicsUtilities.SafeDestroy(ref instanceTypeLodDataBuffer);
+            renderGraph.ReleasePersistentResource(drawCallArgsBuffer);
+            renderGraph.ReleasePersistentResource(rendererInstanceIndexOffsetsBuffer);
+            renderGraph.ReleasePersistentResource(rendererBoundsBuffer);
+            renderGraph.ReleasePersistentResource(rendererCountsBuffer);
+            renderGraph.ReleasePersistentResource(finalRendererCountsBuffer);
+            renderGraph.ReleasePersistentResource(submeshOffsetLengthsBuffer);
+            renderGraph.ReleasePersistentResource(lodSizesBuffer);
+            renderGraph.ReleasePersistentResource(rendererInstanceIDsBuffer);
+            renderGraph.ReleasePersistentResource(visibleRendererInstanceIndicesBuffer);
+            renderGraph.ReleasePersistentResource(instanceTypeIdsBuffer);
+            renderGraph.ReleasePersistentResource(lodFadesBuffer);
+            renderGraph.ReleasePersistentResource(positionsBuffer);
+            renderGraph.ReleasePersistentResource(instanceTypeDataBuffer);
+            renderGraph.ReleasePersistentResource(instanceTypeLodDataBuffer);
         }
 
         public override void Render()
         {
-            // Used to  be done in FrameRenderComplete, now just do it next frame
-            foreach (var data in dataToDelete)
-                data.Clear(renderGraph);
-            dataToDelete.Clear();
-
-            // Clear some buffers. We should be able to mostly avoid this by resetting values in the compute shaders.
-            // Only if changed?
-            if (needsRebuild)
-            {
-                using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Gpu Driven Rendering FillBuffers"))
-                {
-                    pass.SetRenderFunction((command, pass) =>
-                    {
-                        // Fill instanceId buffer. (Should be done when the object is assigned)
-                        // This buffer contains the type at each index. (Eg 0, 1, 2)
-                        var positionCountSum = 0;
-                        foreach (var data in pendingInstanceData)
-                            positionCountSum += data.Count;
-
-                        GraphicsUtilities.SafeResize(ref instanceTypeIdsBuffer, positionCountSum);
-                        GraphicsUtilities.SafeResize(ref positionsBuffer, positionCountSum, sizeof(float) * 12);
-                        GraphicsUtilities.SafeResize(ref lodFadesBuffer, positionCountSum);
-
-                        readyInstanceData.Clear();
-                        int positionOffset = 0;
-                        foreach (var data in pendingInstanceData)
-                        {
-                            command.SetComputeIntParam(fillInstanceTypeIdShader, "_Offset", positionOffset);
-                            command.SetComputeIntParam(fillInstanceTypeIdShader, "_Count", data.Count);
-
-                            command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_InstanceTypeIds", instanceTypeIdsBuffer);
-                            command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_PositionsResult", positionsBuffer);
-                            command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_LodFadesResult", lodFadesBuffer);
-                            command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_PositionsInput", renderGraph.BufferHandleSystem.GetResource(data.PositionBuffer));
-                            command.SetComputeBufferParam(fillInstanceTypeIdShader, 0, "_InstanceTypeIdsInput", renderGraph.BufferHandleSystem.GetResource(data.InstanceTypeIdBuffer));
-                            command.DispatchNormalized(fillInstanceTypeIdShader, 0, data.Count, 1, 1);
-                            positionOffset += data.Count;
-
-                            // Schedule the original buffer for deletion (Immediately releasing can cause errors, eg we might release to pool, then it might get unpooled and used elsewhere before this command executes)
-                            dataToDelete.Add(data);
-                            readyInstanceData.Add(data);
-                        }
-
-                        pendingInstanceData.Clear();
-                    });
-                }
-
-                instanceTypeIdCache.Clear();
-                needsRebuild = false;
-            }
-
-            if (readyInstanceData.Count == 0)
-            {
+            if (hasGenerated || !proceduralGenerationController.IsReady)
                 return;
+
+            hasGenerated = true;
+            proceduralGenerationController.FreeUnusedHandles(renderGraph);
+
+            // Fill instanceId buffer. (Should be done when the object is assigned)
+            // This buffer contains the type at each index. (Eg 0, 1, 2)
+            var positionCountSum = 0;
+            foreach (var data in proceduralGenerationController.instanceData)
+                positionCountSum += data.totalCount;
+
+            instanceTypeIdsBuffer = renderGraph.GetBuffer(positionCountSum, isPersistent: true);
+            positionsBuffer = renderGraph.GetBuffer(positionCountSum, sizeof(float) * 12, isPersistent: true);
+            lodFadesBuffer = renderGraph.GetBuffer(positionCountSum, isPersistent: true);
+
+            // TODO: We need to convert from the indices written in the original pass to the final rendering indices
+            var positionOffset = 0;
+            foreach (var data in proceduralGenerationController.instanceData)
+            {
+                using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Gpu Driven Rendering FillBuffers"))
+                {
+                    pass.Initialize(fillInstanceTypeIdShader, 0, data.totalCount);
+
+                    pass.ReadBuffer("_PositionsInput", data.positions);
+                    pass.ReadBuffer("_InstanceTypeIdsInput", data.instanceId);
+
+                    pass.WriteBuffer("_InstanceTypeIds", instanceTypeIdsBuffer);
+                    pass.WriteBuffer("_PositionsResult", positionsBuffer);
+                    pass.WriteBuffer("_LodFadesResult", lodFadesBuffer);
+
+                    pass.SetRenderFunction((positionOffset, data.totalCount), (command, pass, data) =>
+                    {
+                        pass.SetInt("_Offset", data.positionOffset);
+                        pass.SetInt("_Count", data.totalCount);
+                    });
+
+                    positionOffset += data.totalCount;
+
+                    renderGraph.ReleasePersistentResource(data.positions);
+                    renderGraph.ReleasePersistentResource(data.instanceId);
+                }
             }
 
             // Build mesh rendering data
             using var sharedMaterials = ScopedPooledList<Material>.Get();
-            using var submeshOffsetLengths = ScopedPooledList<Vector2Int>.Get();
-            using var lodSizes = ScopedPooledList<float>.Get();
-            using var rendererBounds = ScopedPooledList<RendererBounds>.Get();
-            using var drawCallArgs = ScopedPooledList<DrawIndexedInstancedIndirectArgs>.Get();
-            using var instanceTypeDatas = ScopedPooledList<InstanceTypeData>.Get();
-            using var instanceTypeLodDatas = ScopedPooledList<InstanceTypeLodData>.Get();
             using var renderers = ScopedPooledList<Renderer>.Get();
+
+            // Note these are used to set data inside the lambda, so can't have a using statement
+            var submeshOffsetLengths = ScopedPooledList<Vector2Int>.Get();
+            var lodSizes = ScopedPooledList<float>.Get();
+            var rendererBounds = ScopedPooledList<RendererBounds>.Get();
+            var drawCallArgs = ScopedPooledList<DrawIndexedInstancedIndirectArgs>.Get();
+            var instanceTypeDatas = ScopedPooledList<InstanceTypeData>.Get();
+            var instanceTypeLodDatas = ScopedPooledList<InstanceTypeLodData>.Get();
 
             var submeshOffset = 0;
             var lodOffset = 0;
@@ -123,154 +109,144 @@ namespace Arycama.CustomRenderPipeline
 
             passDrawList.Clear();
 
-            foreach (var data in readyInstanceData)
+            foreach (var prefab in proceduralGenerationController.prefabs)
             {
-                foreach (var prefab in data.GameObjects)
+                var prefabInstanceCount = prefab.count;
+
+                InstanceTypeData typeData;
+                typeData.instanceCount = prefabInstanceCount;
+                typeData.lodRendererOffset = lodOffset;
+
+                if (prefab.prefab.TryGetComponent<LODGroup>(out var lodGroup))
                 {
-                    InstanceTypeData typeData;
-                    typeData.instanceCount = data.Count;
-                    typeData.lodRendererOffset = lodOffset;
+                    typeData.localReferencePoint = lodGroup.localReferencePoint;
+                    typeData.radius = lodGroup.size * 0.5f;
+                    typeData.lodCount = lodGroup.lodCount;
+                    typeData.lodSizeBufferPosition = lodOffset;
 
-                    var rendererCount = 0;
+                    var lods = lodGroup.GetLODs();
 
-                    if (prefab.TryGetComponent<LODGroup>(out var lodGroup))
+                    foreach (var lod in lods)
                     {
-                        typeData.localReferencePoint = lodGroup.localReferencePoint;
-                        typeData.radius = lodGroup.size * 0.5f;
-                        typeData.lodCount = lodGroup.lodCount;
-                        typeData.lodSizeBufferPosition = lodOffset;
-
-                        // Unity does not have a non-allocating version of GetLODs, so we store the lods in a dictionary.
-                        // This means adding/removing a lod will not update until domain reload however
-                        if (!lodCache.TryGetValue(lodGroup, out var lods))
-                        {
-                            lods = lodGroup.GetLODs();
-                            lodCache.Add(lodGroup, lods);
-                        }
-
-                        foreach (var lod in lods)
-                        {
-                            ProcessLodLevel(lod.renderers, lod.screenRelativeTransitionHeight / QualitySettings.lodBias);
-                        }
+                        ProcessLodLevel(lod.renderers, lod.screenRelativeTransitionHeight / QualitySettings.lodBias);
                     }
-                    else
+                }
+                else
+                {
+                    prefab.prefab.GetComponentsInChildren<Renderer>(renderers);
+                    var bounds = renderers.Value[0].bounds;
+                    for (var i = 1; i < renderers.Value.Count; i++)
                     {
-                        prefab.GetComponentsInChildren<Renderer>(renderers);
-                        var bounds = renderers.Value[0].bounds;
-                        for (var i = 1; i < renderers.Value.Count; i++)
-                        {
-                            bounds.Encapsulate(renderers.Value[i].bounds);
-                        }
-
-                        typeData.localReferencePoint = bounds.center;
-                        typeData.radius = Vector3.Magnitude(bounds.extents);
-                        typeData.lodCount = 1;
-                        typeData.lodSizeBufferPosition = lodOffset;
-
-                        ProcessLodLevel(prefab.GetComponentsInChildren<Renderer>(), 0f);
+                        bounds.Encapsulate(renderers.Value[i].bounds);
                     }
 
-                    void ProcessLodLevel(Renderer[] renderers, float lodSize)
+                    typeData.localReferencePoint = bounds.center;
+                    typeData.radius = Vector3.Magnitude(bounds.extents);
+                    typeData.lodCount = 1;
+                    typeData.lodSizeBufferPosition = lodOffset;
+
+                    ProcessLodLevel(renderers.Value, 0f);
+                }
+
+                void ProcessLodLevel(IList<Renderer> renderers, float lodSize)
+                {
+                    foreach (var renderer in renderers)
                     {
-                        foreach (var renderer in renderers)
+                        if (renderer == null)
+                            continue;
+
+                        var meshFilter = renderer.GetComponent<MeshFilter>();
+                        if (meshFilter == null)
+                            continue;
+
+                        var mesh = meshFilter.sharedMesh;
+                        if (mesh == null)
+                            continue;
+
+                        var rendererHasMotionVectors = renderer.motionVectorGenerationMode == MotionVectorGenerationMode.Object;
+                        var rendererIsShadowCaster = renderer.shadowCastingMode != ShadowCastingMode.Off;
+
+                        // TODO: Once we have combined mesh support, we should just transform the vertices by the matrix to avoid extra shader work
+                        var localToWorld = Matrix4x4.TRS(renderer.transform.localPosition, renderer.transform.localRotation, renderer.transform.localScale);
+
+                        renderer.GetSharedMaterials(sharedMaterials);
+
+                        submeshOffsetLengths.Value.Add(new Vector2Int(submeshOffset, sharedMaterials.Value.Count));
+                        submeshOffset += sharedMaterials.Value.Count;
+
+                        // Get the mesh bounds, and transform by the renderer's matrix if it is not identity
+                        var bounds = mesh.bounds;
+                        if (localToWorld != Matrix4x4.identity)
+                            bounds = bounds.Transform(localToWorld);
+
+                        rendererBounds.Value.Add(new RendererBounds(bounds));
+
+                        for (var i = 0; i < sharedMaterials.Value.Count; i++)
                         {
-                            if (renderer == null)
+                            var material = sharedMaterials.Value[i];
+                            if (material == null)
                                 continue;
 
-                            var meshFilter = renderer.GetComponent<MeshFilter>();
-                            if (meshFilter == null)
-                                continue;
-
-                            var mesh = meshFilter.sharedMesh;
-                            if (mesh == null)
-                                continue;
-
-                            var rendererHasMotionVectors = renderer.motionVectorGenerationMode == MotionVectorGenerationMode.Object;
-                            var rendererIsShadowCaster = renderer.shadowCastingMode != ShadowCastingMode.Off;
-
-                            // TODO: Once we have combined mesh support, we should just transform the vertices by the matrix to avoid extra shader work
-                            var localToWorld = Matrix4x4.TRS(renderer.transform.localPosition, renderer.transform.localRotation, renderer.transform.localScale);
-
-                            renderer.GetSharedMaterials(sharedMaterials);
-
-                            submeshOffsetLengths.Value.Add(new Vector2Int(submeshOffset, sharedMaterials.Value.Count));
-                            submeshOffset += sharedMaterials.Value.Count;
-
-                            // Get the mesh bounds, and transform by the renderer's matrix if it is not identity
-                            var bounds = mesh.bounds;
-                            if (localToWorld != Matrix4x4.identity)
-                                bounds = bounds.Transform(localToWorld);
-
-                            rendererBounds.Value.Add(new RendererBounds(bounds));
-
-                            for (var i = 0; i < sharedMaterials.Value.Count; i++)
+                            // First, find if the material has a motion vectors pass
+                            var materialHasMotionVectors = false;
+                            if (rendererHasMotionVectors)
                             {
-                                var material = sharedMaterials.Value[i];
-                                if (material == null)
-                                    continue;
-
-                                // First, find if the material has a motion vectors pass
-                                var materialHasMotionVectors = false;
-                                if (rendererHasMotionVectors)
-                                {
-                                    for (var j = 0; j < material.passCount; j++)
-                                    {
-                                        if (material.GetPassName(j) != "MotionVectors")
-                                            continue;
-
-                                        materialHasMotionVectors = true;
-                                        break;
-                                    }
-                                }
-
-                                // Now add any valid passes. If material has motion vectors enabled, no other passes will be added except shadows.
                                 for (var j = 0; j < material.passCount; j++)
                                 {
-                                    var passName = material.GetPassName(j);
-
-                                    // Skip MotionVectors passes if not enabled
-                                    if (!materialHasMotionVectors && passName == "MotionVectors")
+                                    if (material.GetPassName(j) != "MotionVectors")
                                         continue;
 
-                                    // Skip ShadowCaster passes if shadows not enabled
-                                    if (!rendererIsShadowCaster && passName == "ShadowCaster")
-                                        continue;
+                                    materialHasMotionVectors = true;
+                                    break;
+                                }
+                            }
 
-                                    // Skip non-motion vector passes if motion vectors enabled (Except shadow caster passes)
-                                    if (materialHasMotionVectors && passName != "MotionVectors" && passName != "ShadowCaster")
-                                        continue;
+                            // Now add any valid passes. If material has motion vectors enabled, no other passes will be added except shadows.
+                            for (var j = 0; j < material.passCount; j++)
+                            {
+                                var passName = material.GetPassName(j);
 
-                                    // Get the draw list for the current pass, or create if it doesn't yet exist
-                                    if (!passDrawList.TryGetValue(passName, out var drawList))
-                                    {
-                                        drawList = new List<RendererDrawCallData>();
-                                        passDrawList.Add(passName, drawList);
-                                    }
+                                // Skip MotionVectors passes if not enabled
+                                if (!materialHasMotionVectors && passName == "MotionVectors")
+                                    continue;
 
-                                    var drawData = new RendererDrawCallData(material.renderQueue, mesh, i, material, j, indirectArgsOffset * sizeof(uint), totalRendererSum, localToWorld);
-                                    drawList.Add(drawData);
+                                // Skip ShadowCaster passes if shadows not enabled
+                                if (!rendererIsShadowCaster && passName == "ShadowCaster")
+                                    continue;
+
+                                // Skip non-motion vector passes if motion vectors enabled (Except shadow caster passes)
+                                if (materialHasMotionVectors && passName != "MotionVectors" && passName != "ShadowCaster")
+                                    continue;
+
+                                // Get the draw list for the current pass, or create if it doesn't yet exist
+                                if (!passDrawList.TryGetValue(passName, out var drawList))
+                                {
+                                    drawList = new List<RendererDrawCallData>();
+                                    passDrawList.Add(passName, drawList);
                                 }
 
-                                var indexCount = meshFilter.sharedMesh.GetIndexCount(i);
-                                var indexStart = meshFilter.sharedMesh.GetIndexStart(i);
-                                drawCallArgs.Value.Add(new DrawIndexedInstancedIndirectArgs(indexCount, 0, indexStart, 0, 0));
-                                indirectArgsOffset += 5;
+                                var drawData = new RendererDrawCallData(material.renderQueue, mesh, i, material, j, indirectArgsOffset * sizeof(uint), totalRendererSum, localToWorld);
+                                drawList.Add(drawData);
                             }
+
+                            var indexCount = meshFilter.sharedMesh.GetIndexCount(i);
+                            var indexStart = meshFilter.sharedMesh.GetIndexStart(i);
+                            drawCallArgs.Value.Add(new DrawIndexedInstancedIndirectArgs(indexCount, 0, indexStart, 0, 0));
+                            indirectArgsOffset += 5;
                         }
-
-                        instanceTypeLodDatas.Value.Add(new InstanceTypeLodData(totalRendererSum, renderers.Length, instanceTimesRendererCount - totalInstanceCount));
-
-                        lodOffset++;
-                        rendererCount += renderers.Length;
-                        totalRendererSum += renderers.Length;
-
-                        instanceTimesRendererCount += renderers.Length * data.Count;
-                        lodSizes.Value.Add(lodSize);
                     }
 
-                    totalInstanceCount += data.Count;
-                    instanceTypeDatas.Value.Add(typeData);
+                    instanceTypeLodDatas.Value.Add(new InstanceTypeLodData(totalRendererSum, renderers.Count, instanceTimesRendererCount - totalInstanceCount));
+
+                    lodOffset++;
+                    totalRendererSum += renderers.Count;
+
+                    instanceTimesRendererCount += renderers.Count * prefabInstanceCount;
+                    lodSizes.Value.Add(lodSize);
                 }
+
+                totalInstanceCount += prefabInstanceCount;
+                instanceTypeDatas.Value.Add(typeData);
             }
 
             // Now that all the renderers are grouped, sort them by queue
@@ -281,58 +257,46 @@ namespace Arycama.CustomRenderPipeline
 
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Gpu Driven Rendering Fill Buffers"))
             {
-                GraphicsUtilities.SafeResize(ref submeshOffsetLengthsBuffer, submeshOffsetLengths.Value.Count);
-                GraphicsUtilities.SafeResize(ref lodSizesBuffer, lodSizes.Value.Count);
-                GraphicsUtilities.SafeResize(ref rendererBoundsBuffer, rendererBounds.Value.Count);
-                GraphicsUtilities.SafeResize(ref instanceTypeDataBuffer, instanceTypeDatas.Value.Count);
-                GraphicsUtilities.SafeResize(ref drawCallArgsBuffer, drawCallArgs.Value.Count, 4, ComputeBufferType.IndirectArguments);
-                GraphicsUtilities.SafeResize(ref instanceTypeLodDataBuffer, instanceTypeLodDatas.Value.Count);
+                submeshOffsetLengthsBuffer = renderGraph.GetBuffer(submeshOffsetLengths.Value.Count, sizeof(uint) * 2, isPersistent: true);
+                lodSizesBuffer = renderGraph.GetBuffer(lodSizes.Value.Count, sizeof(float), isPersistent: true);
+                rendererBoundsBuffer = renderGraph.GetBuffer(rendererBounds.Value.Count, UnsafeUtility.SizeOf<RendererBounds>(), isPersistent: true);
+                instanceTypeDataBuffer = renderGraph.GetBuffer(instanceTypeDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeData>(), isPersistent: true);
+                drawCallArgsBuffer = renderGraph.GetBuffer(drawCallArgs.Value.Count, UnsafeUtility.SizeOf<DrawIndexedInstancedIndirectArgs>(), GraphicsBuffer.Target.IndirectArguments, isPersistent: true);
+                instanceTypeLodDataBuffer = renderGraph.GetBuffer(instanceTypeLodDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeLodData>(), isPersistent: true);
+
+                pass.WriteBuffer("", submeshOffsetLengthsBuffer);
+                pass.WriteBuffer("", lodSizesBuffer);
+                pass.WriteBuffer("", rendererBoundsBuffer);
+                pass.WriteBuffer("", instanceTypeDataBuffer);
+                pass.WriteBuffer("", drawCallArgsBuffer);
+                pass.WriteBuffer("", instanceTypeLodDataBuffer);
 
                 pass.SetRenderFunction((command, pass) =>
                 {
                     // TODO: Use lockbuffer?
-                    command.SetBufferData(submeshOffsetLengthsBuffer, submeshOffsetLengths.Value);
-                    command.SetBufferData(lodSizesBuffer, lodSizes.Value);
-                    command.SetBufferData(rendererBoundsBuffer, rendererBounds.Value);
-                    command.SetBufferData(instanceTypeDataBuffer, instanceTypeDatas.Value);
-                    command.SetBufferData(drawCallArgsBuffer, drawCallArgs.Value);
-                    command.SetBufferData(instanceTypeLodDataBuffer, instanceTypeLodDatas.Value);
+                    command.SetBufferData(pass.GetBuffer(submeshOffsetLengthsBuffer), submeshOffsetLengths.Value);
+                    command.SetBufferData(pass.GetBuffer(lodSizesBuffer), lodSizes.Value);
+                    command.SetBufferData(pass.GetBuffer(rendererBoundsBuffer), rendererBounds.Value);
+                    command.SetBufferData(pass.GetBuffer(instanceTypeDataBuffer), instanceTypeDatas.Value);
+                    command.SetBufferData(pass.GetBuffer(drawCallArgsBuffer), drawCallArgs.Value);
+                    command.SetBufferData(pass.GetBuffer(instanceTypeLodDataBuffer), instanceTypeLodDatas.Value);
+
+                    submeshOffsetLengths.Dispose();
+                    lodSizes.Dispose();
+                    rendererBounds.Dispose();
+                    drawCallArgs.Dispose();
+                    instanceTypeDatas.Dispose();
+                    instanceTypeLodDatas.Dispose();
                 });
             }
 
-            GraphicsUtilities.SafeResize(ref rendererInstanceIDsBuffer, instanceTimesRendererCount);
-            GraphicsUtilities.SafeResize(ref visibleRendererInstanceIndicesBuffer, instanceTimesRendererCount);
-            GraphicsUtilities.SafeResize(ref rendererCountsBuffer, totalRendererSum);
-            GraphicsUtilities.SafeResize(ref rendererInstanceIndexOffsetsBuffer, totalRendererSum);
-            GraphicsUtilities.SafeResize(ref finalRendererCountsBuffer, totalRendererSum);
+            rendererInstanceIDsBuffer = renderGraph.GetBuffer(instanceTimesRendererCount, isPersistent: true);
+            visibleRendererInstanceIndicesBuffer = renderGraph.GetBuffer(instanceTimesRendererCount, isPersistent: true);
+            rendererCountsBuffer = renderGraph.GetBuffer(totalRendererSum, isPersistent: true);
+            rendererInstanceIndexOffsetsBuffer = renderGraph.GetBuffer(totalRendererSum, isPersistent: true);
+            finalRendererCountsBuffer = renderGraph.GetBuffer(totalRendererSum, isPersistent: true);
 
-            var gpuInstanceBuffers = new GpuInstanceBuffers(rendererInstanceIDsBuffer, rendererInstanceIndexOffsetsBuffer, rendererCountsBuffer, finalRendererCountsBuffer, visibleRendererInstanceIndicesBuffer, positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, readyInstanceData, passDrawList);
-
-            renderGraph.SetResource(new GpuInstanceBuffersData(gpuInstanceBuffers), true);
-        }
-
-        /// <summary>
-        /// Gets typeId for a prefab. Adds it to the cache if needed
-        /// </summary>
-        public static int AddInstanceType(GameObject gameObject)
-        {
-            if (!instanceTypeIdCache.TryGetValue(gameObject, out var typeId))
-            {
-                typeId = instanceTypeIdCache.Count;
-                instanceTypeIdCache.Add(gameObject, typeId);
-            }
-
-            return typeId;
-        }
-
-        public static void AddInstanceData(InstanceRendererData instanceRendererData)
-        {
-            pendingInstanceData.Add(instanceRendererData);
-        }
-
-        public static void BeginFillBuffers()
-        {
-            needsRebuild = true;
+            renderGraph.SetResource(new GpuInstanceBuffersData(rendererInstanceIDsBuffer, rendererInstanceIndexOffsetsBuffer, rendererCountsBuffer, finalRendererCountsBuffer, visibleRendererInstanceIndicesBuffer, positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, passDrawList, totalInstanceCount, instanceTimesRendererCount, totalRendererSum), true);
         }
     }
 }

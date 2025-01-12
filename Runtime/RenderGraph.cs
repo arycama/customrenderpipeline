@@ -138,6 +138,8 @@ namespace Arycama.CustomRenderPipeline
 
             if (!FrameDebugger.enabled)
                 FrameIndex++;
+
+            IsExecuting = false;
         }
 
         public void SetResource<T>(T resource, bool isPersistent = false) where T : IRenderPassData
@@ -159,15 +161,16 @@ namespace Arycama.CustomRenderPipeline
 
         public ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(in T data) where T : struct
         {
+            Assert.IsFalse(IsExecuting);
+
             var buffer = BufferHandleSystem.GetResourceHandle(new BufferHandleDescriptor(1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite));
             using (var pass = AddRenderPass<GlobalRenderPass>("Set Constant Buffer"))
             {
                 pass.WriteBuffer("", buffer);
                 pass.SetRenderFunction((data, buffer), (command, pass, data) =>
                 {
-                    var bufferData = BufferHandleSystem.GetResource(data.buffer).LockBufferForWrite<T>(0, 1);
-                    bufferData[0] = data.data;
-                    BufferHandleSystem.GetResource(data.buffer).UnlockBufferAfterWrite<T>(1);
+                    using var bufferData = pass.GetBuffer(data.buffer).DirectWrite<T>();
+                    bufferData.SetData(0, data.data);
                 });
             }
 
@@ -176,11 +179,13 @@ namespace Arycama.CustomRenderPipeline
 
         public void ReleasePersistentResource(ResourceHandle<GraphicsBuffer> handle)
         {
+            Assert.IsFalse(IsExecuting);
             BufferHandleSystem.ReleasePersistentResource(handle);
         }
 
         public void ReleasePersistentResource(ResourceHandle<RenderTexture> handle)
         {
+            Assert.IsFalse(IsExecuting);
             RtHandleSystem.ReleasePersistentResource(handle);
         }
     }

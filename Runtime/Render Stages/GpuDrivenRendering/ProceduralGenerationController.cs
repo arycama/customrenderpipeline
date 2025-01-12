@@ -6,18 +6,32 @@ using UnityEngine.Rendering;
 
 public class ProceduralGenerationController
 {
+    public readonly List<(GameObject prefab, int count)> prefabs = new();
+    public readonly List<(ResourceHandle<GraphicsBuffer> positions, ResourceHandle<GraphicsBuffer> instanceId, int totalCount)> instanceData = new();
+
     private readonly List<(IGpuProceduralGenerator, int)> generatorData = new();
-
-    private readonly List<GameObject> prefabs = new();
-    private readonly List<ResourceHandle<GraphicsBuffer>> positionBuffers = new();
-    private readonly List<ResourceHandle<GraphicsBuffer>> instanceIdBuffers = new();
-    private readonly List<int> counts = new();
-    private readonly List<ResourceHandle<GraphicsBuffer>> activeHandles = new();
-    private readonly Stack<int> freeHandleIndices = new();
-
+    private readonly FreeList<ResourceHandle<GraphicsBuffer>> activeHandles = new();
     private readonly List<ResourceHandle<GraphicsBuffer>> handlesToFree = new();
 
     private int pendingRequests;
+
+    public bool IsReady { get; private set; }
+
+    public void Reset()
+    {
+        // Reset all generators so they will be regenerated
+        for (var i = 0; i < generatorData.Count; i++)
+        {
+            generatorData[i] = (generatorData[i].Item1, -1);
+        }
+
+        prefabs.Clear();
+        instanceData.Clear();
+        activeHandles.Clear();
+        handlesToFree.Clear();
+
+        IsReady = false;
+    }
 
     public IEnumerable<IGpuProceduralGenerator> GetModifiedGenerators()
     {
@@ -49,34 +63,51 @@ public class ProceduralGenerationController
         generatorData.RemoveAt(index);
     }
 
-    public void Reset()
+    public int AddData(ResourceHandle<GraphicsBuffer> positionBuffer, ResourceHandle<GraphicsBuffer> instanceIdBuffer, IList<GameObject> gameObjects)
     {
-        // Reset all generators so they will be regenerated
-        for (var i = 0; i < generatorData.Count; i++)
-        {
-            generatorData[i] = (generatorData[i].Item1, -1);
-        }
-    }
+        instanceData.Add((positionBuffer, instanceIdBuffer, -1));
 
-    public void AddData(ResourceHandle<GraphicsBuffer> positionBuffer, ResourceHandle<GraphicsBuffer> instanceIdBuffer, IList<GameObject> gameObjects)
-    {
-        positionBuffers.Add(positionBuffer);
-        instanceIdBuffers.Add(instanceIdBuffer);
-        counts.Add(-1);
-
+        var startIndex = prefabs.Count;
         for (var i = 0; i < gameObjects.Count; i++)
-            prefabs.Add(gameObjects[i]);
+            prefabs.Add((gameObjects[i], -1));
+
+        return startIndex;
     }
 
-    public void OnRequestComplete(AsyncGPUReadbackRequest request, int index)
+    /// <summary>
+    /// Writes the counts from the GPU readback into each prefab buffer, and frees the handle index for the buffer
+    /// </summary>
+    /// <param name="request"></param>
+    /// <param name="handleIndex"></param>
+    /// <param name="prefabStartIndex"></param>
+    /// <param name="prefabCount"></param>
+    public void OnRequestComplete(AsyncGPUReadbackRequest request, int handleIndex, int prefabStartIndex, int prefabCount)
     {
-        var count = request.GetData<int>()[0];
-        counts[index] = count;
+        var counts = request.GetData<int>();
+        var totalCount = 0;
+        for (var i = 0; i < prefabCount; i++)
+        {
+            var index = prefabStartIndex + i;
+            var data = prefabs[index];
 
-        handlesToFree.Add(activeHandles[index]);
-        freeHandleIndices.Push(index);
+            var count = counts[i];
+            data.count = count;
+            totalCount += count;
+
+            prefabs[index] = data;
+        }
+
+        var passData = instanceData[handleIndex];
+        passData.totalCount = totalCount;
+        instanceData[handleIndex] = passData;
+
+        handlesToFree.Add(activeHandles[handleIndex]);
+        activeHandles.Free(handleIndex);
 
         pendingRequests--;
+
+        if (pendingRequests == 0)
+            IsReady = true;
     }
 
     /// <summary>
@@ -86,18 +117,8 @@ public class ProceduralGenerationController
     /// <returns>The index of the handle</returns>
     public int AddHandleToFree(ResourceHandle<GraphicsBuffer> handle)
     {
-        if(!freeHandleIndices.TryPop(out var index))
-        {
-            index = freeHandleIndices.Count;
-            activeHandles.Add(handle);
-        }
-        else
-        {
-            activeHandles[index] = handle;
-        }
-
         pendingRequests++;
-        return index;
+        return activeHandles.Add(handle);
     }
 
     public void FreeUnusedHandles(RenderGraph renderGraph)
@@ -108,11 +129,5 @@ public class ProceduralGenerationController
         }
 
         handlesToFree.Clear();
-    }
-
-    public void Generate()
-    {
-        if (pendingRequests > 0)
-            return;
     }
 }

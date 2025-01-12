@@ -11,13 +11,13 @@ namespace Arycama.CustomRenderPipeline
     public partial class TerrainSystem : RenderFeature
     {
         private readonly TerrainSettings settings;
-        private ResourceHandle<GraphicsBuffer> terrainLayerData, indexBuffer;
-        private ResourceHandle<RenderTexture> minMaxHeight, heightmap, normalmap, idMap;
+        public ResourceHandle<GraphicsBuffer> terrainLayerData, indexBuffer;
+        public ResourceHandle<RenderTexture> minMaxHeight, heightmap, normalmap, idMap;
         private readonly Material generateIdMapMaterial;
-        private readonly Dictionary<TerrainLayer, int> terrainLayers = new();
+        public readonly Dictionary<TerrainLayer, int> terrainLayers = new();
         private readonly Dictionary<TerrainLayer, int> terrainProceduralLayers = new();
 
-        private Texture2DArray diffuseArray, normalMapArray, maskMapArray;
+        public Texture2DArray diffuseArray, normalMapArray, maskMapArray;
 
         public Terrain terrain { get; private set; }
         public TerrainData terrainData => terrain.terrainData;
@@ -88,34 +88,20 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("", indexBuffer);
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    var pIndices = pass.GetBuffer(indexBuffer).LockBufferForWrite<ushort>(0, QuadListIndexCount);
+                    using var indices = pass.GetBuffer(indexBuffer).DirectWrite<ushort>();
+
                     for (int y = 0, i = 0; y < settings.PatchVertices; y++)
                     {
                         var rowStart = y * VerticesPerTileEdge;
 
                         for (var x = 0; x < settings.PatchVertices; x++, i += 4)
                         {
-                            // Can do a checkerboard flip to avoid directioanl artifacts, but will mess with the tessellation code
-                            //var flip = (x & 1) == (y & 1);
-
-                            //if(flip)
-                            //{
-                            pIndices[i + 0] = (ushort)(rowStart + x);
-                            pIndices[i + 1] = (ushort)(rowStart + x + VerticesPerTileEdge);
-                            pIndices[i + 2] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
-                            pIndices[i + 3] = (ushort)(rowStart + x + 1);
-                            //}
-                            //else
-                            //{
-                            //    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge);
-                            //    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
-                            //    pIndices[index++] = (ushort)(rowStart + x + 1);
-                            //    pIndices[index++] = (ushort)(rowStart + x);
-                            //}
+                            indices.SetData(i + 0, (ushort)(rowStart + x));
+                            indices.SetData(i + 1, (ushort)(rowStart + x + VerticesPerTileEdge));
+                            indices.SetData(i + 2, (ushort)(rowStart + x + VerticesPerTileEdge + 1));
+                            indices.SetData(i + 3, (ushort)(rowStart + x + 1));
                         }
                     }
-
-                    pass.GetBuffer(indexBuffer).UnlockBufferAfterWrite<ushort>(QuadListIndexCount);
                 });
             }
 
@@ -317,14 +303,12 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("", terrainLayerData);
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    var layerData = pass.GetBuffer(terrainLayerData).LockBufferForWrite<TerrainLayerData>(0, count);
+                    using var layerData = pass.GetBuffer(terrainLayerData).DirectWrite<TerrainLayerData>();
                     foreach (var layer in terrainLayers)
                     {
                         var index = layer.Value;
-                        layerData[index] = new TerrainLayerData(layer.Key.tileSize.x, Mathf.Max(1e-3f, layer.Key.smoothness), layer.Key.normalScale, 1.0f - layer.Key.metallic);
+                        layerData.SetData(index, new TerrainLayerData(layer.Key.tileSize.x, Mathf.Max(1e-3f, layer.Key.smoothness), layer.Key.normalScale, 1.0f - layer.Key.metallic));
                     }
-
-                    pass.GetBuffer(terrainLayerData).UnlockBufferAfterWrite<TerrainLayerData>(count);
                 });
             }
         }
@@ -421,27 +405,6 @@ namespace Arycama.CustomRenderPipeline
                     // Only do this if terrain wasn't initialized, 
                     FillLayerData();
                 }
-            }
-
-            var viewData = renderGraph.GetResource<ViewData>();
-            var position = terrain.GetPosition() - viewData.ViewPosition;
-            var size = terrainData.size;
-            var terrainScaleOffset = new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z);
-            var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainData.heightmapResolution);
-            var terrainHeightOffset = position.y;
-            renderGraph.SetResource(new TerrainRenderData(diffuseArray, normalMapArray, maskMapArray, heightmap, normalmap, idMap, terrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainData.alphamapResolution, terrainLayerData));
-
-            // This sets raytracing data on the terrain's material property block
-            using (var pass = renderGraph.AddRenderPass<SetPropertyBlockPass>("Terrain Data Property Block Update"))
-            {
-                var propertyBlock = pass.propertyBlock;
-                terrain.GetSplatMaterialPropertyBlock(propertyBlock);
-                pass.AddRenderPassData<TerrainRenderData>();
-
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    terrain.SetSplatMaterialPropertyBlock(propertyBlock);
-                });
             }
         }
     }

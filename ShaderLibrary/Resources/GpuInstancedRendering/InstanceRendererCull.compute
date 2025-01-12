@@ -27,7 +27,6 @@ struct InstanceTypeLodData
 	uint rendererStart, rendererCount, instancesStart, pad;
 };
 
-float4 _Resolution;
 float4x4 _ScreenMatrix;
 
 // Stores the instanceID of each renderer if visible, or 0
@@ -229,7 +228,7 @@ void Visibility(uint id : SV_DispatchThreadID)
 		//	continue;
 		
 		#ifdef HIZ_ON
-			//if (!HiZCull(screenMin, screenMax, _Resolution.zw))
+			//if (!HiZCull(screenMin, screenMax, _ScaledResolution.zw))
 			//	continue;
 		#endif
 				

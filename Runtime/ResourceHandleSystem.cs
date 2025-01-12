@@ -2,57 +2,12 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class FreeList<T>
-{
-    private readonly Stack<int> availableIndices = new();
-    private readonly List<T> items = new();
-
-    public int Count => items.Count;
-
-    public T this[int i]
-    {
-        get => items[i];
-        set => items[i] = value;
-    }
-
-    public int Add(T item)
-    {
-        if (availableIndices.TryPop(out var index))
-        {
-            items[index] = item;
-        }
-        else
-        {
-            index = items.Count;
-            items.Add(item);
-        }
-
-        return index;
-    }
-
-    public void Free(int index)
-    {
-        items[index] = default;
-        availableIndices.Push(index);
-    }
-}
-
 public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class where V : IResourceDescriptor<T>
 {
-    private int handleCount;
-    private readonly Stack<int> availableHandleIndices = new();
-    private readonly List<int> createList = new(), freeList = new();
-    private readonly List<int> resourceIndices = new();
-    private readonly List<V> descriptors = new();
-    private readonly List<bool> isAssigned = new();
-    private readonly List<bool> isReleasable = new();
-    private readonly List<bool> isPersistent = new();
-
-    private readonly Dictionary<T, ResourceHandle<T>> importedResourceLookup = new();
-
-    // Per resource
+    private readonly FreeList<(int createIndex, int freeIndex, int resourceIndex, V descriptor, bool isAssigned, bool isReleasable, bool isPersistent, bool isUsed)> handleInfo = new();
     private readonly FreeList<(T resource, int lastFrameUsed, bool isAvailable)> resources = new();
-
+    private readonly Dictionary<T, ResourceHandle<T>> importedResourceLookup = new();
+    private readonly List<int> handlesToFree = new();
     private bool disposedValue;
 
     ~ResourceHandleSystem()
@@ -62,122 +17,66 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
     public ResourceHandle<T> GetResourceHandle(V descriptor, bool isPersistent = false)
     {
-        ResourceHandle<T> result;
-        if (availableHandleIndices.TryPop(out var handleIndex))
-        {
-            result = new ResourceHandle<T>(handleIndex);
-            this.isPersistent[handleIndex] = isPersistent;
-
-            isAssigned[handleIndex] = false;
-            isReleasable[handleIndex] = false;
-            descriptors[handleIndex] = descriptor;
-
-            resourceIndices[handleIndex] = -1;
-            createList[handleIndex] = -1;
-            freeList[handleIndex] = -1;
-        }
-        else
-        {
-            handleIndex = handleCount++;
-            result = new ResourceHandle<T>(handleIndex);
-            this.isPersistent.Add(isPersistent);
-
-            isAssigned.Add(false);
-            isReleasable.Add(false);
-            descriptors.Add(descriptor);
-
-            resourceIndices.Add(-1);
-            createList.Add(-1);
-            freeList.Add(-1);
-        }
-
-        return result;
+        var handleIndex = handleInfo.Add((-1, -1, -1, descriptor, false, false, isPersistent, true));
+        return new ResourceHandle<T>(handleIndex);
     }
 
     public ResourceHandle<T> ImportResource(T resource)
     {
-        if (!importedResourceLookup.TryGetValue(resource, out var result))
-        {
-            var descriptor = CreateDescriptorFromResource(resource);
+        if (importedResourceLookup.TryGetValue(resource, out var result))
+            return result;
 
-            var resourceIndex = resources.Count;
-            resources.Add((resource, -1, false));
-
-            if (availableHandleIndices.TryPop(out var handleIndex))
-            {
-                result = new ResourceHandle<T>(handleIndex);
-                isPersistent[handleIndex] = true;
-
-                isAssigned[handleIndex] = false;
-                isReleasable[handleIndex] = false;
-                descriptors[handleIndex] = descriptor;
-
-                resourceIndices[handleIndex] = resourceIndex;
-                createList[handleIndex] = -1;
-                freeList[handleIndex] = -1;
-            }
-            else
-            {
-                handleIndex = handleCount++;
-                result = new ResourceHandle<T>(handleIndex);
-                isPersistent.Add(true);
-
-                isAssigned.Add(false);
-                isReleasable.Add(false);
-                descriptors.Add(descriptor);
-
-                resourceIndices.Add(resourceIndex);
-                createList.Add(-1);
-                freeList.Add(-1);
-            }
-
-            importedResourceLookup.Add(resource, result);
-        }
+        var resourceIndex = resources.Add((resource, -1, false));
+        var descriptor = CreateDescriptorFromResource(resource);
+        var handleIndex = handleInfo.Add((-1, -1, resourceIndex, descriptor, false, false, true, true));
+        result = new ResourceHandle<T>(handleIndex);
+        importedResourceLookup.Add(resource, result);
 
         return result;
     }
 
-
     public void WriteResource(ResourceHandle<T> handle, int passIndex)
     {
         // Persistent handles that have already been created don't need to write a create-index
-        if (isPersistent[handle.Index] && isAssigned[handle.Index])
+        var info = handleInfo[handle.Index];
+        if (info.isPersistent && info.isAssigned)
             return;
 
-        // Select list based on persistent or non-persistent, and initialize or update the index
-        var createIndex = createList[handle.Index];
-        createIndex = createIndex == -1 ? passIndex : Math.Min(passIndex, createIndex);
-        createList[handle.Index] = createIndex;
+        // Initialize or update the index
+        info.createIndex = info.createIndex == -1 ? passIndex : Math.Min(passIndex, info.createIndex);
+        handleInfo[handle.Index] = info;
     }
 
     public void ReadResource(ResourceHandle<T> handle, int passIndex)
     {
-        var currentIndex = freeList[handle.Index];
-        currentIndex = currentIndex == -1 ? passIndex : Math.Max(currentIndex, passIndex);
-        freeList[handle.Index] = currentIndex;
+        var info = handleInfo[handle.Index];
+        info.freeIndex = info.freeIndex == -1 ? passIndex : Math.Max(info.freeIndex, passIndex);
+        handleInfo[handle.Index] = info;
     }
 
     public T GetResource(ResourceHandle<T> handle)
     {
-        var resourceIndex = resourceIndices[handle.Index];
+        var resourceIndex = handleInfo[handle.Index].resourceIndex;
         return resources[resourceIndex].resource;
     }
 
     public void ReleasePersistentResource(ResourceHandle<T> handle)
     {
-        // TODO: This can trigger from gpu instaned rendere data which can be readback while cleanup is occuring, resulting in two releases.
-        //Assert.IsFalse(isReleasable[handle.Index], "Trying to release a non persistent resource");
-        isReleasable[handle.Index] = true;
+        var info = handleInfo[handle.Index];
+        info.isReleasable = true;
+        handleInfo[handle.Index] = info;
     }
 
     public V GetDescriptor(ResourceHandle<T> handle)
     {
-        return descriptors[handle.Index];
+        return handleInfo[handle.Index].descriptor;
     }
 
     public void SetDescriptor(ResourceHandle<T> handle, V descriptor)
     {
-        descriptors[handle.Index] = descriptor;
+        var info = handleInfo[handle.Index];
+        info.descriptor = descriptor;
+        handleInfo[handle.Index] = info;
     }
 
     public void AllocateFrameResources(int renderPassCount, int frameIndex)
@@ -191,32 +90,33 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
             handlesToFree.Add(new());
         }
 
-        // Non-persistent create/free requests
-        for (var i = 0; i < createList.Count; i++)
+        // Add handles to create/free lists if needed
+        for (var i = 0; i < handleInfo.Count; i++)
         {
-            var passIndex = createList[i];
-            if (passIndex != -1)
-                handlesToCreate[passIndex].Add(i);
-        }
+            var (createIndex, freeIndex, _, _, _, isReleasable, isPersistent, isUsed) = handleInfo[i];
 
-        for (var i = 0; i < freeList.Count; i++)
-        {
-            var passIndex = freeList[i];
-            if (passIndex == -1)
+            if (!isUsed)
+                continue;
+
+            if (createIndex != -1)
+                handlesToCreate[createIndex].Add(i);
+        
+            var freePassIndex = freeIndex;
+            if (freePassIndex == -1)
             {
-                if (isPersistent[i] && isReleasable[i])
-                    passIndex = 0;
+                if (isPersistent && isReleasable)
+                    freePassIndex = 0;
                 else
                     continue;
             }
             else
             {
                 // Do nothing for non-releasable persistent textures
-                if (isPersistent[i] && !isReleasable[i])
+                if (isPersistent && !isReleasable)
                     continue;
             }
 
-            handlesToFree[passIndex].Add(i);
+            handlesToFree[freePassIndex].Add(i);
         }
 
         for (var i = 0; i < renderPassCount; i++)
@@ -224,7 +124,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
             // Assign or create any RTHandles that are written to by this pass
             foreach (var handle in handlesToCreate[i])
             {
-                var descriptor = descriptors[handle];
+                var info = handleInfo[handle];
                 var resourceIndex = -1;
                 for (var j = 0; j < resources.Count; j++)
                 {
@@ -236,7 +136,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
                     if (resource.lastFrameUsed > frameIndex)
                         continue;
 
-                    if (!DoesResourceMatchDescriptor(resource.resource, descriptor))
+                    if (!DoesResourceMatchDescriptor(resource.resource, info.descriptor))
                         continue;
 
                     resourceIndex = j;
@@ -248,37 +148,41 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
                 if (resourceIndex == -1)
                 {
-                    var result = descriptor.CreateResource();
+                    var result = info.descriptor.CreateResource();
                     resourceIndex = resources.Add((result, -1, false));
                 }
 
-                isAssigned[handle] = true;
-                createList[handle] = -1;
-                freeList[handle] = -1;
-                resourceIndices[handle] = resourceIndex;
+                info.isAssigned = true;
+                info.createIndex = -1;
+                info.freeIndex = -1;
+                info.resourceIndex = resourceIndex;
+                handleInfo[handle] = info;
             }
 
             // Now mark any textures that need to be released at the end of this pass as available
             foreach (var handle in handlesToFree[i])
             {
-                // Free some handle-related variables
-                isPersistent[handle] = false;
-                isReleasable[handle] = false;
-                isAssigned[handle] = false;
-                createList[handle] = -1;
-                freeList[handle] = -1;
+                var (_, _, resourceIndex, descriptor, _, _, isPersistent, _) = handleInfo[handle];
 
-                // Todo: too much indirection?
-                var resourceIndex = resourceIndices[handle];
+                // Could handle this by updating the last used index or something maybe
                 var resource = resources[resourceIndex];
                 resources[resourceIndex] = (resource.resource, frameIndex, true);
-                availableHandleIndices.Push(handle);
+
+                this.handlesToFree.Add(handle);
             }
         }
     }
 
     public void CleanupCurrentFrame(int frameIndex)
     {
+        // Free handles
+        foreach (var handle in handlesToFree)
+        {
+            handleInfo.Free(handle);
+        }
+
+        handlesToFree.Clear();
+
         // Release any render textures that have not been used for at least a frame
         for (var i = 0; i < resources.Count; i++)
         {
@@ -327,7 +231,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
             {
                 // Persistent resources should be freed first
                 //if (!isAvailable[i])
-                    //Debug.LogError($"Resource at index {i} was not made availalble");
+                //Debug.LogError($"Resource at index {i} was not made availalble");
 
                 DestroyResource(resource.resource);
             }
