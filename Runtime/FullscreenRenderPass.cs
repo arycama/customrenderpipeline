@@ -83,14 +83,14 @@ namespace Arycama.CustomRenderPipeline
             if (!string.IsNullOrEmpty(Keyword))
             {
                 //keyword = new LocalKeyword(material.shader, Keyword);
-                command.EnableShaderKeyword(Keyword);
+                Command.EnableShaderKeyword(Keyword);
             }
 
-            command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount, 1, propertyBlock);
+            Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount, 1, propertyBlock);
 
             if (!string.IsNullOrEmpty(Keyword))
             {
-                command.DisableShaderKeyword(Keyword);
+                Command.DisableShaderKeyword(Keyword);
                 Keyword = null;
             }
 

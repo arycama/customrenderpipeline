@@ -19,7 +19,7 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
 
             material = new Material(Shader.Find("Hidden/ScreenSpaceReflections")) { hideFlags = HideFlags.HideAndDontSave };
-            temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Screen Space Reflections");
+            temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Screen Space Reflections", isScreenTexture: true);
             raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Specular");
         }
 
@@ -140,7 +140,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex, true);
+            var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Temporal"))
             {
                 pass.Initialize(material, 2);

@@ -110,8 +110,8 @@ namespace Arycama.CustomRenderPipeline.Water
                 m33 = 1.0f
             };
 
-            var waterShadow = renderGraph.GetTexture((int)settings.ShadowResolution, (int)settings.ShadowResolution, GraphicsFormat.D16_UNorm);
-            var waterIlluminance = renderGraph.GetTexture((int)settings.ShadowResolution, (int)settings.ShadowResolution, GraphicsFormat.R16_UNorm);
+            var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.D16_UNorm, isExactSize: true);
+            var waterIlluminance = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.R16_UNorm, isExactSize: true);
 
             var passIndex = settings.Material.FindPass("WaterShadow");
             Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");

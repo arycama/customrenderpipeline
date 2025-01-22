@@ -121,7 +121,7 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.AddRenderPassData<ICommonPassData>();
 
                     var index = i;
-                    pass.SetRenderFunction((System.Action<CommandBuffer, RenderPass>)((command, pass) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
                         // First pass sets the buffer contents
                         if (isFirstPass)
@@ -137,9 +137,9 @@ namespace Arycama.CustomRenderPipeline.Water
                         }
 
                         // Do up to 6 passes per dispatch.
-                        pass.SetInt("_PassCount", (int)passCount);
+                        pass.SetInt("_PassCount", passCount);
                         pass.SetInt("_PassOffset", 6 * index);
-                        pass.SetInt("_TotalPassCount", (int)totalPassCount);
+                        pass.SetInt("_TotalPassCount", totalPassCount);
 
                         var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
                         for (var i = 0; i < cullingPlanes.Count; i++)
@@ -153,13 +153,13 @@ namespace Arycama.CustomRenderPipeline.Water
                         var positionX = MathUtils.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
                         var positionZ = MathUtils.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
 
-                        var positionOffset = new Vector4((float)settings.Size, (float)settings.Size, positionX, positionZ);
+                        var positionOffset = new Vector4(settings.Size, settings.Size, positionX, positionZ);
                         pass.SetVector("_TerrainPositionOffset", positionOffset);
 
                         pass.SetFloat("_EdgeLength", (float)settings.EdgeLength * settings.PatchVertices);
                         pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
                         pass.SetFloat("MaxWaterHeight", settings.Profile.MaxWaterHeight);
-                    }));
+                    });
                 }
             }
 
@@ -182,10 +182,10 @@ namespace Arycama.CustomRenderPipeline.Water
                     pass.ReadTexture("_LodInput", tempLodId);
                     pass.ReadBuffer("_IndirectArgs", indirectArgsBuffer);
 
-                    pass.SetRenderFunction((System.Action<CommandBuffer, RenderPass>)((command, pass) =>
+                    pass.SetRenderFunction((command, pass) =>
                     {
-                        pass.SetInt("_CellCount", (int)settings.CellCount);
-                    }));
+                        pass.SetInt("_CellCount", settings.CellCount);
+                    });
                 }
             }
 

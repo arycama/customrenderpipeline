@@ -107,7 +107,6 @@ namespace Arycama.CustomRenderPipeline
 
         public static GraphicsBuffer GenerateGridIndexBuffer(int count, bool alternateIndices = false)
         {
-            var PatchVertices = count;
             var VerticesPerTileEdge = count + 1;
             var QuadListIndexCount = count * count * 4;
 

@@ -14,7 +14,7 @@ namespace Arycama.CustomRenderPipeline
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Temporal AA")) { hideFlags = HideFlags.HideAndDontSave };
-            textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Temporal AA");
+            textureCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Temporal AA", isScreenTexture: true);
         }
 
         protected override void Cleanup(bool disposing)

@@ -17,7 +17,7 @@ namespace Arycama.CustomRenderPipeline
         {
             this.settings = settings;
             material = new Material(Shader.Find("Hidden/Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
-            temporalCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Ambient Occlusion");
+            temporalCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Ambient Occlusion", isScreenTexture: true);
             ambientOcclusionRaytracingShader = Resources.Load<RayTracingShader>("Raytracing/AmbientOcclusion");
         }
 
@@ -145,7 +145,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex, true);
+            var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Temporal"))
             {
                 pass.Initialize(material, 2);

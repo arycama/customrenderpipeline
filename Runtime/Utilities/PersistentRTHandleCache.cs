@@ -18,18 +18,20 @@ namespace Arycama.CustomRenderPipeline
 
         public RenderGraph renderGraph;
         private bool disposedValue;
+        private bool isScreenTexture;
 
-        public PersistentRTHandleCache(GraphicsFormat format, RenderGraph renderGraph, string name = "", TextureDimension dimension = TextureDimension.Tex2D, bool hasMips = false)
+        public PersistentRTHandleCache(GraphicsFormat format, RenderGraph renderGraph, string name = "", TextureDimension dimension = TextureDimension.Tex2D, bool hasMips = false, bool isScreenTexture = false)
         {
             this.format = format;
             this.dimension = dimension;
             this.renderGraph = renderGraph;
             this.name = name;
             this.hasMips = hasMips;
+            this.isScreenTexture = isScreenTexture;
         }
 
         // Gets current texture and marks history as non-persistent
-        public (ResourceHandle<RenderTexture> current, ResourceHandle<RenderTexture> history, bool wasCreated) GetTextures(int width, int height, int viewIndex, bool isScreenTexture = true, int depth = 1)
+        public (ResourceHandle<RenderTexture> current, ResourceHandle<RenderTexture> history, bool wasCreated) GetTextures(int width, int height, int viewIndex, int depth = 1)
         {
             var wasCreated = !textureCache.TryGetValue(viewIndex, out var history);
             if (wasCreated)

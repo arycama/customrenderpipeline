@@ -5,12 +5,13 @@ using Object = UnityEngine.Object;
 
 public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescriptor>
 {
-    private int screenWidth, screenHeight;
+    public int ScreenWidth { get; private set; }
+    public int ScreenHeight { get; private set; }
 
     public void SetScreenSize(int width, int height)
     {
-        screenWidth = Mathf.Max(width, screenWidth);
-        screenHeight = Mathf.Max(height, screenHeight);
+        ScreenWidth = Mathf.Max(width, ScreenWidth);
+        ScreenHeight = Mathf.Max(height, ScreenHeight);
     }
 
     protected override void DestroyResource(RenderTexture resource) => Object.DestroyImmediate(resource);
@@ -38,7 +39,13 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
         if (descriptor.IsScreenTexture)
         {
             // For screen textures, ensure we get a rendertexture that is the actual screen width/height
-            if (resource.width != screenWidth || resource.height != screenHeight)
+            if (resource.width != ScreenWidth || resource.height != ScreenHeight)
+                return false;
+        }
+        else if(descriptor.IsExactSize)
+        {
+            // Some textures need exact size. (Eg writing to multiple targets at non-screen resolution
+            if (resource.width != descriptor.Width || resource.height != descriptor.Height)
                 return false;
         }
         else if (resource.width < descriptor.Width || resource.height < descriptor.Height)

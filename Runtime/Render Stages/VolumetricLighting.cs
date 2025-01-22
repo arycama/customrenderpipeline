@@ -13,7 +13,7 @@ namespace Arycama.CustomRenderPipeline
         public VolumetricLighting(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
-            colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", TextureDimension.Tex3D);
+            colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", TextureDimension.Tex3D, isScreenTexture: true);
         }
 
         protected override void Cleanup(bool disposing)
@@ -27,7 +27,7 @@ namespace Arycama.CustomRenderPipeline
             var volumeWidth = Mathf.CeilToInt(viewData.ScaledWidth / (float)settings.TileSize);
             var volumeHeight = Mathf.CeilToInt(viewData.ScaledHeight / (float)settings.TileSize);
             var volumeDepth = settings.DepthSlices;
-            var textures = colorHistory.GetTextures(volumeWidth, volumeHeight, viewData.ViewIndex, false, volumeDepth);
+            var textures = colorHistory.GetTextures(volumeWidth, volumeHeight, viewData.ViewIndex, volumeDepth);
 
             var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
 

@@ -83,7 +83,7 @@ FragmentInput Vertex(VertexInput input)
 	
 	#ifdef MOTION_VECTORS_ON
 		float3 previousWorldPosition = PreviousObjectToWorld(unity_MotionVectorsParams.x ? input.previousPosition : input.position, input.instanceID);
-		previousWorldPosition.y += sqrt(Sq(_PlanetRadius) - SqrLength(previousWorldPosition.xz)) - _PlanetRadius;
+		previousWorldPosition = PlanetCurve(previousWorldPosition);
 		output.previousPositionCS = WorldToClipPrevious(previousWorldPosition);
 	#endif
 	

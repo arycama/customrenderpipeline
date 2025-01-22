@@ -12,7 +12,7 @@ namespace Arycama.CustomRenderPipeline
     public class RenderGraph : IDisposable
     {
         private bool disposedValue;
-        private readonly List<RenderPass> renderPasses = new();
+        private readonly List<RenderPassBase> renderPasses = new();
 
         private GraphicsBuffer emptyBuffer;
         public RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
@@ -91,7 +91,7 @@ namespace Arycama.CustomRenderPipeline
             GC.SuppressFinalize(this);
         }
 
-        public T AddRenderPass<T>(string name) where T : RenderPass, new()
+        public T AddRenderPass<T>(string name) where T : RenderPassBase, new()
         {
             var result = new T
             {
@@ -117,10 +117,10 @@ namespace Arycama.CustomRenderPipeline
             IsExecuting = false;
         }
 
-        public ResourceHandle<RenderTexture> GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false)
+        public ResourceHandle<RenderTexture> GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
         {
             Assert.IsFalse(IsExecuting);
-            return RtHandleSystem.GetResourceHandle(new RtHandleDescriptor(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips), isPersistent);
+            return RtHandleSystem.GetResourceHandle(new RtHandleDescriptor(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, false, isExactSize), isPersistent);
         }
 
         public ResourceHandle<GraphicsBuffer> GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)

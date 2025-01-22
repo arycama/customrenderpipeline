@@ -2,7 +2,11 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class where V : IResourceDescriptor<T>
+public abstract class ResourceHandleSystem
+{
+}
+
+public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystem, IDisposable where T : class where V : IResourceDescriptor<T>
 {
     private readonly FreeList<(int createIndex, int freeIndex, int resourceIndex, V descriptor, bool isAssigned, bool isReleasable, bool isPersistent, bool isUsed)> handleInfo = new();
     private readonly FreeList<(T resource, int lastFrameUsed, bool isAvailable)> resources = new();
@@ -148,7 +152,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
                 if (resourceIndex == -1)
                 {
-                    var result = info.descriptor.CreateResource();
+                    var result = info.descriptor.CreateResource(this);
                     resourceIndex = resources.Add((result, -1, false));
                 }
 
@@ -166,7 +170,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
 
                 // Could handle this by updating the last used index or something maybe
                 var resource = resources[resourceIndex];
-                resources[resourceIndex] = (resource.resource, frameIndex, true);
+                resources[resourceIndex] = (resource.resource, frameIndex + ExtraFramesToKeepResource(resource.resource), true);
 
                 this.handlesToFree.Add(handle);
             }
@@ -191,7 +195,7 @@ public abstract class ResourceHandleSystem<T, V> : IDisposable where T : class w
                 continue;
 
             // Don't free textures that were used in the last frame
-            if (resource.lastFrameUsed + ExtraFramesToKeepResource(resource.resource) >= frameIndex)
+            if (resource.lastFrameUsed >= frameIndex)
                 continue;
 
             Debug.LogWarning($"Destroying resource {resources[i]} at index {i}");

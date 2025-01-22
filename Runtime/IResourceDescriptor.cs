@@ -1,4 +1,4 @@
 ﻿public interface IResourceDescriptor<T>
 {
-    public T CreateResource();
+    public T CreateResource(ResourceHandleSystem system);
 }

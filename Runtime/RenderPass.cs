@@ -6,7 +6,8 @@ using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
-    public abstract class RenderPass : IDisposable
+
+    public abstract class RenderPass : RenderPassBase
     {
         protected RenderGraphBuilder renderGraphBuilder;
 
@@ -17,14 +18,7 @@ namespace Arycama.CustomRenderPipeline
 
         public List<(RenderPassDataHandle, bool)> RenderPassDataHandles { get; private set; } = new();
 
-        protected CommandBuffer command;
-
-        public RenderGraph RenderGraph { get; set; }
-        internal string Name { get; set; }
-        internal int Index { get; set; }
-
         public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
-
         public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);
         public abstract void SetVector(string propertyName, Vector4 value);
         public abstract void SetVectorArray(string propertyName, Vector4[] value);
@@ -35,7 +29,6 @@ namespace Arycama.CustomRenderPipeline
         public abstract void SetMatrixArray(string propertyName, Matrix4x4[] value);
         public abstract void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value);
 
-        protected abstract void Execute();
 
         protected virtual void PostExecute() { }
 
@@ -92,11 +85,10 @@ namespace Arycama.CustomRenderPipeline
             RenderPassDataHandles.Add((handle, isOptional));
         }
 
-        public void Run(CommandBuffer command)
+        protected override void RunInternal()
         {
             // TODO: Make configurable
-            command.BeginSample(Name);
-            this.command = command;
+            Command.BeginSample(Name);
 
             // Move into some OnPreRender thing in buffer/RTHandles? 
             foreach (var texture in readTextures)
@@ -125,18 +117,18 @@ namespace Arycama.CustomRenderPipeline
                 if (renderPassDataHandle.Item2)
                 {
                     if (RenderGraph.ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, RenderGraph.FrameIndex, out var data))
-                        data.SetProperties(this, command);
+                        data.SetProperties(this, Command);
                 }
                 else
                 {
                     var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, RenderGraph.FrameIndex);
-                    data.SetProperties(this, command);
+                    data.SetProperties(this, Command);
                 }
             }
 
             if (renderGraphBuilder != null)
             {
-                renderGraphBuilder.Execute(command, this);
+                renderGraphBuilder.Execute(Command, this);
                 renderGraphBuilder.ClearRenderFunction();
             }
 
@@ -146,14 +138,10 @@ namespace Arycama.CustomRenderPipeline
 
             Execute();
             PostExecute();
-            command.EndSample(Name);
+            Command.EndSample(Name);
         }
 
         protected abstract void SetupTargets();
-
-        void IDisposable.Dispose()
-        {
-        }
 
         public void SetRenderFunction(Action<CommandBuffer, RenderPass> pass)
         {
@@ -168,18 +156,6 @@ namespace Arycama.CustomRenderPipeline
             result.Data = data;
             result.SetRenderFunction(pass);
             renderGraphBuilder = result;
-        }
-
-        public GraphicsBuffer GetBuffer(ResourceHandle<GraphicsBuffer> handle)
-        {
-            Assert.IsTrue(RenderGraph.IsExecuting);
-            return RenderGraph.BufferHandleSystem.GetResource(handle);
-        }
-
-        public RenderTexture GetRenderTexture(ResourceHandle<RenderTexture> handle)
-        {
-            Assert.IsTrue(RenderGraph.IsExecuting);
-            return RenderGraph.RtHandleSystem.GetResource(handle);
         }
 
         public Vector4 GetScaleLimit2D(ResourceHandle<RenderTexture> handle)

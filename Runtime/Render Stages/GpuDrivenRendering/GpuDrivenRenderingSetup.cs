@@ -9,12 +9,12 @@ namespace Arycama.CustomRenderPipeline
     public class GpuDrivenRenderingSetup : RenderFeature
     {
         private readonly ComputeShader fillInstanceTypeIdShader;
-        private ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, rendererCountsBuffer, finalRendererCountsBuffer, submeshOffsetLengthsBuffer, lodSizesBuffer, rendererInstanceIDsBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, rendererInstanceIndexOffsetsBuffer, visibleRendererInstanceIndicesBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer;
+        private ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, submeshOffsetLengthsBuffer, lodSizesBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer;
 
         private Dictionary<string, List<RendererDrawCallData>> passDrawList = new();
 
         private readonly ProceduralGenerationController proceduralGenerationController;
-        private bool hasGenerated;
+        private int version = -1;
 
         public GpuDrivenRenderingSetup(RenderGraph renderGraph, ProceduralGenerationController proceduralGenerationController) : base(renderGraph)
         {
@@ -25,14 +25,9 @@ namespace Arycama.CustomRenderPipeline
         protected override void Cleanup(bool disposing)
         {
             renderGraph.ReleasePersistentResource(drawCallArgsBuffer);
-            renderGraph.ReleasePersistentResource(rendererInstanceIndexOffsetsBuffer);
             renderGraph.ReleasePersistentResource(rendererBoundsBuffer);
-            renderGraph.ReleasePersistentResource(rendererCountsBuffer);
-            renderGraph.ReleasePersistentResource(finalRendererCountsBuffer);
             renderGraph.ReleasePersistentResource(submeshOffsetLengthsBuffer);
             renderGraph.ReleasePersistentResource(lodSizesBuffer);
-            renderGraph.ReleasePersistentResource(rendererInstanceIDsBuffer);
-            renderGraph.ReleasePersistentResource(visibleRendererInstanceIndicesBuffer);
             renderGraph.ReleasePersistentResource(instanceTypeIdsBuffer);
             renderGraph.ReleasePersistentResource(lodFadesBuffer);
             renderGraph.ReleasePersistentResource(positionsBuffer);
@@ -42,10 +37,14 @@ namespace Arycama.CustomRenderPipeline
 
         public override void Render()
         {
-            if (hasGenerated || !proceduralGenerationController.IsReady)
+            if (version == proceduralGenerationController.Version)
                 return;
 
-            hasGenerated = true;
+            // If we have existing data, make sure to clean it up
+            if(version != -1)
+                Cleanup(false);
+
+            version = proceduralGenerationController.Version;
             proceduralGenerationController.FreeUnusedHandles(renderGraph);
 
             // Fill instanceId buffer. (Should be done when the object is assigned)
@@ -111,18 +110,16 @@ namespace Arycama.CustomRenderPipeline
 
             foreach (var prefab in proceduralGenerationController.prefabs)
             {
-                var prefabInstanceCount = prefab.count;
-
                 InstanceTypeData typeData;
-                typeData.instanceCount = prefabInstanceCount;
+                typeData.instanceCount = prefab.count;
                 typeData.lodRendererOffset = lodOffset;
+                typeData.lodSizeBufferPosition = lodOffset;
 
                 if (prefab.prefab.TryGetComponent<LODGroup>(out var lodGroup))
                 {
                     typeData.localReferencePoint = lodGroup.localReferencePoint;
                     typeData.radius = lodGroup.size * 0.5f;
                     typeData.lodCount = lodGroup.lodCount;
-                    typeData.lodSizeBufferPosition = lodOffset;
 
                     var lods = lodGroup.GetLODs();
 
@@ -143,20 +140,19 @@ namespace Arycama.CustomRenderPipeline
                     typeData.localReferencePoint = bounds.center;
                     typeData.radius = Vector3.Magnitude(bounds.extents);
                     typeData.lodCount = 1;
-                    typeData.lodSizeBufferPosition = lodOffset;
 
                     ProcessLodLevel(renderers.Value, 0f);
                 }
 
                 void ProcessLodLevel(IList<Renderer> renderers, float lodSize)
                 {
+                    var rendererCount = 0;
                     foreach (var renderer in renderers)
                     {
                         if (renderer == null)
                             continue;
 
-                        var meshFilter = renderer.GetComponent<MeshFilter>();
-                        if (meshFilter == null)
+                        if (!renderer.TryGetComponent<MeshFilter>(out var meshFilter))
                             continue;
 
                         var mesh = meshFilter.sharedMesh;
@@ -234,18 +230,20 @@ namespace Arycama.CustomRenderPipeline
                             drawCallArgs.Value.Add(new DrawIndexedInstancedIndirectArgs(indexCount, 0, indexStart, 0, 0));
                             indirectArgsOffset += 5;
                         }
+
+                        rendererCount++;
                     }
 
-                    instanceTypeLodDatas.Value.Add(new InstanceTypeLodData(totalRendererSum, renderers.Count, instanceTimesRendererCount - totalInstanceCount));
+                    instanceTypeLodDatas.Value.Add(new InstanceTypeLodData(totalRendererSum, rendererCount, instanceTimesRendererCount - totalInstanceCount));
 
                     lodOffset++;
-                    totalRendererSum += renderers.Count;
+                    totalRendererSum += rendererCount;
 
-                    instanceTimesRendererCount += renderers.Count * prefabInstanceCount;
+                    instanceTimesRendererCount += rendererCount * prefab.count;
                     lodSizes.Value.Add(lodSize);
                 }
 
-                totalInstanceCount += prefabInstanceCount;
+                totalInstanceCount += prefab.count;
                 instanceTypeDatas.Value.Add(typeData);
             }
 
@@ -290,13 +288,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            rendererInstanceIDsBuffer = renderGraph.GetBuffer(instanceTimesRendererCount, isPersistent: true);
-            visibleRendererInstanceIndicesBuffer = renderGraph.GetBuffer(instanceTimesRendererCount, isPersistent: true);
-            rendererCountsBuffer = renderGraph.GetBuffer(totalRendererSum, isPersistent: true);
-            rendererInstanceIndexOffsetsBuffer = renderGraph.GetBuffer(totalRendererSum, isPersistent: true);
-            finalRendererCountsBuffer = renderGraph.GetBuffer(totalRendererSum, isPersistent: true);
-
-            renderGraph.SetResource(new GpuInstanceBuffersData(rendererInstanceIDsBuffer, rendererInstanceIndexOffsetsBuffer, rendererCountsBuffer, finalRendererCountsBuffer, visibleRendererInstanceIndicesBuffer, positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, passDrawList, totalInstanceCount, instanceTimesRendererCount, totalRendererSum), true);
+            renderGraph.SetResource(new GpuInstanceBuffersData(positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, passDrawList, totalInstanceCount, instanceTimesRendererCount, totalRendererSum), true);
         }
     }
 }

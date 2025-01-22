@@ -17,7 +17,7 @@ namespace Arycama.CustomRenderPipeline
             material = new Material(Shader.Find("Hidden/ScreenSpaceGlobalIllumination")) { hideFlags = HideFlags.HideAndDontSave };
             this.settings = settings;
 
-            temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Screen Space Diffuse");
+            temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Screen Space Diffuse", isScreenTexture: true);
             raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Diffuse");
         }
 
@@ -138,7 +138,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Write final temporal result out to rgba16 (color+weight) and rgb111110 for final ambient composition
-            var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex, true);
+            var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Temporal"))
             {
                 pass.Initialize(material, 2);

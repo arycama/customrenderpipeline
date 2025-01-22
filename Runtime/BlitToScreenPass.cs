@@ -74,7 +74,7 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void Execute()
         {
-            command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3, 1, propertyBlock);
+            Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3, 1, propertyBlock);
 
             material = null;
             passIndex = 0;
@@ -99,7 +99,7 @@ namespace Arycama.CustomRenderPipeline
 
         protected override void SetupTargets()
         {
-            command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
+            Command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
         }
     }
 }

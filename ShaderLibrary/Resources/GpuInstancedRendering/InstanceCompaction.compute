@@ -1,7 +1,5 @@
 ﻿#pragma kernel StreamCompaction
 
-#pragma enable_d3d11_debug_symbols
-
 struct InstanceTypeData
 {
 	float3 localReferencePoint;

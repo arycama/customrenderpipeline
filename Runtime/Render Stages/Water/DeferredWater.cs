@@ -15,7 +15,7 @@ namespace Arycama.CustomRenderPipeline.Water
         {
             this.settings = settings;
             deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water 1")) { hideFlags = HideFlags.HideAndDontSave };
-            temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Water Scatter Temporal");
+            temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Water Scatter Temporal", isScreenTexture: true);
             raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Refraction");
         }
 
@@ -168,7 +168,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
             }
 
-            var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex, true);
+            var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water Temporal"))
             {
                 if (settings.RaytracedRefractions)

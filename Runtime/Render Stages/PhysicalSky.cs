@@ -17,7 +17,7 @@ namespace Arycama.CustomRenderPipeline
             this.settings = settings;
 
             skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
-            textureCache = new(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Physical Sky");
+            textureCache = new(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Physical Sky", isScreenTexture: true);
         }
 
         protected override void Cleanup(bool disposing)
@@ -81,7 +81,7 @@ namespace Arycama.CustomRenderPipeline
             }
 
             // Reprojection
-            var skyColor = textureCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex, true);
+            var skyColor = textureCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex);
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Physical Sky Temporal"))
             {
                 pass.Initialize(skyMaterial, 4);

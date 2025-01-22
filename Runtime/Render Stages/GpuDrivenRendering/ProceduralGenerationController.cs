@@ -15,7 +15,7 @@ public class ProceduralGenerationController
 
     private int pendingRequests;
 
-    public bool IsReady { get; private set; }
+    public int Version { get; private set; } = -1;
 
     public void Reset()
     {
@@ -30,7 +30,7 @@ public class ProceduralGenerationController
         activeHandles.Clear();
         handlesToFree.Clear();
 
-        IsReady = false;
+        Version = -1;
     }
 
     public IEnumerable<IGpuProceduralGenerator> GetModifiedGenerators()
@@ -107,7 +107,7 @@ public class ProceduralGenerationController
         pendingRequests--;
 
         if (pendingRequests == 0)
-            IsReady = true;
+            Version++;
     }
 
     /// <summary>

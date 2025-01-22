@@ -28,7 +28,7 @@ public class ScreenSpaceShadows : RenderFeature
         material = new Material(Shader.Find("Hidden/ScreenSpaceShadows")) { hideFlags = HideFlags.HideAndDontSave };
         this.settings = settings;
         shadowRaytracingShader = Resources.Load<RayTracingShader>("Raytracing/Shadow");
-        temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16_UNorm, renderGraph, "Screen Space Shadows");
+        temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16_UNorm, renderGraph, "Screen Space Shadows", isScreenTexture: true);
     }
 
     protected override void Cleanup(bool disposing)
@@ -159,7 +159,7 @@ public class ScreenSpaceShadows : RenderFeature
         }
 
         // Write final temporal result out to rgba16 (color+weight) and rgb111110 for final ambient composition
-        var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex, true);
+        var (current, history, wasCreated) = temporalCache.GetTextures(viewData.ScaledWidth, viewData.ScaledHeight, viewData.ViewIndex);
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows Temporal"))
         {
             pass.Initialize(material, 2);

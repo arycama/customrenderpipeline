@@ -13,8 +13,9 @@ public readonly struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
     public bool HasMips { get; }
     public bool AutoGenerateMips { get; }
     public bool EnableRandomWrite { get; }
+    public bool IsExactSize { get; }
 
-    public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false)
+    public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false)
     {
         Width = width;
         Height = height;
@@ -25,17 +26,20 @@ public readonly struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
         HasMips = hasMips;
         AutoGenerateMips = autoGenerateMips;
         EnableRandomWrite = enableRandomWrite;
+        IsExactSize = isExactSize;
     }
 
-    public RenderTexture CreateResource()
+    public RenderTexture CreateResource(ResourceHandleSystem system)
     {
+        var rtHandleSystem = system as RTHandleSystem;
+        var (width, height) = IsScreenTexture ? (rtHandleSystem.ScreenWidth, rtHandleSystem.ScreenHeight) : (Width, Height);
         var isDepth = GraphicsFormatUtility.IsDepthFormat(Format);
         var isStencil = GraphicsFormatUtility.IsStencilFormat(Format);
         var graphicsFormat = isDepth ? GraphicsFormat.None : Format;
         var depthFormat = isDepth ? Format : GraphicsFormat.None;
         var stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None;
 
-        var result = new RenderTexture(Width, Height, graphicsFormat, depthFormat)
+        var result = new RenderTexture(width, height, graphicsFormat, depthFormat)
         {
             autoGenerateMips = false, // Always false, we manually handle mip generation if needed
             dimension = Dimension,

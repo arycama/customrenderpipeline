@@ -2,8 +2,6 @@
 
 #pragma multi_compile _ HIZ_ON
 
-#pragma enable_d3d11_debug_symbols
-
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/TerrainCommon.hlsl"
 
@@ -176,11 +174,9 @@ void Visibility(uint id : SV_DispatchThreadID)
 		break;
 	}
 	
-	lod = 0;
-	
 	// If smaller than the smallest lod size, this lod is culled, so do not render
-	//if (lod == UintMax)
-		//return;
+	if (lod == UintMax)
+		return;
 	
 	// Index/length into the buffer of renderers for this lod, so that we can check their visibility
 	InstanceTypeLodData instanceTypeLodData = _InstanceTypeLodData[instanceTypeData.lodRendererOffset + lod];
@@ -224,12 +220,12 @@ void Visibility(uint id : SV_DispatchThreadID)
 		float3 center = (boundsMin + boundsMax) * 0.5;
 		float3 extents = (boundsMax - boundsMin) * 0.5;
 		
-		//if (!FrustumCull(center, extents))
-		//	continue;
+		if (!FrustumCull(center, extents))
+			continue;
 		
 		#ifdef HIZ_ON
-			//if (!HiZCull(screenMin, screenMax, _ScaledResolution.zw))
-			//	continue;
+			if (!HiZCull(screenMin, screenMax, _ScaledResolution.zw))
+				continue;
 		#endif
 				
 		// Write InstanceID into the renderer if visible

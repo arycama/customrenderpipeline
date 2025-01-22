@@ -370,10 +370,9 @@ float3 PreviousObjectToWorld(float3 position, uint instanceID)
 		#else
 			float3x4 previousObjectToWorld = _InPlayMode ? unity_MatrixPreviousM : unity_ObjectToWorld;
 		#endif
-		
-		previousObjectToWorld._m03_m13_m23 -= _ViewPosition;
 	#endif
 	
+	previousObjectToWorld._m03_m13_m23 -= _ViewPosition;
 	return MultiplyPoint3x4(previousObjectToWorld, position);
 }
 

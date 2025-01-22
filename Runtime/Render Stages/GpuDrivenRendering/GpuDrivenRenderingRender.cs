@@ -8,7 +8,6 @@ namespace Arycama.CustomRenderPipeline
         private static readonly uint[] emptyCounter = new uint[1];
 
         private readonly ComputeShader clearShader, cullingShader, scanShader, compactShader;
-        private ResourceHandle<GraphicsBuffer> memoryCounterBuffer;
 
         public GpuDrivenRenderingRender(RenderGraph renderGraph) : base(renderGraph)
         {
@@ -17,12 +16,6 @@ namespace Arycama.CustomRenderPipeline
             scanShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceScan");
             compactShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCompaction");
 
-            memoryCounterBuffer = renderGraph.GetBuffer(isPersistent: true);
-        }
-
-        protected override void Cleanup(bool disposing)
-        {
-            renderGraph.ReleasePersistentResource(memoryCounterBuffer);
         }
 
         public override void Render()
@@ -45,30 +38,37 @@ namespace Arycama.CustomRenderPipeline
 
             var screenMatrix = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * viewMatrix;
 
+            var rendererInstanceIDsBuffer = renderGraph.GetBuffer(gpuInstanceBuffers.instanceTimesRendererCount);
+            var visibleRendererInstanceIndicesBuffer = renderGraph.GetBuffer(gpuInstanceBuffers.instanceTimesRendererCount);
+            var rendererCountsBuffer = renderGraph.GetBuffer(gpuInstanceBuffers.totalRendererSum);
+            var rendererInstanceIndexOffsetsBuffer = renderGraph.GetBuffer(gpuInstanceBuffers.totalRendererSum);
+            var finalRendererCountsBuffer = renderGraph.GetBuffer(gpuInstanceBuffers.totalRendererSum);
+            var memoryCounterBuffer = renderGraph.GetBuffer();
+
             using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Gpu Instance Clear"))
             {
-                pass.WriteBuffer("", gpuInstanceBuffers.rendererInstanceIDsBuffer);
-                pass.WriteBuffer("", gpuInstanceBuffers.rendererInstanceIndexOffsetsBuffer);
-                pass.WriteBuffer("", gpuInstanceBuffers.rendererCountsBuffer);
-                pass.WriteBuffer("", gpuInstanceBuffers.finalRendererCountsBuffer);
-                pass.WriteBuffer("", gpuInstanceBuffers.visibleRendererInstanceIndicesBuffer);
+                pass.WriteBuffer("", rendererInstanceIDsBuffer);
+                pass.WriteBuffer("", rendererInstanceIndexOffsetsBuffer);
+                pass.WriteBuffer("", rendererCountsBuffer);
+                pass.WriteBuffer("", finalRendererCountsBuffer);
+                pass.WriteBuffer("", visibleRendererInstanceIndicesBuffer);
                 pass.WriteBuffer("", memoryCounterBuffer);
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    command.SetComputeBufferParam(clearShader, 0, "_Result", pass.GetBuffer(gpuInstanceBuffers.rendererInstanceIDsBuffer));
+                    command.SetComputeBufferParam(clearShader, 0, "_Result", pass.GetBuffer(rendererInstanceIDsBuffer));
                     command.DispatchNormalized(clearShader, 0, gpuInstanceBuffers.instanceTimesRendererCount, 1, 1);
 
-                    command.SetComputeBufferParam(clearShader, 0, "_Result", pass.GetBuffer(gpuInstanceBuffers.rendererInstanceIndexOffsetsBuffer));
+                    command.SetComputeBufferParam(clearShader, 0, "_Result", pass.GetBuffer(rendererInstanceIndexOffsetsBuffer));
                     command.DispatchNormalized(clearShader, 0, gpuInstanceBuffers.totalRendererSum, 1, 1);
 
-                    command.SetComputeBufferParam(clearShader, 0, "_Result", pass.GetBuffer(gpuInstanceBuffers.rendererCountsBuffer));
+                    command.SetComputeBufferParam(clearShader, 0, "_Result", pass.GetBuffer(rendererCountsBuffer));
                     command.DispatchNormalized(clearShader, 0, gpuInstanceBuffers.totalRendererSum, 1, 1);
 
-                    command.SetComputeBufferParam(clearShader, 0, "_Result", pass.GetBuffer(gpuInstanceBuffers.finalRendererCountsBuffer));
+                    command.SetComputeBufferParam(clearShader, 0, "_Result", pass.GetBuffer(finalRendererCountsBuffer));
                     command.DispatchNormalized(clearShader, 0, gpuInstanceBuffers.totalRendererSum, 1, 1);
 
-                    command.SetComputeBufferParam(clearShader, 0, "_Result", pass.GetBuffer(gpuInstanceBuffers.visibleRendererInstanceIndicesBuffer));
+                    command.SetComputeBufferParam(clearShader, 0, "_Result", pass.GetBuffer(visibleRendererInstanceIndicesBuffer));
                     command.DispatchNormalized(clearShader, 0, gpuInstanceBuffers.instanceTimesRendererCount, 1, 1);
 
                     command.SetBufferData(renderGraph.BufferHandleSystem.GetResource(memoryCounterBuffer), emptyCounter);
@@ -87,8 +87,8 @@ namespace Arycama.CustomRenderPipeline
                 if (!isShadow)
                     pass.AddKeyword("HIZ_ON");
 
-                pass.WriteBuffer("_RendererInstanceIDs", gpuInstanceBuffers.rendererInstanceIDsBuffer);
-                pass.WriteBuffer("_RendererCounts", gpuInstanceBuffers.rendererCountsBuffer);
+                pass.WriteBuffer("_RendererInstanceIDs", rendererInstanceIDsBuffer);
+                pass.WriteBuffer("_RendererCounts", rendererCountsBuffer);
                 pass.WriteBuffer("_LodFades", gpuInstanceBuffers.lodFadesBuffer);
 
                 pass.ReadBuffer("_Positions", gpuInstanceBuffers.positionsBuffer);
@@ -114,11 +114,12 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.Initialize(scanShader, 0, gpuInstanceBuffers.totalRendererSum);
 
-                pass.WriteBuffer("_RendererCounts", gpuInstanceBuffers.rendererCountsBuffer);
-                pass.WriteBuffer("_RendererInstanceIndexOffsets", gpuInstanceBuffers.rendererInstanceIndexOffsetsBuffer);
+                pass.WriteBuffer("_RendererInstanceIndexOffsets", rendererInstanceIndexOffsetsBuffer);
                 pass.WriteBuffer("_DrawCallArgs", gpuInstanceBuffers.drawCallArgsBuffer);
                 pass.WriteBuffer("_MemoryCounter", memoryCounterBuffer);
 
+                pass.ReadBuffer("_MemoryCounter", memoryCounterBuffer);
+                pass.ReadBuffer("_RendererCounts", rendererCountsBuffer);
                 pass.ReadBuffer("_SubmeshOffsetLengths", gpuInstanceBuffers.submeshOffsetLengthsBuffer);
 
                 pass.SetRenderFunction((command, pass) =>
@@ -131,14 +132,15 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.Initialize(compactShader, 0, gpuInstanceBuffers.totalInstanceCount);
 
-                pass.WriteBuffer("_FinalRendererCounts", gpuInstanceBuffers.finalRendererCountsBuffer);
-                pass.WriteBuffer("_VisibleRendererInstanceIndices", gpuInstanceBuffers.visibleRendererInstanceIndicesBuffer);
+                pass.WriteBuffer("_FinalRendererCounts", finalRendererCountsBuffer);
+                pass.WriteBuffer("_VisibleRendererInstanceIndices", visibleRendererInstanceIndicesBuffer);
 
-                pass.ReadBuffer("_RendererInstanceIDs", gpuInstanceBuffers.rendererInstanceIDsBuffer);
-                pass.ReadBuffer("_RendererInstanceIndexOffsets", gpuInstanceBuffers.rendererInstanceIndexOffsetsBuffer);
+                pass.ReadBuffer("_RendererInstanceIDs", rendererInstanceIDsBuffer);
+                pass.ReadBuffer("_RendererInstanceIndexOffsets", rendererInstanceIndexOffsetsBuffer);
                 pass.ReadBuffer("_InstanceTypeIds", gpuInstanceBuffers.instanceTypeIdsBuffer);
                 pass.ReadBuffer("_InstanceTypeData", gpuInstanceBuffers.instanceTypeDataBuffer);
                 pass.ReadBuffer("_InstanceTypeLodData", gpuInstanceBuffers.instanceTypeLodDataBuffer);
+                pass.ReadBuffer("_FinalRendererCounts", finalRendererCountsBuffer);
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -150,13 +152,6 @@ namespace Arycama.CustomRenderPipeline
             if (!gpuInstanceBuffers.rendererDrawCallData.TryGetValue(passName, out var drawList))
                 return;
 
-            var depth = renderGraph.GetResource<CameraDepthData>().Handle;
-            var albedoMetallic = renderGraph.GetResource<AlbedoMetallicData>().Handle;
-            var normalRoughness = renderGraph.GetResource<NormalRoughnessData>().Handle;
-            var bentNormalOcclusion = renderGraph.GetResource<BentNormalOcclusionData>().Handle;
-            var cameraTarget = renderGraph.GetResource<CameraTargetData>().Handle;
-            var velocity = renderGraph.GetResource<VelocityData>().Handle;
-
             // Render instances
             foreach (var draw in drawList)
             {
@@ -166,43 +161,31 @@ namespace Arycama.CustomRenderPipeline
                 if (draw.renderQueue < renderQueueMin || draw.renderQueue > renderQueueMax)
                     continue;
 
-                using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Gpu Driven Rendering"))
+                using (var pass = renderGraph.AddRenderPass<DrawInstancedIndirectRenderPass>("Gpu Driven Rendering"))
                 {
-                    pass.WriteTexture(depth);
-                    pass.WriteTexture(albedoMetallic);
-                    pass.WriteTexture(normalRoughness);
-                    pass.WriteTexture(bentNormalOcclusion);
-                    pass.WriteTexture(cameraTarget);
-                    pass.WriteTexture(velocity);
+                    pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, gpuInstanceBuffers.drawCallArgsBuffer, draw.passIndex, "INDIRECT_RENDERING", 0.0f, 0.0f, true, draw.indirectArgsOffset);
+
+                    pass.WriteDepth(renderGraph.GetResource<CameraDepthData>());
+                    pass.WriteTexture(renderGraph.GetResource<AlbedoMetallicData>());
+                    pass.WriteTexture(renderGraph.GetResource<NormalRoughnessData>());
+                    pass.WriteTexture(renderGraph.GetResource<BentNormalOcclusionData>());
+                    pass.WriteTexture(renderGraph.GetResource<CameraTargetData>());
+                    pass.WriteTexture(renderGraph.GetResource<VelocityData>());
                     pass.AddRenderPassData<AutoExposureData>();
                     pass.AddRenderPassData<TemporalAAData>();
                     pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<ICommonPassData>();
 
-                    pass.ReadBuffer("_RendererInstanceIndexOffsets", gpuInstanceBuffers.rendererInstanceIndexOffsetsBuffer);
-                    pass.ReadBuffer("_VisibleRendererInstanceIndices", gpuInstanceBuffers.visibleRendererInstanceIndicesBuffer);
+                    pass.ReadBuffer("_RendererInstanceIndexOffsets", rendererInstanceIndexOffsetsBuffer);
+                    pass.ReadBuffer("_VisibleRendererInstanceIndices", visibleRendererInstanceIndicesBuffer);
                     pass.ReadBuffer("_InstancePositions", gpuInstanceBuffers.positionsBuffer);
                     pass.ReadBuffer("_InstanceLodFades", gpuInstanceBuffers.lodFadesBuffer);
 
-                    pass.SetRenderFunction((command, pass) =>
+                    pass.SetRenderFunction((draw.rendererOffset, draw.localToWorld), (command, pass, data) =>
                     {
-                        var rtis = new RenderTargetIdentifier[5]
-                        {
-                            pass.GetRenderTexture(albedoMetallic),
-                            pass.GetRenderTexture(normalRoughness),
-                            pass.GetRenderTexture(bentNormalOcclusion),
-                            pass.GetRenderTexture(cameraTarget),
-                            pass.GetRenderTexture(velocity)
-                        };
-
-                        pass.SetInt("RendererOffset", draw.rendererOffset);
+                        pass.SetInt("RendererOffset", data.rendererOffset);
                         pass.SetVector("unity_WorldTransformParams", Vector4.one);
-                        pass.SetMatrix("_LocalToWorld", draw.localToWorld);
-
-                        command.SetRenderTarget(rtis, pass.GetRenderTexture(depth));
-                        command.EnableShaderKeyword("INDIRECT_RENDERING");
-                        command.DrawMeshInstancedIndirect(draw.mesh, draw.submeshIndex, draw.material, draw.passIndex, renderGraph.BufferHandleSystem.GetResource(gpuInstanceBuffers.drawCallArgsBuffer), draw.indirectArgsOffset);
-                        command.DisableShaderKeyword("INDIRECT_RENDERING");
+                        pass.SetMatrix("_LocalToWorld", data.localToWorld);
                     });
                 }
             }

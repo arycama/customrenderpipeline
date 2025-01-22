@@ -57,6 +57,26 @@
 
         Pass
         {
+            Name "MotionVectors"
+			Tags { "LightMode" = "MotionVectors" }
+
+            Stencil
+            {
+                Ref 17
+                Pass Replace
+            }
+
+            HLSLPROGRAM
+            #pragma vertex Vertex
+            #pragma fragment Fragment
+            #pragma multi_compile _ REFLECTION_PROBE_RENDERING
+
+            #include "SpeedTreeImposter.hlsl"
+            ENDHLSL
+        }
+
+        Pass
+        {
             ColorMask 0
             ZClip [_ZClip]
 

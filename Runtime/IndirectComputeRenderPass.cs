@@ -22,12 +22,12 @@ namespace Arycama.CustomRenderPipeline
         protected override void Execute()
         {
             foreach (var keyword in keywords)
-                command.EnableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
+                Command.EnableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
 
-            command.DispatchCompute(computeShader, kernelIndex, GetBuffer(indirectBuffer), argsOffset);
+            Command.DispatchCompute(computeShader, kernelIndex, GetBuffer(indirectBuffer), argsOffset);
 
             foreach (var keyword in keywords)
-                command.DisableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
+                Command.DisableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
 
             keywords.Clear();
         }

@@ -60,7 +60,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
                 var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
 
-                pass.SetRenderFunction((System.Action<CommandBuffer, RenderPass>)((command, pass) =>
+                pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetInt("_VerticesPerEdge", VerticesPerTileEdge);
                     pass.SetInt("_VerticesPerEdgeMinusOne", VerticesPerTileEdge - 1);
@@ -83,7 +83,7 @@ namespace Arycama.CustomRenderPipeline.Water
 
                     pass.SetFloat("_ShoreWaveWindSpeed", settings.Profile.WindSpeed);
                     pass.SetFloat("_ShoreWaveWindAngle", settings.Profile.WindAngle);
-                }));
+                });
             }
 
             renderGraph.SetResource(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction")));

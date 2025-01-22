@@ -19,7 +19,7 @@ public readonly struct BufferHandleDescriptor : IResourceDescriptor<GraphicsBuff
         UsageFlags = usageFlags;
     }
 
-    public GraphicsBuffer CreateResource()
+    public GraphicsBuffer CreateResource(ResourceHandleSystem system)
     {
         return new GraphicsBuffer(Target, UsageFlags, Count, Stride);
     }

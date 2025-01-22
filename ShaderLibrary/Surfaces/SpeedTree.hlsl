@@ -68,8 +68,8 @@ FragmentInput Vertex(VertexInput input)
 	output.tangent = float4(ObjectToWorldDirection(input.tangent.xyz, input.instanceID, true), input.tangent.w * unity_WorldTransformParams.w);
 	output.color = input.color;
 	
-	float3 previousWorldPosition = PreviousObjectToWorld(unity_MotionVectorsParams.x ? input.previousPosition : input.position, input.instanceID);
-	previousWorldPosition.y += sqrt(Sq(_PlanetRadius) - SqrLength(previousWorldPosition.xz)) - _PlanetRadius;
+	float3 previousWorldPosition = PreviousObjectToWorld(input.position, input.instanceID);
+	previousWorldPosition = PlanetCurve(previousWorldPosition);
 	output.previousPositionCS = WorldToClipPrevious(previousWorldPosition);
 #endif
 	

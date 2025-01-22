@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
@@ -15,6 +16,8 @@ namespace Arycama.CustomRenderPipeline
         private float clearDepth;
         private int clearStencil;
         private RenderTargetFlags renderTargetFlags;
+        private Vector2Int? resolution;
+        private bool isScreenPass;
 
         public int DepthSlice { get; set; } = -1;
         public int MipLevel { get; set; }
@@ -29,20 +32,43 @@ namespace Arycama.CustomRenderPipeline
 
         public void WriteTexture(ResourceHandle<RenderTexture> rtHandle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
         {
-            RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
             colorTargets.Add((rtHandle, loadAction, storeAction));
+            WriteResource(rtHandle);
         }
 
         public void WriteDepth(ResourceHandle<RenderTexture> rtHandle, RenderTargetFlags renderTargetFlags = RenderTargetFlags.None, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
         {
-            RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
             this.renderTargetFlags = renderTargetFlags;
             depthBuffer = (rtHandle, loadAction, storeAction);
+            WriteResource(rtHandle);
         }
+
+        private void WriteResource(ResourceHandle<RenderTexture> rtHandle)
+        {
+            RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
+
+            // Check that multiple targets have the same resolution
+            var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(rtHandle);
+            if (!resolution.HasValue)
+            {
+                resolution = new Vector2Int(descriptor.Width, descriptor.Height);
+                isScreenPass = descriptor.IsScreenTexture;
+            }
+            else
+            {
+                if (resolution != new Vector2Int(descriptor.Width, descriptor.Height))
+                    throw new InvalidOperationException($"Render Pass {Name} is attempting to write to multiple textures with different resolutions");
+
+                if (isScreenPass && !descriptor.IsScreenTexture)
+                    throw new InvalidOperationException($"Render Pass {Name} is setting multiple targets in pass that are not marked as screen textures");
+
+                if(!isScreenPass && !descriptor.IsExactSize)
+                    throw new InvalidOperationException($"Render Pass {Name} is setting multiple targets in pass that are not marked as exact size textures");
+            }
+        }
+
         protected override void SetupTargets()
         {
-            int width = 0, height = 0, targetWidth = 0, targetHeight = 0;
-
             var targets = ArrayPool<RenderTargetIdentifier>.Get(colorTargets.Count);
             var loads = ArrayPool<RenderBufferLoadAction>.Get(colorTargets.Count);
             var stores = ArrayPool<RenderBufferStoreAction>.Get(colorTargets.Count);
@@ -53,10 +79,8 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var handle = colorTargets[0].Item1;
                     var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
-                    width = descriptor.Width;
-                    height = descriptor.Height;
-
-                    command.SetRenderTarget(GetRenderTexture(handle), MipLevel, CubemapFace.Unknown, DepthSlice);
+                    Assert.AreEqual(new Vector2Int(descriptor.Width, descriptor.Height), resolution.Value);
+                    Command.SetRenderTarget(GetRenderTexture(handle), MipLevel, CubemapFace.Unknown, DepthSlice);
                 }
                 else
                 {
@@ -65,32 +89,26 @@ namespace Arycama.CustomRenderPipeline
                         var item = colorTargets[i];
                         var handle = item.Item1;
                         var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
-
-                        width = descriptor.Width;
-                        height = descriptor.Height;
-
+                        Assert.AreEqual(new Vector2Int(descriptor.Width, descriptor.Height), resolution.Value);
                         targets[i] = GetRenderTexture(handle);
                         loads[i] = item.Item2;
                         stores[i] = item.Item3;
                     }
 
-                    command.SetRenderTarget(targets, targets[0]);
+                    Command.SetRenderTarget(targets, targets[0]);
                 }
             }
             else
             {
                 var depthHandle = depthBuffer.Item1;
-                var depthDescriptor = RenderGraph.RtHandleSystem.GetDescriptor(depthHandle);
-                width = depthDescriptor.Width;
-                height = depthDescriptor.Height;
-
                 var depthTarget = GetRenderTexture(depthHandle);
-                targetWidth = depthTarget.width;
-                targetHeight = depthTarget.height;
 
                 if (colorTargets.Count == 0)
                 {
-                    command.SetRenderTarget(depthTarget, depthBuffer.Item2, depthBuffer.Item3, depthTarget, depthBuffer.Item2, depthBuffer.Item3);
+                    var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(depthHandle);
+                    Assert.AreEqual(new Vector2Int(descriptor.Width, descriptor.Height), resolution.Value);
+
+                    Command.SetRenderTarget(depthTarget, depthBuffer.Item2, depthBuffer.Item3, depthTarget, depthBuffer.Item2, depthBuffer.Item3);
                 }
                 else
                 {
@@ -99,9 +117,7 @@ namespace Arycama.CustomRenderPipeline
                         var item = colorTargets[i];
                         var handle = item.Item1;
                         var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
-
-                        width = descriptor.Width;
-                        height = descriptor.Height;
+                        Assert.AreEqual(new Vector2Int(descriptor.Width, descriptor.Height), resolution.Value);
 
                         targets[i] = GetRenderTexture(handle);
                         loads[i] = item.Item2;
@@ -109,15 +125,20 @@ namespace Arycama.CustomRenderPipeline
                     }
 
                     var binding = new RenderTargetBinding(targets, loads, stores, depthTarget, depthBuffer.Item2, depthBuffer.Item3) { flags = renderTargetFlags };
-                    command.SetRenderTarget(binding);
+                    Command.SetRenderTarget(binding);
 
                 }
             }
 
             if (clearFlags != RTClearFlags.None)
-                command.ClearRenderTarget(clearFlags, clearColor, clearDepth, (uint)clearStencil);
+                Command.ClearRenderTarget(clearFlags, clearColor, clearDepth, (uint)clearStencil);
 
-            command.SetViewport(new Rect(0, 0, width, height));
+            if(!resolution.HasValue)
+            {
+                throw new InvalidOperationException($"Render Pass {Name} has no resolution set, does it write to any textures");
+            }
+
+            Command.SetViewport(new Rect(0, 0, resolution.Value.x, resolution.Value.y));
 
             ArrayPool<RenderTargetIdentifier>.Release(targets);
             ArrayPool<RenderBufferLoadAction>.Release(loads);
@@ -131,7 +152,7 @@ namespace Arycama.CustomRenderPipeline
                 var handle = colorTarget.Item1;
                 var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
                 if (descriptor.AutoGenerateMips)
-                    command.GenerateMips(GetRenderTexture(handle));
+                    Command.GenerateMips(GetRenderTexture(handle));
             }
 
             // Reset all properties

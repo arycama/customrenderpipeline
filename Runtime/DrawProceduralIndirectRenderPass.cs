@@ -83,22 +83,22 @@ namespace Arycama.CustomRenderPipeline
         {
             if (!string.IsNullOrEmpty(Keyword))
             {
-                command.EnableShaderKeyword(Keyword);
+                Command.EnableShaderKeyword(Keyword);
             }
 
             if (depthBias != 0.0f || slopeDepthBias != 0.0f)
-                command.SetGlobalDepthBias(depthBias, slopeDepthBias);
+                Command.SetGlobalDepthBias(depthBias, slopeDepthBias);
 
-            command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
-            command.DrawProceduralIndirect(GetBuffer(indexBuffer), Matrix4x4.identity, material, passIndex, topology, GetBuffer(indirectArgsBuffer), argsOffset, propertyBlock);
-            command.SetGlobalFloat("_ZClip", 1.0f);
+            Command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
+            Command.DrawProceduralIndirect(GetBuffer(indexBuffer), Matrix4x4.identity, material, passIndex, topology, GetBuffer(indirectArgsBuffer), argsOffset, propertyBlock);
+            Command.SetGlobalFloat("_ZClip", 1.0f);
 
             if (depthBias != 0.0f || slopeDepthBias != 0.0f)
-                command.SetGlobalDepthBias(0.0f, 0.0f);
+                Command.SetGlobalDepthBias(0.0f, 0.0f);
 
             if (!string.IsNullOrEmpty(Keyword))
             {
-                command.DisableShaderKeyword(Keyword);
+                Command.DisableShaderKeyword(Keyword);
                 Keyword = null;
             }
 
@@ -136,8 +136,7 @@ namespace Arycama.CustomRenderPipeline
         private bool zClip;
         private int submeshIndex, argsOffset;
         private Mesh mesh;
-
-        public string Keyword { get; set; }
+        private string Keyword;
 
         public DrawInstancedIndirectRenderPass()
         {
@@ -204,22 +203,22 @@ namespace Arycama.CustomRenderPipeline
         {
             if (!string.IsNullOrEmpty(Keyword))
             {
-                command.EnableShaderKeyword(Keyword);
+                Command.EnableShaderKeyword(Keyword);
             }
 
             if (depthBias != 0.0f || slopeDepthBias != 0.0f)
-                command.SetGlobalDepthBias(depthBias, slopeDepthBias);
+                Command.SetGlobalDepthBias(depthBias, slopeDepthBias);
 
-            command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
-            command.DrawMeshInstancedIndirect(mesh, submeshIndex, material, passIndex, RenderGraph.BufferHandleSystem.GetResource(indirectArgsBuffer), argsOffset);
-            command.SetGlobalFloat("_ZClip", 1.0f);
+            Command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
+            Command.DrawMeshInstancedIndirect(mesh, submeshIndex, material, passIndex, RenderGraph.BufferHandleSystem.GetResource(indirectArgsBuffer), argsOffset, propertyBlock);
+            Command.SetGlobalFloat("_ZClip", 1.0f);
 
             if (depthBias != 0.0f || slopeDepthBias != 0.0f)
-                command.SetGlobalDepthBias(0.0f, 0.0f);
+                Command.SetGlobalDepthBias(0.0f, 0.0f);
 
             if (!string.IsNullOrEmpty(Keyword))
             {
-                command.DisableShaderKeyword(Keyword);
+                Command.DisableShaderKeyword(Keyword);
                 Keyword = null;
             }
 
