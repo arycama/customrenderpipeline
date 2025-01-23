@@ -4,236 +4,30 @@
 
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/TerrainCommon.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 
-struct Bounds
-{
-	float3 min;
-	float pad0;
-	float3 size;
-	float pad1;
-};
+RWStructuredBuffer<uint> _RendererInstanceIDs;
+RWStructuredBuffer<float3x4> _ObjectToWorldWrite;
 
-struct InstanceTypeData
-{
-	float3 localReferencePoint;
-	float radius;
-	uint lodCount, lodSizeBufferPosition, instanceCount, lodRendererOffset;
-};
-
-struct InstanceTypeLodData
-{
-	uint rendererStart, rendererCount, instancesStart, pad;
-};
-
-float4x4 _ScreenMatrix;
-
-// Stores the instanceID of each renderer if visible, or 0
-RWStructuredBuffer<uint> _RendererInstanceIDs, _RendererCounts;
-RWStructuredBuffer<float> _LodFades;
-
+StructuredBuffer<float4> _InstanceBounds;
 StructuredBuffer<float3x4> _Positions;
-StructuredBuffer<InstanceTypeData> _InstanceTypeData;
-StructuredBuffer<InstanceTypeLodData> _InstanceTypeLodData;
-StructuredBuffer<Bounds> _RendererBounds;
-
-Buffer<float> _LodSizes;
-Buffer<uint> _InstanceTypes;
-
 uint _InstanceCount;
 
-float3 MatrixScaleColumnMajor(float4x3 mat)
-{
-	return float3(length(mat[0]), length(mat[1]), length(mat[2]));
-}
-
-float3 MatrixScaleColumnMajor(float4x4 mat)
-{
-	return MatrixScaleColumnMajor((float4x3) mat);
-}
-
-float3 MatrixScaleRowMajor(float4x4 mat)
-{
-	return MatrixScaleColumnMajor(transpose(mat));
-}
-
-float3 MatrixScaleRowMajor(float3x4 mat)
-{
-	return MatrixScaleColumnMajor(transpose(mat));
-}
-
-Texture2D<float> _CameraMaxZTexture;
-int _MaxHiZMip;
-
-bool HiZCull(float3 screenMin, float3 screenMax, float2 resolution)
-{
-	// https://interplayoflight.wordpress.com/2017/11/15/experiments-in-gpu-based-occlusion-culling/
-	float2 size = (screenMax.xy - screenMin.xy) * resolution;
-	float mip = ceil(log2(Max2(size)));
-	
-	 // Texel footprint for the lower (finer-grained) level
-	float levelLower = max(mip - 1, 0);
-	float2 scale = exp2(-levelLower);
-	float2 a = floor(screenMin.xy * scale);
-	float2 b = ceil(screenMax.xy * scale);
-	float2 dims = b - a;
- 
-    // Use the lower level if we only touch <= 2 texels in both dimensions
-	if (dims.x <= 2.0 && dims.y <= 2.0)
-		mip = levelLower;
-	
-	if (mip < _MaxHiZMip)
-	{
-		// find the max depth
-#if 1
-		float minDepth = _CameraMaxZTexture.SampleLevel(_PointClampSampler, float2(screenMin.x, screenMin.y), mip);
-		minDepth = min(minDepth, _CameraMaxZTexture.SampleLevel(_PointClampSampler, float2(screenMax.x, screenMin.y), mip));
-		minDepth = min(minDepth, _CameraMaxZTexture.SampleLevel(_PointClampSampler, float2(screenMin.x, screenMax.y), mip));
-		minDepth = min(minDepth, _CameraMaxZTexture.SampleLevel(_PointClampSampler, float2(screenMax.x, screenMax.y), mip));
-#else
-			float minDepth = _CameraMaxZTexture.mips[mip][float2(screenMin.x, screenMin.y) * resolution / exp2(mip)];
-			minDepth = min(minDepth, _CameraMaxZTexture.mips[mip][float2(screenMax.x, screenMin.y) * resolution / exp2(mip)]);
-			minDepth = min(minDepth, _CameraMaxZTexture.mips[mip][float2(screenMin.x, screenMax.y) * resolution / exp2(mip)]);
-			minDepth = min(minDepth, _CameraMaxZTexture.mips[mip][float2(screenMax.x, screenMax.y) * resolution / exp2(mip)]);
-#endif
-		
-		if (screenMax.z < minDepth)
-			return false;
-	}
-	
-	return true;
-}
-
-bool HiZCull(float3 boundsMin, float3 boundsSize, float2 resolution, float4x4 screenMatrix)
-{
-	// Transform 8 corners into screen space and compute bounding box
-	float3 screenMin = FloatMax, screenMax = FloatMin;
-	
-	[unroll]
-	for (float z = 0; z < 2; z++)
-	{
-		[unroll]
-		for (float y = 0; y < 2; y++)
-		{
-			[unroll]
-			for (float x = 0; x < 2; x++)
-			{
-				float3 positionWS = boundsMin + boundsSize * float3(x, y, z);
-				float3 positionCS = MultiplyPointProj(screenMatrix, positionWS).xyz;
-				screenMin = min(screenMin, positionCS);
-				screenMax = max(screenMax, positionCS);
-			}
-		}
-	}
-	
-	return HiZCull(screenMin, screenMax, resolution);
-}
-
-[numthreads(512, 1, 1)]
+[numthreads(1024, 1, 1)]
 void Visibility(uint id : SV_DispatchThreadID)
 {
-	// Early exit for out of bounds threads
 	if (id >= _InstanceCount)
 		return;
-	
-	// Fetch the world matrix and type for this instance
-	float3x4 objectToWorld = _Positions[id];
-	objectToWorld._m03_m13_m23 -= _ViewPosition;
-	
-	uint instanceType = _InstanceTypes[id];
-	
-	// Fetch data for this instance type
-	InstanceTypeData instanceTypeData = _InstanceTypeData[instanceType];
-	
-	// Calculate max scale from objectToWorldTranspose matrix
-	float scale = Max3(MatrixScaleRowMajor(objectToWorld));
-	
-	// Early exit if lod sphere is outside frustum
-	float3 spherePositionWS = MultiplyPoint3x4(objectToWorld, instanceTypeData.localReferencePoint);
-	for (uint i = 0; i < _CullingPlanesCount; i++)
-	{
-		if (DistanceFromPlane(spherePositionWS, _CullingPlanes[i]) < (-instanceTypeData.radius * scale))
-			return;
-	}
 		
-	// Determine correct lod
-	uint lod = UintMax;
-	float radius = ProjectedSphereRadius(instanceTypeData.radius * scale, spherePositionWS, _CameraAspect);
-	for (i = 0; i < instanceTypeData.lodCount; i++)
-	{
-		float lodSize = _LodSizes[i + instanceTypeData.lodSizeBufferPosition];
-		if (radius <= lodSize)
-			continue;
-			
-		lod = i;
-		
-		// Calculate+Write out the lod fade if visible
-		float prevLod = i == 0 ? 1 : _LodSizes[i - 1 + instanceTypeData.lodSizeBufferPosition];
-		float delta = lodSize - prevLod;
-		_LodFades[id] = (delta == 0) ? 0 : saturate((radius - prevLod) * rcp(delta));
-		
-		break;
-	}
+	float4 boundsData = _InstanceBounds[id];
+	float3 boundsExtents = R11G11B10ToFloat3(asuint(boundsData.w));
 	
-	// If smaller than the smallest lod size, this lod is culled, so do not render
-	if (lod == UintMax)
+	if (!FrustumCull(boundsData.xyz - _ViewPosition, boundsExtents))
 		return;
+		
+	// If frustum cull
+	uint offset = _RendererInstanceIDs.IncrementCounter();
+	_RendererInstanceIDs[offset] = id + 1;
 	
-	// Index/length into the buffer of renderers for this lod, so that we can check their visibility
-	InstanceTypeLodData instanceTypeLodData = _InstanceTypeLodData[instanceTypeData.lodRendererOffset + lod];
-	
-	// Determine if each renderer for this lod is visible
-	for (i = 0; i < instanceTypeLodData.rendererCount; i++)
-	{
-		// Fetch renderer bounds, transform to world space
-		Bounds bounds = _RendererBounds[instanceTypeLodData.rendererStart + i];
-
-		float3 boundsMin, boundsMax, screenMin, screenMax;
-		bool isInitialized = false;
-
-		[unroll]
-		for (float z = 0; z < 2; z++)
-		{
-			[unroll]
-			for (float y = 0; y < 2; y++)
-			{
-				[unroll]
-				for (float x = 0; x < 2; x++)
-				{
-					// Transform corners from object to world space, and calculate min/max for Frustum culling
-					float3 positionOS = bounds.min + bounds.size * float3(x, y, z);
-					float3 positionWS = MultiplyPoint3x4(objectToWorld, positionOS);
-					boundsMin = isInitialized ? min(boundsMin, positionWS) : positionWS;
-					boundsMax = isInitialized ? max(boundsMax, positionWS) : positionWS;
-					
-					// Transform position to clip space for HiZ
-					float3 positionCS = MultiplyPointProj(_ScreenMatrix, positionWS).xyz;
-					positionCS.xy = positionCS.xy * 0.5 + 0.5;
-					
-					screenMin = isInitialized ? min(screenMin, positionCS) : positionCS;
-					screenMax = isInitialized ? max(screenMax, positionCS) : positionCS;
-					
-					isInitialized = true;
-				}
-			}
-		}
-		
-		float3 center = (boundsMin + boundsMax) * 0.5;
-		float3 extents = (boundsMax - boundsMin) * 0.5;
-		
-		if (!FrustumCull(center, extents))
-			continue;
-		
-		#ifdef HIZ_ON
-			if (!HiZCull(screenMin, screenMax, _ScaledResolution.zw))
-				continue;
-		#endif
-				
-		// Write InstanceID into the renderer if visible
-		// There is one uint per renderer per instance, and one  thread per instance. ThreadID*rendererCoutn + rendererOffset gives us the destination
-		uint dstIndex = instanceTypeLodData.instancesStart + i * instanceTypeData.instanceCount + id;
-			
-		// Increment the global counter for this instance
-		_RendererInstanceIDs[dstIndex] = id + 1;
-		InterlockedAdd(_RendererCounts[instanceTypeLodData.rendererStart + i], 1);
-	}
+	_ObjectToWorldWrite[offset] = _Positions[id];
 }

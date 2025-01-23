@@ -9,7 +9,7 @@ namespace Arycama.CustomRenderPipeline
     public class GpuDrivenRenderingSetup : RenderFeature
     {
         private readonly ComputeShader fillInstanceTypeIdShader;
-        private ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, submeshOffsetLengthsBuffer, lodSizesBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer;
+        private ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, submeshOffsetLengthsBuffer, lodSizesBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer, instanceBoundsBuffer;
 
         private Dictionary<string, List<RendererDrawCallData>> passDrawList = new();
 
@@ -33,6 +33,7 @@ namespace Arycama.CustomRenderPipeline
             renderGraph.ReleasePersistentResource(positionsBuffer);
             renderGraph.ReleasePersistentResource(instanceTypeDataBuffer);
             renderGraph.ReleasePersistentResource(instanceTypeLodDataBuffer);
+            renderGraph.ReleasePersistentResource(instanceBoundsBuffer);
         }
 
         public override void Render()
@@ -56,6 +57,25 @@ namespace Arycama.CustomRenderPipeline
             instanceTypeIdsBuffer = renderGraph.GetBuffer(positionCountSum, isPersistent: true);
             positionsBuffer = renderGraph.GetBuffer(positionCountSum, sizeof(float) * 12, isPersistent: true);
             lodFadesBuffer = renderGraph.GetBuffer(positionCountSum, isPersistent: true);
+            instanceBoundsBuffer = renderGraph.GetBuffer(positionCountSum, sizeof(float) * 4, isPersistent: true);
+
+            // Need to compute bounds for each instance
+            var boundsData = new List<Bounds>();
+            foreach (var prefab in proceduralGenerationController.prefabs)
+            {
+                var childRenderers = prefab.prefab.GetComponentsInChildren<MeshRenderer>();
+                if (childRenderers.Length == 0)
+                    continue;
+
+                var bounds = childRenderers[0].bounds;
+                for(var i = 1; i < childRenderers.Length; i++)
+                    bounds.Encapsulate(childRenderers[i].bounds);
+
+                boundsData.Add(bounds);
+            }
+
+            // TODO: Use lock buffer?
+            var instanceBoundsBufferTemp = renderGraph.GetBuffer(proceduralGenerationController.prefabs.Count, UnsafeUtility.SizeOf<Bounds>());
 
             // TODO: We need to convert from the indices written in the original pass to the final rendering indices
             var positionOffset = 0;
@@ -65,17 +85,22 @@ namespace Arycama.CustomRenderPipeline
                 {
                     pass.Initialize(fillInstanceTypeIdShader, 0, data.totalCount);
 
-                    pass.ReadBuffer("_PositionsInput", data.positions);
-                    pass.ReadBuffer("_InstanceTypeIdsInput", data.instanceId);
-
                     pass.WriteBuffer("_InstanceTypeIds", instanceTypeIdsBuffer);
                     pass.WriteBuffer("_PositionsResult", positionsBuffer);
                     pass.WriteBuffer("_LodFadesResult", lodFadesBuffer);
+                    pass.WriteBuffer("_InstanceBounds", instanceBoundsBuffer);
+                    pass.WriteBuffer("_InstanceTypeBounds", instanceBoundsBufferTemp);
+
+                    pass.ReadBuffer("_PositionsInput", data.positions);
+                    pass.ReadBuffer("_InstanceTypeIdsInput", data.instanceId);
+                    pass.ReadBuffer("_InstanceTypeBounds", instanceBoundsBufferTemp);
 
                     pass.SetRenderFunction((positionOffset, data.totalCount), (command, pass, data) =>
                     {
                         pass.SetInt("_Offset", data.positionOffset);
                         pass.SetInt("_Count", data.totalCount);
+
+                        command.SetBufferData(pass.GetBuffer(instanceBoundsBufferTemp), boundsData);
                     });
 
                     positionOffset += data.totalCount;
@@ -221,7 +246,7 @@ namespace Arycama.CustomRenderPipeline
                                     passDrawList.Add(passName, drawList);
                                 }
 
-                                var drawData = new RendererDrawCallData(material.renderQueue, mesh, i, material, j, indirectArgsOffset * sizeof(uint), totalRendererSum, localToWorld);
+                                var drawData = new RendererDrawCallData(material.renderQueue, mesh, i, material, j, indirectArgsOffset * sizeof(uint), totalRendererSum);
                                 drawList.Add(drawData);
                             }
 
@@ -288,7 +313,7 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            renderGraph.SetResource(new GpuInstanceBuffersData(positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, passDrawList, totalInstanceCount, instanceTimesRendererCount, totalRendererSum), true);
+            renderGraph.SetResource(new GpuInstanceBuffersData(positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, instanceBoundsBuffer, passDrawList, totalInstanceCount), true);
         }
     }
 }

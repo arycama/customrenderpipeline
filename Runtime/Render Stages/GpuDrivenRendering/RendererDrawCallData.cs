@@ -12,9 +12,8 @@ namespace Arycama.CustomRenderPipeline
         public int passIndex;
         public int indirectArgsOffset;
         public int rendererOffset;
-        public Matrix4x4 localToWorld;
 
-        public RendererDrawCallData(int renderQueue, Mesh mesh, int submeshIndex, Material material, int passIndex, int indirectArgsOffset, int rendererOffset, Matrix4x4 localToWorld)
+        public RendererDrawCallData(int renderQueue, Mesh mesh, int submeshIndex, Material material, int passIndex, int indirectArgsOffset, int rendererOffset)
         {
             this.renderQueue = renderQueue;
             this.mesh = mesh ?? throw new ArgumentNullException(nameof(mesh));
@@ -23,7 +22,6 @@ namespace Arycama.CustomRenderPipeline
             this.passIndex = passIndex;
             this.indirectArgsOffset = indirectArgsOffset;
             this.rendererOffset = rendererOffset;
-            this.localToWorld = localToWorld;
         }
     }
 }

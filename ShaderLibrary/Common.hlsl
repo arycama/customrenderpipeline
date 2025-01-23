@@ -267,26 +267,15 @@ float3 MultiplyVector(float3x4 mat, float3 v, bool doNormalize)
 	return MultiplyVector((float3x3) mat, v, doNormalize);
 }
 
-//#define INDIRECT_RENDERING
-
-// InstancedIndirect
-StructuredBuffer<uint> _RendererInstanceIndexOffsets;
-uint RendererOffset;
 StructuredBuffer<uint> _VisibleRendererInstanceIndices;
 StructuredBuffer<float3x4> _InstancePositions;
+StructuredBuffer<float3x4> _ObjectToWorld;
 StructuredBuffer<float> _InstanceLodFades;
-float4x4 _LocalToWorld;
 
 float3x4 GetObjectToWorld(uint instanceId)
 {
 	#ifdef INDIRECT_RENDERING
-		uint instanceIndex = instanceId + _RendererInstanceIndexOffsets[RendererOffset];
-		uint index = _VisibleRendererInstanceIndices[instanceIndex];
-	
-		float3x4 objectToWorld = _InstancePositions[index];
-		float4x4 _InstanceToWorld = float4x4(objectToWorld[0], objectToWorld[1], objectToWorld[2], float4(0, 0, 0, 1));
-	
-		return (float3x4)mul(_InstanceToWorld, _LocalToWorld);
+		return _ObjectToWorld[instanceId];
 	#else
 		#ifdef INSTANCING_ON
 			return (float3x4) unity_Builtins0Array[unity_BaseInstanceID + instanceId].unity_ObjectToWorldArray;
@@ -322,15 +311,9 @@ float4x4 FastInverse(float4x4 m)
 float3x4 GetWorldToObject(uint instanceId)
 {
 	#ifdef INDIRECT_RENDERING
-		uint instanceIndex = instanceId + _RendererInstanceIndexOffsets[RendererOffset];
-		uint index = _VisibleRendererInstanceIndices[instanceIndex];
-	
-		float3x4 objectToWorld = _InstancePositions[index];
-		float4x4 _InstanceToWorld = float4x4(objectToWorld[0], objectToWorld[1], objectToWorld[2], float4(0, 0, 0, 1));
-	
-		float4x4 localToWorld = mul(_InstanceToWorld, _LocalToWorld);
-		localToWorld[3] = float4(0, 0, 0, 1);
-		return (float3x4) FastInverse(localToWorld);
+		float3x4 objectToWorld = _ObjectToWorld[instanceId];
+		float4x4 instanceToWorld = float4x4(objectToWorld[0], objectToWorld[1], objectToWorld[2], float4(0, 0, 0, 1));
+		return (float3x4) FastInverse(instanceToWorld);
 	#else
 		#ifdef INSTANCING_ON
 			return (float3x4)unity_Builtins1Array[unity_BaseInstanceID + instanceId].unity_WorldToObjectArray;
@@ -374,6 +357,16 @@ float3 PreviousObjectToWorld(float3 position, uint instanceID)
 	
 	previousObjectToWorld._m03_m13_m23 -= _ViewPosition;
 	return MultiplyPoint3x4(previousObjectToWorld, position);
+}
+
+float GetTangentSign(uint instanceId)
+{
+	// TODO: Implement for flipped meshes?
+	#ifdef INDIRECT_RENDERING
+		return 1;
+	#else
+		return unity_WorldTransformParams.w;
+	#endif
 }
 
 float4 WorldToClip(float3 position)
@@ -581,9 +574,8 @@ float2 ParallaxOffset1Step(float height, float strength, float3 viewDir, float b
 
 float2 GetLodFade(uint instanceID)
 {
-	#ifdef INDIRECT_RENDERING
-		uint instanceIndex = instanceID + _RendererInstanceIndexOffsets[RendererOffset];
-		uint index = _VisibleRendererInstanceIndices[instanceIndex];
+#ifdef INDIRECT_RENDERING
+		uint index = _VisibleRendererInstanceIndices[instanceID];
 		return _InstanceLodFades[index].xx;
 	#else
 		#ifdef INSTANCING_ON

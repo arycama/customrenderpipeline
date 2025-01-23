@@ -65,7 +65,7 @@ FragmentInput Vertex(VertexInput input)
 #ifndef UNITY_PASS_SHADOWCASTER
 	output.worldPosition = worldPosition;
 	output.normal = ObjectToWorldNormal(input.normal, input.instanceID, true);
-	output.tangent = float4(ObjectToWorldDirection(input.tangent.xyz, input.instanceID, true), input.tangent.w * unity_WorldTransformParams.w);
+	output.tangent = float4(ObjectToWorldDirection(input.tangent.xyz, input.instanceID, true), input.tangent.w * GetTangentSign(input.instanceID));
 	output.color = input.color;
 	
 	float3 previousWorldPosition = PreviousObjectToWorld(input.position, input.instanceID);

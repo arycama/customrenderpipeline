@@ -6,11 +6,11 @@ namespace Arycama.CustomRenderPipeline
 {
     public struct GpuInstanceBuffersData : IRenderPassData
     {
-        public ResourceHandle<GraphicsBuffer> positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer;
+        public ResourceHandle<GraphicsBuffer> positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, instanceBoundsBuffer;
         public Dictionary<string, List<RendererDrawCallData>> rendererDrawCallData;
-        public int totalInstanceCount, instanceTimesRendererCount, totalRendererSum;
+        public int totalInstanceCount;
 
-        public GpuInstanceBuffersData(ResourceHandle<GraphicsBuffer> positionsBuffer, ResourceHandle<GraphicsBuffer> instanceTypeIdsBuffer, ResourceHandle<GraphicsBuffer> lodFadesBuffer, ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, ResourceHandle<GraphicsBuffer> lodSizesBuffer, ResourceHandle<GraphicsBuffer> instanceTypeDataBuffer, ResourceHandle<GraphicsBuffer> instanceTypeLodDataBuffer, ResourceHandle<GraphicsBuffer> submeshOffsetLengthsBuffer, ResourceHandle<GraphicsBuffer> drawCallArgsBuffer, Dictionary<string, List<RendererDrawCallData>> rendererDrawCallData, int totalInstanceCount, int instanceTimesRendererCount, int totalRendererSum)
+        public GpuInstanceBuffersData(ResourceHandle<GraphicsBuffer> positionsBuffer, ResourceHandle<GraphicsBuffer> instanceTypeIdsBuffer, ResourceHandle<GraphicsBuffer> lodFadesBuffer, ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, ResourceHandle<GraphicsBuffer> lodSizesBuffer, ResourceHandle<GraphicsBuffer> instanceTypeDataBuffer, ResourceHandle<GraphicsBuffer> instanceTypeLodDataBuffer, ResourceHandle<GraphicsBuffer> submeshOffsetLengthsBuffer, ResourceHandle<GraphicsBuffer> drawCallArgsBuffer, ResourceHandle<GraphicsBuffer> instanceBoundsBuffer, Dictionary<string, List<RendererDrawCallData>> rendererDrawCallData, int totalInstanceCount)
         {
             this.positionsBuffer = positionsBuffer;
             this.instanceTypeIdsBuffer = instanceTypeIdsBuffer;
@@ -23,8 +23,7 @@ namespace Arycama.CustomRenderPipeline
             this.drawCallArgsBuffer = drawCallArgsBuffer;
             this.rendererDrawCallData = rendererDrawCallData;
             this.totalInstanceCount = totalInstanceCount;
-            this.instanceTimesRendererCount = instanceTimesRendererCount;
-            this.totalRendererSum = totalRendererSum;
+            this.instanceBoundsBuffer = instanceBoundsBuffer;
         }
 
         void IRenderPassData.SetInputs(RenderPass pass)

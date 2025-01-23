@@ -163,10 +163,6 @@ FragmentInput Vertex(VertexInput vertex)
 EARLY_DEPTH_STENCIL
 FRAGMENT_OUTPUT Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace) FRAGMENT_OUTPUT_TYPE
 {
-	#ifdef INDIRECT_RENDERING
-		unity_WorldTransformParams = 1;
-	#endif
-
 	#ifdef LOD_FADE_CROSSFADE
 		float dither = InterleavedGradientNoise(input.positionCS.xy, 0);
 		float fade = GetLodFade(input.instanceID).x;
@@ -190,7 +186,7 @@ FRAGMENT_OUTPUT Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	#ifdef REQUIRES_FRAGMENT_TANGENT
 		fragmentData.tangent = input.tangent.xyz;
 		fragmentData.binormalSign = input.tangent.w;
-		fragmentData.binormal = cross(fragmentData.normal, fragmentData.tangent) * (fragmentData.binormalSign * unity_WorldTransformParams.w);
+		fragmentData.binormal = cross(fragmentData.normal, fragmentData.tangent) * (fragmentData.binormalSign * GetTangentSign(input.instanceID));
 	#else
 		// Default frame
 		fragmentData.tangent = normalize(cross(fragmentData.normal, float3(0, 0, 1)));

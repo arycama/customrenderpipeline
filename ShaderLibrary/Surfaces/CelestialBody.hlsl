@@ -18,6 +18,7 @@ struct VertexInput
 
 struct FragmentInput
 {
+	uint instanceID : SV_InstanceID;
 	float4 positionCS : SV_Position;
 	float2 uv : TEXCOORD0;
 	float3 normal : NORMAL;
@@ -46,6 +47,7 @@ FragmentInput Vertex(VertexInput v)
 	o.normal = ObjectToWorldNormal(v.normalOS, v.instanceID, true);
 	o.tangent = float4(ObjectToWorldDirection(v.tangentOS.xyz, v.instanceID, true), v.tangentOS.w);
 	o.uv = v.uv;
+	o.instanceID = v.instanceID;
 	return o;
 }
 
@@ -96,7 +98,7 @@ float3 Fragment(FragmentInput input) : SV_Target
 		illuminance *= max(0, factor);
 	#endif
 
-	float3 bitangent = cross(input.normal, input.tangent.xyz) * (input.tangent.w * unity_WorldTransformParams.w);
+	float3 bitangent = cross(input.normal, input.tangent.xyz) * (input.tangent.w * GetTangentSign(input.instanceID));
 	float3x3 tangentToWorld = float3x3(input.tangent.xyz, bitangent, input.normal);
 	float3 N = MultiplyVector(normalTS, tangentToWorld, true);
 

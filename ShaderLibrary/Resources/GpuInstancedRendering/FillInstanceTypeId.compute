@@ -1,12 +1,22 @@
 #pragma kernel FillData
 
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
+
+struct Bounds
+{
+	float3 center, extents;
+};
+
 uint _Offset, _Count;
 
 RWStructuredBuffer<uint> _InstanceTypeIds;
 RWStructuredBuffer<float3x4> _PositionsResult;
 RWStructuredBuffer<float> _LodFadesResult;
+RWStructuredBuffer<float4> _InstanceBounds;
 
 StructuredBuffer<float3x4> _PositionsInput;
+StructuredBuffer<Bounds> _InstanceTypeBounds;
 Buffer<uint> _InstanceTypeIdsInput;
 
 [numthreads(1024, 1, 1)]
@@ -15,7 +25,42 @@ void FillData(uint id : SV_DispatchThreadID)
 	if (id >= _Count)
 		return;
 	
-	_InstanceTypeIds[_Offset + id] = _InstanceTypeIdsInput[id];
-	_PositionsResult[_Offset + id] = _PositionsInput[id];
-	_LodFadesResult[id] = 0;
+	uint instanceType = _InstanceTypeIdsInput[id];
+	float3x4 objectToWorld = _PositionsInput[id];
+	Bounds bounds = _InstanceTypeBounds[instanceType];
+	
+	float3 inputMin = bounds.center - bounds.extents;
+	float3 inputSize = bounds.extents * 2;
+	float3 boundsMin, boundsMax;
+
+	[unroll]
+	for (float z = 0; z < 2; z++)
+	{
+		[unroll]
+		for (float y = 0; y < 2; y++)
+		{
+			[unroll]
+			for (float x = 0; x < 2; x++)
+			{
+				// Transform corners from object to world space, and calculate min/max for Frustum culling
+				float3 positionOS = inputMin + inputSize * float3(x, y, z);
+				float3 positionWS = MultiplyPoint3x4(objectToWorld, positionOS);
+				boundsMin = any(float3(x, y, z)) ? min(boundsMin, positionWS) : positionWS;
+				boundsMax = any(float3(x, y, z)) ? max(boundsMax, positionWS) : positionWS;
+			}
+		}
+	}
+	
+	float3 center = 0.5 * (boundsMax + boundsMin);
+	float3 extents = 0.5 * (boundsMax - boundsMin);
+	
+	float4 packedBounds;
+	packedBounds.xyz = center;
+	packedBounds.w = asfloat(Float3ToR11G11B10(extents));
+	
+	_InstanceTypeIds[_Offset + id] = instanceType;
+	_PositionsResult[_Offset + id] = objectToWorld;
+	_LodFadesResult[_Offset + id] = 0;
+	_InstanceBounds[_Offset + id] = packedBounds;
+
 }

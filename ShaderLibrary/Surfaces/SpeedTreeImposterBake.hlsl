@@ -14,6 +14,7 @@ struct VertexInput
 	float3 normal : NORMAL;
 	float4 tangent : TANGENT;
 	float4 color : COLOR;
+	uint instanceId : SV_InstanceID;
 };
 
 struct FragmentInput
@@ -23,6 +24,7 @@ struct FragmentInput
 	float3 normal : NORMAL;
 	float4 tangent : TANGENT;
 	float4 color : COLOR;
+	uint instanceId : SV_InstanceID;
 };
 
 struct FragmentOutput
@@ -41,6 +43,7 @@ FragmentInput Vertex(VertexInput input)
 	output.normal = normalize(mul(input.normal, (float3x3) unity_WorldToObject));
 	output.tangent = float4(normalize(mul((float3x3) unity_ObjectToWorld, input.tangent.xyz)), input.tangent.w);
 	output.color = input.color;
+	output.instanceId = input.instanceId;
 	return output;
 }
 
@@ -60,7 +63,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	if (!isFrontFace)
 		normal.z = -normal.z;
 	
-	float3 binormal = cross(input.normal, input.tangent.xyz) * (input.tangent.w * unity_WorldTransformParams.w);
+	float3 binormal = cross(input.normal, input.tangent.xyz) * (input.tangent.w * GetTangentSign(input.instanceId));
 	float3x3 tangentToWorld = float3x3(input.tangent.xyz, binormal, input.normal);
 	normal = normalize(mul(normal, tangentToWorld));
 	
