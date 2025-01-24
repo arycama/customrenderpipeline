@@ -1,17 +1,21 @@
-﻿#pragma kernel Scan
+﻿#pragma kernel StreamCompaction
 
-RWBuffer<uint> _MemoryCounter, _DrawCallArgs;
-Buffer<uint> _RendererCounts;
-Buffer<uint2> _SubmeshOffsetLengths;
-uint _Count;
+uint _InstanceCount;
+StructuredBuffer<uint> _RendererInstanceIDs;
+RWStructuredBuffer<uint> instanceDataOut;
+StructuredBuffer<float3x4> _Positions;
+RWStructuredBuffer<float3x4> _ObjectToWorldWrite;
 
-// Determines the final destination of each renderer ID. 
-// One thread ID per renderer "type"
-[numthreads(64, 1, 1)]
-void Scan(uint id : SV_DispatchThreadID)
+[numthreads(1024, 1, 1)]
+void StreamCompaction(uint id : SV_DispatchThreadID)
 {
-	if (id >= _Count)
+	if (id >= _InstanceCount)
+		return;
+		
+	bool isVisible = _RendererInstanceIDs[id];
+	if (!isVisible)
 		return;
 	
-	_DrawCallArgs[1] = _RendererCounts[id];
+	uint offset = _ObjectToWorldWrite.IncrementCounter();
+	_ObjectToWorldWrite[offset] = _Positions[id];
 }

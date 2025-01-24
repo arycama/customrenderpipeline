@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -50,7 +52,10 @@ public readonly struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
             volumeDepth = VolumeDepth,
         };
 
-        _ = result.Create();
+        if(!result.Create())
+        {
+            Debug.LogError($"{width} {height} {VolumeDepth}");
+        }
 
         return result;
     }

@@ -43,10 +43,10 @@ void FillData(uint id : SV_DispatchThreadID)
 			for (float x = 0; x < 2; x++)
 			{
 				// Transform corners from object to world space, and calculate min/max for Frustum culling
-				float3 positionOS = inputMin + inputSize * float3(x, y, z);
-				float3 positionWS = MultiplyPoint3x4(objectToWorld, positionOS);
-				boundsMin = any(float3(x, y, z)) ? min(boundsMin, positionWS) : positionWS;
-				boundsMax = any(float3(x, y, z)) ? max(boundsMax, positionWS) : positionWS;
+				float3 objectPosition = inputMin + inputSize * float3(x, y, z);
+				float3 worldPosition = MultiplyPoint3x4(objectToWorld, objectPosition);
+				boundsMin = any(float3(x, y, z)) ? min(boundsMin, worldPosition) : worldPosition;
+				boundsMax = any(float3(x, y, z)) ? max(boundsMax, worldPosition) : worldPosition;
 			}
 		}
 	}

@@ -31,7 +31,6 @@ namespace Arycama.CustomRenderPipeline
                 return;
 
             var viewData = renderGraph.GetResource<ViewResolutionData>();
-            var hiZTexture = renderGraph.GetResource<HiZMinDepthData>().Handle;
             var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
 
             var viewMatrix = camera.worldToCameraMatrix;
@@ -44,9 +43,7 @@ namespace Arycama.CustomRenderPipeline
             for (var i = 0; i < cullingPlanes.Count; i++)
                 cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
 
-            var rendererInstanceIDsBuffer = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount, target: GraphicsBuffer.Target.Counter);
-            var objectToWorld = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount, UnsafeUtility.SizeOf<Matrix3x4>(), target: GraphicsBuffer.Target.Counter);
-
+            var rendererInstanceIDsBuffer = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Cull"))
             {
                 pass.Initialize(cullingShader, 0, gpuInstanceBuffers.totalInstanceCount);
@@ -55,21 +52,33 @@ namespace Arycama.CustomRenderPipeline
                     pass.AddKeyword("HIZ_ON");
 
                 pass.WriteBuffer("_RendererInstanceIDs", rendererInstanceIDsBuffer);
-                pass.WriteBuffer("_ObjectToWorldWrite", objectToWorld);
-
-                pass.ReadBuffer("_Positions", gpuInstanceBuffers.positionsBuffer);
                 pass.ReadBuffer("_InstanceBounds", gpuInstanceBuffers.instanceBoundsBuffer);
-                pass.ReadTexture("_CameraMaxZTexture", hiZTexture);
+
+                pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<HiZMaxDepthData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetMatrix("_ScreenMatrix", screenMatrix);
                     pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
-                    pass.SetInt("_MaxHiZMip", Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight) - 1);
+                    pass.SetFloat("_MaxHiZMip", Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight) - 1);
                     pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
                     pass.SetInt("_InstanceCount", gpuInstanceBuffers.totalInstanceCount);
+                });
+            }
 
-                    command.SetBufferCounterValue(pass.GetBuffer(rendererInstanceIDsBuffer), 0);
+            var objectToWorld = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount, UnsafeUtility.SizeOf<Matrix3x4>(), target: GraphicsBuffer.Target.Counter);
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Scan"))
+            {
+                pass.Initialize(scanShader, 0, gpuInstanceBuffers.totalInstanceCount);
+                pass.WriteBuffer("_ObjectToWorldWrite", objectToWorld);
+                pass.ReadBuffer("_RendererInstanceIDs", rendererInstanceIDsBuffer);
+                pass.ReadBuffer("_Positions", gpuInstanceBuffers.positionsBuffer);
+
+                pass.SetRenderFunction((command, pass) =>
+                {
+                    command.SetBufferCounterValue(pass.GetBuffer(objectToWorld), 0);
+                    pass.SetInt("_InstanceCount", gpuInstanceBuffers.totalInstanceCount);
                 });
             }
 
@@ -77,7 +86,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    command.CopyCounterValue(pass.GetBuffer(rendererInstanceIDsBuffer), pass.GetBuffer(gpuInstanceBuffers.drawCallArgsBuffer), 4); 
+                    command.CopyCounterValue(pass.GetBuffer(objectToWorld), pass.GetBuffer(gpuInstanceBuffers.drawCallArgsBuffer), 4); 
                 });
             }
 

@@ -75,7 +75,10 @@ public class GenerateHiZ : RenderFeature
             }
         }
 
-        renderGraph.SetResource(new HiZMinDepthData(result));
+        if(mode == HiZMode.Min)
+            renderGraph.SetResource(new HiZMinDepthData(result));
+        else if(mode == HiZMode.Max)
+            renderGraph.SetResource(new HiZMaxDepthData(result));
     }
 
     public enum HiZMode

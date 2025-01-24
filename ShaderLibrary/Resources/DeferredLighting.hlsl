@@ -150,8 +150,6 @@ float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		result += c * _WaterAlbedo * RcpPi * color * luminance / samples;
 	}
 	
-	result = R11G11B10ToFloat3(Float3ToR11G11B10(result));
-	
 	// Note this is already jittered so we can sample directly
 	return result;
 }

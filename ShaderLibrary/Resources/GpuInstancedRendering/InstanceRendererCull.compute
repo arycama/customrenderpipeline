@@ -6,12 +6,81 @@
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/TerrainCommon.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 
-RWStructuredBuffer<uint> _RendererInstanceIDs;
-RWStructuredBuffer<float3x4> _ObjectToWorldWrite;
+float _MaxHiZMip;
+uint _InstanceCount;
 
 StructuredBuffer<float4> _InstanceBounds;
-StructuredBuffer<float3x4> _Positions;
-uint _InstanceCount;
+Texture2D<float> _HiZMaxDepth;
+RWStructuredBuffer<uint> _RendererInstanceIDs;
+
+bool IsVisible(float3 boundsCenter, float3 boundsExtents)
+{
+	if (!FrustumCull(boundsCenter, boundsExtents))
+		return false;
+		
+	float3 screenMin, screenMax;
+	
+	[unroll]
+	for (float z = 0; z < 2; z++)
+	{
+		[unroll]
+		for (float y = 0; y < 2; y++)
+		{
+			[unroll]
+			for (float x = 0; x < 2; x++)
+			{
+				float3 worldPosition = boundsCenter - boundsExtents + boundsExtents * 2 * float3(x, y, z);
+				float3 screenPosition = MultiplyPointProj(_WorldToScreen, worldPosition).xyz;
+				screenMin = any(float3(x, y, z)) ? min(screenMin, screenPosition) : screenPosition;
+				screenMax = any(float3(x, y, z)) ? max(screenMax, screenPosition) : screenPosition;
+			}
+		}
+	}
+	
+	// Calculate hi-Z buffer mip https://interplayoflight.wordpress.com/2017/11/15/experiments-in-gpu-based-occlusion-culling/
+	float2 size = (screenMax - screenMin).xy * _ScaledResolution.xy;
+	float mip = ceil(log2(Max2(size)));
+ 
+	// If object bounds is larger than entire screen, we can't conservatively reject it, so return visible
+	if (mip > _MaxHiZMip)
+		return true;
+		
+	if (mip > 0.0)
+	{
+		// Texel footprint for the lower (finer-grained) level
+		float levelLower = mip - 1.0;
+		float2 scale = exp2(-levelLower);
+		float2 a = floor(screenMin.xy * scale);
+		float2 b = ceil(screenMax.xy * scale);
+ 
+		// Use the lower level if we only touch <= 2 texels in both dimensions
+		if (all(b - a <= 2.0))
+			mip = levelLower;
+	}
+	else
+	{
+		mip = 0.0;
+	}
+	
+	float4 screenMinMax = float4(screenMin.xy, screenMax.xy);
+	float2 mipRes = floor(_ScaledResolution.xy * exp2(-mip));
+		
+	screenMinMax = screenMinMax * mipRes.xyxy;
+		
+	if (all(screenMinMax.xy >= 0 && screenMinMax.xy < mipRes) && screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.xy])
+		return true;
+			
+	if (all(screenMinMax.zy >= 0 && screenMinMax.zy < mipRes) && screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.zy])
+		return true;
+		
+	if (all(screenMinMax.xw >= 0 && screenMinMax.xw < mipRes) && screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.xw])
+		return true;
+		
+	if (all(screenMinMax.zw >= 0 && screenMinMax.zw < mipRes) && screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.zw])
+		return true;
+		
+	return false;
+}
 
 [numthreads(1024, 1, 1)]
 void Visibility(uint id : SV_DispatchThreadID)
@@ -20,14 +89,8 @@ void Visibility(uint id : SV_DispatchThreadID)
 		return;
 		
 	float4 boundsData = _InstanceBounds[id];
+	float3 boundsCenter = boundsData.xyz - _ViewPosition;
 	float3 boundsExtents = R11G11B10ToFloat3(asuint(boundsData.w));
 	
-	if (!FrustumCull(boundsData.xyz - _ViewPosition, boundsExtents))
-		return;
-		
-	// If frustum cull
-	uint offset = _RendererInstanceIDs.IncrementCounter();
-	_RendererInstanceIDs[offset] = id + 1;
-	
-	_ObjectToWorldWrite[offset] = _Positions[id];
+	_RendererInstanceIDs[id] = IsVisible(boundsCenter, boundsExtents);
 }

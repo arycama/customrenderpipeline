@@ -13,7 +13,7 @@ namespace Arycama.CustomRenderPipeline
         public VolumetricLighting(Settings settings, RenderGraph renderGraph) : base(renderGraph)
         {
             this.settings = settings;
-            colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", TextureDimension.Tex3D, isScreenTexture: true);
+            colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", TextureDimension.Tex3D);
         }
 
         protected override void Cleanup(bool disposing)
@@ -27,7 +27,7 @@ namespace Arycama.CustomRenderPipeline
             var volumeWidth = Mathf.CeilToInt(viewData.ScaledWidth / (float)settings.TileSize);
             var volumeHeight = Mathf.CeilToInt(viewData.ScaledHeight / (float)settings.TileSize);
             var volumeDepth = settings.DepthSlices;
-            var textures = colorHistory.GetTextures(volumeWidth, volumeHeight, viewData.ViewIndex, volumeDepth);
+            var (current, history, wasCreated) = colorHistory.GetTextures(volumeWidth, volumeHeight, viewData.ViewIndex, volumeDepth);
 
             var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
 
@@ -42,9 +42,9 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
             {
                 pass.Initialize(computeShader, 0, volumeWidth, volumeHeight, volumeDepth);
-                pass.WriteTexture("_Result", textures.current);
+                pass.WriteTexture("_Result", current);
 
-                pass.ReadTexture("_Input", textures.history);
+                pass.ReadTexture("_Input", history);
 
                 pass.AddRenderPassData<ClusteredLightCulling.Result>();
                 pass.AddRenderPassData<AutoExposureData>();
@@ -63,7 +63,7 @@ namespace Arycama.CustomRenderPipeline
                     volumeSlices: volumeDepth,
                     blurSigma: settings.BlurSigma,
                     volumeTileSize: settings.TileSize,
-                    history: textures.history,
+                    history: history,
                     pixelToWorldViewDir: pixelToWorldViewDir
                 ),
                 (command, pass, data) =>
@@ -85,7 +85,7 @@ namespace Arycama.CustomRenderPipeline
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Filter X"))
             {
                 pass.Initialize(computeShader, 1, volumeWidth, volumeHeight, volumeDepth);
-                pass.ReadTexture("_Input", textures.current);
+                pass.ReadTexture("_Input", current);
                 pass.WriteTexture("_Result", filterX);
             }
 
