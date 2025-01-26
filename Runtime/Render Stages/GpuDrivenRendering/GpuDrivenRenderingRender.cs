@@ -8,15 +8,13 @@ namespace Arycama.CustomRenderPipeline
     {
         private static readonly uint[] emptyCounter = new uint[1];
 
-        private readonly ComputeShader clearShader, cullingShader, scanShader, compactShader;
+        private readonly ComputeShader clearShader, cullingShader, scanShader;
 
         public GpuDrivenRenderingRender(RenderGraph renderGraph) : base(renderGraph)
         {
             clearShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceClear");
             cullingShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceRendererCull");
-            scanShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceScan");
-            compactShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCompaction");
-
+            scanShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstancePrefixSum");
         }
 
         public override void Render()
@@ -70,8 +68,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteBuffer("PrefixSumsWrite", prefixSums);
                 pass.WriteBuffer("GroupSumsWrite", groupSums);
 
-                pass.ReadBuffer("PrefixSumsWrite", prefixSums);
-                pass.ReadBuffer("GroupSumsWrite", groupSums);
                 pass.ReadBuffer("Input", rendererVisibility);
 
                 pass.SetRenderFunction((command, pass) =>
@@ -80,14 +76,13 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            // TODO: This only handles a 1024^2 array for now
+            // TODO: This only handles a 2048*1024 array for now
             var groupSums1 = renderGraph.GetBuffer((int)groupsX);
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Prefix Sum 2"))
             {
                 pass.Initialize(scanShader, 1, (int)groupsX);
                 pass.WriteBuffer("PrefixSumsWrite", groupSums1);
                 pass.WriteBuffer("DrawCallArgsWrite", gpuInstanceBuffers.drawCallArgsBuffer);
-                pass.ReadBuffer("PrefixSumsWrite", groupSums1);
                 pass.ReadBuffer("Input", groupSums);
 
                 pass.SetRenderFunction((command, pass) =>
@@ -101,7 +96,6 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.Initialize(scanShader, 2, gpuInstanceBuffers.totalInstanceCount);
                 pass.WriteBuffer("_ObjectToWorldWrite", objectToWorld);
-                pass.WriteBuffer("PrefixSumsWrite", prefixSums); // TODO: Temp test code
 
                 pass.ReadBuffer("Input", rendererVisibility);
                 pass.ReadBuffer("_Positions", gpuInstanceBuffers.positionsBuffer);
@@ -140,6 +134,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.ReadBuffer("_InstancePositions", gpuInstanceBuffers.positionsBuffer);
                     pass.ReadBuffer("_InstanceLodFades", gpuInstanceBuffers.lodFadesBuffer);
                 }
+
+                break;
             }
         }
     }

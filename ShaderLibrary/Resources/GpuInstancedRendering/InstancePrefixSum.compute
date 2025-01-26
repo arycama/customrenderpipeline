@@ -1,0 +1,85 @@
+﻿#pragma kernel PrefixScan0 KERNEL=PrefixScan0 WRITE_FINAL_COUNT
+#pragma kernel PrefixScan1 KERNEL=PrefixScan1 WRITE_DRAW_CALL_COUNT
+#pragma kernel StreamCompaction
+
+const static uint threadCount = 1024;
+
+uint MaxThread;
+
+RWStructuredBuffer<uint> PrefixSumsWrite, GroupSumsWrite, DrawCallArgsWrite;
+RWStructuredBuffer<float3x4> _ObjectToWorldWrite;
+
+StructuredBuffer<uint> Input;
+StructuredBuffer<uint> GroupSums, PrefixSums;
+StructuredBuffer<float3x4> _Positions;
+
+groupshared uint sharedSums[threadCount];
+
+[numthreads(threadCount, 1, 1)]
+void KERNEL(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
+{
+	sharedSums[groupIndex] = Input[id];
+	
+	// Perform reduction
+	uint offset = 1;
+	for (uint d = threadCount >> 1; d > 0; d >>= 1)
+	{
+		GroupMemoryBarrierWithGroupSync();
+	
+		if (groupIndex < d)
+		{
+			int ai = offset * (2 * groupIndex + 1) - 1;
+			int bi = offset * (2 * groupIndex + 2) - 1;
+			sharedSums[bi] += sharedSums[ai];
+		}
+	
+		offset *= 2;
+	}
+	
+	// Clear the last element
+	if (!groupIndex)
+	{
+		uint totalSum = sharedSums[threadCount - 1];
+	
+		#ifdef WRITE_FINAL_COUNT
+			GroupSumsWrite[groupId] = totalSum;
+		#endif
+
+		#ifdef WRITE_DRAW_CALL_COUNT
+			DrawCallArgsWrite[1] = totalSum;
+		#endif
+	
+		sharedSums[threadCount - 1] = 0;
+	}
+	
+	// Perform downsweep and build scan
+	for (d = 1; d < threadCount; d *= 2) 
+	{
+		offset >>= 1;
+	
+		GroupMemoryBarrierWithGroupSync();
+	
+		if (groupIndex < d)
+		{
+			int ai = offset * (2 * groupIndex + 1) - 1;
+			int bi = offset * (2 * groupIndex + 2) - 1;
+			int t = sharedSums[ai];
+			sharedSums[ai] = sharedSums[bi];
+			sharedSums[bi] += t;
+		}
+	}
+	
+	GroupMemoryBarrierWithGroupSync();
+	
+	PrefixSumsWrite[id] = sharedSums[groupIndex];
+}
+
+[numthreads(threadCount, 1, 1)]
+void StreamCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID)
+{
+	if (id >= MaxThread || !Input[id])
+		return;
+
+	uint dest = PrefixSums[id] + GroupSums[groupId];
+	_ObjectToWorldWrite[dest] = _Positions[id];
+}
