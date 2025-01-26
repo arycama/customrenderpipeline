@@ -2,9 +2,7 @@
 #pragma kernel PrefixScan1 KERNEL=PrefixScan1 WRITE_DRAW_CALL_COUNT
 #pragma kernel StreamCompaction
 
-#pragma enable_d3d11_debug_symbols
-
-const static uint threadCount = 64;
+const static uint threadCount = 1024;
 const static uint log2ThreadCount = log2(threadCount);
 
 uint MaxThread;
@@ -21,14 +19,14 @@ groupshared uint sharedSums[2][threadCount];
 [numthreads(threadCount, 1, 1)]
 void KERNEL(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
-	sharedSums[0][groupIndex] = groupIndex ? Input[groupId * threadCount + (groupIndex - 1)] : 0;
+	uint value = id < MaxThread ? Input[id] : 0;
+	sharedSums[0][groupIndex] = value;
 	GroupMemoryBarrierWithGroupSync();
 	
 	[unroll]
 	for (uint i = 0; i < log2ThreadCount; i++)
 	{
 		bool input = i & 1;
-		uint value = sharedSums[input][groupIndex];
 		uint offset = 1 << i;
 		
 		if (groupIndex >= offset)
@@ -39,35 +37,31 @@ void KERNEL(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint
 		GroupMemoryBarrierWithGroupSync();
 	}
 	
-	bool finalInput = log2ThreadCount & 1;
-	PrefixSumsWrite[id] = sharedSums[finalInput][groupIndex];
+	PrefixSumsWrite[id] = value;
 	
-	if(groupIndex)
+	// Final thread writes out total count for next pass
+	if(groupIndex < threadCount - 1)
 		return;
 		
-	uint totalCount = sharedSums[finalInput][threadCount - 1];
-	
-	// Since this is an exlusive prefix sum the last element isn't included in the final count, so we need to check if and include it if needed
-	totalCount += Input[groupId * threadCount + threadCount - 1];
-		
 #ifdef WRITE_FINAL_COUNT
-	GroupSumsWrite[groupId] = totalCount;
+	GroupSumsWrite[groupId] = value;
 #endif
 
 #ifdef WRITE_DRAW_CALL_COUNT
-	DrawCallArgsWrite[1] = totalCount;
+	DrawCallArgsWrite[1] = value;
 #endif
 }
 
 [numthreads(threadCount, 1, 1)]
 void StreamCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID)
 {
-	if (!Input[id])
+	if (id >= MaxThread || !Input[id])
 		return;
-		
-	uint dest = PrefixSums[id];
+
+	// Since this is an inclusive prefix scan, subtract 1 from the f
+	uint dest = PrefixSums[id] - 1;
 	if (groupId)
-		dest += GroupSums[groupId];
+		dest += GroupSums[groupId - 1];
 	
 	_ObjectToWorldWrite[dest] = _Positions[id];
 }
