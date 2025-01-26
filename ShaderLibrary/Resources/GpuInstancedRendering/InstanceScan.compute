@@ -1,21 +1,73 @@
-﻿#pragma kernel StreamCompaction
+﻿#pragma kernel PrefixScan0 KERNEL=PrefixScan0 WRITE_FINAL_COUNT
+#pragma kernel PrefixScan1 KERNEL=PrefixScan1 WRITE_DRAW_CALL_COUNT
+#pragma kernel StreamCompaction
 
-uint _InstanceCount;
-StructuredBuffer<uint> _RendererInstanceIDs;
-RWStructuredBuffer<uint> instanceDataOut;
-StructuredBuffer<float3x4> _Positions;
+#pragma enable_d3d11_debug_symbols
+
+const static uint threadCount = 64;
+const static uint log2ThreadCount = log2(threadCount);
+
+uint MaxThread;
+
+RWStructuredBuffer<uint> PrefixSumsWrite, GroupSumsWrite, DrawCallArgsWrite;
 RWStructuredBuffer<float3x4> _ObjectToWorldWrite;
 
-[numthreads(1024, 1, 1)]
-void StreamCompaction(uint id : SV_DispatchThreadID)
+StructuredBuffer<uint> Input;
+StructuredBuffer<uint> GroupSums, PrefixSums;
+StructuredBuffer<float3x4> _Positions;
+
+groupshared uint sharedSums[2][threadCount];
+
+[numthreads(threadCount, 1, 1)]
+void KERNEL(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
-	if (id >= _InstanceCount)
+	sharedSums[0][groupIndex] = groupIndex ? Input[groupId * threadCount + (groupIndex - 1)] : 0;
+	GroupMemoryBarrierWithGroupSync();
+	
+	[unroll]
+	for (uint i = 0; i < log2ThreadCount; i++)
+	{
+		bool input = i & 1;
+		uint value = sharedSums[input][groupIndex];
+		uint offset = 1 << i;
+		
+		if (groupIndex >= offset)
+			value += sharedSums[input][groupIndex - offset];
+		
+		uint output = (i & 1) == 0;
+		sharedSums[output][groupIndex] = value;
+		GroupMemoryBarrierWithGroupSync();
+	}
+	
+	bool finalInput = log2ThreadCount & 1;
+	PrefixSumsWrite[id] = sharedSums[finalInput][groupIndex];
+	
+	if(groupIndex)
 		return;
 		
-	bool isVisible = _RendererInstanceIDs[id];
-	if (!isVisible)
-		return;
+	uint totalCount = sharedSums[finalInput][threadCount - 1];
 	
-	uint offset = _ObjectToWorldWrite.IncrementCounter();
-	_ObjectToWorldWrite[offset] = _Positions[id];
+	// Since this is an exlusive prefix sum the last element isn't included in the final count, so we need to check if and include it if needed
+	totalCount += Input[groupId * threadCount + threadCount - 1];
+		
+#ifdef WRITE_FINAL_COUNT
+	GroupSumsWrite[groupId] = totalCount;
+#endif
+
+#ifdef WRITE_DRAW_CALL_COUNT
+	DrawCallArgsWrite[1] = totalCount;
+#endif
+}
+
+[numthreads(threadCount, 1, 1)]
+void StreamCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID)
+{
+	if (!Input[id])
+		return;
+		
+	uint dest = PrefixSums[id];
+	if (groupId)
+		dest += GroupSums[groupId];
+	
+	_ObjectToWorldWrite[dest] = _Positions[id];
 }

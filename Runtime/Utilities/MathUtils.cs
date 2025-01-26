@@ -9,6 +9,7 @@ namespace Arycama.CustomRenderPipeline
         public const float Log2e = (float)1.44269504088896340736;
 
         public static int DivRoundUp(int x, int y) => (x + y - 1) / y;
+        public static uint DivRoundUp(uint x, uint y) => (x + y - 1) / y;
         public static float Exp2(float x) => Pow(2.0f, x);
         public static float Exp10(float x) => Pow(10.0f, x);
         public static float Rcp(float x) => 1.0f / x;

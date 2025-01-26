@@ -33,17 +33,12 @@ namespace Arycama.CustomRenderPipeline
             var viewData = renderGraph.GetResource<ViewResolutionData>();
             var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
 
-            var viewMatrix = camera.worldToCameraMatrix;
-            viewMatrix.SetColumn(3, new Vector4(0f, 0f, 0f, 1f));
-
-            var screenMatrix = GL.GetGPUProjectionMatrix(camera.projectionMatrix, false) * viewMatrix;
-
             var isShadow = false; // TODO: Support?
             var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
             for (var i = 0; i < cullingPlanes.Count; i++)
                 cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
 
-            var rendererInstanceIDsBuffer = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
+            var rendererVisibility = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Cull"))
             {
                 pass.Initialize(cullingShader, 0, gpuInstanceBuffers.totalInstanceCount);
@@ -51,7 +46,7 @@ namespace Arycama.CustomRenderPipeline
                 if (!isShadow)
                     pass.AddKeyword("HIZ_ON");
 
-                pass.WriteBuffer("_RendererInstanceIDs", rendererInstanceIDsBuffer);
+                pass.WriteBuffer("_RendererInstanceIDs", rendererVisibility);
                 pass.ReadBuffer("_InstanceBounds", gpuInstanceBuffers.instanceBoundsBuffer);
 
                 pass.AddRenderPassData<ICommonPassData>();
@@ -59,7 +54,6 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetMatrix("_ScreenMatrix", screenMatrix);
                     pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
                     pass.SetFloat("_MaxHiZMip", Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight) - 1);
                     pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
@@ -67,26 +61,56 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            var objectToWorld = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount, UnsafeUtility.SizeOf<Matrix3x4>(), target: GraphicsBuffer.Target.Counter);
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Scan"))
+            var prefixSums = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
+            scanShader.GetThreadGroupSizes(1, gpuInstanceBuffers.totalInstanceCount, out var groupsX);
+            var groupSums = renderGraph.GetBuffer((int)groupsX);
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Prefix Sum 1"))
             {
                 pass.Initialize(scanShader, 0, gpuInstanceBuffers.totalInstanceCount);
-                pass.WriteBuffer("_ObjectToWorldWrite", objectToWorld);
-                pass.ReadBuffer("_RendererInstanceIDs", rendererInstanceIDsBuffer);
-                pass.ReadBuffer("_Positions", gpuInstanceBuffers.positionsBuffer);
+                pass.WriteBuffer("PrefixSumsWrite", prefixSums);
+                pass.WriteBuffer("GroupSumsWrite", groupSums);
+
+                pass.ReadBuffer("PrefixSumsWrite", prefixSums);
+                pass.ReadBuffer("GroupSumsWrite", groupSums);
+                pass.ReadBuffer("Input", rendererVisibility);
 
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    command.SetBufferCounterValue(pass.GetBuffer(objectToWorld), 0);
-                    pass.SetInt("_InstanceCount", gpuInstanceBuffers.totalInstanceCount);
+                    pass.SetInt("MaxThread", gpuInstanceBuffers.totalInstanceCount);
                 });
             }
 
-            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Instance Rendering Copy Count"))
+            // TODO: This only handles a 1024^2 array for now
+            var groupSums1 = renderGraph.GetBuffer((int)groupsX);
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Prefix Sum 2"))
             {
+                pass.Initialize(scanShader, 1, (int)groupsX);
+                pass.WriteBuffer("PrefixSumsWrite", groupSums1);
+                pass.WriteBuffer("DrawCallArgsWrite", gpuInstanceBuffers.drawCallArgsBuffer);
+                pass.ReadBuffer("PrefixSumsWrite", groupSums1);
+                pass.ReadBuffer("Input", groupSums);
+
                 pass.SetRenderFunction((command, pass) =>
                 {
-                    command.CopyCounterValue(pass.GetBuffer(objectToWorld), pass.GetBuffer(gpuInstanceBuffers.drawCallArgsBuffer), 4); 
+                    pass.SetInt("MaxThread", (int)groupsX);
+                });
+            }
+
+            var objectToWorld = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount, UnsafeUtility.SizeOf<Matrix3x4>());
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Stream Compaction"))
+            {
+                pass.Initialize(scanShader, 2, gpuInstanceBuffers.totalInstanceCount);
+                pass.WriteBuffer("_ObjectToWorldWrite", objectToWorld);
+                pass.WriteBuffer("PrefixSumsWrite", prefixSums); // TODO: Temp test code
+
+                pass.ReadBuffer("Input", rendererVisibility);
+                pass.ReadBuffer("_Positions", gpuInstanceBuffers.positionsBuffer);
+                pass.ReadBuffer("PrefixSums", prefixSums);
+                pass.ReadBuffer("GroupSums", groupSums1);
+
+                pass.SetRenderFunction((command, pass) =>
+                {
+                    pass.SetInt("MaxThread", gpuInstanceBuffers.totalInstanceCount);
                 });
             }
 
@@ -111,7 +135,7 @@ namespace Arycama.CustomRenderPipeline
                     pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<ICommonPassData>();
 
-                    pass.ReadBuffer("_VisibleRendererInstanceIndices", rendererInstanceIDsBuffer);
+                    pass.ReadBuffer("_VisibleRendererInstanceIndices", rendererVisibility);
                     pass.ReadBuffer("_ObjectToWorld", objectToWorld);
                     pass.ReadBuffer("_InstancePositions", gpuInstanceBuffers.positionsBuffer);
                     pass.ReadBuffer("_InstanceLodFades", gpuInstanceBuffers.lodFadesBuffer);
