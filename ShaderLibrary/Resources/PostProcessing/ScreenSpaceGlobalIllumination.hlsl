@@ -64,7 +64,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 		
 		// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
 		// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
-		float2 hitUv = ClampScaleTextureUv(rayPos.xy / _ScaledResolution.xy - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
+		float2 hitUv = ClampScaleTextureUv(rayPos.xy * _ScaledResolution.zw - velocity - _PreviousJitter.zw, _PreviousColorScaleLimit);
 		color = PreviousFrame.SampleLevel(_TrilinearClampSampler, hitUv, mipLevel);// * _PreviousToCurrentExposure;
 		outDepth = Linear01Depth(depth);
 	}

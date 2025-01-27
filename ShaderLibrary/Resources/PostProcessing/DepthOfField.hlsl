@@ -1,55 +1,54 @@
 #include "../../Common.hlsl"
 #include "../../Color.hlsl"
 #include "../../Samplers.hlsl"
+#include "../../Random.hlsl"
+#include "../../ScreenSpaceRaytracing.hlsl"
 
+Texture2D<float> _Depth, _HiZMinDepth;
 Texture2D<float3> _Input;
-Texture2D<float> _Depth;
 
-float4 _Depth_Scale, _Input_Scale; // TODO: These will need fixing
-float _ApertureSize, _FocalDistance, _FocalLength, _SampleRadius, _MaxCoC, _SensorHeight;
-uint _SampleCount;
+float4 _DepthScaleLimit, _InputScaleLimit;
+float3 _DefocusU, _DefocusV;
+float _SensorRadius, _FocalDistance, _MaxMip, _SampleCount;
 
-float CalculateCoC(float depth)
+float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	return abs(1.0 - _FocalDistance / depth) * _MaxCoC * _SampleRadius;
-}
-
-float3 Fragment(float4 position : SV_Position) : SV_Target
-{
-	float3 result = Rec2020ToICtCp(_Input[position.xy]);
-	//result = _Input[position.xy];
-	return result;
+	float3 color = 0;
+	float weightSum = 0;
 	
+	float phi = Noise1D(position.xy) * TwoPi;
+	float _MaxSteps = 64;
+	float _Thickness = 1;
 	
-	//_FocalDistance = LinearEyeDepth(_Depth[_ScaledResolution.xy / 2]);
-
-	float GoldenAngle = Pi * (3.0 - sqrt(5.0));
-	float2 uv = position.xy * _ScaledResolution.zw;
-	
-	float centerDepth = LinearEyeDepth(_Depth.Sample(_PointClampSampler, uv * _Depth_Scale.xy));
-	float centerSize = CalculateCoC(centerDepth);
-	
-	float3 color = _Input.Sample(_PointClampSampler, uv * _Input_Scale.xy);
-	float weightSum = 1.0;
-	
-	float radius = _SampleRadius;
-	
-	for (float ang = 0.0; radius < _SampleCount; ang += GoldenAngle)
+	for (float i = 0.0; i < _SampleCount; i++)
 	{
-		float2 tc = uv + float2(cos(ang), sin(ang)) * _ScaledResolution.zw * radius;
+		float2 u = VogelDiskSample(i, _SampleCount, phi);
 		
-		float3 sampleColor = _Input.Sample(_PointClampSampler, tc * _Input_Scale.xy);
-		float sampleDepth = LinearEyeDepth(_Depth.Sample(_PointClampSampler, tc * _Depth_Scale.xy));
+		float3 rayOrigin = MultiplyPoint3x4(_ViewToWorld, float3(u * _SensorRadius, 0)) + worldDir * _Near;
+		float3 rayDirection = normalize((_FocalDistance + _Near) * worldDir - rayOrigin);
 		
-		float sampleSize = CalculateCoC(sampleDepth);
-		if (sampleDepth > centerDepth)
-			sampleSize = clamp(sampleSize, 0.0, centerSize * 2.0);
+		bool validHit;
+		float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, _MaxSteps, _Thickness, _HiZMinDepth, _MaxMip, validHit, float3(position.xy, 1.0), false);
+		
+		if (!validHit)
+			continue;
 			
-		color += sampleSize > radius ? sampleColor : color / weightSum;
+		float3 worldHit = PixelToWorld(rayPos);
+		float3 hitRay = worldHit - rayOrigin;
+		float hitDist = length(hitRay);
+	
+		//float2 velocity = Velocity[rayPos.xy];
+		//float linearHitDepth = LinearEyeDepth(rayPos.z);
+		//float mipLevel = log2(_ConeAngle * hitDist * rcp(linearHitDepth));
+			
+		// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
+		// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
+		color += _Input[rayPos.xy];
 		weightSum++;
-		
-		radius += _SampleRadius / radius;
 	}
 
-	return color * rcp(weightSum);
+	if (weightSum)
+		color *= rcp(weightSum);
+	
+	return Rec2020ToICtCp(color);
 }

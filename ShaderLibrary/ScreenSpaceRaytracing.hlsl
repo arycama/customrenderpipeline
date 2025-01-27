@@ -5,7 +5,7 @@
 #include "Random.hlsl"
 #include "Lighting.hlsl"
 
-float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, uint maxSteps, float thickness, Texture2D<float> hiZDepth, float maxMip, out bool validHit, float3 screenPos)
+float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, uint maxSteps, float thickness, Texture2D<float> hiZDepth, float maxMip, out bool validHit, float3 screenPos, bool skyIsMiss = true)
 {
 	// We define the depth of the base as the depth value as:
 	// b = DeviceDepth((1 + thickness) * LinearDepth(d))
@@ -107,7 +107,7 @@ float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, uint maxSteps, float 
 	
 	// Ensure we have not hit the sky or gone out of bounds (Out of bounds is always 0)
 	// TODO: I don't think this will ever be true
-	if(!rayPos.z)
+	if(skyIsMiss && !rayPos.z)
 		validHit = false;
 	
 	return rayPos;

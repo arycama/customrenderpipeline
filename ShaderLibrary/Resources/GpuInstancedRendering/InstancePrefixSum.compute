@@ -21,19 +21,18 @@ void KERNEL(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint
 	sharedSums[groupIndex] = Input[id];
 	
 	// Perform reduction
-	uint offset = 1;
-	for (uint d = threadCount >> 1; d > 0; d >>= 1)
+	[unroll]
+	for (uint i = 0; i < log2(threadCount); i++)
 	{
 		GroupMemoryBarrierWithGroupSync();
-	
-		if (groupIndex < d)
-		{
-			int ai = offset * (2 * groupIndex + 1) - 1;
-			int bi = offset * (2 * groupIndex + 2) - 1;
-			sharedSums[bi] += sharedSums[ai];
-		}
-	
-		offset *= 2;
+		
+		if (groupIndex >= threadCount / exp2(i + 1))
+			continue;
+			
+		uint offset = exp2(i);
+		uint ai = offset * (2 * groupIndex + 1) - 1;
+		uint bi = offset * (2 * groupIndex + 2) - 1;
+		sharedSums[bi] += sharedSums[ai];
 	}
 	
 	// Clear the last element
@@ -53,24 +52,22 @@ void KERNEL(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint
 	}
 	
 	// Perform downsweep and build scan
-	for (d = 1; d < threadCount; d *= 2) 
+	[unroll]
+	for (uint i = 0; i < log2(threadCount); i++) 
 	{
-		offset >>= 1;
-	
 		GroupMemoryBarrierWithGroupSync();
-	
-		if (groupIndex < d)
-		{
-			int ai = offset * (2 * groupIndex + 1) - 1;
-			int bi = offset * (2 * groupIndex + 2) - 1;
-			int t = sharedSums[ai];
-			sharedSums[ai] = sharedSums[bi];
-			sharedSums[bi] += t;
-		}
+		if (groupIndex >= exp2(i))
+			continue;
+			
+		uint offset = threadCount / exp2(i + 1);
+		uint ai = offset * (2 * groupIndex + 1) - 1;
+		uint bi = offset * (2 * groupIndex + 2) - 1;
+		uint t = sharedSums[ai];
+		sharedSums[ai] = sharedSums[bi];
+		sharedSums[bi] += t;
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
-	
 	PrefixSumsWrite[id] = sharedSums[groupIndex];
 }
 

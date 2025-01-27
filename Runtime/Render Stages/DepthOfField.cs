@@ -28,39 +28,29 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.Initialize(material);
                 pass.WriteTexture(tempId, RenderBufferLoadAction.DontCare);
-                pass.ReadTexture("_Input", renderGraph.GetResource<CameraTargetData>().Handle);
-                pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>().Handle);
-                pass.ReadTexture("_Result", tempId);
 
-                var sensorSize = lensSettings.SensorHeight / 1000f; // Divide by 1000 to convert from mm to m
+                pass.AddRenderPassData<CameraTargetData>();
+                pass.AddRenderPassData<CameraDepthData>();
+                pass.AddRenderPassData<HiZMinDepthData>();
+
+                var sensorSize = lensSettings.SensorSize / 1000f; // Divide by 1000 to convert from mm to m
                 var focalLength = 0.5f * sensorSize / Mathf.Tan(viewData.FieldOfView * Mathf.Deg2Rad / 2.0f);
-                var F = focalLength;
-                var A = focalLength / lensSettings.Aperture;
-                var P = lensSettings.FocalDistance;
-                var maxCoC = (A * F) / Mathf.Max((P - F), 1e-6f);
+                var sensorRadius = focalLength / lensSettings.Aperture;
 
                 pass.SetRenderFunction((
-                    focalDistance: lensSettings.FocalDistance,
-                    focalLength: focalLength,
-                    apertureSize: lensSettings.Aperture,
-                    maxCoc: maxCoC,
-                    sensorHeight: sensorSize,
-                    sampleRadius: settings.SampleRadius,
-                    sampleCount: settings.SampleCount
+                    lensSettings.FocalDistance,
+                    SensorRadius: sensorRadius,
+                    settings.SampleCount
                 ),
                 (command, pass, data) =>
                 {
-                    pass.SetFloat("_FocalDistance", data.focalDistance);
-                    pass.SetFloat("_FocalLength", data.focalLength);
-                    pass.SetFloat("_ApertureSize", data.apertureSize);
-                    pass.SetFloat("_MaxCoC", data.maxCoc);
-                    pass.SetFloat("_SensorHeight", data.sensorHeight);
-
-                    pass.SetFloat("_SampleRadius", data.sampleRadius);
-                    pass.SetInt("_SampleCount", data.sampleCount);
+                    pass.SetFloat("_FocalDistance", data.FocalDistance);
+                    pass.SetFloat("_SensorRadius", data.SensorRadius);
+                    pass.SetFloat("_SampleCount", data.SampleCount);
+                    pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(viewData.ScaledWidth, viewData.ScaledHeight) - 1);
                 });
 
-                renderGraph.SetResource(new CameraTargetData(tempId)); ;
+                renderGraph.SetResource(new CameraTargetData(tempId));
             }
         }
     }

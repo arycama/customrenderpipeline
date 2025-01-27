@@ -78,7 +78,14 @@ public class GenerateHiZ : RenderFeature
         if(mode == HiZMode.Min)
             renderGraph.SetResource(new HiZMinDepthData(result));
         else if(mode == HiZMode.Max)
+        {
             renderGraph.SetResource(new HiZMaxDepthData(result));
+
+            using (var pass = renderGraph.AddRenderPass<GlobalRenderPass>("Temp MaxZ Thing"))
+            {
+                pass.AddRenderPassData<HiZMaxDepthData>();
+            }
+        }
     }
 
     public enum HiZMode

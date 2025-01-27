@@ -8,11 +8,8 @@ namespace Arycama.CustomRenderPipeline
         [Serializable]
         public class Settings
         {
-            [SerializeField, Min(0f)] private float sampleRadius = 8f;
-            [SerializeField, Range(1, 128)] private int sampleCount = 8;
-
-            public float SampleRadius => sampleRadius;
-            public int SampleCount => sampleCount;
+            [field: SerializeField, Min(0.0f)] public float MaxCoC { get; private set; } = 1f;
+            [field: SerializeField, Range(1, 128)] public int SampleCount { get; private set; } = 8;
         }
     }
 }

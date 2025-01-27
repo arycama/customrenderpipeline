@@ -180,6 +180,12 @@ float3 IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePosi
 	return rayDirection * t + rayOrigin;
 }
 
+float3 IntersectRayPlaneZ(float3 rayOrigin, float3 rayDirection, float planeDistance)
+{
+	float t = (planeDistance - rayOrigin.z) * rcp(rayDirection.z);
+	return rayDirection * t + rayOrigin;
+}
+
 float Linear01Depth(float depth)
 {
 	return rcp((_Far * rcp(_Near) - 1.0) * depth + 1.0);
