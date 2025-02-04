@@ -36,7 +36,6 @@ namespace Arycama.CustomRenderPipeline
             var tempResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
             var hitResult = renderGraph.GetTexture(viewData.ScaledWidth, viewData.ScaledHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
-            var tanHalfFov = Mathf.Tan(viewData.FieldOfView * Mathf.Deg2Rad * 0.5f);
             var falloffStart = settings.Radius * settings.Falloff;
             var falloffEnd = settings.Radius;
 
@@ -46,16 +45,17 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                    pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, raytracingData.Bias, raytracingData.DistantBias, viewData.FieldOfView);
+                    pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, raytracingData.Bias, raytracingData.DistantBias, viewData.TanHalfFov);
                     pass.WriteTexture(tempResult, "HitColor");
                     pass.WriteTexture(hitResult, "HitResult");
-                    pass.ReadTexture("_Depth", depth);
                     pass.ReadTexture("_NormalRoughness", normalRoughness);
+
                     pass.AddRenderPassData<ICommonPassData>();
+                    pass.AddRenderPassData<CameraDepthData>();
 
                     pass.SetRenderFunction((
                         rawRadius: settings.Radius,
-                        radius: viewData.ScaledHeight / tanHalfFov * 0.5f * settings.Radius,
+                        radius: viewData.ScaledHeight / viewData.TanHalfFov * 0.5f * settings.Radius,
                         aoStrength: settings.Strength,
                         falloffScale: settings.Falloff == 1.0f ? 0.0f : 1.0f / (falloffStart * falloffStart - falloffEnd * falloffEnd),
                         falloffBias: settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff * settings.Falloff),
@@ -80,14 +80,14 @@ namespace Arycama.CustomRenderPipeline
                     pass.Initialize(material);
                     pass.WriteTexture(tempResult);
                     pass.WriteTexture(hitResult);
-                    pass.ReadTexture("_Depth", depth);
                     pass.ReadTexture("_NormalRoughness", normalRoughness);
                     pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                     pass.AddRenderPassData<ICommonPassData>();
+                    pass.AddRenderPassData<CameraDepthData>();
 
                     pass.SetRenderFunction((
                          rawRadius: settings.Radius,
-                         radius: viewData.ScaledHeight / tanHalfFov * 0.5f * settings.Radius,
+                         radius: viewData.ScaledHeight / (float)viewData.TanHalfFov * 0.5f * settings.Radius,
                          aoStrength: settings.Strength,
                          falloffScale: settings.Falloff == 1.0f ? 0.0f : 1.0f / (falloffStart * falloffStart - falloffEnd * falloffEnd),
                          falloffBias: settings.Falloff == 1.0f ? 1.0f : 1.0f / (1.0f - settings.Falloff * settings.Falloff),
@@ -126,8 +126,6 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.ReadTexture("_Input", tempResult);
                 pass.ReadTexture("_HitResult", hitResult);
-                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
-                pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
                 pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 
@@ -137,6 +135,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<VelocityData>();
+                pass.AddRenderPassData<CameraDepthData>();
+                pass.AddRenderPassData<CameraStencilData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -154,11 +154,11 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.ReadTexture("_Input", spatialResult);
                 pass.ReadTexture("_History", history);
-                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
-                pass.ReadTexture("_Depth", depth);
 
                 pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<CameraDepthData>();
+                pass.AddRenderPassData<CameraStencilData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {

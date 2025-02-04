@@ -1,12 +1,4 @@
-﻿#include "../Common.hlsl"
-#include "../Exposure.hlsl"
-#include "../GBuffer.hlsl"
-#include "../Lighting.hlsl"
-#include "../Material.hlsl"
-#include "../Samplers.hlsl"
-#include "../VolumetricLight.hlsl"
-#include "../Temporal.hlsl"
-#include "../Random.hlsl"
+﻿#include "../Packing.hlsl"
 #include "../Raytracing.hlsl"
 #include "../RaytracingLighting.hlsl"
 #include "LitSurfaceCommon.hlsl"
@@ -41,12 +33,12 @@ void RayTracing(inout RayPayload payload : SV_RayPayload, AttributeData attribs 
 	surfaceInput.tangentSign = tangent.w;
 	surfaceInput.isFrontFace = true;
 	
-	
 	SurfaceOutput surface = GetSurfaceAttributes(surfaceInput, true, N, coneWidth);
 
 	// Should make this a function as it's duplicated in a few places
 	float3 f0 = lerp(0.04, surface.albedo, surface.metallic);
-	float3 color = RaytracedLighting(surface.normal, f0, surface.roughness, surface.occlusion, surface.bentNormal, surface.albedo) + surface.emission;
+	float3 albedo = lerp(surface.albedo, 0.0, surface.metallic);
+	float3 color = RaytracedLighting(surface.normal, f0, surface.roughness, surface.occlusion, surface.bentNormal, albedo) + surface.emission;
 	
 	payload.packedColor = Float3ToR11G11B10(color);
 	payload.hitDistance = RayTCurrent();

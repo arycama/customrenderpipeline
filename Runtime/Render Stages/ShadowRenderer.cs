@@ -50,6 +50,7 @@ namespace Arycama.CustomRenderPipeline
                             viewPosition: viewData.ViewPosition,
                             worldToView: shadowRequest.ViewMatrix,
                             worldToClip: shadowRequest.ProjectionMatrix * shadowRequest.ViewMatrix,
+                            viewToClip: shadowRequest.ProjectionMatrix,
                             target: directionalShadows,
                             index: i
                         ),
@@ -61,6 +62,7 @@ namespace Arycama.CustomRenderPipeline
                             // TODO: Use different matrices for shadows?
                             pass.SetMatrix("_WorldToView", data.worldToView);
                             pass.SetMatrix("_WorldToClip", data.worldToClip);
+                            pass.SetMatrix("_ViewToClip", data.viewToClip);
                             pass.SetVector("_ViewPosition", viewData.ViewPosition);
                         });
                     }

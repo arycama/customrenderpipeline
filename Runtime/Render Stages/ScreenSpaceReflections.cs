@@ -62,13 +62,13 @@ namespace Arycama.CustomRenderPipeline
                 {
                     var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, raytracingData.Bias, raytracingData.DistantBias, viewData.FieldOfView);
+                    pass.Initialize(raytracingShader, "RayGeneration", "RayTracing", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, raytracingData.Bias, raytracingData.DistantBias, viewData.TanHalfFov);
                     pass.WriteTexture(tempResult, "HitColor");
                     pass.WriteTexture(hitResult, "HitResult");
-                    pass.ReadTexture("_Depth", depth);
                     pass.ReadTexture("_NormalRoughness", normalRoughness);
                     pass.ReadTexture("PreviousFrame", previousFrame); // Temporary, cuz of leaks if we don't use it..
 
+                    pass.AddRenderPassData<CameraDepthData>();
                     pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                     pass.AddRenderPassData<WaterPrepassResult>(true);
                     pass.AddRenderPassData<ICommonPassData>();
@@ -84,10 +84,9 @@ namespace Arycama.CustomRenderPipeline
                     pass.WriteTexture(hitResult, RenderBufferLoadAction.DontCare);
                     pass.ConfigureClear(RTClearFlags.Color);
 
-                    pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
                     pass.ReadTexture("_NormalRoughness", normalRoughness);
                     pass.ReadTexture("PreviousFrame", previousFrame);
-                    pass.ReadTexture("_Depth", depth);
+                    pass.ReadTexture("", depth);
 
                     pass.AddRenderPassData<SkyReflectionAmbientData>();
                     pass.AddRenderPassData<LitData.Result>();
@@ -97,6 +96,8 @@ namespace Arycama.CustomRenderPipeline
                     pass.AddRenderPassData<BentNormalOcclusionData>();
                     pass.AddRenderPassData<VelocityData>();
                     pass.AddRenderPassData<HiZMinDepthData>();
+                    pass.AddRenderPassData<CameraDepthData>();
+                    pass.AddRenderPassData<CameraStencilData>();
 
                     pass.SetRenderFunction((command, pass) =>
                     {
@@ -118,8 +119,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
 
                 pass.ReadTexture("_Input", tempResult);
-                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
-                pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_HitResult", hitResult);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
                 pass.ReadTexture("AlbedoMetallic", albedoMetallic);
@@ -131,6 +130,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<BentNormalOcclusionData>();
                 pass.AddRenderPassData<VelocityData>();
+                pass.AddRenderPassData<CameraDepthData>();
+                pass.AddRenderPassData<CameraStencilData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -149,8 +150,6 @@ namespace Arycama.CustomRenderPipeline
 
                 pass.ReadTexture("_TemporalInput", spatialResult);
                 pass.ReadTexture("_History", history);
-                pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
-                pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
                 pass.ReadTexture("AlbedoMetallic", albedoMetallic);
                 pass.ReadTexture("RayDepth", rayDepth);
@@ -162,6 +161,8 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<BentNormalOcclusionData>();
                 pass.AddRenderPassData<VelocityData>();
+                pass.AddRenderPassData<CameraDepthData>();
+                pass.AddRenderPassData<CameraStencilData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {

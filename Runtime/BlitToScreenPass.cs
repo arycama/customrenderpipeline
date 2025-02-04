@@ -47,7 +47,7 @@ namespace Arycama.CustomRenderPipeline
         }
 
 
-        public override void SetVector(string propertyName, Vector4 value)
+        public override void SetVector(int propertyName, Vector4 value)
         {
             propertyBlock.SetVector(propertyName, value);
         }

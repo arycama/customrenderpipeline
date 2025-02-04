@@ -8,8 +8,10 @@ namespace Arycama.CustomRenderPipeline
         [Serializable]
         public class Settings
         {
+            [field: SerializeField] public bool UseRaytracing { get; private set; } = false;
             [field: SerializeField, Min(0.0f)] public float MaxCoC { get; private set; } = 1f;
             [field: SerializeField, Range(1, 128)] public int SampleCount { get; private set; } = 8;
+            public bool Test;
         }
     }
 }

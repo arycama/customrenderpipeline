@@ -9,25 +9,29 @@ namespace Arycama.CustomRenderPipeline
     public class RTHandleData : IRenderPassData
     {
         public ResourceHandle<RenderTexture> Handle { get; }
-        private readonly string propertyName, scaleLimitPropertyName;
+        private int propertyNameId, scaleLimitPropertyId;
+        private readonly int mip;
+        private readonly RenderTextureSubElement subElement;
 
-        public RTHandleData(ResourceHandle<RenderTexture> handle, string propertyName)
+        public RTHandleData(ResourceHandle<RenderTexture> handle, string propertyName, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
         {
             Handle = handle;
-            this.propertyName = propertyName;
-            scaleLimitPropertyName = propertyName + "ScaleLimit";
+            this.mip = mip;
+            this.subElement = subElement;
+            propertyNameId = Shader.PropertyToID(propertyName);
+            scaleLimitPropertyId = Shader.PropertyToID($"{propertyName}ScaleLimit");
         }
 
         public static implicit operator ResourceHandle<RenderTexture>(RTHandleData data) => data.Handle;
 
         public void SetInputs(RenderPass pass)
         {
-            pass.ReadTexture(propertyName, Handle);
+            pass.ReadTexture(propertyNameId, Handle, mip, subElement);
         }
 
         public void SetProperties(RenderPass pass, CommandBuffer command)
         {
-            pass.SetVector(scaleLimitPropertyName, pass.GetScaleLimit2D(Handle));
+            pass.SetVector(scaleLimitPropertyId, pass.GetScaleLimit2D(Handle));
         }
     }
 }

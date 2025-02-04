@@ -20,7 +20,7 @@ namespace Arycama.CustomRenderPipeline
 
         public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
         public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);
-        public abstract void SetVector(string propertyName, Vector4 value);
+        public abstract void SetVector(int propertyId, Vector4 value);
         public abstract void SetVectorArray(string propertyName, Vector4[] value);
         public abstract void SetFloat(string propertyName, float value);
         public abstract void SetFloatArray(string propertyName, float[] value);
@@ -29,6 +29,7 @@ namespace Arycama.CustomRenderPipeline
         public abstract void SetMatrixArray(string propertyName, Matrix4x4[] value);
         public abstract void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value);
 
+        public void SetVector(string propertyName, Vector4 value) => SetVector(Shader.PropertyToID(propertyName), value);
 
         protected virtual void PostExecute() { }
 

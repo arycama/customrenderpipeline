@@ -147,12 +147,17 @@ namespace Arycama.CustomRenderPipeline
 
         protected sealed override void PostExecute()
         {
+            Command.ClearRandomWriteTargets();
+
             foreach (var colorTarget in colorTargets)
             {
                 var handle = colorTarget.Item1;
                 var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
                 if (descriptor.AutoGenerateMips)
+                {
+                    Assert.IsTrue(descriptor.HasMips, "Trying to Generate Mips for a Texture without mips enabled");
                     Command.GenerateMips(GetRenderTexture(handle));
+                }
             }
 
             // Reset all properties

@@ -3,6 +3,7 @@
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Lighting.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Material.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Random.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 
 struct VertexInput
 {
@@ -59,29 +60,21 @@ FragmentInput Vertex(VertexInput input)
 		float3 viewDirOS = view - input.position;
 	#endif
 	
-	float l1norm = dot(abs(view), 1.0);
-	float2 res = view.xz * rcp(l1norm);
-	float2 result = float2(res.x + res.y, res.x - res.y);
+	float2 uv = PackNormalHemiOctahedral(view) * _FramesMinusOne;
+	float2 cell = floor(uv);
+	float2 frameUv = frac(uv);
 	
-	float2 atlasUv = (0.5 * result + 0.5) * _FramesMinusOne;
-	float2 cell = floor(atlasUv);
-	float2 localUv = frac(atlasUv);
-	
-	float2 mask = (localUv.x + localUv.y) > 1.0;
+	float2 mask = (frameUv.x + frameUv.y) > 1.0;
 	float2 offsets[3] = { float2(0, 1), mask, float2(1, 0) };
-	float3 weights = float3(min(1.0 - localUv, localUv.yx), abs(localUv.x + localUv.y - 1.0)).xzy;
+	float3 weights = float3(min(1.0 - frameUv, frameUv.yx), abs(frameUv.x + frameUv.y - 1.0)).xzy;
 
 	[unroll]
 	for (uint i = 0; i < 3; i++)
 	{
 		float2 localCell = cell + offsets[i];
-		float2 f = 2.0 * (localCell * _RcpFramesMinusOne) - 1.0;
-	
-		float2 val = float2(f.x + f.y, f.x - f.y) * 0.5;
-		float3 normal = normalize(float3(val.x, 1.0 - dot(abs(val), 1.0), val.y));
-		float3 tangent = abs(normal.y) == 1 ? float3(normal.y, 0, 0) : normalize(cross(normal, float3(0, 1, 0)));
-		float3 bitangent = cross(tangent, normal);
-		float3x3 objectToTangent = float3x3(tangent, bitangent, normal);
+		float3 normal = UnpackNormalHemiOctahedral(localCell * _RcpFramesMinusOne);
+		float3 tangent = normal.z == -1.0 ? float3(1.0, 0.0, 0.0) : BlendNormalRNM(normal, float3(1, 0, 0));
+		float3x3 objectToTangent = TangentToWorldMatrix(normal, tangent);
 		
 		float3 rayOrigin = mul(objectToTangent, input.position);
 		output.uvWeights[i] = float4(rayOrigin.xy + 0.5, localCell.y * _ImposterFrames + localCell.x, weights[i]);
@@ -131,11 +124,10 @@ FragmentOutput Fragment(FragmentInput input)
 	clip(color.a - _Cutoff);
 	
 	FragmentOutput output;
+	output.depth = _ViewToClip._m22 * depth + input.positionCS.z;
 	
-#ifdef UNITY_PASS_SHADOWCASTER
-	output.depth = (_Near / (_Far - _Near)) * depth + input.positionCS.z;
-#else
-	output.depth = ((_Near / (_Far - _Near)) * depth + input.positionCS.z) * rcp(1.0 - depth);
+#ifndef UNITY_PASS_SHADOWCASTER
+	output.depth *= rcp(1.0 - depth);
 	
 	float3 normal = ObjectToWorldNormal(normalSmoothness.rgb * 2 - 1, input.instanceID, true);
 	float perceptualRoughness = SmoothnessToPerceptualRoughness(normalSmoothness.a);

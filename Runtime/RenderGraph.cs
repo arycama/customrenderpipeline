@@ -39,7 +39,7 @@ namespace Arycama.CustomRenderPipeline
             BufferHandleSystem = new();
 
             emptyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" };
-            emptyTexture = new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave };
+            emptyTexture = new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave,  };
             emptyUavTexture = new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, enableRandomWrite = true };
             emptyTextureArray = new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex2DArray, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave };
             empty3DTexture = new RenderTexture(1, 1, 0) { dimension = TextureDimension.Tex3D, volumeDepth = 1, hideFlags = HideFlags.HideAndDontSave };

@@ -126,7 +126,7 @@ namespace Arycama.CustomRenderPipeline
                         var positionOffset = new Vector4(data.TerrainData.size.x, data.TerrainData.size.z, position.x, position.z);
                         pass.SetVector("_TerrainPositionOffset", positionOffset);
 
-                        pass.SetFloat("_EdgeLength", (float)data.settings.EdgeLength * data.settings.PatchVertices);
+                        pass.SetFloat("_EdgeLength", data.settings.EdgeLength * data.settings.PatchVertices);
                         pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
 
                         pass.SetFloat("_InputScale", data.TerrainData.size.y);

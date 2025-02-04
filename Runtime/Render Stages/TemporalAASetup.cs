@@ -43,7 +43,7 @@ namespace Arycama.CustomRenderPipeline
             {
                 for (var x = -1; x <= 1; x++, i++)
                 {
-                    var weight = Mitchell(x + jitter.x, y + jitter.y);
+                    var weight = Filter(x + jitter.x, y + jitter.y);
 
                     if (!settings.IsEnabled)
                         weight = (x == 0 && y == 0) ? 1.0f : 0.0f;
@@ -114,8 +114,18 @@ namespace Arycama.CustomRenderPipeline
                 return 0.0f;
         }
 
-        private float Mitchell(float x, float y)
+        private float Filter(float x, float y)
         {
+            var p = 4;
+            var k = 1.0f / (Mathf.Pow(4.0f / 3.0f, p) - 1.0f);
+
+            var cx = 1.0f - Mathf.Min(1, Mathf.Pow(x * 2.0f / 3.0f, 2.0f));
+            var ax = ((1 + k) * Mathf.Pow(cx, p) - k) * cx * cx;
+
+            var cy = 1.0f - Mathf.Min(1, Mathf.Pow(y * 2.0f / 3.0f, 2.0f));
+            var ay = ((1 + k) * Mathf.Pow(cy, p) - k) * cy * cy;
+
+            //return ax * ay;
             return Mitchell1D(x) * Mitchell1D(y);
         }
     }

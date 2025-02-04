@@ -29,6 +29,54 @@ struct TraceResult
     float4 hit : SV_Target1;
 };
 
+float3 ScreenSpaceRaytrace1(float3 worldPosition, float3 L, uint maxSteps, float thickness, Texture2D<float> hiZDepth, float maxMip, out bool validHit, float3 screenPos, bool skyIsMiss = true)
+{
+	validHit = false;
+
+	// We start tracing from the center of the current pixel, and do so up to the far plane.
+	float3 rayOrigin = MultiplyPointProj(_WorldToPixel, worldPosition).xyz;
+	float3 reflPosSS = MultiplyPointProj(_WorldToPixel, worldPosition + L).xyz;
+	float3 rayDir = reflPosSS - rayOrigin;
+	float2 rayOffset = rayDir.xy >= 0.0 ? 0.5 : -0.5;
+	
+	float3 rayStep = rayDir >= 0 ? 1 : -1;
+
+    // Start ray marching from the next texel to avoid self-intersections.
+	float t = Min2(0.5 / abs(rayDir.xy));
+	float2 currentCell = rayOrigin.xy + rayDir.xy * t;
+
+	for (uint i = 0; i < maxSteps * 4; i++)
+	{
+		float depth = hiZDepth[currentCell + rayOffset];
+		float3 bounds = float3(currentCell + rayOffset, depth);
+		float3 dist = (bounds - rayOrigin) / rayDir;
+		
+		float t1 = t;// min(dist.x, dist.y);
+		
+		float3 rayPos = rayOrigin + t1 * rayDir;
+		float linearRayZ = LinearEyeDepth(rayPos.z);
+		float linearDepth = LinearEyeDepth(depth);
+
+		bool insideFloor = linearRayZ >= linearDepth && linearRayZ <= linearDepth + thickness;
+		bool hitFloor = dist.z <= dist.x && dist.z <= dist.y && t1 <= dist.z;
+
+		if (hitFloor || insideFloor)
+		{
+			validHit = true;
+			return float3(currentCell, depth);
+		}
+		
+		t = min(dist.x, dist.y);
+		if (dist.x < dist.y)
+			currentCell.x += rayStep.x;
+		else
+			currentCell.y += rayStep.y;
+	}
+
+	return 0;
+}
+
+
 TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	float depth = _HiZMinDepth[position.xy];
@@ -47,12 +95,8 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
     // We start tracing from the center of the current pixel, and do so up to the far plane.
 	float3 worldPosition = worldDir * LinearEyeDepth(depth);
 	
-	// Apply normal bias with the magnitude dependent on the distance from the camera.
-    // Unfortunately, we only have access to the shading normal, which is less than ideal...
-	worldPosition = worldPosition * (1 - 0.001 * rcp(max(NdotV, FloatEps)));
-	
 	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZMinDepth, _MaxMip, validHit, float3(position.xy, depth));
+	float3 rayPos = ScreenSpaceRaytrace1(worldPosition, L, _MaxSteps, _Thickness, _HiZMinDepth, _MaxMip, validHit, float3(position.xy, depth));
 	
 	float outDepth;
 	float3 color, hitRay;
@@ -194,6 +238,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	
 	SpatialResult output;
 	output.result = Rec2020ToICtCp(lerp(Rec709ToRec2020(radiance), result.rgb, result.a * SpecularGiStrength));
+	output.result = _Input[position.xy].rgb;
 	output.rayLength = avgRayLength;
 	return output;
 }

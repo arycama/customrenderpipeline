@@ -3,6 +3,7 @@
 #pragma kernel StreamCompaction
 
 const static uint threadCount = 1024;
+const static uint log2ThreadCount = firstbitlow(threadCount);
 
 uint MaxThread;
 
@@ -13,32 +14,33 @@ StructuredBuffer<uint> Input;
 StructuredBuffer<uint> GroupSums, PrefixSums;
 StructuredBuffer<float3x4> _Positions;
 
-groupshared uint sharedSums[threadCount];
+groupshared uint sharedSums[2 * threadCount];
 
 [numthreads(threadCount, 1, 1)]
-void KERNEL(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
+void KERNEL(uint dispatchThreadId : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
-	sharedSums[groupIndex] = Input[id];
-	
-	// Perform reduction
+	sharedSums[2 * groupIndex + 0] = dispatchThreadId < MaxThread ? Input[2 * dispatchThreadId + 0] : 0; // load input into shared memory
+	sharedSums[2 * groupIndex + 1] = dispatchThreadId < MaxThread ? Input[2 * dispatchThreadId + 1] : 0;
+
+    // Perform reduction
 	[unroll]
-	for (uint i = 0; i < log2(threadCount); i++)
+	for (uint i = 0; i <= log2ThreadCount; i++)
 	{
 		GroupMemoryBarrierWithGroupSync();
 		
-		if (groupIndex >= threadCount / exp2(i + 1))
+		if (groupIndex >= (threadCount >> i))
 			continue;
 			
-		uint offset = exp2(i);
+		uint offset = 1 << i;
 		uint ai = offset * (2 * groupIndex + 1) - 1;
 		uint bi = offset * (2 * groupIndex + 2) - 1;
 		sharedSums[bi] += sharedSums[ai];
 	}
-	
-	// Clear the last element
+
+    // Write total count if required, and clear the last element
 	if (!groupIndex)
 	{
-		uint totalSum = sharedSums[threadCount - 1];
+		uint totalSum = sharedSums[2 * threadCount - 1];
 	
 		#ifdef WRITE_FINAL_COUNT
 			GroupSumsWrite[groupId] = totalSum;
@@ -47,28 +49,35 @@ void KERNEL(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint
 		#ifdef WRITE_DRAW_CALL_COUNT
 			DrawCallArgsWrite[1] = totalSum;
 		#endif
-	
-		sharedSums[threadCount - 1] = 0;
+		
+		sharedSums[2 * threadCount - 1] = 0;
 	}
-	
-	// Perform downsweep and build scan
+
+    // Perform downsweep and build scan
 	[unroll]
-	for (uint i = 0; i < log2(threadCount); i++) 
+	for (i = 0; i <= log2ThreadCount; i++)
 	{
 		GroupMemoryBarrierWithGroupSync();
-		if (groupIndex >= exp2(i))
+
+		if (groupIndex >= (1 << i))
 			continue;
 			
-		uint offset = threadCount / exp2(i + 1);
+		uint offset = threadCount >> i;
 		uint ai = offset * (2 * groupIndex + 1) - 1;
 		uint bi = offset * (2 * groupIndex + 2) - 1;
 		uint t = sharedSums[ai];
 		sharedSums[ai] = sharedSums[bi];
 		sharedSums[bi] += t;
 	}
-	
+
 	GroupMemoryBarrierWithGroupSync();
-	PrefixSumsWrite[id] = sharedSums[groupIndex];
+
+	if (dispatchThreadId >= MaxThread)
+		return;
+		
+	// Store to main memory
+	PrefixSumsWrite[2 * dispatchThreadId + 0] = sharedSums[2 * groupIndex + 0];
+	PrefixSumsWrite[2 * dispatchThreadId + 1] = sharedSums[2 * groupIndex + 1];
 }
 
 [numthreads(threadCount, 1, 1)]
@@ -77,6 +86,6 @@ void StreamCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID)
 	if (id >= MaxThread || !Input[id])
 		return;
 
-	uint dest = PrefixSums[id] + GroupSums[groupId];
+	uint dest = PrefixSums[id] + GroupSums[groupId >> 1];
 	_ObjectToWorldWrite[dest] = _Positions[id];
 }

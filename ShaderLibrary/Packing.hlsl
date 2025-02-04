@@ -56,20 +56,20 @@ float3 UnpackNormalOctQuadEncode(float2 f)
 	return normalize(n);
 }
 
-float2 PackNormalHemiOctEncode(float3 n)
+// Packs a normal into a uv using hemi-octahedral encoding
+float2 PackNormalHemiOctahedral(float3 n)
 {
-    float l1norm = dot(abs(n), 1.0);
-    float2 res = n.xy * (1.0 / l1norm);
-
-    return float2(res.x + res.y, res.x - res.y);
+	float l1norm = dot(abs(n), 1.0);
+	float2 res = n.xz * (1.0 / l1norm);
+	return 0.5 * float2(res.x + res.y, res.x - res.y) + 0.5;
 }
 
-float3 UnpackNormalHemiOctEncode(float2 f)
+// Unpacks a normal from a hemi-octahedral encoded uv
+float3 UnpackNormalHemiOctahedral(float2 uv)
 {
+	float2 f = 2.0 * uv - 1.0;
 	float2 val = float2(f.x + f.y, f.x - f.y) * 0.5;
-	float3 n = float3(val, 1.0 - dot(abs(val), 1.0));
-
-	return normalize(n);
+	return normalize(float3(val, 1.0 - dot(abs(val), 1.0)).xzy);
 }
 
 uint Float3ToR11G11B10(float3 rgb)

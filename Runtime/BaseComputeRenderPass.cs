@@ -36,7 +36,7 @@ namespace Arycama.CustomRenderPipeline
             Command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, GetBuffer(buffer));
         }
 
-        public override void SetVector(string propertyName, Vector4 value)
+        public override void SetVector(int propertyName, Vector4 value)
         {
             Command.SetComputeVectorParam(computeShader, propertyName, value);
         }
@@ -94,7 +94,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var colorTarget in colorBindings)
             {
                 var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(colorTarget.Item1);
-                if (descriptor.AutoGenerateMips)
+                if (descriptor.AutoGenerateMips && descriptor.HasMips)
                     Command.GenerateMips(GetRenderTexture(colorTarget.Item1));
             }
 

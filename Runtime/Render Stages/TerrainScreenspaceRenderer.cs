@@ -24,9 +24,10 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(renderGraph.GetResource<AlbedoMetallicData>());
                 pass.WriteTexture(renderGraph.GetResource<NormalRoughnessData>());
                 pass.WriteTexture(renderGraph.GetResource<BentNormalOcclusionData>());
-                pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>());
+
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<TerrainRenderData>();
+                pass.AddRenderPassData<CameraDepthData>();
             }
         }
     }

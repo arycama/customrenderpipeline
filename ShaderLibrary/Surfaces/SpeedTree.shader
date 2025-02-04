@@ -73,6 +73,17 @@ Shader "Surface/SpeedTree"
             #include "SpeedTree.hlsl"
             ENDHLSL
         }
+
+        Pass
+        {
+            Name "RayTracing"
+            Tags{ "LightMode" = "RayTracing" }
+
+            HLSLPROGRAM
+            #pragma raytracing RayTracing
+            #include "SpeedTreeRayTracing.hlsl"
+            ENDHLSL
+        }
     }
 
     CustomEditor "SpeedTreeShaderGui"

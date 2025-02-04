@@ -133,7 +133,7 @@ float4 qmul(float4 q1, float4 q2)
     );
 }
 
-float3 rotate_vector(float3 v, float4 r)
+float3 RotateVector(float3 v, float4 r)
 {
 	float4 r_c = r * float4(-1, -1, -1, 1);
 	return qmul(r, qmul(float4(v, 0), r_c)).xyz;
@@ -153,21 +153,23 @@ float4 FromToRotation(float3 F, float3 T)
 // https://blog.selfshadow.com/publications/blending-in-detail/
 float3 FromToRotationZ(float3 baseNormal, float3 detailNormal)
 {
-	//float4 q = FromToRotation(float3(0, 0, 1), baseNormal);
-	//return rotate_vector(detailNormal, q);
-
-	float3 tp = baseNormal + float3(0, 0, 1);
-	float3 up = detailNormal * float2(-1, 1).xxy;
-	return tp * dot(tp, up) / tp.z - up;
+	float3 t = baseNormal + float2(0, 1).xxy;
+	float3 u = detailNormal * float2(-1, 1).xxy;
+	return (dot(t, u) * rcp(t.z)) * t - u;
 }
 
 float3 SampleConeUniform(float u1, float u2, float cosTheta)
 {
-	float r0 = cosTheta + u1 * (1.0 - cosTheta);
+	float r0 = lerp(cosTheta, 1.0, u1);
 	float phi = TwoPi * u2;
 	return SphericalToCartesian(phi, r0);
 }
 
+float3 SampleConeUniform(float u1, float u2, float cosTheta, float3 normal)
+{
+	float3 localNormal = SampleConeUniform(u1, u2, cosTheta);
+	return FromToRotationZ(normal, localNormal);
+}
 
 // Projects a vector onto another vector (Assumes vectors are normalized)
 float3 Project(float3 V, float3 N)
@@ -280,5 +282,40 @@ float TriangleArea(float2 a, float2 b, float2 c)
 {
 	return 0.5 * abs(a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
 }
+
+
+float DistanceToPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal)
+{
+	return dot(planePosition - rayOrigin, planeNormal) / dot(planeNormal, rayDirection);
+}
+
+bool IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal, out float t)
+{
+	bool res = false;
+	t = -1.0;
+
+	float denom = dot(planeNormal, rayDirection);
+	if (abs(denom) > 1e-5)
+	{
+		float3 d = planePosition - rayOrigin;
+		t = dot(d, planeNormal) / denom;
+		res = (t >= 0);
+	}
+
+	return res;
+}
+
+float3 IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal)
+{
+	float t = dot(planePosition - rayOrigin, planeNormal) / dot(planeNormal, rayDirection);
+	return rayDirection * t + rayOrigin;
+}
+
+float3 IntersectRayPlaneZ(float3 rayOrigin, float3 rayDirection, float planeDistance)
+{
+	float t = (planeDistance - rayOrigin.z) * rcp(rayDirection.z);
+	return rayDirection * t + rayOrigin;
+}
+
 
 #endif

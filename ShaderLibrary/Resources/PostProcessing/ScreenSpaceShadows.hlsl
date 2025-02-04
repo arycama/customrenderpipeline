@@ -30,8 +30,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	//worldPosition = worldPosition * (1 - 0.0005 * rcp(max(NdotV, FloatEps)));
 	
 	float2 u = Noise2D(position.xy);
-	float3 localL = SampleConeUniform(u.x, u.y, LightCosTheta);
-	float3 L = LightDirection;//FromToRotationZ(LightDirection, localL);
+	float3 L = SampleConeUniform(u.x, u.y, LightCosTheta, LightDirection);
 
 	bool validHit;
 	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, _HiZMinDepth, _MaxMip, validHit, float3(position.xy, depth));

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -160,6 +161,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.SetRenderFunction((command, pass) =>
                 {
                     // TODO: Do this manually? Since this will be compute shader anyway.. could do in same pass
+                    Assert.IsTrue(renderGraph.RtHandleSystem.GetDescriptor(displacementCurrent).HasMips, "Trying to Generate Mips for a Texture without mips enabled");
                     command.GenerateMips(pass.GetRenderTexture(displacementCurrent));
 
                     pass.SetInt("Size", settings.Resolution >> 2);

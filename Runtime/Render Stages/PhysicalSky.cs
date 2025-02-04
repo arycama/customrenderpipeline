@@ -36,7 +36,6 @@ namespace Arycama.CustomRenderPipeline
             {
                 pass.Initialize(skyMaterial, 3);
                 pass.WriteTexture(skyTemp, RenderBufferLoadAction.DontCare);
-                pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>().Handle);
 
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<AutoExposureData>();
@@ -48,6 +47,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<DirectionalLightInfo>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<SkyTransmittanceData>();
+                pass.AddRenderPassData<CameraDepthData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -62,10 +62,10 @@ namespace Arycama.CustomRenderPipeline
                 pass.Initialize(skyMaterial, 5);
                 pass.WriteTexture(skyTemp2, RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_SkyInput", skyTemp);
-                pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>().Handle);
                 pass.AddRenderPassData<CloudRenderResult>();
                 pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<CameraDepthData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -88,7 +88,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(skyColor.current, RenderBufferLoadAction.DontCare);
                 pass.ReadTexture("_SkyInput", skyTemp2);
                 pass.ReadTexture("_SkyHistory", skyColor.history);
-                pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>().Handle);
+
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<CloudRenderResult>();
@@ -97,6 +97,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<PreviousFrameVelocity>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<VelocityData>();
+                pass.AddRenderPassData<CameraDepthData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {

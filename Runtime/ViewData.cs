@@ -12,7 +12,7 @@ namespace Arycama.CustomRenderPipeline
         public int PixelHeight { get; }
         public int ScaledWidth { get; }
         public int ScaledHeight { get; }
-        public float FieldOfView { get; }
+        public float TanHalfFov { get; }
         public float Scale { get; }
         public int ViewIndex { get; }
         public float Near { get; }
@@ -25,7 +25,7 @@ namespace Arycama.CustomRenderPipeline
         public Matrix4x4 JitteredClipToWorld { get; }
         public Camera Camera { get; }
 
-        public ViewData(Vector3 viewPosition, float viewHeight, Quaternion viewRotation, int pixelWidth, int pixelHeight, int scaledWidth, int scaledHeight, float fieldOfView, float scale, int viewIndex, float near, float far, float aspect, Vector2 jitter, Matrix4x4 clipToWorld, Matrix4x4 jitteredClipToWorld, Camera camera)
+        public ViewData(Vector3 viewPosition, float viewHeight, Quaternion viewRotation, int pixelWidth, int pixelHeight, int scaledWidth, int scaledHeight, float tanHalfFov, float scale, int viewIndex, float near, float far, float aspect, Vector2 jitter, Matrix4x4 clipToWorld, Matrix4x4 jitteredClipToWorld, Camera camera)
         {
             ViewPosition = viewPosition;
             ViewHeight = viewHeight;
@@ -34,7 +34,7 @@ namespace Arycama.CustomRenderPipeline
             PixelHeight = pixelHeight;
             ScaledWidth = scaledWidth;
             ScaledHeight = scaledHeight;
-            FieldOfView = fieldOfView;
+            TanHalfFov = tanHalfFov;
             Scale = scale;
             ViewIndex = viewIndex;
             Near = near;

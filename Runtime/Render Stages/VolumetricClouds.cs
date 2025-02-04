@@ -54,7 +54,6 @@ namespace Arycama.CustomRenderPipeline
                 pass.WriteTexture(cloudTransmittanceTemp, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(cloudDepth, RenderBufferLoadAction.DontCare);
 
-                pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>().Handle);
                 pass.AddRenderPassData<CloudData>();
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<CloudShadowDataResult>();
@@ -62,6 +61,7 @@ namespace Arycama.CustomRenderPipeline
                 pass.AddRenderPassData<DirectionalLightInfo>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<SkyTransmittanceData>();
+                pass.AddRenderPassData<CameraDepthData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -82,10 +82,11 @@ namespace Arycama.CustomRenderPipeline
                 pass.ReadTexture("_History", luminanceHistory);
                 pass.ReadTexture("_TransmittanceHistory", transmittanceHistory);
                 pass.ReadTexture("CloudDepthTexture", cloudDepth);
-                pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>().Handle);
+
                 pass.AddRenderPassData<TemporalAAData>();
                 pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<CameraDepthData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {

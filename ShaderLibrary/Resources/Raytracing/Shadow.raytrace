@@ -38,8 +38,7 @@ void RayGeneration()
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	worldPosition = PlanetCurveInverse(worldPosition);
 	
-    float3 localL = SampleConeUniform(u.x, u.y, LightCosTheta);
-	float3 L = FromToRotationZ(LightDirection, localL);
+    float3 L = SampleConeUniform(u.x, u.y, LightCosTheta, LightDirection);
 	
 	RayPayloadAmbientOcclusion payload;
 	payload.hitDistance = 0.0;

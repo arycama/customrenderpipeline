@@ -37,7 +37,7 @@ namespace Arycama.CustomRenderPipeline
             var result = new Result(volumetricLight, /*volumetricLight.Scale, */viewData.Near, /*volumetricLight.Limit, */settings.MaxDistance, new Vector2(1.0f / viewData.ScaledWidth, 1.0f / viewData.ScaledHeight), settings.DepthSlices, settings.NonLinearDepth ? 1.0f : 0.0f);
             renderGraph.SetResource(result);
 
-            var pixelToWorldViewDir = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, viewData.Jitter, viewData.FieldOfView, viewData.Aspect, Matrix4x4.Rotate(viewData.ViewRotation), false, true);
+            var pixelToWorldViewDir = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, viewData.Jitter, viewData.TanHalfFov, viewData.Aspect, Matrix4x4.Rotate(viewData.ViewRotation), false, true);
 
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
             {

@@ -528,6 +528,7 @@ float3 DiscLightApprox(float angularDiameter, float3 R, float3 L)
 float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false, float opacity = 1.0)
 {
 	float3 f0 = lerp(0.04, input.albedo * opacity, input.f0);
+	float3 albedo = lerp(input.albedo, 0.0, input.f0);
 
 	#ifdef SCREENSPACE_REFLECTIONS_ON
 		float3 radiance = ICtCpToRec2020(ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit)));
@@ -542,10 +543,10 @@ float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false, flo
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float3 irradiance = ICtCpToRec2020(ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit)));
 	#else
-		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, input.albedo* opacity);
+		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, albedo * opacity);
 	#endif
 	
-	float3 luminance = Rec2020ToRec709(radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, f0, input.albedo * opacity, input.translucency));
+	float3 luminance = Rec2020ToRec709(radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, f0, albedo * opacity, input.translucency));
 	
 	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
 	{

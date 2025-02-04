@@ -28,8 +28,6 @@ public class DeferredLightingCombine : RenderFeature
             pass.Initialize(material, 1);
             pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
 
-            pass.ReadTexture("_Depth", renderGraph.GetResource<CameraDepthData>());
-            pass.ReadTexture("_Stencil", renderGraph.GetResource<CameraDepthData>(), 0, RenderTextureSubElement.Stencil);
             pass.ReadTexture("_Input", renderGraph.GetResource<CameraTargetData>());
 
             pass.AddRenderPassData<CloudRenderResult>();
@@ -39,6 +37,8 @@ public class DeferredLightingCombine : RenderFeature
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<WaterPrepassResult>(true);
             pass.AddRenderPassData<SkyTransmittanceData>();
+            pass.AddRenderPassData<CameraDepthData>();
+            pass.AddRenderPassData<CameraStencilData>();
 
             // Only for debugging 
             pass.AddRenderPassData<ScreenSpaceReflectionResult>();

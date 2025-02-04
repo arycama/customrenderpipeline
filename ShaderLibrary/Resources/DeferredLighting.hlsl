@@ -60,6 +60,8 @@ float4 CloudTextureScaleLimit, SkyTextureScaleLimit;
 
 float3 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
+	//return ICtCpToRec2020(ScreenSpaceReflections[position.xy]);
+
 	float depth = _Depth[position.xy];
 	uint stencil = _Stencil[position.xy].g;
 	

@@ -158,34 +158,6 @@ cbuffer UnityInstancing_PerDraw2
 	unity_Builtins3Array[2];
 };
 
-bool IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal, out float t)
-{
-	bool res = false;
-	t = -1.0;
-
-	float denom = dot(planeNormal, rayDirection);
-	if (abs(denom) > 1e-5)
-	{
-		float3 d = planePosition - rayOrigin;
-		t = dot(d, planeNormal) / denom;
-		res = (t >= 0);
-	}
-
-	return res;
-}
-
-float3 IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal)
-{
-	float t = dot(planePosition - rayOrigin, planeNormal) / dot(planeNormal, rayDirection);
-	return rayDirection * t + rayOrigin;
-}
-
-float3 IntersectRayPlaneZ(float3 rayOrigin, float3 rayDirection, float planeDistance)
-{
-	float t = (planeDistance - rayOrigin.z) * rcp(rayDirection.z);
-	return rayDirection * t + rayOrigin;
-}
-
 float Linear01Depth(float depth)
 {
 	return rcp((_Far * rcp(_Near) - 1.0) * depth + 1.0);

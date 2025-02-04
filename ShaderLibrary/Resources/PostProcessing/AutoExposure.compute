@@ -180,7 +180,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	float adaptedEv = lerp(averageEv, previousEv, exp(-_DeltaTime * AdaptationSpeed));
 	
 	if (Mode == 1.0)
-		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
+		adaptedEv = ComputeEV100(Aperture, rcp(ShutterSpeed), Iso);
 		
 	float adaptedLuminance = EV100ToLuminance(adaptedEv);
 	float k = adaptedLuminance > 0.0 ? 1.03 - 2.0 / (log10(adaptedLuminance + 1.0) + 2.0) : 1.0;

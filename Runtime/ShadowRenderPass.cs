@@ -38,7 +38,7 @@ namespace Arycama.CustomRenderPipeline
             Command.SetGlobalBuffer(propertyName, GetBuffer(buffer));
         }
 
-        public override void SetVector(string propertyName, Vector4 value)
+        public override void SetVector(int propertyName, Vector4 value)
         {
             Command.SetGlobalVector(propertyName, value);
         }

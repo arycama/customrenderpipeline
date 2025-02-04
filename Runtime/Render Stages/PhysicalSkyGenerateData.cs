@@ -152,7 +152,7 @@ namespace Arycama.CustomRenderPipeline
                     {
                         var rotation = Quaternion.LookRotation(GraphicsUtilities.lookAtList[i], GraphicsUtilities.upVectorList[i]);
                         var viewToWorld = Matrix4x4.TRS(viewData.ViewPosition, rotation, Vector3.one);
-                        array[i] = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(settings.ReflectionResolution, settings.ReflectionResolution, Vector2.zero, 90.0f, 1.0f, viewToWorld, true);
+                        array[i] = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(settings.ReflectionResolution, settings.ReflectionResolution, Vector2.zero, 1.0f, 1.0f, viewToWorld, true);
                     }
 
                     pass.SetMatrixArray("_PixelToWorldViewDirs", array);
@@ -237,7 +237,7 @@ namespace Arycama.CustomRenderPipeline
                             var resolution = settings.ReflectionResolution >> index;
                             var rotation = Quaternion.LookRotation(GraphicsUtilities.lookAtList[j], GraphicsUtilities.upVectorList[j]);
                             var viewToWorld = Matrix4x4.TRS(viewData.ViewPosition, rotation, Vector3.one);
-                            array[j] = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(resolution, resolution, Vector2.zero, 90.0f, 1.0f, viewToWorld, true);
+                            array[j] = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(resolution, resolution, Vector2.zero, 1.0f, 1.0f, viewToWorld, true);
                         }
 
                         pass.SetMatrixArray("_PixelToWorldViewDirs", array);

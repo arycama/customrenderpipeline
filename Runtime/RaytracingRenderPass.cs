@@ -12,11 +12,11 @@ namespace Arycama.CustomRenderPipeline
         private string rayGenName, shaderPassName;
         private int width, height, depth;
         private RayTracingAccelerationStructure rtas;
-        private float bias, distantBias, fieldOfView;
+        private float bias, distantBias, tanHalfFov;
 
         protected readonly List<(ResourceHandle<RenderTexture>, int)> colorBindings = new();
 
-        public void Initialize(RayTracingShader shader, string rayGenName, string shaderPassName, RayTracingAccelerationStructure rtas, int width = 1, int height = 1, int depth = 1, float bias = 0.01f, float distantBias = 0.01f, float fieldOfView = 0)
+        public void Initialize(RayTracingShader shader, string rayGenName, string shaderPassName, RayTracingAccelerationStructure rtas, int width = 1, int height = 1, int depth = 1, float bias = 0.01f, float distantBias = 0.01f, float tanHalfFov = 0)
         {
             this.shader = shader;
             this.rayGenName = rayGenName;
@@ -27,7 +27,7 @@ namespace Arycama.CustomRenderPipeline
             this.rtas = rtas;
             this.bias = bias;
             this.distantBias = distantBias;
-            this.fieldOfView = fieldOfView;
+            this.tanHalfFov = tanHalfFov;
         }
 
         public void WriteTexture(ResourceHandle<RenderTexture> rtHandle, int propertyId)
@@ -60,7 +60,7 @@ namespace Arycama.CustomRenderPipeline
             // command.SetRayTracingBufferParam(shader, propertyName, buffer);
         }
 
-        public override void SetVector(string propertyName, Vector4 value)
+        public override void SetVector(int propertyName, Vector4 value)
         {
             Command.SetRayTracingVectorParam(shader, propertyName, value);
         }
@@ -85,22 +85,22 @@ namespace Arycama.CustomRenderPipeline
             Command.SetRayTracingIntParam(shader, propertyName, value);
         }
 
-        internal static float GetPixelSpreadTangent(float fov, int width, int height)
+        internal static float GetPixelSpreadTangent(float tanHalfFov, int width, int height)
         {
-            return Mathf.Tan(fov * Mathf.Deg2Rad * 0.5f) * 2.0f / Mathf.Min(width, height);
+            return tanHalfFov * 2.0f / Mathf.Min(width, height);
         }
 
-        internal static float GetPixelSpreadAngle(float fov, int width, int height)
+        internal static float GetPixelSpreadAngle(float tanHalfFov, int width, int height)
         {
-            return Mathf.Atan(GetPixelSpreadTangent(fov, width, height));
+            return Mathf.Atan(GetPixelSpreadTangent(tanHalfFov, width, height));
         }
 
         protected override void Execute()
         {
             Assert.IsNotNull(rtas);
 
-            Command.SetGlobalFloat("_RaytracingPixelSpreadAngle", GetPixelSpreadAngle(fieldOfView, width, height));
-            Command.SetRayTracingFloatParams(shader, "_RaytracingPixelSpreadAngle", GetPixelSpreadAngle(fieldOfView, width, height));
+            Command.SetGlobalFloat("_RaytracingPixelSpreadAngle", GetPixelSpreadAngle(tanHalfFov, width, height));
+            Command.SetRayTracingFloatParams(shader, "_RaytracingPixelSpreadAngle", GetPixelSpreadAngle(tanHalfFov, width, height));
 
             Command.SetRayTracingFloatParams(shader, "_RaytracingBias", bias);
             Command.SetRayTracingFloatParams(shader, "_RaytracingDistantBias", distantBias);
@@ -137,7 +137,7 @@ namespace Arycama.CustomRenderPipeline
             foreach (var colorTarget in colorBindings)
             {
                 var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(colorTarget.Item1);
-                if (descriptor.AutoGenerateMips)
+                if (descriptor.AutoGenerateMips && descriptor.HasMips)
                     Command.GenerateMips(GetRenderTexture(colorTarget.Item1));
             }
 

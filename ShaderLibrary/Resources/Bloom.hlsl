@@ -14,6 +14,32 @@ float KarisAverage(float3 col)
 	return 1.0f / (1.0f + luma);
 }
 
+//-------------------------------------------------
+// RGB to HSV converion functions from http://www.chilliant.com/rgb2hsv.html
+float3 RGBtoHCV(float3 RGB)
+{
+	// Based on work by Sam Hocevar and Emil Persson
+	float4 P = (RGB.g < RGB.b) ? float4(RGB.bg, -1.0, 2.0 / 3.0) : float4(RGB.gb, 0.0, -1.0 / 3.0);
+	float4 Q = (RGB.r < P.x) ? float4(P.xyw, RGB.r) : float4(RGB.r, P.yzx);
+	float C = Q.x - min(Q.w, Q.y);
+	float H = abs((Q.w - Q.y) / (6 * C + 1e-10) + Q.z);
+	return float3(H, C, Q.x);
+}
+
+float3 RGBtoHSV(float3 RGB)
+{
+	float3 HCV = RGBtoHCV(RGB);
+	float S = HCV.y / (HCV.z + 1e-10);
+	return float3(HCV.x, S, HCV.z);
+}
+//--------------------------------------------------
+
+// Convert rgb to hsv and then remap angle part to 370-750 range so it matches wavelength range of visible light.
+float GetWaveLength(float3 RGB)
+{
+	return (clamp(0, 300, RGBtoHSV(RGB).x * 360) / 300) * 370 + 380;
+}
+
 float3 FragmentDownsample(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {
 	// Take 13 samples around current texel:
@@ -78,6 +104,9 @@ float3 FragmentDownsample(float4 position : SV_Position, float2 uv : TEXCOORD0) 
 		color += (b + d + f + h) * 0.0625;
 		color += (j + k + l + m) * 0.125;
 	#endif
+	
+	//float airyDisk = 0.61*((GetWaveLength(ToneMapFilmicU2(color.rgb))/750f)/fApertureDiameter);
+	//color*=saturate(1-airyDisk);
 	
 	return color;
 }

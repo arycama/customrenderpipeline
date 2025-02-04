@@ -76,11 +76,12 @@ public class ScreenSpaceShadows : RenderFeature
             {
                 var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                pass.Initialize(shadowRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, raytracingData.Bias, raytracingData.DistantBias, viewData.FieldOfView);
+                pass.Initialize(shadowRaytracingShader, "RayGeneration", "RayTracingAmbientOcclusion", raytracingData.Rtas, viewData.ScaledWidth, viewData.ScaledHeight, 1, raytracingData.Bias, raytracingData.DistantBias, viewData.TanHalfFov);
                 pass.WriteTexture(tempResult, "HitResult");
-                pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
+
                 pass.AddRenderPassData<ICommonPassData>();
+                pass.AddRenderPassData<CameraDepthData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
@@ -109,8 +110,8 @@ public class ScreenSpaceShadows : RenderFeature
                 pass.AddRenderPassData<ShadowRenderer.Result>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<HiZMinDepthData>();
+                pass.AddRenderPassData<CameraDepthData>();
 
-                pass.ReadTexture("_Depth", depth);
                 pass.ReadTexture("_NormalRoughness", normalRoughness);
 
                 pass.SetRenderFunction((command, pass) =>
@@ -133,8 +134,6 @@ public class ScreenSpaceShadows : RenderFeature
             pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
 
             pass.ReadTexture("_Input", tempResult);
-            pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
-            pass.ReadTexture("_Depth", depth);
 
             pass.AddRenderPassData<TemporalAAData>();
             pass.AddRenderPassData<SkyReflectionAmbientData>();
@@ -142,6 +141,8 @@ public class ScreenSpaceShadows : RenderFeature
             pass.AddRenderPassData<AutoExposureData>();
             pass.AddRenderPassData<ICommonPassData>();
             pass.AddRenderPassData<VelocityData>();
+            pass.AddRenderPassData<CameraDepthData>();
+            pass.AddRenderPassData<CameraStencilData>();
 
             pass.SetRenderFunction((command, pass) =>
             {
@@ -168,8 +169,6 @@ public class ScreenSpaceShadows : RenderFeature
 
             pass.ReadTexture("_TemporalInput", spatialResult);
             pass.ReadTexture("_History", history);
-            pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
-            pass.ReadTexture("_Depth", depth);
             //pass.ReadTexture("_HitResult", hitResult);
             pass.ReadTexture("_NormalRoughness", normalRoughness);
             //pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
@@ -181,6 +180,8 @@ public class ScreenSpaceShadows : RenderFeature
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<ICommonPassData>();
             pass.AddRenderPassData<VelocityData>();
+            pass.AddRenderPassData<CameraDepthData>();
+            pass.AddRenderPassData<CameraStencilData>();
 
             pass.SetRenderFunction((command, pass) =>
             {

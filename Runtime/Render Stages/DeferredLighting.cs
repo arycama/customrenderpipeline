@@ -27,8 +27,6 @@ public class DeferredLighting : RenderFeature
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);
 
-            pass.ReadTexture("_Stencil", depth, subElement: RenderTextureSubElement.Stencil);
-
             pass.AddRenderPassData<SkyReflectionAmbientData>();
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<CloudShadowDataResult>();
@@ -49,6 +47,7 @@ public class DeferredLighting : RenderFeature
             pass.AddRenderPassData<CameraDepthData>();
             pass.AddRenderPassData<AlbedoMetallicData>();
             pass.AddRenderPassData<NormalRoughnessData>();
+            pass.AddRenderPassData<CameraStencilData>();
 
             var hasWaterShadow = renderGraph.IsRenderPassDataValid<WaterShadowResult>();
             pass.Keyword = hasWaterShadow ? "WATER_SHADOWS_ON" : string.Empty;

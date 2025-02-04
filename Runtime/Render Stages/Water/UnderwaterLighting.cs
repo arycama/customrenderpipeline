@@ -26,7 +26,6 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.WriteDepth(renderGraph.GetResource<CameraDepthData>().Handle, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(underwaterResultId, RenderBufferLoadAction.DontCare);
 
-                pass.ReadTexture("_Depth", renderGraph.GetResource<DepthCopyData>().Handle);
                 pass.ReadTexture("_AlbedoMetallic", renderGraph.GetResource<AlbedoMetallicData>().Handle);
                 pass.ReadTexture("_NormalRoughness", renderGraph.GetResource<NormalRoughnessData>().Handle);
                 pass.ReadTexture("_BentNormalOcclusion", renderGraph.GetResource<BentNormalOcclusionData>().Handle);
@@ -43,6 +42,7 @@ namespace Arycama.CustomRenderPipeline.Water
                 pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<ICommonPassData>();
                 pass.AddRenderPassData<CausticsResult>();
+                pass.AddRenderPassData<CameraDepthData>();
 
                 pass.SetRenderFunction((command, pass) =>
                 {
