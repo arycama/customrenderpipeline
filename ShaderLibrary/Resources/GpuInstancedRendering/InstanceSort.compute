@@ -1,0 +1,65 @@
+#pragma kernel InstanceSort
+
+RWStructuredBuffer<uint> Result;
+StructuredBuffer<uint> Input;
+StructuredBuffer<uint> DrawCallArgs, SortKeys;
+RWStructuredBuffer<float> SortKeysWrite;
+
+const static uint threadCount = 256;
+
+groupshared uint histogram[256];
+groupshared uint sharedPrefixSum[threadCount];
+groupshared uint sharedKeys[2][threadCount];
+groupshared uint sharedData[2][threadCount];
+
+[numthreads(threadCount, 1, 1)]
+void InstanceSort(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex)
+{
+	Result[id] = Input[id];
+	return;
+	
+	bool outOfRange = id >= DrawCallArgs[1];
+	sharedKeys[0][groupIndex] = outOfRange ? 0xFFFFFFFF : SortKeys[id];
+	sharedData[0][groupIndex] = outOfRange ? 0 : Input[id];
+	
+	[unroll]
+	for (uint i = 0; i < 4; i++)
+	{
+		// Clear histogram
+		histogram[groupIndex] = 0;
+		GroupMemoryBarrierWithGroupSync();
+
+		// Count occurrences of each digit
+		uint key = sharedKeys[i & 1][groupIndex];
+		uint digit = (key >> (8 * i)) & 0xFF;
+		
+		InterlockedAdd(histogram[digit], 1);
+		GroupMemoryBarrierWithGroupSync();
+
+		// Compute prefix sum
+		uint sum = 0, arraySum = 0;
+		for (uint j = 0; j < groupIndex; j++)
+		{
+			sum += histogram[j];
+			arraySum += ((sharedKeys[i & 1][j] >> (8 * i)) & 0xFF) == digit;
+		}
+		
+		sharedPrefixSum[groupIndex] = sum;
+		GroupMemoryBarrierWithGroupSync();
+
+		// Reorder elements to shared memory
+		uint index = sharedPrefixSum[digit] + arraySum;
+		
+		sharedKeys[!(i & 1)][index] = key;
+		sharedData[!(i & 1)][index] = sharedData[i & 1][groupIndex];
+	}
+	
+	GroupMemoryBarrierWithGroupSync();
+	
+	if (outOfRange)
+		return;
+	
+	// Write final results
+	Result[id] = sharedData[0][groupIndex];
+	SortKeysWrite[id] = sharedKeys[0][groupIndex];
+}

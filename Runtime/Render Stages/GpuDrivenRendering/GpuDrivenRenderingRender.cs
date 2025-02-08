@@ -1,22 +1,25 @@
 ﻿using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 namespace Arycama.CustomRenderPipeline
 {
     public class GpuDrivenRenderingRender : RenderFeature
     {
-        private readonly ComputeShader cullingShader, instancePrefixSum;
+        private readonly ComputeShader cullingShader, instancePrefixSum, instanceSort, instanceCompaction, instanceCopyData;
 
         public GpuDrivenRenderingRender(RenderGraph renderGraph) : base(renderGraph)
         {
             cullingShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceRendererCull");
             instancePrefixSum = Resources.Load<ComputeShader>("GpuInstancedRendering/InstancePrefixSum");
+            instanceSort = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceSort");
+            instanceCompaction = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCompaction");
+            instanceCopyData = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCopyData");
         }
 
         public override void Render()
         {
-            var camera = renderGraph.GetResource<ViewData>().Camera;
+            var viewData = renderGraph.GetResource<ViewData>();
+            var camera = viewData.Camera;
 
             if (camera.cameraType != CameraType.SceneView && camera.cameraType != CameraType.Game && camera.cameraType != CameraType.Reflection)
                 return;
@@ -25,7 +28,6 @@ namespace Arycama.CustomRenderPipeline
             if (!renderGraph.ResourceMap.TryGetRenderPassData<GpuInstanceBuffersData>(handle, renderGraph.FrameIndex, out var gpuInstanceBuffers))
                 return;
 
-            var viewData = renderGraph.GetResource<ViewResolutionData>();
             var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
 
             var isShadow = false; // TODO: Support?
@@ -88,16 +90,61 @@ namespace Arycama.CustomRenderPipeline
                 });
             }
 
-            var objectToWorld = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount, UnsafeUtility.SizeOf<Matrix3x4>());
+            // Need a buffer big enough to hold all potential indices
+            var instanceIndices = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
+            var sortKeys = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
             using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Stream Compaction"))
             {
-                pass.Initialize(instancePrefixSum, 2, gpuInstanceBuffers.totalInstanceCount);
-                pass.WriteBuffer("_ObjectToWorldWrite", objectToWorld);
+                pass.Initialize(instanceCompaction, 0, gpuInstanceBuffers.totalInstanceCount);
+                pass.WriteBuffer("Output", instanceIndices);
+                pass.WriteBuffer("SortKeysWrite", sortKeys);
 
                 pass.ReadBuffer("Input", visibilityPredicates);
-                pass.ReadBuffer("_Positions", gpuInstanceBuffers.positionsBuffer);
                 pass.ReadBuffer("PrefixSums", prefixSums);
                 pass.ReadBuffer("GroupSums", groupSums1);
+                pass.ReadBuffer("InstanceBounds", gpuInstanceBuffers.instanceBoundsBuffer);
+
+                pass.SetRenderFunction((command, pass) =>
+                {
+                    pass.SetInt("MaxThread", gpuInstanceBuffers.totalInstanceCount);
+                    pass.SetVector("CameraForward", viewData.Camera.transform.forward);
+                    pass.SetVector("ViewPosition", viewData.Camera.transform.position);
+                });
+            }
+
+            var threadGroups = renderGraph.GetBuffer(3, target: GraphicsBuffer.Target.IndirectArguments);
+            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("ComputeThreadCount"))
+            {
+                pass.Initialize(instanceCopyData, 0, 1, 1, 1, false);
+                pass.WriteBuffer("ThreadGroupsWrite", threadGroups);
+                pass.ReadBuffer("DrawCallArgs", gpuInstanceBuffers.drawCallArgsBuffer);
+            }
+
+            var sortedInstanceIndices = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
+            var sortedKeys = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
+            using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Instance Sort"))
+            {
+                pass.Initialize(instanceSort, threadGroups);
+                pass.WriteBuffer("Result", sortedInstanceIndices);
+                pass.WriteBuffer("SortKeysWrite", sortedKeys);
+
+                pass.ReadBuffer("Input", instanceIndices);
+                pass.ReadBuffer("SortKeys", sortKeys);
+                pass.ReadBuffer("DrawCallArgs", gpuInstanceBuffers.drawCallArgsBuffer);
+            }
+
+            var objectToWorld = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount, UnsafeUtility.SizeOf<Matrix3x4>());
+            using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Copy Data"))
+            {
+                pass.Initialize(instanceCopyData, threadGroups, 1);
+                pass.WriteBuffer("_ObjectToWorldWrite", objectToWorld);
+
+                pass.ReadBuffer("InputIndices", sortedInstanceIndices);
+                pass.ReadBuffer("_Positions", gpuInstanceBuffers.positionsBuffer);
+                pass.ReadBuffer("DrawCallArgs", gpuInstanceBuffers.drawCallArgsBuffer);
+
+                // Just here for debug
+                pass.ReadBuffer("SortedKeys", sortedKeys);
 
                 pass.SetRenderFunction((command, pass) =>
                 {

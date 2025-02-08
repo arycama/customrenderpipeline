@@ -58,28 +58,26 @@ bool IsVisible(float3 boundsCenter, float3 boundsExtents)
 			mip = levelLower;
 	}
 	else
-	{
 		mip = 0.0;
+		
+	// Check if this aabb will actually generate any pixels (Eg overlap the center of the target pixel
+	if (mip == 0.0)
+	{
+		float2 screenCenter = 0.5 * (screenMax + screenMin).xy;
+		float2 pixelCenter = floor(screenCenter) + 0.5;
+		
+		if (any(pixelCenter < screenMin.xy || pixelCenter > screenMax.xy))
+			return false;
 	}
 	
-	float4 screenMinMax = float4(screenMin.xy, screenMax.xy);
 	float2 mipRes = floor(_ScaledResolution.xy * exp2(-mip));
+	float4 screenMinMax = float4(screenMin.xy, screenMax.xy) * mipRes.xyxy;
+	screenMinMax = clamp(screenMinMax, 0, mipRes.xyxy - 1);
 		
-	screenMinMax = screenMinMax * mipRes.xyxy;
-		
-	if (all(screenMinMax.xy >= 0 && screenMinMax.xy < mipRes) && screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.xy])
-		return true;
-			
-	if (all(screenMinMax.zy >= 0 && screenMinMax.zy < mipRes) && screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.zy])
-		return true;
-		
-	if (all(screenMinMax.xw >= 0 && screenMinMax.xw < mipRes) && screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.xw])
-		return true;
-		
-	if (all(screenMinMax.zw >= 0 && screenMinMax.zw < mipRes) && screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.zw])
-		return true;
-		
-	return false;
+	return screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.xy] ||
+		screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.zy] ||
+		screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.xw] ||
+		screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.zw];
 }
 
 [numthreads(1024, 1, 1)]

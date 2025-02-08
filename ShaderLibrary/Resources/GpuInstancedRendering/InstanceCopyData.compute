@@ -1,0 +1,40 @@
+﻿#pragma kernel ComputeThreadCount
+#pragma kernel InstanceCopyData
+#pragma enable_d3d11_debug_symbols
+
+// Since we use groupId to index the instance prefix sum, this needs to match
+const static uint threadCount = 256;
+const static uint log2ThreadCount = firstbitlow(threadCount);
+
+uint MaxThread;
+
+RWStructuredBuffer<float3x4> _ObjectToWorldWrite;
+
+StructuredBuffer<uint> Input, InputIndices;
+StructuredBuffer<float3x4> _Positions;
+
+RWStructuredBuffer<uint> ThreadGroupsWrite;
+StructuredBuffer<uint> DrawCallArgs;
+
+uint DivRoundUp(uint x, uint y)
+{
+	return (x + y - 1) / y;
+}
+
+[numthreads(1, 1, 1)]
+void ComputeThreadCount()
+{
+	uint visibleInstanceCount = DrawCallArgs[1];
+	ThreadGroupsWrite[0] = DivRoundUp(visibleInstanceCount, threadCount);
+}
+
+[numthreads(threadCount, 1, 1)]
+void InstanceCopyData(uint id : SV_DispatchThreadID)
+{
+	uint maxIndex = DrawCallArgs[1];
+	if (id >= maxIndex)
+		return;
+	
+	uint src = InputIndices[id];
+	_ObjectToWorldWrite[id] = _Positions[src];
+}

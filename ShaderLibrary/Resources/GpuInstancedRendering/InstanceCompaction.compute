@@ -1,26 +1,34 @@
-﻿#pragma kernel StreamCompaction
+﻿#pragma kernel InstanceCompaction
+#pragma enable_d3d11_debug_symbols
 
-RWStructuredBuffer<uint> _VisibleRendererInstanceIndices;
-Buffer<uint> _RendererInstanceIDs;
-uint _RendererInstanceIDsCount;
+// Since we use groupId to index the instance prefix sum, this needs to match
+const static uint threadCount = 1024;
+const static uint log2ThreadCount = firstbitlow(threadCount);
 
-// Checks each renderer of each instance for visbility. If visible, it writes the index of the instance matrix to a buffer.
-// One thread per instance.
-[numthreads(1024, 1, 1)]
-void StreamCompaction(uint id : SV_DispatchThreadID)
+uint MaxThread;
+float3 CameraForward, ViewPosition;
+
+RWStructuredBuffer<uint> Output;
+RWStructuredBuffer<uint> SortKeysWrite;
+
+StructuredBuffer<uint> Input;
+StructuredBuffer<uint> GroupSums, PrefixSums;
+StructuredBuffer<float4> InstanceBounds;
+
+[numthreads(threadCount, 1, 1)]
+void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 {
-	// Check that we're not out of bounds
-	if (id >= _RendererInstanceIDsCount)
-		return;
-	
-	// Get the stored Instance ID, ensure it is not 0/invisible
-	uint instanceID = _RendererInstanceIDs[id];
-	if (instanceID == 0)
+	if (id >= MaxThread || !Input[id])
 		return;
 
-	uint dstOffset = _VisibleRendererInstanceIndices.IncrementCounter();
+	uint dest = PrefixSums[id] + GroupSums[groupId >> 1];
+	Output[dest] = id;
 	
-	// Write the final destination index
-	// -1, as we +1 when initially writing so that 0 can be used for culled renderers
-	_VisibleRendererInstanceIndices[dstOffset] = instanceID - 1;
+	// Compute sort key from instanceType, lod and viewDistance
+	float4 boundsData = InstanceBounds[id];
+	float3 worldBoundsCenter = boundsData.xyz - ViewPosition;
+	
+	float viewZ = max(0, dot(CameraForward, worldBoundsCenter));
+	uint sortKey = viewZ;
+	SortKeysWrite[dest] = sortKey;
 }
