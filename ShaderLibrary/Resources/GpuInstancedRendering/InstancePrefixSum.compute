@@ -1,6 +1,5 @@
 ﻿#pragma kernel PrefixScan0 KERNEL=PrefixScan0 WRITE_FINAL_COUNT
 #pragma kernel PrefixScan1 KERNEL=PrefixScan1 WRITE_DRAW_CALL_COUNT
-#pragma enable_d3d11_debug_symbols
 
 const static uint threadCount = 1024;
 const static uint log2ThreadCount = firstbitlow(threadCount);

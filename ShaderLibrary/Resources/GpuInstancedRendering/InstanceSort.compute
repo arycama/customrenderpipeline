@@ -15,9 +15,6 @@ groupshared uint sharedData[2][threadCount];
 [numthreads(threadCount, 1, 1)]
 void InstanceSort(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex)
 {
-	Result[id] = Input[id];
-	return;
-	
 	bool outOfRange = id >= DrawCallArgs[1];
 	sharedKeys[0][groupIndex] = outOfRange ? 0xFFFFFFFF : SortKeys[id];
 	sharedData[0][groupIndex] = outOfRange ? 0 : Input[id];
