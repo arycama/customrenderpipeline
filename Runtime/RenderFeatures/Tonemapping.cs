@@ -5,16 +5,16 @@ public partial class Tonemapping : CameraRenderFeature
 {
 	private Material material;
 	private Settings settings;
-	private CustomRenderPipelineAsset asset;
+    private Bloom.Settings bloomSettings;
 	private Matrix4x4 RgbToLmsr;
 	private Matrix4x4 LmsToRgb;
 
 	private bool previousNormalize;
 
-	public Tonemapping(RenderGraph renderGraph, Settings settings, CustomRenderPipelineAsset asset) : base(renderGraph)
+	public Tonemapping(RenderGraph renderGraph, Settings settings, Bloom.Settings bloomSettings) : base(renderGraph)
 	{
 		this.settings = settings;
-		this.asset = asset;
+		this.bloomSettings = bloomSettings;
 		material = new Material(Shader.Find("Hidden/Tonemap")) { hideFlags = HideFlags.HideAndDontSave };
 
 		var hdrSettings = HDROutputSettings.main;
@@ -82,7 +82,7 @@ public partial class Tonemapping : CameraRenderFeature
 			pass.SetFloat("PaperWhite", settings.PaperWhite);
 			pass.SetFloat("IsSceneView", camera.cameraType == CameraType.SceneView ? 1 : 0);
 			pass.SetFloat("IsPreview", camera.cameraType == CameraType.Preview ? 1 : 0);
-			pass.SetFloat("BloomStrength", asset.Bloom.BloomStrength);
+			pass.SetFloat("BloomStrength", bloomSettings.BloomStrength);
 			pass.SetFloat("ColorGamut", (int)colorGamut);
 			pass.SetMatrix("RgbToLmsr", RgbToLmsr);
 			pass.SetMatrix("LmrToRgb", LmsToRgb);

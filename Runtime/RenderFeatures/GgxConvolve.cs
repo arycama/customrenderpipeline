@@ -7,13 +7,17 @@ public class GgxConvolve : CameraRenderFeature
 	public override string ProfilerNameOverride => "Ggx Convolve";
 
 	private readonly Material skyMaterial, ggxConvolveMaterial;
-	private readonly CustomRenderPipelineAsset settings;
+	private readonly LightingSettings lightingSettings;
+	private readonly VolumetricClouds.Settings cloudSettings;
+	private readonly Sky.Settings skySettings;
 
-	public GgxConvolve(RenderGraph renderGraph, CustomRenderPipelineAsset settings) : base(renderGraph)
+	public GgxConvolve(RenderGraph renderGraph, LightingSettings lightingSettings, VolumetricClouds.Settings cloudSettings, Sky.Settings skySettings) : base(renderGraph)
 	{
 		ggxConvolveMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
         skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
-		this.settings = settings;
+		this.lightingSettings = lightingSettings;
+		this.cloudSettings = cloudSettings;
+		this.skySettings = skySettings;
 	}
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
@@ -34,15 +38,15 @@ public class GgxConvolve : CameraRenderFeature
 		//	return;
 		//}
 
-		var envResolution = settings.LightingSettings.EnvironmentResolution;
+		var envResolution = lightingSettings.EnvironmentResolution;
 		var reflectionProbeTemp = renderGraph.GetTexture(envResolution, envResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, hasMips: true, autoGenerateMips: true);
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Environment Cubemap"))
 		{
 			var keyword = string.Empty;
 			var viewHeight = camera.transform.position.y;
-			if (viewHeight > settings.Clouds.StartHeight)
+			if (viewHeight > cloudSettings.StartHeight)
 			{
-				if (viewHeight > settings.Clouds.StartHeight + settings.Clouds.LayerThickness)
+				if (viewHeight > cloudSettings.StartHeight + cloudSettings.LayerThickness)
 				{
 					keyword = "ABOVE_CLOUD_LAYER";
 				}
@@ -67,8 +71,8 @@ public class GgxConvolve : CameraRenderFeature
 
 			pass.SetRenderFunction((command, pass) =>
 			{
-				settings.Clouds.SetCloudPassData(pass, time);
-				pass.SetFloat("_Samples", settings.Sky.ReflectionSamples);
+				cloudSettings.SetCloudPassData(pass, time);
+				pass.SetFloat("_Samples", skySettings.ReflectionSamples);
 
 				using var scope = ArrayPool<Matrix4x4>.Get(6, out var array);
 				for (var i = 0; i < 6; i++)
@@ -139,7 +143,7 @@ public class GgxConvolve : CameraRenderFeature
 
 				pass.WriteTexture(reflectionProbe);
 				pass.ReadTexture("_AmbientProbeInputCubemap", reflectionProbeTemp);
-				pass.SetRenderFunction((i, envResolution, settings.LightingSettings.EnvironmentSamples), static (command, pass, data) =>
+				pass.SetRenderFunction((i, envResolution, lightingSettings.EnvironmentSamples), static (command, pass, data) =>
 				{
 					using var scope = ArrayPool<Matrix4x4>.Get(6, out var array);
 

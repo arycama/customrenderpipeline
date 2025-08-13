@@ -29,9 +29,9 @@ public partial class Sky : CameraRenderFeature
 		renderGraph.AddProfileBeginPass("Sky Render");
 
 		var starsTemp = renderGraph.GetTexture(settings.StarResolution, settings.StarResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, isExactSize: true);
-		using (var pass = renderGraph.AddRenderPass<DrawProceduralRenderPass>("Render Stars"))
+		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Render Stars"))
 		{
-			pass.Initialize(settings.StarMaterial, Matrix4x4.identity, 0, 4 * settings.StarCount, 1, MeshTopology.Quads);
+			//pass.Initialize(settings.StarMaterial, Matrix4x4.identity, 0, 4 * settings.StarCount, 1, MeshTopology.Quads);
 
 			pass.WriteTexture(starsTemp);
 			

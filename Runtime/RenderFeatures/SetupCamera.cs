@@ -5,12 +5,12 @@ using UnityEngine.Rendering;
 
 public class SetupCamera : CameraRenderFeature
 {
-	private CustomRenderPipelineAsset settings;
+	private Sky.Settings sky;
 	private readonly Dictionary<Camera, (Vector3, Quaternion, Matrix4x4)> previousCameraTransform = new();
 
-	public SetupCamera(RenderGraph renderGraph, CustomRenderPipelineAsset settings) : base(renderGraph)
+	public SetupCamera(RenderGraph renderGraph, Sky.Settings sky) : base(renderGraph)
 	{
-		this.settings = settings;
+		this.sky = sky;
 	}
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
@@ -145,7 +145,7 @@ public class SetupCamera : CameraRenderFeature
 			pixelToWorldDir,
 			pixelToView,
 			viewPosition,
-			viewPosition.y + settings.Sky.PlanetRadius * settings.Sky.EarthScale,
+			viewPosition.y + sky.PlanetRadius * sky.EarthScale,
 			new Float4(viewRotation.Rotate(new Float3(tanHalfFovX * (-1.0f + jitter.x), tanHalfFovY * (1.0f + jitter.y), 1.0f)), 0),
 			new Float4(viewRotation.Rotate(new Float3(tanHalfFovX * (3.0f + jitter.x), tanHalfFovY * (1.0f + jitter.y), 1.0f)), 0),
 			new Float4(viewRotation.Rotate(new Float3(tanHalfFovX * (-1.0f + jitter.x), tanHalfFovY * (-3.0f + jitter.y), 1.0f)), 0),

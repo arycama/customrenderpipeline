@@ -5,127 +5,142 @@ using UnityEngine.Rendering;
 
 public abstract class CustomRenderPipelineBase : RenderPipeline
 {
-	private List<FrameRenderFeature> perFrameRenderFeatures;
-	private List<CameraRenderFeature> perCameraRenderFeatures;
+    private List<FrameRenderFeature> perFrameRenderFeatures;
+    private List<CameraRenderFeature> perCameraRenderFeatures;
 
-	protected readonly CustomRenderPipelineAsset settings;
-	private readonly CommandBuffer command;
+    private readonly CommandBuffer command;
 
-	protected readonly RenderGraph renderGraph;
-	private bool isInitialized;
-	private readonly bool renderDocLoaded;
+    protected readonly RenderGraph renderGraph;
+    private bool isInitialized;
+    private readonly bool renderDocLoaded;
 
-	public bool IsDisposingFromRenderDoc { get; protected set; }
+    public bool IsDisposingFromRenderDoc { get; protected set; }
 
-	public CustomRenderPipelineBase(CustomRenderPipelineAsset renderPipelineAsset)
-	{
-		settings = renderPipelineAsset;
+    protected abstract SupportedRenderingFeatures SupportedRenderingFeatures { get; }
 
-		renderDocLoaded = RenderDoc.IsLoaded();
+    protected abstract bool UseSrpBatching { get; }
 
-		// TODO: Can probably move some of this to the asset class
-		SupportedRenderingFeatures.active = renderPipelineAsset.SupportedRenderingFeatures;
-		GraphicsSettings.lightsUseLinearIntensity = true;
-		GraphicsSettings.lightsUseColorTemperature = true;
-		GraphicsSettings.realtimeDirectRectangularAreaLights = true;
+    public CustomRenderPipelineBase()
+    {
+        renderDocLoaded = RenderDoc.IsLoaded();
 
-		renderGraph = new(this);
+        // TODO: Can probably move some of this to the asset class
+        GraphicsSettings.lightsUseLinearIntensity = true;
+        GraphicsSettings.lightsUseColorTemperature = true;
+        GraphicsSettings.realtimeDirectRectangularAreaLights = true;
 
-		command = new CommandBuffer() { name = "Render Camera" };
-	}
+        renderGraph = new(this);
 
-	protected override void Dispose(bool disposing)
-	{
-		// Could dispose in reverse order?
-		foreach (var renderFeature in perFrameRenderFeatures)
-			renderFeature?.Dispose();
+        command = new CommandBuffer() { name = "Render Camera" };
+    }
 
-		foreach (var renderFeature in perCameraRenderFeatures)
-			renderFeature?.Dispose();
+    protected override void Dispose(bool disposing)
+    {
+        // Could dispose in reverse order?
+        foreach (var renderFeature in perFrameRenderFeatures)
+            renderFeature?.Dispose();
 
-		command.Release();
+        foreach (var renderFeature in perCameraRenderFeatures)
+            renderFeature?.Dispose();
 
-		renderGraph.Dispose();
-	}
+        command.Release();
+
+        renderGraph.Dispose();
+    }
 
     protected override void Render(ScriptableRenderContext context, Camera[] cameras) => Render(context, cameras);
 
     protected override void Render(ScriptableRenderContext context, List<Camera> cameras) => Render(context, cameras);
 
-	protected abstract List<FrameRenderFeature> InitializePerFrameRenderFeatures();
+    protected abstract List<FrameRenderFeature> InitializePerFrameRenderFeatures();
 
-	protected abstract List<CameraRenderFeature> InitializePerCameraRenderFeatures();
+    protected abstract List<CameraRenderFeature> InitializePerCameraRenderFeatures();
 
-	private void Render(ScriptableRenderContext context, IList<Camera> cameras)
-	{
-		// When renderdoc is loaded, all renderTextures become un-created.. but Unity does not dispose the render pipeline until the next frame
-		// To avoid errors/leaks/crashes, check to see if renderDoc.IsLoaded has changed, and skip rendering for one frame.. this allows Unity to
-		// dispose the render pipeline, and then recreate it on the next frame, which will clear/re-initialize all textures..
-		if (!renderDocLoaded && RenderDoc.IsLoaded())
-		{
-			IsDisposingFromRenderDoc = true;
-			return;
-		}
+    private void Render(ScriptableRenderContext context, IList<Camera> cameras)
+    {
+        // When renderdoc is loaded, all renderTextures become un-created.. but Unity does not dispose the render pipeline until the next frame
+        // To avoid errors/leaks/crashes, check to see if renderDoc.IsLoaded has changed, and skip rendering for one frame.. this allows Unity to
+        // dispose the render pipeline, and then recreate it on the next frame, which will clear/re-initialize all textures..
+        if (!renderDocLoaded && RenderDoc.IsLoaded())
+        {
+            IsDisposingFromRenderDoc = true;
+            return;
+        }
 
-		GraphicsSettings.useScriptableRenderPipelineBatching = settings.UseSrpBatching;
+        GraphicsSettings.useScriptableRenderPipelineBatching = UseSrpBatching;
 
-		try
-		{
-			if (!isInitialized)
-			{
-				perFrameRenderFeatures = InitializePerFrameRenderFeatures();
-				perCameraRenderFeatures = InitializePerCameraRenderFeatures();
-				isInitialized = true;
-			}
+        try
+        {
+            if (!isInitialized)
+            {
+                perFrameRenderFeatures = InitializePerFrameRenderFeatures();
+                perCameraRenderFeatures = InitializePerCameraRenderFeatures();
+                isInitialized = true;
+            }
 
-			using (renderGraph.AddProfileScope("Prepare Frame"))
-			foreach (var frameRenderFeature in perFrameRenderFeatures)
-			{
-				frameRenderFeature.Render(context);
-			}
+            using (renderGraph.AddProfileScope("Prepare Frame"))
+                foreach (var frameRenderFeature in perFrameRenderFeatures)
+                {
+                    frameRenderFeature.Render(context);
+                }
 
-			foreach (var camera in cameras)
-			{
-				camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
+            foreach (var camera in cameras)
+            {
+                camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 
-				using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
+                using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
 
-				foreach (var cameraRenderFeature in perCameraRenderFeatures)
-				{
-					cameraRenderFeature.Render(camera, context);
-				}
+                foreach (var cameraRenderFeature in perCameraRenderFeatures)
+                {
+                    cameraRenderFeature.Render(camera, context);
+                }
 
-				var wireOverlay = context.CreateWireOverlayRendererList(camera);
+                var wireOverlay = context.CreateWireOverlayRendererList(camera);
 
-				// Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
-				if (camera.cameraType == CameraType.Game && camera == Camera.main)
-				{
-					using var pass = renderGraph.AddRenderPass<GenericRenderPass>("UI Overlay");
-					pass.UseProfiler = false;
+                // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
+                if (camera.cameraType == CameraType.Game && camera == Camera.main)
+                {
+                    using var pass = renderGraph.AddRenderPass<GenericRenderPass>("UI Overlay");
+                    pass.UseProfiler = false;
 
-					var uiOverlay = context.CreateUIOverlayRendererList(camera);
-					pass.SetRenderFunction((command, pass) =>
-					{
-						command.EnableShaderKeyword("UI_OVERLAY_RENDERING");
-						command.DrawRendererList(uiOverlay);
-						command.DisableShaderKeyword("UI_OVERLAY_RENDERING");
+                    var uiOverlay = context.CreateUIOverlayRendererList(camera);
+                    pass.SetRenderFunction((command, pass) =>
+                    {
+                        command.EnableShaderKeyword("UI_OVERLAY_RENDERING");
+                        command.DrawRendererList(uiOverlay);
+                        command.DisableShaderKeyword("UI_OVERLAY_RENDERING");
 
-						command.DrawRendererList(wireOverlay);
-					});
-				}
-			}
+                        command.DrawRendererList(wireOverlay);
+                    });
+                }
+            }
 
-			renderGraph.Execute(command);
+            renderGraph.Execute(command);
 
-			context.ExecuteCommandBuffer(command);
-			command.Clear();
+            context.ExecuteCommandBuffer(command);
+            command.Clear();
 
-			if(context.SubmitForRenderPassValidation())
-				context.Submit();
-		}
-		finally
-		{
-			renderGraph.CleanupCurrentFrame();
-		}
-	}
+            if (context.SubmitForRenderPassValidation())
+                context.Submit();
+        }
+        finally
+        {
+            renderGraph.CleanupCurrentFrame();
+        }
+    }
+}
+
+public abstract class CustomRenderPipelineBase<T> : CustomRenderPipelineBase where T : CustomRenderPipelineAssetBase
+{
+    protected readonly T asset;
+
+    protected override SupportedRenderingFeatures SupportedRenderingFeatures => asset.SupportedRenderingFeatures;
+
+    protected override bool UseSrpBatching => asset.UseSrpBatching;
+
+    public CustomRenderPipelineBase(T asset) : base()
+    {
+        this.asset = asset;
+        SupportedRenderingFeatures.active = SupportedRenderingFeatures;
+    }
 }

@@ -8,7 +8,7 @@ using static Math;
 using UnityEditor;
 #endif
 
-public class CustomRenderPipeline : CustomRenderPipelineBase
+public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelineAsset>
 {
 	private static readonly IndexedString blueNoise1DIds = new("STBN/stbn_vec1_2Dx1D_128x128x64_");
 	private static readonly IndexedString blueNoise2DIds = new("STBN/stbn_vec2_2Dx1D_128x128x64_");
@@ -30,8 +30,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase
 		cameraDepthCache = new(GraphicsFormat.D32_SFloat_S8_UInt, renderGraph, "Previous Depth", isScreenTexture: true);
 		cameraVelocityCache = new(GraphicsFormat.R16G16_SFloat, renderGraph, "Previous Velocity", isScreenTexture: true);
 
-		terrainSystem = new TerrainSystem(renderGraph, settings.TerrainSettings);
-        terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, settings.TerrainSettings);
+		terrainSystem = new TerrainSystem(renderGraph, asset.TerrainSettings);
+        terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, asset.TerrainSettings);
 	}
 
 	protected override void Dispose(bool disposing)
@@ -47,7 +47,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase
 
 	protected override List<FrameRenderFeature> InitializePerFrameRenderFeatures() => new()
 	{
-		new RaytracingSystem(renderGraph, settings.RayTracingSettings),
+		new RaytracingSystem(renderGraph, asset.RayTracingSettings),
 
 		new GenericFrameRenderFeature(renderGraph, "Per Frame Data", context =>
 		{
@@ -55,8 +55,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase
 			overlayMatrix = GL.GetGPUProjectionMatrix(overlayMatrix, false);
 
 			// TODO: Move this into light setup
-			var sunCosAngle = AngularDiameterToConeCosAngle(Radians(settings.LightingSettings.SunAngularDiameter));
-			var sinSigmaSq = (float)Square(Sin(Radians(settings.LightingSettings.SunAngularDiameter / 2.0)));
+			var sunCosAngle = AngularDiameterToConeCosAngle(Radians(asset.LightingSettings.SunAngularDiameter));
+			var sinSigmaSq = (float)Square(Sin(Radians(asset.LightingSettings.SunAngularDiameter / 2.0)));
 
 			previousTime = time;
 
@@ -76,7 +76,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase
 				(float)deltaTime,
 				(float)renderGraph.FrameIndex,
 				(float)previousTime,
-				settings.LightingSettings.MicroShadows ? 1f : 0f, // TODO: Move into lighting setup
+				asset.LightingSettings.MicroShadows ? 1f : 0f, // TODO: Move into lighting setup
 				sunCosAngle,
 				Rcp(ConeCosAngleToSolidAngle(sunCosAngle)),
 				Application.isPlaying ? 1f : 0f,
@@ -87,10 +87,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase
 				Screen.width - 1,
 				Screen.height - 1,
 				sinSigmaSq,
-				0.5f * Radians(settings.LightingSettings.SunAngularDiameter) // TODO: Move into lighting setup
+				0.5f * Radians(asset.LightingSettings.SunAngularDiameter) // TODO: Move into lighting setup
 			))));
 
-			var noiseIndex = settings.NoiseDebug ? 34 : renderGraph.FrameIndex % 64;
+			var noiseIndex = asset.NoiseDebug ? 34 : renderGraph.FrameIndex % 64;
 			var blueNoise1D = Resources.Load<Texture2D>(blueNoise1DIds.GetString(noiseIndex));
 			var blueNoise2D = Resources.Load<Texture2D>(blueNoise2DIds.GetString(noiseIndex));
 			var blueNoise3D = Resources.Load<Texture2D>(blueNoise3DIds.GetString(noiseIndex));
@@ -111,12 +111,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase
 		}),
 
 		new PrecomputeDfg(renderGraph),
-		new VolumetricCloudsSetup(settings.Clouds, renderGraph),
-		new SkyLookupTables(settings.Sky, renderGraph),
-		new WaterFft(renderGraph, settings.OceanSettings),
+		new VolumetricCloudsSetup(asset.Clouds, renderGraph),
+		new SkyLookupTables(asset.Sky, renderGraph),
+		new WaterFft(renderGraph, asset.OceanSettings),
 		terrainSystem,
         new ProceduralGenerationGpu(renderGraph, DependencyResolver.Resolve<ProceduralGenerationController>()),
-		new WaterShoreMask(renderGraph, settings.WaterShoreMaskSettings),
+		new WaterShoreMask(renderGraph, asset.WaterShoreMaskSettings),
         new GpuDrivenRenderingSetup(renderGraph, DependencyResolver.Resolve<ProceduralGenerationController>()),
 	};
 
@@ -139,15 +139,15 @@ public class CustomRenderPipeline : CustomRenderPipelineBase
 #endif
 				ScriptableRenderContext.EmitGeometryForCamera(camera);
 
-			cullingParameters.shadowDistance = settings.LightingSettings.DirectionalShadowDistance;
+			cullingParameters.shadowDistance = asset.LightingSettings.DirectionalShadowDistance;
 			cullingParameters.cullingOptions = CullingOptions.NeedsLighting | CullingOptions.DisablePerObjectCulling | CullingOptions.ShadowCasters;
 
 			renderGraph.SetResource(new CullingResultsData(context.Cull(ref cullingParameters)));
 		}),
 
-		new TemporalAASetup(renderGraph, settings.TemporalAASettings),
-		new AutoExposurePreRender(renderGraph, settings.Tonemapping),
-		new SetupCamera(renderGraph, settings),
+		new TemporalAASetup(renderGraph, asset.TemporalAASettings),
+		new AutoExposurePreRender(renderGraph, asset.Tonemapping),
+		new SetupCamera(renderGraph, asset.Sky),
 
 		new GenericCameraRenderFeature(renderGraph, "Clear Camera Targets", (camera, context) =>
 		{
@@ -181,7 +181,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase
 		}),
 
 		new TerrainViewData(renderGraph, terrainSystem),
-		new TerrainRenderer(settings.TerrainSettings, renderGraph),
+		new TerrainRenderer(asset.TerrainSettings, renderGraph),
 		new GenericCameraRenderFeature(renderGraph, "Gbuffer", (camera, context) =>
 		{
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
@@ -270,7 +270,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase
 			}
 		}),
 
-		new WaterRenderer(renderGraph, settings.OceanSettings),
+		new WaterRenderer(renderGraph, asset.OceanSettings),
 
 		new CameraVelocity(renderGraph),
 
@@ -279,37 +279,35 @@ public class CustomRenderPipeline : CustomRenderPipelineBase
 		new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
 
 		// Light processing
-		new LightingSetup(renderGraph, settings.LightingSettings),
-		new PhysicalSkyGenerateData(settings.Sky, settings.Clouds, renderGraph),
-		new GgxConvolve(renderGraph, settings),
+		new LightingSetup(renderGraph, asset.LightingSettings),
+		new PhysicalSkyGenerateData(asset.Sky, asset.Clouds, renderGraph),
+		new GgxConvolve(renderGraph, asset.LightingSettings, asset.Clouds, asset.Sky),
 
-		new ShadowRenderer(renderGraph, settings.LightingSettings, terrainShadowRenderer),
-		new VolumetricCloudShadow(settings.Clouds, settings.Sky, renderGraph),
-		new WaterShadowRenderer(renderGraph, settings.OceanSettings),
-		new WaterCaustics(renderGraph, settings.OceanSettings),
-
-		
+		new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer),
+		new VolumetricCloudShadow(asset.Clouds, asset.Sky, renderGraph),
+		new WaterShadowRenderer(renderGraph, asset.OceanSettings),
+		new WaterCaustics(renderGraph, asset.OceanSettings),
 		
 		// Depends on light, plus ambient
-		new ClusteredLightCulling(settings.ClusteredLightingSettings, renderGraph),
-		new VolumetricLighting(settings.VolumetricLightingSettings, renderGraph),
+		new ClusteredLightCulling(asset.ClusteredLightingSettings, renderGraph),
+		new VolumetricLighting(asset.VolumetricLightingSettings, renderGraph),
 
-		new UnderwaterLighting(renderGraph, settings.OceanSettings),
-		new DeferredWater(renderGraph, settings.OceanSettings),
+		new UnderwaterLighting(renderGraph, asset.OceanSettings),
+		new DeferredWater(renderGraph, asset.OceanSettings),
 
 		// Depends on atmosphere, depth and light
-		new VolumetricClouds(settings.Clouds, renderGraph),
-		new Sky(renderGraph, settings.Sky),
+		new VolumetricClouds(asset.Clouds, renderGraph),
+		new Sky(renderGraph, asset.Sky),
 
 		// Could do SSR+SSGI+SSSSS here too, all the screen passes
-		new AmbientOcclusion(renderGraph, settings.AmbientOcclusionSettings),
-		new ScreenSpaceShadows(renderGraph, settings.ScreenSpaceShadows, settings.LightingSettings),
-		new DiffuseGlobalIllumination(renderGraph, settings.DiffuseGlobalIlluminationSettings),
-		new ScreenSpaceReflections(renderGraph, settings: settings.ScreenSpaceReflectionsSettings),
+		new AmbientOcclusion(renderGraph, asset.AmbientOcclusionSettings),
+		new ScreenSpaceShadows(renderGraph, asset.ScreenSpaceShadows, asset.LightingSettings),
+		new DiffuseGlobalIllumination(renderGraph, asset.DiffuseGlobalIlluminationSettings),
+		new ScreenSpaceReflections(renderGraph, settings: asset.ScreenSpaceReflectionsSettings),
 		
 		// TODO: Could render clouds after deferred, then sky after that
-		new DeferredLighting(renderGraph, settings.Sky),
-		new SunDiskRenderer(renderGraph, settings),
+		new DeferredLighting(renderGraph, asset.Sky),
+		new SunDiskRenderer(renderGraph, asset.LightingSettings),
 
 		new GenericCameraRenderFeature(renderGraph, "", (camera, context) =>
 		{
@@ -354,12 +352,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase
 			pass.AddRenderPassData<ClusteredLightCulling.Result>();
 		}),
 
-		new AutoExposure(settings.AutoExposureSettings, settings.LensSettings, renderGraph, settings.Tonemapping),
-        new DepthOfField(settings.DepthOfFieldSettings, settings.LensSettings, renderGraph, settings.TemporalAASettings),
+		new AutoExposure(asset.AutoExposureSettings, asset.LensSettings, renderGraph, asset.Tonemapping),
+        new DepthOfField(asset.DepthOfFieldSettings, asset.LensSettings, renderGraph, asset.TemporalAASettings),
 		new CameraVelocityDilate(renderGraph),
-		new TemporalAA(settings.TemporalAASettings, renderGraph),
-		new Bloom(renderGraph, settings.Bloom),
-		new Tonemapping(renderGraph, settings.Tonemapping, settings),
+		new TemporalAA(asset.TemporalAASettings, renderGraph),
+		new Bloom(renderGraph, asset.Bloom),
+		new Tonemapping(renderGraph, asset.Tonemapping, asset.Bloom),
 		new RenderGizmos(renderGraph),
 	};
 }

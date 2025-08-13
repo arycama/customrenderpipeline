@@ -2,11 +2,17 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
+public abstract class CustomRenderPipelineAssetBase : RenderPipelineAsset
+{
+    public abstract SupportedRenderingFeatures SupportedRenderingFeatures { get; }
+	public abstract bool UseSrpBatching { get; }
+}
+
 [CreateAssetMenu(menuName = "Data/Render Pipeline Asset")]
-public class CustomRenderPipelineAsset : RenderPipelineAsset<CustomRenderPipeline>
+public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 {
 	[field: SerializeField] public bool NoiseDebug { get; private set; } = false;
-	[field: SerializeField] public bool UseSrpBatching { get; private set; } = true;
+	[field: SerializeField] private bool useSrpBatching = true;
 
 	[field: SerializeField] public WaterSettings OceanSettings { get; private set; }
 	[field: SerializeField] public WaterShoreMask.Settings WaterShoreMaskSettings { get; private set; }
@@ -56,7 +62,9 @@ public class CustomRenderPipelineAsset : RenderPipelineAsset<CustomRenderPipelin
 	public override Shader terrainDetailGrassShader => defaultShaders.TerrainDetailGrassShader ?? base.terrainDetailGrassShader;
 	public override Shader terrainDetailLitShader => defaultShaders.TerrainDetailLitShader ?? base.terrainDetailLitShader;
 
-	public SupportedRenderingFeatures SupportedRenderingFeatures => new()
+	public override bool UseSrpBatching => useSrpBatching;
+
+    public override SupportedRenderingFeatures SupportedRenderingFeatures => new()
 	{
 		defaultMixedLightingModes = SupportedRenderingFeatures.LightmapMixedBakeModes.None,
 		editableMaterialRenderQueue = false,
