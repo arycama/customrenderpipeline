@@ -1,16 +1,16 @@
-﻿#pragma kernel Visibility
+﻿ #pragma kernel Visibility
 
 #pragma multi_compile _ HIZ_ON
 
-#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
-#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/TerrainCommon.hlsl"
-#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
+#include "../../Common.hlsl"
+#include "../../TerrainCommon.hlsl"
+#include "../../Packing.hlsl"
+#include "../../MatrixUtils.hlsl"
 
 float _MaxHiZMip;
 uint _InstanceCount;
 
 StructuredBuffer<float4> _InstanceBounds;
-Texture2D<float> _HiZMaxDepth;
 RWStructuredBuffer<uint> _RendererInstanceIDs;
 
 bool IsVisible(float3 boundsCenter, float3 boundsExtents)
@@ -21,24 +21,24 @@ bool IsVisible(float3 boundsCenter, float3 boundsExtents)
 	float3 screenMin, screenMax;
 	
 	[unroll]
-	for (float z = 0; z < 2; z++)
+	for (uint z = 0, i = 0; z < 2; z++, i++)
 	{
 		[unroll]
-		for (float y = 0; y < 2; y++)
+		for (uint y = 0; y < 2; y++, i++)
 		{
 			[unroll]
-			for (float x = 0; x < 2; x++)
+			for (uint x = 0; x < 2; x++, i++)
 			{
 				float3 worldPosition = boundsCenter - boundsExtents + boundsExtents * 2 * float3(x, y, z);
-				float3 screenPosition = MultiplyPointProj(_WorldToScreen, worldPosition).xyz;
-				screenMin = any(float3(x, y, z)) ? min(screenMin, screenPosition) : screenPosition;
-				screenMax = any(float3(x, y, z)) ? max(screenMax, screenPosition) : screenPosition;
+				float3 screenPosition = MultiplyPointProj(WorldToScreen, worldPosition).xyz;
+				screenMin = i ? min(screenMin, screenPosition) : screenPosition;
+				screenMax = i ? max(screenMax, screenPosition) : screenPosition;
 			}
 		}
 	}
 	
 	// Calculate hi-Z buffer mip https://interplayoflight.wordpress.com/2017/11/15/experiments-in-gpu-based-occlusion-culling/
-	float2 size = (screenMax - screenMin).xy * _ScaledResolution.xy;
+	float2 size = (screenMax - screenMin).xy * ViewSize;
 	float mip = ceil(log2(Max2(size)));
  
 	// If object bounds is larger than entire screen, we can't conservatively reject it, so return visible
@@ -70,14 +70,14 @@ bool IsVisible(float3 boundsCenter, float3 boundsExtents)
 			return false;
 	}
 	
-	float2 mipRes = floor(_ScaledResolution.xy * exp2(-mip));
+	float2 mipRes = floor(ViewSize * exp2(-mip));
 	float4 screenMinMax = float4(screenMin.xy, screenMax.xy) * mipRes.xyxy;
 	screenMinMax = clamp(screenMinMax, 0, mipRes.xyxy - 1);
 		
-	return screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.xy] ||
-		screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.zy] ||
-		screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.xw] ||
-		screenMax.z > _HiZMaxDepth.mips[mip][screenMinMax.zw];
+	return screenMax.z > HiZMaxDepth.mips[mip][screenMinMax.xy] ||
+		screenMax.z > HiZMaxDepth.mips[mip][screenMinMax.zy] ||
+		screenMax.z > HiZMaxDepth.mips[mip][screenMinMax.xw] ||
+		screenMax.z > HiZMaxDepth.mips[mip][screenMinMax.zw];
 }
 
 [numthreads(1024, 1, 1)]
@@ -87,7 +87,7 @@ void Visibility(uint id : SV_DispatchThreadID)
 		return;
 		
 	float4 boundsData = _InstanceBounds[id];
-	float3 boundsCenter = boundsData.xyz - _ViewPosition;
+	float3 boundsCenter = boundsData.xyz - ViewPosition;
 	float3 boundsExtents = R11G11B10ToFloat3(asuint(boundsData.w));
 	
 	_RendererInstanceIDs[id] = IsVisible(boundsCenter, boundsExtents);

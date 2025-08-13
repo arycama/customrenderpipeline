@@ -3,9 +3,10 @@ Shader "Hidden/Bloom"
     SubShader
     {
         Cull Off
-        ZWrite Off
+        ZClip Off
         ZTest Off
-        
+        ZWrite Off
+
         Pass
         {
             Name "Downsample First"
@@ -13,7 +14,7 @@ Shader "Hidden/Bloom"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentDownsample
-            #define KARIS_AVERAGE
+            #define FIRST
             #include "Bloom.hlsl"
             ENDHLSL
         }

@@ -1,0 +1,12 @@
+#pragma kernel CSMain
+
+#include "TerrainAmbientOcclusion.hlsl"
+
+RWTexture2D<float4> Result;
+
+[numthreads(8, 8, 1)]
+void CSMain(uint2 id : SV_DispatchThreadID)
+{
+	float2 uv = (id + 0.5) / Resolution;
+	Result[id] = Fragment(float4(id + 0.5, 0, 0), uv, 0);
+}

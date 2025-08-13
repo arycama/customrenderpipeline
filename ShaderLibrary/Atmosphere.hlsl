@@ -1,9 +1,9 @@
-#ifndef ATMOSPHERE_INCLUDED
-#define ATMOSPHERE_INCLUDED
+#pragma once
 
 #include "Geometry.hlsl"
+#include "Material.hlsl" 
 #include "Samplers.hlsl" 
-#include "Utility.hlsl" 
+#include "Volumetrics.hlsl" 
 
 cbuffer AtmosphereProperties
 {
@@ -104,46 +104,6 @@ float DistanceToNearestAtmosphereBoundary(float height, float cosAngle)
 	return DistanceToNearestAtmosphereBoundary(height, cosAngle, RayIntersectsGround(height, cosAngle));
 }
 
-float RayleighPhase(float cosAngle)
-{
-	return 3.0 * (1.0 + Sq(cosAngle)) / (16.0 * Pi);
-}
-
-float MiePhase(float cosTheta, float g)
-{
-	//float denom = 1.0 + g * g + 2.0 * g * -cosTheta;
-	//return RcpFourPi * (1.0 - g * g) / (denom * sqrt(denom));
-	return (3.0 / (8.0 * Pi)) * ((((1.0 - Sq(g)) * (1.0 + Sq(cosTheta))) / ((2.0 + Sq(g)) * pow(abs(1.0 + Sq(g) - 2.0 * g * cosTheta), 3.0 / 2.0))));
-}
-
-float CornetteShanksPhasePartConstant(float anisotropy)
-{
-	float g = anisotropy;
-
-	return (3 / (8 * Pi)) * (1 - g * g) / (2 + g * g);
-}
-
-// Similar to the RayleighPhaseFunction.
-float CornetteShanksPhasePartSymmetrical(float cosTheta)
-{
-	float h = 1 + cosTheta * cosTheta;
-	return h;
-}
-
-float CornetteShanksPhasePartAsymmetrical(float anisotropy, float cosTheta)
-{
-	float g = anisotropy;
-	float x = 1 + g * g - 2 * g * cosTheta;
-	float f = rsqrt(max(x, HalfEps)); // x^(-1/2)
-	return f * f * f; // x^(-3/2)
-}
-
-float CornetteShanksPhasePartVarying(float anisotropy, float cosTheta)
-{
-	return CornetteShanksPhasePartSymmetrical(cosTheta) *
-           CornetteShanksPhasePartAsymmetrical(anisotropy, cosTheta); // h * x^(-3/2)
-}
-
 float3 PlanetCurve(float3 worldPosition)
 {
 	worldPosition.y += sqrt(Sq(_PlanetRadius) - SqrLength(worldPosition.xz)) - _PlanetRadius;
@@ -182,7 +142,7 @@ float3 AtmosphereScatter(float viewHeight, float viewCosAngle, float distance, f
 {
 	float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, distance);
 	float4 scatter = AtmosphereScatter(viewHeight, viewCosAngle, distance);
-	return scatter.xyz * RayleighPhase(LdotV) + scatter.w * MiePhase(LdotV, _MiePhase);
+	return scatter.xyz * RayleighPhase(LdotV) + scatter.w * CsPhase(LdotV, _MiePhase);
 }
 
 // Texture sampling helpers
@@ -252,7 +212,14 @@ float UvFromViewCosAngle(float viewHeight, float viewCosAngle, bool rayIntersect
 
 float AtmosphereDepth(float viewHeight, float viewCosAngle, bool rayIntersectsGround)
 {
-	return _AtmosphereDepth.Sample(_LinearClampSampler, 0.0);
+	return _AtmosphereDepth.Sample(LinearClampSampler, 0.0);
+}
+
+// Calcualtes transmittance to the edge of the atmosphere along a ray from a starting height
+float3 TransmittanceToAtmosphere(float height, float cosAngle)
+{
+	float2 uv = float2(UvFromViewHeight(height), UvFromViewCosAngle(height, cosAngle, false));
+	return _Transmittance.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(uv, _TransmittanceSize), 0.0);
 }
 
 float3 TransmittanceToAtmosphere(float viewHeight, float viewCosAngle, float lightCosAngle, float distance)
@@ -262,8 +229,7 @@ float3 TransmittanceToAtmosphere(float viewHeight, float viewCosAngle, float lig
 
 	float heightAtDistance = HeightAtDistance(viewHeight, viewCosAngle, distance);
 	float lightCosAngleAtDistance = LightCosAngleAtDistance(viewHeight, viewCosAngle, lightCosAngle, distance);
-	float2 uv = float2(UvFromViewHeight(heightAtDistance), UvFromViewCosAngle(heightAtDistance, lightCosAngleAtDistance, false));
-	return _Transmittance.SampleLevel(_LinearClampSampler, Remap01ToHalfTexel(uv, _TransmittanceSize), 0.0);
+	return TransmittanceToAtmosphere(heightAtDistance, lightCosAngleAtDistance);
 }
 
 float3 TransmittanceToPoint(float viewHeight, float viewCosAngle, float distance, bool rayIntersectsGround, float maxDistance)
@@ -271,7 +237,7 @@ float3 TransmittanceToPoint(float viewHeight, float viewCosAngle, float distance
 	float2 uv;
 	uv.x = distance / maxDistance;
 	uv.y = UvFromViewCosAngle(viewHeight, viewCosAngle, rayIntersectsGround);
-	return _SkyTransmittance.SampleLevel(_LinearClampSampler, float3(Remap01ToHalfTexel(uv, _TransmittanceSize), rayIntersectsGround), 0.0);
+	return _SkyTransmittance.SampleLevel(LinearClampSampler, float3(Remap01ToHalfTexel(uv, _TransmittanceSize), rayIntersectsGround), 0.0);
 }
 
 float3 TransmittanceToPoint(float viewHeight, float viewCosAngle, float distance)
@@ -286,14 +252,20 @@ float3 LuminanceToPoint(float viewHeight, float viewCosAngle, float distance, bo
 	float2 uv;
 	uv.x = distance / maxDistance;
 	uv.y = UvFromViewCosAngle(viewHeight, viewCosAngle, rayIntersectsGround);
-	return SkyLuminance.SampleLevel(_LinearClampSampler, float3(Remap01ToHalfTexel(uv, SkyLuminanceSize), rayIntersectsGround), 0.0);
+	return SkyLuminance.SampleLevel(LinearClampSampler, float3(Remap01ToHalfTexel(uv, SkyLuminanceSize), rayIntersectsGround), 0.0);
+}
+
+float3 LuminanceToAtmosphere(float viewHeight, float viewCosAngle, bool rayIntersectsGround)
+{
+	// TODO: Could store this in a dedicated LUT for efficiency
+	return LuminanceToPoint(viewHeight, viewCosAngle, 1.0, rayIntersectsGround, 1.0);
 }
 
 float3 GetGroundAmbient(float viewHeight, float viewCosAngle, float lightCosAngle, float distance)
 {
 	float lightCosAngleAtDistance = LightCosAngleAtDistance(viewHeight, viewCosAngle, lightCosAngle, distance);
 	float2 uv = float2(ApplyScaleOffset(0.5 * lightCosAngleAtDistance + 0.5, _GroundAmbientRemap), 0.5);
-	return _GroundAmbient.SampleLevel(_LinearClampSampler, uv, 0.0);
+	return _GroundAmbient.SampleLevel(LinearClampSampler, uv, 0.0);
 }
 
 float3 GetSkyAmbient(float viewHeight, float viewCosAngle, float lightCosAngle, float distance)
@@ -304,13 +276,13 @@ float3 GetSkyAmbient(float viewHeight, float viewCosAngle, float lightCosAngle, 
 	float viewHeightUv = (heightAtDistance - _PlanetRadius) / _AtmosphereHeight;
 	float lightUv = 0.5 * lightCosAngleAtDistance + 0.5;
 	float2 uv = ApplyScaleOffset(float2(viewHeightUv, lightUv), _SkyAmbientRemap);
-	return _SkyAmbient.SampleLevel(_LinearClampSampler, uv, 0.0);
+	return _SkyAmbient.SampleLevel(LinearClampSampler, uv, 0.0);
 }
 
 float GetSkyCdf(float viewHeight, float viewCosAngle, float xi, float colorIndex, bool rayIntersectsGround)
 {
 	float2 uv = float2(xi, UvFromViewCosAngle(viewHeight, viewCosAngle, rayIntersectsGround));
-	return _SkyCdf.Sample(_LinearClampSampler, float3(Remap01ToHalfTexel(uv, _SkyCdfSize), colorIndex + rayIntersectsGround * 3));
+	return _SkyCdf.Sample(LinearClampSampler, float3(Remap01ToHalfTexel(uv, _SkyCdfSize), colorIndex + rayIntersectsGround * 3));
 }
 
 float3 GetMultiScatter(float viewHeight, float viewCosAngle, float lightCosAngle, float distance)
@@ -322,7 +294,7 @@ float3 GetMultiScatter(float viewHeight, float viewCosAngle, float lightCosAngle
 	float lightUv = 0.5 * lightCosAngleAtDistance + 0.5;
 
 	float2 uv = ApplyScaleOffset(float2(viewHeightUv, lightUv), _MultiScatterRemap);
-	return _MultiScatter.SampleLevel(_LinearClampSampler, uv, 0.0);
+	return _MultiScatter.SampleLevel(LinearClampSampler, uv, 0.0);
 }
 
 struct AtmosphereResult
@@ -333,33 +305,31 @@ struct AtmosphereResult
 	float weightedDepth;
 };
 
-AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float lightCosAngle, float samples, float rayLength, bool applyMultiScatter, float sampleOffset, bool samplePlanet, bool rayIntersectsGround)
+AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float lightCosAngle, float samples, float rayLength, bool applyMultiScatter, bool samplePlanet, bool rayIntersectsGround)
 {
 	float dt = rayLength / samples;
 
-	float3 transmittance = 1.0, luminance = 0.0, density = 0.0, transmittanceSum = 0.0, weightedDepthSum = 0.0;
-	for (float i = 0.0; i < samples; i++)
+	float3 luminance = 0.0, density = 0.0, transmittanceSum = 0.0, weightedDepthSum = 0.0, transmittance = 1.0;
+	for (float i = 0.5; i < samples; i++)
 	{
-		float currentDistance = (i + sampleOffset) * dt;
+		float currentDistance = i * dt;
 		
-		float3 opticalDepth = AtmosphereExtinction(viewHeight, viewCosAngle, currentDistance);
-		float3 extinction = exp(-opticalDepth * dt);
-		
-		float3 throughput = transmittance * (1.0 - extinction) * rcp(opticalDepth);
+		float3 sampleExtinction = AtmosphereExtinction(viewHeight, viewCosAngle, currentDistance);
+		float3 sampleTransmittance = exp(-sampleExtinction * dt);
 		
 		float4 scatter = AtmosphereScatter(viewHeight, viewCosAngle, currentDistance);
+		float3 currentScatter = scatter.xyz + scatter.w;
+		
+		float3 currentLuminance = TransmittanceToAtmosphere(viewHeight, viewCosAngle, lightCosAngle, currentDistance);
 		if (applyMultiScatter)
-			luminance += throughput * GetMultiScatter(viewHeight, viewCosAngle, lightCosAngle, currentDistance) * (scatter.xyz + scatter.w);
+			currentLuminance += GetMultiScatter(viewHeight, viewCosAngle, lightCosAngle, currentDistance);
 		
-		float3 currentScatter = throughput * (scatter.xyz * RcpFourPi + scatter.w * RcpFourPi);
-		density += currentScatter;
+		density += transmittance * currentScatter * (1.0 - sampleTransmittance) * rcp(sampleExtinction);
+		luminance += currentLuminance * transmittance * currentScatter * (1.0 - sampleTransmittance) * rcp(sampleExtinction);
 		
-		float3 lightTransmittance = TransmittanceToAtmosphere(viewHeight, viewCosAngle, lightCosAngle, currentDistance);
-		luminance += currentScatter * lightTransmittance;
-		
-		transmittance *= extinction;
 		transmittanceSum += transmittance;
 		weightedDepthSum += currentDistance * transmittance;
+		transmittance *= sampleTransmittance;
 	}
 	
 	// Account for bounced light off the earth
@@ -367,7 +337,12 @@ AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float li
 	{
 		float lightCosAngleAtDistance = LightCosAngleAtDistance(viewHeight, viewCosAngle, lightCosAngle, rayLength);
 		float3 lightTransmittance = TransmittanceToAtmosphere(viewHeight, viewCosAngle, lightCosAngle, rayLength);
-		luminance += lightTransmittance * transmittance * saturate(lightCosAngleAtDistance) * _GroundColor * RcpPi;
+		float3 groundLighting = lightTransmittance * saturate(lightCosAngleAtDistance) * RcpPi;
+		
+		if(applyMultiScatter)
+			groundLighting += GetGroundAmbient(viewHeight, viewCosAngle, lightCosAngle, rayLength);
+			
+		luminance += groundLighting * _GroundColor * transmittance * FourPi; // Lum is divided by 4 pi later.
 	}
 	
 	weightedDepthSum *= transmittanceSum ? rcp(transmittanceSum) : 1.0;
@@ -379,5 +354,3 @@ AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float li
 	output.weightedDepth = dot(weightedDepthSum / rayLength, transmittance) / dot(transmittance, 1.0);
 	return output;
 }
-
-#endif

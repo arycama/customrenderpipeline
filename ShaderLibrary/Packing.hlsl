@@ -1,5 +1,6 @@
-﻿#ifndef PACKING_INCLUDED
-#define PACKING_INCLUDED
+﻿#pragma once
+
+#include "Math.hlsl"
 
 // Pack float2 (each of 12 bit) in 888
 float3 PackFloat2To888(float2 f)
@@ -86,4 +87,22 @@ float3 R11G11B10ToFloat3(uint rgb)
 	return asfloat(((exponent + 112) << 23) | (mantissa << uint2(17, 18).xxy));
 }
 
-#endif
+float3 UnpackNormalSNorm(float2 packedNormal, float scale = 1.0)
+{
+	float3 normal;
+	normal.xy = packedNormal * scale;
+	normal.z = sqrt(saturate(1.0 - SqrLength(normal.xy)));
+	return normal;
+}
+
+float3 UnpackNormalUNorm(float2 packedNormal, float scale = 1.0)
+{
+	packedNormal.xy = 2.0 * packedNormal - 1.0;
+	return UnpackNormalSNorm(packedNormal, scale);
+}
+
+float3 UnpackNormal(float4 packedNormal, float scale = 1.0)
+{
+	packedNormal.a *= packedNormal.r;
+	return UnpackNormalUNorm(packedNormal.ag, scale);
+}

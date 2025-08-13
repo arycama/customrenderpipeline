@@ -1,4 +1,6 @@
-﻿#pragma kernel PrefixScan0 KERNEL=PrefixScan0 WRITE_FINAL_COUNT
+﻿#include "../../PrefixSum.hlsl"
+
+#pragma kernel PrefixScan0 KERNEL=PrefixScan0 WRITE_FINAL_COUNT
 #pragma kernel PrefixScan1 KERNEL=PrefixScan1 WRITE_DRAW_CALL_COUNT
 
 const static uint threadCount = 1024;
@@ -13,69 +15,42 @@ StructuredBuffer<uint> Input;
 StructuredBuffer<uint> GroupSums, PrefixSums;
 StructuredBuffer<float3x4> _Positions;
 
-groupshared uint sharedSums[2 * threadCount];
+groupshared uint sharedSums[threadCount];
+
+void PrefixSumSharedWrite(uint index, uint data)
+{
+	sharedSums[index] = data;
+}
+
+uint PrefixSumSharedRead(uint index)
+{
+	return sharedSums[index];
+}
 
 [numthreads(threadCount, 1, 1)]
 void KERNEL(uint dispatchThreadId : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
 	// Load input into shared memory
-	sharedSums[2 * groupIndex + 0] = dispatchThreadId < MaxThread ? Input[2 * dispatchThreadId + 0] : 0;
-	sharedSums[2 * groupIndex + 1] = dispatchThreadId < MaxThread ? Input[2 * dispatchThreadId + 1] : 0;
+	sharedSums[groupIndex] = dispatchThreadId < MaxThread ? Input[dispatchThreadId] : 0;
 
-    // Perform reduction
-	[unroll]
-	for (uint i = 0; i <= log2ThreadCount; i++)
-	{
-		GroupMemoryBarrierWithGroupSync();
-		
-		if (groupIndex >= (threadCount >> i))
-			continue;
-		
-		uint offset = 1 << i;
-		uint ai = offset * (2 * groupIndex + 1) - 1;
-		uint bi = offset * (2 * groupIndex + 2) - 1;
-		sharedSums[bi] += sharedSums[ai];
-	}
+	uint totalSum;
+	PrefixSum(groupIndex, threadCount, log2ThreadCount, totalSum);
 
-    // Write total count if required, and clear the last element
-	if (!groupIndex)
-	{
-		uint totalSum = sharedSums[2 * threadCount - 1];
-	
-		#ifdef WRITE_FINAL_COUNT
+	#ifdef WRITE_FINAL_COUNT
+		if(!groupIndex)
 			GroupSumsWrite[groupId] = totalSum;
-		#endif
+	#endif
 
-		#ifdef WRITE_DRAW_CALL_COUNT
+	#ifdef WRITE_DRAW_CALL_COUNT
+		if(!groupIndex)
 			DrawCallArgsWrite[1] = totalSum;
-		#endif
-		
-		sharedSums[2 * threadCount - 1] = 0;
-	}
-
-    // Perform downsweep and build scan
-	[unroll]
-	for (i = 0; i <= log2ThreadCount; i++)
-	{
-		GroupMemoryBarrierWithGroupSync();
-
-		if (groupIndex >= (1 << i))
-			continue;
-			
-		uint offset = threadCount >> i;
-		uint ai = offset * (2 * groupIndex + 1) - 1;
-		uint bi = offset * (2 * groupIndex + 2) - 1;
-		uint t = sharedSums[ai];
-		sharedSums[ai] = sharedSums[bi];
-		sharedSums[bi] += t;
-	}
-
+	#endif
+	
 	GroupMemoryBarrierWithGroupSync();
-
+	
 	if (dispatchThreadId >= MaxThread)
 		return;
 		
 	// Store to main memory
-	PrefixSumsWrite[2 * dispatchThreadId + 0] = sharedSums[2 * groupIndex + 0];
-	PrefixSumsWrite[2 * dispatchThreadId + 1] = sharedSums[2 * groupIndex + 1];
+	PrefixSumsWrite[dispatchThreadId] = sharedSums[groupIndex];
 }

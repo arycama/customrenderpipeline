@@ -1,5 +1,4 @@
-#ifndef GEOMETRY_INCLUDED
-#define GEOMETRY_INCLUDED
+#pragma once
 
 #include "Math.hlsl"
 
@@ -7,23 +6,37 @@
 float4 _CullingPlanes[6];
 uint _CullingPlanesCount;
 
+const static float3x3 Identity3x3 = float3x3(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+
 float3 SphericalToCartesian(float cosPhi, float sinPhi, float cosTheta, float sinTheta)
 {
 	return float3(float2(cosPhi, sinPhi) * sinTheta, cosTheta);
 }
 
-float3 SphericalToCartesian(float cosPhi, float sinPhi, float cosTheta)
+float3 SphericalToCartesian(float phi, float cosTheta, float sinTheta)
 {
-	float sinTheta = SinFromCos(cosTheta);
+	float sinPhi, cosPhi;
+	sincos(phi, sinPhi, cosPhi);
 	return SphericalToCartesian(cosPhi, sinPhi, cosTheta, sinTheta);
 }
 
 float3 SphericalToCartesian(float phi, float cosTheta)
 {
-	float sinPhi, cosPhi;
-	sincos(phi, sinPhi, cosPhi);
+	float sinTheta = SinFromCos(cosTheta);
+	return SphericalToCartesian(phi, cosTheta, sinTheta);
+}
 
-	return SphericalToCartesian(cosPhi, sinPhi, cosTheta);
+float3 SampleSphereUniform(float u1, float u2)
+{
+	float phi = TwoPi * u2;
+	float cosTheta = 1.0 - 2.0 * u1;
+
+	return SphericalToCartesian(phi, cosTheta);
+}
+
+float SphericalDot(float cosThetaA, float phiA, float cosThetaB, float phiB)
+{
+	return SinFromCos(cosThetaA) * SinFromCos(cosThetaB) * cos(phiA - phiB) + cosThetaA * cosThetaB;
 }
 
 float DistanceToSphereInside(float height, float cosAngle, float radius)
@@ -82,7 +95,7 @@ bool FrustumCull(float3 center, float3 extents)
 	[unroll]
 	for (uint i = 0; i < 6; i++)
 	{
-		if(i >= _CullingPlanesCount)
+		if (i >= _CullingPlanesCount)
 			return true;
 		
 		float4 plane = _CullingPlanes[i];
@@ -183,32 +196,9 @@ float3 ProjectOnPlane(float3 V, float3 N)
 	return V - Project(V, N);
 }
 
-// Ref: https://seblagarde.wordpress.com/2014/12/01/inverse-trigonometric-functions-gpu-optimization-for-amd-gcn-architecture/
-// Input [-1, 1] and output [0, PI], 12 VALU
-float FastACos(float inX)
-{
-	float res = FastACosPos(inX);
-	return inX >= 0 ? res : Pi - res; // Undo range reduction
-}
-
-float2 FastACos(float2 inX)
-{
-	float2 res = FastACosPos(inX);
-	return inX >= 0 ? res : Pi - res; // Undo range reduction
-}
-
 float Angle(float3 from, float3 to)
 {
 	return FastACos(dot(from, to));
-}
-
-// Move to sampling.hlsl
-float3 SampleSphereUniform(float u1, float u2)
-{
-	float phi = TwoPi * u2;
-	float cosTheta = 1.0 - 2.0 * u1;
-
-	return SphericalToCartesian(phi, cosTheta);
 }
 
 // Reference : http://www.cs.virginia.edu/~jdl/bib/globillum/mis/shirley96.pdf + PBRT
@@ -248,8 +238,8 @@ float3 SampleHemisphereCosine(float u1, float u2, float3 normal)
 	// This function needs to used safenormalize because there is a probability
     // that the generated direction is the exact opposite of the normal and that would lead
     // to a nan vector otheriwse.
-	float3 pointOnSphere = SampleSphereUniform(u1, u2);
-	return normalize(normal + pointOnSphere);
+	//float3 pointOnSphere = SampleSphereUniform(u1, u2);
+	//return normalize(normal + pointOnSphere);
 	
 	float3 result = SampleHemisphereCosine(u1, u2);
 	return FromToRotationZ(normal, result);
@@ -283,10 +273,9 @@ float TriangleArea(float2 a, float2 b, float2 c)
 	return 0.5 * abs(a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
 }
 
-
 float DistanceToPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal)
 {
-	return dot(planePosition - rayOrigin, planeNormal) / dot(planeNormal, rayDirection);
+	return dot(planePosition - rayOrigin, planeNormal) * rcp(dot(planeNormal, rayDirection));
 }
 
 bool IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal, out float t)
@@ -297,18 +286,21 @@ bool IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePositi
 	float denom = dot(planeNormal, rayDirection);
 	if (abs(denom) > 1e-5)
 	{
-		float3 d = planePosition - rayOrigin;
-		t = dot(d, planeNormal) / denom;
-		res = (t >= 0);
+		t = dot(planePosition - rayOrigin, planeNormal) / denom;
+		res = t >= 0;
 	}
 
 	return res;
 }
 
+float RayPlaneDistance(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal)
+{
+	return dot(planePosition - rayOrigin, planeNormal) * rcp(dot(planeNormal, rayDirection));
+}
+
 float3 IntersectRayPlane(float3 rayOrigin, float3 rayDirection, float3 planePosition, float3 planeNormal)
 {
-	float t = dot(planePosition - rayOrigin, planeNormal) / dot(planeNormal, rayDirection);
-	return rayDirection * t + rayOrigin;
+	return RayPlaneDistance(rayOrigin, rayDirection, planePosition, planeNormal) * rayDirection + rayOrigin;
 }
 
 float3 IntersectRayPlaneZ(float3 rayOrigin, float3 rayDirection, float planeDistance)
@@ -317,5 +309,179 @@ float3 IntersectRayPlaneZ(float3 rayOrigin, float3 rayDirection, float planeDist
 	return rayDirection * t + rayOrigin;
 }
 
+float3x3 WorldToTangentMatrix(float3 worldNormal, float3 worldTangent, float bitangentSign = 1.0)
+{
+	float3 bitangent = cross(worldNormal, worldTangent) * bitangentSign;
+	return float3x3(worldTangent, bitangent, worldNormal);
+}
 
-#endif
+float3x3 TangentToWorldMatrix(float3 worldNormal, float3 worldTangent, float bitangentSign = 1.0)
+{
+	return transpose(WorldToTangentMatrix(worldNormal, worldTangent, bitangentSign));
+}
+
+float3 TangentToWorldNormal(float3 tangentNormal, float3 worldNormal, float3 worldTangent, float bitangentSign)
+{
+	float3x3 tangentToWorld = TangentToWorldMatrix(worldNormal, worldTangent, bitangentSign);
+	return normalize(mul(tangentToWorld, tangentNormal));
+}
+
+float CosAngle(float3 a, float3 b)
+{
+	return dot(a, b);
+}
+
+float3 SignedAngle(float3 a, float3 b, float3 axis)
+{
+	return Angle(a, b) * sign(dot(axis, cross(a, b)));
+}
+
+// Computes sin(thetaA + thetaB)
+float SineAddition(float cosA, float sinA, float cosB, float sinB)
+{
+	return sinA * cosB + cosA * sinB;
+}
+
+// Computes sin(thetaA + thetaB)
+float SineAddition(float cosA, float cosB)
+{
+	return SineAddition(cosA, SinFromCos(cosA), cosB, SinFromCos(cosB));
+}
+
+// Computes sin(thetaA - thetaB)
+float SineDifference(float cosA, float sinA, float cosB, float sinB)
+{
+	return sinA * cosB - cosA * sinB;
+}
+
+// Computes sin(thetaA - thetaB)
+float SineDifference(float cosA, float cosB)
+{
+	return SineDifference(cosA, SinFromCos(cosA), cosB, SinFromCos(cosB));
+}
+
+// Computes cos(thetaA + thetaB)
+float CosineAddition(float cosA, float sinA, float cosB, float sinB)
+{
+	return cosA * cosB - sinA * sinB;
+}
+
+// Computes cos(thetaA + thetaB)
+float CosineAddition(float cosA, float cosB)
+{
+	return CosineAddition(cosA, SinFromCos(cosA), cosB, SinFromCos(cosB));
+}
+
+// Computes cos(thetaA - thetaB)
+float CosineDifference(float cosA, float sinA, float cosB, float sinB)
+{
+	return cosA * cosB + sinA * sinB;
+}
+
+// Computes cos(thetaA - thetaB)
+float CosineDifference(float cosA, float cosB)
+{
+	return CosineDifference(cosA, SinFromCos(cosA), cosB, SinFromCos(cosB));
+}
+
+float3 Slerp(float3 a, float3 b, float t)
+{
+	float cosTheta = dot(a, b);
+	float theta = FastACos(cosTheta);
+	return (sin((1 - t) * theta) * a + sin(t * theta) * b) / sin(theta);
+}
+
+// Rotates from a to b by cosAngle
+float3 RotateTowards(float3 a, float3 b, float cosAngle)
+{
+	float sinAngle = SinFromCos(cosAngle);
+	float cosTheta = dot(a, b);
+	float sinTheta = SinFromCos(cosTheta);
+	return (SineDifference(cosTheta, sinTheta, cosAngle, sinAngle) * a + sinAngle * b) * rcp(sinTheta);
+}
+
+float AngularDiameterToAngularRadius(float angularDiameter) { return 0.5 * angularDiameter; }
+float AngularRadiusToConeCosAngle(float angularRadius) { return cos(angularRadius); }
+float ConeCosAngleToSolidAngle(float coneCosAngle) { return -TwoPi * coneCosAngle + TwoPi; }
+float SolidAngleToConeCosAngle(float solidAngle) { return -RcpTwoPi * solidAngle + 1.0; }
+float CosConeAngleToConeAngle(float cosConeAngle) { return FastACos(cosConeAngle); }
+
+float AngularDiameterToConeCosAngle(float angularDiameter) { return AngularRadiusToConeCosAngle(AngularDiameterToAngularRadius(angularDiameter)); }
+float AngularRadiusToSolidAngle(float angularRadius) { return ConeCosAngleToSolidAngle(AngularRadiusToConeCosAngle(angularRadius)); }
+float AngularDiameterToSolidAngle(float angularDiameter) { return AngularRadiusToSolidAngle(AngularDiameterToAngularRadius(angularDiameter)); }
+
+float VisibilityToConeCosAngle(float occlusion) { return sqrt(saturate(1.0 - occlusion)); }
+float ConeCosAngleToVisibility(float coneCosAngle) { return 1.0 - Sq(coneCosAngle); }
+float VisibilityToConeAngle(float occlusion) { return CosConeAngleToConeAngle(VisibilityToConeCosAngle(occlusion)); }
+
+float DistToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
+{
+	float3 rcpDir = rcp(target - origin);
+	return Max3(min(boxMin * rcpDir, boxMax * rcpDir) - origin * rcpDir);
+}
+
+float3 ClipToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
+{
+	float t = DistToAABB(origin, target, boxMin, boxMax);
+	return lerp(origin, target, saturate(t));
+}
+
+// TODO: Maybe make these switch back to returning cosAngle instead of solidAngle
+float SphericalCapIntersectionCosAngle(float3 a, float cosA, float3 b, float cosB)
+{
+	float cosC = dot(a, b);
+	float sinA = SinFromCos(cosA);
+	float sinB = SinFromCos(cosB);
+	float sinC = SinFromCos(cosC);
+	float alpha = FastACos(clamp((cosC - cosA * cosB) * rcp(sinA * sinB), -1, 1));
+	float beta = FastACos(clamp((cosB - cosC * cosA) * rcp(sinA * sinC), -1, 1));
+	float gamma = FastACos(clamp((cosA - cosC * cosB) * rcp(sinB * sinC), -1, 1));
+	return RcpPi * (alpha + beta * cosA + gamma * cosB);
+}
+
+float4 SphericalCapIntersection(float3 a, float cosA, float3 b, float cosB)
+{
+	float cosC = dot(a, b);
+	if (cosC <= CosineAddition(cosA, cosB))
+		return float4(a, 0);
+
+	// Cone a fully inside cone b, return cone a
+	if (cosB <= CosineAddition(cosA, cosC))
+		float4(a, cosA);
+		
+	// Cone b fully inside cone a, return cone b
+	if (cosA <= CosineAddition(cosB, cosC))
+		float4(b, cosB);
+	
+	// Compute the vector that is in the center of the overlapping area
+	float cosDelta = CosineDifference(cosA, cosB);
+	float cosAngle = sqrt(0.5 * CosineDifference(cosC, cosDelta) + 0.5);
+	float3 L = RotateTowards(b, a, cosAngle);
+	float intersectionCosConeAngle = SphericalCapIntersectionCosAngle(a, cosA, b, cosB);
+	return float4(L, intersectionCosConeAngle);
+}
+
+bool RayAABBIntersection(
+    float3 rayOrigin, // Origin of the ray
+    float3 rayDirection, // Normalized direction of the ray
+    float3 aabbMin, // Minimum corner of the AABB
+    float3 aabbMax, // Maximum corner of the AABB
+    out float t_min, // Near intersection distance
+    out float t_max // Far intersection distance
+)
+{
+    // Calculate intersections with the AABB's slabs (per axis)
+	float3 t0 = (aabbMin - rayOrigin) / rayDirection;
+	float3 t1 = (aabbMax - rayOrigin) / rayDirection;
+    
+    // Ensure t0 holds the min per-component and t1 holds the max
+	float3 t_smaller = min(t0, t1);
+	float3 t_larger = max(t0, t1);
+    
+    // Find the largest t_min (entry point) and smallest t_max (exit point)
+	t_min = max(max(t_smaller.x, t_smaller.y), t_smaller.z);
+	t_max = min(min(t_larger.x, t_larger.y), t_larger.z);
+    
+    // Check if the ray misses the AABB or starts inside it
+	return t_min < t_max && t_max > 0.0;
+}

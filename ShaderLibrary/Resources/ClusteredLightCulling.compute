@@ -1,12 +1,15 @@
 #pragma kernel ClusteredLighting
 
 #include "../Common.hlsl"
+#include "../LightingCommon.hlsl"
+#include "../Math.hlsl"
+#include "../SpaceTransforms.hlsl"
 
-RWStructuredBuffer<uint> _LightCounter, _LightClusterListWrite;
-RWTexture3D<uint2> _LightClusterIndicesWrite;
+RWStructuredBuffer<uint> LightCounter, LightClusterListWrite;
+RWTexture3D<uint2> LightClusterIndicesWrite;
 
-groupshared uint _LightIndices[64][64];
-float _RcpClusterDepth;
+groupshared uint LightIndices[64][64];
+float RcpClusterDepth;
 
 bool IntersectSphereAABB(float3 position, float sqRadius, float3 aabbMin, float3 aabbMax)
 {
@@ -30,14 +33,15 @@ void ClusteredLighting(uint3 id : SV_DispatchThreadId, uint groupIndex : SV_Grou
 			[unroll]
 			for (uint x = 0; x < 2; x++)
 			{
-				float eyeDepth = _Near * pow(abs(_Far / _Near), (id.z + z) * _RcpClusterDepth);
+				// TODO: Precompute scale/bias
+				float eyeDepth = Near * pow(abs(Far / Near), (id.z + z) * RcpClusterDepth);
                 
 				float3 positionSS;
-				positionSS.x = (id.x + x) * _TileSize;
-				positionSS.y = (id.y + y) * _TileSize;
-				positionSS.z = EyeToDeviceDepth(eyeDepth);
+				positionSS.x = (id.x + x) * TileSize;
+				positionSS.y = (id.y + y) * TileSize;
+				positionSS.z = LinearToDeviceDepth(eyeDepth);
                 
-				float3 positionWS = PixelToWorld(positionSS);
+				float3 positionWS = MultiplyPointProj(PixelToWorld, positionSS);
                 
 				if (x == 0 && y == 0 && z == 0)
 				{
@@ -54,28 +58,28 @@ void ClusteredLighting(uint3 id : SV_DispatchThreadId, uint groupIndex : SV_Grou
     
     // Multiple iterations for > threadCount lights
 	uint lightCount = 0;
-	for (uint i = 0; i < _PointLightCount; i++)
+	for (uint i = 0; i < PointLightCount; i++)
 	{
-		LightData lightData = _PointLights[i];
+		LightData lightData = PointLights[i];
 
         // For spotlights, modify their culling sphere
 		float3 centerWS = lightData.position;
 		if (!IntersectSphereAABB(centerWS, Sq(lightData.range), minBounds, maxBounds))
 			continue;
 
-		_LightIndices[groupIndex][lightCount++] = i;
+		LightIndices[groupIndex][lightCount++] = i;
 	}
 
 	uint lightOffset = 0;
 	if (lightCount > 0)
 	{
-		InterlockedAdd(_LightCounter[0], lightCount, lightOffset);
+		InterlockedAdd(LightCounter[0], lightCount, lightOffset);
 
 		for (i = 0; i < lightCount; i++)
 		{
-			_LightClusterListWrite[lightOffset + i] = _LightIndices[groupIndex][i];
+			LightClusterListWrite[lightOffset + i] = LightIndices[groupIndex][i];
 		}
 	}
 	
-	_LightClusterIndicesWrite[id] = uint2(lightOffset, lightCount);
+	LightClusterIndicesWrite[id] = uint2(lightOffset, lightCount);
 }

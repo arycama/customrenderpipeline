@@ -4,15 +4,14 @@
 #include "../../Samplers.hlsl"
 #include "../../Lighting.hlsl"
 #include "../../Raytracing.hlsl"
+#include "../../SpaceTransforms.hlsl"
 
-RWTexture2D<float4> HitResult, HitColor;
-Texture2D<float> _Depth;
-Texture2D<float4> _NormalRoughness;
-float _Radius, _RawRadius, _AoStrength, _FalloffScale, _FalloffBias, _SampleCount;
+RWTexture2D<float4> HitResult;
+float Radius, Falloff;
 float _RaytracingBias, _RaytracingDistantBias;
 
 [shader("miss")]
-void MissShader(inout RayPayloadAmbientOcclusion payload : SV_RayPayload)
+void MissShader(inout RayPayloadVisibility payload : SV_RayPayload)
 {
 	payload.hitDistance = 0.0;
 }
@@ -21,51 +20,61 @@ void MissShader(inout RayPayloadAmbientOcclusion payload : SV_RayPayload)
 void RayGeneration()
 {
 	uint2 position = DispatchRaysIndex().xy;
-	float depth = _Depth[position];
-	if(depth == 0.0)
+	float depth = Depth[position];
+	if (depth == 0.0)
 		return;
 	
-	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
+	float3 worldPosition = PixelToWorldPosition(float3(position + 0.5, depth));
 	float3 V = normalize(-worldPosition);
 	
 	float NdotV;
-	float3 N = GBufferNormal(position, _NormalRoughness, V, NdotV);
+	float3 N = GBufferNormal(position, NormalRoughness, V, NdotV);
 	
-	float3 noise3DCosine = Noise3DCosine(position);
-	float rcpPdf = Pi * rcp(noise3DCosine.z);
-	float3 L = FromToRotationZ(N, noise3DCosine);
 	
-	// We also need to undo the planet curve, since it's not accounted for in the BLAS
-	worldPosition = PlanetCurveInverse(worldPosition);
+	float2 noise2D = Noise2D(position);
 	
-	RayDesc ray;
-	ray.Origin = worldPosition + _ViewPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
-	ray.Direction = L;
-	ray.TMin = 0.0;
-	ray.TMax = _RawRadius;
+	float visibility = 0.0;
+	float3 bentNormal = 0.0;
+	float weightSum = 0.0;
 	
-	RayPayloadAmbientOcclusion payload;
-	payload.hitDistance = 0.0;
+	uint samples = 8;
+	for (uint i = 0; i < samples; i++)
+	{
+		float2 u = Hammersley2dSeq(i, samples);
+		u = frac(u + noise2D);
+	
+		float3 L = SampleHemisphereCosine(u.x, u.y, N);
 		
-	uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES | RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH;
-	TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+		RayDesc ray;
+		ray.Origin = worldPosition + ViewPosition + N * EvaluateRayTracingBias(worldPosition, Near, Far, _RaytracingBias, _RaytracingDistantBias);
+		ray.Direction = L;
+		ray.TMin = 0.0;
+		ray.TMax = Radius;
 	
-	bool validHit = payload.hitDistance;
-	float outDepth;
-	float3 color, hitRay;
-	if(validHit)
-	{
-		color = 0.0;
-		hitRay = L * payload.hitDistance;
-		outDepth = Linear01Depth(depth);
-	}
-	else
-	{
-		color = 0.0;
-		hitRay = L;
-		outDepth = 0.0;
+		RayPayloadVisibility payload;
+	
+		uint flags = RAY_FLAG_CULL_BACK_FACING_TRIANGLES;
+		TraceRay(SceneRaytracingAccelerationStructure, flags, 0xFF, 0, 1, 0, ray, payload);
+		
+		if (payload.hitDistance > 0.0)
+		{
+			// Something was hit
+			float start = Radius * Falloff;
+			float end = Radius;
+			float weight = saturate((end - payload.hitDistance) * rcp(end - start));
+			visibility += lerp(1, 0, weight);
+			bentNormal += L * (1.0 - weight);
+		}
+		else
+		{
+			// No hit
+			visibility += 1.0;
+			bentNormal += L;
+		}
 	}
 	
-	HitColor[position] = float4(color, rcpPdf);
-	HitResult[position] = float4(hitRay, outDepth);
+	bentNormal /= samples;
+	
+	float occlusion = visibility / samples;
+	HitResult[position] = float4(bentNormal, VisibilityToConeAngle(occlusion));
 }

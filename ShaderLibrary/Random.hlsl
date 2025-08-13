@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Common.hlsl"
 #include "Math.hlsl"
 
 uint PcgHash(uint state)
@@ -41,12 +42,27 @@ uint PcgHash4(uint4 v)
 	return PcgHash(v.x ^ PcgHash3(v.yzw));
 }
 
-uint PermuteState(uint state) { return state * 747796405u + 2891336453u; }
+uint PermuteState(uint state)
+{
+	return state * 747796405u + 2891336453u;
+}
 
-float1 ConstructFloat(uint1 m) { return asfloat((m & 0x007FFFFF) | 0x3F800000) - 1; }
-float2 ConstructFloat(uint2 m) { return asfloat((m & 0x007FFFFF) | 0x3F800000) - 1; }
-float3 ConstructFloat(uint3 m) { return asfloat((m & 0x007FFFFF) | 0x3F800000) - 1; }
-float4 ConstructFloat(uint4 m) { return asfloat((m & 0x007FFFFF) | 0x3F800000) - 1; }
+float1 ConstructFloat(uint1 m)
+{
+	return asfloat((m & 0x007FFFFF) | 0x3F800000) - 1;
+}
+float2 ConstructFloat(uint2 m)
+{
+	return asfloat((m & 0x007FFFFF) | 0x3F800000) - 1;
+}
+float3 ConstructFloat(uint3 m)
+{
+	return asfloat((m & 0x007FFFFF) | 0x3F800000) - 1;
+}
+float4 ConstructFloat(uint4 m)
+{
+	return asfloat((m & 0x007FFFFF) | 0x3F800000) - 1;
+}
 
 uint RandomUint(uint value, uint seed = 0)
 {
@@ -137,7 +153,7 @@ float InterleavedGradientNoise(float2 pixCoord, int frameCount)
 // Ref: http://holger.dammertz.org/stuff/notes_HammersleyOnHemisphere.html
 float VanDerCorputBase2(uint i)
 {
-	return reversebits(i) * rcp(4294967296.0); // 2^-32
+	return reversebits(i) * 2.3283064365386963e-10;
 }
 
 float2 Hammersley2dSeq(uint i, uint sequenceLength)
@@ -155,49 +171,45 @@ float PlusNoise(float2 p, float frameIndex)
 	return frac(0.2 * frameIndex * goldenRatio + (0.2 * p.x + (0.6 * p.y + 0.1))); // Unbiased version
 }
 
-Texture2D<float> _BlueNoise1D;
-Texture2D<float2> _BlueNoise2D, _BlueNoise2DUnit;
-Texture2D<float3> _BlueNoise3D, _BlueNoise3DUnit, _BlueNoise3DCosine;
-
 float Noise1D(uint2 coord)
 {
-	return _BlueNoise1D[coord % 128];
+	return BlueNoise1D[coord % 128];
 }
 
 float2 Noise2D(uint2 coord)
 {
-	return _BlueNoise2D[coord % 128];
+	return BlueNoise2D[coord % 128];
 }
 
 float2 Noise2DUnit(uint2 coord)
 {
-	return normalize(2.0 * _BlueNoise2DUnit[coord % 128] - 1.0);
+	return normalize(2.0 * BlueNoise2DUnit[coord % 128] - 1.0);
 }
 
 float3 Noise3D(uint2 coord)
 {
-	return _BlueNoise3D[coord % 128];
+	return BlueNoise3D[coord % 128];
 }
 
 float3 Noise3DUnit(uint2 coord)
 {
-	return normalize(2.0 * _BlueNoise3DUnit[coord % 128] - 1.0);
+	return normalize(2.0 * BlueNoise3DUnit[coord % 128] - 1.0);
 }
 
 float3 Noise3DCosine(uint2 coord)
 {
-	return normalize(2.0 * _BlueNoise3DCosine[coord % 128] - 1.0);
+	return normalize(2.0 * BlueNoise3DCosine[coord % 128] - 1.0);
 }
 
 float2 VogelDiskSample(int sampleIndex, int samplesCount, float phi)
 {
-  float GoldenAngle = 2.4f;
+	float GoldenAngle = 2.4f;
 
-  float r = sqrt(sampleIndex + 0.5f) / sqrt(samplesCount);
-  float theta = sampleIndex * GoldenAngle + phi;
+	float r = sqrt(sampleIndex + 0.5f) / sqrt(samplesCount);
+	float theta = sampleIndex * GoldenAngle + phi;
 
-  float sine, cosine;
-  sincos(theta, sine, cosine);
+	float sine, cosine;
+	sincos(theta, sine, cosine);
   
-  return float2(r * cosine, r * sine);
+	return float2(r * cosine, r * sine);
 }

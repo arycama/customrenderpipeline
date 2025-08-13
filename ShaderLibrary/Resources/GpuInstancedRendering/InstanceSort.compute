@@ -1,3 +1,5 @@
+#include "../../PrefixSum.hlsl"
+
 #pragma kernel InstanceSort
 
 RWStructuredBuffer<uint> Result;
@@ -6,57 +8,63 @@ StructuredBuffer<uint> DrawCallArgs, SortKeys;
 RWStructuredBuffer<float> SortKeysWrite;
 
 const static uint threadCount = 256;
+const static uint log2ThreadCount = firstbitlow(threadCount);
 
-groupshared uint histogram[256];
-groupshared uint sharedPrefixSum[threadCount];
-groupshared uint sharedKeys[2][threadCount];
-groupshared uint sharedData[2][threadCount];
+groupshared uint sharedKeys[threadCount];
+groupshared uint sharedIndices[threadCount];
+groupshared uint histogram[threadCount];
+groupshared uint histogram1[4];
+groupshared uint4 prefixSum[threadCount];
+
+void PrefixSumSharedWrite(uint index, uint data)
+{
+	histogram[index] = data;
+}
+
+uint PrefixSumSharedRead(uint index)
+{
+	return histogram[index];
+}
 
 [numthreads(threadCount, 1, 1)]
-void InstanceSort(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex)
+void InstanceSort(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
 	bool outOfRange = id >= DrawCallArgs[1];
-	sharedKeys[0][groupIndex] = outOfRange ? 0xFFFFFFFF : SortKeys[id];
-	sharedData[0][groupIndex] = outOfRange ? 0 : Input[id];
+	sharedKeys[groupIndex] = outOfRange ? 0xFFFFFFFF : SortKeys[id];
+	sharedIndices[groupIndex] = groupIndex;
 	
 	[unroll]
 	for (uint i = 0; i < 4; i++)
 	{
 		// Clear histogram
 		histogram[groupIndex] = 0;
+		
 		GroupMemoryBarrierWithGroupSync();
 
 		// Count occurrences of each digit
-		uint key = sharedKeys[i & 1][groupIndex];
+		uint srcIndex = sharedIndices[groupIndex];
+		uint key = sharedKeys[srcIndex];
 		uint digit = (key >> (8 * i)) & 0xFF;
 		
 		InterlockedAdd(histogram[digit], 1);
-		GroupMemoryBarrierWithGroupSync();
-
-		// Compute prefix sum
-		uint sum = 0, arraySum = 0;
-		for (uint j = 0; j < groupIndex; j++)
-		{
-			sum += histogram[j];
-			arraySum += ((sharedKeys[i & 1][j] >> (8 * i)) & 0xFF) == digit;
-		}
+		PrefixSum(groupIndex, threadCount, log2ThreadCount);
 		
-		sharedPrefixSum[groupIndex] = sum;
-		GroupMemoryBarrierWithGroupSync();
-
 		// Reorder elements to shared memory
-		uint index = sharedPrefixSum[digit] + arraySum;
+		uint arraySum = 0;
+		for (uint j = 0; j < groupIndex; j++)
+			arraySum += ((sharedKeys[sharedIndices[j]] >> (8 * i)) & 0xFF) == digit;
+	
+		uint dstIndex = histogram[digit] + arraySum;
 		
-		sharedKeys[!(i & 1)][index] = key;
-		sharedData[!(i & 1)][index] = sharedData[i & 1][groupIndex];
+		GroupMemoryBarrierWithGroupSync();
+		
+		sharedIndices[dstIndex] = srcIndex;
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
 	
-	if (outOfRange)
-		return;
-	
 	// Write final results
-	Result[id] = sharedData[0][groupIndex];
-	SortKeysWrite[id] = sharedKeys[0][groupIndex];
+	uint finalSrc = groupId * threadCount + sharedIndices[groupIndex];
+	Result[id] = Input[finalSrc];
+	SortKeysWrite[id] = SortKeys[finalSrc];
 }

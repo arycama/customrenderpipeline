@@ -1,7 +1,8 @@
 #pragma kernel FillData
 
-#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
-#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
+#include "../../Common.hlsl"
+#include "../../Packing.hlsl"
+#include "../../MatrixUtils.hlsl"
 
 struct Bounds
 {

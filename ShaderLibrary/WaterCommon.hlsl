@@ -1,12 +1,13 @@
-﻿#ifndef WATER_COMMON_INCLUDED
-#define WATER_COMMON_INCLUDED
+﻿#pragma once
 
 #include "Atmosphere.hlsl"
 #include "Common.hlsl"
 #include "Material.hlsl"
 #include "Geometry.hlsl"
 #include "Samplers.hlsl"
+#include "SpaceTransforms.hlsl"
 #include "Water/WaterShoreMask.hlsl"
+#include "Volumetrics.hlsl"
 
 cbuffer OceanData
 {
@@ -84,11 +85,12 @@ bool CheckTerrainMask(float3 p0, float3 p1, float3 p2, float3 p3)
 
 void GerstnerWaves(float3 worldPosition, float time, out float3 displacement, out float3 normal, out float scale)
 {
-	displacement = normal = float3(0, 1, 0);
+	displacement = 0;
+	normal = float3(0, 1, 0);
 	scale = 0;
 	
 	// Early exit if out of bounds
-	float2 uv = (worldPosition.xz + _ViewPosition.xz) * ShoreScaleOffset.xy + ShoreScaleOffset.zw;
+	float2 uv = (worldPosition.xz + ViewPosition.xz) * ShoreScaleOffset.xy + ShoreScaleOffset.zw;
 	if (any(saturate(uv) != uv))
 		return;
 	
@@ -96,10 +98,10 @@ void GerstnerWaves(float3 worldPosition, float time, out float3 displacement, ou
 	float2 shoreDirection;
 	GetShoreData(worldPosition, shoreDepth, shoreDistance, shoreDirection);
 	//if (shoreDistance < 0.0)
-	//{
-		scale = 1;//0.95;
+	{
+		scale = 0;//0.95;
 		return;
-	//}
+	}
 	
 	// Largest wave arising from a wind speed
 	float amplitude = 0.22 * Sq(OceanWindSpeed) / _OceanGravity; // _ShoreWaveHeight;
@@ -134,9 +136,9 @@ float3 GetCaustics(float3 worldPosition, float3 L, bool sampleLevel = false)
 	float2 causticsUv = hit.xz * _OceanScale[CausticsCascade];
 	
 #ifdef SHADER_STAGE_RAYTRACING
-	float3 caustics = OceanCaustics.SampleLevel(_LinearRepeatSampler, causticsUv, 0.0);
+	float3 caustics = OceanCaustics.SampleLevel(LinearRepeatSampler, causticsUv, 0.0);
 #else
-	float3 caustics = OceanCaustics.Sample(_LinearRepeatSampler, causticsUv);
+	float3 caustics = OceanCaustics.Sample(LinearRepeatSampler, causticsUv);
 	//float3 caustics = OceanCaustics.SampleLevel(_LinearRepeatSampler, causticsUv, 0.0);
 #endif
 	
@@ -149,11 +151,11 @@ float3 GetCaustics(float3 worldPosition, float3 L, bool sampleLevel = false)
 
 float WaterShadowDistance(float3 position, float3 L)
 {
-	float shadowDistance = max(0.0, -_ViewPosition.y - position.y) / max(1e-6, saturate(L.y));
+	float shadowDistance = max(0.0, -ViewPosition.y - position.y) / max(1e-6, saturate(L.y));
 	float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, position);
 	if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
 	{
-		float shadowDepth = _WaterShadows.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);
+		float shadowDepth = _WaterShadows.SampleLevel(LinearClampSampler, shadowPosition.xy, 0.0);
 		shadowDistance = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
 	}
 	
@@ -168,19 +170,17 @@ float3 WaterShadow(float3 position, float3 L)
 float3 WaterPhaseFunction(float LdotV, float opticalDepth)
 {
 	float3 asymmetry = exp(-_WaterShadowExtinction * opticalDepth);
-	return lerp(MiePhase(LdotV, -0.3), MiePhase(LdotV, 0.85), asymmetry);
+	return lerp(CsPhase(LdotV, -0.3), CsPhase(LdotV, 0.85), asymmetry);
 }
 
 float GetWaterIlluminance(float3 position)
 {
-	float illuminance = 1.0;;
+	float illuminance = 1.0;
 	float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, position);
 	if (all(saturate(shadowPosition.xy) == shadowPosition.xy))
 	{
-		illuminance = WaterIlluminance.SampleLevel(_LinearClampSampler, shadowPosition.xy, 0.0);
+		illuminance = WaterIlluminance.SampleLevel(LinearClampSampler, shadowPosition.xy, 0.0);
 	}
 	
 	return illuminance;
 }
-
-#endif

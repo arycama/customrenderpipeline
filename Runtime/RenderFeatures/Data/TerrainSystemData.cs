@@ -1,0 +1,27 @@
+﻿using UnityEngine;
+using UnityEngine.Rendering;
+
+public class TerrainSystemData : IRenderPassData
+{
+	public ResourceHandle<RenderTexture> MinMaxHeights { get; }
+	public Terrain Terrain { get; }
+	public TerrainData TerrainData { get; }
+	public ResourceHandle<GraphicsBuffer> IndexBuffer { get; }
+
+	public TerrainSystemData(ResourceHandle<RenderTexture> minMaxHeights, Terrain terrain, TerrainData terrainData, ResourceHandle<GraphicsBuffer> indexBuffer)
+	{
+		MinMaxHeights = minMaxHeights;
+		Terrain = terrain;
+		TerrainData = terrainData;
+		IndexBuffer = indexBuffer;
+	}
+
+	void IRenderPassData.SetInputs(RenderPassBase pass)
+	{
+		pass.ReadBuffer("", IndexBuffer);
+	}
+
+	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	{
+	}
+}

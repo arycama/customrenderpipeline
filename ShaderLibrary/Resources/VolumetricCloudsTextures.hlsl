@@ -3,6 +3,8 @@
 
 #include "Packages/com.arycama.webglnoiseunity/Noise.hlsl"
 
+#pragma warning (disable: 3571)
+
 float2 _WeatherMapResolution;
 float3 _NoiseResolution, _DetailNoiseResolution;
 float _WeatherMapFrequency, _WeatherMapH, _NoiseFrequency, _NoiseH, _DetailNoiseFrequency, _DetailNoiseH;
@@ -26,7 +28,7 @@ float3 FragmentWeatherMap(float4 position : SV_Position, float2 uv : TEXCOORD0, 
 	for (float i = 0; i < _WeatherMapOctaves; i++)
 	{
 		float freq = _WeatherMapFrequency * exp2(i);
-		float amp = pow(freq, -_WeatherMapH);// * smoothstep(1.0, 0.5, w * freq);
+		float amp = pow(freq, -_WeatherMapH); // * smoothstep(1.0, 0.5, w * freq);
 		result += SimplexNoise(samplePosition * freq, freq, 0.0) * amp;
 		sum += amp;
 	}
@@ -48,7 +50,7 @@ float3 FragmentNoise(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	for (float i = 0; i < _NoiseOctaves; i++)
 	{
 		float freq = _NoiseFrequency * exp2(i);
-		float amp = pow(freq, -_NoiseH);// * smoothstep(1.0, 0.5, w * freq);
+		float amp = pow(freq, -_NoiseH); // * smoothstep(1.0, 0.5, w * freq);
 		perlinResult += SimplexNoise(samplePosition * freq, freq, 0.0) * amp;
 		sum += amp;
 	}
@@ -61,8 +63,8 @@ float3 FragmentNoise(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	for (i = 0; i < _CellularNoiseOctaves; i++)
 	{
 		float freq = _CellularNoiseFrequency * exp2(i);
-		float amp = pow(freq, -_CellularNoiseH);// * smoothstep(1.0, 0.5, w * freq);
-		cellularResult += saturate(1.0 - CellularNoise(samplePosition * freq, freq)) * amp;
+		float amp = pow(freq, -_CellularNoiseH); // * smoothstep(1.0, 0.5, w * freq);
+		cellularResult += saturate(1.0 - CellularNoise(samplePosition * freq, freq)).r * amp;
 		cellularSum += amp;
 	}
 	
@@ -85,7 +87,7 @@ float3 FragmentDetailNoise(float4 position : SV_Position, float2 uv : TEXCOORD0,
 	for (float i = 0; i < _DetailNoiseOctaves; i++)
 	{
 		float freq = _DetailNoiseFrequency * exp2(i);
-		float amp = pow(freq, -_DetailNoiseH);// * smoothstep(1.0, 0.5, w * freq);
+		float amp = pow(freq, -_DetailNoiseH); // * smoothstep(1.0, 0.5, w * freq);
 		//result += saturate(1.0 - CellularNoise(samplePosition * freq, freq)) * amp;
 		result += SimplexNoise(samplePosition * freq, freq) * amp;
 		sum += amp;

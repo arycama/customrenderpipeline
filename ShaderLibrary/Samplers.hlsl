@@ -1,7 +1,5 @@
-#ifndef SAMPLER_STATES_INCLUDED
-#define SAMPLER_STATES_INCLUDED
+#pragma once
 
-SamplerState _LinearClampSampler, _LinearRepeatSampler, _PointClampSampler, _TrilinearRepeatAniso16Sampler, _TrilinearRepeatSampler, _TrilinearClampSampler;
-SamplerComparisonState _PointClampCompareSampler, _LinearClampCompareSampler;
+SamplerState PointClampSampler, PointRepeatSampler, LinearClampSampler, LinearRepeatSampler, TrilinearClampSampler, TrilinearRepeatSampler, TrilinearRepeatAniso16Sampler;
 
-#endif
+const static SamplerState SurfaceSampler = TrilinearRepeatAniso16Sampler;

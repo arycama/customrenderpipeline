@@ -3,8 +3,9 @@ Shader "Hidden/Terrain Id Map"
     SubShader
     {
         Cull Off
-        ZWrite Off
+        ZClip Off
         ZTest Off
+        ZWrite Off
 
         Pass
         {

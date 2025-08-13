@@ -1,0 +1,107 @@
+#include "../Common.hlsl"
+#include "../Geometry.hlsl"
+#include "../Random.hlsl"
+#include "../Samplers.hlsl"
+#include "../SphericalHarmonics.hlsl"
+
+#pragma kernel AmbientProbe
+
+float _MipLevel;
+static const uint _SampleCount = 512;
+groupshared float SharedCoeffs[9][_SampleCount];
+TextureCube<float3> _AmbientProbeInputCubemap;
+RWBuffer<float4> _AmbientProbeOutputBuffer;
+
+[numthreads(_SampleCount, 1, 1)]
+void AmbientProbe(uint groupIndex : SV_GroupIndex)
+{
+	float2 u = Hammersley2dSeq(groupIndex, _SampleCount);
+	float3 N = SampleSphereUniform(u.x, u.y);
+	float3 value = _AmbientProbeInputCubemap.SampleLevel(TrilinearClampSampler, N, _MipLevel) * FourPi / _SampleCount;
+	
+	float basis[9];
+	GetShBasis(N, basis);
+	
+	// Red
+	uint i, j;
+	//[unroll]
+	for (i = 0; i < 9; i++)
+		SharedCoeffs[i][groupIndex] = basis[i] * value.r;
+	
+	//[unroll]
+	for (i = _SampleCount >> 1; i > 0; i >>= 1)
+	{
+		GroupMemoryBarrierWithGroupSync();
+		
+		if (groupIndex < i)
+		{
+			//[unroll]
+			for (j = 0; j < 9; j++)
+				SharedCoeffs[j][groupIndex] += SharedCoeffs[j][groupIndex + i];
+		}
+	}
+	
+	GroupMemoryBarrierWithGroupSync();
+	
+	float3 result[9];
+	if (!groupIndex)
+	{
+		//[unroll]
+		for (i = 0; i < 9; i++)
+			result[i].r = SharedCoeffs[i][0];
+	}
+	
+	// Green
+	//[unroll]
+	for (i = 0; i < 9; i++)
+		SharedCoeffs[i][groupIndex] = basis[i] * value.g;
+	
+	//[unroll]
+	for (i = _SampleCount >> 1; i > 0; i >>= 1)
+	{
+		GroupMemoryBarrierWithGroupSync();
+		
+		if (groupIndex < i)
+		{
+			//[unroll]
+			for (j = 0; j < 9; j++)
+				SharedCoeffs[j][groupIndex] += SharedCoeffs[j][groupIndex + i];
+		}
+	}
+	
+	if (!groupIndex)
+	{
+		//[unroll]
+		for (uint i = 0; i < 9; i++)
+			result[i].g = SharedCoeffs[i][0];
+	}
+	
+	// Blue
+	//[unroll]
+	for (i = 0; i < 9; i++)
+		SharedCoeffs[i][groupIndex] = basis[i] * value.b;
+	
+	//[unroll]
+	for (i = _SampleCount >> 1; i > 0; i >>= 1)
+	{
+		GroupMemoryBarrierWithGroupSync();
+		
+		if (groupIndex < i)
+		{
+			//[unroll]
+			for (j = 0; j < 9; j++)
+				SharedCoeffs[j][groupIndex] += SharedCoeffs[j][groupIndex + i];
+		}
+	}
+	
+	if (groupIndex)
+		return;
+		
+	//[unroll]
+	for (i = 0; i < 9; i++)
+		result[i].b = SharedCoeffs[i][0];
+		
+	//[unroll]
+	for (i = 0; i < 9; i++)
+		_AmbientProbeOutputBuffer[i] = float4(result[i], 1);
+}

@@ -1,4 +1,0 @@
-﻿namespace Arycama.CustomRenderPipeline
-{
-
-}

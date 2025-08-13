@@ -1,3 +1,4 @@
+#include "../../Color.hlsl"
 #include "../../Common.hlsl"
 #include "../../GBuffer.hlsl"
 #include "../../Random.hlsl"
@@ -5,17 +6,15 @@
 #include "../../Lighting.hlsl"
 #include "../../ImageBasedLighting.hlsl"
 #include "../../Raytracing.hlsl"
-#include "../../Water/WaterPrepassCommon.hlsl"
+#include "../../SpaceTransforms.hlsl"
 
 RWTexture2D<float3> HitColor;
-Texture2D<float> _Depth;
-
 float _RaytracingBias, _RaytracingDistantBias, _SampleCount, _FocusDistance, _ApertureRadius, _Test;
 
 [shader("miss")]
 void MissShader(inout RayPayload payload : SV_RayPayload)
 {
-	payload.packedColor = 0.0;
+	payload.packedColor = 0.0; 
 	payload.hitDistance = 0.0;
 }
 
@@ -23,22 +22,22 @@ void MissShader(inout RayPayload payload : SV_RayPayload)
 void RayGeneration()
 {
 	float focusDistance = _FocusDistance;
-	focusDistance = LinearEyeDepth(_Depth[_ScaledResolution.xy / 2]);
+	//focusDistance = LinearEyeDepth(Depth[_ScaledResolution.xy / 2]);
 
 	uint2 position = DispatchRaysIndex().xy;
 	
-	float3 worldDir = PixelToWorldDir(position + 0.5, false);
+	float3 worldDir = TransformPixelToWorldDirection(position + 0.5, false);
 	float offset = Noise1D(position.xy);
 	float phi = offset * TwoPi;
 	
-	float3 worldPosition = focusDistance * worldDir + _ViewPosition;
+	float3 worldPosition = focusDistance * worldDir + ViewPosition;
 	
 	float3 color = 0;
 	float weightSum = 0;
 	for (float i = 0.0; i < _SampleCount; i++)
 	{
 		float2 uv = VogelDiskSample(i, _SampleCount, phi) * _ApertureRadius;
-		float3 rayOrigin = _ViewPosition + MultiplyPoint3x4(_ViewToWorld, float3(uv, 0));
+		float3 rayOrigin = ViewPosition + MultiplyPoint3x4(ViewToWorld, float3(uv, 0));
 		float3 rayDirection = normalize(worldPosition - rayOrigin);
 		
 		RayDesc ray;
@@ -70,5 +69,5 @@ void RayGeneration()
 	if (weightSum)
 		color *= rcp(weightSum);
 	
-	HitColor[position] = Rec709ToICtCp(color);
+	HitColor[position] = Rec709ToRec2020(color);
 }

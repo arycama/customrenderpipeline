@@ -1,6 +1,3 @@
-#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
-#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Samplers.hlsl"
-
 #pragma kernel HiZ MIN FIRST 
 #pragma kernel HiZ MIN 
 #pragma kernel HiZ MAX FIRST 
@@ -8,6 +5,7 @@
 #pragma kernel HiZ CHECKER FIRST 
 #pragma kernel HiZ CHECKER
 
+SamplerState _LinearClampSampler;
 Texture2D<float> _Input;
 RWTexture2D<float> _Result0, _Result1, _Result2, _Result3, _Result4, _Result5;
 uint _Width, _Height, _MaxMip;

@@ -1,4 +1,5 @@
 #include "../../Common.hlsl"
+#include "../../Packing.hlsl"
 #include "../../Samplers.hlsl"
 #include "../../WaterCommon.hlsl"
 
@@ -6,14 +7,13 @@ float _CausticsDepth, _CausticsCascade, _PatchSize;
 float3 _RefractiveIndex, _LightDirection0;
 matrix unity_MatrixVP;
 
-
 float4 FragmentPrepare(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {
 	uv = (position.xy - 0.5) / 128;
-	float3 displacement = OceanDisplacement.Sample(_LinearRepeatSampler, float3(uv, _CausticsCascade));
+	float3 displacement = OceanDisplacement.Sample(LinearRepeatSampler, float3(uv, _CausticsCascade));
 	float3 worldPosition = float3(uv * _PatchSize, 0).xzy + displacement;
 
-	float3 normal = UnpackNormalSNorm(OceanNormalFoamSmoothness.Sample(_LinearRepeatSampler, float3(uv, _CausticsCascade)).rg).xzy;
+	float3 normal = UnpackNormalSNorm(OceanNormalFoamSmoothness.Sample(LinearRepeatSampler, float3(uv, _CausticsCascade)).rg).xzy;
 	float3 refractDir = refract(-_LightDirection0, normal, rcp(1.34));
 	float3 refractedPosition = IntersectRayPlane(worldPosition, refractDir, float3(0, -_CausticsDepth, 0.0), float3(0, 1, 0));
 	
@@ -57,17 +57,19 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	float3 refractDir = refract(-_LightDirection0, normal, rcp(1.34));
 	float3 refractedPosition = IntersectRayPlane(worldPosition, refractDir, float3(0, -_CausticsDepth, 0.0), float3(0, 1, 0));
 	
-	float4 worldX = _Input.GatherRed(_LinearRepeatSampler, uv);
-	float4 worldZ = _Input.GatherGreen(_LinearRepeatSampler, uv);
-	float4 refractedX = _Input.GatherBlue(_LinearRepeatSampler, uv);
-	float4 refractedZ = _Input.GatherAlpha(_LinearRepeatSampler, uv);
+	float4 worldX = _Input.GatherRed(LinearRepeatSampler, uv);
+	float4 worldZ = _Input.GatherGreen(LinearRepeatSampler, uv);
+	float4 refractedX = _Input.GatherBlue(LinearRepeatSampler, uv);
+	float4 refractedZ = _Input.GatherAlpha(LinearRepeatSampler, uv);
 	
-	float ratio = CalculateArea(worldX, worldZ) / CalculateArea(refractedX, refractedZ);
+	float area0 = CalculateArea(worldX, worldZ);
+	float area1 = CalculateArea(refractedX, refractedZ);
+	float ratio = area1 ? area0 / area1 : 0;
 	
 	FragmentInput output;
 	output.worldRefractedPosition = float4(worldPosition.xz, refractedPosition.xz);
 	output.position = mul(unity_MatrixVP, float4(refractedPosition, 1));
-	output.ratio = RemoveNaN(ratio);
+	output.ratio = max(0, ratio);
 	return output;
 }
 
@@ -84,9 +86,9 @@ Texture2D<float3> _MainTex;
 float3 FragmentBlit(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float3 col = 0.0;
-	col += _MainTex.Sample(_LinearRepeatSampler, uv * 0.5 + float2(0, 0));
-	col += _MainTex.Sample(_LinearRepeatSampler, uv * 0.5 + float2(0.5, 0));
-	col += _MainTex.Sample(_LinearRepeatSampler, uv * 0.5 + float2(0, 0.5));
-	col += _MainTex.Sample(_LinearRepeatSampler, uv * 0.5 + float2(0.5, 0.5));
+	col += _MainTex.Sample(LinearRepeatSampler, uv * 0.5 + float2(0, 0));
+	col += _MainTex.Sample(LinearRepeatSampler, uv * 0.5 + float2(0.5, 0));
+	col += _MainTex.Sample(LinearRepeatSampler, uv * 0.5 + float2(0, 0.5));
+	col += _MainTex.Sample(LinearRepeatSampler, uv * 0.5 + float2(0.5, 0.5));
 	return col;
 }

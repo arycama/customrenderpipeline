@@ -1,7 +1,6 @@
-// Complex number utilities
+#pragma once
 
-#ifndef COMPLEX_INCLUDED
-#define COMPLEX_INCLUDED
+// Complex number utilities
 
 float2 czero()
 {
@@ -53,5 +52,3 @@ float2 cdot(float2 a, float2 b)
 	result.y = a.y * b.x - a.x * b.y;
 	return result;
 }
-
-#endif

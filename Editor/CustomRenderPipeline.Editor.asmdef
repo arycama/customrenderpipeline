@@ -2,7 +2,8 @@
     "name": "CustomRenderPipeline.Editor",
     "rootNamespace": "",
     "references": [
-        "GUID:1bcfe51ba756cbb44ad8412bbf8ea492"
+        "GUID:1bcfe51ba756cbb44ad8412bbf8ea492",
+        "GUID:234d1a8f0805642469a12616ea271347"
     ],
     "includePlatforms": [
         "Editor"

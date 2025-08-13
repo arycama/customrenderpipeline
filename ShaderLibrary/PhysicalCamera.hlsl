@@ -1,9 +1,9 @@
-﻿#ifndef PHYSICAL_CAMERA_INCLUDED
-#define PHYSICAL_CAMERA_INCLUDED
+#pragma once
 
+#include "Common.hlsl"
 #include "Math.hlsl"
 
-const static float Sensitivity = 100.0;
+const static float Sensitivity = 100.0; // K
 const static float LensAttenuation = 0.65; // q
 const static float LensImperfectionExposureScale = 78.0 / (Sensitivity * LensAttenuation);
 const static float ReflectedLightMeterConstant = 12.5;
@@ -25,7 +25,7 @@ float ComputeEV100(float aperture, float shutterSpeed, float ISO)
 
 float LuminanceToEV100(float luminance)
 {
-	return log2(luminance) - log2(ReflectedLightMeterConstant / Sensitivity);
+	return log2(luminance * Sensitivity / ReflectedLightMeterConstant);
 }
 
 float EV100ToLuminance(float ev)
@@ -37,5 +37,3 @@ float EV100ToExposure(float ev100)
 {
 	return rcp(LensImperfectionExposureScale) * exp2(-ev100);
 }
-
-#endif

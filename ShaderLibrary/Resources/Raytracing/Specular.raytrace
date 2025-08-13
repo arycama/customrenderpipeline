@@ -1,4 +1,5 @@
 #include "../../Common.hlsl"
+#include "../../Color.hlsl"
 #include "../../GBuffer.hlsl"
 #include "../../Random.hlsl"
 #include "../../Samplers.hlsl"
@@ -6,9 +7,6 @@
 #include "../../ImageBasedLighting.hlsl"
 #include "../../Raytracing.hlsl"
 #include "../../Water/WaterPrepassCommon.hlsl"
-
-Texture2D<float4> _NormalRoughness;
-Texture2D<float> _Depth;
 
 RWTexture2D<float4> HitResult;
 RWTexture2D<float4> HitColor;
@@ -26,28 +24,25 @@ void MissShader(inout RayPayload payload : SV_RayPayload)
 void RayGeneration()
 {
 	uint2 position = DispatchRaysIndex().xy;
-	float depth = _Depth[position];
+	float depth = Depth[position];
 	if(depth == 0.0)
 		return;
 	
-	float4 normalRoughness = _NormalRoughness[position];
+	float4 normalRoughness = NormalRoughness[position];
 	float2 u = Noise2D(position);
 	
-	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
+	float3 worldPosition = PixelToWorldPosition(float3(position + 0.5, depth));
 	float3 V = normalize(-worldPosition);
 	
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
-	
-	// We also need to undo the planet curve, since it's not accounted for in the BLAS
-	worldPosition = PlanetCurveInverse(worldPosition);
 	
 	float roughness = Sq(normalRoughness.a);
 	float rcpPdf;
 	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	
 	RayDesc ray;
-	ray.Origin = worldPosition + _ViewPosition + N * EvaluateRayTracingBias(worldPosition, _Near, _Far, _RaytracingBias * 10, _RaytracingDistantBias * 10);
+	ray.Origin = worldPosition + ViewPosition + N * EvaluateRayTracingBias(worldPosition, Near, Far, _RaytracingBias, _RaytracingDistantBias);
 	ray.Direction = L;
 	ray.TMin = 0.0;
 	ray.TMax = 1e10f;
@@ -87,6 +82,6 @@ void RayGeneration()
 		color *= exp(-payload.hitDistance * _WaterExtinction);
 	}
 	
-	HitColor[position] = float4(Rec709ToICtCp(color), rcpPdf);
+	HitColor[position] = float4(color, rcpPdf);
 	HitResult[position] = float4(hitRay, outDepth);
 }

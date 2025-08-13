@@ -1,5 +1,4 @@
-#ifndef TESSELLATION_INCLUDED
-#define TESSELLATION_INCLUDED
+#pragma once
 
 struct HullConstantOutputIsoline
 {
@@ -76,5 +75,3 @@ float4 Bilerp(float4 v0, float4 v1, float4 v2, float4 v3, float2 i)
 	float4 top = lerp(v1, v2, i.x);
 	return lerp(bottom, top, i.y);
 }
-
-#endif

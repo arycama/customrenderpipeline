@@ -8,23 +8,24 @@ struct FragmentOutput
 	#ifdef CLOUD_SHADOW
 		float3 result : SV_Target0;
 	#else
-		float3 luminance : SV_Target0;
-		float transmittance : SV_Target1;
-		float2 depth : SV_Target2;
+	float4 luminance : SV_Target0;
+	float transmittance : SV_Target1;
+	float depth : SV_Target2;
 	#endif
 };
 
-const static float3 _PlanetCenter = float3(0.0, -_PlanetRadius - _ViewPosition.y, 0.0);
+// TODO: Remove/precompute
+const static float3 _PlanetCenter = float3(0.0, -_PlanetRadius - ViewPosition.y, 0.0);
 
 FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	#ifdef CLOUD_SHADOW
 		float3 P = position.x * _CloudShadowToWorld._m00_m10_m20 + position.y * _CloudShadowToWorld._m01_m11_m21 + _CloudShadowToWorld._m03_m13_m23;
 		float3 rd = _CloudShadowViewDirection;
-		float _ViewHeight = distance(_PlanetCenter, P);
+		float ViewHeight = distance(_PlanetCenter, P);
 		float3 N = normalize(P - _PlanetCenter);
 		float viewCosAngle = dot(N, rd);
-		float2 offsets = 0.5;
+		float2 offsets = 0.5;//Noise2D(position.xy);
 	#else
 		float3 P = 0.0;
 		float rcpRdLength = RcpLength(worldDir);
@@ -36,40 +37,40 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	FragmentOutput output;
 	
 	#ifdef BELOW_CLOUD_LAYER
-		float rayStart = DistanceToSphereInside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
-		float rayEnd = DistanceToSphereInside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+		float rayStart = DistanceToSphereInside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
+		float rayEnd = DistanceToSphereInside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
 	
-		if (RayIntersectsGround(_ViewHeight, viewCosAngle))
+		if (RayIntersectsGround(ViewHeight, viewCosAngle))
 		{
-			output.luminance = Rec709ToICtCp(0.0);
+			output.luminance = float4(Rec2020ToICtCp(0.0), 1.0);
 			output.transmittance = 1.0;
 			output.depth = 0.0;
 			return output;
 		}
 	#elif defined(ABOVE_CLOUD_LAYER) || defined(CLOUD_SHADOW)
-		float rayStart = DistanceToSphereOutside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
-		float rayEnd = DistanceToSphereOutside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
+		float rayStart = DistanceToSphereOutside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+		float rayEnd = DistanceToSphereOutside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
 	#else
 		float rayStart = 0.0;
-		bool rayIntersectsLowerCloud = RayIntersectsSphere(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
-		float rayEnd = rayIntersectsLowerCloud ? DistanceToSphereOutside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight) : DistanceToSphereInside(_ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+		bool rayIntersectsLowerCloud = RayIntersectsSphere(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
+		float rayEnd = rayIntersectsLowerCloud ? DistanceToSphereOutside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight) : DistanceToSphereInside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
 	#endif
 	
 	#ifndef CLOUD_SHADOW
-		float sceneDepth = _Depth[position.xy];
-		if (sceneDepth != 0.0)
+	float sceneDepth = Depth[position.xy];
+	if (sceneDepth != 0.0)
+	{
+		float sceneDistance = LinearEyeDepth(sceneDepth) * rcp(rcpRdLength);
+		if (sceneDistance < rayStart)
 		{
-			float sceneDistance = LinearEyeDepth(sceneDepth) * rcp(rcpRdLength);
-			if (sceneDistance < rayStart)
-			{
-				output.luminance = Rec709ToICtCp(0.0);
-				output.transmittance = 1.0;
-				output.depth = 0.0;
-				return output;
-			}
-		
-			rayEnd = min(sceneDistance, rayEnd);
+			output.luminance = float4(Rec2020ToICtCp(0.0), 1.0);
+			output.transmittance = 1.0;
+			output.depth = 0.0;
+			return output;
 		}
+		
+		rayEnd = min(sceneDistance, rayEnd);
+	}
 	#endif
 	
 	#ifdef CLOUD_SHADOW
@@ -80,87 +81,108 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float sampleCount = _Samples;
 	#endif
 	
-	float cloudDepth;
-	float4 result = EvaluateCloud(rayStart, rayEnd - rayStart, sampleCount, rd, _ViewHeight, viewCosAngle, offsets, P, isShadow, cloudDepth, true);
-	float totalRayLength = rayEnd - cloudDepth;
+	float cloudDistance;
+	float4 result = EvaluateCloud(rayStart, rayEnd - rayStart, sampleCount, rd, ViewHeight, viewCosAngle, offsets, P, isShadow, cloudDistance, true);
+	float totalRayLength = rayEnd - cloudDistance;
+	
+	result = IsInfOrNaN(result) ? 0 : result;
 	
 	#ifdef CLOUD_SHADOW
-		output.result = float3(cloudDepth * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a);
+		output.result = float3(cloudDistance * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a);
 	#else
-		output.luminance = Rec709ToICtCp(result.rgb);
+		output.luminance = float4(Rec2020ToICtCp(Rec709ToRec2020(result.rgb) * PaperWhite), 1.0);
 		output.transmittance = result.a;
-		output.depth = float2(cloudDepth, -(result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) : 0.0);
+		output.depth = LinearToDeviceDepth(cloudDistance * rcpRdLength);
 	#endif
 	
 	return output;
 }
 
-Texture2D<float> _InputTransmittance, _TransmittanceHistory;
-float4 _HistoryScaleLimit, _TransmittanceHistoryScaleLimit;
+Texture2D<float> _InputTransmittance, _TransmittanceHistory, WeightHistory;
+float4 _HistoryScaleLimit, _TransmittanceHistoryScaleLimit, WeightHistoryScaleLimit;
 float _IsFirst;
 float _StationaryBlend, _MotionBlend, _MotionFactor;
+float DepthThreshold;
 
 struct TemporalOutput
 {
-	float3 luminance : SV_Target0;
+	float4 luminance : SV_Target0;
 	float transmittance : SV_Target1;
 };
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	int2 pixelId = (int2) position.xy;
-	float rcpRdLength = RcpLength(worldDir);
 	
-	float cloudDistance = CloudDepthTexture[pixelId].r;
-	float2 motion = CalculateVelocity(uv, cloudDistance * rcp(rcpRdLength));
+	float depth = Depth[position.xy];
+	float2 motion = depth ? Velocity[position.xy] : CalculateVelocity(uv, CloudDepthTexture[pixelId]);
 	
 	float2 historyUv = uv - motion;
+	float4 mean = 0.0, stdDev = 0.0, current = 0.0;
 	
-	// Neighborhood clamp
-	float4 mean = 0.0, stdDev = 0.0, result = 0.0, minValue = 0.0, maxValue = 0.0;
+	float centerDepth = LinearEyeDepth(Depth[position.xy]);
+	float weightSum = 0.0;
+	float depthWeightSum = 0.0;
 	
 	[unroll]
-	for(int y = -1, i = 0; y <= 1; y++)
+	for (int y = -1, i = 0; y <= 1; y++)
 	{
 		[unroll]
-		for(int x = -1; x <= 1; x++, i++)
+		for (int x = -1; x <= 1; x++, i++)
 		{
-			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
-			float4 color = float4(_Input[pixelId + int2(x, y)], _InputTransmittance[pixelId + int2(x, y)]);
-			result = i == 0 ? color * weight : result + color * weight;
-			mean += color;
-			stdDev += color * color;
-			minValue = i == 0 ? color : min(minValue, color);
-			maxValue = i == 0 ? color : max(maxValue, color);
+			float weight = GetBoxFilterWeight(i);
+			uint2 coord = clamp(pixelId + int2(x, y), 0, ViewSizeMinusOne);
+			
+			float depth = LinearEyeDepth(Depth[coord]);
+			
+			// Weigh contribution to the result and bounding box 
+			float depthWeight = saturate(1.0 - abs(centerDepth - depth) / max(1, centerDepth) * DepthThreshold);
+			
+			float4 color = float4(_Input[coord], _InputTransmittance[coord]);
+			current = i == 0 ? (color * weight * depthWeight) : (current + color * weight * depthWeight);
+			mean += color * depthWeight;
+			stdDev += Sq(color) * depthWeight;
+			
+			depthWeightSum += depthWeight;
+			weightSum += weight * depthWeight;
 		}
 	}
 	
-	mean /= 9.0;
-	stdDev /= 9.0;
+	current /= weightSum;
+	mean /= depthWeightSum;
+	stdDev /= depthWeightSum;
 	stdDev = sqrt(abs(stdDev - mean * mean));
-	minValue = max(minValue, mean - stdDev);
-	maxValue = min(maxValue, mean + stdDev);
+	float4 minValue = mean - stdDev;
+	float4 maxValue = mean + stdDev;
 
-	float4 history;
-	history.rgb = _History.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
-	history.rgb = ClipToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
-	//history.rgb *= _PreviousToCurrentExposure; // History is in ICtCp, so can't re-expose
-	
-	history.a = _TransmittanceHistory.Sample(_LinearClampSampler, ClampScaleTextureUv(historyUv, _TransmittanceHistoryScaleLimit));
-	
-	// Not sure what best way to handle is, not clamping reduces flicker which is the main issue
-	history.a = clamp(history.a, minValue.a, maxValue.a);
-	
-	float motionLength = saturate(length(motion) * _MotionFactor);
-	float blend = lerp(_StationaryBlend, _MotionBlend, motionLength);
-	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
-		result = lerp(history, result, 0.05);
+	{
+		float4 bilinearWeights  = BilinearWeights(historyUv, ViewSize);
 	
-	result.rgb = RemoveNaN(result.rgb);
+		float4 currentDepths = LinearEyeDepth(Depth.Gather(LinearClampSampler, uv));
+		float4 previousDepths = LinearEyeDepth(PreviousDepth.Gather(LinearClampSampler, historyUv));
+	
+		float4 historyR = _History.GatherRed(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit)) * PreviousToCurrentExposure;
+		float4 historyG = _History.GatherGreen(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
+		float4 historyB = _History.GatherBlue(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
+		float4 historyA = _TransmittanceHistory.Gather(LinearClampSampler, ClampScaleTextureUv(historyUv, _TransmittanceHistoryScaleLimit));
+		
+		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);
+		
+		float4 history = 0;
+		[unroll]
+		for (uint i = 0; i < 4; i++)
+		{
+			float4 historySample = float4(historyR[i], historyG[i], historyB[i], historyA[i]);
+			history += bilinearWeights[i] * lerp(current, historySample, depthWeights[i]);
+		}
+		
+		history = clamp(history, minValue, maxValue);
+		current = lerp(history, current, 0.05);
+	}
 	
 	TemporalOutput output;
-	output.luminance = result.rgb;
-	output.transmittance = result.a;
+	output.luminance = float4(current.rgb, 1.0);
+	output.transmittance = current.a;
 	return output;
 }

@@ -1,0 +1,79 @@
+#pragma kernel MultiScatter KERNEL=MultiScatter MULTI_SCATTER
+#pragma kernel AmbientGroundLookup KERNEL=AmbientGroundLookup AMBIENT_GROUND
+#pragma kernel AmbientSkyLookup KERNEL=AmbientSkyLookup AMBIENT_SKY
+
+#include "../../Common.hlsl"
+#include "../../Atmosphere.hlsl"
+#include "../../Random.hlsl"
+
+#ifdef __INTELLISENSE__
+	#define AMBIENT_SKY
+#endif
+
+static const uint _ThreadCount = 1024;
+groupshared float3 MultiScatterShared[_ThreadCount], ScatterShared[_ThreadCount];
+
+RWTexture2D<float3> _MultiScatterResult, _AmbientGroundResult, _AmbientSkyResult;
+float2 _ScaleOffset;
+float _Samples;
+
+[numthreads(_ThreadCount, 1, 1)]
+void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
+{
+	#ifdef AMBIENT_GROUND
+		float3 uv = float2(0.0, groupId.x * _ScaleOffset.x).xxy;
+	#else
+		float3 uv = float3(groupId * _ScaleOffset, 0.0).xzy;
+	#endif
+	
+	float2 u = Hammersley2dSeq(groupIndex, _ThreadCount);
+	float lightCosAngle = 2.0 * uv.z - 1.0;
+	
+	#ifdef AMBIENT_GROUND
+		float viewHeight = _PlanetRadius;
+		float viewCosAngle = SampleHemisphereCosine(u.x, u.y).z;
+	#else
+		float viewHeight = uv.x * _AtmosphereHeight + _PlanetRadius;
+		float viewCosAngle = SampleSphereUniform(u.x, u.y).z;
+	#endif
+	
+	#if defined(AMBIENT_GROUND) || defined(AMBIENT_SKY)
+		bool applyMultiScatter = true;
+	#else
+		bool applyMultiScatter = false;
+	#endif
+	
+	bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
+	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
+	AtmosphereResult result = SampleAtmosphere(viewHeight, viewCosAngle, lightCosAngle, _Samples, rayLength, applyMultiScatter, true, rayIntersectsGround);
+	ScatterShared[groupIndex] = result.luminance / _ThreadCount;
+	MultiScatterShared[groupIndex] = result.density / _ThreadCount;
+	
+	[unroll]
+	for (uint s = _ThreadCount >> 1; s > 0; s >>= 1)
+	{
+		GroupMemoryBarrierWithGroupSync();
+		
+		if (groupIndex >= s)
+			continue;
+		
+		ScatterShared[groupIndex] += ScatterShared[groupIndex + s];
+		MultiScatterShared[groupIndex] += MultiScatterShared[groupIndex + s];
+	}
+	
+	if (groupIndex)
+		return;
+	
+	#ifdef AMBIENT_GROUND
+		// Divide by pi not needed since cosine importance sampling handles it
+		_AmbientGroundResult[groupId] = ScatterShared[0] * RcpFourPi;
+	#elif defined(AMBIENT_SKY)
+		_AmbientSkyResult[groupId] = ScatterShared[0] * RcpFourPi;
+	#else
+		float3 luminance = ScatterShared[0];
+		float3 multiScatter = MultiScatterShared[0];
+		float3 output = luminance * rcp(1.0 - multiScatter);
+	
+		_MultiScatterResult[groupId] = output;
+	#endif
+}

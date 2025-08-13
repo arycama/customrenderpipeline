@@ -1,5 +1,4 @@
-#ifndef RAYTRACING_INCLUDED
-#define RAYTRACING_INCLUDED
+#pragma once
 
 #include "Common.hlsl"
 #include "Lighting.hlsl"
@@ -46,7 +45,7 @@ struct RayPayload
 	RayCone cone;
 };
 
-struct RayPayloadAmbientOcclusion
+struct RayPayloadVisibility
 {
 	float hitDistance;
 };
@@ -460,5 +459,3 @@ float RoughnessToSpreadAngle(float roughness)
     // FIXME: The mapping will most likely need adjustment...
 	return roughness * Pi / 8;
 }
-
-#endif

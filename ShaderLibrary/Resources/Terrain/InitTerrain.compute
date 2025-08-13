@@ -1,6 +1,7 @@
 #pragma kernel InitHeightmap
 
 #include "../../Common.hlsl"
+#include "../../Math.hlsl"
 
 Texture2D<float> HeightmapInput;
 RWTexture2D<float> HeightmapResult;

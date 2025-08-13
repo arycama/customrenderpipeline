@@ -1,7 +1,6 @@
-#ifndef OPEN_DRT_INCLUDED
-#define OPEN_DRT_INCLUDED
+#pragma once
 
-#include "Utility.hlsl"
+#include "Math.hlsl"
 
 cbuffer OpenDRTParams
 {
@@ -9,10 +8,12 @@ cbuffer OpenDRTParams
 	float PaperWhiteLuminance; // Lg * 0.18
 	float PaperWhiteBoost; //Lgb
 	float Contrast; // p
+	float3 Hueshift; // hs_r, hs_g, hs_b
 	float Toe; // toe
 	float PurityCompress; // pc_p
 	float PurityBoost; // pb
-	float3 Hueshift; // hs_r, hs_g, hs_b
+	float OpenDRTParamsPadding0;
+	float OpenDRTParamsPadding1;
 };
 
 // Functions for the OpenDRT Transform
@@ -172,5 +173,3 @@ float3 OpenDRT(float3 rgb)
 	// Apply tonescale to RGB Ratios
 	return rgb * norm;
 }
-
-#endif

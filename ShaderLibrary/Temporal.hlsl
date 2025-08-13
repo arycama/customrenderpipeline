@@ -1,8 +1,9 @@
-#ifndef TEMPORAL_INCLUDED
-#define TEMPORAL_INCLUDED
+#pragma once
 
 #include "Common.hlsl"
 #include "Color.hlsl"
+#include "Exposure.hlsl"
+#include "SpaceTransforms.hlsl"
 
 cbuffer TemporalProperties
 {
@@ -19,32 +20,24 @@ cbuffer TemporalProperties
 	float4 _BoxFilterWeights1;
 };
 
-float2 CalculateVelocity(float2 screenUv, float4 previousClipPosition)
+float GetBoxFilterWeight(uint index)
 {
-	float2 previousPosition = PerspectiveDivide(previousClipPosition).xy * 0.5 + 0.5;
-	return screenUv + _Jitter.zw - previousPosition;
-}
-
-// Calculate from uv, depth and linearDepth
-float2 CalculateVelocity(float2 uv, float depth, float linearDepth)
-{
-	float4 clipPosition = float4(uv * 2 - 1, depth, linearDepth);
-	clipPosition.xyz *= linearDepth;
+	float filterWeights[9] = { _BoxFilterWeights0[0], _BoxFilterWeights0[1], _BoxFilterWeights0[2], _BoxFilterWeights0[3], _CenterBoxFilterWeight, _BoxFilterWeights1[0], _BoxFilterWeights1[1], _BoxFilterWeights1[2], _BoxFilterWeights1[3] };
 	
-	float4x4 clipToPreviousClip = mul(_WorldToPreviousClip, _ClipToWorld);
-	float4 previousPositionCS = mul(clipToPreviousClip, clipPosition);
-	
-	return CalculateVelocity(uv, previousPositionCS);
+	return filterWeights[index];
 }
 
-// Calculate only from uv and linearDepth
-float2 CalculateVelocity(float2 uv, float linearDepth)
+float2 CalculateVelocity(float2 uv, float4 previousClipPosition)
 {
-	float depth = EyeToDeviceDepth(linearDepth);
-	return CalculateVelocity(uv, depth, linearDepth);
+	return uv + _Jitter.zw - PreviousScreenPosition(previousClipPosition);
 }
 
-void TemporalNeighborhood(Texture2D<float4> input, int2 coord, out float4 minValue, out float4 maxValue, out float4 result, bool useICtCp = true)
+float2 CalculateVelocity(float2 uv, float depth)
+{
+	return CalculateVelocity(uv, PreviousClipPosition(uv, depth));
+}
+
+void TemporalNeighborhood(Texture2D<float4> input, int2 coord, out float4 minValue, out float4 maxValue, out float4 result)
 {
 	float4 mean = 0.0, stdDev = 0.0;
 	
@@ -54,9 +47,8 @@ void TemporalNeighborhood(Texture2D<float4> input, int2 coord, out float4 minVal
 		[unroll]
 		for(int x = -1; x <= 1; x++, i++)
 		{
-			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
-			float4 color = input[coord + int2(x, y)];
-			color.rgb = useICtCp ? Rec709ToICtCp(color.rgb) : color.rgb;
+			float weight = GetBoxFilterWeight(i);
+			float4 color = input[clamp(coord + int2(x, y), 0, ViewSizeMinusOne)];
 			result = i == 0 ? color * weight : result + color * weight;
 			mean += color;
 			stdDev += color * color;
@@ -82,8 +74,8 @@ void TemporalNeighborhood(Texture2D<float3> input, int2 coord, out float3 minVal
 		[unroll]
 		for(int x = -1; x <= 1; x++, i++)
 		{
-			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
-			float3 color = input[coord + int2(x, y)];
+			float weight = GetBoxFilterWeight(i);
+			float3 color = input[clamp(coord + int2(x, y), 0, ViewSizeMinusOne)];
 			result = i == 0 ? color * weight : result + color * weight;
 			mean += color;
 			stdDev += color * color;
@@ -109,8 +101,8 @@ void TemporalNeighborhood(Texture2D<float> input, int2 coord, out float minValue
 		[unroll]
 		for (int x = -1; x <= 1; x++, i++)
 		{
-			float weight = i < 4 ? _BoxFilterWeights0[i & 3] : (i == 4 ? _CenterBoxFilterWeight : _BoxFilterWeights1[(i - 1) & 3]);
-			float color = input[coord + int2(x, y)];
+			float weight = GetBoxFilterWeight(i);
+			float color = input[clamp(coord + int2(x, y), 0, ViewSizeMinusOne)];
 			result = i == 0 ? color * weight : result + color * weight;
 			mean += color;
 			stdDev += color * color;
@@ -125,5 +117,3 @@ void TemporalNeighborhood(Texture2D<float> input, int2 coord, out float minValue
 	minValue = max(minValue, mean - stdDev);
 	maxValue = min(maxValue, mean + stdDev);
 }
-
-#endif

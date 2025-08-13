@@ -1,13 +1,34 @@
-﻿#ifndef GBUFFER_INCLUDED
-#define GBUFFER_INCLUDED
+#pragma once
 
+#include "Common.hlsl"
+#include "Material.hlsl"
 #include "Packing.hlsl"
-#include "Lighting.hlsl"
+
+struct GBufferOutput
+{
+	float4 albedoMetallic : SV_Target0;
+	float4 normalRoughness : SV_Target1;
+	float4 bentNormalOcclusion : SV_Target2;
+	float3 emissive : SV_Target3;
+	float4 translucency : SV_Target4;
+};
+
+Texture2D<float4> GbufferAlbedoMetallic, NormalRoughness, BentNormalOcclusion;
+
+float3 PackGBufferNormal(float3 normal)
+{
+	return PackFloat2To888(0.5 * PackNormalOctQuadEncode(normal) + 0.5);
+}
+
+float3 UnpackGBufferNormal(float4 data)
+{
+	return UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(data.xyz) - 1.0);
+}
 
 float3 GBufferNormal(float4 data, float3 V, out float NdotV)
 {
-	float3 N = UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(data.xyz) - 1.0);
-	return GetViewReflectedNormal(N, V, NdotV);
+	float3 N = UnpackGBufferNormal(data);
+	return GetViewClampedNormal(N, V, NdotV);
 }
 
 float3 GBufferNormal(float4 data, float3 V)
@@ -27,22 +48,27 @@ float3 GBufferNormal(uint2 coord, Texture2D<float4> tex, float3 V)
 	return GBufferNormal(coord, tex, V, NdotV);
 }
 
-struct GBufferOutput
+float3 PackAlbedo(float3 rgb)
 {
-	float4 albedoMetallic : SV_Target0;
-	float4 normalRoughness : SV_Target1;
-	float4 bentNormalOcclusion : SV_Target2;
-	float3 emissive : SV_Target3;
-};
-
-GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float perceptualRoughness, float3 bentNormal, float occlusion, float3 emissive)
-{
-	GBufferOutput gbuffer;
-	gbuffer.albedoMetallic = float4(albedo, metallic);
-	gbuffer.normalRoughness = float4(PackFloat2To888(0.5 * PackNormalOctQuadEncode(normal) + 0.5), perceptualRoughness);
-	gbuffer.bentNormalOcclusion = float4(bentNormal * 0.5 + 0.5, occlusion);
-	gbuffer.emissive = Rec709ToRec2020(emissive);
-	return gbuffer;
+	// TODO: YCoCg
+	return rgb;
 }
 
-#endif
+float3 UnpackAlbedo(float4 enc)
+{
+	// TODO: YCoCg
+	return enc.rgb;
+}
+
+GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float perceptualRoughness, float3 bentNormal, float visibilityAngle, float3 emissive, float3 translucency)
+{
+	albedo = PackAlbedo(albedo);
+
+	GBufferOutput gbuffer;
+	gbuffer.albedoMetallic = float4(albedo, metallic);
+	gbuffer.normalRoughness = float4(PackGBufferNormal(normal), perceptualRoughness);
+	gbuffer.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal), visibilityAngle);
+	gbuffer.emissive = emissive;
+	gbuffer.translucency = float4(translucency, 1.0);
+	return gbuffer;
+}

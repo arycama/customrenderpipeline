@@ -1,0 +1,25 @@
+#pragma kernel Copy
+#pragma kernel GenerateMinMaxMip
+
+Texture2D<float> Input;
+RWTexture2D<float> Output, MipInput;
+uint Width, Height, Mip;
+
+[numthreads(8, 8, 1)]
+void Copy(uint2 id : SV_DispatchThreadID)
+{
+	Output[id] = Input[id];
+}
+
+[numthreads(8, 8, 1)]
+void GenerateMinMaxMip(uint2 id : SV_DispatchThreadID)
+{
+	float4 heights = float4(
+        MipInput[id * 2 + uint2(0, 0)],
+        MipInput[id * 2 + uint2(1, 0)],
+        MipInput[id * 2 + uint2(0, 1)],
+        MipInput[id * 2 + uint2(1, 1)]
+    );
+    
+	Output[id] = max(max(heights.x, heights.y), max(heights.z, heights.w));
+}

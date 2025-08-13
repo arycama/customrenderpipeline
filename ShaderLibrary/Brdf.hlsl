@@ -1,164 +1,82 @@
-﻿#ifndef BRDF_INCLUDED
-#define BRDF_INCLUDED
+#pragma once
 
+#include "Common.hlsl"
+#include "Material.hlsl"
 #include "Math.hlsl"
-#include "Utility.hlsl"
 #include "Samplers.hlsl"
 
-float4 _GGXDirectionalAlbedoRemap;
-float2 _GGXAverageAlbedoRemap;
-float2 _GGXDirectionalAlbedoMSScaleOffset;
-float4 _GGXAverageAlbedoMSRemap;
+Texture2D<float> DirectionalAlbedo, AverageAlbedo, AverageAlbedoMs;
+Texture3D<float> DirectionalAlbedoMs;
 
-Texture3D<float> _GGXDirectionalAlbedoMS;
-Texture2D<float2> _GGXDirectionalAlbedo;
-Texture2D<float> _GGXAverageAlbedo, _GGXAverageAlbedoMS;
-Texture3D<float> _GGXSpecularOcclusion;
-
-float GgxDistribution(float roughness, float NdotH)
+float GetPartLambdaV(float roughness2, float NdotV)
 {
-	// Eq 31: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html
-	float a2 = Sq(roughness);
-	return RcpPi * a2 * rcp(Sq(Sq(NdotH) * (a2 - 1.0) + 1.0));
+	return sqrt((-NdotV * roughness2 + NdotV) * NdotV + roughness2);
 }
 
-float Lambda(float NdotV, float roughness)
+float GgxDistribution(float roughness2, float NdotH)
 {
-	// Eq 29: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html
-	return (-1.0 + sqrt(1.0 + Sq(roughness) * (rcp(Sq(NdotV)) - 1.0))) / 2.0;
+	float denom = Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0);
+	return roughness2 ? (denom ? roughness2 * rcp(denom) : 0.0) : (NdotH == 1);
 }
 
-float GgxShadowingMasking(float roughness, float NdotV, float NdotL)
+float GgxV(float NdotL, float NdotV, float roughness2, float partLambdaV)
 {
-	// Eq 28: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html
-	return rcp(1.0 + Lambda(NdotV, roughness) + Lambda(NdotL, roughness));
+	float lambdaV = NdotL * partLambdaV;
+	float lambdaL = NdotV * sqrt((-NdotL * roughness2 + NdotL) * NdotL + roughness2);
+	return 0.5 * rcp(lambdaV + lambdaL);
 }
 
-float GgxShadowingMasking(float roughness, float NdotV, float NdotL, float LdotH, float VdotH)
+float GgxDv(float roughness2, float NdotH, float NdotL, float NdotV, float partLambdaV)
 {
-	// Eq 28: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html
-	return (LdotH > 0 && VdotH > 0) ? GgxShadowingMasking(roughness, NdotV, NdotL) : 0.0;
+	float s2 = Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0);
+	float lambdaL = NdotV * sqrt((-NdotL * roughness2 + NdotL) * NdotL + roughness2);
+	float denom = 2.0 * (NdotL * partLambdaV + lambdaL) * s2;
+	return denom ? roughness2 * rcp(denom) : 0.0;
 }
 
-// Ref: http://jcgt.org/published/0003/02/03/paper.pdf
-float GgxVisibility(float roughness, float NdotL, float NdotV)
+float FresnelTerm(float LdotH)
 {
-	float g = GgxShadowingMasking(roughness, NdotV, NdotL);
-	
-	// Eq 23: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html
-	return g * rcp(4.0 * abs(NdotV) * abs(NdotL)); // Unsure about the abs
-}
-
-float GgxReflection(float roughness, float NdotL, float NdotV, float NdotH)
-{
-	float d = GgxDistribution(roughness, NdotH);
-	float v = GgxVisibility(roughness, NdotV, NdotL);
-	return d * v;
-}
-
-float GgxReflection(float roughness, float NdotL, float NdotV, float NdotH, float LdotH, float VdotH)
-{
-	if(LdotH <= 0.0 || VdotH <= 0.0 || NdotH <= 0.0)
-		return 0.0;
-		
-	float d = GgxDistribution(roughness, NdotH);
-	float v = GgxVisibility(roughness, NdotV, NdotL);
-	return d * v;
-}
-
-float3 GgxTransmission(float roughness, float NdotL, float NdotV, float NdotHt, float LdotHt, float VdotHt, float3 ni, float3 no)
-{
-	float d = GgxDistribution(roughness, NdotHt);
-	//float g = GgxShadowingMasking(roughness, NdotV, NdotL, LdotHt, VdotHt);
-	float g = GgxShadowingMasking(roughness, NdotV, NdotL);
-	return abs(LdotHt) * abs(VdotHt) * rcp(abs(NdotL) * abs(NdotV)) * (Sq(no) * d * g * rcp(Sq(ni * LdotHt + no * VdotHt)));
-}
-
-
-float Fresnel(float LdotH, float f0)
-{
-	return lerp(f0, 1.0, pow(1.0 - LdotH, 5.0));
+	return pow(1.0 - LdotH, 5.0);
 }
 
 float3 Fresnel(float LdotH, float3 f0)
 {
-	return lerp(f0, 1.0, pow(1.0 - LdotH, 5.0));
+	return lerp(f0, 1.0, FresnelTerm(LdotH));
 }
 
-// Includes handling for TIR
-float Fresnel(float LdotH, float ni, float no)
+float3 GgxSingleScatter(float roughness2, float NdotL, float LdotV, float NdotV, float partLambdaV, float3 f0)
 {
-	if (ni > no)
-	{
-		float invEta = no / ni;
-		float sinTheta2 = Sq(invEta) * (1.0 - Sq(LdotH));
-	
-		if (sinTheta2 > 1.0)
-			return 1.0; // TIR
-		
-		LdotH = sqrt(1.0 - sinTheta2);
-	}
-	
-	float f0 = Sq((ni - no) * rcp(ni + no));
-	return Fresnel(LdotH, f0);
+	float rcpLenLv = rsqrt(2.0 + 2.0 * LdotV);
+	float NdotH = (NdotL + NdotV) * rcpLenLv;
+	float ggx = GgxDv(roughness2, NdotH, NdotL, NdotV, partLambdaV);
+	float LdotH = LdotV * rcpLenLv + rcpLenLv;
+	return ggx * Fresnel(LdotH, f0);
 }
 
 float3 AverageFresnel(float3 f0)
 {
-	return rcp(21.0) + 20 * rcp(21.0) * f0;
+	return (20 * rcp(21.0)) * f0 + rcp(21.0);
 }
 
-float2 DirectionalAlbedo(float NdotV, float perceptualRoughness)
+float3 GgxMultiScatterTerm(float3 f0, float perceptualRoughness, float NdotV, float ems)
 {
-	if(NdotV <= 0.0)
-		return 0.0;
-		
-	float2 uv = float2(sqrt(NdotV), perceptualRoughness) * _GGXDirectionalAlbedoRemap.xy + _GGXDirectionalAlbedoRemap.zw;
-	return _GGXDirectionalAlbedo.SampleLevel(_LinearClampSampler, uv, 0);
-}
-
-float AverageAlbedo(float perceptualRoughness)
-{
-	float2 averageUv = float2(perceptualRoughness * _GGXAverageAlbedoRemap.x + _GGXAverageAlbedoRemap.y, 0.0);
-	return _GGXAverageAlbedo.SampleLevel(_LinearClampSampler, averageUv, 0.0);
-}
-
-float DirectionalAlbedoMs(float NdotV, float perceptualRoughness, float3 f0)
-{
-	float3 uv = float3(sqrt(NdotV), perceptualRoughness, Max3(f0)) * _GGXDirectionalAlbedoMSScaleOffset.x + _GGXDirectionalAlbedoMSScaleOffset.y;
-	return _GGXDirectionalAlbedoMS.SampleLevel(_LinearClampSampler, uv, 0.0);
-}
-
-float AverageAlbedoMs(float perceptualRoughness, float3 f0)
-{
-	float2 uv = float2(perceptualRoughness, Max3(f0)) * _GGXAverageAlbedoMSRemap.xy + _GGXAverageAlbedoMSRemap.zw;
-	return _GGXAverageAlbedoMS.SampleLevel(_LinearClampSampler, uv, 0.0);
-}
-
-float3 GGXMultiScatter(float NdotV, float NdotL, float perceptualRoughness, float3 f0)
-{
-	if (NdotV <= 0 || NdotL <= 0.0)
-		return 0.0;
-
-	float Ewo = DirectionalAlbedo(NdotV, perceptualRoughness).g;
-	float Ewi = DirectionalAlbedo(NdotL, perceptualRoughness).g;
-	float Emavg = AverageAlbedo(perceptualRoughness);
+	float averageAlbedo = AverageAlbedo.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(perceptualRoughness, 0), float2(32, 1)));
+	float3 averageFresnel = AverageFresnel(f0);
+	float3 denominator = 1.0 - averageAlbedo - averageFresnel * Sq(1.0 - averageAlbedo);
 	
-	// Multiple-scattering ggx
-	float ms = (1.0 - Ewo) * (1.0 - Ewi) * rcp(max(HalfEps, Pi * (1.0 - Emavg)));
-	
-	// Multiple-scattering Fresnsel
-	float3 FAvg = AverageFresnel(f0);
-	float3 f = Sq(FAvg) * Emavg * rcp(max(HalfEps, 1.0 - FAvg * (1.0 - Emavg)));
-	return ms * f;
+	// AverageAlbedo for NdotL is already applied to each light contribution
+	return denominator ? (ems * Sq(averageFresnel) * averageAlbedo * rcp(denominator)) : 0.0;
 }
 
-float GGXDiffuse(float NdotL, float NdotV, float perceptualRoughness, float3 f0)
+float3 Ggx(float roughness2, float NdotL, float LdotV, float NdotV, float partLambdaV, float perceptualRoughness, float3 f0, float3 multiScatterTerm)
 {
-	float Ewi = DirectionalAlbedoMs(abs(NdotL), perceptualRoughness, f0);
-	float Ewo = DirectionalAlbedoMs(abs(NdotV), perceptualRoughness, f0);
-	float Eavg = AverageAlbedoMs(perceptualRoughness, f0);
-	return (1.0 - Eavg) ? RcpPi * (1.0 - Ewo) * (1.0 - Ewi) * rcp(1.0 - Eavg) : 0.0;
+	// TODO: Maybe can combine 2nd lookup with diffuse multi scatter LUT
+	return GgxSingleScatter(roughness2, NdotL, LdotV, NdotV, partLambdaV, f0) + DirectionalAlbedo.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float2(NdotL, perceptualRoughness), 32), 0.0) * multiScatterTerm;
 }
 
-#endif
+//float4 BrdfDirect(float NdotL, float perceptualRoughness, float f0Avg, float roughness2, float LdotV, float NdotV, float partLambdaV)
+//{
+//	float diffuse = DirectionalAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float3(NdotL, perceptualRoughness, f0Avg), 16));
+//	float3 specular = Ggx(roughness2, NdotL, LdotV, NdotV, partLambdaV, perceptualRoughness);
+//	return float4(specular, diffuse) * NdotL; // RcpPi is multiplied outside of this function
+//}

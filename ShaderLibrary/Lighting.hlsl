@@ -1,30 +1,33 @@
-﻿#ifndef LIGHTING_INCLUDED
-#define LIGHTING_INCLUDED
+﻿#pragma once
 
 #include "Atmosphere.hlsl"
 #include "Brdf.hlsl"
+#include "Color.hlsl"
 #include "Common.hlsl"
 #include "Exposure.hlsl"
 #include "ImageBasedLighting.hlsl"
-#include "Temporal.hlsl"
+#include "LightingCommon.hlsl"
+#include "SpaceTransforms.hlsl"
+#include "Utility.hlsl"
 #include "WaterCommon.hlsl"
 
-// TODO: Move to shadow.hlsl
-StructuredBuffer<float4> _DirectionalShadowTexelSizes;
-float ShadowMapResolution, RcpShadowMapResolution, ShadowFilterRadius, ShadowFilterSigma;
-
-Texture2D<float3> ScreenSpaceGlobalIllumination;
-Texture2D<float> ScreenSpaceShadows;
-
-float4 ScreenSpaceGlobalIlluminationScaleLimit, ScreenSpaceShadowsScaleLimit;
-float DiffuseGiStrength, SpecularGiStrength;
-
-float3 _LightColor0, _LightColor1, _LightDirection0, _LightDirection1;
-
-cbuffer AmbientSh
+cbuffer LightingData
 {
-	float4 _AmbientSh[7];
+	float3 _LightDirection0;
+	uint DirectionalCascadeCount;
+	float3 _LightColor0;
+	uint _LightCount;
+	float3 _LightDirection1;
+	float LightingDataPadding0;
+	float3 _LightColor1;
+	float LightingDataPadding1;
 };
+
+SamplerComparisonState LinearClampCompareSampler, PointClampCompareSampler;
+Texture2DArray<float> DirectionalShadows;
+Texture2D<float2> _PrecomputedDfg;
+float4 DirectionalShadows_TexelSize;
+StructuredBuffer<matrix> DirectionalShadowMatrices;
 
 cbuffer CloudCoverage
 {
@@ -33,91 +36,21 @@ cbuffer CloudCoverage
 
 float _CloudCoverageScale, _CloudCoverageOffset;
 
-// https://torust.me/ZH3.pdf
-float3 SHLinearEvaluateIrradiance(float3 sh[4], float3 direction)
-{
-	return 1.0;
-}
-
-float3 SHHallucinateZH3Irradiance(float3 sh[4], float3 direction)
-{
-	// Use the zonal axis from the luminance SH.
-	const float3 lumCoeffs = float3(0.2126f, 0.7152f, 0.0722f); // sRGB luminance.
-	float3 zonalAxis = normalize(float3(-dot(sh[3], lumCoeffs), -dot(sh[1], lumCoeffs), dot(sh[2], lumCoeffs)));
-	float3 ratio = 0.0;
-	ratio.r = abs(dot(float3(-sh[3].r, -sh[1].r, sh[2].r), zonalAxis));
-	ratio.g = abs(dot(float3(-sh[3].g, -sh[1].g, sh[2].g), zonalAxis));
-	ratio.b = abs(dot(float3(-sh[3].b, -sh[1].b, sh[2].b), zonalAxis));
-	ratio /= sh[0];
-	float3 zonalL2Coeff = sh[0] * (0.08f * ratio + 0.6f * ratio * ratio); // Curve-fit; Section3.4.3
-	float fZ = dot(zonalAxis, direction);
-	float zhDir = sqrt(5.0f / (16.0f * Pi)) * (3.0f * fZ * fZ - 1.0f);
-	// Convolve sh with the normalized cosine kernel (multiply the L1 band by the zonal scale 2/3), then dot with
-	// SH (direction) for linear SH (Equation5).
-	float3 result = SHLinearEvaluateIrradiance(sh, direction);
-	// Add irradiance from the ZH3 term. zonal L2 Coeff is the ZH3 coefficient for a radiance signal, so we need to
-	// multiply by 1/4 (the L2 zonal scale for a normalized clamped cosine kernel) to evaluate irradiance.
-	result += 0.25f * zonalL2Coeff * zhDir;
-	return result;
-}
-
-float3 EvaluateSH(float3 N, float3 occlusion, float4 sh[7])
-{
-	// Calculate the zonal harmonics expansion for V(x, ωi)*(n.l)
-	float3 t = FastACosPos(sqrt(saturate(1.0 - occlusion)));
-	float3 a = sin(t);
-	float3 b = cos(t);
-	
-	// Calculate the zonal harmonics expansion for V(x, ωi)*(n.l)
-	float3 A0 = a * a;
-	float3 A1 = 1.0 - b * b * b;
-	float3 A2 = a * a * (1.0 + 3.0 * b * b);
-	 
-	float3 irradiance = 0.0;
-	irradiance.r = dot(sh[0].xyz * A1.r, N) + sh[0].w * A0.r;
-	irradiance.g = dot(sh[1].xyz * A1.g, N) + sh[1].w * A0.g;
-	irradiance.b = dot(sh[2].xyz * A1.b, N) + sh[2].w * A0.b;
-	
-    // 4 of the quadratic (L2) polynomials
-	float4 vB = N.xyzz * N.yzzx;
-	irradiance.r += dot(sh[3] * A2.r, vB) + sh[3].z / 3.0 * (A0.r - A2.r);
-	irradiance.g += dot(sh[4] * A2.g, vB) + sh[4].z / 3.0 * (A0.g - A2.g);
-	irradiance.b += dot(sh[5] * A2.b, vB) + sh[5].z / 3.0 * (A0.b - A2.b);
-
-    // Final (5th) quadratic (L2) polynomial
-	float vC = N.x * N.x - N.y * N.y;
-	irradiance += sh[6].rgb * A2 * vC;
-	
-	return irradiance;// * occlusion;
-}
-
-// ref: Practical Realtime Strategies for Accurate Indirect Occlusion
-// Update ambient occlusion to colored ambient occlusion based on statitics of how light is bouncing in an object and with the albedo of the object
-float3 GTAOMultiBounce(float visibility, float3 albedo)
-{
-	float3 a = 2.0404 * albedo - 0.3324;
-	float3 b = -4.7951 * albedo + 0.6417;
-	float3 c = 2.7552 * albedo + 0.6903;
-
-	float x = visibility;
-	return max(x, ((x * a + b) * x + c) * x);
-}
-
-float3 AmbientLight(float3 N, float occlusion, float3 albedo, float4 sh[7])
-{
-	//return EvaluateSH(N, GTAOMultiBounce(occlusion, albedo), sh);
-	return EvaluateSH(N, occlusion, sh);
-}
-
-float3 AmbientLight(float3 N, float occlusion = 1.0, float3 albedo = 1.0)
-{
-	return AmbientLight(N, occlusion, albedo, _AmbientSh);
-}
-
 matrix _WorldToCloudShadow;
 float _CloudShadowDepthInvScale, _CloudShadowExtinctionInvScale;
 float4 _CloudShadowScaleLimit;
 Texture2D<float3> _CloudShadow;
+
+Texture2D<float> ScreenSpaceShadows;
+float ScreenSpaceShadowsIntensity;
+
+Texture2D<float3> ScreenSpaceGlobalIllumination;
+
+float4 ScreenSpaceGlobalIlluminationScaleLimit, ScreenSpaceShadowsScaleLimit;
+float DiffuseGiStrength, SpecularGiStrength;
+
+Texture2D<float4> ScreenSpaceReflections;
+float4 ScreenSpaceReflectionsScaleLimit;
 
 float CloudTransmittance(float3 positionWS)
 {
@@ -125,205 +58,207 @@ float CloudTransmittance(float3 positionWS)
 	if (any(saturate(coords.xy) != coords.xy) || coords.z < 0.0)
 		return 1.0;
 	
-	float3 shadowData = _CloudShadow.SampleLevel(_LinearClampSampler, ClampScaleTextureUv(coords.xy, _CloudShadowScaleLimit), 0.0);
+	float3 shadowData = _CloudShadow.SampleLevel(LinearClampSampler, ClampScaleTextureUv(coords.xy, _CloudShadowScaleLimit), 0.0);
 	float depth = max(0.0, coords.z - shadowData.r) * _CloudShadowDepthInvScale;
 	float transmittance = exp2(-depth * shadowData.g * _CloudShadowExtinctionInvScale);
 	return max(transmittance, shadowData.b);
 }
 
-TextureCube<float3> _SkyReflection;
+float LuminanceToIlluminance(float luminance, float solidAngle) { return luminance * solidAngle; }
+float IlluminanceToLuminance(float illuminance, float rcpSolidAngle) { return illuminance * rcpSolidAngle; }
+float LuminanceToSolidAngle(float rcpLuminance, float illuminance) { return illuminance * rcpLuminance; }
 
-struct LightingInput
+float3 DiscLightApprox(float angularDiameter, float3 R, float3 L)
 {
-	float3 normal;
-	float3 worldPosition;
-	float2 pixelPosition;
-	float eyeDepth;
-	float3 albedo;
-	float3 f0;
-	float perceptualRoughness;
-	float occlusion;
-	float3 translucency;
-	float3 bentNormal;
-	bool isWater;
-	float2 uv;
-	float NdotV;
-	bool isThinSurface;
-	bool isVolumetric;
-};
+    // Disk light approximation based on angular diameter
+	float r = sin(radians(angularDiameter * 0.5)); // Disk radius
+	float d = cos(radians(angularDiameter * 0.5)); // Distance to disk
 
-float3 CalculateLighting(float3 albedo, float metallic, float perceptualRoughness, float3 L, float3 V, float3 N, float3 bentNormal, float occlusion, float3 translucency, float NdotV, bool isVolumetric = false, bool isBackface = false, bool isThinSurface = false, float opacity = 1.0)
+    // Closest point to a disk (since the radius is small, this is a good approximation
+	float DdotR = dot(L, R);
+	float3 S = R - DdotR * L;
+	return DdotR < d ? normalize(d * L + normalize(S) * r) : R;
+}
+
+// A right disk is a disk oriented to always face the lit surface.
+// Solid angle of a sphere or a right disk is 2 PI (1-cos(subtended angle)).
+// Subtended angle sigma = arcsin(r / d) for a sphere
+// and sigma = atan(r / d) for a right disk
+// sinSigmaSqr = sin(subtended angle)^2, it is (r^2 / d^2) for a sphere
+// and (r^2 / ( r^2 + d^2)) for a disk
+// cosTheta is not clamped
+float DiskIlluminance(float cosTheta, float sinSigmaSqr)
 {
-	float3 f0 = lerp(0.04, albedo, metallic);
+	if (Sq(cosTheta) > sinSigmaSqr)
+		return Pi * sinSigmaSqr * saturate(cosTheta);
+		
+	float sinTheta = SinFromCos(cosTheta);
+	float x = sqrt(1.0 / sinSigmaSqr - 1.0); // Equivalent to rsqrt(-cos(sigma)^2))
+	float y = -x * (cosTheta / sinTheta);
+	float sinThetaSqrtY = sinTheta * sqrt(1.0 - y * y);
+	return max(0.0, (cosTheta * FastACos(y) - x * sinThetaSqrtY) * sinSigmaSqr + ATan(sinThetaSqrtY / x));
+}
+
+float4 cubic(float v)
+{
+	float4 n = float4(1.0, 2.0, 3.0, 4.0) - v;
+	float4 s = n * n * n;
+	float4 o;
+	o.x = s.x;
+	o.y = s.y - 4.0 * s.x;
+	o.z = s.z - 4.0 * s.y + 6.0 * s.x;
+	o.w = 6.0 - o.x - o.y - o.z;
+	return o;
+}
+
+float GetDirectionalShadow(float3 worldPosition)
+{
+	for (uint i = 0; i < DirectionalCascadeCount; i++)
+	{
+		float3 shadowPosition = MultiplyPoint3x4((float3x4) DirectionalShadowMatrices[i], worldPosition);
+		if (any(saturate(shadowPosition.xyz) != shadowPosition.xyz))
+			continue;
+			
+		float2 uv = shadowPosition.xy;
+
+		// Single
+		#if 0
+			return DirectionalShadows.SampleCmpLevelZero(PointClampCompareSampler, float3(uv, i), shadowPosition.z);
+		#elif 0
+			float2 localUv = uv * DirectionalShadows_TexelSize.zw;
+			float2 texelCenter = floor(localUv) + 0.5;
+
+			float radius = 3;
+			float r = 0, weightSum = 0;
+			for (float y = -radius; y <= radius; y++)
+			{
+				for (float x = -radius; x <= radius; x++)
+				{
+					float2 coord = texelCenter + float2(x, y);
+					float d = DirectionalShadows[int3(coord, i)];
+					float2 delta = localUv - coord;
+					float2 weights = saturate(1 - abs(delta / radius));
+					float weight = weights.x * weights.y;
+					if (d < shadowPosition.z)
+						r += weight;
+            
+					weightSum += weight;
+				}
+			}
+			
+			return r / weightSum;
+		
+			return DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, i), shadowPosition.z);
+		#elif 1
+			// Bilinear 3x3
+			float2 iTc = uv * DirectionalShadows_TexelSize.zw;
+			float2 tc = floor(iTc - 0.5) + 0.5;
+			float2 f = iTc - tc;
+			
+			float2 w0 = 0.5 - abs(0.25 * (1.0 + f));
+			float2 w1 = 0.5 - abs(0.25 * (0.0 + f));
+			float2 w2 = 0.5 - abs(0.25 * (1.0 - f));
+			float2 w3 = 0.5 - abs(0.25 * (2.0 - f));
+			
+			float2 s0 = w0 + w1;
+			float2 s1 = w2 + w3;
+ 
+			float2 f0 = w1 / (w0 + w1);
+			float2 f1 = w3 / (w2 + w3);
+ 
+			float2 t0 = tc - 1 + f0;
+			float2 t1 = tc + 1 + f1;
+			
+			t0 *= DirectionalShadows_TexelSize.xy;
+			t1 *= DirectionalShadows_TexelSize.xy;
+			
+			return DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t0.y), i), shadowPosition.z) * s0.x * s0.y + 
+				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t0.y), i), shadowPosition.z) * s1.x * s0.y +
+				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t1.y), i), shadowPosition.z) * s0.x * s1.y +
+				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t1.y), i), shadowPosition.z) * s1.x * s1.y;
+		#elif 0
+			float2 q = frac(uv * DirectionalShadows_TexelSize.zw);
+			float2 c = (q * (q - 1.0) + 0.5) * DirectionalShadows_TexelSize.xy;
+			float2 t0 = uv - c;
+			float2 t1 = uv + c;
+		
+			// Biquadratic
+			float s = DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t0.x, t0.y, i), shadowPosition.z);
+			s += DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t0.x, t1.y, i), shadowPosition.z);
+			s += DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t1.x, t1.y, i), shadowPosition.z);
+			s += DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t1.x, t0.y, i), shadowPosition.z);
+			return s * 0.25;
+		#else
+			// Bicubic b-spline
+			float2 iTc = uv * DirectionalShadows_TexelSize.zw;
+			float2 tc = floor(iTc - 0.5) + 0.5;
+			float2 f = iTc - tc;
+			float2 f2 = f * f;
+			float2 f3 = f2 * f;
+			
+			float2 w0 = 1.0 / 6.0 * Cb(1.0 - f);
+			float2 w1 = 1.0 / 6.0 * (4.0 + 3.0 * Cb(f) - 6.0 * Sq(f));
+			float2 w2 = 1.0 / 6.0 * (4.0 + 3.0 * Cb(1.0 - f) - 6.0 * Sq(1.0 - f));
+			float2 w3 = 1.0 / 6.0 * Cb(f);
+			
+			float2 s0 = w0 + w1;
+			float2 s1 = w2 + w3;
+ 
+			float2 f0 = w1 / (w0 + w1);
+			float2 f1 = w3 / (w2 + w3);
+ 
+			float2 t0 = tc - 1 + f0;
+			float2 t1 = tc + 1 + f1;
+			
+			t0 *= DirectionalShadows_TexelSize.xy;
+			t1 *= DirectionalShadows_TexelSize.xy;
+			
+			return DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t0.y), i), shadowPosition.z) * s0.x * s0.y +
+				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t0.y), i), shadowPosition.z) * s1.x * s0.y +
+				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t1.y), i), shadowPosition.z) * s0.x * s1.y +
+				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t1.y), i), shadowPosition.z) * s1.x * s1.y;
+		#endif
+	}
 	
-	float3 p = albedo;
-	float s = 1;
-	float ps = 1;
-	float l = translucency.r;
-	float m = metallic;
-	float t = 1.0 - opacity;
-	float3 psr0 = (1 - m) * (0.04) * ps + m * p; // lerp(f0, p, metallic), replace with f0
-	float3 psr90 = (1 - m) * s + m; // == 1, replace with 1
-	float3 pt = p * (1 - m) * t; // albedo * (1 - metallic) * (1 - opacity)?
-	float3 pd = p * (1 - m) * (1 - t); // albedo * opacity * (1 - metlalic)
+	return 1.0;
+}
 
-	float microShadow = saturate(Sq(abs(dot(bentNormal, L)) * rsqrt(saturate(1.0 - occlusion))));
-	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
-
+// TODO: Can parameters be simplified/shortened
+float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAngle, float roughness2, float f0Avg, float partLambdaV, float3 multiScatterTerm, float3 L, float3 N, float3 B, float3 worldPosition, float NdotV, float3 V, float3 diffuseTerm, float3 albedo, float3 translucency, bool isDirectional)
+{
 	float NdotL = dot(N, L);
-	//float3 T = dot(N, V) * dot(N, L) > 0 ? (1 - l) * pd : l * pd;
-	float3 T = dot(N, V) * dot(N, L) > 0 ? pd : pd * l;
-	float3 b = GGXDiffuse(NdotL, NdotV, perceptualRoughness, f0) * T;
 	
-	float3 H = normalize(V + L);
-	float NdotH = dot(N, H);
-	float VdotH = dot(H, V);
-	float LdotH = dot(L, H);
-	
-	float3 F = Fresnel(VdotH, f0);
-	float Mr = GgxReflection(roughness, NdotL, NdotV, NdotH, LdotH, VdotH);
-	float3 result = Mr * F;
-	
-	float3 MrMsFs = GGXMultiScatter(NdotV, NdotL, perceptualRoughness, f0); // Unsure about saturate
-	result += MrMsFs;
-	
-	result += b; // * microShadow;
-	
-	if (isThinSurface)
+	float illuminance = saturate(NdotL);
+	if (isDirectional)
 	{
-		float3 p = albedo;
-		float3 Lp = reflect(L, -N);
-		float3 Hp = normalize(V + Lp);
-		float VdotHp = dot(V, Hp);
-		float NdotLp = dot(N, Lp);
-		float NdotHp = dot(N, Hp);
-		float LpdotHp = dot(Lp, Hp);
-		
-		float Mtp = GgxReflection(roughness, NdotLp, NdotV, NdotHp, LpdotHp, VdotHp);
-		float3 F = Fresnel(VdotHp, f0);
-		
-		result += pt * Mtp * (1.0 - F);
-	}
-	
-	// Hardcoded to water IoR for now since thats the only thing that needs this
-	float ni = isBackface ? 1.0 : 1.34;
-	float no = isBackface ? 1.34 : 1.0;
-	
-	float3 Ht = normalize(-(ni * L + no * V));
-	float NdotHt = dot(N, Ht);
-	float LdotHt = dot(L, Ht);
-	float VdotHt = dot(V, Ht);
-	
-	// Eq 24: https://dassaultsystemes-technology.github.io/EnterprisePBRShadingModel/spec-2025x.md.html#components/core/dielectricbsdffortransparentsurfaces
-	float3 mt = GgxTransmission(roughness, NdotL, NdotV, NdotHt, LdotHt, VdotHt, ni, no);
-	float fd1 = Fresnel(LdotHt, ni, no);
-	
-	if (isVolumetric)
-		result += mt * (1.0 - fd1);
-			
-	return result * abs(NdotL);
-}
-
-// Important: call Orthonormalize() on the tangent and recompute the bitangent afterwards.
-float3 GetViewReflectedNormal(float3 N, float3 V, out float NdotV)
-{
-	NdotV = dot(N, V);
-
-    // N = (NdotV >= 0.0) ? N : (N - 2.0 * NdotV * V);
-	N += (2.0 * saturate(-NdotV)) * V;
-	NdotV = abs(NdotV);
-
-	return N;
-}
-
-// Orthonormalizes the tangent frame using the Gram-Schmidt process.
-// We assume that the normal is normalized and that the two vectors
-// aren't collinear.
-// Returns the new tangent (the normal is unaffected).
-float3 Orthonormalize(float3 tangent, float3 normal)
-{
-	return normalize(tangent - dot(tangent, normal) * normal);
-}
-
-uint GetShadowCascade(uint lightIndex, float3 lightPosition, out float3 positionLS)
-{
-	DirectionalLight light = _DirectionalLights[lightIndex];
-	
-	for (uint j = 0; j < light.cascadeCount; j++)
-	{
-		// find the first cascade which is not out of bounds
-		matrix shadowMatrix = _DirectionalMatrices[light.shadowIndex + j];
-		positionLS = MultiplyPoint3x4(shadowMatrix, lightPosition);
-		if (all(saturate(positionLS) == positionLS))
-			return j;
-	}
-	
-	return ~0u;
-}
-
-float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow, out bool validShadow)
-{
-	validShadow = false;
-	DirectionalLight light = _DirectionalLights[lightIndex];
-	if (light.shadowIndex == ~0u)
-		return 1.0;
-		
-	float3 lightPosition = MultiplyPoint3x4(light.worldToLight, worldPosition);
-	float3 shadowPosition;
-	uint cascade = GetShadowCascade(lightIndex, worldPosition, shadowPosition);
-	if (cascade == ~0u)
-		return 1.0;
-	
-	validShadow = true;
-	//if (!softShadow)
-		return _DirectionalShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(shadowPosition.xy, light.shadowIndex + cascade), shadowPosition.z);
-	
-	float2 center = shadowPosition.xy * ShadowMapResolution;
-	
-	float4 data = _DirectionalShadowTexelSizes[light.shadowIndex + cascade];
-	
-	float2 filterSize = (ShadowFilterRadius / data.xy);
-	float2 halfSizeInt = floor(filterSize) + 1;
-	float sum = 0.0, weightSum = 0.0;
-	for(float y = -halfSizeInt.y; y <= halfSizeInt.y; y++)
-	{
-		for(float x = -halfSizeInt.x; x <= halfSizeInt.x; x++)
+		//float sinSigmaSq = SinSigmaSq;
+		if (MicroShadows)
 		{
-			float2 coord = floor(center) + 0.5 + float2(x, y);
-			float shadow = shadowPosition.z >= _DirectionalShadows[float3(coord, light.shadowIndex + cascade)];
-			//float2 weights = saturate(1.0 - abs(center - coord) / filterSize);
-			
-			// Parabola
-			//weights = saturate(1.0 - (SqrLength(center - coord) / Sq(filterSize)));
-			
-			// Smoothstep
-			//weights = smoothstep(filterSize, 0, abs(center - coord));
-			
-			// Gaussian
-			float2 weights = exp2(-ShadowFilterSigma * Sq((center - coord) * data.xy));
-			
-			// cos?
-			//weights = 0.5 * cos(Pi * saturate(abs(center - coord) / filterSize)) + 0.5;
-			
-			float weight = weights.x * weights.y;
-			
-			
-			sum += shadow * weight;
-			weightSum += weight;
+			//illuminance *= Sq(saturate(saturate(dot(B, L)) / cosVisibilityAngle));
+		//	float4 intersectionResult = SphericalCapIntersection(B, cosVisibilityAngle, L, SunCosAngle);
+		//	if (intersectionResult.a == 0)
+		//		sinSigmaSq = 0;
+		//	else
+		//	{
+		//		float cosTheta = dot(intersectionResult.xyz, N);
+		//		sinSigmaSq = 1.0 - Sq(intersectionResult.a);
+		//	}
 		}
+		
+		//illuminance = DiskIlluminance(NdotL, sinSigmaSq) * SunRcpSolidAngle;
 	}
 	
-	return weightSum ? sum / weightSum : 1.0;
+	diffuseTerm *= DirectionalAlbedoMs.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float3(abs(NdotL), perceptualRoughness, f0Avg), 16), 0.0);
+	float3 result = diffuseTerm * (albedo * illuminance + translucency * saturate(-NdotL));
+	
+	if (NdotL > 0.0)
+	{
+		float LdotV = dot(L, V);
+		result += Ggx(roughness2, NdotL, LdotV, NdotV, partLambdaV, perceptualRoughness, f0, multiScatterTerm) * illuminance;
+	}
+	
+	return RcpPi * result;
 }
-
-float GetShadow(float3 worldPosition, uint lightIndex, bool softShadow)
-{
-	bool validShadow;
-	return GetShadow(worldPosition, lightIndex, softShadow, validShadow);
-}
-
-Texture2D<float3> ScreenSpaceReflections;
-float4 ScreenSpaceReflectionsScaleLimit;
 
 // Computes the squared magnitude of the vector computed by MapCubeToSphere().
 float ComputeCubeToSphereMapSqMagnitude(float3 v)
@@ -411,14 +346,7 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 		
 	float rcpLightDist = rsqrt(sqrLightDist);
 	float3 L = lightVector * rcpLightDist;
-	//float NdotL = dot(input.normal, L);
-	//if (!isVolumetric && NdotL <= 0.0)
-	//	continue;
-	
-	//Sq(min(rcp(0.01), rcpLightDist) * saturate(1.0 - Sq(sqrLightDist * rcp(Sq(light.range)))));
-
 	float rangeAttenuationScale = rcp(Sq(light.range));
-	float3 direction = normalize(lightVector);
 
     // Rotate the light direction into the light space.
 	float3x3 lightToWorld = float3x3(light.right, light.up, light.forward);
@@ -427,7 +355,8 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
     // Apply the sphere light hack to soften the core of the punctual light.
     // It is not physically plausible (using max() is more correct, but looks worse).
     // See https://www.desmos.com/calculator/otqhxunqhl
-	float dist = max(light.size.x, length(lightVector));
+	//float dist = max(light.size.x, length(lightVector));
+	float dist = length(lightVector);
 	float distSq = dist * dist;
 	float distRcp = rsqrt(distSq);
     
@@ -463,195 +392,172 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 			if (light.lightType == 3)
 				positionCS /= positionLS.z;
 
-         // Box lights have no range attenuation, so we must clip manually.
+			 // Box lights have no range attenuation, so we must clip manually.
 			if (Max3(float3(abs(positionCS), abs(positionLS.z - 0.5 * light.range) - 0.5 * light.range + 1)) > 1.0)
 				attenuation = 0.0;
 		}
 	}
     
     // Shadows (If enabled, disabled in reflection probes for now)
-#if 0
 	if (light.shadowIndex != UintMax)
 	{
         // Point light
 		if (light.lightType == 1)
 		{
-			float3 toLight = lightVector * float3(-1, 1, -1);
+			float3 toLight = lightVector * float3(1, -1, 1);
 			float dominantAxis = Max3(abs(toLight));
-			float depth = rcp(dominantAxis) * light.shadowProjectionY + light.shadowProjectionX;
-			attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(toLight, light.shadowIndex), depth);
+			float depth = (dominantAxis * light.shadowProjectionX + light.shadowProjectionY) / dominantAxis;
+			
+			float faceIndex = CubeMapFaceID(-toLight);
+			float2 uv = CubeMapFaceUv(-toLight, faceIndex);
+			float shadowIndex = light.shadowIndex + faceIndex;
+			attenuation *= PointShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, shadowIndex), depth);
 		}
 
         // Spot light
 		if (light.lightType == 2 || light.lightType == 3 || light.lightType == 4)
 		{
-			float3 positionLS = MultiplyPointProj(_SpotlightShadowMatrices[light.shadowIndex], worldPosition).xyz;
-			if (all(saturate(positionLS.xy) == positionLS.xy))            
-				attenuation *= _SpotlightShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(positionLS.xy, light.shadowIndex), positionLS.z);
+			float2 uv = positionLS.xy * light.size / positionLS.z * 0.5 + 0.5;
+			float depth = (positionLS.z * light.shadowProjectionX + light.shadowProjectionY) / positionLS.z;
+			attenuation *= SpotShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, light.shadowIndex), depth);
 		}
         
         // Area light
-		if (light.lightType == 6)
-		{
-			float4 positionLS = MultiplyPoint(_AreaShadowMatrices[light.shadowIndex], worldPosition);
+		//if (light.lightType == 6)
+		//{
+		//	float4 positionLS = MultiplyPoint(_AreaShadowMatrices[light.shadowIndex], worldPosition);
             
-            // Vogel disk randomised PCF
-			float sum = 0.0;
-			for (uint j = 0; j < _PcfSamples; j++)
-			{
-				float2 offset = VogelDiskSample(j, _PcfSamples, dither * TwoPi) * _ShadowPcfRadius;
-				float3 uv = float3(positionLS.xy + offset, positionLS.z) / positionLS.w;
-				sum += _AreaShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(uv.xy, light.shadowIndex), uv.z);
-			}
+  //          // Vogel disk randomised PCF
+		//	float sum = 0.0;
+		//	for (uint j = 0; j < _PcfSamples; j++)
+		//	{
+		//		float2 offset = VogelDiskSample(j, _PcfSamples, dither * TwoPi) * _ShadowPcfRadius;
+		//		float3 uv = float3(positionLS.xy + offset, positionLS.z) / positionLS.w;
+		//		sum += _AreaShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float3(uv.xy, light.shadowIndex), uv.z);
+		//	}
                 
-			attenuation *= sum / _PcfSamples;
-		}
+		//	attenuation *= sum / _PcfSamples;
+		//}
 	}
-#endif
 
 	return attenuation;
 }
 
-
-float3 DiscLightApprox(float angularDiameter, float3 R, float3 L)
+float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAngle, float3 albedo, float3 N, float3 bentNormal, float3 worldPosition, float3 translucency, uint2 pixelCoordinate, float eyeDepth, float opacity = 1.0, bool isWater = false)
 {
-    // Disk light approximation based on angular diameter
-	float r = sin(radians(angularDiameter * 0.5)); // Disk radius
-	float d = cos(radians(angularDiameter * 0.5)); // Distance to disk
-
-    // Closest point to a disk (since the radius is small, this is a good approximation
-	float DdotR = dot(L, R);
-	float3 S = R - DdotR * L;
-	return DdotR < d ? normalize(d * L + normalize(S) * r) : R;
-}
-
-float3 GetLighting(LightingInput input, float3 V, bool isVolumetric = false, float opacity = 1.0)
-{
-	float3 f0 = lerp(0.04, input.albedo * opacity, input.f0);
-	float3 albedo = lerp(input.albedo, 0.0, input.f0);
-
-	#ifdef SCREENSPACE_REFLECTIONS_ON
-		float3 radiance = ICtCpToRec2020(ScreenSpaceReflections.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceReflectionsScaleLimit)));
-	#else
-		float3 radiance = IndirectSpecular(input.normal, V, f0, input.NdotV, input.perceptualRoughness, input.isWater, _SkyReflection);
+	float3 V = normalize(-worldPosition);
+	float NdotV = dot(N, V);
+	
+	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
+	float roughness2 = Sq(roughness);
+	float partLambdaV = GetPartLambdaV(roughness2, NdotV);
+	
+	float f0Avg = dot(f0, 1.0 / 3.0);
+	float2 dfg = _PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
+	float ems = 1.0 - dfg.x - dfg.y;
+	float3 multiScatterTerm = GgxMultiScatterTerm(f0, perceptualRoughness, NdotV, ems);
+	
+	// Can combine below into 1 lookup
+	float viewDirectionalAlbedoMs = DirectionalAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float3(NdotV, perceptualRoughness, f0Avg), 16));
+	float averageAlbedoMs = AverageAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(perceptualRoughness, Remap(f0Avg, 0.04, 1, 0, 1)), 16));
+	float3 diffuseTerm = averageAlbedoMs ? viewDirectionalAlbedoMs * rcp(averageAlbedoMs) : 0.0; // TODO: Bake into DFG?
+	
+	// Direct lighting
+	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition));
+	
+	float shadow = GetDirectionalShadow(worldPosition) * CloudTransmittance(worldPosition);
+	
+	#ifdef SCREEN_SPACE_SHADOWS
+		shadow = min(shadow, lerp(1.0, ScreenSpaceShadows[pixelCoordinate], ScreenSpaceShadowsIntensity));
 	#endif
 	
-	float3 R = reflect(-V, input.normal);
-	float BdotR = dot(input.bentNormal, R);
-	radiance *= IndirectSpecularFactor(input.NdotV, input.perceptualRoughness, f0) * SpecularOcclusion(input.NdotV, input.perceptualRoughness, input.occlusion, BdotR);
-	
-	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-		float3 irradiance = ICtCpToRec2020(ScreenSpaceGlobalIllumination.Sample(_LinearClampSampler, ClampScaleTextureUv(input.uv + _Jitter.zw, ScreenSpaceGlobalIlluminationScaleLimit)));
-	#else
-		float3 irradiance = AmbientLight(input.bentNormal, input.occlusion, albedo * opacity);
+	#ifdef UNDERWATER_LIGHTING_ON
+		lightTransmittance *= WaterShadow(worldPosition, _LightDirection0) * GetCaustics(worldPosition + ViewPosition, _LightDirection0);
 	#endif
 	
-	float3 luminance = Rec2020ToRec709(radiance + irradiance * IndirectDiffuseFactor(input.NdotV, input.perceptualRoughness, f0, albedo * opacity, input.translucency));
-	
-	for (uint i = 0; i < min(_DirectionalLightCount, 4); i++)
-	{
-		DirectionalLight light = _DirectionalLights[i];
-		
-		float3 L = light.direction;// DiscLightApprox(5.3, reflect(-V, input.normal), light.direction);
-
-		// Skip expensive shadow lookup if NdotL is negative
-		//float NdotL = dot(input.normal, L);
-		//if (!isVolumetric && (!input.isVolumetric) && NdotL <= 0.0 && all(input.translucency == 0.0))
-		//	continue;
-			
-		float3 lightTransmittance = TransmittanceToAtmosphere(_ViewHeight, -V.y, L.y, length(input.worldPosition));
-		
-		float attenuation = 1.0;
-		if(i == 0)
-		{
-			attenuation *= CloudTransmittance(input.worldPosition);
-			
-			#ifdef WATER_SHADOWS_ON
-			if(input.isWater)
-			{
-				float3 shadowPosition = MultiplyPoint3x4(_WaterShadowMatrix1, input.worldPosition);
-				if(all(saturate(shadowPosition.xyz) == shadowPosition.xyz))
-					attenuation *= _WaterShadows.SampleCmpLevelZero(_LinearClampCompareSampler, shadowPosition.xy, shadowPosition.z);
-			}
-			#endif
-			
-			#ifdef SCREEN_SPACE_SHADOWS_ON
-				attenuation *= ScreenSpaceShadows[input.pixelPosition];
-			#else
-				attenuation *= GetShadow(input.worldPosition, i, !isVolumetric);
-			#endif
-		}
-		else
-			attenuation *= GetShadow(input.worldPosition, i, !isVolumetric);
-		
-		if (!attenuation)
-			continue;
-		
-		if (isVolumetric)
-			luminance += light.color * lightTransmittance * (_Exposure * attenuation);
-		else
-		{
-			#ifdef UNDERWATER_LIGHTING_ON
-			if(i == 0)
-				light.color *= WaterShadow(input.worldPosition, L) * GetCaustics(input.worldPosition + _ViewPosition, L);
-			#endif
-			
-			luminance += (CalculateLighting(input.albedo, input.f0.r, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV, input.isVolumetric, input.isVolumetric, input.isThinSurface, opacity) * light.color * lightTransmittance) * (_Exposure * attenuation);
-		}
-	}
+	float3 luminance = EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, _LightDirection0, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, true) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
 	
 	uint3 clusterIndex;
-	clusterIndex.xy = floor(input.pixelPosition) / _TileSize;
-	clusterIndex.z = log2(input.eyeDepth) * _ClusterScale + _ClusterBias;
+	clusterIndex.xy = pixelCoordinate / TileSize;
+	clusterIndex.z = log2(eyeDepth) * ClusterScale + ClusterBias;
 	
-	uint2 lightOffsetAndCount = _LightClusterIndices[clusterIndex];
+	uint2 lightOffsetAndCount = LightClusterIndices[clusterIndex];
 	uint startOffset = lightOffsetAndCount.x;
 	uint lightCount = lightOffsetAndCount.y;
 	
 	// Point lights
-	for (i = 0; i < min(128, lightCount); i++)
+	for (uint i = 0; i < min(128, lightCount); i++)
 	{
-		uint index = _LightClusterList[startOffset + i];
-		LightData light = _PointLights[index];
+		uint index = LightClusterList[startOffset + i];
+		LightData light = PointLights[index];
 		
-		float3 lightVector = light.position - input.worldPosition;
+		float3 lightVector = light.position - worldPosition;
 		float sqrLightDist = dot(lightVector, lightVector);
 		if (sqrLightDist >= Sq(light.range))
 			continue;
 		
 		float rcpLightDist = rsqrt(sqrLightDist);
 		float3 L = lightVector * rcpLightDist;
-		//float NdotL = dot(input.normal, L);
-		//if (!isVolumetric && NdotL <= 0.0)
-		//	continue;
+		float NdotL = dot(N, L);
+		if (NdotL <= 0.0)
+			continue;
 		
-		float attenuation = GetLightAttenuation(light, input.worldPosition, 0.5, false);
+		float attenuation = GetLightAttenuation(light, worldPosition, 0.5, false);
 		if (!attenuation)
 			continue;
 		
-		#if 0
-		if (light.shadowIndexVisibleFaces)
-		{
-			uint shadowIndex = light.shadowIndexVisibleFaces >> 8;
-			uint visibleFaces = light.shadowIndexVisibleFaces & 0xf;
-			float dominantAxis = Max3(abs(lightVector));
-			float depth = rcp(dominantAxis) * light.depthRemapScale + light.depthRemapOffset;
-			//attenuation *= _PointShadows.SampleCmpLevelZero(_LinearClampCompareSampler, float4(lightVector * float3(-1, 1, -1), shadowIndex), depth);
-			//if (!attenuation)
-			//	continue;
-		}
-		#endif
-		
-		if (isVolumetric)
-			luminance += light.color * _Exposure * attenuation;
-		else
-		{
-			//if (NdotL > 0.0)
-			luminance += CalculateLighting(input.albedo, input.f0.r, input.perceptualRoughness, L, V, input.normal, input.bentNormal, input.occlusion, input.translucency, input.NdotV, input.isWater, input.isVolumetric, input.isThinSurface, opacity) * attenuation * light.color * _Exposure;
-		}
+		luminance += EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, L, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, false) * (light.color * Exposure * attenuation);
 	}
 	
-	return luminance;
-}
+	// Indirect Lighting
+	float3 iblN = N;
+	float3 R = reflect(-V, N);
+	float3 rStrength = 1.0;
+	
+	// Reflection correction for water
+	if (isWater && R.y < 0.0)
+	{
+		iblN = float3(0.0, 1.0, 0.0);
+		float NdotR = dot(iblN, -R);
+		float2 dfg = _PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotR, perceptualRoughness), 32));
+		rStrength = dfg.x * f0 + dfg.y;
+		R = reflect(R, iblN);
+	}
+	
+	float3 iblR = GetSpecularDominantDir(N, R, roughness, NdotV);
+	float iblMipLevel = PerceptualRoughnessToMipmapLevel(perceptualRoughness);
+	float3 radiance = _SkyReflection.SampleLevel(TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
+	
+	float BdotR = dot(bentNormal, R);
+	float specularOcclusion = GetSpecularOcclusion(visibilityAngle, BdotR, perceptualRoughness, dot(N, R));
+	radiance *= specularOcclusion;
+	
+	#ifdef SCREENSPACE_REFLECTIONS_ON
+		float4 ssr = ScreenSpaceReflections[pixelCoordinate];
+		radiance = lerp(radiance, ssr.rgb, ssr.a * SpecularGiStrength);
+	#endif
 
-#endif
+	float3 fssEss = dfg.x * f0 + dfg.y;
+	luminance += radiance * fssEss;
+	
+	float3 irradiance = AmbientCosine(bentNormal, visibilityAngle);
+	
+	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
+		irradiance += ICtCpToRec709(ScreenSpaceGlobalIllumination[pixelCoordinate]) / PaperWhite * DiffuseGiStrength;
+	#endif
+	
+	float3 fAvg = AverageFresnel(f0);
+	float3 fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
+	float3 kd = 1.0 - fssEss - fmsEms;
+	luminance += irradiance * (fmsEms + albedo * kd);
+	
+	float3 irradiance1 = AmbientCosine(-N, visibilityAngle);
+	
+	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
+		irradiance1 += ICtCpToRec709(ScreenSpaceGlobalIllumination[pixelCoordinate]) / PaperWhite * DiffuseGiStrength;
+	#endif
+	
+	luminance += irradiance1 * translucency * kd;
+	
+	return float4(luminance, lerp(opacity, 1.0, fssEss.r));
+}

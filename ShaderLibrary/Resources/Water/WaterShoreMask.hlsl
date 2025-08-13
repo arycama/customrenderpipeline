@@ -1,4 +1,5 @@
 #include "../../Common.hlsl"
+#include "../../Math.hlsl"
 
 Texture2D<float> Heightmap;
 float Cutoff, MaxDistance, InvResolution;

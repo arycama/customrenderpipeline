@@ -67,7 +67,7 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 				
 				if (FrustumCull(center, extents))
 				{
-					float factor = ProjectedSphereRadius(length(extents), center, _CameraAspect) * _ScaledResolution.x * 0.5 / _EdgeLength;
+					float factor = ProjectedSphereRadius(length(extents), center, CameraAspect) * ViewSize.x * 0.5 / _EdgeLength;
 					if (factor <= 1.0 || i + _PassOffset == _TotalPassCount - 1)
 					{
 						// If equal to or smaller than the target size, write the lod data.

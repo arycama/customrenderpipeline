@@ -2,7 +2,7 @@
 #pragma kernel InstanceCopyData
 
 // Since we use groupId to index the instance prefix sum, this needs to match
-const static uint threadCount = 256;
+const static uint threadCount = 1024;
 const static uint log2ThreadCount = firstbitlow(threadCount);
 
 uint MaxThread;
@@ -25,6 +25,11 @@ void ComputeThreadCount()
 {
 	uint visibleInstanceCount = DrawCallArgs[1];
 	ThreadGroupsWrite[0] = DivRoundUp(visibleInstanceCount, threadCount);
+	ThreadGroupsWrite[1] = 1;
+	ThreadGroupsWrite[2] = 1;
+	ThreadGroupsWrite[3] = DivRoundUp(visibleInstanceCount, 256);
+	ThreadGroupsWrite[4] = 1;
+	ThreadGroupsWrite[5] = 1;
 }
 
 [numthreads(threadCount, 1, 1)]

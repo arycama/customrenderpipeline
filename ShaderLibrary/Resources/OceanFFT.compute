@@ -2,6 +2,7 @@
 #include "../Math.hlsl"
 #include "../Random.hlsl"
 #include "../Material.hlsl"
+#include "../Packing.hlsl"
 #include "../WaterCommon.hlsl"
 
 #pragma kernel Dispersion
@@ -163,12 +164,12 @@ float GetSpectrumAmplitude(float2 k, float kLength, float rcpTileLength)
 	
 	float spectrum = sqrt(max(0, 4.0 * s * d * wNorm));
 	
+	//spectrum = PhillipsSpectrum(k, kLength, rcpTileLength);
+	
 	// Move waves along wind direction
 	//float2 windDirection = float2(cos(OceanWindAngle * TwoPi), sin(OceanWindAngle * TwoPi));
 	//if (dot(k, windDirection) < 0.0)
 	//	spectrum *= -sqrt(1.0 - OceanSwell);
-		
-	//spectrum = PhillipsSpectrum(k, kLength, rcpTileLength);
 	
 	// Remove small wavelengths (eq 41)
 	spectrum *= sqrt(exp(-Sq(kLength * OceanShortWavesFade)));

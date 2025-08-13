@@ -5,15 +5,11 @@
 #include "../../Lighting.hlsl"
 #include "../../Raytracing.hlsl"
 
-Texture2D<float> _Depth;
-Texture2D<float4> _NormalRoughness;
 RWTexture2D<float4> HitResult;
-
-float3 LightDirection;
-float _RaytracingBias, _RaytracingDistantBias, LightCosTheta;
+float _RaytracingBias, _RaytracingDistantBias;
 
 [shader("miss")]
-void MissShader(inout RayPayloadAmbientOcclusion payload : SV_RayPayload)
+void MissShader(inout RayPayloadVisibility payload : SV_RayPayload)
 {
 	payload.hitDistance = 0.0;
 }
@@ -22,25 +18,25 @@ void MissShader(inout RayPayloadAmbientOcclusion payload : SV_RayPayload)
 void RayGeneration()
 {
 	uint2 position = DispatchRaysIndex().xy;
-	float depth = _Depth[position];
+	float depth = Depth[position];
 	if(depth == 0.0)
 		return;
 		
-	float4 normalRoughness = _NormalRoughness[position];
+	float4 normalRoughness = NormalRoughness[position];
 	float2 u = Noise2D(position);
 	
-	float3 worldPosition = PixelToWorld(float3(position + 0.5, depth));
+	float3 worldPosition = PixelToWorldPosition(float3(position + 0.5, depth));
 	float3 V = normalize(-worldPosition);
 	
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
-	worldPosition = PlanetCurveInverse(worldPosition);
+	//worldPosition = PlanetCurveInverse(worldPosition);
 	
-    float3 L = SampleConeUniform(u.x, u.y, LightCosTheta, LightDirection);
+	float3 L = SampleConeUniform(u.x, u.y, SunCosAngle, _LightDirection0);
 	
-	RayPayloadAmbientOcclusion payload;
+	RayPayloadVisibility payload;
 	payload.hitDistance = 0.0;
 	
 	// Skip tracing rays where NdotL <= 0.0, as this will always be in shadow
@@ -48,7 +44,7 @@ void RayGeneration()
 	if(NdotL > 0.0)
 	{
 		RayDesc ray;
-		ray.Origin = worldPosition + _ViewPosition;
+		ray.Origin = worldPosition + ViewPosition;
 		ray.Direction = L;
 		ray.TMin = 0.0;
 		ray.TMax = 1e10f;
@@ -60,7 +56,7 @@ void RayGeneration()
 	}
 	else
 	{
-		payload.hitDistance = 1e-6;
+		payload.hitDistance = 0.0;
 	}
 	
 	bool validHit = payload.hitDistance;

@@ -1,41 +1,57 @@
-#ifndef VOLUMETRIC_LIGHT_INCLUDED
-#define VOLUMETRIC_LIGHT_INCLUDED
+#pragma once
 
+#include "Common.hlsl"
 #include "Samplers.hlsl"
+#include "Math.hlsl"
 
-cbuffer VolumetricLightProperties
+cbuffer VolumetricLightingData
 {
-	float3 _VolumetricLightScale;
-	float _VolumetricLightNear;
+	float LinearToVolumetricScale; //  rcp(log2(far / near));
+	float LinearToVolumetricOffset; // -log2(near) * LinearToVolumetricScale;
+	float VolumetricToLinearScale; // (log2(far) - log2(near)) / slices
+	float VolumetricToLinearOffset; // log2(near)
 	
-	float3 _VolumetricLightMax;
-	float _VolumetricLightFar;
+	float VolumeWidth;
+	float VolumeHeight;
+	float VolumeDepth;
+	float RcpVolumeDepth;
 	
-	float2 _RcpVolumetricLightResolution;
-	float _VolumeSlices;
-	float _NonLinearDepth;
+	uint VolumetricLog2TileSize;
+	float VolumetricBlurSigma;
+	float VolumetricLightingDataPadding0;
+	float VolumetricLightingDataPadding1;
 };
 
-Texture3D<float4> _VolumetricLighting;
+float3 VolumetricLightScale;
+float3 VolumetricLightMax;
 
-float GetVolumetricUv(float linearDepth)
+Texture3D<float4> VolumetricLighting;
+
+float VolumetricToLinearDepth(float depth)
 {
-	//if (_NonLinearDepth)
-	//{
-	//	return (log2(linearDepth) * (_VolumeSlices / log2(_VolumetricLightFar / _VolumetricLightNear)) - _VolumeSlices * log2(_VolumetricLightNear) / log2(_VolumetricLightFar / _VolumetricLightNear)) / _VolumeSlices;
-	//}
-	//else
-	//{
-		// inv lerp
-		return (linearDepth - _VolumetricLightNear) * rcp(_VolumetricLightFar - _VolumetricLightNear);
-	//}
+	return exp2(VolumetricToLinearScale * depth + VolumetricToLinearOffset);
+}
+
+float LinearToVolumetricDepth(float linearDepth)
+{
+	float depth = LinearToVolumetricScale * log2(linearDepth) + LinearToVolumetricOffset;
+		
+	#if 1
+		// Correct for the non-linear z depth
+		float i = floor(depth * VolumeDepth);
+		float current = VolumetricToLinearDepth(i);
+		float next = VolumetricToLinearDepth(i + 1);
+		float t = InvLerp(linearDepth, current, next);
+		depth = (i + t) / VolumeDepth;
+	#endif
+	
+	return depth;
 }
 
 float4 SampleVolumetricLight(float2 pixelPosition, float eyeDepth)
 {
-	float normalizedDepth = GetVolumetricUv(eyeDepth);
-	float3 volumeUv = float3(pixelPosition * _RcpVolumetricLightResolution, normalizedDepth);
-	return _VolumetricLighting.Sample(_LinearClampSampler, min(volumeUv * _VolumetricLightScale, _VolumetricLightMax));
+	float3 volumeUv = float3(pixelPosition * RcpViewSize, LinearToVolumetricDepth(eyeDepth));
+	return VolumetricLighting.Sample(TrilinearClampSampler, min(volumeUv * VolumetricLightScale, VolumetricLightMax));
 }
 
 float3 ApplyVolumetricLight(float3 color, float2 pixelPosition, float eyeDepth)
@@ -43,5 +59,3 @@ float3 ApplyVolumetricLight(float3 color, float2 pixelPosition, float eyeDepth)
 	float4 volumetricLighting = SampleVolumetricLight(pixelPosition, eyeDepth);
 	return color * volumetricLighting.a + volumetricLighting.rgb;
 }
-
-#endif

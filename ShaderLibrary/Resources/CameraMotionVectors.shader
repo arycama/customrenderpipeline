@@ -3,19 +3,18 @@ Shader "Hidden/Camera Motion Vectors"
     SubShader
     {
         Cull Off
-        ZWrite Off
+        ZClip Off
         ZTest Off
+        ZWrite Off
 
         Pass
         {
-            Name "Camera Motion Vectors"
-
             Stencil
             {
-                // Ensure only 1 is set, and not bit 2
-                Ref 1
-                Comp Equal
-                ReadMask 3
+                // Note this is set to render for sky/far plane too which is intentional to avoid reprojection issues
+                Ref 2
+                ReadMask 2
+                Comp NotEqual
             }
 
             HLSLPROGRAM

@@ -1,0 +1,58 @@
+#pragma kernel GenerateLengthToSmoothness
+#pragma kernel ShortenNormal
+#pragma kernel MipNormalAndSmoothness
+
+#include "../Color.hlsl"
+#include "../Common.hlsl"
+#include "../Material.hlsl"
+#include "../Math.hlsl"
+#include "../Packing.hlsl"
+#include "../Samplers.hlsl"
+
+RWTexture2D<float4> Result;
+RWTexture2D<float> _LengthToRoughnessResult;
+Texture2D<float4> Input;
+uint _Mip;
+float _Resolution, _MaxIterations;
+
+[numthreads(8, 8, 1)]
+void GenerateLengthToSmoothness(uint2 id : SV_DispatchThreadID)
+{
+	float uv = id.x / (_Resolution - 1.0);
+	float target = Remap(uv, 0.0, 1.0, 2.0 / 3.0, 1.0); // Remap target
+    
+	float t = 0; //xi;
+	float minDelta = FloatMax;
+
+	for (float i = 0; i < 256.0; i++)
+	{
+		float xi = i / (256.0 - 1.0);
+		float currentLength = RoughnessToNormalLength(xi);
+
+		float delta = abs(currentLength - target);
+		if (delta < minDelta)
+		{
+			minDelta = delta;
+			t = xi;
+		}
+	}
+	
+	_LengthToRoughnessResult[id] = t;
+}
+
+[numthreads(8, 8, 1)]
+void ShortenNormal(uint2 id : SV_DispatchThreadID)
+{
+	float4 data = Input[id];
+	float3 normal = UnpackNormalUNorm(data.rg);
+	float len = PerceptualRoughnessToNormalLength(data.a);
+	Result[id] = float4(normal * len, VisibilityToConeAngle(data.b) * RcpHalfPi);
+}
+
+[numthreads(8, 8, 1)]
+void MipNormalAndSmoothness(uint2 id : SV_DispatchThreadID)
+{
+	float4 data = Input.mips[_Mip][id];
+	float roughness = LengthToPerceptualRoughness(length(data.rgb));
+	Result[id] = float4(0.5 * normalize(data.rgb).rg + 0.5, data.a, roughness);
+}

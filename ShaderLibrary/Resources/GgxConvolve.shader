@@ -1,12 +1,24 @@
 Shader "Hidden/GgxConvolve"
 {
-    SubShader
+    Properties 
     {
-        Pass
+        [NoScaleOffset] _Texture("Texture", Cube) = "" {}
+    }
+
+    SubShader 
+    {
+        Cull Off
+        ZClip Off
+        ZTest Off
+        ZWrite Off
+
+        Pass 
         {
-            Cull Off
-            ZWrite Off
-            ZTest Off
+            Stencil
+            {
+                Ref 1
+                Comp NotEqual
+            }
 
             HLSLPROGRAM
             #pragma target 5.0
@@ -15,7 +27,6 @@ Shader "Hidden/GgxConvolve"
             #pragma fragment Fragment
             #include "GgxConvolve.hlsl"
             ENDHLSL
-          
         }
     }
 }

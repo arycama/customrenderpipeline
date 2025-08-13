@@ -1,0 +1,155 @@
+#pragma kernel SeedPixels
+#pragma kernel JumpFlood
+#pragma kernel Resolve
+
+Texture2DArray<float4> _Texture0, _Texture1, _Texture2, _Texture3, _Texture4, _Texture5, _Texture6;
+RWTexture2DArray<float4> _Texture0Write, _Texture1Write, _Texture2Write, _Texture3Write, _Texture4Write, _Texture5Write, _Texture6Write, _Texture7Write;
+float _Texture0sRGB, _Texture1sRGB, _Texture2sRGB, _Texture3sRGB, _Texture4sRGB, _Texture5sRGB, _Texture6sRGB;
+
+Texture2DArray<int2> _Input;
+RWTexture2DArray<int2> _Result;
+int _CellSize, _Offset, _Resolution, _TextureCount;
+float _InvCellSize, _InvResolution, _MaxDistance;
+
+float SqrLength(float2 x)
+{
+	return dot(x, x);
+}
+
+[numthreads(8, 8, 1)]
+void SeedPixels(uint3 id : SV_DispatchThreadID)
+{
+	float minDist = -1;
+	int2 minSeed = -1;
+	float height = _Texture0[id].a;
+	
+	[unroll]
+	for (int y = -1; y < 2; y++)
+	{
+		[unroll]
+		for (int x = -1; x < 2; x++)
+		{
+			// Skip out of bounds pixels
+			int2 coord = id.xy + int2(x, y);
+			if (any(coord < 0 || coord >= _Resolution))
+				continue;
+
+			float neighborHeight = _Texture0[int3(coord, id.z)].a;
+			if ((height >= 0.5 && neighborHeight >= 0.5) || (height < 0.5 && neighborHeight < 0.5))
+				continue;
+				
+			float dist = distance(coord, id.xy);
+			if (minDist != -1 && dist > minDist)
+				continue;
+					
+			minDist = dist;
+			minSeed = coord;
+		}
+	}
+
+	_Result[id] = minSeed;
+}
+
+[numthreads(8, 8, 1)]
+void JumpFlood(uint3 id : SV_DispatchThreadID)
+{
+	float minDist = -1;
+	int2 minSeed = -1;
+
+	[unroll]
+	for (int y = -1; y < 2; y++)
+	{
+		[unroll]
+		for (int x = -1; x < 2; x++)
+		{
+			// Skip out of bounds pixels
+			int2 coord = id.xy + int2(x, y) * _Offset;
+			if (any(coord < 0 || coord >= _Resolution))
+				continue;
+			
+			int2 neighbourSeed = _Input[int3(coord, id.z)];
+			if (any(neighbourSeed == -1))
+				continue;
+				
+			float dist = distance(neighbourSeed, id.xy);
+			if (minDist != -1 && dist > minDist)
+				continue;
+					
+			minDist = dist;
+			minSeed = neighbourSeed;
+		}
+	}
+	
+	#ifdef FINAL_PASS
+		float minDist = sqrt(minDistSq);
+		float height = Input[position.xy].a;
+		if (height < Cutoff)
+		{
+			InterlockedMax(MinMaxValuesWrite[0], asuint(-minDist));
+		}
+		else
+		{
+			InterlockedMax(MinMaxValuesWrite[1], asuint(minDist));
+		}
+	#endif
+	
+	_Result[id] = minSeed;
+}
+
+float3 LinearToSrgb(float3 color)
+{
+	float3 srgbLo = color * 12.92;
+	float3 srgbHi = pow(color, rcp(2.4)) * 1.055 - 0.055;
+	return color <= 0.0031308 ? srgbLo : srgbHi;
+}
+
+float4 LinearToSrgb(float4 color)
+{
+	return float4(LinearToSrgb(color.rgb), color.a);
+}
+
+[numthreads(8, 8, 1)]
+void Resolve(uint3 id : SV_DispatchThreadID)
+{
+	int2 seed = _Input[id];
+	float2 delta = seed * _InvResolution - id.xy * _InvResolution;
+	float dist = length(delta);
+
+	float height = _Texture0[id].a;
+	if (height < 0.5)
+	{
+		dist = -dist;
+	}
+	else
+	{
+		seed = id.xy;
+	}
+
+	float outDist = dist / sqrt(2.0) * 0.5 + 0.5;
+	float4 input = _Texture0[int3(seed, id.z)];
+	
+	if (_Texture0sRGB)
+		input.rgb = LinearToSrgb(input.rgb);
+	
+	_Texture0Write[id] = float4(input.rgb, height);
+	//_Texture0Write[id] = float4(_Texture0sRGB ? LinearToSrgb(_Texture0[int3(seed, id.z)].rgb) : _Texture0[int3(seed, id.z)].rgb, outDist);
+	
+	// Write textures
+	if (_TextureCount > 1)
+		_Texture1Write[id] = _Texture1sRGB ? LinearToSrgb(_Texture1[int3(seed, id.z)]) : _Texture1[int3(seed, id.z)];
+	
+	if (_TextureCount > 2)
+		_Texture2Write[id] = _Texture2sRGB ? LinearToSrgb(_Texture2[int3(seed, id.z)]) : _Texture2[int3(seed, id.z)];
+	
+	if (_TextureCount > 3)
+		_Texture3Write[id] = _Texture3sRGB ? LinearToSrgb(_Texture3[int3(seed, id.z)]) : _Texture3[int3(seed, id.z)];
+	
+	if (_TextureCount > 4)
+		_Texture4Write[id] = _Texture4sRGB ? LinearToSrgb(_Texture4[int3(seed, id.z)]) : _Texture4[int3(seed, id.z)];
+	
+	if (_TextureCount > 5)
+		_Texture5Write[id] = _Texture5sRGB ? LinearToSrgb(_Texture5[int3(seed, id.z)]) : _Texture5[int3(seed, id.z)];
+	
+	if (_TextureCount > 6)
+		_Texture6Write[id] = _Texture6sRGB ? LinearToSrgb(_Texture6[int3(seed, id.z)]) : _Texture6[int3(seed, id.z)];
+}

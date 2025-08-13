@@ -3,7 +3,7 @@
 #include "../Lighting.hlsl"
 #include "../CloudCommon.hlsl"
 
-#pragma kernel CSMain
+#pragma kernel CloudCoverage
 
 RWBuffer<float4> _Result;
 
@@ -11,26 +11,20 @@ static const uint _ThreadCount = 1024;
 
 groupshared float4 _SharedLuminanceExtinction[_ThreadCount];
 
-[numthreads(_ThreadCount, 1, 1)]
-void CSMain (uint groupIndex : SV_GroupIndex)
+[numthreads(1024, 1, 1)]
+void CloudCoverage(uint groupIndex : SV_GroupIndex)
 {
-	float2 u = Hammersley2dSeq(groupIndex, _ThreadCount);
-	float3 V = SampleHemisphereUniform(u.x, u.y).xzy;
-	
+	float2 uv = Hammersley2dSeq(groupIndex, _ThreadCount);
+	float sampleCount = _ThreadCount;
+	float3 V = SampleHemisphereUniform(uv.x, uv.y).xzy;
+
 	float rayStart = DistanceToSphereInside(_PlanetRadius, V.y, _PlanetRadius + _StartHeight);
 	float rayEnd = DistanceToSphereInside(_PlanetRadius, V.y, _PlanetRadius + _StartHeight + _LayerThickness);
 	
 	float cloudDistance;
-	float4 clouds = EvaluateCloud(rayStart, rayEnd - rayStart, 8, V, _PlanetRadius, V.y, 0.5, float3(0.0, -_ViewPosition.y, 0.0), false, cloudDistance, false);
+	float4 clouds = EvaluateCloud(rayStart, rayEnd - rayStart, 16, V, _PlanetRadius, V.y, 0.5, float3(0.0, -ViewPosition.y, 0.0), false, cloudDistance, false);
 	
-	// Divide result by the pdf
-	float uniformHemispherePdf = rcp(TwoPi);
-	clouds.rgb /= uniformHemispherePdf;
-	
-	// Since this is replacing a sphere phase function, apply uniform phase function
-	clouds.rgb *= RcpFourPi;
-	
-	_SharedLuminanceExtinction[groupIndex] = clouds;
+	_SharedLuminanceExtinction[groupIndex] = clouds / sampleCount;
 	
 	[unroll]
 	for (uint s = _ThreadCount >> 1; s > 0; s >>= 1)
@@ -44,13 +38,12 @@ void CSMain (uint groupIndex : SV_GroupIndex)
 	if (groupIndex)
 		return;
 	
-	float4 result = _SharedLuminanceExtinction[0] * rcp(_ThreadCount);
+	float4 result = _SharedLuminanceExtinction[0];
+	result = lerp(_CloudCoverage, result, 0.05);
+	
+	// TODO: Need to figure out why this happens and fix it
+	result = IsInfOrNaN(result) ? float2(0.0, 1.0).xxxy : result;
 	
 	// Smooth results over time to avoid flickering
-	//result = lerp(_CloudCoverage, result, 0.05);
-	
-	result = isnan(result) ? float2(0.0, 1.0).xxxy : result;
-	
 	_Result[0] = result;
-	//_Result[0] = float2(0, 1).xxxy;
 }

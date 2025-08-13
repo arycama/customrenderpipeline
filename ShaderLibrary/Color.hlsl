@@ -1,5 +1,4 @@
-#ifndef COLOR_INCLUDED
-#define COLOR_INCLUDED
+#pragma once
 
 #include "Math.hlsl"
 
@@ -266,9 +265,14 @@ float3x3 calculate_cat_matrix
 	return mul(CONE_RESP_MAT_BRADFORD, mul(vkMat, Inverse(CONE_RESP_MAT_BRADFORD)));
 }
 
-float Luminance(float3 color, Chromaticities chromacity = REC709_PRI)
+float Rec709Luminance(float3 color, Chromaticities chromacity = REC709_PRI)
 {
 	return mul(RGBtoXYZ(REC709_PRI), color).y;
+}
+
+float Rec2020Luminance(float3 color, Chromaticities chromacity = REC2020_PRI)
+{
+	return mul(RGBtoXYZ(REC2020_PRI), color).y;
 }
 
 // Rec 2020
@@ -384,10 +388,13 @@ float3 Rec709ToP3D65(float3 rec709)
 	return XYZToP3D65(Rec709ToXYZ(rec709));
 }
 
+float3 Rec2020ToP3D65(float3 rec2020)
+{
+	return XYZToP3D65(Rec2020ToXYZ(rec2020));
+}
+
 // ICtCp
 // RGB with sRGB/Rec.709 primaries to ICtCp
-
-
 float3 Rec2020ToICtCp(float3 rec2020)
 {
 	float3 lms = Rec2020ToLMS(rec2020);
@@ -428,7 +435,7 @@ float3 FastTonemap(float3 color, float luminance)
 
 float3 FastTonemap(float3 color)
 {
-	return FastTonemap(color, Luminance(color));
+	return FastTonemap(color, Rec709Luminance(color));
 }
 
 float4 FastTonemap(float4 color)
@@ -443,7 +450,7 @@ float3 FastTonemapInverse(float3 color, float luminance)
 
 float3 FastTonemapInverse(float3 color)
 {
-	return FastTonemapInverse(color, Luminance(color));
+	return FastTonemapInverse(color, Rec709Luminance(color));
 }
 
 float4 FastTonemapInverse(float4 color)
@@ -480,5 +487,3 @@ float4 YCoCgToRgbFastTonemapInverse(float4 tonemappedYCoCg)
 {
 	return float4(YCoCgToRgb(FastTonemapYCoCgInverse(tonemappedYCoCg.rgb)), tonemappedYCoCg.a);
 }
-
-#endif

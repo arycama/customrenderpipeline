@@ -64,12 +64,12 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 			{
 				float2 patchSize = _TerrainPositionOffset.xy * exp2(-(i + _PassOffset));
 				
-				float3 center = float3((coord + 0.5) * patchSize + _TerrainPositionOffset.zw, -_ViewPosition.y).xzy;
+				float3 center = float3((coord + 0.5) * patchSize + _TerrainPositionOffset.zw, -ViewPosition.y).xzy;
 				float3 extents = float3(patchSize * 0.5, MaxWaterHeight * 0.5).xzy;
 				
 				if (FrustumCull(center, extents))
 				{
-					float factor = ProjectedSphereRadius(length(extents), center, _CameraAspect) * _ScaledResolution.x * 0.5 / _EdgeLength;
+					float factor = ProjectedSphereRadius(length(extents), center, CameraAspect) * ViewSize.x * 0.5 / _EdgeLength;
 					if (factor <= 1.0 || i + _PassOffset == _TotalPassCount - 1)
 					{
 						// If equal to or smaller than the target size, write the lod data.

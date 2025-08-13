@@ -3,8 +3,11 @@
 #pragma kernel MipNormalAndSmoothness
 
 #include "../../Color.hlsl"
+#include "../../Common.hlsl"
 #include "../../Material.hlsl"
+#include "../../Math.hlsl"
 #include "../../Packing.hlsl"
+#include "../../Samplers.hlsl"
 
 RWTexture2D<float4> _NormalResult, _SmoothnessResult;
 RWTexture2D<float> _LengthToRoughnessResult;
