@@ -48,8 +48,6 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
         renderGraph.Dispose();
     }
 
-    protected override void Render(ScriptableRenderContext context, Camera[] cameras) => Render(context, cameras);
-
     protected override void Render(ScriptableRenderContext context, List<Camera> cameras) => Render(context, cameras);
 
     protected abstract List<FrameRenderFeature> InitializePerFrameRenderFeatures();

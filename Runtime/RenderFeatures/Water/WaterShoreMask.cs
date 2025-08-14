@@ -150,7 +150,7 @@ public class WaterShoreMask : FrameRenderFeature
 
     private readonly struct ResultData
     {
-        private readonly float minDist, maxDist, padding0, padding1;
+        public readonly float minDist, maxDist, padding0, padding1;
 
         public ResultData(float minDist, float maxDist)
         {

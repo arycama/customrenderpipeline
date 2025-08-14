@@ -2,12 +2,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public abstract class CustomRenderPipelineAssetBase : RenderPipelineAsset
-{
-    public abstract SupportedRenderingFeatures SupportedRenderingFeatures { get; }
-	public abstract bool UseSrpBatching { get; }
-}
-
 [CreateAssetMenu(menuName = "Data/Render Pipeline Asset")]
 public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 {
@@ -39,32 +33,13 @@ public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 	[field: SerializeField] public TemporalAA.Settings TemporalAASettings { get; private set; }
 	[field: SerializeField] public Tonemapping.Settings Tonemapping { get; private set; }
 
-	[SerializeField] private DefaultPipelineMaterials defaultMaterials = new();
-	[SerializeField] private DefaultPipelineShaders defaultShaders = new();
-
-	public override Material defaultMaterial => defaultMaterials.DefaultMaterial ?? base.defaultMaterial;
-	public override Material defaultUIMaterial => defaultMaterials.DefaultUIMaterial ?? base.defaultUIMaterial;
-	public override Material default2DMaterial => defaultMaterials.Default2DMaterial ?? base.default2DMaterial;
-	public override Material defaultLineMaterial => defaultMaterials.DefaultLineMaterial ?? base.defaultLineMaterial;
-	public override Material defaultParticleMaterial => defaultMaterials.DefaultParticleMaterial ?? base.defaultParticleMaterial;
-	public override Material defaultTerrainMaterial => defaultMaterials.DefaultTerrainMaterial ?? base.defaultTerrainMaterial;
-	public override Material defaultUIETC1SupportedMaterial => defaultMaterials.DefaultUIETC1SupportedMaterial ?? base.defaultUIETC1SupportedMaterial;
-	public override Material defaultUIOverdrawMaterial => defaultMaterials.DefaultUIOverdrawMaterial ?? base.defaultUIOverdrawMaterial;
-	public override Material default2DMaskMaterial => defaultMaterials.Default2DMaskMaterial;
-
-	public override Shader autodeskInteractiveMaskedShader => defaultShaders.AutodeskInteractiveMaskedShader ?? base.autodeskInteractiveMaskedShader;
-	public override Shader autodeskInteractiveShader => defaultShaders.AutodeskInteractiveShader ?? base.autodeskInteractiveShader;
-	public override Shader autodeskInteractiveTransparentShader => defaultShaders.AutodeskInteractiveTransparentShader ?? base.autodeskInteractiveTransparentShader;
-	public override Shader defaultSpeedTree7Shader => defaultShaders.DefaultSpeedTree7Shader ?? base.defaultSpeedTree7Shader;
-	public override Shader defaultSpeedTree8Shader => defaultShaders.DefaultSpeedTree8Shader ?? base.defaultSpeedTree8Shader;
-	public override Shader defaultShader => defaultShaders.DefaultShader ?? base.defaultShader;
-	public override Shader terrainDetailGrassBillboardShader => defaultShaders.TerrainDetailGrassBillboardShader ?? base.terrainDetailGrassBillboardShader;
-	public override Shader terrainDetailGrassShader => defaultShaders.TerrainDetailGrassShader ?? base.terrainDetailGrassShader;
-	public override Shader terrainDetailLitShader => defaultShaders.TerrainDetailLitShader ?? base.terrainDetailLitShader;
+	public override Type pipelineType => typeof(CustomRenderPipeline);
 
 	public override bool UseSrpBatching => useSrpBatching;
 
-    public override SupportedRenderingFeatures SupportedRenderingFeatures => new()
+	public override string renderPipelineShaderTag => "CustomRenderPipeline";
+
+	public override SupportedRenderingFeatures SupportedRenderingFeatures => new()
 	{
 		defaultMixedLightingModes = SupportedRenderingFeatures.LightmapMixedBakeModes.None,
 		editableMaterialRenderQueue = false,
@@ -100,15 +75,5 @@ public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 	protected override RenderPipeline CreatePipeline()
 	{
 		return new CustomRenderPipeline(this);
-	}
-
-	protected override void OnValidate()
-	{
-		//base.OnValidate();
-	}
-
-	public void ReloadRenderPipeline()
-	{
-		base.OnValidate();
 	}
 }

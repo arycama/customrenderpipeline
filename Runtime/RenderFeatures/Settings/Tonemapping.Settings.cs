@@ -15,12 +15,11 @@ public partial class Tonemapping
 		[field: SerializeField] public HDRDisplayBitDepth BitDepth { get; private set; } = HDRDisplayBitDepth.BitDepth10;
 
 		[field: Header("Purkinje")]
-		[field: SerializeField] public bool Purkinje { get; private set; } = true;
+		[field: SerializeField] public bool Purkinje { get; private set; } = false;
 		[field: SerializeField] public bool NormalizeLmsr { get; private set; } = true;
-		[field: SerializeField, Range(0, 2)] public float RodInputStrengthR { get; private set; } = 0.63721f;
-		[field: SerializeField, Range(0, 2)] public float RodInputStrengthG { get; private set; } = 0.39242f;
-		[field: SerializeField, Range(0, 2)] public float RodInputStrengthB { get; private set; } = 1.6064f;
+		[field: SerializeField, ColorUsage(false, true)] public Color RodColor { get; private set; } = new Color(0.63721f, 0.39242f, 1.6064f);
 
+#if false
 		[Header("Exposure Fusion")]
 		[SerializeField] private bool enableLtm = true;
 		[SerializeField] private bool boostLocalContrast = false;
@@ -30,5 +29,6 @@ public partial class Tonemapping
 		[SerializeField, Range(0, 12)] private int mip = 4;
 		[SerializeField, Range(0, 6)] private int displayMip = 2;
 		[SerializeField, Range(0.0f, 20.0f)] private float exposurePreferenceSigma = 5.0f;
+#endif
 	}
 }
