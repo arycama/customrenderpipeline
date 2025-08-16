@@ -5,6 +5,7 @@
 #include "../MatrixUtils.hlsl"
 #include "../PhysicalCamera.hlsl"
 #include "../Samplers.hlsl"
+#include "../GT7Tonemap.hlsl"
 
 // For ssr/ssgi debug only
 #include "../Lighting.hlsl"
@@ -129,9 +130,17 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 	if (Tonemap)
 	{
-		color = Rec2020ToICtCp(color);
-		color.r = LinearToST2084(BT2390EETF(ST2084ToLinear(color), MinLuminance, MaxLuminance));
-		color = ICtCpToRec2020(color);
+		color /= PaperWhite;
+	
+		GT7ToneMapping toneMapper;
+		toneMapper.initializeAsHDR(MaxLuminance);
+		color = toneMapper.applyToneMapping(color);
+		
+		color *= PaperWhite;
+	
+		//color = Rec2020ToICtCp(color);
+		//color.r = LinearToST2084(BT2390EETF(ST2084ToLinear(color), MinLuminance, MaxLuminance));
+		//color = ICtCpToRec2020(color);
 	}
 	
 	if (IsPreview)
