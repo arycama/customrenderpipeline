@@ -1,3 +1,4 @@
+using System;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
@@ -60,6 +61,9 @@ public class TerrainGpuTreeRenderer : MonoBehaviour, IGpuProceduralGenerator
 				var position = terrainSize * instance.position + terrainPosition;
 				positions[i] = new(right, up, fwd, position);
 			}
+
+			Array.Sort(types, positions);
+			Array.Sort(types);
 
 			positionsBuffer = renderGraph.GetBuffer(treeCount, UnsafeUtility.SizeOf<Float3x4>());
 			typeBuffer = renderGraph.GetBuffer(treeCount);

@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 public class GpuDrivenRenderingSetup : FrameRenderFeature
 {
     private readonly ComputeShader fillInstanceTypeIdShader;
-    private ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, submeshOffsetLengthsBuffer, lodSizesBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer, instanceBoundsBuffer;
+    private ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, lodSizesBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer, instanceBoundsBuffer;
 
     private Dictionary<string, List<RendererDrawCallData>> passDrawList = new();
 
@@ -24,7 +24,6 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
     {
         renderGraph.ReleasePersistentResource(drawCallArgsBuffer);
         renderGraph.ReleasePersistentResource(rendererBoundsBuffer);
-        renderGraph.ReleasePersistentResource(submeshOffsetLengthsBuffer);
         renderGraph.ReleasePersistentResource(lodSizesBuffer);
         renderGraph.ReleasePersistentResource(instanceTypeIdsBuffer);
         renderGraph.ReleasePersistentResource(lodFadesBuffer);
@@ -58,7 +57,7 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
         instanceBoundsBuffer = renderGraph.GetBuffer(positionCountSum, sizeof(float) * 4, isPersistent: true);
 
         // Need to compute bounds for each instance
-        var boundsData = new List<Bounds>();
+        var boundsData = new List<RendererBounds>();
         foreach (var prefab in proceduralGenerationController.prefabs)
         {
             var childRenderers = prefab.prefab.GetComponentsInChildren<MeshRenderer>();
@@ -69,11 +68,11 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
             for(var i = 1; i < childRenderers.Length; i++)
                 bounds.Encapsulate(childRenderers[i].bounds);
 
-            boundsData.Add(bounds);
+            boundsData.Add(new RendererBounds(bounds));
         }
 
         // TODO: Use lock buffer?
-        var instanceBoundsBufferTemp = renderGraph.GetBuffer(proceduralGenerationController.prefabs.Count, UnsafeUtility.SizeOf<Bounds>());
+        var instanceBoundsBufferTemp = renderGraph.GetBuffer(proceduralGenerationController.prefabs.Count, UnsafeUtility.SizeOf<RendererBounds>());
 
         // TODO: We need to convert from the indices written in the original pass to the final rendering indices
         var positionOffset = 0;
@@ -113,15 +112,13 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
         using var renderers = ScopedPooledList<Renderer>.Get();
 
         // Note these are used to set data inside the lambda, so can't have a using statement
-        var submeshOffsetLengths = ScopedPooledList<Vector2Int>.Get();
         var lodSizes = ScopedPooledList<float>.Get();
         var rendererBounds = ScopedPooledList<RendererBounds>.Get();
         var drawCallArgs = ScopedPooledList<DrawIndexedInstancedIndirectArgs>.Get();
         var instanceTypeDatas = ScopedPooledList<InstanceTypeData>.Get();
         var instanceTypeLodDatas = ScopedPooledList<InstanceTypeLodData>.Get();
 
-        var submeshOffset = 0;
-        var lodOffset = 0;
+        var totalLodCount = 0;
         var instanceTimesRendererCount = 0;
         var totalRendererCount = 0;
 
@@ -135,8 +132,8 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
         {
             InstanceTypeData typeData;
             typeData.instanceCount = prefab.count;
-            typeData.lodRendererOffset = lodOffset;
-            typeData.lodSizeBufferPosition = lodOffset;
+            typeData.lodRendererOffset = totalLodCount;
+            typeData.lodSizeBufferPosition = totalLodCount;
 
             if (prefab.prefab.TryGetComponent<LODGroup>(out var lodGroup))
             {
@@ -190,9 +187,6 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
 
                     renderer.GetSharedMaterials(sharedMaterials);
 
-                    submeshOffsetLengths.Value.Add(new Vector2Int(submeshOffset, sharedMaterials.Value.Count));
-                    submeshOffset += sharedMaterials.Value.Count;
-
                     // Get the mesh bounds, and transform by the renderer's matrix if it is not identity
                     var bounds = (Bounds)mesh.bounds;
                     if (localToWorld != Matrix4x4.identity)
@@ -244,7 +238,7 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
                                 passDrawList.Add(passName, drawList);
                             }
 
-                            var drawData = new RendererDrawCallData(material.renderQueue, mesh, i, material, j, indirectArgsOffset * sizeof(uint), totalRendererCount);
+                            var drawData = new RendererDrawCallData(material.renderQueue, mesh, i, material, j, indirectArgsOffset * sizeof(uint), totalRendererCount, totalLodCount);
                             drawList.Add(drawData);
                         }
 
@@ -258,7 +252,7 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
 
                 instanceTypeLodDatas.Value.Add(new InstanceTypeLodData(totalRendererCount, rendererCount, instanceTimesRendererCount - totalInstanceCount));
 
-                lodOffset++; // TODO: Could simply be incremented once per group
+                totalLodCount++; // TODO: Could simply be incremented once per group
                 totalRendererCount += rendererCount;
 
                 instanceTimesRendererCount += rendererCount * prefab.count;
@@ -277,14 +271,12 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
 
         using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Gpu Driven Rendering Fill Buffers"))
         {
-            submeshOffsetLengthsBuffer = renderGraph.GetBuffer(submeshOffsetLengths.Value.Count, sizeof(uint) * 2, isPersistent: true);
             lodSizesBuffer = renderGraph.GetBuffer(lodSizes.Value.Count, sizeof(float), isPersistent: true);
             rendererBoundsBuffer = renderGraph.GetBuffer(rendererBounds.Value.Count, UnsafeUtility.SizeOf<RendererBounds>(), isPersistent: true);
             instanceTypeDataBuffer = renderGraph.GetBuffer(instanceTypeDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeData>(), isPersistent: true);
             drawCallArgsBuffer = renderGraph.GetBuffer(drawCallArgs.Value.Count, UnsafeUtility.SizeOf<DrawIndexedInstancedIndirectArgs>(), GraphicsBuffer.Target.IndirectArguments, isPersistent: true);
             instanceTypeLodDataBuffer = renderGraph.GetBuffer(instanceTypeLodDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeLodData>(), isPersistent: true);
 
-            pass.WriteBuffer("", submeshOffsetLengthsBuffer);
             pass.WriteBuffer("", lodSizesBuffer);
             pass.WriteBuffer("", rendererBoundsBuffer);
             pass.WriteBuffer("", instanceTypeDataBuffer);
@@ -294,14 +286,12 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
             pass.SetRenderFunction((command, pass) =>
             {
                 // TODO: Use lockbuffer?
-                command.SetBufferData(pass.GetBuffer(submeshOffsetLengthsBuffer), submeshOffsetLengths.Value);
                 command.SetBufferData(pass.GetBuffer(lodSizesBuffer), lodSizes.Value);
                 command.SetBufferData(pass.GetBuffer(rendererBoundsBuffer), rendererBounds.Value);
                 command.SetBufferData(pass.GetBuffer(instanceTypeDataBuffer), instanceTypeDatas.Value);
                 command.SetBufferData(pass.GetBuffer(drawCallArgsBuffer), drawCallArgs.Value);
                 command.SetBufferData(pass.GetBuffer(instanceTypeLodDataBuffer), instanceTypeLodDatas.Value);
 
-                submeshOffsetLengths.Dispose();
                 lodSizes.Dispose();
                 rendererBounds.Dispose();
                 drawCallArgs.Dispose();
@@ -310,6 +300,6 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
             });
         }
 
-        renderGraph.SetResource(new GpuInstanceBuffersData(positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, instanceBoundsBuffer, passDrawList, totalInstanceCount, totalRendererCount), true);
+        renderGraph.SetResource(new GpuInstanceBuffersData(positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, drawCallArgsBuffer, instanceBoundsBuffer, passDrawList, totalInstanceCount, totalRendererCount, totalLodCount), true);
     }
 }

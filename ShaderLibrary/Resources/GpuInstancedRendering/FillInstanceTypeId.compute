@@ -6,7 +6,10 @@
 
 struct Bounds
 {
-	float3 center, extents;
+	float3 min;
+	float pad0;
+	float3 size;
+	float pad1;
 };
 
 uint _Offset, _Count;
@@ -29,25 +32,22 @@ void FillData(uint id : SV_DispatchThreadID)
 	uint instanceType = _InstanceTypeIdsInput[id];
 	float3x4 objectToWorld = _PositionsInput[id];
 	Bounds bounds = _InstanceTypeBounds[instanceType];
-	
-	float3 inputMin = bounds.center - bounds.extents;
-	float3 inputSize = bounds.extents * 2;
 	float3 boundsMin, boundsMax;
 
 	[unroll]
-	for (float z = 0; z < 2; z++)
+	for (uint z = 0, i = 0; z < 2; z++)
 	{
 		[unroll]
-		for (float y = 0; y < 2; y++)
+		for (uint y = 0; y < 2; y++)
 		{
 			[unroll]
-			for (float x = 0; x < 2; x++)
+			for (uint x = 0; x < 2; x++, i++)
 			{
 				// Transform corners from object to world space, and calculate min/max for Frustum culling
-				float3 objectPosition = inputMin + inputSize * float3(x, y, z);
+				float3 objectPosition = bounds.min + bounds.size * float3(x, y, z);
 				float3 worldPosition = MultiplyPoint3x4(objectToWorld, objectPosition);
-				boundsMin = any(float3(x, y, z)) ? min(boundsMin, worldPosition) : worldPosition;
-				boundsMax = any(float3(x, y, z)) ? max(boundsMax, worldPosition) : worldPosition;
+				boundsMin = i ? min(boundsMin, worldPosition) : worldPosition;
+				boundsMax = i ? max(boundsMax, worldPosition) : worldPosition;
 			}
 		}
 	}

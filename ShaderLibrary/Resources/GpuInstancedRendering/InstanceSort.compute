@@ -67,5 +67,5 @@ void InstanceSort(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	// Write final results
 	uint finalSrc = groupId * threadCount + sharedIndices[groupIndex];
 	Result[id] = Input[finalSrc];
-	SortKeysWrite[id] = SortKeys[finalSrc];
+	//SortKeysWrite[id] = SortKeys[finalSrc];
 }

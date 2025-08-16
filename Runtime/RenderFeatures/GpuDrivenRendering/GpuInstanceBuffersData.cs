@@ -4,11 +4,11 @@ using UnityEngine.Rendering;
 
 public struct GpuInstanceBuffersData : IRenderPassData
 {
-    public ResourceHandle<GraphicsBuffer> positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, instanceBoundsBuffer;
+    public ResourceHandle<GraphicsBuffer> positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, drawCallArgsBuffer, instanceBoundsBuffer;
     public Dictionary<string, List<RendererDrawCallData>> rendererDrawCallData;
-	public int totalInstanceCount, totalRendererCount;
+	public int totalInstanceCount, totalRendererCount, totalLodCount;
 
-    public GpuInstanceBuffersData(ResourceHandle<GraphicsBuffer> positionsBuffer, ResourceHandle<GraphicsBuffer> instanceTypeIdsBuffer, ResourceHandle<GraphicsBuffer> lodFadesBuffer, ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, ResourceHandle<GraphicsBuffer> lodSizesBuffer, ResourceHandle<GraphicsBuffer> instanceTypeDataBuffer, ResourceHandle<GraphicsBuffer> instanceTypeLodDataBuffer, ResourceHandle<GraphicsBuffer> submeshOffsetLengthsBuffer, ResourceHandle<GraphicsBuffer> drawCallArgsBuffer, ResourceHandle<GraphicsBuffer> instanceBoundsBuffer, Dictionary<string, List<RendererDrawCallData>> rendererDrawCallData, int totalInstanceCount, int totalRendererCount)
+    public GpuInstanceBuffersData(ResourceHandle<GraphicsBuffer> positionsBuffer, ResourceHandle<GraphicsBuffer> instanceTypeIdsBuffer, ResourceHandle<GraphicsBuffer> lodFadesBuffer, ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, ResourceHandle<GraphicsBuffer> lodSizesBuffer, ResourceHandle<GraphicsBuffer> instanceTypeDataBuffer, ResourceHandle<GraphicsBuffer> instanceTypeLodDataBuffer, ResourceHandle<GraphicsBuffer> drawCallArgsBuffer, ResourceHandle<GraphicsBuffer> instanceBoundsBuffer, Dictionary<string, List<RendererDrawCallData>> rendererDrawCallData, int totalInstanceCount, int totalRendererCount, int totalLodCount)
     {
         this.positionsBuffer = positionsBuffer;
         this.instanceTypeIdsBuffer = instanceTypeIdsBuffer;
@@ -17,12 +17,12 @@ public struct GpuInstanceBuffersData : IRenderPassData
         this.lodSizesBuffer = lodSizesBuffer;
         this.instanceTypeDataBuffer = instanceTypeDataBuffer;
         this.instanceTypeLodDataBuffer = instanceTypeLodDataBuffer;
-        this.submeshOffsetLengthsBuffer = submeshOffsetLengthsBuffer;
         this.drawCallArgsBuffer = drawCallArgsBuffer;
         this.rendererDrawCallData = rendererDrawCallData;
         this.totalInstanceCount = totalInstanceCount;
         this.instanceBoundsBuffer = instanceBoundsBuffer;
 		this.totalRendererCount = totalRendererCount;
+		this.totalLodCount = totalLodCount;
 	}
 
 	void IRenderPassData.SetInputs(RenderPassBase pass)

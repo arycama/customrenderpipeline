@@ -2,16 +2,16 @@
 
 public struct RendererBounds
 {
-    public Vector3 center;
+    public Vector3 min;
     public float pad0;
-    public Vector3 extents;
+    public Vector3 size;
     public float pad1;
 
     public RendererBounds(Bounds bounds)
     {
-        center = bounds.Min;
+		min = bounds.Min;
         pad0 = 0;
-        extents = bounds.Size;
+		size = bounds.Size;
         pad1 = 0;
     }
 }

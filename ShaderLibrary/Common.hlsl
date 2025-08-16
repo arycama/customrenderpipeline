@@ -149,11 +149,13 @@ StructuredBuffer<uint> _VisibleRendererInstanceIndices;
 StructuredBuffer<float3x4> _InstancePositions;
 StructuredBuffer<float3x4> _ObjectToWorld;
 StructuredBuffer<float> _InstanceLodFades;
+uint InstanceIdOffsetsIndex;
+StructuredBuffer<uint> InstanceIdOffsets;
 
 float2 GetLodFade(uint instanceID)
 {
 	#ifdef INDIRECT_RENDERING
-		uint index = _VisibleRendererInstanceIndices[instanceID];
+		uint index = _VisibleRendererInstanceIndices[InstanceIdOffsets[InstanceIdOffsetsIndex] + instanceID];
 		return _InstanceLodFades[index].xx;
 	#else
 		#ifdef INSTANCING_ON

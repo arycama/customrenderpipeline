@@ -1,0 +1,41 @@
+#include "../../PrefixSum.hlsl"
+
+#pragma kernel InstanceIdOffsets
+#pragma enable_d3d11_debug_symbols
+
+RWStructuredBuffer<uint> Output;
+StructuredBuffer<uint> LodCounts;
+uint MaxThread;
+
+groupshared uint DrawCallCounts[64];
+
+const static uint ThreadCount = 64;
+const static uint Log2ThreadCount = firstbitlow(ThreadCount);
+
+void PrefixSumSharedWrite(uint index, uint data)
+{
+	DrawCallCounts[index] = data;
+}
+
+uint PrefixSumSharedRead(uint index)
+{
+	return DrawCallCounts[index];
+}
+
+[numthreads(ThreadCount, 1, 1)]
+void InstanceIdOffsets(uint groupIndex : SV_GroupIndex)
+{
+	uint drawCallCount = groupIndex < MaxThread ? LodCounts[groupIndex] : 0;
+
+	DrawCallCounts[groupIndex] = drawCallCount;
+
+	uint totalSum;
+	PrefixSum(groupIndex, ThreadCount, Log2ThreadCount, totalSum);
+	
+	GroupMemoryBarrierWithGroupSync();
+	
+	if (groupIndex >= MaxThread)
+		return;
+		
+	Output[groupIndex] = DrawCallCounts[groupIndex];
+}

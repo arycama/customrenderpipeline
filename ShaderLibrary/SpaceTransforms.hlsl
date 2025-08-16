@@ -17,7 +17,7 @@ float3x4 MakeCameraRelative(float3x4 m)
 float3x4 GetObjectToWorld(uint instanceId, bool cameraRelative = true)
 {
 	#ifdef INDIRECT_RENDERING
-		float3x4 objectToWorld = _ObjectToWorld[instanceId];
+		float3x4 objectToWorld = _ObjectToWorld[InstanceIdOffsets[InstanceIdOffsetsIndex] +instanceId];
 	#elif defined(INSTANCING_ON)
 		float3x4 objectToWorld = (float3x4)unity_Builtins0Array[unity_BaseInstanceID + instanceId].unity_ObjectToWorldArray;
 	#else
@@ -33,7 +33,7 @@ float3x4 GetObjectToWorld(uint instanceId, bool cameraRelative = true)
 float3x4 GetWorldToObject(uint instanceId, bool cameraRelative = true)
 {
 	#ifdef INDIRECT_RENDERING
-		float3x4 objectToWorld = _ObjectToWorld[instanceId];
+		float3x4 objectToWorld = _ObjectToWorld[InstanceIdOffsets[InstanceIdOffsetsIndex] +instanceId];
 		float4x4 instanceToWorld = float4x4(objectToWorld[0], objectToWorld[1], objectToWorld[2], float4(0, 0, 0, 1));
 		float3x4 worldToObject = (float3x4)FastInverse(instanceToWorld);
 	#elif defined(INSTANCING_ON)

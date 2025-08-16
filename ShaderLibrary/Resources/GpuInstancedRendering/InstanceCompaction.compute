@@ -9,8 +9,9 @@ uint MaxThread;
 float3 CameraForward, ViewPosition;
 
 RWStructuredBuffer<uint> Output;
-RWStructuredBuffer<uint> SortKeysWrite;
+//RWStructuredBuffer<uint> SortKeysWrite;
 RWStructuredBuffer<uint> DrawCallArgsWrite;
+RWStructuredBuffer<uint> LodCounts;
 
 StructuredBuffer<uint> Input;
 StructuredBuffer<uint> GroupSums, PrefixSums;
@@ -20,7 +21,7 @@ struct InstanceTypeData
 {
 	float3 localReferencePoint;
 	float radius;
-	uint lodCount, lodSizebufferPOsition, instanceCount, lodRendererOffset;
+	uint lodCount, lodSizebufferPosition, instanceCount, lodRendererOffset;
 };
 
 struct InstanceTypeLodData
@@ -53,6 +54,8 @@ void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID
 	InstanceTypeData instanceTypeData = InstanceTypeDatas[instanceType];
 	uint lodInfoIndex = instanceTypeData.lodRendererOffset + lod;
 	
+	InterlockedAdd(LodCounts[lodInfoIndex], 1);
+	
 	InstanceTypeLodData lodData = InstanceTypeLodDatas[lodInfoIndex];
 	
 	for (uint i = 0; i < lodData.rendererCount; i++)
@@ -61,7 +64,7 @@ void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID
 		InterlockedAdd(DrawCallArgsWrite[index], 1);
 	}
 	
-	float viewZ = max(0, dot(CameraForward, worldBoundsCenter));
-	uint sortKey = viewZ;
-	SortKeysWrite[dest] = sortKey;
+	//float viewZ = max(0, dot(CameraForward, worldBoundsCenter));
+	//uint sortKey = viewZ;
+	//SortKeysWrite[dest] = sortKey;
 }

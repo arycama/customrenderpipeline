@@ -10,8 +10,9 @@ public struct RendererDrawCallData
     public int passIndex;
     public int indirectArgsOffset;
     public int rendererOffset;
+	public int lodOffset;
 
-    public RendererDrawCallData(int renderQueue, Mesh mesh, int submeshIndex, Material material, int passIndex, int indirectArgsOffset, int rendererOffset)
+    public RendererDrawCallData(int renderQueue, Mesh mesh, int submeshIndex, Material material, int passIndex, int indirectArgsOffset, int rendererOffset, int lodOffset)
     {
         this.renderQueue = renderQueue;
         this.mesh = mesh ?? throw new ArgumentNullException(nameof(mesh));
@@ -20,7 +21,8 @@ public struct RendererDrawCallData
         this.passIndex = passIndex;
         this.indirectArgsOffset = indirectArgsOffset;
         this.rendererOffset = rendererOffset;
+		this.lodOffset = lodOffset;
     }
 
-	public override string ToString() => $"{mesh} {submeshIndex} {material} {renderQueue} {passIndex} {indirectArgsOffset} {rendererOffset}";
+	public override string ToString() => $"{mesh} {submeshIndex} {material} {renderQueue} {passIndex} {indirectArgsOffset} {rendererOffset} {lodOffset}";
 }
