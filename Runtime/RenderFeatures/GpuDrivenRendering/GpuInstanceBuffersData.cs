@@ -6,9 +6,9 @@ public struct GpuInstanceBuffersData : IRenderPassData
 {
     public ResourceHandle<GraphicsBuffer> positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, instanceBoundsBuffer;
     public Dictionary<string, List<RendererDrawCallData>> rendererDrawCallData;
-    public int totalInstanceCount;
+	public int totalInstanceCount, totalRendererCount;
 
-    public GpuInstanceBuffersData(ResourceHandle<GraphicsBuffer> positionsBuffer, ResourceHandle<GraphicsBuffer> instanceTypeIdsBuffer, ResourceHandle<GraphicsBuffer> lodFadesBuffer, ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, ResourceHandle<GraphicsBuffer> lodSizesBuffer, ResourceHandle<GraphicsBuffer> instanceTypeDataBuffer, ResourceHandle<GraphicsBuffer> instanceTypeLodDataBuffer, ResourceHandle<GraphicsBuffer> submeshOffsetLengthsBuffer, ResourceHandle<GraphicsBuffer> drawCallArgsBuffer, ResourceHandle<GraphicsBuffer> instanceBoundsBuffer, Dictionary<string, List<RendererDrawCallData>> rendererDrawCallData, int totalInstanceCount)
+    public GpuInstanceBuffersData(ResourceHandle<GraphicsBuffer> positionsBuffer, ResourceHandle<GraphicsBuffer> instanceTypeIdsBuffer, ResourceHandle<GraphicsBuffer> lodFadesBuffer, ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, ResourceHandle<GraphicsBuffer> lodSizesBuffer, ResourceHandle<GraphicsBuffer> instanceTypeDataBuffer, ResourceHandle<GraphicsBuffer> instanceTypeLodDataBuffer, ResourceHandle<GraphicsBuffer> submeshOffsetLengthsBuffer, ResourceHandle<GraphicsBuffer> drawCallArgsBuffer, ResourceHandle<GraphicsBuffer> instanceBoundsBuffer, Dictionary<string, List<RendererDrawCallData>> rendererDrawCallData, int totalInstanceCount, int totalRendererCount)
     {
         this.positionsBuffer = positionsBuffer;
         this.instanceTypeIdsBuffer = instanceTypeIdsBuffer;
@@ -22,7 +22,8 @@ public struct GpuInstanceBuffersData : IRenderPassData
         this.rendererDrawCallData = rendererDrawCallData;
         this.totalInstanceCount = totalInstanceCount;
         this.instanceBoundsBuffer = instanceBoundsBuffer;
-    }
+		this.totalRendererCount = totalRendererCount;
+	}
 
 	void IRenderPassData.SetInputs(RenderPassBase pass)
 	{

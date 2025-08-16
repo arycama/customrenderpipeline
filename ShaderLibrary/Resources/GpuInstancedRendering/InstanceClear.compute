@@ -1,9 +1,12 @@
 ﻿#pragma kernel ClearBuffer
+#pragma enable_d3d11_debug_symbols
 
-RWStructuredBuffer<uint> _Result;
+RWStructuredBuffer<uint> Output;
+uint MaxThread;
 
-[numthreads(1024, 1 ,1)]
+[numthreads(64, 1 ,1)]
 void ClearBuffer(uint id : SV_DispatchThreadID)
 {
-	_Result[id] = 0;
+	if(id < MaxThread)
+		Output[id * 5 + 1] = 0;
 }

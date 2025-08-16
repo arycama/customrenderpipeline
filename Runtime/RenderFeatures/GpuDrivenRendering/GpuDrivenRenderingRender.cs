@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 public class GpuDrivenRenderingRender : CameraRenderFeature
 {
-    private readonly ComputeShader cullingShader, instancePrefixSum, instanceSort, instanceCompaction, instanceCopyData;
+    private readonly ComputeShader cullingShader, instancePrefixSum, instanceSort, instanceCompaction, instanceCopyData, instanceClear;
 
     public GpuDrivenRenderingRender(RenderGraph renderGraph) : base(renderGraph)
     {
@@ -13,6 +13,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
         instanceSort = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceSort");
         instanceCompaction = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCompaction");
         instanceCopyData = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCopyData");
+		instanceClear = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceClear");
     }
 
     public override void Render(Camera camera, ScriptableRenderContext context)
@@ -60,7 +61,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
         var prefixSums = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
         instancePrefixSum.GetThreadGroupSizes(0, gpuInstanceBuffers.totalInstanceCount, out var groupsX);
         var groupSums = renderGraph.GetBuffer((int)groupsX);
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Prefix Sum 1"))
+		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Prefix Sum 1"))
         {
             pass.Initialize(instancePrefixSum, 0, gpuInstanceBuffers.totalInstanceCount);
             pass.WriteBuffer("PrefixSumsWrite", prefixSums);
@@ -76,11 +77,12 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 
         // TODO: This only handles a 2048*1024 array for now
         var groupSums1 = renderGraph.GetBuffer((int)groupsX);
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Prefix Sum 2"))
+		var totalInstanceCountBuffer = renderGraph.GetBuffer(1);
+		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Prefix Sum 2"))
         {
             pass.Initialize(instancePrefixSum, 1, (int)groupsX);
             pass.WriteBuffer("PrefixSumsWrite", groupSums1);
-            pass.WriteBuffer("DrawCallArgsWrite", gpuInstanceBuffers.drawCallArgsBuffer);
+            pass.WriteBuffer("TotalInstanceCount", totalInstanceCountBuffer);
             pass.ReadBuffer("Input", groupSums);
 
             pass.SetRenderFunction((command, pass) =>
@@ -89,21 +91,38 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
             });
         }
 
-        // Need a buffer big enough to hold all potential indices
-        var instanceIndices = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
+		// Clear the draw call args buffer
+		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Clear Instance Counts"))
+		{
+			var threadCount = gpuInstanceBuffers.totalRendererCount;
+			pass.Initialize(instanceClear, 0, threadCount);
+			pass.WriteBuffer("Output", gpuInstanceBuffers.drawCallArgsBuffer);
+
+			pass.SetRenderFunction((command, pass) =>
+			{
+				pass.SetInt("MaxThread", threadCount);
+			});
+		}
+
+		// Need a buffer big enough to hold all potential indices
+		var instanceIndices = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
         var sortKeys = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
         using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Stream Compaction"))
         {
             pass.Initialize(instanceCompaction, 0, gpuInstanceBuffers.totalInstanceCount);
             pass.WriteBuffer("Output", instanceIndices);
             pass.WriteBuffer("SortKeysWrite", sortKeys);
+			pass.WriteBuffer("DrawCallArgsWrite", gpuInstanceBuffers.drawCallArgsBuffer);
 
-            pass.ReadBuffer("Input", visibilityPredicates);
+			pass.ReadBuffer("Input", visibilityPredicates);
             pass.ReadBuffer("PrefixSums", prefixSums);
             pass.ReadBuffer("GroupSums", groupSums1);
             pass.ReadBuffer("InstanceBounds", gpuInstanceBuffers.instanceBoundsBuffer);
+			pass.ReadBuffer("InstanceTypeIds", gpuInstanceBuffers.instanceTypeIdsBuffer);
+			pass.ReadBuffer("InstanceTypeDatas", gpuInstanceBuffers.instanceTypeDataBuffer);
+			pass.ReadBuffer("InstanceTypeLodDatas", gpuInstanceBuffers.instanceTypeLodDataBuffer);
 
-            pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction((command, pass) =>
             {
                 pass.SetInt("MaxThread", gpuInstanceBuffers.totalInstanceCount);
                 pass.SetVector("CameraForward", camera.transform.forward);
@@ -116,7 +135,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
         {
             pass.Initialize(instanceCopyData, 0, 1, 1, 1, false);
             pass.WriteBuffer("ThreadGroupsWrite", threadGroups);
-            pass.ReadBuffer("DrawCallArgs", gpuInstanceBuffers.drawCallArgsBuffer);
+            pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
         }
 
         var sortedInstanceIndices = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
@@ -129,7 +148,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 
             pass.ReadBuffer("Input", instanceIndices);
             pass.ReadBuffer("SortKeys", sortKeys);
-            pass.ReadBuffer("DrawCallArgs", gpuInstanceBuffers.drawCallArgsBuffer);
+            pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
         }
 
         var objectToWorld = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount, UnsafeUtility.SizeOf<Float3x4>());
@@ -140,7 +159,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 
             pass.ReadBuffer("InputIndices", sortedInstanceIndices);
             pass.ReadBuffer("_Positions", gpuInstanceBuffers.positionsBuffer);
-            pass.ReadBuffer("DrawCallArgs", gpuInstanceBuffers.drawCallArgsBuffer);
+            pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
 
             // Just here for debug
             pass.ReadBuffer("SortedKeys", sortedKeys);

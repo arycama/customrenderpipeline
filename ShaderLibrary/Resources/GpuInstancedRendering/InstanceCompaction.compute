@@ -1,4 +1,5 @@
 ﻿#pragma kernel InstanceCompaction
+#pragma enable_d3d11_debug_symbols
 
 // Since we use groupId to index the instance prefix sum, this needs to match
 const static uint threadCount = 1024;
@@ -9,10 +10,27 @@ float3 CameraForward, ViewPosition;
 
 RWStructuredBuffer<uint> Output;
 RWStructuredBuffer<uint> SortKeysWrite;
+RWStructuredBuffer<uint> DrawCallArgsWrite;
 
 StructuredBuffer<uint> Input;
 StructuredBuffer<uint> GroupSums, PrefixSums;
 StructuredBuffer<float4> InstanceBounds;
+
+struct InstanceTypeData
+{
+	float3 localReferencePoint;
+	float radius;
+	uint lodCount, lodSizebufferPOsition, instanceCount, lodRendererOffset;
+};
+
+struct InstanceTypeLodData
+{
+	uint rendererStart, rendererCount, instancesStart, pad;
+};
+
+StructuredBuffer<uint> InstanceTypeIds;
+StructuredBuffer<InstanceTypeData> InstanceTypeDatas;
+StructuredBuffer<InstanceTypeLodData> InstanceTypeLodDatas;
 
 [numthreads(threadCount, 1, 1)]
 void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
@@ -26,6 +44,22 @@ void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID
 	// Compute sort key from instanceType, lod and viewDistance
 	float4 boundsData = InstanceBounds[id];
 	float3 worldBoundsCenter = boundsData.xyz - ViewPosition;
+	
+	// Calculate lod (Assume 0 for now)
+	uint instanceType = InstanceTypeIds[id];
+	uint lod = 0; // Insert lod calculation here
+	
+	// Increment the counter for each submesh  associated with this instance-lod-combination
+	InstanceTypeData instanceTypeData = InstanceTypeDatas[instanceType];
+	uint lodInfoIndex = instanceTypeData.lodRendererOffset + lod;
+	
+	InstanceTypeLodData lodData = InstanceTypeLodDatas[lodInfoIndex];
+	
+	for (uint i = 0; i < lodData.rendererCount; i++)
+	{
+		uint index = (lodData.rendererStart + i) * 5 + 1;
+		InterlockedAdd(DrawCallArgsWrite[index], 1);
+	}
 	
 	float viewZ = max(0, dot(CameraForward, worldBoundsCenter));
 	uint sortKey = viewZ;

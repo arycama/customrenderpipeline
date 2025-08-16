@@ -1,10 +1,11 @@
 #include "../../PrefixSum.hlsl"
 
 #pragma kernel InstanceSort
+#pragma enable_d3d11_debug_symbols
 
 RWStructuredBuffer<uint> Result;
 StructuredBuffer<uint> Input;
-StructuredBuffer<uint> DrawCallArgs, SortKeys;
+StructuredBuffer<uint> TotalInstanceCount, SortKeys;
 RWStructuredBuffer<float> SortKeysWrite;
 
 const static uint threadCount = 256;
@@ -29,7 +30,7 @@ uint PrefixSumSharedRead(uint index)
 [numthreads(threadCount, 1, 1)]
 void InstanceSort(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
-	bool outOfRange = id >= DrawCallArgs[1];
+	bool outOfRange = id >= TotalInstanceCount[0];
 	sharedKeys[groupIndex] = outOfRange ? 0xFFFFFFFF : SortKeys[id];
 	sharedIndices[groupIndex] = groupIndex;
 	

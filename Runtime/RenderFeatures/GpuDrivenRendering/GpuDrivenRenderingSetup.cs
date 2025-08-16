@@ -123,7 +123,7 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
         var submeshOffset = 0;
         var lodOffset = 0;
         var instanceTimesRendererCount = 0;
-        var totalRendererSum = 0;
+        var totalRendererCount = 0;
 
         // Stores the starting thread for each instance position
         var totalInstanceCount = 0;
@@ -244,7 +244,7 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
                                 passDrawList.Add(passName, drawList);
                             }
 
-                            var drawData = new RendererDrawCallData(material.renderQueue, mesh, i, material, j, indirectArgsOffset * sizeof(uint), totalRendererSum);
+                            var drawData = new RendererDrawCallData(material.renderQueue, mesh, i, material, j, indirectArgsOffset * sizeof(uint), totalRendererCount);
                             drawList.Add(drawData);
                         }
 
@@ -252,15 +252,14 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
                         var indexStart = meshFilter.sharedMesh.GetIndexStart(i);
                         drawCallArgs.Value.Add(new DrawIndexedInstancedIndirectArgs(indexCount, 0, indexStart, 0, 0));
                         indirectArgsOffset += 5;
-                    }
+						rendererCount++;
+					}
+				}
 
-                    rendererCount++;
-                }
+                instanceTypeLodDatas.Value.Add(new InstanceTypeLodData(totalRendererCount, rendererCount, instanceTimesRendererCount - totalInstanceCount));
 
-                instanceTypeLodDatas.Value.Add(new InstanceTypeLodData(totalRendererSum, rendererCount, instanceTimesRendererCount - totalInstanceCount));
-
-                lodOffset++;
-                totalRendererSum += rendererCount;
+                lodOffset++; // TODO: Could simply be incremented once per group
+                totalRendererCount += rendererCount;
 
                 instanceTimesRendererCount += rendererCount * prefab.count;
                 lodSizes.Value.Add(lodSize);
@@ -311,6 +310,6 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
             });
         }
 
-        renderGraph.SetResource(new GpuInstanceBuffersData(positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, instanceBoundsBuffer, passDrawList, totalInstanceCount), true);
+        renderGraph.SetResource(new GpuInstanceBuffersData(positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, submeshOffsetLengthsBuffer, drawCallArgsBuffer, instanceBoundsBuffer, passDrawList, totalInstanceCount, totalRendererCount), true);
     }
 }

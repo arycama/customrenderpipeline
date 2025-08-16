@@ -2,13 +2,14 @@
 
 #pragma kernel PrefixScan0 KERNEL=PrefixScan0 WRITE_FINAL_COUNT
 #pragma kernel PrefixScan1 KERNEL=PrefixScan1 WRITE_DRAW_CALL_COUNT
+#pragma enable_d3d11_debug_symbols
 
 const static uint threadCount = 1024;
 const static uint log2ThreadCount = firstbitlow(threadCount);
 
 uint MaxThread;
 
-RWStructuredBuffer<uint> PrefixSumsWrite, GroupSumsWrite, DrawCallArgsWrite;
+RWStructuredBuffer<uint> PrefixSumsWrite, GroupSumsWrite, TotalInstanceCount;
 RWStructuredBuffer<float3x4> _ObjectToWorldWrite;
 
 StructuredBuffer<uint> Input;
@@ -43,7 +44,7 @@ void KERNEL(uint dispatchThreadId : SV_DispatchThreadID, uint groupIndex : SV_Gr
 
 	#ifdef WRITE_DRAW_CALL_COUNT
 		if(!groupIndex)
-			DrawCallArgsWrite[1] = totalSum;
+			TotalInstanceCount[0] = totalSum;
 	#endif
 	
 	GroupMemoryBarrierWithGroupSync();
