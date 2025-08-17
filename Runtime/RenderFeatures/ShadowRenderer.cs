@@ -32,13 +32,13 @@ public class ShadowRenderer : CameraRenderFeature
 
 		// Allocate and clear shadow maps
 		var directionalShadowCount = Max(1, requestData.DirectionalShadowRequests.Count);
-		var directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, directionalShadowCount, TextureDimension.Tex2DArray, isExactSize: true); // TODO: Should allow for different slices, but exact resolution
+		var directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, directionalShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
 
 		var pointShadowCount = Max(1, requestData.PointShadowRequests.Count);
-		var pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D16_UNorm, pointShadowCount, TextureDimension.Tex2DArray);
+		var pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D16_UNorm, pointShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
 
 		var spotShadowCount = Max(1, requestData.SpotShadowRequests.Count);
-		var spotShadows = renderGraph.GetTexture(settings.SpotShadowResolution, settings.SpotShadowResolution, GraphicsFormat.D16_UNorm, spotShadowCount, TextureDimension.Tex2DArray);
+		var spotShadows = renderGraph.GetTexture(settings.SpotShadowResolution, settings.SpotShadowResolution, GraphicsFormat.D16_UNorm, spotShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
 		renderGraph.SetResource(new ShadowData(directionalShadows, pointShadows, spotShadows));
 
 		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Render Shadows Setup"))
@@ -61,7 +61,7 @@ public class ShadowRenderer : CameraRenderFeature
 			});
 		}
 
-		void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip)
+		void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip, bool isPointLight)
 		{
 			var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
 			var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, camera.transform.position, 0, request.LightPosition, 0));
@@ -71,12 +71,11 @@ public class ShadowRenderer : CameraRenderFeature
 
 			using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Shadow"))
 			{
-				var isOrtho = projectionType == BatchCullingProjectionType.Orthographic;
-				pass.Initialize(context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, !isOrtho);
+				pass.Initialize(context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, isPointLight);
 
 				// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
 				pass.WriteTexture(target);
-				pass.ReadBuffer("PerCascadeData", perCascadeData);
+				pass.AddRenderPassData<ShadowRequestData>();
 
 				pass.SetRenderFunction((target, index),
 				static (command, pass, data) =>
@@ -95,7 +94,7 @@ public class ShadowRenderer : CameraRenderFeature
 				using (renderGraph.AddProfileScope(directionalCascadeIds.GetString(i)))
 				{
 					var request = requestData.DirectionalShadowRequests[i];
-					RenderShadowMap(request, BatchCullingProjectionType.Orthographic, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false);
+					RenderShadowMap(request, BatchCullingProjectionType.Orthographic, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false, false);
 				}
 			}
 
@@ -109,7 +108,7 @@ public class ShadowRenderer : CameraRenderFeature
 				using (renderGraph.AddProfileScope(pointLightIds.GetString(i)))
 				{
 					var request = requestData.PointShadowRequests[i];
-					RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true);
+					RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, true);
 				}
 			}
 			ListPool<ShadowRequest>.Release(requestData.PointShadowRequests);
@@ -122,7 +121,7 @@ public class ShadowRenderer : CameraRenderFeature
 				using (renderGraph.AddProfileScope(SpotLightIds.GetString(i)))
 				{
 					var request = requestData.SpotShadowRequests[i];
-					RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true);
+					RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, false);
 				}
 			}
 
