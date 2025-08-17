@@ -120,11 +120,12 @@ public class RaytracingRenderPass : RenderPass<RaytracingRenderPass>
 		Command.SetRayTracingMatrixParam(shader, propertyName, value);
 	}
 
-	public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value)
+	public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value, int size, int offset)
 	{
 		var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
-		var size = descriptor.Count * descriptor.Stride;
-		Command.SetRayTracingConstantBufferParam(shader, propertyName, GetBuffer(value), 0, size);
+		if (size == 0)
+			size = descriptor.Count * descriptor.Stride;
+		Command.SetRayTracingConstantBufferParam(shader, propertyName, GetBuffer(value), offset, size);
 	}
 
 	public override void SetMatrixArray(string propertyName, Matrix4x4[] value)

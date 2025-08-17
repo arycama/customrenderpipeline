@@ -8,7 +8,7 @@ public abstract class RenderPassBase : IDisposable
 {
 	// TODO: Convert to handles and remove
 	protected readonly List<(int, ResourceHandle<RenderTexture>, int, RenderTextureSubElement)> readTextures = new();
-	protected readonly List<(string, ResourceHandle<GraphicsBuffer>)> readBuffers = new();
+	protected readonly List<(string, ResourceHandle<GraphicsBuffer>, int size, int offset)> readBuffers = new();
 	protected readonly List<(string, ResourceHandle<GraphicsBuffer>)> writeBuffers = new();
 
 	private List<(RenderPassDataHandle, bool)> RenderPassDataHandles = new();
@@ -28,7 +28,7 @@ public abstract class RenderPassBase : IDisposable
 	public abstract void SetInt(string propertyName, int value);
 	public abstract void SetMatrix(string propertyName, Matrix4x4 value);
 	public abstract void SetMatrixArray(string propertyName, Matrix4x4[] value);
-	public abstract void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value);
+	public abstract void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value, int size, int offset);
 
 	public void SetVector(string propertyName, Vector4 value) => SetVector(Shader.PropertyToID(propertyName), value);
 
@@ -91,7 +91,7 @@ public abstract class RenderPassBase : IDisposable
 		{
 			var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(buffer.Item2);
 			if (descriptor.Target.HasFlag(GraphicsBuffer.Target.Constant))
-				SetConstantBuffer(buffer.Item1, buffer.Item2);
+				SetConstantBuffer(buffer.Item1, buffer.Item2, buffer.size, buffer.offset);
 			else
 				SetBuffer(buffer.Item1, buffer.Item2);
 		}
@@ -150,10 +150,10 @@ public abstract class RenderPassBase : IDisposable
 		ReadTexture(Shader.PropertyToID(propertyName), texture, mip, subElement);
 	}
 
-	public void ReadBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
+	public void ReadBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer, int size = 0, int offset = 0)
 	{
 		RenderGraph.BufferHandleSystem.ReadResource(buffer, Index);
-		readBuffers.Add((propertyName, buffer));
+		readBuffers.Add((propertyName, buffer, size, offset));
 	}
 
 	public void WriteBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
