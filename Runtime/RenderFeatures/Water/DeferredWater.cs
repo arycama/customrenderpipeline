@@ -24,6 +24,8 @@ public class DeferredWater : CameraRenderFeature
 
     public override void Render(Camera camera, ScriptableRenderContext context)
     {
+		using var scope = renderGraph.AddProfileScope("Deferred Water");
+
         var refractionResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
         var scatterResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
         var depth = renderGraph.GetResource<CameraDepthData>().Handle;
@@ -33,7 +35,7 @@ public class DeferredWater : CameraRenderFeature
         var bentNormalOcclusion = renderGraph.GetResource<BentNormalOcclusionData>().Handle;
         var translucency = renderGraph.GetResource<TranslucencyData>().Handle;
 
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water"))
+        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Render"))
         {
             pass.Initialize(deferredWaterMaterial);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
@@ -174,7 +176,7 @@ public class DeferredWater : CameraRenderFeature
         }
 
         var (current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Water Temporal"))
+        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal"))
         {
             if (settings.RaytracedRefractions)
                 pass.Keyword = "RAYTRACED_REFRACTIONS_ON";

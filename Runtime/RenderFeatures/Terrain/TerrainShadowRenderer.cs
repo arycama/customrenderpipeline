@@ -53,6 +53,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 			pass.AddRenderPassData<TerrainRenderData>();
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 			pass.AddRenderPassData<ViewData>();
+			pass.AddRenderPassData<ShadowRequestData>();
 
 			pass.SetRenderFunction((command, pass) =>
 			{

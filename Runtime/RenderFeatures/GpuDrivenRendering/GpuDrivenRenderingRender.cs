@@ -32,6 +32,8 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
     public GpuRenderingData Render(Int2 viewSize, Float3 mainViewPosition, Float3 mainViewForward, bool isShadow, CullingPlanes cullingPlanes, GpuDrivenRenderingData instanceData)
     {
+		using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
+
 		var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
 		for (var i = 0; i < cullingPlanes.Count; i++)
 			cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);

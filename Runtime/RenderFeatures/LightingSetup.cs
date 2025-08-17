@@ -74,7 +74,7 @@ public partial class LightingSetup : CameraRenderFeature
 			if (light.shadows != LightShadows.None && cullingResults.GetShadowCasterBounds(i, out var shadowCasterBounds))
 			{
 				var worldShadowBounds = (Bounds)shadowCasterBounds;
-				var viewBounds = worldShadowBounds.Transform3x4(camera.transform.worldToLocalMatrix);
+				//var viewBounds = worldShadowBounds.Transform3x4(camera.transform.worldToLocalMatrix);
 
 				if (light.type == LightType.Directional)
 				{
@@ -83,8 +83,10 @@ public partial class LightingSetup : CameraRenderFeature
 					var lightViewMatrix = Matrix4x4.Rotate(lightInverse);
 
 
-					var n = Max(camera.nearClipPlane, viewBounds.Min.z);
-					var f = Min(settings.DirectionalShadowDistance, viewBounds.Max.z);
+					//var n = Max(camera.nearClipPlane, viewBounds.Min.z);
+					//var f = Min(settings.DirectionalShadowDistance, viewBounds.Max.z);
+					var n = camera.nearClipPlane;
+					var f = settings.DirectionalShadowDistance;
 					var m = (float)settings.DirectionalCascadeCount;
 					var uniformity = Math.Pow(settings.CascadeUniformity, 2.2f);
 
