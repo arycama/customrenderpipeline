@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 public class GpuDrivenRenderingRender : CameraRenderFeature
 {
-    private readonly ComputeShader cullingShader, instancePrefixSum, instanceSort, instanceCompaction, instanceIdOffsets, instanceCopyData, instanceClear;
+    private readonly ComputeShader cullingShader, instancePrefixSum, instanceSort, instanceCompaction, instanceIdOffsets, instanceCopyData, writeDrawCallArgs;
 
     public GpuDrivenRenderingRender(RenderGraph renderGraph) : base(renderGraph)
     {
@@ -14,7 +14,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
         instanceCompaction = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCompaction");
         instanceCopyData = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCopyData");
 		instanceIdOffsets = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceIdOffsets");
-		instanceClear = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceClear");
+		writeDrawCallArgs = Resources.Load<ComputeShader>("GpuInstancedRendering/WriteDrawCallArgs");
     }
 
     public override void Render(Camera camera, ScriptableRenderContext context)
@@ -24,8 +24,8 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
         if (camera.cameraType != CameraType.SceneView && camera.cameraType != CameraType.Game && camera.cameraType != CameraType.Reflection)
             return;
 
-        var handle = renderGraph.ResourceMap.GetResourceHandle<GpuInstanceBuffersData>();
-        if (!renderGraph.ResourceMap.TryGetRenderPassData<GpuInstanceBuffersData>(handle, renderGraph.FrameIndex, out var gpuInstanceBuffers))
+        var handle = renderGraph.ResourceMap.GetResourceHandle<GpuDrivenRenderingData>();
+        if (!renderGraph.ResourceMap.TryGetRenderPassData<GpuDrivenRenderingData>(handle, renderGraph.FrameIndex, out var gpuInstanceBuffers))
             return;
 
         var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
@@ -35,16 +35,16 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
         for (var i = 0; i < cullingPlanes.Count; i++)
             cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
 
-        var visibilityPredicates = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
+        var visibilityPredicates = renderGraph.GetBuffer(gpuInstanceBuffers.instanceCount);
         using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Cull"))
         {
-            pass.Initialize(cullingShader, 0, gpuInstanceBuffers.totalInstanceCount);
+            pass.Initialize(cullingShader, 0, gpuInstanceBuffers.instanceCount);
 
             if (!isShadow)
                 pass.AddKeyword("HIZ_ON");
 
             pass.WriteBuffer("_RendererInstanceIDs", visibilityPredicates);
-            pass.ReadBuffer("_InstanceBounds", gpuInstanceBuffers.instanceBoundsBuffer);
+            pass.ReadBuffer("_InstanceBounds", gpuInstanceBuffers.instanceBounds);
 
             pass.AddRenderPassData<FrameData>();
             pass.AddRenderPassData<ViewData>();
@@ -55,16 +55,16 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
                 pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
                 pass.SetFloat("_MaxHiZMip", Texture2DExtensions.MipCount(camera.scaledPixelWidth, camera.scaledPixelHeight) - 1);
                 pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
-                pass.SetInt("_InstanceCount", gpuInstanceBuffers.totalInstanceCount);
+                pass.SetInt("_InstanceCount", gpuInstanceBuffers.instanceCount);
             });
         }
 
-        var prefixSums = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
-        instancePrefixSum.GetThreadGroupSizes(0, gpuInstanceBuffers.totalInstanceCount, out var groupsX);
+        var prefixSums = renderGraph.GetBuffer(gpuInstanceBuffers.instanceCount);
+        instancePrefixSum.GetThreadGroupSizes(0, gpuInstanceBuffers.instanceCount, out var groupsX);
         var groupSums = renderGraph.GetBuffer((int)groupsX);
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Prefix Sum 1"))
         {
-            pass.Initialize(instancePrefixSum, 0, gpuInstanceBuffers.totalInstanceCount);
+            pass.Initialize(instancePrefixSum, 0, gpuInstanceBuffers.instanceCount);
             pass.WriteBuffer("PrefixSumsWrite", prefixSums);
             pass.WriteBuffer("GroupSumsWrite", groupSums);
 
@@ -72,7 +72,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetInt("MaxThread", gpuInstanceBuffers.totalInstanceCount);
+                pass.SetInt("MaxThread", gpuInstanceBuffers.instanceCount);
             });
         }
 
@@ -92,52 +92,55 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
             });
         }
 
-		// Clear the draw call args buffer
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Clear Instance Counts"))
-		{
-			var threadCount = gpuInstanceBuffers.totalRendererCount;
-			pass.Initialize(instanceClear, 0, threadCount);
-			pass.WriteBuffer("Output", gpuInstanceBuffers.drawCallArgsBuffer);
-
-			pass.SetRenderFunction((command, pass) =>
-			{
-				pass.SetInt("MaxThread", threadCount);
-			});
-		}
-
 		// Need a buffer big enough to hold all potential indices
-		var instanceIndices = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
-		var lodCounts = renderGraph.GetBuffer(gpuInstanceBuffers.totalLodCount);
+		var instanceIndices = renderGraph.GetBuffer(gpuInstanceBuffers.instanceCount);
+		var lodCounts = renderGraph.GetBuffer(gpuInstanceBuffers.lodCount);
         //var sortKeys = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount);
         using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Stream Compaction"))
         {
-            pass.Initialize(instanceCompaction, 0, gpuInstanceBuffers.totalInstanceCount);
+            pass.Initialize(instanceCompaction, 0, gpuInstanceBuffers.instanceCount);
             pass.WriteBuffer("Output", instanceIndices);
             //pass.WriteBuffer("SortKeysWrite", sortKeys);
-			pass.WriteBuffer("DrawCallArgsWrite", gpuInstanceBuffers.drawCallArgsBuffer);
 			pass.WriteBuffer("LodCounts", lodCounts);
 
 			pass.ReadBuffer("Input", visibilityPredicates);
             pass.ReadBuffer("PrefixSums", prefixSums);
             pass.ReadBuffer("GroupSums", groupSums1);
-            pass.ReadBuffer("InstanceBounds", gpuInstanceBuffers.instanceBoundsBuffer);
-			pass.ReadBuffer("InstanceTypeIds", gpuInstanceBuffers.instanceTypeIdsBuffer);
-			pass.ReadBuffer("InstanceTypeDatas", gpuInstanceBuffers.instanceTypeDataBuffer);
-			pass.ReadBuffer("InstanceTypeLodDatas", gpuInstanceBuffers.instanceTypeLodDataBuffer);
+            pass.ReadBuffer("InstanceBounds", gpuInstanceBuffers.instanceBounds);
+			pass.ReadBuffer("InstanceTypeIds", gpuInstanceBuffers.instanceTypes);
+			pass.ReadBuffer("InstanceTypeDatas", gpuInstanceBuffers.instanceTypeData);
 
 			pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetInt("MaxThread", gpuInstanceBuffers.totalInstanceCount);
+                pass.SetInt("MaxThread", gpuInstanceBuffers.instanceCount);
                 pass.SetVector("CameraForward", camera.transform.forward);
                 pass.SetVector("ViewPosition", camera.transform.position);
 
-				using (ArrayPool<uint>.Get(gpuInstanceBuffers.totalLodCount, out var data))
+				using (ArrayPool<uint>.Get(gpuInstanceBuffers.lodCount, out var data))
 					command.SetBufferData(pass.GetBuffer(lodCounts), data);
             });
         }
 
+		// Write the draw call args for each type
+		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Write Draw Call Args"))
+		{
+			pass.Initialize(writeDrawCallArgs, 0, gpuInstanceBuffers.rendererCount);
+			pass.WriteBuffer("DrawCallArgs", gpuInstanceBuffers.drawCallArgs);
+
+			// Contains mapping from renderer to lod, which is used to pull the lod count for each renderer, as one lod may have multiple renderers, submeshes etc
+			pass.ReadBuffer("RendererLodIndices", gpuInstanceBuffers.rendererLodIndices);
+			pass.ReadBuffer("LodCounts", lodCounts);
+
+			pass.SetRenderFunction((command, pass) =>
+			{
+				var b = pass.GetBuffer(gpuInstanceBuffers.rendererLodIndices);
+
+				pass.SetInt("MaxThread", gpuInstanceBuffers.rendererCount);
+			});
+		}
+
 		// Write out the offset for each type
-		var instanceIdOffsetsBuffer = renderGraph.GetBuffer(gpuInstanceBuffers.totalLodCount);
+		var instanceIdOffsetsBuffer = renderGraph.GetBuffer(gpuInstanceBuffers.lodCount);
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Id Offsets"))
 		{
 			pass.Initialize(instanceIdOffsets, 0, 1, 1, 1, false);
@@ -146,7 +149,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 
 			pass.SetRenderFunction((command, pass) =>
 			{
-				pass.SetInt("MaxThread", gpuInstanceBuffers.totalLodCount);
+				pass.SetInt("MaxThread", gpuInstanceBuffers.lodCount);
 			});
 		}
 
@@ -171,14 +174,14 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
         //    pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
         //}
 
-        var objectToWorld = renderGraph.GetBuffer(gpuInstanceBuffers.totalInstanceCount, UnsafeUtility.SizeOf<Float3x4>());
+        var objectToWorld = renderGraph.GetBuffer(gpuInstanceBuffers.instanceCount, UnsafeUtility.SizeOf<Float3x4>());
         using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Copy Data"))
         {
             pass.Initialize(instanceCopyData, threadGroups, 1);
             pass.WriteBuffer("_ObjectToWorldWrite", objectToWorld);
 
             pass.ReadBuffer("InputIndices", instanceIndices);
-            pass.ReadBuffer("_Positions", gpuInstanceBuffers.positionsBuffer);
+            pass.ReadBuffer("_Positions", gpuInstanceBuffers.positions);
             pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
 
             // Just here for debug
@@ -186,7 +189,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetInt("MaxThread", gpuInstanceBuffers.totalInstanceCount);
+                pass.SetInt("MaxThread", gpuInstanceBuffers.instanceCount);
             });
         }
 
@@ -199,7 +202,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 			var draw = drawList[i];
 			using (var pass = renderGraph.AddRenderPass<DrawInstancedIndirectRenderPass>("Gpu Driven Rendering"))
             {
-                pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, gpuInstanceBuffers.drawCallArgsBuffer, draw.passIndex, "INDIRECT_RENDERING", 0.0f, 0.0f, true, draw.indirectArgsOffset);
+                pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, gpuInstanceBuffers.drawCallArgs, draw.passIndex, "INDIRECT_RENDERING", 0.0f, 0.0f, true, draw.indirectArgsOffset);
 
                 pass.WriteDepth(renderGraph.GetResource<CameraDepthData>());
                 pass.WriteTexture(renderGraph.GetResource<AlbedoMetallicData>());
@@ -216,8 +219,8 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 
                 pass.ReadBuffer("_VisibleRendererInstanceIndices", visibilityPredicates);
                 pass.ReadBuffer("_ObjectToWorld", objectToWorld);
-                pass.ReadBuffer("_InstancePositions", gpuInstanceBuffers.positionsBuffer);
-                pass.ReadBuffer("_InstanceLodFades", gpuInstanceBuffers.lodFadesBuffer);
+                pass.ReadBuffer("_InstancePositions", gpuInstanceBuffers.positions);
+                pass.ReadBuffer("_InstanceLodFades", gpuInstanceBuffers.lodFades);
 				pass.ReadBuffer("InstanceIdOffsets", instanceIdOffsetsBuffer);
 
 				pass.SetRenderFunction(draw.lodOffset, static (command, pass, lodOffset) =>

@@ -1,7 +1,6 @@
 #include "../../PrefixSum.hlsl"
 
 #pragma kernel InstanceSort
-#pragma enable_d3d11_debug_symbols
 
 RWStructuredBuffer<uint> Result;
 StructuredBuffer<uint> Input;

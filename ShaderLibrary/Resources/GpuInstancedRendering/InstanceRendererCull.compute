@@ -1,7 +1,6 @@
 ﻿ #pragma kernel Visibility
 
 #pragma multi_compile _ HIZ_ON
-#pragma enable_d3d11_debug_symbols
 
 #include "../../Common.hlsl"
 #include "../../TerrainCommon.hlsl"

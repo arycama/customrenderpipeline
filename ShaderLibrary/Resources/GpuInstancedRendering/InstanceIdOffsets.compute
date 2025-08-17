@@ -1,7 +1,6 @@
 #include "../../PrefixSum.hlsl"
 
 #pragma kernel InstanceIdOffsets
-#pragma enable_d3d11_debug_symbols
 
 RWStructuredBuffer<uint> Output;
 StructuredBuffer<uint> LodCounts;

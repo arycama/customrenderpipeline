@@ -1,6 +1,5 @@
 ﻿#pragma kernel ComputeThreadCount
 #pragma kernel InstanceCopyData
-#pragma enable_d3d11_debug_symbols
 
 // Since we use groupId to index the instance prefix sum, this needs to match
 const static uint threadCount = 1024;

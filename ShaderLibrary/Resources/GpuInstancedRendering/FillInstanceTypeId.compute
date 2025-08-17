@@ -2,15 +2,8 @@
 
 #include "../../Common.hlsl"
 #include "../../Packing.hlsl"
+#include "../../IndirectRendering.hlsl"
 #include "../../MatrixUtils.hlsl"
-
-struct Bounds
-{
-	float3 min;
-	float pad0;
-	float3 size;
-	float pad1;
-};
 
 uint _Offset, _Count;
 
@@ -63,5 +56,4 @@ void FillData(uint id : SV_DispatchThreadID)
 	_PositionsResult[_Offset + id] = objectToWorld;
 	_LodFadesResult[_Offset + id] = 0;
 	_InstanceBounds[_Offset + id] = packedBounds;
-
 }

@@ -1,0 +1,20 @@
+// Copies the count of a lod to the indirect buffer of each renderer/submesh. Uses a thread per renderer/submesh to 'pull' and write the data once per thread instead of having to do multiple writes per thread
+
+#include "../../IndirectRendering.hlsl"
+
+#pragma kernel WriteDrawCallArgs
+
+StructuredBuffer<uint> RendererLodIndices, LodCounts;
+RWStructuredBuffer<IndirectDrawIndexedArgs> DrawCallArgs;
+uint MaxThread;
+
+[numthreads(1024, 1, 1)]
+void WriteDrawCallArgs(uint dispatchThreadId : SV_DispatchThreadID)
+{
+	if(dispatchThreadId >= MaxThread)
+		return;
+
+	uint lodIndex = RendererLodIndices[dispatchThreadId];
+	uint lodCount = LodCounts[lodIndex];
+	DrawCallArgs[dispatchThreadId].instanceCount = lodCount;
+}
