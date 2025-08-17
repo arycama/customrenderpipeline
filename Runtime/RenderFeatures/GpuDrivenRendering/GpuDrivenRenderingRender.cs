@@ -223,9 +223,10 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
                 pass.ReadBuffer("_InstanceLodFades", gpuInstanceBuffers.lodFades);
 				pass.ReadBuffer("InstanceIdOffsets", instanceIdOffsetsBuffer);
 
-				pass.SetRenderFunction(draw.lodOffset, static (command, pass, lodOffset) =>
+				pass.SetRenderFunction((draw.lodOffset, draw.objectToWorld), static (command, pass, data) =>
 				{
-					pass.SetInt("InstanceIdOffsetsIndex", lodOffset);
+					pass.SetInt("InstanceIdOffsetsIndex", data.lodOffset);
+					pass.SetMatrix("LocalToWorld", (Matrix4x4)data.objectToWorld);
 				});
             }
         }

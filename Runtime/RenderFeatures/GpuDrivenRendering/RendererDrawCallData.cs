@@ -11,8 +11,9 @@ public struct RendererDrawCallData
     public int indirectArgsOffset;
     public int rendererOffset;
 	public int lodOffset;
+	public Float3x4 objectToWorld;
 
-    public RendererDrawCallData(int renderQueue, Mesh mesh, int submeshIndex, Material material, int passIndex, int indirectArgsOffset, int rendererOffset, int lodOffset)
+    public RendererDrawCallData(int renderQueue, Mesh mesh, int submeshIndex, Material material, int passIndex, int indirectArgsOffset, int rendererOffset, int lodOffset, Float3x4 objectToWorld)
     {
         this.renderQueue = renderQueue;
         this.mesh = mesh ?? throw new ArgumentNullException(nameof(mesh));
@@ -22,6 +23,7 @@ public struct RendererDrawCallData
         this.indirectArgsOffset = indirectArgsOffset;
         this.rendererOffset = rendererOffset;
 		this.lodOffset = lodOffset;
+		this.objectToWorld = objectToWorld;
     }
 
 	public override string ToString() => $"{mesh} {submeshIndex} {material} {renderQueue} {passIndex} {indirectArgsOffset} {rendererOffset} {lodOffset}";

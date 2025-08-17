@@ -145,12 +145,15 @@ cbuffer UnityPerDraw
 	};
 #endif
 
+#ifdef INDIRECT_RENDERING
 StructuredBuffer<uint> _VisibleRendererInstanceIndices;
 StructuredBuffer<float3x4> _InstancePositions;
 StructuredBuffer<float3x4> _ObjectToWorld;
 StructuredBuffer<float> _InstanceLodFades;
 uint InstanceIdOffsetsIndex;
 StructuredBuffer<uint> InstanceIdOffsets;
+float4x4 LocalToWorld;
+#endif
 
 float2 GetLodFade(uint instanceID)
 {
@@ -161,7 +164,7 @@ float2 GetLodFade(uint instanceID)
 		#ifdef INSTANCING_ON
 			return unity_Builtins0Array[unity_BaseInstanceID + instanceID].unity_LODFadeArray;
 		#else
-	return unity_LODFade.xy;
+			return unity_LODFade.xy;
 		#endif
 	#endif
 }

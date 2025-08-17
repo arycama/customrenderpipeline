@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 public class GpuDrivenRenderingSetup : FrameRenderFeature
 {
     private readonly ComputeShader fillInstanceTypeIdShader;
-    private ResourceHandle<GraphicsBuffer> rendererBoundsBuffer, lodSizesBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer, instanceBoundsBuffer, rendererLodIndicesBuffer;
+    private ResourceHandle<GraphicsBuffer> lodSizesBuffer, instanceTypeIdsBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, positionsBuffer, lodFadesBuffer, drawCallArgsBuffer, instanceBoundsBuffer, rendererLodIndicesBuffer;
 
     private Dictionary<string, List<RendererDrawCallData>> passDrawList = new();
 
@@ -23,7 +23,6 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
     protected override void Cleanup(bool disposing)
     {
         renderGraph.ReleasePersistentResource(drawCallArgsBuffer);
-        renderGraph.ReleasePersistentResource(rendererBoundsBuffer);
         renderGraph.ReleasePersistentResource(lodSizesBuffer);
         renderGraph.ReleasePersistentResource(instanceTypeIdsBuffer);
         renderGraph.ReleasePersistentResource(lodFadesBuffer);
@@ -114,7 +113,6 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
 
         // Note these are used to set data inside the lambda, so can't have a using statement
         var lodSizes = ScopedPooledList<float>.Get();
-        var rendererBounds = ScopedPooledList<RendererBounds>.Get();
         var drawCallArgs = ScopedPooledList<IndirectDrawIndexedArgs>.Get();
         var instanceTypeDatas = ScopedPooledList<InstanceTypeData>.Get();
         var instanceTypeLodDatas = ScopedPooledList<InstanceTypeLodData>.Get();
@@ -189,13 +187,6 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
 
                     renderer.GetSharedMaterials(sharedMaterials);
 
-                    // Get the mesh bounds, and transform by the renderer's matrix if it is not identity
-                    var bounds = (Bounds)mesh.bounds;
-                    if (localToWorld != Matrix4x4.identity)
-                        bounds = bounds.Transform(localToWorld);
-
-                    rendererBounds.Value.Add(new RendererBounds(bounds));
-
                     for (var i = 0; i < sharedMaterials.Value.Count; i++)
                     {
                         var material = sharedMaterials.Value[i];
@@ -240,7 +231,7 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
                                 passDrawList.Add(passName, drawList);
                             }
 
-                            var drawData = new RendererDrawCallData(material.renderQueue, mesh, i, material, j, indirectArgsOffset * sizeof(uint), totalRendererCount, totalLodCount);
+                            var drawData = new RendererDrawCallData(material.renderQueue, mesh, i, material, j, indirectArgsOffset * sizeof(uint), totalRendererCount, totalLodCount, (Float3x4)localToWorld);
                             drawList.Add(drawData);
 						}
 
@@ -277,14 +268,12 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
         using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Gpu Driven Rendering Fill Buffers"))
         {
             lodSizesBuffer = renderGraph.GetBuffer(lodSizes.Value.Count, sizeof(float), isPersistent: true);
-            rendererBoundsBuffer = renderGraph.GetBuffer(rendererBounds.Value.Count, UnsafeUtility.SizeOf<RendererBounds>(), isPersistent: true);
             instanceTypeDataBuffer = renderGraph.GetBuffer(instanceTypeDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeData>(), isPersistent: true);
             drawCallArgsBuffer = renderGraph.GetBuffer(drawCallArgs.Value.Count, UnsafeUtility.SizeOf<IndirectDrawIndexedArgs>(), GraphicsBuffer.Target.IndirectArguments, isPersistent: true);
             instanceTypeLodDataBuffer = renderGraph.GetBuffer(instanceTypeLodDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeLodData>(), isPersistent: true);
 			rendererLodIndicesBuffer = renderGraph.GetBuffer(rendererLodIndices.Value.Count, isPersistent: true);
 
 			pass.WriteBuffer("", lodSizesBuffer);
-            pass.WriteBuffer("", rendererBoundsBuffer);
             pass.WriteBuffer("", instanceTypeDataBuffer);
             pass.WriteBuffer("", drawCallArgsBuffer);
             pass.WriteBuffer("", instanceTypeLodDataBuffer);
@@ -294,7 +283,6 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
             {
                 // TODO: Use lockbuffer?
                 command.SetBufferData(pass.GetBuffer(lodSizesBuffer), lodSizes.Value);
-                command.SetBufferData(pass.GetBuffer(rendererBoundsBuffer), rendererBounds.Value);
                 command.SetBufferData(pass.GetBuffer(instanceTypeDataBuffer), instanceTypeDatas.Value);
                 command.SetBufferData(pass.GetBuffer(drawCallArgsBuffer), drawCallArgs.Value);
                 command.SetBufferData(pass.GetBuffer(instanceTypeLodDataBuffer), instanceTypeLodDatas.Value);
@@ -303,7 +291,6 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
 				command.SetBufferData(b, rendererLodIndices.Value);
 
                 lodSizes.Dispose();
-                rendererBounds.Dispose();
                 drawCallArgs.Dispose();
                 instanceTypeDatas.Dispose();
                 instanceTypeLodDatas.Dispose();
@@ -311,6 +298,6 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
             });
         }
 
-        renderGraph.SetResource(new GpuDrivenRenderingData(positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, rendererBoundsBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, drawCallArgsBuffer, instanceBoundsBuffer, rendererLodIndicesBuffer, passDrawList, totalInstanceCount, totalRendererCount, totalLodCount), true);
+        renderGraph.SetResource(new GpuDrivenRenderingData(positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, drawCallArgsBuffer, instanceBoundsBuffer, rendererLodIndicesBuffer, passDrawList, totalInstanceCount, totalRendererCount, totalLodCount), true);
     }
 }
