@@ -9,8 +9,9 @@ public class ShadowRequestData : IRenderPassData
 	public ResourceHandle<RenderTexture> Shadow { get; }
 	public int CascadeIndex { get; }
 	ResourceHandle<GraphicsBuffer> perCascadeData;
+	public bool ZClip { get; }
 
-	public ShadowRequestData(ShadowRequest shadowRequest, float bias, float slopBias, ResourceHandle<RenderTexture> shadow, int cascadeIndex, ResourceHandle<GraphicsBuffer> perCascadeData)
+	public ShadowRequestData(ShadowRequest shadowRequest, float bias, float slopBias, ResourceHandle<RenderTexture> shadow, int cascadeIndex, ResourceHandle<GraphicsBuffer> perCascadeData, bool zClip)
 	{
 		ShadowRequest = shadowRequest;
 		Bias = bias;
@@ -18,6 +19,7 @@ public class ShadowRequestData : IRenderPassData
 		Shadow = shadow;
 		CascadeIndex = cascadeIndex;
 		this.perCascadeData = perCascadeData;
+		ZClip = zClip;
 	}
 
 	public void SetInputs(RenderPassBase pass)

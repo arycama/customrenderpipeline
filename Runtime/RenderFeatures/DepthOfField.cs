@@ -26,8 +26,6 @@ public partial class DepthOfField : CameraRenderFeature
 			return;
 
 		var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
-		var viewData = renderGraph.GetResource<ViewData>();
-
 		var tempId = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
 		var sensorSize = lensSettings.SensorSize * 0.001f; // Convert from mm to m
 		var focalLength = 0.5f * sensorSize / camera.TanHalfFov();

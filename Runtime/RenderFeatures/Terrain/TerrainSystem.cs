@@ -488,7 +488,6 @@ public class TerrainViewData : CameraRenderFeature
 		if (terrainSystem.terrain == null)
 			return;
 
-		var viewData = renderGraph.GetResource<ViewData>();
 		var position = terrainSystem.terrain.GetPosition() - camera.transform.position;
 		var size = terrainSystem.terrainData.size;
 		var terrainScaleOffset = new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z);

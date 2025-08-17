@@ -20,6 +20,8 @@ public static class Texture2DExtensions
 
 	public static int MipCount(int width, int height) => MipCount(Math.Max(width, height));
 
+	public static int MipCount(Int2 size) => MipCount(Math.Max(size.x, size.y));
+
 	/// <summary>
 	/// Calculates the index offset to access a mip-level of a texture stored as a 1D array. 
 	/// </summary>

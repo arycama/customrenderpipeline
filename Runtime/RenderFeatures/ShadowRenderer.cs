@@ -8,15 +8,17 @@ public class ShadowRenderer : CameraRenderFeature
 {
 	private readonly LightingSettings settings;
 	private readonly TerrainShadowRenderer terrainShadowRenderer;
+	private readonly GpuDrivenRenderer gpuDrivenRenderer;
 
 	private static IndexedString directionalCascadeIds = new("Directional Cascade "),
 		pointLightIds = new("Point Light "),
 		SpotLightIds = new("Spot Light ");
 
-	public ShadowRenderer(RenderGraph renderGraph, LightingSettings settings, TerrainShadowRenderer terrainShadowRenderer) : base(renderGraph)
+	public ShadowRenderer(RenderGraph renderGraph, LightingSettings settings, TerrainShadowRenderer terrainShadowRenderer, GpuDrivenRenderer gpuDrivenRenderer) : base(renderGraph)
 	{
 		this.settings = settings;
 		this.terrainShadowRenderer = terrainShadowRenderer;
+		this.gpuDrivenRenderer = gpuDrivenRenderer;
 	}
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
@@ -59,17 +61,18 @@ public class ShadowRenderer : CameraRenderFeature
 			});
 		}
 
-		void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY)
+		void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip)
 		{
 			var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
 			var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, camera.transform.position, 0, request.LightPosition, 0));
-			renderGraph.SetResource(new ShadowRequestData(request, bias, slopeBias, target, index, perCascadeData));
+			var shadowRequestData = new ShadowRequestData(request, bias, slopeBias, target, index, perCascadeData, zClip);
+			renderGraph.SetResource(shadowRequestData);
 			terrainShadowRenderer.Render(camera, context);
 
 			using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Shadow"))
 			{
 				var isOrtho = projectionType == BatchCullingProjectionType.Orthographic;
-				pass.Initialize(context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, !isOrtho, !isOrtho);
+				pass.Initialize(context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, !isOrtho);
 
 				// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
 				pass.WriteTexture(target);
@@ -81,6 +84,8 @@ public class ShadowRenderer : CameraRenderFeature
 					command.SetRenderTarget(pass.GetRenderTexture(data.target), pass.GetRenderTexture(data.target), 0, CubemapFace.Unknown, data.index);
 				});
 			}
+
+			gpuDrivenRenderer.RenderShadow(camera.transform.position, camera.transform.forward, shadowRequestData, camera.ScaledViewSize());
 		}
 
 		using (renderGraph.AddProfileScope($"Directional Shadows"))
@@ -90,7 +95,7 @@ public class ShadowRenderer : CameraRenderFeature
 				using (renderGraph.AddProfileScope(directionalCascadeIds.GetString(i)))
 				{
 					var request = requestData.DirectionalShadowRequests[i];
-					RenderShadowMap(request, BatchCullingProjectionType.Orthographic, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true);
+					RenderShadowMap(request, BatchCullingProjectionType.Orthographic, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false);
 				}
 			}
 
@@ -104,7 +109,7 @@ public class ShadowRenderer : CameraRenderFeature
 				using (renderGraph.AddProfileScope(pointLightIds.GetString(i)))
 				{
 					var request = requestData.PointShadowRequests[i];
-					RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false);
+					RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true);
 				}
 			}
 			ListPool<ShadowRequest>.Release(requestData.PointShadowRequests);
@@ -117,7 +122,7 @@ public class ShadowRenderer : CameraRenderFeature
 				using (renderGraph.AddProfileScope(SpotLightIds.GetString(i)))
 				{
 					var request = requestData.SpotShadowRequests[i];
-					RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true);
+					RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true);
 				}
 			}
 

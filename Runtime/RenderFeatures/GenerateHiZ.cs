@@ -16,9 +16,7 @@ public class GenerateHiZ : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
-		var viewData = renderGraph.GetResource<ViewData>();
 		var kernel = (int)mode * 2;
-
 		var mipCount = Texture2DExtensions.MipCount(camera.scaledPixelWidth, camera.scaledPixelHeight);
 		var maxMipsPerPass = 6;
 		var hasSecondPass = mipCount > maxMipsPerPass;

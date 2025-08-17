@@ -15,7 +15,6 @@ public class WaterRenderer : WaterRendererBase
             return;
 
         var passData = Cull(camera.transform.position, renderGraph.GetResource<CullingPlanesData>().CullingPlanes);
-        var viewData = renderGraph.GetResource<ViewData>();
 
         // Writes (worldPos - displacementPos).xz. Uv coord is reconstructed later from delta and worldPosition (reconstructed from depth)
         var oceanRenderResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);

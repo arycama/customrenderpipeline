@@ -23,6 +23,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	private readonly PersistentRTHandleCache cameraTargetCache, cameraDepthCache, cameraVelocityCache;
 	private readonly TerrainSystem terrainSystem;
 	private readonly TerrainShadowRenderer terrainShadowRenderer;
+	private readonly GpuDrivenRenderer gpuDrivenRenderer;
 
 	public CustomRenderPipeline(CustomRenderPipelineAsset renderPipelineAsset) : base(renderPipelineAsset)
 	{
@@ -32,6 +33,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		terrainSystem = new TerrainSystem(renderGraph, asset.TerrainSettings);
         terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, asset.TerrainSettings);
+		gpuDrivenRenderer = new GpuDrivenRenderer(renderGraph);
 	}
 
 	protected override void Dispose(bool disposing)
@@ -43,6 +45,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		cameraVelocityCache.Dispose();
 		terrainSystem.Dispose();
 		terrainShadowRenderer.Dispose();
+		gpuDrivenRenderer.Dispose();
 	} 
 
 	protected override List<FrameRenderFeature> InitializePerFrameRenderFeatures() => new()
@@ -245,7 +248,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
 
-		new GpuDrivenRenderingRender(renderGraph),
+		new GpuDrivenRenderingRender(gpuDrivenRenderer, renderGraph),
 
 		// Finalize gbuffer
 		new ScreenSpaceTerrain(renderGraph),
@@ -283,7 +286,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new PhysicalSkyGenerateData(asset.Sky, asset.Clouds, renderGraph),
 		new GgxConvolve(renderGraph, asset.LightingSettings, asset.Clouds, asset.Sky),
 
-		new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer),
+		new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer, gpuDrivenRenderer),
 		new VolumetricCloudShadow(asset.Clouds, asset.Sky, renderGraph),
 		new WaterShadowRenderer(renderGraph, asset.OceanSettings),
 		new WaterCaustics(renderGraph, asset.OceanSettings),

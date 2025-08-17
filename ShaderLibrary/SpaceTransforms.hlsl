@@ -19,8 +19,7 @@ float3x4 GetObjectToWorld(uint instanceId, bool cameraRelative = true)
 	#ifdef INDIRECT_RENDERING
 		uint offsetInstanceId = InstanceIdOffsets[InstanceIdOffsetsIndex] + instanceId;
 		float3x4 objectToWorld = _ObjectToWorld[offsetInstanceId];
-		float4x4 _InstanceToWorld = float4x4(objectToWorld[0], objectToWorld[1], objectToWorld[2], float4(0, 0, 0, 1));
-		objectToWorld = (float3x4) mul(_InstanceToWorld, LocalToWorld);
+		objectToWorld = Mul3x4Affine(objectToWorld, (float3x4)LocalToWorld);
 	#elif defined(INSTANCING_ON)
 		float3x4 objectToWorld = (float3x4)unity_Builtins0Array[unity_BaseInstanceID + instanceId].unity_ObjectToWorldArray;
 	#else

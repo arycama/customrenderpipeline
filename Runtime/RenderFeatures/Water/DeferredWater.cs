@@ -24,7 +24,6 @@ public class DeferredWater : CameraRenderFeature
 
     public override void Render(Camera camera, ScriptableRenderContext context)
     {
-        var viewData = renderGraph.GetResource<ViewData>();
         var refractionResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
         var scatterResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
         var depth = renderGraph.GetResource<CameraDepthData>().Handle;

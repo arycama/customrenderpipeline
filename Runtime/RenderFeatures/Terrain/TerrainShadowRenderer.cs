@@ -44,7 +44,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 
 		using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
 		{
-			pass.Initialize(settings.Material, terrainSystemData.IndexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, null, shadowRequestData.Bias, shadowRequestData.SlopeBias, false);
+			pass.Initialize(settings.Material, terrainSystemData.IndexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, null, shadowRequestData.Bias, shadowRequestData.SlopeBias, shadowRequestData.ZClip);
 
 			pass.WriteTexture(shadowRequestData.Shadow);
 			pass.DepthSlice = shadowRequestData.CascadeIndex;

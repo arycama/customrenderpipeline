@@ -21,9 +21,7 @@ public class TerrainRenderer : TerrainRendererBase
 		if (terrainSystemData.Terrain == null || settings.Material == null)
 			return;
 
-		var viewData = renderGraph.GetResource<ViewData>();
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
-
 		var passData = Cull(camera.transform.position, cullingPlanes);
 		var passIndex = settings.Material.FindPass("Terrain");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no Terrain Pass");

@@ -26,8 +26,6 @@ public class WaterShadowRenderer : WaterRendererBase
             break;
         }
 
-        var viewData = renderGraph.GetResource<ViewData>();
-
 		// TODO: Should be able to simply just define a box and not even worry about view position since we translate it anyway
 		var viewPosition = camera.transform.position;
         var size = new Vector3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
