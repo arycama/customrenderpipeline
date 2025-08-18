@@ -25,12 +25,15 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
 		var renderingData = gpuDrivenRenderer.Render(camera.ScaledViewSize(), false, cullingPlanes, instanceData);
 
+		using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
+
 		for (var i = 0; i < drawList.Count; i++)
 		{
 			var draw = drawList[i];
 			using (var pass = renderGraph.AddRenderPass<DrawInstancedIndirectRenderPass>("Gpu Driven Rendering"))
 			{
 				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, draw.passIndex, "INDIRECT_RENDERING", 0.0f, 0.0f, true, draw.indirectArgsOffset);
+				pass.UseProfiler = false;
 
 				pass.WriteDepth(renderGraph.GetResource<CameraDepthData>());
 				pass.WriteTexture(renderGraph.GetResource<AlbedoMetallicData>());

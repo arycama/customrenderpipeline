@@ -43,11 +43,13 @@ void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID
 	InstanceTypeData instanceTypeData = InstanceTypeDatas[instanceType];
 	
 	uint maxLodCount = min(8, instanceTypeData.lodCount);
-	uint lod = maxLodCount;
-	float viewZ = dot(boundsCenter, ViewForward);
+	uint lod = maxLodCount - 1;
+	float viewZ = max(0.0, dot(boundsCenter, ViewForward));
 	float worldRadius = Max3(boundsExtents);
 	float screenHeight = worldRadius * rcp(viewZ * TanHalfFov) * 0.5;
 	
+	// TODO: Currently a lod greater than cutoff distance will still be rendered. We can't remove it from drawing here because
+	// The total instance sum has already been calculated by a previous prefix sum. Should instead remove it from the instance cull stage
 	[unroll]
 	for (uint i = 0; i < maxLodCount; i++)
 	{
@@ -64,7 +66,8 @@ void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID
 	uint lodInfoIndex = instanceTypeData.lodRendererOffset + lod;
 	InterlockedAdd(LodCounts[lodInfoIndex], 1);
 	
-	uint viewZNorm = saturate(LinearToDeviceDepth(viewZ)) * 65536.0;
-	uint sortKey = lod | ((instanceType & 8192) << 3) | ((viewZNorm & 65536) << 16);
+	// Logarithmic distribution
+	uint viewZNorm = Remap(viewZ, Near, Far, 0.0, 65536.0);
+	uint sortKey = viewZNorm | (lod << 16) | (instanceType << 19);
 	SortKeysWrite[dest] = sortKey;
 }

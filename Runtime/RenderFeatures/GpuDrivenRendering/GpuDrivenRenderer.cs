@@ -161,6 +161,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
 			pass.ReadBuffer("Input", instanceIndices);
 			pass.ReadBuffer("SortKeys", sortKeys);
+            pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
 		}
 
 		var objectToWorld = renderGraph.GetBuffer(instanceData.instanceCount, UnsafeUtility.SizeOf<Float3x4>());
@@ -173,7 +174,10 @@ public class GpuDrivenRenderer : RenderFeatureBase
             pass.ReadBuffer("_Positions", instanceData.positions);
             pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
 
-            pass.SetRenderFunction((command, pass) =>
+			// Temporarily here to avoid memory leaks due to sortedKeys not being used anywhere. (Only used for debug really)
+			pass.ReadBuffer("SortKeys", sortedKeys);
+
+			pass.SetRenderFunction((command, pass) =>
             {
                 pass.SetInt("MaxThread", instanceData.instanceCount);
             });
@@ -200,12 +204,14 @@ public class GpuDrivenRenderer : RenderFeatureBase
 		}
 
 		var renderingData = Render(viewSize, true, cullingPlanes, instanceData);
+		using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
 
 		for (var i = 0; i < drawList.Count; i++)
 		{
 			var draw = drawList[i];
 			using (var pass = renderGraph.AddRenderPass<DrawInstancedIndirectRenderPass>("Gpu Driven Rendering Shadow"))
 			{
+				pass.UseProfiler = false;
 				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, draw.passIndex, "INDIRECT_RENDERING", request.Bias, request.SlopeBias, request.ZClip, draw.indirectArgsOffset);
 
 				pass.WriteTexture(request.Shadow);

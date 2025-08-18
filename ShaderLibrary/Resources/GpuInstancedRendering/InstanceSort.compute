@@ -1,29 +1,31 @@
+#include "../../Math.hlsl"
 #include "../../PrefixSum.hlsl"
 
 #pragma kernel InstanceSort
+#pragma enable_d3d11_debug_symbols
 
 RWStructuredBuffer<uint> Result;
 StructuredBuffer<uint> Input;
 StructuredBuffer<uint> TotalInstanceCount, SortKeys;
-RWStructuredBuffer<float> SortKeysWrite;
+RWStructuredBuffer<uint> SortKeysWrite;
 
 const static uint threadCount = 256;
 const static uint log2ThreadCount = firstbitlow(threadCount);
 
 groupshared uint sharedKeys[threadCount];
 groupshared uint sharedIndices[threadCount];
-groupshared uint histogram[threadCount];
-groupshared uint histogram1[4];
-groupshared uint4 prefixSum[threadCount];
+groupshared uint sharedSums[threadCount];
+
+groupshared uint sharedTotalFalses;
 
 void PrefixSumSharedWrite(uint index, uint data)
 {
-	histogram[index] = data;
+	sharedSums[index] = data;
 }
 
 uint PrefixSumSharedRead(uint index)
 {
-	return histogram[index];
+	return sharedSums[index];
 }
 
 [numthreads(threadCount, 1, 1)]
@@ -33,32 +35,28 @@ void InstanceSort(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	sharedKeys[groupIndex] = outOfRange ? 0xFFFFFFFF : SortKeys[id];
 	sharedIndices[groupIndex] = groupIndex;
 	
-	[unroll]
-	for (uint i = 0; i < 4; i++)
+	for (uint i = 0; i < 32; i++)
 	{
-		// Clear histogram
-		histogram[groupIndex] = 0;
-		
 		GroupMemoryBarrierWithGroupSync();
 
-		// Count occurrences of each digit
 		uint srcIndex = sharedIndices[groupIndex];
 		uint key = sharedKeys[srcIndex];
-		uint digit = (key >> (8 * i)) & 0xFF;
+		bool bit = (key >> i) & 0x1;
 		
-		InterlockedAdd(histogram[digit], 1);
-		PrefixSum(groupIndex, threadCount, log2ThreadCount);
+		sharedSums[groupIndex] = !bit;
 		
-		// Reorder elements to shared memory
-		uint arraySum = 0;
-		for (uint j = 0; j < groupIndex; j++)
-			arraySum += ((sharedKeys[sharedIndices[j]] >> (8 * i)) & 0xFF) == digit;
-	
-		uint dstIndex = histogram[digit] + arraySum;
+		uint totalFalses;
+		PrefixSum(groupIndex, threadCount, log2ThreadCount, totalFalses);
 		
+		if (!groupIndex)
+			sharedTotalFalses = totalFalses;
+			
 		GroupMemoryBarrierWithGroupSync();
 		
-		sharedIndices[dstIndex] = srcIndex;
+		uint f = sharedSums[groupIndex];
+		uint t = groupIndex - f + sharedTotalFalses;
+		uint d = bit ? t : f;
+		sharedIndices[d] = srcIndex;
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
@@ -66,5 +64,5 @@ void InstanceSort(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	// Write final results
 	uint finalSrc = groupId * threadCount + sharedIndices[groupIndex];
 	Result[id] = Input[finalSrc];
-	//SortKeysWrite[id] = SortKeys[finalSrc];
+	SortKeysWrite[id] = SortKeys[finalSrc];
 }
