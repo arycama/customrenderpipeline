@@ -412,6 +412,7 @@ float AngularDiameterToSolidAngle(float angularDiameter) { return AngularRadiusT
 
 float VisibilityToConeCosAngle(float occlusion) { return sqrt(saturate(1.0 - occlusion)); }
 float ConeCosAngleToVisibility(float coneCosAngle) { return 1.0 - Sq(coneCosAngle); }
+float ConeAngleToVisibility(float coneAngle) { return ConeCosAngleToVisibility(cos(coneAngle)); }
 float VisibilityToConeAngle(float occlusion) { return CosConeAngleToConeAngle(VisibilityToConeCosAngle(occlusion)); }
 
 float DistToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)

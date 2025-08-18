@@ -46,9 +46,9 @@ void RayGeneration()
 		float3 L = SampleHemisphereCosine(u.x, u.y, N);
 		
 		RayDesc ray;
-		ray.Origin = worldPosition + ViewPosition + N * EvaluateRayTracingBias(worldPosition, Near, Far, _RaytracingBias, _RaytracingDistantBias);
+		ray.Origin = worldPosition + ViewPosition;//+N * EvaluateRayTracingBias(worldPosition, Near, Far, _RaytracingBias, _RaytracingDistantBias);
 		ray.Direction = L;
-		ray.TMin = 0.0;
+		ray.TMin = 0.001;
 		ray.TMax = Radius;
 	
 		RayPayloadVisibility payload;

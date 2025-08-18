@@ -1,4 +1,7 @@
-﻿#include "../../IndirectRendering.hlsl"
+﻿#include "../../Common.hlsl"
+#include "../../IndirectRendering.hlsl"
+#include "../../Packing.hlsl"
+#include "../../SpaceTransforms.hlsl"
 
 #pragma kernel InstanceCompaction
 
@@ -7,10 +10,9 @@ const static uint threadCount = 1024;
 const static uint log2ThreadCount = firstbitlow(threadCount);
 
 uint MaxThread;
-float3 CameraForward, ViewPosition;
 
 RWStructuredBuffer<uint> Output;
-//RWStructuredBuffer<uint> SortKeysWrite;
+RWStructuredBuffer<uint> SortKeysWrite;
 RWStructuredBuffer<uint> LodCounts;
 
 StructuredBuffer<uint> Input;
@@ -20,6 +22,7 @@ StructuredBuffer<float4> InstanceBounds;
 StructuredBuffer<uint> InstanceTypeIds;
 StructuredBuffer<InstanceTypeData> InstanceTypeDatas;
 StructuredBuffer<InstanceTypeLodData> InstanceTypeLodDatas;
+StructuredBuffer<float> LodSizes;
 
 [numthreads(threadCount, 1, 1)]
 void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
@@ -32,18 +35,36 @@ void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID
 	
 	// Compute sort key from instanceType, lod and viewDistance
 	float4 boundsData = InstanceBounds[id];
-	float3 worldBoundsCenter = boundsData.xyz - ViewPosition;
+	float3 boundsCenter = boundsData.xyz - ViewPosition;
+	float3 boundsExtents = R11G11B10ToFloat3(asuint(boundsData.w));
 	
 	// Calculate lod (Assume 0 for now)
 	uint instanceType = InstanceTypeIds[id];
-	uint lod = 0; // Insert lod calculation here
-	
-	// Increment the counter for each submesh  associated with this instance-lod-combination
 	InstanceTypeData instanceTypeData = InstanceTypeDatas[instanceType];
+	
+	uint maxLodCount = min(8, instanceTypeData.lodCount);
+	uint lod = maxLodCount;
+	float viewZ = dot(boundsCenter, ViewForward);
+	float worldRadius = Max3(boundsExtents);
+	float screenHeight = worldRadius * rcp(viewZ * TanHalfFov) * 0.5;
+	
+	[unroll]
+	for (uint i = 0; i < maxLodCount; i++)
+	{
+		uint index = instanceTypeData.lodSizebufferPosition + i;
+		float lodSize = LodSizes[index];
+	
+		if (screenHeight <= lodSize)
+			continue;
+			
+		lod = i;
+		break;
+	}
+	
 	uint lodInfoIndex = instanceTypeData.lodRendererOffset + lod;
 	InterlockedAdd(LodCounts[lodInfoIndex], 1);
 	
-	//float viewZ = max(0, dot(CameraForward, worldBoundsCenter));
-	//uint sortKey = viewZ;
-	//SortKeysWrite[dest] = sortKey;
+	uint viewZNorm = saturate(LinearToDeviceDepth(viewZ)) * 65536.0;
+	uint sortKey = lod | ((instanceType & 8192) << 3) | ((viewZNorm & 65536) << 16);
+	SortKeysWrite[dest] = sortKey;
 }

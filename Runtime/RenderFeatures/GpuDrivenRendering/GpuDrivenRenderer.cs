@@ -3,19 +3,20 @@ using UnityEngine;
 
 public class GpuDrivenRenderer : RenderFeatureBase
 {
-    private readonly ComputeShader cullingShader, instancePrefixSum, instanceCompaction, instanceIdOffsets, instanceCopyData, writeDrawCallArgs;
+    private readonly ComputeShader cullingShader, instancePrefixSum, instanceCompaction, instanceSort, instanceIdOffsets, instanceCopyData, writeDrawCallArgs;
 
     public GpuDrivenRenderer(RenderGraph renderGraph) : base(renderGraph)
     {
         cullingShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceRendererCull");
         instancePrefixSum = Resources.Load<ComputeShader>("GpuInstancedRendering/InstancePrefixSum");
-        instanceCompaction = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCompaction");
+        instanceSort = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceSort");
+		instanceCompaction = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCompaction");
         instanceCopyData = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCopyData");
 		instanceIdOffsets = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceIdOffsets");
 		writeDrawCallArgs = Resources.Load<ComputeShader>("GpuInstancedRendering/WriteDrawCallArgs");
     }
 
-    public GpuRenderingData Render(Int2 viewSize, Float3 mainViewPosition, Float3 mainViewForward, bool isShadow, CullingPlanes cullingPlanes, GpuDrivenRenderingData instanceData)
+    public GpuRenderingData Render(Int2 viewSize, bool isShadow, CullingPlanes cullingPlanes, GpuDrivenRenderingData instanceData)
     {
 		using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
 
@@ -82,12 +83,14 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
 		// Need a buffer big enough to hold all potential indices
 		var instanceIndices = renderGraph.GetBuffer(instanceData.instanceCount);
+        var sortKeys = renderGraph.GetBuffer(instanceData.instanceCount);
 		var lodCounts = renderGraph.GetBuffer(instanceData.lodCount);
         using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Stream Compaction"))
         {
             pass.Initialize(instanceCompaction, 0, instanceData.instanceCount);
             pass.WriteBuffer("Output", instanceIndices);
 			pass.WriteBuffer("LodCounts", lodCounts);
+			pass.WriteBuffer("SortKeysWrite", sortKeys);
 
 			pass.ReadBuffer("Input", visibilityPredicates);
             pass.ReadBuffer("PrefixSums", prefixSums);
@@ -95,14 +98,13 @@ public class GpuDrivenRenderer : RenderFeatureBase
             pass.ReadBuffer("InstanceBounds", instanceData.instanceBounds);
 			pass.ReadBuffer("InstanceTypeIds", instanceData.instanceTypes);
 			pass.ReadBuffer("InstanceTypeDatas", instanceData.instanceTypeData);
+			pass.ReadBuffer("LodSizes", instanceData.lodSizes);
+
+			pass.AddRenderPassData<ViewData>();
 
 			pass.SetRenderFunction((command, pass) =>
             {
                 pass.SetInt("MaxThread", instanceData.instanceCount);
-
-				// For lod maybe?
-                pass.SetVector("CameraForward", (Vector3)mainViewForward);
-                pass.SetVector("ViewPosition", (Vector3)mainViewPosition);
 
 				using (ArrayPool<uint>.Get(instanceData.lodCount, out var data))
 					command.SetBufferData(pass.GetBuffer(lodCounts), data);
@@ -149,7 +151,19 @@ public class GpuDrivenRenderer : RenderFeatureBase
             pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
         }
 
-        var objectToWorld = renderGraph.GetBuffer(instanceData.instanceCount, UnsafeUtility.SizeOf<Float3x4>());
+		var sortedInstanceIndices = renderGraph.GetBuffer(instanceData.instanceCount);
+		var sortedKeys = renderGraph.GetBuffer(instanceData.instanceCount);
+		using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Instance Sort"))
+		{
+			pass.Initialize(instanceSort, threadGroups, 0, 3);
+			pass.WriteBuffer("Result", sortedInstanceIndices);
+			pass.WriteBuffer("SortKeysWrite", sortedKeys);
+
+			pass.ReadBuffer("Input", instanceIndices);
+			pass.ReadBuffer("SortKeys", sortKeys);
+		}
+
+		var objectToWorld = renderGraph.GetBuffer(instanceData.instanceCount, UnsafeUtility.SizeOf<Float3x4>());
         using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Copy Data"))
         {
             pass.Initialize(instanceCopyData, threadGroups, 1);
@@ -168,7 +182,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 		return new GpuRenderingData(visibilityPredicates, objectToWorld, instanceIdOffsetsBuffer);
     }
 
-	public void RenderShadow(Float3 mainViewPosition, Float3 mainViewForward, ShadowRequestData request, Int2 viewSize)
+	public void RenderShadow(Float3 mainViewPosition, ShadowRequestData request, Int2 viewSize)
 	{
 		var handle = renderGraph.ResourceMap.GetResourceHandle<GpuDrivenRenderingData>();
 		if (!renderGraph.ResourceMap.TryGetRenderPassData<GpuDrivenRenderingData>(handle, renderGraph.FrameIndex, out var instanceData))
@@ -185,7 +199,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			cullingPlanes.SetCullingPlane(i, plane);
 		}
 
-		var renderingData = Render(viewSize, mainViewPosition, mainViewForward, true, cullingPlanes, instanceData);
+		var renderingData = Render(viewSize, true, cullingPlanes, instanceData);
 
 		for (var i = 0; i < drawList.Count; i++)
 		{

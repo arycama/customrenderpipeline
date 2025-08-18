@@ -61,27 +61,37 @@ float4 FragmentCompute(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		[unroll]
 		for (float side = 0; side < 2; side++)
 		{
-			float dt = (-1 + 2 * side) * scaling;
+			// Find the intersection with the next pixel, and use that as the starting point for the ray
+			float2 rayDir = omega * (2.0 * side - 1.0);
+			float minT = Min2(FastSign(rayDir) * (0.5 + 0.01) / rayDir);
+			float2 rayStart = position.xy + minT * rayDir;
+			
+			// Clamp end point to screen boundaries to avoid wasting samples outside and to avoid issues reading out of bounds depth
+			float2 rayEnd = clamp(rayStart + rayDir * scaling, 0.0, ViewSize);
+			float2 ds = (rayEnd - rayStart) / Samples;
 		
 			float minHorizonCosAngle = cos((2 * side - 1) * HalfPi + n);
 			float horizonCosAngle = minHorizonCosAngle;
 			for (float k = 0; k < Samples; k++)
 			{
-				float s = (k + noise.y) / Samples;
-				float2 sampleCoord = position.xy + s * dt * omega;
+				float s = k + noise.y;
+				float2 sampleCoord = rayStart + ds * s;
+				
 				float3 samplePosition = ComputeViewspacePosition(sampleCoord);
-				float3 sampleHorizon = normalize(samplePosition - viewPosition);
+				float3 sampleDelta = samplePosition - viewPosition;
+				float sampleDistSqr = SqrLength(sampleDelta);
+				
+				float sampleRcpDistance = rsqrt(sampleDistSqr);
+				float3 sampleHorizon = sampleDelta * sampleRcpDistance;
 				float sampleHorizonCosAngle = dot(sampleHorizon, viewV);
 				
-				#if 1
-				// TODO: Better heuristic for skipping close samples
-				float dist = distance(samplePosition, viewPosition);
-				if (dist < 0.0025 * viewPosition.z)
-					continue;
-					
+				#if 0
+				horizonCosAngle = max(horizonCosAngle, sampleHorizonCosAngle);
+				#else
+				float sampleDistance = rcp(sampleRcpDistance);
 				float start = Radius * Falloff * ratio;
 				float end = Radius * ratio;
-				float weight = saturate((end - dist) * rcp(end - start));
+				float weight = saturate((end - sampleDistance) * rcp(end - start));
 				float weightedSampleHorizonCosAngle = lerp(minHorizonCosAngle, sampleHorizonCosAngle, weight);
 					
 				if (weightedSampleHorizonCosAngle >= horizonCosAngle)
@@ -94,14 +104,14 @@ float4 FragmentCompute(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 					// Otherwise, reduce the max horizon to attenuate thin features, but only if the -non- weighted sample is also below the current sample
 					// This prevents the falloff causing objects to be treated as thin when they would not be otherwise
 					
-					// TODO: only apply when sample distance to current max horizon i s suficient and when it is not too far away fro mthe sampling hemisphere base
+					// TODO: only apply when sample distance to current max horizon is suficient and when it is not too far away fro mthe sampling hemisphere base
 					horizonCosAngle = lerp(horizonCosAngle, minHorizonCosAngle, ThinOccluderCompensation);
 				}
 				#endif
 			}
 			
 			// Convert to horizon angle and clamp
-			float h = (-1 + 2 * side) * acos(horizonCosAngle);
+			float h = (-1 + 2 * side) * FastACos(horizonCosAngle);
 			result.a += (cosN + 2 * h * sin(n) - cos(2 * h - n)) / 4.0 * weight;
 			
 			sinTheta += 6.0 * sin(h - n) - sin(3.0 * h - n) - 3 * sin(h + n);
@@ -203,11 +213,12 @@ float4 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 {
 	float4 result = Input[position.xy];
 	result.xyz = normalize(result.xyz);
+	result.a = VisibilityToConeCosAngle(pow(ConeAngleToVisibility(result.a), Strength));
 	
 	// Combine with existing cone 
 	float4 bentNormalOcclusion = BentNormalOcclusion[position.xy];
 	bentNormalOcclusion.xyz = UnpackGBufferNormal(bentNormalOcclusion);
 	
-	result = SphericalCapIntersection(bentNormalOcclusion.xyz, cos(bentNormalOcclusion.a * HalfPi), result.xyz, cos(result.w));
+	result = SphericalCapIntersection(bentNormalOcclusion.xyz, cos(bentNormalOcclusion.a * HalfPi), result.xyz, result.w);
 	return float4(PackGBufferNormal(result.xyz), FastACos(result.a) * RcpHalfPi);
 }

@@ -58,6 +58,8 @@ cbuffer ViewData
 	float4 PixelToViewScaleOffset;
 };
 
+const static float3 ViewForward = ViewToWorld._13_23_33;
+
 cbuffer PerCascadeData
 {
 	matrix WorldToShadowView;

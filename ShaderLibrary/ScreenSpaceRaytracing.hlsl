@@ -199,7 +199,7 @@ float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, uint maxSteps, float 
 		}
 		
 		// Increment whichever cell had the first intersection. (In the very rare case this hits a corner, it will increment both, since Min2 will be equal for both components)
-		currentCell.xy += (minT == dists.xy) * rayStep.xy;
+		currentCell.xy += (minT == dists.xy) * rayStep.xy; // SHouldnt this be rayDir instead of step? Well its to change the.. cell, not the actual position
 		
 		if (any(currentCell.xy < 0.0 || currentCell >= ViewSize))
 			break;

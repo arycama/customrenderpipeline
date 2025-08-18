@@ -84,7 +84,7 @@ public class ShadowRenderer : CameraRenderFeature
 				});
 			}
 
-			gpuDrivenRenderer.RenderShadow(camera.transform.position, camera.transform.forward, shadowRequestData, camera.ScaledViewSize());
+			gpuDrivenRenderer.RenderShadow(camera.transform.position, shadowRequestData, camera.ScaledViewSize());
 		}
 
 		using (renderGraph.AddProfileScope($"Directional Shadows"))

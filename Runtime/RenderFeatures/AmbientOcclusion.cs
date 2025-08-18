@@ -16,7 +16,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 		[field: SerializeField, Range(1, 32)] public int Samples { get; private set; } = 8;
 		[field: SerializeField, Range(0, 1)] public float Falloff { get; private set; } = 0.75f;
 		[field: SerializeField, Range(0, 1)] public float MaxScreenRadius { get; private set; } = 0.15f;
-		[field: SerializeField, Range(0, 0.1f)] public float ThinOccluderCompensation { get; private set; } = 0.05f;
+		[field: SerializeField, Range(0, 0.01f)] public float ThinOccluderCompensation { get; private set; } = 0.05f;
 	}
 
 	private readonly Material material;

@@ -23,7 +23,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 			return;
 
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
-		var renderingData = gpuDrivenRenderer.Render(camera.ScaledViewSize(), camera.transform.position, camera.transform.forward, false, cullingPlanes, instanceData);
+		var renderingData = gpuDrivenRenderer.Render(camera.ScaledViewSize(), false, cullingPlanes, instanceData);
 
 		for (var i = 0; i < drawList.Count; i++)
 		{
