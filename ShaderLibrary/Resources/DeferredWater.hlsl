@@ -52,9 +52,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float linearDepth = LinearEyeDepth(depth);
 	float waterDistance = linearDepth * rcp(rcpLenV);
 	float3 worldPosition = -V * waterDistance;
-	
 	float2 oceanUv = worldPosition.xz - waterNormalFoamRoughness.xy;
-	
 
 	float foam = 0.0;
 	float smoothness = 0.0;
@@ -83,6 +81,14 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	smoothness = LengthToSmoothness(smoothness * 0.25);
 	 
 	// Foam calculations
+	
+	// Sample underwater depth with an offset based on fake refraction calculated from normal
+	float distortion = _RefractOffset * 0.5 / TanHalfFov / linearDepth;
+	float2 uvOffset = N.xz * distortion;
+	float2 refractionUv = uvOffset * ViewSize + position.xy;
+	float2 refractedPositionSS = clamp(refractionUv, 0, ViewSize - 1);
+	float underwaterDepth = _UnderwaterDepth[refractedPositionSS];
+	
 	if (foam > 0)
 	{
 		float2 foamUv = oceanUv * _FoamTex_ST.xy + _FoamTex_ST.zw;
@@ -95,19 +101,12 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	}
 	
 	N = normalize(N);
-	float perceptualRoughness = SmoothnessToPerceptualRoughness(smoothness);
 	
 	float NdotV;
 	N = GetViewClampedNormal(N, V, NdotV);
 	
+	float perceptualRoughness = SmoothnessToPerceptualRoughness(smoothness);
 	perceptualRoughness = SpecularAntiAliasing(perceptualRoughness, N);
-	
-	// Sample underwater depth with an offset based on fake refraction calculated from normal
-	float distortion = _RefractOffset * 0.5 / TanHalfFov / linearDepth;
-	float2 uvOffset = N.xz * distortion;
-	float2 refractionUv = uvOffset * ViewSize + position.xy;
-	float2 refractedPositionSS = clamp(refractionUv, 0, ViewSize - 1);
-	float underwaterDepth = _UnderwaterDepth[refractedPositionSS];
 
 	// If this offset is above water, revert to the non-refracted position to avoid above water objects bleeding into the refractions
 	if (underwaterDepth > depth)

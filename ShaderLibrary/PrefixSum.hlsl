@@ -4,6 +4,10 @@
 void PrefixSumSharedWrite(uint index, uint data); // array[index] = data
 uint PrefixSumSharedRead(uint index); // return array[index];
 
+#define NUM_BANKS 16
+#define LOG_NUM_BANKS 4
+#define CONFLICT_FREE_OFFSET(n)((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS))
+
 void PrefixSum(uint groupIndex, uint size, uint log2Size, out uint totalSum)
 {
 	// Perform reduction

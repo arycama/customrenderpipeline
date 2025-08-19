@@ -58,7 +58,7 @@ public class TerrainSystem : FrameRenderFeature
 	private void TerrainCallbacks_textureChanged(Terrain terrain, string textureName, RectInt texelRegion, bool synched)
 	{
 		if (terrain == this.terrain && textureName == TerrainData.AlphamapTextureName)
-			InitializeIdMap(true);
+			InitializeIdMap(true, texelRegion);
 	}
 
 	private void CleanupResources()
@@ -186,9 +186,6 @@ public class TerrainSystem : FrameRenderFeature
 		maskMapArray = new(maskWidth, maskHeight, arraySize, maskFormat == GraphicsFormat.None ? GraphicsFormat.R8_UNorm : maskFormat, flags) { name = "Terrain Mask" };
 		maskMapArray.Apply(false, true);
 
-		// Graph doesn't support persistent buffers yet
-		// TODO: Add persistent buffer support 
-		//var layerDataBuffer = renderGraph.GetBuffer(layers.Length, UnsafeUtility.SizeOf<TerrainLayerData>(), GraphicsBuffer.Target.Structured);
 		terrainLayerData = renderGraph.GetBuffer(arraySize, UnsafeUtility.SizeOf<TerrainLayerData>(), GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.LockBufferForWrite, true);
 
 		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Terrain Layer Data Init"))
@@ -198,11 +195,8 @@ public class TerrainSystem : FrameRenderFeature
 				// Add to texture array
 				foreach (var layer in terrainLayers)
 				{
-					//Debug.Log($"Copying {layer.Key.diffuseTexture.graphicsFormat}, ({layer.Key.diffuseTexture.width}x{layer.Key.diffuseTexture.height}");
 					command.CopyTexture(layer.Key.diffuseTexture, 0, diffuseArray, layer.Value);
-					//Debug.Log($"Copying {layer.Key.normalMapTexture.graphicsFormat}, ({layer.Key.normalMapTexture.width}x{layer.Key.normalMapTexture.height}");
 					command.CopyTexture(layer.Key.normalMapTexture, 0, normalMapArray, layer.Value);
-					//Debug.Log($"Copying {layer.Key.maskMapTexture.graphicsFormat}, ({layer.Key.maskMapTexture.width}x{layer.Key.maskMapTexture.height}");
 					command.CopyTexture(layer.Key.maskMapTexture, 0, maskMapArray, layer.Value);
 				}
 			});
@@ -341,7 +335,7 @@ public class TerrainSystem : FrameRenderFeature
 		}
 	}
 
-	private void InitializeIdMap(bool isUpdate)
+	private void InitializeIdMap(bool isUpdate, RectInt? texelRegion = null)
 	{
 		if (terrainLayers.Count == 0)
 			return;
@@ -366,7 +360,18 @@ public class TerrainSystem : FrameRenderFeature
 				pass.SetInt("_TotalLayers", terrainLayers.Count);
 				pass.SetInt("_TextureCount", terrainData.alphamapLayers);
 				pass.SetVector("PositionOffset", Vector2.zero);
-				pass.SetVector("UvScaleOffset", new Vector4(1, 1, 0, 0));
+
+				if (texelRegion.HasValue)
+				{
+					var region = texelRegion.Value;
+					command.SetViewport(new Rect(region.position, region.size));
+					pass.SetVector("PositionOffset", (Vector2)region.position);
+					pass.SetVector("UvScaleOffset", new Vector4(region.size.x, region.size.y, region.position.x, region.position.y) / terrainData.alphamapResolution);
+				}
+				else
+				{
+					pass.SetVector("UvScaleOffset", new Vector4(1, 1, 0, 0));
+				}
 
 				// Shader supports up to 8 layers. Can easily be increased by modifying shader though
 				for (var i = 0; i < 8; i++)

@@ -78,8 +78,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 	color = lerp(color, bloom, BloomStrength);
 	
-	//color = ICtCpToRec2020(ScreenSpaceGlobalIllumination[position.xy]);
-	//color = ICtCpToRec2020(ScreenSpaceReflections[position.xy]);
+	//color = ScreenSpaceGlobalIllumination[position.xy].rgb;
+	//color = ScreenSpaceReflections[position.xy];
 	
 	if (Purkinje)
 	{

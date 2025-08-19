@@ -44,7 +44,7 @@ Texture2D<float3> _CloudShadow;
 Texture2D<float> ScreenSpaceShadows;
 float ScreenSpaceShadowsIntensity;
 
-Texture2D<float3> ScreenSpaceGlobalIllumination;
+Texture2D<float4> ScreenSpaceGlobalIllumination;
 
 float4 ScreenSpaceGlobalIlluminationScaleLimit, ScreenSpaceShadowsScaleLimit;
 float DiffuseGiStrength, SpecularGiStrength;
@@ -543,7 +543,8 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float3 irradiance = AmbientCosine(bentNormal, visibilityAngle);
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-		irradiance += ICtCpToRec709(ScreenSpaceGlobalIllumination[pixelCoordinate]) / PaperWhite * DiffuseGiStrength;
+		float4 ssgi = ScreenSpaceGlobalIllumination[pixelCoordinate];
+		irradiance += ssgi.rgb * DiffuseGiStrength;//lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength);
 	#endif
 	
 	float3 fAvg = AverageFresnel(f0);
@@ -554,7 +555,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float3 irradiance1 = AmbientCosine(-N, visibilityAngle);
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-		irradiance1 += ICtCpToRec709(ScreenSpaceGlobalIllumination[pixelCoordinate]) / PaperWhite * DiffuseGiStrength;
+		irradiance1 += ssgi.rgb * DiffuseGiStrength;//lerp(irradiance1, ssgi.rgb, ssgi.a * DiffuseGiStrength);
 	#endif
 	
 	luminance += irradiance1 * translucency * kd;

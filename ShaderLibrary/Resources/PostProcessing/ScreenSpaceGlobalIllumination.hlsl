@@ -56,12 +56,9 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 		float mipLevel = log2(_ConeAngle * hitDist * rcp(linearHitDepth));
 		
 		color = PreviousColor.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, _PreviousColorScaleLimit), mipLevel);
-		color.r *= PreviousToCurrentExposure;
 	}
 	else
 	{
-		// For a miss, output black and a depth of 0 to indicate no miss. Note that this is still included in denoising to avoid large amounts of 
-		// misses from contributing too strongly
 		color = 0.0;
 		hitRay = L;
 		outDepth = 0.0;
@@ -97,6 +94,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	float phi = Noise1D(position.xy) * TwoPi;
 	
 	float4 result = 0.0;
+	float nonHitWeight = 0.0;
 	float avgRayLength = 0.0;
 	for (uint i = 0; i <= _ResolveSamples; i++)
 	{
@@ -104,8 +102,8 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		float2 coord = clamp(floor(position.xy + u), 0.0, ViewSize - 1.0) + 0.5;
 		float4 hitData = _HitResult[coord];
 		
-		// Since reflection rays don't trigger for sky pixels, this will all be zeros
-		if (all(hitData == 0.0))
+		// Don't denoise from sky pixels
+		if (all(!hitData))
 			continue;
 		
 		// For misses, we just store the ray direction, since it represents a hit at an infinite distance (eg probe)
@@ -128,26 +126,40 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		float weight = RcpPi * NdotL;
 		float4 hitColor = _Input[coord];
 		float weightOverPdf = weight * hitColor.w;
-		result += float4(hitColor.rgb, 1.0) * weightOverPdf;
-		avgRayLength += rcp(rcpRayLength) * weightOverPdf;
+		
+		if (hasHit)
+		{
+			result += float4(hitColor.rgb, 1.0) * weightOverPdf;
+			avgRayLength += rcp(rcpRayLength) * weightOverPdf;
+		}
+		else
+		{
+			nonHitWeight += weightOverPdf;
+		}
 	}
-
+	
 	// Normalize color and result by total hitweight
 	if (result.a)
 	{
 		avgRayLength *= rcp(result.a);
-		result *= rcp(result.a);
+		result.rgb *= rcp(result.a);
 	}
 	
+	// Add the nonhit and hit weights to get a total weight
+	float totalWeight = result.a + nonHitWeight;
+	
+	// Final alpha is the ratio of hit weight vs non hit weight
+	result.a = totalWeight ? result.a / totalWeight : 0.0;
+	
 	SpatialResult output;
-	output.result = float4(Rec709ToICtCp(result.rgb * PaperWhite), 1.0);
+	output.result = result;
 	output.rayLength = avgRayLength;
 	output.weight = result.a * rcp(_ResolveSamples + 1.0);
 	return output;
 }
 
 Texture2D<float> RayDepth, WeightInput, WeightHistory;
-Texture2D<float3> _TemporalInput, _History;
+Texture2D<float4> _TemporalInput, _History;
 float4 WeightHistoryScaleLimit;
 
 struct TemporalOutput
@@ -158,7 +170,7 @@ struct TemporalOutput
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float3 minValue, maxValue, current;
+	float4 minValue, maxValue, current;
 	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, current);
 	
 	float rayLength = RayDepth[position.xy];
@@ -166,29 +178,27 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	worldPosition += normalize(worldDir) * rayLength;
 	
 	float2 historyUv = uv - Velocity[position.xy];
-	float3 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
-	history.r *= PreviousToCurrentExposure;
+	float4 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
 	
-	float weight = WeightInput[position.xy];
-	float weightHistory = WeightHistory.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, WeightHistoryScaleLimit));
-
-	history = ClipToAABB(history, current, minValue, maxValue);
+	history.rgb = ClipToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
+	history.a = clamp(history.a, minValue.a, maxValue.a);
 	
-	if(!_IsFirst && all(saturate(historyUv) == historyUv))
+	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
 		// Weigh current and history
-		current *= weight;
-		history *= weightHistory;
+		//current.rgb *= current.a;
+		//history.rgb *= history.a;
 		current = lerp(history, current, 0.05);
-		weight = lerp(weightHistory, weight, 0.05);
 		
 		// Remove weight and store
-		if (weight)
-			current *= rcp(weight);
+		//if (current.a)
+		//	current *= rcp(current.a);
 	}
 	
+	current = IsInfOrNaN(current) ? 0 : current;
+	
 	TemporalOutput result;
-	result.color = float4(current, 1.0);
-	result.weight = weight;
+	result.color = current;
+	result.weight = 1;
 	return result;
 }

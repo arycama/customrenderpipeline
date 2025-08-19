@@ -44,7 +44,7 @@ void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID
 	
 	uint maxLodCount = min(8, instanceTypeData.lodCount);
 	uint lod = maxLodCount - 1;
-	float viewZ = max(0.0, dot(boundsCenter, ViewForward));
+	float viewZ = abs(dot(boundsCenter, ViewForward));
 	float worldRadius = Max3(boundsExtents);
 	float screenHeight = worldRadius * rcp(viewZ * TanHalfFov) * 0.5;
 	

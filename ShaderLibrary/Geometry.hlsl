@@ -92,12 +92,11 @@ float DistanceFromPlane(float3 p, float4 plane)
 bool FrustumCull(float3 center, float3 extents)
 {
 	// To allow unrolling/efficient constant buffer indexing, simply skip remaining planes based on count
+	const uint maxCullingPlanes = 10;
+	
 	[unroll]
-	for (uint i = 0; i < 6; i++)
+	for (uint i = 0; i < min(maxCullingPlanes, _CullingPlanesCount); i++)
 	{
-		if (i >= _CullingPlanesCount)
-			return true;
-		
 		float4 plane = _CullingPlanes[i];
 		float3 p = center + (plane.xyz >= 0.0 ? extents : -extents);
 		if (DistanceFromPlane(p, plane) < 0.0)

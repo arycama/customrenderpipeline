@@ -111,7 +111,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	
 	float roughness2 = Sq(roughness);
 	float partLambdaV = GetPartLambdaV(roughness2, NdotV);
-
+	
     float4 result = 0.0;
 	float nonHitWeight = 0.0;
 	float avgRayLength = 0.0;

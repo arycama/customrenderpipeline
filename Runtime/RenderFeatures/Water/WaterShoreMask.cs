@@ -25,12 +25,12 @@ public class WaterShoreMask : FrameRenderFeature
         material = new Material(Shader.Find("Hidden/WaterShoreMask")) { hideFlags = HideFlags.HideAndDontSave };
         resultDataBuffer = renderGraph.BufferHandleSystem.ImportResource(new GraphicsBuffer(GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, 1, UnsafeUtility.SizeOf<ResultData>()));
 
-        TerrainCallbacks.heightmapChanged += TerrainHeightmapChanged;
+        //TerrainCallbacks.heightmapChanged += TerrainHeightmapChanged;
     }
 
     protected override void Cleanup(bool disposing)
     {
-        TerrainCallbacks.heightmapChanged -= TerrainHeightmapChanged;
+        //TerrainCallbacks.heightmapChanged -= TerrainHeightmapChanged;
     }
 
     private void TerrainHeightmapChanged(Terrain terrain, RectInt heightRegion, bool synched)
