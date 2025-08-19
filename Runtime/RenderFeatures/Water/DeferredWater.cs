@@ -72,8 +72,8 @@ public class DeferredWater : CameraRenderFeature
                 var material = settings.Material;
                 pass.SetVector("_Color", material.GetColor("_Color").linear);
                 pass.SetVector("_Extinction", material.GetColor("_Extinction"));
-                //pass.SetFloat("_WaterMieFactor", material.GetFloat("_MieFactor"));
-                //pass.SetFloat("_WaterMiePhase", material.GetFloat("_MiePhase"));
+                pass.SetFloat("_WaterMieFactor", material.GetFloat("_MieFactor"));
+                pass.SetFloat("_WaterMiePhase", material.GetFloat("_MiePhase"));
 
                 pass.SetFloat("_RefractOffset", material.GetFloat("_RefractOffset"));
 

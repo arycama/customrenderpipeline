@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using static Math;
 
 public class WaterFft : FrameRenderFeature
 {
@@ -61,7 +62,16 @@ public class WaterFft : FrameRenderFeature
 
         // Load resources
         var computeShader = Resources.Load<ComputeShader>("OceanFFT");
-        var oceanBuffer = renderGraph.SetConstantBuffer((
+		var oceanScale = new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w);
+
+		var maxWaveNumber0 = Sqrt(2 * Square(Pi * settings.Resolution * oceanScale.x));
+		var maxWaveNumber1 = Sqrt(2 * Square(Pi * settings.Resolution * oceanScale.y));
+		var maxWaveNumber2 = Sqrt(2 * Square(Pi * settings.Resolution * oceanScale.z));
+		var maxWaveNumber3 = Sqrt(2 * Square(Pi * settings.Resolution * oceanScale.w));
+
+
+
+		var oceanBuffer = renderGraph.SetConstantBuffer((
             Profile.WindSpeed,
             Profile.WindAngle,
             Profile.Fetch,
@@ -70,10 +80,10 @@ public class WaterFft : FrameRenderFeature
             Profile.PeakEnhancement,
             Profile.ShortWavesFade,
             0f,
-            oceanScale: new Vector4(1f / patchSizes.x, 1f / patchSizes.y, 1f / patchSizes.z, 1f / patchSizes.w),
-            spectrumStart: new Vector4(0, Profile.MaxWaveNumber * patchSizes.y / patchSizes.x, Profile.MaxWaveNumber * patchSizes.z / patchSizes.y, Profile.MaxWaveNumber * patchSizes.w / patchSizes.z),
-            spectrumEnd: new Vector4(Profile.MaxWaveNumber, Profile.MaxWaveNumber, Profile.MaxWaveNumber, settings.Resolution),
-            Profile.Gravity,
+            oceanScale: oceanScale,
+			spectrumStart: new Vector4(0, maxWaveNumber0, maxWaveNumber1, maxWaveNumber2),
+			spectrumEnd: new Vector4(maxWaveNumber0, maxWaveNumber1, maxWaveNumber2, maxWaveNumber3),
+			Profile.Gravity,
             (float)timeData.Time,
             Profile.TimeScale,
             Profile.SequenceLength

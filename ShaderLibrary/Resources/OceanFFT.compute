@@ -180,22 +180,21 @@ float GetSpectrumAmplitude(float2 k, float kLength, float rcpTileLength)
 [numthreads(32, 32, 1)]
 void Spectrum(uint3 id : SV_DispatchThreadID)
 {
-	int n = (int)id.x - HalfResolution;
-	int m = (int)id.y - HalfResolution;
+	float n = (float)id.x - HalfResolution + 0.5;
+	float m = (float) id.y - HalfResolution + 0.5;
 	
 	float4 hkt = 0.0;
 	float wk = 0.0;
 	
 	uint index = (id.z * _Resolution + id.y) * _Resolution + id.x;
 	
-	float nr = length(float2(n, m));
-	if ((n || m) && nr >= SpectrumStart[id.z] && nr < SpectrumEnd[id.z])
-	{
-		float rcpPatchSize = _OceanScale[id.z];
-		float2 k = TwoPi * float2(n, m) * rcpPatchSize;
-		float rcpKLength = RcpLength(k);
-		float kLength = rcp(rcpKLength);
+	float rcpPatchSize = _OceanScale[id.z];
+	float2 k = TwoPi * float2(n, m) * rcpPatchSize;
+	float rcpKLength = RcpLength(k);
+	float kLength = rcp(rcpKLength);
 	
+	if (kLength >= SpectrumStart[id.z] && kLength < SpectrumEnd[id.z])
+	{
 		// Eq 31
 		float w = DispersionDeep(kLength);
 	

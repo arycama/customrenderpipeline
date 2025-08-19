@@ -61,7 +61,7 @@ float FragmentAverageAlbedo(float4 position : SV_Position, float2 uv : TEXCOORD0
 		result += (1.0 - DirectionalAlbedo[uint2(x, position.x)]) * cosTheta;
 	}
 
-	return result / samples * 2.0;
+	return 1.0 - result / samples * 2.0;
 }
 
 float FragmentDirectionalAlbedoMultiScattered(float4 position : SV_Position, float2 uv0 : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
@@ -79,8 +79,7 @@ float FragmentDirectionalAlbedoMultiScattered(float4 position : SV_Position, flo
 	float roughness2 = Sq(roughness);
 	float partLambdaV = GetPartLambdaV(roughness2, NdotV);
 	
-	float f0 = Remap(uv.z, 0, 1, 0.04, 1);
-	
+	float f0 = uv.z;
 	uint samples = 1024;
 	
 	float multiScatterResult = 0;

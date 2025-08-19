@@ -459,7 +459,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	
 	// Can combine below into 1 lookup
 	float viewDirectionalAlbedoMs = DirectionalAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float3(NdotV, perceptualRoughness, f0Avg), 16));
-	float averageAlbedoMs = AverageAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(perceptualRoughness, Remap(f0Avg, 0.04, 1, 0, 1)), 16));
+	float averageAlbedoMs = AverageAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(perceptualRoughness, f0Avg), 16));
 	float3 diffuseTerm = averageAlbedoMs ? viewDirectionalAlbedoMs * rcp(averageAlbedoMs) : 0.0; // TODO: Bake into DFG?
 	
 	// Direct lighting

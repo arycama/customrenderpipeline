@@ -62,10 +62,10 @@ float3 GgxMultiScatterTerm(float3 f0, float perceptualRoughness, float NdotV, fl
 {
 	float averageAlbedo = AverageAlbedo.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(perceptualRoughness, 0), float2(32, 1)));
 	float3 averageFresnel = AverageFresnel(f0);
-	float3 denominator = 1.0 - averageAlbedo - averageFresnel * Sq(1.0 - averageAlbedo);
+	float3 denominator = averageAlbedo - averageFresnel * Sq(averageAlbedo);
 	
 	// AverageAlbedo for NdotL is already applied to each light contribution
-	return denominator ? (ems * Sq(averageFresnel) * averageAlbedo * rcp(denominator)) : 0.0;
+	return denominator ? (ems * Sq(averageFresnel) * (1.0 - averageAlbedo) * rcp(denominator)) : 0.0;
 }
 
 float3 Ggx(float roughness2, float NdotL, float LdotV, float NdotV, float partLambdaV, float perceptualRoughness, float3 f0, float3 multiScatterTerm)
