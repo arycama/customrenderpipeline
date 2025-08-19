@@ -99,5 +99,5 @@ void Visibility(uint id : SV_DispatchThreadID)
 	float3 boundsCenter = boundsData.xyz - ViewPosition;
 	float3 boundsExtents = R11G11B10ToFloat3(asuint(boundsData.w));
 	
-	_RendererInstanceIDs[id] = 0;//IsVisible(boundsCenter, boundsExtents);
+	_RendererInstanceIDs[id] = IsVisible(boundsCenter, boundsExtents);
 }

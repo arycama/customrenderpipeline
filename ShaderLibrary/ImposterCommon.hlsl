@@ -1,0 +1,124 @@
+#pragma once
+
+// Helper functions
+// Packs a normal into a uv using hemi-octahedral encoding
+float2 HemiOctahedralNormalToUv(float3 n)
+{
+	float l1norm = dot(abs(n), 1.0);
+	float2 res = n.xz * rcp(l1norm);
+	return 0.5 * float2(res.x + res.y, res.x - res.y) + 0.5;
+}
+
+float2 OctahedralNormalToUv(float3 n)
+{
+	n *= rcp(dot(abs(n), 1.0));
+	float t = saturate(-n.y);
+	return 0.5 * (n.xz + (n.xz >= 0.0 ? t : -t)) + 0.5;
+}
+
+// Unpacks a normal from a hemi-octahedral encoded uv
+float3 UvToHemiOctahedralNormal(float2 uv)
+{
+	float2 f = 2.0 * uv - 1.0;
+	float2 val = float2(f.x + f.y, f.x - f.y) * 0.5;
+	return normalize(float3(val, 1.0 - dot(abs(val), 1.0)).xzy);
+}
+
+float3 UvToOctahedralNormal(float2 uv)
+{
+	float2 f = 2.0 * uv - 1.0;
+	float3 n = float3(f, 1.0 - abs(f.x) - abs(f.y));
+
+	float t = max(-n.y, 0.0);
+	n.xz += n.xz >= 0.0 ? -t.x : t.x;
+
+	return normalize(n);
+}
+
+float2 Parallax(Texture2DArray<float> Height, float3 uv, out float outHeight, float3 viewDir, float3 rayOrigin, float offset = 0.5)
+{
+	outHeight = 0.5;
+	
+	#ifdef PARALLAX_OFFSET
+		float3 ro = float3(uv.xy, 0.0);
+		float height1 = Height.Sample(SurfaceSampler, float3(uv.xy, uv.z)) - 0.5;
+		outHeight = height1;
+		//return IntersectRayPlane(ro, viewDir, float3(0, 0, height1), float3(0, 0, 1));
+		
+		half3 v = -viewDir;
+		//v.z += 0.42;
+		return float3(uv.xy + height1 * (v.xy / v.z), height1).xy;
+	
+		//height = Height.Sample(SurfaceSampler, float3(uv.xy, uv.z)) - 0.5;
+		//return height * viewDir.xy + uv.xy;
+	#endif
+
+	#ifdef PARALLAX_STEEP
+		float parallaxSamples = 8;
+		float scale = 1;
+		float3 rd = -normalize(viewDir);
+	
+		// Find where the raymarch would begin intersecting the volume
+		float maxHeight = 0.5 * scale;
+		float3 ro = IntersectRayPlane(float3(uv.xy, 0.0), rd, float3(0, 0, maxHeight), float3(0, 0, 1));
+		
+		float minHeight = -0.5 * scale;
+		float maxT = RayPlaneDistance(ro, rd, float3(0, 0, minHeight), float3(0, 0, 1));
+		
+		float dt = maxT / parallaxSamples;
+		rd *= dt;
+		
+		float2 dxScale = ddx(rd.xy);
+		float2 dyScale = ddy(rd.xy);
+		float2 dxOffset = ddx(offset * rd.xy + ro.xy);
+		float2 dyOffset = ddy(offset * rd.xy + ro.xy);
+		
+		float3 prevP = offset * rd * dt + ro;
+		float height = (Height.Sample(SurfaceSampler, float3(prevP.xy, uv.z)) - 0.5) * scale;
+		float prevHeight = height;
+		
+		for (float i = 1; i <= parallaxSamples; i++)
+		{
+			float3 p = (i + offset) * rd + ro;
+			float2 dx = i * dxScale + dxOffset;
+			float2 dy = i * dyScale + dyOffset;
+			height = (Height.SampleGrad(SurfaceSampler, float3(p.xy, uv.z), dx, dy) - 0.5) * scale;
+			
+			if (p.z <= height)
+			{
+				// Linear interpolation between prevP and p for exact intersection
+				float alpha = (prevHeight - prevP.z) / ((prevHeight - prevP.z) - (height - p.z));
+				height = lerp(prevHeight, height, alpha);
+				outHeight = height;
+				return float3(lerp(prevP.xy, p.xy, alpha), height);
+			}
+			
+			prevP = p;
+			prevHeight = height;
+		}
+		
+		outHeight = height;
+		return prevP.xy;
+	#endif
+
+	return uv.xy;
+}
+
+float2 NormalToUv(float3 normal)
+{
+	#ifdef MODE_HEMISPHERE
+		normal.y = max(0.0, normal.y);
+		return HemiOctahedralNormalToUv(normal);
+	#else
+	return OctahedralNormalToUv(normal);
+	#endif
+}
+
+float3 UvToNormal(float2 uv)
+{
+	#ifdef MODE_HEMISPHERE
+		return UvToHemiOctahedralNormal(uv);
+	#else
+		return UvToOctahedralNormal(uv);
+	#endif
+}

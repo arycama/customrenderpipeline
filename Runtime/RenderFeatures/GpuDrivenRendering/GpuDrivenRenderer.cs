@@ -16,9 +16,9 @@ public class GpuDrivenRenderer : RenderFeatureBase
 		writeDrawCallArgs = Resources.Load<ComputeShader>("GpuInstancedRendering/WriteDrawCallArgs");
     }
 
-    public GpuRenderingData Render(Int2 viewSize, bool isShadow, CullingPlanes cullingPlanes, GpuDrivenRenderingData instanceData)
+    public GpuRenderingData Setup(Int2 viewSize, bool isShadow, CullingPlanes cullingPlanes, GpuDrivenRenderingData instanceData)
     {
-		using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
+		using var scope = renderGraph.AddProfileScope("Setup");
 
 		var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
 		for (var i = 0; i < cullingPlanes.Count; i++)
@@ -154,7 +154,6 @@ public class GpuDrivenRenderer : RenderFeatureBase
 		// Radix sort zzz too many passes
 		using (renderGraph.AddProfileScope("Radix Sort"))
 		{
-
 			for (var i = 0; i < 32; i++)
 			{
 				using var passScope = renderGraph.AddProfileScope($"Pass {i}");
@@ -245,8 +244,11 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			cullingPlanes.SetCullingPlane(i, plane);
 		}
 
-		var renderingData = Render(viewSize, true, cullingPlanes, instanceData);
-		using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
+		using var setupScope = renderGraph.AddProfileScope("Gpu Driven Rendering");
+
+		var renderingData = Setup(viewSize, true, cullingPlanes, instanceData);
+
+		using var renderScope = renderGraph.AddProfileScope("Render");
 
 		for (var i = 0; i < drawList.Count; i++)
 		{

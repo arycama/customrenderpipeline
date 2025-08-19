@@ -448,11 +448,11 @@ float4 SphericalCapIntersection(float3 a, float cosA, float3 b, float cosB)
 
 	// Cone a fully inside cone b, return cone a
 	if (cosB <= CosineAddition(cosA, cosC))
-		float4(a, cosA);
+		return float4(a, cosA);
 		
 	// Cone b fully inside cone a, return cone b
 	if (cosA <= CosineAddition(cosB, cosC))
-		float4(b, cosB);
+		return float4(b, cosB);
 	
 	// Compute the vector that is in the center of the overlapping area
 	float cosDelta = CosineDifference(cosA, cosB);

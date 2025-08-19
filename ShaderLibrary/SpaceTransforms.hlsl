@@ -41,7 +41,6 @@ float3x4 GetWorldToObject(uint instanceId, bool cameraRelative = true)
 		float3x4 worldToObject = Affine3x4Inverse(localToWorld);
 	#elif defined(INSTANCING_ON)
 		float3x4 worldToObject = (float3x4)unity_Builtins1Array[unity_BaseInstanceID + instanceId].unity_WorldToObjectArray;
-		worldToObject = (float3x4) FastInverse(unity_Builtins1Array[unity_BaseInstanceID + instanceId].unity_WorldToObjectArray);
 	#else
 		float3x4 worldToObject = (float3x4)unity_WorldToObject;
 	#endif

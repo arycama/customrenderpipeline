@@ -22,10 +22,12 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 		if (!instanceData.rendererDrawCallData.TryGetValue("MotionVectors", out var drawList))
 			return;
 
-		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
-		var renderingData = gpuDrivenRenderer.Render(camera.ScaledViewSize(), false, cullingPlanes, instanceData);
-
 		using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
+
+		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
+		var renderingData = gpuDrivenRenderer.Setup(camera.ScaledViewSize(), false, cullingPlanes, instanceData);
+
+		using var renderScope = renderGraph.AddProfileScope("Render");
 
 		for (var i = 0; i < drawList.Count; i++)
 		{
