@@ -1,22 +1,23 @@
 #include "../../Math.hlsl"
 #include "../../PrefixSum.hlsl"
 
-#pragma kernel InstanceSort
+#pragma kernel RadixCount COUNT
+#pragma kernel RadixScan SCAN
+#pragma kernel RadixScatter SCATTER
 #pragma enable_d3d11_debug_symbols
 
-RWStructuredBuffer<uint> Result;
-StructuredBuffer<uint> Input;
-StructuredBuffer<uint> TotalInstanceCount, SortKeys;
-RWStructuredBuffer<uint> SortKeysWrite;
+#ifdef SCAN
+	const static uint threadCount = 1024;
+#else
+	const static uint threadCount = 256;
+#endif
 
-const static uint threadCount = 256;
 const static uint log2ThreadCount = firstbitlow(threadCount);
 
-groupshared uint sharedKeys[threadCount];
-groupshared uint sharedIndices[threadCount];
-groupshared uint sharedSums[threadCount];
+StructuredBuffer<uint> TotalInstanceCount, SortKeys;
+uint BitIndex;
 
-groupshared uint sharedTotalFalses;
+groupshared uint sharedSums[threadCount];
 
 void PrefixSumSharedWrite(uint index, uint data)
 {
@@ -28,41 +29,85 @@ uint PrefixSumSharedRead(uint index)
 	return sharedSums[index];
 }
 
-[numthreads(threadCount, 1, 1)]
-void InstanceSort(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
-{
-	bool outOfRange = id >= TotalInstanceCount[0];
-	sharedKeys[groupIndex] = outOfRange ? 0xFFFFFFFF : SortKeys[id];
-	sharedIndices[groupIndex] = groupIndex;
-	
-	for (uint i = 0; i < 32; i++)
-	{
-		GroupMemoryBarrierWithGroupSync();
+RWStructuredBuffer<uint> CountResult;
 
-		uint srcIndex = sharedIndices[groupIndex];
-		uint key = sharedKeys[srcIndex];
-		bool bit = (key >> i) & 0x1;
+[numthreads(threadCount, 1, 1)]
+void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
+{
+	// Count the elements for this block
+	bool outOfRange = id >= TotalInstanceCount[0];
+	uint key = outOfRange ? 0xFFFFFFFF : SortKeys[id];
+	bool bit = (key >> BitIndex) & 0x1;
 		
-		sharedSums[groupIndex] = !bit;
-		
-		uint totalFalses;
-		PrefixSum(groupIndex, threadCount, log2ThreadCount, totalFalses);
-		
-		if (!groupIndex)
-			sharedTotalFalses = totalFalses;
-			
-		GroupMemoryBarrierWithGroupSync();
-		
-		uint f = sharedSums[groupIndex];
-		uint t = groupIndex - f + sharedTotalFalses;
-		uint d = bit ? t : f;
-		sharedIndices[d] = srcIndex;
-	}
+	sharedSums[groupIndex] = !bit;
 	
 	GroupMemoryBarrierWithGroupSync();
 	
+	uint totalFalses;
+	PrefixSum(groupIndex, threadCount, log2ThreadCount, totalFalses);
+	
+	// Could write out the prefix sum results here.. but instead we just perform it again in the sort kernel
+	// Write the final count out to global memory
+	if (!groupIndex)
+		CountResult[groupId] = totalFalses;
+}
+
+StructuredBuffer<uint> Count, TotalGroupCount;
+RWStructuredBuffer<uint> ScanResult, TotalFalsesResult;
+
+[numthreads(threadCount, 1, 1)]
+void RadixScan(uint groupIndex : SV_GroupIndex)
+{
+	bool outOfRange = groupIndex >= TotalGroupCount[0];
+
+	// Prefix sum the counts
+	sharedSums[groupIndex] = outOfRange ? 0 : Count[groupIndex];
+	
+	GroupMemoryBarrierWithGroupSync();
+	
+	uint totalFalses;
+	PrefixSum(groupIndex, threadCount, log2ThreadCount, totalFalses);
+	
+	GroupMemoryBarrierWithGroupSync();
+	
+	// Write the total prefix sum for each group
+	ScanResult[groupIndex] = sharedSums[groupIndex];
+	
+	// Write the toal global number of falses
+	if (!groupIndex)
+		TotalFalsesResult[0] = totalFalses;
+}
+
+RWStructuredBuffer<uint> ScatterDataResult, ScatterKeysResult;
+StructuredBuffer<uint> ScatterData, TotalFalses, GroupScans;
+
+groupshared uint sharedKeys[threadCount];
+
+[numthreads(threadCount, 1, 1)]
+void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
+{
+	// Count the elements for this block
+	bool outOfRange = id >= TotalInstanceCount[0];
+	uint key = outOfRange ? 0xFFFFFFFF : SortKeys[id];
+	bool bit = (key >> BitIndex) & 0x1;
+	
+	sharedSums[groupIndex] = !bit;
+	
+	GroupMemoryBarrierWithGroupSync();
+	
+	uint totalFalses;
+	PrefixSum(groupIndex, threadCount, log2ThreadCount, totalFalses);
+	
+	GroupMemoryBarrierWithGroupSync();
+	
+	uint groupScan = GroupScans[groupId]; // TODO: Shared memory
+	
+	uint i = id;
+	uint f = sharedSums[groupIndex] + groupScan; // Add the group scan to the result.
+	uint t = i - f + TotalFalses[0]; // TODO: Is it better to load this into shared memory?
+	uint d = bit ? t : f;
+	
 	// Write final results
-	uint finalSrc = groupId * threadCount + sharedIndices[groupIndex];
-	Result[id] = Input[finalSrc];
-	SortKeysWrite[id] = SortKeys[finalSrc];
+	ScatterDataResult[d] = ScatterData[id];
+	ScatterKeysResult[d] = SortKeys[id];
 }

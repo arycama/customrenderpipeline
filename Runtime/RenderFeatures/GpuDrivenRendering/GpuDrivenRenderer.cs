@@ -151,17 +151,59 @@ public class GpuDrivenRenderer : RenderFeatureBase
             pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
         }
 
-		var sortedInstanceIndices = renderGraph.GetBuffer(instanceData.instanceCount);
-		var sortedKeys = renderGraph.GetBuffer(instanceData.instanceCount);
-		using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Instance Sort"))
+		// Radix sort zzz too many passes
+		using (renderGraph.AddProfileScope("Radix Sort"))
 		{
-			pass.Initialize(instanceSort, threadGroups, 0, 3);
-			pass.WriteBuffer("Result", sortedInstanceIndices);
-			pass.WriteBuffer("SortKeysWrite", sortedKeys);
 
-			pass.ReadBuffer("Input", instanceIndices);
-			pass.ReadBuffer("SortKeys", sortKeys);
-            pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
+			for (var i = 0; i < 32; i++)
+			{
+				using var passScope = renderGraph.AddProfileScope($"Pass {i}");
+
+				instanceSort.GetThreadGroupSizes(0, instanceData.instanceCount, out var countGroups);
+
+				var countResult = renderGraph.GetBuffer((int)countGroups);
+				using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Radix Count"))
+				{
+					pass.Initialize(instanceSort, threadGroups, 0);
+					pass.WriteBuffer("CountResult", countResult);
+					pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
+					pass.ReadBuffer("SortKeys", sortKeys);
+
+					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
+				}
+
+				var totalFalses = renderGraph.GetBuffer();
+				var scanResult = renderGraph.GetBuffer((int)countGroups);
+				using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Radix Sum"))
+				{
+					pass.Initialize(instanceSort, 1, normalizedDispatch: false);
+					pass.WriteBuffer("TotalFalsesResult", totalFalses);
+					pass.WriteBuffer("ScanResult", scanResult);
+					pass.ReadBuffer("Count", countResult);
+					pass.ReadBuffer("TotalGroupCount", threadGroups);
+				}
+
+				var sortedInstanceIndices = renderGraph.GetBuffer(instanceData.instanceCount);
+				var sortedKeys = renderGraph.GetBuffer(instanceData.instanceCount);
+				using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Radix Scatter"))
+				{
+					pass.Initialize(instanceSort, threadGroups, 2);
+					pass.WriteBuffer("ScatterDataResult", sortedInstanceIndices);
+					pass.WriteBuffer("ScatterKeysResult", sortedKeys);
+
+					pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
+					pass.ReadBuffer("SortKeys", sortKeys);
+					pass.ReadBuffer("ScatterData", instanceIndices);
+					pass.ReadBuffer("TotalFalses", totalFalses);
+					pass.ReadBuffer("GroupScans", scanResult);
+
+					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
+				}
+
+				// Current outputs become the new inputs
+				sortKeys = sortedKeys;
+				instanceIndices = sortedInstanceIndices;
+			}
 		}
 
 		var objectToWorld = renderGraph.GetBuffer(instanceData.instanceCount, UnsafeUtility.SizeOf<Float3x4>());
@@ -175,7 +217,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
             pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
 
 			// Temporarily here to avoid memory leaks due to sortedKeys not being used anywhere. (Only used for debug really)
-			pass.ReadBuffer("SortKeys", sortedKeys);
+			pass.ReadBuffer("SortKeys", sortKeys);
 
 			pass.SetRenderFunction((command, pass) =>
             {

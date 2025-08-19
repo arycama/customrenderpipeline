@@ -2,6 +2,7 @@
 
 public static class ComputeShaderExtensions
 {
+	// TODO: Return int/int2/int3 for these methods
 	public static void GetThreadGroupSizes(this ComputeShader computeShader, int kernelIndex, Vector3Int threads, out uint groupsX, out uint groupsY, out uint groupsZ)
 	{
 		computeShader.GetKernelThreadGroupSizes(kernelIndex, out var x, out var y, out var z);
@@ -10,11 +11,13 @@ public static class ComputeShaderExtensions
 		groupsZ = Math.DivRoundUp((uint)threads.z, z);
 	}
 
+	// TODO: Return int/int2/int3 for these methods
 	public static void GetThreadGroupSizes(this ComputeShader computeShader, int kernelIndex, Vector2Int threads, out uint groupsX, out uint groupsY)
 	{
 		computeShader.GetThreadGroupSizes(kernelIndex, new Vector3Int(threads.x, threads.y, 1), out groupsX, out groupsY, out _);
 	}
 
+	// TODO: Return int/int2/int3 for these methods
 	public static void GetThreadGroupSizes(this ComputeShader computeShader, int kernelIndex, int threadsX, out uint groupsX)
 	{
 		computeShader.GetThreadGroupSizes(kernelIndex, new Vector3Int(threadsX, 1, 1), out groupsX, out _, out _);

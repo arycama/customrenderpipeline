@@ -23,13 +23,9 @@ uint DivRoundUp(uint x, uint y)
 [numthreads(1, 1, 1)]
 void ComputeThreadCount()
 {
-	uint visibleInstanceCount = TotalInstanceCount[0];
-	ThreadGroupsWrite[0] = DivRoundUp(visibleInstanceCount, threadCount);
+	ThreadGroupsWrite[0] = DivRoundUp(TotalInstanceCount[0], 256);
 	ThreadGroupsWrite[1] = 1;
 	ThreadGroupsWrite[2] = 1;
-	ThreadGroupsWrite[3] = DivRoundUp(visibleInstanceCount, 256);
-	ThreadGroupsWrite[4] = 1;
-	ThreadGroupsWrite[5] = 1;
 }
 
 [numthreads(threadCount, 1, 1)]
