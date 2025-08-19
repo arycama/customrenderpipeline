@@ -13,7 +13,7 @@ public class WaterFft : FrameRenderFeature
     private readonly ResourceHandle<GraphicsBuffer> spectrumBuffer, dispersionBuffer;
     private readonly ResourceHandle<RenderTexture> lengthToRoughness;
     private bool roughnessInitialized;
-    private ResourceHandle<RenderTexture> displacementCurrent = new ResourceHandle<RenderTexture>(-1);
+    private ResourceHandle<RenderTexture> displacementCurrent = new(-1);
 
     private WaterProfile Profile => settings.Profile;
 

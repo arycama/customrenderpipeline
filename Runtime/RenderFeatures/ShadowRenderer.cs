@@ -91,7 +91,7 @@ public class ShadowRenderer : CameraRenderFeature
 		{
 			for (var i = 0; i < requestData.DirectionalShadowRequests.Count; i++)
 			{
-				using (renderGraph.AddProfileScope(directionalCascadeIds.GetString(i)))
+				using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
 				{
 					var request = requestData.DirectionalShadowRequests[i];
 					RenderShadowMap(request, BatchCullingProjectionType.Orthographic, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false, false);
@@ -105,7 +105,7 @@ public class ShadowRenderer : CameraRenderFeature
 		{
 			for (var i = 0; i < requestData.PointShadowRequests.Count; i++)
 			{
-				using (renderGraph.AddProfileScope(pointLightIds.GetString(i)))
+				using (renderGraph.AddProfileScope(pointLightIds[i]))
 				{
 					var request = requestData.PointShadowRequests[i];
 					RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, true);
@@ -118,7 +118,7 @@ public class ShadowRenderer : CameraRenderFeature
 		{
 			for (var i = 0; i < requestData.SpotShadowRequests.Count; i++)
 			{
-				using (renderGraph.AddProfileScope(SpotLightIds.GetString(i)))
+				using (renderGraph.AddProfileScope(SpotLightIds[i]))
 				{
 					var request = requestData.SpotShadowRequests[i];
 					RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, false);

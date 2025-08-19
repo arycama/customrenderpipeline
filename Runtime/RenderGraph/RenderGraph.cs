@@ -136,7 +136,7 @@ public class RenderGraph : IDisposable
 		});
 	}
 
-	public ProfilePassScope AddProfileScope(string name) => new ProfilePassScope(name, this);
+	public ProfilePassScope AddProfileScope(string name) => new(name, this);
 
 	public void Execute(CommandBuffer command)
 	{
@@ -246,38 +246,5 @@ public class RenderGraph : IDisposable
 	{
 		Assert.IsFalse(IsExecuting);
 		RtHandleSystem.ReleasePersistentResource(handle);
-	}
-}
-
-public readonly struct ProfilePassScope : IDisposable
-{
-	private readonly string name;
-	private readonly RenderGraph renderGraph;
-
-	public ProfilePassScope(string name, RenderGraph renderGraph)
-	{
-		// TODO: There might be a more concise way to do this
-		var pass = renderGraph.AddRenderPass<GenericRenderPass>(name);
-		pass.UseProfiler = false;
-
-		pass.SetRenderFunction((command, pass) =>
-		{
-			command.BeginSample(name);
-		});
-
-		this.name = name;
-		this.renderGraph = renderGraph;
-	}
-
-	readonly void IDisposable.Dispose()
-	{
-		// TODO: There might be a more concise way to do this
-		var pass = renderGraph.AddRenderPass<GenericRenderPass>(name);
-		pass.UseProfiler = false;
-
-		pass.SetRenderFunction(name, (command, pass, name) =>
-		{
-			command.EndSample(name);
-		});
 	}
 }

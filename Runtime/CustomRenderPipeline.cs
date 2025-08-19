@@ -10,13 +10,13 @@ using UnityEditor;
 
 public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelineAsset>
 {
-	private static readonly IndexedString blueNoise1DIds = new("STBN/stbn_vec1_2Dx1D_128x128x64_");
-	private static readonly IndexedString blueNoise2DIds = new("STBN/stbn_vec2_2Dx1D_128x128x64_");
-	private static readonly IndexedString blueNoise3DIds = new("STBN/stbn_vec3_2Dx1D_128x128x64_");
+	private static readonly IndexedString blueNoise1DIds = new("STBN/stbn_vec1_2Dx1D_128x128x64_", 64);
+	private static readonly IndexedString blueNoise2DIds = new("STBN/stbn_vec2_2Dx1D_128x128x64_", 64);
+	private static readonly IndexedString blueNoise3DIds = new("STBN/stbn_vec3_2Dx1D_128x128x64_", 64);
 
-	private static readonly IndexedString blueNoise2DUnitIds = new("STBN/stbn_unitvec2_2Dx1D_128x128x64_");
-	private static readonly IndexedString blueNoise3DUnitIds = new("STBN/stbn_unitvec3_2Dx1D_128x128x64_");
-	private static readonly IndexedString blueNoise3DCosineIds = new("STBN/stbn_unitvec3_cosine_2Dx1D_128x128x64_");
+	private static readonly IndexedString blueNoise2DUnitIds = new("STBN/stbn_unitvec2_2Dx1D_128x128x64_", 64);
+	private static readonly IndexedString blueNoise3DUnitIds = new("STBN/stbn_unitvec3_2Dx1D_128x128x64_", 64);
+	private static readonly IndexedString blueNoise3DCosineIds = new("STBN/stbn_unitvec3_cosine_2Dx1D_128x128x64_", 64);
 
 	private double time, previousTime, deltaTime;
 
@@ -94,12 +94,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			))));
 
 			var noiseIndex = asset.NoiseDebug ? 34 : renderGraph.FrameIndex % 64;
-			var blueNoise1D = Resources.Load<Texture2D>(blueNoise1DIds.GetString(noiseIndex));
-			var blueNoise2D = Resources.Load<Texture2D>(blueNoise2DIds.GetString(noiseIndex));
-			var blueNoise3D = Resources.Load<Texture2D>(blueNoise3DIds.GetString(noiseIndex));
-			var blueNoise2DUnit = Resources.Load<Texture2D>(blueNoise2DUnitIds.GetString(noiseIndex));
-			var blueNoise3DUnit = Resources.Load<Texture2D>(blueNoise3DUnitIds.GetString(noiseIndex));
-			var blueNoise3DCosine = Resources.Load<Texture2D>(blueNoise3DCosineIds.GetString(noiseIndex));
+			var blueNoise1D = Resources.Load<Texture2D>(blueNoise1DIds[noiseIndex]);
+			var blueNoise2D = Resources.Load<Texture2D>(blueNoise2DIds[noiseIndex]);
+			var blueNoise3D = Resources.Load<Texture2D>(blueNoise3DIds[noiseIndex]);
+			var blueNoise2DUnit = Resources.Load<Texture2D>(blueNoise2DUnitIds[noiseIndex]);
+			var blueNoise3DUnit = Resources.Load<Texture2D>(blueNoise3DUnitIds[noiseIndex]);
+			var blueNoise3DCosine = Resources.Load<Texture2D>(blueNoise3DCosineIds[noiseIndex]);
 
 			using var pass = renderGraph.AddRenderPass<GenericRenderPass>("Set Per Frame Data");
 			pass.SetRenderFunction((command, pass) =>

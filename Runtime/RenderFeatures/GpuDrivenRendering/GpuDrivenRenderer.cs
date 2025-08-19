@@ -3,6 +3,7 @@ using UnityEngine;
 
 public class GpuDrivenRenderer : RenderFeatureBase
 {
+	private static IndexedString radixPassId = new("Pass ", 32);
     private readonly ComputeShader cullingShader, instancePrefixSum, instanceCompaction, instanceSort, instanceIdOffsets, instanceCopyData, writeDrawCallArgs;
 
     public GpuDrivenRenderer(RenderGraph renderGraph) : base(renderGraph)
@@ -39,12 +40,15 @@ public class GpuDrivenRenderer : RenderFeatureBase
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<HiZMaxDepthData>();
 
-            pass.SetRenderFunction((command, pass) =>
+			var maxMip = Texture2DExtensions.MipCount(viewSize) - 1;
+			pass.SetRenderFunction((cullingPlanesArray, maxMip, instanceData.instanceCount), static (command, pass, data) =>
             {
-                pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
-                pass.SetFloat("_MaxHiZMip", Texture2DExtensions.MipCount(viewSize) - 1);
-                pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
-                pass.SetInt("_InstanceCount", instanceData.instanceCount);
+                pass.SetVectorArray("_CullingPlanes", data.cullingPlanesArray);
+                pass.SetFloat("_MaxHiZMip", data.maxMip);
+                pass.SetInt("_CullingPlanesCount", data.cullingPlanesArray.Length);
+                pass.SetInt("_InstanceCount", data.instanceCount);
+
+				ArrayPool<Vector4>.Release(data.cullingPlanesArray);
             });
         }
 
@@ -59,9 +63,9 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
             pass.ReadBuffer("Input", visibilityPredicates);
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(instanceData.instanceCount, static (command, pass, instanceCount) =>
             {
-                pass.SetInt("MaxThread", instanceData.instanceCount);
+                pass.SetInt("MaxThread", instanceCount);
             });
         }
 
@@ -75,9 +79,9 @@ public class GpuDrivenRenderer : RenderFeatureBase
             pass.WriteBuffer("TotalInstanceCount", totalInstanceCountBuffer);
             pass.ReadBuffer("Input", groupSums);
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction((int)groupsX, static (command, pass, groupsX) =>
             {
-                pass.SetInt("MaxThread", (int)groupsX);
+                pass.SetInt("MaxThread", groupsX);
             });
         }
 
@@ -102,12 +106,15 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
 			pass.AddRenderPassData<ViewData>();
 
-			pass.SetRenderFunction((command, pass) =>
-            {
-                pass.SetInt("MaxThread", instanceData.instanceCount);
+			var lodCountsData = ArrayPool<uint>.Get(instanceData.lodCount);
+			for (var i = 0; i < instanceData.lodCount; i++)
+				lodCountsData[i] = 0;
 
-				using (ArrayPool<uint>.Get(instanceData.lodCount, out var data))
-					command.SetBufferData(pass.GetBuffer(lodCounts), data);
+			pass.SetRenderFunction((instanceData.instanceCount, lodCounts, lodCountsData), static (command, pass, data) =>
+            {
+                pass.SetInt("MaxThread", data.instanceCount);
+				command.SetBufferData(pass.GetBuffer(data.lodCounts), data.lodCountsData);
+				ArrayPool<uint>.Release(data.lodCountsData);
             });
         }
 
@@ -121,11 +128,9 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			pass.ReadBuffer("RendererLodIndices", instanceData.rendererLodIndices);
 			pass.ReadBuffer("LodCounts", lodCounts);
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(instanceData.rendererCount, static (command, pass, rendererCount) =>
 			{
-				var b = pass.GetBuffer(instanceData.rendererLodIndices);
-
-				pass.SetInt("MaxThread", instanceData.rendererCount);
+				pass.SetInt("MaxThread", rendererCount);
 			});
 		}
 
@@ -137,9 +142,9 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			pass.WriteBuffer("Output", instanceIdOffsetsBuffer);
 			pass.ReadBuffer("LodCounts", lodCounts);
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(instanceData.lodCount, static (command, pass, lodCount) =>
 			{
-				pass.SetInt("MaxThread", instanceData.lodCount);
+				pass.SetInt("MaxThread", lodCount);
 			});
 		}
 
@@ -156,7 +161,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 		{
 			for (var i = 0; i < 32; i++)
 			{
-				using var passScope = renderGraph.AddProfileScope($"Pass {i}");
+				using var passScope = renderGraph.AddProfileScope(radixPassId[i]);
 
 				instanceSort.GetThreadGroupSizes(0, instanceData.instanceCount, out var countGroups);
 
@@ -218,9 +223,9 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			// Temporarily here to avoid memory leaks due to sortedKeys not being used anywhere. (Only used for debug really)
 			pass.ReadBuffer("SortKeys", sortKeys);
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(instanceData.instanceCount, static (command, pass, instanceCount) =>
             {
-                pass.SetInt("MaxThread", instanceData.instanceCount);
+                pass.SetInt("MaxThread", instanceCount);
             });
         }
 

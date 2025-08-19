@@ -4,7 +4,7 @@ using UnityEngine;
 
 public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDisposable where T : class where V : IResourceDescriptor<T>
 {
-	private readonly FreeList<(int createIndex, int freeIndex, int resourceIndex, V descriptor, bool isAssigned, bool isReleasable, bool isPersistent, bool isUsed)> handleInfo = new();
+	private readonly FreeList<ResourceHandleData<V, T>> handleInfo = new();
 	private readonly FreeList<(T resource, int lastFrameUsed, bool isAvailable)> resources = new();
 	private readonly Dictionary<T, ResourceHandle<T>> importedResourceLookup = new();
 	private readonly List<int> handlesToFree = new();
@@ -20,7 +20,7 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 
 	public ResourceHandle<T> GetResourceHandle(V descriptor, bool isPersistent = false)
 	{
-		var handleIndex = handleInfo.Add((-1, -1, -1, descriptor, false, false, isPersistent, true));
+		var handleIndex = handleInfo.Add(new(-1, -1, -1, descriptor, false, false, isPersistent, true));
 		return new ResourceHandle<T>(handleIndex);
 	}
 
@@ -31,7 +31,7 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 
 		var resourceIndex = resources.Add((resource, -1, false));
 		var descriptor = CreateDescriptorFromResource(resource);
-		var handleIndex = handleInfo.Add((-1, -1, resourceIndex, descriptor, false, false, true, true));
+		var handleIndex = handleInfo.Add(new(-1, -1, resourceIndex, descriptor, false, false, true, true));
 		result = new ResourceHandle<T>(handleIndex);
 		importedResourceLookup.Add(resource, result);
 
@@ -101,20 +101,20 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 		// Add handles to create/free lists if needed
 		for (var i = 0; i < handleInfo.Count; i++)
 		{
-			var (createIndex, freeIndex, _, _, _, isReleasable, isPersistent, isUsed) = handleInfo[i];
+			var resourceHandleData = handleInfo[i];
 
-			if (!isUsed)
+			if (!resourceHandleData.isUsed)
 				continue;
 
-			if (createIndex != -1)
+			if (resourceHandleData.createIndex != -1)
 			{
-				frameHandlesToCreate[createIndex].Add(i);
+				frameHandlesToCreate[resourceHandleData.createIndex].Add(i);
 			}
 
-			var freePassIndex = freeIndex;
+			var freePassIndex = resourceHandleData.freeIndex;
 			if (freePassIndex == -1)
 			{
-				if (isPersistent && isReleasable)
+				if (resourceHandleData.isPersistent && resourceHandleData.isReleasable)
 					freePassIndex = 0;
 				else
 					continue;
@@ -122,7 +122,7 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 			else
 			{
 				// Do nothing for non-releasable persistent textures
-				if (isPersistent && !isReleasable)
+				if (resourceHandleData.isPersistent && !resourceHandleData.isReleasable)
 					continue;
 			}
 
@@ -172,11 +172,11 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 			// Now mark any textures that need to be released at the end of this pass as available
 			foreach (var handle in frameHandlesToFree[i])
 			{
-				var (_, _, resourceIndex, descriptor, _, _, isPersistent, _) = handleInfo[handle];
+				var resourceHandleData = handleInfo[handle];
 
 				// Could handle this by updating the last used index or something maybe
-				var resource = resources[resourceIndex];
-				resources[resourceIndex] = (resource.resource, frameIndex + ExtraFramesToKeepResource(resource.resource), true);
+				var resource = resources[resourceHandleData.resourceIndex];
+				resources[resourceHandleData.resourceIndex] = (resource.resource, frameIndex + ExtraFramesToKeepResource(resource.resource), true);
 
 				this.handlesToFree.Add(handle);
 			}

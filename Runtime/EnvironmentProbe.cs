@@ -18,8 +18,8 @@ public class EnvironmentProbe : MonoBehaviour
     [SerializeField, FormerlySerializedAs("size")] private Vector3 projectionSize = new(10, 5, 10);
     [SerializeField, FormerlySerializedAs("offset")] private Vector3 projectionOffset = new(0, 0, 0);
 
-    [SerializeField] private Vector3 influenceSize = new Vector3(10, 5, 10);
-    [SerializeField] private Vector3 influenceOffset = new Vector3(0, 0, 0);
+    [SerializeField] private Vector3 influenceSize = new(10, 5, 10);
+    [SerializeField] private Vector3 influenceOffset = new(0, 0, 0);
 
     public float BlendDistance => blendDistance;
     public bool BoxProjection => boxProjection;
