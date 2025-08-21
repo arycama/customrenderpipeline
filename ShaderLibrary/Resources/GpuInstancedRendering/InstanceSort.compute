@@ -14,7 +14,7 @@ const static uint threadCount = 256;
 
 const static uint log2ThreadCount = firstbitlow(threadCount);
 
-StructuredBuffer<uint> TotalInstanceCount, SortKeys;
+StructuredBuffer<uint> TotalInstanceCount, CountKeys, CountData;
 uint BitIndex;
 
 groupshared uint sharedSums[threadCount];
@@ -29,7 +29,7 @@ uint PrefixSumSharedRead(uint index)
 	return sharedSums[index];
 }
 
-RWStructuredBuffer<uint> CountResult;
+RWStructuredBuffer<uint> CountResult, CountKeysResult, CountDataResult;
 groupshared uint SharedTotalFalses;
 
 [numthreads(threadCount, 1, 1)]
@@ -37,7 +37,8 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 {
 	// Count the elements for this block
 	bool outOfRange = id >= TotalInstanceCount[0];
-	uint key = outOfRange ? 0xFFFFFFFF : SortKeys[id];
+	uint key = outOfRange ? 0xFFFFFFFF : CountKeys[id];
+	uint data = outOfRange ? 0 : CountData[id];
 	bool bit = (key >> BitIndex) & 0x1;
 		
 	sharedSums[groupIndex] = !bit;
@@ -52,15 +53,12 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 		
 	GroupMemoryBarrierWithGroupSync();
 	
-	//uint i = id;
-	//uint f = sharedSums[groupIndex] + groupScan;
-	///uint t = i - f + SharedTotalFalses;
-	//uint d = bit ? t : f;
-	
-	// Could write out the prefix sum results here.. but instead we just perform it again in the sort kernel
 	// Write the final count out to global memory
 	if (!groupIndex)
 		CountResult[groupId] = totalFalses;
+		
+	CountKeysResult[id] = key;
+	CountDataResult[id] = data;
 }
 
 StructuredBuffer<uint> Count, TotalGroupCount;
@@ -90,7 +88,7 @@ void RadixScan(uint groupIndex : SV_GroupIndex)
 }
 
 RWStructuredBuffer<uint> ScatterDataResult, ScatterKeysResult;
-StructuredBuffer<uint> ScatterData, TotalFalses, GroupScans;
+StructuredBuffer<uint> ScatterKeys, ScatterData, TotalFalses, GroupScans;
 
 groupshared uint sharedKeys[threadCount];
 groupshared uint sharedData[threadCount];
@@ -100,10 +98,10 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 {
 	// Sort
 	bool outOfRange = id >= TotalInstanceCount[0];
-	uint key = outOfRange ? 0xFFFFFFFF : SortKeys[id];
+	uint key = outOfRange ? 0xFFFFFFFF : ScatterKeys[id];
 	uint data = outOfRange ? 0 : ScatterData[id];
 	bool bit = (key >> BitIndex) & 0x1;
-		
+	
 	sharedSums[groupIndex] = !bit;
 	
 	GroupMemoryBarrierWithGroupSync();

@@ -166,12 +166,18 @@ public class GpuDrivenRenderer : RenderFeatureBase
 				instanceSort.GetThreadGroupSizes(0, instanceData.instanceCount, out var countGroups);
 
 				var countResult = renderGraph.GetBuffer((int)countGroups);
+				var tempKeys = renderGraph.GetBuffer(instanceData.instanceCount);
+				var tempData = renderGraph.GetBuffer(instanceData.instanceCount);
+
 				using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Radix Count"))
 				{
 					pass.Initialize(instanceSort, threadGroups, 0);
 					pass.WriteBuffer("CountResult", countResult);
+					pass.WriteBuffer("CountKeysResult", tempKeys);
+					pass.WriteBuffer("CountDataResult", tempData);
 					pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
-					pass.ReadBuffer("SortKeys", sortKeys);
+					pass.ReadBuffer("CountKeys", sortKeys);
+					pass.ReadBuffer("CountData", instanceIndices);
 
 					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
 				}
@@ -187,26 +193,21 @@ public class GpuDrivenRenderer : RenderFeatureBase
 					pass.ReadBuffer("TotalGroupCount", threadGroups);
 				}
 
-				var sortedInstanceIndices = renderGraph.GetBuffer(instanceData.instanceCount);
-				var sortedKeys = renderGraph.GetBuffer(instanceData.instanceCount);
+			
 				using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Radix Scatter"))
 				{
 					pass.Initialize(instanceSort, threadGroups, 2);
-					pass.WriteBuffer("ScatterDataResult", sortedInstanceIndices);
-					pass.WriteBuffer("ScatterKeysResult", sortedKeys);
+					pass.WriteBuffer("ScatterDataResult", instanceIndices);
+					pass.WriteBuffer("ScatterKeysResult", sortKeys);
 
 					pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
-					pass.ReadBuffer("SortKeys", sortKeys);
-					pass.ReadBuffer("ScatterData", instanceIndices);
+					pass.ReadBuffer("ScatterKeys", tempKeys);
+					pass.ReadBuffer("ScatterData", tempData);
 					pass.ReadBuffer("TotalFalses", totalFalses);
 					pass.ReadBuffer("GroupScans", scanResult);
 
 					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
 				}
-
-				// Current outputs become the new inputs
-				sortKeys = sortedKeys;
-				instanceIndices = sortedInstanceIndices;
 			}
 		}
 
