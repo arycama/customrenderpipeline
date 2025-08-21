@@ -12,6 +12,8 @@ StructuredBuffer<uint> Input;
 
 groupshared uint sharedSums[threadCount];
 
+uint GroupId;
+
 void PrefixSumSharedWrite(uint index, uint data)
 {
 	sharedSums[index] = data;
@@ -22,30 +24,32 @@ uint PrefixSumSharedRead(uint index)
 	return sharedSums[index];
 }
 
-[numthreads(threadCount, 1, 1)]
-void KERNEL(uint dispatchThreadId : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
+void PrefixSumOutputTotalCount(uint index, uint totalSum)
 {
-	// Load input into shared memory
-	sharedSums[groupIndex] = dispatchThreadId < MaxThread ? Input[dispatchThreadId] : 0;
-
-	uint totalSum;
-	PrefixSum(groupIndex, threadCount, log2ThreadCount, totalSum);
-
 	#ifdef WRITE_FINAL_COUNT
-		if(!groupIndex)
-			GroupSumsWrite[groupId] = totalSum;
+		if(index == threadCount - 1)
+			GroupSumsWrite[GroupId] = totalSum;
 	#endif
 
 	#ifdef WRITE_DRAW_CALL_COUNT
-		if(!groupIndex)
+		if(index  == threadCount - 1)
 			TotalInstanceCount[0] = totalSum;
 	#endif
+}
+
+[numthreads(threadCount, 1, 1)]
+void KERNEL(uint dispatchThreadId : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
+{
+	GroupId = groupId;
+
+	// Load input into shared memory
+	sharedSums[groupIndex] = dispatchThreadId < MaxThread ? Input[dispatchThreadId] : 0;
+
+	PrefixSum(groupIndex, threadCount, log2ThreadCount);
 	
 	GroupMemoryBarrierWithGroupSync();
 	
-	if (dispatchThreadId >= MaxThread)
-		return;
-		
 	// Store to main memory
-	PrefixSumsWrite[dispatchThreadId] = sharedSums[groupIndex];
+	if (dispatchThreadId < MaxThread)
+		PrefixSumsWrite[dispatchThreadId] = sharedSums[groupIndex];
 }

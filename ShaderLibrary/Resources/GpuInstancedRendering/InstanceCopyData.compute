@@ -20,10 +20,18 @@ uint DivRoundUp(uint x, uint y)
 	return (x + y - 1) / y;
 }
 
+cbuffer DataLength
+{
+	uint TotalLength;
+	uint pad0;
+	uint pad1;
+	uint pad2;
+};
+
 [numthreads(1, 1, 1)]
 void ComputeThreadCount()
 {
-	ThreadGroupsWrite[0] = DivRoundUp(TotalInstanceCount[0], 256);
+	ThreadGroupsWrite[0] = DivRoundUp(TotalLength, 256);
 	ThreadGroupsWrite[1] = 1;
 	ThreadGroupsWrite[2] = 1;
 }
@@ -31,8 +39,7 @@ void ComputeThreadCount()
 [numthreads(threadCount, 1, 1)]
 void InstanceCopyData(uint id : SV_DispatchThreadID)
 {
-	uint maxIndex = TotalInstanceCount[0];
-	if (id >= maxIndex)
+	if (id >= TotalLength)
 		return;
 	
 	uint src = InputIndices[id];

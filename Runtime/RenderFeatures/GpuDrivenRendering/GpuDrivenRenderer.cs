@@ -26,7 +26,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
 
 		var visibilityPredicates = renderGraph.GetBuffer(instanceData.instanceCount);
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Cull"))
+        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Cull"))
         {
             pass.Initialize(cullingShader, 0, instanceData.instanceCount);
 
@@ -55,7 +55,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
         var prefixSums = renderGraph.GetBuffer(instanceData.instanceCount);
         instancePrefixSum.GetThreadGroupSizes(0, instanceData.instanceCount, out var groupsX);
         var groupSums = renderGraph.GetBuffer((int)groupsX);
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Prefix Sum 1"))
+		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Prefix Sum 1"))
         {
             pass.Initialize(instancePrefixSum, 0, instanceData.instanceCount);
             pass.WriteBuffer("PrefixSumsWrite", prefixSums);
@@ -71,8 +71,8 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
         // TODO: This only handles a 2048*1024 array for now
         var groupSums1 = renderGraph.GetBuffer((int)groupsX);
-		var totalInstanceCountBuffer = renderGraph.GetBuffer(1);
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Instance Prefix Sum 2"))
+		var totalInstanceCountBuffer = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
+		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Prefix Sum 2"))
         {
             pass.Initialize(instancePrefixSum, 1, (int)groupsX);
             pass.WriteBuffer("PrefixSumsWrite", groupSums1);
@@ -84,6 +84,17 @@ public class GpuDrivenRenderer : RenderFeatureBase
                 pass.SetInt("MaxThread", groupsX);
             });
         }
+
+		var maxCount = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
+		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Copy Count"))
+		{
+			pass.WriteBuffer("", maxCount);
+			pass.ReadBuffer("", totalInstanceCountBuffer);
+			pass.SetRenderFunction((maxCount, totalInstanceCountBuffer), static (command, pass, data) =>
+			{
+				command.CopyBuffer(pass.GetBuffer(data.totalInstanceCountBuffer), pass.GetBuffer(data.maxCount));
+			});
+		}
 
 		// Need a buffer big enough to hold all potential indices
 		var instanceIndices = renderGraph.GetBuffer(instanceData.instanceCount);
@@ -153,7 +164,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
         {
             pass.Initialize(instanceCopyData, 0, 1, 1, 1, false);
             pass.WriteBuffer("ThreadGroupsWrite", threadGroups);
-            pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
+            pass.ReadBuffer("DataLength", maxCount);
         }
 
 		// Radix sort zzz too many passes
@@ -172,12 +183,13 @@ public class GpuDrivenRenderer : RenderFeatureBase
 				using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Radix Count"))
 				{
 					pass.Initialize(instanceSort, threadGroups, 0);
+					pass.WriteBuffer("KeysResult", tempKeys);
+					pass.WriteBuffer("DataResult", tempData);
 					pass.WriteBuffer("CountResult", countResult);
-					pass.WriteBuffer("CountKeysResult", tempKeys);
-					pass.WriteBuffer("CountDataResult", tempData);
-					pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
-					pass.ReadBuffer("CountKeys", sortKeys);
-					pass.ReadBuffer("CountData", instanceIndices);
+
+					pass.ReadBuffer("DataLength", maxCount);
+					pass.ReadBuffer("Keys", sortKeys);
+					pass.ReadBuffer("Data", instanceIndices);
 
 					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
 				}
@@ -189,22 +201,23 @@ public class GpuDrivenRenderer : RenderFeatureBase
 					pass.Initialize(instanceSort, 1, normalizedDispatch: false);
 					pass.WriteBuffer("TotalFalsesResult", totalFalses);
 					pass.WriteBuffer("ScanResult", scanResult);
-					pass.ReadBuffer("Count", countResult);
+					pass.ReadBuffer("GroupCounts", countResult);
 					pass.ReadBuffer("TotalGroupCount", threadGroups);
 				}
 			
 				using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Radix Scatter"))
 				{
 					pass.Initialize(instanceSort, threadGroups, 2);
-					pass.WriteBuffer("ScatterDataResult", instanceIndices);
-					pass.WriteBuffer("ScatterKeysResult", sortKeys);
+					pass.WriteBuffer("KeysResult", sortKeys);
+					pass.WriteBuffer("DataResult", instanceIndices);
 
-					pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
-					pass.ReadBuffer("ScatterKeys", tempKeys);
-					pass.ReadBuffer("ScatterData", tempData);
+					pass.ReadBuffer("DataLength", maxCount);
+					pass.ReadBuffer("Keys", tempKeys);
+					pass.ReadBuffer("Data", tempData);
+
 					pass.ReadBuffer("TotalFalses", totalFalses);
 					pass.ReadBuffer("GroupScans", scanResult);
-					pass.ReadBuffer("ScatterCounts", countResult);
+					pass.ReadBuffer("GroupCounts", countResult);
 
 					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
 				}
@@ -219,7 +232,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
             pass.ReadBuffer("InputIndices", instanceIndices);
             pass.ReadBuffer("_Positions", instanceData.positions);
-            pass.ReadBuffer("TotalInstanceCount", totalInstanceCountBuffer);
+			pass.ReadBuffer("DataLength", maxCount);
 
 			// Temporarily here to avoid memory leaks due to sortedKeys not being used anywhere. (Only used for debug really)
 			pass.ReadBuffer("SortKeys", sortKeys);

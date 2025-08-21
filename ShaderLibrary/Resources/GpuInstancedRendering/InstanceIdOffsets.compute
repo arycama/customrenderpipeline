@@ -21,20 +21,18 @@ uint PrefixSumSharedRead(uint index)
 	return DrawCallCounts[index];
 }
 
+void PrefixSumOutputTotalCount(uint index, uint totalSum)
+{
+}
+
 [numthreads(ThreadCount, 1, 1)]
 void InstanceIdOffsets(uint groupIndex : SV_GroupIndex)
 {
-	uint drawCallCount = groupIndex < MaxThread ? LodCounts[groupIndex] : 0;
+	DrawCallCounts[groupIndex] = groupIndex < MaxThread ? LodCounts[groupIndex] : 0;
 
-	DrawCallCounts[groupIndex] = drawCallCount;
-
-	uint totalSum;
-	PrefixSum(groupIndex, ThreadCount, Log2ThreadCount, totalSum);
-	
+	PrefixSum(groupIndex, ThreadCount, Log2ThreadCount);
 	GroupMemoryBarrierWithGroupSync();
 	
-	if (groupIndex >= MaxThread)
-		return;
-		
-	Output[groupIndex] = DrawCallCounts[groupIndex];
+	if (groupIndex < MaxThread)
+		Output[groupIndex] = DrawCallCounts[groupIndex];
 }

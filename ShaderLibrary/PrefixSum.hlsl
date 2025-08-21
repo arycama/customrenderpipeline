@@ -3,12 +3,13 @@
 // Note that a GroupMemoryBarrierWithGroupSync may be required. This is left out incase the caller does not require it.
 void PrefixSumSharedWrite(uint index, uint data); // array[index] = data
 uint PrefixSumSharedRead(uint index); // return array[index];
+void PrefixSumOutputTotalCount(uint index, uint data);
 
 #define NUM_BANKS 16
 #define LOG_NUM_BANKS 4
 #define CONFLICT_FREE_OFFSET(n)((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS))
 
-void PrefixSum(uint groupIndex, uint size, uint log2Size, out uint totalSum)
+void PrefixSum(uint groupIndex, uint size, uint log2Size)
 {
 	// Perform reduction
 	[unroll]
@@ -28,10 +29,10 @@ void PrefixSum(uint groupIndex, uint size, uint log2Size, out uint totalSum)
 	GroupMemoryBarrierWithGroupSync();
 	
 	// Clear the last element
-	totalSum = 0; // Only initialized to avoid uninitialized variable warnings
-	if (!groupIndex)
+	if (groupIndex == size - 1)
 	{
-		totalSum = PrefixSumSharedRead(size - 1);
+		uint totalSum = PrefixSumSharedRead(size - 1);
+		PrefixSumOutputTotalCount(groupIndex, totalSum);
 		PrefixSumSharedWrite(size - 1, 0);
 	}
 		
@@ -52,11 +53,4 @@ void PrefixSum(uint groupIndex, uint size, uint log2Size, out uint totalSum)
 		PrefixSumSharedWrite(ai, t1);
 		PrefixSumSharedWrite(bi, t0 + t1);
 	}
-}
-
-// Overload that doesn't output the total sum
-void PrefixSum(uint groupIndex, uint size, uint log2Size)
-{
-	uint totalSum;
-	PrefixSum(groupIndex, size, log2Size, totalSum);
 }
