@@ -192,7 +192,6 @@ public class GpuDrivenRenderer : RenderFeatureBase
 					pass.ReadBuffer("Count", countResult);
 					pass.ReadBuffer("TotalGroupCount", threadGroups);
 				}
-
 			
 				using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Radix Scatter"))
 				{
@@ -205,6 +204,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 					pass.ReadBuffer("ScatterData", tempData);
 					pass.ReadBuffer("TotalFalses", totalFalses);
 					pass.ReadBuffer("GroupScans", scanResult);
+					pass.ReadBuffer("ScatterCounts", countResult);
 
 					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
 				}

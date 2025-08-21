@@ -19,6 +19,15 @@ uint BitIndex;
 
 groupshared uint sharedSums[threadCount];
 
+RWStructuredBuffer<uint> CountResult, CountKeysResult, CountDataResult;
+groupshared uint SharedTotalFalses;
+
+StructuredBuffer<uint> Count, TotalGroupCount;
+RWStructuredBuffer<uint> ScanResult, TotalFalsesResult;
+
+RWStructuredBuffer<uint> ScatterDataResult, ScatterKeysResult;
+StructuredBuffer<uint> ScatterKeys, ScatterData, TotalFalses, GroupScans, ScatterCounts;
+
 void PrefixSumSharedWrite(uint index, uint data)
 {
 	sharedSums[index] = data;
@@ -28,9 +37,6 @@ uint PrefixSumSharedRead(uint index)
 {
 	return sharedSums[index];
 }
-
-RWStructuredBuffer<uint> CountResult, CountKeysResult, CountDataResult;
-groupshared uint SharedTotalFalses;
 
 [numthreads(threadCount, 1, 1)]
 void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
@@ -53,16 +59,19 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 		
 	GroupMemoryBarrierWithGroupSync();
 	
+	// Shuffle in group memory based on counter
+	uint f = sharedSums[groupIndex];
+	uint t = groupIndex - f + SharedTotalFalses;
+	uint d = bit ? t : f;
+		
+	// Write to global memory
+	CountKeysResult[groupId * threadCount + d] = key;
+	CountDataResult[groupId * threadCount + d] = data;
+	
 	// Write the final count out to global memory
 	if (!groupIndex)
 		CountResult[groupId] = totalFalses;
-		
-	CountKeysResult[id] = key;
-	CountDataResult[id] = data;
 }
-
-StructuredBuffer<uint> Count, TotalGroupCount;
-RWStructuredBuffer<uint> ScanResult, TotalFalsesResult;
 
 [numthreads(threadCount, 1, 1)]
 void RadixScan(uint groupIndex : SV_GroupIndex)
@@ -87,49 +96,15 @@ void RadixScan(uint groupIndex : SV_GroupIndex)
 		TotalFalsesResult[0] = totalFalses;
 }
 
-RWStructuredBuffer<uint> ScatterDataResult, ScatterKeysResult;
-StructuredBuffer<uint> ScatterKeys, ScatterData, TotalFalses, GroupScans;
-
-groupshared uint sharedKeys[threadCount];
-groupshared uint sharedData[threadCount];
-
 [numthreads(threadCount, 1, 1)]
 void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
-	// Sort
-	bool outOfRange = id >= TotalInstanceCount[0];
-	uint key = outOfRange ? 0xFFFFFFFF : ScatterKeys[id];
-	uint data = outOfRange ? 0 : ScatterData[id];
+	uint key = ScatterKeys[id];
+	uint data = ScatterData[id];
 	bool bit = (key >> BitIndex) & 0x1;
 	
-	sharedSums[groupIndex] = !bit;
-	
-	GroupMemoryBarrierWithGroupSync();
-	
-	uint totalFalses;
-	PrefixSum(groupIndex, threadCount, log2ThreadCount, totalFalses);
-		
-	if (!groupIndex)
-		SharedTotalFalses = totalFalses;
-			
-	GroupMemoryBarrierWithGroupSync();
-	
-	// Shuffle in group memory based on counter
-	uint f = sharedSums[groupIndex];
-	uint t = groupIndex - f + SharedTotalFalses;
-	uint d = bit ? t : f;
-	sharedKeys[d] = key;
-	sharedData[d] = data;
-		
-	GroupMemoryBarrierWithGroupSync();
-	
-	// Calculate final local and write results
-	key = sharedKeys[groupIndex];
-	data = sharedData[groupIndex];
-	
-	bit = (key >> BitIndex) & 0x1;
 	uint groupScan = GroupScans[groupId];
-	uint localOffset = bit ? SharedTotalFalses : 0;
+	uint localOffset = bit ? ScatterCounts[groupId] : 0;
 	uint globalOffset = bit ? groupId * threadCount + TotalFalses[0] - groupScan : groupScan;
 	uint globalDest = groupIndex - localOffset + globalOffset;
 	
