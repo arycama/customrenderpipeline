@@ -33,10 +33,5 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 		float3 translucency = 0;
 	#endif
 	
-	bool isThinSurface = false;
-	
 	return EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, bentNormal, worldPosition, translucency, position.xy, eyeDepth).rgb + Input[position.xy];
-	
-	
-	//return GetLighting(lightingInput, V) + _Emissive[position.xy];
 }

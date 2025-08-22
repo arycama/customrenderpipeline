@@ -3,6 +3,7 @@
 #pragma kernel AmbientSkyLookup KERNEL=AmbientSkyLookup AMBIENT_SKY
 
 #include "../../Common.hlsl"
+#include "../../Color.hlsl"
 #include "../../Atmosphere.hlsl"
 #include "../../Random.hlsl"
 
@@ -66,9 +67,9 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	
 	#ifdef AMBIENT_GROUND
 		// Divide by pi not needed since cosine importance sampling handles it
-		_AmbientGroundResult[groupId] = ScatterShared[0] * RcpFourPi;
+		_AmbientGroundResult[groupId] = Rec709ToRec2020(ScatterShared[0] * RcpFourPi);
 	#elif defined(AMBIENT_SKY)
-		_AmbientSkyResult[groupId] = ScatterShared[0] * RcpFourPi;
+		_AmbientSkyResult[groupId] = Rec709ToRec2020(ScatterShared[0] * RcpFourPi);
 	#else
 		float3 luminance = ScatterShared[0];
 		float3 multiScatter = MultiScatterShared[0];

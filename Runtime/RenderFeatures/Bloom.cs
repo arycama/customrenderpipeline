@@ -20,11 +20,11 @@ public class Bloom : CameraRenderFeature
 		[field: SerializeField, Range(1, 3)] public int DistortionQuality { get; private set; } = 2;
 		[field: SerializeField, Range(0f, 0.1f)] public float Distortion { get; private set; } = 0.02f;
 
-		[field: SerializeField, Range(0f, 1)] public float GhostStrength { get; private set; } = 1f;
+		[field: SerializeField, Range(0f, 0.1f)] public float GhostStrength { get; private set; } = 1f;
 		[field: SerializeField, Range(0, 8)] public int GhostCount { get; private set; } = 7;
 		[field: SerializeField, Range(0f, 1f)] public float GhostSpacing { get; private set; } = 1.19f;
 
-		[field: SerializeField, Range(0f, 1)] public float HaloStrength { get; private set; } = 1f;
+		[field: SerializeField, Range(0f, 0.1f)] public float HaloStrength { get; private set; } = 1f;
 		[field: SerializeField, Range(0f, 1f)] public float HaloRadius { get; private set; } = 0.692f;
 		[field: SerializeField, Range(0f, 1f)] public float HaloWidth { get; private set; } = 0.692f;
 

@@ -141,7 +141,7 @@ void RayGeneration()
 	
 	// Ambient 
 	float3 finalTransmittance = exp(-t * _Extinction);
-	luminance += AmbientCosine(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
+	luminance += Rec2020ToRec709(AmbientCosine(float3(0.0, 1.0, 0.0))) * (1.0 - finalTransmittance);
 	luminance *= _Color;
 	
 	ScatterResult[position] = luminance;

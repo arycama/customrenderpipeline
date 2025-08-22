@@ -1,4 +1,5 @@
 #include "../Common.hlsl"
+#include "../Color.hlsl"
 #include "../Geometry.hlsl"
 #include "../Random.hlsl"
 #include "../Samplers.hlsl"

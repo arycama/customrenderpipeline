@@ -125,6 +125,9 @@ float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 			luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance);
 		}
 	}
+	
+	luminance = Rec709ToRec2020(luminance);
+	
 	#else
 		float3 currentLuminance = maxLuminance;
 		float offset = offsets.x;
@@ -156,11 +159,13 @@ float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 			}
 		}
 
+		luminance = Rec709ToRec2020(luminance);
+		
 		if (rayIntersectsGround)
 		{
-			float3 transmittance = TransmittanceToPoint(ViewHeight, viewCosAngle, maxRayLength, true, maxRayLength);
+			float3 transmittance = Rec709ToRec2020(TransmittanceToPoint(ViewHeight, viewCosAngle, maxRayLength, true, maxRayLength));
 			float lightCosAngleAtDistance = LightCosAngleAtDistance(ViewHeight, viewCosAngle, _LightDirection0.y, maxRayLength);
-			float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, viewCosAngle, _LightDirection0.y, maxRayLength);
+			float3 lightTransmittance = Rec709ToRec2020(TransmittanceToAtmosphere(ViewHeight, viewCosAngle, _LightDirection0.y, maxRayLength));
 			
 			#ifndef REFLECTION_PROBE
 				float attenuation = CloudTransmittance(rayDirection * maxRayLength);
@@ -168,11 +173,13 @@ float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 				lightTransmittance *= attenuation;
 			#endif
 			
-			float3 groundAmbient = GetGroundAmbient(ViewHeight, viewCosAngle, _LightDirection0.y, maxRayLength) * _LightColor0 * Exposure;
+			float3 groundLighting = lightTransmittance * saturate(lightCosAngleAtDistance) * RcpPi * Rec709ToRec2020(_LightColor0) * Exposure;			
+			float3 groundAmbient = GetGroundAmbient(ViewHeight, viewCosAngle, _LightDirection0.y, maxRayLength) * Rec709ToRec2020(_LightColor0) * Exposure;
 			groundAmbient = groundAmbient * _CloudCoverage.a + _CloudCoverage.rgb * RcpPi;
 			
-			float3 groundLighting = lightTransmittance * saturate(lightCosAngleAtDistance) * RcpPi * _LightColor0 * Exposure + groundAmbient;
-			luminance += groundLighting * _GroundColor * transmittance * cloudTransmittance;
+			groundLighting += groundAmbient;
+			
+			luminance += groundLighting * Rec709ToRec2020(_GroundColor) * transmittance * cloudTransmittance;
 		}
 	#endif
 	
@@ -184,7 +191,7 @@ float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		return float4(luminance, 1.0);
 	#endif
 	
-	return float4(Rec2020ToICtCp(Rec709ToRec2020(luminance) * PaperWhite), 1.0);
+	return float4(Rec2020ToICtCp(luminance * PaperWhite), 1.0);
 }
 
 float4 _SkyHistoryScaleLimit;

@@ -445,6 +445,9 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 
 float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAngle, float3 albedo, float3 N, float3 bentNormal, float3 worldPosition, float3 translucency, uint2 pixelCoordinate, float eyeDepth, float opacity = 1.0, bool isWater = false)
 {
+	albedo = Rec709ToRec2020(albedo);
+	translucency = Rec709ToRec2020(translucency);
+
 	float3 V = normalize(-worldPosition);
 	float NdotV = dot(N, V);
 	
@@ -463,7 +466,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float3 diffuseTerm = averageAlbedoMs ? viewDirectionalAlbedoMs * rcp(averageAlbedoMs) : 0.0; // TODO: Bake into DFG?
 	
 	// Direct lighting
-	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition));
+	float3 lightTransmittance = Rec709ToRec2020(TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition)));
 	
 	float shadow = GetDirectionalShadow(worldPosition) * CloudTransmittance(worldPosition);
 	
@@ -475,7 +478,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 		lightTransmittance *= WaterShadow(worldPosition, _LightDirection0) * GetCaustics(worldPosition + ViewPosition, _LightDirection0);
 	#endif
 	
-	float3 luminance = EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, _LightDirection0, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, true) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
+	float3 luminance = EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, _LightDirection0, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, true) * (Rec709ToRec2020(_LightColor0) * lightTransmittance * Exposure) * shadow;
 	
 	uint3 clusterIndex;
 	clusterIndex.xy = pixelCoordinate / TileSize;
@@ -506,7 +509,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 		if (!attenuation)
 			continue;
 		
-		luminance += EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, L, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, false) * (light.color * Exposure * attenuation);
+		luminance += EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, L, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, false) * (Rec709ToRec2020(light.color) * Exposure * attenuation);
 	}
 	
 	// Indirect Lighting
@@ -544,6 +547,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float4 ssgi = ScreenSpaceGlobalIllumination[pixelCoordinate];
+		//irradiance += lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength);
 		irradiance += ssgi.rgb * DiffuseGiStrength;//lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength);
 	#endif
 	
@@ -552,9 +556,10 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float3 kd = 1.0 - fssEss - fmsEms;
 	luminance += irradiance * (fmsEms + albedo * kd);
 	
-	float3 irradiance1 = AmbientCosine(-N, visibilityAngle);
+	float3 irradiance1 = AmbientCosine(V, visibilityAngle);
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
+		//irradiance1+= lerp(irradiance1, ssgi.rgb, ssgi.a * DiffuseGiStrength);
 		irradiance1 += ssgi.rgb * DiffuseGiStrength;//lerp(irradiance1, ssgi.rgb, ssgi.a * DiffuseGiStrength);
 	#endif
 	

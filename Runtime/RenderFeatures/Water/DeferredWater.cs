@@ -13,7 +13,7 @@ public class DeferredWater : CameraRenderFeature
     {
         this.settings = settings;
         deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water 1")) { hideFlags = HideFlags.HideAndDontSave };
-        temporalCache = new PersistentRTHandleCache(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Water Scatter Temporal", isScreenTexture: true);
+        temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Water Scatter Temporal", isScreenTexture: true);
         raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Refraction");
     }
 
@@ -26,8 +26,7 @@ public class DeferredWater : CameraRenderFeature
     {
 		using var scope = renderGraph.AddProfileScope("Deferred Water");
 
-        var refractionResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-        var scatterResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+        var scatterResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
         var depth = renderGraph.GetResource<CameraDepthData>().Handle;
 
         var albedoMetallic = renderGraph.GetResource<AlbedoMetallicData>().Handle;
@@ -42,7 +41,7 @@ public class DeferredWater : CameraRenderFeature
             pass.WriteTexture(albedoMetallic);
             pass.WriteTexture(normalRoughness);
             pass.WriteTexture(bentNormalOcclusion);
-            pass.WriteTexture(refractionResult);
+            pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);
             pass.WriteTexture(translucency);
             pass.WriteTexture(scatterResult);
 
@@ -129,12 +128,13 @@ public class DeferredWater : CameraRenderFeature
                 });
             }
 
-            using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Water Raytraced Refractions"))
+			using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Water Raytraced Refractions"))
             {
-                var raytracingData = renderGraph.GetResource<RaytracingResult>();
+				var refractionResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+				var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
                 pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, 0.1f, 0.1f, camera.TanHalfFov());
-                pass.WriteTexture(refractionResult, "RefractionResult");
+                //pass.WriteTexture(refractionResult, "RefractionResult");
                 pass.WriteTexture(scatterResult, "ScatterResult");
                 //pass.WriteTexture(tempResult, "HitColor");
                 //pass.WriteTexture(hitResult, "HitResult");
@@ -183,7 +183,6 @@ public class DeferredWater : CameraRenderFeature
 
             pass.Initialize(deferredWaterMaterial, 1);
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
-            pass.ReadTexture("_RefractionInput", refractionResult);
             pass.ReadTexture("_ScatterInput", scatterResult);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);

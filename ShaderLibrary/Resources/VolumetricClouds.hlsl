@@ -84,7 +84,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	#endif
 	
 	float cloudDistance;
-	float4 result = EvaluateCloud(rayStart, rayEnd - rayStart, sampleCount, rd, ViewHeight, viewCosAngle, offsets, P, isShadow, cloudDistance, true);
+	float4 result = EvaluateCloud(rayStart, rayEnd - rayStart, sampleCount, rd, ViewHeight, viewCosAngle, offsets, P, isShadow, cloudDistance, false);
 	float totalRayLength = rayEnd - cloudDistance;
 	
 	result = IsInfOrNaN(result) ? 0 : result;
@@ -92,7 +92,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	#ifdef CLOUD_SHADOW
 		output.result = float3(cloudDistance * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a);
 	#else
-		output.luminance = float4(Rec2020ToICtCp(Rec709ToRec2020(result.rgb) * PaperWhite), 1.0);
+		output.luminance = float4(Rec2020ToICtCp(result.rgb * PaperWhite), 1.0);
 		output.transmittance = result.a;
 		output.depth = LinearToDeviceDepth(cloudDistance * rcpRdLength);
 	#endif

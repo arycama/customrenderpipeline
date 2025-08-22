@@ -130,8 +130,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float b = maxUnderwaterDistance;
 
 	float3 atmosphereTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, waterDistance);
-	float xi = min(0.999, noise.x); // Clamp to avoid sampling at infinity
-	float t = -(l * log((xi * (exp(b * cp * (-v / l - 1)) - 1) + 1))) / (cp * (l + v));
+	float xi = min(0.99, noise.x); // Clamp to avoid sampling at infinity
+	float t = -l * log(xi * (exp(b * cp * (-v / l - 1)) - 1) + 1) / (cp * (l + v));
 	float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
 	float weight = rcp(dot(pdf, rcp(3.0)));
 	float3 P = worldPosition + -underwaterV * t;
@@ -145,7 +145,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float LdotV = dot(_LightDirection0, -underwaterV);
 	float3 ambient = AmbientCosine(float3(0.0, 1.0, 0.0));
 	float phase = CsPhase(LdotV, _WaterMiePhase) * FourPi;
-	float3 luminance = weight * (factor * Exposure * shadow * phase * _LightColor0 * atmosphereTransmittance * RcpPi * transmittance + ambient * ambientTransmittance) * _Color * _Extinction;
+	float3 luminance = weight * (factor * Exposure * shadow * phase * Rec709ToRec2020(_LightColor0) * atmosphereTransmittance * RcpPi * transmittance + ambient * ambientTransmittance) * _Color * _Extinction;
 	
 	// TODO: Stencil? Or hw blend?
 	float3 underwater = 0.0;
@@ -165,25 +165,22 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float3 kd = 1.0 - fssEss - fmsEms;
 	
 	FragmentOutput output;
-	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, Rec709ToRec2020(max(0, underwater * (1.0 - foam) * kd)), 0.0);
-	output.luminance = max(0, luminance);
+	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam) * kd, 0.0);
+	output.luminance = Rec2020ToICtCp(luminance * PaperWhite);
 	return output;
 }
 
 struct TemporalOutput
 {
-	float3 temporal : SV_Target0;
-	float3 emissive : SV_Target1;
+	float4 temporal : SV_Target0;
+	float3 scene : SV_Target1;
 };
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	float3 minValue, maxValue, result;
 	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result);
-	
-	float3 worldPosition = worldDir * LinearEyeDepth(Depth[position.xy]);
-	
-	// TODO: Velocity?
+
 	float2 historyUv = uv - Velocity[position.xy];
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
@@ -210,7 +207,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float3 kd = 1.0 - fssEss - fmsEms;
 	
 	TemporalOutput output;
-	output.temporal = result;
-	output.emissive = Rec709ToRec2020(result * kd) + _RefractionInput[position.xy];
+	output.temporal = float4(result, 1.0);
+	output.scene = ICtCpToRec2020(result) / PaperWhite * kd;
 	return output;
 }

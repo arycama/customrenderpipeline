@@ -153,9 +153,9 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 			result.a = saturate(Remap(result.a, _TransmittanceThreshold));
 	
 		// Final lighting
-		float3 lightTransmittance = TransmittanceToAtmosphere(viewHeight, rd.y, _LightDirection0.y, cloudDepth);
+		float3 lightTransmittance = Rec709ToRec2020(TransmittanceToAtmosphere(viewHeight, rd.y, _LightDirection0.y, cloudDepth));
 		float attenuation = sunShadow ? GetDirectionalShadow(rd * cloudDepth) : 1.0;
-		result.rgb *= lightTransmittance * _LightColor0 * (Exposure * attenuation);
+		result.rgb *= lightTransmittance * Rec709ToRec2020(_LightColor0) * (Exposure * attenuation);
 		
 		float3 ambient = GetSkyAmbient(viewHeight, viewCosAngle, _LightDirection0.y, cloudDepth) * _LightColor0 * Exposure * RcpFourPi;
 		for (float j = 0.0; j < ScatterOctaves; j++)
@@ -163,11 +163,11 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		
 		if (sunShadow)
 		{
-			result.rgb *= TransmittanceToPoint(viewHeight, viewCosAngle, cloudDepth);
+			result.rgb *= Rec709ToRec2020(TransmittanceToPoint(viewHeight, viewCosAngle, cloudDepth));
 		}
 		else
 		{
-			result.rgb *= TransmittanceToPoint1(viewHeight, viewCosAngle, cloudDepth);
+			result.rgb *= Rec709ToRec2020(TransmittanceToPoint1(viewHeight, viewCosAngle, cloudDepth));
 		}
 	}
 	

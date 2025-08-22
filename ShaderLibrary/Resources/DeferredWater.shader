@@ -34,7 +34,7 @@ Shader "Hidden/Deferred Water 1"
             Name "Deferred Water Temporal"
 
             Blend 0 Off
-            //Blend 1 One One
+            Blend 1 One One
 
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
