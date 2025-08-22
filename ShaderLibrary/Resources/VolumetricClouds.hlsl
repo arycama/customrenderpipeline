@@ -16,6 +16,8 @@ struct FragmentOutput
 
 // TODO: Remove/precompute
 const static float3 _PlanetCenter = float3(0.0, -_PlanetRadius - ViewPosition.y, 0.0);
+TextureCube<float3> Stars;
+float StarExposure;
 
 FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
@@ -108,19 +110,22 @@ struct TemporalOutput
 {
 	float4 luminance : SV_Target0;
 	float transmittance : SV_Target1;
+	float4 frameResult : SV_Target2; // Blend One SrcAlpha
 };
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	int2 pixelId = (int2) position.xy;
 	
-	float depth = Depth[position.xy];
-	float2 motion = depth ? Velocity[position.xy] : CalculateVelocity(uv, CloudDepthTexture[pixelId]);
+	float depth = CloudDepthTexture[pixelId];//Depth[position.xy];
+	//float2 motion = depth ? Velocity[position.xy] : CalculateVelocity(uv, CloudDepthTexture[pixelId]);
+	float2 motion = CalculateVelocity(uv, CloudDepthTexture[pixelId]);
 	
 	float2 historyUv = uv - motion;
 	float4 mean = 0.0, stdDev = 0.0, current = 0.0;
 	
-	float centerDepth = LinearEyeDepth(Depth[position.xy]);
+	float rawDepth = Depth[position.xy];
+	float centerDepth = LinearEyeDepth(rawDepth);
 	float weightSum = 0.0;
 	float depthWeightSum = 0.0;
 	
@@ -184,5 +189,16 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	TemporalOutput output;
 	output.luminance = float4(current.rgb, 1.0);
 	output.transmittance = current.a;
+	
+	current.rgb = ICtCpToRec2020(current.rgb) / PaperWhite;
+		
+	if (!rawDepth)
+	{
+		float3 stars = Stars.Sample(TrilinearClampSampler, worldDir) * Exposure * 2;
+		stars *= TransmittanceToAtmosphere(ViewHeight, worldDir.y);
+		current.rgb += Rec709ToRec2020(stars) * StarExposure;
+	}
+	
+	output.frameResult = current;
 	return output;
 }

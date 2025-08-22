@@ -6,6 +6,7 @@
 #include "../../CloudCommon.hlsl"
 #include "../../Random.hlsl"
 #include "../../Temporal.hlsl"
+#include "../../VolumetricLight.hlsl"
 
 matrix _PixelToWorldViewDirs[6];
 Texture2D<float> CloudTransmittanceTexture;
@@ -88,6 +89,7 @@ float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	float maxRayLength = DistanceToNearestAtmosphereBoundary(ViewHeight, viewCosAngle, rayIntersectsGround);
 	float3 maxLuminance = LuminanceToAtmosphere(ViewHeight, viewCosAngle, rayIntersectsGround);
 	
+	// TODO: These branches are a bit insane after compilation, need to optimize.
 	#ifdef SCENE
 	float offset = offsets.x;
 	if (cloudTransmittance == 0.0)
@@ -189,11 +191,18 @@ float4 _SkyHistoryScaleLimit;
 Texture2D<float3> _SkyInput, _SkyHistory;
 float _IsFirst, _ClampWindow, _DepthFactor, _MotionFactor;
 
-float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+struct FragmentOutput
+{
+	float4 frame : SV_Target0;
+	float4 temporal : SV_Target1;
+};
+
+FragmentOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float3 mean = 0.0, stdDev = 0.0, current = 0.0;
 	
-	float centerDepth = LinearEyeDepth(Depth[position.xy]);
+	float centerDepthRaw = Depth[position.xy];
+	float centerDepth = LinearEyeDepth(centerDepthRaw);
 	float weightSum = 0.0;
 	float depthWeightSum = 0.0;
 	
@@ -258,5 +267,15 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		current = lerp(history, current, 0.05);
 	}
 	
-	return float4(current, 1.0);
+	FragmentOutput output;
+	output.temporal = float4(current, 1.0);
+	
+	current = ICtCpToRec2020(current) / PaperWhite;
+	
+	// Sample vol lighting and output. Vol light.a is applied to scene if it contains additional fog
+	float4 volumetricLighting = SampleVolumetricLight(position.xy, centerDepth);
+	current += Rec709ToRec2020(volumetricLighting.rgb);
+	
+	output.frame = float4(current, volumetricLighting.a);
+	return output;
 }

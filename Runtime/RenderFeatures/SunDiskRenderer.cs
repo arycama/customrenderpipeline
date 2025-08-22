@@ -36,8 +36,6 @@ public class SunDiskRenderer : CameraRenderFeature
 			pass.AddRenderPassData<TemporalAAData>();
 
 			pass.AddRenderPassData<SkyTransmittanceData>();
-			pass.AddRenderPassData<SkyResultData>();
-			pass.AddRenderPassData<CloudRenderResult>();
 			pass.AddRenderPassData<CloudShadowDataResult>();
 
 			pass.SetRenderFunction((command, pass) =>

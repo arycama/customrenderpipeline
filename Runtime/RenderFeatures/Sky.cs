@@ -26,21 +26,7 @@ public partial class Sky : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
-		renderGraph.AddProfileBeginPass("Sky Render");
-
-		var starsTemp = renderGraph.GetTexture(settings.StarResolution, settings.StarResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, isExactSize: true);
-		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Render Stars"))
-		{
-			//pass.Initialize(settings.StarMaterial, Matrix4x4.identity, 0, 4 * settings.StarCount, 1, MeshTopology.Quads);
-
-			pass.WriteTexture(starsTemp);
-			
-			pass.SetRenderFunction((command, pass) =>
-			{
-				command.SetRenderTarget(pass.GetRenderTexture(starsTemp), 0, CubemapFace.Unknown, -1);
-				command.ClearRenderTarget(true, true, Color.clear);
-			});
-		}
+		renderGraph.AddProfileBeginPass("Sky");
 
 		var skyTemp = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
 		var depth = renderGraph.GetResource<CameraDepthData>();
@@ -94,6 +80,7 @@ public partial class Sky : CameraRenderFeature
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal"))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Temporal"));
+			pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);
 			pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 			pass.ReadTexture("_SkyInput", skyTemp);
 			pass.ReadTexture("_SkyHistory", history);
@@ -107,6 +94,7 @@ public partial class Sky : CameraRenderFeature
 			pass.AddRenderPassData<ViewData>();
 			pass.AddRenderPassData<VelocityData>();
 			pass.AddRenderPassData<CameraDepthData>();
+			pass.AddRenderPassData<VolumetricLighting.Result>();
 
 			pass.SetRenderFunction((command, pass) =>
 			{
@@ -126,7 +114,6 @@ public partial class Sky : CameraRenderFeature
 			});
 		}
 
-		renderGraph.SetResource(new SkyResultData(current, starsTemp));
-		renderGraph.AddProfileEndPass("Sky Render");
+		renderGraph.AddProfileEndPass("Sky");
 	}
 }

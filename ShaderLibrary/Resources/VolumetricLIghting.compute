@@ -123,6 +123,7 @@ void KERNEL(uint3 id : SV_DispatchThreadID)
 	if (weightSum > 0.0)
 		result /= weightSum;
 	
+	result.a = 0;
 	Result[id] = result;
 }
 

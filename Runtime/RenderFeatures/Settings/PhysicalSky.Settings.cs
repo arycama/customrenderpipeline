@@ -21,6 +21,7 @@ public partial class Sky
 		[field: SerializeField] public float PlanetRadius { get; private set; } = 6360000.0f;
 		[field: SerializeField] public float AtmosphereHeight { get; private set; } = 100000.0f;
 		[field: SerializeField] public Color GroundColor { get; private set; } = Color.grey;
+		[field: SerializeField] public float StarExposure { get; private set; } = 1;
 		[field: SerializeField] public Cubemap StarMap { get; private set; }
 
 		[field: Header("Star Properties")]

@@ -7,11 +7,13 @@ public partial class VolumetricClouds : CameraRenderFeature
     private readonly Material material;
     private readonly Settings settings;
     private readonly PersistentRTHandleCache cloudLuminanceTextureCache, cloudTransmittanceTextureCache;
+	private readonly Sky.Settings skySettings;
 
-    public VolumetricClouds(Settings settings, RenderGraph renderGraph) : base(renderGraph)
+	public VolumetricClouds(Settings settings, RenderGraph renderGraph, Sky.Settings skySettings) : base(renderGraph)
     {
         this.settings = settings;
-        material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };
+		this.skySettings = skySettings;
+		material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };
 
         cloudLuminanceTextureCache = new(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Cloud Luminance", isScreenTexture: true);
         cloudTransmittanceTextureCache = new(GraphicsFormat.R16_UNorm, renderGraph, "Cloud Transmittance", isScreenTexture: true);
@@ -70,7 +72,7 @@ public partial class VolumetricClouds : CameraRenderFeature
             });
         }
 
-        // Reprojection
+        // Reprojection+output
         var (luminanceCurrent, luminanceHistory, luminanceWasCreated) = cloudLuminanceTextureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
         var (transmittanceCurrent, transmittanceHistory, transmittanceWasCreated) = cloudTransmittanceTextureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal"))
@@ -78,6 +80,7 @@ public partial class VolumetricClouds : CameraRenderFeature
             pass.Initialize(material, 5);
             pass.WriteTexture(luminanceCurrent, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(transmittanceCurrent, RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);
             pass.ReadTexture("_Input", cloudLuminanceTemp);
             pass.ReadTexture("_InputTransmittance", cloudTransmittanceTemp);
             pass.ReadTexture("_History", luminanceHistory);
@@ -90,6 +93,7 @@ public partial class VolumetricClouds : CameraRenderFeature
             pass.AddRenderPassData<CameraDepthData>();
 			pass.AddRenderPassData<PreviousDepth>();
 			pass.AddRenderPassData<PreviousVelocity>();
+			pass.AddRenderPassData<VelocityData>();
 			pass.AddRenderPassData<VelocityData>();
 			var time = (float)pass.RenderGraph.GetResource<TimeData>().Time;
 
@@ -107,7 +111,10 @@ public partial class VolumetricClouds : CameraRenderFeature
                 pass.SetInt("_MaxWidth", camera.scaledPixelWidth - 1);
                 pass.SetInt("_MaxHeight", camera.scaledPixelHeight - 1);
 
-                settings.SetCloudPassData(pass, time);
+				pass.SetTexture("Stars", skySettings.StarMap);
+				pass.SetFloat("StarExposure", skySettings.StarExposure);
+
+				settings.SetCloudPassData(pass, time);
             });
         }
 

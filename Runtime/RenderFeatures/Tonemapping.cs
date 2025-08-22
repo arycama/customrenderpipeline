@@ -25,6 +25,7 @@ public partial class Tonemapping : CameraRenderFeature
 			var transfer = ColorGamutUtility.GetTransferFunction(gamut);
 			var whitePoint = ColorGamutUtility.GetWhitePoint(gamut);
 
+			hdrSettings.paperWhiteNits = settings.PaperWhite;
 			hdrSettings.automaticHDRTonemapping = false;
 			Debug.Log($"HDR Display Info: Min Nits {hdrSettings.minToneMapLuminance}, Max Nits {hdrSettings.maxToneMapLuminance}, Paper White {hdrSettings.paperWhiteNits}, Max Full Frame Nits {hdrSettings.maxFullFrameToneMapLuminance}, Gamut {hdrSettings.displayColorGamut}, Primaries {primaries}, Transfer {transfer}, WhitePoint {whitePoint}");
 		}
@@ -62,6 +63,7 @@ public partial class Tonemapping : CameraRenderFeature
 		{
 			hdrSettings.RequestHDRModeChange(settings.Hdr);
 			hdrSettings.automaticHDRTonemapping = false;
+			hdrSettings.paperWhiteNits = settings.PaperWhite;
 
 #if UNITY_EDITOR
 			UnityEditor.PlayerSettings.hdrBitDepth = settings.BitDepth;

@@ -84,13 +84,5 @@ float3 Fragment(FragmentInput input) : SV_Target
 	illuminance *= TransmittanceToAtmosphere(ViewHeight, -V.y);
 	
 	// TODO: Put this in some include
-	float cloudTransmittance = CloudTransmittanceTexture[input.position.xy];
-	illuminance *= cloudTransmittance;
-	illuminance = Rec709ToRec2020(illuminance);
-	
-	float2 screenUv = input.position.xy * RcpViewSize;
-	float3 clouds = ICtCpToRec2020(CloudTexture.Sample(LinearClampSampler, ClampScaleTextureUv(screenUv + _Jitter.zw, CloudTextureScaleLimit)).rgb) / PaperWhite;
-	float3 sky = ICtCpToRec2020(SkyTexture.Sample(LinearClampSampler, ClampScaleTextureUv(screenUv + _Jitter.zw, SkyTextureScaleLimit))) / PaperWhite;
-		
-	return illuminance + clouds + sky;
+	return Rec709ToRec2020(illuminance);
 }

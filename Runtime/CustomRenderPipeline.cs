@@ -298,10 +298,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new UnderwaterLighting(renderGraph, asset.OceanSettings),
 		new DeferredWater(renderGraph, asset.OceanSettings),
 
-		// Depends on atmosphere, depth and light
-		new VolumetricClouds(asset.Clouds, renderGraph),
-		new Sky(renderGraph, asset.Sky),
-
 		// Could do SSR+SSGI+SSSSS here too, all the screen passes
 		new AmbientOcclusion(renderGraph, asset.AmbientOcclusionSettings),
 		new ScreenSpaceShadows(renderGraph, asset.ScreenSpaceShadows, asset.LightingSettings),
@@ -310,7 +306,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		
 		// TODO: Could render clouds after deferred, then sky after that
 		new DeferredLighting(renderGraph, asset.Sky),
-		new SunDiskRenderer(renderGraph, asset.LightingSettings),
 
 		new GenericCameraRenderFeature(renderGraph, "", (camera, context) =>
 		{
@@ -325,6 +320,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 				});
 			}
 		}),
+
+		new SunDiskRenderer(renderGraph, asset.LightingSettings),
+
+		// Depends on atmosphere, depth and light
+		new VolumetricClouds(asset.Clouds, renderGraph, asset.Sky),
+		new Sky(renderGraph, asset.Sky),
 
 		new GenericCameraRenderFeature(renderGraph, "", (camera, context) =>
 		{
@@ -347,7 +348,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 			pass.AddRenderPassData<TemporalAAData>();
 			pass.AddRenderPassData<SkyTransmittanceData>();
-			pass.AddRenderPassData<SkyResultData>();
 			pass.AddRenderPassData<CloudRenderResult>();
 			pass.AddRenderPassData<CloudShadowDataResult>();
 			pass.AddRenderPassData<VolumetricLighting.Result>();

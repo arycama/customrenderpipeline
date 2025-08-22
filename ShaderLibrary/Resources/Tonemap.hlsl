@@ -185,8 +185,6 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 		}
 	}
 	
-	//return color;
-	
 	// When in scene view, Unity converts the output to sRGB, renders editor content, then applies the above transfer function at the end.
 	// To maintain our own tonemapping, we need to perform the inverse of this.
 	if (IsSceneView)
@@ -199,7 +197,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 		
 			case ColorGamutHDR10:
 				//color = ST2084ToLinear(color) / PaperWhite;
-				color = Rec2020ToRec709(ST2084ToLinear(color) / SceneViewNitsForPaperWhite);
+				color = Rec2020ToRec709(ST2084ToLinear(color)) / SceneViewNitsForPaperWhite;
 				break;
 		
 			case ColorGamutP3D65G22:

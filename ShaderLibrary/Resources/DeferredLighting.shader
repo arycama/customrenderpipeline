@@ -52,22 +52,5 @@ Shader "Hidden/Deferred Lighting"
             #include "DeferredLighting.hlsl"
             ENDHLSL
         }
-
-         Pass
-        {
-            // Render sky only
-            Stencil
-            {
-                Ref 0
-                Comp Equal
-            }
-
-            HLSLPROGRAM
-            #pragma target 5.0
-            #pragma vertex VertexFullscreenTriangle
-            #pragma fragment FragmentSky
-            #include "DeferredLighting.hlsl"
-            ENDHLSL
-        }
     }
 }
