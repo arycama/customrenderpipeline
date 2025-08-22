@@ -56,9 +56,9 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 		}
 			
 		// Procedural layer
-		uint proceduralIndex = _ProceduralIndices[i];
-		if (proceduralIndex > 0)
-			alpha += _ExtraLayers[uint3(offsetPosition, proceduralIndex - 1)];
+		//uint proceduralIndex = _ProceduralIndices[i];
+		//if (proceduralIndex > 0)
+		//	alpha += _ExtraLayers[uint3(offsetPosition, proceduralIndex - 1)];
 		
         // Check the strength of the current splatmap layer
 		if (alpha > weight0)
@@ -135,7 +135,7 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	//else
 		//index1 = index0;
 	
-	blend = Remap(blend, 0.0, 0.5);
+	//blend = Remap(blend, 0.0, 0.5);
 	
 	if(weight1 == 0.0)
 		index1 = index0;

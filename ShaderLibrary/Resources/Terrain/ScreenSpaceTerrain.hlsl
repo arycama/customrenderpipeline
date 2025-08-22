@@ -76,7 +76,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		
 		// Layer0
 		uint data = layerData[index];
-		float blend = Remap(((data >> 26) & 0xF) / 15.0, 0.0, 1.0, 0.0, 0.5);
+		float blend = ((data >> 26) & 0xF) / 15.0;
 		
 		uint id0 = ((data >> 0) & 0xF);
 		uint id1 = ((data >> 13) & 0xF);
@@ -136,8 +136,8 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		roughness += normalData.a * layerWeight;
 		
 		float3 unpackedNormal = UnpackNormalUNorm(normalData.xy);
-		unpackedNormal.xy = mul(unpackedNormal.xy, rotationMatrix);
 		unpackedNormal.z = max(1e-6, unpackedNormal.z);
+		unpackedNormal.xy = mul(unpackedNormal.xy, rotationMatrix);
 		normal = BlendNormalDerivative(normal, unpackedNormal, layerWeight);
 	}
 	
