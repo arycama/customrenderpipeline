@@ -71,9 +71,10 @@ public partial class LightingSetup : CameraRenderFeature
 			var size = new Vector2(0.1f, 0.1f);
 #endif
 
-			if (light.shadows != LightShadows.None && cullingResults.GetShadowCasterBounds(i, out var shadowCasterBounds))
+			if (light.shadows != LightShadows.None)
 			{
-				var worldShadowBounds = (Bounds)shadowCasterBounds;
+				var hasShadowBounds = cullingResults.GetShadowCasterBounds(i, out var shadowCasterBounds);
+				//var worldShadowBounds = (Bounds)shadowCasterBounds;
 				//var viewBounds = worldShadowBounds.Transform3x4(camera.transform.worldToLocalMatrix);
 
 				if (light.type == LightType.Directional)
@@ -276,7 +277,7 @@ public partial class LightingSetup : CameraRenderFeature
 						}
 
 						// Further limit shadow bounds to the size of the shadow bounds in cascade space
-						var cascadeBounds = worldShadowBounds.Transform3x4(cascadeViewMatrix);
+						//var cascadeBounds = worldShadowBounds.Transform3x4(cascadeViewMatrix);
 						//viewLightBounds = viewLightBounds.Shrink(cascadeBounds);
 
 						// Snap to texels to avoid shimmering
@@ -293,7 +294,7 @@ public partial class LightingSetup : CameraRenderFeature
 
 						var relativeViewMatrix = cascadeViewMatrix * cameraInverseTranslation;
 
-						directionalShadowRequests.Add(new(i, relativeViewMatrix, projectionMatrix, shadowSplitData, -1, Float3.Zero));
+						directionalShadowRequests.Add(new(i, relativeViewMatrix, projectionMatrix, shadowSplitData, -1, Float3.Zero, hasShadowBounds));
 						directionalShadowMatrices.Add(MatrixExtensions.ConvertToAtlasMatrix(projectionMatrix * relativeViewMatrix));
 					}
 				}
@@ -318,7 +319,7 @@ public partial class LightingSetup : CameraRenderFeature
 						var viewMatrixRws = Matrix4x4Extensions.WorldToLocal(light.transform.position - camera.transform.position, rotation);
 						viewMatrixRws.SetRow(1, -viewMatrixRws.GetRow(1));
 
-						pointShadowRequests.Add(new(i, viewMatrixRws, projectionMatrix, shadowSplitData, index, light.transform.position));
+						pointShadowRequests.Add(new(i, viewMatrixRws, projectionMatrix, shadowSplitData, index, light.transform.position, hasShadowBounds));
 					}
 				}
 
@@ -333,7 +334,7 @@ public partial class LightingSetup : CameraRenderFeature
 					var viewMatrixRws = Matrix4x4Extensions.WorldToLocal(light.transform.position - camera.transform.position, light.transform.rotation);
 
 					shadowIndex = (uint)spotShadowRequests.Count;
-					var shadowRequest = new ShadowRequest(i, viewMatrixRws, projectionMatrix, shadowSplitData, -1, light.transform.position);
+					var shadowRequest = new ShadowRequest(i, viewMatrixRws, projectionMatrix, shadowSplitData, -1, light.transform.position, hasShadowBounds);
 					spotShadowRequests.Add(shadowRequest);
 				}
 			}

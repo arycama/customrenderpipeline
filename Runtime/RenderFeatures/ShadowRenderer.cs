@@ -69,19 +69,22 @@ public class ShadowRenderer : CameraRenderFeature
 			renderGraph.SetResource(shadowRequestData);
 			terrainShadowRenderer.Render(camera, context);
 
-			using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Shadow"))
+			if (request.HasCasters)
 			{
-				pass.Initialize(context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, isPointLight);
-
-				// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
-				pass.WriteTexture(target);
-				pass.AddRenderPassData<ShadowRequestData>();
-
-				pass.SetRenderFunction((target, index),
-				static (command, pass, data) =>
+				using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Shadow"))
 				{
-					command.SetRenderTarget(pass.GetRenderTexture(data.target), pass.GetRenderTexture(data.target), 0, CubemapFace.Unknown, data.index);
-				});
+					pass.Initialize(context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, isPointLight);
+
+					// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
+					pass.WriteTexture(target);
+					pass.AddRenderPassData<ShadowRequestData>();
+
+					pass.SetRenderFunction((target, index),
+					static (command, pass, data) =>
+					{
+						command.SetRenderTarget(pass.GetRenderTexture(data.target), pass.GetRenderTexture(data.target), 0, CubemapFace.Unknown, data.index);
+					});
+				}
 			}
 
 			gpuDrivenRenderer.RenderShadow(camera.transform.position, shadowRequestData, camera.ScaledViewSize());

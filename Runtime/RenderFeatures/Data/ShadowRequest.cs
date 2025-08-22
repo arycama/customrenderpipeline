@@ -9,8 +9,9 @@ public readonly struct ShadowRequest
 	public ShadowSplitData ShadowSplitData { get; }
 	public int CubemapFace { get; }
 	public Float3 LightPosition { get; }
+	public bool HasCasters { get; }
 
-	public ShadowRequest(int lightIndex, Matrix4x4 viewMatrix, Matrix4x4 projectionMatrix, ShadowSplitData shadowSplitData, int cubemapFace, Float3 lightPosition)
+	public ShadowRequest(int lightIndex, Matrix4x4 viewMatrix, Matrix4x4 projectionMatrix, ShadowSplitData shadowSplitData, int cubemapFace, Float3 lightPosition, bool hasCasters)
 	{
 		LightIndex = lightIndex;
 		ViewMatrix = viewMatrix;
@@ -18,5 +19,6 @@ public readonly struct ShadowRequest
 		ShadowSplitData = shadowSplitData;
 		CubemapFace = cubemapFace;
 		LightPosition = lightPosition;
+		HasCasters = hasCasters;
 	}
 }
