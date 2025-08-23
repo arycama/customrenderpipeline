@@ -57,7 +57,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
         var groupSums = renderGraph.GetBuffer((int)groupsX);
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Prefix Sum 1"))
         {
-            pass.Initialize(instancePrefixSum, 0, instanceData.instanceCount);
+			pass.Initialize(instancePrefixSum, 0, (int)groupsX, normalizedDispatch: false);
             pass.WriteBuffer("PrefixSumsWrite", prefixSums);
             pass.WriteBuffer("GroupSumsWrite", groupSums);
 
@@ -74,7 +74,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 		var totalInstanceCountBuffer = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Prefix Sum 2"))
         {
-            pass.Initialize(instancePrefixSum, 1, (int)groupsX);
+            pass.Initialize(instancePrefixSum, 1, 1, normalizedDispatch: false);
             pass.WriteBuffer("PrefixSumsWrite", groupSums1);
             pass.WriteBuffer("TotalInstanceCount", totalInstanceCountBuffer);
             pass.ReadBuffer("Input", groupSums);
