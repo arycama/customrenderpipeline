@@ -1,0 +1,67 @@
+﻿#pragma kernel PrefixScan0 KERNEL=PrefixScan0 WRITE_FINAL_COUNT
+#pragma kernel PrefixScan1 KERNEL=PrefixScan1 WRITE_DRAW_CALL_COUNT
+
+const static uint threadCount = 1024;
+
+uint MaxThread;
+RWStructuredBuffer<uint> PrefixSumsWrite, GroupSumsWrite, TotalInstanceCount;
+StructuredBuffer<uint> Input;
+
+groupshared uint sharedSums[threadCount];
+
+[numthreads(threadCount, 1, 1)]
+void KERNEL(uint dispatchThreadId : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
+{
+	uint thid = groupIndex;
+
+	sharedSums[thid] = Input[dispatchThreadId];
+	
+	for (uint i = 0; i < log2(threadCount); i++)
+	{
+		GroupMemoryBarrierWithGroupSync();
+		
+		if (thid < threadCount >> (i + 1))
+		{
+			uint offset = 1 << i;
+			uint ai = offset * (2 * thid + 1) - 1;
+			uint bi = offset * (2 * thid + 2) - 1;
+			sharedSums[bi] += sharedSums[ai];
+		}
+	}
+	
+	GroupMemoryBarrierWithGroupSync();
+	
+	if (thid == threadCount - 1)
+	{
+		uint totalSum = sharedSums[threadCount - 1];
+		
+		#ifdef WRITE_FINAL_COUNT
+			GroupSumsWrite[groupId] = totalSum;
+		#endif
+
+		#ifdef WRITE_DRAW_CALL_COUNT
+			TotalInstanceCount[0] = totalSum;
+		#endif
+	
+		sharedSums[threadCount - 1] = 0;
+	}
+		
+	for (i = 0; i < log2(threadCount); i++)
+	{
+		GroupMemoryBarrierWithGroupSync();
+
+		if (thid < (1 << i))
+		{
+			uint offset = threadCount >> (i + 1);
+			uint ai = offset * (2 * thid + 1) - 1;
+			uint bi = offset * (2 * thid + 2) - 1;
+			uint t0 = sharedSums[ai];
+			uint t1 = sharedSums[bi];
+			sharedSums[ai] = t1;
+			sharedSums[bi] = t0 + t1;
+		}
+	}
+	
+	GroupMemoryBarrierWithGroupSync();
+	PrefixSumsWrite[dispatchThreadId] = sharedSums[thid];
+}

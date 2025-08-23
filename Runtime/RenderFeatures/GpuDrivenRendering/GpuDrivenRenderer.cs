@@ -4,12 +4,13 @@ using UnityEngine;
 public class GpuDrivenRenderer : RenderFeatureBase
 {
 	private static IndexedString radixPassId = new("Pass ", 32);
-    private readonly ComputeShader cullingShader, instancePrefixSum, instanceCompaction, instanceSort, instanceIdOffsets, instanceCopyData, writeDrawCallArgs;
+    private readonly ComputeShader cullingShader, instancePrefixSum, instancePrefixSum1, instanceCompaction, instanceSort, instanceIdOffsets, instanceCopyData, writeDrawCallArgs;
 
     public GpuDrivenRenderer(RenderGraph renderGraph) : base(renderGraph)
     {
         cullingShader = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceRendererCull");
         instancePrefixSum = Resources.Load<ComputeShader>("GpuInstancedRendering/InstancePrefixSum");
+		instancePrefixSum1 = Resources.Load<ComputeShader>("GpuInstancedRendering/InstancePrefixSum1");
         instanceSort = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceSort");
 		instanceCompaction = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCompaction");
         instanceCopyData = Resources.Load<ComputeShader>("GpuInstancedRendering/InstanceCopyData");
@@ -53,11 +54,13 @@ public class GpuDrivenRenderer : RenderFeatureBase
         }
 
         var prefixSums = renderGraph.GetBuffer(instanceData.instanceCount);
-        instancePrefixSum.GetThreadGroupSizes(0, instanceData.instanceCount, out var groupsX);
-        var groupSums = renderGraph.GetBuffer((int)groupsX);
+
+		// We use 1024 thread groups but each thread reads two sums
+		var groups = Math.DivRoundUp(instanceData.instanceCount, 1024);
+		var groupSums = renderGraph.GetBuffer(groups);
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Prefix Sum 1"))
         {
-			pass.Initialize(instancePrefixSum, 0, (int)groupsX, normalizedDispatch: false);
+            pass.Initialize(instancePrefixSum1, 0, groups, normalizedDispatch: false);
             pass.WriteBuffer("PrefixSumsWrite", prefixSums);
             pass.WriteBuffer("GroupSumsWrite", groupSums);
 
@@ -70,7 +73,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
         }
 
         // TODO: This only handles a 2048*1024 array for now
-        var groupSums1 = renderGraph.GetBuffer((int)groupsX);
+        var groupSums1 = renderGraph.GetBuffer(groups);
 		var totalInstanceCountBuffer = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Prefix Sum 2"))
         {
@@ -79,9 +82,9 @@ public class GpuDrivenRenderer : RenderFeatureBase
             pass.WriteBuffer("TotalInstanceCount", totalInstanceCountBuffer);
             pass.ReadBuffer("Input", groupSums);
 
-            pass.SetRenderFunction((int)groupsX, static (command, pass, groupsX) =>
+            pass.SetRenderFunction(groups, static (command, pass, groups) =>
             {
-                pass.SetInt("MaxThread", groupsX);
+                pass.SetInt("MaxThread", groups);
             });
         }
 
