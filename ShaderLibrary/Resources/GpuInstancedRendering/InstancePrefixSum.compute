@@ -1,4 +1,6 @@
-﻿#pragma kernel PrefixScan0 KERNEL=PrefixScan0 WRITE_FINAL_COUNT
+﻿#include "../../PrefixSum.hlsl"
+
+#pragma kernel PrefixScan0 KERNEL=PrefixScan0 WRITE_FINAL_COUNT
 #pragma kernel PrefixScan1 KERNEL=PrefixScan1 WRITE_DRAW_CALL_COUNT
 
 const static uint threadCount = 1024;
@@ -9,66 +11,41 @@ StructuredBuffer<uint> Input;
 
 groupshared uint temp[2 * threadCount];
 
+uint GroupId;
+
+void PrefixSumSharedWrite(uint index, uint data)
+{
+	temp[index] = data;
+}
+
+uint PrefixSumSharedRead(uint index)
+{
+	return temp[index];
+}
+
+void PrefixSumOutputTotalCount(uint totalSum)
+{
+	#ifdef WRITE_FINAL_COUNT
+		GroupSumsWrite[GroupId] = totalSum;
+	#endif
+
+	#ifdef WRITE_DRAW_CALL_COUNT
+		TotalInstanceCount[0] = totalSum;
+	#endif
+}
+
 [numthreads(threadCount, 1, 1)]
 void KERNEL(uint dispatchThreadId : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
-	uint n = threadCount * 2;
-	uint offset = 1;
+	GroupId = groupId;
 	
 	// A: load input into shared memory
 	temp[2 * groupIndex + 0] = Input[2 * dispatchThreadId + 0];
 	temp[2 * groupIndex + 1] = Input[2 * dispatchThreadId + 1];
-	
-	// build sum in place up the tree
-	for (uint d = n >> 1; d > 0; d >>= 1)
-	{
-		GroupMemoryBarrierWithGroupSync();
-		
-		if (groupIndex < d)
-		{
-			// B
-			uint ai = offset * (2 * groupIndex + 1) - 1;
-			uint bi = offset * (2 * groupIndex + 2) - 1;
-			temp[bi] += temp[ai];
-		}
-		
-		offset *= 2;
-	}
-	
+
 	GroupMemoryBarrierWithGroupSync();
 	
-	// C: clear the last element
-	if (!groupIndex)
-	{
-		#ifdef WRITE_FINAL_COUNT
-			GroupSumsWrite[groupId] = temp[n - 1];
-		#endif
-
-		#ifdef WRITE_DRAW_CALL_COUNT
-			TotalInstanceCount[0] = temp[n - 1];
-		#endif
-		
-		temp[n - 1] = 0;
-	}
-	
-	// traverse down tree & build scan
-	for (d = 1; d < n; d *= 2)
-	{
-		offset >>= 1;
-		GroupMemoryBarrierWithGroupSync();
-
-		if (groupIndex < d)
-		{
-			// D
-			uint ai = offset * (2 * groupIndex + 1) - 1;
-			uint bi = offset * (2 * groupIndex + 2) - 1;
-			uint t = temp[ai];
-			temp[ai] = temp[bi];
-			temp[bi] += t;
-		}
-	}
-	
-	GroupMemoryBarrierWithGroupSync();
+	PrefixSum(groupIndex, threadCount * 2);
 	
 	// E
 	PrefixSumsWrite[2 * dispatchThreadId + 0] = temp[2 * groupIndex + 0];

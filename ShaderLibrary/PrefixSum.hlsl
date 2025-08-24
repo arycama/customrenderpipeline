@@ -3,54 +3,53 @@
 // Note that a GroupMemoryBarrierWithGroupSync may be required. This is left out incase the caller does not require it.
 void PrefixSumSharedWrite(uint index, uint data); // array[index] = data
 uint PrefixSumSharedRead(uint index); // return array[index];
-void PrefixSumOutputTotalCount(uint index, uint data);
+void PrefixSumOutputTotalCount(uint data);
 
-#define NUM_BANKS 16
-#define LOG_NUM_BANKS 4
-#define CONFLICT_FREE_OFFSET(n)((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS))
-
-void PrefixSum(uint groupIndex, uint size, uint log2Size)
+void PrefixSum(uint groupIndex, uint size)
 {
-	// Perform reduction
-	[unroll]
-	for (uint i = 0; i < log2Size; i++)
+	uint offset = 1;
+	
+	// build sum in place up the tree
+	for (uint d = size >> 1; d > 0; d >>= 1)
 	{
 		GroupMemoryBarrierWithGroupSync();
 		
-		if (groupIndex >= size >> (i + 1))
-			continue;
+		if (groupIndex < d)
+		{
+			// B
+			uint ai = offset * (2 * groupIndex + 1) - 1;
+			uint bi = offset * (2 * groupIndex + 2) - 1;
+			PrefixSumSharedWrite(bi, PrefixSumSharedRead(ai) + PrefixSumSharedRead(bi));
+		}
 		
-		uint offset = 1 << i;
-		uint ai = offset * (2 * groupIndex + 1) - 1;
-		uint bi = offset * (2 * groupIndex + 2) - 1;
-		PrefixSumSharedWrite(bi, PrefixSumSharedRead(bi) + PrefixSumSharedRead(ai));
+		offset *= 2;
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
 	
-	// Clear the last element
-	if (groupIndex == size - 1)
+	// C: clear the last element
+	if (!groupIndex)
 	{
-		uint totalSum = PrefixSumSharedRead(size - 1);
-		PrefixSumOutputTotalCount(groupIndex, totalSum);
+		PrefixSumOutputTotalCount(PrefixSumSharedRead(size - 1));
 		PrefixSumSharedWrite(size - 1, 0);
 	}
-		
-	// Perform downsweep and build scan
-	[unroll]
-	for (i = 0; i < log2Size; i++)
+	
+	// traverse down tree & build scan
+	for (d = 1; d < size; d *= 2)
 	{
+		offset >>= 1;
 		GroupMemoryBarrierWithGroupSync();
 
-		if (groupIndex >= (1 << i))
-			continue;
-			
-		uint offset = size >> (i + 1);
-		uint ai = offset * (2 * groupIndex + 1) - 1;
-		uint bi = offset * (2 * groupIndex + 2) - 1;
-		uint t0 = PrefixSumSharedRead(ai);
-		uint t1 = PrefixSumSharedRead(bi);
-		PrefixSumSharedWrite(ai, t1);
-		PrefixSumSharedWrite(bi, t0 + t1);
+		if (groupIndex < d)
+		{
+			// D
+			uint ai = offset * (2 * groupIndex + 1) - 1;
+			uint bi = offset * (2 * groupIndex + 2) - 1;
+			uint t = PrefixSumSharedRead(ai);
+			PrefixSumSharedWrite(ai, PrefixSumSharedRead(bi));
+			PrefixSumSharedWrite(bi, PrefixSumSharedRead(bi) + t);
+		}
 	}
+	
+	GroupMemoryBarrierWithGroupSync();
 }

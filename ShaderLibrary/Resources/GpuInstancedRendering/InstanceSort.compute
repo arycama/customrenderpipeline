@@ -1,5 +1,5 @@
 #include "../../Math.hlsl"
-#include "../../PrefixSum.hlsl"
+#include "../../PrefixSum1.hlsl"
 
 #pragma kernel RadixCount COUNT
 #pragma kernel RadixScan SCAN
