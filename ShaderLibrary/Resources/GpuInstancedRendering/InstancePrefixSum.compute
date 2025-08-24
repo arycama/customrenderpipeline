@@ -9,18 +9,18 @@ uint MaxThread;
 RWStructuredBuffer<uint> PrefixSumsWrite, GroupSumsWrite, TotalInstanceCount;
 StructuredBuffer<uint> Input;
 
-groupshared uint temp[2 * threadCount];
+groupshared uint sharedSums[threadCount];
 
 uint GroupId;
 
 void PrefixSumSharedWrite(uint index, uint data)
 {
-	temp[index] = data;
+	sharedSums[index] = data;
 }
 
 uint PrefixSumSharedRead(uint index)
 {
-	return temp[index];
+	return sharedSums[index];
 }
 
 void PrefixSumOutputTotalCount(uint totalSum)
@@ -38,16 +38,15 @@ void PrefixSumOutputTotalCount(uint totalSum)
 void KERNEL(uint dispatchThreadId : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
 	GroupId = groupId;
-	
-	// A: load input into shared memory
-	temp[2 * groupIndex + 0] = Input[2 * dispatchThreadId + 0];
-	temp[2 * groupIndex + 1] = Input[2 * dispatchThreadId + 1];
 
+	// Load input into shared memory
+	sharedSums[groupIndex] = dispatchThreadId < MaxThread ? Input[dispatchThreadId] : 0;
+
+	PrefixSum(groupIndex, threadCount);
+	
 	GroupMemoryBarrierWithGroupSync();
 	
-	PrefixSum(groupIndex, threadCount * 2);
-	
-	// E
-	PrefixSumsWrite[2 * dispatchThreadId + 0] = temp[2 * groupIndex + 0];
-	PrefixSumsWrite[2 * dispatchThreadId + 1] = temp[2 * groupIndex + 1];
+	// Store to main memory
+	if (dispatchThreadId < MaxThread)
+		PrefixSumsWrite[dispatchThreadId] = sharedSums[groupIndex];
 }

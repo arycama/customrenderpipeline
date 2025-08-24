@@ -1,5 +1,5 @@
 #include "../../Math.hlsl"
-#include "../../PrefixSum1.hlsl"
+#include "../../PrefixSum.hlsl"
 
 #pragma kernel RadixCount COUNT
 #pragma kernel RadixScan SCAN
@@ -10,8 +10,6 @@
 #else
 	const static uint threadCount = 256;
 #endif
-
-const static uint log2ThreadCount = firstbitlow(threadCount);
 
 RWStructuredBuffer<uint> KeysResult, DataResult, CountResult, ScanResult, TotalFalsesResult;
 StructuredBuffer<uint> Keys, Data, GroupCounts, TotalGroupCount, TotalFalses, GroupScans;
@@ -38,17 +36,15 @@ uint PrefixSumSharedRead(uint index)
 	return sharedSums[index];
 }
 
-void PrefixSumOutputTotalCount(uint index, uint totalSum)
+void PrefixSumOutputTotalCount(uint totalSum)
 {
-#ifdef COUNT
-	if (index == threadCount - 1)
+	#ifdef COUNT
 		SharedTotalFalses = totalSum;
-#endif
+	#endif
 
-#ifdef SCAN
-	if (index == threadCount - 1)
+	#ifdef SCAN
 		TotalFalsesResult[0] = totalSum;
-#endif
+	#endif
 }
 
 [numthreads(threadCount, 1, 1)]
@@ -62,7 +58,7 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 	
 	sharedSums[groupIndex] = !bit;
 	
-	PrefixSum(groupIndex, threadCount, log2ThreadCount);
+	PrefixSum(groupIndex, threadCount);
 	GroupMemoryBarrierWithGroupSync();
 	
 	// Shuffle in group memory based on counter
@@ -86,7 +82,7 @@ void RadixScan(uint groupIndex : SV_GroupIndex)
 	bool outOfRange = groupIndex >= TotalGroupCount[0];
 	sharedSums[groupIndex] = outOfRange ? 0 : GroupCounts[groupIndex];
 	
-	PrefixSum(groupIndex, threadCount, log2ThreadCount);
+	PrefixSum(groupIndex, threadCount);
 	GroupMemoryBarrierWithGroupSync();
 	
 	// Write the total prefix sum for each group

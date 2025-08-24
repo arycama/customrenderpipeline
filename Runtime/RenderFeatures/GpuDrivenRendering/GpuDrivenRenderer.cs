@@ -55,11 +55,11 @@ public class GpuDrivenRenderer : RenderFeatureBase
         var prefixSums = renderGraph.GetBuffer(instanceData.instanceCount);
 
 		// We use 1024 thread groups but each thread reads two sums
-		var groups = Math.DivRoundUp(instanceData.instanceCount, 2048);
-		var groupSums = renderGraph.GetBuffer(groups);
+		instancePrefixSum.GetThreadGroupSizes(0, instanceData.instanceCount, out var groups);
+		var groupSums = renderGraph.GetBuffer((int)groups);
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Prefix Sum 1"))
         {
-            pass.Initialize(instancePrefixSum, 0, groups, normalizedDispatch: false);
+            pass.Initialize(instancePrefixSum, 0, (int)groups, normalizedDispatch: false);
             pass.WriteBuffer("PrefixSumsWrite", prefixSums);
             pass.WriteBuffer("GroupSumsWrite", groupSums);
 
@@ -72,7 +72,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
         }
 
         // TODO: This only handles a 2048*1024 array for now
-        var groupSums1 = renderGraph.GetBuffer(groups);
+        var groupSums1 = renderGraph.GetBuffer((int)groups);
 		var totalInstanceCountBuffer = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Prefix Sum 2"))
         {
@@ -83,7 +83,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
             pass.SetRenderFunction(groups, static (command, pass, groups) =>
             {
-                pass.SetInt("MaxThread", groups);
+                pass.SetInt("MaxThread", (int)groups);
             });
         }
 

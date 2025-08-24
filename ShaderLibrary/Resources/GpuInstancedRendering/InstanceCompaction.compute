@@ -30,7 +30,7 @@ void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID
 	if (id >= MaxThread || !Input[id])
 		return;
 
-	uint dest = PrefixSums[id] + GroupSums[groupId / 2];
+	uint dest = PrefixSums[id] + GroupSums[groupId];
 	Output[dest] = id;
 	
 	// Compute sort key from instanceType, lod and viewDistance
