@@ -8,9 +8,12 @@ void PrefixSumOutputTotalCount(uint data);
 const static uint NumBanks = 16;
 const static uint LogNumBanks = firstbitlow(NumBanks);
 uint ConflictFreeOffset(uint n) { return n >> (NumBanks + (n >> (2u * LogNumBanks))); }
+uint ConflictFreeIndex(uint n) { return n + ConflictFreeOffset(n); }
 
-void PrefixSum(uint groupIndex, uint size)
+uint PrefixSum(uint value, uint groupIndex, uint size)
 {
+	PrefixSumSharedWrite(groupIndex + ConflictFreeOffset(groupIndex), value);
+
 	uint offset = 1;
 	
 	// build sum in place up the tree
@@ -62,4 +65,6 @@ void PrefixSum(uint groupIndex, uint size)
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
+	
+	return PrefixSumSharedRead(groupIndex);
 }

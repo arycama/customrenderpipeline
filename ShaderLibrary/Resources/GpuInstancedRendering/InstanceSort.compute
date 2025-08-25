@@ -18,6 +18,9 @@ uint BitIndex;
 groupshared uint sharedSums[2 * threadCount];
 groupshared uint SharedTotalFalses;
 
+uint GroupId;
+float IsPass1;
+
 cbuffer DataLength
 {
 	uint TotalLength;
@@ -39,10 +42,17 @@ uint PrefixSumSharedRead(uint index)
 void PrefixSumOutputTotalCount(uint totalSum)
 {
 	#ifdef COUNT
-		SharedTotalFalses = totalSum;
+		if(!IsPass1)
+		{
+			SharedTotalFalses = totalSum;
+			CountResult[2 * GroupId + 0] = totalSum;
+		}
+		else
+			CountResult[2 * GroupId + 1] = totalSum;
 	#endif
 
 	#ifdef SCAN
+	if(!IsPass1)
 		TotalFalsesResult[0] = totalSum;
 	#endif
 }
@@ -50,29 +60,24 @@ void PrefixSumOutputTotalCount(uint totalSum)
 [numthreads(threadCount, 1, 1)]
 void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
+	GroupId = groupId;
+	
 	// Count the elements for this block
 	bool outOfRange = id >= TotalLength;
 	uint key = outOfRange ? 0xFFFFFFFF : Keys[id];
 	uint data = outOfRange ? 0 : Data[id];
 	bool bit = (key >> BitIndex) & 0x1;
 	
-	sharedSums[groupIndex + ConflictFreeOffset(groupIndex)] = !bit;
-	
-	PrefixSum(groupIndex, threadCount);
-	GroupMemoryBarrierWithGroupSync();
-	
 	// Shuffle in group memory based on counter
-	uint f = sharedSums[groupIndex];
-	uint t = groupIndex - f + SharedTotalFalses;
+	uint f = PrefixSum(!bit, groupIndex, threadCount);
+	
+	IsPass1 = true;
+	uint t = SharedTotalFalses + PrefixSum(bit, groupIndex, threadCount);
 	uint d = bit ? t : f;
 	
 	// Write to global memory
 	KeysResult[groupId * threadCount + d] = key;
 	DataResult[groupId * threadCount + d] = data;
-	
-	// Write the final count out to global memory
-	if (!groupIndex)
-		CountResult[groupId] = SharedTotalFalses;
 }
 
 [numthreads(threadCount, 1, 1)]
@@ -80,13 +85,10 @@ void RadixScan(uint groupIndex : SV_GroupIndex)
 {
 	// Prefix sum the counts
 	bool outOfRange = groupIndex >= TotalGroupCount[0];
-	sharedSums[groupIndex] = outOfRange ? 0 : GroupCounts[groupIndex];
+	ScanResult[2 * groupIndex + 0] = PrefixSum(outOfRange ? 0 : GroupCounts[2 * groupIndex + 0], groupIndex, threadCount);
 	
-	PrefixSum(groupIndex, threadCount);
-	GroupMemoryBarrierWithGroupSync();
-	
-	// Write the total prefix sum for each group
-	ScanResult[groupIndex] = sharedSums[groupIndex];
+	IsPass1 = true;
+	ScanResult[2 * groupIndex + 1] = PrefixSum(outOfRange ? 0 : GroupCounts[2 * groupIndex + 1], groupIndex, threadCount);
 }
 
 [numthreads(threadCount, 1, 1)]
@@ -99,9 +101,9 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	uint data = Data[id];
 	bool bit = (key >> BitIndex) & 0x1;
 	
-	uint groupScan = GroupScans[groupId];
-	uint localOffset = bit ? GroupCounts[groupId] : 0;
-	uint globalOffset = bit ? groupId * threadCount + TotalFalses[0] - groupScan : groupScan;
+	uint groupScan = GroupScans[2 * groupId + 0];
+	uint localOffset = bit ? GroupCounts[2 * groupId + 0] : 0;
+	uint globalOffset = bit ? GroupScans[2 * groupId + 1] + TotalFalses[0] : groupScan;
 	uint globalDest = groupIndex - localOffset + globalOffset;
 	
 	// Write final results
