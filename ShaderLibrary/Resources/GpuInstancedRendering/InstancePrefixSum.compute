@@ -1,4 +1,4 @@
-﻿#include "../../PrefixSum.hlsl"
+﻿#include "../../PrefixSum1.hlsl"
 
 #pragma kernel PrefixScan0 KERNEL=PrefixScan0 WRITE_FINAL_COUNT
 #pragma kernel PrefixScan1 KERNEL=PrefixScan1 WRITE_DRAW_CALL_COUNT

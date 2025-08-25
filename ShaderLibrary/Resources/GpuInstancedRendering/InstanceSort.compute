@@ -15,7 +15,7 @@ RWStructuredBuffer<uint> KeysResult, DataResult, CountResult, ScanResult, TotalF
 StructuredBuffer<uint> Keys, Data, GroupCounts, TotalGroupCount, TotalFalses, GroupScans;
 uint BitIndex;
 
-groupshared uint sharedSums[threadCount];
+groupshared uint sharedSums[2 * threadCount];
 groupshared uint SharedTotalFalses;
 
 cbuffer DataLength
@@ -56,7 +56,7 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 	uint data = outOfRange ? 0 : Data[id];
 	bool bit = (key >> BitIndex) & 0x1;
 	
-	sharedSums[groupIndex] = !bit;
+	sharedSums[groupIndex + ConflictFreeOffset(groupIndex)] = !bit;
 	
 	PrefixSum(groupIndex, threadCount);
 	GroupMemoryBarrierWithGroupSync();

@@ -5,16 +5,15 @@ void PrefixSumSharedWrite(uint index, uint data); // array[index] = data
 uint PrefixSumSharedRead(uint index); // return array[index];
 void PrefixSumOutputTotalCount(uint data);
 
-const static uint NumBanks = 16;
-const static uint LogNumBanks = firstbitlow(NumBanks);
-uint ConflictFreeOffset(uint n) { return n >> (NumBanks + (n >> (2u * LogNumBanks))); }
+#define NUM_BANKS 16
+#define LOG_NUM_BANKS 4
+#define CONFLICT_FREE_OFFSET(n)((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS))
 
 void PrefixSum(uint groupIndex, uint size)
 {
 	uint offset = 1;
 	
 	// build sum in place up the tree
-	[unroll]
 	for (uint d = size >> 1; d > 0; d >>= 1)
 	{
 		GroupMemoryBarrierWithGroupSync();
@@ -24,8 +23,6 @@ void PrefixSum(uint groupIndex, uint size)
 			// B
 			uint ai = offset * (2 * groupIndex + 1) - 1;
 			uint bi = offset * (2 * groupIndex + 2) - 1;
-			ai += ConflictFreeOffset(ai);
-			bi += ConflictFreeOffset(bi);
 			PrefixSumSharedWrite(bi, PrefixSumSharedRead(ai) + PrefixSumSharedRead(bi));
 		}
 		
@@ -37,12 +34,11 @@ void PrefixSum(uint groupIndex, uint size)
 	// C: clear the last element
 	if (!groupIndex)
 	{
-		PrefixSumOutputTotalCount(PrefixSumSharedRead(size - 1 + ConflictFreeOffset(size - 1)));
-		PrefixSumSharedWrite(size - 1 + ConflictFreeOffset(size - 1), 0);
+		PrefixSumOutputTotalCount(PrefixSumSharedRead(size - 1));
+		PrefixSumSharedWrite(size - 1, 0);
 	}
 	
 	// traverse down tree & build scan
-	[unroll]
 	for (d = 1; d < size; d *= 2)
 	{
 		offset >>= 1;
@@ -53,8 +49,6 @@ void PrefixSum(uint groupIndex, uint size)
 			// D
 			uint ai = offset * (2 * groupIndex + 1) - 1;
 			uint bi = offset * (2 * groupIndex + 2) - 1;
-			ai += ConflictFreeOffset(ai);
-			bi += ConflictFreeOffset(bi);
 			uint t = PrefixSumSharedRead(ai);
 			PrefixSumSharedWrite(ai, PrefixSumSharedRead(bi));
 			PrefixSumSharedWrite(bi, PrefixSumSharedRead(bi) + t);

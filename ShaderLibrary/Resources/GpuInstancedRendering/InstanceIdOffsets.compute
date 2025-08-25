@@ -1,4 +1,4 @@
-#include "../../PrefixSum.hlsl"
+#include "../../PrefixSum1.hlsl"
 
 #pragma kernel InstanceIdOffsets
 
