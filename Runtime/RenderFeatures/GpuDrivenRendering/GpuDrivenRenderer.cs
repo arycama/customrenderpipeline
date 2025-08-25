@@ -178,7 +178,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
 				instanceSort.GetThreadGroupSizes(0, instanceData.instanceCount, out var countGroups);
 
-				var countResult = renderGraph.GetBuffer((int)countGroups * 2);
+				var countResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
 				var tempKeys = renderGraph.GetBuffer(instanceData.instanceCount);
 				var tempData = renderGraph.GetBuffer(instanceData.instanceCount);
 
@@ -196,7 +196,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
 				}
 
-				var scanResult = renderGraph.GetBuffer((int)countGroups * 2);
+				var scanResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
 				using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Radix Sum"))
 				{
 					pass.Initialize(instanceSort, 1, normalizedDispatch: false);

@@ -18,7 +18,7 @@ uint PrefixSum(uint value, uint groupIndex, uint size, out uint totalSum)
 	uint offset = 1;
 	
 	// build sum in place up the tree
-	[unroll]
+	//[unroll]
 	for (uint d = size >> 1; d > 0; d >>= 1)
 	{
 		GroupMemoryBarrierWithGroupSync();
@@ -46,7 +46,7 @@ uint PrefixSum(uint value, uint groupIndex, uint size, out uint totalSum)
 	}
 	
 	// traverse down tree & build scan
-	[unroll]
+	//[unroll]
 	for (d = 1; d < size; d *= 2)
 	{
 		offset >>= 1;

@@ -7,8 +7,10 @@
 
 const static uint threadCount = 256;
 
-RWStructuredBuffer<uint> KeysResult, DataResult, CountResult, ScanResult;
-StructuredBuffer<uint> Keys, Data, GroupCounts, TotalGroupCount, TotalFalses, GroupScans;
+RWStructuredBuffer<uint> KeysResult, DataResult;
+RWStructuredBuffer<uint4> CountResult, ScanResult;
+StructuredBuffer<uint> Keys, Data, TotalGroupCount;
+StructuredBuffer<uint4> GroupCounts, GroupScans;
 uint BitIndex;
 
 groupshared uint sharedSums[threadCount];
@@ -31,6 +33,11 @@ uint PrefixSumSharedRead(uint index)
 	return sharedSums[index];
 }
 
+uint Select4(bool4 condition, uint4 values)
+{
+	return condition.x ? values.x : (condition.y ? values.y : condition.z ? values.z : values.w);
+}
+
 [numthreads(threadCount, 1, 1)]
 void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
@@ -38,25 +45,23 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 	bool outOfRange = id >= TotalLength;
 	uint key = outOfRange ? 0xFFFFFFFF : Keys[id];
 	uint data = outOfRange ? 0 : Data[id];
-	bool bit = (key >> BitIndex) & 0x1;
+	uint value = (key >> BitIndex) & 0x1;
 	
-	// Shuffle in group memory based on counter
-	uint totalFalses;
-	uint f = PrefixSum(!bit, groupIndex, threadCount, totalFalses);
+	// Count and sort
+	uint4 sums, offsets;
+	offsets.x = PrefixSum(value == 0, groupIndex, threadCount, sums.x);
+	offsets.y = PrefixSum(value == 1, groupIndex, threadCount, sums.y) + sums.x;
+	offsets.z = PrefixSum(value == 2, groupIndex, threadCount, sums.z) + sums.x + sums.y;
+	offsets.w = PrefixSum(value == 3, groupIndex, threadCount, sums.w) + sums.x + sums.y + sums.z;
 	
 	if (!groupIndex)
-		CountResult[2 * groupId + 0] = totalFalses;
-	
-	uint totalTrues;
-	uint t = totalFalses + PrefixSum(bit, groupIndex, threadCount, totalTrues);
-	uint d = bit ? t : f;
+		CountResult[groupId] = sums;
+		
+	uint d = offsets[value];
 	
 	// Write to global memory
 	KeysResult[groupId * threadCount + d] = key;
 	DataResult[groupId * threadCount + d] = data;
-	
-	if (!groupIndex)
-		CountResult[2 * groupId + 1] = totalTrues;
 }
 
 [numthreads(threadCount, 1, 1)]
@@ -64,9 +69,15 @@ void RadixScan(uint groupIndex : SV_GroupIndex)
 {
 	// Prefix sum the counts
 	bool outOfRange = groupIndex >= TotalGroupCount[0];
-	uint totalFalses;
-	ScanResult[2 * groupIndex + 0] = PrefixSum(outOfRange ? 0 : GroupCounts[2 * groupIndex + 0], groupIndex, threadCount, totalFalses);
-	ScanResult[2 * groupIndex + 1] = PrefixSum(outOfRange ? 0 : GroupCounts[2 * groupIndex + 1], groupIndex, threadCount) + totalFalses;
+	uint4 data = outOfRange ? 0 : GroupCounts[groupIndex];
+	
+	uint4 sums, offsets;
+	offsets.x = PrefixSum(data.x, groupIndex, threadCount, sums.x);
+	offsets.y = PrefixSum(data.y, groupIndex, threadCount, sums.y) + sums.x;
+	offsets.z = PrefixSum(data.z, groupIndex, threadCount, sums.z) + sums.x + sums.y;
+	offsets.w = PrefixSum(data.w, groupIndex, threadCount, sums.w) + sums.x + sums.y + sums.z;
+	
+	ScanResult[groupIndex] = offsets;
 }
 
 [numthreads(threadCount, 1, 1)]
@@ -76,11 +87,13 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 		return;
 
 	uint key = Keys[id];
-	bool bit = (key >> BitIndex) & 0x1;
+	uint value = (key >> BitIndex) & 0x1;
 	
-	uint localOffset = bit ? GroupCounts[2 * groupId + 0] : 0;
-	uint globalOffset = bit ? GroupScans[2 * groupId + 1] : GroupScans[2 * groupId + 0];
-	uint globalDest = groupIndex - localOffset + globalOffset;
+	uint4 localOffsets = GroupCounts[groupId];
+	
+	uint localOffset = value ? localOffsets[value - 1] : 0;
+	
+	uint globalDest = groupIndex - localOffset + GroupScans[groupId][value];
 	
 	// Write final results
 	DataResult[globalDest] = Data[id];
