@@ -3,14 +3,15 @@
 // Note that a GroupMemoryBarrierWithGroupSync may be required. This is left out incase the caller does not require it.
 void PrefixSumSharedWrite(uint index, uint data); // array[index] = data
 uint PrefixSumSharedRead(uint index); // return array[index];
-void PrefixSumOutputTotalCount(uint data);
 
 const static uint NumBanks = 16;
 const static uint LogNumBanks = firstbitlow(NumBanks);
 uint ConflictFreeOffset(uint n) { return n >> (NumBanks + (n >> (2u * LogNumBanks))); }
 uint ConflictFreeIndex(uint n) { return n + ConflictFreeOffset(n); }
 
-uint PrefixSum(uint value, uint groupIndex, uint size)
+groupshared uint SharedTotalSum;
+
+uint PrefixSum(uint value, uint groupIndex, uint size, out uint totalSum)
 {
 	PrefixSumSharedWrite(groupIndex + ConflictFreeOffset(groupIndex), value);
 
@@ -40,7 +41,7 @@ uint PrefixSum(uint value, uint groupIndex, uint size)
 	// C: clear the last element
 	if (!groupIndex)
 	{
-		PrefixSumOutputTotalCount(PrefixSumSharedRead(size - 1 + ConflictFreeOffset(size - 1)));
+		SharedTotalSum = PrefixSumSharedRead(size - 1 + ConflictFreeOffset(size - 1));
 		PrefixSumSharedWrite(size - 1 + ConflictFreeOffset(size - 1), 0);
 	}
 	
@@ -66,5 +67,13 @@ uint PrefixSum(uint value, uint groupIndex, uint size)
 	
 	GroupMemoryBarrierWithGroupSync();
 	
+	totalSum = SharedTotalSum;
+	
 	return PrefixSumSharedRead(groupIndex);
+}
+
+uint PrefixSum(uint value, uint groupIndex, uint size)
+{
+	uint totalSum;
+	return PrefixSum(value, groupIndex, size, totalSum);
 }

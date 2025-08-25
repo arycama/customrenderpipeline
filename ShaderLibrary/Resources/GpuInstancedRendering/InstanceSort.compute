@@ -5,21 +5,13 @@
 #pragma kernel RadixScan SCAN
 #pragma kernel RadixScatter SCATTER
 
-#ifdef SCAN
-	const static uint threadCount = 1024;
-#else
-	const static uint threadCount = 256;
-#endif
+const static uint threadCount = 256;
 
-RWStructuredBuffer<uint> KeysResult, DataResult, CountResult, ScanResult, TotalFalsesResult;
+RWStructuredBuffer<uint> KeysResult, DataResult, CountResult, ScanResult;
 StructuredBuffer<uint> Keys, Data, GroupCounts, TotalGroupCount, TotalFalses, GroupScans;
 uint BitIndex;
 
-groupshared uint sharedSums[2 * threadCount];
-groupshared uint SharedTotalFalses;
-
-uint GroupId;
-float IsPass1;
+groupshared uint sharedSums[threadCount];
 
 cbuffer DataLength
 {
@@ -39,29 +31,9 @@ uint PrefixSumSharedRead(uint index)
 	return sharedSums[index];
 }
 
-void PrefixSumOutputTotalCount(uint totalSum)
-{
-	#ifdef COUNT
-		if(!IsPass1)
-		{
-			SharedTotalFalses = totalSum;
-			CountResult[2 * GroupId + 0] = totalSum;
-		}
-		else
-			CountResult[2 * GroupId + 1] = totalSum;
-	#endif
-
-	#ifdef SCAN
-	if(!IsPass1)
-		TotalFalsesResult[0] = totalSum;
-	#endif
-}
-
 [numthreads(threadCount, 1, 1)]
 void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
-	GroupId = groupId;
-	
 	// Count the elements for this block
 	bool outOfRange = id >= TotalLength;
 	uint key = outOfRange ? 0xFFFFFFFF : Keys[id];
@@ -69,15 +41,22 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 	bool bit = (key >> BitIndex) & 0x1;
 	
 	// Shuffle in group memory based on counter
-	uint f = PrefixSum(!bit, groupIndex, threadCount);
+	uint totalFalses;
+	uint f = PrefixSum(!bit, groupIndex, threadCount, totalFalses);
 	
-	IsPass1 = true;
-	uint t = SharedTotalFalses + PrefixSum(bit, groupIndex, threadCount);
+	if (!groupIndex)
+		CountResult[2 * groupId + 0] = totalFalses;
+	
+	uint totalTrues;
+	uint t = totalFalses + PrefixSum(bit, groupIndex, threadCount, totalTrues);
 	uint d = bit ? t : f;
 	
 	// Write to global memory
 	KeysResult[groupId * threadCount + d] = key;
 	DataResult[groupId * threadCount + d] = data;
+	
+	if (!groupIndex)
+		CountResult[2 * groupId + 1] = totalTrues;
 }
 
 [numthreads(threadCount, 1, 1)]
@@ -85,10 +64,9 @@ void RadixScan(uint groupIndex : SV_GroupIndex)
 {
 	// Prefix sum the counts
 	bool outOfRange = groupIndex >= TotalGroupCount[0];
-	ScanResult[2 * groupIndex + 0] = PrefixSum(outOfRange ? 0 : GroupCounts[2 * groupIndex + 0], groupIndex, threadCount);
-	
-	IsPass1 = true;
-	ScanResult[2 * groupIndex + 1] = PrefixSum(outOfRange ? 0 : GroupCounts[2 * groupIndex + 1], groupIndex, threadCount);
+	uint totalFalses;
+	ScanResult[2 * groupIndex + 0] = PrefixSum(outOfRange ? 0 : GroupCounts[2 * groupIndex + 0], groupIndex, threadCount, totalFalses);
+	ScanResult[2 * groupIndex + 1] = PrefixSum(outOfRange ? 0 : GroupCounts[2 * groupIndex + 1], groupIndex, threadCount) + totalFalses;
 }
 
 [numthreads(threadCount, 1, 1)]
@@ -98,15 +76,13 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 		return;
 
 	uint key = Keys[id];
-	uint data = Data[id];
 	bool bit = (key >> BitIndex) & 0x1;
 	
-	uint groupScan = GroupScans[2 * groupId + 0];
 	uint localOffset = bit ? GroupCounts[2 * groupId + 0] : 0;
-	uint globalOffset = bit ? GroupScans[2 * groupId + 1] + TotalFalses[0] : groupScan;
+	uint globalOffset = bit ? GroupScans[2 * groupId + 1] : GroupScans[2 * groupId + 0];
 	uint globalDest = groupIndex - localOffset + globalOffset;
 	
 	// Write final results
-	DataResult[globalDest] = data;
+	DataResult[globalDest] = Data[id];
 	KeysResult[globalDest] = key;
 }
