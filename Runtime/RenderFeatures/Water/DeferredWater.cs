@@ -24,6 +24,9 @@ public class DeferredWater : CameraRenderFeature
 
     public override void Render(Camera camera, ScriptableRenderContext context)
     {
+		if (!settings.IsEnabled)
+			return;
+
 		using var scope = renderGraph.AddProfileScope("Deferred Water");
 
         var scatterResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);

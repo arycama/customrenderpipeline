@@ -172,16 +172,16 @@ public class GpuDrivenRenderer : RenderFeatureBase
 		// Radix sort zzz too many passes
 		using (renderGraph.AddProfileScope("Radix Sort"))
 		{
-			for (var i = 0; i < 32; i++)
+			instanceSort.GetThreadGroupSizes(0, instanceData.instanceCount, out var countGroups);
+			var tempKeys = renderGraph.GetBuffer(instanceData.instanceCount);
+			var tempData = renderGraph.GetBuffer(instanceData.instanceCount);
+			var countResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
+			var scanResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
+			var scanResultTemp = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
+
+			for (var i = 0; i < 16; i++)
 			{
 				using var passScope = renderGraph.AddProfileScope(radixPassId[i]);
-
-				instanceSort.GetThreadGroupSizes(0, instanceData.instanceCount, out var countGroups);
-
-				var countResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
-				var tempKeys = renderGraph.GetBuffer(instanceData.instanceCount);
-				var tempData = renderGraph.GetBuffer(instanceData.instanceCount);
-
 				using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Radix Count"))
 				{
 					pass.Initialize(instanceSort, threadGroups, 0);
@@ -193,14 +193,14 @@ public class GpuDrivenRenderer : RenderFeatureBase
 					pass.ReadBuffer("Keys", sortKeys);
 					pass.ReadBuffer("Data", instanceIndices);
 
-					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
+					pass.SetRenderFunction(2 * i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
 				}
 
-				var scanResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
 				using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Radix Sum"))
 				{
 					pass.Initialize(instanceSort, 1, normalizedDispatch: false);
 					pass.WriteBuffer("ScanResult", scanResult);
+					pass.WriteBuffer("ScanResultTemp", scanResultTemp);
 					pass.ReadBuffer("GroupCounts", countResult);
 					pass.ReadBuffer("TotalGroupCount", threadGroups);
 				}
@@ -215,10 +215,11 @@ public class GpuDrivenRenderer : RenderFeatureBase
 					pass.ReadBuffer("Keys", tempKeys);
 					pass.ReadBuffer("Data", tempData);
 
+					pass.ReadBuffer("ScanResultTempRead", scanResultTemp);
 					pass.ReadBuffer("GroupScans", scanResult);
 					pass.ReadBuffer("GroupCounts", countResult);
 
-					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
+					pass.SetRenderFunction(2 * i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
 				}
 			}
 		}
