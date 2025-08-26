@@ -8,9 +8,9 @@
 const static uint threadCount = 256;
 
 RWStructuredBuffer<uint> KeysResult, DataResult;
-RWStructuredBuffer<uint4> CountResult, ScanResult, ScanResultTemp;
+RWStructuredBuffer<uint4> CountResult, ScanResult;
 StructuredBuffer<uint> Keys, Data, TotalGroupCount;
-StructuredBuffer<uint4> GroupCounts, GroupScans, ScanResultTempRead;
+StructuredBuffer<uint4> GroupCounts, GroupScans;
 uint BitIndex;
 
 groupshared uint sharedSums[threadCount];
@@ -45,14 +45,18 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 	// Count and sort
 	uint4 sums, offsets;
 	offsets.x = PrefixSum(value == 0, groupIndex, threadCount, sums.x);
-	offsets.y = PrefixSum(value == 1, groupIndex, threadCount, sums.y) + sums.x;
-	offsets.z = PrefixSum(value == 2, groupIndex, threadCount, sums.z) + sums.x + sums.y;
-	offsets.w = PrefixSum(value == 3, groupIndex, threadCount, sums.w) + sums.x + sums.y + sums.z;
+	offsets.y = PrefixSum(value == 1, groupIndex, threadCount, sums.y);
+	offsets.z = PrefixSum(value == 2, groupIndex, threadCount, sums.z);
+	offsets.w = PrefixSum(value == 3, groupIndex, threadCount, sums.w);
+	
+	offsets.yzw += sums.x;
+	offsets.zw += sums.y;
+	offsets.w += sums.z;
 	
 	if (!groupIndex)
 		CountResult[groupId] = sums;
 		
-	uint d = value == 0 ? offsets.x : (value == 1 ? offsets.y : (value == 2 ? offsets.z : offsets.w));
+	uint d = offsets[value];
 	
 	// Write to global memory
 	KeysResult[groupId * threadCount + d] = key;
@@ -76,7 +80,6 @@ void RadixScan(uint groupIndex : SV_GroupIndex)
 	offsets.zw += sums.y;
 	offsets.w += sums.z;
 	
-	ScanResultTemp[groupIndex] = sums;
 	ScanResult[groupIndex] = offsets;
 }
 
@@ -90,28 +93,12 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	uint value = (key >> BitIndex) & 0x3;
 	
 	uint4 localOffsets = GroupCounts[groupId];
-	uint4 globalOffsets = GroupScans[groupId];
+	localOffsets.w += localOffsets.z;
+	localOffsets.zw += localOffsets.y;
+	localOffsets.yzw += localOffsets.x;
 	
-	uint4 globalCounts = ScanResultTempRead[groupId];
-	
-	uint localOffset;
-	switch (value)
-	{
-		case 0:
-			localOffset = 0;
-			break;
-		case 1:
-			localOffset = localOffsets.x;
-			break;
-		case 2:
-			localOffset = localOffsets.x + localOffsets.y;
-			break;
-		case 3:
-			localOffset = localOffsets.x + localOffsets.y + localOffsets.z;
-			break;
-	}
-	
-	uint globalOffset = value == 0 ? globalOffsets.x : (value == 1 ? globalOffsets.y : (value == 2 ? globalOffsets.z : globalOffsets.w));
+	uint localOffset = value ? localOffsets[value - 1] : 0;
+	uint globalOffset = GroupScans[groupId][value];
 	
 	uint globalDest = groupIndex - localOffset + globalOffset;
 	

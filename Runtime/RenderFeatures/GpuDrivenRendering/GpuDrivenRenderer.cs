@@ -177,7 +177,6 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			var tempData = renderGraph.GetBuffer(instanceData.instanceCount);
 			var countResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
 			var scanResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
-			var scanResultTemp = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
 
 			for (var i = 0; i < 16; i++)
 			{
@@ -200,7 +199,6 @@ public class GpuDrivenRenderer : RenderFeatureBase
 				{
 					pass.Initialize(instanceSort, 1, normalizedDispatch: false);
 					pass.WriteBuffer("ScanResult", scanResult);
-					pass.WriteBuffer("ScanResultTemp", scanResultTemp);
 					pass.ReadBuffer("GroupCounts", countResult);
 					pass.ReadBuffer("TotalGroupCount", threadGroups);
 				}
@@ -215,7 +213,6 @@ public class GpuDrivenRenderer : RenderFeatureBase
 					pass.ReadBuffer("Keys", tempKeys);
 					pass.ReadBuffer("Data", tempData);
 
-					pass.ReadBuffer("ScanResultTempRead", scanResultTemp);
 					pass.ReadBuffer("GroupScans", scanResult);
 					pass.ReadBuffer("GroupCounts", countResult);
 
