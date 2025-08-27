@@ -5,12 +5,16 @@
 #pragma kernel RadixScan SCAN
 #pragma kernel RadixScatter SCATTER
 
+#ifdef SCAN
 const static uint threadCount = 256;
+#else
+const static uint threadCount = 128;
+#endif
 
-RWStructuredBuffer<uint> KeysResult, DataResult;
-RWStructuredBuffer<uint4> CountResult, ScanResult;
-StructuredBuffer<uint> Keys, Data, TotalGroupCount;
-StructuredBuffer<uint4> GroupCounts, GroupScans;
+RWStructuredBuffer<uint> KeysResult, DataResult, CountResult;
+RWStructuredBuffer<uint4> ScanResult;
+StructuredBuffer<uint> Keys, Data, TotalGroupCount, GroupCounts;
+StructuredBuffer<uint4> GroupScans;
 uint BitIndex;
 
 groupshared uint sharedSums[threadCount];
@@ -43,18 +47,21 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 	uint value = (key >> BitIndex) & 0x3;
 	
 	// Count and sort
-	uint4 sums, offsets;
-	offsets.x = PrefixSum(value == 0, groupIndex, threadCount, sums.x);
-	offsets.y = PrefixSum(value == 1, groupIndex, threadCount, sums.y);
-	offsets.z = PrefixSum(value == 2, groupIndex, threadCount, sums.z);
-	offsets.w = PrefixSum(value == 3, groupIndex, threadCount, sums.w);
+	uint4 packedValues = (value == uint4(0, 1, 2, 3)) << uint4(0, 8, 16, 24);
+	uint packedValue = packedValues.x | packedValues.y | packedValues.z | packedValues.w;
+	
+	uint packedSum;
+	uint packedOffset = PrefixSum(packedValue, groupIndex, threadCount, packedSum);
+	
+	uint4 offsets = (packedOffset >> uint4(0, 8, 16, 24)) & 0xFF;
+	uint4 sums = (packedSum >> uint4(0, 8, 16, 24)) & 0xFF;
+	
+	if (!groupIndex)
+		CountResult[groupId] = packedSum;
 	
 	offsets.yzw += sums.x;
 	offsets.zw += sums.y;
 	offsets.w += sums.z;
-	
-	if (!groupIndex)
-		CountResult[groupId] = sums;
 		
 	uint d = offsets[value];
 	
@@ -68,7 +75,8 @@ void RadixScan(uint groupIndex : SV_GroupIndex)
 {
 	// Prefix sum the counts
 	bool outOfRange = groupIndex >= TotalGroupCount[0];
-	uint4 counts = outOfRange ? 0 : GroupCounts[groupIndex];
+	uint packedCount = outOfRange ? 0 : GroupCounts[groupIndex];
+	uint4 counts = (packedCount >> uint4(0, 8, 16, 24)) & 0xFF;
 	
 	uint4 sums, offsets;
 	offsets.x = PrefixSum(counts.x, groupIndex, threadCount, sums.x);
@@ -92,7 +100,9 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	uint key = Keys[id];
 	uint value = (key >> BitIndex) & 0x3;
 	
-	uint4 localOffsets = GroupCounts[groupId];
+	uint packedLocalOffsets = GroupCounts[groupId];
+	uint4 localOffsets = (packedLocalOffsets >> uint4(0, 8, 16, 24)) & 0xFF;
+	
 	localOffsets.w += localOffsets.z;
 	localOffsets.zw += localOffsets.y;
 	localOffsets.yzw += localOffsets.x;

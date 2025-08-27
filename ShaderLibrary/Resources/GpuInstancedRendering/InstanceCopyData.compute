@@ -31,7 +31,7 @@ cbuffer DataLength
 [numthreads(1, 1, 1)]
 void ComputeThreadCount()
 {
-	ThreadGroupsWrite[0] = DivRoundUp(TotalLength, 256);
+	ThreadGroupsWrite[0] = DivRoundUp(TotalLength, 128);
 	ThreadGroupsWrite[1] = 1;
 	ThreadGroupsWrite[2] = 1;
 }

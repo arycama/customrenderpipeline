@@ -175,7 +175,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			instanceSort.GetThreadGroupSizes(0, instanceData.instanceCount, out var countGroups);
 			var tempKeys = renderGraph.GetBuffer(instanceData.instanceCount);
 			var tempData = renderGraph.GetBuffer(instanceData.instanceCount);
-			var countResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
+			var countResult = renderGraph.GetBuffer((int)countGroups, sizeof(int));
 			var scanResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
 
 			for (var i = 0; i < 16; i++)
