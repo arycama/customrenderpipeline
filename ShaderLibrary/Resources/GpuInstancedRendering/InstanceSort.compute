@@ -109,10 +109,6 @@ void RadixScan(uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 		TotalSumsResult[groupId] = sum;
 }
 
-// Double buffered, so two indices per element
-groupshared uint SharedLocalOffsets[2][Exp2BitsPerPass];
-groupshared uint SharedGlobalOffsets[2][Exp2BitsPerPass];
-
 [numthreads(threadCount, 1, 1)]
 void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
@@ -128,21 +124,14 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	uint globalSum = 0;
 	if (groupIndex < Exp2BitsPerPass)
 	{
-		uint localSum = groupIndex ? localOffsets[groupIndex - 1] : 0;
-		SharedLocalOffsets[0][groupIndex] = localSum;
-		
-		globalSum = GroupScans[groupId * 4 + groupIndex] - localSum;
-		SharedGlobalOffsets[0][groupIndex] = globalSum;
-	}
-	
-	GroupMemoryBarrierWithGroupSync();
-	
-	if (groupIndex < Exp2BitsPerPass)
-	{
+		// We need to compute the global offset for each digit from this group, this can be done with two prefix
+		// scans, or alternatively, can be reformulated to one, hence the below complexity
+		// TODO: Can this simplify further and avoid looking up groupscans twice
+		globalSum = TotalSums[groupIndex - 1] + GroupScans[groupId * 4 + groupIndex];
 		if (groupIndex)
-			globalSum += TotalSums[groupIndex - 1] - SharedGlobalOffsets[0][groupIndex - 1] - SharedLocalOffsets[0][groupIndex - 1];
-			
-		SharedGlobalOffsets[0][groupIndex] = globalSum;
+			globalSum -= GroupScans[groupId * 4 + (groupIndex - 1)] + localOffsets[groupIndex - 1];
+		
+		SharedSums[0][groupIndex] = globalSum;
 	}
 	
 	[unroll]
@@ -154,15 +143,15 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	
 		uint offset = 1 << i;
 		if (groupIndex >= offset)
-			globalSum += SharedGlobalOffsets[i & 1][groupIndex - offset];
+			globalSum += SharedSums[i & 1][groupIndex - offset];
 			
-		SharedGlobalOffsets[!(i & 1)][groupIndex] = globalSum;
+		SharedSums[!(i & 1)][groupIndex] = globalSum;
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
 	
 	// Write final results
-	uint globalDest = groupIndex + SharedGlobalOffsets[0][value];
+	uint globalDest = groupIndex + SharedSums[0][value];
 	KeysResult[globalDest] = key;
 	DataResult[globalDest] = data;
 }
