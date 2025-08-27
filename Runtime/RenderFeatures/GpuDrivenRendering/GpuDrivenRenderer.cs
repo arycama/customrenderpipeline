@@ -176,7 +176,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			var tempKeys = renderGraph.GetBuffer(instanceData.instanceCount);
 			var tempData = renderGraph.GetBuffer(instanceData.instanceCount);
 			var countResult = renderGraph.GetBuffer((int)countGroups, sizeof(int));
-			var scanResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
+			var scanResult = renderGraph.GetBuffer((int)countGroups * 4, sizeof(int));
 			var scanSums = renderGraph.GetBuffer(16); // Stores total sums for each value, needs to be 2^n, where n is bits per pass
 
 			var bitsPerPass = 2;
@@ -200,7 +200,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
 				using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Radix Sum"))
 				{
-					pass.Initialize(instanceSort, 1, normalizedDispatch: false);
+					pass.Initialize(instanceSort, 1, 4, normalizedDispatch: false);
 					pass.WriteBuffer("ScanResult", scanResult);
 					pass.WriteBuffer("TotalSumsResult", scanSums);
 					pass.ReadBuffer("GroupCounts", countResult);

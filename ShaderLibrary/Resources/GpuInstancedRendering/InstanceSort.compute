@@ -7,15 +7,13 @@
 //#pragma enable_d3d11_debug_symbols
 
 #ifdef SCAN
-const static uint threadCount = 256;
+const static uint threadCount = 512;
 #else
 const static uint threadCount = 128;
 #endif
 
-RWStructuredBuffer<uint> KeysResult, DataResult, CountResult, TotalSumsResult;
-RWStructuredBuffer<uint4> ScanResult;
-StructuredBuffer<uint> Keys, Data, TotalGroupCount, GroupCounts, TotalSums;
-StructuredBuffer<uint4> GroupScans;
+RWStructuredBuffer<uint> KeysResult, DataResult, CountResult, TotalSumsResult, ScanResult;
+StructuredBuffer<uint> Keys, Data, TotalGroupCount, GroupCounts, TotalSums, GroupScans;
 uint BitIndex;
 
 groupshared uint sharedSums[threadCount];
@@ -94,23 +92,21 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 }
 
 [numthreads(threadCount, 1, 1)]
-void RadixScan(uint groupIndex : SV_GroupIndex)
+void RadixScan(uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
 	// Prefix sum the counts
 	bool outOfRange = groupIndex >= TotalGroupCount[0];
 	uint packedCount = outOfRange ? 0 : GroupCounts[groupIndex];
 	uint4 counts = (packedCount >> uint4(0, 8, 16, 24)) & 0xFF;
+
+	uint count = counts[groupId];
+	uint sum;
+	uint offset = PrefixSum(count, groupIndex, threadCount, sum);
 	
-	uint4 sums, offsets;
-	offsets.x = PrefixSum(counts.x, groupIndex, threadCount, sums.x);
-	offsets.y = PrefixSum(counts.y, groupIndex, threadCount, sums.y);
-	offsets.z = PrefixSum(counts.z, groupIndex, threadCount, sums.z);
-	offsets.w = PrefixSum(counts.w, groupIndex, threadCount, sums.w);
+	ScanResult[4 * groupIndex + groupId] = offset;
 	
-	ScanResult[groupIndex] = offsets;
-	
-	if (groupIndex < 4)
-		TotalSumsResult[groupIndex] = sums[groupIndex];
+	if (!groupIndex)
+		TotalSumsResult[groupId] = sum;
 }
 
 // Double buffered, so two indices per element
@@ -130,7 +126,7 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	
 	// Prefix sum
 	uint localSum = groupIndex ? localOffsets[groupIndex - 1] : 0;
-	uint globalSum = groupIndex ? TotalSums[groupIndex - 1] : 0;
+	uint globalSum = groupIndex ? (TotalSums[groupIndex - 1]) : 0;
 	if (groupIndex < Exp2BitsPerPass)
 	{
 		SharedLocalOffsets[0][groupIndex] = localSum;
@@ -156,10 +152,20 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 		SharedGlobalOffsets[!(i & 1)][groupIndex] = globalSum;
 	}
 	
+	// TODO: Feels like this can be part of the prefix scan somehow
+	if (groupIndex < Exp2BitsPerPass)
+		SharedGlobalOffsets[0][groupIndex] += GroupScans[groupId * 4 + groupIndex];
+	
 	GroupMemoryBarrierWithGroupSync();
 	
-	uint globalOffset = GroupScans[groupId][value] + SharedGlobalOffsets[0][value];
-	uint globalDest = groupIndex - SharedLocalOffsets[0][value] + globalOffset;
+	//uint4 globalOffsets = GroupScans[groupId];
+	//uint4 sums = uint4(TotalSums[0], TotalSums[1], TotalSums[2], TotalSums[3]);
+	//globalOffsets.y += sums.x;
+	//globalOffsets.z += sums.x + sums.y;
+	//globalOffsets.w += sums.x + sums.y + sums.z;
+	//globalOffset = globalOffsets[value];
+	
+	uint globalDest = groupIndex - SharedLocalOffsets[0][value] + SharedGlobalOffsets[0][value];
 	
 	// Write final resultsx
 	KeysResult[globalDest] = key;
