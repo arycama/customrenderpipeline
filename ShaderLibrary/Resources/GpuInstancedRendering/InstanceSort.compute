@@ -125,21 +125,23 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	uint4 localOffsets = (packedLocalOffsets >> uint4(0, 8, 16, 24)) & 0xFF;
 	
 	// Prefix sum
-	uint localSum = 0, globalSum = 0;
+	uint globalSum = 0;
 	if (groupIndex < Exp2BitsPerPass)
 	{
-		localSum = groupIndex ? localOffsets[groupIndex - 1] : 0;
+		uint localSum = groupIndex ? localOffsets[groupIndex - 1] : 0;
 		SharedLocalOffsets[0][groupIndex] = localSum;
 		
-		globalSum = GroupScans[groupId * 4 + groupIndex];
+		globalSum = GroupScans[groupId * 4 + groupIndex] - localSum;
 		SharedGlobalOffsets[0][groupIndex] = globalSum;
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
 	
-	if (groupIndex && groupIndex < Exp2BitsPerPass)
+	if (groupIndex < Exp2BitsPerPass)
 	{
-		globalSum += TotalSums[groupIndex - 1] - SharedGlobalOffsets[0][groupIndex - 1];
+		if (groupIndex)
+			globalSum += TotalSums[groupIndex - 1] - SharedGlobalOffsets[0][groupIndex - 1] - SharedLocalOffsets[0][groupIndex - 1];
+			
 		SharedGlobalOffsets[0][groupIndex] = globalSum;
 	}
 	
@@ -147,26 +149,20 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	for (uint i = 0; i < BitsPerPass; i++)
 	{
 		GroupMemoryBarrierWithGroupSync();
-		
 		if (groupIndex >= Exp2BitsPerPass)
 			continue;
 	
 		uint offset = 1 << i;
 		if (groupIndex >= offset)
-		{
-			localSum += SharedLocalOffsets[i & 1][groupIndex - offset];
 			globalSum += SharedGlobalOffsets[i & 1][groupIndex - offset];
-		}
 			
-		SharedLocalOffsets[!(i & 1)][groupIndex] = localSum;
 		SharedGlobalOffsets[!(i & 1)][groupIndex] = globalSum;
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
 	
 	// Write final results
-	// Hrmmm could we actually do this whole thing in a single prefix sum somehow..
-	uint globalDest = groupIndex - SharedLocalOffsets[0][value] + SharedGlobalOffsets[0][value];
+	uint globalDest = groupIndex + SharedGlobalOffsets[0][value];
 	KeysResult[globalDest] = key;
 	DataResult[globalDest] = data;
 }
