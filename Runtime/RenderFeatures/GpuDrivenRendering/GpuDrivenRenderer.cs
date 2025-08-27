@@ -177,8 +177,11 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			var tempData = renderGraph.GetBuffer(instanceData.instanceCount);
 			var countResult = renderGraph.GetBuffer((int)countGroups, sizeof(int));
 			var scanResult = renderGraph.GetBuffer((int)countGroups, sizeof(int) * 4);
+			var scanSums = renderGraph.GetBuffer(16); // Stores total sums for each value, needs to be 2^n, where n is bits per pass
 
-			for (var i = 0; i < 16; i++)
+			var bitsPerPass = 2;
+			var totalBits = 32;
+			for (var i = 0; i < totalBits; i += bitsPerPass)
 			{
 				using var passScope = renderGraph.AddProfileScope(radixPassId[i]);
 				using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Radix Count"))
@@ -192,13 +195,14 @@ public class GpuDrivenRenderer : RenderFeatureBase
 					pass.ReadBuffer("Keys", sortKeys);
 					pass.ReadBuffer("Data", instanceIndices);
 
-					pass.SetRenderFunction(2 * i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
+					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
 				}
 
 				using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Radix Sum"))
 				{
 					pass.Initialize(instanceSort, 1, normalizedDispatch: false);
 					pass.WriteBuffer("ScanResult", scanResult);
+					pass.WriteBuffer("TotalSumsResult", scanSums);
 					pass.ReadBuffer("GroupCounts", countResult);
 					pass.ReadBuffer("TotalGroupCount", threadGroups);
 				}
@@ -215,8 +219,9 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
 					pass.ReadBuffer("GroupScans", scanResult);
 					pass.ReadBuffer("GroupCounts", countResult);
+					pass.ReadBuffer("TotalSums", scanSums);
 
-					pass.SetRenderFunction(2 * i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
+					pass.SetRenderFunction(i, static (command, pass, data) => { pass.SetInt("BitIndex", data); });
 				}
 			}
 		}

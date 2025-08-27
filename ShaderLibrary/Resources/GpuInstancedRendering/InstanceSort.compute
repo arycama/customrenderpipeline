@@ -4,6 +4,7 @@
 #pragma kernel RadixCount COUNT
 #pragma kernel RadixScan SCAN
 #pragma kernel RadixScatter SCATTER
+//#pragma enable_d3d11_debug_symbols
 
 #ifdef SCAN
 const static uint threadCount = 256;
@@ -11,9 +12,9 @@ const static uint threadCount = 256;
 const static uint threadCount = 128;
 #endif
 
-RWStructuredBuffer<uint> KeysResult, DataResult, CountResult;
+RWStructuredBuffer<uint> KeysResult, DataResult, CountResult, TotalSumsResult;
 RWStructuredBuffer<uint4> ScanResult;
-StructuredBuffer<uint> Keys, Data, TotalGroupCount, GroupCounts;
+StructuredBuffer<uint> Keys, Data, TotalGroupCount, GroupCounts, TotalSums;
 StructuredBuffer<uint4> GroupScans;
 uint BitIndex;
 
@@ -37,6 +38,10 @@ uint PrefixSumSharedRead(uint index)
 	return sharedSums[index];
 }
 
+const static uint BitsPerPass = 2;
+const static uint Exp2BitsPerPass = 1 << BitsPerPass;
+groupshared uint SharedSums[2][Exp2BitsPerPass]; // Double buffered, so two indices per element
+
 [numthreads(threadCount, 1, 1)]
 void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
@@ -53,21 +58,39 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 	uint packedSum;
 	uint packedOffset = PrefixSum(packedValue, groupIndex, threadCount, packedSum);
 	
+	// Unpack sums and offset?
 	uint4 offsets = (packedOffset >> uint4(0, 8, 16, 24)) & 0xFF;
 	uint4 sums = (packedSum >> uint4(0, 8, 16, 24)) & 0xFF;
+
+	// Prefix sum
+	uint sum = groupIndex ? sums[groupIndex - 1] : 0;
+	if (groupIndex < Exp2BitsPerPass)
+		SharedSums[0][groupIndex] = sum;
 	
-	if (!groupIndex)
-		CountResult[groupId] = packedSum;
-	
-	offsets.yzw += sums.x;
-	offsets.zw += sums.y;
-	offsets.w += sums.z;
+	[unroll]
+	for (uint i = 0; i < BitsPerPass; i++)
+	{
+		GroupMemoryBarrierWithGroupSync();
 		
-	uint d = offsets[value];
+		if (groupIndex >= Exp2BitsPerPass)
+			continue;
+	
+		uint offset = 1 << i;
+		if (groupIndex >= offset)
+			sum += SharedSums[i & 1][groupIndex - offset];
+			
+		SharedSums[!(i & 1)][groupIndex] = sum;
+	}
+	GroupMemoryBarrierWithGroupSync();
+	
+	uint d = offsets[value] + SharedSums[0][value];
 	
 	// Write to global memory
 	KeysResult[groupId * threadCount + d] = key;
 	DataResult[groupId * threadCount + d] = data;
+	
+	if (!groupIndex)
+		CountResult[groupId] = packedSum;
 }
 
 [numthreads(threadCount, 1, 1)]
@@ -84,35 +107,61 @@ void RadixScan(uint groupIndex : SV_GroupIndex)
 	offsets.z = PrefixSum(counts.z, groupIndex, threadCount, sums.z);
 	offsets.w = PrefixSum(counts.w, groupIndex, threadCount, sums.w);
 	
-	offsets.yzw += sums.x;
-	offsets.zw += sums.y;
-	offsets.w += sums.z;
-	
 	ScanResult[groupIndex] = offsets;
+	
+	if (groupIndex < 4)
+		TotalSumsResult[groupIndex] = sums[groupIndex];
 }
+
+// Double buffered, so two indices per element
+groupshared uint SharedLocalOffsets[2][Exp2BitsPerPass];
+groupshared uint SharedGlobalOffsets[2][Exp2BitsPerPass];
 
 [numthreads(threadCount, 1, 1)]
 void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 {
-	if (id >= TotalLength)
-		return;
-
-	uint key = Keys[id];
+	bool outOfRange = id >= TotalLength;
+	uint key = outOfRange ? UintMax : Keys[id];
+	uint data = outOfRange ? 0 : Data[id];
 	uint value = (key >> BitIndex) & 0x3;
 	
 	uint packedLocalOffsets = GroupCounts[groupId];
 	uint4 localOffsets = (packedLocalOffsets >> uint4(0, 8, 16, 24)) & 0xFF;
 	
-	localOffsets.w += localOffsets.z;
-	localOffsets.zw += localOffsets.y;
-	localOffsets.yzw += localOffsets.x;
+	// Prefix sum
+	uint localSum = groupIndex ? localOffsets[groupIndex - 1] : 0;
+	uint globalSum = groupIndex ? TotalSums[groupIndex - 1] : 0;
+	if (groupIndex < Exp2BitsPerPass)
+	{
+		SharedLocalOffsets[0][groupIndex] = localSum;
+		SharedGlobalOffsets[0][groupIndex] = globalSum;
+	}
 	
-	uint localOffset = value ? localOffsets[value - 1] : 0;
-	uint globalOffset = GroupScans[groupId][value];
+	[unroll]
+	for (uint i = 0; i < BitsPerPass; i++)
+	{
+		GroupMemoryBarrierWithGroupSync();
+		
+		if (groupIndex >= Exp2BitsPerPass)
+			continue;
 	
-	uint globalDest = groupIndex - localOffset + globalOffset;
+		uint offset = 1 << i;
+		if (groupIndex >= offset)
+		{
+			localSum += SharedLocalOffsets[i & 1][groupIndex - offset];
+			globalSum += SharedGlobalOffsets[i & 1][groupIndex - offset];
+		}
+			
+		SharedLocalOffsets[!(i & 1)][groupIndex] = localSum;
+		SharedGlobalOffsets[!(i & 1)][groupIndex] = globalSum;
+	}
 	
-	// Write final results
-	DataResult[globalDest] = Data[id];
+	GroupMemoryBarrierWithGroupSync();
+	
+	uint globalOffset = GroupScans[groupId][value] + SharedGlobalOffsets[0][value];
+	uint globalDest = groupIndex - SharedLocalOffsets[0][value] + globalOffset;
+	
+	// Write final resultsx
 	KeysResult[globalDest] = key;
+	DataResult[globalDest] = data;
 }
