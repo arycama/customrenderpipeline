@@ -129,13 +129,17 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	if (groupIndex < Exp2BitsPerPass)
 	{
 		localSum = groupIndex ? localOffsets[groupIndex - 1] : 0;
-		globalSum = GroupScans[groupId * 4 + groupIndex];
-	
-		// TODO: Is there a way to avoid looking up group scans twice
-		if (groupIndex)
-			globalSum += TotalSums[groupIndex - 1] - GroupScans[groupId * 4 + (groupIndex - 1)];
-	
 		SharedLocalOffsets[0][groupIndex] = localSum;
+		
+		globalSum = GroupScans[groupId * 4 + groupIndex];
+		SharedGlobalOffsets[0][groupIndex] = globalSum;
+	}
+	
+	GroupMemoryBarrierWithGroupSync();
+	
+	if (groupIndex && groupIndex < Exp2BitsPerPass)
+	{
+		globalSum += TotalSums[groupIndex - 1] - SharedGlobalOffsets[0][groupIndex - 1];
 		SharedGlobalOffsets[0][groupIndex] = globalSum;
 	}
 	
@@ -160,9 +164,9 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 	
 	GroupMemoryBarrierWithGroupSync();
 	
+	// Write final results
+	// Hrmmm could we actually do this whole thing in a single prefix sum somehow..
 	uint globalDest = groupIndex - SharedLocalOffsets[0][value] + SharedGlobalOffsets[0][value];
-	
-	// Write final resultsx
 	KeysResult[globalDest] = key;
 	DataResult[globalDest] = data;
 }
