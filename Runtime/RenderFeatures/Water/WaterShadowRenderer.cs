@@ -116,7 +116,7 @@ public class WaterShadowRenderer : WaterRendererBase
         var profile = settings.Profile;
         var resolution = settings.Resolution;
 
-        using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Shadow"))
+        using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectIndexedRenderPass>("Ocean Shadow"))
         {
             pass.Initialize(settings.Material, indexBuffer, cullResult.IndirectArgsBuffer, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
             pass.WriteDepth(waterShadow);

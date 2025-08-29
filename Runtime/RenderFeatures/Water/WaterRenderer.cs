@@ -38,7 +38,7 @@ public class WaterRenderer : WaterRendererBase
             });
         }
 
-        using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Ocean Render"))
+        using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectIndexedRenderPass>("Ocean Render"))
         {
             pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
 

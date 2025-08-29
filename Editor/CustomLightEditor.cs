@@ -3,6 +3,7 @@ using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 using UnityEngine.Rendering;
+using static Math;
 
 [CustomEditorForRenderPipeline(typeof(Light), typeof(CustomRenderPipelineAsset))]
 public class CustomLightEditor : LightEditor
@@ -12,14 +13,82 @@ public class CustomLightEditor : LightEditor
 		serializedObject.Update();
 
 		var type = (LightType)settings.lightType.enumValueIndex;
-		if (type == LightType.Spot)
+
+		if (type == LightType.Directional)
+		{ 
+			settings.DrawIntensity();
+		}
+		else
 		{
-			_ = EditorGUILayout.PropertyField(settings.lightType);
-			settings.DrawInnerAndOuterSpotAngle();
+			var unit = (LightUnit)EditorGUILayout.EnumPopup("Unit", (LightUnit)settings.lightUnit.intValue);
+			settings.lightUnit.intValue = (int)unit;
+
+			// Convert internal candela unit to other and display
+			var intensity = settings.intensity.floatValue;
+			switch (unit)
+			{
+				case LightUnit.Lumen:
+					intensity /= FourPi;
+					break;
+				case LightUnit.Candela:
+					break;
+				case LightUnit.Lux:
+					// Assume lux at 1m
+					break;
+				case LightUnit.Nits:
+					// Equivalent to candela
+					break;
+				case LightUnit.Ev100:
+					break;
+				default:
+					throw new NotSupportedException(unit.ToString());
+			}
+
+			intensity = EditorGUILayout.FloatField("Intensity", intensity);
+
+			// Convert back
+			switch (unit)
+			{
+				case LightUnit.Lumen:
+					intensity *= FourPi;
+					break;
+				case LightUnit.Candela:
+					break;
+				case LightUnit.Lux:
+					// Assume lux at 1m
+					break;
+				case LightUnit.Nits:
+					// Equivalent to candela
+					break;
+				case LightUnit.Ev100:
+					break;
+				default:
+					throw new NotSupportedException(unit.ToString());
+			}
+
+			settings.intensity.floatValue = intensity;
 		}
 
+		settings.DrawColor();
+		settings.DrawShadowsType();
+
+		_ = EditorGUILayout.PropertyField(settings.lightType);
+
+		if (type != LightType.Directional)
+			settings.DrawRange();
+
+		if (type != LightType.Directional && type != LightType.Point)
+		{
+			_ = EditorGUILayout.PropertyField(settings.areaSizeX);
+			_ = EditorGUILayout.PropertyField(settings.areaSizeY);
+		}
+
+		if (type == LightType.Spot)
+			settings.DrawInnerAndOuterSpotAngle();
+
+
+
 		_ = serializedObject.ApplyModifiedProperties();
-		base.OnInspectorGUI();
 	}
 
 	private static float SliderLineHandle(Vector3 position, Vector3 direction, float value)

@@ -42,7 +42,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 		var size = terrainData.size;
 		var position = terrain.GetPosition() - camera.transform.position;
 
-		using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
+		using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectIndexedRenderPass>("Terrain Render"))
 		{
 			pass.Initialize(settings.Material, terrainSystemData.IndexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, null, shadowRequestData.Bias, shadowRequestData.SlopeBias, shadowRequestData.ZClip);
 

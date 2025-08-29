@@ -116,6 +116,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			pass.ReadBuffer("InstanceTypeIds", instanceData.instanceTypes);
 			pass.ReadBuffer("InstanceTypeDatas", instanceData.instanceTypeData);
 			pass.ReadBuffer("LodSizes", instanceData.lodSizes);
+			pass.ReadBuffer("InstanceMatrices", instanceData.positions);
 
 			pass.AddRenderPassData<ViewData>();
 

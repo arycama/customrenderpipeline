@@ -8,10 +8,11 @@ public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 	[field: SerializeField] public bool NoiseDebug { get; private set; } = false;
 	[field: SerializeField] private bool useSrpBatching = true;
 
+	[field: SerializeField] public RaytracingSystem.Settings RayTracingSettings { get; private set; }
 	[field: SerializeField] public WaterSettings OceanSettings { get; private set; }
 	[field: SerializeField] public WaterShoreMask.Settings WaterShoreMaskSettings { get; private set; }
 	[field: SerializeField] public TerrainSettings TerrainSettings { get; private set; }
-	[field: SerializeField] public RaytracingSystem.Settings RayTracingSettings { get; private set; }
+	[field: SerializeField] public GrassRenderer.Settings Grass { get; private set; }
 
 	[field: SerializeField] public LightingSettings LightingSettings { get; private set; }
 
@@ -51,7 +52,6 @@ public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 		motionVectors = true,
 		overridesEnvironmentLighting = true,
 		overridesFog = true,
-		overridesLODBias = true,
 		overridesMaximumLODLevel = false,
 		overridesOtherLightingSettings = true,
 		overridesRealtimeReflectionProbes = true,

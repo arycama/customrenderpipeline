@@ -64,13 +64,7 @@ public partial class LightingSetup : CameraRenderFeature
 			var angleScale = 0f;
 			var angleOffset = 1f;
 
-#if UNITY_EDITOR
 			var size = light.areaSize;
-#else
-			// TODO: Fix
-			var size = new Vector2(0.1f, 0.1f);
-#endif
-
 			if (light.shadows != LightShadows.None)
 			{
 				var hasShadowBounds = cullingResults.GetShadowCasterBounds(i, out var shadowCasterBounds);
@@ -323,6 +317,7 @@ public partial class LightingSetup : CameraRenderFeature
 					}
 				}
 
+				// TODO: Box/Pyramid/Area/Disc
 				if (visibleLight.lightType == LightType.Spot)
 				{
 					var forward = light.transform.forward;
@@ -339,17 +334,13 @@ public partial class LightingSetup : CameraRenderFeature
 				}
 			}
 
-			uint lightType;
 			switch (light.type)
 			{
 				case LightType.Directional:
-					lightType = 0;
 					break;
 				case LightType.Point:
-					lightType = 1;
 					break;
 				case LightType.Spot:
-					lightType = 2;
 					var halfAngle = Radians(light.spotAngle) * 0.5f;
 					var innerConePercent = light.innerSpotAngle / visibleLight.spotAngle;
 					var cosSpotOuterHalfAngle = Saturate(Cos(halfAngle));
@@ -359,19 +350,14 @@ public partial class LightingSetup : CameraRenderFeature
 					size.x = size.y = Rcp(Tan(halfAngle));
 					break;
 				case LightType.Pyramid:
-					lightType = 3;
 					break;
 				case LightType.Box:
-					lightType = 4;
 					break;
 				case LightType.Rectangle:
-					lightType = 5;
 					break;
 				case LightType.Tube:
-					lightType = 6;
 					break;
 				case LightType.Disc:
-					lightType = 8;
 					break;
 				default:
 					throw new ArgumentOutOfRangeException(nameof(light.type));
@@ -382,7 +368,7 @@ public partial class LightingSetup : CameraRenderFeature
 				lightToWorld.GetPosition() - camera.transform.position,
 				light.range,
 				(Vector4)visibleLight.finalColor,
-				lightType,
+				(uint)light.type,
 				lightToWorld.Right(),
 				angleScale,
 				lightToWorld.Up(),

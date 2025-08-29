@@ -250,6 +250,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new GpuDrivenRenderingRender(gpuDrivenRenderer, renderGraph),
 
+		new GrassRenderer(asset.Grass, terrainSystem, renderGraph),
+
 		// Finalize gbuffer
 		new ScreenSpaceTerrain(renderGraph),
 

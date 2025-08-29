@@ -17,6 +17,7 @@ StructuredBuffer<uint> Keys, Data, TotalGroupCount, GroupCounts, TotalSums, Grou
 uint BitIndex;
 
 groupshared uint sharedSums[threadCount];
+groupshared uint sharedSums4[threadCount];
 
 cbuffer DataLength
 {
@@ -36,6 +37,16 @@ uint PrefixSumSharedRead(uint index)
 	return sharedSums[index];
 }
 
+void PrefixSumSharedWrite4(uint index, uint4 data)
+{
+	sharedSums4[index] = data;
+}
+
+uint4 PrefixSumSharedRead4(uint index)
+{
+	return sharedSums4[index];
+}
+
 const static uint BitsPerPass = 2;
 const static uint Exp2BitsPerPass = 1 << BitsPerPass;
 groupshared uint SharedSums[2][Exp2BitsPerPass]; // Double buffered, so two indices per element
@@ -52,18 +63,20 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 	// Count and sort
 	uint4 packedValues = (value == uint4(0, 1, 2, 3)) << uint4(0, 8, 16, 24);
 	uint packedValue = packedValues.x | packedValues.y | packedValues.z | packedValues.w;
-	
 	uint packedSum;
 	uint packedOffset = PrefixSum(packedValue, groupIndex, threadCount, packedSum);
 	
-	// Unpack sums and offset?
+	// Unpack sums and offset
 	uint4 offsets = (packedOffset >> uint4(0, 8, 16, 24)) & 0xFF;
 	uint4 sums = (packedSum >> uint4(0, 8, 16, 24)) & 0xFF;
-
+	
 	// Prefix sum
-	uint sum = groupIndex ? sums[groupIndex - 1] : 0;
+	uint sum = 0;
 	if (groupIndex < Exp2BitsPerPass)
+	{
+		sum = groupIndex ? sums[groupIndex - 1] : 0;
 		SharedSums[0][groupIndex] = sum;
+	}
 	
 	[unroll]
 	for (uint i = 0; i < BitsPerPass; i++)
@@ -89,6 +102,24 @@ void RadixCount(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex, 
 	
 	if (!groupIndex)
 		CountResult[groupId] = packedSum;
+		
+	{
+		uint value = (key >> BitIndex) & 0xF;
+		uint4 packedValues[4];
+		
+		[unroll]
+		for (uint i = 0; i < 4; i++)
+			packedValues[i] = (value == (uint4(0, 4, 8, 12) + i)) << (i * 8);
+	
+		uint4 packedValue = packedValues[0] | packedValues[1] | packedValues[2] | packedValues[3];
+		uint4 packedSum;
+		uint4 packedOffset = PrefixSum(packedValue, groupIndex, threadCount, packedSum);
+		
+		// Unpack sums and offset
+		uint4 offsets = (packedOffset >> uint4(0, 8, 16, 24)) & 0xFF;
+		uint4 sums = (packedSum >> uint4(0, 8, 16, 24)) & 0xFF;
+	}
+
 }
 
 [numthreads(threadCount, 1, 1)]
@@ -103,7 +134,7 @@ void RadixScan(uint groupIndex : SV_GroupIndex, uint groupId : SV_GroupID)
 	uint sum;
 	uint offset = PrefixSum(count, groupIndex, threadCount, sum);
 	
-	ScanResult[4 * groupIndex + groupId] = offset;
+	ScanResult[Exp2BitsPerPass * groupIndex + groupId] = offset;
 	
 	if (!groupIndex)
 		TotalSumsResult[groupId] = sum;
@@ -127,9 +158,9 @@ void RadixScatter(uint id : SV_DispatchThreadID, uint groupIndex : SV_GroupIndex
 		// We need to compute the global offset for each digit from this group, this can be done with two prefix
 		// scans, or alternatively, can be reformulated to one, hence the below complexity
 		// TODO: Can this simplify further and avoid looking up groupscans twice
-		globalSum = TotalSums[groupIndex - 1] + GroupScans[groupId * 4 + groupIndex];
+		globalSum = TotalSums[groupIndex - 1] + GroupScans[Exp2BitsPerPass * groupId + groupIndex];
 		if (groupIndex)
-			globalSum -= GroupScans[groupId * 4 + (groupIndex - 1)] + localOffsets[groupIndex - 1];
+			globalSum -= GroupScans[Exp2BitsPerPass * groupId + (groupIndex - 1)] + localOffsets[groupIndex - 1];
 		
 		SharedSums[0][groupIndex] = globalSum;
 	}

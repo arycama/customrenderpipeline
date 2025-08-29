@@ -1,4 +1,5 @@
 ﻿#include "../../Common.hlsl"
+#include "../../Geometry.hlsl"
 #include "../../IndirectRendering.hlsl"
 #include "../../Packing.hlsl"
 #include "../../SpaceTransforms.hlsl"
@@ -23,6 +24,7 @@ StructuredBuffer<uint> InstanceTypeIds;
 StructuredBuffer<InstanceTypeData> InstanceTypeDatas;
 StructuredBuffer<InstanceTypeLodData> InstanceTypeLodDatas;
 StructuredBuffer<float> LodSizes;
+StructuredBuffer<float3x4> InstanceMatrices;
 
 [numthreads(threadCount, 1, 1)]
 void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
@@ -44,12 +46,16 @@ void InstanceCompaction(uint id : SV_DispatchThreadID, uint groupId : SV_GroupID
 	
 	uint maxLodCount = min(8, instanceTypeData.lodCount);
 	uint lod = maxLodCount - 1;
-	float viewZ = abs(dot(boundsCenter, ViewForward));
-	float worldRadius = Max3(boundsExtents);
-	float screenHeight = worldRadius * rcp(viewZ * TanHalfFov) * 0.5;
+	float3x4 objectToWorld = InstanceMatrices[id];
+	float worldSpaceScale = Max3(float3(length(objectToWorld._11_21_31), length(objectToWorld._12_22_32), length(objectToWorld._13_23_33)));
+	float worldRadius = worldSpaceScale * instanceTypeData.radius; // TODO: Maybe use AABB max instead?
+	float3 worldReferencePoint = MultiplyPoint3x4(objectToWorld, instanceTypeData.localReferencePoint) - ViewPosition;
+	float screenHeight = ProjectedSphereRadius(worldRadius, worldReferencePoint, rcp(TanHalfFov));
+	
+	float viewZ = abs(dot(worldReferencePoint, ViewForward));
 	
 	// TODO: Currently a lod greater than cutoff distance will still be rendered. We can't remove it from drawing here because
-	// The total instance sum has already been calculated by a previous prefix sum. Should instead remove it from the instance cull stage
+	// the total instance sum has already been calculated by a previous prefix sum. Should instead remove it from the instance cull stage
 	[unroll]
 	for (uint i = 0; i < maxLodCount; i++)
 	{

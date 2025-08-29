@@ -107,10 +107,9 @@ bool FrustumCull(float3 center, float3 extents)
 }
 
 // Projects edge bounding-sphere into clip space
-float ProjectedSphereRadius(float worldRadius, float3 worldPosition, float cameraAspect)
+float ProjectedSphereRadius(float radius, float3 worldPosition, float rcpTanHalfFov)
 {
-	float d2 = dot(worldPosition, worldPosition);
-	return worldRadius * abs(cameraAspect) * rsqrt(max(0.0, d2 - worldRadius * worldRadius));
+	return radius * RcpLength(worldPosition) * rcpTanHalfFov;
 }
 
 // Quad variant
@@ -125,16 +124,16 @@ bool QuadFrustumCull(float3 p0, float3 p1, float3 p2, float3 p3, float threshold
 	return FrustumCull(center, extents);
 }
 
-float CalculateSphereEdgeFactor(float radius, float3 edgeCenter, float targetEdgeLength, float cameraAspect, float screenWidth)
+float CalculateSphereEdgeFactor(float radius, float3 edgeCenter, float targetEdgeLength, float rcpTanHalfFov, float screenHeight)
 {
-	return max(1.0, ProjectedSphereRadius(radius, edgeCenter, cameraAspect) * screenWidth.x * 0.5 / targetEdgeLength);
+	return max(1.0, ProjectedSphereRadius(radius, edgeCenter, rcpTanHalfFov) * screenHeight * 0.5 / targetEdgeLength);
 }
 
-float CalculateSphereEdgeFactor(float3 corner0, float3 corner1, float targetEdgeLength, float cameraAspect, float screenWidth)
+float CalculateSphereEdgeFactor(float3 corner0, float3 corner1, float targetEdgeLength, float rcpTanHalfFov, float screenHeight)
 {
 	float3 edgeCenter = 0.5 * (corner0 + corner1);
 	float r = 0.5 * distance(corner0, corner1);
-	return CalculateSphereEdgeFactor(r, edgeCenter, targetEdgeLength, cameraAspect, screenWidth);
+	return CalculateSphereEdgeFactor(r, edgeCenter, targetEdgeLength, rcpTanHalfFov, screenHeight);
 }
 
 float4 qmul(float4 q1, float4 q2)

@@ -362,15 +362,15 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
     
 	float3 invHalfDim = rcp(float3(light.range + light.size.x * 0.5, light.range + light.size.y * 0.5, light.range));
 
-    // Line Light
+    // Tube Light
 	float attenuation = 1.0;
-	if (light.lightType == 5)
+	if (light.lightType == LightTypeTube)
 	{
 		attenuation *= EllipsoidalDistanceAttenuation(lightVector, invHalfDim, rangeAttenuationScale, 1.0);
 	}
 
-    // Rectangle/area light
-	if (light.lightType == 6)
+    // Rectangle light
+	if (light.lightType == LightTypeRectangle)
 	{
 		if (dot(light.forward, lightVector) >= FloatEps)
 			attenuation = 0.0;
@@ -385,15 +385,15 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 		attenuation *= PunctualLightAttenuation(distances, rangeAttenuationScale, 1.0, light.angleScale, light.angleOffset);
 
         // Manually clip box light X/Y (Z is handled by above)
-		if (light.lightType == 3 || light.lightType == 4)
+		if (light.lightType == LightTypePyramid || light.lightType == LightTypeBox)
 		{
             // Perform perspective projection for frustum light
 			float2 positionCS = positionLS.xy;
-			if (light.lightType == 3)
+			if (light.lightType == LightTypePyramid)
 				positionCS /= positionLS.z;
 
 			 // Box lights have no range attenuation, so we must clip manually.
-			if (Max3(float3(abs(positionCS), abs(positionLS.z - 0.5 * light.range) - 0.5 * light.range + 1)) > 1.0)
+			if (Max3(float3(abs(positionCS), abs(positionLS.z - 0.5 * light.range) - 0.5 * light.range + 1)) > 0.5)
 				attenuation = 0.0;
 		}
 	}
@@ -402,7 +402,7 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 	if (light.shadowIndex != UintMax)
 	{
         // Point light
-		if (light.lightType == 1)
+		if (light.lightType == LightTypePoint)
 		{
 			float3 toLight = lightVector * float3(1, -1, 1);
 			float dominantAxis = Max3(abs(toLight));
@@ -415,7 +415,7 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 		}
 
         // Spot light
-		if (light.lightType == 2 || light.lightType == 3 || light.lightType == 4)
+		if (light.lightType == LightTypeSpot || light.lightType == LightTypePyramid || light.lightType == LightTypeBox)
 		{
 			float2 uv = positionLS.xy * light.size / positionLS.z * 0.5 + 0.5;
 			float depth = (positionLS.z * light.shadowProjectionX + light.shadowProjectionY) / positionLS.z;
@@ -423,7 +423,7 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 		}
         
         // Area light
-		//if (light.lightType == 6)
+		//if (light.lightType == LightTypeRectangle)
 		//{
 		//	float4 positionLS = MultiplyPoint(_AreaShadowMatrices[light.shadowIndex], worldPosition);
             
@@ -547,8 +547,8 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float4 ssgi = ScreenSpaceGlobalIllumination[pixelCoordinate];
-		//irradiance += lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength);
-		irradiance += ssgi.rgb * DiffuseGiStrength;//lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength);
+		irradiance += lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength);
+		//irradiance += ssgi.rgb * DiffuseGiStrength;//lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength);
 	#endif
 	
 	float3 fAvg = AverageFresnel(f0);
@@ -559,8 +559,8 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float3 irradiance1 = AmbientCosine(V, visibilityAngle);
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-		//irradiance1+= lerp(irradiance1, ssgi.rgb, ssgi.a * DiffuseGiStrength);
-		irradiance1 += ssgi.rgb * DiffuseGiStrength;//lerp(irradiance1, ssgi.rgb, ssgi.a * DiffuseGiStrength);
+		irradiance1+= lerp(irradiance1, ssgi.rgb, ssgi.a * DiffuseGiStrength);
+		//irradiance1 += ssgi.rgb * DiffuseGiStrength;//lerp(irradiance1, ssgi.rgb, ssgi.a * DiffuseGiStrength);
 	#endif
 	
 	luminance += irradiance1 * translucency * kd;

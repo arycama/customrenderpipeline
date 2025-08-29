@@ -29,7 +29,7 @@ public class TerrainRenderer : TerrainRendererBase
 		var size = terrainSystemData.TerrainData.size;
 		var position = terrainSystemData.Terrain.GetPosition() - camera.transform.position;
 
-		using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Terrain Render"))
+		using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectIndexedRenderPass>("Terrain Render"))
 		{
 			pass.WriteDepth(renderGraph.GetResource<CameraDepthData>(), RenderTargetFlags.None, RenderBufferLoadAction.DontCare);
 

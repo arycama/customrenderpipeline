@@ -1,11 +1,12 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public class DrawProceduralIndirectRenderPass : GraphicsRenderPass
+public class DrawProceduralIndirectIndexedRenderPass : GraphicsRenderPass
 {
 	public readonly MaterialPropertyBlock propertyBlock;
 	private Material material;
 	private int passIndex;
+	private ResourceHandle<GraphicsBuffer> indexBuffer;
 	private ResourceHandle<GraphicsBuffer> indirectArgsBuffer;
 	private MeshTopology topology;
 	private float depthBias, slopeDepthBias;
@@ -14,7 +15,7 @@ public class DrawProceduralIndirectRenderPass : GraphicsRenderPass
 
 	public string Keyword { get; set; }
 
-	public DrawProceduralIndirectRenderPass()
+	public DrawProceduralIndirectIndexedRenderPass()
 	{
 		propertyBlock = new MaterialPropertyBlock();
 	}
@@ -24,11 +25,12 @@ public class DrawProceduralIndirectRenderPass : GraphicsRenderPass
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material,  ResourceHandle<GraphicsBuffer> indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, string keyword = null, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true, int argsOffset = 0)
+	public void Initialize(Material material, ResourceHandle<GraphicsBuffer> indexBuffer, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, string keyword = null, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true, int argsOffset = 0)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
 		Keyword = keyword;
+		this.indexBuffer = indexBuffer;
 		this.indirectArgsBuffer = indirectArgsBuffer;
 		this.topology = topology;
 		this.depthBias = depthBias;
@@ -36,6 +38,7 @@ public class DrawProceduralIndirectRenderPass : GraphicsRenderPass
 		this.zClip = zClip;
 		this.argsOffset = argsOffset;
 
+		ReadBuffer("", indexBuffer);
 		ReadBuffer("", indirectArgsBuffer);
 	}
 
@@ -85,7 +88,7 @@ public class DrawProceduralIndirectRenderPass : GraphicsRenderPass
 			Command.SetGlobalDepthBias(depthBias, slopeDepthBias);
 
 		Command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
-		Command.DrawProceduralIndirect(Matrix4x4.identity, material, passIndex, topology, GetBuffer(indirectArgsBuffer), argsOffset, propertyBlock);
+		Command.DrawProceduralIndirect(GetBuffer(indexBuffer), Matrix4x4.identity, material, passIndex, topology, GetBuffer(indirectArgsBuffer), argsOffset, propertyBlock);
 		Command.SetGlobalFloat("_ZClip", 1.0f);
 
 		if (depthBias != 0.0f || slopeDepthBias != 0.0f)
