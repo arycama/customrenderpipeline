@@ -332,7 +332,7 @@ public class TerrainSystem : FrameRenderFeature
 				foreach (var layer in terrainLayers)
 				{
 					var index = layer.Value;
-					layerData.SetData(index, new TerrainLayerData(layer.Key.tileSize.x, Mathf.Max(1e-3f, layer.Key.smoothness), layer.Key.normalScale, 1.0f - layer.Key.metallic));
+					layerData.SetData(index, new TerrainLayerData(Rcp(layer.Key.tileSize.x), Mathf.Max(1e-3f, layer.Key.smoothness), layer.Key.normalScale, 1.0f - layer.Key.metallic));
 				}
 			});
 		}
@@ -346,32 +346,30 @@ public class TerrainSystem : FrameRenderFeature
 		var idMapResolution = terrainData.alphamapResolution;
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Terrain Layer Data Init"))
 		{
-			var indicesBuffer = renderGraph.GetBuffer(terrainLayers.Count);
-
+			//var indicesBuffer = renderGraph.GetBuffer(terrainLayers.Count);
 			pass.Initialize(generateIdMapMaterial);
-			pass.WriteTexture(idMap, RenderBufferLoadAction.DontCare);
-			pass.ReadTexture("_TerrainNormalMap", normalmap);
-			pass.WriteBuffer("_ProceduralIndices", indicesBuffer);
-			pass.ReadBuffer("_ProceduralIndices", indicesBuffer);
+			pass.WriteTexture(idMap);
+			pass.ReadTexture("TerrainNormalMap", normalmap);
+			//pass.WriteBuffer("ProceduralIndices", indicesBuffer);
+			//pass.ReadBuffer("ProceduralIndices", indicesBuffer);
 			pass.ReadBuffer("TerrainLayerData", terrainLayerData);
 
 			pass.SetRenderFunction((command, pass) =>
 			{
 				pass.SetInt("LayerCount", terrainData.alphamapLayers);
-				pass.SetFloat("_Resolution", idMapResolution);
 				pass.SetVector("TerrainSize", terrain.terrainData.size);
-				pass.SetInt("_TotalLayers", terrainLayers.Count);
-				pass.SetInt("_TextureCount", terrainData.alphamapLayers);
+				pass.SetInt("TotalLayers", terrainLayers.Count);
+				pass.SetInt("TextureCount", terrainData.alphamapLayers);
 				pass.SetVector("PositionOffset", Vector2.zero);
 
-				if (texelRegion.HasValue)
-				{
-					var region = texelRegion.Value;
-					command.SetViewport(new Rect(region.position, region.size));
-					pass.SetVector("PositionOffset", (Vector2)region.position);
-					pass.SetVector("UvScaleOffset", new Vector4(region.size.x, region.size.y, region.position.x, region.position.y) / terrainData.alphamapResolution);
-				}
-				else
+				//if (texelRegion.HasValue)
+				//{
+				//	var region = texelRegion.Value;
+				//	command.SetViewport(new Rect(region.position, region.size));
+				//	pass.SetVector("PositionOffset", (Vector2)region.position);
+				//	pass.SetVector("UvScaleOffset", new Vector4(region.size.x, region.size.y, region.position.x, region.position.y) / terrainData.alphamapResolution);
+				//}
+				//else
 				{
 					pass.SetVector("UvScaleOffset", new Vector4(1, 1, 0, 0));
 				}
@@ -380,23 +378,23 @@ public class TerrainSystem : FrameRenderFeature
 				for (var i = 0; i < 8; i++)
 				{
 					var texture = i < terrainData.alphamapTextureCount ? terrainData.alphamapTextures[i] : Texture2D.blackTexture;
-					pass.SetTexture($"_Input{i}", texture);
+					pass.SetTexture($"Input{i}", texture);
 				}
 
 				// Need to build buffer of layer to array index
-				var layers = new NativeArray<int>(terrainLayers.Count, Allocator.Temp);
-				foreach (var layer in terrainLayers)
-				{
-					if (terrainProceduralLayers.TryGetValue(layer.Key, out var proceduralIndex))
-					{
-						// Use +1 so we can use 0 to indicate no data
-						layers[layer.Value] = proceduralIndex + 1;
-					}
-				}
+				//var layers = new NativeArray<int>(terrainLayers.Count, Allocator.Temp);
+				//foreach (var layer in terrainLayers)
+				//{
+				//	if (terrainProceduralLayers.TryGetValue(layer.Key, out var proceduralIndex))
+				//	{
+				//		// Use +1 so we can use 0 to indicate no data
+				//		layers[layer.Value] = proceduralIndex + 1;
+				//	}
+				//}
 
-				command.SetBufferData(pass.GetBuffer(indicesBuffer), layers);
-				var tempArrayId = Shader.PropertyToID("_TempTerrainId");
-				command.SetGlobalTexture("_ExtraLayers", tempArrayId);
+				//command.SetBufferData(pass.GetBuffer(indicesBuffer), layers);
+				//var tempArrayId = Shader.PropertyToID("TempTerrainId");
+				//command.SetGlobalTexture("ExtraLayers", tempArrayId);
 			});
 		}
 
@@ -406,11 +404,11 @@ public class TerrainSystem : FrameRenderFeature
 			{
 				pass.Initialize(terrainAmbientOcclusionMaterial);
 				pass.WriteTexture(aoMap);
-				pass.ReadTexture("_TerrainNormalMap", normalmap);
+				pass.ReadTexture("TerrainNormalMap", normalmap);
 
 				pass.SetRenderFunction((command, pass) =>
 				{
-					pass.SetTexture("_TerrainHeightmapTexture", terrainData.heightmapTexture);
+					pass.SetTexture("TerrainHeightmap", terrainData.heightmapTexture);
 					pass.SetFloat("DirectionCount", settings.AmbientOcclusionDirections);
 					pass.SetFloat("SampleCount", settings.AmbientOcclusionSamples);
 					pass.SetFloat("Radius", settings.AmbientOcclusionRadius / terrainData.size.x);

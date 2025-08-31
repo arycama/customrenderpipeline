@@ -32,8 +32,8 @@ public struct TerrainRenderData : IRenderPassData
 
 	public readonly void SetInputs(RenderPassBase pass)
 	{
-		pass.ReadTexture("_TerrainHeightmapTexture", terrainHeightmapTexture);
-		pass.ReadTexture("_TerrainNormalMap", terrainNormalMap);
+		pass.ReadTexture("TerrainHeightmap", terrainHeightmapTexture);
+		pass.ReadTexture("TerrainNormalMap", terrainNormalMap);
 		pass.ReadTexture("IdMap", idMap);
 		pass.ReadTexture("BentNormalVisibility", aoMap);
 		pass.ReadBuffer("TerrainLayerData", terrainLayerData);

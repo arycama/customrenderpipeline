@@ -17,18 +17,19 @@ struct LayerData
 
 // New
 StructuredBuffer<LayerData> TerrainLayerData;
-Texture2DArray<float4> AlbedoSmoothness, Normal, Mask;
+Texture2DArray<float3> AlbedoSmoothness;
+Texture2DArray<float4> Normal, Mask;
 Texture2D<uint> IdMap;
 float3 TerrainSize;
-Texture2D<float2> _TerrainNormalMap;
+Texture2D<float2> TerrainNormalMap;
 
-Texture2D<float> _TerrainHeightmapTexture;
-float4 _TerrainRemapHalfTexel, _TerrainScaleOffset, _TerrainNormalMap_TexelSize;
+Texture2D<float> TerrainHeightmap;
+float4 _TerrainRemapHalfTexel, _TerrainScaleOffset;
 float _TerrainHeightScale, _TerrainHeightOffset, IdMapResolution;
 
 float GetTerrainHeight(float2 uv)
 {
-	return _TerrainHeightmapTexture.SampleLevel(LinearClampSampler, uv, 0) * _TerrainHeightScale + _TerrainHeightOffset;
+	return TerrainHeightmap.SampleLevel(LinearClampSampler, uv, 0) * _TerrainHeightScale + _TerrainHeightOffset;
 }
 
 float2 WorldToTerrainPositionHalfTexel(float3 worldPosition)
@@ -49,12 +50,12 @@ float GetTerrainHeight(float3 worldPosition)
 
 float3 GetTerrainNormal(float2 uv)
 {
-	return UnpackNormalSNorm(_TerrainNormalMap.Sample(SurfaceSampler, uv)).xzy;
+	return UnpackNormalSNorm(TerrainNormalMap.Sample(SurfaceSampler, uv)).xzy;
 }
 
 float3 GetTerrainNormalLevel(float2 uv)
 {
-	return UnpackNormalSNorm(_TerrainNormalMap.SampleLevel(SurfaceSampler, uv, 0.0)).xzy;
+	return UnpackNormalSNorm(TerrainNormalMap.SampleLevel(SurfaceSampler, uv, 0.0)).xzy;
 }
 
 float3 GetTerrainNormal(float3 worldPosition)

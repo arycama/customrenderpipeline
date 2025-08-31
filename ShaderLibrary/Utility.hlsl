@@ -154,3 +154,29 @@ float QuadReadAcrossDiagonal(float value, uint2 screenPos)
 	float X = value - (dX * quadDir.x);
 	return X - (ddy_fine(value) * quadDir.y);
 }
+
+float2 SnapToTexelCenter(float2 uv, float2 textureSize, float2 rcpTextureSize)
+{
+	float2 localUv = uv * textureSize - 0.5;
+	return (floor(localUv) + 0.5) * rcpTextureSize;
+}
+
+uint Log2Pow2(uint a)
+{
+	return firstbitlow(a);
+}
+
+uint Exp2Pow2(uint a)
+{
+	return 1 << a;
+}
+
+uint BitPack(uint data, uint size, uint offset)
+{
+	return (data & (Exp2Pow2(size) - 1u)) << offset;
+}
+
+uint BitUnpack(uint data, uint size, uint offset)
+{
+	return (data >> offset) & (Exp2Pow2(size) - 1u);
+}

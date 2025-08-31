@@ -52,7 +52,7 @@ public class WaterRenderer : WaterRendererBase
             pass.AddRenderPassData<OceanFftResult>();
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<TemporalAAData>();
-            pass.AddRenderPassData<WaterShoreMask.Result>();
+            pass.AddRenderPassData<WaterShoreMask.Result>(true);
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
 

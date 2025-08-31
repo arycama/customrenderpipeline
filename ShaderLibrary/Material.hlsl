@@ -128,11 +128,16 @@ float3 Parallax(float2 uv, float3 tangentViewDirection, float scale, float offse
 	}
 }
 
+float4 BilinearWeights(float2 localUv)
+{
+	float4 weights = localUv.xxyy * float4(-1, 1, 1, -1) + float4(1, 0, 0, 1);
+	return weights.zzww * weights.xyyx;
+}
+
 float4 BilinearWeights(float2 uv, float2 textureSize)
 {
 	float2 localUv = frac(uv * textureSize - 0.5 + rcp(512.0));
-	float4 weights = localUv.xxyy * float4(-1, 1, 1, -1) + float4(1, 0, 0, 1);
-	return weights.zzww * weights.xyyx;
+	return BilinearWeights(localUv);
 }
 
 float LengthToRoughness(float len)

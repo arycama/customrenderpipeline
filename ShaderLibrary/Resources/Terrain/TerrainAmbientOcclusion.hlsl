@@ -6,7 +6,6 @@
 #include "../../Samplers.hlsl"
 #include "../../TerrainCommon.hlsl"
 
-Texture2D<float3> _TerrainNormalmapTexture;
 float DirectionCount, SampleCount, Radius;
 float TerrainHeightmapScaleY;
 float3 TerrainHeightmapScale;
@@ -30,10 +29,10 @@ float4 UnpackWeight(float4 input, out float weight)
 
 float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float3 normal = UnpackNormalSNorm(_TerrainNormalMap[position.xy]).xzy;
+	float3 normal = UnpackNormalSNorm(TerrainNormalMap[position.xy]).xzy;
 	
 	float2 coord = floor(position.xy);
-	float3 worldPosition = float3(RemapHalfTexelTo01(uv, Resolution), _TerrainHeightmapTexture[position.xy] / kmaxHeight).xzy * TerrainSize;
+	float3 worldPosition = float3(RemapHalfTexelTo01(uv, Resolution), TerrainHeightmap[position.xy] / kmaxHeight).xzy * TerrainSize;
 	
 	float correction = 0.0;
 	float4 result = 0.0;
@@ -65,7 +64,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 					break;
 					
 				float2 sampleCoord = sampleUv * Resolution;
-				float3 samplePosition = float3(RemapHalfTexelTo01(sampleUv, Resolution), _TerrainHeightmapTexture[sampleCoord] / kmaxHeight).xzy * TerrainSize;
+				float3 samplePosition = float3(RemapHalfTexelTo01(sampleUv, Resolution), TerrainHeightmap[sampleCoord] / kmaxHeight).xzy * TerrainSize;
 				
 				float3 delta = samplePosition - worldPosition;
 				float squareLength = SqrLength(delta);
