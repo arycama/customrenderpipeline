@@ -17,8 +17,9 @@ struct LayerData
 
 // New
 StructuredBuffer<LayerData> TerrainLayerData;
+Texture2DArray<float1> Mask;
 Texture2DArray<float3> AlbedoSmoothness;
-Texture2DArray<float4> Normal, Mask;
+Texture2DArray<float4> Normal;
 Texture2D<uint> IdMap;
 float3 TerrainSize;
 Texture2D<float2> TerrainNormalMap;
