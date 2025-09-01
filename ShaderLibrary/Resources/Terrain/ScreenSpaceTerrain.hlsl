@@ -60,24 +60,26 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		uint layerIndex = layerIndices[i];
 		float scale = TerrainLayerData[layerIndex].Scale;
 		
-		float height = Mask.Sample(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex)) + layerWeights[i];
+		float height = Mask.Sample(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex)) * layerWeights[i];
 		layerWeights[i] = height;
 		maxHeight = max(maxHeight, height);
 	}
 	
-	float threshold = 0.1;
-	float heightSum = 0.0;
+	float density = 32;
+	float weightSum = 0.0;
 	for (uint i = 0; i < layers; i++)
 	{
 		uint layerIndex = layerIndices[i];
 		float scale = TerrainLayerData[layerIndex].Scale;
 		
-		float height = max(0.0, layerWeights[i] - maxHeight + threshold);
-		albedo += AlbedoSmoothness.Sample(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex)) * height;
-		heightSum += height;
+		float depth = maxHeight - layerWeights[i];
+		float weight = exp(-depth * density);
+		
+		albedo += AlbedoSmoothness.Sample(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex)) * weight;
+		weightSum += weight;
 	}
 	
-	albedo /= heightSum;
+	albedo /= weightSum;
 	
 	return OutputGBuffer(albedo, 0, terrainNormal, 1, terrainNormal, 1, 0, 0);
 }

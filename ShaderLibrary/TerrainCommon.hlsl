@@ -12,7 +12,7 @@ struct LayerData
 	float Scale;
 	float Blending;
 	float Stochastic;
-	float Rotation;
+	float HeightScale;
 };
 
 // New

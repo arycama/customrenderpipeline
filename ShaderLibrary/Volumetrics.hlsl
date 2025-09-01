@@ -38,3 +38,23 @@ float CsPhase(float cosTheta, float g)
 {
 	return 3.0 * rcp(8.0 * Pi) * (1.0 - Sq(g)) * (1.0 + Sq(cosTheta)) * rcp(pow((2.0 + Sq(g)) * (1.0 + Sq(g) - 2.0 * g * cosTheta), 1.5));
 }
+
+float ExtinctionFromScatterAbsorption(float scatter, float absorption)
+{
+	return scatter + absorption;
+}
+
+float AlbedoFromScatterAbsorption(float scatter, float absorption)
+{
+	return scatter / (scatter + absorption);
+}
+
+float ScatterFromAlbedoExtinction(float albedo, float extinction)
+{
+	return albedo * extinction;
+}
+
+float AbsorptionFromAlbedoExtinction(float albedo, float extinction)
+{
+	return extinction - albedo * extinction;
+}
