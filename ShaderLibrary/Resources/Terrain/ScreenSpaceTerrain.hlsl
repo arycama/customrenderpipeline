@@ -43,7 +43,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float4 bilinearWeights = BilinearWeights(uv, IdMapResolution);
 	
 	uint indices[8];
-	float weights[8];
+	float heights[8];
 	
 	// Build up to 8 unique layer pairs
     [unroll]
@@ -56,21 +56,23 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		if (i < 4)
 			blend = 1.0 - blend;
 		
+		bool hasMatch = false;
 		float weight = bilinearWeights[i % 4] * blend;
 		[unroll]
 		for (uint j = 0; j < i; j++)
 		{
 			if (indices[j] == layerIndex)
 			{
-				weights[j] += weight;
+				heights[j] += weight;
+				hasMatch = true;
 				break;
 			}
 		}
 	
-		if (j == i)
+		if (!hasMatch)
 		{
 			indices[i] = layerIndex;
-			weights[i] = weight;
+			heights[i] = weight;
 		}
 	}
 	
@@ -81,14 +83,11 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
     [unroll]
 	for (i = 0; i < 8; i++)
 	{
-		if(!weights[i])
-			continue;
-	
 		uint layerIndex = indices[i];
 		LayerData layerData = TerrainLayerData[layerIndex];
 		float scale = layerData.Scale;
 		float heightScale = layerData.HeightScale;
-		weights[i] *= Mask.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale);// * heightScale;
+		heights[i] *= Mask.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale);// * heightScale;
 	}
 	
 	// https://bertdobbelaere.github.io/sorting_networks.html
@@ -108,61 +107,48 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		uint a = comparisons[i].x;
 		uint b = comparisons[i].y;
         
-		if (weights[a] < weights[b])
+		if (heights[a] < heights[b])
 		{
-			Swap(weights[a], weights[b]);
+			Swap(heights[a], heights[b]);
 			Swap(indices[a], indices[b]);
 		}
 	}
 	
-	//float transmittance = 1.0;
-	//float3 albedo = 0.0;
-	//float weightSum = 0.0;
+	float transmittance = 1.0;
+	float opacitySum = 0.0;
+	float3 albedo = 0.0, albedoSum = 0.0;
+	float extinctionSum = 0.0;
 	
- //   [unroll]
-	//for (i = 0; i < 2; i++)
-	//{
-	//	uint layerIndex = indices[i];
-	//	LayerData layerData = TerrainLayerData[layerIndex];
-	//	float currentHeight = weights[i];
-	//	float nextHeight = weights[i + 1];
-	//	float opacity = (currentHeight - nextHeight) * layerData.Blending;
+	[unroll]
+	for (i = 0; i < 8; i++)
+	{
+		uint layerIndex = indices[i];
+		LayerData layerData = TerrainLayerData[layerIndex];
+		float scale = layerData.Scale;
+		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale);
+		
+		// Get distance from the current height to the next
+		float currentHeight = heights[i];
+		float nextHeight = i > 6 ? 0 : heights[min(7, i + 1)];
+		float heightDelta = currentHeight - nextHeight;
+		
+		// Previous layers contain density from that layer, so we just add the extinction for the new layer
+		float extinction = -log(1.0 - layerData.Blending);
+		extinctionSum += extinction;
+		
+		float currentTransmittance = exp(-heightDelta * extinctionSum);
+		float opacity = 1.0 - currentTransmittance;
+		
+		albedoSum += currentAlbedo * extinction;
+		float3 combinedAlbedo = albedoSum / extinctionSum;
+		
+		albedo += combinedAlbedo * opacity * transmittance;
+		opacitySum += opacity * transmittance;
+		
+		transmittance *= currentTransmittance;
+	}
 	
-	//	float scale = layerData.Scale;
-	//	albedo += AlbedoSmoothness.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale) * transmittance;
-	//	weightSum += transmittance;
-	//	transmittance *= 1.0 - opacity;
-	//}
-	
-	//albedo /= weightSum;
-	
-	uint layerIndex0 = indices[0];
-	LayerData layerData0 = TerrainLayerData[layerIndex0];
-	float height0 = weights[0];
-	float scale0 = layerData0.Scale;
-	float3 albedo0 = AlbedoSmoothness.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale0, layerIndex0), dx * scale0, dy * scale0);
-	
-	float height1 = weights[1];
-	float transmittance0 = saturate((height0 - height1) * layerData0.Blending);
-	
-	//float3 albedo = albedo0 * (1 - transmittance0);
-	
-	uint layerIndex1 = indices[1];
-	LayerData layerData1 = TerrainLayerData[layerIndex1];
-	float scale1 = layerData1.Scale;
-	
-	float3 albedo1 = AlbedoSmoothness.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale1, layerIndex1), dx * scale1, dy * scale1);
-	
-	//albedo += albedo1 * (1.0 - transmittance1) * transmittance0;
-	
-	//albedo /=1 + transmittance0;
-	
-	float3 albedo = lerp(albedo0, albedo1, transmittance0);
-	
-	//float t = saturate((height0 - height1) / (layerData0.Blending * 0.01));
-	//float3 albedo = lerp(albedo1, albedo0, t);
-	
-
+	albedo /= opacitySum;
 	
 	return OutputGBuffer(albedo, 0, terrainNormal, 1, terrainNormal, 1, 0, 0);
 }

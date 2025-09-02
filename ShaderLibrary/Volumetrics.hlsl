@@ -46,7 +46,7 @@ float ExtinctionFromScatterAbsorption(float scatter, float absorption)
 
 float AlbedoFromScatterAbsorption(float scatter, float absorption)
 {
-	return scatter / (scatter + absorption);
+	return scatter / ExtinctionFromScatterAbsorption(scatter, absorption);
 }
 
 float ScatterFromAlbedoExtinction(float albedo, float extinction)
@@ -56,5 +56,15 @@ float ScatterFromAlbedoExtinction(float albedo, float extinction)
 
 float AbsorptionFromAlbedoExtinction(float albedo, float extinction)
 {
-	return extinction - albedo * extinction;
+	return extinction - ScatterFromAlbedoExtinction(albedo, extinction);
+}
+
+float CombineAlbedo(float albedo0, float extinction0, float albedo1, float extinction1)
+{
+	return (albedo0 * extinction0 + albedo1 * extinction1) / (extinction0 + extinction1);
+}
+
+float3 CombineAlbedo(float3 albedo0, float extinction0, float3 albedo1, float extinction1)
+{
+	return (albedo0 * extinction0 + albedo1 * extinction1) / (extinction0 + extinction1);
 }
