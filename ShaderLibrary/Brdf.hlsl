@@ -53,6 +53,11 @@ float3 GgxSingleScatter(float roughness2, float NdotL, float LdotV, float NdotV,
 	return ggx * Fresnel(LdotH, f0);
 }
 
+float AverageFresnel(float f0)
+{
+	return (20 * rcp(21.0)) * f0 + rcp(21.0);
+}
+
 float3 AverageFresnel(float3 f0)
 {
 	return (20 * rcp(21.0)) * f0 + rcp(21.0);

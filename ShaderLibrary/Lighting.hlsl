@@ -475,6 +475,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	#endif
 	
 	#ifdef UNDERWATER_LIGHTING_ON
+		float3 underwaterTransmittance = exp(-_WaterShadowExtinction * max(0.0, -(worldPosition.y + ViewPosition.y)));
 		lightTransmittance *= WaterShadow(worldPosition, _LightDirection0) * GetCaustics(worldPosition + ViewPosition, _LightDirection0);
 	#endif
 	
@@ -535,6 +536,10 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float specularOcclusion = GetSpecularOcclusion(visibilityAngle, BdotR, perceptualRoughness, dot(N, R));
 	radiance *= specularOcclusion;
 	
+	#ifdef UNDERWATER_LIGHTING_ON
+		radiance *= underwaterTransmittance;
+	#endif
+	
 	#ifdef SCREENSPACE_REFLECTIONS_ON
 		float4 ssr = ScreenSpaceReflections[pixelCoordinate];
 		radiance = lerp(radiance, ssr.rgb, ssr.a * SpecularGiStrength);
@@ -544,6 +549,10 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	luminance += radiance * fssEss;
 	
 	float3 irradiance = AmbientCosine(bentNormal, visibilityAngle);
+	
+	#ifdef UNDERWATER_LIGHTING_ON
+		irradiance *= underwaterTransmittance;
+	#endif
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float4 ssgi = ScreenSpaceGlobalIllumination[pixelCoordinate];
@@ -557,6 +566,10 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	luminance += irradiance * (fmsEms + albedo * kd);
 	
 	float3 irradiance1 = AmbientCosine(-bentNormal, visibilityAngle);
+	
+	#ifdef UNDERWATER_LIGHTING_ON
+		irradiance1 *= underwaterTransmittance;
+	#endif
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		//irradiance1+= lerp(irradiance1, ssgi.rgb, ssgi.a * DiffuseGiStrength);

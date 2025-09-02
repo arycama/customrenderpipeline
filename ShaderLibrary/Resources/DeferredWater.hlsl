@@ -87,7 +87,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float distortion = _RefractOffset * 0.5 / TanHalfFov / linearDepth;
 	float2 uvOffset = N.xz * distortion;
 	float2 refractionUv = uvOffset * ViewSize + position.xy;
-	float2 refractedPositionSS = clamp(refractionUv, 0, ViewSize - 1);
+	float2 refractedPositionSS = clamp(refractionUv, 0.5, ViewSize - 0.5);
 	float underwaterDepth = _UnderwaterDepth[refractedPositionSS];
 	
 	if (foam > 0)
@@ -130,23 +130,30 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float v = underwaterV.y;
 	float b = maxUnderwaterDistance;
 
-	float3 atmosphereTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, waterDistance);
 	float xi = min(0.99, noise.x); // Clamp to avoid sampling at infinity
 	float t = -l * log(xi * (exp(b * cp * (-v / l - 1)) - 1) + 1) / (cp * (l + v));
 	float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
 	float weight = rcp(dot(pdf, rcp(3.0)));
 	float3 P = worldPosition + -underwaterV * t;
+	
+	// Direct light
 	float sunT = WaterShadowDistance(P, _LightDirection0);
-
 	float3 transmittance = exp(-_Extinction * (sunT + t));
-	float3 ambientTransmittance = exp(-_Extinction * (-(worldPosition.y + ViewPosition.y) + t));
 	float shadow = GetDirectionalShadow(P) * CloudTransmittance(P);
 	float factor = GetWaterIlluminance(P);
-		
+	
+	float3 atmosphereTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, waterDistance);
+	float3 sunColor = Rec709ToRec2020(_LightColor0) * Exposure * atmosphereTransmittance;
 	float LdotV = dot(_LightDirection0, -underwaterV);
+	float phase = CsPhase(LdotV, _WaterMiePhase);
+	float3 directLight = sunColor * factor * shadow * phase * transmittance;
+		
+	float3 ambientTransmittance = exp(-_Extinction * (t + max(0.0, -(P.y + ViewPosition.y))));
 	float3 ambient = AmbientCosine(float3(0.0, 1.0, 0.0));
-	float phase = CsPhase(LdotV, _WaterMiePhase) * FourPi;
-	float3 luminance = weight * (factor * Exposure * shadow * phase * Rec709ToRec2020(_LightColor0) * atmosphereTransmittance * RcpPi * transmittance + ambient * ambientTransmittance) * _Color * _Extinction;
+	float3 indirect = ambient * ambientTransmittance;
+	
+	float3 scatter = _Color * _Extinction;
+	float3 luminance = weight * (directLight + indirect) * scatter;
 	
 	// TODO: Stencil? Or hw blend?
 	float3 underwater = 0.0;
@@ -155,18 +162,9 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		underwater = _UnderwaterResult.Sample(LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit));
 		underwater *= exp(-_Extinction * maxUnderwaterDistance);
 	}
-	
-	// TODO: Put somewhere
-	float2 dfg = _PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
-	float f0 = 0.02;
-	float fssEss = dfg.x * f0 + dfg.y;
-	float3 fAvg = AverageFresnel(f0);
-	float ems = 1.0 - dfg.x - dfg.y;
-	float3 fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
-	float3 kd = 1.0 - fssEss - fmsEms;
-	
+
 	FragmentOutput output;
-	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam) * kd, 0.0);
+	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam), 0.0);
 	output.luminance = Rec2020ToICtCp(luminance * PaperWhite);
 	return output;
 }
@@ -174,7 +172,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 struct TemporalOutput
 {
 	float4 temporal : SV_Target0;
-	float3 scene : SV_Target1;
+	float4 scene : SV_Target1;
 };
 
 TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
@@ -202,13 +200,13 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float2 dfg = _PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
 	float f0 = 0.02;
 	float fssEss = dfg.x * f0 + dfg.y;
-	float3 fAvg = AverageFresnel(f0);
+	float fAvg = AverageFresnel(f0);
 	float ems = 1.0 - dfg.x - dfg.y;
-	float3 fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
-	float3 kd = 1.0 - fssEss - fmsEms;
+	float fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
+	float kd = 1.0 - fssEss - fmsEms;
 	
 	TemporalOutput output;
 	output.temporal = float4(result, 1.0);
-	output.scene = ICtCpToRec2020(result) / PaperWhite * kd;
+	output.scene = float4(ICtCpToRec2020(result) / PaperWhite, kd);
 	return output;
 }
