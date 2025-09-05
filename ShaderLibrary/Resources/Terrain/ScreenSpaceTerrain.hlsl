@@ -55,7 +55,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	{
 		uint offset = i < 4 ? 0 : 13;
 		uint layerIndex = BitUnpack(layerData[i % 4], 4, offset);
-		float blend = Remap(BitUnpack(layerData[i % 4], 4, 26), 0.0, 15.0);
+		float blend = Remap(BitUnpack(layerData[i % 4], 4, 26), 0.0, 15.0, 0.0, 0.5);
 		
 		if (i < 4)
 			blend = 1.0 - blend;
@@ -79,8 +79,6 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 			heights[i] = weight;
 		}
 	}
-	
-
 	
 	// Sample heights
     [unroll]
@@ -118,7 +116,6 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	}
 	
 	float transmittance = 1.0;
-	float opacitySum = 0.0;
 	float3 albedo = 0.0, albedoSum = 0.0;
 	float extinctionSum = 0.0;
 	
@@ -129,6 +126,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		LayerData layerData = TerrainLayerData[layerIndex];
 		float scale = layerData.Scale;
 		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale);
+		float4 currentNormalRoughnessOcclusion = Normal.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale);
 		
 		// Get distance from the current height to the next
 		float currentHeight = heights[i];
@@ -136,22 +134,17 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		float heightDelta = currentHeight - nextHeight;
 		
 		// Previous layers contain density from that layer, so we just add the extinction for the new layer
-		float extinction = rcp(max(1e-3, Sq(1.0 - layerData.Blending))) / layerData.HeightScale;
+		float extinction = layerData.Blending;
 		extinctionSum += extinction;
 		
 		float currentTransmittance = exp(-heightDelta * extinctionSum);
-		float opacity = 1.0 - currentTransmittance;
 		
 		albedoSum += currentAlbedo * extinction;
-		float3 combinedAlbedo = albedoSum / extinctionSum;
-		
-		albedo += combinedAlbedo * opacity * transmittance;
-		opacitySum += opacity * transmittance;
-		
+		albedo += albedoSum / extinctionSum * (1.0 - currentTransmittance) * transmittance;
 		transmittance *= currentTransmittance;
 	}
 	
-	albedo /= opacitySum;
+	albedo /= 1.0 - transmittance;
 	
 	return OutputGBuffer(albedo, 0, terrainNormal, 1, terrainNormal, 1, 0, 0);
 }

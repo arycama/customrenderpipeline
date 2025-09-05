@@ -124,7 +124,7 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	//else
 		//index1 = index0;
 	
-	//blend = Remap(blend, 0.0, 0.5);
+	blend = Remap(blend, 0.0, 0.5);
 	
 	//if(weight1 == 0.0)
 	//	index1 = index0;

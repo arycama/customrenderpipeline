@@ -334,7 +334,9 @@ public class TerrainSystem : FrameRenderFeature
 					var index = layer.Value;
 
 					// Convert opacity at distance to density
-					layerData.SetData(index, new TerrainLayerData(Rcp(layer.Key.tileSize.x), layer.Key.smoothness, layer.Key.normalScale, layer.Key.metallic));
+					var extinction = Rcp(Max(1e-3f, Square(1.0f - layer.Key.smoothness))) / layer.Key.metallic;
+
+					layerData.SetData(index, new TerrainLayerData(Rcp(layer.Key.tileSize.x), extinction, layer.Key.normalScale, layer.Key.metallic));
 				}
 			});
 		}
