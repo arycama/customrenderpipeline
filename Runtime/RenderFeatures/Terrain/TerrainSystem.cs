@@ -332,7 +332,9 @@ public class TerrainSystem : FrameRenderFeature
 				foreach (var layer in terrainLayers)
 				{
 					var index = layer.Value;
-					layerData.SetData(index, new TerrainLayerData(Rcp(layer.Key.tileSize.x), Mathf.Max(1e-3f, layer.Key.smoothness), layer.Key.normalScale, layer.Key.metallic));
+
+					// Convert opacity at distance to density
+					layerData.SetData(index, new TerrainLayerData(Rcp(layer.Key.tileSize.x), layer.Key.smoothness, layer.Key.normalScale, layer.Key.metallic));
 				}
 			});
 		}

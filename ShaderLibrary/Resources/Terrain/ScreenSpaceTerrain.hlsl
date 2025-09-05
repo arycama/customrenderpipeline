@@ -37,6 +37,10 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float3 terrainNormal = GetTerrainNormal(normalUv);
 	
 	uv = WorldToTerrainPosition(worldPosition);
+	
+	float2 dx = ddx(worldPosition.xz);
+	float2 dy = ddy(worldPosition.xz);
+	
 	worldPosition += ViewPosition;
 	
 	uint4 layerData = IdMap.Gather(SurfaceSampler, uv);
@@ -76,8 +80,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		}
 	}
 	
-	float2 dx = ddx(worldPosition.xz);
-	float2 dy = ddy(worldPosition.xz);
+
 	
 	// Sample heights
     [unroll]
@@ -87,7 +90,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		LayerData layerData = TerrainLayerData[layerIndex];
 		float scale = layerData.Scale;
 		float heightScale = layerData.HeightScale;
-		heights[i] *= Mask.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale); // * heightScale;
+		heights[i] *= (Mask.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale)) * heightScale;
 	}
 	
 	// https://bertdobbelaere.github.io/sorting_networks.html
@@ -133,17 +136,16 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		float heightDelta = currentHeight - nextHeight;
 		
 		// Previous layers contain density from that layer, so we just add the extinction for the new layer
-		float extinction = -log(1.0 - layerData.Blending);
+		float extinction = rcp(max(1e-3, Sq(1.0 - layerData.Blending))) / layerData.HeightScale;
 		extinctionSum += extinction;
 		
-		float currentTransmittance = exp(-heightDelta * extinction);
-		currentTransmittance = pow(1 - heightDelta, rcp(1.0 - layerData.Blending));
+		float currentTransmittance = exp(-heightDelta * extinctionSum);
 		float opacity = 1.0 - currentTransmittance;
 		
 		albedoSum += currentAlbedo * extinction;
 		float3 combinedAlbedo = albedoSum / extinctionSum;
 		
-		albedo += currentAlbedo * opacity * transmittance;
+		albedo += combinedAlbedo * opacity * transmittance;
 		opacitySum += opacity * transmittance;
 		
 		transmittance *= currentTransmittance;
