@@ -117,6 +117,7 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	float transmittance = 1.0;
 	float3 albedo = 0.0, albedoSum = 0.0;
+	float4 normalOcclusionRoughness = 0.0, normalOcclusionRoughnessSum = 0.0;
 	float extinctionSum = 0.0;
 	
 	[unroll]
@@ -126,7 +127,10 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		LayerData layerData = TerrainLayerData[layerIndex];
 		float scale = layerData.Scale;
 		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale);
-		float4 currentNormalRoughnessOcclusion = Normal.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale);
+		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale);
+		
+		float3 normal = UnpackNormalUNorm(currentNormalOcclusionRoughness.rg);
+		currentNormalOcclusionRoughness.rg = normal.xy / normal.z;
 		
 		// Get distance from the current height to the next
 		float currentHeight = heights[i];
@@ -138,13 +142,27 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 		extinctionSum += extinction;
 		
 		float currentTransmittance = exp(-heightDelta * extinctionSum);
+		float currentWeight = rcp(extinctionSum) * (1.0 - currentTransmittance) * transmittance;
 		
 		albedoSum += currentAlbedo * extinction;
-		albedo += albedoSum / extinctionSum * (1.0 - currentTransmittance) * transmittance;
+		albedo += albedoSum * currentWeight;
+		
+		normalOcclusionRoughnessSum += currentNormalOcclusionRoughness * extinction;
+		normalOcclusionRoughness += normalOcclusionRoughnessSum * currentWeight;
+		
 		transmittance *= currentTransmittance;
 	}
 	
-	albedo /= 1.0 - transmittance;
+	float3 normal = normalize(float3(normalOcclusionRoughness.rg, 1));
 	
-	return OutputGBuffer(albedo, 0, terrainNormal, 1, terrainNormal, 1, 0, 0);
+	albedo /= 1.0 - transmittance;
+	normalOcclusionRoughness.ba /= 1.0 - transmittance;
+	terrainNormal = BlendNormalRNM(terrainNormal.xzy, normal).xzy;
+	
+	float4 visibilityCone = BentNormalVisibility.Sample(SurfaceSampler, normalUv);
+	visibilityCone.xyz = normalize(visibilityCone.xyz);
+	visibilityCone.a = cos((0.5 * visibilityCone.a + 0.5) * HalfPi);
+	visibilityCone = SphericalCapIntersection(terrainNormal, cos(normalOcclusionRoughness.b * HalfPi), visibilityCone.xyz, visibilityCone.a);
+	
+	return OutputGBuffer(albedo, 0, terrainNormal, normalOcclusionRoughness.a, visibilityCone.xyz, FastACos(visibilityCone.a) * RcpHalfPi, 0, 0);
 }

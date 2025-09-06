@@ -18,7 +18,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	private static readonly IndexedString blueNoise3DUnitIds = new("STBN/stbn_unitvec3_2Dx1D_128x128x64_", 64);
 	private static readonly IndexedString blueNoise3DCosineIds = new("STBN/stbn_unitvec3_cosine_2Dx1D_128x128x64_", 64);
 
-	private double time, previousTime, deltaTime;
+	private double previousTime;
 
 	private readonly PersistentRTHandleCache cameraTargetCache, cameraDepthCache, cameraVelocityCache;
 	private readonly TerrainSystem terrainSystem;
@@ -61,17 +61,16 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			var sunCosAngle = AngularDiameterToConeCosAngle(Radians(asset.LightingSettings.SunAngularDiameter));
 			var sinSigmaSq = (float)Square(Sin(Radians(asset.LightingSettings.SunAngularDiameter / 2.0)));
 
-			previousTime = time;
 
 #if UNITY_EDITOR
-			time = EditorApplication.isPlaying && !EditorApplication.isPaused ? Time.unscaledTimeAsDouble : EditorApplication.timeSinceStartup;
+			var time = EditorApplication.isPlaying && !EditorApplication.isPaused ? Time.unscaledTimeAsDouble : EditorApplication.timeSinceStartup;
 #else
-			time = Time.unscaledTimeAsDouble;
+			var time = Time.unscaledTimeAsDouble;
 #endif
+			var deltaTime = time - previousTime;
+			previousTime = time;
 
-			deltaTime = time - previousTime;
-
-			renderGraph.SetResource(new TimeData(time, previousTime, deltaTime));
+			renderGraph.SetResource(new TimeData(time, previousTime));
 
 			renderGraph.SetResource(new FrameData(renderGraph.SetConstantBuffer((
 				overlayMatrix,

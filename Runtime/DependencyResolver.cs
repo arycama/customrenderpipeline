@@ -7,7 +7,7 @@ public static class DependencyResolver
 
 	public static void AddGlobalDependency<T>(T dependency)
 	{
-		globalDependencies.Add(typeof(T), dependency);
+		globalDependencies[typeof(T)] = dependency;
 	}
 
 	public static T Resolve<T>()

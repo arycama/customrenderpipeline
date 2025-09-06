@@ -8,6 +8,8 @@ public class SetupCamera : CameraRenderFeature
 	private Sky.Settings sky;
 	private readonly Dictionary<Camera, (Vector3, Quaternion, Matrix4x4)> previousCameraTransform = new();
 
+	private readonly Dictionary<Camera, double> previousTimeCache = new();
+
 	public SetupCamera(RenderGraph renderGraph, Sky.Settings sky) : base(renderGraph)
 	{
 		this.sky = sky;
@@ -126,8 +128,15 @@ public class SetupCamera : CameraRenderFeature
 
 		var pixelToViewScaleOffset = new Float4(tanHalfFovX * 2.0f / camera.scaledPixelWidth, tanHalfFovY * 2.0f / camera.scaledPixelHeight, -tanHalfFovX * (1.0f - jitter.x), -tanHalfFovY * (1.0f + jitter.y));
 
-		// TODO: could make some of these float3's and pack with another float
-		renderGraph.SetResource(new ViewData(renderGraph.SetConstantBuffer((
+		if(!previousTimeCache.TryGetValue(camera, out var previousTime))
+			previousTime = 0f;
+
+		var timeData = renderGraph.GetResource<TimeData>();
+		var renderDeltaTime = (float)(timeData.Time - previousTime);
+		previousTimeCache[camera] = timeData.Time;
+
+	// TODO: could make some of these float3's and pack with another float
+	renderGraph.SetResource(new ViewData(renderGraph.SetConstantBuffer((
 			worldToView,
 			worldToClip,
 			worldToPreviousClip,
@@ -161,7 +170,11 @@ public class SetupCamera : CameraRenderFeature
 			camera.scaledPixelHeight - 1,
 			camera.aspect,
 			camera.TanHalfFov(),
-			pixelToViewScaleOffset
+			pixelToViewScaleOffset,
+			renderDeltaTime,
+			0f,
+			0f,
+			0f
 		))));
 
 		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Set View Properties"))

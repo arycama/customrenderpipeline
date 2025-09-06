@@ -101,6 +101,8 @@ public partial class AutoExposure : CameraRenderFeature
 			pass.ReadBuffer("LuminanceHistogram", histogram);
 			pass.WriteBuffer("LuminanceOutput", output);
 			pass.AddRenderPassData<AutoExposureData>();
+			pass.AddRenderPassData<FrameData>();
+			pass.AddRenderPassData<ViewData>();
 
 			var currentData = renderGraph.GetResource<AutoExposureData>();
 

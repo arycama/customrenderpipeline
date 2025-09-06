@@ -4,13 +4,11 @@ public class TimeData : IRenderPassData
 {
 	public double Time { get; }
 	public double PreviousTime { get; }
-	public double DeltaTime { get; }
 
-	public TimeData(double time, double previousTime, double deltaTime)
+	public TimeData(double time, double previousTime)
 	{
 		Time = time;
 		PreviousTime = previousTime;
-		DeltaTime = deltaTime;
 	}
 
 	public void SetInputs(RenderPassBase pass)

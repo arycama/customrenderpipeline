@@ -62,7 +62,7 @@ public class DeferredWater : CameraRenderFeature
             pass.AddRenderPassData<LightingData>();
 
             pass.AddRenderPassData<OceanFftResult>();
-            pass.AddRenderPassData<WaterShoreMask.Result>();
+            pass.AddRenderPassData<WaterShoreMask.Result>(true);
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
             pass.AddRenderPassData<CausticsResult>();

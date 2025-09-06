@@ -125,7 +125,7 @@ public class WaterShadowRenderer : WaterRendererBase
             pass.ReadBuffer("_PatchData", cullResult.PatchDataBuffer);
 
             pass.AddRenderPassData<OceanFftResult>();
-            pass.AddRenderPassData<WaterShoreMask.Result>();
+            pass.AddRenderPassData<WaterShoreMask.Result>(true);
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
             pass.AddRenderPassData<LightingData>();
