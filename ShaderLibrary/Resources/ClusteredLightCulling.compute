@@ -41,7 +41,7 @@ void ClusteredLighting(uint3 id : SV_DispatchThreadId, uint groupIndex : SV_Grou
 				positionSS.y = (id.y + y) * TileSize;
 				positionSS.z = LinearToDeviceDepth(eyeDepth);
                 
-				float3 positionWS = MultiplyPointProj(PixelToWorld, positionSS);
+				float3 positionWS = MultiplyPointProj(PixelToWorld, positionSS).xyz;
                 
 				if (x == 0 && y == 0 && z == 0)
 				{

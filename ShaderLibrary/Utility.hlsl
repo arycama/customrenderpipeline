@@ -168,7 +168,7 @@ uint Log2Pow2(uint a)
 
 uint Exp2Pow2(uint a)
 {
-	return 1 << a;
+	return 1u << a;
 }
 
 uint BitPack(uint data, uint size, uint offset)

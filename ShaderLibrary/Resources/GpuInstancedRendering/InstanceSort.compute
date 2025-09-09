@@ -17,7 +17,7 @@ StructuredBuffer<uint> Keys, Data, TotalGroupCount, GroupCounts, TotalSums, Grou
 uint BitIndex;
 
 groupshared uint sharedSums[threadCount];
-groupshared uint sharedSums4[threadCount];
+groupshared uint4 sharedSums4[threadCount];
 
 cbuffer DataLength
 {

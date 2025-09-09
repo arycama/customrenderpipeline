@@ -38,7 +38,9 @@ public partial class VolumetricLighting : CameraRenderFeature
 			(float)settings.DepthSlices,
             Rcp(settings.DepthSlices),
             (uint)Log2(settings.TileSize),
-            (float)settings.BlurSigma
+            (float)settings.BlurSigma,
+			(uint)settings.DepthSlices,
+			0f
         ));
 
 		var rawJitter = renderGraph.GetResource<TemporalAASetupData>().Jitter;

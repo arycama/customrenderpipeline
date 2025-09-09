@@ -139,7 +139,7 @@ void Accumulate(uint2 id : SV_DispatchThreadID)
 	
 	float3 transmittance = 1.0;
 	float4 result = float2(0.0, 1.0).xxxy;
-	for (uint i = 0; i < VolumeDepth; i++)
+	for (uint i = 0; i < VolumeDepthInt; i++)
 	{
 		float t0 = VolumetricToLinearDepth(i + 0);
 		float t1 = VolumetricToLinearDepth(i + 1);

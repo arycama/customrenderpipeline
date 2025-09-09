@@ -18,7 +18,7 @@ cbuffer VolumetricLightingData
 	
 	uint VolumetricLog2TileSize;
 	float VolumetricBlurSigma;
-	float VolumetricLightingDataPadding0;
+	uint VolumeDepthInt;
 	float VolumetricLightingDataPadding1;
 };
 

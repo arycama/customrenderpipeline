@@ -7,7 +7,7 @@ uint PrefixSumSharedRead(uint index); // return array[index];
 const static uint NumBanks = 16;
 const static uint LogNumBanks = firstbitlow(NumBanks);
 groupshared uint SharedTotalSum;
-groupshared uint SharedTotalSum4;
+groupshared uint4 SharedTotalSum4;
 
 uint ConflictFreeOffset(uint n)
 {

@@ -102,7 +102,7 @@ void RayGeneration()
 	uint channelIndex = noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2);
 	float xi = min(noise.x, 0.999); // xi of 1 maps to infinity, so clamp
 	float3 c = _Extinction;
-	float3 cp = Select(_Extinction, channelIndex);
+	float cp = Select(_Extinction, channelIndex);
 	float l = _LightDirection0.y;
 	float v = V.y;
 	float b = validHit ? payload.hitDistance : 1e+32;
@@ -130,7 +130,7 @@ void RayGeneration()
 		shadowDistance0 = saturate(shadowDepth - shadowPosition.z) * _WaterShadowFar;
 	}
 	
-	float3 asymmetry = exp(-_Extinction * (shadowDistance0 + t));
+	float asymmetry = exp(-cp * (shadowDistance0 + t));
 	float LdotV0 = dot(_LightDirection0, L);
 	float phase = lerp(CsPhase(LdotV0, -0.3), CsPhase(LdotV0, 0.85), asymmetry);
 	float3 lightColor0 = phase * _LightColor0 * TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition));

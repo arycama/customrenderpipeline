@@ -106,7 +106,7 @@ float JonswapSpectrum(float w)
 	float sigma = w <= wp ? 0.07 : 0.09;
 	float r = exp(-Sq(w - wp) * rcp(2.0 * Sq(sigma) * Sq(wp)));
 	float beta = 5.0 / 4.0;
-	return PmSpectrum(w, wp, alpha, beta) * pow(gamma, r);
+	return PmSpectrum(w, wp, alpha, beta) * pow(abs(gamma), r);
 }
 
 // Source: Christopher J. Horvath - Empirical Directional Wave Spectra for Computer Graphics
