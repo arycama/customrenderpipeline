@@ -1,7 +1,10 @@
 using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
 using UnityEngine.Serialization;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 [ExecuteAlways]
 public class EnvironmentProbe : MonoBehaviour
@@ -35,7 +38,8 @@ public class EnvironmentProbe : MonoBehaviour
         IsDirty = false;
     }
 
-    private static void OnPreSceneGUICallback(SceneView sceneView)
+#if UNITY_EDITOR
+	private static void OnPreSceneGUICallback(SceneView _)
     {
         if (!UnityEditor.Handles.ShouldRenderGizmos())
             return;
@@ -63,4 +67,5 @@ public class EnvironmentProbe : MonoBehaviour
             Graphics.DrawMesh(previewMesh, objectToWorld, previewMaterial, 0, SceneView.currentDrawingSceneView.camera, 0, propertyBlock);
         }
     }
+#endif
 }

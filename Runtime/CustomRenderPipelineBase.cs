@@ -1,7 +1,10 @@
 ﻿using System.Collections.Generic;
-using UnityEditorInternal;
 using UnityEngine;
 using UnityEngine.Rendering;
+
+#if UNITY_EDITOR
+using UnityEditorInternal;
+#endif
 
 public abstract class CustomRenderPipelineBase : RenderPipeline
 {
@@ -22,10 +25,12 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
     public CustomRenderPipelineBase()
     {
-        renderDocLoaded = RenderDoc.IsLoaded();
+#if UNITY_EDITOR
+		renderDocLoaded = RenderDoc.IsLoaded();
+#endif
 
-        // TODO: Can probably move some of this to the asset class
-        GraphicsSettings.lightsUseLinearIntensity = true;
+		// TODO: Can probably move some of this to the asset class
+		GraphicsSettings.lightsUseLinearIntensity = true;
         GraphicsSettings.lightsUseColorTemperature = true;
         GraphicsSettings.realtimeDirectRectangularAreaLights = true;
 
@@ -56,16 +61,18 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
     private void Render(ScriptableRenderContext context, IList<Camera> cameras)
     {
-        // When renderdoc is loaded, all renderTextures become un-created.. but Unity does not dispose the render pipeline until the next frame
-        // To avoid errors/leaks/crashes, check to see if renderDoc.IsLoaded has changed, and skip rendering for one frame.. this allows Unity to
-        // dispose the render pipeline, and then recreate it on the next frame, which will clear/re-initialize all textures..
-        if (!renderDocLoaded && RenderDoc.IsLoaded())
+#if UNITY_EDITOR
+		// When renderdoc is loaded, all renderTextures become un-created.. but Unity does not dispose the render pipeline until the next frame
+		// To avoid errors/leaks/crashes, check to see if renderDoc.IsLoaded has changed, and skip rendering for one frame.. this allows Unity to
+		// dispose the render pipeline, and then recreate it on the next frame, which will clear/re-initialize all textures..
+		if (!renderDocLoaded && RenderDoc.IsLoaded())
         {
             IsDisposingFromRenderDoc = true;
             return;
         }
+#endif
 
-        GraphicsSettings.useScriptableRenderPipelineBatching = UseSrpBatching;
+		GraphicsSettings.useScriptableRenderPipelineBatching = UseSrpBatching;
 
         try
         {
