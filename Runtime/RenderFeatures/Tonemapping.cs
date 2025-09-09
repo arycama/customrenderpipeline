@@ -27,7 +27,7 @@ public partial class Tonemapping : CameraRenderFeature
 
 			hdrSettings.paperWhiteNits = settings.PaperWhite;
 			hdrSettings.automaticHDRTonemapping = false;
-			Debug.Log($"HDR Display Info: Min Nits {hdrSettings.minToneMapLuminance}, Max Nits {hdrSettings.maxToneMapLuminance}, Paper White {hdrSettings.paperWhiteNits}, Max Full Frame Nits {hdrSettings.maxFullFrameToneMapLuminance}, Gamut {hdrSettings.displayColorGamut}, Primaries {primaries}, Transfer {transfer}, WhitePoint {whitePoint}");
+			//Debug.Log($"HDR Display Info: Min Nits {hdrSettings.minToneMapLuminance}, Max Nits {hdrSettings.maxToneMapLuminance}, Paper White {hdrSettings.paperWhiteNits}, Max Full Frame Nits {hdrSettings.maxFullFrameToneMapLuminance}, Gamut {hdrSettings.displayColorGamut}, Primaries {primaries}, Transfer {transfer}, WhitePoint {whitePoint}");
 		}
 
 		RgbToLmsr = CalculateRgbToLMSR(settings.NormalizeLmsr);
