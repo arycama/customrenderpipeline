@@ -247,6 +247,13 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
 
+		// This is just here to avoid memory leaks when GPU driven rendering isn't used.
+        new GenericCameraRenderFeature(renderGraph, "HiZ Read Temp", (camera, context) =>
+		{
+			using var pass = renderGraph.AddRenderPass<GenericRenderPass>("HiZ Read Temp");
+			pass.AddRenderPassData<HiZMaxDepthData>();
+		}),
+
 		new GpuDrivenRenderingRender(gpuDrivenRenderer, renderGraph),
 
 		new GrassRenderer(asset.Grass, terrainSystem, renderGraph),
