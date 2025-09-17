@@ -111,7 +111,9 @@ public partial class VolumetricClouds : CameraRenderFeature
                 pass.SetInt("_MaxWidth", camera.scaledPixelWidth - 1);
                 pass.SetInt("_MaxHeight", camera.scaledPixelHeight - 1);
 
-				pass.SetTexture("Stars", skySettings.StarMap);
+                if(skySettings.StarMap != null)
+				    pass.SetTexture("Stars", skySettings.StarMap);
+
 				pass.SetFloat("StarExposure", skySettings.StarExposure);
 
 				settings.SetCloudPassData(pass, time);
