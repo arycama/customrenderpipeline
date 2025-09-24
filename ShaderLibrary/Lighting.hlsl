@@ -234,7 +234,7 @@ float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAn
 		//float sinSigmaSq = SinSigmaSq;
 		if (MicroShadows)
 		{
-			//illuminance *= Sq(saturate(saturate(dot(B, L)) / cosVisibilityAngle));
+			illuminance *= Sq(saturate(saturate(dot(B, L)) / cosVisibilityAngle));
 		//	float4 intersectionResult = SphericalCapIntersection(B, cosVisibilityAngle, L, SunCosAngle);
 		//	if (intersectionResult.a == 0)
 		//		sinSigmaSq = 0;
