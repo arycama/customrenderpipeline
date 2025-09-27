@@ -249,12 +249,25 @@ float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAn
 	}
 	
 	diffuseTerm *= DirectionalAlbedoMs.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float3(abs(NdotL), perceptualRoughness, f0Avg), 16), 0.0);
-	float3 result = diffuseTerm * (albedo * illuminance + translucency * saturate(-NdotL));
+	float3 result = diffuseTerm * (albedo * illuminance + translucency * saturate(-NdotL) * 0);
 	
 	if (NdotL > 0.0)
 	{
 		float LdotV = dot(L, V);
 		result += Ggx(roughness2, NdotL, LdotV, NdotV, partLambdaV, perceptualRoughness, f0, multiScatterTerm) * illuminance;
+	}
+	else
+	{
+		float3 lr = L + 2 * N * -NdotL;
+				
+		float LdotV = saturate(dot(lr, V));
+		float rcpLenLv = rsqrt(2.0 + 2.0 * LdotV);
+		float NdotH = (-NdotL + NdotV) * rcpLenLv;
+		float ggx = GgxDv(roughness2, NdotH, -NdotL, NdotV, partLambdaV);
+		float LdotH = LdotV * rcpLenLv + rcpLenLv;
+		
+		result += ggx * (1 - Fresnel(LdotH, f0)) * -NdotL * translucency;
+
 	}
 	
 	return RcpPi * result;
