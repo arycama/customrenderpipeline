@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -8,6 +9,7 @@ public class VolumetricCloudShadow : CameraRenderFeature
     private readonly Sky.Settings physicalSkySettings;
     private readonly Material material;
     private readonly ComputeShader cloudCoverageComputeShader;
+	private Dictionary<Camera, ResourceHandle<GraphicsBuffer>> perCameraCoverage = new();
 
     public VolumetricCloudShadow(VolumetricClouds.Settings settings, Sky.Settings physicalSkySettings, RenderGraph renderGraph) : base(renderGraph)
     {
@@ -18,7 +20,15 @@ public class VolumetricCloudShadow : CameraRenderFeature
         material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public override void Render(Camera camera, ScriptableRenderContext context)
+	protected override void Cleanup(bool disposing)
+	{
+		foreach (var buffer in perCameraCoverage.Values)
+		{
+			renderGraph.ReleasePersistentResource(buffer);
+		}
+	}
+
+	public override void Render(Camera camera, ScriptableRenderContext context)
     {
         var lightDirection = Vector3.up;
         var lightRotation = Quaternion.LookRotation(Vector3.down);
@@ -118,15 +128,20 @@ public class VolumetricCloudShadow : CameraRenderFeature
         }
 
         // Cloud coverage
-        var cloudCoverageBufferTemp = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
         var cloudCoverageBuffer = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
-
         var result = new CloudShadowDataResult(cloudShadow, depth, worldToShadow, settings.Density, cloudCoverageBuffer, 0.0f, settings.StartHeight + settings.LayerThickness);
-        renderGraph.SetResource(result); ;
+        renderGraph.SetResource(result);
 
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Cloud Coverage"))
+		var isFirst = !perCameraCoverage.TryGetValue(camera, out var cloudCoverageBufferTemp);
+		if (isFirst)
+		{
+			cloudCoverageBufferTemp = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource, GraphicsBuffer.UsageFlags.None, true);
+			perCameraCoverage.Add(camera, cloudCoverageBufferTemp);
+		}
+
+		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Cloud Coverage"))
         {
-            pass.Initialize(cloudCoverageComputeShader, 0, 1);
+			pass.Initialize(cloudCoverageComputeShader, 0, 1);
 
             pass.AddRenderPassData<CloudData>();
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
@@ -141,6 +156,7 @@ public class VolumetricCloudShadow : CameraRenderFeature
             pass.SetRenderFunction((command, pass) =>
             {
                 settings.SetCloudPassData(pass, time);
+				pass.SetFloat("IsFirst", isFirst ? 1 : 0);
             });
         }
 

@@ -10,6 +10,7 @@ RWBuffer<float4> _Result;
 static const uint _ThreadCount = 1024;
 
 groupshared float4 _SharedLuminanceExtinction[_ThreadCount];
+float IsFirst;
 
 [numthreads(1024, 1, 1)]
 void CloudCoverage(uint groupIndex : SV_GroupIndex)
@@ -39,7 +40,9 @@ void CloudCoverage(uint groupIndex : SV_GroupIndex)
 		return;
 	
 	float4 result = _SharedLuminanceExtinction[0];
-	result = lerp(_CloudCoverage, result, 0.05);
+	
+	if (!IsFirst)
+		result = lerp(_CloudCoverage, result, 0.05);
 	
 	// TODO: Need to figure out why this happens and fix it
 	result = IsInfOrNaN(result) ? float2(0.0, 1.0).xxxy : result;
