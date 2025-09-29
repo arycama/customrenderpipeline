@@ -24,7 +24,7 @@ public class DeferredWater : CameraRenderFeature
 
     public override void Render(Camera camera, ScriptableRenderContext context)
     {
-		if (!settings.IsEnabled)
+		if (!settings.IsEnabled || (camera.cameraType != CameraType.Game && camera.cameraType != CameraType.SceneView))
 			return;
 
 		using var scope = renderGraph.AddProfileScope("Deferred Water");

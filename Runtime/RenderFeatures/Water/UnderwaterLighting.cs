@@ -15,7 +15,7 @@ public class UnderwaterLighting : CameraRenderFeature
 
     public override void Render(Camera camera, ScriptableRenderContext context)
     {
-		if (!settings.IsEnabled)
+		if (!settings.IsEnabled || (camera.cameraType != CameraType.Game && camera.cameraType != CameraType.SceneView))
 			return;
 
         var underwaterResultId = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);

@@ -11,7 +11,7 @@ public class WaterShadowRenderer : WaterRendererBase
 
     public override void Render(Camera camera, ScriptableRenderContext context)
     {
-        if (!settings.IsEnabled)
+        if (!settings.IsEnabled || (camera.cameraType != CameraType.Game && camera.cameraType != CameraType.SceneView))
             return;
 
         var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;

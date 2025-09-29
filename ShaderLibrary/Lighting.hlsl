@@ -555,7 +555,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	
 	#ifdef SCREENSPACE_REFLECTIONS_ON
 		float4 ssr = ScreenSpaceReflections[pixelCoordinate];
-		radiance = lerp(radiance, ssr.rgb, ssr.a * SpecularGiStrength);
+		radiance = lerp(radiance + ssr.rgb * DiffuseGiStrength, lerp(radiance, ssr.rgb, ssr.a * DiffuseGiStrength), ConeAngleToVisibility(visibilityAngle));
 	#endif
 
 	float3 fssEss = dfg.x * f0 + dfg.y;
@@ -569,8 +569,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float4 ssgi = ScreenSpaceGlobalIllumination[pixelCoordinate];
-		//irradiance += lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength);
-		irradiance += ssgi.rgb * DiffuseGiStrength;//lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength);
+		irradiance = lerp(irradiance + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeAngleToVisibility(visibilityAngle));
 	#endif
 	
 	float3 fAvg = AverageFresnel(f0);
@@ -585,8 +584,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	#endif
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-		//irradiance1+= lerp(irradiance1, ssgi.rgb, ssgi.a * DiffuseGiStrength);
-		irradiance1 += ssgi.rgb * DiffuseGiStrength;//lerp(irradiance1, ssgi.rgb, ssgi.a * DiffuseGiStrength);
+		irradiance1 = lerp(irradiance1 + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeAngleToVisibility(visibilityAngle));
 	#endif
 	
 	luminance += irradiance1 * translucency * kd;

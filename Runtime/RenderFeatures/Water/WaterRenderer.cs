@@ -11,7 +11,7 @@ public class WaterRenderer : WaterRendererBase
 
     public override void Render(Camera camera, ScriptableRenderContext context)
     {
-        if (!settings.IsEnabled)
+        if (!settings.IsEnabled || (camera.cameraType != CameraType.Game && camera.cameraType != CameraType.SceneView))
             return;
 
         var passData = Cull(camera.transform.position, renderGraph.GetResource<CullingPlanesData>().CullingPlanes);
