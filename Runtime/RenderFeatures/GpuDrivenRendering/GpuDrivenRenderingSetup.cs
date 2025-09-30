@@ -13,6 +13,7 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
 
     private readonly ProceduralGenerationController proceduralGenerationController;
     private int version = -1;
+	private bool isInitialized;
 
     public GpuDrivenRenderingSetup(RenderGraph renderGraph, ProceduralGenerationController proceduralGenerationController) : base(renderGraph)
     {
@@ -22,6 +23,9 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
 
     protected override void Cleanup(bool disposing)
     {
+		if (!isInitialized)
+			return;
+
         renderGraph.ReleasePersistentResource(drawCallArgsBuffer);
         renderGraph.ReleasePersistentResource(lodSizesBuffer);
         renderGraph.ReleasePersistentResource(instanceTypeIdsBuffer);
@@ -51,7 +55,16 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
         foreach (var data in proceduralGenerationController.instanceData)
             positionCountSum += data.totalCount;
 
-        instanceTypeIdsBuffer = renderGraph.GetBuffer(positionCountSum, isPersistent: true);
+		if (positionCountSum == 0)
+		{
+			renderGraph.ClearResource<GpuDrivenRenderingData>();
+			isInitialized = false;
+			return;
+		}
+
+		isInitialized = true;
+
+		instanceTypeIdsBuffer = renderGraph.GetBuffer(positionCountSum, isPersistent: true);
         positionsBuffer = renderGraph.GetBuffer(positionCountSum, sizeof(float) * 12, isPersistent: true);
         lodFadesBuffer = renderGraph.GetBuffer(positionCountSum, isPersistent: true);
         instanceBoundsBuffer = renderGraph.GetBuffer(positionCountSum, sizeof(float) * 4, isPersistent: true);
@@ -107,8 +120,10 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
             }
         }
 
-        // Build mesh rendering data
-        using var sharedMaterials = ScopedPooledList<Material>.Get();
+		proceduralGenerationController.instanceData.Clear();
+
+		// Build mesh rendering data
+		using var sharedMaterials = ScopedPooledList<Material>.Get();
         using var renderers = ScopedPooledList<Renderer>.Get();
 
         // Note these are used to set data inside the lambda, so can't have a using statement

@@ -194,6 +194,12 @@ public class RenderGraph : IDisposable
 		ResourceMap.SetRenderPassData(resource, FrameIndex, isPersistent);
 	}
 
+	public void ClearResource<T>() where T : IRenderPassData
+	{
+		Assert.IsFalse(IsExecuting);
+		ResourceMap.SetRenderPassData<T>(default, -1, false);
+	}
+
 	public bool IsRenderPassDataValid<T>() where T : IRenderPassData
 	{
 		return ResourceMap.IsRenderPassDataValid<T>(FrameIndex);

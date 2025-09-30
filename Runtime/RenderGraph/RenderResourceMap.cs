@@ -103,6 +103,11 @@ public class RenderResourceMap : IDisposable
 		SetRenderPassData(handle, renderResource, frameIndex, isPersistent);
 	}
 
+	public bool ClearRenderPassData<T>()
+	{
+		return handleIndexMap.Remove(typeof(T));
+	}
+
 	protected virtual void Dispose(bool disposing)
 	{
 		if (disposedValue)

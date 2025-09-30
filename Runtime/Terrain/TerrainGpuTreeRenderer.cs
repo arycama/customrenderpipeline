@@ -9,8 +9,6 @@ public class TerrainGpuTreeRenderer : MonoBehaviour, IGpuProceduralGenerator
 {
 	private ProceduralGenerationController proceduralGenerationController;
 
-	private ResourceHandle<GraphicsBuffer> positionsBuffer, typeBuffer;
-
 	private void OnEnable()
 	{
 		proceduralGenerationController = DependencyResolver.Resolve<ProceduralGenerationController>();
@@ -65,24 +63,25 @@ public class TerrainGpuTreeRenderer : MonoBehaviour, IGpuProceduralGenerator
 			Array.Sort(types, positions);
 			Array.Sort(types);
 
-			positionsBuffer = renderGraph.GetBuffer(treeCount, UnsafeUtility.SizeOf<Float3x4>());
-			typeBuffer = renderGraph.GetBuffer(treeCount);
+			var positionsBuffer = renderGraph.GetBuffer(treeCount, UnsafeUtility.SizeOf<Float3x4>(), isPersistent: true);
+			var typeBuffer = renderGraph.GetBuffer(treeCount, isPersistent: true);
 			var counterBufferHandle = renderGraph.GetBuffer(isPersistent: true);
 
 			pass.WriteBuffer("", positionsBuffer);
 			pass.WriteBuffer("", typeBuffer);
 			pass.WriteBuffer("", counterBufferHandle);
 
-			pass.SetRenderFunction((command, pass) =>
+			var prefabCount = prototypes.Length;
+			pass.SetRenderFunction((positionsBuffer, typeBuffer, positions, types, proceduralGenerationController, counterBufferHandle, gameObjects, counts, prefabCount), static (command, pass, data) =>
 			{
-				command.SetBufferData(pass.GetBuffer(positionsBuffer), positions);
-				command.SetBufferData(pass.GetBuffer(typeBuffer), types);
+				command.SetBufferData(pass.GetBuffer(data.positionsBuffer), data.positions);
+				command.SetBufferData(pass.GetBuffer(data.typeBuffer), data.types);
 
 				// TODO: Make this not neccessary.
-				var index = proceduralGenerationController.AddHandleToFree(counterBufferHandle);
-				var prefabStart = proceduralGenerationController.AddData(positionsBuffer, typeBuffer, gameObjects);
+				var index = data.proceduralGenerationController.AddHandleToFree(data.counterBufferHandle);
+				var prefabStart = data.proceduralGenerationController.AddData(data.positionsBuffer, data.typeBuffer, data.gameObjects);
 
-				proceduralGenerationController.OnRequestComplete(counts, index, prefabStart, prototypes.Length);
+				data.proceduralGenerationController.OnRequestComplete(data.counts, index, prefabStart, data.prefabCount);
 			});
 		}
 	}

@@ -34,6 +34,9 @@ public class WaterFft : FrameRenderFeature
 
     public override void Render(ScriptableRenderContext context)
     {
+		if (!settings.IsEnabled)
+			return;
+
         // Todo: Should this happen in constructor?
         if (!roughnessInitialized)
         {
@@ -68,8 +71,6 @@ public class WaterFft : FrameRenderFeature
 		var maxWaveNumber1 = Sqrt(2 * Square(Pi * settings.Resolution * oceanScale.y));
 		var maxWaveNumber2 = Sqrt(2 * Square(Pi * settings.Resolution * oceanScale.z));
 		var maxWaveNumber3 = Sqrt(2 * Square(Pi * settings.Resolution * oceanScale.w));
-
-
 
 		var oceanBuffer = renderGraph.SetConstantBuffer((
             Profile.WindSpeed,

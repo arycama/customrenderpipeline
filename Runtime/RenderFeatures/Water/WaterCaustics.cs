@@ -82,6 +82,9 @@ public class WaterCaustics : CameraRenderFeature
 
     public override void Render(Camera camera, ScriptableRenderContext context)
     {
+		if (!settings.IsEnabled)
+			return;
+
 		using var scope = renderGraph.AddProfileScope("Water Caustics");
 
         var Profile = settings.Profile;

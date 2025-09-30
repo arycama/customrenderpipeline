@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Assertions;
 
 public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDisposable where T : class where V : IResourceDescriptor<T>
 {
@@ -66,6 +67,7 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 	public void ReleasePersistentResource(ResourceHandle<T> handle)
 	{
 		var info = handleInfo[handle.Index];
+		Assert.IsTrue(info.isPersistent);
 		info.isReleasable = true;
 		handleInfo[handle.Index] = info;
 	}

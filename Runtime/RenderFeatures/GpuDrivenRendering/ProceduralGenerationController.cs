@@ -61,7 +61,8 @@ public class ProceduralGenerationController
         var index = generatorData.FindIndex(x => x.Item1 == generator);
         Assert.AreNotEqual(index, -1, "Trying to remove a generator that was not added");
         generatorData.RemoveAt(index);
-    }
+		Version++;
+	}
 
     public int AddData(ResourceHandle<GraphicsBuffer> positionBuffer, ResourceHandle<GraphicsBuffer> instanceIdBuffer, IList<GameObject> gameObjects)
     {
