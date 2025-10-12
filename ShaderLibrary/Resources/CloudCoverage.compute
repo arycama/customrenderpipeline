@@ -45,7 +45,8 @@ void CloudCoverage(uint groupIndex : SV_GroupIndex)
 		result = lerp(_CloudCoverage, result, 0.05);
 	
 	// TODO: Need to figure out why this happens and fix it
-	result = IsInfOrNaN(result) ? float2(0.0, 1.0).xxxy : result;
+	//result = IsInfOrNaN(result) ? float2(0.0, 1.0).xxxy : result;
+	result = float2(0.0, 1.0).xxxy;
 	
 	// Smooth results over time to avoid flickering
 	_Result[0] = result;
