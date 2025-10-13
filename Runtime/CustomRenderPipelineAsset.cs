@@ -14,6 +14,7 @@ public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 	[field: SerializeField] public TerrainSettings TerrainSettings { get; private set; }
 	[field: SerializeField] public GrassRenderer.Settings Grass { get; private set; }
 
+	[field: SerializeField] public EnvironmentLightingSettings EnvironmentLighting { get; private set; }
 	[field: SerializeField] public LightingSettings LightingSettings { get; private set; }
 
 	[field: SerializeField] public ClusteredLightCulling.Settings ClusteredLightingSettings { get; private set; }

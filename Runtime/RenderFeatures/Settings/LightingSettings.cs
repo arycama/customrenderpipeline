@@ -4,8 +4,6 @@ using UnityEngine;
 [Serializable]
 public class LightingSettings
 {
-	[field: SerializeField] public int EnvironmentResolution { get; private set; } = 128;
-	[field: SerializeField, Range(1, 512)] public int EnvironmentSamples { get; private set; } = 128;
 	[field: SerializeField] public bool MicroShadows { get; private set; } = true;
 	[field: SerializeField, Range(1e-3f, 180)] public float SunAngularDiameter { get; private set; } = 0.52f;
 

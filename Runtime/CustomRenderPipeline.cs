@@ -292,7 +292,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// Light processing
 		new LightingSetup(renderGraph, asset.LightingSettings),
 		new PhysicalSkyGenerateData(asset.Sky, asset.Clouds, renderGraph),
-		new GgxConvolve(renderGraph, asset.LightingSettings, asset.Clouds, asset.Sky),
+		new PhysicalSkyProbe(renderGraph, asset.EnvironmentLighting, asset.Clouds, asset.Sky),
+		new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting),
 
 		new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer, gpuDrivenRenderer),
 		new VolumetricCloudShadow(asset.Clouds, asset.Sky, renderGraph),

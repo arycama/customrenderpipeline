@@ -2,97 +2,33 @@
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class GgxConvolve : CameraRenderFeature
+public class EnvironmentConvolve : CameraRenderFeature
 {
 	public override string ProfilerNameOverride => "Ggx Convolve";
 
-	private readonly Material skyMaterial, ggxConvolveMaterial;
-	private readonly LightingSettings lightingSettings;
-	private readonly VolumetricClouds.Settings cloudSettings;
-	private readonly Sky.Settings skySettings;
+	private readonly Material convolveMaterial;
+	private readonly EnvironmentLightingSettings settings;
 
-	public GgxConvolve(RenderGraph renderGraph, LightingSettings lightingSettings, VolumetricClouds.Settings cloudSettings, Sky.Settings skySettings) : base(renderGraph)
+	public EnvironmentConvolve(RenderGraph renderGraph, EnvironmentLightingSettings settings) : base(renderGraph)
 	{
-		ggxConvolveMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
-        skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
-		this.lightingSettings = lightingSettings;
-		this.cloudSettings = cloudSettings;
-		this.skySettings = skySettings;
+		convolveMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
+		this.settings = settings;
 	}
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
-		using var scope = renderGraph.AddProfileScope("Environment Probe Update");
+		using var scope = renderGraph.AddProfileScope("Environment Probe Convolve");
 
-		// TODO: Use octahedral maps
-		// TODO: Init ambient probe to black or similar in the case of no skybox
-		// TODO: Supply an external cubemap instead of doing all the logic here
 		var ambientBuffer = renderGraph.GetBuffer(9, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
-		//if (!RenderSettings.skybox || RenderSettings.skybox.FindPass("Cubemap") == -1)
-		//{
-		//	// Still need to mark buffer as written to so it gets handled correctly. Guess I could set the data here from cpu
-		//	using var pass = renderGraph.AddRenderPass<GenericRenderPass>("Ambient Probe Update");
-		//	pass.WriteBuffer("", ambientBuffer);
-
-		//	renderGraph.SetResource(new EnvironmentData(renderGraph.EmptyCubemap, ambientBuffer));
-		//	return;
-		//}
-
-		var envResolution = lightingSettings.EnvironmentResolution;
-		var reflectionProbeTemp = renderGraph.GetTexture(envResolution, envResolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, hasMips: true, autoGenerateMips: true);
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Environment Cubemap"))
-		{
-			var keyword = string.Empty;
-			var viewHeight = camera.transform.position.y;
-			if (viewHeight > cloudSettings.StartHeight)
-			{
-				if (viewHeight > cloudSettings.StartHeight + cloudSettings.LayerThickness)
-				{
-					keyword = "ABOVE_CLOUD_LAYER";
-				}
-			}
-			else
-			{
-				keyword = "BELOW_CLOUD_LAYER";
-			}
-
-			pass.Initialize(skyMaterial, skyMaterial.FindPass("Reflection Probe"), 1, keyword);
-			pass.WriteTexture(reflectionProbeTemp);
-
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<CloudData>();
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<SkyTransmittanceData>();
-			pass.AddRenderPassData<SkyReflectionAmbientData>();
-			
-			var time = (float)pass.RenderGraph.GetResource<TimeData>().Time;
-
-			pass.SetRenderFunction((command, pass) =>
-			{
-				cloudSettings.SetCloudPassData(pass, time);
-				pass.SetFloat("_Samples", skySettings.ReflectionSamples);
-
-				using var scope = ArrayPool<Matrix4x4>.Get(6, out var array);
-				for (var i = 0; i < 6; i++)
-				{
-					var rotation = Quaternion.LookRotation(Matrix4x4Extensions.lookAtList[i], Matrix4x4Extensions.upVectorList[i]);
-					var viewToWorld = Matrix4x4.TRS(Float3.Zero, rotation, Float3.One);
-					array[i] = MatrixExtensions.PixelToWorldViewDirectionMatrix(envResolution, envResolution, Vector2.zero, 1.0f, 1.0f, viewToWorld, true);
-				}
-
-				pass.SetMatrixArray("_PixelToWorldViewDirs", array);
-			});
-		}
+		var envResolution = settings.Resolution;
 
 		var ambientComputeShader = Resources.Load<ComputeShader>("AmbientProbe");
 		var ambientBufferTemp = renderGraph.GetBuffer(9, sizeof(float) * 4, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ambient Convolve"))
 		{
 			pass.Initialize(ambientComputeShader, normalizedDispatch: false);
-			pass.ReadTexture("_AmbientProbeInputCubemap", reflectionProbeTemp);
 			pass.WriteBuffer("_AmbientProbeOutputBuffer", ambientBufferTemp);
+			pass.AddRenderPassData<EnvironmentProbeTempResult>();
 
 			pass.SetRenderFunction(envResolution, static (command, pass, reflectionResolution) =>
 			{
@@ -118,32 +54,32 @@ public class GgxConvolve : CameraRenderFeature
 		{
 			pass.WriteTexture(reflectionProbe);
 			pass.WriteBuffer("", ambientBuffer);
-
-			pass.ReadTexture("", reflectionProbeTemp);
 			pass.ReadBuffer("", ambientBufferTemp);
+			pass.AddRenderPassData<EnvironmentProbeTempResult>();
+			var reflectionProbeTemp = renderGraph.GetResource<EnvironmentProbeTempResult>();
 
-			pass.SetRenderFunction((reflectionProbeTemp, ambientBufferTemp, reflectionProbe, ambientBuffer), (command, pass, data) =>
+			pass.SetRenderFunction((reflectionProbeTemp.TempProbe, ambientBufferTemp, reflectionProbe, ambientBuffer), (command, pass, data) =>
 			{
 				command.CopyBuffer(pass.GetBuffer(data.ambientBufferTemp), pass.GetBuffer(data.ambientBuffer));
 
 				// Need to copy the faces one by one since we don't want to copy the whole texture
 				for (var i = 0; i < 6; i++)
-					command.CopyTexture(pass.GetRenderTexture(data.reflectionProbeTemp), i, 0, pass.GetRenderTexture(data.reflectionProbe), i, 0);
+					command.CopyTexture(pass.GetRenderTexture(data.TempProbe), i, 0, pass.GetRenderTexture(data.reflectionProbe), i, 0);
 			});
 		}
 
 		const int mipLevels = 6;
-
 		for (var i = 1; i < 7; i++)
 		{
 			using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ggx Convolve"))
 			{
-				pass.Initialize(ggxConvolveMaterial);
+				pass.Initialize(convolveMaterial);
 				pass.MipLevel = i;
 
 				pass.WriteTexture(reflectionProbe);
-				pass.ReadTexture("_AmbientProbeInputCubemap", reflectionProbeTemp);
-				pass.SetRenderFunction((i, envResolution, lightingSettings.EnvironmentSamples), static (command, pass, data) =>
+				pass.AddRenderPassData<EnvironmentProbeTempResult>();
+
+				pass.SetRenderFunction((i, envResolution, settings.Samples), static (command, pass, data) =>
 				{
 					using var scope = ArrayPool<Matrix4x4>.Get(6, out var array);
 
@@ -159,7 +95,7 @@ public class GgxConvolve : CameraRenderFeature
 					var mipPerceptualRoughness = Mathf.Clamp01(1.7f / 1.4f - Math.Sqrt(2.89f / 1.96f - 2.8f / 1.96f * perceptualRoughness));
 					var mipRoughness = mipPerceptualRoughness * mipPerceptualRoughness;
 
-					pass.SetFloat("_Samples", data.EnvironmentSamples);
+					pass.SetFloat("_Samples", data.Samples);
 					pass.SetMatrixArray("_PixelToWorldViewDirs", array);
 					pass.SetFloat("_Level", data.i);
 					pass.SetFloat("_InvOmegaP", 6.0f * data.envResolution * data.envResolution / (4.0f * Mathf.PI));
