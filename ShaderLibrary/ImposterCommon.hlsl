@@ -1,40 +1,8 @@
 #pragma once
 
+#include "Packing.hlsl"
+
 // Helper functions
-// Packs a normal into a uv using hemi-octahedral encoding
-float2 HemiOctahedralNormalToUv(float3 n)
-{
-	float l1norm = dot(abs(n), 1.0);
-	float2 res = n.xz * rcp(l1norm);
-	return 0.5 * float2(res.x + res.y, res.x - res.y) + 0.5;
-}
-
-float2 OctahedralNormalToUv(float3 n)
-{
-	n *= rcp(dot(abs(n), 1.0));
-	float t = saturate(-n.y);
-	return 0.5 * (n.xz + (n.xz >= 0.0 ? t : -t)) + 0.5;
-}
-
-// Unpacks a normal from a hemi-octahedral encoded uv
-float3 UvToHemiOctahedralNormal(float2 uv)
-{
-	float2 f = 2.0 * uv - 1.0;
-	float2 val = float2(f.x + f.y, f.x - f.y) * 0.5;
-	return normalize(float3(val, 1.0 - dot(abs(val), 1.0)).xzy);
-}
-
-float3 UvToOctahedralNormal(float2 uv)
-{
-	float2 f = 2.0 * uv - 1.0;
-	float3 n = float3(f, 1.0 - abs(f.x) - abs(f.y));
-
-	float t = max(-n.y, 0.0);
-	n.xz += n.xz >= 0.0 ? -t.x : t.x;
-
-	return normalize(n);
-}
-
 float2 Parallax(Texture2DArray<float> Height, float3 uv, out float outHeight, float3 viewDir, float3 rayOrigin, float offset = 0.5)
 {
 	outHeight = 0.5;
@@ -108,17 +76,17 @@ float2 NormalToUv(float3 normal)
 {
 	#ifdef MODE_HEMISPHERE
 		normal.y = max(0.0, normal.y);
-		return HemiOctahedralNormalToUv(normal);
+		return NormalToHemiOctahedralUv(normal);
 	#else
-	return OctahedralNormalToUv(normal);
+		return NormalToOctahedralUv(normal);
 	#endif
 }
 
 float3 UvToNormal(float2 uv)
 {
 	#ifdef MODE_HEMISPHERE
-		return UvToHemiOctahedralNormal(uv);
+		return HemiOctahedralUvToNormal(uv);
 	#else
-		return UvToOctahedralNormal(uv);
+		return OctahedralUvToNormal(uv);
 	#endif
 }

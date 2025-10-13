@@ -1,6 +1,7 @@
 #include "../Common.hlsl"
 #include "../Color.hlsl"
 #include "../Geometry.hlsl"
+#include "../Packing.hlsl"
 #include "../Random.hlsl"
 #include "../Samplers.hlsl"
 #include "../SphericalHarmonics.hlsl"
@@ -10,7 +11,7 @@
 float _MipLevel;
 static const uint _SampleCount = 512;
 groupshared float SharedCoeffs[9][_SampleCount];
-TextureCube<float3> _AmbientProbeInputCubemap;
+Texture2D<float3> Input;
 RWStructuredBuffer<float4> _AmbientProbeOutputBuffer;
 
 [numthreads(_SampleCount, 1, 1)]
@@ -18,7 +19,8 @@ void AmbientProbe(uint groupIndex : SV_GroupIndex)
 {
 	float2 u = Hammersley2dSeq(groupIndex, _SampleCount);
 	float3 N = SampleSphereUniform(u.x, u.y);
-	float3 value = _AmbientProbeInputCubemap.SampleLevel(TrilinearClampSampler, N, _MipLevel) * FourPi / _SampleCount;
+	float2 uv = NormalToOctahedralUv(N);
+	float3 value = Input.SampleLevel(TrilinearClampSampler, uv, _MipLevel) * FourPi / _SampleCount;
 	
 	float basis[9];
 	GetShBasis(N, basis);

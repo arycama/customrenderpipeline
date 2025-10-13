@@ -17,12 +17,12 @@ Texture2D<float4> GbufferAlbedoMetallic, NormalRoughness, BentNormalOcclusion;
 
 float3 PackGBufferNormal(float3 normal)
 {
-	return PackFloat2To888(0.5 * PackNormalOctQuadEncode(normal) + 0.5);
+	return PackFloat2To888(NormalToOctahedralUv(normal));
 }
 
 float3 UnpackGBufferNormal(float4 data)
 {
-	return UnpackNormalOctQuadEncode(2.0 * Unpack888ToFloat2(data.xyz) - 1.0);
+	return OctahedralUvToNormal(Unpack888ToFloat2(data.xyz));
 }
 
 float3 GBufferNormal(float4 data, float3 V, out float NdotV)

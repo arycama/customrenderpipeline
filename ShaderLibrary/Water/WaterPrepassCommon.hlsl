@@ -9,7 +9,7 @@ float3 _WaterAlbedo, _WaterExtinction;
 
 float3 GetTriangleNormal(uint2 coord, float3 V, out bool isFrontFace)
 {
-	float3 triangleNormal = UnpackNormalOctQuadEncode(2.0 * _WaterTriangleNormal[coord] - 1.0);
+	float3 triangleNormal = OctahedralUvToNormal(_WaterTriangleNormal[coord]);
 	isFrontFace = dot(V, triangleNormal) >= 0.0;
 	return triangleNormal;
 }
@@ -17,7 +17,7 @@ float3 GetTriangleNormal(uint2 coord, float3 V, out bool isFrontFace)
 float3 GetTriangleNormal(uint2 coord, float3 V, out bool isFrontFace, out bool isValid)
 {
 	float2 data = _WaterTriangleNormal[coord];
-	float3 triangleNormal = UnpackNormalOctQuadEncode(2.0 * data - 1.0);
+	float3 triangleNormal = OctahedralUvToNormal(data);
 	isFrontFace = dot(V, triangleNormal) >= 0.0;
 	isValid = any(data != 0.0);
 	return triangleNormal;

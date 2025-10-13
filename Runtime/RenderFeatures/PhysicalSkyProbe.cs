@@ -23,7 +23,7 @@ public class PhysicalSkyProbe : CameraRenderFeature
 	{
 		using var scope = renderGraph.AddProfileScope("Environment Probe Update");
 
-		var reflectionProbeTemp = renderGraph.GetTexture(environmentLighting.Resolution, environmentLighting.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, dimension: TextureDimension.Cube, hasMips: true, autoGenerateMips: true);
+		var reflectionProbeTemp = renderGraph.GetTexture(environmentLighting.Resolution, environmentLighting.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true);
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Environment Cubemap"))
 		{
 			var keyword = string.Empty;
@@ -57,16 +57,6 @@ public class PhysicalSkyProbe : CameraRenderFeature
 			{
 				cloudSettings.SetCloudPassData(pass, time);
 				pass.SetFloat("_Samples", skySettings.ReflectionSamples);
-
-				using var scope = ArrayPool<Matrix4x4>.Get(6, out var array);
-				for (var i = 0; i < 6; i++)
-				{
-					var rotation = Quaternion.LookRotation(Matrix4x4Extensions.lookAtList[i], Matrix4x4Extensions.upVectorList[i]);
-					var viewToWorld = Matrix4x4.TRS(Float3.Zero, rotation, Float3.One);
-					array[i] = MatrixExtensions.PixelToWorldViewDirectionMatrix(environmentLighting.Resolution, environmentLighting.Resolution, Vector2.zero, 1.0f, 1.0f, viewToWorld, true);
-				}
-
-				pass.SetMatrixArray("_PixelToWorldViewDirs", array);
 			});
 		}
 

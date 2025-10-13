@@ -1,15 +1,15 @@
 #include "../Common.hlsl"
 #include "../Lighting.hlsl"
+#include "../Packing.hlsl"
 #include "../Random.hlsl"
 
-TextureCube<float3> _AmbientProbeInputCubemap;
+Texture2D<float3> Input;
 float _Level, _Samples, _InvOmegaP;
-float4x4 _PixelToWorldViewDirs[6];
 
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	float NdotV = 1;
-	float3 V = normalize(mul((float3x3) _PixelToWorldViewDirs[index], float3(position.xy, 1.0)));
+	float3 V = OctahedralUvToNormal(uv);
 	
 	// Precompute?
 	float perceptualRoughness = MipmapLevelToPerceptualRoughness(_Level);
@@ -36,7 +36,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 		float3 localL = reflect(-localV, H);
 		
 		float3 L = FromToRotationZ(V, localL);
-		float3 color = _AmbientProbeInputCubemap.SampleLevel(TrilinearClampSampler, L, mipLevel);
+		float2 uv = NormalToOctahedralUv(L);
+		float3 color = Input.SampleLevel(TrilinearClampSampler, uv, mipLevel);
 
 		result += float4(color, 1.0) * GgxV(NdotL, NdotV, roughness2, partLambdaV) * NdotL * NdotV;
 	}

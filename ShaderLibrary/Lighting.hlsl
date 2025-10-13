@@ -7,6 +7,7 @@
 #include "Exposure.hlsl"
 #include "ImageBasedLighting.hlsl"
 #include "LightingCommon.hlsl"
+#include "Packing.hlsl"
 #include "SpaceTransforms.hlsl"
 #include "Utility.hlsl"
 #include "WaterCommon.hlsl"
@@ -543,7 +544,8 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	
 	float3 iblR = GetSpecularDominantDir(N, R, roughness, NdotV);
 	float iblMipLevel = PerceptualRoughnessToMipmapLevel(perceptualRoughness);
-	float3 radiance = SkyReflection.SampleLevel(TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
+	float2 skyUv = NormalToOctahedralUv(iblR);
+	float3 radiance = SkyReflection.SampleLevel(TrilinearClampSampler, skyUv, iblMipLevel) * rStrength;
 	
 	float BdotR = dot(bentNormal, R);
 	float specularOcclusion = GetSpecularOcclusion(visibilityAngle, BdotR, perceptualRoughness, dot(N, R));

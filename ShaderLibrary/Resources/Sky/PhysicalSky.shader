@@ -16,8 +16,7 @@ Shader "Hidden/Physical Sky"
             Name "Reflection Probe"
 
             HLSLPROGRAM
-            #pragma vertex VertexIdPassthrough
-            #pragma geometry GeometryCubemapRender
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentRender
             #pragma multi_compile _ BELOW_CLOUD_LAYER ABOVE_CLOUD_LAYER
             #define REFLECTION_PROBE

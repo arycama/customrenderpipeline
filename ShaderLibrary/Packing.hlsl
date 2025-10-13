@@ -26,51 +26,35 @@ float2 Unpack888ToFloat2(float3 x)
 	return cb / 4095.0;
 }
 
-// Ref: http://jcgt.org/published/0003/02/01/paper.pdf "A Survey of Efficient Representations for Independent Unit Vectors"
-// Encode with Oct, this function work with any size of output
-// return float between [-1, 1]
-float2 PackNormalOctQuadEncode(float3 n)
-{
-    //float l1norm    = dot(abs(n), 1.0);
-    //float2 res0     = n.xy * (1.0 / l1norm);
-
-    //float2 val      = 1.0 - abs(res0.yx);
-    //return (n.zz < float2(0.0, 0.0) ? (res0 >= 0.0 ? val : -val) : res0);
-
-    // Optimized version of above code:
-	n *= rcp(max(dot(abs(n), 1.0), 1e-6));
-	float t = saturate(-n.z);
-	return n.xy + (n.xy >= 0.0 ? t : -t);
-}
-
-float3 UnpackNormalOctQuadEncode(float2 f)
-{
-	float3 n = float3(f.x, f.y, 1.0 - abs(f.x) - abs(f.y));
-
-    //float2 val = 1.0 - abs(n.yx);
-    //n.xy = (n.zz < float2(0.0, 0.0) ? (n.xy >= 0.0 ? val : -val) : n.xy);
-
-    // Optimized version of above code:
-	float t = max(-n.z, 0.0);
-	n.xy += n.xy >= 0.0 ? -t.xx : t.xx;
-
-	return normalize(n);
-}
-
 // Packs a normal into a uv using hemi-octahedral encoding
-float2 PackNormalHemiOctahedral(float3 n)
+float2 NormalToHemiOctahedralUv(float3 n)
 {
-	float l1norm = dot(abs(n), 1.0);
-	float2 res = n.xz * (1.0 / l1norm);
+	float2 res = n.xy * rcp(dot(abs(n), 1.0));
 	return 0.5 * float2(res.x + res.y, res.x - res.y) + 0.5;
 }
 
 // Unpacks a normal from a hemi-octahedral encoded uv
-float3 UnpackNormalHemiOctahedral(float2 uv)
+float3 HemiOctahedralUvToNormal(float2 uv)
 {
 	float2 f = 2.0 * uv - 1.0;
 	float2 val = float2(f.x + f.y, f.x - f.y) * 0.5;
-	return normalize(float3(val, 1.0 - dot(abs(val), 1.0)).xzy);
+	return normalize(float3(val, 1.0 - dot(abs(val), 1.0)));
+}
+
+float3 OctahedralUvToNormal(float2 uv)
+{
+	float2 f = 2.0 * uv - 1.0;
+	float3 n = float3(f, 1.0 - abs(f.x) - abs(f.y));
+	float t = max(-n.z, 0.0);
+	n.xy += n.xy >= 0.0 ? -t : t;
+	return normalize(n);
+}
+
+float2 NormalToOctahedralUv(float3 n)
+{
+	n *= rcp(dot(abs(n), 1.0));
+	float t = saturate(-n.z);
+	return 0.5 * (n.xy + (n.xy >= 0.0 ? t : -t)) + 0.5;
 }
 
 uint Float3ToR11G11B10(float3 rgb)

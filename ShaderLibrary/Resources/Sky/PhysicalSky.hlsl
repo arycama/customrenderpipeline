@@ -7,8 +7,8 @@
 #include "../../Random.hlsl"
 #include "../../Temporal.hlsl"
 #include "../../VolumetricLight.hlsl"
+#include "../../Packing.hlsl"
 
-matrix _PixelToWorldViewDirs[6];
 Texture2D<float> CloudTransmittanceTexture;
 Texture2D<float3> CloudTexture;
 
@@ -49,7 +49,7 @@ float3 SampleLuminance(float3 rayDirection, float xi, uint colorIndex, bool rayI
 float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
 {
 	#ifdef REFLECTION_PROBE
-		float3 rayDirection = normalize(MultiplyVector(_PixelToWorldViewDirs[index], float3(position.xy, 1.0)));
+		float3 rayDirection = OctahedralUvToNormal(uv);
 		float2 offsets = InterleavedGradientNoise(position.xy, 0);
 	#else
 		float rcpRdLength = RcpLength(worldDir);

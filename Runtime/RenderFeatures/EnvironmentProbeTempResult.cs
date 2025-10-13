@@ -9,7 +9,7 @@ public readonly struct EnvironmentProbeTempResult : IRenderPassData
 
 	void IRenderPassData.SetInputs(RenderPassBase pass)
 	{
-		pass.ReadTexture("_AmbientProbeInputCubemap", TempProbe);
+		pass.ReadTexture("Input", TempProbe);
 	}
 
 	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
