@@ -16,7 +16,7 @@ public readonly struct AutoExposureData : IRenderPassData
 
 	public readonly void SetInputs(RenderPassBase pass)
 	{
-		pass.ReadBuffer("Exposure", ExposureBuffer);
+		pass.ReadBuffer("ExposureBuffer", ExposureBuffer);
 	}
 
 	public readonly void SetProperties(RenderPassBase pass, CommandBuffer command)

@@ -1,6 +1,6 @@
 #pragma once
 
-cbuffer Exposure
+cbuffer ExposureBuffer
 {
 	float Exposure;
 	float RcpExposure;
