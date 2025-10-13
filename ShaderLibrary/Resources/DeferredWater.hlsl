@@ -197,7 +197,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float perceptualRoughness = normalRoughness.a;
 	
 	// TODO: Put somewhere
-	float2 dfg = _PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
+	float2 dfg = PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
 	float f0 = 0.02;
 	float fssEss = dfg.x * f0 + dfg.y;
 	float fAvg = AverageFresnel(f0);

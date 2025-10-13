@@ -7,7 +7,7 @@
 #include "SphericalHarmonics.hlsl"
 
 Texture3D<float> SpecularOcclusion;
-TextureCube<float3> _SkyReflection;
+TextureCube<float3> SkyReflection;
 
 cbuffer AmbientSh
 {

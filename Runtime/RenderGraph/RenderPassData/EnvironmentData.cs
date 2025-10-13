@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public class EnvironmentData : IRenderPassData
+public readonly struct EnvironmentData : IRenderPassData
 {
 	private readonly ResourceHandle<RenderTexture> skyReflection;
 	private readonly ResourceHandle<GraphicsBuffer> ambientBuffer;
@@ -12,13 +12,13 @@ public class EnvironmentData : IRenderPassData
 		this.ambientBuffer = ambientBuffer;
 	}
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+    readonly void IRenderPassData.SetInputs(RenderPassBase pass)
 	{
-		pass.ReadTexture("_SkyReflection", skyReflection);
+		pass.ReadTexture("SkyReflection", skyReflection);
 		pass.ReadBuffer("AmbientSh", ambientBuffer);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+    readonly void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
 	{
 	}
 }

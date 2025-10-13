@@ -25,7 +25,7 @@ cbuffer LightingData
 
 SamplerComparisonState LinearClampCompareSampler, PointClampCompareSampler;
 Texture2DArray<float> DirectionalShadows;
-Texture2D<float2> _PrecomputedDfg;
+Texture2D<float2> PrecomputedDfg;
 float4 DirectionalShadows_TexelSize;
 StructuredBuffer<matrix> DirectionalShadowMatrices;
 
@@ -469,7 +469,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float partLambdaV = GetPartLambdaV(roughness2, NdotV);
 	
 	float f0Avg = dot(f0, 1.0 / 3.0);
-	float2 dfg = _PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
+	float2 dfg = PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
 	float ems = 1.0 - dfg.x - dfg.y;
 	float3 multiScatterTerm = GgxMultiScatterTerm(f0, perceptualRoughness, NdotV, ems);
 	
@@ -536,14 +536,14 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	{
 		iblN = float3(0.0, 1.0, 0.0);
 		float NdotR = dot(iblN, -R);
-		float2 dfg = _PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotR, perceptualRoughness), 32));
+		float2 dfg = PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotR, perceptualRoughness), 32));
 		rStrength = dfg.x * f0 + dfg.y;
 		R = reflect(R, iblN);
 	}
 	
 	float3 iblR = GetSpecularDominantDir(N, R, roughness, NdotV);
 	float iblMipLevel = PerceptualRoughnessToMipmapLevel(perceptualRoughness);
-	float3 radiance = _SkyReflection.SampleLevel(TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
+	float3 radiance = SkyReflection.SampleLevel(TrilinearClampSampler, iblR, iblMipLevel) * rStrength;
 	
 	float BdotR = dot(bentNormal, R);
 	float specularOcclusion = GetSpecularOcclusion(visibilityAngle, BdotR, perceptualRoughness, dot(N, R));

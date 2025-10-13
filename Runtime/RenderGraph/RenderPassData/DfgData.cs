@@ -17,7 +17,7 @@ public class DfgData : IRenderPassData
 
 	void IRenderPassData.SetInputs(RenderPassBase pass)
 	{
-		pass.ReadTexture("_PrecomputedDfg", precomputeDfg);
+		pass.ReadTexture("PrecomputedDfg", precomputeDfg);
 		pass.ReadTexture("DirectionalAlbedo", directionalAlbedo);
 		pass.ReadTexture("AverageAlbedo", averageAlbedo);
 		pass.ReadTexture("DirectionalAlbedoMs", directionalAlbedoMs);

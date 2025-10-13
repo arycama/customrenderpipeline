@@ -5,7 +5,7 @@
 
 #pragma kernel CloudCoverage
 
-RWBuffer<float4> _Result;
+RWStructuredBuffer<float4> _Result;
 
 static const uint _ThreadCount = 1024;
 
