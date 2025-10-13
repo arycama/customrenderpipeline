@@ -49,7 +49,7 @@ public class EnvironmentConvolve : CameraRenderFeature
 			});
 		}
 
-		var reflectionProbe = renderGraph.GetTexture(envResolution, envResolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true);
+		var reflectionProbe = renderGraph.GetTexture(envResolution, envResolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true);
 		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Ambient Buffer Copy"))
 		{
 			pass.WriteTexture(reflectionProbe);
@@ -61,36 +61,34 @@ public class EnvironmentConvolve : CameraRenderFeature
 			pass.SetRenderFunction((reflectionProbeTemp.TempProbe, ambientBufferTemp, reflectionProbe, ambientBuffer), (command, pass, data) =>
 			{
 				command.CopyBuffer(pass.GetBuffer(data.ambientBufferTemp), pass.GetBuffer(data.ambientBuffer));
-
-				// Need to copy the faces one by one since we don't want to copy the whole texture
-				command.CopyTexture(pass.GetRenderTexture(data.TempProbe), pass.GetRenderTexture(data.reflectionProbe));
+				command.CopyTexture(pass.GetRenderTexture(data.TempProbe), 0, 0, pass.GetRenderTexture(data.reflectionProbe), 0, 0);
 			});
 		}
 
-		//const int mipLevels = 6;
-		//for (var i = 1; i < 7; i++)
-		//{
-		//	using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ggx Convolve"))
-		//	{
-		//		pass.Initialize(convolveMaterial);
-		//		pass.MipLevel = i;
+		const int mipLevels = 6;
+		for (var i = 1; i < 7; i++)
+		{
+			using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ggx Convolve"))
+			{
+				pass.Initialize(convolveMaterial);
+				pass.MipLevel = i;
 
-		//		pass.WriteTexture(reflectionProbe);
-		//		pass.AddRenderPassData<EnvironmentProbeTempResult>();
+				pass.WriteTexture(reflectionProbe);
+				pass.AddRenderPassData<EnvironmentProbeTempResult>();
 
-		//		pass.SetRenderFunction((i, envResolution, settings.Samples), static (command, pass, data) =>
-		//		{
-		//			var perceptualRoughness = Math.Saturate(data.i / (float)mipLevels);
-		//			var mipPerceptualRoughness = Math.Saturate(1.7f / 1.4f - Math.Sqrt(2.89f / 1.96f - 2.8f / 1.96f * perceptualRoughness));
-		//			var mipRoughness = mipPerceptualRoughness * mipPerceptualRoughness;
+				pass.SetRenderFunction((i, envResolution, settings.Samples), static (command, pass, data) =>
+				{
+					var perceptualRoughness = Math.Saturate(data.i / (float)mipLevels);
+					var mipPerceptualRoughness = Math.Saturate(1.7f / 1.4f - Math.Sqrt(2.89f / 1.96f - 2.8f / 1.96f * perceptualRoughness));
+					var mipRoughness = mipPerceptualRoughness * mipPerceptualRoughness;
 
-		//			pass.SetFloat("_Samples", data.Samples);
-		//			pass.SetFloat("_Level", data.i);
-		//			pass.SetFloat("_InvOmegaP", 6.0f * data.envResolution * data.envResolution / (4.0f * Math.Pi));
-		//			pass.SetFloat("_Roughness", mipRoughness);
-		//		});
-		//	}
-		//}
+					pass.SetFloat("_Samples", data.Samples);
+					pass.SetFloat("_Level", data.i);
+					pass.SetFloat("_InvOmegaP", 6.0f * data.envResolution * data.envResolution / (4.0f * Math.Pi));
+					pass.SetFloat("_Roughness", mipRoughness);
+				});
+			}
+		}
 
 		renderGraph.SetResource(new EnvironmentData(reflectionProbe, ambientBuffer));
 	}

@@ -41,6 +41,13 @@ float3 HemiOctahedralUvToNormal(float2 uv)
 	return normalize(float3(val, 1.0 - dot(abs(val), 1.0)));
 }
 
+float2 NormalToOctahedralUv(float3 n)
+{
+	n *= rcp(dot(abs(n), 1.0));
+	float t = saturate(-n.z);
+	return 0.5 * (n.xy + (n.xy >= 0.0 ? t : -t)) + 0.5;
+}
+
 float3 OctahedralUvToNormal(float2 uv)
 {
 	float2 f = 2.0 * uv - 1.0;
@@ -48,13 +55,6 @@ float3 OctahedralUvToNormal(float2 uv)
 	float t = max(-n.z, 0.0);
 	n.xy += n.xy >= 0.0 ? -t : t;
 	return normalize(n);
-}
-
-float2 NormalToOctahedralUv(float3 n)
-{
-	n *= rcp(dot(abs(n), 1.0));
-	float t = saturate(-n.z);
-	return 0.5 * (n.xy + (n.xy >= 0.0 ? t : -t)) + 0.5;
 }
 
 uint Float3ToR11G11B10(float3 rgb)

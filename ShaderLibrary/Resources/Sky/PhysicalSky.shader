@@ -15,6 +15,8 @@ Shader "Hidden/Physical Sky"
         {
             Name "Reflection Probe"
 
+            Blend SrcAlpha OneMinusSrcAlpha
+
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentRender

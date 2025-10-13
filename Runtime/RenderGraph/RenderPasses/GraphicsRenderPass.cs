@@ -152,7 +152,7 @@ public abstract class GraphicsRenderPass : RenderPass<GraphicsRenderPass>
 			throw new InvalidOperationException($"Render Pass {Name} has no resolution set, does it write to any textures");
 		}
 
-		Command.SetViewport(new Rect(0, 0, resolution.Value.x, resolution.Value.y));
+		Command.SetViewport(new Rect(0, 0, resolution.Value.x >> MipLevel, resolution.Value.y >> MipLevel));
 
 		ArrayPool<RenderTargetIdentifier>.Release(targets);
 		ArrayPool<RenderBufferLoadAction>.Release(loads);

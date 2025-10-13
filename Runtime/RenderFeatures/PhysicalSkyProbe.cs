@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -10,6 +11,7 @@ public class PhysicalSkyProbe : CameraRenderFeature
 	private readonly EnvironmentLightingSettings environmentLighting;
 	private readonly VolumetricClouds.Settings cloudSettings;
 	private readonly Sky.Settings skySettings;
+	private readonly Dictionary<Camera, ResourceHandle<RenderTexture>> cameraProbeHandles = new();
 
 	public PhysicalSkyProbe(RenderGraph renderGraph, EnvironmentLightingSettings environmentLighting, VolumetricClouds.Settings cloudSettings, Sky.Settings skySettings) : base(renderGraph)
 	{
@@ -19,11 +21,22 @@ public class PhysicalSkyProbe : CameraRenderFeature
 		this.skySettings = skySettings;
 	}
 
+	protected override void Cleanup(bool disposing)
+	{
+		foreach (var probe in cameraProbeHandles)
+			renderGraph.ReleasePersistentResource(probe.Value);
+	}
+
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
 		using var scope = renderGraph.AddProfileScope("Environment Probe Update");
 
-		var reflectionProbeTemp = renderGraph.GetTexture(environmentLighting.Resolution, environmentLighting.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true);
+		if(!cameraProbeHandles.TryGetValue(camera, out var reflectionProbeTemp))
+		{
+			reflectionProbeTemp = renderGraph.GetTexture(environmentLighting.Resolution, environmentLighting.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true, isPersistent: true, isExactSize: true);
+			cameraProbeHandles.Add(camera, reflectionProbeTemp);
+		}
+
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Environment Cubemap"))
 		{
 			var keyword = string.Empty;

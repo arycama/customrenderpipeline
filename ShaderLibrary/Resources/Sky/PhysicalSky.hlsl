@@ -50,13 +50,12 @@ float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 {
 	#ifdef REFLECTION_PROBE
 		float3 rayDirection = OctahedralUvToNormal(uv);
-		float2 offsets = InterleavedGradientNoise(position.xy, 0);
 	#else
 		float rcpRdLength = RcpLength(worldDir);
 		float3 rayDirection = worldDir * rcpRdLength;
-		float2 offsets = Noise2D(position.xy);
 	#endif
 	
+	float2 offsets = Noise2D(position.xy);
 	float viewCosAngle = rayDirection.y;
 	uint colorIndex = offsets.y < (1.0 / 3.0) ? 0 : (offsets.y < 2.0 / 3.0 ? 1 : 2);
 	float3 luminance = 0.0;
@@ -188,7 +187,7 @@ float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		luminance = 0;
 		
 	#ifdef REFLECTION_PROBE
-		return float4(luminance, 1.0);
+		return float4(luminance, 0.05);
 	#endif
 	
 	return float4(Rec2020ToICtCp(luminance * PaperWhite), 1.0);
