@@ -13,8 +13,6 @@ PrecomputeDfgOutput FragmentDirectionalAlbedo(float4 position : SV_Position, flo
 	uv = RemapHalfTexelTo01(uv, 32);
 	
 	float NdotV = max(1e-3, uv.x);
-	float sinThetaV = SinFromCos(NdotV);
-	
 	float perceptualRoughness = uv.y;
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 	float roughness2 = Sq(roughness);
@@ -27,17 +25,17 @@ PrecomputeDfgOutput FragmentDirectionalAlbedo(float4 position : SV_Position, flo
 	{
 		float2 u = Hammersley2dSeq(i, samples);
 		float NdotH = sqrt((1.0 - u.x) * rcp(u.x * (roughness2 - 1.0) + 1.0));
-		float cosPhi = cos(TwoPi * u.y);
+		float phi = TwoPi * u.y;
 
-		float LdotH = sinThetaV * cosPhi * SinFromCos(NdotH) + NdotV * NdotH;
+		float LdotH = SphericalDot(NdotV, 0.0, NdotH, phi);
 		float NdotL = -NdotV + 2.0 * LdotH * NdotH;
 		
 		if (NdotL <= 0.0)
 			continue;
-
+		
 		float ggxV = GgxV(NdotL, NdotV, roughness2, partLambdaV);
 		float weightOverPdf = 4.0 * ggxV * NdotL * LdotH / NdotH;
-
+		
 		result.x += weightOverPdf * (1.0 - FresnelTerm(LdotH));
 		result.y += weightOverPdf;
 	}
@@ -71,9 +69,7 @@ float FragmentDirectionalAlbedoMultiScattered(float4 position : SV_Position, flo
 	float3 uv = float3(uv0, (index + 0.5) / resolution);
 	uv = RemapHalfTexelTo01(uv, resolution);
 	
-	float NdotV = max(1e-3, uv.x);
-	float sinThetaV = SinFromCos(NdotV);
-	
+	float NdotV = max(1e-3, uv.x);	
 	float perceptualRoughness = uv.y;
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 	float roughness2 = Sq(roughness);
@@ -88,9 +84,9 @@ float FragmentDirectionalAlbedoMultiScattered(float4 position : SV_Position, flo
 	{
 		float2 u = Hammersley2dSeq(i, samples);
 		float NdotH = sqrt((1.0 - u.x) * rcp(u.x * (roughness2 - 1.0) + 1.0));
-		float cosPhi = cos(TwoPi * u.y);
+		float phi = TwoPi * u.y;
 
-		float LdotH = sinThetaV * cosPhi * SinFromCos(NdotH) + NdotV * NdotH;
+		float LdotH = SphericalDot(NdotV, 0.0, NdotH, phi);
 		float NdotL = -NdotV + 2.0 * LdotH * NdotH;
 		
 		if (NdotL <= 0.0)
@@ -159,9 +155,8 @@ float FragmentSpecularOcclusion(float4 position : SV_Position, float2 uv0 : TEXC
 		float2 u = Hammersley2dSeq(i, samples);
 		float NdotH = sqrt((1.0 - u.x) * rcp(u.x * (roughness2 - 1.0) + 1.0));
 		float phi = TwoPi * u.y;
-		float cosPhi = cos(phi);
 
-		float LdotH = sinThetaV * cosPhi * SinFromCos(NdotH) + NdotV * NdotH;
+		float LdotH = SphericalDot(NdotV, 0.0, NdotH, phi);
 		float NdotL = -NdotV + 2.0 * LdotH * NdotH;
 		
 		if (NdotL <= 0.0)

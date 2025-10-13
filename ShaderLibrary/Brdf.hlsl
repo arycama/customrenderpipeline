@@ -8,6 +8,21 @@
 Texture2D<float> DirectionalAlbedo, AverageAlbedo, AverageAlbedoMs;
 Texture3D<float> DirectionalAlbedoMs;
 
+float LambdaGgx(float roughness2, float cosTheta)
+{
+	return 0.5 * sqrt(1.0 + roughness2 * (rcp(Sq(cosTheta)) - 1.0)) - 0.5;
+}
+
+float GgxG1(float roughness2, float cosTheta)
+{
+	return rcp(1.0 + LambdaGgx(roughness2, cosTheta));
+}
+
+float GgxG2(float roughness2, float cosThetaI, float cosThetaO)
+{
+	return rcp(1.0 + LambdaGgx(roughness2, cosThetaI) + LambdaGgx(roughness2, cosThetaO));
+}
+
 float GetPartLambdaV(float roughness2, float NdotV)
 {
 	return sqrt((-NdotV * roughness2 + NdotV) * NdotV + roughness2);
@@ -22,14 +37,14 @@ float GgxDistribution(float roughness2, float NdotH)
 float GgxV(float NdotL, float NdotV, float roughness2, float partLambdaV)
 {
 	float lambdaV = NdotL * partLambdaV;
-	float lambdaL = NdotV * sqrt((-NdotL * roughness2 + NdotL) * NdotL + roughness2);
+	float lambdaL = NdotV * GetPartLambdaV(roughness2, NdotL);
 	return 0.5 * rcp(lambdaV + lambdaL);
 }
 
 float GgxDv(float roughness2, float NdotH, float NdotL, float NdotV, float partLambdaV)
 {
 	float s2 = Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0);
-	float lambdaL = NdotV * sqrt((-NdotL * roughness2 + NdotL) * NdotL + roughness2);
+	float lambdaL = NdotV * GetPartLambdaV(roughness2, NdotL);
 	float denom = 2.0 * (NdotL * partLambdaV + lambdaL) * s2;
 	return denom ? roughness2 * rcp(denom) : 0.0;
 }

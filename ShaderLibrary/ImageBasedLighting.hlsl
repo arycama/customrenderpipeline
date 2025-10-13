@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Common.hlsl"
+#include "Brdf.hlsl"
 #include "Geometry.hlsl"
 #include "Material.hlsl"
 #include "Samplers.hlsl"
@@ -223,4 +223,45 @@ float GetSpecularOcclusion(float visibilityAngle, float BdotR, float perceptualR
 	float specOcc0 = SpecularOcclusion.Sample(TrilinearClampSampler, uvw0);
 	float specOcc1 = SpecularOcclusion.Sample(TrilinearClampSampler, uvw1);
 	return lerp(specOcc0, specOcc1, qWeight);
+}
+
+float3 SampleGgxVndf(float roughness, float2 u, float3 localV)
+{
+	// Section 3.2: transforming the view direction to the hemisphere configuration
+	float3 Vh = normalize(float3(roughness * localV.xy, localV.z));
+	
+	 // Section 4.1: orthonormal basis (with special case if cross product is zero)
+	float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
+	float3 T1 = lensq ? float3(-Vh.y, Vh.x, 0) * rsqrt(lensq) : float3(1, 0, 0);
+	float3 T2 = cross(Vh, T1);
+
+	// Section 4.2: parameterization of the projected area
+	float phi = TwoPi * u.y;
+	float r = sqrt(u.x);
+	float t1 = r * cos(phi);
+	float t2 = r * sin(phi);
+	float s = 0.5 * Vh.z + 0.5;
+	t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
+		
+	// Section 4.3: reprojection onto hemisphere
+	float3 Nh = float3(t1, t2, sqrt(saturate(1.0 - Sq(t1) - Sq(t2))));
+	
+	// Section 3.4: transforming the normal back to the ellipsoid configuration
+	return normalize(float3(roughness * Nh.x, roughness * Nh.y, max(0.0, Nh.z)));
+}
+
+float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 localV, out float weightOverPdf, out float pdf)
+{
+	float roughness2 = Sq(roughness);
+	float3 localH = SampleGgxVndf(roughness, u, localV);
+	float3 localL = reflect(-localV, localH);
+	pdf = 0.25 * GgxDistribution(roughness2, localH.z) * rcp(dot(localV, localH.z));
+	weightOverPdf = GgxG2(roughness2, localL.z, localV.z) * rcp(GgxG1(roughness2, localV.z));
+	return localL;
+}
+
+float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 localV, out float weightOverPdf)
+{
+	float pdf;
+	return ImportanceSampleGgxVndf(roughness, u, localV, weightOverPdf, pdf);
 }

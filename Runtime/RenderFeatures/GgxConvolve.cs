@@ -82,10 +82,12 @@ public class EnvironmentConvolve : CameraRenderFeature
 					var mipPerceptualRoughness = Math.Saturate(1.7f / 1.4f - Math.Sqrt(2.89f / 1.96f - 2.8f / 1.96f * perceptualRoughness));
 					var mipRoughness = mipPerceptualRoughness * mipPerceptualRoughness;
 
-					pass.SetFloat("_Samples", data.Samples);
-					pass.SetFloat("_Level", data.i);
-					pass.SetFloat("_InvOmegaP", 6.0f * data.envResolution * data.envResolution / (4.0f * Math.Pi));
-					pass.SetFloat("_Roughness", mipRoughness);
+					pass.SetInt("Samples", data.Samples);
+					pass.SetFloat("RcpSamples", Math.Rcp(data.Samples));
+					pass.SetFloat("Level", data.i);
+					pass.SetFloat("RcpOmegaP", data.envResolution * data.envResolution / (4.0f * Math.Pi * data.Samples));
+					pass.SetFloat("PerceptualRoughness", mipPerceptualRoughness);
+					pass.SetFloat("Roughness", mipRoughness);
 				});
 			}
 		}
