@@ -11,7 +11,7 @@ float _MipLevel;
 static const uint _SampleCount = 512;
 groupshared float SharedCoeffs[9][_SampleCount];
 TextureCube<float3> _AmbientProbeInputCubemap;
-RWBuffer<float4> _AmbientProbeOutputBuffer;
+RWStructuredBuffer<float4> _AmbientProbeOutputBuffer;
 
 [numthreads(_SampleCount, 1, 1)]
 void AmbientProbe(uint groupIndex : SV_GroupIndex)
