@@ -76,17 +76,17 @@ float2 NormalToUv(float3 normal)
 {
 	#ifdef MODE_HEMISPHERE
 		normal.y = max(0.0, normal.y);
-		return NormalToHemiOctahedralUv(normal);
+		return NormalToHemiOctahedralUv(normal.xzy);
 	#else
-		return NormalToOctahedralUv(normal);
+		return NormalToOctahedralUv(normal.xzy);
 	#endif
 }
 
 float3 UvToNormal(float2 uv)
 {
 	#ifdef MODE_HEMISPHERE
-		return HemiOctahedralUvToNormal(uv);
+		return HemiOctahedralUvToNormal(uv).xzy;
 	#else
-		return OctahedralUvToNormal(uv);
+		return OctahedralUvToNormal(uv).xzy;
 	#endif
 }
