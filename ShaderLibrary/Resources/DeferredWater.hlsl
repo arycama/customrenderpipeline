@@ -38,7 +38,7 @@ float _WaterMiePhase, _WaterMieFactor;
 struct FragmentOutput
 {
 	GBufferOutput gbuffer;
-	float3 luminance : SV_Target5;
+	float3 luminance : SV_Target4;
 };
 
 FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)

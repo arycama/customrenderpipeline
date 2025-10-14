@@ -52,7 +52,7 @@ float3 OctahedralUvToNormal(float2 uv)
 {
 	float2 f = 2.0 * uv - 1.0;
 	float3 n = float3(f, 1.0 - abs(f.x) - abs(f.y));
-	float t = max(-n.z, 0.0);
+	float t = saturate(-n.z);
 	n.xy += n.xy >= 0.0 ? -t : t;
 	return normalize(n);
 }
