@@ -15,7 +15,7 @@ public readonly struct EnvironmentData : IRenderPassData
     readonly void IRenderPassData.SetInputs(RenderPassBase pass)
 	{
 		pass.ReadTexture("SkyReflection", skyReflection);
-		pass.ReadBuffer("AmbientSh", ambientBuffer);
+		pass.ReadBuffer("AmbientShBuffer", ambientBuffer);
 	}
 
     readonly void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)

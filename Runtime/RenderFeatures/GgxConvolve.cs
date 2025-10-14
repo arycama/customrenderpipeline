@@ -19,18 +19,15 @@ public class EnvironmentConvolve : CameraRenderFeature
 	{
 		using var scope = renderGraph.AddProfileScope("Environment Probe Convolve");
 
-		var ambientBuffer = renderGraph.GetBuffer(9, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
-		var envResolution = settings.Resolution;
-
 		var ambientComputeShader = Resources.Load<ComputeShader>("AmbientProbe");
-		var ambientBufferTemp = renderGraph.GetBuffer(9, sizeof(float) * 4, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
+		var ambientBufferTemp = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ambient Convolve"))
 		{
 			pass.Initialize(ambientComputeShader, normalizedDispatch: false);
 			pass.WriteBuffer("_AmbientProbeOutputBuffer", ambientBufferTemp);
 			pass.AddRenderPassData<EnvironmentProbeTempResult>();
 
-			pass.SetRenderFunction(envResolution, static (command, pass, reflectionResolution) =>
+			pass.SetRenderFunction(settings.Resolution, static (command, pass, reflectionResolution) =>
 			{
 				// Prefiltered importance sampling, use lower MIP-map levels for fetching samples with low probabilities in order to reduce the variance.
 				// Ref: http://http.developer.nvidia.com/GPUGems3/gpugems3_ch20.html
@@ -49,7 +46,8 @@ public class EnvironmentConvolve : CameraRenderFeature
 			});
 		}
 
-		var reflectionProbe = renderGraph.GetTexture(envResolution, envResolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true);
+		var reflectionProbe = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true);
+		var ambientBuffer = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
 		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Ambient Buffer Copy"))
 		{
 			pass.WriteTexture(reflectionProbe);
@@ -76,7 +74,7 @@ public class EnvironmentConvolve : CameraRenderFeature
 				pass.WriteTexture(reflectionProbe);
 				pass.AddRenderPassData<EnvironmentProbeTempResult>();
 
-				pass.SetRenderFunction((i, envResolution, settings.Samples), static (command, pass, data) =>
+				pass.SetRenderFunction((i, envResolution: settings.Resolution, settings.Samples), static (command, pass, data) =>
 				{
 					var perceptualRoughness = Math.Saturate(data.i / (float)mipLevels);
 					var mipPerceptualRoughness = Math.Saturate(1.7f / 1.4f - Math.Sqrt(2.89f / 1.96f - 2.8f / 1.96f * perceptualRoughness));

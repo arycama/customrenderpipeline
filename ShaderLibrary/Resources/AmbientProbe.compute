@@ -20,13 +20,25 @@ void AmbientProbe(uint groupIndex : SV_GroupIndex)
 	float2 u = Hammersley2dSeq(groupIndex, _SampleCount);
 	float3 N = SampleSphereUniform(u.x, u.y);
 	float2 uv = NormalToOctahedralUv(N);
-	float3 value = Input.SampleLevel(TrilinearClampSampler, uv, _MipLevel) * FourPi / _SampleCount;
+	float3 value = Input.SampleLevel(TrilinearClampSampler, uv, _MipLevel);
 	
+	// These values are squared since they are applied twice. To save some ALU these are all pre-multiplied at the convolve stage
 	float basis[9];
-	GetShBasis(N, basis);
+	basis[0] = Sq(1.0 / (2.0 * SqrtPi));
+	basis[1] = Sq(sqrt(3.0) / (2.0 * SqrtPi)) * N.y;
+	basis[2] = Sq(sqrt(3.0) / (2.0 * SqrtPi)) * N.z;
+	basis[3] = Sq(sqrt(3.0) / (2.0 * SqrtPi)) * N.x;
+	basis[4] = Sq(sqrt(15.0) / (2.0 * SqrtPi)) * N.x * N.y;
+	basis[5] = Sq(sqrt(15.0) / (2.0 * SqrtPi)) * N.y * N.z;
+	basis[6] = Sq(sqrt(5.0) / (4.0 * SqrtPi)) * (3.0 * Sq(N.z) - 1.0);
+	basis[7] = Sq(sqrt(15.0) / (2.0 * SqrtPi)) * N.x * N.z;
+	basis[8] = Sq(sqrt(15.0) / (4.0 * SqrtPi)) * (Sq(N.x) - Sq(N.y));
+	
+	for (uint i = 0; i < 9; i++)
+		basis[i] *= FourPi / _SampleCount;
 	
 	// Red
-	uint i, j;
+	uint j;
 	//[unroll]
 	for (i = 0; i < 9; i++)
 		SharedCoeffs[i][groupIndex] = basis[i] * value.r;
@@ -104,7 +116,11 @@ void AmbientProbe(uint groupIndex : SV_GroupIndex)
 	for (i = 0; i < 9; i++)
 		result[i].b = SharedCoeffs[i][0];
 		
-	//[unroll]
-	for (i = 0; i < 9; i++)
-		_AmbientProbeOutputBuffer[i] = float4(result[i], 1);
+	_AmbientProbeOutputBuffer[0] = float4(result[3].r, result[1].r, result[2].r, result[0].r - result[6].r);
+	_AmbientProbeOutputBuffer[1] = float4(result[3].g, result[1].g, result[2].g, result[0].g - result[6].g);
+	_AmbientProbeOutputBuffer[2] = float4(result[3].b, result[1].b, result[2].b, result[0].b - result[6].b);
+	_AmbientProbeOutputBuffer[3] = float4(result[4].r, result[5].r, result[6].r * 3.0, result[7].r);
+	_AmbientProbeOutputBuffer[4] = float4(result[4].g, result[5].g, result[6].g * 3.0, result[7].g);
+	_AmbientProbeOutputBuffer[5] = float4(result[4].b, result[5].b, result[6].b * 3.0, result[7].b);
+	_AmbientProbeOutputBuffer[6] = float4(result[8].r, result[8].g, result[8].b, 1.0);
 }
