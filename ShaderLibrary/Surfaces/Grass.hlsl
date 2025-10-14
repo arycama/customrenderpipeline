@@ -46,7 +46,7 @@ struct FragmentInput
 {
 	float3 normal : NORMAL;
 	float2 uv : TEXCOORD;
-	float4 positionCS : SV_POSITION;
+	float4 position : SV_POSITION;
 	float3 positionWS : POSITION1;
 };
 
@@ -230,18 +230,18 @@ FragmentInput Domain(HullConstantOutput input, OutputPatch<DomainInput, 4> v, fl
 	
 	FragmentInput o;
 	o.positionWS = input.center;
-	o.positionCS = WorldToClip(position);
+	o.position = WorldToClip(position);
 	o.normal = normal;
 	o.uv = finalUv;
 	return o;
 }
 
-GBufferOutput Fragment(FragmentInput i, bool isFrontFace : SV_IsFrontFace)
+GBufferOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 {
-	float4 tex = _MainTex.Sample(LinearClampSampler, i.uv);
+	float4 tex = _MainTex.Sample(LinearClampSampler, input.uv);
 	
 	// Get X/Y position and mip of target texture.
-	float2 terrainUv = WorldToTerrainPosition(i.positionWS);
+	float2 terrainUv = WorldToTerrainPosition(input.positionWS);
 	//float mipLevel = CalculateVirtualMipLevel(terrainUv);
 	
 	//float2 derivativeScale;
@@ -251,13 +251,13 @@ GBufferOutput Fragment(FragmentInput i, bool isFrontFace : SV_IsFrontFace)
 	//SurfaceData surface = DefaultSurface();
 	//surface.Albedo = lerp(albedoSmoothness.rgb, _Color.rgb, i.uv.y) ;
 	float3 Albedo = _Color.rgb * tex.rgb;
-	float Occlusion = lerp(0.5, 1.0, i.uv.y);
+	float Occlusion = lerp(0.5, 1.0, input.uv.y);
 	float roughness = SmoothnessToPerceptualRoughness(_Smoothness);
-	float3 Normal = normalize(i.normal);
+	float3 Normal = normalize(input.normal);
 	float3 Translucency = _Translucency;
 	
 	if (!isFrontFace)
 		Normal = -Normal;
 	
-	return OutputGBuffer(Albedo, 0, Normal, roughness, Normal, VisibilityToConeAngle(Occlusion) * RcpHalfPi, 0, Translucency);
+	return OutputGBuffer(Albedo, 0, Normal, roughness, Normal, VisibilityToConeAngle(Occlusion) * RcpHalfPi, 0, Translucency, input.position.xy);
 }

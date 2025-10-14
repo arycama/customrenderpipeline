@@ -24,7 +24,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float4 bentNormalOcclusion = BentNormalOcclusion[position.xy];
 	uint stencil = Stencil[position.xy].g;
 	 
-	float3 albedo = UnpackAlbedo(albedoMetallic);
+	float3 albedo = UnpackAlbedo(albedoMetallic, position.xy);
+	return albedo;
 	float metallic = albedoMetallic.a;
 	float3 normal = GBufferNormal(position.xy, NormalRoughness, V);
 	float perceptualRoughness = normalRoughness.a;

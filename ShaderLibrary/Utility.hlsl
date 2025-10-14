@@ -76,74 +76,74 @@ float2 QuadOffset(uint2 screenPos)
 
 float1 QuadReadAcrossX(float1 value, uint2 screenPos)
 {
-#ifdef INTRINSIC_QUAD_SHUFFLE
-	return QuadReadAcrossX(value);
-#else
-	return value - ddx(value) * QuadOffset(screenPos).x;
-#endif
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossX(value);
+	#else
+		return value - ddx(value) * QuadOffset(screenPos).x;
+	#endif
 }
 
 float2 QuadReadAcrossX(float2 value, uint2 screenPos)
 {
-#ifdef INTRINSIC_QUAD_SHUFFLE
-	return QuadReadAcrossX(value);
-#else
-return value - ddx(value) * QuadOffset(screenPos).x;
-#endif
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossX(value);
+	#else
+		return value - ddx(value) * QuadOffset(screenPos).x;
+	#endif
 }
 
 float3 QuadReadAcrossX(float3 value, uint2 screenPos)
 {
-#ifdef INTRINSIC_QUAD_SHUFFLE
-	return QuadReadAcrossX(value);
-#else
-	return value - ddx(value) * QuadOffset(screenPos).x;
-#endif
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossX(value);
+	#else
+		return value - ddx(value) * QuadOffset(screenPos).x;
+	#endif
 }
 
 float4 QuadReadAcrossX(float4 value, uint2 screenPos)
 {
-#ifdef INTRINSIC_QUAD_SHUFFLE
-	return QuadReadAcrossX(value);
-#else
-	return value - ddx(value) * QuadOffset(screenPos).x;
-#endif
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossX(value);
+	#else
+		return value - ddx(value) * QuadOffset(screenPos).x;
+	#endif
 }
 
 float1 QuadReadAcrossY(float1 value, uint2 screenPos)
 {
-#ifdef INTRINSIC_QUAD_SHUFFLE
-	return QuadReadAcrossY(value);
-#else
-	return value - ddy(value) * QuadOffset(screenPos).y;
-#endif
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossY(value);
+	#else
+		return value - ddy(value) * QuadOffset(screenPos).y;
+	#endif
 }
 
 float2 QuadReadAcrossY(float2 value, uint2 screenPos)
 {
-#ifdef INTRINSIC_QUAD_SHUFFLE
-	return QuadReadAcrossY(value);
-#else
-	return value - ddy(value) * QuadOffset(screenPos).y;
-#endif
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossY(value);
+	#else
+		return value - ddy(value) * QuadOffset(screenPos).y;
+	#endif
 }
 
 float3 QuadReadAcrossY(float3 value, uint2 screenPos)
 {
-#ifdef INTRINSIC_QUAD_SHUFFLE
-	return QuadReadAcrossY(value);
-#else
-	return value - ddy(value) * QuadOffset(screenPos).y;
-#endif
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossY(value);
+	#else
+		return value - ddy(value) * QuadOffset(screenPos).y;
+	#endif
 }
 
 float4 QuadReadAcrossY(float4 value, uint2 screenPos)
 {
-#ifdef INTRINSIC_QUAD_SHUFFLE
-	return QuadReadAcrossY(value);
-#else
-	return value - ddy(value) * QuadOffset(screenPos).y;
-#endif
+	#ifdef INTRINSIC_QUAD_SHUFFLE
+		return QuadReadAcrossY(value);
+	#else
+		return value - ddy(value) * QuadOffset(screenPos).y;
+	#endif
 }
 
 float QuadReadAcrossDiagonal(float value, uint2 screenPos)
@@ -152,6 +152,15 @@ float QuadReadAcrossDiagonal(float value, uint2 screenPos)
 	float dY = ddy_fine(value);
 	float2 quadDir = QuadOffset(screenPos);
 	float X = value - (dX * quadDir.x);
+	return X - (ddy_fine(value) * quadDir.y);
+}
+
+float4 QuadReadAcrossDiagonal(float4 value, uint2 screenPos)
+{
+	float4 dX = ddx_fine(value);
+	float4 dY = ddy_fine(value);
+	float2 quadDir = QuadOffset(screenPos);
+	float4 X = value - (dX * quadDir.x);
 	return X - (ddy_fine(value) * quadDir.y);
 }
 

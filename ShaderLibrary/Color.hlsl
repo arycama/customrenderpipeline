@@ -412,19 +412,27 @@ float3 Rec709ToICtCp(float3 rec709)
 
 float3 RgbToYCoCg(float3 rgb)
 {
+	float yCoCgChromaBias = 128.0 / 255.0;
+
 	float3 yCoCg;
 	yCoCg.x = dot(rgb, float3(0.25, 0.5, 0.25));
-	yCoCg.y = dot(rgb, float3(0.5, 0.0, -0.5));
-	yCoCg.z = dot(rgb, float3(-0.25, 0.5, -0.25));
+	yCoCg.y = dot(rgb, float3(0.5, 0.0, -0.5)) + yCoCgChromaBias;
+	yCoCg.z = dot(rgb, float3(-0.25, 0.5, -0.25)) + yCoCgChromaBias;
 	return yCoCg;
 }
 
 float3 YCoCgToRgb(float3 yCoCg)
 {
+	float yCoCgChromaBias = 128.0 / 255.0;
+
+	float y = yCoCg.x;
+	float co = yCoCg.y - yCoCgChromaBias;
+	float cg = yCoCg.z - yCoCgChromaBias;
+
 	float3 rgb;
-	rgb.r = dot(yCoCg, float3(1.0, 1.0, -1.0));
-	rgb.g = dot(yCoCg, float3(1.0, 0.0, 1.0));
-	rgb.b = dot(yCoCg, float3(1.0, -1.0, -1.0));
+	rgb.r = y + co - cg;
+	rgb.g = y + cg;
+	rgb.b = y - co - cg;
 	return rgb;
 }
 
