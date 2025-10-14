@@ -35,7 +35,6 @@ public class DeferredLighting : CameraRenderFeature
 			pass.AddRenderPassData<AlbedoMetallicData>();
 			pass.AddRenderPassData<NormalRoughnessData>();
 			pass.AddRenderPassData<BentNormalOcclusionData>();
-			pass.AddRenderPassData<TranslucencyData>();
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 			pass.AddRenderPassData<TemporalAAData>();
 

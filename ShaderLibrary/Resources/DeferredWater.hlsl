@@ -164,7 +164,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	}
 
 	FragmentOutput output;
-	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam), 0.0, position.xy);
+	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam), 0.0, position.xy, false);
 	output.luminance = Rec2020ToICtCp(luminance * PaperWhite);
 	return output;
 }

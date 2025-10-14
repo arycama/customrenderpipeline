@@ -42,7 +42,6 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 				pass.WriteTexture(renderGraph.GetResource<NormalRoughnessData>());
 				pass.WriteTexture(renderGraph.GetResource<BentNormalOcclusionData>());
 				pass.WriteTexture(renderGraph.GetResource<CameraTargetData>());
-				pass.WriteTexture(renderGraph.GetResource<TranslucencyData>());
 				pass.WriteTexture(renderGraph.GetResource<VelocityData>());
 				pass.AddRenderPassData<AutoExposureData>();
 				pass.AddRenderPassData<TemporalAAData>();

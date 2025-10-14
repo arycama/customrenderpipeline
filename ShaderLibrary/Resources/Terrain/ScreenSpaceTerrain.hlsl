@@ -164,5 +164,5 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	visibilityCone.a = cos((0.5 * visibilityCone.a + 0.5) * HalfPi);
 	visibilityCone = SphericalCapIntersection(terrainNormal, cos(normalOcclusionRoughness.b * HalfPi), visibilityCone.xyz, visibilityCone.a);
 	
-	return OutputGBuffer(albedo, 0, terrainNormal, normalOcclusionRoughness.a, visibilityCone.xyz, FastACos(visibilityCone.a) * RcpHalfPi, 0, 0, position.xy);
+	return OutputGBuffer(albedo, 0, terrainNormal, normalOcclusionRoughness.a, visibilityCone.xyz, FastACos(visibilityCone.a) * RcpHalfPi, 0, 0, position.xy, false);
 }

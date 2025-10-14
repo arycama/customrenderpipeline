@@ -166,10 +166,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			renderGraph.SetResource(new PreviousColor(previousScene));
 			renderGraph.SetResource(new PreviousVelocity(previousVelocity));
 
-			renderGraph.SetResource(new AlbedoMetallicData(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true)));
+			renderGraph.SetResource(new AlbedoMetallicData(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true)));
 			renderGraph.SetResource(new NormalRoughnessData(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true)));
 			renderGraph.SetResource(new BentNormalOcclusionData(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true)));
-			renderGraph.SetResource(new TranslucencyData(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true)));
 			renderGraph.SetResource(new VelocityData(velocity));
 
 			pass.WriteTexture(cameraDepth);
@@ -196,7 +195,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.WriteTexture(renderGraph.GetResource<NormalRoughnessData>());
 			pass.WriteTexture(renderGraph.GetResource<BentNormalOcclusionData>());
 			pass.WriteTexture(renderGraph.GetResource<CameraTargetData>());
-			pass.WriteTexture(renderGraph.GetResource<TranslucencyData>());
 
 			pass.AddRenderPassData<FrameData>();
 			pass.AddRenderPassData<ViewData>();
@@ -215,7 +213,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.WriteTexture(renderGraph.GetResource<NormalRoughnessData>());
 			pass.WriteTexture(renderGraph.GetResource<BentNormalOcclusionData>());
 			pass.WriteTexture(renderGraph.GetResource<CameraTargetData>());
-			pass.WriteTexture(renderGraph.GetResource<TranslucencyData>());
 			pass.WriteTexture(renderGraph.GetResource<VelocityData>());
 
 			pass.AddRenderPassData<FrameData>();
@@ -236,7 +233,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.WriteTexture(renderGraph.GetResource<NormalRoughnessData>());
 			pass.WriteTexture(renderGraph.GetResource<BentNormalOcclusionData>());
 			pass.WriteTexture(renderGraph.GetResource<CameraTargetData>());
-			pass.WriteTexture(renderGraph.GetResource<TranslucencyData>());
 			pass.WriteTexture(renderGraph.GetResource<VelocityData>());
 
 			pass.AddRenderPassData<FrameData>();

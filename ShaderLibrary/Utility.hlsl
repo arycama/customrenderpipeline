@@ -79,7 +79,7 @@ float1 QuadReadAcrossX(float1 value, uint2 screenPos)
 	#ifdef INTRINSIC_QUAD_SHUFFLE
 		return QuadReadAcrossX(value);
 	#else
-		return value - ddx(value) * QuadOffset(screenPos).x;
+		return value - ddx_fine(value) * QuadOffset(screenPos).x;
 	#endif
 }
 
@@ -88,7 +88,7 @@ float2 QuadReadAcrossX(float2 value, uint2 screenPos)
 	#ifdef INTRINSIC_QUAD_SHUFFLE
 		return QuadReadAcrossX(value);
 	#else
-		return value - ddx(value) * QuadOffset(screenPos).x;
+		return value - ddx_fine(value) * QuadOffset(screenPos).x;
 	#endif
 }
 
@@ -97,7 +97,7 @@ float3 QuadReadAcrossX(float3 value, uint2 screenPos)
 	#ifdef INTRINSIC_QUAD_SHUFFLE
 		return QuadReadAcrossX(value);
 	#else
-		return value - ddx(value) * QuadOffset(screenPos).x;
+		return value - ddx_fine(value) * QuadOffset(screenPos).x;
 	#endif
 }
 
@@ -106,7 +106,7 @@ float4 QuadReadAcrossX(float4 value, uint2 screenPos)
 	#ifdef INTRINSIC_QUAD_SHUFFLE
 		return QuadReadAcrossX(value);
 	#else
-		return value - ddx(value) * QuadOffset(screenPos).x;
+		return value - ddx_fine(value) * QuadOffset(screenPos).x;
 	#endif
 }
 
@@ -115,7 +115,7 @@ float1 QuadReadAcrossY(float1 value, uint2 screenPos)
 	#ifdef INTRINSIC_QUAD_SHUFFLE
 		return QuadReadAcrossY(value);
 	#else
-		return value - ddy(value) * QuadOffset(screenPos).y;
+		return value - ddy_fine(value) * QuadOffset(screenPos).y;
 	#endif
 }
 
@@ -124,7 +124,7 @@ float2 QuadReadAcrossY(float2 value, uint2 screenPos)
 	#ifdef INTRINSIC_QUAD_SHUFFLE
 		return QuadReadAcrossY(value);
 	#else
-		return value - ddy(value) * QuadOffset(screenPos).y;
+		return value - ddy_fine(value) * QuadOffset(screenPos).y;
 	#endif
 }
 
@@ -133,7 +133,7 @@ float3 QuadReadAcrossY(float3 value, uint2 screenPos)
 	#ifdef INTRINSIC_QUAD_SHUFFLE
 		return QuadReadAcrossY(value);
 	#else
-		return value - ddy(value) * QuadOffset(screenPos).y;
+		return value - ddy_fine(value) * QuadOffset(screenPos).y;
 	#endif
 }
 
@@ -142,7 +142,7 @@ float4 QuadReadAcrossY(float4 value, uint2 screenPos)
 	#ifdef INTRINSIC_QUAD_SHUFFLE
 		return QuadReadAcrossY(value);
 	#else
-		return value - ddy(value) * QuadOffset(screenPos).y;
+		return value - ddy_fine(value) * QuadOffset(screenPos).y;
 	#endif
 }
 
@@ -188,4 +188,9 @@ uint BitPack(uint data, uint size, uint offset)
 uint BitUnpack(uint data, uint size, uint offset)
 {
 	return (data >> offset) & (Exp2Pow2(size) - 1u);
+}
+
+bool Checker(float2 position)
+{
+	return frac((position.x + position.y) * 0.5) < 0.5;
 }

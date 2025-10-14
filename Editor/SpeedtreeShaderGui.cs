@@ -15,7 +15,10 @@ public class SpeedTreeShaderGui : ShaderGUI
 
 		// Assign _Subsurface property depending on whether subsurface texture is null or not
 		var subsurfaceTexProperty = FindProperty("Subsurface", properties);
-		material.ToggleKeyword("SUBSURFACE_ON", subsurfaceTexProperty.textureValue != null);
+		var isSubsurface = subsurfaceTexProperty.textureValue != null;
+		material.ToggleKeyword("SUBSURFACE_ON", isSubsurface);
+		material.SetInteger("StencilRef", isSubsurface ? 17 : 1);
+		material.SetInteger("StencilRefMotion", isSubsurface ? 19 : 3);
 
 		var albedoOpacityProperty = FindProperty("AlbedoOpacity", properties);
 		var albedoOpacity = albedoOpacityProperty.textureValue;

@@ -259,5 +259,5 @@ GBufferOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	if (!isFrontFace)
 		Normal = -Normal;
 	
-	return OutputGBuffer(Albedo, 0, Normal, roughness, Normal, VisibilityToConeAngle(Occlusion) * RcpHalfPi, 0, Translucency, input.position.xy);
+	return OutputGBuffer(Albedo, 0, Normal, roughness, Normal, VisibilityToConeAngle(Occlusion) * RcpHalfPi, 0, Translucency, input.position.xy, true);
 }

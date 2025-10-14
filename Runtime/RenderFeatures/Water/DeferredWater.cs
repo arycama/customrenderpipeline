@@ -35,7 +35,6 @@ public class DeferredWater : CameraRenderFeature
         var albedoMetallic = renderGraph.GetResource<AlbedoMetallicData>().Handle;
         var normalRoughness = renderGraph.GetResource<NormalRoughnessData>().Handle;
         var bentNormalOcclusion = renderGraph.GetResource<BentNormalOcclusionData>().Handle;
-        var translucency = renderGraph.GetResource<TranslucencyData>().Handle;
 
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Render"))
         {
@@ -45,7 +44,6 @@ public class DeferredWater : CameraRenderFeature
             pass.WriteTexture(normalRoughness);
             pass.WriteTexture(bentNormalOcclusion);
             pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);
-            pass.WriteTexture(translucency);
             pass.WriteTexture(scatterResult);
 
             pass.ReadTexture("_UnderwaterDepth", renderGraph.GetResource<DepthCopyData>().Handle);
