@@ -4,7 +4,8 @@ using UnityEngine;
 [Serializable]
 public class LightingSettings
 {
-	[field: SerializeField, Range(0, 5)] public int DirectionalFilterSize { get; private set; } = 1;
+	[field: SerializeField, Min(0.0f), Tooltip("Length of fadeout for directional shadow")] public float DirectionalFadeLength { get; private set; } = 16f;
+	[field: SerializeField, Range(0, 5)] public int DirectionalMaxFilterSize { get; private set; } = 1;
 	[field: SerializeField, Min(0.0f), Tooltip("Simulated distance between receiver and a blocker, used to calculate penumbra size")] public float DirectionalBlockerDistance { get; private set; } = 1.5f;
 
 	[field: SerializeField] public bool MicroShadows { get; private set; } = true;
@@ -19,7 +20,7 @@ public class LightingSettings
 	[field: SerializeField] public bool SnapTexels { get; private set; } = true;
 	[field: SerializeField] public bool UseCloseFit { get; private set; } = true;
 	[field: SerializeField] public bool UseOverlapFix { get; private set; } = true;
-	[field: SerializeField, Range(0, 1)] public float CascadeUniformity { get; private set; } = 0.5f;
+	[field: SerializeField, Range(0, 2)] public float CascadeUniformity { get; private set; } = 0.5f;
 	[field: SerializeField, Range(1, 8)] public int DirectionalCascadeCount { get; private set; } = 4;
 	[field: SerializeField] public float DirectionalShadowDistance { get; private set; } = 128;
 	[field: SerializeField] public int DirectionalShadowResolution { get; private set; } = 4096;

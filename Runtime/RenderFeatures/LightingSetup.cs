@@ -23,7 +23,7 @@ public partial class LightingSetup : CameraRenderFeature
 		var spotShadowRequests = ListPool<ShadowRequest>.Get();
 		var lightList = ListPool<LightData>.Get();
 		var directionalShadowMatrices = ListPool<Float3x4>.Get();
-		var directionalCascadeSizes = ListPool<Float2>.Get();
+		var directionalCascadeSizes = ListPool<Float4>.Get();
 
 		// Find first 2 directional lights
 		Float3 lightColor0 = Float3.Zero, lightColor1 = Float3.Zero, lightDirection0 = Float3.Up, lightDirection1 = Float3.Up;
@@ -33,6 +33,11 @@ public partial class LightingSetup : CameraRenderFeature
 		var cameraTransform = camera.transform.WorldRigidTransform();
 		var cameraToWorld = camera.transform.localToWorldMatrix;
 		var cameraInverseTranslation = Matrix4x4.Translate(camera.transform.position);
+
+		var n = camera.nearClipPlane;
+		var f = settings.DirectionalShadowDistance;
+		var m = (float)settings.DirectionalCascadeCount;
+		var c = Pow(Max(1e-3f, settings.CascadeUniformity), 2.2f);
 
 		for (var i = 0; i < cullingResults.visibleLights.Length; i++)
 		{
@@ -77,15 +82,6 @@ public partial class LightingSetup : CameraRenderFeature
 					// ref https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
 					var lightInverse = ((Quaternion)visibleLight.light.transform.rotation).Inverse;
 					var lightViewMatrix = Matrix4x4.Rotate(lightInverse);
-
-
-					//var n = Max(camera.nearClipPlane, viewBounds.Min.z);
-					//var f = Min(settings.DirectionalShadowDistance, viewBounds.Max.z);
-					var n = camera.nearClipPlane;
-					var f = settings.DirectionalShadowDistance;
-					var m = (float)settings.DirectionalCascadeCount;
-					var uniformity = Math.Pow(settings.CascadeUniformity, 2.2f);
-
 					var lightView = lightInverse.Rotate(camera.transform.position);
 
 					var viewPosition = camera.transform.position;
@@ -129,26 +125,19 @@ public partial class LightingSetup : CameraRenderFeature
 					var topRightRay = new Ray2D(topRightNear.xy, Float2.Normalize(topRightFar.xy - topRightNear.xy));
 					var bottomRightRay = new Ray2D(bottomRightNear.xy, Float2.Normalize(bottomRightFar.xy - bottomRightNear.xy));
 
-					float GetFrustumNear(int cascade)
+					float GetFrustumDepth(int j)
 					{
-						var j = cascade;
-						var logarithmicNear = j == 0 ? n : n * Pow(f / n, j / m);
-						var uniformNear = n + (f - n) * (j / m);
-						return Lerp(logarithmicNear, uniformNear, uniformity);
-					}
-
-					float GetFrustumFar(int cascade)
-					{
-						var j = cascade;
-						var logarithmicFar = j + 1 == m ? f : n * Pow(f / n, (j + 1) / m);
-						var uniformFar = n + (f - n) * ((j + 1) / m);
-						return Lerp(logarithmicFar, uniformFar, uniformity);
+						var L = Rcp(c);
+						var M = Log2(c * (f - n) + 1);
+						var N = n - Rcp(c);
+						var x = j / m;
+						return L * Exp2(M * x) + N;
 					}
 
 					Bounds GetCascadeBounds(int cascade)
 					{
-						var near = GetFrustumNear(cascade);
-						var far = GetFrustumFar(cascade);
+						var near = GetFrustumDepth(cascade);
+						var far = GetFrustumDepth(cascade + 1);
 						return Geometry.GetFrustumBounds(tanHalfFov, camera.aspect, near, far, viewToLight);
 					}
 
@@ -182,13 +171,8 @@ public partial class LightingSetup : CameraRenderFeature
 					for (var j = 0; j < settings.DirectionalCascadeCount; j++)
 					{
 						// Transform camera split bounds to light space
-						var logarithmicNear = j == 0 ? n : n * Pow(f / n, j / m);
-						var uniformNear = n + (f - n) * (j / m);
-						var near = Lerp(logarithmicNear, uniformNear, uniformity);
-
-						var logarithmicFar = j + 1 == m ? f : n * Pow(f / n, (j + 1) / m);
-						var uniformFar = n + (f - n) * ((j + 1) / m);
-						var far = Lerp(logarithmicFar, uniformFar, uniformity);
+						var near = GetFrustumDepth(j);
+						var far = GetFrustumDepth(j + 1);
 
 						var viewLightBounds = Geometry.GetFrustumBounds(tanHalfFov, camera.aspect, near, far, viewToLight);
 						var cascadeViewMatrix = lightViewMatrix;
@@ -291,7 +275,13 @@ public partial class LightingSetup : CameraRenderFeature
 
 						directionalShadowRequests.Add(new(i, relativeViewMatrix, projectionMatrix, shadowSplitData, -1, Float3.Zero, hasShadowBounds));
 						directionalShadowMatrices.Add((Float3x4)MatrixExtensions.ConvertToAtlasMatrix(projectionMatrix * relativeViewMatrix));
-						directionalCascadeSizes.Add(worldUnitsPerTexel);
+
+						// Note it could be max(cascadeTexelSize * 0.5, but this means we'd get no anti-aliasing on the min filter size)
+						var filterSize = Float2.Max(worldUnitsPerTexel, settings.DirectionalBlockerDistance * Radians(settings.SunAngularDiameter) * 0.5f);
+						var filterRadius = Float2.Min(settings.DirectionalMaxFilterSize, Float2.Ceil(filterSize * settings.DirectionalShadowResolution * 0.5f));
+						var rcpFilterSize = worldUnitsPerTexel / filterSize;
+						//directionalCascadeSizes.Add(new Float4(filterRadius, rcpFilterSize));
+						directionalCascadeSizes.Add(new Float4(rcpFilterSize, filterRadius));
 					}
 				}
 
@@ -395,16 +385,24 @@ public partial class LightingSetup : CameraRenderFeature
 			});
 		}
 
-		var directionalCascadeSizesBuffer = renderGraph.GetBuffer(Max(1, directionalCascadeSizes.Count), UnsafeUtility.SizeOf<Float2>());
+		var directionalCascadeSizesBuffer = renderGraph.GetBuffer(Max(1, directionalCascadeSizes.Count), UnsafeUtility.SizeOf<Float4>());
 		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Set Directional Cascade Sizes"))
 		{
 			pass.WriteBuffer("", directionalCascadeSizesBuffer);
 			pass.SetRenderFunction((directionalCascadeSizes, directionalCascadeSizesBuffer), static (command, pass, data) =>
 			{
 				command.SetBufferData(pass.GetBuffer(data.directionalCascadeSizesBuffer), data.directionalCascadeSizes);
-				ListPool<Float2>.Release(data.directionalCascadeSizes);
+				ListPool<Float4>.Release(data.directionalCascadeSizes);
 			});
 		}
+
+		// Decoding params
+		var F = m * Rcp(Log2(c * (f - n) + 1));
+		var E = Log2(c) * F;
+		var G = Rcp(c) - n;
+
+		var fadeScale = -Rcp(settings.DirectionalFadeLength);
+		var fadeOffset = settings.DirectionalShadowDistance * Rcp(settings.DirectionalFadeLength);
 
 		var lightingData = renderGraph.SetConstantBuffer
 		((
@@ -413,9 +411,14 @@ public partial class LightingSetup : CameraRenderFeature
 			lightColor0,
 			dirLightCount,
 			lightDirection1,
-			(float)settings.DirectionalFilterSize,
+			(float)settings.DirectionalMaxFilterSize,
 			lightColor1,
-			settings.DirectionalFilterFalloff
+			settings.DirectionalBlockerDistance,
+			new Float4(E, F, G, 0),
+			fadeScale,
+			fadeOffset,
+			(float)settings.DirectionalShadowResolution,
+			Rcp(settings.DirectionalShadowResolution)
 		));
 
 		renderGraph.SetResource(new LightingData(lightDirection0, lightColor0, lightDirection1, lightColor1, lightingData, directionalShadowMatricesBuffer, directionalCascadeSizesBuffer));

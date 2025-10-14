@@ -19,17 +19,21 @@ cbuffer LightingData
 	float3 _LightColor0;
 	uint _LightCount;
 	float3 _LightDirection1;
-	float DirectionalFilterRadius;
+	float DirectionalMaxFilterRadius;
 	float3 _LightColor1;
-	float DirectionalFilterFalloff;
+	float DirectionalBlockerDistance;
+	float4 DirectionalCascadeDepthParams;
+	float DirectionalFadeScale;
+	float DirectionalFadeOffset;
+	float DirectionalShadowResolution;
+	float RcpDirectionalShadowResolution;
 };
 
 SamplerComparisonState LinearClampCompareSampler, PointClampCompareSampler;
 Texture2DArray<float> DirectionalShadows;
 Texture2D<float2> PrecomputedDfg;
-float4 DirectionalShadows_TexelSize;
 StructuredBuffer<float3x4> DirectionalShadowMatrices;
-StructuredBuffer<float2> DirectionalCascadeSizes;
+StructuredBuffer<float4> DirectionalCascadeSizes;
 
 cbuffer CloudCoverage
 {
@@ -115,116 +119,106 @@ float4 cubic(float v)
 
 float GetDirectionalShadow(float3 worldPosition)
 {
-	for (uint i = 0; i < DirectionalCascadeCount; i++)
-	{
-		float3 shadowPosition = MultiplyPoint3x4(DirectionalShadowMatrices[i], worldPosition);
-		if (any(saturate(shadowPosition.xyz) != shadowPosition.xyz))
-			continue;
-			
-		float2 uv = shadowPosition.xy;
-
-		// Single
-		#if 0
-			return DirectionalShadows.SampleCmpLevelZero(PointClampCompareSampler, float3(uv, i), shadowPosition.z);
-		#elif 1
-			float2 cascadeTexelSize = DirectionalCascadeSizes[i];
-			float2 rcpFilterSize = rcp(max(0.5 * cascadeTexelSize, DirectionalFilterFalloff * SunAngularRadius));
-			
-			float2 localUv = uv * DirectionalShadows_TexelSize.zw;
-			float2 texelCenter = floor(localUv) + 0.5;
-			
-			float radius = DirectionalFilterRadius;
-			float visibilitySum = 0, weightSum = 0;
-			for (float y = -radius; y <= radius; y++)
-			{
-				for (float x = -radius; x <= radius; x++)
-				{
-					float2 coord = texelCenter + float2(x, y);
-					float d = DirectionalShadows[int3(coord, i)];
-					float2 delta = localUv - coord;
-					float2 weights = saturate(1.0 - abs(delta) * cascadeTexelSize * rcpFilterSize);
-					float weight = weights.x * weights.y;
-					bool isVisible = d < shadowPosition.z;
-					visibilitySum += isVisible * weight;
-					weightSum += weight;
-				}
-			}
-			
-			return visibilitySum / weightSum;
-		
-			return DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, i), shadowPosition.z);
-		#elif 1
-			// Bilinear 3x3
-			float2 iTc = uv * DirectionalShadows_TexelSize.zw;
-			float2 tc = floor(iTc - 0.5) + 0.5;
-			float2 f = iTc - tc;
-			
-			float2 w0 = 0.5 - abs(0.25 * (1.0 + f));
-			float2 w1 = 0.5 - abs(0.25 * (0.0 + f));
-			float2 w2 = 0.5 - abs(0.25 * (1.0 - f));
-			float2 w3 = 0.5 - abs(0.25 * (2.0 - f));
-			
-			float2 s0 = w0 + w1;
-			float2 s1 = w2 + w3;
- 
-			float2 f0 = w1 / (w0 + w1);
-			float2 f1 = w3 / (w2 + w3);
- 
-			float2 t0 = tc - 1 + f0;
-			float2 t1 = tc + 1 + f1;
-			
-			t0 *= DirectionalShadows_TexelSize.xy;
-			t1 *= DirectionalShadows_TexelSize.xy;
-			
-			return DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t0.y), i), shadowPosition.z) * s0.x * s0.y + 
-				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t0.y), i), shadowPosition.z) * s1.x * s0.y +
-				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t1.y), i), shadowPosition.z) * s0.x * s1.y +
-				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t1.y), i), shadowPosition.z) * s1.x * s1.y;
-		#elif 0
-			float2 q = frac(uv * DirectionalShadows_TexelSize.zw);
-			float2 c = (q * (q - 1.0) + 0.5) * DirectionalShadows_TexelSize.xy;
-			float2 t0 = uv - c;
-			float2 t1 = uv + c;
-		
-			// Biquadratic
-			float s = DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t0.x, t0.y, i), shadowPosition.z);
-			s += DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t0.x, t1.y, i), shadowPosition.z);
-			s += DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t1.x, t1.y, i), shadowPosition.z);
-			s += DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t1.x, t0.y, i), shadowPosition.z);
-			return s * 0.25;
-		#else
-			// Bicubic b-spline
-			float2 iTc = uv * DirectionalShadows_TexelSize.zw;
-			float2 tc = floor(iTc - 0.5) + 0.5;
-			float2 f = iTc - tc;
-			float2 f2 = f * f;
-			float2 f3 = f2 * f;
-			
-			float2 w0 = 1.0 / 6.0 * Cb(1.0 - f);
-			float2 w1 = 1.0 / 6.0 * (4.0 + 3.0 * Cb(f) - 6.0 * Sq(f));
-			float2 w2 = 1.0 / 6.0 * (4.0 + 3.0 * Cb(1.0 - f) - 6.0 * Sq(1.0 - f));
-			float2 w3 = 1.0 / 6.0 * Cb(f);
-			
-			float2 s0 = w0 + w1;
-			float2 s1 = w2 + w3;
- 
-			float2 f0 = w1 / (w0 + w1);
-			float2 f1 = w3 / (w2 + w3);
- 
-			float2 t0 = tc - 1 + f0;
-			float2 t1 = tc + 1 + f1;
-			
-			t0 *= DirectionalShadows_TexelSize.xy;
-			t1 *= DirectionalShadows_TexelSize.xy;
-			
-			return DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t0.y), i), shadowPosition.z) * s0.x * s0.y +
-				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t0.y), i), shadowPosition.z) * s1.x * s0.y +
-				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t1.y), i), shadowPosition.z) * s0.x * s1.y +
-				DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t1.y), i), shadowPosition.z) * s1.x * s1.y;
-		#endif
-	}
+	float viewDepth = WorldToViewPosition(worldPosition).z;
+	float fade = saturate(DirectionalFadeScale * viewDepth + DirectionalFadeOffset);
+	if(!fade)
+		return 1.0;
 	
-	return 1.0;
+	float cascade = DirectionalCascadeDepthParams.y * log2(viewDepth + DirectionalCascadeDepthParams.z) + DirectionalCascadeDepthParams.x;
+	float3 shadowPosition = MultiplyPoint3x4(DirectionalShadowMatrices[cascade], worldPosition);
+
+	float2 rcpFilterSize = DirectionalCascadeSizes[cascade].xy;
+	float2 radiusPixels = DirectionalCascadeSizes[cascade].zw;
+	float2 localUv = shadowPosition.xy * DirectionalShadowResolution;
+	float2 texelCenter = floor(localUv) + 0.5;
+
+	float visibilitySum = 0, weightSum = 0;
+	for (float y = -radiusPixels.y; y <= radiusPixels.y; y++)
+	{
+		for (float x = -radiusPixels.x; x <= radiusPixels.x; x++)
+		{
+			float2 coord = clamp(texelCenter + float2(x, y), 0.5, DirectionalShadowResolution - 0.5);
+			float d = DirectionalShadows[int3(coord, cascade)];
+			float2 delta = localUv - coord;
+			float2 weights = saturate(1.0 - abs(delta) * rcpFilterSize);
+			float weight = weights.x * weights.y;
+			bool isVisible = d < shadowPosition.z;
+			visibilitySum += isVisible * weight;
+			weightSum += weight;
+		}
+	}
+
+	return lerp(1.0, visibilitySum / weightSum, fade);
+	
+	#if 0
+		// Bilinear 3x3
+		float2 iTc = uv * DirectionalShadowResolution;
+		float2 tc = floor(iTc - 0.5) + 0.5;
+		float2 f = iTc - tc;
+			
+		float2 w0 = 0.5 - abs(0.25 * (1.0 + f));
+		float2 w1 = 0.5 - abs(0.25 * (0.0 + f));
+		float2 w2 = 0.5 - abs(0.25 * (1.0 - f));
+		float2 w3 = 0.5 - abs(0.25 * (2.0 - f));
+			
+		float2 s0 = w0 + w1;
+		float2 s1 = w2 + w3;
+ 
+		float2 f0 = w1 / (w0 + w1);
+		float2 f1 = w3 / (w2 + w3);
+ 
+		float2 t0 = tc - 1 + f0;
+		float2 t1 = tc + 1 + f1;
+			
+		t0 *= RcpDirectionalShadowResolution;
+		t1 *= RcpDirectionalShadowResolution;
+			
+		return DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t0.y), i), shadowPosition.z) * s0.x * s0.y + 
+			DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t0.y), i), shadowPosition.z) * s1.x * s0.y +
+			DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t1.y), i), shadowPosition.z) * s0.x * s1.y +
+			DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t1.y), i), shadowPosition.z) * s1.x * s1.y;
+	#elif 0
+		float2 q = frac(uv * DirectionalShadowResolution);
+		float2 c = (q * (q - 1.0) + 0.5) * RcpDirectionalShadowResolution;
+		float2 t0 = uv - c;
+		float2 t1 = uv + c;
+		
+		// Biquadratic
+		float s = DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t0.x, t0.y, i), shadowPosition.z);
+		s += DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t0.x, t1.y, i), shadowPosition.z);
+		s += DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t1.x, t1.y, i), shadowPosition.z);
+		s += DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(t1.x, t0.y, i), shadowPosition.z);
+		return s * 0.25;
+	#elif 0
+		// Bicubic b-spline
+		float2 iTc = uv * DirectionalShadowResolution;
+		float2 tc = floor(iTc - 0.5) + 0.5;
+		float2 f = iTc - tc;
+		float2 f2 = f * f;
+		float2 f3 = f2 * f;
+			
+		float2 w0 = 1.0 / 6.0 * Cb(1.0 - f);
+		float2 w1 = 1.0 / 6.0 * (4.0 + 3.0 * Cb(f) - 6.0 * Sq(f));
+		float2 w2 = 1.0 / 6.0 * (4.0 + 3.0 * Cb(1.0 - f) - 6.0 * Sq(1.0 - f));
+		float2 w3 = 1.0 / 6.0 * Cb(f);
+			
+		float2 s0 = w0 + w1;
+		float2 s1 = w2 + w3;
+ 
+		float2 f0 = w1 / (w0 + w1);
+		float2 f1 = w3 / (w2 + w3);
+ 
+		float2 t0 = tc - 1 + f0;
+		float2 t1 = tc + 1 + f1;
+			
+		t0 *= RcpDirectionalShadowResolution;
+		t1 *= RcpDirectionalShadowResolution;
+			
+		return DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t0.y), i), shadowPosition.z) * s0.x * s0.y +
+			DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t0.y), i), shadowPosition.z) * s1.x * s0.y +
+			DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t0.x, t1.y), i), shadowPosition.z) * s0.x * s1.y +
+			DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(float2(t1.x, t1.y), i), shadowPosition.z) * s1.x * s1.y;
+	#endif
 }
 
 // TODO: Can parameters be simplified/shortened
