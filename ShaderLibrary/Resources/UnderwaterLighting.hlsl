@@ -30,5 +30,9 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	// TODO: Support?
 	float3 translucency = 0;
 	
-	return EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, bentNormal, worldPosition, translucency, position.xy, eyeDepth).rgb + Input[position.xy];
+	float3 result = EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, bentNormal, worldPosition, translucency, position.xy, eyeDepth).rgb + Input[position.xy];
+	
+	float waterDepth = LinearEyeDepth(Depth[position.xy]);
+	result *= Rec709ToRec2020(TransmittanceToPoint(ViewHeight, -V.y, waterDepth * rcp(rcpVLength)));
+	return result;
 }

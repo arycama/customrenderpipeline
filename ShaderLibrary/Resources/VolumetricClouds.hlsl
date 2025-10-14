@@ -84,7 +84,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	#endif
 	
 	float cloudDistance;
-	float4 result = EvaluateCloud(rayStart, rayEnd - rayStart, sampleCount, rd, ViewHeight, viewCosAngle, offsets, P, isShadow, cloudDistance, false);
+	float4 result = EvaluateCloud(rayStart, rayEnd - rayStart, sampleCount, rd, ViewHeight, viewCosAngle, offsets, P, isShadow, cloudDistance, true);
 	float totalRayLength = rayEnd - cloudDistance;
 	
 	result = IsInfOrNaN(result) ? 0 : result;

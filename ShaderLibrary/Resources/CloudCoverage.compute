@@ -25,8 +25,9 @@ void CloudCoverage(uint groupIndex : SV_GroupIndex)
 	float cloudDistance;
 	float4 clouds = EvaluateCloud(rayStart, rayEnd - rayStart, 16, V, _PlanetRadius, V.y, 0.5, float3(0.0, -ViewPosition.y, 0.0), false, cloudDistance, false);
 	
+	// TODO: Need to figure out why this happens and fix it
 	if (any(IsInfOrNaN(clouds)))
-		clouds = 0;
+		clouds = float2(0.0, 1.0).xxxy;
 	
 	_SharedLuminanceExtinction[groupIndex] = clouds / sampleCount;
 	
@@ -46,10 +47,6 @@ void CloudCoverage(uint groupIndex : SV_GroupIndex)
 	
 	if (!IsFirst)
 		result = lerp(_CloudCoverage, result, 0.05);
-	
-	// TODO: Need to figure out why this happens and fix it
-	//result = IsInfOrNaN(result) ? float2(0.0, 1.0).xxxy : result;
-	//result = float2(0.0, 1.0).xxxy;
 	
 	// Smooth results over time to avoid flickering
 	_Result[0] = result;
