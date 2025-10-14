@@ -22,7 +22,8 @@ public partial class LightingSetup : CameraRenderFeature
 		var pointShadowRequests = ListPool<ShadowRequest>.Get();
 		var spotShadowRequests = ListPool<ShadowRequest>.Get();
 		var lightList = ListPool<LightData>.Get();
-		var directionalShadowMatrices = ListPool<Float4x4>.Get();
+		var directionalShadowMatrices = ListPool<Float3x4>.Get();
+		var directionalCascadeSizes = ListPool<Float2>.Get();
 
 		// Find first 2 directional lights
 		Float3 lightColor0 = Float3.Zero, lightColor1 = Float3.Zero, lightDirection0 = Float3.Up, lightDirection1 = Float3.Up;
@@ -275,9 +276,9 @@ public partial class LightingSetup : CameraRenderFeature
 						//viewLightBounds = viewLightBounds.Shrink(cascadeBounds);
 
 						// Snap to texels to avoid shimmering
+						var worldUnitsPerTexel = viewLightBounds.Size.xy / settings.DirectionalShadowResolution;
 						if (settings.SnapTexels)
 						{
-							var worldUnitsPerTexel = viewLightBounds.Size.xy / settings.DirectionalShadowResolution;
 							viewLightBounds.center.x = Floor(viewLightBounds.center.x / worldUnitsPerTexel.x) * worldUnitsPerTexel.x;
 							viewLightBounds.center.y = Floor(viewLightBounds.center.y / worldUnitsPerTexel.y) * worldUnitsPerTexel.y;
 						}
@@ -289,7 +290,8 @@ public partial class LightingSetup : CameraRenderFeature
 						var relativeViewMatrix = cascadeViewMatrix * cameraInverseTranslation;
 
 						directionalShadowRequests.Add(new(i, relativeViewMatrix, projectionMatrix, shadowSplitData, -1, Float3.Zero, hasShadowBounds));
-						directionalShadowMatrices.Add(MatrixExtensions.ConvertToAtlasMatrix(projectionMatrix * relativeViewMatrix));
+						directionalShadowMatrices.Add((Float3x4)MatrixExtensions.ConvertToAtlasMatrix(projectionMatrix * relativeViewMatrix));
+						directionalCascadeSizes.Add(worldUnitsPerTexel);
 					}
 				}
 
@@ -382,14 +384,25 @@ public partial class LightingSetup : CameraRenderFeature
 		}
 
 		// Set final matrices
-		var directionalShadowMatricesBuffer = renderGraph.GetBuffer(Max(1, directionalShadowMatrices.Count), UnsafeUtility.SizeOf<Matrix4x4>());
+		var directionalShadowMatricesBuffer = renderGraph.GetBuffer(Max(1, directionalShadowMatrices.Count), UnsafeUtility.SizeOf<Float3x4>());
 		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Set Directional Shadow Matrices"))
 		{
 			pass.WriteBuffer("", directionalShadowMatricesBuffer);
 			pass.SetRenderFunction((directionalShadowMatrices, directionalShadowMatricesBuffer), static (command, pass, data) =>
 			{
 				command.SetBufferData(pass.GetBuffer(data.directionalShadowMatricesBuffer), data.directionalShadowMatrices);
-				ListPool<Float4x4>.Release(data.directionalShadowMatrices);
+				ListPool<Float3x4>.Release(data.directionalShadowMatrices);
+			});
+		}
+
+		var directionalCascadeSizesBuffer = renderGraph.GetBuffer(Max(1, directionalCascadeSizes.Count), UnsafeUtility.SizeOf<Float2>());
+		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Set Directional Cascade Sizes"))
+		{
+			pass.WriteBuffer("", directionalCascadeSizesBuffer);
+			pass.SetRenderFunction((directionalCascadeSizes, directionalCascadeSizesBuffer), static (command, pass, data) =>
+			{
+				command.SetBufferData(pass.GetBuffer(data.directionalCascadeSizesBuffer), data.directionalCascadeSizes);
+				ListPool<Float2>.Release(data.directionalCascadeSizes);
 			});
 		}
 
@@ -400,12 +413,12 @@ public partial class LightingSetup : CameraRenderFeature
 			lightColor0,
 			dirLightCount,
 			lightDirection1,
-			0,
+			(float)settings.DirectionalFilterSize,
 			lightColor1,
-			0
+			settings.DirectionalFilterFalloff
 		));
 
-		renderGraph.SetResource(new LightingData(lightDirection0, lightColor0, lightDirection1, lightColor1, lightingData, directionalShadowMatricesBuffer));
+		renderGraph.SetResource(new LightingData(lightDirection0, lightColor0, lightDirection1, lightColor1, lightingData, directionalShadowMatricesBuffer, directionalCascadeSizesBuffer));
 
 		var pointLightBuffer = lightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(lightList.Count, UnsafeUtility.SizeOf<LightData>());
 		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Set Light Data"))

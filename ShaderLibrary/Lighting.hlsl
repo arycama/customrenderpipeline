@@ -19,16 +19,17 @@ cbuffer LightingData
 	float3 _LightColor0;
 	uint _LightCount;
 	float3 _LightDirection1;
-	float LightingDataPadding0;
+	float DirectionalFilterRadius;
 	float3 _LightColor1;
-	float LightingDataPadding1;
+	float DirectionalFilterFalloff;
 };
 
 SamplerComparisonState LinearClampCompareSampler, PointClampCompareSampler;
 Texture2DArray<float> DirectionalShadows;
 Texture2D<float2> PrecomputedDfg;
 float4 DirectionalShadows_TexelSize;
-StructuredBuffer<matrix> DirectionalShadowMatrices;
+StructuredBuffer<float3x4> DirectionalShadowMatrices;
+StructuredBuffer<float2> DirectionalCascadeSizes;
 
 cbuffer CloudCoverage
 {
@@ -116,7 +117,7 @@ float GetDirectionalShadow(float3 worldPosition)
 {
 	for (uint i = 0; i < DirectionalCascadeCount; i++)
 	{
-		float3 shadowPosition = MultiplyPoint3x4((float3x4) DirectionalShadowMatrices[i], worldPosition);
+		float3 shadowPosition = MultiplyPoint3x4(DirectionalShadowMatrices[i], worldPosition);
 		if (any(saturate(shadowPosition.xyz) != shadowPosition.xyz))
 			continue;
 			
@@ -125,12 +126,15 @@ float GetDirectionalShadow(float3 worldPosition)
 		// Single
 		#if 0
 			return DirectionalShadows.SampleCmpLevelZero(PointClampCompareSampler, float3(uv, i), shadowPosition.z);
-		#elif 0
+		#elif 1
+			float2 cascadeTexelSize = DirectionalCascadeSizes[i];
+			float2 rcpFilterSize = rcp(max(0.5 * cascadeTexelSize, DirectionalFilterFalloff * SunAngularRadius));
+			
 			float2 localUv = uv * DirectionalShadows_TexelSize.zw;
 			float2 texelCenter = floor(localUv) + 0.5;
-
-			float radius = 3;
-			float r = 0, weightSum = 0;
+			
+			float radius = DirectionalFilterRadius;
+			float visibilitySum = 0, weightSum = 0;
 			for (float y = -radius; y <= radius; y++)
 			{
 				for (float x = -radius; x <= radius; x++)
@@ -138,16 +142,15 @@ float GetDirectionalShadow(float3 worldPosition)
 					float2 coord = texelCenter + float2(x, y);
 					float d = DirectionalShadows[int3(coord, i)];
 					float2 delta = localUv - coord;
-					float2 weights = saturate(1 - abs(delta / radius));
+					float2 weights = saturate(1.0 - abs(delta) * cascadeTexelSize * rcpFilterSize);
 					float weight = weights.x * weights.y;
-					if (d < shadowPosition.z)
-						r += weight;
-            
+					bool isVisible = d < shadowPosition.z;
+					visibilitySum += isVisible * weight;
 					weightSum += weight;
 				}
 			}
 			
-			return r / weightSum;
+			return visibilitySum / weightSum;
 		
 			return DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, i), shadowPosition.z);
 		#elif 1

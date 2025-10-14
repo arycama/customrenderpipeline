@@ -4,6 +4,9 @@ using UnityEngine;
 [Serializable]
 public class LightingSettings
 {
+	[field: SerializeField, Range(0, 5)] public int DirectionalFilterSize { get; private set; } = 1;
+	[field: SerializeField, Min(0.0f), Tooltip("Simulated distance between receiver and a blocker, used to calculate penumbra size")] public float DirectionalBlockerDistance { get; private set; } = 1.5f;
+
 	[field: SerializeField] public bool MicroShadows { get; private set; } = true;
 	[field: SerializeField, Range(1e-3f, 180)] public float SunAngularDiameter { get; private set; } = 0.52f;
 
