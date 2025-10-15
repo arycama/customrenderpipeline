@@ -137,7 +137,7 @@ FragmentOutput FragmentCombine(FragmentInput input)
 	output.output[1] = Input1[pos];
 	output.output[2] = Input2[pos];
 	output.output[3] = Input3[pos];
-	output.output[4] = Input4[pos];
+	output.output[4] = Input4[int3(input.position.xy, input.viewIndex)];
 	output.output[5] = Input5[pos];
 	output.output[6] = Input6[pos];
 	output.output[7] = Input7[pos];

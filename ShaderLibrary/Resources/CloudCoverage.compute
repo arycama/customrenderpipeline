@@ -47,6 +47,8 @@ void CloudCoverage(uint groupIndex : SV_GroupIndex)
 	
 	if (!IsFirst)
 		result = lerp(_CloudCoverage, result, 0.05);
+		
+	result = float2(0.0, 1.0).xxxy;
 	
 	// Smooth results over time to avoid flickering
 	_Result[0] = result;
