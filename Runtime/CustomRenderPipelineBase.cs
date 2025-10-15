@@ -95,6 +95,8 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
                 using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
 
+                renderGraph.RtHandleSystem.SetScreenSize(camera.pixelWidth, camera.pixelHeight);
+
                 foreach (var cameraRenderFeature in perCameraRenderFeatures)
                 {
                     cameraRenderFeature.Render(camera, context);

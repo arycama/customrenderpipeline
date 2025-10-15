@@ -126,8 +126,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	{
 		new GenericCameraRenderFeature(renderGraph, "Camera Cull", (camera, context) =>
 		{
-			renderGraph.RtHandleSystem.SetScreenSize(camera.pixelWidth, camera.pixelHeight);
-
 			if (!camera.TryGetCullingParameters(out var cullingParameters))
 				return;
 
