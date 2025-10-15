@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using System;
 
 #if UNITY_EDITOR
 using UnityEditorInternal;
@@ -74,56 +75,58 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
 		GraphicsSettings.useScriptableRenderPipelineBatching = UseSrpBatching;
 
-        try
+		if (!isInitialized)
+		{
+			perFrameRenderFeatures = InitializePerFrameRenderFeatures();
+			perCameraRenderFeatures = InitializePerCameraRenderFeatures();
+			isInitialized = true;
+		}
+
+		using (renderGraph.AddProfileScope("Prepare Frame"))
+		{
+			foreach (var frameRenderFeature in perFrameRenderFeatures)
+			{
+				frameRenderFeature.Render(context);
+			}
+		}
+
+        foreach (var camera in cameras)
         {
-            if (!isInitialized)
-            {
-                perFrameRenderFeatures = InitializePerFrameRenderFeatures();
-                perCameraRenderFeatures = InitializePerCameraRenderFeatures();
-                isInitialized = true;
-            }
+            camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 
-            using (renderGraph.AddProfileScope("Prepare Frame"))
-                foreach (var frameRenderFeature in perFrameRenderFeatures)
-                {
-                    frameRenderFeature.Render(context);
-                }
-
-            foreach (var camera in cameras)
-            {
-                camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
-
-                using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
+            using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
 
                 renderGraph.RtHandleSystem.SetScreenSize(camera.pixelWidth, camera.pixelHeight);
 
-                foreach (var cameraRenderFeature in perCameraRenderFeatures)
-                {
-                    cameraRenderFeature.Render(camera, context);
-                }
-
-                var wireOverlay = context.CreateWireOverlayRendererList(camera);
-
-                // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
-                if (camera.cameraType == CameraType.Game && camera == Camera.main)
-                {
-                    using var pass = renderGraph.AddRenderPass<GenericRenderPass>("UI Overlay");
-                    pass.UseProfiler = false;
-
-                    var uiOverlay = context.CreateUIOverlayRendererList(camera);
-                    pass.SetRenderFunction((command, pass) =>
-                    {
-                        command.EnableShaderKeyword("UI_OVERLAY_RENDERING");
-                        command.DrawRendererList(uiOverlay);
-                        command.DisableShaderKeyword("UI_OVERLAY_RENDERING");
-
-                        command.DrawRendererList(wireOverlay);
-                    });
-                }
+            foreach (var cameraRenderFeature in perCameraRenderFeatures)
+            {
+                cameraRenderFeature.Render(camera, context);
             }
 
-            renderGraph.Execute(command);
+            var wireOverlay = context.CreateWireOverlayRendererList(camera);
 
+            // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
+            if (camera.cameraType == CameraType.Game && camera == Camera.main)
+            {
+                using var pass = renderGraph.AddRenderPass<GenericRenderPass>("UI Overlay");
+                pass.UseProfiler = false;
+
+                var uiOverlay = context.CreateUIOverlayRendererList(camera);
+                pass.SetRenderFunction((command, pass) =>
+                {
+                    command.EnableShaderKeyword("UI_OVERLAY_RENDERING");
+                    command.DrawRendererList(uiOverlay);
+                    command.DisableShaderKeyword("UI_OVERLAY_RENDERING");
+
+                    command.DrawRendererList(wireOverlay);
+                });
+            }
+        }
+
+		renderGraph.Execute(command);
+
+		try
+		{
             context.ExecuteCommandBuffer(command);
             command.Clear();
 

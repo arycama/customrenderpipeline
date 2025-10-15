@@ -58,7 +58,7 @@ public abstract class GraphicsRenderPass : RenderPass<GraphicsRenderPass>
 
 		// Since depth textures are 'read' during rendering for comparisons, we also mark it as read if it's depth or stencil can be modified
 		if(renderTargetFlags != RenderTargetFlags.ReadOnlyDepthStencil)
-			ReadTexture("", rtHandle);
+			RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
     }
 
     private void WriteResource(ResourceHandle<RenderTexture> rtHandle)

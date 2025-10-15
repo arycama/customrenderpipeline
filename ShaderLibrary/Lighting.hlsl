@@ -128,7 +128,7 @@ float GetDirectionalShadow(float3 worldPosition)
 	float3 shadowPosition = MultiplyPoint3x4(DirectionalShadowMatrices[cascade], worldPosition);
 
 	float2 rcpFilterSize = DirectionalCascadeSizes[cascade].xy;
-	float2 radiusPixels = DirectionalCascadeSizes[cascade].zw;
+	float2 radiusPixels = clamp(DirectionalCascadeSizes[cascade].zw, 0, 8); // Prevent possible TDR
 	float2 localUv = shadowPosition.xy * DirectionalShadowResolution;
 	float2 texelCenter = floor(localUv) + 0.5;
 

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -29,10 +30,26 @@ public readonly struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 		IsExactSize = isExactSize;
 	}
 
+	public override string ToString() => $"{Width}x{Height}x{VolumeDepth} {Format} {Dimension}";
+
 	public RenderTexture CreateResource(ResourceHandleSystemBase system)
 	{
 		var rtHandleSystem = system as RTHandleSystem;
-		var (width, height) = IsScreenTexture ? (rtHandleSystem.ScreenWidth, rtHandleSystem.ScreenHeight) : (Width, Height);
+
+		int width, height;
+		if (IsScreenTexture)
+		{
+			Assert.IsTrue(rtHandleSystem.ScreenWidth > 0);
+			Assert.IsTrue(rtHandleSystem.ScreenHeight > 0);
+			width = rtHandleSystem.ScreenWidth;
+			height = rtHandleSystem.ScreenHeight;
+		}
+		else
+		{
+			width = Width;
+			height = Height;
+		}
+
 		var isDepth = GraphicsFormatUtility.IsDepthFormat(Format);
 		var isStencil = GraphicsFormatUtility.IsStencilFormat(Format);
 		var graphicsFormat = isDepth ? GraphicsFormat.None : Format;
@@ -52,7 +69,11 @@ public readonly struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 
 		if (!result.Create())
 		{
-			Debug.LogError($"{width} {height} {VolumeDepth}");
+			Debug.LogError($"Failed to create RenderTexture {this}");
+		}
+		else
+		{
+			//Debug.Log($"Creating RenderTexture {this}");
 		}
 
 		return result;

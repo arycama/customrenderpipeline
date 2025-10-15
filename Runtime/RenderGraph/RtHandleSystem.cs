@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
@@ -10,8 +11,11 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
 
 	public void SetScreenSize(int width, int height)
 	{
-		ScreenWidth = Mathf.Max(width, ScreenWidth);
-		ScreenHeight = Mathf.Max(height, ScreenHeight);
+		Assert.IsTrue(width > 0);
+		Assert.IsTrue(height > 0);
+
+		ScreenWidth = Math.Max(width, ScreenWidth);
+		ScreenHeight = Math.Max(height, ScreenHeight);
 	}
 
 	protected override void DestroyResource(RenderTexture resource) => Object.DestroyImmediate(resource);

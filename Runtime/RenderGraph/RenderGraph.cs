@@ -143,24 +143,34 @@ public class RenderGraph : IDisposable
 		BufferHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 		RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 
-		IsExecuting = true;
-
-		foreach (var renderPass in renderPasses)
+		try
 		{
-			renderPass.Run(command);
+			IsExecuting = true;
 
-			renderPass.Reset();
-
-			if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))
+			foreach (var renderPass in renderPasses)
 			{
-				pool = new();
-				renderPassPool.Add(renderPass.GetType(), pool);
+				renderPass.Run(command);
+
+				renderPass.Reset();
+
+				if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))
+				{
+					pool = new();
+					renderPassPool.Add(renderPass.GetType(), pool);
+				}
+
+				pool.Push(renderPass);
 			}
-
-			pool.Push(renderPass);
 		}
-
-		IsExecuting = false;
+		catch(Exception exception)
+		{
+			CleanupCurrentFrame();
+			throw exception;
+		}
+		finally
+		{
+			IsExecuting = false;
+		}
 	}
 
 	public ResourceHandle<RenderTexture> GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
