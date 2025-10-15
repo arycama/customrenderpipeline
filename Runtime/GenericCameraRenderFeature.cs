@@ -4,17 +4,12 @@ using UnityEngine.Rendering;
 
 public class GenericCameraRenderFeature : CameraRenderFeature
 {
-	private string profilerName;
+	private readonly Action<Camera, ScriptableRenderContext> render;
 
-	private Action<Camera, ScriptableRenderContext> render;
-
-	public GenericCameraRenderFeature(RenderGraph renderGraph, string profilerName, Action<Camera, ScriptableRenderContext> render) : base(renderGraph)
+	public GenericCameraRenderFeature(RenderGraph renderGraph, Action<Camera, ScriptableRenderContext> render) : base(renderGraph)
 	{
-		this.profilerName = profilerName;
 		this.render = render;
 	}
-
-	public override string ProfilerNameOverride => profilerName;
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{

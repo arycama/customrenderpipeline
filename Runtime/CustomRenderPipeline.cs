@@ -124,7 +124,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 	protected override List<CameraRenderFeature> InitializePerCameraRenderFeatures() => new()
 	{
-		new GenericCameraRenderFeature(renderGraph, "Camera Cull", (camera, context) =>
+		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
 			if (!camera.TryGetCullingParameters(out var cullingParameters))
 				return;
@@ -149,7 +149,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new AutoExposurePreRender(renderGraph, asset.Tonemapping),
 		new SetupCamera(renderGraph, asset.Sky),
 
-		new GenericCameraRenderFeature(renderGraph, "Clear Camera Targets", (camera, context) =>
+		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
 			var (cameraTarget, previousScene, currentSceneCreated) = cameraTargetCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
 			var cameraDepth = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true);
@@ -181,7 +181,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new TerrainViewData(renderGraph, terrainSystem),
 		new TerrainRenderer(asset.TerrainSettings, renderGraph),
-		new GenericCameraRenderFeature(renderGraph, "Gbuffer", (camera, context) =>
+		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
 
@@ -199,7 +199,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.AddRenderPassData<AutoExposureData>();
 		}),
 
-		new GenericCameraRenderFeature(renderGraph, "Velocity", (camera, context) =>
+		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
 
@@ -219,7 +219,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.AddRenderPassData<AutoExposureData>();
 		}),
 
-		new GenericCameraRenderFeature(renderGraph, "Grass Velocity", (camera, context) =>
+		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
 
@@ -242,7 +242,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
 
 		// This is just here to avoid memory leaks when GPU driven rendering isn't used.
-        new GenericCameraRenderFeature(renderGraph, "HiZ Read Temp", (camera, context) =>
+        new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
 			using var pass = renderGraph.AddRenderPass<GenericRenderPass>("HiZ Read Temp");
 			pass.AddRenderPassData<HiZMaxDepthData>();
@@ -255,7 +255,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// Finalize gbuffer
 		new ScreenSpaceTerrain(renderGraph),
 
-		new GenericCameraRenderFeature(renderGraph, "Depth Copy", (camera, context) =>
+		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
             // Copy scene depth (Required for underwater lighting)
             // TODO: Could avoid this by using another depth texture for water.. will require some extra logic in other passes though
@@ -310,7 +310,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// TODO: Could render clouds after deferred, then sky after that
 		new DeferredLighting(renderGraph, asset.Sky),
 
-		new GenericCameraRenderFeature(renderGraph, "", (camera, context) =>
+		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
             // Generate for next frame
             using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Generate Color Pyramid"))
@@ -330,7 +330,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new VolumetricClouds(asset.Clouds, renderGraph, asset.Sky),
 		new Sky(renderGraph, asset.Sky),
 
-		new GenericCameraRenderFeature(renderGraph, "", (camera, context) =>
+		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
 			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Render Transparent");
 
