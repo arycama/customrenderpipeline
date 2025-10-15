@@ -55,9 +55,13 @@ public abstract class GraphicsRenderPass : RenderPass<GraphicsRenderPass>
 		this.renderTargetFlags = renderTargetFlags;
 		depthBuffer = (rtHandle, loadAction, storeAction);
 		WriteResource(rtHandle);
-	}
 
-	private void WriteResource(ResourceHandle<RenderTexture> rtHandle)
+		// Since depth textures are 'read' during rendering for comparisons, we also mark it as read if it's depth or stencil can be modified
+		if(renderTargetFlags != RenderTargetFlags.ReadOnlyDepthStencil)
+			ReadTexture("", rtHandle);
+    }
+
+    private void WriteResource(ResourceHandle<RenderTexture> rtHandle)
 	{
 		RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
 
