@@ -173,10 +173,22 @@ public class RenderGraph : IDisposable
 		}
 	}
 
-	public ResourceHandle<RenderTexture> GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
+	public ResourceHandle<RenderTexture> GetTexture(RtHandleDescriptor descriptor, bool isPersistent = false)
 	{
 		Assert.IsFalse(IsExecuting);
-		return RtHandleSystem.GetResourceHandle(new RtHandleDescriptor(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, false, isExactSize), isPersistent);
+		return RtHandleSystem.GetResourceHandle(descriptor, isPersistent);
+	}
+
+	/// <summary> Gets a texture with the same attributes as the handle </summary>
+	public ResourceHandle<RenderTexture> GetTexture(ResourceHandle<RenderTexture> handle, bool isPersistent = false)
+	{
+		var descriptor = RtHandleSystem.GetDescriptor(handle);
+		return RtHandleSystem.GetResourceHandle(descriptor, isPersistent);
+	}
+
+	public ResourceHandle<RenderTexture> GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false)
+	{
+		return GetTexture(new RtHandleDescriptor(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, false, isExactSize), isPersistent);
 	}
 
 	public ResourceHandle<GraphicsBuffer> GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)

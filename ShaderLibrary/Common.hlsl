@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#ifndef COMMON_INCLUDED
+#define COMMON_INCLUDED
 
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/CommonShaders.hlsl"
 
@@ -186,3 +187,5 @@ float3 GetFrustumCorner(uint id)
 float Select(float2 v, uint index) { return index ? v.y : v.x; }
 float Select(float3 v, uint index) { return index ? (index == 2 ? v.z : v.y) : v.x; }
 float Select(float4 v, uint index) { return index ? (index == 3 ? v.w : (index == 2 ? v.z : v.y)) : v.x; }
+
+#endif

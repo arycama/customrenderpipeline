@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPACE_TRANSFORMS_INCLUDED
+#define SPACE_TRANSFORMS_INCLUDED
 
 #include "Common.hlsl"
 #include "MatrixUtils.hlsl"
@@ -217,3 +218,5 @@ float3 TransformPixelToViewDirection(float2 position, bool doNormalize)
 {
 	return -TransformPixelToWorldDirection(position, doNormalize);
 }
+
+#endif

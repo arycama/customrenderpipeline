@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#ifndef PACKING_INCLUDED
+#define PACKING_INCLUDED
 
 #include "Math.hlsl"
 
@@ -90,3 +91,5 @@ float3 UnpackNormal(float4 packedNormal, float scale = 1.0)
 	packedNormal.a *= packedNormal.r;
 	return UnpackNormalUNorm(packedNormal.ag, scale);
 }
+
+#endif

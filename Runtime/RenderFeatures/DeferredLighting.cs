@@ -48,6 +48,8 @@ public class DeferredLighting : CameraRenderFeature
 
 			pass.AddRenderPassData<DiffuseGlobalIllumination.Result>();
 			pass.AddRenderPassData<ScreenSpaceReflectionResult>();
+			pass.AddRenderPassData<DecalAlbedoData>();
+			pass.AddRenderPassData<DecalNormalData>();
 		}
 
 		RenderPass(0); // No translucency

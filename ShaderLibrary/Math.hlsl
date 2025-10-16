@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MATH_INCLUDED
+#define MATH_INCLUDED
 
 const static float HalfEps = 4.8828125e-4;
 const static float HalfMin = 6.103515625e-5; // 2^-14, the same value for 10, 11 and 16-bit: https://www.khronos.org/opengl/wiki/Small_Float_Formats
@@ -260,3 +261,5 @@ float2 ApplyScaleOffset(float2 uv, float4 scaleOffset)
 {
 	return uv * scaleOffset.xy + scaleOffset.zw;
 }
+
+#endif

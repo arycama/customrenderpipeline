@@ -255,6 +255,35 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// Finalize gbuffer
 		new ScreenSpaceTerrain(renderGraph),
 
+		// Decals
+		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		{
+			var decalAlbedo = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true);
+			renderGraph.SetResource(new DecalAlbedoData(decalAlbedo));
+
+			var decalNormal = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
+			renderGraph.SetResource(new DecalNormalData(decalNormal));
+
+			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+
+			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Decal");
+			pass.ConfigureClear(RTClearFlags.Color);
+
+			pass.Initialize("Decal", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.QuantizedFrontToBack, PerObjectData.None);
+			pass.WriteDepth(renderGraph.GetResource<CameraDepthData>(), RenderTargetFlags.ReadOnlyDepthStencil);
+			pass.WriteTexture(decalAlbedo);
+			pass.WriteTexture(decalNormal);
+
+			pass.AddRenderPassData<FrameData>();
+			pass.AddRenderPassData<ViewData>();
+			pass.AddRenderPassData<AutoExposureData>();
+			pass.AddRenderPassData<CameraDepthData>();
+			pass.AddRenderPassData<AlbedoMetallicData>();
+			pass.AddRenderPassData<NormalRoughnessData>();
+		}),
+
+		new DecalComposite(renderGraph),
+
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
             // Copy scene depth (Required for underwater lighting)

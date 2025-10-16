@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#ifndef COMMON_SHADERS_INCLUDED
+#define COMMON_SHADERS_INCLUDED
 
 float3 GetFrustumCorner(uint cornerId);
 
@@ -70,3 +71,5 @@ void GeometryCubemapRender(triangle uint id[3] : TEXCOORD, inout TriangleStream<
 {
 	FullscreenGeometryPassthrough(id, instanceId, stream);
 }
+
+#endif

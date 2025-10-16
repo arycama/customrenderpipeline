@@ -63,7 +63,7 @@ float3 HierarchicalRaymarch(float3 origin, float3 direction, float2 screenSize, 
     uvOffset = direction.xy < 0.0f ? -uvOffset : uvOffset;
 
     // Offset applied depending on current mip resolution to move the boundary to the left/right upper/lower border depending on ray direction.
-	float2 floorOffset = direction >= 0.0;
+	float2 floorOffset = direction.xy >= 0.0;
 
     // Initially advance ray to avoid immediate self intersections.
     float currentT;
@@ -71,7 +71,7 @@ float3 HierarchicalRaymarch(float3 origin, float3 direction, float2 screenSize, 
 	InitialAdvanceRay(origin, direction, screenSize, floorOffset, uvOffset, position, currentT);
 
 	float2 mipResolution = screenSize;
-	for (float i = 0.0; i < maxSteps; i++)
+	for (uint i = 0; i < maxSteps; i++)
 	{
 		float2 currentMipPosition = mipResolution * position.xy;
 		float surfaceZ = depth.mips[currentMip][int2(currentMipPosition)];
@@ -107,7 +107,7 @@ float ValidateHit(float3 hit, float2 uv, float3 world_space_ray_direction, float
 
     // Don't lookup radiance from the background.
     int2 texel_coords = int2(screen_size * hit.xy);
-    float surface_z = HiZMinDepth.mips[1][texel_coords / 2];
+    float surface_z = HiZMinDepth.mips[1][texel_coords >> 1];
     if (surface_z == 0.0) {
         return 0;
     }
@@ -163,11 +163,9 @@ float3 ScreenSpaceRaytrace(float3 worldPosition, float3 L, uint maxSteps, float 
 	reflPosSS = reflPos;
 	reflPosSS.xy *= ViewSize;
 	rayDir = reflPosSS - rayOrigin;
-    
-    
 	
 	float3 rayStep = FastSign(rayDir); // Which directions to move the ray when it hits a boundary
-	float2 cellOffset = rayStep * 0.5; // Offset for center coordinate to get bounds, since we store centered coords
+	float2 cellOffset = rayStep.xy * 0.5; // Offset for center coordinate to get bounds, since we store centered coords
 	float2 currentCell = rayOrigin.xy; // Starting cell center, assume pixel coords centered on 0.5
 
 	for (uint i = 0; i < maxSteps * 4; i++)
