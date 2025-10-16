@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public class ShadowData : IRenderPassData
+public struct ShadowData : IRenderPassData
 {
 	private readonly ResourceHandle<RenderTexture> directionalShadows;
     private readonly ResourceHandle<RenderTexture> pointShadows;

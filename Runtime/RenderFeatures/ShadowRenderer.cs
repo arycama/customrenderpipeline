@@ -101,7 +101,8 @@ public class ShadowRenderer : CameraRenderFeature
 				}
 			}
 
-			ListPool<ShadowRequest>.Release(requestData.DirectionalShadowRequests);
+			// This is released via particle shadows instead
+			//ListPool<ShadowRequest>.Release(requestData.DirectionalShadowRequests);
 		}
 
 		using (renderGraph.AddProfileScope("Point Shadows"))

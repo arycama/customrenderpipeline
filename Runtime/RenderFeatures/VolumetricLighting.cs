@@ -65,6 +65,7 @@ public partial class VolumetricLighting : CameraRenderFeature
             pass.AddRenderPassData<CloudShadowDataResult>();
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<HiZMaxDepthData>();
+            pass.AddRenderPassData<ParticleShadowData>();
 
 			pass.SetRenderFunction((pixelToWorldViewDir, history), static (command, pass, data) =>
             {

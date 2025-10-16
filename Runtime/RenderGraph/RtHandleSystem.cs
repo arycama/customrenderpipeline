@@ -49,7 +49,7 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
 		else if (descriptor.IsExactSize || descriptor.Dimension == TextureDimension.Cube || descriptor.Dimension == TextureDimension.CubeArray)
 		{
 			// Some textures need exact size. (Eg writing to multiple targets at non-screen resolution
-			if (resource.width != descriptor.Width || resource.height != descriptor.Height)
+			if (resource.width != descriptor.Width || resource.height != descriptor.Height || resource.volumeDepth != descriptor.VolumeDepth)
 				return false;
 		}
 		else if (resource.width < descriptor.Width || resource.height < descriptor.Height)

@@ -16,6 +16,7 @@ public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 
 	[field: SerializeField] public EnvironmentLightingSettings EnvironmentLighting { get; private set; }
 	[field: SerializeField] public LightingSettings LightingSettings { get; private set; }
+	[field: SerializeField] public ParticleShadows.Settings ParticleShadows { get; private set; }
 
 	[field: SerializeField] public ClusteredLightCulling.Settings ClusteredLightingSettings { get; private set; }
 	[field: SerializeField] public VolumetricLighting.Settings VolumetricLightingSettings { get; private set; }

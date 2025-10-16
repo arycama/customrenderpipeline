@@ -33,6 +33,7 @@ SamplerComparisonState LinearClampCompareSampler, PointClampCompareSampler;
 Texture2DArray<float> DirectionalShadows;
 StructuredBuffer<float3x4> DirectionalShadowMatrices;
 StructuredBuffer<float4> DirectionalCascadeSizes;
+Texture3D<float> DirectionalParticleShadows;
 
 cbuffer CloudCoverage
 {
@@ -146,8 +147,17 @@ float GetDirectionalShadow(float3 worldPosition)
 			weightSum += weight;
 		}
 	}
-
-	return lerp(1.0, visibilitySum / weightSum, fade);
+	
+	float visibility = visibilitySum / weightSum;
+	
+	// Particle shadows
+	float3 particleShadowUv = shadowPosition;
+	particleShadowUv.x = (particleShadowUv.x + floor(cascade)) * rcp(DirectionalCascadeCount);
+	particleShadowUv.z = 1 - particleShadowUv.z;
+	float particleShadow = DirectionalParticleShadows.SampleLevel(TrilinearClampSampler, particleShadowUv, 0.0);
+	visibility *= particleShadow;
+	
+	return lerp(1.0, visibility, fade);
 	
 	#if 0
 		// Bilinear 3x3

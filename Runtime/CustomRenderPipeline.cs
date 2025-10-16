@@ -320,6 +320,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting),
 
 		new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer, gpuDrivenRenderer),
+		new ParticleShadows(renderGraph, asset.ParticleShadows),
 		new VolumetricCloudShadow(asset.Clouds, asset.Sky, renderGraph),
 		new WaterShadowRenderer(renderGraph, asset.OceanSettings),
 		new WaterCaustics(renderGraph, asset.OceanSettings),
@@ -386,6 +387,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.AddRenderPassData<VolumetricLighting.Result>();
 			pass.AddRenderPassData<LightingSetup.Result>();
 			pass.AddRenderPassData<ClusteredLightCulling.Result>();
+			pass.AddRenderPassData<ParticleShadowData>();
 		}),
 
 		new AutoExposure(asset.AutoExposureSettings, asset.LensSettings, renderGraph, asset.Tonemapping),

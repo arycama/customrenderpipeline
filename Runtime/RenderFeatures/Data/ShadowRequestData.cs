@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public class ShadowRequestData : IRenderPassData
+public struct ShadowRequestData : IRenderPassData
 {
 	public ShadowRequest ShadowRequest { get; }
 	public float Bias { get; }

@@ -11,6 +11,8 @@ float4 CloudTextureScaleLimit, SkyTextureScaleLimit;
 
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
+	//return DirectionalParticleShadows.SampleLevel(TrilinearClampSampler, float3(uv, 1), 0.0);
+
 	float depth = Depth[position.xy];
 	float eyeDepth = LinearEyeDepth(depth);
 	float3 worldPosition = worldDir * eyeDepth;
