@@ -74,6 +74,10 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float3 normal = UnpackNormalUNorm(normalOcclusionRoughness.rg);
 	float3 worldNormal = TangentToWorldNormal(normal, input.normal, input.tangent.xyz, input.tangent.w);
 	
+	// Discard empty pixels, saves compositing invisible pixels
+	if (!albedoOpacity.a)
+		discard;
+	
 	FragmentOutput output;
 	output.albedoOpacity = albedoOpacity;
 	output.normalRoughness = float4(0.5 * worldNormal + 0.5, normalOcclusionRoughness.a);

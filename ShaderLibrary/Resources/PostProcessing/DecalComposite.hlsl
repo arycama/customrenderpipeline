@@ -8,10 +8,20 @@ struct FragmentOutput
 	float4 normalRoughness : SV_Target1;
 };
 
-FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+Texture2D<float4> AlbedoMetallicCopy, NormalRoughnessCopy;
+
+FragmentOutput FragmentCopy(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float4 albedoMetallic = GbufferAlbedoMetallic[position.xy];
-	float4 normalRoughness = NormalRoughness[position.xy];
+	FragmentOutput output;
+	output.albedoMetallic = GbufferAlbedoMetallic[position.xy];
+	output.normalRoughness = NormalRoughness[position.xy];
+	return output;
+}
+
+FragmentOutput FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+{
+	float4 albedoMetallic = AlbedoMetallicCopy[position.xy];
+	float4 normalRoughness = NormalRoughnessCopy[position.xy];
 	
 	float4 decal = DecalAlbedo[position.xy];
 	float4 decalNormal = DecalNormal[position.xy];
