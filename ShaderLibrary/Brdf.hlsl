@@ -6,6 +6,7 @@
 #include "Samplers.hlsl"
 
 Texture2D<float> DirectionalAlbedo, AverageAlbedo, AverageAlbedoMs;
+Texture2D<float2> PrecomputedDfg;
 Texture3D<float> DirectionalAlbedoMs;
 
 float LambdaGgx(float roughness2, float cosTheta)
@@ -68,14 +69,14 @@ float3 GgxSingleScatter(float roughness2, float NdotL, float LdotV, float NdotV,
 	return ggx * Fresnel(LdotH, f0);
 }
 
-float AverageFresnel(float f0)
+float3 AverageFresnel(float3 f0)
 {
 	return (20 * rcp(21.0)) * f0 + rcp(21.0);
 }
 
-float3 AverageFresnel(float3 f0)
+float AverageFresnel(float f0)
 {
-	return (20 * rcp(21.0)) * f0 + rcp(21.0);
+	return AverageFresnel(f0).r;
 }
 
 float3 GgxMultiScatterTerm(float3 f0, float perceptualRoughness, float NdotV, float ems)
@@ -100,3 +101,13 @@ float3 Ggx(float roughness2, float NdotL, float LdotV, float NdotV, float partLa
 //	float3 specular = Ggx(roughness2, NdotL, LdotV, NdotV, partLambdaV, perceptualRoughness);
 //	return float4(specular, diffuse) * NdotL; // RcpPi is multiplied outside of this function
 //}
+
+float3 EnergyCompensationFactor(float3 f0, float perceptualRoughness, float NdotV)
+{
+	float2 dfg = PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
+	float3 fssEss = dfg.x * f0 + dfg.y;
+	float3 fAvg = AverageFresnel(f0);
+	float ems = 1.0 - dfg.x - dfg.y;
+	float3 fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
+	return 1.0 - fssEss - fmsEms;
+}

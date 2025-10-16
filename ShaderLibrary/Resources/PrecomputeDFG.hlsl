@@ -97,7 +97,7 @@ float FragmentDirectionalAlbedoMultiScattered(float4 position : SV_Position, flo
 		result += weightOverPdf;
 		
 		float multiScatter = DirectionalAlbedo.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float2(NdotL, perceptualRoughness), 32), 0.0);
-		float rcpPdf = (4 * LdotH) * rcp(GgxDistribution(roughness2, NdotH) * NdotH);
+		float rcpPdf = (4 * LdotH) * rcp(GgxDistribution(max(1e-3, roughness2), NdotH) * NdotH);
 		multiScatterResult += multiScatter * NdotL * rcpPdf;
 	}
 	

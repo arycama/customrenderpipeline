@@ -194,16 +194,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float3 V = normalize(-worldDir);
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
-	float perceptualRoughness = normalRoughness.a;
-	
-	// TODO: Put somewhere
-	float2 dfg = PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
-	float f0 = 0.02;
-	float fssEss = dfg.x * f0 + dfg.y;
-	float fAvg = AverageFresnel(f0);
-	float ems = 1.0 - dfg.x - dfg.y;
-	float fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
-	float kd = 1.0 - fssEss - fmsEms;
+	float kd = EnergyCompensationFactor(0.02, normalRoughness.a, NdotV).r;
 	
 	TemporalOutput output;
 	output.temporal = float4(result, 1.0);

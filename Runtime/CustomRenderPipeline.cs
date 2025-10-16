@@ -280,6 +280,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.AddRenderPassData<CameraDepthData>();
 			pass.AddRenderPassData<AlbedoMetallicData>();
 			pass.AddRenderPassData<NormalRoughnessData>();
+			pass.AddRenderPassData<DfgData>();
 		}),
 
 		new DecalComposite(renderGraph),

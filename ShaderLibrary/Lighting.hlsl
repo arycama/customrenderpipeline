@@ -31,7 +31,6 @@ cbuffer LightingData
 
 SamplerComparisonState LinearClampCompareSampler, PointClampCompareSampler;
 Texture2DArray<float> DirectionalShadows;
-Texture2D<float2> PrecomputedDfg;
 StructuredBuffer<float3x4> DirectionalShadowMatrices;
 StructuredBuffer<float4> DirectionalCascadeSizes;
 

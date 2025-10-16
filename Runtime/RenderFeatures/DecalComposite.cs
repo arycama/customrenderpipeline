@@ -16,9 +16,11 @@ public class DecalComposite : CameraRenderFeature
 
 		var albedoMetallic = renderGraph.GetResource<AlbedoMetallicData>();
 		var normalRoughness = renderGraph.GetResource<NormalRoughnessData>();
+		var bentNormalOcclusion = renderGraph.GetResource<BentNormalOcclusionData>();
 
 		var albedoMetallicCopy = renderGraph.GetTexture(albedoMetallic);
 		var normalRoughnessCopy = renderGraph.GetTexture(normalRoughness);
+		var bentNormalOcclusionCopy = renderGraph.GetTexture(bentNormalOcclusion);
 
 		// Copy the existing gbuffer textures to new ones
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Copy"))
@@ -28,9 +30,11 @@ public class DecalComposite : CameraRenderFeature
 			pass.WriteDepth(renderGraph.GetResource<CameraDepthData>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(albedoMetallicCopy);
 			pass.WriteTexture(normalRoughnessCopy);
+			pass.WriteTexture(bentNormalOcclusionCopy);
 
 			pass.AddRenderPassData<AlbedoMetallicData>();
 			pass.AddRenderPassData<NormalRoughnessData>();
+			pass.AddRenderPassData<BentNormalOcclusionData>();
 		}
 
 		// Now composite the decal buffers
@@ -41,9 +45,11 @@ public class DecalComposite : CameraRenderFeature
 			pass.WriteDepth(renderGraph.GetResource<CameraDepthData>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(albedoMetallic);
 			pass.WriteTexture(normalRoughness);
+			pass.WriteTexture(bentNormalOcclusion);
 
 			pass.ReadTexture("AlbedoMetallicCopy", albedoMetallicCopy);
 			pass.ReadTexture("NormalRoughnessCopy", normalRoughnessCopy);
+			pass.ReadTexture("BentNormalOcclusionCopy", bentNormalOcclusionCopy);
 
 			pass.AddRenderPassData<DecalAlbedoData>();
 			pass.AddRenderPassData<DecalNormalData>();

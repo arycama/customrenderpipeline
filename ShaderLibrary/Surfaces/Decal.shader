@@ -6,6 +6,8 @@ Shader "Surface/Decal"
 		AlbedoOpacity("Albedo Opacity", 2D) = "white" {}
 		NormalOcclusionRoughness("Normal Occlusion Roughness", 2D) = "white" {}
 		Transparency("Transparency", Range(0, 1)) = 0
+		Smoothness("Smoothness", Range(0, 1)) = 1
+		NormalBlend("Normal Blend", Range(0, 1)) = 0
 	}
 
 	SubShader
@@ -14,6 +16,7 @@ Shader "Surface/Decal"
 
 		Pass
 		{
+			// Only render where bit 1 is set (Which indicates no background), and set bit 5 (32) and bit 1(1), eg 33 to indicate a decal
 			Stencil
 			{
 				Ref 33
