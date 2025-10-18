@@ -16,7 +16,7 @@ void CSMain (uint2 id : SV_DispatchThreadID)
 	float transmittance = 1.0;
 	for (uint i = 0; i < ParticleShadowDepthInt; i++)
 	{
-		float extinction = ParticleExtinction[uint3(id, i)] / 65536.0;
+		float extinction = ParticleExtinction[uint3(id, i)] / 2048.0;
 		transmittance *= exp(-extinction * step);
 		ParticleShadowWrite[uint3(id.xy, i)] = transmittance;
 	}

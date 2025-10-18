@@ -148,7 +148,7 @@ float GetDirectionalShadow(float3 worldPosition)
 		}
 	}
 	
-	float visibility = visibilitySum / weightSum;
+	float visibility = weightSum ? visibilitySum / weightSum : 1;
 	
 	// Particle shadows
 	float3 particleShadowUv = shadowPosition;
