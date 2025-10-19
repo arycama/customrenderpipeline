@@ -1,14 +1,61 @@
-// Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel CSMain
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Geometry.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Math.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Random.hlsl"
 
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
-RWTexture2D<float4> Result;
+#pragma kernel Initialize
+#pragma kernel Update
 
-[numthreads(8,8,1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
+RWStructuredBuffer<float4> Positions;
+
+uint RainDropletCount;
+float RainRadius, RainVelocity, WindAngle, WindStrength, WindTurbulence;
+
+float3 UniformPointInSphere(float3 random)
 {
-    // TODO: insert actual code here!
+	// Generate random direction
+	float theta = random.x * 2.0 * TwoPi;
+	float phi = FastACos(2.0 * random.y - 1.0);
+	float r = pow(random.z, 1.0 / 3.0); // Cube root for uniform volume distribution
+    
+    // Convert spherical to Cartesian coordinates
+	float sinPhi = sin(phi);
+	float x = r * sinPhi * cos(theta);
+	float y = r * sinPhi * sin(theta);
+	float z = r * cos(phi);
+    
+	return float3(x, y, z);
+}
 
-    Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
+[numthreads(1024, 1, 1)]
+void Initialize(uint id : SV_DispatchThreadID)
+{
+	if(id > RainDropletCount)
+		return;
+
+	float4 random = RandomFloat4(id);
+	Positions[id] = float4(ViewPosition + UniformPointInSphere(random.xyz) * RainRadius, lerp(-WindTurbulence, WindTurbulence, random.w)); //w component used for turbulence
+}
+
+[numthreads(1024, 1, 1)]
+void Update(uint id : SV_DispatchThreadID)
+{
+	if (id > RainDropletCount)
+		return;
+		
+	float4 positionTurbulence = Positions[id];
+	
+	float2 windAngle;
+	sincos(TwoPi * WindAngle + positionTurbulence.w, windAngle.y, windAngle.x);
+	
+	float3 windVector = float3(windAngle * WindStrength, -RainVelocity).xzy;
+	positionTurbulence.xyz += DeltaTime * windVector;
+	
+	if (SqrLength(ViewPosition - positionTurbulence.xyz) > Sq(RainRadius))
+	{
+		float4 random = RandomFloat4(id);
+		positionTurbulence = float4(ViewPosition + UniformPointInSphere(random.xyz) * RainRadius, lerp(-WindTurbulence, WindTurbulence, random.w)); //w component used for turbulence
+	}
+		
+	Positions[id] = positionTurbulence;
 }

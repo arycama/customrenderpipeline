@@ -51,6 +51,8 @@ public class DecalComposite : CameraRenderFeature
 			pass.ReadTexture("NormalRoughnessCopy", normalRoughnessCopy);
 			pass.ReadTexture("BentNormalOcclusionCopy", bentNormalOcclusionCopy);
 
+			pass.AddRenderPassData<CameraTargetData>();
+			pass.AddRenderPassData<CameraDepthData>();
 			pass.AddRenderPassData<DecalAlbedoData>();
 			pass.AddRenderPassData<DecalNormalData>();
 		}

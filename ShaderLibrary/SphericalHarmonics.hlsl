@@ -2,24 +2,25 @@
 
 #include "Math.hlsl"
 
-const static float3 IsotropicZonalHarmonics = float3(1.0, 0.0, 0.0);
-const static float3 RayleighZonalHarmonics = float3(1.0, 0.0, 0.5);
-const static float3 HazyZonalHarmonics = float3(1.0, 0.9, 0.8);
-const static float3 MurkyZonalHarmonics = float3(1.0, 0.95, 0.9);
+// All the non cosine zonal harmonics are divided by 4, since they are used for volumetric functions which need to be divided by four pi.
+const static float3 IsotropicZonalHarmonics = float3(1.0, 0.0, 0.0) / 4.0;
+const static float3 RayleighZonalHarmonics = float3(1.0, 0.0, 0.5) / 4.0;
+const static float3 HazyZonalHarmonics = float3(1.0, 0.9, 0.8) / 4.0;
+const static float3 MurkyZonalHarmonics = float3(1.0, 0.95, 0.9) / 4.0;
 
 float3 SchlickZonalHarmonics(float g)
 {
-	return float3(1.0, g, g * g);
+	return float3(1.0, g, g * g) / 4.0;
 }
 
 float3 HenyeyGreensteinZonalHarmonics(float g)
 {
-	return float3(1.0, g, g * g);
+	return float3(1.0, g, g * g) / 4.0;
 }
 
 float3 CornetteShanksZonalHarmonics(float g)
 {
-	return float3(1.0, g, 0.5 * (3.0 * Sq(g) - 1.0));
+	return float3(1.0, g, 0.5 * (3.0 * Sq(g) - 1.0)) / 4.0;
 }
 
 float3 CosineZonalHarmonics(float visibilityAperture)

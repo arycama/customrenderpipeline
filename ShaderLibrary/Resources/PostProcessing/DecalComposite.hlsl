@@ -1,6 +1,7 @@
 #include "../../Common.hlsl"
 #include "../../DBuffer.hlsl"
 #include "../../GBuffer.hlsl"
+#include "../../SpaceTransforms.hlsl"
 
 struct FragmentOutput
 {
@@ -34,6 +35,22 @@ FragmentOutput FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOO
 	float3 normal = UnpackGBufferNormal(normalRoughness);
 	float roughness = normalRoughness.a;
 	
+	// Rain stuff, TODO: should probably be done elsewhere or at least handled more explicitly
+	float depth = Depth[position.xy];
+	float eyeDepth = LinearEyeDepth(depth);
+	float3 worldPosition = worldDir * eyeDepth;
+	float3 geoNormal = normalize(cross(ddy(worldPosition), ddx(worldPosition)));
+	
+	// Approx from https://seblagarde.wordpress.com/2013/04/14/water-drop-3b-physically-based-wet-surfaces/
+	float porosity = saturate((roughness - 0.5) / 0.4);
+	float wetLevel = saturate(dot(geoNormal, float3(0, 1, 0)));
+	
+	float factor = lerp(1, 0.1, porosity);
+	albedo *= lerp(1, factor, wetLevel);
+	roughness = lerp(0.0, roughness, lerp(1, factor, wetLevel));
+	
+	normal = normalize(lerp(normal, float3(0, 1, 0), wetLevel * 0.5));
+	
 	albedo = lerp(albedo, decal.rgb, decal.a);
 	
 	decalNormal.xyz = 2.0 * decalNormal.xyz - 1.0;
@@ -43,6 +60,7 @@ FragmentOutput FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOO
 	roughness = lerp(roughness, decalNormal.a, decal.a);
 	float visibilityAngle = lerp(bentNormalOcclusion.a, 1.0, decal.a); // TODO: Write out visibilityConeAngle from dbuffer pass
 	
+
 	FragmentOutput output;
 	output.albedoMetallic = float4(PackAlbedo(albedo, position.xy), 0, albedoMetallic.a);
 	output.normalRoughness = float4(PackGBufferNormal(normal), roughness);

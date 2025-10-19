@@ -76,7 +76,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(0, -1), BloomScaleLimit)) * 0.125;
 	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(1, -1), BloomScaleLimit)) * 0.0625;
 	
-	color = lerp(color, bloom, BloomStrength);
+	//color = lerp(color, bloom, BloomStrength);
 	
 	//color = ScreenSpaceGlobalIllumination[position.xy].rgb;
 	//color = ScreenSpaceReflections[position.xy];
@@ -85,7 +85,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	{
 		// Lms to opponent space
 		
-		float3 c = Rec2020ToRec709(color * RcpExposure);
+		// Some out of gamut colors can produce negative values, leading to nans)
+		float3 c = max(0, Rec2020ToRec709(color * RcpExposure));
 		float4 q = mul((float4x3) RgbToLmsr, c); // lmsr
 		
 		float3 m = float3(0.63721, 0.39242, 1.6064); // maximal cone sensitivity

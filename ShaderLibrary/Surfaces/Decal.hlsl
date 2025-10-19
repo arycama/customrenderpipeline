@@ -74,6 +74,21 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	
 	// TODO: Compile define?
 	float3 gbufferAlbedo = UnpackAlbedo(GbufferAlbedoMetallic[input.position.xy].rg, input.position.xy);
+
+	// Rain stuff, TODO: should probably be done elsewhere or at least handled more explicitly
+	//float depth = Depth[position.xy];
+	//float eyeDepth = LinearEyeDepth(depth);
+	//float3 worldPosition = worldDir * eyeDepth;
+	float3 geoNormal = normalize(cross(ddy(worldPosition), ddx(worldPosition)));
+	
+	// Approx from https://seblagarde.wordpress.com/2013/04/14/water-drop-3b-physically-based-wet-surfaces/
+	float roughness = NormalRoughness[input.position.xy].a;
+	float porosity = saturate((roughness - 0.5) / 0.4);
+	float wetLevel = saturate(dot(geoNormal, float3(0, 1, 0)));
+	
+	float factor = lerp(1, 0.1, porosity);
+	gbufferAlbedo *= lerp(1, factor, wetLevel);
+	roughness = lerp(0.0, roughness, lerp(1, factor, wetLevel));
 	
 	float NdotV;
 	float3 N = GetViewClampedNormal(worldNormal, V, NdotV);
@@ -85,6 +100,6 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	
 	FragmentOutput output;
 	output.albedoOpacity = albedoOpacity;
-	output.normalRoughness = float4(0.5 * worldNormal + 0.5, lerp(1.0, normalOcclusionRoughness.a, Smoothness));
+	output.normalRoughness = float4(0.5 * worldNormal + 0.5, lerp(1.0, roughness, Smoothness));
 	return output;
 }

@@ -41,11 +41,14 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 		float metallic = albedoMetallic.a;
 	#endif
 	
+	//float3 geoNormal = normalize(cross(ddy(worldPosition), ddx(worldPosition)));
+	//perceptualRoughness = lerp(perceptualRoughness, 0.025, saturate(dot(geoNormal, float3(0, 1, 0))));
+	
 	float3 f0 = lerp(0.04, albedo.rgb, metallic);
 	albedo = lerp(albedo.rgb, 0, metallic);
 	
 	bool isWater = (stencil & 8) != 0;
-	float3 result = EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, bentNormal, worldPosition, translucency, position.xy, eyeDepth, 1.0, isWater);
+	float3 result = EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, bentNormal, worldPosition, translucency, position.xy, eyeDepth, 1.0, isWater, true);
 	
 	// Sky is added elsewhere but since it involves an RGB multiply which we can't do without dual source blending, apply it here. Even though this happens before cloud opacity, order doesn't matter for transmittance simple it is multiplicative
 	result *= Rec709ToRec2020(TransmittanceToPoint(ViewHeight, -V.y, eyeDepth * rcp(rcpVLength)));

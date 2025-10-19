@@ -124,6 +124,9 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	minValue = max(minValue, mean - stdDev);
 	maxValue = min(maxValue, mean + stdDev);
 	
+	uint stencil = Stencil[position.xy].g;
+	bool isResponsive = stencil & 64;
+	
 	if (_HasHistory && all(saturate(historyUv) == historyUv))
 	{
 		float3 historySample = History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, HistoryScaleLimit)).rgb;
@@ -140,6 +143,10 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 		result.rgb *= result.a;
 	
 		float blending = lerp(_StationaryBlending, _VelocityBlending, saturate(length(velocity) * _VelocityWeight));
+		
+		if (isResponsive)
+			blending = 0.5;
+		
 		result = lerp(result, history, blending);
 	
 		// Remove weight and store

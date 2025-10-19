@@ -157,9 +157,17 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		float attenuation = sunShadow ? GetDirectionalShadow(rd * cloudDepth) : 1.0;
 		result.rgb *= lightTransmittance * Rec709ToRec2020(_LightColor0) * (Exposure * attenuation);
 		
-		float3 ambient = GetSkyAmbient(viewHeight, viewCosAngle, _LightDirection0.y, cloudDepth) * _LightColor0 * Exposure * RcpFourPi;
+		// TODO: This should use a sky convolution that does not include clouds
 		for (float j = 0.0; j < ScatterOctaves; j++)
+		{
+			#if 1
+				float3 ambient = AmbientCsTwoLobe(-rd, _ForwardScatterPhase * pow(ScatterEccentricityAttenuation, j), _BackScatterPhase * pow(ScatterEccentricityAttenuation, j), 0.5);
+			#else
+				float3 ambient = GetSkyAmbient(viewHeight, viewCosAngle, _LightDirection0.y, cloudDepth) * _LightColor0 * Exposure * RcpFourPi;
+			#endif
+			
 			result.rgb += ambient * pow(ScatterContribution, j) * (1 - exp2(-pow(ScatterAttenuation, j) * opticalDepth)) / pow(ScatterAttenuation, j);
+		}
 		
 		if (sunShadow)
 		{

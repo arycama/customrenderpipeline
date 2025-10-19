@@ -117,7 +117,7 @@ float4 cubic(float v)
 	return o;
 }
 
-float GetDirectionalShadow(float3 worldPosition)
+float GetDirectionalShadow(float3 worldPosition, bool softShadows = false)
 {
 	float viewDepth = WorldToViewPosition(worldPosition).z;
 	float fade = saturate(DirectionalFadeScale * viewDepth + DirectionalFadeOffset);
@@ -131,24 +131,32 @@ float GetDirectionalShadow(float3 worldPosition)
 	float2 radiusPixels = clamp(DirectionalCascadeSizes[cascade].zw, 0, 8); // Prevent possible TDR
 	float2 localUv = shadowPosition.xy * DirectionalShadowResolution;
 	float2 texelCenter = floor(localUv) + 0.5;
-
-	float visibilitySum = 0, weightSum = 0;
-	for (float y = -radiusPixels.y; y <= radiusPixels.y; y++)
-	{
-		for (float x = -radiusPixels.x; x <= radiusPixels.x; x++)
-		{
-			float2 coord = clamp(texelCenter + float2(x, y), 0.5, DirectionalShadowResolution - 0.5);
-			float d = DirectionalShadows[int3(coord, cascade)];
-			float2 delta = localUv - coord;
-			float2 weights = saturate(1.0 - abs(delta) * rcpFilterSize);
-			float weight = weights.x * weights.y;
-			bool isVisible = d < shadowPosition.z;
-			visibilitySum += isVisible * weight;
-			weightSum += weight;
-		}
-	}
 	
-	float visibility = weightSum ? visibilitySum / weightSum : 1;
+	float visibility;
+	if (softShadows)
+	{
+		float visibilitySum = 0, weightSum = 0;
+		for (float y = -radiusPixels.y; y <= radiusPixels.y; y++)
+		{
+			for (float x = -radiusPixels.x; x <= radiusPixels.x; x++)
+			{
+				float2 coord = clamp(texelCenter + float2(x, y), 0.5, DirectionalShadowResolution - 0.5);
+				float d = DirectionalShadows[int3(coord, cascade)];
+				float2 delta = localUv - coord;
+				float2 weights = saturate(1.0 - abs(delta) * rcpFilterSize);
+				float weight = weights.x * weights.y;
+				bool isVisible = d < shadowPosition.z;
+				visibilitySum += isVisible * weight;
+				weightSum += weight;
+			}
+		}
+	
+		visibility = weightSum ? visibilitySum / weightSum : 1;
+	}
+	else
+	{
+		return DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(shadowPosition.xy, cascade), shadowPosition.z);
+	}
 	
 	// Particle shadows
 	float3 particleShadowUv = shadowPosition;
@@ -463,7 +471,7 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 	return attenuation;
 }
 
-float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAngle, float3 albedo, float3 N, float3 bentNormal, float3 worldPosition, float3 translucency, uint2 pixelCoordinate, float eyeDepth, float opacity = 1.0, bool isWater = false)
+float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAngle, float3 albedo, float3 N, float3 bentNormal, float3 worldPosition, float3 translucency, uint2 pixelCoordinate, float eyeDepth, float opacity = 1.0, bool isWater = false, bool softShadows = false)
 {
 	albedo = Rec709ToRec2020(albedo);
 	translucency = Rec709ToRec2020(translucency);
@@ -488,7 +496,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	// Direct lighting
 	float3 lightTransmittance = Rec709ToRec2020(TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition)));
 	
-	float shadow = GetDirectionalShadow(worldPosition) * CloudTransmittance(worldPosition);
+	float shadow = GetDirectionalShadow(worldPosition, softShadows) * CloudTransmittance(worldPosition);
 	
 	#ifdef SCREEN_SPACE_SHADOWS
 		shadow = min(shadow, lerp(1.0, ScreenSpaceShadows[pixelCoordinate], ScreenSpaceShadowsIntensity));
