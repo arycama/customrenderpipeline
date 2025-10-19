@@ -4,22 +4,13 @@
 #include "../SpaceTransforms.hlsl"
 #include "../Math.hlsl"
 #include "../Temporal.hlsl"
+#include "../Utility.hlsl"
 
 struct FragmentInput
 {
 	float4 position : SV_POSITION;
 	float2 uv : TEXCOORD;
 };
-
-float2 GetQuadTexCoord(uint vertexID)
-{
-	uint topBit = vertexID >> 1;
-	uint botBit = (vertexID & 1);
-	float u = topBit;
-	float v = (topBit + botBit) & 1; // produces 0 for indices 0,3 and 1 for 1,2
-   // v = 1.0 - v;
-	return float2(u, v);
-}
 
 FragmentInput Vertex(uint id : SV_VertexID)
 {

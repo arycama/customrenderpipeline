@@ -390,6 +390,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.AddRenderPassData<ParticleShadowData>();
 		}),
 
+		new Rain(renderGraph, asset.Rain),
 		new AutoExposure(asset.AutoExposureSettings, asset.LensSettings, renderGraph, asset.Tonemapping),
         new DepthOfField(asset.DepthOfFieldSettings, asset.LensSettings, renderGraph, asset.TemporalAASettings),
 		new CameraVelocityDilate(renderGraph),

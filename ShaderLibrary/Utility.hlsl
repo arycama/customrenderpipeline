@@ -194,3 +194,13 @@ bool Checker(float2 position)
 {
 	return frac((position.x + position.y) * 0.5) < 0.5;
 }
+
+float2 GetQuadTexCoord(uint vertexID)
+{
+	uint topBit = vertexID >> 1;
+	uint botBit = (vertexID & 1);
+	float u = topBit;
+	float v = (topBit + botBit) & 1; // produces 0 for indices 0,3 and 1 for 1,2
+    v = 1.0 - v;
+	return float2(u, v);
+}

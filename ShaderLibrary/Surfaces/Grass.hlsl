@@ -5,6 +5,7 @@
 #include "../Gbuffer.hlsl"
 #include "../Material.hlsl"
 #include "../Geometry.hlsl"
+#include "../Utility.hlsl"
 
 Texture2D _MainTex;
 float4 _Color, _Translucency;
@@ -65,18 +66,6 @@ float3x3 RotationFromAxisAngle(float3 A, float sinAngle, float cosAngle)
 	return float3x3(A.x * A.x * (1 - c) + c, A.x * A.y * (1 - c) - A.z * s, A.x * A.z * (1 - c) + A.y * s,
                     A.x * A.y * (1 - c) + A.z * s, A.y * A.y * (1 - c) + c, A.y * A.z * (1 - c) - A.x * s,
                     A.x * A.z * (1 - c) - A.y * s, A.y * A.z * (1 - c) + A.x * s, A.z * A.z * (1 - c) + c);
-}
-
-float2 GetQuadTexCoord(uint vertexID)
-{
-	uint topBit = vertexID >> 1;
-	uint botBit = (vertexID & 1);
-	float u = topBit;
-	float v = (topBit + botBit) & 1; // produces 0 for indices 0,3 and 1 for 1,2
-#if UNITY_UV_STARTS_AT_TOP
-    v = 1.0 - v;
-#endif
-	return float2(u, v);
 }
 
 StructuredBuffer<InstanceData> _FinalPatches;
