@@ -21,22 +21,13 @@ public class WaterRenderer : WaterRendererBase
 
         // Also write triangleNormal to another texture with oct encoding. This allows reconstructing the derivative correctly to avoid mip issues on edges,
         // As well as backfacing triangle detection for rendering under the surface
-        var waterTriangleNormal = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16_UNorm, isScreenTexture: true);
+        var waterTriangleNormal = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16_UNorm, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 
         var passIndex = settings.Material.FindPass("Water");
         Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
 
         var profile = settings.Profile;
         var resolution = settings.Resolution;
-
-        using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Ocean Clear Pass"))
-        {
-            pass.SetRenderFunction((command, pass) =>
-            {
-                command.SetRenderTarget(pass.GetRenderTexture(waterTriangleNormal));
-                command.ClearRenderTarget(false, true, Color.clear);
-            });
-        }
 
         using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectIndexedRenderPass>("Ocean Render"))
         {

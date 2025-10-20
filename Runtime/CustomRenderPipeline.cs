@@ -27,7 +27,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 	public CustomRenderPipeline(CustomRenderPipelineAsset renderPipelineAsset) : base(renderPipelineAsset)
 	{
-		cameraTargetCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Previous Scene Color", hasMips: true, isScreenTexture: true);
+		cameraTargetCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Previous Scene Color", hasMips: true, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 		cameraDepthCache = new(GraphicsFormat.D32_SFloat_S8_UInt, renderGraph, "Previous Depth", isScreenTexture: true);
 		cameraVelocityCache = new(GraphicsFormat.R16G16_SFloat, renderGraph, "Previous Velocity", isScreenTexture: true);
 
@@ -137,7 +137,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 				ScriptableRenderContext.EmitWorldGeometryForSceneView(camera);
 			else
 #endif
-				ScriptableRenderContext.EmitGeometryForCamera(camera);
+			ScriptableRenderContext.EmitGeometryForCamera(camera);
 
 			cullingParameters.shadowDistance = asset.LightingSettings.DirectionalShadowDistance;
 			cullingParameters.cullingOptions = CullingOptions.NeedsLighting | CullingOptions.DisablePerObjectCulling | CullingOptions.ShadowCasters;
@@ -152,10 +152,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
 			var (cameraTarget, previousScene, currentSceneCreated) = cameraTargetCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-			var cameraDepth = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true);
+			var cameraDepth = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true, clearFlags: RTClearFlags.DepthStencil);
 			var (velocity, previousVelocity, currentVelocityCreated) = cameraVelocityCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-
-			using var pass = renderGraph.AddRenderPass<GenericRenderPass>("Clear Camera Targets");
 
 			renderGraph.SetResource(new CameraTargetData(cameraTarget));
 			renderGraph.SetResource(new CameraDepthData(cameraDepth));
@@ -169,14 +167,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			renderGraph.SetResource(new BentNormalOcclusionData(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true)));
 			renderGraph.SetResource(new VelocityData(velocity));
 
-			pass.WriteTexture(cameraDepth);
-			pass.WriteTexture(cameraTarget);
-
-			pass.SetRenderFunction((command, pass) =>
-			{
-				command.SetRenderTarget(pass.GetRenderTexture(cameraTarget), pass.GetRenderTexture(cameraDepth));
-				command.ClearRenderTarget(true, true, Color.clear);
-			});
+			var (depthCopy, previousDepthCopy, depthCopyCreated) = cameraDepthCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
+			renderGraph.SetResource(new PreviousDepth(previousDepthCopy));
+			renderGraph.SetResource(new DepthCopyData(depthCopy));
 		}),
 
 		new TerrainViewData(renderGraph, terrainSystem),
@@ -292,9 +285,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
             // TODO: Could avoid this by using another depth texture for water.. will require some extra logic in other passes though
             using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Copy Depth Texture"))
 			{
-				var (depthCopy, previousDepthCopy, depthCopyCreated) = cameraDepthCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-				renderGraph.SetResource(new PreviousDepth(previousDepthCopy));
-				renderGraph.SetResource(new DepthCopyData(depthCopy));
+
 
 				pass.ReadTexture("", renderGraph.GetResource<CameraDepthData>());
 				pass.WriteTexture(renderGraph.GetResource<DepthCopyData>());

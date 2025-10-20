@@ -1,17 +1,12 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class ShadowRenderPass : RenderPass<ShadowRenderPass>
+public class ShadowRenderPass : GraphicsRenderPass
 {
 	private RendererList rendererList;
 	private float bias, slopeBias;
 	private bool zClip;
 	private bool isPointLight;
-
-	public void WriteTexture(ResourceHandle<RenderTexture> rtHandle)
-	{
-		RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
-	}
 
 	public void Initialize(ScriptableRenderContext context, CullingResults cullingResults, int lightIndex, BatchCullingProjectionType projectionType, ShadowSplitData shadowSplitData, float bias, float slopeBias, bool zClip, bool isPointLight)
 	{
@@ -105,9 +100,5 @@ public class ShadowRenderPass : RenderPass<ShadowRenderPass>
 	public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
 	{
 		Command.SetGlobalMatrixArray(propertyName, value);
-	}
-
-	protected override void SetupTargets()
-	{
 	}
 }

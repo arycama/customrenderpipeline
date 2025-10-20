@@ -54,7 +54,7 @@ public class ParticleShadows : CameraRenderFeature
 		var directionalShadowCount = Max(1, requestData.DirectionalShadowRequests.Count);
 
 		// Since 3D texture arrays aren't a thing, allocate one wide texture
-		var directionalShadows = renderGraph.GetTexture(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, GraphicsFormat.R32_UInt, settings.DirectionalDepth, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true);
+		var directionalShadows = renderGraph.GetTexture(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, GraphicsFormat.R32_UInt, settings.DirectionalDepth, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true, clearFlags: RTClearFlags.Depth);
 
 		// We need a dummy texture, just use smallest format available
 		var dummy = renderGraph.GetTexture(settings.DirectionalResolution, settings.DirectionalResolution, GraphicsFormat.R8_UNorm, isExactSize: true);
@@ -73,8 +73,8 @@ public class ParticleShadows : CameraRenderFeature
 			//pass.WriteTexture(spotShadows);
 
 			// Here to avoid crashes due to not being written if no dir shadows..
-			pass.WriteTexture(dummy);
-			pass.ReadTexture("", dummy);
+			//pass.WriteTexture(dummy);
+			//pass.ReadTexture("", dummy);
 
 			pass.SetRenderFunction((directionalShadows/*, pointShadows, spotShadows*/), static (command, pass, data) =>
 			{
@@ -94,78 +94,59 @@ public class ParticleShadows : CameraRenderFeature
 			var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
 			var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, camera.transform.position, 0, request.LightPosition, 0));
 
-			//if (request.HasCasters) // This is only valid for shadowcaster passes, would need to use render lists to skip
+			while (cameras.Count <= index)
 			{
-				using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Particle Shadows"))
+				// Each probe gets it's own camera. This seems to be neccessary for now
+				// TODO: Try removing this after we convert the logic to use matrices instead of transforms, and see if we can just use one camera. 
+				var cameraGameObject = new GameObject("Particle Shadow Camera")
 				{
-					while(cameras.Count <= index)
-					{
-						// Each probe gets it's own camera. This seems to be neccessary for now
-						// TODO: Try removing this after we convert the logic to use matrices instead of transforms, and see if we can just use one camera. 
-						var cameraGameObject = new GameObject("Particle Shadow Camera")
-						{
-							hideFlags = HideFlags.HideAndDontSave
-						};
+					hideFlags = HideFlags.HideAndDontSave
+				};
 
-						var particleShadowCamera = cameraGameObject.AddComponent<Camera>();
-						particleShadowCamera.enabled = false;
-						particleShadowCamera.orthographic = true;
-						cameras.Add(particleShadowCamera);
-					}
+				var particleShadowCamera = cameraGameObject.AddComponent<Camera>();
+				particleShadowCamera.enabled = false;
+				particleShadowCamera.orthographic = true;
+				cameras.Add(particleShadowCamera);
+			}
 
-					var camera = cameras[index];
-					camera.transform.position = request.ViewPosition;
-					camera.transform.rotation = request.ViewRotation;
-					camera.nearClipPlane = request.Near;
-					camera.farClipPlane = request.Far;
-					camera.orthographicSize = request.Height * 0.5f;
-					camera.aspect = request.Width / request.Height;
+			var particleCamera = cameras[index];
+			particleCamera.transform.position = request.ViewPosition;
+			particleCamera.transform.rotation = request.ViewRotation;
+			particleCamera.nearClipPlane = request.Near;
+			particleCamera.farClipPlane = request.Far;
+			particleCamera.orthographicSize = request.Height * 0.5f;
+			particleCamera.aspect = request.Width / request.Height;
 
-					//Debug.Log(camera.aspect);
-					//camera.worldToCameraMatrix = request.ViewMatrix;
-					//camera.projectionMatrix = request.ProjectionMatrix;
-					//camera.cullingMatrix = request.ProjectionMatrix * request.ViewMatrix;
+			if (!particleCamera.TryGetCullingParameters(out var cullingPrameters))
+				return;
 
-					if(!camera.TryGetCullingParameters(out var cullingPrameters))
-						return;
+			using (var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Particle Shadows"))
+			{
+				cullingPrameters.cullingOptions = CullingOptions.ForceEvenIfCameraIsNotActive | CullingOptions.DisablePerObjectCulling;
+				var cullingResults = context.Cull(ref cullingPrameters);
+				pass.Initialize("ParticleShadow", context, cullingResults, particleCamera, RenderQueueRange.transparent, SortingCriteria.CommonTransparent);
 
-					cullingPrameters.cullingOptions = CullingOptions.ForceEvenIfCameraIsNotActive | CullingOptions.DisablePerObjectCulling;
-					var cullingResults = context.Cull(ref cullingPrameters);
+				// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
+				pass.WriteTexture(dummy);
+				pass.ReadTexture("", dummy);
 
-					var sortingSettings = new SortingSettings(camera);
-					var drawingSettings = new DrawingSettings(new ShaderTagId("ParticleShadow"), sortingSettings);
-					var filteringSettings = new FilteringSettings(RenderQueueRange.transparent);
-					var rendererParams = new RendererListParams(cullingResults, drawingSettings, filteringSettings);
-					var rendererList = context.CreateRendererList(ref rendererParams);
+				pass.ReadTexture("ParticleShadowWrite", target);
+				pass.AddRenderPassData<CameraDepthData>();
+				pass.AddRenderPassData<ViewData>(); 
 
-					//pass.Initialize(context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, isPointLight);
+				pass.ReadBuffer("PerCascadeData", perCascadeData);
+				var voxelSize = (request.Far - request.Near) / settings.DirectionalDepth;
 
-					// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
-					pass.WriteTexture(dummy);
-					pass.ReadTexture("ParticleShadowWrite", target);
-					//pass.AddRenderPassData<ShadowRequestData>();
-					pass.AddRenderPassData<CameraDepthData>(); // For depth fade (Though, could skip for performance?)
-					pass.AddRenderPassData<ViewData>(); // For depth fade (Though, could skip for performance?)
-
-					pass.ReadBuffer("PerCascadeData", perCascadeData);
-
-					var voxelSize = (request.Far - request.Near) / settings.DirectionalDepth;
-
-					pass.SetRenderFunction((dummy, target, index, settings.DirectionalResolution, rendererList, settings.DirectionalDepth, zClip, voxelSize),
-					static (command, pass, data) =>
-					{
-						pass.SetFloat("_ZClip", data.zClip ? 1.0f : 0.0f);
-						pass.SetFloat("ParticleShadowDepth", data.DirectionalDepth);
-						pass.SetFloat("ParticleShadowResolution", data.DirectionalResolution);
-						pass.SetFloat("ParticleShadowIndex", data.index);
-						pass.SetFloat("ParticleVoxelSize", data.voxelSize);
-						command.SetRenderTarget(pass.GetRenderTexture(data.dummy), pass.GetRenderTexture(data.dummy));
-						command.SetViewport(new Rect(0, 0, data.DirectionalResolution, data.DirectionalResolution));
-						command.ClearRandomWriteTargets();
-						command.SetRandomWriteTarget(1, pass.GetRenderTexture(data.target));
-						command.DrawRendererList(data.rendererList);
-					});
-				}
+				pass.SetRenderFunction((dummy, target, index, settings.DirectionalResolution, settings.DirectionalDepth, zClip, voxelSize), static (command, pass, data) =>
+				{
+					pass.SetFloat("_ZClip", data.zClip ? 1.0f : 0.0f);
+					pass.SetFloat("ParticleShadowDepth", data.DirectionalDepth);
+					pass.SetFloat("ParticleShadowResolution", data.DirectionalResolution);
+					pass.SetFloat("ParticleShadowIndex", data.index);
+					pass.SetFloat("ParticleVoxelSize", data.voxelSize);
+					command.ClearRandomWriteTargets();
+					command.SetRandomWriteTarget(1, pass.GetRenderTexture(data.target));
+				});
 			}
 		}
 

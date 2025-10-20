@@ -280,7 +280,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 				pass.UseProfiler = false;
 				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, draw.passIndex, "INDIRECT_RENDERING", request.Bias, request.SlopeBias, request.ZClip, draw.indirectArgsOffset);
 
-				pass.WriteTexture(request.Shadow);
+				pass.WriteDepth(request.Shadow);
 				pass.DepthSlice = request.CascadeIndex;
 
 				pass.AddRenderPassData<ViewData>();

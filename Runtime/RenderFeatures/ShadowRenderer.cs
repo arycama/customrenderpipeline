@@ -43,7 +43,6 @@ public class ShadowRenderer : CameraRenderFeature
 
 		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Render Shadows Setup"))
 		{
-			// TODO: We should really add initial clear actions
 			pass.WriteTexture(directionalShadows);
 			pass.WriteTexture(pointShadows);
 			pass.WriteTexture(spotShadows);
@@ -74,16 +73,9 @@ public class ShadowRenderer : CameraRenderFeature
 				using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Shadow"))
 				{
 					pass.Initialize(context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, isPointLight);
-
-					// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
-					pass.WriteTexture(target);
+					pass.DepthSlice = index;
+					pass.WriteDepth(target);
 					pass.AddRenderPassData<ShadowRequestData>();
-
-					pass.SetRenderFunction((target, index),
-					static (command, pass, data) =>
-					{
-						command.SetRenderTarget(pass.GetRenderTexture(data.target), pass.GetRenderTexture(data.target), 0, CubemapFace.Unknown, data.index);
-					});
 				}
 			}
 

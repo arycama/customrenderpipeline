@@ -83,7 +83,7 @@ public abstract class GraphicsRenderPass : RenderPass<GraphicsRenderPass>
 		var hasDepthBuffer = depthBuffer.Item1.Index != -1;
 		Assert.IsTrue(hasDepthBuffer || targetCount > 0);
 
-		var depthTarget = GetRenderTexture(hasDepthBuffer ? depthBuffer.Item1 : colorTargets[0].Item1);
+		var depthTarget = new RenderTargetIdentifier(GetRenderTexture(hasDepthBuffer ? depthBuffer.Item1 : colorTargets[0].Item1), MipLevel, CubemapFace, DepthSlice);
 		var depthLoadAction = hasDepthBuffer ? depthBuffer.Item2 : RenderBufferLoadAction.DontCare;
 		var depthStoreAction = hasDepthBuffer ? depthBuffer.Item3 : RenderBufferStoreAction.DontCare;
 

@@ -186,7 +186,7 @@ public class RenderGraph : IDisposable
 		return RtHandleSystem.GetResourceHandle(descriptor, isPersistent);
 	}
 
-	public ResourceHandle<RenderTexture> GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false, bool isRandomWrite = false, RTClearFlags clearFlags = RTClearFlags.None, Color clearColor = default, float clearDepth = 0f, uint clearStencil = 0u)
+	public ResourceHandle<RenderTexture> GetTexture(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false, bool isRandomWrite = false, RTClearFlags clearFlags = RTClearFlags.None, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u)
 	{
 		return GetTexture(new RtHandleDescriptor(width, height, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isRandomWrite, isExactSize, clearFlags, clearColor, clearDepth, clearStencil), isPersistent);
 	}

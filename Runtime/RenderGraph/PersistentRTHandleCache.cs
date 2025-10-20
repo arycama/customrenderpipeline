@@ -17,10 +17,14 @@ public class PersistentRTHandleCache : IDisposable
 
 	public RenderGraph renderGraph;
 	private bool disposedValue;
-	private bool isScreenTexture;
-	private bool autoGenerateMips;
+	private readonly bool isScreenTexture;
+	private readonly bool autoGenerateMips;
+	private readonly RTClearFlags clearFlags;
+	private readonly float clearDepth;
+	private readonly uint clearStencil;
+	private readonly Color clearColor;
 
-	public PersistentRTHandleCache(GraphicsFormat format, RenderGraph renderGraph, string name = "", TextureDimension dimension = TextureDimension.Tex2D, bool hasMips = false, bool isScreenTexture = false, bool autoGenerateMips = false)
+	public PersistentRTHandleCache(GraphicsFormat format, RenderGraph renderGraph, string name = "", TextureDimension dimension = TextureDimension.Tex2D, bool hasMips = false, bool isScreenTexture = false, bool autoGenerateMips = false, RTClearFlags clearFlags = RTClearFlags.None, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u)
 	{
 		this.format = format;
 		this.dimension = dimension;
@@ -29,6 +33,10 @@ public class PersistentRTHandleCache : IDisposable
 		this.hasMips = hasMips;
 		this.isScreenTexture = isScreenTexture;
 		this.autoGenerateMips = autoGenerateMips;
+		this.clearFlags = clearFlags;
+		this.clearColor = clearColor;
+		this.clearDepth = clearDepth;
+		this.clearStencil = clearStencil;
 	}
 
 	// Gets current texture and marks history as non-persistent
@@ -61,7 +69,7 @@ public class PersistentRTHandleCache : IDisposable
 		else
 			renderGraph.ReleasePersistentResource(history);
 
-		var current = renderGraph.GetTexture(width, height, format, depth, dimension, isScreenTexture, hasMips, autoGenerateMips, true);
+		var current = renderGraph.GetTexture(width, height, format, depth, dimension, isScreenTexture, hasMips, autoGenerateMips, true, false, false, clearFlags, clearColor, clearDepth, clearStencil);
 		textureCache[camera] = current;
 
 		return (current, history, wasCreated);
