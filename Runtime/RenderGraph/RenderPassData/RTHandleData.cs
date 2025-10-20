@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 /// <summary>
 /// Utility class for an IRenderPassData that contains a single ResourceHandle<RenderTexture>
 /// </summary>
-public class andleRTHandleData : IRenderPassData
+public class RTHandleData : IRenderPassData
 {
 	public ResourceHandle<RenderTexture> Handle { get; }
 	private int propertyNameId, scaleLimitPropertyId;
