@@ -1,8 +1,4 @@
-﻿using UnityEngine;
-
-public class BloomData : RTHandleData
+﻿public struct BloomData : IRtHandleId
 {
-	public BloomData(ResourceHandle<RenderTexture> handle) : base(handle, "Bloom")
-	{
-	}
+	readonly string IRtHandleId.Id => "Bloom";
 }

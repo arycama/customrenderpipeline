@@ -240,14 +240,14 @@ public class RenderGraph : IDisposable
 		return ResourceMap.GetRenderPassData<T>(FrameIndex);
 	}
 
-	public void SetRTHandle<T>(T id, ResourceHandle<RenderTexture> handle) where T : IRtHandleId
+	public void SetRTHandle<T>(ResourceHandle<RenderTexture> handle) where T : IRtHandleId, new()
 	{
-		rtHandles[typeof(T)] = new RTHandleData1(handle, id.Id);
+		rtHandles[typeof(T)] = new RTHandleData1(handle, new T().Id);
 	}
 
-	public RTHandleData1 GetRTHandle<T>() where T : IRtHandleId
+	public RTHandleData1 GetRTHandle(Type type)
 	{
-		return rtHandles[typeof(T)];
+		return rtHandles[type];
 	}
 
 	public ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(T data) where T : struct

@@ -118,7 +118,7 @@ public class Bloom : CameraRenderFeature
 
 				pass.SetFloat("DirtStrength", data.settings.DirtStrength);
 
-				if(data.settings.LensDirt != null)
+				if (data.settings.LensDirt != null)
 					pass.SetTexture("LensDirt", data.settings.LensDirt);
 
 				// Lens flare 
@@ -137,7 +137,7 @@ public class Bloom : CameraRenderFeature
 			});
 		}
 
-		renderGraph.SetResource(new BloomData(bloomIds[0]));
+		renderGraph.SetRTHandle<BloomData>(bloomIds[0]);
 		ListPool<ResourceHandle<RenderTexture>>.Release(bloomIds);
 
 		renderGraph.AddProfileEndPass("Bloom");

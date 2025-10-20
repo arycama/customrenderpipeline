@@ -76,7 +76,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(0, -1), BloomScaleLimit)) * 0.125;
 	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(1, -1), BloomScaleLimit)) * 0.0625;
 	
-	//color = lerp(color, bloom, BloomStrength);
+	color = lerp(color, bloom, BloomStrength);
 	
 	//color = ScreenSpaceGlobalIllumination[position.xy].rgb;
 	//color = ScreenSpaceReflections[position.xy];
