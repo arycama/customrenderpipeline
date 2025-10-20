@@ -17,6 +17,7 @@ public class RenderGraph : IDisposable
 
 	private readonly GraphicsBuffer emptyBuffer;
 	private readonly RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
+	private readonly Dictionary<Type, RTHandleData1> rtHandles = new();
 
 	public RTHandleSystem RtHandleSystem { get; }
 	public BufferHandleSystem BufferHandleSystem { get; }
@@ -237,6 +238,16 @@ public class RenderGraph : IDisposable
 	{
 		Assert.IsFalse(IsExecuting);
 		return ResourceMap.GetRenderPassData<T>(FrameIndex);
+	}
+
+	public void SetRTHandle<T>(T id, ResourceHandle<RenderTexture> handle) where T : IRtHandleId
+	{
+		rtHandles[typeof(T)] = new RTHandleData1(handle, id.Id);
+	}
+
+	public RTHandleData1 GetRTHandle<T>() where T : IRtHandleId
+	{
+		return rtHandles[typeof(T)];
 	}
 
 	public ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(T data) where T : struct
