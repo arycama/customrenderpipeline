@@ -124,7 +124,7 @@ float GetDirectionalShadow(float3 worldPosition, bool softShadows = false)
 	if(!fade)
 		return 1.0;
 	
-	float cascade = DirectionalCascadeDepthParams.y * log2(viewDepth + DirectionalCascadeDepthParams.z) + DirectionalCascadeDepthParams.x;
+	float cascade = floor(DirectionalCascadeDepthParams.y * log2(viewDepth + DirectionalCascadeDepthParams.z) + DirectionalCascadeDepthParams.x);
 	float3 shadowPosition = MultiplyPoint3x4(DirectionalShadowMatrices[cascade], worldPosition);
 
 	float2 rcpFilterSize = DirectionalCascadeSizes[cascade].xy;
@@ -155,7 +155,7 @@ float GetDirectionalShadow(float3 worldPosition, bool softShadows = false)
 	}
 	else
 	{
-		return DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(shadowPosition.xy, cascade), shadowPosition.z);
+		visibility = DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(shadowPosition.xy, cascade), shadowPosition.z);
 	}
 	
 	// Particle shadows

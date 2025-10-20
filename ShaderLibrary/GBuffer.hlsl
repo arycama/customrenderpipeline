@@ -55,11 +55,8 @@ float2 PackAlbedo(float3 rgb, float2 screenPosition)
 	return Checker(screenPosition) ? yCoCg.xy : yCoCg.xz;
 }
 
-float3 UnpackAlbedo(float2 enc, float2 screenPosition)
+float3 UnpackAlbedo(float2 enc, float2 screenPosition, float2 a0, float2 a1)
 {
-	float2 a0 = QuadReadAcrossX(enc, screenPosition);
-	float2 a1 = QuadReadAcrossY(enc, screenPosition);
-	
 	float threshold = 30.0 / 255.0;
 	float2 lum = float2(a0.x, a1.x);
 	float2 w = 1.0 - step(threshold, abs(lum - enc.x));
@@ -72,6 +69,13 @@ float3 UnpackAlbedo(float2 enc, float2 screenPosition)
 
 	float3 yCoCg = Checker(screenPosition) ? float3(enc.rg, chroma) : float3(enc.r, chroma, enc.g);
 	return YCoCgToRgb(yCoCg);
+}
+
+float3 UnpackAlbedo(float2 enc, float2 screenPosition)
+{
+	float2 a0 = QuadReadAcrossX(enc, screenPosition);
+	float2 a1 = QuadReadAcrossY(enc, screenPosition);
+	return UnpackAlbedo(enc, screenPosition, a0, a1);
 }
 
 GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float perceptualRoughness, float3 bentNormal, float visibilityAngle, float3 emissive, float3 translucency, float2 screenPosition, bool isTranslucent = false)

@@ -186,10 +186,10 @@ public abstract class RenderPassBase : IDisposable
 		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
 		var resource = GetRenderTexture(handle);
 
-		var scaleX = (float)descriptor.Width / resource.width;
-		var scaleY = (float)descriptor.Height / resource.height;
-		var limitX = (descriptor.Width - 0.5f) / resource.width;
-		var limitY = (descriptor.Height - 0.5f) / resource.height;
+		var scaleX = (float)descriptor.width / resource.width;
+		var scaleY = (float)descriptor.height / resource.height;
+		var limitX = (descriptor.width - 0.5f) / resource.width;
+		var limitY = (descriptor.height - 0.5f) / resource.height;
 
 		return new Vector4(scaleX, scaleY, limitX, limitY);
 	}
@@ -199,9 +199,9 @@ public abstract class RenderPassBase : IDisposable
 		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
 		var resource = GetRenderTexture(handle);
 
-		var scaleX = (float)descriptor.Width / resource.width;
-		var scaleY = (float)descriptor.Height / resource.height;
-		var scaleZ = (float)descriptor.VolumeDepth / resource.volumeDepth;
+		var scaleX = (float)descriptor.width / resource.width;
+		var scaleY = (float)descriptor.height / resource.height;
+		var scaleZ = (float)descriptor.volumeDepth / resource.volumeDepth;
 
 		return new Vector3(scaleX, scaleY, scaleZ);
 	}
@@ -211,9 +211,9 @@ public abstract class RenderPassBase : IDisposable
 		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
 		var resource = GetRenderTexture(handle);
 
-		var scaleX = (float)descriptor.Width / resource.width;
-		var scaleY = (float)descriptor.Height / resource.height;
-		var scaleZ = (float)descriptor.VolumeDepth / resource.volumeDepth;
+		var scaleX = (float)descriptor.width / resource.width;
+		var scaleY = (float)descriptor.height / resource.height;
+		var scaleZ = (float)descriptor.volumeDepth / resource.volumeDepth;
 
 		var limitX = MathF.Floor(resource.width * scaleX);
 		var limitY = MathF.Floor(resource.height * scaleY);

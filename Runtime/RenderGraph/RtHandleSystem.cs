@@ -24,35 +24,35 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
 
 	protected override bool DoesResourceMatchDescriptor(RenderTexture resource, RtHandleDescriptor descriptor)
 	{
-		var isDepth = GraphicsFormatUtility.IsDepthFormat(descriptor.Format);
-		if (isDepth && descriptor.Format != resource.depthStencilFormat || !isDepth && descriptor.Format != resource.graphicsFormat)
+		var isDepth = GraphicsFormatUtility.IsDepthFormat(descriptor.format);
+		if (isDepth && descriptor.format != resource.depthStencilFormat || !isDepth && descriptor.format != resource.graphicsFormat)
 			return false;
 
-		if (resource.dimension != descriptor.Dimension)
+		if (resource.dimension != descriptor.dimension)
 			return false;
 
-		if (resource.enableRandomWrite != descriptor.EnableRandomWrite)
+		if (resource.enableRandomWrite != descriptor.enableRandomWrite)
 			return false;
 
-		if (resource.useMipMap != descriptor.HasMips)
+		if (resource.useMipMap != descriptor.hasMips)
 			return false;
 
-		if (resource.volumeDepth < descriptor.VolumeDepth)
+		if (resource.volumeDepth < descriptor.volumeDepth)
 			return false;
 
-		if (descriptor.IsScreenTexture)
+		if (descriptor.isScreenTexture)
 		{
 			// For screen textures, ensure we get a rendertexture that is the actual screen width/height
 			if (resource.width != ScreenWidth || resource.height != ScreenHeight)
 				return false;
 		}
-		else if (descriptor.IsExactSize || descriptor.Dimension == TextureDimension.Cube || descriptor.Dimension == TextureDimension.CubeArray)
+		else if (descriptor.isExactSize || descriptor.dimension == TextureDimension.Cube || descriptor.dimension == TextureDimension.CubeArray)
 		{
 			// Some textures need exact size. (Eg writing to multiple targets at non-screen resolution
-			if (resource.width != descriptor.Width || resource.height != descriptor.Height || resource.volumeDepth != descriptor.VolumeDepth)
+			if (resource.width != descriptor.width || resource.height != descriptor.height || resource.volumeDepth != descriptor.volumeDepth)
 				return false;
 		}
-		else if (resource.width < descriptor.Width || resource.height < descriptor.Height)
+		else if (resource.width < descriptor.width || resource.height < descriptor.height)
 			return false;
 
 		return true;

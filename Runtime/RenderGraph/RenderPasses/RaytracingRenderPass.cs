@@ -34,7 +34,7 @@ public class RaytracingRenderPass : RenderPass<RaytracingRenderPass>
 		RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
 
 		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(rtHandle);
-		descriptor = new RtHandleDescriptor(descriptor.Width, descriptor.Height, descriptor.Format, descriptor.VolumeDepth, descriptor.Dimension, descriptor.IsScreenTexture, descriptor.HasMips, descriptor.AutoGenerateMips, true);
+		descriptor = new RtHandleDescriptor(descriptor.width, descriptor.height, descriptor.format, descriptor.volumeDepth, descriptor.dimension, descriptor.isScreenTexture, descriptor.hasMips, descriptor.autoGenerateMips, true, descriptor.isExactSize, descriptor.clearFlags, descriptor.clearColor, descriptor.clearDepth, descriptor.clearStencil);
 		colorBindings.Add((rtHandle, propertyId));
 		RenderGraph.RtHandleSystem.SetDescriptor(rtHandle, descriptor);
 	}
@@ -138,7 +138,7 @@ public class RaytracingRenderPass : RenderPass<RaytracingRenderPass>
 		foreach (var colorTarget in colorBindings)
 		{
 			var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(colorTarget.Item1);
-			if (descriptor.AutoGenerateMips && descriptor.HasMips)
+			if (descriptor.autoGenerateMips && descriptor.hasMips)
 				Command.GenerateMips(GetRenderTexture(colorTarget.Item1));
 		}
 

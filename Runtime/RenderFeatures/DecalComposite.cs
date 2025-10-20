@@ -55,6 +55,14 @@ public class DecalComposite : CameraRenderFeature
 			pass.AddRenderPassData<CameraDepthData>();
 			pass.AddRenderPassData<DecalAlbedoData>();
 			pass.AddRenderPassData<DecalNormalData>();
+			pass.AddRenderPassData<RainTextureResult>();
+
+			pass.SetRenderFunction((command, pass) =>
+			{
+				pass.SetVector("AlbedoMetallicCopyScaleLimit", pass.GetScaleLimit2D(albedoMetallicCopy));
+				pass.SetVector("NormalRoughnessCopyScaleLimit", pass.GetScaleLimit2D(normalRoughnessCopy));
+				pass.SetVector("BentNormalOcclusionCopyScaleLimit", pass.GetScaleLimit2D(bentNormalOcclusionCopy));
+			});
 		}
 	}
 }

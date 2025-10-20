@@ -22,7 +22,7 @@ public abstract class BaseComputeRenderPass<T> : RenderPass<T> where T : RenderP
 		colorBindings.Add(new(rtHandle, propertyId, mip));
 
 		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(rtHandle);
-		descriptor = new RtHandleDescriptor(descriptor.Width, descriptor.Height, descriptor.Format, descriptor.VolumeDepth, descriptor.Dimension, descriptor.IsScreenTexture, descriptor.HasMips, descriptor.AutoGenerateMips, true);
+		descriptor = new RtHandleDescriptor(descriptor.width, descriptor.height, descriptor.format, descriptor.volumeDepth, descriptor.dimension, descriptor.isScreenTexture, descriptor.hasMips, descriptor.autoGenerateMips, true, descriptor.isExactSize, descriptor.clearFlags, descriptor.clearColor, descriptor.clearDepth, descriptor.clearStencil);
 		RenderGraph.RtHandleSystem.SetDescriptor(rtHandle, descriptor);
 	}
 
@@ -102,7 +102,7 @@ public abstract class BaseComputeRenderPass<T> : RenderPass<T> where T : RenderP
 		foreach (var colorTarget in colorBindings)
 		{
 			var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(colorTarget.Item1);
-			if (descriptor.AutoGenerateMips && descriptor.HasMips)
+			if (descriptor.autoGenerateMips && descriptor.hasMips)
 				Command.GenerateMips(GetRenderTexture(colorTarget.Item1));
 		}
 

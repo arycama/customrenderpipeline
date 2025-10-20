@@ -172,7 +172,7 @@ float4 Fragment(FragmentInput input) : SV_Target
 	
 		float3 result = opacity * lighting;
 	#else
-		float3 result = opacity * input.lighting;
+		float3 result = 0.5 * opacity * input.lighting;
 	#endif
 	
 	return float4(result, opacity) * depthFade;

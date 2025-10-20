@@ -107,7 +107,7 @@ public class WaterShadowRenderer : WaterRendererBase
             m33 = 1.0f
         };
 
-        var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.D16_UNorm, isExactSize: true);
+        var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.D16_UNorm, isExactSize: true, clearFlags: RTClearFlags.Depth);
         var waterIlluminance = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.R16_UNorm, isExactSize: true);
 
         var passIndex = settings.Material.FindPass("WaterShadow");
@@ -121,7 +121,6 @@ public class WaterShadowRenderer : WaterRendererBase
             pass.Initialize(settings.Material, indexBuffer, cullResult.IndirectArgsBuffer, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
             pass.WriteDepth(waterShadow);
             pass.WriteTexture(waterIlluminance, RenderBufferLoadAction.DontCare);
-            pass.ConfigureClear(RTClearFlags.Depth);
             pass.ReadBuffer("_PatchData", cullResult.PatchDataBuffer);
 
             pass.AddRenderPassData<OceanFftResult>();

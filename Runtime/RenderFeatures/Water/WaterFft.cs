@@ -170,7 +170,7 @@ public class WaterFft : FrameRenderFeature
             pass.SetRenderFunction((command, pass) =>
             {
                 // TODO: Do this manually? Since this will be compute shader anyway.. could do in same pass
-                Assert.IsTrue(renderGraph.RtHandleSystem.GetDescriptor(displacementCurrent).HasMips, "Trying to Generate Mips for a Texture without mips enabled");
+                Assert.IsTrue(renderGraph.RtHandleSystem.GetDescriptor(displacementCurrent).hasMips, "Trying to Generate Mips for a Texture without mips enabled");
                 command.GenerateMips(pass.GetRenderTexture(displacementCurrent));
 
                 pass.SetInt("Size", settings.Resolution >> 2);

@@ -255,19 +255,20 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// Finalize gbuffer
 		new ScreenSpaceTerrain(renderGraph),
 
+		new RainTextureUpdater(renderGraph, asset.RainTexture),
+
 		// Decals
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
-			var decalAlbedo = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true);
+			var decalAlbedo = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 			renderGraph.SetResource(new DecalAlbedoData(decalAlbedo));
 
-			var decalNormal = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
+			var decalNormal = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 			renderGraph.SetResource(new DecalNormalData(decalNormal));
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
 
 			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Decal");
-			pass.ConfigureClear(RTClearFlags.Color);
 
 			pass.Initialize("Decal", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.QuantizedFrontToBack, PerObjectData.None);
 			pass.WriteDepth(renderGraph.GetResource<CameraDepthData>(), RenderTargetFlags.ReadOnlyDepthStencil);

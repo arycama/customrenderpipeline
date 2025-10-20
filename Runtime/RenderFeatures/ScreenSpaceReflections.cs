@@ -32,10 +32,10 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
 		using var scope = renderGraph.AddProfileScope("Specular Global Illumination");
 
         // Must be screen texture since we use stencil to skip sky pixels
-        var tempResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
+        var tempResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 
         // Slight fuzzyness with 16 bits, probably due to depth.. would like to investigate
-        var hitResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true);
+        var hitResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 
         var depth = renderGraph.GetResource<CameraDepthData>().Handle;
         var normalRoughness = renderGraph.GetResource<NormalRoughnessData>().Handle;
@@ -88,7 +88,6 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(hitResult, RenderBufferLoadAction.DontCare);
-                pass.ConfigureClear(RTClearFlags.Color);
                 pass.ReadTexture("", depth);
 
                 pass.AddRenderPassData<SkyReflectionAmbientData>();

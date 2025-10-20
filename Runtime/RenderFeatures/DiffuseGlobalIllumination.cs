@@ -30,8 +30,8 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
     {
 		using var scope = renderGraph.AddProfileScope("Diffuse Global Illumination");
 
-        var tempResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-        var hitResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var tempResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+        var hitResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
         var previousFrame = renderGraph.GetResource<PreviousColor>().Handle;
 
         var depth = renderGraph.GetResource<CameraDepthData>().Handle;
@@ -79,7 +79,6 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
                 pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(tempResult);
                 pass.WriteTexture(hitResult);
-                pass.ConfigureClear(RTClearFlags.Color);
 
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<TemporalAAData>();
