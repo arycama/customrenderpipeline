@@ -14,9 +14,9 @@ public class DecalComposite : CameraRenderFeature
 	{
 		using var scope = renderGraph.AddProfileScope("Decal Composite");
 
-		var albedoMetallic = renderGraph.GetRTHandle<AlbedoMetallicData>();
-		var normalRoughness = renderGraph.GetRTHandle<NormalRoughnessData>();
-		var bentNormalOcclusion = renderGraph.GetRTHandle<BentNormalOcclusionData>();
+		var albedoMetallic = renderGraph.GetRTHandle<GBufferAlbedoMetallic>();
+		var normalRoughness = renderGraph.GetRTHandle<GBufferNormalRoughness>();
+		var bentNormalOcclusion = renderGraph.GetRTHandle<GBufferBentNormalOcclusion>();
 
 		var albedoMetallicCopy = renderGraph.GetTexture(albedoMetallic);
 		var normalRoughnessCopy = renderGraph.GetTexture(normalRoughness);
@@ -32,9 +32,9 @@ public class DecalComposite : CameraRenderFeature
 			pass.WriteTexture(normalRoughnessCopy);
 			pass.WriteTexture(bentNormalOcclusionCopy);
 
-			pass.ReadRtHandle<AlbedoMetallicData>();
-			pass.ReadRtHandle<NormalRoughnessData>();
-			pass.ReadRtHandle<BentNormalOcclusionData>();
+			pass.ReadRtHandle<GBufferAlbedoMetallic>();
+			pass.ReadRtHandle<GBufferNormalRoughness>();
+			pass.ReadRtHandle<GBufferBentNormalOcclusion>();
 		}
 
 		// Now composite the decal buffers
@@ -53,8 +53,8 @@ public class DecalComposite : CameraRenderFeature
 
 			pass.ReadRtHandle<CameraTarget>();
 			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<DecalAlbedoData>();
-			pass.ReadRtHandle<DecalNormalData>();
+			pass.ReadRtHandle<DecalAlbedo>();
+			pass.ReadRtHandle<DecalNormal>();
 			pass.AddRenderPassData<RainTextureResult>();
 
 			pass.SetRenderFunction((command, pass) =>

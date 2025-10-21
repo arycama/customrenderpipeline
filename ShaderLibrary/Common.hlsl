@@ -3,11 +3,11 @@
 
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/CommonShaders.hlsl"
 
-Texture2D<float> Depth, HiZMinDepth, HiZMaxDepth;
-Texture2D<float> BlueNoise1D, PreviousDepth;
-Texture2D<float2> BlueNoise2D, BlueNoise2DUnit, Velocity, PreviousVelocity;
-Texture2D<float3> BlueNoise3D, BlueNoise3DUnit, BlueNoise3DCosine, PreviousColor;
-Texture2D<uint2> Stencil;
+Texture2D<float> CameraDepth, HiZMinDepth, HiZMaxDepth;
+Texture2D<float> BlueNoise1D, PreviousCameraDepth;
+Texture2D<float2> BlueNoise2D, BlueNoise2DUnit, CameraVelocity, PreviousCameraVelocity;
+Texture2D<float3> BlueNoise3D, BlueNoise3DUnit, BlueNoise3DCosine, PreviousCameraTarget, CameraTarget;
+Texture2D<uint2> CameraStencil;
 
 cbuffer FrameData
 {

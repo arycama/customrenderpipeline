@@ -57,7 +57,7 @@ public partial class AutoExposure : CameraRenderFeature
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Auto Exposure"))
 		{
 			pass.Initialize(computeShader, 0, camera.scaledPixelWidth, camera.scaledPixelHeight);
-			pass.ReadTexture("Input", renderGraph.GetRTHandle<CameraTarget>().handle);
+			pass.ReadTexture(nameof(CameraTarget), renderGraph.GetRTHandle<CameraTarget>().handle);
 			pass.WriteBuffer("LuminanceHistogram", histogram);
 			pass.AddRenderPassData<AutoExposureData>();
 

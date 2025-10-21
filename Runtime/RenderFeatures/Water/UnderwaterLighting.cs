@@ -26,9 +26,9 @@ public class UnderwaterLighting : CameraRenderFeature
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>().handle, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(underwaterResultId, RenderBufferLoadAction.DontCare);
 
-            pass.ReadRtHandle<AlbedoMetallicData>();
-            pass.ReadRtHandle<NormalRoughnessData>();
-            pass.ReadRtHandle<BentNormalOcclusionData>();
+            pass.ReadRtHandle<GBufferAlbedoMetallic>();
+            pass.ReadRtHandle<GBufferNormalRoughness>();
+            pass.ReadRtHandle<GBufferBentNormalOcclusion>();
             pass.ReadRtHandle<CameraTarget>();
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<VolumetricLighting.Result>();
@@ -42,7 +42,7 @@ public class UnderwaterLighting : CameraRenderFeature
             pass.AddRenderPassData<FrameData>();
             pass.AddRenderPassData<CausticsResult>();
             pass.ReadRtHandle<CameraDepth>();
-            pass.ReadRtHandle<DepthCopyData>();
+            pass.ReadRtHandle<DepthCopy>();
                 
             pass.SetRenderFunction((command, pass) =>
             {

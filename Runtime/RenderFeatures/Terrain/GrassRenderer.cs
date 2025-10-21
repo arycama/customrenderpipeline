@@ -76,7 +76,7 @@ public class GrassRenderer : CameraRenderFeature
 				pass.AddRenderPassData<TerrainRenderData>();
 				pass.AddRenderPassData<ViewData>();
 				pass.AddRenderPassData<FrameData>();
-				pass.ReadRtHandle<HiZMaxDepthData>();
+				pass.ReadRtHandle<HiZMaxDepth>();
 
 				pass.SetRenderFunction((command, pass) =>
 				{
@@ -150,11 +150,11 @@ public class GrassRenderer : CameraRenderFeature
 				pass.Initialize(material, indirectArgsBuffer, MeshTopology.Points);
 
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-				pass.WriteTexture(renderGraph.GetRTHandle<AlbedoMetallicData>());
-				pass.WriteTexture(renderGraph.GetRTHandle<NormalRoughnessData>());
-				pass.WriteTexture(renderGraph.GetRTHandle<BentNormalOcclusionData>());
+				pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
+				pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
+				pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 				pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
-				pass.WriteTexture(renderGraph.GetRTHandle<VelocityData>());
+				pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
 
 				pass.ReadBuffer("_FinalPatches", finalPatches);
 

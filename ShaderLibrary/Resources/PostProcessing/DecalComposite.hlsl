@@ -19,15 +19,15 @@ float4 AlbedoMetallicCopyScaleLimit, NormalRoughnessCopyScaleLimit, BentNormalOc
 FragmentOutput FragmentCopy(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	FragmentOutput output;
-	output.albedoMetallic = GbufferAlbedoMetallic[position.xy];
-	output.normalRoughness = NormalRoughness[position.xy];
-	output.bentNormalOcclusion = BentNormalOcclusion[position.xy];
+	output.albedoMetallic = GBufferAlbedoMetallic[position.xy];
+	output.normalRoughness = GBufferNormalRoughness[position.xy];
+	output.bentNormalOcclusion = GBufferBentNormalOcclusion[position.xy];
 	return output;
 }
 
 FragmentOutput FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float depth = Depth[position.xy];
+	float depth = CameraDepth[position.xy];
 	float eyeDepth = LinearEyeDepth(depth);
 	float3 worldPosition = worldDir * eyeDepth;
 	float3 rainNormal = UnpackNormalSNorm(RainTexture.Sample(SurfaceSampler, (worldPosition.xz + ViewPosition.xz) / RainTextureSize)).xzy;

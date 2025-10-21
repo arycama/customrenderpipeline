@@ -59,7 +59,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	#endif
 	
 	#ifndef CLOUD_SHADOW
-	float sceneDepth = Depth[position.xy];
+	float sceneDepth = CameraDepth[position.xy];
 	if (sceneDepth != 0.0)
 	{
 		float sceneDistance = LinearEyeDepth(sceneDepth) * rcp(rcpRdLength);
@@ -117,14 +117,14 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 {
 	int2 pixelId = (int2) position.xy;
 	
-	float depth = CloudDepthTexture[pixelId];//Depth[position.xy];
-	//float2 motion = depth ? Velocity[position.xy] : CalculateVelocity(uv, CloudDepthTexture[pixelId]);
+	float depth = CloudDepthTexture[pixelId]; //CameraDepth[position.xy];
+	//float2 motion = depth ? CameraVelocity[position.xy] : CalculateVelocity(uv, CloudDepthTexture[pixelId]);
 	float2 motion = CalculateVelocity(uv, CloudDepthTexture[pixelId]);
 	
 	float2 historyUv = uv - motion;
 	float4 mean = 0.0, stdDev = 0.0, current = 0.0;
 	
-	float rawDepth = Depth[position.xy];
+	float rawDepth = CameraDepth[position.xy];
 	float centerDepth = LinearEyeDepth(rawDepth);
 	float weightSum = 0.0;
 	float depthWeightSum = 0.0;
@@ -138,7 +138,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 			float weight = GetBoxFilterWeight(i);
 			uint2 coord = clamp(pixelId + int2(x, y), 0, ViewSizeMinusOne);
 			
-			float depth = LinearEyeDepth(Depth[coord]);
+			float depth = LinearEyeDepth(CameraDepth[coord]);
 			
 			// Weigh contribution to the result and bounding box 
 			float depthWeight = saturate(1.0 - abs(centerDepth - depth) / max(1, centerDepth) * DepthThreshold);
@@ -164,8 +164,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	{
 		float4 bilinearWeights  = BilinearWeights(historyUv, ViewSize);
 	
-		float4 currentDepths = LinearEyeDepth(Depth.Gather(LinearClampSampler, uv));
-		float4 previousDepths = LinearEyeDepth(PreviousDepth.Gather(LinearClampSampler, historyUv));
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, uv));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, historyUv));
 	
 		float4 historyR = _History.GatherRed(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit)) * PreviousToCurrentExposure;
 		float4 historyG = _History.GatherGreen(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));

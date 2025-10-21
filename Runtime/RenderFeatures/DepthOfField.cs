@@ -85,7 +85,7 @@ public partial class DepthOfField : CameraRenderFeature
 
 				pass.ReadRtHandle<CameraTarget>();
 				pass.ReadRtHandle<CameraDepth>();
-				pass.ReadRtHandle<HiZMinDepthData>();
+				pass.ReadRtHandle<HiZMinDepth>();
 				pass.AddRenderPassData<FrameData>();
 				pass.AddRenderPassData<ViewData>();
 

@@ -2,24 +2,23 @@
 #include "../Lighting.hlsl"
 #include "../Packing.hlsl"
 
-Texture2D<float> _DepthCopy;
-Texture2D<float3> Input;
+Texture2D<float> DepthCopy;
 
 float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float depth = _DepthCopy[position.xy];
+	float depth = DepthCopy[position.xy];
 	float eyeDepth = LinearEyeDepth(depth);
 	float3 worldPosition = worldDir * eyeDepth;
 	float rcpVLength = RcpLength(worldDir);
 	float3 V = -worldDir * rcpVLength;
 
-	float4 albedoMetallic = GbufferAlbedoMetallic[position.xy];
-	float4 normalRoughness = NormalRoughness[position.xy];
-	float4 bentNormalOcclusion = BentNormalOcclusion[position.xy];
+	float4 albedoMetallic = GBufferAlbedoMetallic[position.xy];
+	float4 normalRoughness = GBufferNormalRoughness[position.xy];
+	float4 bentNormalOcclusion = GBufferBentNormalOcclusion[position.xy];
 	 
 	float3 albedo = UnpackAlbedo(albedoMetallic.rg, position.xy);
 	float metallic = albedoMetallic.a;
-	float3 normal = GBufferNormal(position.xy, NormalRoughness, V);
+	float3 normal = GBufferNormal(position.xy, GBufferNormalRoughness, V);
 	float perceptualRoughness = normalRoughness.a;
 	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion);
 	float visibilityAngle = bentNormalOcclusion.a * HalfPi;
@@ -30,9 +29,9 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	// TODO: Support?
 	float3 translucency = 0;
 	
-	float3 result = EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, bentNormal, worldPosition, translucency, position.xy, eyeDepth).rgb + Input[position.xy];
+	float3 result = EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, bentNormal, worldPosition, translucency, position.xy, eyeDepth).rgb + CameraTarget[position.xy];
 	
-	float waterDepth = LinearEyeDepth(Depth[position.xy]);
+	float waterDepth = LinearEyeDepth(CameraDepth[position.xy]);
 	result *= Rec709ToRec2020(TransmittanceToPoint(ViewHeight, -V.y, waterDepth * rcp(rcpVLength)));
 	return result;
 }

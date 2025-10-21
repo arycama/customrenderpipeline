@@ -53,7 +53,7 @@ public partial class Tonemapping : CameraRenderFeature
 		pass.Initialize(material);
 
 		pass.ReadRtHandle<CameraTarget>();
-		pass.ReadRtHandle<BloomData>();
+		pass.ReadRtHandle<CameraBloom>();
 		pass.AddRenderPassData<AutoExposureData>();
 
 		var hdrSettings = HDROutputSettings.main;

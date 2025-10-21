@@ -10,7 +10,7 @@ float Radius, Samples, Directions, Falloff, ThinOccluderCompensation, Strength, 
 
 float3 ComputeViewspacePosition(float2 coord)
 {
-	float depth = Depth[coord];
+	float depth = CameraDepth[coord];
 	float linearDepth = LinearEyeDepth(depth);
 	return float3(coord * PixelToViewScaleOffset.xy + PixelToViewScaleOffset.zw, 1.0) * linearDepth;
 }
@@ -32,7 +32,7 @@ float4 UnpackWeight(float4 input, out float weight)
 float4 FragmentCompute(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
 	float2 noise = BlueNoise2D[position.xy % 128];
-	float3 normalV = mul((float3x3) WorldToView, UnpackGBufferNormal(NormalRoughness[position.xy]));
+	float3 normalV = mul((float3x3) WorldToView, UnpackGBufferNormal(GBufferNormalRoughness[position.xy]));
 	float3 viewPosition = ComputeViewspacePosition(position.xy);
 	float3 viewV = normalize(-viewPosition);
 
@@ -142,7 +142,7 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float4 result = 0.0, mean = 0.0, stdDev = 0.0;
 	float totalWeight = 0.0;
 	
-	float centerDepth = LinearEyeDepth(Depth[position.xy]);
+	float centerDepth = LinearEyeDepth(CameraDepth[position.xy]);
 	float weightSum = 0.0;
 	float depthWeightSum = 0.0;
 	
@@ -157,7 +157,7 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 			
 			// Remove weighting for temporal neighborhood
 			float DepthThreshold = 1; // TODO: Make a variable, maybe global?
-			float depth = LinearEyeDepth(Depth[position.xy + int2(x, y)]);
+			float depth = LinearEyeDepth(CameraDepth[position.xy + int2(x, y)]);
 			float depthWeight = saturate(1.0 - abs(centerDepth - depth) / max(1, centerDepth) * DepthThreshold);
 			
 			mean += color * depthWeight;
@@ -182,7 +182,7 @@ float4 FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	if (HasHistory)
 	{
-		float2 velocity = Velocity[position.xy];
+		float2 velocity = CameraVelocity[position.xy];
 		float2 previousUv = uv - velocity;
 
 		if (all(saturate(previousUv.xy) == previousUv.xy))
@@ -216,7 +216,7 @@ float4 FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	result.a = VisibilityToConeCosAngle(pow(ConeAngleToVisibility(result.a), Strength));
 	
 	// Combine with existing cone 
-	float4 bentNormalOcclusion = BentNormalOcclusion[position.xy];
+	float4 bentNormalOcclusion = GBufferBentNormalOcclusion[position.xy];
 	bentNormalOcclusion.xyz = UnpackGBufferNormal(bentNormalOcclusion);
 	
 	result = SphericalCapIntersection(bentNormalOcclusion.xyz, cos(bentNormalOcclusion.a * HalfPi), result.xyz, result.w);

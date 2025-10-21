@@ -100,7 +100,7 @@ float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	}
 	else
 	{
-		float sceneDistance = LinearEyeDepth(Depth[position.xy]) * rcp(rcpRdLength);
+		float sceneDistance = LinearEyeDepth(CameraDepth[position.xy]) * rcp(rcpRdLength);
 		
 		if(cloudTransmittance < 1.0)
 		{
@@ -207,7 +207,7 @@ FragmentOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 {
 	float3 mean = 0.0, stdDev = 0.0, current = 0.0;
 	
-	float centerDepthRaw = Depth[position.xy];
+	float centerDepthRaw = CameraDepth[position.xy];
 	float centerDepth = LinearEyeDepth(centerDepthRaw);
 	float weightSum = 0.0;
 	float depthWeightSum = 0.0;
@@ -221,7 +221,7 @@ FragmentOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 			float weight = GetBoxFilterWeight(i);
 			uint2 coord = clamp(position.xy + int2(x, y), 0, ViewSizeMinusOne);
 			
-			float depth = LinearEyeDepth(Depth[coord]);
+			float depth = LinearEyeDepth(CameraDepth[coord]);
 			
 			// Weigh contribution to the result and bounding box 
 			float DepthThreshold = 1.0;
@@ -244,15 +244,15 @@ FragmentOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float3 minValue = mean - stdDev;
 	float3 maxValue = mean + stdDev;
 	
-	float2 motion = Velocity[position.xy];
+	float2 motion = CameraVelocity[position.xy];
 	float2 historyUv = uv - motion;
 	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
 		float4 bilinearWeights = BilinearWeights(historyUv, ViewSize);
 	
-		float4 currentDepths = LinearEyeDepth(Depth.Gather(LinearClampSampler, uv));
-		float4 previousDepths = LinearEyeDepth(PreviousDepth.Gather(LinearClampSampler, historyUv));
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, uv));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, historyUv));
 	
 		float4 historyR = _SkyHistory.GatherRed(LinearClampSampler, ClampScaleTextureUv(historyUv, _SkyHistoryScaleLimit)) * PreviousToCurrentExposure;
 		float4 historyG = _SkyHistory.GatherGreen(LinearClampSampler, ClampScaleTextureUv(historyUv, _SkyHistoryScaleLimit));

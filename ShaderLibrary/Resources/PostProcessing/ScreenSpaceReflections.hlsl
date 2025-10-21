@@ -12,7 +12,7 @@
 
 cbuffer Properties
 {
-	float4 _PreviousColorScaleLimit;
+	float4 PreviousCameraTargetScaleLimit;
 	float _MaxSteps, _Thickness, _ResolveSize, _MaxMip;
     uint _ResolveSamples;
 };
@@ -36,7 +36,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float3 worldPosition = worldDir * linearDepth;
 	float3 V = normalize(-worldDir);
 	
-	float4 normalRoughness = NormalRoughness[position.xy];
+	float4 normalRoughness = GBufferNormalRoughness[position.xy];
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
@@ -52,7 +52,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float3 color, hitRay;
 	if(validHit)
 	{
-		float2 velocity = Velocity[rayPos.xy];
+		float2 velocity = CameraVelocity[rayPos.xy];
 		float2 hitUv = rayPos.xy * RcpViewSize - velocity;
 		outDepth = Linear01Depth(depth);
 		
@@ -67,7 +67,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 		float linearHitDepth = LinearEyeDepth(rayPos.z);
 		float mipLevel = log2(ViewSize.y * 0.5 * coneTangent * hitDist / (linearHitDepth * TanHalfFov));
 		
-		color = PreviousColor.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, _PreviousColorScaleLimit), mipLevel);
+		color = PreviousCameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, PreviousCameraTargetScaleLimit), mipLevel);
 	}
 	else
 	{
@@ -97,16 +97,16 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 {
 	float3 V = -worldDir * RcpLength(worldDir);
 	
-    float4 normalRoughness = NormalRoughness[position.xy];
+	float4 normalRoughness = GBufferNormalRoughness[position.xy];
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
-	float3 worldPosition = worldDir * LinearEyeDepth(Depth[position.xy]);
+	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
 	
 	float roughness = max(1e-3, Sq(normalRoughness.a));
 
-	float4 albedoMetallic = GbufferAlbedoMetallic[position.xy];
+	float4 albedoMetallic = GBufferAlbedoMetallic[position.xy];
     float3 f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
 	
 	float roughness2 = Sq(roughness);
@@ -194,10 +194,10 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, current);
 	
 	float rayLength = RayDepth[position.xy];
-	float3 worldPosition = worldDir * LinearEyeDepth(Depth[position.xy]);
+	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
 	worldPosition += normalize(worldDir) * rayLength;
 	
-	float2 historyUv = uv - Velocity[position.xy];
+	float2 historyUv = uv - CameraVelocity[position.xy];
 	float4 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
 	
 	history.rgb = ClipToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);

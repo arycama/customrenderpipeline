@@ -41,7 +41,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	return float4(rayPos, validHit); // float4(hitRay, outDepth);
 }
 
-float4 _PreviousColorScaleLimit;
+float4 PreviousCameraTargetScaleLimit;
 float _ConeAngle, _ResolveSize;
 uint _ResolveSamples;
 
@@ -56,10 +56,10 @@ float FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	float rcpVLength = RcpLength(worldDir);
 	float3 V = -worldDir * rcpVLength;
 	
-	float4 normalRoughness = NormalRoughness[position.xy];
+	float4 normalRoughness = GBufferNormalRoughness[position.xy];
 	float NdotV;
 	
-	float3 worldPosition = worldDir * LinearEyeDepth(Depth[position.xy]);
+	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
 	
 	float result = 0.0, weightSum = 0.0;
@@ -107,7 +107,7 @@ float FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float minValue, maxValue, result;
 	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, result);
 	
-	float2 historyUv = uv - Velocity[position.xy];
+	float2 historyUv = uv - CameraVelocity[position.xy];
 	float history = _History.Sample(LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 
 	history = clamp(history, minValue, maxValue);

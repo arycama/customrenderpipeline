@@ -116,7 +116,7 @@ Texture2D<float> Opacity;
 
 float4 Fragment(FragmentInput input) : SV_Target
 {
-	float depth = LinearEyeDepth(Depth[input.position.xy]);
+	float depth = LinearEyeDepth(CameraDepth[input.position.xy]);
 	float depthFade = saturate((depth.r - input.position.w) / DepthFade);
 	
 	float opacity = Opacity.Sample(SurfaceSampler, input.uv);

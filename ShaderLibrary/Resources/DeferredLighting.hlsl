@@ -13,19 +13,19 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 {
 	//return DirectionalParticleShadows.SampleLevel(TrilinearClampSampler, float3(uv, 1), 0.0);
 
-	float depth = Depth[position.xy];
+	float depth = CameraDepth[position.xy];
 	float eyeDepth = LinearEyeDepth(depth);
 	float3 worldPosition = worldDir * eyeDepth;
 	float rcpVLength = RcpLength(worldDir);
 	float3 V = -worldDir * rcpVLength;
 
-	float4 albedoMetallic = GbufferAlbedoMetallic[position.xy];
-	float4 normalRoughness = NormalRoughness[position.xy];
-	float4 bentNormalOcclusion = BentNormalOcclusion[position.xy];
-	uint stencil = Stencil[position.xy].g;
+	float4 albedoMetallic = GBufferAlbedoMetallic[position.xy];
+	float4 normalRoughness = GBufferNormalRoughness[position.xy];
+	float4 bentNormalOcclusion = GBufferBentNormalOcclusion[position.xy];
+	uint stencil = CameraStencil[position.xy].g;
 
 	float3 albedo = UnpackAlbedo(albedoMetallic.rg, position.xy);
-	float3 normal = GBufferNormal(position.xy, NormalRoughness, V);
+	float3 normal = GBufferNormal(position.xy, GBufferNormalRoughness, V);
 	float perceptualRoughness = normalRoughness.a;
 	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion);
 	float visibilityAngle = bentNormalOcclusion.a * HalfPi;

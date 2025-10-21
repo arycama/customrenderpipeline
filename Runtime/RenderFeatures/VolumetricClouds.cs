@@ -91,9 +91,9 @@ public partial class VolumetricClouds : CameraRenderFeature
             pass.AddRenderPassData<AutoExposureData>();
             pass.AddRenderPassData<ViewData>();
             pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<PreviousDepth>();
-			pass.ReadRtHandle<PreviousVelocity>();
-			pass.ReadRtHandle<VelocityData>();
+			pass.ReadRtHandle<PreviousCameraDepth>();
+			pass.ReadRtHandle<PreviousCameraVelocity>();
+			pass.ReadRtHandle<CameraVelocity>();
 			var time = (float)pass.RenderGraph.GetResource<TimeData>().Time;
 
             pass.SetRenderFunction((command, pass) =>

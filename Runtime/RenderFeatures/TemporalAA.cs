@@ -44,7 +44,7 @@ public partial class TemporalAA : CameraRenderFeature
 		pass.ReadRtHandle<CameraTarget>();
 		pass.ReadRtHandle<CameraStencil>();
 		pass.ReadRtHandle<CameraDepth>();
-		pass.ReadRtHandle<VelocityData>();
+		pass.ReadRtHandle<CameraVelocity>();
 		pass.AddRenderPassData<AutoExposureData>();
 
 		pass.SetRenderFunction((

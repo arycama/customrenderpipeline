@@ -137,7 +137,7 @@ public class Bloom : CameraRenderFeature
 			});
 		}
 
-		renderGraph.SetRTHandle<BloomData>(bloomIds[0]);
+		renderGraph.SetRTHandle<CameraBloom>(bloomIds[0]);
 		ListPool<ResourceHandle<RenderTexture>>.Release(bloomIds);
 
 		renderGraph.AddProfileEndPass("Bloom");

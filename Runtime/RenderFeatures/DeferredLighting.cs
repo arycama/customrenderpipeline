@@ -32,9 +32,9 @@ public class DeferredLighting : CameraRenderFeature
 
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadRtHandle<CameraStencil>();
-			pass.ReadRtHandle<AlbedoMetallicData>();
-			pass.ReadRtHandle<NormalRoughnessData>();
-			pass.ReadRtHandle<BentNormalOcclusionData>();
+			pass.ReadRtHandle<GBufferAlbedoMetallic>();
+			pass.ReadRtHandle<GBufferNormalRoughness>();
+			pass.ReadRtHandle<GBufferBentNormalOcclusion>();
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 			pass.AddRenderPassData<TemporalAAData>();
 

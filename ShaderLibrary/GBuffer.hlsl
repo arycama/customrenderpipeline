@@ -14,7 +14,7 @@ struct GBufferOutput
 	float3 emissive : SV_Target3;
 };
 
-Texture2D<float4> GbufferAlbedoMetallic, NormalRoughness, BentNormalOcclusion;
+Texture2D<float4> GBufferAlbedoMetallic, GBufferNormalRoughness, GBufferBentNormalOcclusion;
 
 float3 PackGBufferNormal(float3 normal)
 {

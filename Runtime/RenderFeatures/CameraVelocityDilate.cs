@@ -18,10 +18,10 @@ public class CameraVelocityDilate : CameraRenderFeature
 		{
 			pass.Initialize(material, 1);
 			pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
-			pass.ReadRtHandle<VelocityData>();
+			pass.ReadRtHandle<CameraVelocity>();
 			pass.ReadRtHandle<CameraDepth>();
 		}
 
-		renderGraph.SetRTHandle<VelocityData>(result);
+		renderGraph.SetRTHandle<CameraVelocity>(result);
 	}
 }

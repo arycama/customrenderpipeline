@@ -27,9 +27,9 @@ public class ScreenSpaceTerrain : CameraRenderFeature
 			var offset = -scale * (terrain.GetPosition().XZ() - camera.transform.position.XZ());
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
-			pass.WriteTexture(renderGraph.GetRTHandle<AlbedoMetallicData>());
-			pass.WriteTexture(renderGraph.GetRTHandle<NormalRoughnessData>());
-			pass.WriteTexture(renderGraph.GetRTHandle<BentNormalOcclusionData>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 			pass.AddRenderPassData<ViewData>();
 			pass.ReadRtHandle<CameraDepth>();
 			pass.AddRenderPassData<TerrainRenderData>();

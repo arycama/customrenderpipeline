@@ -76,9 +76,9 @@ public class GenerateHiZ : CameraRenderFeature
 		}
 
 		if(mode == HiZMode.Min)
-			renderGraph.SetRTHandle<HiZMinDepthData>(result);
+			renderGraph.SetRTHandle<HiZMinDepth>(result);
 		else if (mode == HiZMode.Max)
-			renderGraph.SetRTHandle<HiZMaxDepthData>(result);
+			renderGraph.SetRTHandle<HiZMaxDepth>(result);
 	}
 
 	public enum HiZMode

@@ -43,7 +43,7 @@ struct FragmentOutput
 
 FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float depth = Depth[position.xy];
+	float depth = CameraDepth[position.xy];
 	float4 waterNormalFoamRoughness = _WaterNormalFoam[position.xy];
 	
 	float rcpLenV = RcpLength(worldDir);
@@ -180,7 +180,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float3 minValue, maxValue, result;
 	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result);
 
-	float2 historyUv = uv - Velocity[position.xy];
+	float2 historyUv = uv - CameraVelocity[position.xy];
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
 		float3 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
@@ -190,7 +190,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	}
 	
 	// Apply roughness to transmission
-	float4 normalRoughness = NormalRoughness[position.xy];
+	float4 normalRoughness = GBufferNormalRoughness[position.xy];
 	float3 V = normalize(-worldDir);
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);

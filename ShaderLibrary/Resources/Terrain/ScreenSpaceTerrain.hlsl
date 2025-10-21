@@ -32,7 +32,7 @@ void CompareSwap(inout float key0, inout uint value0, inout float key1, inout ui
 
 GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float3 worldPosition = worldDir * LinearEyeDepth(Depth[position.xy]);
+	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
 	float2 normalUv = WorldToTerrainPositionHalfTexel(worldPosition);
 	float3 terrainNormal = GetTerrainNormal(normalUv);
 	

@@ -32,9 +32,9 @@ public class DeferredWater : CameraRenderFeature
         var scatterResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
         var depth = renderGraph.GetRTHandle<CameraDepth>().handle;
 
-        var albedoMetallic = renderGraph.GetRTHandle<AlbedoMetallicData>().handle;
-        var normalRoughness = renderGraph.GetRTHandle<NormalRoughnessData>().handle;
-        var bentNormalOcclusion = renderGraph.GetRTHandle<BentNormalOcclusionData>().handle;
+        var albedoMetallic = renderGraph.GetRTHandle<GBufferAlbedoMetallic>().handle;
+        var normalRoughness = renderGraph.GetRTHandle<GBufferNormalRoughness>().handle;
+        var bentNormalOcclusion = renderGraph.GetRTHandle<GBufferBentNormalOcclusion>().handle;
 
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Render"))
         {
@@ -46,7 +46,7 @@ public class DeferredWater : CameraRenderFeature
             pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>().handle);
             pass.WriteTexture(scatterResult);
 
-            pass.ReadTexture("_UnderwaterDepth", renderGraph.GetRTHandle<DepthCopyData>().handle);
+            pass.ReadTexture("_UnderwaterDepth", renderGraph.GetRTHandle<DepthCopy>().handle);
 
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<AutoExposureData>();
@@ -141,7 +141,7 @@ public class DeferredWater : CameraRenderFeature
                 //pass.WriteTexture(hitResult, "HitResult");
                 //pass.ReadTexture("PreviousFrame", previousFrameColor); // Temporary, cuz of leaks if we don't use it..
 
-                pass.ReadRtHandle<NormalRoughnessData>();
+                pass.ReadRtHandle<GBufferNormalRoughness>();
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 				pass.AddRenderPassData<WaterShadowResult>();
                 pass.AddRenderPassData<LightingData>();
@@ -188,19 +188,19 @@ public class DeferredWater : CameraRenderFeature
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>().handle);
 
-            pass.ReadTexture("_UnderwaterDepth", renderGraph.GetRTHandle<DepthCopyData>().handle);
+            pass.ReadTexture("_UnderwaterDepth", renderGraph.GetRTHandle<DepthCopy>().handle);
             pass.ReadTexture("_History", history);
 
-			pass.ReadRtHandle<NormalRoughnessData>();
-			pass.ReadRtHandle<BentNormalOcclusionData>();
-			pass.ReadRtHandle<AlbedoMetallicData>();
+			pass.ReadRtHandle<GBufferNormalRoughness>();
+			pass.ReadRtHandle<GBufferBentNormalOcclusion>();
+			pass.ReadRtHandle<GBufferAlbedoMetallic>();
 			pass.AddRenderPassData<TemporalAAData>();
             pass.AddRenderPassData<AutoExposureData>();
             pass.AddRenderPassData<SkyReflectionAmbientData>();
             pass.AddRenderPassData<DfgData>();
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
-            pass.ReadRtHandle<VelocityData>();
+            pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();
             pass.ReadRtHandle<CameraStencil>();
 

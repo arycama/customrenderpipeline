@@ -5,7 +5,6 @@
 #include "../../Exposure.hlsl"
 
 Texture2D<float4> History;
-Texture2D<float3> Input;
 Texture2D<float> InputVelocityMagnitudeHistory, HistoryWeight;
 
 cbuffer Properties
@@ -52,7 +51,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 		uint2 centerCoord = (uint2)position.xy;
 	#endif
 
-	float2 velocity = Velocity[centerCoord];
+	float2 velocity = CameraVelocity[centerCoord];
 	float2 historyUv = uv - velocity;
 	
 	float2 f = frac(historyUv * ViewSize - 0.5);
@@ -80,7 +79,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 		[unroll]
 		for (int x = -1; x <= 1; x++, i++)
 		{
-			float3 color = Rec2020ToICtCp(Input[clamp(centerCoord + int2(x, y), 0, MaxScreenSize)] * PaperWhite);
+			float3 color = Rec2020ToICtCp(CameraTarget[clamp(centerCoord + int2(x, y), 0, MaxScreenSize)] * PaperWhite);
 			
 			#ifdef UPSCALE
 				float _BlendSharpness = 0.5;
@@ -124,7 +123,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	minValue = max(minValue, mean - stdDev);
 	maxValue = min(maxValue, mean + stdDev);
 	
-	uint stencil = Stencil[position.xy].g;
+	uint stencil = CameraStencil[position.xy].g;
 	bool isResponsive = stencil & 64;
 	
 	if (_HasHistory && all(saturate(historyUv) == historyUv))
@@ -156,7 +155,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	
 	FragmentOutput output;
 	output.result = float4(ICtCpToRec2020(result.rgb) / PaperWhite, 1.0);
-	//output.result.rgb = Input[position.xy];
+	//output.result.rgb = CameraTarget[position.xy];
 	output.history = float4(result.rgb, 1.0);
 	output.historyWeight = result.a;
 	return output;

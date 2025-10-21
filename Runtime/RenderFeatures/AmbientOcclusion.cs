@@ -57,7 +57,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 				pass.WriteTexture(result, "HitResult");
 
 				pass.ReadRtHandle<CameraDepth>();
-				pass.ReadRtHandle<NormalRoughnessData>();
+				pass.ReadRtHandle<GBufferNormalRoughness>();
 				pass.AddRenderPassData<ViewData>();
 				pass.AddRenderPassData<FrameData>();
 
@@ -78,7 +78,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 				pass.WriteTexture(result);
 
 				pass.ReadRtHandle<CameraDepth>();
-				pass.ReadRtHandle<NormalRoughnessData>();
+				pass.ReadRtHandle<GBufferNormalRoughness>();
 				pass.AddRenderPassData<FrameData>();
 				pass.AddRenderPassData<ViewData>();
 
@@ -105,10 +105,10 @@ public partial class AmbientOcclusion : CameraRenderFeature
 
 			pass.AddRenderPassData<FrameData>();
 			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<VelocityData>();
+			pass.ReadRtHandle<CameraVelocity>();
 			pass.AddRenderPassData<TemporalAAData>();
-			pass.ReadRtHandle<PreviousVelocity>();
-			pass.ReadRtHandle<PreviousDepth>();
+			pass.ReadRtHandle<PreviousCameraVelocity>();
+			pass.ReadRtHandle<PreviousCameraDepth>();
 
 			pass.SetRenderFunction((command, pass) =>
 			{
@@ -123,7 +123,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 			pass.Initialize(material, 2);
 			pass.WriteTexture(output);
 			pass.ReadTexture("Input", current);
-			pass.ReadRtHandle<BentNormalOcclusionData>();
+			pass.ReadRtHandle<GBufferBentNormalOcclusion>();
 			pass.AddRenderPassData<TemporalAAData>();
 
 			pass.SetRenderFunction((command, pass) =>
@@ -133,7 +133,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 			});
 		}
 
-		renderGraph.SetRTHandle<BentNormalOcclusionData>(output);
+		renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(output);
 
 		renderGraph.AddProfileEndPass("Ambient Occlusion");
 	}

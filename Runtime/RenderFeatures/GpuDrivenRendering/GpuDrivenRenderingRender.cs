@@ -38,11 +38,11 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 				pass.UseProfiler = false;
 
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-				pass.WriteTexture(renderGraph.GetRTHandle<AlbedoMetallicData>());
-				pass.WriteTexture(renderGraph.GetRTHandle<NormalRoughnessData>());
-				pass.WriteTexture(renderGraph.GetRTHandle<BentNormalOcclusionData>());
+				pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
+				pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
+				pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 				pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
-				pass.WriteTexture(renderGraph.GetRTHandle<VelocityData>());
+				pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
 				pass.AddRenderPassData<AutoExposureData>();
 				pass.AddRenderPassData<TemporalAAData>();
 				pass.AddRenderPassData<AtmospherePropertiesAndTables>();

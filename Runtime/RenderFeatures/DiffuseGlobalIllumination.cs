@@ -32,10 +32,10 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
 
         var tempResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
         var hitResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
-        var previousFrame = renderGraph.GetRTHandle<PreviousColor>().handle;
+        var previousFrame = renderGraph.GetRTHandle<PreviousCameraTarget>().handle;
 
         var depth = renderGraph.GetRTHandle<CameraDepth>().handle;
-        var normalRoughness = renderGraph.GetRTHandle<NormalRoughnessData>().handle;
+        var normalRoughness = renderGraph.GetRTHandle<GBufferNormalRoughness>().handle;
         if (settings.UseRaytracing)
         {
             // Need to set some things as globals so that hit shaders can access them..
@@ -59,8 +59,8 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
                 pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFov());
                 pass.WriteTexture(tempResult, "HitColor");
                 pass.WriteTexture(hitResult, "HitResult");
-				pass.ReadRtHandle<NormalRoughnessData>();
-				pass.ReadRtHandle<PreviousColor>();
+				pass.ReadRtHandle<GBufferNormalRoughness>();
+				pass.ReadRtHandle<PreviousCameraTarget>();
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<AutoExposureData>();
@@ -87,12 +87,12 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<ViewData>();
                 pass.AddRenderPassData<FrameData>();
-                pass.ReadRtHandle<BentNormalOcclusionData>();
-                pass.ReadRtHandle<VelocityData>();
-                pass.ReadRtHandle<HiZMinDepthData>();
+                pass.ReadRtHandle<GBufferBentNormalOcclusion>();
+                pass.ReadRtHandle<CameraVelocity>();
+                pass.ReadRtHandle<HiZMinDepth>();
                 pass.ReadRtHandle<CameraDepth>();
-				pass.ReadRtHandle<NormalRoughnessData>();
-				pass.ReadRtHandle<PreviousColor>();
+				pass.ReadRtHandle<GBufferNormalRoughness>();
+				pass.ReadRtHandle<PreviousCameraTarget>();
 
 				pass.SetRenderFunction((command, pass) =>
                 {
@@ -100,7 +100,7 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
                     pass.SetFloat("_MaxSteps", settings.MaxSamples);
                     pass.SetFloat("_Thickness", settings.Thickness);
                     pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(camera.scaledPixelWidth, camera.scaledPixelHeight) - 1);
-                    pass.SetVector("_PreviousColorScaleLimit", pass.GetScaleLimit2D(previousFrame));
+                    pass.SetVector("PreviousCameraTargetScaleLimit", pass.GetScaleLimit2D(previousFrame));
                     pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * settings.ConeAngle * Mathf.Deg2Rad) * (camera.scaledPixelHeight / camera.TanHalfFov() * 0.5f));
                 });
             }
@@ -126,11 +126,11 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             pass.AddRenderPassData<AutoExposureData>();
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
-            pass.ReadRtHandle<BentNormalOcclusionData>();
-            pass.ReadRtHandle<VelocityData>();
+            pass.ReadRtHandle<GBufferBentNormalOcclusion>();
+            pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();
             pass.ReadRtHandle<CameraStencil>();
-			pass.ReadRtHandle<NormalRoughnessData>();
+			pass.ReadRtHandle<GBufferNormalRoughness>();
 
             pass.SetRenderFunction((command, pass) =>
             {
@@ -165,11 +165,11 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
-            pass.ReadRtHandle<BentNormalOcclusionData>();
-            pass.ReadRtHandle<VelocityData>();
+            pass.ReadRtHandle<GBufferBentNormalOcclusion>();
+            pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();
             pass.ReadRtHandle<CameraStencil>();
-			pass.ReadRtHandle<NormalRoughnessData>();
+			pass.ReadRtHandle<GBufferNormalRoughness>();
 
 			pass.SetRenderFunction((command, pass) =>
             {

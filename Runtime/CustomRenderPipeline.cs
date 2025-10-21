@@ -159,17 +159,17 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			renderGraph.SetRTHandle<CameraDepth>(cameraDepth, subElement: RenderTextureSubElement.Depth);
 			renderGraph.SetRTHandle<CameraStencil>(cameraDepth, subElement: RenderTextureSubElement.Stencil);
 
-			renderGraph.SetRTHandle<PreviousColor>(previousScene);
-			renderGraph.SetRTHandle<PreviousVelocity>(previousVelocity);
+			renderGraph.SetRTHandle<PreviousCameraTarget>(previousScene);
+			renderGraph.SetRTHandle<PreviousCameraVelocity>(previousVelocity);
 
-			renderGraph.SetRTHandle<AlbedoMetallicData>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<NormalRoughnessData>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<BentNormalOcclusionData>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<VelocityData>(velocity);
+			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<CameraVelocity>(velocity);
 
 			var (depthCopy, previousDepthCopy, depthCopyCreated) = cameraDepthCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-			renderGraph.SetRTHandle<PreviousDepth>(previousDepthCopy);
-			renderGraph.SetRTHandle<DepthCopyData>(depthCopy, subElement: RenderTextureSubElement.Depth);
+			renderGraph.SetRTHandle<PreviousCameraDepth>(previousDepthCopy);
+			renderGraph.SetRTHandle<DepthCopy>(depthCopy, subElement: RenderTextureSubElement.Depth);
 		}),
 
 		new TerrainViewData(renderGraph, terrainSystem),
@@ -182,9 +182,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 			pass.Initialize("Deferred", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-			pass.WriteTexture(renderGraph.GetRTHandle<AlbedoMetallicData>());
-			pass.WriteTexture(renderGraph.GetRTHandle<NormalRoughnessData>());
-			pass.WriteTexture(renderGraph.GetRTHandle<BentNormalOcclusionData>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 
 			pass.AddRenderPassData<FrameData>();
@@ -200,11 +200,11 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 			pass.Initialize("MotionVectors", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.MotionVectors, false);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-			pass.WriteTexture(renderGraph.GetRTHandle<AlbedoMetallicData>());
-			pass.WriteTexture(renderGraph.GetRTHandle<NormalRoughnessData>());
-			pass.WriteTexture(renderGraph.GetRTHandle<BentNormalOcclusionData>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
-			pass.WriteTexture(renderGraph.GetRTHandle<VelocityData>());
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
 
 			pass.AddRenderPassData<FrameData>();
 			pass.AddRenderPassData<ViewData>();
@@ -220,11 +220,11 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 			pass.Initialize("GrassVelocity", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, false);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-			pass.WriteTexture(renderGraph.GetRTHandle<AlbedoMetallicData>());
-			pass.WriteTexture(renderGraph.GetRTHandle<NormalRoughnessData>());
-			pass.WriteTexture(renderGraph.GetRTHandle<BentNormalOcclusionData>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
-			pass.WriteTexture(renderGraph.GetRTHandle<VelocityData>());
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
 
 			pass.AddRenderPassData<FrameData>();
 			pass.AddRenderPassData<ViewData>();
@@ -238,7 +238,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
 			using var pass = renderGraph.AddRenderPass<GenericRenderPass>("HiZ Read Temp");
-			pass.ReadRtHandle<HiZMaxDepthData>();
+			pass.ReadRtHandle<HiZMaxDepth>();
 		}),
 
 		new GpuDrivenRenderingRender(gpuDrivenRenderer, renderGraph),
@@ -254,10 +254,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
 			var decalAlbedo = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true, clearFlags: RTClearFlags.Color);
-			renderGraph.SetRTHandle<DecalAlbedoData>(decalAlbedo);
+			renderGraph.SetRTHandle<DecalAlbedo>(decalAlbedo);
 
 			var decalNormal = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true, clearFlags: RTClearFlags.Color);
-			renderGraph.SetRTHandle<DecalNormalData>(decalNormal);
+			renderGraph.SetRTHandle<DecalNormal>(decalNormal);
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
 
@@ -272,8 +272,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.AddRenderPassData<ViewData>();
 			pass.AddRenderPassData<AutoExposureData>();
 			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<AlbedoMetallicData>();
-			pass.ReadRtHandle<NormalRoughnessData>();
+			pass.ReadRtHandle<GBufferAlbedoMetallic>();
+			pass.ReadRtHandle<GBufferNormalRoughness>();
 			pass.AddRenderPassData<DfgData>();
 		}),
 
@@ -286,9 +286,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
             using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Copy Depth Texture"))
 			{
 				pass.ReadTexture("", renderGraph.GetRTHandle<CameraDepth>());
-				pass.WriteTexture(renderGraph.GetRTHandle<DepthCopyData>());
+				pass.WriteTexture(renderGraph.GetRTHandle<DepthCopy>());
 
-				pass.SetRenderFunction((renderGraph.GetRTHandle<CameraDepth>().handle, renderGraph.GetRTHandle<DepthCopyData>().handle), (command, pass, data) =>
+				pass.SetRenderFunction((renderGraph.GetRTHandle<CameraDepth>().handle, renderGraph.GetRTHandle<DepthCopy>().handle), (command, pass, data) =>
 				{
 					command.CopyTexture(pass.GetRenderTexture(data.Item1), pass.GetRenderTexture(data.Item2));
 				});
@@ -297,7 +297,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new WaterRenderer(renderGraph, asset.OceanSettings),
 
-		new CameraVelocity(renderGraph),
+		new GenerateCameraVelocity(renderGraph),
 
 		// Depth Processing
 		new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Min),

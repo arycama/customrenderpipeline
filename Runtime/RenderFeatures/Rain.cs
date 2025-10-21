@@ -107,7 +107,7 @@ public class Rain : CameraRenderFeature
 			pass.AddRenderPassData<FrameData>();
 			pass.AddRenderPassData<ViewData>();
 			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<PreviousColor>();
+			pass.ReadRtHandle<PreviousCameraTarget>();
 			pass.AddRenderPassData<EnvironmentData>();
 			pass.AddRenderPassData<LightingData>();
 

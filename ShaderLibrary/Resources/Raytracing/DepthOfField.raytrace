@@ -22,7 +22,7 @@ void MissShader(inout RayPayload payload : SV_RayPayload)
 void RayGeneration()
 {
 	float focusDistance = _FocusDistance;
-	//focusDistance = LinearEyeDepth(Depth[_ScaledResolution.xy / 2]);
+	//focusDistance = LinearEyeDepth(CameraDepth[_ScaledResolution.xy / 2]);
 
 	uint2 position = DispatchRaysIndex().xy;
 	

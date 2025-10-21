@@ -10,9 +10,9 @@
 // For ssr/ssgi debug only
 #include "../Lighting.hlsl"
 
-Texture2D<float3> Input, Bloom;
+Texture2D<float3> CameraBloom;
 float IsSceneView, ColorGamut, Tonemap, IsPreview;
-float4 BloomScaleLimit, Bloom_TexelSize, InputScaleLimit;
+float4 CameraBloomScaleLimit, CameraBloom_TexelSize, CameraTargetScaleLimit;
 float BloomStrength, MinLuminance, MaxLuminance;
 float4x4 RgbToLmsr, LmsToRgb;
 float Purkinje;
@@ -62,19 +62,19 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	if (!IsSceneView && !IsPreview)
 		uv.y = 1 - uv.y;
 
-	float3 color = Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv, InputScaleLimit));
+	float3 color = CameraTarget.Sample(LinearClampSampler, ClampScaleTextureUv(uv, CameraTargetScaleLimit));
 	
-	float3 bloom = Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(-1, 1), BloomScaleLimit)) * 0.0625;
-	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(0, 1), BloomScaleLimit)) * 0.125;
-	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(1, 1), BloomScaleLimit)) * 0.0625;
+	float3 bloom = CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, 1), CameraBloomScaleLimit)) * 0.0625;
+	bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, 1), CameraBloomScaleLimit)) * 0.125;
+	bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, 1), CameraBloomScaleLimit)) * 0.0625;
 
-	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(-1, 0), BloomScaleLimit)) * 0.125;
-	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(0, 0), BloomScaleLimit)) * 0.25;
-	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(1, 0), BloomScaleLimit)) * 0.125;
+	bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, 0), CameraBloomScaleLimit)) * 0.125;
+	bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, 0), CameraBloomScaleLimit)) * 0.25;
+	bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, 0), CameraBloomScaleLimit)) * 0.125;
 
-	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(-1, -1), BloomScaleLimit)) * 0.0625;
-	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(0, -1), BloomScaleLimit)) * 0.125;
-	bloom += Bloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Bloom_TexelSize.xy * float2(1, -1), BloomScaleLimit)) * 0.0625;
+	bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, -1), CameraBloomScaleLimit)) * 0.0625;
+	bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, -1), CameraBloomScaleLimit)) * 0.125;
+	bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, -1), CameraBloomScaleLimit)) * 0.0625;
 	
 	color = lerp(color, bloom, BloomStrength);
 	

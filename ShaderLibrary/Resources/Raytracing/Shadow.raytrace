@@ -18,11 +18,11 @@ void MissShader(inout RayPayloadVisibility payload : SV_RayPayload)
 void RayGeneration()
 {
 	uint2 position = DispatchRaysIndex().xy;
-	float depth = Depth[position];
+	float depth = CameraDepth[position];
 	if(depth == 0.0)
 		return;
 		
-	float4 normalRoughness = NormalRoughness[position];
+	float4 normalRoughness = GBufferNormalRoughness[position];
 	float2 u = Noise2D(position);
 	
 	float3 worldPosition = PixelToWorldPosition(float3(position + 0.5, depth));

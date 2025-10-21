@@ -89,10 +89,10 @@ public partial class Sky : CameraRenderFeature
 			pass.AddRenderPassData<TemporalAAData>();
 			pass.AddRenderPassData<CloudRenderResult>();
 			pass.AddRenderPassData<AutoExposureData>();
-			pass.ReadRtHandle<PreviousDepth>();
-			pass.ReadRtHandle<PreviousVelocity>();
+			pass.ReadRtHandle<PreviousCameraDepth>();
+			pass.ReadRtHandle<PreviousCameraVelocity>();
 			pass.AddRenderPassData<ViewData>();
-			pass.ReadRtHandle<VelocityData>();
+			pass.ReadRtHandle<CameraVelocity>();
 			pass.ReadRtHandle<CameraDepth>();
 			pass.AddRenderPassData<VolumetricLighting.Result>();
 

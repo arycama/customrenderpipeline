@@ -10,7 +10,6 @@
 static const uint HistogramBins = 256;
 static const uint SqrtHistogramBins = sqrt(HistogramBins);
 
-Texture2D<float3> Input;
 Texture2D<float> ExposureCompensationTexture;
 RWStructuredBuffer<uint> LuminanceHistogram;
 RWStructuredBuffer<float4> LuminanceOutput;
@@ -42,7 +41,7 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
     
 	if (all(threadId <= ViewSizeMinusOne))
 	{
-		float3 color = Input[threadId];
+		float3 color = CameraTarget[threadId];
 		float luminance = Rec2020Luminance(color) * RcpExposure;
 		
 		if (IsInfOrNaN(luminance))

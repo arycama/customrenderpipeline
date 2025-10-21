@@ -35,7 +35,7 @@ public class WaterRenderer : WaterRendererBase
 
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>().handle);
             pass.WriteTexture(oceanRenderResult, RenderBufferLoadAction.DontCare);
-            pass.WriteTexture(renderGraph.GetRTHandle<VelocityData>().handle);
+            pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>().handle);
             pass.WriteTexture(waterTriangleNormal, RenderBufferLoadAction.DontCare);
 
             pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
