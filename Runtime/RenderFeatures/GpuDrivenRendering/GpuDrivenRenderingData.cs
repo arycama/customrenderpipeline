@@ -26,11 +26,11 @@ public struct GpuDrivenRenderingData : IRenderPassData
 		this.rendererLodIndices = rendererLodIndices;
 	}
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

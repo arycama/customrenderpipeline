@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
-public class IndirectComputeRenderPass : BaseComputeRenderPass<IndirectComputeRenderPass>
+public class IndirectComputeRenderPass : BaseComputeRenderPass
 {
 	private uint argsOffset;
 	private ResourceHandle<GraphicsBuffer> indirectBuffer;
@@ -29,16 +29,5 @@ public class IndirectComputeRenderPass : BaseComputeRenderPass<IndirectComputeRe
 			Command.DisableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
 
 		keywords.Clear();
-	}
-
-	protected override void ExecuteRenderPassBuilder()
-	{
-		Assert.IsFalse(hasDefault && hasData);
-
-		if (hasDefault)
-			renderGraphBuilderDefault.Execute(Command, this);
-
-		if (hasData)
-			renderGraphBuilder.Execute(Command, this);
 	}
 }

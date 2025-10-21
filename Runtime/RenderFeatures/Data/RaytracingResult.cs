@@ -14,12 +14,12 @@ public struct RaytracingResult : IRenderPassData
 		DistantBias = distantBias;
 	}
 
-	public readonly void SetInputs(RenderPassBase pass)
+	public readonly void SetInputs(RenderPass pass)
 	{
 		// TODO: RTAS input handling
 	}
 
-	public readonly void SetProperties(RenderPassBase pass, CommandBuffer command)
+	public readonly void SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

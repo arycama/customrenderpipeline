@@ -12,12 +12,12 @@ public readonly struct ScreenSpaceReflectionResult : IRenderPassData
         this.intensity = intensity;
     }
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
         pass.ReadTexture("ScreenSpaceReflections", ScreenSpaceReflections);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 		pass.SetVector("ScreenSpaceReflectionsScaleLimit", pass.GetScaleLimit2D(ScreenSpaceReflections));
 		pass.SetFloat("SpecularGiStrength", intensity);

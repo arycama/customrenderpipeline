@@ -15,7 +15,7 @@ public readonly struct DfgData : IRenderPassData
 		this.specularOcclusion = specularOcclusion;
 	}
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture("PrecomputedDfg", precomputeDfg);
 		pass.ReadTexture("DirectionalAlbedo", directionalAlbedo);
@@ -25,7 +25,7 @@ public readonly struct DfgData : IRenderPassData
 		pass.ReadTexture("SpecularOcclusion", specularOcclusion);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

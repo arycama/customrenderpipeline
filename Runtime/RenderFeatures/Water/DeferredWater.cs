@@ -64,8 +64,8 @@ public class DeferredWater : CameraRenderFeature
 			pass.SetRenderFunction((command, pass) =>
             {
                 var material = settings.Material;
-                pass.SetVector("_Color", material.GetColor("_Color").linear);
-                pass.SetVector("_Extinction", material.GetColor("_Extinction"));
+                pass.SetVector("_Color", material.GetColor("_Color").LinearFloat3());
+                pass.SetVector("_Extinction", material.GetColor("_Extinction").Float3());
                 pass.SetFloat("_WaterMieFactor", material.GetFloat("_MieFactor"));
                 pass.SetFloat("_WaterMiePhase", material.GetFloat("_MiePhase"));
 
@@ -149,11 +149,11 @@ public class DeferredWater : CameraRenderFeature
 
 				pass.SetRenderFunction((command, pass) =>
                 {
-                    pass.SetVector("_Extinction", settings.Material.GetColor("_Extinction"));
+                    pass.SetVector("_Extinction", settings.Material.GetColor("_Extinction").Float3());
 
                     var material = settings.Material;
-                    pass.SetVector("_Color", material.GetColor("_Color").linear);
-                    pass.SetVector("_Extinction", material.GetColor("_Extinction"));
+                    pass.SetVector("_Color", material.GetColor("_Color").LinearFloat3());
+                    pass.SetVector("_Extinction", material.GetColor("_Extinction").Float3());
                 });
             }
 
@@ -202,8 +202,8 @@ public class DeferredWater : CameraRenderFeature
                 pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
                 pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(history));
 
-                pass.SetVector("_Color", settings.Material.GetColor("_Color").linear);
-                pass.SetVector("_Extinction", settings.Material.GetColor("_Extinction"));
+                pass.SetVector("_Color", settings.Material.GetColor("_Color").LinearFloat3());
+                pass.SetVector("_Extinction", settings.Material.GetColor("_Extinction").Float3());
             });
         }
     }

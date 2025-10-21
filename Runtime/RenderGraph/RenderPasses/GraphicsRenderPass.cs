@@ -5,7 +5,7 @@ using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 using static Math;
 
-public abstract class        GraphicsRenderPass : RenderPass<GraphicsRenderPass>
+public abstract class GraphicsRenderPass : RenderPass
 {
 	private readonly List<(ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction)> colorTargets = new();
 	private (ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction) depthBuffer = (new ResourceHandle<RenderTexture>(-1), RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
@@ -206,16 +206,5 @@ public abstract class        GraphicsRenderPass : RenderPass<GraphicsRenderPass>
 		renderTargetFlags = RenderTargetFlags.None;
 		DepthSlice = -1;
 		MipLevel = 0;
-	}
-
-	protected override void ExecuteRenderPassBuilder()
-	{
-		Assert.IsFalse(hasDefault && hasData);
-
-		if (hasDefault)
-			renderGraphBuilderDefault.Execute(Command, this);
-
-		if (hasData)
-			renderGraphBuilder.Execute(Command, this);
 	}
 }

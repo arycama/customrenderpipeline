@@ -44,13 +44,13 @@ public class ClusteredLightCulling : CameraRenderFeature
 			this.tileSize = tileSize;
 		}
 
-		public void SetInputs(RenderPassBase pass)
+		public void SetInputs(RenderPass pass)
 		{
 			pass.ReadTexture("LightClusterIndices", lightClusterIndices);
 			pass.ReadBuffer("LightClusterList", lightList);
 		}
 
-		public void SetProperties(RenderPassBase pass, CommandBuffer command)
+		public void SetProperties(RenderPass pass, CommandBuffer command)
 		{
 			pass.SetFloat("ClusterScale", clusterScale);
 			pass.SetFloat("ClusterBias", clusterBias);

@@ -3,7 +3,7 @@ using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 /// <summary> Has no specific functionality but can be used as a general wrapper around render functionality </summary>
-public class GenericRenderPass : RenderPass<GenericRenderPass>
+public class GenericRenderPass : RenderPass
 {
 	public void WriteTexture(ResourceHandle<RenderTexture> rtHandle)
 	{
@@ -21,7 +21,7 @@ public class GenericRenderPass : RenderPass<GenericRenderPass>
 		Command.SetGlobalBuffer(propertyName, GetBuffer(buffer));
 	}
 
-	public override void SetVector(int propertyName, Vector4 value)
+	public override void SetVector(int propertyName, Float4 value)
 	{
 		Command.SetGlobalVector(propertyName, value);
 	}
@@ -45,17 +45,6 @@ public class GenericRenderPass : RenderPass<GenericRenderPass>
 		Command.SetGlobalInt(propertyName, value);
 	}
 
-	protected override void ExecuteRenderPassBuilder()
-	{
-		Assert.IsFalse(hasDefault && hasData);
-
-		if (hasDefault)
-			renderGraphBuilderDefault.Execute(Command, this);
-
-		if (hasData)
-			renderGraphBuilder.Execute(Command, this);
-	}
-
 	protected override void Execute()
 	{
 		// Does nothing (Eventually could do a command.setglobalbuffer or something?)
@@ -77,9 +66,5 @@ public class GenericRenderPass : RenderPass<GenericRenderPass>
 	public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
 	{
 		Command.SetGlobalMatrixArray(propertyName, value);
-	}
-
-	protected override void SetupTargets()
-	{
 	}
 }

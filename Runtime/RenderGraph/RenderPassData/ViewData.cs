@@ -10,12 +10,12 @@ public readonly struct ViewData : IRenderPassData
 		this.buffer = buffer;
 	}
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
 		pass.ReadBuffer("ViewData", buffer);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

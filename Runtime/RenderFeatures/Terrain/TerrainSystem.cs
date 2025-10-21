@@ -261,7 +261,7 @@ public class TerrainSystem : FrameRenderFeature
 				var height = terrainData.size.y;
 				pass.SetInt("MaxWidth", terrainData.heightmapResolution - 1);
 				pass.SetInt("MaxHeight", terrainData.heightmapResolution - 1);
-				pass.SetVector("Scale", new Vector2(height / (8f * scale.x), height / (8f * scale.z)));
+				pass.SetVector("Scale", new Float2(height / (8f * scale.x), height / (8f * scale.z)));
 			});
 		}
 
@@ -361,10 +361,10 @@ public class TerrainSystem : FrameRenderFeature
 			pass.SetRenderFunction((command, pass) =>
 			{
 				pass.SetInt("LayerCount", terrainData.alphamapLayers);
-				pass.SetVector("TerrainSize", terrain.terrainData.size);
+				pass.SetVector("TerrainSize", (Float3)terrain.terrainData.size);
 				pass.SetInt("TotalLayers", terrainLayers.Count);
 				pass.SetInt("TextureCount", terrainData.alphamapLayers);
-				pass.SetVector("PositionOffset", Vector2.zero);
+				pass.SetVector("PositionOffset", Float2.Zero);
 
 				//if (texelRegion.HasValue)
 				//{
@@ -420,8 +420,8 @@ public class TerrainSystem : FrameRenderFeature
 
 					var kmaxHeight = 32766.0f / 65535.0f;
 					pass.SetFloat("TerrainHeightmapScaleY", terrainData.heightmapScale.y / kmaxHeight);
-					pass.SetVector("TerrainHeightmapScale", terrainData.heightmapScale);
-					pass.SetVector("TerrainSize", terrainData.size);
+					pass.SetVector("TerrainHeightmapScale", (Float3)terrainData.heightmapScale);
+					pass.SetVector("TerrainSize", (Float3)terrainData.size);
 
 					//if (texelRegion.HasValue)
 					//{

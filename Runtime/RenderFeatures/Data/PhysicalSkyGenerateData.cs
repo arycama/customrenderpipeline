@@ -66,7 +66,7 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
                 pass.SetVector("_ScaleOffset", scaleOffset);
                 pass.SetFloat("_TransmittanceWidth", settings.TransmittanceWidth);
                 pass.SetFloat("_TransmittanceHeight", settings.TransmittanceHeight);
-				pass.SetVector("SkyLuminanceSize", new Vector2(settings.LuminanceWidth, settings.LuminanceHeight));
+				pass.SetVector("SkyLuminanceSize", new Float2(settings.LuminanceWidth, settings.LuminanceHeight));
             });
 		}
 
@@ -87,9 +87,9 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
             {
                 pass.SetFloat("_Samples", settings.CdfSamples);
                 pass.SetFloat("_ColorChannelScale", (settings.CdfWidth - 1.0f) / (settings.CdfWidth / 3.0f));
-                pass.SetVector("_SkyCdfSize", new Vector2(settings.CdfWidth, settings.CdfHeight));
-                pass.SetVector("_CdfSize", new Vector2(settings.CdfWidth, settings.CdfHeight));
-				pass.SetVector("SkyLuminanceSize", new Vector2(settings.LuminanceWidth, settings.LuminanceHeight));
+                pass.SetVector("_SkyCdfSize", new Float2(settings.CdfWidth, settings.CdfHeight));
+                pass.SetVector("_CdfSize", new Float2(settings.CdfWidth, settings.CdfHeight));
+				pass.SetVector("SkyLuminanceSize", new Float2(settings.LuminanceWidth, settings.LuminanceHeight));
             });
         }
 
@@ -127,7 +127,7 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
         }
 
         // Specular convolution
-        renderGraph.SetResource(new SkyReflectionAmbientData(cdf, skyLuminance, weightedDepth, new Vector2(settings.LuminanceWidth, settings.LuminanceHeight), new Vector2(settings.CdfWidth, settings.CdfHeight)));
+        renderGraph.SetResource(new SkyReflectionAmbientData(cdf, skyLuminance, weightedDepth, new Float2(settings.LuminanceWidth, settings.LuminanceHeight), new Float2(settings.CdfWidth, settings.CdfHeight)));
 
 		renderGraph.AddProfileEndPass("Sky Precompute");
 	}

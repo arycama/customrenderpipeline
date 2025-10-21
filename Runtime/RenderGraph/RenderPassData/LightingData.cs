@@ -22,14 +22,14 @@ public readonly struct LightingData : IRenderPassData
 		this.directionalCascadeSizes = directionalCascadeSizes;
 	}
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
 		pass.ReadBuffer("LightingData", lightingData);
 		pass.ReadBuffer("DirectionalShadowMatrices", directionalShadowMatrices);
 		pass.ReadBuffer("DirectionalCascadeSizes", directionalCascadeSizes);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

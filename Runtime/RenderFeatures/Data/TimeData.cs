@@ -11,11 +11,11 @@ public readonly struct TimeData : IRenderPassData
 		this.previousTime = previousTime;
 	}
 
-	public void SetInputs(RenderPassBase pass)
+	public void SetInputs(RenderPass pass)
 	{
 	}
 
-	public void SetProperties(RenderPassBase pass, CommandBuffer command)
+	public void SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

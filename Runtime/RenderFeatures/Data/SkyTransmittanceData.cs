@@ -13,12 +13,12 @@ public readonly struct SkyTransmittanceData : IRenderPassData
 		this.height = height;
 	}
 
-	public void SetInputs(RenderPassBase pass)
+	public void SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture("_SkyTransmittance", skyTransmittance);
 	}
 
-	public void SetProperties(RenderPassBase pass, CommandBuffer command)
+	public void SetProperties(RenderPass pass, CommandBuffer command)
 	{
 		pass.SetFloat("_TransmittanceWidth", width);
 		pass.SetFloat("_TransmittanceHeight", height);

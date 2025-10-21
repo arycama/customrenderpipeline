@@ -46,7 +46,7 @@ public class UnderwaterLighting : CameraRenderFeature
                 
             pass.SetRenderFunction((command, pass) =>
             {
-                pass.SetVector("_WaterExtinction", settings.Material.GetColor("_Extinction"));
+                pass.SetVector("_WaterExtinction", settings.Material.GetColor("_Extinction").Float3());
             });
         }
 

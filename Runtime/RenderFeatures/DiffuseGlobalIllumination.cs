@@ -191,12 +191,12 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             this.intensity = intensity;
         }
 
-		void IRenderPassData.SetInputs(RenderPassBase pass)
+		void IRenderPassData.SetInputs(RenderPass pass)
 		{
             pass.ReadTexture("ScreenSpaceGlobalIllumination", ScreenSpaceGlobalIllumination);
 		}
 
-		void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+		void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 		{
 			pass.SetVector("ScreenSpaceGlobalIlluminationScaleLimit", pass.GetScaleLimit2D(ScreenSpaceGlobalIllumination));
 			pass.SetFloat("DiffuseGiStrength", intensity);

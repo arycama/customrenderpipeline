@@ -10,13 +10,13 @@ public struct AtmospherePropertiesAndTables : IRenderPassData
 	private readonly ResourceHandle<RenderTexture> groundAmbient;
 	private readonly ResourceHandle<RenderTexture> skyAmbient;
 
-	private Vector4 transmittanceRemap;
-	private Vector4 multiScatterRemap;
-	private Vector4 skyAmbientRemap;
-	private Vector2 groundAmbientRemap;
-	private Vector2 transmittanceSize;
+	private Float4 transmittanceRemap;
+	private Float4 multiScatterRemap;
+	private Float4 skyAmbientRemap;
+	private Float2 groundAmbientRemap;
+	private Float2 transmittanceSize;
 
-	public AtmospherePropertiesAndTables(ResourceHandle<GraphicsBuffer> atmospherePropertiesBuffer, ResourceHandle<RenderTexture> transmittance, ResourceHandle<RenderTexture> multiScatter, ResourceHandle<RenderTexture> groundAmbient, ResourceHandle<RenderTexture> skyAmbient, Vector4 transmittanceRemap, Vector4 multiScatterRemap, Vector4 skyAmbientRemap, Vector2 groundAmbientRemap, Vector2 transmittanceSize)
+	public AtmospherePropertiesAndTables(ResourceHandle<GraphicsBuffer> atmospherePropertiesBuffer, ResourceHandle<RenderTexture> transmittance, ResourceHandle<RenderTexture> multiScatter, ResourceHandle<RenderTexture> groundAmbient, ResourceHandle<RenderTexture> skyAmbient, Float4 transmittanceRemap, Float4 multiScatterRemap, Float4 skyAmbientRemap, Float2 groundAmbientRemap, Float2 transmittanceSize)
 	{
 		this.atmospherePropertiesBuffer = atmospherePropertiesBuffer;
 		this.transmittance = transmittance;
@@ -30,7 +30,7 @@ public struct AtmospherePropertiesAndTables : IRenderPassData
 		this.transmittanceSize = transmittanceSize;
 	}
 
-	public readonly void SetInputs(RenderPassBase pass)
+	public readonly void SetInputs(RenderPass pass)
 	{
 		pass.ReadBuffer("AtmosphereProperties", atmospherePropertiesBuffer);
 		pass.ReadTexture("_Transmittance", transmittance);
@@ -39,7 +39,7 @@ public struct AtmospherePropertiesAndTables : IRenderPassData
 		pass.ReadTexture("_GroundAmbient", groundAmbient);
 	}
 
-	public readonly void SetProperties(RenderPassBase pass, CommandBuffer command)
+	public readonly void SetProperties(RenderPass pass, CommandBuffer command)
 	{
 		pass.SetVector("_AtmosphereTransmittanceRemap", transmittanceRemap);
 		pass.SetVector("_MultiScatterRemap", multiScatterRemap);

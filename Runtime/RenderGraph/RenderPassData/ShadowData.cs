@@ -14,14 +14,14 @@ public struct ShadowData : IRenderPassData
 		this.spotShadows = spotShadows;
 	}
 
-	public void SetInputs(RenderPassBase pass)
+	public void SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture("DirectionalShadows", directionalShadows);
 		pass.ReadTexture("PointShadows", pointShadows);
 		pass.ReadTexture("SpotShadows", spotShadows);
 	}
 
-	public void SetProperties(RenderPassBase pass, CommandBuffer command)
+	public void SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

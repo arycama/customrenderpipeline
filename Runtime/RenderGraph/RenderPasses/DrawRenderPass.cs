@@ -33,7 +33,7 @@ public abstract class DrawRenderPass : GraphicsRenderPass
 		propertyBlock.SetBuffer(propertyName, GetBuffer(buffer));
 	}
 
-	public override void SetVector(int propertyName, Vector4 value)
+	public override void SetVector(int propertyName, Float4 value)
 	{
 		propertyBlock.SetVector(propertyName, value);
 	}

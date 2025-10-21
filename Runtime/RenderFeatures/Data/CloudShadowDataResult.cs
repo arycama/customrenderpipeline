@@ -20,13 +20,13 @@ public readonly struct CloudShadowDataResult : IRenderPassData
 		this.endHeight = endHeight;
 	}
 
-	public void SetInputs(RenderPassBase pass)
+	public void SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture("_CloudShadow", cloudShadow);
 		pass.ReadBuffer("CloudCoverage", cloudCoverageBuffer);
 	}
 
-	public void SetProperties(RenderPassBase pass, CommandBuffer command)
+	public void SetProperties(RenderPass pass, CommandBuffer command)
 	{
 		pass.SetMatrix("_WorldToCloudShadow", worldToCloudShadow);
 		pass.SetFloat("_CloudShadowDepthInvScale", cloudDepthInvScale);

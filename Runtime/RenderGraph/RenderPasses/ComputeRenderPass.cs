@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
-public class ComputeRenderPass : BaseComputeRenderPass<ComputeRenderPass>
+public class ComputeRenderPass : BaseComputeRenderPass
 {
 	private int xThreads, yThreads, zThreads;
 	private bool normalizedDispatch;
@@ -17,17 +17,6 @@ public class ComputeRenderPass : BaseComputeRenderPass<ComputeRenderPass>
 		this.yThreads = yThreads;
 		this.zThreads = zThreads;
 		this.normalizedDispatch = normalizedDispatch;
-	}
-
-	protected override void ExecuteRenderPassBuilder()
-	{
-		Assert.IsFalse(hasDefault && hasData);
-
-		if (hasDefault)
-			renderGraphBuilderDefault.Execute(Command, this);
-
-		if (hasData)
-			renderGraphBuilder.Execute(Command, this);
 	}
 
 	protected override void Execute()

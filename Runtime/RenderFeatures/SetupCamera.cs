@@ -2,12 +2,12 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using static Math;
 
 public class SetupCamera : CameraRenderFeature
 {
-	private Sky.Settings sky;
+	private readonly Sky.Settings sky;
 	private readonly Dictionary<Camera, (Vector3, Quaternion, Matrix4x4)> previousCameraTransform = new();
-
 	private readonly Dictionary<Camera, double> previousTimeCache = new();
 
 	public SetupCamera(RenderGraph renderGraph, Sky.Settings sky) : base(renderGraph)
@@ -25,11 +25,11 @@ public class SetupCamera : CameraRenderFeature
 		var far = camera.farClipPlane;
 		var aspect = camera.aspect;
 
-		var tanHalfFovY = Mathf.Tan(camera.fieldOfView * Mathf.Deg2Rad * 0.5f);
+		var tanHalfFovY = Tan(0.5f * Radians(camera.fieldOfView));
 		var tanHalfFovX = tanHalfFovY * aspect;
 
-		var viewForward = camera.transform.forward;
-		var viewPosition = (Vector3)camera.cameraToWorldMatrix.GetColumn(3);// camera.transform.position;
+		var viewForward = (Float3)camera.transform.forward;
+		var viewPosition = (Float3)camera.cameraToWorldMatrix.GetColumn(3);// camera.transform.position;
 
 		var cameraToWorld = camera.cameraToWorldMatrix;
 		cameraToWorld.SetColumn(2, -cameraToWorld.GetColumn(2));

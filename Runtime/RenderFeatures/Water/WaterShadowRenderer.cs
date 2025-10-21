@@ -155,6 +155,6 @@ public class WaterShadowRenderer : WaterRendererBase
             });
         }
 
-        renderGraph.SetResource(new WaterShadowResult(waterShadow, shadowMatrix, 0.0f, (float)(maxValue.z - minValue.z), settings.Material.GetVector("_Extinction"), waterIlluminance));
+        renderGraph.SetResource(new WaterShadowResult(waterShadow, shadowMatrix, 0.0f, (float)(maxValue.z - minValue.z), settings.Material.GetColor("_Extinction").Float3(), waterIlluminance));
     }
 }

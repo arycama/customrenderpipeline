@@ -12,12 +12,12 @@ public struct RainTextureResult : IRenderPassData
 		this.size = size;
 	}
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture("RainTexture", rainTexture);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 		pass.SetFloat("RainTextureSize", size);
 	}

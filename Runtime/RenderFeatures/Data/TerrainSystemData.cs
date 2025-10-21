@@ -16,12 +16,12 @@ public readonly struct TerrainSystemData : IRenderPassData
 		this.indexBuffer = indexBuffer;
 	}
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
 		pass.ReadBuffer("", indexBuffer);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

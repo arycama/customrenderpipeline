@@ -12,14 +12,14 @@ public readonly struct CloudRenderResult : IRenderPassData
 		this.cloudDepth = cloudDepth;
 	}
 
-	public void SetInputs(RenderPassBase pass)
+	public void SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture("CloudTexture", cloudTexture);
 		pass.ReadTexture("CloudTransmittanceTexture", cloudTransmittanceTexture);
 		pass.ReadTexture("CloudDepthTexture", cloudDepth);
 	}
 
-	public void SetProperties(RenderPassBase pass, CommandBuffer command)
+	public void SetProperties(RenderPass pass, CommandBuffer command)
 	{
 		pass.SetVector("CloudTextureScaleLimit", pass.GetScaleLimit2D(cloudTexture));
 		pass.SetVector("CloudTransmittanceTextureScaleLimit", pass.GetScaleLimit2D(cloudTransmittanceTexture));

@@ -18,7 +18,7 @@ public readonly struct OceanFftResult : IRenderPassData
         this.oceanBuffer = oceanBuffer;
     }
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture("OceanDisplacement", oceanDisplacement);
 		pass.ReadTexture("OceanDisplacementHistory", oceanDisplacementHistory);
@@ -27,7 +27,7 @@ public readonly struct OceanFftResult : IRenderPassData
 		pass.ReadBuffer("OceanData", oceanBuffer);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

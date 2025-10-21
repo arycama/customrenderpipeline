@@ -2,7 +2,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public abstract class BaseComputeRenderPass<T> : RenderPass<T> where T : RenderPass<T>
+public abstract class BaseComputeRenderPass : RenderPass
 {
 	protected ComputeShader computeShader;
 	protected int kernelIndex;
@@ -41,7 +41,7 @@ public abstract class BaseComputeRenderPass<T> : RenderPass<T> where T : RenderP
 		Command.SetComputeBufferParam(computeShader, kernelIndex, propertyName, GetBuffer(buffer));
 	}
 
-	public override void SetVector(int propertyName, Vector4 value)
+	public override void SetVector(int propertyName, Float4 value)
 	{
 		Command.SetComputeVectorParam(computeShader, propertyName, value);
 	}

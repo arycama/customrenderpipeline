@@ -72,7 +72,7 @@ public class Bloom : CameraRenderFeature
 			var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
 			var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
 
-			pass.SetRenderFunction((new Vector2(1.0f / width, 1.0f / height), rt, settings), static (command, pass, data) =>
+			pass.SetRenderFunction((new Float2(1.0f / width, 1.0f / height), rt, settings), static (command, pass, data) =>
 			{
 				pass.SetVector("RcpResolution", data.Item1);
 				pass.SetVector("InputScaleLimit", pass.GetScaleLimit2D(data.rt));
@@ -110,7 +110,7 @@ public class Bloom : CameraRenderFeature
 			var width = Mathf.Max(1, camera.pixelWidth >> i);
 			var height = Mathf.Max(1, camera.pixelHeight >> i);
 
-			pass.SetRenderFunction((settings, new Vector2(1f / width, 1f / height), input), static (command, pass, data) =>
+			pass.SetRenderFunction((settings, new Float2(1f / width, 1f / height), input), static (command, pass, data) =>
 			{
 				pass.SetFloat("Strength", data.settings.BloomStrength);
 				pass.SetVector("RcpResolution", data.Item2);

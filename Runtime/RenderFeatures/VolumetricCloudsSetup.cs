@@ -42,7 +42,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
                 pass.SetFloat("_WeatherMapH", settings.WeatherMapNoiseParams.H);
                 pass.SetFloat("_WeatherMapOctaves", settings.WeatherMapNoiseParams.Octaves);
                 pass.SetFloat("_WeatherMapFactor", settings.WeatherMapNoiseParams.FractalBound);
-                pass.SetVector("_WeatherMapResolution", (Vector2)settings.WeatherMapResolution);
+                pass.SetVector("_WeatherMapResolution", settings.WeatherMapResolution);
             });
         }
 
@@ -61,7 +61,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
                 pass.SetFloat("_NoiseH", settings.NoiseParams.H);
                 pass.SetFloat("_NoiseOctaves", settings.NoiseParams.Octaves);
                 pass.SetFloat("_NoiseFactor", settings.NoiseParams.FractalBound);
-                pass.SetVector("_NoiseResolution", (Vector3)settings.NoiseResolution);
+                pass.SetVector("_NoiseResolution", settings.NoiseResolution);
 
                 pass.SetFloat("_CellularNoiseFrequency", settings.CellularNoiseParams.Frequency);
                 pass.SetFloat("_CellularNoiseH", settings.CellularNoiseParams.H);
@@ -83,7 +83,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
                 pass.SetFloat("_DetailNoiseH", settings.DetailNoiseParams.H);
                 pass.SetFloat("_DetailNoiseOctaves", settings.DetailNoiseParams.Octaves);
                 pass.SetFloat("_DetailNoiseFactor", settings.DetailNoiseParams.FractalBound);
-                pass.SetVector("_DetailNoiseResolution", (Vector3)settings.DetailNoiseResolution);
+                pass.SetVector("_DetailNoiseResolution", settings.DetailNoiseResolution);
             });
         }
 

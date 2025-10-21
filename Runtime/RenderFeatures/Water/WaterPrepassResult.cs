@@ -1,12 +1,12 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public struct WaterPrepassResult : IRenderPassData
+public readonly struct WaterPrepassResult : IRenderPassData
 {
     private readonly ResourceHandle<RenderTexture> waterNormalFoam, waterTriangleNormal;
-    private Vector3 albedo, extinction;
+    private readonly Float3 albedo, extinction;
 
-    public WaterPrepassResult(ResourceHandle<RenderTexture> waterNormalFoam, ResourceHandle<RenderTexture> waterTriangleNormal, Vector3 albedo, Vector3 extinction)
+    public WaterPrepassResult(ResourceHandle<RenderTexture> waterNormalFoam, ResourceHandle<RenderTexture> waterTriangleNormal, Float3 albedo, Float3 extinction)
     {
         this.waterNormalFoam = waterNormalFoam;
         this.waterTriangleNormal = waterTriangleNormal;
@@ -14,13 +14,13 @@ public struct WaterPrepassResult : IRenderPassData
         this.extinction = extinction;
     }
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	readonly void IRenderPassData.SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture("_WaterNormalFoam", waterNormalFoam);
 		pass.ReadTexture("_WaterTriangleNormal", waterTriangleNormal);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	readonly void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 		pass.SetVector("_WaterAlbedo", albedo);
 		pass.SetVector("_WaterExtinction", extinction);

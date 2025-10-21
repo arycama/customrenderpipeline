@@ -20,12 +20,12 @@ public readonly struct RTHandleData : IRenderPassData
 		scaleLimitPropertyId = Shader.PropertyToID($"{propertyName}ScaleLimit");
 	}
 
-	public void SetInputs(RenderPassBase pass)
+	public void SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture(propertyNameId, handle, mip, subElement);
 	}
 
-	public void SetProperties(RenderPassBase pass, CommandBuffer command)
+	public void SetProperties(RenderPass pass, CommandBuffer command)
 	{
 		pass.SetVector(scaleLimitPropertyId, pass.GetScaleLimit2D(handle));
 	}

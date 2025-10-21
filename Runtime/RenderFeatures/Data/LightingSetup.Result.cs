@@ -14,12 +14,12 @@ public partial class LightingSetup
 			this.pointLightCount = pointLightCount;
 		}
 
-		public void SetInputs(RenderPassBase pass)
+		public void SetInputs(RenderPass pass)
 		{
 			pass.ReadBuffer("PointLights", pointLights);
 		}
 
-		public void SetProperties(RenderPassBase pass, CommandBuffer command)
+		public void SetProperties(RenderPass pass, CommandBuffer command)
 		{
 			pass.SetInt("PointLightCount", pointLightCount);
 		}

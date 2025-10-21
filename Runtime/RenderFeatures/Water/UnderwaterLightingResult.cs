@@ -10,12 +10,12 @@ public readonly struct UnderwaterLightingResult : IRenderPassData
         underwaterLighting = waterNormalFoam;
     }
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
         pass.ReadTexture("_UnderwaterResult", underwaterLighting);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
         pass.SetVector("_UnderwaterResultScaleLimit", pass.GetScaleLimit2D(underwaterLighting));
 	}

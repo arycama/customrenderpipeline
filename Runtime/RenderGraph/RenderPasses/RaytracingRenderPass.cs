@@ -5,7 +5,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 // TODO: Maybe share some cfuncionality with graphics render pass  or compute render pass
-public class RaytracingRenderPass : RenderPass<RaytracingRenderPass>
+public class RaytracingRenderPass : RenderPass
 {
 	private RayTracingShader shader;
 	private string rayGenName, shaderPassName;
@@ -61,7 +61,7 @@ public class RaytracingRenderPass : RenderPass<RaytracingRenderPass>
 			Command.SetRayTracingBufferParam(shader, propertyName, graphicsBuffer);
 	}
 
-	public override void SetVector(int propertyName, Vector4 value)
+	public override void SetVector(int propertyName, Float4 value)
 	{
 		Command.SetRayTracingVectorParam(shader, propertyName, value);
 	}
@@ -143,16 +143,5 @@ public class RaytracingRenderPass : RenderPass<RaytracingRenderPass>
 		}
 
 		colorBindings.Clear();
-	}
-
-	protected override void ExecuteRenderPassBuilder()
-	{
-		Assert.IsFalse(hasDefault && hasData);
-
-		if (hasDefault)
-			renderGraphBuilderDefault.Execute(Command, this);
-
-		if (hasData)
-			renderGraphBuilder.Execute(Command, this);
 	}
 }

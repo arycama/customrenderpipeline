@@ -16,8 +16,8 @@ public partial class AutoExposure
 
 		[field: Header("Metering")]
 		[field: SerializeField] public MeteringMode MeteringMode { get; private set; } = MeteringMode.Center;
-		[field: SerializeField] public Vector2 ProceduralCenter { get; private set; } = new(0.5f, 0.5f);
-		[field: SerializeField] public Vector2 ProceduralRadii { get; private set; } = new(0.2f, 0.3f);
+		[field: SerializeField] public Float2 ProceduralCenter { get; private set; } = new(0.5f, 0.5f);
+		[field: SerializeField] public Float2 ProceduralRadii { get; private set; } = new(0.2f, 0.3f);
 		[field: SerializeField, Min(0.0f)] public float ProceduralSoftness { get; private set; } = 0.5f;
 
 		[field: Header("Exposure Compensation")]

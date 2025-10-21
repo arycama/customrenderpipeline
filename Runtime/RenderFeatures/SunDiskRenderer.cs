@@ -40,8 +40,8 @@ public class SunDiskRenderer : CameraRenderFeature
 			pass.SetRenderFunction((command, pass) =>
 			{
 				pass.SetFloat("AngularDiameter", settings.SunAngularDiameter);
-				pass.SetVector("Luminance", (Vector3)lightData.light0Color);
-				pass.SetVector("Direction", (Vector3)lightData.light0Direction);
+				pass.SetVector("Luminance", lightData.light0Color);
+				pass.SetVector("Direction", lightData.light0Direction);
 			});
 		}
 	}

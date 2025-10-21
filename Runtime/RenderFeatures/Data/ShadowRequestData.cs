@@ -22,12 +22,12 @@ public struct ShadowRequestData : IRenderPassData
 		ZClip = zClip;
 	}
 
-	public void SetInputs(RenderPassBase pass)
+	public void SetInputs(RenderPass pass)
 	{
 		pass.ReadBuffer("PerCascadeData", perCascadeData);
 	}
 
-	public void SetProperties(RenderPassBase pass, CommandBuffer command)
+	public void SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

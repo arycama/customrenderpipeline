@@ -51,9 +51,9 @@ public class WaterShoreMask : FrameRenderFeature
         lastVersion = version;
         terrain = Terrain.activeTerrain;
 
-        var terrainPosition = terrain.transform.position;
+        var terrainPosition = (Float3)terrain.transform.position;
         var terrainData = terrain.terrainData;
-        var terrainSize = terrainData.size;
+        var terrainSize = (Float3)terrainData.size;
 
         // Seed pixels
         var heightmapResolution = terrainData.heightmapResolution;
@@ -144,8 +144,8 @@ public class WaterShoreMask : FrameRenderFeature
             });
         }
 
-        var scaleOffset = new Vector4(1f / terrainSize.x, 1f / terrainSize.z, -terrainPosition.x / terrainSize.x, -terrainPosition.z / terrainSize.z);
-        renderGraph.SetResource<Result>(new Result(result, resultDataBuffer, scaleOffset, terrainSize, -terrainPosition.y, terrainSize.x), true);
+        var scaleOffset = new Float4(1f / terrainSize.x, 1f / terrainSize.z, -terrainPosition.x / terrainSize.x, -terrainPosition.z / terrainSize.z);
+        renderGraph.SetResource<Result>(new Result(result, resultDataBuffer, scaleOffset, terrainSize.xz, -terrainPosition.y, terrainSize.x), true);
     }
 
     private readonly struct ResultData
@@ -165,11 +165,11 @@ public class WaterShoreMask : FrameRenderFeature
     {
         private readonly ResourceHandle<RenderTexture> shoreDistance;
         private readonly ResourceHandle<GraphicsBuffer> resultDataBuffer;
-        private Vector4 scaleOffset;
-        private Vector2 terrainSize;
+        private Float4 scaleOffset;
+        private Float2 terrainSize;
         private readonly float maxOceanDepth, maxTerrainDistance;
 
-        public Result(ResourceHandle<RenderTexture> shoreDistance, ResourceHandle<GraphicsBuffer> resultDataBuffer, Vector4 scaleOffset, Vector2 terrainSize, float maxOceanDepth, float maxTerrainDistance)
+        public Result(ResourceHandle<RenderTexture> shoreDistance, ResourceHandle<GraphicsBuffer> resultDataBuffer, Float4 scaleOffset, Float2 terrainSize, float maxOceanDepth, float maxTerrainDistance)
         {
             this.shoreDistance = shoreDistance;
             this.resultDataBuffer = resultDataBuffer;
@@ -179,13 +179,13 @@ public class WaterShoreMask : FrameRenderFeature
             this.maxTerrainDistance = maxTerrainDistance;
         }
 
-		void IRenderPassData.SetInputs(RenderPassBase pass)
+		void IRenderPassData.SetInputs(RenderPass pass)
 		{
 			pass.ReadTexture("ShoreDistance", shoreDistance);
 			pass.ReadBuffer("WaterShoreMaskProperties", resultDataBuffer);
 		}
 
-		void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+		void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 		{
 			pass.SetVector("ShoreScaleOffset", scaleOffset);
 			pass.SetVector("ShoreTerrainSize", terrainSize);

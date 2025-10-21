@@ -89,7 +89,7 @@ public partial class Tonemapping : CameraRenderFeature
 			pass.SetMatrix("RgbToLmsr", RgbToLmsr);
 			pass.SetMatrix("LmrToRgb", LmsToRgb);
 			pass.SetFloat("Purkinje", settings.Purkinje ? 1 : 0);
-			pass.SetVector("RodInputStrength", settings.RodColor.linear);
+			pass.SetVector("RodInputStrength", settings.RodColor.LinearFloat3());
 		});
 	}
 

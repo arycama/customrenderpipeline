@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
-public class SetPropertyBlockPass : RenderPass<SetPropertyBlockPass>
+public class SetPropertyBlockPass : RenderPass
 {
 	public readonly MaterialPropertyBlock propertyBlock;
 
@@ -34,7 +34,7 @@ public class SetPropertyBlockPass : RenderPass<SetPropertyBlockPass>
 		propertyBlock.SetBuffer(propertyName, GetBuffer(buffer));
 	}
 
-	public override void SetVector(int propertyName, Vector4 value)
+	public override void SetVector(int propertyName, Float4 value)
 	{
 		propertyBlock.SetVector(propertyName, value);
 	}
@@ -79,20 +79,5 @@ public class SetPropertyBlockPass : RenderPass<SetPropertyBlockPass>
 	public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
 	{
 		propertyBlock.SetMatrixArray(propertyName, value);
-	}
-
-	protected override void SetupTargets()
-	{
-	}
-
-	protected override void ExecuteRenderPassBuilder()
-	{
-		Assert.IsFalse(hasDefault && hasData);
-
-		if (hasDefault)
-			renderGraphBuilderDefault.Execute(Command, this);
-
-		if (hasData)
-			renderGraphBuilder.Execute(Command, this);
 	}
 }

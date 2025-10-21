@@ -33,7 +33,7 @@ public class ShadowRenderPass : GraphicsRenderPass
 		Command.SetGlobalBuffer(propertyName, GetBuffer(buffer));
 	}
 
-	public override void SetVector(int propertyName, Vector4 value)
+	public override void SetVector(int propertyName, Float4 value)
 	{
 		Command.SetGlobalVector(propertyName, value);
 	}

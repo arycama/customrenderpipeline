@@ -2,6 +2,6 @@ using UnityEngine.Rendering;
 
 public interface IRenderPassData
 {
-	public void SetInputs(RenderPassBase pass);
-	public void SetProperties(RenderPassBase pass, CommandBuffer command);
+	public void SetInputs(RenderPass pass);
+	public void SetProperties(RenderPass pass, CommandBuffer command);
 }

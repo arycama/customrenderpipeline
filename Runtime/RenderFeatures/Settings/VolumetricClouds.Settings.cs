@@ -7,21 +7,21 @@ public partial class VolumetricClouds
     public class Settings
     {
         [field: Header("Weather Map")]
-        [field: SerializeField] public Vector2Int WeatherMapResolution { get; private set; } = new(256, 256);
+        [field: SerializeField] public Int2 WeatherMapResolution { get; private set; } = new(256, 256);
         [field: SerializeField] public float WeatherMapScale { get; private set; } = 32768.0f;
-        [field: SerializeField] public Vector2 WeatherMapSpeed { get; private set; } = Vector2.zero;
+        [field: SerializeField] public Float2 WeatherMapSpeed { get; private set; } = Vector2.zero;
         [field: SerializeField, Range(0.0f, 1.0f)] public float WeatherMapStrength { get; private set; } = 1.0f;
         [field: SerializeField] public FractalNoiseParameters WeatherMapNoiseParams { get; private set; }
 
         [field: Header("Noise Texture")]
-        [field: SerializeField] public Vector3Int NoiseResolution { get; private set; } = new(128, 64, 128);
+        [field: SerializeField] public Int3 NoiseResolution { get; private set; } = new(128, 64, 128);
         [field: SerializeField] public float NoiseScale { get; private set; } = 4096.0f;
         [field: SerializeField, Range(0.0f, 1.0f)] public float NoiseStrength { get; private set; } = 1.0f;
         [field: SerializeField] public FractalNoiseParameters NoiseParams { get; private set; }
         [field: SerializeField] public FractalNoiseParameters CellularNoiseParams { get; private set; }
 
         [field: Header("Detail Noise Texture")]
-        [field: SerializeField] public Vector3Int DetailNoiseResolution { get; private set; } = new(32, 32, 32);
+        [field: SerializeField] public Int3 DetailNoiseResolution { get; private set; } = new(32, 32, 32);
         [field: SerializeField] public float DetailScale { get; private set; } = 512.0f;
         [field: SerializeField, Range(0.0f, 1.0f)] public float DetailStrength { get; private set; } = 1.0f;
         [field: SerializeField] public FractalNoiseParameters DetailNoiseParams { get; private set; }
@@ -56,7 +56,7 @@ public partial class VolumetricClouds
 
         [field: NonSerialized] public int Version { get; private set; }
 
-        public void SetCloudPassData(RenderPassBase pass, float deltaTime)
+        public void SetCloudPassData(RenderPass pass, float deltaTime)
         {
 			// TODO: Cbuffer
             pass.SetFloat("_WeatherMapStrength", WeatherMapStrength);
@@ -79,9 +79,9 @@ public partial class VolumetricClouds
             pass.SetFloat("_Samples", RaySamples);
             pass.SetFloat("_LightSamples", LightSamples);
 
-            pass.SetVector("_NoiseResolution", (Vector3)NoiseResolution);
-            pass.SetVector("_DetailNoiseResolution", (Vector3)DetailNoiseResolution);
-            pass.SetVector("_WeatherMapResolution", (Vector2)WeatherMapResolution);
+            pass.SetVector("_NoiseResolution", NoiseResolution);
+            pass.SetVector("_DetailNoiseResolution", DetailNoiseResolution);
+            pass.SetVector("_WeatherMapResolution", WeatherMapResolution);
 
             pass.SetFloat("_BackScatterPhase", BackScatterPhase);
             pass.SetFloat("_ForwardScatterPhase", ForwardScatterPhase);

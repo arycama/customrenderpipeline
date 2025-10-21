@@ -14,13 +14,13 @@ public partial class VolumetricLighting
             this.volumetricLightingData = volumetricLightingData;
         }
 
-        public readonly void SetInputs(RenderPassBase pass)
+        public readonly void SetInputs(RenderPass pass)
         {
             pass.ReadTexture("VolumetricLighting", volumetricLighting);
 			pass.ReadBuffer("VolumetricLightingData", volumetricLightingData);
         }
 
-        public readonly void SetProperties(RenderPassBase pass, CommandBuffer command)
+        public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
 			pass.SetVector("VolumetricLightScale", pass.GetScale3D(volumetricLighting));
 			pass.SetVector("VolumetricLightMax", pass.GetLimit3D(volumetricLighting));

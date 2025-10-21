@@ -14,12 +14,12 @@ public struct CausticsResult : IRenderPassData
         this.depth = depth;
     }
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
         pass.ReadTexture("OceanCaustics", caustics);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 		pass.SetFloat("CausticsCascade", cascade);
 		pass.SetFloat("CausticsDepth", depth);

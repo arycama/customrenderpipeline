@@ -14,14 +14,14 @@ public readonly struct CloudData : IRenderPassData
 		this.detailNoiseTexture = detailNoiseTexture;
 	}
 
-	public void SetInputs(RenderPassBase pass)
+	public void SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture("_WeatherMap", weatherMap);
 		pass.ReadTexture("_CloudNoise", noiseTexture);
 		pass.ReadTexture("_CloudDetailNoise", detailNoiseTexture);
 	}
 
-	public void SetProperties(RenderPassBase pass, CommandBuffer command)
+	public void SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

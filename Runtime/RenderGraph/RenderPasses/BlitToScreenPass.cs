@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
-public class BlitToScreenPass : RenderPass<BlitToScreenPass>
+public class BlitToScreenPass : RenderPass
 {
 	private readonly MaterialPropertyBlock propertyBlock;
 	private Material material;
@@ -52,7 +52,7 @@ public class BlitToScreenPass : RenderPass<BlitToScreenPass>
 	}
 
 
-	public override void SetVector(int propertyName, Vector4 value)
+	public override void SetVector(int propertyName, Float4 value)
 	{
 		propertyBlock.SetVector(propertyName, value);
 	}
@@ -75,17 +75,6 @@ public class BlitToScreenPass : RenderPass<BlitToScreenPass>
 	public override void SetInt(string propertyName, int value)
 	{
 		propertyBlock.SetInt(propertyName, value);
-	}
-
-	protected override void ExecuteRenderPassBuilder()
-	{
-		Assert.IsFalse(hasDefault && hasData);
-
-		if(hasDefault)
-			renderGraphBuilderDefault.Execute(Command, this);
-
-		if(hasData)
-			renderGraphBuilder.Execute(Command, this);
 	}
 
 	protected override void Execute()

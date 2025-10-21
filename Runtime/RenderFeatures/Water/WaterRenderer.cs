@@ -75,6 +75,6 @@ public class WaterRenderer : WaterRendererBase
             });
         }
 
-        renderGraph.SetResource(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, (Vector4)settings.Material.GetColor("_Color").linear, (Vector4)settings.Material.GetColor("_Extinction")));
+        renderGraph.SetResource(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, settings.Material.GetColor("_Color").LinearFloat3(), settings.Material.GetColor("_Extinction").Float3()));
     }
 }

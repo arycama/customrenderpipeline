@@ -10,10 +10,10 @@ using Object = UnityEngine.Object;
 
 public class RenderGraph : IDisposable
 {
-	private readonly Dictionary<Type, Stack<RenderPassBase>> renderPassPool = new();
+	private readonly Dictionary<Type, Stack<RenderPass>> renderPassPool = new();
 
 	private bool disposedValue;
-	private readonly List<RenderPassBase> renderPasses = new();
+	private readonly List<RenderPass> renderPasses = new();
 
 	private readonly GraphicsBuffer emptyBuffer;
 	private readonly RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
@@ -93,7 +93,7 @@ public class RenderGraph : IDisposable
 		GC.SuppressFinalize(this);
 	}
 
-	public T AddRenderPass<T>(string name) where T : RenderPassBase, new()
+	public T AddRenderPass<T>(string name) where T : RenderPass, new()
 	{
 		if (!renderPassPool.TryGetValue(typeof(T), out var pool))
 		{

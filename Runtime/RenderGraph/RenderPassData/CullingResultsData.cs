@@ -6,12 +6,12 @@ public readonly struct CullingResultsData : IRenderPassData
 
 	public CullingResultsData(CullingResults cullingResults) => this.cullingResults = cullingResults;
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
 
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

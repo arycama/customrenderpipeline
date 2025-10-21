@@ -14,12 +14,12 @@ public readonly struct AutoExposureData : IRenderPassData
         this.paperWhite = maxLuminance;
     }
 
-	public readonly void SetInputs(RenderPassBase pass)
+	public readonly void SetInputs(RenderPass pass)
 	{
 		pass.ReadBuffer("ExposureBuffer", ExposureBuffer);
 	}
 
-	public readonly void SetProperties(RenderPassBase pass, CommandBuffer command)
+	public readonly void SetProperties(RenderPass pass, CommandBuffer command)
 	{
         pass.SetFloat("PaperWhite", paperWhite);
 	}

@@ -12,13 +12,13 @@ public readonly struct EnvironmentData : IRenderPassData
 		this.ambientBuffer = ambientBuffer;
 	}
 
-    readonly void IRenderPassData.SetInputs(RenderPassBase pass)
+    readonly void IRenderPassData.SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture("SkyReflection", skyReflection);
 		pass.ReadBuffer("AmbientShBuffer", ambientBuffer);
 	}
 
-    readonly void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+    readonly void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }

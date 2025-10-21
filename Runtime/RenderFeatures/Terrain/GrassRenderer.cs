@@ -179,8 +179,8 @@ public class GrassRenderer : CameraRenderFeature
 					//terrain.SetMaterialProperties(material);
 
 					pass.SetFloat("BladeCount", bladeCount);
-					pass.SetVector("_TerrainSize", terrain.terrainData.size);
-					pass.SetVector("_TerrainPosition", terrain.GetPosition());
+					pass.SetVector("_TerrainSize", (Float3)terrain.terrainData.size);
+					pass.SetVector("_TerrainPosition", (Float3)terrain.GetPosition());
 
 					//command.DrawProceduralIndirect(Matrix4x4.identity, material, 0, MeshTopology.Points, pass.GetBuffer(indirectArgsBuffer));
 				});

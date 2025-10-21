@@ -111,7 +111,7 @@ public class WaterCaustics : CameraRenderFeature
 				pass.SetFloat("_CausticsDepth", settings.CausticsDepth);
 				pass.SetFloat("_CausticsCascade", settings.CasuticsCascade);
 				pass.SetFloat("_PatchSize", patchSize);
-				pass.SetVector("_RefractiveIndex", Vector3.one * (1.0f / 1.34f));
+				pass.SetVector("_RefractiveIndex", Float3.One * (1.0f / 1.34f));
 			});
 		}
 
@@ -135,7 +135,7 @@ public class WaterCaustics : CameraRenderFeature
 				pass.SetFloat("_CausticsDepth", settings.CausticsDepth);
 				pass.SetFloat("_CausticsCascade", settings.CasuticsCascade);
 				pass.SetFloat("_PatchSize", patchSize);
-				pass.SetVector("_RefractiveIndex", Vector3.one * (1.0f / 1.34f));
+				pass.SetVector("_RefractiveIndex", Float3.One * (1.0f / 1.34f));
 			});
 		}
 

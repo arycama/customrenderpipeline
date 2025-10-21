@@ -14,12 +14,12 @@ public partial class ScreenSpaceShadows
 			this.intensity = intensity;
 		}
 
-		public void SetInputs(RenderPassBase pass)
+		public void SetInputs(RenderPass pass)
 		{
 			pass.ReadTexture("ScreenSpaceShadows", screenSpaceShadows);
 		}
 
-		public void SetProperties(RenderPassBase pass, CommandBuffer command)
+		public void SetProperties(RenderPass pass, CommandBuffer command)
 		{
 			pass.SetFloat("ScreenSpaceShadowsIntensity", intensity);
 		}

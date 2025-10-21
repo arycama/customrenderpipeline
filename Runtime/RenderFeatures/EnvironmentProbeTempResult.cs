@@ -7,12 +7,12 @@ public readonly struct EnvironmentProbeTempResult : IRenderPassData
 
 	public EnvironmentProbeTempResult(ResourceHandle<RenderTexture> tempProbe) => this.TempProbe = tempProbe;
 
-	void IRenderPassData.SetInputs(RenderPassBase pass)
+	void IRenderPassData.SetInputs(RenderPass pass)
 	{
 		pass.ReadTexture("Input", TempProbe);
 	}
 
-	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
 	}
 }
