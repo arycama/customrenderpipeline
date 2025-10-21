@@ -58,15 +58,6 @@ public abstract class DrawRenderPass : GraphicsRenderPass
 		propertyBlock.SetInt(propertyName, value);
 	}
 
-	protected override void ExecuteRenderPassBuilder()
-	{
-		if (renderGraphBuilder != null)
-		{
-			renderGraphBuilder.Execute(Command, this);
-			renderGraphBuilder.ClearRenderFunction();
-		}
-	}
-
 	public override void SetMatrix(string propertyName, Matrix4x4 value)
 	{
 		propertyBlock.SetMatrix(propertyName, value);

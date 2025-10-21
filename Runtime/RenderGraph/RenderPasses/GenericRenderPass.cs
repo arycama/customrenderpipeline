@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 /// <summary> Has no specific functionality but can be used as a general wrapper around render functionality </summary>
@@ -46,11 +47,13 @@ public class GenericRenderPass : RenderPass<GenericRenderPass>
 
 	protected override void ExecuteRenderPassBuilder()
 	{
-		if (renderGraphBuilder != null)
-		{
+		Assert.IsFalse(hasDefault && hasData);
+
+		if (hasDefault)
+			renderGraphBuilderDefault.Execute(Command, this);
+
+		if (hasData)
 			renderGraphBuilder.Execute(Command, this);
-			renderGraphBuilder.ClearRenderFunction();
-		}
 	}
 
 	protected override void Execute()

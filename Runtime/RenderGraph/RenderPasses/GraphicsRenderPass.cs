@@ -5,7 +5,7 @@ using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 using static Math;
 
-public abstract class GraphicsRenderPass : RenderPass<GraphicsRenderPass>
+public abstract class        GraphicsRenderPass : RenderPass<GraphicsRenderPass>
 {
 	private readonly List<(ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction)> colorTargets = new();
 	private (ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction) depthBuffer = (new ResourceHandle<RenderTexture>(-1), RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
@@ -75,10 +75,10 @@ public abstract class GraphicsRenderPass : RenderPass<GraphicsRenderPass>
 	protected override void SetupTargets()
 	{
 		var targetCount = Max(1, colorTargets.Count);
-		var targets = ArrayPool<RenderTargetIdentifier>.Get(targetCount);
-		var loads = ArrayPool<RenderBufferLoadAction>.Get(targetCount);
-		var stores = ArrayPool<RenderBufferStoreAction>.Get(targetCount);
-		var clearColors = ArrayPool<Color>.Get(targetCount);
+		using var targetsScope = ArrayPool<RenderTargetIdentifier>.Get(targetCount, out var targets);
+		using var loadsScope = ArrayPool<RenderBufferLoadAction>.Get(targetCount, out var loads);
+		using var storesScope = ArrayPool<RenderBufferStoreAction>.Get(targetCount, out var stores);
+		using var clearColorsScope = ArrayPool<Color>.Get(targetCount, out var clearColors);
 
 		var hasDepthBuffer = depthBuffer.Item1.Index != -1;
 		Assert.IsTrue(hasDepthBuffer || targetCount > 0);
@@ -183,10 +183,6 @@ public abstract class GraphicsRenderPass : RenderPass<GraphicsRenderPass>
 			throw new InvalidOperationException($"Render Pass {Name} has no resolution set, does it write to any textures");
 
 		Command.SetViewport(new Rect(0, 0, resolution.Value.x >> MipLevel, resolution.Value.y >> MipLevel));
-
-		ArrayPool<RenderTargetIdentifier>.Release(targets);
-		ArrayPool<RenderBufferLoadAction>.Release(loads);
-		ArrayPool<RenderBufferStoreAction>.Release(stores);
 	}
 
 	protected sealed override void PostExecute()
@@ -214,10 +210,12 @@ public abstract class GraphicsRenderPass : RenderPass<GraphicsRenderPass>
 
 	protected override void ExecuteRenderPassBuilder()
 	{
-		if (renderGraphBuilder != null)
-		{
+		Assert.IsFalse(hasDefault && hasData);
+
+		if (hasDefault)
+			renderGraphBuilderDefault.Execute(Command, this);
+
+		if (hasData)
 			renderGraphBuilder.Execute(Command, this);
-			renderGraphBuilder.ClearRenderFunction();
-		}
 	}
 }

@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 public class IndirectComputeRenderPass : BaseComputeRenderPass<IndirectComputeRenderPass>
@@ -32,10 +33,12 @@ public class IndirectComputeRenderPass : BaseComputeRenderPass<IndirectComputeRe
 
 	protected override void ExecuteRenderPassBuilder()
 	{
-		if (renderGraphBuilder != null)
-		{
+		Assert.IsFalse(hasDefault && hasData);
+
+		if (hasDefault)
+			renderGraphBuilderDefault.Execute(Command, this);
+
+		if (hasData)
 			renderGraphBuilder.Execute(Command, this);
-			renderGraphBuilder.ClearRenderFunction();
-		}
 	}
 }

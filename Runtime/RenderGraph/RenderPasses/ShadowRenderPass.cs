@@ -58,15 +58,6 @@ public class ShadowRenderPass : GraphicsRenderPass
 		Command.SetGlobalInt(propertyName, value);
 	}
 
-	protected override void ExecuteRenderPassBuilder()
-	{
-		if (renderGraphBuilder != null)
-		{
-			renderGraphBuilder.Execute(Command, this);
-			renderGraphBuilder.ClearRenderFunction();
-		}
-	}
-
 	protected override void Execute()
 	{
 		Command.SetGlobalDepthBias(bias, slopeBias);

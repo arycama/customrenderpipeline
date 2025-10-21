@@ -57,15 +57,6 @@ public class ObjectRenderPass : GraphicsRenderPass
 		Command.SetGlobalInt(propertyName, value);
 	}
 
-	protected override void ExecuteRenderPassBuilder()
-	{
-		if (renderGraphBuilder != null)
-		{
-			renderGraphBuilder.Execute(Command, this);
-			renderGraphBuilder.ClearRenderFunction();
-		}
-	}
-
 	protected override void Execute()
 	{
 		if(rendererLists[0].isValid)

@@ -21,11 +21,13 @@ public class ComputeRenderPass : BaseComputeRenderPass<ComputeRenderPass>
 
 	protected override void ExecuteRenderPassBuilder()
 	{
-		if (renderGraphBuilder != null)
-		{
+		Assert.IsFalse(hasDefault && hasData);
+
+		if (hasDefault)
+			renderGraphBuilderDefault.Execute(Command, this);
+
+		if (hasData)
 			renderGraphBuilder.Execute(Command, this);
-			renderGraphBuilder.ClearRenderFunction();
-		}
 	}
 
 	protected override void Execute()

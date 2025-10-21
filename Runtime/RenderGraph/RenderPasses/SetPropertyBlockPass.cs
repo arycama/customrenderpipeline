@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 public class SetPropertyBlockPass : RenderPass<SetPropertyBlockPass>
@@ -86,10 +87,12 @@ public class SetPropertyBlockPass : RenderPass<SetPropertyBlockPass>
 
 	protected override void ExecuteRenderPassBuilder()
 	{
-		if (renderGraphBuilder != null)
-		{
+		Assert.IsFalse(hasDefault && hasData);
+
+		if (hasDefault)
+			renderGraphBuilderDefault.Execute(Command, this);
+
+		if (hasData)
 			renderGraphBuilder.Execute(Command, this);
-			renderGraphBuilder.ClearRenderFunction();
-		}
 	}
 }
