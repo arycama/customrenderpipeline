@@ -1,8 +1,4 @@
-﻿using UnityEngine;
-
-public class CameraDepthData : RTHandleData
+﻿public struct CameraDepth : IRtHandleId
 {
-	public CameraDepthData(ResourceHandle<RenderTexture> handle) : base(handle, "Depth")
-	{
-	}
+	readonly string IRtHandleId.Id => "Depth";
 }

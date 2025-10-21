@@ -64,7 +64,7 @@ public partial class VolumetricLighting : CameraRenderFeature
             pass.AddRenderPassData<ShadowData>();
             pass.AddRenderPassData<CloudShadowDataResult>();
             pass.AddRenderPassData<ViewData>();
-            pass.AddRenderPassData<HiZMaxDepthData>();
+            pass.ReadRtHandle<HiZMaxDepthData>();
             pass.AddRenderPassData<ParticleShadowData>();
 
 			pass.SetRenderFunction((pixelToWorldViewDir, history), static (command, pass, data) =>
@@ -86,7 +86,7 @@ public partial class VolumetricLighting : CameraRenderFeature
 				pass.WriteTexture("Result", filterX);
 				pass.ReadBuffer("VolumetricLightingData", volumetricLightingData);
 				pass.ReadTexture("Input", current);
-				pass.AddRenderPassData<HiZMaxDepthData>();
+				pass.ReadRtHandle<HiZMaxDepthData>();
 			}
 
 			// Filter Y
@@ -97,7 +97,7 @@ public partial class VolumetricLighting : CameraRenderFeature
 				pass.WriteTexture("Result", filterY);
 				pass.ReadBuffer("VolumetricLightingData", volumetricLightingData);
 				pass.ReadTexture("Input", filterX);
-				pass.AddRenderPassData<HiZMaxDepthData>();
+				pass.ReadRtHandle<HiZMaxDepthData>();
 			}
 
 			finalInput = filterY;
@@ -113,7 +113,7 @@ public partial class VolumetricLighting : CameraRenderFeature
 			pass.ReadTexture("Input", finalInput);
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<HiZMaxDepthData>();
+			pass.ReadRtHandle<HiZMaxDepthData>();
 
 			pass.SetRenderFunction(pixelToWorldViewDir, static (command, pass, data) =>
             {

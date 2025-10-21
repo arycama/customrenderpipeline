@@ -83,7 +83,7 @@ public class ClusteredLightCulling : CameraRenderFeature
 			pass.ReadBuffer("LightCounter", counterBuffer);
 			pass.WriteTexture("LightClusterIndicesWrite", lightClusterIndices);
 			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<HiZMaxDepthData>();
+			pass.ReadRtHandle<HiZMaxDepthData>();
 
 			pass.SetRenderFunction(
 			(

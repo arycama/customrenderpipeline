@@ -38,7 +38,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
             pass.AddRenderPassData<FrameData>();
             pass.AddRenderPassData<ViewData>();
-            pass.AddRenderPassData<HiZMaxDepthData>();
+            pass.ReadRtHandle<HiZMaxDepthData>();
 
 			var maxMip = Texture2DExtensions.MipCount(viewSize) - 1;
 			pass.SetRenderFunction((cullingPlanesArray, maxMip, instanceData.instanceCount), static (command, pass, data) =>

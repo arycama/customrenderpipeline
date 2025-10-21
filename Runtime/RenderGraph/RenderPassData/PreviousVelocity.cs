@@ -1,8 +1,4 @@
-﻿using UnityEngine;
-
-public class PreviousVelocity : RTHandleData
+﻿public struct PreviousVelocity : IRtHandleId
 {
-	public PreviousVelocity(ResourceHandle<RenderTexture> handle) : base(handle, "PreviousVelocity")
-	{
-	}
+	readonly string IRtHandleId.Id => "PreviousVelocity";
 }

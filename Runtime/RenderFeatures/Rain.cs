@@ -99,15 +99,15 @@ public class Rain : CameraRenderFeature
 		{
 			pass.Initialize(settings.Material, Float4x4.Identity, 0, 4, dropletCount, MeshTopology.Quads);
 
-			pass.WriteTexture(renderGraph.GetResource<CameraTargetData>());
-			pass.WriteDepth(renderGraph.GetResource<CameraDepthData>(), RenderTargetFlags.ReadOnlyDepth);
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepth);
 
 			pass.ReadBuffer("Positions", positionBuffer);
 
 			pass.AddRenderPassData<FrameData>();
 			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<CameraDepthData>();
-			pass.AddRenderPassData<PreviousColor>();
+			pass.ReadRtHandle<CameraDepth>();
+			pass.ReadRtHandle<PreviousColor>();
 			pass.AddRenderPassData<EnvironmentData>();
 			pass.AddRenderPassData<LightingData>();
 

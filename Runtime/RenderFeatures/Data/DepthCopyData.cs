@@ -1,8 +1,4 @@
-﻿using UnityEngine;
-
-public class DepthCopyData : RTHandleData
+﻿public struct DepthCopyData : IRtHandleId
 {
-	public DepthCopyData(ResourceHandle<RenderTexture> handle) : base(handle, "_DepthCopy")
-	{
-	}
+	readonly string IRtHandleId.Id => "_DepthCopy";
 }

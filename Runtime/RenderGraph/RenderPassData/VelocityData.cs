@@ -1,8 +1,4 @@
-﻿using UnityEngine;
-
-public class VelocityData : RTHandleData
+﻿public struct VelocityData : IRtHandleId
 {
-	public VelocityData(ResourceHandle<RenderTexture> handle) : base(handle, "Velocity")
-	{
-	}
+	readonly string IRtHandleId.Id => "Velocity";
 }

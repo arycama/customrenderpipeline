@@ -1,8 +1,4 @@
-﻿using UnityEngine;
-
-public class DecalAlbedoData : RTHandleData
+﻿public struct DecalAlbedoData : IRtHandleId
 {
-	public DecalAlbedoData(ResourceHandle<RenderTexture> handle) : base(handle, "DecalAlbedo")
-	{
-	}
+	readonly string IRtHandleId.Id => "";
 }

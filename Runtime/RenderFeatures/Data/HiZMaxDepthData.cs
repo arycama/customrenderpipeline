@@ -1,8 +1,4 @@
-﻿using UnityEngine;
-
-public class HiZMaxDepthData : RTHandleData
+﻿public struct HiZMaxDepthData : IRtHandleId
 {
-	public HiZMaxDepthData(ResourceHandle<RenderTexture> handle) : base(handle, "HiZMaxDepth")
-	{
-	}
+	readonly string IRtHandleId.Id => "HiZMaxDepth";
 }

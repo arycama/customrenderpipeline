@@ -1,8 +1,4 @@
-﻿using UnityEngine;
-
-public class PreviousColor : RTHandleData
+﻿public struct PreviousColor : IRtHandleId
 {
-	public PreviousColor(ResourceHandle<RenderTexture> handle) : base(handle, "PreviousColor")
-	{
-	}
+	readonly string IRtHandleId.Id => "PreviousColor";
 }

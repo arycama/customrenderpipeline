@@ -29,7 +29,7 @@ public partial class Sky : CameraRenderFeature
 		renderGraph.AddProfileBeginPass("Sky");
 
 		var skyTemp = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
-		var depth = renderGraph.GetResource<CameraDepthData>();
+		var depth = renderGraph.GetRTHandle<CameraDepth>();
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Render Sky"))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Render Sky"));
@@ -67,7 +67,7 @@ public partial class Sky : CameraRenderFeature
 			pass.AddRenderPassData<SkyReflectionAmbientData>();
 			pass.AddRenderPassData<ViewData>();
 			pass.AddRenderPassData<SkyTransmittanceData>();
-			pass.AddRenderPassData<CameraDepthData>();
+			pass.ReadRtHandle<CameraDepth>();
 
 			pass.SetRenderFunction((command, pass) =>
 			{
@@ -80,7 +80,7 @@ public partial class Sky : CameraRenderFeature
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal"))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Temporal"));
-			pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>().handle);
 			pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 			pass.ReadTexture("_SkyInput", skyTemp);
 			pass.ReadTexture("_SkyHistory", history);
@@ -89,11 +89,11 @@ public partial class Sky : CameraRenderFeature
 			pass.AddRenderPassData<TemporalAAData>();
 			pass.AddRenderPassData<CloudRenderResult>();
 			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<PreviousDepth>();
-			pass.AddRenderPassData<PreviousVelocity>();
+			pass.ReadRtHandle<PreviousDepth>();
+			pass.ReadRtHandle<PreviousVelocity>();
 			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<VelocityData>();
-			pass.AddRenderPassData<CameraDepthData>();
+			pass.ReadRtHandle<VelocityData>();
+			pass.ReadRtHandle<CameraDepth>();
 			pass.AddRenderPassData<VolumetricLighting.Result>();
 
 			pass.SetRenderFunction((command, pass) =>

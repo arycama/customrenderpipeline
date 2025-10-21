@@ -19,8 +19,8 @@ public class DeferredLighting : CameraRenderFeature
 			using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting");
 
 			pass.Initialize(material, index);
-			pass.WriteDepth(renderGraph.GetResource<CameraDepthData>().Handle, RenderTargetFlags.ReadOnlyDepthStencil);
-			pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>().handle, RenderTargetFlags.ReadOnlyDepthStencil);
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>().handle);
 
 			pass.AddRenderPassData<DfgData>();
 			pass.AddRenderPassData<FrameData>();
@@ -30,11 +30,11 @@ public class DeferredLighting : CameraRenderFeature
 			pass.AddRenderPassData<ShadowData>();
 			pass.AddRenderPassData<AutoExposureData>();
 
-			pass.AddRenderPassData<CameraDepthData>();
-			pass.AddRenderPassData<CameraStencilData>();
-			pass.AddRenderPassData<AlbedoMetallicData>();
-			pass.AddRenderPassData<NormalRoughnessData>();
-			pass.AddRenderPassData<BentNormalOcclusionData>();
+			pass.ReadRtHandle<CameraDepth>();
+			pass.ReadRtHandle<CameraStencil>();
+			pass.ReadRtHandle<AlbedoMetallicData>();
+			pass.ReadRtHandle<NormalRoughnessData>();
+			pass.ReadRtHandle<BentNormalOcclusionData>();
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 			pass.AddRenderPassData<TemporalAAData>();
 

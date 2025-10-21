@@ -62,7 +62,7 @@ public partial class VolumetricClouds : CameraRenderFeature
             pass.AddRenderPassData<LightingData>();
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<SkyTransmittanceData>();
-            pass.AddRenderPassData<CameraDepthData>();
+            pass.ReadRtHandle<CameraDepth>();
 
             var time = (float)pass.RenderGraph.GetResource<TimeData>().Time;
 
@@ -80,7 +80,7 @@ public partial class VolumetricClouds : CameraRenderFeature
             pass.Initialize(material, 5);
             pass.WriteTexture(luminanceCurrent, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(transmittanceCurrent, RenderBufferLoadAction.DontCare);
-			pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>().handle);
             pass.ReadTexture("_Input", cloudLuminanceTemp);
             pass.ReadTexture("_InputTransmittance", cloudTransmittanceTemp);
             pass.ReadTexture("_History", luminanceHistory);
@@ -90,11 +90,10 @@ public partial class VolumetricClouds : CameraRenderFeature
             pass.AddRenderPassData<TemporalAAData>();
             pass.AddRenderPassData<AutoExposureData>();
             pass.AddRenderPassData<ViewData>();
-            pass.AddRenderPassData<CameraDepthData>();
-			pass.AddRenderPassData<PreviousDepth>();
-			pass.AddRenderPassData<PreviousVelocity>();
-			pass.AddRenderPassData<VelocityData>();
-			pass.AddRenderPassData<VelocityData>();
+            pass.ReadRtHandle<CameraDepth>();
+			pass.ReadRtHandle<PreviousDepth>();
+			pass.ReadRtHandle<PreviousVelocity>();
+			pass.ReadRtHandle<VelocityData>();
 			var time = (float)pass.RenderGraph.GetResource<TimeData>().Time;
 
             pass.SetRenderFunction((command, pass) =>

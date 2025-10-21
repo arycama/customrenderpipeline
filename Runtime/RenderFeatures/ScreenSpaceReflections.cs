@@ -37,10 +37,10 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
         // Slight fuzzyness with 16 bits, probably due to depth.. would like to investigate
         var hitResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 
-        var depth = renderGraph.GetResource<CameraDepthData>().Handle;
-        var normalRoughness = renderGraph.GetResource<NormalRoughnessData>().Handle;
-        var previousFrame = renderGraph.GetResource<PreviousColor>().Handle;
-        var albedoMetallic = renderGraph.GetResource<AlbedoMetallicData>().Handle;
+        var depth = renderGraph.GetRTHandle<CameraDepth>().handle;
+        var normalRoughness = renderGraph.GetRTHandle<NormalRoughnessData>().handle;
+        var previousFrame = renderGraph.GetRTHandle<PreviousColor>().handle;
+        var albedoMetallic = renderGraph.GetRTHandle<AlbedoMetallicData>().handle;
 
         if (settings.UseRaytracing)
         {
@@ -67,14 +67,14 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
                 pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFov());
                 pass.WriteTexture(tempResult, "HitColor");
                 pass.WriteTexture(hitResult, "HitResult");
-				pass.AddRenderPassData<NormalRoughnessData>();
-				pass.AddRenderPassData<PreviousColor>();
+				pass.ReadRtHandle<NormalRoughnessData>();
+				pass.ReadRtHandle<PreviousColor>();
 				pass.AddRenderPassData<SkyReflectionAmbientData>();
 				pass.AddRenderPassData<LightingSetup.Result>();
 				pass.AddRenderPassData<AutoExposureData>();
 				pass.AddRenderPassData<FrameData>();
 				pass.AddRenderPassData<ViewData>();
-				pass.AddRenderPassData<CameraDepthData>();
+				pass.ReadRtHandle<CameraDepth>();
 				pass.AddRenderPassData<EnvironmentData>();
 				pass.AddRenderPassData<LightingData>();
 				pass.AddRenderPassData<WaterPrepassResult>();
@@ -96,13 +96,13 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
                 pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<ViewData>();
                 pass.AddRenderPassData<FrameData>();
-                pass.AddRenderPassData<BentNormalOcclusionData>();
-                pass.AddRenderPassData<VelocityData>();
-                pass.AddRenderPassData<HiZMinDepthData>();
-                pass.AddRenderPassData<CameraDepthData>();
-                pass.AddRenderPassData<CameraStencilData>();
-				pass.AddRenderPassData<NormalRoughnessData>();
-				pass.AddRenderPassData<PreviousColor>();
+                pass.ReadRtHandle<BentNormalOcclusionData>();
+                pass.ReadRtHandle<VelocityData>();
+                pass.ReadRtHandle<HiZMinDepthData>();
+                pass.ReadRtHandle<CameraDepth>();
+                pass.ReadRtHandle<CameraStencil>();
+				pass.ReadRtHandle<NormalRoughnessData>();
+				pass.ReadRtHandle<PreviousColor>();
 				pass.SetRenderFunction((command, pass) =>
                 {
                     pass.SetFloat("_MaxSteps", settings.MaxSamples);
@@ -126,19 +126,18 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
 
 			pass.ReadTexture("_Input", tempResult);
             pass.ReadTexture("_HitResult", hitResult);
-			pass.AddRenderPassData<NormalRoughnessData>();
-			pass.AddRenderPassData<AlbedoMetallicData>();
+			pass.ReadRtHandle<NormalRoughnessData>();
+			pass.ReadRtHandle<AlbedoMetallicData>();
 
             pass.AddRenderPassData<TemporalAAData>();
             pass.AddRenderPassData<SkyReflectionAmbientData>();
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-            //pass.AddRenderPassData<WaterPrepassResult>(true);
             pass.AddRenderPassData<FrameData>();
             pass.AddRenderPassData<ViewData>();
-            pass.AddRenderPassData<BentNormalOcclusionData>();
-            pass.AddRenderPassData<VelocityData>();
-            pass.AddRenderPassData<CameraDepthData>();
-            pass.AddRenderPassData<CameraStencilData>();
+            pass.ReadRtHandle<BentNormalOcclusionData>();
+            pass.ReadRtHandle<VelocityData>();
+            pass.ReadRtHandle<CameraDepth>();
+            pass.ReadRtHandle<CameraStencil>();
 
             pass.SetRenderFunction((command, pass) =>
             {
@@ -159,8 +158,8 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
 
 			pass.ReadTexture("_TemporalInput", spatialResult);
             pass.ReadTexture("_History", history);
-			pass.AddRenderPassData<NormalRoughnessData>();
-			pass.AddRenderPassData<AlbedoMetallicData>();
+			pass.ReadRtHandle<NormalRoughnessData>();
+			pass.ReadRtHandle<AlbedoMetallicData>();
 			pass.ReadTexture("RayDepth", rayDepth);
 			pass.ReadTexture("WeightInput", spatialWeight);
 			pass.ReadTexture("WeightHistory", historyWeight);
@@ -170,10 +169,10 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
             pass.AddRenderPassData<SkyReflectionAmbientData>();
             pass.AddRenderPassData<FrameData>();
             pass.AddRenderPassData<ViewData>();
-            pass.AddRenderPassData<BentNormalOcclusionData>();
-            pass.AddRenderPassData<VelocityData>();
-            pass.AddRenderPassData<CameraDepthData>();
-            pass.AddRenderPassData<CameraStencilData>();
+            pass.ReadRtHandle<BentNormalOcclusionData>();
+            pass.ReadRtHandle<VelocityData>();
+            pass.ReadRtHandle<CameraDepth>();
+            pass.ReadRtHandle<CameraStencil>();
 
             pass.SetRenderFunction((command, pass) =>
             {

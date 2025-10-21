@@ -28,7 +28,7 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 	{
 		using var scope = renderGraph.AddProfileScope("Screen Space Shadows");
 
-		var depth = renderGraph.GetResource<CameraDepthData>().Handle;
+		var depth = renderGraph.GetRTHandle<CameraDepth>().handle;
 		var tempResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
 		if (settings.UseRaytracing)
@@ -40,14 +40,14 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 
 			pass.WriteTexture(tempResult, "HitResult");
 
-			pass.AddRenderPassData<CameraDepthData>();
+			pass.ReadRtHandle<CameraDepth>();
 			pass.AddRenderPassData<FrameData>();
 			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<NormalRoughnessData>();
+			pass.ReadRtHandle<NormalRoughnessData>();
 			pass.AddRenderPassData<ViewData>();
 
 			// Only here to avoid memory leaks due to it not being used..
-			pass.AddRenderPassData<HiZMinDepthData>();
+			pass.ReadRtHandle<HiZMinDepthData>();
 		}
 		else
 		{
@@ -57,8 +57,8 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 			pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
 			pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
 
-			pass.AddRenderPassData<CameraDepthData>();
-			pass.AddRenderPassData<HiZMinDepthData>();
+			pass.ReadRtHandle<CameraDepth>();
+			pass.ReadRtHandle<HiZMinDepthData>();
 			pass.AddRenderPassData<LightingData>();
 			pass.AddRenderPassData<ViewData>();
 			pass.AddRenderPassData<FrameData>();
@@ -86,9 +86,9 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 			pass.AddRenderPassData<AutoExposureData>();
 			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<VelocityData>();
-			pass.AddRenderPassData<CameraDepthData>();
-			pass.AddRenderPassData<CameraStencilData>();
+			pass.ReadRtHandle<VelocityData>();
+			pass.ReadRtHandle<CameraDepth>();
+			pass.ReadRtHandle<CameraStencil>();
 			pass.AddRenderPassData<LightingData>();
 
 			pass.SetRenderFunction((command, pass) =>
@@ -121,10 +121,10 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 			pass.AddRenderPassData<SkyReflectionAmbientData>();
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<VelocityData>();
-			pass.AddRenderPassData<NormalRoughnessData>();
-			pass.AddRenderPassData<CameraDepthData>();
-			pass.AddRenderPassData<CameraStencilData>();
+			pass.ReadRtHandle<VelocityData>();
+			pass.ReadRtHandle<NormalRoughnessData>();
+			pass.ReadRtHandle<CameraDepth>();
+			pass.ReadRtHandle<CameraStencil>();
 
 			pass.SetRenderFunction((command, pass) =>
 			{

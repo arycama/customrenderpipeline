@@ -1,8 +1,4 @@
-using UnityEngine;
-
-public class HiZMinDepthData : RTHandleData
+public struct HiZMinDepthData : IRtHandleId
 {
-	public HiZMinDepthData(ResourceHandle<RenderTexture> handle) : base(handle, "HiZMinDepth")
-	{
-	}
+	readonly string IRtHandleId.Id => "HiZMinDetph";
 }

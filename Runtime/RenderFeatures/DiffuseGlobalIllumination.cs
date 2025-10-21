@@ -32,10 +32,10 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
 
         var tempResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
         var hitResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
-        var previousFrame = renderGraph.GetResource<PreviousColor>().Handle;
+        var previousFrame = renderGraph.GetRTHandle<PreviousColor>().handle;
 
-        var depth = renderGraph.GetResource<CameraDepthData>().Handle;
-        var normalRoughness = renderGraph.GetResource<NormalRoughnessData>().Handle;
+        var depth = renderGraph.GetRTHandle<CameraDepth>().handle;
+        var normalRoughness = renderGraph.GetRTHandle<NormalRoughnessData>().handle;
         if (settings.UseRaytracing)
         {
             // Need to set some things as globals so that hit shaders can access them..
@@ -59,14 +59,14 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
                 pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFov());
                 pass.WriteTexture(tempResult, "HitColor");
                 pass.WriteTexture(hitResult, "HitResult");
-				pass.AddRenderPassData<NormalRoughnessData>();
-				pass.AddRenderPassData<PreviousColor>();
+				pass.ReadRtHandle<NormalRoughnessData>();
+				pass.ReadRtHandle<PreviousColor>();
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<AutoExposureData>();
                 pass.AddRenderPassData<FrameData>();
                 pass.AddRenderPassData<ViewData>();
-                pass.AddRenderPassData<CameraDepthData>();
+                pass.ReadRtHandle<CameraDepth>();
                 pass.AddRenderPassData<EnvironmentData>();
                 pass.AddRenderPassData<LightingData>();
 			}
@@ -87,12 +87,12 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
                 pass.AddRenderPassData<ViewData>();
                 pass.AddRenderPassData<FrameData>();
-                pass.AddRenderPassData<BentNormalOcclusionData>();
-                pass.AddRenderPassData<VelocityData>();
-                pass.AddRenderPassData<HiZMinDepthData>();
-                pass.AddRenderPassData<CameraDepthData>();
-				pass.AddRenderPassData<NormalRoughnessData>();
-				pass.AddRenderPassData<PreviousColor>();
+                pass.ReadRtHandle<BentNormalOcclusionData>();
+                pass.ReadRtHandle<VelocityData>();
+                pass.ReadRtHandle<HiZMinDepthData>();
+                pass.ReadRtHandle<CameraDepth>();
+				pass.ReadRtHandle<NormalRoughnessData>();
+				pass.ReadRtHandle<PreviousColor>();
 
 				pass.SetRenderFunction((command, pass) =>
                 {
@@ -126,11 +126,11 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             pass.AddRenderPassData<AutoExposureData>();
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
-            pass.AddRenderPassData<BentNormalOcclusionData>();
-            pass.AddRenderPassData<VelocityData>();
-            pass.AddRenderPassData<CameraDepthData>();
-            pass.AddRenderPassData<CameraStencilData>();
-			pass.AddRenderPassData<NormalRoughnessData>();
+            pass.ReadRtHandle<BentNormalOcclusionData>();
+            pass.ReadRtHandle<VelocityData>();
+            pass.ReadRtHandle<CameraDepth>();
+            pass.ReadRtHandle<CameraStencil>();
+			pass.ReadRtHandle<NormalRoughnessData>();
 
             pass.SetRenderFunction((command, pass) =>
             {
@@ -165,11 +165,11 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
-            pass.AddRenderPassData<BentNormalOcclusionData>();
-            pass.AddRenderPassData<VelocityData>();
-            pass.AddRenderPassData<CameraDepthData>();
-            pass.AddRenderPassData<CameraStencilData>();
-			pass.AddRenderPassData<NormalRoughnessData>();
+            pass.ReadRtHandle<BentNormalOcclusionData>();
+            pass.ReadRtHandle<VelocityData>();
+            pass.ReadRtHandle<CameraDepth>();
+            pass.ReadRtHandle<CameraStencil>();
+			pass.ReadRtHandle<NormalRoughnessData>();
 
 			pass.SetRenderFunction((command, pass) =>
             {

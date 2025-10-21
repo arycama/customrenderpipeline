@@ -12,7 +12,7 @@ public abstract class RenderPassBase : IDisposable
 	protected readonly List<(string, ResourceHandle<GraphicsBuffer>)> writeBuffers = new();
 
 	private List<(RenderPassDataHandle, bool)> RenderPassDataHandles = new();
-	private List<Type> inputRtHandles = new();
+	private List<Type> readRtHandles = new();
 
 	protected CommandBuffer Command { get; private set; }
 	public RenderGraph RenderGraph { get; set; }
@@ -49,7 +49,7 @@ public abstract class RenderPassBase : IDisposable
 		Name = null;
 		Index = -1;
 		UseProfiler = true;
-		inputRtHandles.Clear();
+		readRtHandles.Clear();
 	}
 
 	void IDisposable.Dispose()
@@ -73,9 +73,9 @@ public abstract class RenderPassBase : IDisposable
 	{
 	}
 
-	public void AddRtHandle<T>()
+	public void ReadRtHandle<T>()
 	{
-		inputRtHandles.Add(typeof(T));
+		readRtHandles.Add(typeof(T));
 		var handleData = RenderGraph.GetRTHandle(typeof(T));
 		handleData.SetInputs(this);
 	}
@@ -125,7 +125,7 @@ public abstract class RenderPassBase : IDisposable
 			}
 		}
 
-		foreach(var handle in inputRtHandles)
+		foreach(var handle in readRtHandles)
 		{
 			var handleData = RenderGraph.GetRTHandle(handle);
 			handleData.SetProperties(this, Command);

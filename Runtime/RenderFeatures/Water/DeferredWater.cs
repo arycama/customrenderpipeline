@@ -30,11 +30,11 @@ public class DeferredWater : CameraRenderFeature
 		using var scope = renderGraph.AddProfileScope("Deferred Water");
 
         var scatterResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
-        var depth = renderGraph.GetResource<CameraDepthData>().Handle;
+        var depth = renderGraph.GetRTHandle<CameraDepth>().handle;
 
-        var albedoMetallic = renderGraph.GetResource<AlbedoMetallicData>().Handle;
-        var normalRoughness = renderGraph.GetResource<NormalRoughnessData>().Handle;
-        var bentNormalOcclusion = renderGraph.GetResource<BentNormalOcclusionData>().Handle;
+        var albedoMetallic = renderGraph.GetRTHandle<AlbedoMetallicData>().handle;
+        var normalRoughness = renderGraph.GetRTHandle<NormalRoughnessData>().handle;
+        var bentNormalOcclusion = renderGraph.GetRTHandle<BentNormalOcclusionData>().handle;
 
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Render"))
         {
@@ -43,10 +43,10 @@ public class DeferredWater : CameraRenderFeature
             pass.WriteTexture(albedoMetallic);
             pass.WriteTexture(normalRoughness);
             pass.WriteTexture(bentNormalOcclusion);
-            pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);
+            pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>().handle);
             pass.WriteTexture(scatterResult);
 
-            pass.ReadTexture("_UnderwaterDepth", renderGraph.GetResource<DepthCopyData>().Handle);
+            pass.ReadTexture("_UnderwaterDepth", renderGraph.GetRTHandle<DepthCopyData>().handle);
 
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<AutoExposureData>();
@@ -64,8 +64,8 @@ public class DeferredWater : CameraRenderFeature
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
             pass.AddRenderPassData<CausticsResult>();
-            pass.AddRenderPassData<CameraDepthData>();
-            pass.AddRenderPassData<CameraStencilData>();
+            pass.ReadRtHandle<CameraDepth>();
+            pass.ReadRtHandle<CameraStencil>();
 
             pass.SetRenderFunction((command, pass) =>
             {
@@ -141,7 +141,7 @@ public class DeferredWater : CameraRenderFeature
                 //pass.WriteTexture(hitResult, "HitResult");
                 //pass.ReadTexture("PreviousFrame", previousFrameColor); // Temporary, cuz of leaks if we don't use it..
 
-                pass.AddRenderPassData<NormalRoughnessData>();
+                pass.ReadRtHandle<NormalRoughnessData>();
                 pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 				pass.AddRenderPassData<WaterShadowResult>();
                 pass.AddRenderPassData<LightingData>();
@@ -149,8 +149,8 @@ public class DeferredWater : CameraRenderFeature
                 pass.AddRenderPassData<FrameData>();
                 pass.AddRenderPassData<OceanFftResult>();
                 pass.AddRenderPassData<CausticsResult>();
-                pass.AddRenderPassData<CameraDepthData>();
-                pass.AddRenderPassData<CameraStencilData>();
+                pass.ReadRtHandle<CameraDepth>();
+                pass.ReadRtHandle<CameraStencil>();
 				pass.AddRenderPassData<EnvironmentData>();
 
 				pass.SetRenderFunction((command, pass) =>
@@ -186,23 +186,23 @@ public class DeferredWater : CameraRenderFeature
             pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.ReadTexture("_ScatterInput", scatterResult);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
-            pass.WriteTexture(renderGraph.GetResource<CameraTargetData>().Handle);
+            pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>().handle);
 
-            pass.ReadTexture("_UnderwaterDepth", renderGraph.GetResource<DepthCopyData>().Handle);
+            pass.ReadTexture("_UnderwaterDepth", renderGraph.GetRTHandle<DepthCopyData>().handle);
             pass.ReadTexture("_History", history);
 
-			pass.AddRenderPassData<NormalRoughnessData>();
-			pass.AddRenderPassData<BentNormalOcclusionData>();
-			pass.AddRenderPassData<AlbedoMetallicData>();
+			pass.ReadRtHandle<NormalRoughnessData>();
+			pass.ReadRtHandle<BentNormalOcclusionData>();
+			pass.ReadRtHandle<AlbedoMetallicData>();
 			pass.AddRenderPassData<TemporalAAData>();
             pass.AddRenderPassData<AutoExposureData>();
             pass.AddRenderPassData<SkyReflectionAmbientData>();
             pass.AddRenderPassData<DfgData>();
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
-            pass.AddRenderPassData<VelocityData>();
-            pass.AddRenderPassData<CameraDepthData>();
-            pass.AddRenderPassData<CameraStencilData>();
+            pass.ReadRtHandle<VelocityData>();
+            pass.ReadRtHandle<CameraDepth>();
+            pass.ReadRtHandle<CameraStencil>();
 
             pass.SetRenderFunction((command, pass) =>
             {

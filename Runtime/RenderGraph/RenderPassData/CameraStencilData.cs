@@ -1,9 +1,4 @@
-﻿using UnityEngine;
-using UnityEngine.Rendering;
-
-public class CameraStencilData : RTHandleData
+﻿public struct CameraStencil : IRtHandleId
 {
-	public CameraStencilData(ResourceHandle<RenderTexture> handle) : base(handle, "Stencil", subElement: RenderTextureSubElement.Stencil)
-	{
-	}
+	readonly string IRtHandleId.Id => "Stencil";
 }

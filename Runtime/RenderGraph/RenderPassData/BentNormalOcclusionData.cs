@@ -1,8 +1,4 @@
-﻿using UnityEngine;
-
-public class BentNormalOcclusionData : RTHandleData
+﻿public struct BentNormalOcclusionData : IRtHandleId
 {
-	public BentNormalOcclusionData(ResourceHandle<RenderTexture> handle) : base(handle, "BentNormalOcclusion")
-	{
-	}
+	readonly string IRtHandleId.Id => "BentNormalOcclusion";
 }

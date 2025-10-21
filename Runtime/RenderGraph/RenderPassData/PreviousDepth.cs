@@ -1,8 +1,4 @@
-﻿using UnityEngine;
-
-public class PreviousDepth : RTHandleData
+﻿public struct PreviousDepth : IRtHandleId
 {
-	public PreviousDepth(ResourceHandle<RenderTexture> handle) : base(handle, "PreviousDepth")
-	{
-	}
+	readonly string IRtHandleId.Id => "PreviousDepth";
 }

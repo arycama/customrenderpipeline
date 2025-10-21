@@ -1,10 +1,4 @@
-﻿using UnityEngine;
-
-public class CameraTargetData : RTHandleData, IRtHandleId
+﻿public struct CameraTarget : IRtHandleId
 {
-	string IRtHandleId.Id => "Input";
-
-	public CameraTargetData(ResourceHandle<RenderTexture> handle) : base(handle, "Input")
-	{
-	}
+	readonly string IRtHandleId.Id => "Input";
 }

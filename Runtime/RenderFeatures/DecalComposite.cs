@@ -14,9 +14,9 @@ public class DecalComposite : CameraRenderFeature
 	{
 		using var scope = renderGraph.AddProfileScope("Decal Composite");
 
-		var albedoMetallic = renderGraph.GetResource<AlbedoMetallicData>();
-		var normalRoughness = renderGraph.GetResource<NormalRoughnessData>();
-		var bentNormalOcclusion = renderGraph.GetResource<BentNormalOcclusionData>();
+		var albedoMetallic = renderGraph.GetRTHandle<AlbedoMetallicData>();
+		var normalRoughness = renderGraph.GetRTHandle<NormalRoughnessData>();
+		var bentNormalOcclusion = renderGraph.GetRTHandle<BentNormalOcclusionData>();
 
 		var albedoMetallicCopy = renderGraph.GetTexture(albedoMetallic);
 		var normalRoughnessCopy = renderGraph.GetTexture(normalRoughness);
@@ -27,14 +27,14 @@ public class DecalComposite : CameraRenderFeature
 		{
 			pass.Initialize(material, 0);
 
-			pass.WriteDepth(renderGraph.GetResource<CameraDepthData>(), RenderTargetFlags.ReadOnlyDepthStencil);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(albedoMetallicCopy);
 			pass.WriteTexture(normalRoughnessCopy);
 			pass.WriteTexture(bentNormalOcclusionCopy);
 
-			pass.AddRenderPassData<AlbedoMetallicData>();
-			pass.AddRenderPassData<NormalRoughnessData>();
-			pass.AddRenderPassData<BentNormalOcclusionData>();
+			pass.ReadRtHandle<AlbedoMetallicData>();
+			pass.ReadRtHandle<NormalRoughnessData>();
+			pass.ReadRtHandle<BentNormalOcclusionData>();
 		}
 
 		// Now composite the decal buffers
@@ -42,7 +42,7 @@ public class DecalComposite : CameraRenderFeature
 		{
 			pass.Initialize(material, 1);
 
-			pass.WriteDepth(renderGraph.GetResource<CameraDepthData>(), RenderTargetFlags.ReadOnlyDepthStencil);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(albedoMetallic);
 			pass.WriteTexture(normalRoughness);
 			pass.WriteTexture(bentNormalOcclusion);
@@ -51,10 +51,10 @@ public class DecalComposite : CameraRenderFeature
 			pass.ReadTexture("NormalRoughnessCopy", normalRoughnessCopy);
 			pass.ReadTexture("BentNormalOcclusionCopy", bentNormalOcclusionCopy);
 
-			pass.AddRenderPassData<CameraTargetData>();
-			pass.AddRenderPassData<CameraDepthData>();
-			pass.AddRenderPassData<DecalAlbedoData>();
-			pass.AddRenderPassData<DecalNormalData>();
+			pass.ReadRtHandle<CameraTarget>();
+			pass.ReadRtHandle<CameraDepth>();
+			pass.ReadRtHandle<DecalAlbedoData>();
+			pass.ReadRtHandle<DecalNormalData>();
 			pass.AddRenderPassData<RainTextureResult>();
 
 			pass.SetRenderFunction((command, pass) =>

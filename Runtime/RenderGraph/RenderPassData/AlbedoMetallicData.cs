@@ -1,8 +1,4 @@
-﻿using UnityEngine;
-
-public class AlbedoMetallicData : RTHandleData
+﻿public struct AlbedoMetallicData : IRtHandleId
 {
-	public AlbedoMetallicData(ResourceHandle<RenderTexture> handle) : base(handle, "GbufferAlbedoMetallic")
-	{
-	}
+	readonly string IRtHandleId.Id => "GbufferAlbedoMetallic";
 }

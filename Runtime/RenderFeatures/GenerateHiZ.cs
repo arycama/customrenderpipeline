@@ -30,7 +30,7 @@ public class GenerateHiZ : CameraRenderFeature
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Hi Z First Pass"))
 		{
 			pass.Initialize(computeShader, kernel, camera.scaledPixelWidth, camera.scaledPixelHeight);
-			var depth = renderGraph.GetResource<CameraDepthData>().Handle;
+			var depth = renderGraph.GetRTHandle<CameraDepth>().handle;
 			pass.ReadTexture("_Input", depth);
 
 			for (var i = 0; i < maxMipsPerPass; i++)
@@ -76,9 +76,9 @@ public class GenerateHiZ : CameraRenderFeature
 		}
 
 		if(mode == HiZMode.Min)
-			renderGraph.SetResource(new HiZMinDepthData(result));
+			renderGraph.SetRTHandle<HiZMinDepthData>(result);
 		else if (mode == HiZMode.Max)
-			renderGraph.SetResource(new HiZMaxDepthData(result));
+			renderGraph.SetRTHandle<HiZMaxDepthData>(result);
 	}
 
 	public enum HiZMode

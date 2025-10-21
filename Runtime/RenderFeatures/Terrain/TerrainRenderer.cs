@@ -31,7 +31,7 @@ public class TerrainRenderer : TerrainRendererBase
 
 		using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectIndexedRenderPass>("Terrain Render"))
 		{
-			pass.WriteDepth(renderGraph.GetResource<CameraDepthData>(), RenderTargetFlags.None, RenderBufferLoadAction.DontCare);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.None, RenderBufferLoadAction.DontCare);
 
 			pass.Initialize(settings.Material, terrainSystemData.IndexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
 			pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
@@ -72,7 +72,7 @@ public class TerrainRenderer : TerrainRendererBase
 		using (var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Render Terrain Replacement"))
 		{
 			pass.Initialize("Terrain", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque);
-			pass.WriteDepth(renderGraph.GetResource<CameraDepthData>(), RenderTargetFlags.None);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.None);
 			pass.AddRenderPassData<ViewData>();
 		}
 	}

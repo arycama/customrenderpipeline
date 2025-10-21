@@ -56,7 +56,7 @@ public partial class DepthOfField : CameraRenderFeature
 				//pass.WriteTexture(hitResult, "HitResult");
 
 				pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-				pass.AddRenderPassData<CameraDepthData>();
+				pass.ReadRtHandle<CameraDepth>();
 				pass.AddRenderPassData<ViewData>();
 				pass.AddRenderPassData<FrameData>();
 				pass.AddRenderPassData<TerrainRenderData>(true);
@@ -83,9 +83,9 @@ public partial class DepthOfField : CameraRenderFeature
 				pass.Initialize(material);
 				pass.WriteTexture(tempId, RenderBufferLoadAction.DontCare);
 
-				pass.AddRenderPassData<CameraTargetData>();
-				pass.AddRenderPassData<CameraDepthData>();
-				pass.AddRenderPassData<HiZMinDepthData>();
+				pass.ReadRtHandle<CameraTarget>();
+				pass.ReadRtHandle<CameraDepth>();
+				pass.ReadRtHandle<HiZMinDepthData>();
 				pass.AddRenderPassData<FrameData>();
 				pass.AddRenderPassData<ViewData>();
 
@@ -106,6 +106,6 @@ public partial class DepthOfField : CameraRenderFeature
 			}
 		}
 
-		renderGraph.SetResource(new CameraTargetData(tempId));
+		renderGraph.SetRTHandle<CameraTarget>(tempId);
 	}
 }

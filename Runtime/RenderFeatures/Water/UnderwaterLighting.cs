@@ -23,13 +23,13 @@ public class UnderwaterLighting : CameraRenderFeature
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Underwater Lighting"))
         {
             pass.Initialize(underwaterLightingMaterial);
-            pass.WriteDepth(renderGraph.GetResource<CameraDepthData>().Handle, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>().handle, RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(underwaterResultId, RenderBufferLoadAction.DontCare);
 
-            pass.AddRenderPassData<AlbedoMetallicData>();
-            pass.AddRenderPassData<NormalRoughnessData>();
-            pass.AddRenderPassData<BentNormalOcclusionData>();
-            pass.AddRenderPassData<CameraTargetData>();
+            pass.ReadRtHandle<AlbedoMetallicData>();
+            pass.ReadRtHandle<NormalRoughnessData>();
+            pass.ReadRtHandle<BentNormalOcclusionData>();
+            pass.ReadRtHandle<CameraTarget>();
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
             pass.AddRenderPassData<VolumetricLighting.Result>();
             pass.AddRenderPassData<CloudShadowDataResult>();
@@ -41,8 +41,8 @@ public class UnderwaterLighting : CameraRenderFeature
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
             pass.AddRenderPassData<CausticsResult>();
-            pass.AddRenderPassData<CameraDepthData>();
-            pass.AddRenderPassData<DepthCopyData>();
+            pass.ReadRtHandle<CameraDepth>();
+            pass.ReadRtHandle<DepthCopyData>();
                 
             pass.SetRenderFunction((command, pass) =>
             {

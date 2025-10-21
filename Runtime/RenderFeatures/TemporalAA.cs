@@ -41,10 +41,10 @@ public partial class TemporalAA : CameraRenderFeature
 		pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 		pass.WriteTexture(currentWeight, RenderBufferLoadAction.DontCare);
 		pass.AddRenderPassData<TemporalAAData>();
-		pass.AddRenderPassData<CameraTargetData>();
-		pass.AddRenderPassData<CameraStencilData>();
-		pass.AddRenderPassData<CameraDepthData>();
-		pass.AddRenderPassData<VelocityData>();
+		pass.ReadRtHandle<CameraTarget>();
+		pass.ReadRtHandle<CameraStencil>();
+		pass.ReadRtHandle<CameraDepth>();
+		pass.ReadRtHandle<VelocityData>();
 		pass.AddRenderPassData<AutoExposureData>();
 
 		pass.SetRenderFunction((
@@ -74,6 +74,6 @@ public partial class TemporalAA : CameraRenderFeature
 			pass.SetVector("WeightHistoryScaleLimit", pass.GetScaleLimit2D(history));
 		});
 
-		renderGraph.SetResource(new CameraTargetData(result)); ;
+		renderGraph.SetRTHandle<CameraTarget>(result);
 	}
 }
