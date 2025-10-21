@@ -51,7 +51,6 @@ public class DecalComposite : CameraRenderFeature
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadRtHandle<DecalAlbedo>();
 			pass.ReadRtHandle<DecalNormal>();
-			pass.AddRenderPassData<RainTextureResult>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{

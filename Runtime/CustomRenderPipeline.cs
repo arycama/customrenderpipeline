@@ -151,35 +151,26 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
-			var (cameraTarget, previousScene, currentSceneCreated) = cameraTargetCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
 			var cameraDepth = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true, clearFlags: RTClearFlags.DepthStencil);
-			var (velocity, previousVelocity, currentVelocityCreated) = cameraVelocityCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-
-			renderGraph.SetRTHandle<CameraTarget>(cameraTarget);
 			renderGraph.SetRTHandle<CameraDepth>(cameraDepth, subElement: RenderTextureSubElement.Depth);
 			renderGraph.SetRTHandle<CameraStencil>(cameraDepth, subElement: RenderTextureSubElement.Stencil);
-
-			renderGraph.SetRTHandle<PreviousCameraTarget>(previousScene);
-			renderGraph.SetRTHandle<PreviousCameraVelocity>(previousVelocity);
-
-			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<CameraVelocity>(velocity);
-
-			var (depthCopy, previousDepthCopy, depthCopyCreated) = cameraDepthCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-			renderGraph.SetRTHandle<PreviousCameraDepth>(previousDepthCopy);
-			renderGraph.SetRTHandle<CameraDepthCopy>(depthCopy, subElement: RenderTextureSubElement.Depth);
 		}),
 
 		new TerrainViewData(renderGraph, terrainSystem),
 		new TerrainRenderer(asset.TerrainSettings, renderGraph),
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
-			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
+			var (cameraTarget, previousScene, currentSceneCreated) = cameraTargetCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
+			renderGraph.SetRTHandle<CameraTarget>(cameraTarget);
+			renderGraph.SetRTHandle<PreviousCameraTarget>(previousScene);
+
+			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
 
 			using var pass = renderGraph.AddObjectRenderPass("Gbuffer");
 
+			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("Deferred", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
@@ -194,8 +185,11 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
-			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
+			var (velocity, previousVelocity, currentVelocityCreated) = cameraVelocityCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
+			renderGraph.SetRTHandle<CameraVelocity>(velocity);
+			renderGraph.SetRTHandle<PreviousCameraVelocity>(previousVelocity);
 
+			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			using var pass = renderGraph.AddObjectRenderPass("Velocity");
 
 			pass.Initialize("MotionVectors", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.MotionVectors, false);
@@ -248,8 +242,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// Finalize gbuffer
 		new ScreenSpaceTerrain(renderGraph),
 
-		new RainTextureUpdater(renderGraph, asset.RainTexture),
-
 		// Decals
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
@@ -278,10 +270,15 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		}),
 
 		new DecalComposite(renderGraph),
+		new RainTextureUpdater(renderGraph, asset.Rain),
 
+        // Copy scene depth (Required for underwater lighting)
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
-            // Copy scene depth (Required for underwater lighting)
+			var (depthCopy, previousDepthCopy, depthCopyCreated) = cameraDepthCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
+			renderGraph.SetRTHandle<PreviousCameraDepth>(previousDepthCopy);
+			renderGraph.SetRTHandle<CameraDepthCopy>(depthCopy, subElement: RenderTextureSubElement.Depth);
+
             // TODO: Could avoid this by using another depth texture for water.. will require some extra logic in other passes though
             using (var pass = renderGraph.AddGenericRenderPass("Copy Depth Texture", (renderGraph.GetRTHandle<CameraDepth>(), renderGraph.GetRTHandle<CameraDepthCopy>())))
 			{

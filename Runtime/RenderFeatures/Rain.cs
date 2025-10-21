@@ -14,6 +14,9 @@ public class Rain : CameraRenderFeature
 		[field: SerializeField, Range(0, Math.Pi)] public float WindTurbulence { get; private set; } = 0.1f;
 		[field: SerializeField, Min(0)] public float WindStrength { get; private set; } = 0.5f;
 		[field: SerializeField] public Material Material { get; private set; }
+		[field: SerializeField, Range(0f, 1f)] public float WetLevel { get; private set; } = 0.5f;
+		[field: SerializeField] public int Resolution { get; private set; } = 256;
+		[field: SerializeField] public float Size { get; private set; } = 1;
 	}
 
 	private readonly Settings settings;
@@ -36,7 +39,7 @@ public class Rain : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
-		var dropletCount = (int)(settings.DropletCount * (4.0f / 3.0f) * Math.Pi * Math.Pow(settings.Radius, 3));
+		var dropletCount = (int)(settings.DropletCount * settings.WetLevel * (4.0f / 3.0f) * Math.Pi * Math.Pow(settings.Radius, 3));
 		if (settings.Material == null || dropletCount == 0)
 			return;
 

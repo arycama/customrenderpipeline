@@ -7,12 +7,12 @@ Shader "Hidden/Decal Composite"
         ZWrite Off
         ZTest Off
 
-        // Stencil
-        // {
-        //     Ref 32
-        //     Comp Equal
-        //     ReadMask 32
-        // }
+        Stencil
+        {
+            Ref 32
+            Comp Equal
+            ReadMask 32
+        }
 
         Pass
         {

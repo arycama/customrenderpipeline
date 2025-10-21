@@ -93,18 +93,17 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
             using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
 
-                renderGraph.RtHandleSystem.SetScreenSize(camera.pixelWidth, camera.pixelHeight);
+            renderGraph.RtHandleSystem.SetScreenSize(camera.pixelWidth, camera.pixelHeight);
 
             foreach (var cameraRenderFeature in perCameraRenderFeatures)
             {
                 cameraRenderFeature.Render(camera, context);
             }
 
-            var wireOverlay = context.CreateWireOverlayRendererList(camera);
-
             // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
             if (camera.cameraType == CameraType.Game && camera == Camera.main)
             {
+				var wireOverlay = context.CreateWireOverlayRendererList(camera);
 				var uiOverlay = context.CreateUIOverlayRendererList(camera);
 
 				using var pass = renderGraph.AddGenericRenderPass("UI Overlay", (uiOverlay, wireOverlay));

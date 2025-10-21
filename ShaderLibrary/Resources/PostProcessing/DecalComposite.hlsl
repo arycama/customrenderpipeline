@@ -11,8 +11,6 @@ struct FragmentOutput
 };
 
 Texture2D<float4> AlbedoMetallicCopy, NormalRoughnessCopy, BentNormalOcclusionCopy;
-Texture2D<float2> RainTexture;
-float RainTextureSize;
 
 float4 AlbedoMetallicCopyScaleLimit, NormalRoughnessCopyScaleLimit, BentNormalOcclusionCopyScaleLimit;
 
@@ -30,44 +28,18 @@ FragmentOutput FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOO
 	float depth = CameraDepth[position.xy];
 	float eyeDepth = LinearEyeDepth(depth);
 	float3 worldPosition = worldDir * eyeDepth;
-	float3 rainNormal = UnpackNormalSNorm(RainTexture.Sample(SurfaceSampler, (worldPosition.xz + ViewPosition.xz) / RainTextureSize)).xzy;
 	
-	float3 geoNormal = normalize(cross(ddy(worldPosition), ddx(worldPosition)));
-	float wetLevel = saturate(dot(geoNormal, float3(0, 1, 0)));
-	float rippleLevel = saturate(Remap(dot(geoNormal, float3(0, 1, 0)), 0.75, 1.0));
-	rainNormal = lerp(float3(0, 1, 0), rainNormal, rippleLevel);
-	
-	float2 offset = rainNormal.xz * rippleLevel * 0.1 * (0.5 / TanHalfFov / eyeDepth);
-	float2 screenUv = floor(clamp(position.xy + offset * ViewSize, 0.5, ViewSize - 0.5)) + 0.5;
-	
-	float4 albedoMetallic = AlbedoMetallicCopy[screenUv];
-	
-	float2 quadOffset = QuadOffset(screenUv);
-	float4 a0 = AlbedoMetallicCopy[screenUv + float2(quadOffset.x, 0)];
-	float4 a1 = AlbedoMetallicCopy[screenUv + float2(0, quadOffset.y)];
-	
-	float4 normalRoughness = NormalRoughnessCopy[screenUv];
-	float4 bentNormalOcclusion = BentNormalOcclusionCopy[screenUv];
+	float4 albedoMetallic = AlbedoMetallicCopy[position.xy];
+	float4 normalRoughness = NormalRoughnessCopy[position.xy];
+	float4 bentNormalOcclusion = BentNormalOcclusionCopy[position.xy];
 	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion);
 	
 	float4 decal = DecalAlbedo[position.xy];
 	float4 decalNormal = DecalNormal[position.xy];
 	
-	float3 albedo = UnpackAlbedo(albedoMetallic.rg, screenUv, a0.xy, a1.xy);
+	float3 albedo = UnpackAlbedo(albedoMetallic.rg, position.xy);
 	float3 normal = UnpackGBufferNormal(normalRoughness);
 	float roughness = normalRoughness.a;
-	
-	// Rain stuff, TODO: should probably be done elsewhere or at least handled more explicitly
-
-	
-	// Approx from https://seblagarde.wordpress.com/2013/04/14/water-drop-3b-physically-based-wet-surfaces/
-	float porosity = saturate((roughness - 0.5) / 0.4);
-	
-	float factor = lerp(1, 0.1, porosity);
-	albedo *= lerp(1, factor, wetLevel);
-	roughness = lerp(0.0, roughness, lerp(1, factor, wetLevel));
-	
-	normal = normalize(lerp(normal, rainNormal, wetLevel * 0.5));
 	
 	albedo = lerp(albedo, decal.rgb, decal.a);
 	
@@ -77,7 +49,6 @@ FragmentOutput FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOO
 	
 	roughness = lerp(roughness, decalNormal.a, decal.a);
 	float visibilityAngle = lerp(bentNormalOcclusion.a, 1.0, decal.a); // TODO: Write out visibilityConeAngle from dbuffer pass
-	
 
 	FragmentOutput output;
 	output.albedoMetallic = float4(PackAlbedo(albedo, position.xy), 0, albedoMetallic.a);

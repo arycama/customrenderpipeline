@@ -28,7 +28,6 @@ public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 
 	[field: SerializeField] public VolumetricClouds.Settings Clouds { get; private set; }
 	[field: SerializeField] public Sky.Settings Sky { get; private set; }
-	[field: SerializeField] public RainTextureUpdater.Settings RainTexture { get; private set; }
 	[field: SerializeField] public Rain.Settings Rain { get; private set; }
 
 	[field: SerializeField] public AutoExposure.Settings AutoExposureSettings { get; private set; }
