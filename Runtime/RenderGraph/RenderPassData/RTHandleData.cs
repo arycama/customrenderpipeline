@@ -11,13 +11,13 @@ public readonly struct RTHandleData : IRenderPassData
 	private readonly int mip;
 	private readonly RenderTextureSubElement subElement;
 
-	public RTHandleData(ResourceHandle<RenderTexture> handle, string propertyName, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+	public RTHandleData(ResourceHandle<RenderTexture> handle, int propertyNameId, int scaleLimitPropertyId, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
 	{
 		this.handle = handle;
 		this.mip = mip;
 		this.subElement = subElement;
-		propertyNameId = Shader.PropertyToID(propertyName);
-		scaleLimitPropertyId = Shader.PropertyToID($"{propertyName}ScaleLimit");
+		this.propertyNameId = propertyNameId;
+		this.scaleLimitPropertyId = scaleLimitPropertyId;
 	}
 
 	public void SetInputs(RenderPass pass)
@@ -27,6 +27,6 @@ public readonly struct RTHandleData : IRenderPassData
 
 	public void SetProperties(RenderPass pass, CommandBuffer command)
 	{
-		pass.SetVector(scaleLimitPropertyId, pass.GetScaleLimit2D(handle));
+		pass.SetVector(scaleLimitPropertyId, pass.RenderGraph.GetScaleLimit2D(handle));
 	}
 }

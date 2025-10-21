@@ -1,4 +1,10 @@
-﻿public struct CameraTarget : IRtHandleId
+﻿using UnityEngine;
+
+public readonly struct CameraTarget : IRtHandleId
 {
-	readonly string IRtHandleId.Id => nameof(CameraTarget);
+	public static readonly int PropertyId = Shader.PropertyToID(nameof(CameraTarget));
+	public static readonly int ScaleLimitPropertyId = Shader.PropertyToID($"{nameof(CameraTarget)}ScaleLimit");
+
+	readonly int IRtHandleId.PropertyId => PropertyId;
+	readonly int IRtHandleId.ScaleLimitPropertyId => ScaleLimitPropertyId;
 }

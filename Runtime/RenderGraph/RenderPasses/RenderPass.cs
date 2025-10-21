@@ -151,16 +151,8 @@ public abstract class RenderPass : IDisposable
 		// Set any data from each pass
 		foreach (var renderPassDataHandle in RenderPassDataHandles)
 		{
-			if (renderPassDataHandle.Item2)
-			{
-				if (RenderGraph.ResourceMap.TryGetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, RenderGraph.FrameIndex, out var data))
-					data.SetProperties(this, Command);
-			}
-			else
-			{
-				var data = RenderGraph.ResourceMap.GetRenderPassData<IRenderPassData>(renderPassDataHandle.Item1, RenderGraph.FrameIndex);
-				data.SetProperties(this, Command);
-			}
+			var hasResource = RenderGraph.ResourceMap.TrySetProperties(renderPassDataHandle.Item1, RenderGraph.FrameIndex, this, command);
+			Assert.IsTrue(hasResource || renderPassDataHandle.Item2);
 		}
 
 		foreach(var handle in readRtHandles)
@@ -219,55 +211,9 @@ public abstract class RenderPass : IDisposable
 	{
 		Assert.IsFalse(RenderGraph.IsExecuting);
 		var handle = RenderGraph.ResourceMap.GetResourceHandle<T>();
-
-		if (isOptional)
-		{
-			if (RenderGraph.ResourceMap.TryGetRenderPassData<T>(handle, RenderGraph.FrameIndex, out var data))
-				data.SetInputs(this);
-		}
-		else
-		{
-			var data = RenderGraph.ResourceMap.GetRenderPassData<T>(handle, RenderGraph.FrameIndex);
-			data.SetInputs(this);
-		}
+		var hasResource = RenderGraph.ResourceMap.TrySetInputs(handle, RenderGraph.FrameIndex, this);
+		Assert.IsTrue(isOptional || hasResource);
 
 		RenderPassDataHandles.Add((handle, isOptional));
-	}
-
-	public Float4 GetScaleLimit2D(ResourceHandle<RenderTexture> handle)
-	{
-		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
-		var resource = GetRenderTexture(handle);
-
-		var scaleX = (float)descriptor.width / resource.width;
-		var scaleY = (float)descriptor.height / resource.height;
-		var limitX = (descriptor.width - 0.5f) / resource.width;
-		var limitY = (descriptor.height - 0.5f) / resource.height;
-
-		return new Float4(scaleX, scaleY, limitX, limitY);
-	}
-
-	public Float3 GetScale3D(ResourceHandle<RenderTexture> handle)
-	{
-		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
-		var resource = GetRenderTexture(handle);
-
-		var scaleX = (float)descriptor.width / resource.width;
-		var scaleY = (float)descriptor.height / resource.height;
-		var scaleZ = (float)descriptor.volumeDepth / resource.volumeDepth;
-
-		return new Float3(scaleX, scaleY, scaleZ);
-	}
-
-	public Float3 GetLimit3D(ResourceHandle<RenderTexture> handle)
-	{
-		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
-		var resource = GetRenderTexture(handle);
-
-		var limitX = (descriptor.width - 0.5f) / resource.width;
-		var limitY = (descriptor.height - 0.5f) / resource.height;
-		var limitZ = (descriptor.volumeDepth - 0.5f) / resource.volumeDepth;
-
-		return new Float3(limitX, limitY, limitZ);
 	}
 }

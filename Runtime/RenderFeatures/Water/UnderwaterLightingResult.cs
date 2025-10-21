@@ -17,6 +17,6 @@ public readonly struct UnderwaterLightingResult : IRenderPassData
 
 	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
-        pass.SetVector("_UnderwaterResultScaleLimit", pass.GetScaleLimit2D(underwaterLighting));
+        pass.SetVector("_UnderwaterResultScaleLimit", pass.RenderGraph.GetScaleLimit2D(underwaterLighting));
 	}
 }

@@ -33,7 +33,7 @@ public class ProceduralGenerationController
         Version = -1;
     }
 
-    public IEnumerable<IGpuProceduralGenerator> GetModifiedGenerators()
+    public void GetModifiedGenerators(List<IGpuProceduralGenerator> list)
     {
         // Check each generator to see if it's version has changed, if so, udpate it
         for (var i = 0; i < generatorData.Count; i++)
@@ -44,7 +44,7 @@ public class ProceduralGenerationController
             if (version == element.Item2)
                 continue;
 
-            yield return element.Item1;
+			list.Add(element.Item1);
 
             generatorData[i] = (element.Item1, version);
         }

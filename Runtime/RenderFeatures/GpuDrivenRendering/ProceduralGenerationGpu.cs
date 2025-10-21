@@ -1,4 +1,5 @@
-﻿using UnityEngine.Rendering;
+﻿using UnityEngine.Pool;
+using UnityEngine.Rendering;
 
 public class ProceduralGenerationGpu : FrameRenderFeature
 {
@@ -14,7 +15,10 @@ public class ProceduralGenerationGpu : FrameRenderFeature
 
     public override void Render(ScriptableRenderContext context)
     {
-        foreach(var generator in controller.GetModifiedGenerators())
+		using var scope = ListPool<IGpuProceduralGenerator>.Get(out var list);
+		controller.GetModifiedGenerators(list);
+
+		foreach (var generator in list)
         {
             generator.Generate(renderGraph);
         }

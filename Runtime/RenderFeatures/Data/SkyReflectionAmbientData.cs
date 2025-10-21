@@ -28,7 +28,7 @@ public struct SkyReflectionAmbientData : IRenderPassData
 
 	public readonly void SetProperties(RenderPass pass, CommandBuffer command)
 	{
-		pass.SetVector("SkyLuminanceScaleLimit", pass.GetScaleLimit2D(skyLuminance));
+		pass.SetVector("SkyLuminanceScaleLimit", pass.RenderGraph.GetScaleLimit2D(skyLuminance));
 		pass.SetVector("SkyLuminanceSize", skyLuminanceSize);
 		pass.SetVector("_SkyCdfSize", cdfLookupSize);
 	}

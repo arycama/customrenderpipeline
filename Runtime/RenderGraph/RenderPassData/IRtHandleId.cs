@@ -1,4 +1,5 @@
 public interface IRtHandleId
 {
-	string Id { get; }
+	int PropertyId { get; }
+	int ScaleLimitPropertyId { get; }
 }

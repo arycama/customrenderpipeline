@@ -21,7 +21,7 @@ public readonly struct CloudRenderResult : IRenderPassData
 
 	public void SetProperties(RenderPass pass, CommandBuffer command)
 	{
-		pass.SetVector("CloudTextureScaleLimit", pass.GetScaleLimit2D(cloudTexture));
-		pass.SetVector("CloudTransmittanceTextureScaleLimit", pass.GetScaleLimit2D(cloudTransmittanceTexture));
+		pass.SetVector("CloudTextureScaleLimit", pass.RenderGraph.GetScaleLimit2D(cloudTexture));
+		pass.SetVector("CloudTransmittanceTextureScaleLimit", pass.RenderGraph.GetScaleLimit2D(cloudTransmittanceTexture));
 	}
 }

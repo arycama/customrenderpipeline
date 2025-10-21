@@ -113,7 +113,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				pass.SetFloat("HasHistory", data.wasCreated ? 0 : 1);
-				pass.SetVector("HistoryScaleLimit", pass.GetScaleLimit2D(data.history));
+				pass.SetVector("HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
 			});
 		}
 
@@ -129,7 +129,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				pass.SetFloat("Strength", data.AoStrength);
-				pass.SetVector("InputScaleLimit", pass.GetScaleLimit2D(data.current));
+				pass.SetVector("InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.current));
 			});
 		}
 

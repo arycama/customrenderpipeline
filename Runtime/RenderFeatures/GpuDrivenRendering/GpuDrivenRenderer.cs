@@ -249,8 +249,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 
 	public void RenderShadow(Float3 mainViewPosition, ShadowRequestData request, Int2 viewSize)
 	{
-		var handle = renderGraph.ResourceMap.GetResourceHandle<GpuDrivenRenderingData>();
-		if (!renderGraph.ResourceMap.TryGetRenderPassData<GpuDrivenRenderingData>(handle, renderGraph.FrameIndex, out var instanceData))
+		if (!renderGraph.ResourceMap.TryGetResource<GpuDrivenRenderingData>(renderGraph.FrameIndex, out var instanceData))
 			return;
 
 		if (!instanceData.rendererDrawCallData.TryGetValue("ShadowCaster", out var drawList))

@@ -92,7 +92,7 @@ float3 TransmittanceToPoint1(float viewHeight, float cosAngle, float distance)
 	return TransmittanceToPoint(viewHeight, cosAngle, heightAtDistance, cosAngleAtDistance);
 }
 
-float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 rd, float viewHeight, float viewCosAngle, float2 offsets, float3 P, bool isShadow, out float cloudDepth, bool sunShadow = false)
+float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 rd, float viewHeight, float viewCosAngle, float2 offsets, float3 P, bool isShadow, out float cloudDepth, bool sunShadow = false, bool applyCloudCoverage = true)
 {
 	float LdotV = dot(rd, _LightDirection0);
 	float dt = rayLength / sampleCount;
@@ -160,10 +160,16 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		// TODO: This should use a sky convolution that does not include clouds
 		for (float j = 0.0; j < ScatterOctaves; j++)
 		{
-			#if 1
+			#if 0
 				float3 ambient = AmbientCsTwoLobe(-rd, _ForwardScatterPhase * pow(ScatterEccentricityAttenuation, j), _BackScatterPhase * pow(ScatterEccentricityAttenuation, j), 0.5);
 			#else
-				float3 ambient = GetSkyAmbient(viewHeight, viewCosAngle, _LightDirection0.y, cloudDepth) * _LightColor0 * Exposure * RcpFourPi;
+				float3 ambient = GetSkyAmbient(viewHeight, viewCosAngle, _LightDirection0.y, cloudDepth) * _LightColor0 * Exposure;
+				
+				// Attenuate sky ambient by cloud coveerage
+				if (applyCloudCoverage)
+					ambient = ambient * _CloudCoverage.a + _CloudCoverage.rgb * _GroundColor;
+					
+				ambient *= RcpFourPi;
 			#endif
 			
 			result.rgb += ambient * pow(ScatterContribution, j) * (1 - exp2(-pow(ScatterAttenuation, j) * opticalDepth)) / pow(ScatterAttenuation, j);

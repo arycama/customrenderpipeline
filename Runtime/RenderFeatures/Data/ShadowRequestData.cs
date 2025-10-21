@@ -1,15 +1,15 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public struct ShadowRequestData : IRenderPassData
+public readonly struct ShadowRequestData : IRenderPassData
 {
-	public ShadowRequest ShadowRequest { get; }
-	public float Bias { get; }
-	public float SlopeBias { get; }
-	public ResourceHandle<RenderTexture> Shadow { get; }
-	public int CascadeIndex { get; }
-	ResourceHandle<GraphicsBuffer> perCascadeData;
-	public bool ZClip { get; }
+	public readonly ShadowRequest ShadowRequest;
+	public readonly float Bias;
+	public readonly float SlopeBias;
+	public readonly ResourceHandle<RenderTexture> Shadow;
+	public readonly int CascadeIndex;
+	public readonly ResourceHandle<GraphicsBuffer> perCascadeData;
+	public readonly bool ZClip;
 
 	public ShadowRequestData(ShadowRequest shadowRequest, float bias, float slopBias, ResourceHandle<RenderTexture> shadow, int cascadeIndex, ResourceHandle<GraphicsBuffer> perCascadeData, bool zClip)
 	{

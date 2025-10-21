@@ -40,6 +40,6 @@ public readonly struct CloudShadowDataResult : IRenderPassData
 		pass.SetFloat("_CloudCoverageScale", cloudCoverageScale);
 		pass.SetFloat("_CloudCoverageOffset", cloudCoverageOffset);
 
-		pass.SetVector("_CloudShadowScaleLimit", pass.GetScaleLimit2D(cloudShadow));
+		pass.SetVector("_CloudShadowScaleLimit", pass.RenderGraph.GetScaleLimit2D(cloudShadow));
 	}
 }

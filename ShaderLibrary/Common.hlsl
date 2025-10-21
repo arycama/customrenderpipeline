@@ -60,9 +60,7 @@ cbuffer ViewData
 	float TanHalfFov;
 	float4 PixelToViewScaleOffset;
 	float RenderDeltaTime;
-	float ViewDataPadding0;
-	float ViewDataPadding1;
-	float ViewDataPadding2;
+	float3 PreviousViewPosition;
 };
 
 const static float3 ViewForward = ViewToWorld._13_23_33;

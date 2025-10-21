@@ -34,7 +34,7 @@ void Initialize(uint id : SV_DispatchThreadID)
 		return;
 
 	float4 random = RandomFloat4(id);
-	Positions[id] = float4(ViewPosition + UniformPointInSphere(random.xyz) * RainRadius, lerp(-WindTurbulence, WindTurbulence, random.w)); //w component used for turbulence
+	Positions[id] = float4(UniformPointInSphere(random.xyz) * RainRadius, lerp(-WindTurbulence, WindTurbulence, random.w)); //w component used for turbulence
 }
 
 [numthreads(1024, 1, 1)]
@@ -44,18 +44,24 @@ void Update(uint id : SV_DispatchThreadID)
 		return;
 		
 	float4 positionTurbulence = Positions[id];
+	float3 position = positionTurbulence.xyz;
+	float turbulence = positionTurbulence.w;
 	
 	float2 windAngle;
-	sincos(TwoPi * WindAngle + positionTurbulence.w, windAngle.y, windAngle.x);
+	sincos(TwoPi * WindAngle + turbulence, windAngle.y, windAngle.x);
 	
 	float3 windVector = float3(windAngle * WindStrength, -RainVelocity).xzy;
-	positionTurbulence.xyz += DeltaTime * windVector;
-	
-	if (SqrLength(ViewPosition - positionTurbulence.xyz) > Sq(RainRadius))
+	position += DeltaTime * windVector;
+
+	if (SqrLength(position) > Sq(RainRadius))
 	{
 		float4 random = RandomFloat4(id);
-		positionTurbulence = float4(ViewPosition + UniformPointInSphere(random.xyz) * RainRadius, lerp(-WindTurbulence, WindTurbulence, random.w)); //w component used for turbulence
+		position = UniformPointInSphere(random.xyz) * RainRadius;
+		turbulence = lerp(-WindTurbulence, WindTurbulence, random.w); //w component used for turbulence
 	}
-		
-	Positions[id] = positionTurbulence;
+	
+	float3 viewDelta = ViewPosition - PreviousViewPosition;
+	position -= viewDelta;
+
+	Positions[id] = float4(position, turbulence);
 }

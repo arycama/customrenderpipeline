@@ -41,7 +41,7 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	float3 objectPosition = float3((GetQuadVertexPosition(localVertexId) - 0.5) * float2(SizeX, SizeY), 0);
 	
 	float4 positionTurbulence = Positions[quadId];
-	float3 center = positionTurbulence.xyz - ViewPosition;
+	float3 center = positionTurbulence.xyz;
 	
 	// TODO: Precalculate?
 	float2 windAngle;

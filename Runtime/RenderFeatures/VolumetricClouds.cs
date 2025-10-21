@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System;
+using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -74,8 +76,20 @@ public partial class VolumetricClouds : CameraRenderFeature
         // Reprojection+output
         var (luminanceCurrent, luminanceHistory, luminanceWasCreated) = cloudLuminanceTextureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
         var (transmittanceCurrent, transmittanceHistory, transmittanceWasCreated) = cloudTransmittanceTextureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-		using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", (luminanceWasCreated, settings.StationaryBlend, settings.MotionBlend, settings.MotionFactor, settings.DepthThreshold
-			, luminanceHistory, transmittanceHistory, camera.ScaledViewSize(), skySettings, settings, time)))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", new VolumetricCloudTemporalData
+		(
+			luminanceWasCreated,
+			settings.StationaryBlend,
+			settings.MotionBlend,
+			settings.MotionFactor,
+			settings.DepthThreshold,
+			luminanceHistory, 
+			transmittanceHistory,
+			camera.ScaledViewSize(),
+			skySettings,
+			settings,
+			time
+		)))
 		{
 			pass.Initialize(material, 5);
 			pass.WriteTexture(luminanceCurrent, RenderBufferLoadAction.DontCare);
@@ -103,8 +117,8 @@ public partial class VolumetricClouds : CameraRenderFeature
 				pass.SetFloat("_MotionFactor", data.MotionFactor);
 				pass.SetFloat("DepthThreshold", data.DepthThreshold);
 
-				pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(data.luminanceHistory));
-				pass.SetVector("_TransmittanceHistoryScaleLimit", pass.GetScaleLimit2D(data.transmittanceHistory));
+				pass.SetVector("_HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.luminanceHistory));
+				pass.SetVector("_TransmittanceHistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.transmittanceHistory));
 
 				pass.SetInt("_MaxWidth", data.Item8.x - 1);
 				pass.SetInt("_MaxHeight", data.Item8.y - 1);
@@ -122,4 +136,71 @@ public partial class VolumetricClouds : CameraRenderFeature
 
 		renderGraph.AddProfileEndPass("Clouds");
     }
+}
+
+internal struct VolumetricCloudTemporalData
+{
+	public bool luminanceWasCreated;
+	public float StationaryBlend;
+	public float MotionBlend;
+	public float MotionFactor;
+	public float DepthThreshold;
+	public ResourceHandle<RenderTexture> luminanceHistory;
+	public ResourceHandle<RenderTexture> transmittanceHistory;
+	public Int2 Item8;
+	public Sky.Settings skySettings;
+	public VolumetricClouds.Settings settings;
+	public float time;
+
+	public VolumetricCloudTemporalData(bool luminanceWasCreated, float stationaryBlend, float motionBlend, float motionFactor, float depthThreshold, ResourceHandle<RenderTexture> luminanceHistory, ResourceHandle<RenderTexture> transmittanceHistory, Int2 item8, Sky.Settings skySettings, VolumetricClouds.Settings settings, float time)
+	{
+		this.luminanceWasCreated = luminanceWasCreated;
+		StationaryBlend = stationaryBlend;
+		MotionBlend = motionBlend;
+		MotionFactor = motionFactor;
+		DepthThreshold = depthThreshold;
+		this.luminanceHistory = luminanceHistory;
+		this.transmittanceHistory = transmittanceHistory;
+		Item8 = item8;
+		this.skySettings = skySettings;
+		this.settings = settings;
+		this.time = time;
+	}
+
+	public override bool Equals(object obj) => obj is VolumetricCloudTemporalData other && luminanceWasCreated == other.luminanceWasCreated && StationaryBlend == other.StationaryBlend && MotionBlend == other.MotionBlend && MotionFactor == other.MotionFactor && DepthThreshold == other.DepthThreshold && EqualityComparer<ResourceHandle<RenderTexture>>.Default.Equals(luminanceHistory, other.luminanceHistory) && EqualityComparer<ResourceHandle<RenderTexture>>.Default.Equals(transmittanceHistory, other.transmittanceHistory) && EqualityComparer<Int2>.Default.Equals(Item8, other.Item8) && EqualityComparer<Sky.Settings>.Default.Equals(skySettings, other.skySettings) && EqualityComparer<VolumetricClouds.Settings>.Default.Equals(settings, other.settings) && time == other.time;
+
+	public override int GetHashCode()
+	{
+		var hash = new HashCode();
+		hash.Add(luminanceWasCreated);
+		hash.Add(StationaryBlend);
+		hash.Add(MotionBlend);
+		hash.Add(MotionFactor);
+		hash.Add(DepthThreshold);
+		hash.Add(luminanceHistory);
+		hash.Add(transmittanceHistory);
+		hash.Add(Item8);
+		hash.Add(skySettings);
+		hash.Add(settings);
+		hash.Add(time);
+		return hash.ToHashCode();
+	}
+
+	public void Deconstruct(out bool luminanceWasCreated, out float stationaryBlend, out float motionBlend, out float motionFactor, out float depthThreshold, out ResourceHandle<RenderTexture> luminanceHistory, out ResourceHandle<RenderTexture> transmittanceHistory, out Int2 item8, out Sky.Settings skySettings, out VolumetricClouds.Settings settings, out float time)
+	{
+		luminanceWasCreated = this.luminanceWasCreated;
+		stationaryBlend = StationaryBlend;
+		motionBlend = MotionBlend;
+		motionFactor = MotionFactor;
+		depthThreshold = DepthThreshold;
+		luminanceHistory = this.luminanceHistory;
+		transmittanceHistory = this.transmittanceHistory;
+		item8 = Item8;
+		skySettings = this.skySettings;
+		settings = this.settings;
+		time = this.time;
+	}
+
+	public static implicit operator (bool luminanceWasCreated, float StationaryBlend, float MotionBlend, float MotionFactor, float DepthThreshold, ResourceHandle<RenderTexture> luminanceHistory, ResourceHandle<RenderTexture> transmittanceHistory, Int2, Sky.Settings skySettings, VolumetricClouds.Settings settings, float time)(VolumetricCloudTemporalData value) => (value.luminanceWasCreated, value.StationaryBlend, value.MotionBlend, value.MotionFactor, value.DepthThreshold, value.luminanceHistory, value.transmittanceHistory, value.Item8, value.skySettings, value.settings, value.time);
+	public static implicit operator VolumetricCloudTemporalData((bool luminanceWasCreated, float StationaryBlend, float MotionBlend, float MotionFactor, float DepthThreshold, ResourceHandle<RenderTexture> luminanceHistory, ResourceHandle<RenderTexture> transmittanceHistory, Int2, Sky.Settings skySettings, VolumetricClouds.Settings settings, float time) value) => new VolumetricCloudTemporalData(value.luminanceWasCreated, value.StationaryBlend, value.MotionBlend, value.MotionFactor, value.DepthThreshold, value.luminanceHistory, value.transmittanceHistory, value.Item8, value.skySettings, value.settings, value.time);
 }

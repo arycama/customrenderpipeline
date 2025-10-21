@@ -21,7 +21,7 @@ public class RenderGraph : IDisposable
 
 	public RTHandleSystem RtHandleSystem { get; }
 	public BufferHandleSystem BufferHandleSystem { get; }
-	public RenderResourceMap ResourceMap { get; }
+	public RenderResourceMap ResourceMap { get; } = new();
 	public CustomRenderPipelineBase RenderPipeline { get; }
 
 	public ResourceHandle<GraphicsBuffer> EmptyBuffer { get; }
@@ -56,7 +56,6 @@ public class RenderGraph : IDisposable
 		EmptyCubemap = RtHandleSystem.ImportResource(emptyCubemap);
 		EmptyCubemapArray = RtHandleSystem.ImportResource(emptyCubemapArray);
 
-		ResourceMap = new(this);
 		RenderPipeline = renderPipeline;
 	}
 
@@ -151,34 +150,24 @@ public class RenderGraph : IDisposable
 		BufferHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 		RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 
-		try
-		{
-			IsExecuting = true;
+		IsExecuting = true;
 
-			foreach (var renderPass in renderPasses)
+		foreach (var renderPass in renderPasses)
+		{
+			renderPass.Run(command);
+
+			renderPass.Reset();
+
+			if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))
 			{
-				renderPass.Run(command);
-
-				renderPass.Reset();
-
-				if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))
-				{
-					pool = new();
-					renderPassPool.Add(renderPass.GetType(), pool);
-				}
-
-				pool.Push(renderPass);
+				pool = new();
+				renderPassPool.Add(renderPass.GetType(), pool);
 			}
+
+			pool.Push(renderPass);
 		}
-		catch(Exception exception)
-		{
-			CleanupCurrentFrame();
-			throw exception;
-		}
-		finally
-		{
-			IsExecuting = false;
-		}
+
+		IsExecuting = false;
 	}
 
 	public ResourceHandle<RenderTexture> GetTexture(RtHandleDescriptor descriptor, bool isPersistent = false)
@@ -214,8 +203,6 @@ public class RenderGraph : IDisposable
 
 		if (!FrameDebugger.enabled)
 			FrameIndex++;
-
-		IsExecuting = false;
 	}
 
 	public void SetResource<T>(T resource, bool isPersistent = false) where T : struct, IRenderPassData
@@ -230,26 +217,23 @@ public class RenderGraph : IDisposable
 		ResourceMap.SetRenderPassData<T>(default, -1, false);
 	}
 
-	public bool IsRenderPassDataValid<T>() where T : struct, IRenderPassData
-	{
-		return ResourceMap.IsRenderPassDataValid<T>(FrameIndex);
-	}
-
 	public bool TryGetResource<T>(out T resource) where T : struct, IRenderPassData
 	{
 		Assert.IsFalse(IsExecuting);
-		return ResourceMap.TryGetRenderPassData<T>(FrameIndex, out resource);
+		return ResourceMap.TryGetResource<T>(FrameIndex, out resource);
 	}
 
 	public T GetResource<T>() where T : struct, IRenderPassData
 	{
-		Assert.IsFalse(IsExecuting);
-		return ResourceMap.GetRenderPassData<T>(FrameIndex);
+		var hasResource = TryGetResource<T>(out var resource);
+		Assert.IsTrue(hasResource);
+		return resource;
 	}
 
-	public void SetRTHandle<T>(ResourceHandle<RenderTexture> handle, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default) where T : IRtHandleId, new()
+	public void SetRTHandle<T>(ResourceHandle<RenderTexture> handle, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default) where T : struct, IRtHandleId
 	{
-		rtHandles[typeof(T)] = new RTHandleData(handle, new T().Id, mip, subElement);
+		var data = new T();
+		rtHandles[typeof(T)] = new RTHandleData(handle, data.PropertyId, data.ScaleLimitPropertyId, mip, subElement);
 	}
 
 	public RTHandleData GetRTHandle(Type type)
@@ -297,5 +281,48 @@ public class RenderGraph : IDisposable
 	{
 		Assert.IsFalse(IsExecuting);
 		RtHandleSystem.ReleasePersistentResource(handle);
+	}
+
+	public Float4 GetScaleLimit2D(ResourceHandle<RenderTexture> handle)
+	{
+		Assert.IsTrue(IsExecuting);
+
+		var descriptor = RtHandleSystem.GetDescriptor(handle);
+		var resource = RtHandleSystem.GetResource(handle);
+
+		var scaleX = (float)descriptor.width / resource.width;
+		var scaleY = (float)descriptor.height / resource.height;
+		var limitX = (descriptor.width - 0.5f) / resource.width;
+		var limitY = (descriptor.height - 0.5f) / resource.height;
+
+		return new Float4(scaleX, scaleY, limitX, limitY);
+	}
+
+	public Float3 GetScale3D(ResourceHandle<RenderTexture> handle)
+	{
+		Assert.IsTrue(IsExecuting);
+
+		var descriptor = RtHandleSystem.GetDescriptor(handle);
+		var resource = RtHandleSystem.GetResource(handle);
+
+		var scaleX = (float)descriptor.width / resource.width;
+		var scaleY = (float)descriptor.height / resource.height;
+		var scaleZ = (float)descriptor.volumeDepth / resource.volumeDepth;
+
+		return new Float3(scaleX, scaleY, scaleZ);
+	}
+
+	public Float3 GetLimit3D(ResourceHandle<RenderTexture> handle)
+	{
+		Assert.IsTrue(IsExecuting);
+
+		var descriptor = RtHandleSystem.GetDescriptor(handle);
+		var resource = RtHandleSystem.GetResource(handle);
+
+		var limitX = (descriptor.width - 0.5f) / resource.width;
+		var limitY = (descriptor.height - 0.5f) / resource.height;
+		var limitZ = (descriptor.volumeDepth - 0.5f) / resource.volumeDepth;
+
+		return new Float3(limitX, limitY, limitZ);
 	}
 }

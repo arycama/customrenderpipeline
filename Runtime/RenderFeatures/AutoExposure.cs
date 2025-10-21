@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
@@ -54,19 +55,19 @@ public partial class AutoExposure : CameraRenderFeature
 		exposureTexture.Apply(false, false);
 
 		var histogram = renderGraph.GetBuffer(256);
-		using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", 
-		(
-			minEv: settings.MinEv,
-			maxEv: settings.MaxEv,
-			adaptationSpeed: settings.AdaptationSpeed,
-			exposureCompensation: settings.ExposureCompensation,
-			iso: lensSettings.Iso,
-			aperture: lensSettings.Aperture,
-			shutterSpeed: lensSettings.ShutterSpeed,
-			histogramMin: settings.HistogramMin,
-			histogramMax: settings.HistogramMax,
-			exposureCompensationRemap: GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1),
-			meteringMode: (float)settings.MeteringMode,
+		using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", new AutoExposureStructData
+		(			
+			settings.MinEv,
+			settings.MaxEv,
+			settings.AdaptationSpeed,
+			settings.ExposureCompensation,
+			lensSettings.Iso,
+			lensSettings.Aperture,
+			lensSettings.ShutterSpeed,
+			settings.HistogramMin,
+			settings.HistogramMax,
+			GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1),
+			(float)settings.MeteringMode,
 			settings.ProceduralCenter,
 			settings.ProceduralRadii,
 			settings.ProceduralSoftness
@@ -146,4 +147,83 @@ public partial class AutoExposure : CameraRenderFeature
 			});
 		}
 	}
+}
+
+internal struct AutoExposureStructData
+{
+	public float minEv;
+	public float maxEv;
+	public float adaptationSpeed;
+	public float exposureCompensation;
+	public float iso;
+	public float aperture;
+	public float shutterSpeed;
+	public float histogramMin;
+	public float histogramMax;
+	public Float4 exposureCompensationRemap;
+	public float meteringMode;
+	public Float2 ProceduralCenter;
+	public Float2 ProceduralRadii;
+	public float ProceduralSoftness;
+
+	public AutoExposureStructData(float minEv, float maxEv, float adaptationSpeed, float exposureCompensation, float iso, float aperture, float shutterSpeed, float histogramMin, float histogramMax, Float4 exposureCompensationRemap, float meteringMode, Float2 proceduralCenter, Float2 proceduralRadii, float proceduralSoftness)
+	{
+		this.minEv = minEv;
+		this.maxEv = maxEv;
+		this.adaptationSpeed = adaptationSpeed;
+		this.exposureCompensation = exposureCompensation;
+		this.iso = iso;
+		this.aperture = aperture;
+		this.shutterSpeed = shutterSpeed;
+		this.histogramMin = histogramMin;
+		this.histogramMax = histogramMax;
+		this.exposureCompensationRemap = exposureCompensationRemap;
+		this.meteringMode = meteringMode;
+		ProceduralCenter = proceduralCenter;
+		ProceduralRadii = proceduralRadii;
+		ProceduralSoftness = proceduralSoftness;
+	}
+
+	public override bool Equals(object obj) => obj is AutoExposureStructData other && minEv == other.minEv && maxEv == other.maxEv && adaptationSpeed == other.adaptationSpeed && exposureCompensation == other.exposureCompensation && iso == other.iso && aperture == other.aperture && shutterSpeed == other.shutterSpeed && histogramMin == other.histogramMin && histogramMax == other.histogramMax && EqualityComparer<Float4>.Default.Equals(exposureCompensationRemap, other.exposureCompensationRemap) && meteringMode == other.meteringMode && EqualityComparer<Float2>.Default.Equals(ProceduralCenter, other.ProceduralCenter) && EqualityComparer<Float2>.Default.Equals(ProceduralRadii, other.ProceduralRadii) && ProceduralSoftness == other.ProceduralSoftness;
+
+	public override int GetHashCode()
+	{
+		var hash = new System.HashCode();
+		hash.Add(minEv);
+		hash.Add(maxEv);
+		hash.Add(adaptationSpeed);
+		hash.Add(exposureCompensation);
+		hash.Add(iso);
+		hash.Add(aperture);
+		hash.Add(shutterSpeed);
+		hash.Add(histogramMin);
+		hash.Add(histogramMax);
+		hash.Add(exposureCompensationRemap);
+		hash.Add(meteringMode);
+		hash.Add(ProceduralCenter);
+		hash.Add(ProceduralRadii);
+		hash.Add(ProceduralSoftness);
+		return hash.ToHashCode();
+	}
+
+	public void Deconstruct(out float minEv, out float maxEv, out float adaptationSpeed, out float exposureCompensation, out float iso, out float aperture, out float shutterSpeed, out float histogramMin, out float histogramMax, out Float4 exposureCompensationRemap, out float meteringMode, out Float2 proceduralCenter, out Float2 proceduralRadii, out float proceduralSoftness)
+	{
+		minEv = this.minEv;
+		maxEv = this.maxEv;
+		adaptationSpeed = this.adaptationSpeed;
+		exposureCompensation = this.exposureCompensation;
+		iso = this.iso;
+		aperture = this.aperture;
+		shutterSpeed = this.shutterSpeed;
+		histogramMin = this.histogramMin;
+		histogramMax = this.histogramMax;
+		exposureCompensationRemap = this.exposureCompensationRemap;
+		meteringMode = this.meteringMode;
+		proceduralCenter = ProceduralCenter;
+		proceduralRadii = ProceduralRadii;
+		proceduralSoftness = ProceduralSoftness;
+	}
+
+	public static implicit operator (float minEv, float maxEv, float adaptationSpeed, float exposureCompensation, float iso, float aperture, float shutterSpeed, float histogramMin, float histogramMax, Float4 exposureCompensationRemap, float meteringMode, Float2 ProceduralCenter, Float2 ProceduralRadii, float ProceduralSoftness)(AutoExposureStructData value) => (value.minEv, value.maxEv, value.adaptationSpeed, value.exposureCompensation, value.iso, value.aperture, value.shutterSpeed, value.histogramMin, value.histogramMax, value.exposureCompensationRemap, value.meteringMode, value.ProceduralCenter, value.ProceduralRadii, value.ProceduralSoftness);
+	public static implicit operator AutoExposureStructData((float minEv, float maxEv, float adaptationSpeed, float exposureCompensation, float iso, float aperture, float shutterSpeed, float histogramMin, float histogramMax, Float4 exposureCompensationRemap, float meteringMode, Float2 ProceduralCenter, Float2 ProceduralRadii, float ProceduralSoftness) value) => new AutoExposureStructData(value.minEv, value.maxEv, value.adaptationSpeed, value.exposureCompensation, value.iso, value.aperture, value.shutterSpeed, value.histogramMin, value.histogramMax, value.exposureCompensationRemap, value.meteringMode, value.ProceduralCenter, value.ProceduralRadii, value.ProceduralSoftness);
 }

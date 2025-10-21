@@ -72,7 +72,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 			renderGraph.SetResource(new TimeData(time, previousTime));
 
-			renderGraph.SetResource(new FrameData(renderGraph.SetConstantBuffer((
+			renderGraph.SetResource(new FrameData(renderGraph.SetConstantBuffer(new FrameDataStruct(
 				overlayMatrix,
 				(float)time,
 				(float)deltaTime,
@@ -388,4 +388,95 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new Tonemapping(renderGraph, asset.Tonemapping, asset.Bloom),
 		new RenderGizmos(renderGraph),
 	};
+}
+
+internal struct FrameDataStruct
+{
+	public Float4x4 overlayMatrix;
+	public float Item2;
+	public float Item3;
+	public float Item4;
+	public float Item5;
+	public float Item6;
+	public float sunCosAngle;
+	public float Item8;
+	public float Item9;
+	public float Item10;
+	public float Item11;
+	public float Item12;
+	public float Item13;
+	public int Item14;
+	public int Item15;
+	public float sinSigmaSq;
+	public float Item17;
+
+	public FrameDataStruct(Float4x4 overlayMatrix, float item2, float item3, float item4, float item5, float item6, float sunCosAngle, float item8, float item9, float item10, float item11, float item12, float item13, int item14, int item15, float sinSigmaSq, float item17)
+	{
+		this.overlayMatrix = overlayMatrix;
+		Item2 = item2;
+		Item3 = item3;
+		Item4 = item4;
+		Item5 = item5;
+		Item6 = item6;
+		this.sunCosAngle = sunCosAngle;
+		Item8 = item8;
+		Item9 = item9;
+		Item10 = item10;
+		Item11 = item11;
+		Item12 = item12;
+		Item13 = item13;
+		Item14 = item14;
+		Item15 = item15;
+		this.sinSigmaSq = sinSigmaSq;
+		Item17 = item17;
+	}
+
+	public override bool Equals(object obj) => obj is FrameDataStruct other && EqualityComparer<Float4x4>.Default.Equals(overlayMatrix, other.overlayMatrix) && Item2 == other.Item2 && Item3 == other.Item3 && Item4 == other.Item4 && Item5 == other.Item5 && Item6 == other.Item6 && sunCosAngle == other.sunCosAngle && Item8 == other.Item8 && Item9 == other.Item9 && Item10 == other.Item10 && Item11 == other.Item11 && Item12 == other.Item12 && Item13 == other.Item13 && Item14 == other.Item14 && Item15 == other.Item15 && sinSigmaSq == other.sinSigmaSq && Item17 == other.Item17;
+
+	public override int GetHashCode()
+	{
+		var hash = new System.HashCode();
+		hash.Add(overlayMatrix);
+		hash.Add(Item2);
+		hash.Add(Item3);
+		hash.Add(Item4);
+		hash.Add(Item5);
+		hash.Add(Item6);
+		hash.Add(sunCosAngle);
+		hash.Add(Item8);
+		hash.Add(Item9);
+		hash.Add(Item10);
+		hash.Add(Item11);
+		hash.Add(Item12);
+		hash.Add(Item13);
+		hash.Add(Item14);
+		hash.Add(Item15);
+		hash.Add(sinSigmaSq);
+		hash.Add(Item17);
+		return hash.ToHashCode();
+	}
+
+	public void Deconstruct(out Float4x4 overlayMatrix, out float item2, out float item3, out float item4, out float item5, out float item6, out float sunCosAngle, out float item8, out float item9, out float item10, out float item11, out float item12, out float item13, out int item14, out int item15, out float sinSigmaSq, out float item17)
+	{
+		overlayMatrix = this.overlayMatrix;
+		item2 = Item2;
+		item3 = Item3;
+		item4 = Item4;
+		item5 = Item5;
+		item6 = Item6;
+		sunCosAngle = this.sunCosAngle;
+		item8 = Item8;
+		item9 = Item9;
+		item10 = Item10;
+		item11 = Item11;
+		item12 = Item12;
+		item13 = Item13;
+		item14 = Item14;
+		item15 = Item15;
+		sinSigmaSq = this.sinSigmaSq;
+		item17 = Item17;
+	}
+
+	public static implicit operator (Float4x4 overlayMatrix, float, float, float, float, float, float sunCosAngle, float, float, float, float, float, float, int, int, float sinSigmaSq, float)(FrameDataStruct value) => (value.overlayMatrix, value.Item2, value.Item3, value.Item4, value.Item5, value.Item6, value.sunCosAngle, value.Item8, value.Item9, value.Item10, value.Item11, value.Item12, value.Item13, value.Item14, value.Item15, value.sinSigmaSq, value.Item17);
+	public static implicit operator FrameDataStruct((Float4x4 overlayMatrix, float, float, float, float, float, float sunCosAngle, float, float, float, float, float, float, int, int, float sinSigmaSq, float) value) => new FrameDataStruct(value.overlayMatrix, value.Item2, value.Item3, value.Item4, value.Item5, value.Item6, value.sunCosAngle, value.Item8, value.Item9, value.Item10, value.Item11, value.Item12, value.Item13, value.Item14, value.Item15, value.sinSigmaSq, value.Item17);
 }

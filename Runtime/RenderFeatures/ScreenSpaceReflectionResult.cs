@@ -19,7 +19,7 @@ public readonly struct ScreenSpaceReflectionResult : IRenderPassData
 
 	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
-		pass.SetVector("ScreenSpaceReflectionsScaleLimit", pass.GetScaleLimit2D(ScreenSpaceReflections));
+		pass.SetVector("ScreenSpaceReflectionsScaleLimit", pass.RenderGraph.GetScaleLimit2D(ScreenSpaceReflections));
 		pass.SetFloat("SpecularGiStrength", intensity);
 	}
 }

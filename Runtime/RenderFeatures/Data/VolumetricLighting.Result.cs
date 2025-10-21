@@ -22,8 +22,8 @@ public partial class VolumetricLighting
 
         public readonly void SetProperties(RenderPass pass, CommandBuffer command)
         {
-			pass.SetVector("VolumetricLightScale", pass.GetScale3D(volumetricLighting));
-			pass.SetVector("VolumetricLightMax", pass.GetLimit3D(volumetricLighting));
+			pass.SetVector("VolumetricLightScale", pass.RenderGraph.GetScale3D(volumetricLighting));
+			pass.SetVector("VolumetricLightMax", pass.RenderGraph.GetLimit3D(volumetricLighting));
 		}
     }
 }

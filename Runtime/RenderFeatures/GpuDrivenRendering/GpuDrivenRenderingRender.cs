@@ -15,8 +15,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 		if (camera.cameraType != CameraType.SceneView && camera.cameraType != CameraType.Game && camera.cameraType != CameraType.Reflection)
 			return;
 
-		var handle = renderGraph.ResourceMap.GetResourceHandle<GpuDrivenRenderingData>();
-		if (!renderGraph.ResourceMap.TryGetRenderPassData<GpuDrivenRenderingData>(handle, renderGraph.FrameIndex, out var instanceData))
+		if (!renderGraph.ResourceMap.TryGetResource<GpuDrivenRenderingData>(renderGraph.FrameIndex, out var instanceData))
 			return;
 
 		if (!instanceData.rendererDrawCallData.TryGetValue("MotionVectors", out var drawList))

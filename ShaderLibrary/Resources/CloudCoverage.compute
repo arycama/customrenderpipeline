@@ -23,7 +23,7 @@ void CloudCoverage(uint groupIndex : SV_GroupIndex)
 	float rayEnd = DistanceToSphereInside(_PlanetRadius, V.y, _PlanetRadius + _StartHeight + _LayerThickness);
 	
 	float cloudDistance;
-	float4 clouds = EvaluateCloud(rayStart, rayEnd - rayStart, 16, V, _PlanetRadius, V.y, 0.5, float3(0.0, -ViewPosition.y, 0.0), false, cloudDistance, false);
+	float4 clouds = EvaluateCloud(rayStart, rayEnd - rayStart, 16, V, _PlanetRadius, V.y, 0.5, float3(0.0, -ViewPosition.y, 0.0), false, cloudDistance, false, false);
 	
 	// TODO: Need to figure out why this happens and fix it
 	if (any(IsInfOrNaN(clouds)))

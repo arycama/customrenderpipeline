@@ -1,4 +1,10 @@
-﻿public struct CameraStencil : IRtHandleId
+﻿using UnityEngine;
+
+public readonly struct CameraStencil : IRtHandleId
 {
-	readonly string IRtHandleId.Id => nameof(CameraStencil);
+	public static readonly int PropertyId = Shader.PropertyToID(nameof(CameraStencil));
+	public static readonly int ScaleLimitPropertyId = Shader.PropertyToID($"{nameof(CameraStencil)}ScaleLimit");
+
+	readonly int IRtHandleId.PropertyId => PropertyId;
+	readonly int IRtHandleId.ScaleLimitPropertyId => ScaleLimitPropertyId;
 }

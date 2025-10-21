@@ -44,7 +44,7 @@ public class GenerateHiZ : CameraRenderFeature
 				pass.SetInt("_Width", data.Item1.x);
 				pass.SetInt("_Height", data.Item1.y);
 				pass.SetInt("_MaxMip", data.Item2);
-				pass.SetVector("_InputScaleLimit", pass.GetScaleLimit2D(data.Item3));
+				pass.SetVector("_InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.Item3));
 			});
 		}
 

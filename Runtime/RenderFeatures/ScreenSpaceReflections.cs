@@ -169,7 +169,7 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
             pass.SetRenderFunction(static (command, pass, data) =>
             {
                 pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
-                pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(data.history));
+                pass.SetVector("_HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
             });
         }
 

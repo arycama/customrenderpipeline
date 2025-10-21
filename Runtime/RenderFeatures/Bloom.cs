@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
@@ -32,8 +33,8 @@ public class Bloom : CameraRenderFeature
 		[field: SerializeField] public Texture2D StarburstTexture { get; private set; }
 	}
 
-	private Settings settings;
-	private Material material;
+	private readonly Settings settings;
+	private readonly Material material;
 
 	public Bloom(RenderGraph renderGraph, Settings settings) : base(renderGraph)
 	{
@@ -64,37 +65,55 @@ public class Bloom : CameraRenderFeature
 			var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
 			var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
 
-			var rt = i > 0 ? bloomIds[i - 1] : renderGraph.GetRTHandle<CameraTarget>();
+			var source = i > 0 ? bloomIds[i - 1] : renderGraph.GetRTHandle<CameraTarget>();
 
-			using var pass = renderGraph.AddFullscreenRenderPass("Bloom Down", (new Float2(1.0f / width, 1.0f / height), rt, settings));
+			using var pass = renderGraph.AddFullscreenRenderPass("Bloom Down", new BloomData
+			(
+				new Float2(1.0f / width, 1.0f / height),
+				source,
+				settings.DirtStrength,
+				settings.LensDirt,
+				settings.DistortionQuality,
+				settings.Distortion,
+				settings.GhostStrength,
+				settings.GhostCount,
+				settings.GhostSpacing,
+				settings.HaloStrength,
+				settings.HaloWidth,
+				settings.HaloRadius,
+				settings.StreakStrength,
+				settings.StarburstTexture,
+				settings.BloomStrength
+			));
+
 			pass.Initialize(material, i == settings.FlareMip ? 0 : 1);
 			pass.WriteTexture(bloomIds[i], RenderBufferLoadAction.DontCare);
 
-			pass.ReadTexture("Input", rt);
+			pass.ReadTexture("Input", source);
 			pass.AddRenderPassData<ViewData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetVector("RcpResolution", data.Item1);
-				pass.SetVector("InputScaleLimit", pass.GetScaleLimit2D(data.rt));
-				pass.SetFloat("DirtStrength", data.settings.DirtStrength);
+				pass.SetVector("RcpResolution", data.RcpResolution);
+				pass.SetVector("InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.source));
+				pass.SetFloat("DirtStrength", data.DirtStrength);
 
-				if (data.settings.LensDirt != null)
-					pass.SetTexture("LensDirt", data.settings.LensDirt);
+				if (data.LensDirt != null)
+					pass.SetTexture("LensDirt", data.LensDirt);
 
 				// Lens flare 
-				pass.SetFloat("DistortionQuality", data.settings.DistortionQuality);
-				pass.SetFloat("Distortion", data.settings.Distortion);
-				pass.SetFloat("GhostStrength", data.settings.GhostStrength);
-				pass.SetFloat("GhostCount", data.settings.GhostCount);
-				pass.SetFloat("GhostSpacing", data.settings.GhostSpacing);
-				pass.SetFloat("HaloStrength", data.settings.HaloStrength);
-				pass.SetFloat("HaloWidth", data.settings.HaloWidth);
-				pass.SetFloat("HaloRadius", data.settings.HaloRadius);
-				pass.SetFloat("StreakStrength", data.settings.StreakStrength);
+				pass.SetFloat("DistortionQuality", data.DistortionQuality);
+				pass.SetFloat("Distortion", data.Distortion);
+				pass.SetFloat("GhostStrength", data.GhostStrength);
+				pass.SetFloat("GhostCount", data.GhostCount);
+				pass.SetFloat("GhostSpacing", data.GhostSpacing);
+				pass.SetFloat("HaloStrength", data.HaloStrength);
+				pass.SetFloat("HaloWidth", data.HaloWidth);
+				pass.SetFloat("HaloRadius", data.HaloRadius);
+				pass.SetFloat("StreakStrength", data.StreakStrength);
 
-				if (data.settings.StarburstTexture != null)
-					pass.SetTexture("StarBurst", data.settings.StarburstTexture);
+				if (data.StarburstTexture != null)
+					pass.SetTexture("StarBurst", data.StarburstTexture);
 			});
 		}
 
@@ -105,7 +124,24 @@ public class Bloom : CameraRenderFeature
 			var width = Mathf.Max(1, camera.pixelWidth >> i);
 			var height = Mathf.Max(1, camera.pixelHeight >> i);
 
-			using var pass = renderGraph.AddFullscreenRenderPass("Bloom Up", (settings, new Float2(1f / width, 1f / height), input));
+			using var pass = renderGraph.AddFullscreenRenderPass("Bloom Up", new BloomData
+			(
+				new Float2(1.0f / width, 1.0f / height),
+				input,
+				settings.DirtStrength,
+				settings.LensDirt,
+				settings.DistortionQuality,
+				settings.Distortion,
+				settings.GhostStrength,
+				settings.GhostCount,
+				settings.GhostSpacing,
+				settings.HaloStrength,
+				settings.HaloWidth,
+				settings.HaloRadius,
+				settings.StreakStrength,
+				settings.StarburstTexture,
+				settings.BloomStrength
+			));
 
 			pass.Initialize(material, 2);
 			pass.WriteTexture(bloomIds[i - 1]);
@@ -113,28 +149,28 @@ public class Bloom : CameraRenderFeature
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetFloat("Strength", data.settings.BloomStrength);
-				pass.SetVector("RcpResolution", data.Item2);
-				pass.SetVector("InputScaleLimit", pass.GetScaleLimit2D(data.input));
+				pass.SetFloat("Strength", data.bloomStrength);
+				pass.SetVector("RcpResolution", data.RcpResolution);
+				pass.SetVector("InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.source));
 
-				pass.SetFloat("DirtStrength", data.settings.DirtStrength);
+				pass.SetFloat("DirtStrength", data.DirtStrength);
 
-				if (data.settings.LensDirt != null)
-					pass.SetTexture("LensDirt", data.settings.LensDirt);
+				if (data.LensDirt != null)
+					pass.SetTexture("LensDirt", data.LensDirt);
 
 				// Lens flare 
-				pass.SetFloat("DistortionQuality", data.settings.DistortionQuality);
-				pass.SetFloat("Distortion", data.settings.Distortion);
-				pass.SetFloat("GhostStrength", data.settings.GhostStrength);
-				pass.SetFloat("GhostCount", data.settings.GhostCount);
-				pass.SetFloat("GhostSpacing", data.settings.GhostSpacing);
-				pass.SetFloat("HaloStrength", data.settings.HaloStrength);
-				pass.SetFloat("HaloWidth", data.settings.HaloWidth);
-				pass.SetFloat("HaloRadius", data.settings.HaloRadius);
-				pass.SetFloat("StreakStrength", data.settings.StreakStrength);
+				pass.SetFloat("DistortionQuality", data.DistortionQuality);
+				pass.SetFloat("Distortion", data.Distortion);
+				pass.SetFloat("GhostStrength", data.GhostStrength);
+				pass.SetFloat("GhostCount", data.GhostCount);
+				pass.SetFloat("GhostSpacing", data.GhostSpacing);
+				pass.SetFloat("HaloStrength", data.HaloStrength);
+				pass.SetFloat("HaloWidth", data.HaloWidth);
+				pass.SetFloat("HaloRadius", data.HaloRadius);
+				pass.SetFloat("StreakStrength", data.StreakStrength);
 
-				if (data.settings.StarburstTexture != null)
-					pass.SetTexture("StarBurst", data.settings.StarburstTexture);
+				if (data.StarburstTexture != null)
+					pass.SetTexture("StarBurst", data.StarburstTexture);
 			});
 		}
 
@@ -142,5 +178,43 @@ public class Bloom : CameraRenderFeature
 		ListPool<ResourceHandle<RenderTexture>>.Release(bloomIds);
 
 		renderGraph.AddProfileEndPass("Bloom");
+	}
+
+	private readonly struct BloomData
+	{
+		public readonly Float2 RcpResolution;
+		public readonly ResourceHandle<RenderTexture> source;
+		public readonly float DirtStrength;
+		public readonly Texture2D LensDirt;
+		public readonly int DistortionQuality;
+		public readonly float Distortion;
+		public readonly float GhostStrength;
+		public readonly int GhostCount;
+		public readonly float GhostSpacing;
+		public readonly float HaloStrength;
+		public readonly float HaloWidth;
+		public readonly float HaloRadius;
+		public readonly float StreakStrength;
+		public readonly Texture2D StarburstTexture;
+		public readonly float bloomStrength;
+
+		public BloomData(Float2 rcpResolution, ResourceHandle<RenderTexture> source, float dirtStrength, Texture2D lensDirt, int distortionQuality, float distortion, float ghostStrength, int ghostCount, float ghostSpacing, float haloStrength, float haloWidth, float haloRadius, float streakStrength, Texture2D starburstTexture, float bloomStrength)
+		{
+			RcpResolution = rcpResolution;
+			this.source = source;
+			DirtStrength = dirtStrength;
+			LensDirt = lensDirt;
+			DistortionQuality = distortionQuality;
+			Distortion = distortion;
+			GhostStrength = ghostStrength;
+			GhostCount = ghostCount;
+			GhostSpacing = ghostSpacing;
+			HaloStrength = haloStrength;
+			HaloWidth = haloWidth;
+			HaloRadius = haloRadius;
+			StreakStrength = streakStrength;
+			StarburstTexture = starburstTexture;
+			this.bloomStrength = bloomStrength;
+		}
 	}
 }

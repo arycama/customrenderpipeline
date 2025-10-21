@@ -1,4 +1,10 @@
-﻿public struct GBufferBentNormalOcclusion : IRtHandleId
+﻿using UnityEngine;
+
+public readonly struct GBufferBentNormalOcclusion : IRtHandleId
 {
-	readonly string IRtHandleId.Id => nameof(GBufferBentNormalOcclusion);
+	public static readonly int PropertyId = Shader.PropertyToID(nameof(GBufferBentNormalOcclusion));
+	public static readonly int ScaleLimitPropertyId = Shader.PropertyToID($"{nameof(GBufferBentNormalOcclusion)}ScaleLimit");
+
+	readonly int IRtHandleId.PropertyId => PropertyId;
+	readonly int IRtHandleId.ScaleLimitPropertyId => ScaleLimitPropertyId;
 }

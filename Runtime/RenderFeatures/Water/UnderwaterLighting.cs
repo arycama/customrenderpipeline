@@ -50,6 +50,6 @@ public class UnderwaterLighting : CameraRenderFeature
             });
         }
 
-        renderGraph.SetResource(new UnderwaterLightingResult(underwaterResultId)); ;
+        renderGraph.SetResource(new UnderwaterLightingResult(underwaterResultId));
     }
 }

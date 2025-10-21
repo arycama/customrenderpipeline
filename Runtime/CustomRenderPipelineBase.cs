@@ -53,13 +53,11 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
         renderGraph.Dispose();
     }
 
-    protected override void Render(ScriptableRenderContext context, List<Camera> cameras) => Render(context, cameras);
+	protected abstract List<FrameRenderFeature> InitializePerFrameRenderFeatures();
 
-    protected abstract List<FrameRenderFeature> InitializePerFrameRenderFeatures();
+	protected abstract List<CameraRenderFeature> InitializePerCameraRenderFeatures();
 
-    protected abstract List<CameraRenderFeature> InitializePerCameraRenderFeatures();
-
-    private void Render(ScriptableRenderContext context, IList<Camera> cameras)
+	protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
 #if UNITY_EDITOR
 		// When renderdoc is loaded, all renderTextures become un-created.. but Unity does not dispose the render pipeline until the next frame
@@ -89,9 +87,9 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 			}
 		}
 
-        foreach (var camera in cameras)
+		foreach (var camera in cameras)
         {
-            camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
+			camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 
             using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
 
@@ -125,18 +123,11 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
 		renderGraph.Execute(command);
 
-		try
-		{
-            context.ExecuteCommandBuffer(command);
-            command.Clear();
+        context.ExecuteCommandBuffer(command);
+		command.Clear();
+		context.Submit();
 
-            if (context.SubmitForRenderPassValidation())
-                context.Submit();
-        }
-        finally
-        {
-            renderGraph.CleanupCurrentFrame();
-        }
+        renderGraph.CleanupCurrentFrame();
     }
 }
 

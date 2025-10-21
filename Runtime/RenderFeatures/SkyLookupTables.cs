@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -32,22 +33,23 @@ public class SkyLookupTables : FrameRenderFeature
     {
 		renderGraph.AddProfileBeginPass("Sky Tables");
 
-        var atmospherePropertiesBuffer = renderGraph.SetConstantBuffer((
-                rayleighScatter: settings.RayleighScatter / settings.EarthScale,
-                mieScatter: settings.MieScatter / settings.EarthScale,
-                ozoneAbsorption: settings.OzoneAbsorption / settings.EarthScale,
-                mieAbsorption: settings.MieAbsorption / settings.EarthScale,
-                groundColor: settings.GroundColor.LinearFloat3(),
-                miePhase: settings.MiePhase,
-                rayleighHeight: settings.RayleighHeight * settings.EarthScale,
-                mieHeight: settings.MieHeight * settings.EarthScale,
-                ozoneWidth: settings.OzoneWidth * settings.EarthScale,
-                ozoneHeight: settings.OzoneHeight * settings.EarthScale,
-                planetRadius: settings.PlanetRadius * settings.EarthScale,
-                atmosphereHeight: settings.AtmosphereHeight * settings.EarthScale,
-                topRadius: (settings.PlanetRadius + settings.AtmosphereHeight) * settings.EarthScale,
-                cloudScatter: settings.CloudScatter
-        ));
+        var atmospherePropertiesBuffer = renderGraph.SetConstantBuffer(new AtmosphereData
+		(
+				settings.RayleighScatter / settings.EarthScale,
+				settings.MieScatter / settings.EarthScale,
+				settings.OzoneAbsorption / settings.EarthScale,
+				settings.MieAbsorption / settings.EarthScale,
+				settings.GroundColor.LinearFloat3(),
+				settings.MiePhase,
+				settings.RayleighHeight * settings.EarthScale,
+				settings.MieHeight * settings.EarthScale,
+				settings.OzoneWidth * settings.EarthScale,
+				settings.OzoneHeight * settings.EarthScale,
+				settings.PlanetRadius * settings.EarthScale,
+				settings.AtmosphereHeight * settings.EarthScale,
+				(settings.PlanetRadius + settings.AtmosphereHeight) * settings.EarthScale,
+				settings.CloudScatter
+		));
 
         var transmittanceRemap = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
         var multiScatterRemap = GraphicsUtilities.HalfTexelRemap(settings.MultiScatterWidth, settings.MultiScatterHeight);
@@ -135,4 +137,83 @@ public class SkyLookupTables : FrameRenderFeature
 
 		renderGraph.AddProfileEndPass("Sky Tables");
 	}
+}
+
+internal struct AtmosphereData
+{
+	public Vector3 rayleighScatter;
+	public float mieScatter;
+	public Vector3 ozoneAbsorption;
+	public float mieAbsorption;
+	public Float3 groundColor;
+	public float miePhase;
+	public float rayleighHeight;
+	public float mieHeight;
+	public float ozoneWidth;
+	public float ozoneHeight;
+	public float planetRadius;
+	public float atmosphereHeight;
+	public float topRadius;
+	public float cloudScatter;
+
+	public AtmosphereData(Vector3 rayleighScatter, float mieScatter, Vector3 ozoneAbsorption, float mieAbsorption, Float3 groundColor, float miePhase, float rayleighHeight, float mieHeight, float ozoneWidth, float ozoneHeight, float planetRadius, float atmosphereHeight, float topRadius, float cloudScatter)
+	{
+		this.rayleighScatter = rayleighScatter;
+		this.mieScatter = mieScatter;
+		this.ozoneAbsorption = ozoneAbsorption;
+		this.mieAbsorption = mieAbsorption;
+		this.groundColor = groundColor;
+		this.miePhase = miePhase;
+		this.rayleighHeight = rayleighHeight;
+		this.mieHeight = mieHeight;
+		this.ozoneWidth = ozoneWidth;
+		this.ozoneHeight = ozoneHeight;
+		this.planetRadius = planetRadius;
+		this.atmosphereHeight = atmosphereHeight;
+		this.topRadius = topRadius;
+		this.cloudScatter = cloudScatter;
+	}
+
+	public override bool Equals(object obj) => obj is AtmosphereData other && rayleighScatter.Equals(other.rayleighScatter) && mieScatter == other.mieScatter && ozoneAbsorption.Equals(other.ozoneAbsorption) && mieAbsorption == other.mieAbsorption && groundColor.Equals(other.groundColor) && miePhase == other.miePhase && rayleighHeight == other.rayleighHeight && mieHeight == other.mieHeight && ozoneWidth == other.ozoneWidth && ozoneHeight == other.ozoneHeight && planetRadius == other.planetRadius && atmosphereHeight == other.atmosphereHeight && topRadius == other.topRadius && cloudScatter == other.cloudScatter;
+
+	public override int GetHashCode()
+	{
+		var hash = new HashCode();
+		hash.Add(rayleighScatter);
+		hash.Add(mieScatter);
+		hash.Add(ozoneAbsorption);
+		hash.Add(mieAbsorption);
+		hash.Add(groundColor);
+		hash.Add(miePhase);
+		hash.Add(rayleighHeight);
+		hash.Add(mieHeight);
+		hash.Add(ozoneWidth);
+		hash.Add(ozoneHeight);
+		hash.Add(planetRadius);
+		hash.Add(atmosphereHeight);
+		hash.Add(topRadius);
+		hash.Add(cloudScatter);
+		return hash.ToHashCode();
+	}
+
+	public void Deconstruct(out Vector3 rayleighScatter, out float mieScatter, out Vector3 ozoneAbsorption, out float mieAbsorption, out Float3 groundColor, out float miePhase, out float rayleighHeight, out float mieHeight, out float ozoneWidth, out float ozoneHeight, out float planetRadius, out float atmosphereHeight, out float topRadius, out float cloudScatter)
+	{
+		rayleighScatter = this.rayleighScatter;
+		mieScatter = this.mieScatter;
+		ozoneAbsorption = this.ozoneAbsorption;
+		mieAbsorption = this.mieAbsorption;
+		groundColor = this.groundColor;
+		miePhase = this.miePhase;
+		rayleighHeight = this.rayleighHeight;
+		mieHeight = this.mieHeight;
+		ozoneWidth = this.ozoneWidth;
+		ozoneHeight = this.ozoneHeight;
+		planetRadius = this.planetRadius;
+		atmosphereHeight = this.atmosphereHeight;
+		topRadius = this.topRadius;
+		cloudScatter = this.cloudScatter;
+	}
+
+	public static implicit operator (Vector3 rayleighScatter, float mieScatter, Vector3 ozoneAbsorption, float mieAbsorption, Float3 groundColor, float miePhase, float rayleighHeight, float mieHeight, float ozoneWidth, float ozoneHeight, float planetRadius, float atmosphereHeight, float topRadius, float cloudScatter)(AtmosphereData value) => (value.rayleighScatter, value.mieScatter, value.ozoneAbsorption, value.mieAbsorption, value.groundColor, value.miePhase, value.rayleighHeight, value.mieHeight, value.ozoneWidth, value.ozoneHeight, value.planetRadius, value.atmosphereHeight, value.topRadius, value.cloudScatter);
+	public static implicit operator AtmosphereData((Vector3 rayleighScatter, float mieScatter, Vector3 ozoneAbsorption, float mieAbsorption, Float3 groundColor, float miePhase, float rayleighHeight, float mieHeight, float ozoneWidth, float ozoneHeight, float planetRadius, float atmosphereHeight, float topRadius, float cloudScatter) value) => new AtmosphereData(value.rayleighScatter, value.mieScatter, value.ozoneAbsorption, value.mieAbsorption, value.groundColor, value.miePhase, value.rayleighHeight, value.mieHeight, value.ozoneWidth, value.ozoneHeight, value.planetRadius, value.atmosphereHeight, value.topRadius, value.cloudScatter);
 }

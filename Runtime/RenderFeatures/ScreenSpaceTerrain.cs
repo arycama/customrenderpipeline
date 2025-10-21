@@ -16,7 +16,7 @@ public class ScreenSpaceTerrain : CameraRenderFeature
 		if (terrain == null)
 			return;
 
-		var size = (Float2)terrain.terrainData.size.XZ();
+		var size = terrain.terrainData.size.XZ();
 		var scale = 1f / size;
 		var offset = -scale * (terrain.GetPosition().XZ() - camera.transform.position.XZ());
 
