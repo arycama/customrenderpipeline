@@ -19,8 +19,8 @@ public class DeferredLighting : CameraRenderFeature
 			using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting");
 
 			pass.Initialize(material, index);
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>().handle, RenderTargetFlags.ReadOnlyDepthStencil);
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>().handle);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 
 			pass.AddRenderPassData<DfgData>();
 			pass.AddRenderPassData<FrameData>();

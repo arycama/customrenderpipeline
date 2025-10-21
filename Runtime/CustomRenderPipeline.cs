@@ -169,7 +169,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 			var (depthCopy, previousDepthCopy, depthCopyCreated) = cameraDepthCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
 			renderGraph.SetRTHandle<PreviousCameraDepth>(previousDepthCopy);
-			renderGraph.SetRTHandle<DepthCopy>(depthCopy, subElement: RenderTextureSubElement.Depth);
+			renderGraph.SetRTHandle<CameraDepthCopy>(depthCopy, subElement: RenderTextureSubElement.Depth);
 		}),
 
 		new TerrainViewData(renderGraph, terrainSystem),
@@ -286,9 +286,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
             using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Copy Depth Texture"))
 			{
 				pass.ReadTexture("", renderGraph.GetRTHandle<CameraDepth>());
-				pass.WriteTexture(renderGraph.GetRTHandle<DepthCopy>());
+				pass.WriteTexture(renderGraph.GetRTHandle<CameraDepthCopy>());
 
-				pass.SetRenderFunction((renderGraph.GetRTHandle<CameraDepth>().handle, renderGraph.GetRTHandle<DepthCopy>().handle), (command, pass, data) =>
+				pass.SetRenderFunction((renderGraph.GetRTHandle<CameraDepth>(), renderGraph.GetRTHandle<CameraDepthCopy>()), (command, pass, data) =>
 				{
 					command.CopyTexture(pass.GetRenderTexture(data.Item1), pass.GetRenderTexture(data.Item2));
 				});
@@ -336,9 +336,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
             // Generate for next frame
             using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Generate Color Pyramid"))
 			{
-				var cameraTarget = renderGraph.GetRTHandle<CameraTarget>().handle;
-				pass.ReadTexture("", cameraTarget);
-				pass.SetRenderFunction(cameraTarget, (command, pass, cameraTarget) =>
+				pass.ReadRtHandle<CameraTarget>();
+				pass.SetRenderFunction(renderGraph.GetRTHandle<CameraTarget>(), (command, pass, cameraTarget) =>
 				{
 					command.GenerateMips(pass.GetRenderTexture(cameraTarget));
 				});

@@ -36,11 +36,6 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
         // Slight fuzzyness with 16 bits, probably due to depth.. would like to investigate
         var hitResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 
-        var depth = renderGraph.GetRTHandle<CameraDepth>().handle;
-        var normalRoughness = renderGraph.GetRTHandle<GBufferNormalRoughness>().handle;
-        var previousFrame = renderGraph.GetRTHandle<PreviousCameraTarget>().handle;
-        var albedoMetallic = renderGraph.GetRTHandle<GBufferAlbedoMetallic>().handle;
-
         if (settings.UseRaytracing)
         {
             // Need to set some things as globals so that hit shaders can access them..
@@ -84,10 +79,10 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Trace"))
             {
                 pass.Initialize(material);
-                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
                 pass.WriteTexture(hitResult, RenderBufferLoadAction.DontCare);
-                pass.ReadTexture("", depth);
+                pass.ReadTexture("", renderGraph.GetRTHandle<CameraDepth>());
 
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                // pass.AddRenderPassData<LitData.Result>();
@@ -107,7 +102,6 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
                     pass.SetFloat("_MaxSteps", settings.MaxSamples);
                     pass.SetFloat("_Thickness", settings.Thickness);
                     pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(camera.scaledPixelWidth, camera.scaledPixelHeight) - 1);
-                    pass.SetVector("PreviousCameraTargetScaleLimit", pass.GetScaleLimit2D(previousFrame));
                 });
             }
         }
@@ -118,7 +112,7 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Specular GI Spatial"))
         {
             pass.Initialize(material, 1);
-            pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
 			pass.WriteTexture(spatialWeight, RenderBufferLoadAction.DontCare);
@@ -151,7 +145,7 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Reflections Temporal"))
         {
             pass.Initialize(material, 2);
-            pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 			pass.WriteTexture(currentWeight, RenderBufferLoadAction.DontCare);
 

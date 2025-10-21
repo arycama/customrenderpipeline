@@ -65,7 +65,7 @@ public class Bloom : CameraRenderFeature
 			pass.Initialize(material, i == settings.FlareMip ? 0 : 1);
 			pass.WriteTexture(bloomIds[i], RenderBufferLoadAction.DontCare);
 
-			var rt = i > 0 ? bloomIds[i - 1] : renderGraph.GetRTHandle<CameraTarget>().handle;
+			var rt = i > 0 ? bloomIds[i - 1] : renderGraph.GetRTHandle<CameraTarget>();
 			pass.ReadTexture("Input", rt);
 			pass.AddRenderPassData<ViewData>();
 

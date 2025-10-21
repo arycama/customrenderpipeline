@@ -250,9 +250,9 @@ public class RenderGraph : IDisposable
 		return rtHandles[type];
 	}
 
-	public RTHandleData GetRTHandle<T>() where T : IRtHandleId
+	public ResourceHandle<RenderTexture> GetRTHandle<T>() where T : IRtHandleId
 	{
-		return GetRTHandle(typeof(T));
+		return GetRTHandle(typeof(T)).handle;
 	}
 
 	public ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(T data) where T : struct

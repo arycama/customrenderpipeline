@@ -32,10 +32,7 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
 
         var tempResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
         var hitResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
-        var previousFrame = renderGraph.GetRTHandle<PreviousCameraTarget>().handle;
 
-        var depth = renderGraph.GetRTHandle<CameraDepth>().handle;
-        var normalRoughness = renderGraph.GetRTHandle<GBufferNormalRoughness>().handle;
         if (settings.UseRaytracing)
         {
             // Need to set some things as globals so that hit shaders can access them..
@@ -76,7 +73,7 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Trace"))
             {
                 pass.Initialize(material);
-                pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+                pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(tempResult);
                 pass.WriteTexture(hitResult);
 
@@ -100,7 +97,6 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
                     pass.SetFloat("_MaxSteps", settings.MaxSamples);
                     pass.SetFloat("_Thickness", settings.Thickness);
                     pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(camera.scaledPixelWidth, camera.scaledPixelHeight) - 1);
-                    pass.SetVector("PreviousCameraTargetScaleLimit", pass.GetScaleLimit2D(previousFrame));
                     pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * settings.ConeAngle * Mathf.Deg2Rad) * (camera.scaledPixelHeight / camera.TanHalfFov() * 0.5f));
                 });
             }
@@ -112,7 +108,7 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
         {
             pass.Initialize(material, 1);
-            pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(spatialWeight, RenderBufferLoadAction.DontCare);
@@ -148,7 +144,7 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
         using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Temporal"))
         {
             pass.Initialize(material, 2);
-            pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(currentWeight, RenderBufferLoadAction.DontCare);
 

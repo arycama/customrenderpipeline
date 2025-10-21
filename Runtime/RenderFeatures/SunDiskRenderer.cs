@@ -25,9 +25,8 @@ public class SunDiskRenderer : CameraRenderFeature
 
 			pass.Initialize(celestialBodyMaterial, matrix, 0, 4, 1, MeshTopology.Quads);
 
-			var depth = renderGraph.GetRTHandle<CameraDepth>().handle;
-			pass.WriteDepth(depth);
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>().handle);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 
 			pass.AddRenderPassData<AutoExposureData>();
 			pass.AddRenderPassData<ViewData>();

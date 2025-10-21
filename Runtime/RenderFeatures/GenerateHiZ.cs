@@ -30,8 +30,7 @@ public class GenerateHiZ : CameraRenderFeature
 		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Hi Z First Pass"))
 		{
 			pass.Initialize(computeShader, kernel, camera.scaledPixelWidth, camera.scaledPixelHeight);
-			var depth = renderGraph.GetRTHandle<CameraDepth>().handle;
-			pass.ReadTexture("_Input", depth);
+			pass.ReadTexture("_Input", renderGraph.GetRTHandle<CameraDepth>());
 
 			for (var i = 0; i < maxMipsPerPass; i++)
 			{
@@ -45,7 +44,7 @@ public class GenerateHiZ : CameraRenderFeature
 				pass.SetInt("_Width", camera.scaledPixelWidth);
 				pass.SetInt("_Height", camera.scaledPixelHeight);
 				pass.SetInt("_MaxMip", hasSecondPass ? maxMipsPerPass : mipCount);
-				pass.SetVector("_InputScaleLimit", pass.GetScaleLimit2D(depth));
+				pass.SetVector("_InputScaleLimit", pass.GetScaleLimit2D(renderGraph.GetRTHandle<CameraDepth>()));
 			});
 		}
 

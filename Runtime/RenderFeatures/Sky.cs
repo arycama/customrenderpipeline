@@ -29,11 +29,10 @@ public partial class Sky : CameraRenderFeature
 		renderGraph.AddProfileBeginPass("Sky");
 
 		var skyTemp = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
-		var depth = renderGraph.GetRTHandle<CameraDepth>();
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Render Sky"))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Render Sky"));
-			pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(skyTemp, RenderBufferLoadAction.DontCare);
 
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
@@ -55,7 +54,7 @@ public partial class Sky : CameraRenderFeature
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Render Scene"))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Render Scene"));
-			pass.WriteDepth(depth, RenderTargetFlags.ReadOnlyDepthStencil);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(skyTemp, RenderBufferLoadAction.Load);
 
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
@@ -80,7 +79,7 @@ public partial class Sky : CameraRenderFeature
 		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal"))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Temporal"));
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>().handle);
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 			pass.ReadTexture("_SkyInput", skyTemp);
 			pass.ReadTexture("_SkyHistory", history);

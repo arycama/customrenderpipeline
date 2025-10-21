@@ -16,8 +16,8 @@
 
 Texture2D<float4> _WaterNormalFoam;
 Texture2D<float3> _WaterEmission, _UnderwaterResult;
-Texture2D<float> _UnderwaterDepth;
 Texture2D<float3> _RefractionInput, _ScatterInput, _History;
+Texture2D<float> CameraDepthCopy;
 float4 _HistoryScaleLimit;
 float _IsFirst;
 
@@ -88,7 +88,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float2 uvOffset = N.xz * distortion;
 	float2 refractionUv = uvOffset * ViewSize + position.xy;
 	float2 refractedPositionSS = clamp(refractionUv, 0.5, ViewSize - 0.5);
-	float underwaterDepth = _UnderwaterDepth[refractedPositionSS];
+	float underwaterDepth = CameraDepthCopy[refractedPositionSS];
 	
 	if (foam > 0)
 	{
@@ -113,7 +113,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	if (underwaterDepth > depth)
 	{
 		uvOffset = 0.0;
-		underwaterDepth = _UnderwaterDepth[position.xy];
+		underwaterDepth = CameraDepthCopy[position.xy];
 		refractedPositionSS = position.xy;
 	}
 	
