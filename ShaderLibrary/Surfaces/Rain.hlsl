@@ -64,7 +64,7 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	float3 V = normalize(-worldPosition);
 	float3 lighting = AmbientHgTwoLobe(V, ForwardScatterPhase, -BackwardScatterPhase, ScatterBlend);
 	
-	float shadow = GetDirectionalShadow(worldPosition);
+	float shadow = GetDirectionalShadow(worldPosition) * CloudTransmittance(worldPosition);
 	float LdotV = dot(_LightDirection0, V);
 	
 	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition));

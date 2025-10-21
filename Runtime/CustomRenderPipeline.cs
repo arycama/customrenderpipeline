@@ -270,7 +270,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		}),
 
 		new DecalComposite(renderGraph),
-		new RainTextureUpdater(renderGraph, asset.Rain),
 
         // Copy scene depth (Required for underwater lighting)
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
@@ -318,6 +317,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new UnderwaterLighting(renderGraph, asset.OceanSettings),
 		new DeferredWater(renderGraph, asset.OceanSettings),
+
+		// Do rain after water so we can get raindrops on the water surface
+		new RainTextureUpdater(renderGraph, asset.Rain),
 
 		// Could do SSR+SSGI+SSSSS here too, all the screen passes
 		new AmbientOcclusion(renderGraph, asset.AmbientOcclusionSettings),

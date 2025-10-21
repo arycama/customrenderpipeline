@@ -128,15 +128,11 @@ public class VolumetricCloudShadow : CameraRenderFeature
         }
 
         // Cloud coverage
-        var cloudCoverageBuffer = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
-        var result = new CloudShadowDataResult(cloudShadow, depth, worldToShadow, settings.Density, cloudCoverageBuffer, 0.0f, settings.StartHeight + settings.LayerThickness);
-        renderGraph.SetResource(result);
-
-		var isFirst = !perCameraCoverage.TryGetValue(camera, out var cloudCoverageBufferTemp);
+		var isFirst = !perCameraCoverage.TryGetValue(camera, out var previousCloudCoverage);
 		if (isFirst)
 		{
-			cloudCoverageBufferTemp = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource, GraphicsBuffer.UsageFlags.None, true);
-			perCameraCoverage.Add(camera, cloudCoverageBufferTemp);
+			previousCloudCoverage = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource, GraphicsBuffer.UsageFlags.None, true);
+			perCameraCoverage.Add(camera, previousCloudCoverage);
 		}
 
 		using (var pass = renderGraph.AddComputeRenderPass("Cloud Coverage", (settings, time, isFirst)))
@@ -145,10 +141,10 @@ public class VolumetricCloudShadow : CameraRenderFeature
 
             pass.AddRenderPassData<CloudData>();
             pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-            pass.WriteBuffer("_Result", cloudCoverageBufferTemp);
+            pass.WriteBuffer("_Result", previousCloudCoverage);
             pass.AddRenderPassData<AutoExposureData>();
-            pass.AddRenderPassData<CloudShadowDataResult>();
             pass.AddRenderPassData<LightingData>();
+			pass.AddRenderPassData<FrameData>();
 			pass.AddRenderPassData<ViewData>();
 			pass.AddRenderPassData<SkyTransmittanceData>();
 
@@ -159,14 +155,18 @@ public class VolumetricCloudShadow : CameraRenderFeature
             });
         }
 
-        using (var pass = renderGraph.AddGenericRenderPass("Cloud Coverage Copy", (cloudCoverageBufferTemp, cloudCoverageBuffer)))
+		var cloudCoverageBuffer = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
+		using (var pass = renderGraph.AddGenericRenderPass("Cloud Coverage Copy", (previousCloudCoverage, cloudCoverageBuffer)))
         {
-            pass.ReadBuffer("", cloudCoverageBufferTemp);
+            pass.ReadBuffer("", previousCloudCoverage);
             pass.WriteBuffer("", cloudCoverageBuffer);
-            pass.SetRenderFunction(static (command, pass, data) =>
+            pass.SetRenderFunction((System.Action<CommandBuffer, RenderPass, (ResourceHandle<GraphicsBuffer> cloudCoverageBufferTemp, ResourceHandle<GraphicsBuffer> cloudCoverageBuffer)>)(static (command, pass, data) =>
             {
                 command.CopyBuffer(pass.GetBuffer(data.cloudCoverageBufferTemp), pass.GetBuffer(data.cloudCoverageBuffer));
-            });
+            }));
         }
-    }
+
+		var result = new CloudShadowDataResult(cloudShadow, depth, worldToShadow, settings.Density, cloudCoverageBuffer, 0.0f, settings.StartHeight + settings.LayerThickness);
+		renderGraph.SetResource(result);
+	}
 }

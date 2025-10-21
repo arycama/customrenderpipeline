@@ -1,4 +1,5 @@
-#pragma once
+#ifndef ATMOSPHERE_INCLUDED
+#define ATMOSPHERE_INCLUDED
 
 #include "Geometry.hlsl"
 #include "Material.hlsl" 
@@ -354,3 +355,5 @@ AtmosphereResult SampleAtmosphere(float viewHeight, float viewCosAngle, float li
 	output.weightedDepth = dot(weightedDepthSum / rayLength, transmittance) / dot(transmittance, 1.0);
 	return output;
 }
+
+#endif

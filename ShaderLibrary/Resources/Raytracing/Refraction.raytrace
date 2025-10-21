@@ -118,7 +118,7 @@ void RayGeneration()
 	
 	// Todo: share/merge with non raytraced code?
 	//#if defined(LIGHT_COUNT_ONE) || defined(LIGHT_COUNT_TWO)
-	float attenuation = GetDirectionalShadow(P);
+	float attenuation = GetDirectionalShadow(P) * CloudTransmittance(P);
 	attenuation *= CloudTransmittance(P);
 	
 	// TODO: Implement

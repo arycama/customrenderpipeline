@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using System;
+
 
 #if UNITY_EDITOR
 using UnityEditorInternal;
@@ -41,16 +43,25 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
     protected override void Dispose(bool disposing)
     {
-        // Could dispose in reverse order?
-        foreach (var renderFeature in perFrameRenderFeatures)
-            renderFeature?.Dispose();
+		try
+		{
+			// Could dispose in reverse order?
+			foreach (var renderFeature in perFrameRenderFeatures)
+				renderFeature?.Dispose();
 
-        foreach (var renderFeature in perCameraRenderFeatures)
-            renderFeature?.Dispose();
+			foreach (var renderFeature in perCameraRenderFeatures)
+				renderFeature?.Dispose();
 
-        command.Release();
+			command.Release();
 
-        renderGraph.Dispose();
+			renderGraph.Dispose();
+		}
+		catch(Exception ex)
+		{
+		}
+		finally
+		{
+		}
     }
 
 	protected abstract List<FrameRenderFeature> InitializePerFrameRenderFeatures();

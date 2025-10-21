@@ -1,6 +1,5 @@
 #include "../Common.hlsl"
 #include "../Atmosphere.hlsl"
-#include "../Lighting.hlsl"
 #include "../CloudCommon.hlsl"
 
 #pragma kernel CloudCoverage
@@ -25,10 +24,6 @@ void CloudCoverage(uint groupIndex : SV_GroupIndex)
 	float cloudDistance;
 	float4 clouds = EvaluateCloud(rayStart, rayEnd - rayStart, 16, V, _PlanetRadius, V.y, 0.5, float3(0.0, -ViewPosition.y, 0.0), false, cloudDistance, false, false);
 	
-	// TODO: Need to figure out why this happens and fix it
-	if (any(IsInfOrNaN(clouds)))
-		clouds = float2(0.0, 1.0).xxxy;
-	
 	_SharedLuminanceExtinction[groupIndex] = clouds / sampleCount;
 	
 	[unroll]
@@ -45,11 +40,9 @@ void CloudCoverage(uint groupIndex : SV_GroupIndex)
 	
 	float4 result = _SharedLuminanceExtinction[0];
 	
-	if (!IsFirst)
-		result = lerp(_CloudCoverage, result, 0.05);
-		
-	result = float2(0.0, 1.0).xxxy;
-	
 	// Smooth results over time to avoid flickering
+	if (!IsFirst)
+		result = lerp(_Result[0], result, 0.05);
+		
 	_Result[0] = result;
 }
