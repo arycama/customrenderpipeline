@@ -27,7 +27,7 @@ public class GenerateHiZ : CameraRenderFeature
 		var result = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32_SFloat, hasMips: true, isScreenTexture: true);
 
 		// First pass
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Hi Z First Pass"))
+		using (var pass = renderGraph.AddComputeRenderPass("Hi Z First Pass", (camera.ScaledViewSize(), hasSecondPass ? maxMipsPerPass : mipCount, renderGraph.GetRTHandle<CameraDepth>())))
 		{
 			pass.Initialize(computeShader, kernel, camera.scaledPixelWidth, camera.scaledPixelHeight);
 			pass.ReadTexture("_Input", renderGraph.GetRTHandle<CameraDepth>());
@@ -39,19 +39,19 @@ public class GenerateHiZ : CameraRenderFeature
 				pass.WriteTexture(resultIds.GetProperty(i), texture, mip);
 			}
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetInt("_Width", camera.scaledPixelWidth);
-				pass.SetInt("_Height", camera.scaledPixelHeight);
-				pass.SetInt("_MaxMip", hasSecondPass ? maxMipsPerPass : mipCount);
-				pass.SetVector("_InputScaleLimit", pass.GetScaleLimit2D(renderGraph.GetRTHandle<CameraDepth>()));
+				pass.SetInt("_Width", data.Item1.x);
+				pass.SetInt("_Height", data.Item1.y);
+				pass.SetInt("_MaxMip", data.Item2);
+				pass.SetVector("_InputScaleLimit", pass.GetScaleLimit2D(data.Item3));
 			});
 		}
 
 		// Second pass if needed
 		if (hasSecondPass)
 		{
-			using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Hi Z Second Pass"))
+			using (var pass = renderGraph.AddComputeRenderPass("Hi Z Second Pass", (camera.ScaledViewSize(), maxMipsPerPass, mipCount)))
 			{
 				pass.Initialize(computeShader, kernel + 1, camera.scaledPixelWidth >> (maxMipsPerPass - 1), camera.scaledPixelHeight >> (maxMipsPerPass - 1));
 
@@ -65,11 +65,11 @@ public class GenerateHiZ : CameraRenderFeature
 					pass.WriteTexture(resultIds.GetProperty(i), texture, mip);
 				}
 
-				pass.SetRenderFunction((command, pass) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					pass.SetInt("_Width", camera.scaledPixelWidth >> (maxMipsPerPass - 1));
-					pass.SetInt("_Height", camera.scaledPixelHeight >> (maxMipsPerPass - 1));
-					pass.SetInt("_MaxMip", mipCount - maxMipsPerPass);
+					pass.SetInt("_Width", data.Item1.x >> (data.maxMipsPerPass - 1));
+					pass.SetInt("_Height", data.Item1.y >> (data.maxMipsPerPass - 1));
+					pass.SetInt("_MaxMip", data.mipCount - data.maxMipsPerPass);
 				});
 			}
 		}

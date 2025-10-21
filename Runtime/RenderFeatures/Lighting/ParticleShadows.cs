@@ -65,7 +65,7 @@ public class ParticleShadows : CameraRenderFeature
 		//var spotShadowCount = Max(1, requestData.SpotShadowRequests.Count);
 		//var spotShadows = renderGraph.GetTexture(settings.SpotShadowResolution, settings.SpotShadowResolution, GraphicsFormat.D16_UNorm, spotShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
 
-		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Render Shadows Setup"))
+		using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", directionalShadows))
 		{
 			// TODO: We should really add initial clear actions
 			pass.WriteTexture(directionalShadows);
@@ -76,7 +76,7 @@ public class ParticleShadows : CameraRenderFeature
 			//pass.WriteTexture(dummy);
 			//pass.ReadTexture("", dummy);
 
-			pass.SetRenderFunction((directionalShadows/*, pointShadows, spotShadows*/), static (command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				command.SetRenderTarget(pass.GetRenderTexture(data), pass.GetRenderTexture(data), 0, CubemapFace.Unknown, -1);
 				command.ClearRenderTarget(false, true, Color.clear);
@@ -120,7 +120,8 @@ public class ParticleShadows : CameraRenderFeature
 			if (!particleCamera.TryGetCullingParameters(out var cullingPrameters))
 				return;
 
-			using (var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Particle Shadows"))
+			var voxelSize = (request.Far - request.Near) / settings.DirectionalDepth;
+			using (var pass = renderGraph.AddObjectRenderPass("Particle Shadows", (dummy, target, index, settings.DirectionalResolution, settings.DirectionalDepth, zClip, voxelSize)))
 			{
 				cullingPrameters.cullingOptions = CullingOptions.ForceEvenIfCameraIsNotActive | CullingOptions.DisablePerObjectCulling;
 				var cullingResults = context.Cull(ref cullingPrameters);
@@ -135,9 +136,8 @@ public class ParticleShadows : CameraRenderFeature
 				pass.AddRenderPassData<ViewData>(); 
 
 				pass.ReadBuffer("PerCascadeData", perCascadeData);
-				var voxelSize = (request.Far - request.Near) / settings.DirectionalDepth;
 
-				pass.SetRenderFunction((dummy, target, index, settings.DirectionalResolution, settings.DirectionalDepth, zClip, voxelSize), static (command, pass, data) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					pass.SetFloat("_ZClip", data.zClip ? 1.0f : 0.0f);
 					pass.SetFloat("ParticleShadowDepth", data.DirectionalDepth);
@@ -169,23 +169,23 @@ public class ParticleShadows : CameraRenderFeature
 
 		// Accumulate directional shadows
 		var result = renderGraph.GetTexture(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true);
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Particle Shadow Directional Accumulate"))
+		var shadowSteps = renderGraph.GetBuffer(directionalShadowCount);
+
+		using (var pass = renderGraph.AddComputeRenderPass("Particle Shadow Directional Accumulate", (settings.DirectionalDepth, settings.DirectionalResolution, shadowSteps, directionalShadowSizes)))
 		{
 			pass.Initialize(accumulateShader, 0, settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, 1);
-			var shadowSteps = renderGraph.GetBuffer(directionalShadowCount);
-
 			pass.ReadBuffer("ParticleShadowStep", shadowSteps);
 			pass.WriteBuffer("ParticleShadowStep", shadowSteps);
 			pass.WriteTexture("ParticleShadowWrite", result);
 			pass.ReadTexture("ParticleExtinction", directionalShadows);
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetInt("ParticleShadowDepthInt", settings.DirectionalDepth);
-				pass.SetInt("ParticleShadowResolutionInt", settings.DirectionalResolution);
+				pass.SetInt("ParticleShadowDepthInt", data.DirectionalDepth);
+				pass.SetInt("ParticleShadowResolutionInt", data.DirectionalResolution);
 				command.ClearRandomWriteTargets();
-				command.SetBufferData(pass.GetBuffer(shadowSteps), directionalShadowSizes);
-				ArrayPool<float>.Release(directionalShadowSizes);
+				command.SetBufferData(pass.GetBuffer(data.shadowSteps), data.directionalShadowSizes);
+				ArrayPool<float>.Release(data.directionalShadowSizes);
 			});
 		}
 

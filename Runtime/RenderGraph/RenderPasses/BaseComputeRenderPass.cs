@@ -2,7 +2,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public abstract class BaseComputeRenderPass : RenderPass
+public abstract class BaseComputeRenderPass<T> : RenderPass<T>
 {
 	protected ComputeShader computeShader;
 	protected int kernelIndex;

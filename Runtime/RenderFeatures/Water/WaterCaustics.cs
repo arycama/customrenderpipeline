@@ -20,66 +20,66 @@ public class WaterCaustics : CameraRenderFeature
 		var bufferSize = count * count * indicesPerQuad;
 		var triangles = new uint[bufferSize];
 
+		for (int y = 0, i = 0, vi = 0; y < count; y++, vi++)
+		{
+			var rowStart = y * (count + 1);
+
+			for (int x = 0; x < count; x++, i += indicesPerQuad, vi++)
+			{
+				var columnStart = rowStart + x;
+
+				var flip = alternateIndices ? (x & 1) == (y & 1) : true;
+
+				if (isQuad)
+				{
+					if (flip)
+					{
+						triangles[i + 0] = (uint)(columnStart);
+						triangles[i + 1] = (uint)(columnStart + count + 1);
+						triangles[i + 2] = (uint)(columnStart + count + 2);
+						triangles[i + 3] = (uint)(columnStart + 1);
+					}
+					else
+					{
+						triangles[i + 1] = (uint)(columnStart + count + 1);
+						triangles[i + 2] = (uint)(columnStart + count + 2);
+						triangles[i + 3] = (uint)(columnStart + 1);
+						triangles[i + 0] = (uint)(columnStart);
+					}
+				}
+				else
+				{
+					if (flip)
+					{
+						triangles[i + 0] = (uint)columnStart;
+						triangles[i + 1] = (uint)(columnStart + count + 1);
+						triangles[i + 2] = (uint)(columnStart + count + 2);
+						triangles[i + 3] = (uint)(columnStart + count + 2);
+						triangles[i + 4] = (uint)(columnStart + 1);
+						triangles[i + 5] = (uint)columnStart;
+					}
+					else
+					{
+						triangles[i + 0] = (uint)columnStart;
+						triangles[i + 1] = (uint)(columnStart + count + 1);
+						triangles[i + 2] = (uint)(columnStart + 1);
+						triangles[i + 3] = (uint)(columnStart + 1);
+						triangles[i + 4] = (uint)(columnStart + count + 1);
+						triangles[i + 5] = (uint)(columnStart + count + 2);
+					}
+				}
+			}
+		}
+
 		indexBuffer = renderGraph.GetBuffer(bufferSize, target: GraphicsBuffer.Target.Index, isPersistent: true);
 
-		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Ocean Caustics Init"))
+		using (var pass = renderGraph.AddGenericRenderPass("Ocean Caustics Init", (indexBuffer, triangles)))
 		{
 			pass.WriteBuffer("", indexBuffer);
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				for (int y = 0, i = 0, vi = 0; y < count; y++, vi++)
-				{
-					var rowStart = y * (count + 1);
-
-					for (int x = 0; x < count; x++, i += indicesPerQuad, vi++)
-					{
-						var columnStart = rowStart + x;
-
-						var flip = alternateIndices ? (x & 1) == (y & 1) : true;
-
-						if (isQuad)
-						{
-							if (flip)
-							{
-								triangles[i + 0] = (uint)(columnStart);
-								triangles[i + 1] = (uint)(columnStart + count + 1);
-								triangles[i + 2] = (uint)(columnStart + count + 2);
-								triangles[i + 3] = (uint)(columnStart + 1);
-							}
-							else
-							{
-								triangles[i + 1] = (uint)(columnStart + count + 1);
-								triangles[i + 2] = (uint)(columnStart + count + 2);
-								triangles[i + 3] = (uint)(columnStart + 1);
-								triangles[i + 0] = (uint)(columnStart);
-							}
-						}
-						else
-						{
-							if (flip)
-							{
-								triangles[i + 0] = (uint)columnStart;
-								triangles[i + 1] = (uint)(columnStart + count + 1);
-								triangles[i + 2] = (uint)(columnStart + count + 2);
-								triangles[i + 3] = (uint)(columnStart + count + 2);
-								triangles[i + 4] = (uint)(columnStart + 1);
-								triangles[i + 5] = (uint)columnStart;
-							}
-							else
-							{
-								triangles[i + 0] = (uint)columnStart;
-								triangles[i + 1] = (uint)(columnStart + count + 1);
-								triangles[i + 2] = (uint)(columnStart + 1);
-								triangles[i + 3] = (uint)(columnStart + 1);
-								triangles[i + 4] = (uint)(columnStart + count + 1);
-								triangles[i + 5] = (uint)(columnStart + count + 2);
-							}
-						}
-					}
-				}
-
-				command.SetBufferData(pass.GetBuffer(indexBuffer), triangles);
+				command.SetBufferData(pass.GetBuffer(data.indexBuffer), data.triangles);
 			});
 		}
 	}
@@ -101,22 +101,22 @@ public class WaterCaustics : CameraRenderFeature
 		var patchSize = patchSizes[settings.CasuticsCascade];
 
 		var temp0 = renderGraph.GetTexture(129, 129, GraphicsFormat.R16G16B16A16_SFloat, isExactSize: true);
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Caustics Blit"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Caustics Blit", (settings.CausticsDepth, settings.CasuticsCascade, patchSize)))
 		{
 			pass.Initialize(material, 2);
 			pass.WriteTexture(temp0, RenderBufferLoadAction.DontCare);
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetFloat("_CausticsDepth", settings.CausticsDepth);
-				pass.SetFloat("_CausticsCascade", settings.CasuticsCascade);
-				pass.SetFloat("_PatchSize", patchSize);
+				pass.SetFloat("_CausticsDepth", data.CausticsDepth);
+				pass.SetFloat("_CausticsCascade", data.CasuticsCascade);
+				pass.SetFloat("_PatchSize", data.patchSize);
 				pass.SetVector("_RefractiveIndex", Float3.One * (1.0f / 1.34f));
 			});
 		}
 
 		var tempResult = renderGraph.GetTexture(settings.CasuticsResolution * 2, settings.CasuticsResolution * 2, GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true, clearFlags: RTClearFlags.Color);
-		using (var pass = renderGraph.AddRenderPass<DrawProceduralIndexedRenderPass>("Ocean Caustics Render"))
+		using (var pass = renderGraph.AddDrawProceduralIndexedRenderPass("Ocean Caustics Render", (patchSize, settings.CausticsDepth, settings.CasuticsCascade)))
 		{
 			pass.Initialize(indexBuffer, material, Matrix4x4.identity, 0, MeshTopology.Triangles);
 
@@ -126,21 +126,21 @@ public class WaterCaustics : CameraRenderFeature
 			pass.AddRenderPassData<OceanFftResult>();
 			pass.ReadTexture("_Input", temp0);
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				var viewMatrix = Matrix4x4.LookAt(Vector3.zero, Vector3.down, Vector3.forward).inverse;
-				var projectionMatrix = Matrix4x4.Ortho(-patchSize, patchSize, -patchSize, patchSize, 0, settings.CausticsDepth * 2);
+				var projectionMatrix = Matrix4x4.Ortho(-data.patchSize, data.patchSize, -data.patchSize, data.patchSize, 0, data.CausticsDepth * 2);
 				command.SetViewProjectionMatrices(viewMatrix, projectionMatrix);
 
-				pass.SetFloat("_CausticsDepth", settings.CausticsDepth);
-				pass.SetFloat("_CausticsCascade", settings.CasuticsCascade);
-				pass.SetFloat("_PatchSize", patchSize);
+				pass.SetFloat("_CausticsDepth", data.CausticsDepth);
+				pass.SetFloat("_CausticsCascade", data.CasuticsCascade);
+				pass.SetFloat("_PatchSize", data.patchSize);
 				pass.SetVector("_RefractiveIndex", Float3.One * (1.0f / 1.34f));
 			});
 		}
 
 		var result = renderGraph.GetTexture(settings.CasuticsResolution, settings.CasuticsResolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true, isExactSize: true);
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Caustics Blit"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Caustics Blit"))
 		{
 			pass.Initialize(material, 1);
 			pass.ReadTexture("_MainTex", tempResult);

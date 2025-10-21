@@ -65,9 +65,9 @@ public class RaytracingSystem : FrameRenderFeature
             return;
 
 		// TODO: Could use camera relative, 1 rtas per camera
-        using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("RTAS Update"))
+        using (var pass = renderGraph.AddGenericRenderPass("RTAS Update", rtas))
         {
-            pass.SetRenderFunction(rtas, (command, pass, data) =>
+            pass.SetRenderFunction(static (command, pass, data) =>
             {
                 command.BuildRayTracingAccelerationStructure(data);
             });

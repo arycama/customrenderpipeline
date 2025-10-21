@@ -1,6 +1,4 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -71,12 +69,12 @@ public class ClusteredLightCulling : CameraRenderFeature
 		var lightClusterIndices = renderGraph.GetTexture(clusterWidth, clusterHeight, GraphicsFormat.R32G32_SInt, settings.ClusterDepth, TextureDimension.Tex3D);
 
 		var lightList = renderGraph.GetBuffer(clusterCount * settings.MaxLightsPerTile);
+		var counterBuffer = renderGraph.GetBuffer();
 
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Clustered Light Culling"))
+		using (var pass = renderGraph.AddComputeRenderPass("Clustered Light Culling", (tileSize: settings.TileSize, rcpClusterDepth: 1.0f / settings.ClusterDepth, counterBuffer)))
 		{
 			pass.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
 			pass.AddRenderPassData<LightingSetup.Result>();
-			var counterBuffer = renderGraph.GetBuffer();
 
 			pass.WriteBuffer("LightClusterListWrite", lightList);
 			pass.WriteBuffer("LightCounter", counterBuffer);
@@ -85,14 +83,7 @@ public class ClusteredLightCulling : CameraRenderFeature
 			pass.AddRenderPassData<ViewData>();
 			pass.ReadRtHandle<HiZMaxDepth>();
 
-			pass.SetRenderFunction(
-			(
-				tileSize: settings.TileSize,
-				rcpClusterDepth: 1.0f / settings.ClusterDepth,
-				counterBuffer: counterBuffer
-			),
-
-			(command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				command.SetBufferData(pass.GetBuffer(data.counterBuffer), zeroArray);
 				pass.SetInt("TileSize", data.tileSize);

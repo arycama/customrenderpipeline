@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -16,13 +14,13 @@ public class SunDiskRenderer : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
-		using (var pass = renderGraph.AddRenderPass<DrawProceduralRenderPass>("Sun Disk"))
-		{
-			var lightData = renderGraph.GetResource<LightingData>();
-			var viewPosition = camera.transform.position;
-			var scale = 2 * Mathf.Tan(0.5f * settings.SunAngularDiameter * Mathf.Deg2Rad);
-			var matrix = Matrix4x4.TRS(viewPosition + lightData.light0Direction, Quaternion.LookRotation(lightData.light0Direction), Vector3.one * scale);
+		var lightData = renderGraph.GetResource<LightingData>();
+		var viewPosition = camera.transform.position;
+		var scale = 2 * Mathf.Tan(0.5f * settings.SunAngularDiameter * Mathf.Deg2Rad);
+		var matrix = Matrix4x4.TRS(viewPosition + lightData.light0Direction, Quaternion.LookRotation(lightData.light0Direction), Vector3.one * scale);
 
+		using (var pass = renderGraph.AddDrawProceduralRenderPass("Sun Disk", (settings.SunAngularDiameter, lightData.light0Color, lightData.light0Direction)))
+		{
 			pass.Initialize(celestialBodyMaterial, matrix, 0, 4, 1, MeshTopology.Quads);
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
@@ -37,11 +35,11 @@ public class SunDiskRenderer : CameraRenderFeature
 			pass.AddRenderPassData<SkyTransmittanceData>();
 			pass.AddRenderPassData<CloudShadowDataResult>();
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetFloat("AngularDiameter", settings.SunAngularDiameter);
-				pass.SetVector("Luminance", lightData.light0Color);
-				pass.SetVector("Direction", lightData.light0Direction);
+				pass.SetFloat("AngularDiameter", data.SunAngularDiameter);
+				pass.SetVector("Luminance", data.light0Color);
+				pass.SetVector("Direction", data.light0Direction);
 			});
 		}
 	}

@@ -36,7 +36,7 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
         if (settings.UseRaytracing)
         {
             // Need to set some things as globals so that hit shaders can access them..
-            using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Specular GI Raytrace Setup"))
+            using (var pass = renderGraph.AddGenericRenderPass("Specular GI Raytrace Setup"))
             {
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LightingSetup.Result>();
@@ -49,7 +49,7 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
                 pass.AddRenderPassData<EnvironmentData>();
                 pass.AddRenderPassData<LightingData>();
 			}
-            using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Diffuse GI Raytrace"))
+            using (var pass = renderGraph.AddRaytracingRenderPass("Diffuse GI Raytrace"))
             {
                 var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
@@ -70,42 +70,42 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
 		}
         else
         {
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Trace"))
-            {
-                pass.Initialize(material);
-                pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
-                pass.WriteTexture(tempResult);
-                pass.WriteTexture(hitResult);
+			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Trace", (settings.Intensity, settings.MaxSamples, settings.Thickness, camera.ScaledViewSize(), settings.ConeAngle, camera.TanHalfFov())))
+			{
+				pass.Initialize(material);
+				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+				pass.WriteTexture(tempResult);
+				pass.WriteTexture(hitResult);
 
-                pass.AddRenderPassData<LightingSetup.Result>();
-                pass.AddRenderPassData<TemporalAAData>();
-                pass.AddRenderPassData<AutoExposureData>();
-                pass.AddRenderPassData<SkyReflectionAmbientData>();
-                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<ViewData>();
-                pass.AddRenderPassData<FrameData>();
-                pass.ReadRtHandle<GBufferBentNormalOcclusion>();
-                pass.ReadRtHandle<CameraVelocity>();
-                pass.ReadRtHandle<HiZMinDepth>();
-                pass.ReadRtHandle<CameraDepth>();
+				pass.AddRenderPassData<LightingSetup.Result>();
+				pass.AddRenderPassData<TemporalAAData>();
+				pass.AddRenderPassData<AutoExposureData>();
+				pass.AddRenderPassData<SkyReflectionAmbientData>();
+				pass.AddRenderPassData<AtmospherePropertiesAndTables>();
+				pass.AddRenderPassData<ViewData>();
+				pass.AddRenderPassData<FrameData>();
+				pass.ReadRtHandle<GBufferBentNormalOcclusion>();
+				pass.ReadRtHandle<CameraVelocity>();
+				pass.ReadRtHandle<HiZMinDepth>();
+				pass.ReadRtHandle<CameraDepth>();
 				pass.ReadRtHandle<GBufferNormalRoughness>();
 				pass.ReadRtHandle<PreviousCameraTarget>();
 
-				pass.SetRenderFunction((command, pass) =>
-                {
-                    pass.SetFloat("_Intensity", settings.Intensity);
-                    pass.SetFloat("_MaxSteps", settings.MaxSamples);
-                    pass.SetFloat("_Thickness", settings.Thickness);
-                    pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(camera.scaledPixelWidth, camera.scaledPixelHeight) - 1);
-                    pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * settings.ConeAngle * Mathf.Deg2Rad) * (camera.scaledPixelHeight / camera.TanHalfFov() * 0.5f));
-                });
-            }
+				pass.SetRenderFunction(static (command, pass, data) =>
+				{
+					pass.SetFloat("_Intensity", data.Intensity);
+					pass.SetFloat("_MaxSteps", data.MaxSamples);
+					pass.SetFloat("_Thickness", data.Thickness);
+					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.Item4) - 1);
+					pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * data.ConeAngle * Mathf.Deg2Rad) * (data.Item4.y / data.Item6 * 0.5f));
+				});
+			}
         }
 
         var spatialResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
         var spatialWeight = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16_UNorm, isScreenTexture: true);
         var rayDepth = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16_SFloat, isScreenTexture: true);
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Spatial"))
+        using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Spatial", (settings.Intensity, settings.MaxSamples, settings.Thickness, settings.ResolveSamples, settings.ResolveSize)))
         {
             pass.Initialize(material, 1);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -128,20 +128,20 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             pass.ReadRtHandle<CameraStencil>();
 			pass.ReadRtHandle<GBufferNormalRoughness>();
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetFloat("_Intensity", settings.Intensity);
-                pass.SetFloat("_MaxSteps", settings.MaxSamples);
-                pass.SetFloat("_Thickness", settings.Thickness);
-                pass.SetInt("_ResolveSamples", settings.ResolveSamples);
-                pass.SetFloat("_ResolveSize", settings.ResolveSize);
-                pass.SetFloat("DiffuseGiStrength", settings.Intensity);
+                pass.SetFloat("_Intensity", data.Intensity);
+                pass.SetFloat("_MaxSteps", data.MaxSamples);
+                pass.SetFloat("_Thickness", data.Thickness);
+                pass.SetInt("_ResolveSamples", data.ResolveSamples);
+                pass.SetFloat("_ResolveSize", data.ResolveSize);
+                pass.SetFloat("DiffuseGiStrength", data.Intensity);
             });
         }
 
         var (current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
         var (currentWeight, historyWeight, wasCreatedWeight) = temporalWeightCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Global Illumination Temporal"))
+        using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Temporal", (wasCreated, history, settings.Intensity, settings.MaxSamples, settings.Thickness)))
         {
             pass.Initialize(material, 2);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -167,13 +167,13 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             pass.ReadRtHandle<CameraStencil>();
 			pass.ReadRtHandle<GBufferNormalRoughness>();
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
-                pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(history));
-                pass.SetFloat("_Intensity", settings.Intensity);
-                pass.SetFloat("_MaxSteps", settings.MaxSamples);
-                pass.SetFloat("_Thickness", settings.Thickness);
+                pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
+                pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(data.history));
+                pass.SetFloat("_Intensity", data.Intensity);
+                pass.SetFloat("_MaxSteps", data.MaxSamples);
+                pass.SetFloat("_Thickness", data.Thickness);
             });
         }
 

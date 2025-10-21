@@ -51,7 +51,7 @@ public class Rain : CameraRenderFeature
 			previousDropletCount = dropletCount;
 
 			// New buffer, need to initialize positions
-			using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Initialize"))
+			using (var pass = renderGraph.AddComputeRenderPass("Initialize", (dropletCount, settings.Radius, settings.Velocity, settings.WindAngle, settings.WindStrength, settings.WindTurbulence)))
 			{
 				pass.Initialize(rainComputeShader, 0, dropletCount);
 
@@ -61,19 +61,19 @@ public class Rain : CameraRenderFeature
 				pass.AddRenderPassData<ViewData>();
 				pass.AddRenderPassData<FrameData>();
 
-				pass.SetRenderFunction((command, pass) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					pass.SetInt("RainDropletCount", dropletCount);
-					pass.SetFloat("RainRadius", settings.Radius);
-					pass.SetFloat("RainVelocity", settings.Velocity);
-					pass.SetFloat("WindAngle", settings.WindAngle);
-					pass.SetFloat("WindStrength", settings.WindStrength);
-					pass.SetFloat("WindTurbulence", settings.WindTurbulence);
+					pass.SetInt("RainDropletCount", data.dropletCount);
+					pass.SetFloat("RainRadius", data.Radius);
+					pass.SetFloat("RainVelocity", data.Velocity);
+					pass.SetFloat("WindAngle", data.WindAngle);
+					pass.SetFloat("WindStrength", data.WindStrength);
+					pass.SetFloat("WindTurbulence", data.WindTurbulence);
 				});
 			}
 		}
 
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Update"))
+		using (var pass = renderGraph.AddComputeRenderPass("Update", (dropletCount, settings.Radius, settings.Velocity, settings.WindAngle, settings.WindStrength, settings.WindTurbulence)))
 		{
 			pass.Initialize(rainComputeShader, 1, dropletCount);
 
@@ -83,19 +83,19 @@ public class Rain : CameraRenderFeature
 			pass.AddRenderPassData<ViewData>();
 			pass.AddRenderPassData<FrameData>();
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetInt("RainDropletCount", dropletCount);
-				pass.SetFloat("RainRadius", settings.Radius);
-				pass.SetFloat("RainVelocity", settings.Velocity);
-				pass.SetFloat("WindAngle", settings.WindAngle);
-				pass.SetFloat("WindStrength", settings.WindStrength);
-				pass.SetFloat("WindTurbulence", settings.WindTurbulence);
+				pass.SetInt("RainDropletCount", data.dropletCount);
+				pass.SetFloat("RainRadius", data.Radius);
+				pass.SetFloat("RainVelocity", data.Velocity);
+				pass.SetFloat("WindAngle", data.WindAngle);
+				pass.SetFloat("WindStrength", data.WindStrength);
+				pass.SetFloat("WindTurbulence", data.WindTurbulence);
 			});
 		}
 
 		// TODO: Index buffer, but make some common function to build/get an index buffer 
-		using (var pass = renderGraph.AddRenderPass<DrawProceduralRenderPass>("Render"))
+		using (var pass = renderGraph.AddDrawProceduralRenderPass("Render", (dropletCount, settings.Radius, settings.Velocity, settings.WindAngle, settings.WindStrength, settings.WindTurbulence)))
 		{
 			pass.Initialize(settings.Material, Float4x4.Identity, 0, 4, dropletCount, MeshTopology.Quads);
 
@@ -111,14 +111,14 @@ public class Rain : CameraRenderFeature
 			pass.AddRenderPassData<EnvironmentData>();
 			pass.AddRenderPassData<LightingData>();
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetInt("RainDropletCount", dropletCount);
-				pass.SetFloat("RainRadius", settings.Radius);
-				pass.SetFloat("RainVelocity", settings.Velocity);
-				pass.SetFloat("WindAngle", settings.WindAngle);
-				pass.SetFloat("WindStrength", settings.WindStrength);
-				pass.SetFloat("WindTurbulence", settings.WindTurbulence);
+				pass.SetInt("RainDropletCount", data.dropletCount);
+				pass.SetFloat("RainRadius", data.Radius);
+				pass.SetFloat("RainVelocity", data.Velocity);
+				pass.SetFloat("WindAngle", data.WindAngle);
+				pass.SetFloat("WindStrength", data.WindStrength);
+				pass.SetFloat("WindTurbulence", data.WindTurbulence);
 			});
 		}
 	}

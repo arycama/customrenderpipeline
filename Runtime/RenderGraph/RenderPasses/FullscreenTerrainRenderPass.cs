@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-public class FullscreenTerrainRenderPass : FullscreenRenderPass
+public class FullscreenTerrainRenderPass<T> : FullscreenRenderPass<T>
 {
 	private Terrain terrain;
 

@@ -41,17 +41,33 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 			tempIds.Add(renderGraph.GetTexture(tempResolution, tempResolution, GraphicsFormat.R16_UInt));
 		}
 
+		var terrainSystemData = renderGraph.GetResource<TerrainSystemData>();
 		for (var i = 0; i < dispatchCount; i++)
 		{
-			using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Terrain Quadtree Cull"))
+			var isFirstPass = i == 0; // Also indicates whether this is -not- the first pass
+			var passCount = Mathf.Min(maxPassesPerDispatch, totalPassCount - i * maxPassesPerDispatch);
+			var index = i;
+
+			using (var pass = renderGraph.AddComputeRenderPass("Terrain Quadtree Cull", 
+			(
+				viewPosition,
+				cullingPlanes,
+				indirectArgsBuffer,
+				totalPassCount,
+				isFirstPass,
+				passCount,
+				index,
+				QuadListIndexCount,
+				terrainSystemData.terrain,
+				terrainSystemData.terrainData,
+				settings
+			)))
 			{
-				var isFirstPass = i == 0; // Also indicates whether this is -not- the first pass
 				if (!isFirstPass)
 					pass.ReadTexture("_TempResult", tempIds[i - 1]);
 
 				var isFinalPass = i == dispatchCount - 1; // Also indicates whether this is -not- the final pass
 
-				var passCount = Mathf.Min(maxPassesPerDispatch, totalPassCount - i * maxPassesPerDispatch);
 				var threadCount = 1 << (i * 6 + passCount - 1);
 				pass.Initialize(compute, 0, threadCount, threadCount);
 
@@ -70,29 +86,12 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 				if (!isFinalPass)
 					pass.WriteTexture("_TempResultWrite", tempIds[i]);
 
-				var terrainSystemData = renderGraph.GetResource<TerrainSystemData>();
-
 				pass.WriteBuffer("_IndirectArgs", indirectArgsBuffer);
 				pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
 				pass.ReadTexture("_TerrainHeights", terrainSystemData.minMaxHeights);
 				pass.AddRenderPassData<ViewData>();
 
-				var index = i;
-				pass.SetRenderFunction(
-				(
-					viewPosition,
-					cullingPlanes,
-					indirectArgsBuffer,
-					totalPassCount,
-					isFirstPass,
-					passCount,
-					index,
-					QuadListIndexCount,
-					terrainSystemData.terrain,
-					terrainSystemData.terrainData,
-					settings
-				),
-				(command, pass, data) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					// First pass sets the buffer contents
 					if (data.isFirstPass)
@@ -137,7 +136,7 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 
 		if (dispatchCount > 1)
 		{
-			using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Terrain Quadtree Cull"))
+			using (var pass = renderGraph.AddComputeRenderPass("Terrain Quadtree Cull"))
 			{
 				pass.Initialize(compute, 1, normalizedDispatch: false);
 				pass.WriteBuffer("_IndirectArgs", lodIndirectArgsBuffer);
@@ -147,14 +146,14 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 				pass.ReadBuffer("_IndirectArgsInput", indirectArgsBuffer);
 			}
 
-			using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Terrain Quadtree Cull"))
+			using (var pass = renderGraph.AddIndirectComputeRenderPass("Terrain Quadtree Cull", settings))
 			{
 				pass.Initialize(compute, lodIndirectArgsBuffer, 2);
 				pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
 				pass.ReadTexture("_LodInput", tempLodId);
 				pass.ReadBuffer("_IndirectArgs", indirectArgsBuffer);
 
-				pass.SetRenderFunction((command, pass) =>
+				pass.SetRenderFunction(static (command, pass, settings) =>
 				{
 					pass.SetInt("_CellCount", settings.CellCount);
 				});

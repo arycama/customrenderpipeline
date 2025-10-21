@@ -31,12 +31,12 @@ public class VolumetricCloudsSetup : FrameRenderFeature
 
         version = settings.Version;
 
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Weather Map"))
+        using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Weather Map", settings))
         {
             pass.Initialize(material, 0);
             pass.WriteTexture(weatherMap, RenderBufferLoadAction.DontCare);
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, settings) =>
             {
                 pass.SetFloat("_WeatherMapFrequency", settings.WeatherMapNoiseParams.Frequency);
                 pass.SetFloat("_WeatherMapH", settings.WeatherMapNoiseParams.H);
@@ -48,14 +48,14 @@ public class VolumetricCloudsSetup : FrameRenderFeature
 
         // Noise
         var maxInstanceCount = 32;
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Noise Texture"))
+        using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Noise Texture", settings))
         {
             var primitiveCount = Math.DivRoundUp(settings.NoiseResolution.z, maxInstanceCount);
             pass.Initialize(material, 1, primitiveCount);
             pass.DepthSlice = -1;
             pass.WriteTexture(noiseTexture, RenderBufferLoadAction.DontCare);
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, settings) =>
             {
                 pass.SetFloat("_NoiseFrequency", settings.NoiseParams.Frequency);
                 pass.SetFloat("_NoiseH", settings.NoiseParams.H);
@@ -70,14 +70,14 @@ public class VolumetricCloudsSetup : FrameRenderFeature
         }
 
         // Detail
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Clouds Detail Noise Texture"))
+        using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Detail Noise Texture", settings))
         {
             var primitiveCount = Math.DivRoundUp(settings.DetailNoiseResolution.z, maxInstanceCount);
             pass.Initialize(material, 2, primitiveCount);
             pass.DepthSlice = -1;
             pass.WriteTexture(detailNoiseTexture, RenderBufferLoadAction.DontCare);
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, settings) =>
             {
                 pass.SetFloat("_DetailNoiseFrequency", settings.DetailNoiseParams.Frequency);
                 pass.SetFloat("_DetailNoiseH", settings.DetailNoiseParams.H);

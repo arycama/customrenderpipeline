@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -177,16 +176,16 @@ public class SetupCamera : CameraRenderFeature
 			0f
 		))));
 
-		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Set View Properties"))
+		using (var pass = renderGraph.AddGenericRenderPass("Set View Properties", (viewPosition, viewRotation, tanHalfFovX, tanHalfFovY, jitter)))
 		{
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetVector("ViewPosition1", viewPosition);
+				pass.SetVector("ViewPosition1", data.viewPosition);
 				pass.SetVectorArray("FrustumCorners1", new Vector4[3]
 				{
-					new Float4(viewRotation.Rotate(new Float3(tanHalfFovX * (-1.0f + jitter.x), tanHalfFovY * (1.0f + jitter.y), 1.0f)), 0),
-					new Float4(viewRotation.Rotate(new Float3(tanHalfFovX * (3.0f + jitter.x), tanHalfFovY * (1.0f + jitter.y), 1.0f)), 0),
-					new Float4(viewRotation.Rotate(new Float3(tanHalfFovX * (-1.0f + jitter.x), tanHalfFovY * (-3.0f + jitter.y), 1.0f)), 0),
+					new Float4(data.viewRotation.Rotate(new Float3(data.tanHalfFovX * (-1.0f + data.jitter.x), data.tanHalfFovY * (1.0f + data.jitter.y), 1.0f)), 0),
+					new Float4(data.viewRotation.Rotate(new Float3(data.tanHalfFovX * (3.0f + data.jitter.x), data.tanHalfFovY * (1.0f + data.jitter.y), 1.0f)), 0),
+					new Float4(data.viewRotation.Rotate(new Float3(data.tanHalfFovX * (-1.0f + data.jitter.x), data.tanHalfFovY * (-3.0f + data.jitter.y), 1.0f)), 0),
 				});
 			});
 		}

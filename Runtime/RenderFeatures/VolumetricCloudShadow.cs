@@ -111,19 +111,19 @@ public class VolumetricCloudShadow : CameraRenderFeature
 
         var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32);
         var cloudShadowDataBuffer = renderGraph.SetConstantBuffer((invViewProjection, -lightDirection, 1f / depth, 1f / settings.Density, (float)settings.ShadowSamples, 0.0f, 0.0f));
+		var time = (float)renderGraph.GetResource<TimeData>().time;
 
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Volumetric Cloud Shadow"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Cloud Shadow", (settings, time)))
         {
             pass.Initialize(material, 3);
             pass.WriteTexture(cloudShadow, RenderBufferLoadAction.DontCare);
             pass.ReadBuffer("CloudShadowData", cloudShadowDataBuffer);
             pass.AddRenderPassData<CloudData>();
             pass.AddRenderPassData<ViewData>();
-            var time = (float)pass.RenderGraph.GetResource<TimeData>().time;
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, data) =>
             {
-                settings.SetCloudPassData(pass, time);
+				data.settings.SetCloudPassData(pass, data.time);
             });
         }
 
@@ -139,7 +139,7 @@ public class VolumetricCloudShadow : CameraRenderFeature
 			perCameraCoverage.Add(camera, cloudCoverageBufferTemp);
 		}
 
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Cloud Coverage"))
+		using (var pass = renderGraph.AddComputeRenderPass("Cloud Coverage", (settings, time, isFirst)))
         {
 			pass.Initialize(cloudCoverageComputeShader, 0, 1);
 
@@ -151,22 +151,21 @@ public class VolumetricCloudShadow : CameraRenderFeature
             pass.AddRenderPassData<LightingData>();
 			pass.AddRenderPassData<ViewData>();
 			pass.AddRenderPassData<SkyTransmittanceData>();
-            var time = (float)pass.RenderGraph.GetResource<TimeData>().time;
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, data) =>
             {
-                settings.SetCloudPassData(pass, time);
-				pass.SetFloat("IsFirst", isFirst ? 1 : 0);
+				data.settings.SetCloudPassData(pass, data.time);
+				pass.SetFloat("IsFirst", data.isFirst ? 1 : 0);
             });
         }
 
-        using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Cloud Coverage Copy"))
+        using (var pass = renderGraph.AddGenericRenderPass("Cloud Coverage Copy", (cloudCoverageBufferTemp, cloudCoverageBuffer)))
         {
             pass.ReadBuffer("", cloudCoverageBufferTemp);
             pass.WriteBuffer("", cloudCoverageBuffer);
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, data) =>
             {
-                command.CopyBuffer(pass.GetBuffer(cloudCoverageBufferTemp), pass.GetBuffer(cloudCoverageBuffer));
+                command.CopyBuffer(pass.GetBuffer(data.cloudCoverageBufferTemp), pass.GetBuffer(data.cloudCoverageBuffer));
             });
         }
     }

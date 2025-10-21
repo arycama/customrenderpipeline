@@ -20,7 +20,7 @@ public class UnderwaterLighting : CameraRenderFeature
 
         var underwaterResultId = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ocean Underwater Lighting"))
+        using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Underwater Lighting", settings))
         {
             pass.Initialize(underwaterLightingMaterial);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -44,7 +44,7 @@ public class UnderwaterLighting : CameraRenderFeature
             pass.ReadRtHandle<CameraDepth>();
             pass.ReadRtHandle<CameraDepthCopy>();
                 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, settings) =>
             {
                 pass.SetVector("_WaterExtinction", settings.Material.GetColor("_Extinction").Float3());
             });

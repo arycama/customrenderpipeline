@@ -4,6 +4,39 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
+public abstract class RenderPass<T> : RenderPass
+{
+	private Action<CommandBuffer, RenderPass> defaultRenderFunction;
+	private Action<CommandBuffer, RenderPass, T> renderFunction;
+	public T renderData;
+
+	public override void Reset()
+	{
+		base.Reset();
+		defaultRenderFunction = null;
+		renderFunction = null;
+		renderData = default;
+	}
+
+	protected override void ExecuteRenderPassBuilder()
+	{
+		if (defaultRenderFunction != null)
+			defaultRenderFunction(Command, this);
+		else
+			renderFunction?.Invoke(Command, this, renderData);
+	}
+
+	public void SetRenderFunction(Action<CommandBuffer, RenderPass> renderFunction)
+	{
+		defaultRenderFunction = renderFunction;
+	}
+
+	public void SetRenderFunction(Action<CommandBuffer, RenderPass, T> renderFunction)
+	{
+		this.renderFunction = renderFunction;
+	}
+}
+
 public abstract class RenderPass : IDisposable
 {
 	// TODO: Convert to handles and remove
@@ -13,10 +46,12 @@ public abstract class RenderPass : IDisposable
 
 	private readonly List<(RenderPassDataHandle, bool)> RenderPassDataHandles = new();
 	private readonly List<Type> readRtHandles = new();
+	public readonly MaterialPropertyBlock propertyBlock;
 
-	private Action<CommandBuffer, RenderPass> defaultRenderFunction;
-	private IRenderFunction renderGraphBuilder;
-	private object renderData;
+	public RenderPass()
+	{
+		propertyBlock = new();
+	}
 
 	protected CommandBuffer Command { get; private set; }
 	public RenderGraph RenderGraph { get; set; }
@@ -41,14 +76,7 @@ public abstract class RenderPass : IDisposable
 
 	protected virtual void SetupTargets() { }
 
-	protected void ExecuteRenderPassBuilder()
-	{
-		if (defaultRenderFunction != null)
-			defaultRenderFunction(Command, this);
-		else
-			renderGraphBuilder?.Execute(Command, this, renderData);
-	}
-
+	protected abstract void ExecuteRenderPassBuilder();
 	public virtual void Reset()
 	{
 		readTextures.Clear();
@@ -60,9 +88,6 @@ public abstract class RenderPass : IDisposable
 		Index = -1;
 		UseProfiler = true;
 		readRtHandles.Clear();
-		defaultRenderFunction = null;
-		renderGraphBuilder = null;
-		renderData = null;
 	}
 
 	void IDisposable.Dispose()
@@ -244,16 +269,5 @@ public abstract class RenderPass : IDisposable
 		var limitZ = (descriptor.volumeDepth - 0.5f) / resource.volumeDepth;
 
 		return new Float3(limitX, limitY, limitZ);
-	}
-
-	public void SetRenderFunction(Action<CommandBuffer, RenderPass> renderFunction)
-	{
-		defaultRenderFunction = renderFunction;
-	}
-
-	public void SetRenderFunction<K>(K data, Action<CommandBuffer, RenderPass, K> renderFunction)
-	{
-		renderData = data;
-		renderGraphBuilder = new RenderFunction<K>(renderFunction);
 	}
 }

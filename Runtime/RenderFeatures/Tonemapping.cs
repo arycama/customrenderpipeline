@@ -48,14 +48,6 @@ public partial class Tonemapping : CameraRenderFeature
 			previousNormalize = settings.NormalizeLmsr;
 		}
 
-		using var pass = renderGraph.AddRenderPass<BlitToScreenPass>("Tonemapping");
-
-		pass.Initialize(material);
-
-		pass.ReadRtHandle<CameraTarget>();
-		pass.ReadRtHandle<CameraBloom>();
-		pass.AddRenderPassData<AutoExposureData>();
-
 		var hdrSettings = HDROutputSettings.main;
 		var hdrEnabled = settings.Hdr && hdrSettings.available;
 		var colorGamut = ColorGamut.sRGB;
@@ -72,24 +64,33 @@ public partial class Tonemapping : CameraRenderFeature
 			colorGamut = hdrSettings.displayColorGamut;
 		}
 
+
+		using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (settings, camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb));
+
+		pass.Initialize(material);
+
+		pass.ReadRtHandle<CameraTarget>();
+		pass.ReadRtHandle<CameraBloom>();
+		pass.AddRenderPassData<AutoExposureData>();
+	
 		// Just for debug 
 		pass.AddRenderPassData<DiffuseGlobalIllumination.Result>();
 		pass.AddRenderPassData<ScreenSpaceReflectionResult>();
 
-		pass.SetRenderFunction((command, pass) =>
+		pass.SetRenderFunction(static (command, pass, data) =>
 		{
-			pass.SetFloat("Tonemap", settings.Tonemap ? 1 : 0);
-			pass.SetFloat("MinLuminance", settings.MinLuminance);
-			pass.SetFloat("MaxLuminance", settings.MaxLuminance);
-			pass.SetFloat("PaperWhite", settings.PaperWhite);
-			pass.SetFloat("IsSceneView", camera.cameraType == CameraType.SceneView ? 1 : 0);
-			pass.SetFloat("IsPreview", camera.cameraType == CameraType.Preview ? 1 : 0);
-			pass.SetFloat("BloomStrength", bloomSettings.BloomStrength);
-			pass.SetFloat("ColorGamut", (int)colorGamut);
-			pass.SetMatrix("RgbToLmsr", RgbToLmsr);
-			pass.SetMatrix("LmrToRgb", LmsToRgb);
-			pass.SetFloat("Purkinje", settings.Purkinje ? 1 : 0);
-			pass.SetVector("RodInputStrength", settings.RodColor.LinearFloat3());
+			pass.SetFloat("Tonemap", data.settings.Tonemap ? 1 : 0);
+			pass.SetFloat("MinLuminance", data.settings.MinLuminance);
+			pass.SetFloat("MaxLuminance", data.settings.MaxLuminance);
+			pass.SetFloat("PaperWhite", data.settings.PaperWhite);
+			pass.SetFloat("IsSceneView", data.camera.cameraType == CameraType.SceneView ? 1 : 0);
+			pass.SetFloat("IsPreview", data.camera.cameraType == CameraType.Preview ? 1 : 0);
+			pass.SetFloat("BloomStrength", data.bloomSettings.BloomStrength);
+			pass.SetFloat("ColorGamut", (int)data.colorGamut);
+			pass.SetMatrix("RgbToLmsr", data.RgbToLmsr);
+			pass.SetMatrix("LmrToRgb", data.LmsToRgb);
+			pass.SetFloat("Purkinje", data.settings.Purkinje ? 1 : 0);
+			pass.SetVector("RodInputStrength", data.settings.RodColor.LinearFloat3());
 		});
 	}
 

@@ -32,7 +32,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 		for (var i = 0; i < drawList.Count; i++)
 		{
 			var draw = drawList[i];
-			using (var pass = renderGraph.AddRenderPass<DrawInstancedIndirectRenderPass>("Gpu Driven Rendering"))
+			using (var pass = renderGraph.AddDrawInstancedIndirectRenderPass("Gpu Driven Rendering", (draw.lodOffset, draw.objectToWorld)))
 			{
 				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, draw.passIndex, "INDIRECT_RENDERING", 0.0f, 0.0f, true, draw.indirectArgsOffset);
 				pass.UseProfiler = false;
@@ -55,7 +55,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 				pass.ReadBuffer("_InstanceLodFades", instanceData.lodFades);
 				pass.ReadBuffer("InstanceIdOffsets", renderingData.instanceIdOffsetsBuffer);
 
-				pass.SetRenderFunction((draw.lodOffset, draw.objectToWorld), static (command, pass, data) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					pass.SetInt("InstanceIdOffsetsIndex", data.lodOffset);
 					pass.SetMatrix("LocalToWorld", (Matrix4x4)data.objectToWorld);

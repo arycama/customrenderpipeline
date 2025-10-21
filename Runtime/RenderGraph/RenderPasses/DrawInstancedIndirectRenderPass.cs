@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-public class DrawInstancedIndirectRenderPass : DrawRenderPass
+public class DrawInstancedIndirectRenderPass<T> : DrawRenderPass<T>
 {
 	private Material material;
 	private int passIndex;

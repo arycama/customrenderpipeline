@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
 
-public class ObjectRenderPass : GraphicsRenderPass
+public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 {
 	private List<RendererList> rendererLists = new();
 

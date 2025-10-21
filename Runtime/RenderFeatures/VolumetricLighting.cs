@@ -49,7 +49,7 @@ public partial class VolumetricLighting : CameraRenderFeature
 		var pixelToWorldViewDir = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, tanHalfFov, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation));
 
         var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Volumetric Lighting"))
+		using (var pass = renderGraph.AddComputeRenderPass("Volumetric Lighting", (pixelToWorldViewDir, history)))
         {
             pass.Initialize(computeShader, 0, volumeWidth, volumeHeight, settings.DepthSlices);
             pass.WriteTexture("Result", current);
@@ -67,7 +67,7 @@ public partial class VolumetricLighting : CameraRenderFeature
             pass.ReadRtHandle<HiZMaxDepth>();
             pass.AddRenderPassData<ParticleShadowData>();
 
-			pass.SetRenderFunction((pixelToWorldViewDir, history), static (command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
             {
                 pass.SetMatrix("PixelToWorldViewDir", data.pixelToWorldViewDir);
 				pass.SetVector("InputScale", pass.GetScale3D(data.history));
@@ -80,7 +80,7 @@ public partial class VolumetricLighting : CameraRenderFeature
 		if (settings.BlurSigma > 0)
 		{
 			var filterX = renderGraph.GetTexture(volumeWidth, volumeHeight, GraphicsFormat.R16G16B16A16_SFloat, settings.DepthSlices, TextureDimension.Tex3D);
-			using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Filter X"))
+			using (var pass = renderGraph.AddComputeRenderPass("Filter X"))
 			{
 				pass.Initialize(computeShader, 1, volumeWidth, volumeHeight, settings.DepthSlices);
 				pass.WriteTexture("Result", filterX);
@@ -91,7 +91,7 @@ public partial class VolumetricLighting : CameraRenderFeature
 
 			// Filter Y
 			var filterY = renderGraph.GetTexture(volumeWidth, volumeHeight, GraphicsFormat.R16G16B16A16_SFloat, settings.DepthSlices, TextureDimension.Tex3D);
-			using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Filter Y"))
+			using (var pass = renderGraph.AddComputeRenderPass("Filter Y"))
 			{
 				pass.Initialize(computeShader, 2, volumeWidth, volumeHeight, settings.DepthSlices);
 				pass.WriteTexture("Result", filterY);
@@ -105,7 +105,7 @@ public partial class VolumetricLighting : CameraRenderFeature
 
 		// Accumulate
 		var volumetricLight = renderGraph.GetTexture(volumeWidth, volumeHeight, GraphicsFormat.R16G16B16A16_SFloat, settings.DepthSlices, TextureDimension.Tex3D);
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Accumulate"))
+		using (var pass = renderGraph.AddComputeRenderPass("Accumulate", pixelToWorldViewDir))
         {
             pass.Initialize(computeShader, 3, volumeWidth, volumeHeight, 1);
             pass.WriteTexture("Result", volumetricLight);
@@ -115,7 +115,7 @@ public partial class VolumetricLighting : CameraRenderFeature
             pass.AddRenderPassData<ViewData>();
 			pass.ReadRtHandle<HiZMaxDepth>();
 
-			pass.SetRenderFunction(pixelToWorldViewDir, static (command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
             {
                 pass.SetMatrix("PixelToWorldViewDir", data);
             });

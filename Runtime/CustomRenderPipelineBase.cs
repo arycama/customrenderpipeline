@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
-using System;
 
 #if UNITY_EDITOR
 using UnityEditorInternal;
@@ -108,17 +107,18 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
             // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
             if (camera.cameraType == CameraType.Game && camera == Camera.main)
             {
-                using var pass = renderGraph.AddRenderPass<GenericRenderPass>("UI Overlay");
+				var uiOverlay = context.CreateUIOverlayRendererList(camera);
+
+				using var pass = renderGraph.AddGenericRenderPass("UI Overlay", (uiOverlay, wireOverlay));
                 pass.UseProfiler = false;
 
-                var uiOverlay = context.CreateUIOverlayRendererList(camera);
-                pass.SetRenderFunction((command, pass) =>
+                pass.SetRenderFunction(static (command, pass, data) =>
                 {
                     command.EnableShaderKeyword("UI_OVERLAY_RENDERING");
-                    command.DrawRendererList(uiOverlay);
+                    command.DrawRendererList(data.uiOverlay);
                     command.DisableShaderKeyword("UI_OVERLAY_RENDERING");
 
-                    command.DrawRendererList(wireOverlay);
+                    command.DrawRendererList(data.wireOverlay);
                 });
             }
         }

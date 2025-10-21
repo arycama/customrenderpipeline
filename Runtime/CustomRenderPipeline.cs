@@ -100,15 +100,15 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			var blueNoise3DUnit = Resources.Load<Texture2D>(blueNoise3DUnitIds[noiseIndex]);
 			var blueNoise3DCosine = Resources.Load<Texture2D>(blueNoise3DCosineIds[noiseIndex]);
 
-			using var pass = renderGraph.AddRenderPass<GenericRenderPass>("Set Per Frame Data");
-			pass.SetRenderFunction((command, pass) =>
+			using var pass = renderGraph.AddGenericRenderPass("Set Per Frame Data", (blueNoise1D, blueNoise2D, blueNoise3D, blueNoise2DUnit, blueNoise3DUnit, blueNoise3DCosine));
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetTexture("BlueNoise1D", blueNoise1D);
-				pass.SetTexture("BlueNoise2D", blueNoise2D);
-				pass.SetTexture("BlueNoise3D", blueNoise3D);
-				pass.SetTexture("BlueNoise2DUnit", blueNoise2DUnit);
-				pass.SetTexture("BlueNoise3DUnit", blueNoise3DUnit);
-				pass.SetTexture("BlueNoise3DCosine", blueNoise3DCosine);
+				pass.SetTexture("BlueNoise1D", data.blueNoise1D);
+				pass.SetTexture("BlueNoise2D", data.blueNoise2D);
+				pass.SetTexture("BlueNoise3D", data.blueNoise3D);
+				pass.SetTexture("BlueNoise2DUnit", data.blueNoise2DUnit);
+				pass.SetTexture("BlueNoise3DUnit", data.blueNoise3DUnit);
+				pass.SetTexture("BlueNoise3DCosine", data.blueNoise3DCosine);
 			});
 		}),
 
@@ -178,7 +178,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		{
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
-			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Gbuffer");
+			using var pass = renderGraph.AddObjectRenderPass("Gbuffer");
 
 			pass.Initialize("Deferred", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
@@ -196,7 +196,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		{
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
-			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Velocity");
+			using var pass = renderGraph.AddObjectRenderPass("Velocity");
 
 			pass.Initialize("MotionVectors", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.MotionVectors, false);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
@@ -216,7 +216,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		{
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
-			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("GrassVelocity");
+			using var pass = renderGraph.AddObjectRenderPass("GrassVelocity");
 
 			pass.Initialize("GrassVelocity", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, false);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
@@ -237,7 +237,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// This is just here to avoid memory leaks when GPU driven rendering isn't used.
         new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
-			using var pass = renderGraph.AddRenderPass<GenericRenderPass>("HiZ Read Temp");
+			using var pass = renderGraph.AddGenericRenderPass("HiZ Read Temp");
 			pass.ReadRtHandle<HiZMaxDepth>();
 		}),
 
@@ -261,7 +261,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
-			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Decal");
+			using var pass = renderGraph.AddObjectRenderPass("Decal");
 
 			pass.Initialize("Decal", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.QuantizedFrontToBack, PerObjectData.None);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -283,12 +283,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		{
             // Copy scene depth (Required for underwater lighting)
             // TODO: Could avoid this by using another depth texture for water.. will require some extra logic in other passes though
-            using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Copy Depth Texture"))
+            using (var pass = renderGraph.AddGenericRenderPass("Copy Depth Texture", (renderGraph.GetRTHandle<CameraDepth>(), renderGraph.GetRTHandle<CameraDepthCopy>())))
 			{
 				pass.ReadTexture("", renderGraph.GetRTHandle<CameraDepth>());
 				pass.WriteTexture(renderGraph.GetRTHandle<CameraDepthCopy>());
 
-				pass.SetRenderFunction((renderGraph.GetRTHandle<CameraDepth>(), renderGraph.GetRTHandle<CameraDepthCopy>()), (command, pass, data) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					command.CopyTexture(pass.GetRenderTexture(data.Item1), pass.GetRenderTexture(data.Item2));
 				});
@@ -334,10 +334,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
             // Generate for next frame
-            using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Generate Color Pyramid"))
+            using (var pass = renderGraph.AddGenericRenderPass("Generate Color Pyramid", renderGraph.GetRTHandle<CameraTarget>()))
 			{
 				pass.ReadRtHandle<CameraTarget>();
-				pass.SetRenderFunction(renderGraph.GetRTHandle<CameraTarget>(), (command, pass, cameraTarget) =>
+				pass.SetRenderFunction(static (command, pass, cameraTarget) =>
 				{
 					command.GenerateMips(pass.GetRenderTexture(cameraTarget));
 				});
@@ -352,7 +352,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
-			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Render Transparent");
+			using var pass = renderGraph.AddObjectRenderPass("Render Transparent");
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("SRPDefaultUnlit", context, cullingResults, camera, RenderQueueRange.transparent, SortingCriteria.CommonTransparent, PerObjectData.None, false);

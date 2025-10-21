@@ -1,11 +1,9 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Assertions;
-using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 // TODO: Maybe share some cfuncionality with graphics render pass  or compute render pass
-public class RaytracingRenderPass : RenderPass
+public class RaytracingRenderPass<T> : RenderPass<T>
 {
 	private RayTracingShader shader;
 	private string rayGenName, shaderPassName;

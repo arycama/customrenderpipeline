@@ -12,7 +12,7 @@ public class GenerateCameraVelocity : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Camera Velocity"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Camera Velocity"))
 		{
 			pass.Initialize(material);
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());

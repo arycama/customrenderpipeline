@@ -1,5 +1,4 @@
 ﻿using UnityEngine;
-using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
 public class RenderGizmos : CameraRenderFeature
@@ -17,11 +16,11 @@ public class RenderGizmos : CameraRenderFeature
 		var preImageEffects = context.CreateGizmoRendererList(camera, GizmoSubset.PreImageEffects);
 		var postImageEffects = context.CreateGizmoRendererList(camera, GizmoSubset.PostImageEffects);
 
-		using var pass = renderGraph.AddRenderPass<GenericRenderPass>("");
-		pass.SetRenderFunction((command, pass) =>
+		using var pass = renderGraph.AddGenericRenderPass("", (preImageEffects, postImageEffects));
+		pass.SetRenderFunction(static (command, pass, data) =>
 		{
-			command.DrawRendererList(preImageEffects);
-			command.DrawRendererList(postImageEffects);
+			command.DrawRendererList(data.preImageEffects);
+			command.DrawRendererList(data.postImageEffects);
 		});
 	#endif
 	}

@@ -14,7 +14,7 @@ public class CameraVelocityDilate : CameraRenderFeature
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
 		var result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R16G16_SFloat);
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Velocity Dilate"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Velocity Dilate"))
 		{
 			pass.Initialize(material, 1);
 			pass.WriteTexture(result, RenderBufferLoadAction.DontCare);

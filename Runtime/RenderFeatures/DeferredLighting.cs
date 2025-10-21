@@ -16,7 +16,7 @@ public class DeferredLighting : CameraRenderFeature
 	{
 		void RenderPass(int index)
 		{
-			using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Deferred Lighting");
+			using var pass = renderGraph.AddFullscreenRenderPass("Deferred Lighting");
 
 			pass.Initialize(material, index);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -57,7 +57,7 @@ public class DeferredLighting : CameraRenderFeature
 
 		//  Final pass renders background and composites the sky, clouds and volumetric lighting
 		// TODO: this currently renders before the sun/moon disk meaning some pixels are overwritten. Could instead use a stencil bit to avoid
-		//using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Render Sky"))
+		//using (var pass = renderGraph.AddFullscreenRenderPass("Render Sky"))
 		//{
 		//	pass.Initialize(material, 2);
 		//	pass.WriteTexture(renderGraph.GetResource<CameraTargetData>());
@@ -68,7 +68,7 @@ public class DeferredLighting : CameraRenderFeature
 		//	pass.AddRenderPassData<TemporalAAData>();
 		//	pass.AddRenderPassData<VolumetricLighting.Result>();
 
-		//	pass.SetRenderFunction((command, pass) =>
+		//	pass.SetRenderFunction(static (command, pass) =>
 		//	{
 		//		if (skySettings.StarMap)
 		//			pass.SetTexture("Stars", skySettings.StarMap);

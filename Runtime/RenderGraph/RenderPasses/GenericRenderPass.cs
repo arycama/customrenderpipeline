@@ -1,9 +1,8 @@
 using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 /// <summary> Has no specific functionality but can be used as a general wrapper around render functionality </summary>
-public class GenericRenderPass : RenderPass
+public class GenericRenderPass<T> : RenderPass<T>
 {
 	public void WriteTexture(ResourceHandle<RenderTexture> rtHandle)
 	{

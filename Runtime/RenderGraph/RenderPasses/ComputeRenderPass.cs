@@ -1,10 +1,9 @@
 using System;
-using System.Collections;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
-public class ComputeRenderPass : BaseComputeRenderPass
+public class ComputeRenderPass<T> : BaseComputeRenderPass<T>
 {
 	private int xThreads, yThreads, zThreads;
 	private bool normalizedDispatch;

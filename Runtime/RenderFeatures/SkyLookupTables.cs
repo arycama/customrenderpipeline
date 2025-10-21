@@ -66,72 +66,72 @@ public class SkyLookupTables : FrameRenderFeature
 
 		version = settings.Version;
 
-        // Generate transmittance LUT
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Atmosphere Transmittance"))
-        {
-            pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Lookup"));
-            pass.WriteTexture(transmittance, RenderBufferLoadAction.DontCare);
-            result.SetInputs(pass);
+		// Generate transmittance LUT
+		using (var pass = renderGraph.AddFullscreenRenderPass("Atmosphere Transmittance", (settings.miePhase, result, settings)))
+		{
+			pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Lookup"));
+			pass.WriteTexture(transmittance, RenderBufferLoadAction.DontCare);
+			result.SetInputs(pass);
 
-            pass.SetRenderFunction((command, pass) =>
-            {
-                command.SetGlobalTexture("_MiePhaseTexture", settings.miePhase);
+			pass.SetRenderFunction(static (command, pass, data) =>
+			{
+				command.SetGlobalTexture("_MiePhaseTexture", data.settings.miePhase);
 
-                result.SetProperties(pass, command);
-                pass.SetFloat("_Samples", settings.TransmittanceSamples);
-                pass.SetVector("_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(settings.TransmittanceWidth, settings.TransmittanceHeight));
-                pass.SetFloat("_TransmittanceWidth", settings.TransmittanceWidth);
-                pass.SetFloat("_TransmittanceHeight", settings.TransmittanceHeight);
+				data.result.SetProperties(pass, command);
+				pass.SetFloat("_Samples", data.settings.TransmittanceSamples);
+				pass.SetVector("_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(data.settings.TransmittanceWidth, data.settings.TransmittanceHeight));
+				pass.SetFloat("_TransmittanceWidth", data.settings.TransmittanceWidth);
+				pass.SetFloat("_TransmittanceHeight", data.settings.TransmittanceHeight);
 
-            });
-        }
+			});
+		}
 
         var computeShader = Resources.Load<ComputeShader>("Sky/PhysicalSky");
 
 		// Generate multi-scatter LUT
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Atmosphere Multi Scatter"))
+		using (var pass = renderGraph.AddComputeRenderPass("Atmosphere Multi Scatter", (result, settings)))
 		{
 			pass.Initialize(computeShader, 0, settings.MultiScatterWidth, settings.MultiScatterHeight, 1, false);
 			pass.WriteTexture("_MultiScatterResult", multiScatter);
 			result.SetInputs(pass);
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				result.SetProperties(pass, command);
-				pass.SetFloat("_Samples", settings.MultiScatterSamples);
-				pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.MultiScatterWidth, settings.MultiScatterHeight));
+				data.result.SetProperties(pass, command);
+				pass.SetFloat("_Samples", data.settings.MultiScatterSamples);
+				pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(data.settings.MultiScatterWidth, data.settings.MultiScatterHeight));
 			});
 		}
 
 		// Ambient Ground LUT
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Atmosphere Ambient Ground"))
-        {
-            pass.Initialize(computeShader, 1, settings.AmbientGroundWidth, 1, 1, false);
-            pass.WriteTexture("_AmbientGroundResult", groundAmbient);
-            result.SetInputs(pass);
+		using (var pass = renderGraph.AddComputeRenderPass("Atmosphere Ambient Ground", (result, settings)))
+		{
+			pass.Initialize(computeShader, 1, settings.AmbientGroundWidth, 1, 1, false);
+			pass.WriteTexture("_AmbientGroundResult", groundAmbient);
+			result.SetInputs(pass);
 
-            pass.SetRenderFunction((command, pass) =>
-            {
-                result.SetProperties(pass, command);
-                pass.SetFloat("_Samples", settings.AmbientGroundSamples);
-                pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AmbientGroundWidth, 1));
-            });
-        }
+			pass.SetRenderFunction(static (command, pass, data) =>
+			{
+				data.result.SetProperties(pass, command);
+				pass.SetFloat("_Samples", data.settings.AmbientGroundSamples);
+				pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(data.settings.AmbientGroundWidth, 1));
+			});
+		}
 
-        // Ambient Sky LUT
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Atmosphere Ambient Sky"))
-        {
-            pass.Initialize(computeShader, 2, settings.AmbientSkyWidth, settings.AmbientSkyHeight, 1, false);
-            pass.WriteTexture("_AmbientSkyResult", skyAmbient);
-            result.SetInputs(pass);
+		// Ambient Sky LUT
+		using (var pass = renderGraph.AddComputeRenderPass("Atmosphere Ambient Sky", (result, settings)))
+		{
+			pass.Initialize(computeShader, 2, settings.AmbientSkyWidth, settings.AmbientSkyHeight, 1, false);
+			pass.WriteTexture("_AmbientSkyResult", skyAmbient);
+			result.SetInputs(pass);
 
-            pass.SetRenderFunction((command, pass) =>
-            {
-                result.SetProperties(pass, command);
-                pass.SetFloat("_Samples", settings.AmbientSkySamples);
-                pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(settings.AmbientSkyWidth, settings.AmbientSkyHeight));
-            });
-        }
+			pass.SetRenderFunction(static (command, pass, data) =>
+			{
+				data.result.SetProperties(pass, command);
+				pass.SetFloat("_Samples", data.settings.AmbientSkySamples);
+				pass.SetVector("_ScaleOffset", GraphicsUtilities.ThreadIdScaleOffset01(data.settings.AmbientSkyWidth, data.settings.AmbientSkyHeight));
+			});
+		}
 
 		renderGraph.AddProfileEndPass("Sky Tables");
 	}

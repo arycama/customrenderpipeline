@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
-using UnityEngine.Rendering;
 
 public abstract class WaterRendererBase : CameraRenderFeature
 {
@@ -84,87 +83,88 @@ public abstract class WaterRendererBase : CameraRenderFeature
 
         for (var i = 0; i < dispatchCount; i++)
         {
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Quadtree Cull"))
-            {
-                var isFirstPass = i == 0; // Also indicates whether this is -not- the first pass
-                if (!isFirstPass)
-                    pass.ReadTexture("_TempResult", tempIds[i - 1]);
+			var isFirstPass = i == 0; // Also indicates whether this is -not- the first pass
+			var index = i;
+			var passCount = Mathf.Min(maxPassesPerDispatch, totalPassCount - i * maxPassesPerDispatch);
 
-                var isFinalPass = i == dispatchCount - 1; // Also indicates whether this is -not- the final pass
+			using (var pass = renderGraph.AddComputeRenderPass("Ocean Quadtree Cull", (isFirstPass, QuadListIndexCount, indirectArgsBuffer, passCount, index, totalPassCount, cullingPlanes, viewPosition, settings)))
+			{
+				if (!isFirstPass)
+					pass.ReadTexture("_TempResult", tempIds[i - 1]);
 
-                var passCount = Mathf.Min(maxPassesPerDispatch, totalPassCount - i * maxPassesPerDispatch);
-                var threadCount = 1 << (i * 6 + passCount - 1);
-                pass.Initialize(compute, 0, threadCount, threadCount);
+				var isFinalPass = i == dispatchCount - 1; // Also indicates whether this is -not- the final pass
 
-                if (isFirstPass)
-                    pass.AddKeyword("FIRST");
+				var threadCount = 1 << (i * 6 + passCount - 1);
+				pass.Initialize(compute, 0, threadCount, threadCount);
 
-                if (isFinalPass)
-                    pass.AddKeyword("FINAL");
+				if (isFirstPass)
+					pass.AddKeyword("FIRST");
 
-                // pass.AddKeyword("NO_HEIGHTS");
+				if (isFinalPass)
+					pass.AddKeyword("FINAL");
 
-                if (isFinalPass && !isFirstPass)
-                {
-                    // Final pass writes out lods to a temp texture if more than one pass was used
-                    pass.WriteTexture("_LodResult", tempLodId);
-                }
+				// pass.AddKeyword("NO_HEIGHTS");
 
-                if (!isFinalPass)
-                    pass.WriteTexture("_TempResultWrite", tempIds[i]);
+				if (isFinalPass && !isFirstPass)
+				{
+					// Final pass writes out lods to a temp texture if more than one pass was used
+					pass.WriteTexture("_LodResult", tempLodId);
+				}
 
-                pass.WriteBuffer("_IndirectArgs", indirectArgsBuffer);
-                pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
+				if (!isFinalPass)
+					pass.WriteTexture("_TempResultWrite", tempIds[i]);
 
-                pass.AddRenderPassData<ViewData>();
-                pass.AddRenderPassData<FrameData>();
+				pass.WriteBuffer("_IndirectArgs", indirectArgsBuffer);
+				pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
 
-                var index = i;
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    // First pass sets the buffer contents
-                    if (isFirstPass)
-                    {
-                        var indirectArgs = ListPool<int>.Get();
-                        indirectArgs.Add(QuadListIndexCount); // index count per instance
-                        indirectArgs.Add(0); // instance count (filled in later)
-                        indirectArgs.Add(0); // start index location
-                        indirectArgs.Add(0); // base vertex location
-                        indirectArgs.Add(0); // start instance location
-                        command.SetBufferData(pass.GetBuffer(indirectArgsBuffer), indirectArgs);
-                        ListPool<int>.Release(indirectArgs);
-                    }
+				pass.AddRenderPassData<ViewData>();
+				pass.AddRenderPassData<FrameData>();
 
-                    // Do up to 6 passes per dispatch.
-                    pass.SetInt("_PassCount", passCount);
-                    pass.SetInt("_PassOffset", 6 * index);
-                    pass.SetInt("_TotalPassCount", totalPassCount);
+				pass.SetRenderFunction(static (command, pass, data) =>
+				{
+					// First pass sets the buffer contents
+					if (data.isFirstPass)
+					{
+						var indirectArgs = ListPool<int>.Get();
+						indirectArgs.Add(data.QuadListIndexCount); // index count per instance
+						indirectArgs.Add(0); // instance count (filled in later)
+						indirectArgs.Add(0); // start index location
+						indirectArgs.Add(0); // base vertex location
+						indirectArgs.Add(0); // start instance location
+						command.SetBufferData(pass.GetBuffer(data.indirectArgsBuffer), indirectArgs);
+						ListPool<int>.Release(indirectArgs);
+					}
 
-                    var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
-                    for (var i = 0; i < cullingPlanes.Count; i++)
-                        cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
+					// Do up to 6 passes per dispatch.
+					pass.SetInt("_PassCount", data.passCount);
+					pass.SetInt("_PassOffset", 6 * data.index);
+					pass.SetInt("_TotalPassCount", data.totalPassCount);
 
-                    pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
-                    ArrayPool<Vector4>.Release(cullingPlanesArray);
+					var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
+					for (var i = 0; i < data.cullingPlanes.Count; i++)
+						cullingPlanesArray[i] = data.cullingPlanes.GetCullingPlaneVector4(i);
 
-                    // Snap to quad-sized increments on largest cell
-                    var texelSize = settings.Size / (float)settings.PatchVertices;
-                    var positionX = Math.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
-                    var positionZ = Math.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
+					pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
+					ArrayPool<Vector4>.Release(cullingPlanesArray);
 
-                    var positionOffset = new Vector4(settings.Size, settings.Size, positionX, positionZ);
-                    pass.SetVector("_TerrainPositionOffset", positionOffset);
+					// Snap to quad-sized increments on largest cell
+					var texelSize = data.settings.Size / (float)data.settings.PatchVertices;
+					var positionX = Math.Snap(data.viewPosition.x, texelSize) - data.viewPosition.x - data.settings.Size * 0.5f;
+					var positionZ = Math.Snap(data.viewPosition.z, texelSize) - data.viewPosition.z - data.settings.Size * 0.5f;
 
-                    pass.SetFloat("_EdgeLength", (float)settings.EdgeLength * settings.PatchVertices);
-                    pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
-                    pass.SetFloat("MaxWaterHeight", settings.Profile.MaxWaterHeight);
-                });
-            }
+					var positionOffset = new Vector4(data.settings.Size, data.settings.Size, positionX, positionZ);
+					pass.SetVector("_TerrainPositionOffset", positionOffset);
+
+					pass.SetFloat("_EdgeLength", (float)data.settings.EdgeLength * data.settings.PatchVertices);
+					pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
+					pass.SetFloat("MaxWaterHeight", data.settings.Profile.MaxWaterHeight);
+				});
+			}
         }
 
         if (dispatchCount > 1)
         {
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Quadtree Cull"))
+            using (var pass = renderGraph.AddComputeRenderPass("Ocean Quadtree Cull"))
             {
                 pass.Initialize(compute, 1, normalizedDispatch: false);
                 pass.WriteBuffer("_IndirectArgs", lodIndirectArgsBuffer);
@@ -174,16 +174,16 @@ public abstract class WaterRendererBase : CameraRenderFeature
                 pass.ReadBuffer("_IndirectArgsInput", indirectArgsBuffer);
             }
 
-            using (var pass = renderGraph.AddRenderPass<IndirectComputeRenderPass>("Ocean Quadtree Cull"))
+            using (var pass = renderGraph.AddIndirectComputeRenderPass("Ocean Quadtree Cull", settings.CellCount))
             {
                 pass.Initialize(compute, lodIndirectArgsBuffer, 2);
                 pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
                 pass.ReadTexture("_LodInput", tempLodId);
                 pass.ReadBuffer("_IndirectArgs", indirectArgsBuffer);
 
-                pass.SetRenderFunction((command, pass) =>
+                pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    pass.SetInt("_CellCount", settings.CellCount);
+                    pass.SetInt("_CellCount", data);
                 });
             }
         }

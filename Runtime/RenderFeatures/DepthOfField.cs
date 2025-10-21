@@ -34,7 +34,7 @@ public partial class DepthOfField : CameraRenderFeature
 		if (settings.UseRaytracing)
 		{
 			// Need to set some things as globals so that hit shaders can access them..
-			using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Depth of Field Raytrace Setup"))
+			using (var pass = renderGraph.AddGenericRenderPass("Depth of Field Raytrace Setup"))
 			{
 				pass.AddRenderPassData<SkyReflectionAmbientData>();
 				pass.AddRenderPassData<LightingSetup.Result>();
@@ -47,7 +47,13 @@ public partial class DepthOfField : CameraRenderFeature
 				pass.AddRenderPassData<FrameData>();
 			}
 
-			using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Depth of Field "))
+			using (var pass = renderGraph.AddRaytracingRenderPass("Depth of Field", 
+			(
+				focusDistance: lensSettings.FocalDistance,
+				apertureRadius,
+				settings.SampleCount,
+				taaSettings.IsEnabled ? 1.0f : 0.0f
+			)))
 			{
 				var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
@@ -61,13 +67,7 @@ public partial class DepthOfField : CameraRenderFeature
 				pass.AddRenderPassData<FrameData>();
 				pass.AddRenderPassData<TerrainRenderData>(true);
 
-				pass.SetRenderFunction((
-					focusDistance: lensSettings.FocalDistance,
-					apertureRadius,
-					settings.SampleCount,
-					taaSettings.IsEnabled ? 1.0f : 0.0f
-				),
-				(command, pass, data) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					pass.SetFloat("_FocusDistance", data.focusDistance);
 					pass.SetFloat("_ApertureRadius", data.apertureRadius);
@@ -78,7 +78,14 @@ public partial class DepthOfField : CameraRenderFeature
 		}
 		else
 		{
-			using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Depth of Field"))
+			using (var pass = renderGraph.AddFullscreenRenderPass("Depth of Field", 
+			(
+				focusDistance: lensSettings.FocalDistance,
+				apertureRadius,
+				settings.SampleCount,
+				taaSettings.IsEnabled ? 1.0f : 0.0f,
+				camera.ScaledViewSize()
+			)))
 			{
 				pass.Initialize(material);
 				pass.WriteTexture(tempId, RenderBufferLoadAction.DontCare);
@@ -89,18 +96,12 @@ public partial class DepthOfField : CameraRenderFeature
 				pass.AddRenderPassData<FrameData>();
 				pass.AddRenderPassData<ViewData>();
 
-				pass.SetRenderFunction((
-					focusDistance: lensSettings.FocalDistance,
-					apertureRadius,
-					settings.SampleCount,
-					taaSettings.IsEnabled ? 1.0f : 0.0f
-				),
-				(command, pass, data) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					pass.SetFloat("_FocusDistance", data.focusDistance);
 					pass.SetFloat("_ApertureRadius", data.apertureRadius);
 					pass.SetFloat("_SampleCount", data.SampleCount);
-					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(camera.scaledPixelWidth, camera.scaledPixelHeight) - 1);
+					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.Item5) - 1);
 					pass.SetFloat("_TaaEnabled", data.Item4);
 				});
 			}

@@ -1,5 +1,4 @@
 using System;
-using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
@@ -57,7 +56,7 @@ public class GrassRenderer : CameraRenderFeature
 		if (settings.Update)
 		{
 			var compute = Resources.Load<ComputeShader>("GrassCull");
-			using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Grass Render"))
+			using (var pass = renderGraph.AddGenericRenderPass("Grass Render", (subdividePatchesA, subdividePatchesB, finalPatches, terrain, compute, material, cullingPlanes, patchCounts, settings, height, elementCountBuffer, terrainSystem, camera, indirectDispatchBuffer)))
 			{
 				pass.WriteBuffer("", finalPatches);
 				pass.WriteBuffer("", subdividePatchesA);
@@ -78,74 +77,74 @@ public class GrassRenderer : CameraRenderFeature
 				pass.AddRenderPassData<FrameData>();
 				pass.ReadRtHandle<HiZMaxDepth>();
 
-				pass.SetRenderFunction((command, pass) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					command.SetBufferCounterValue(pass.GetBuffer(subdividePatchesA), 0);
-					command.SetBufferCounterValue(pass.GetBuffer(subdividePatchesB), 0);
-					command.SetBufferCounterValue(pass.GetBuffer(finalPatches), 0);
+					command.SetBufferCounterValue(pass.GetBuffer(data.subdividePatchesA), 0);
+					command.SetBufferCounterValue(pass.GetBuffer(data.subdividePatchesB), 0);
+					command.SetBufferCounterValue(pass.GetBuffer(data.finalPatches), 0);
 
-					var extents = terrain.terrainData.size * 0.5f;
-					var center = terrain.GetPosition() + extents;
+					var extents = data.terrain.terrainData.size * 0.5f;
+					var center = data.terrain.GetPosition() + extents;
 
-					command.SetComputeVectorParam(compute, "_TerrainPosition", terrain.GetPosition());
-					command.SetComputeVectorParam(compute, "_TerrainSize", terrain.terrainData.size);
+					command.SetComputeVectorParam(data.compute, "_TerrainPosition", data.terrain.GetPosition());
+					command.SetComputeVectorParam(data.compute, "_TerrainSize", data.terrain.terrainData.size);
 
-					command.SetComputeVectorParam(compute, "_BoundsCenter", center);
-					command.SetComputeVectorParam(compute, "_BoundsExtents", extents);
+					command.SetComputeVectorParam(data.compute, "_BoundsCenter", center);
+					command.SetComputeVectorParam(data.compute, "_BoundsExtents", extents);
 
-					command.SetComputeFloatParam(compute, "_EdgeLength", material.GetFloat("_EdgeLength"));
-					command.SetComputeIntParam(compute, "_CullingPlanesCount", cullingPlanes.Count);
+					command.SetComputeFloatParam(data.compute, "_EdgeLength", data.material.GetFloat("_EdgeLength"));
+					command.SetComputeIntParam(data.compute, "_CullingPlanesCount", data.cullingPlanes.Count);
 
-					var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
-					for (var i = 0; i < cullingPlanes.Count; i++)
-						cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
+					var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
+					for (var i = 0; i < data.cullingPlanes.Count; i++)
+						cullingPlanesArray[i] = data.cullingPlanes.GetCullingPlaneVector4(i);
 
 					pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
 					ArrayPool<Vector4>.Release(cullingPlanesArray);
 
 					command.EnableShaderKeyword("HI_Z_CULL");
 
-					var mipCount = Texture2DExtensions.MipCount(patchCounts.x, patchCounts.y) - 1;
+					var mipCount = Texture2DExtensions.MipCount(data.patchCounts.x, data.patchCounts.y) - 1;
 					for (var i = 0; i <= mipCount; i++)
 					{
 						var kernelIndex = i == 0 ? 0 : (i == mipCount ? 2 : 1);
 
 						// Need to ping pong between two buffers so we're not reading/writing to the same one
-						var srcBuffer = i % 2 == 0 ? subdividePatchesB : subdividePatchesA;
-						var dstBuffer = i % 2 == 0 ? subdividePatchesA : subdividePatchesB;
+						var srcBuffer = i % 2 == 0 ? data.subdividePatchesB : data.subdividePatchesA;
+						var dstBuffer = i % 2 == 0 ? data.subdividePatchesA : data.subdividePatchesB;
 
 						var mip = mipCount - i;
-						var patchExtents = settings.PatchSize * Mathf.Pow(2, mip) * 0.5f;
-						command.SetComputeVectorParam(compute, "_PatchExtents", new Vector3(patchExtents, height * 0.5f, patchExtents));
-						command.SetComputeBufferParam(compute, kernelIndex, "_InputPatches", pass.GetBuffer(srcBuffer));
-						command.SetComputeBufferParam(compute, kernelIndex, "_SubdividePatches", pass.GetBuffer(dstBuffer));
-						command.SetComputeBufferParam(compute, kernelIndex, "_FinalPatchesWrite", pass.GetBuffer(finalPatches));
-						command.SetComputeBufferParam(compute, kernelIndex, "_ElementCount", pass.GetBuffer(elementCountBuffer));
-						command.SetComputeVectorArrayParam(compute, "_CullingPlanes", cullingPlanesArray);
-						command.SetComputeTextureParam(compute, kernelIndex, "_TerrainHeights", pass.GetRenderTexture(terrainSystem.minMaxHeight));
-						command.SetComputeFloatParam(compute, "_MaxHiZMip", Texture2DExtensions.MipCount(camera.ViewSize()) - 1);
+						var patchExtents = data.settings.PatchSize * Mathf.Pow(2, mip) * 0.5f;
+						command.SetComputeVectorParam(data.compute, "_PatchExtents", new Vector3(patchExtents, data.height * 0.5f, patchExtents));
+						command.SetComputeBufferParam(data.compute, kernelIndex, "_InputPatches", pass.GetBuffer(srcBuffer));
+						command.SetComputeBufferParam(data.compute, kernelIndex, "_SubdividePatches", pass.GetBuffer(dstBuffer));
+						command.SetComputeBufferParam(data.compute, kernelIndex, "_FinalPatchesWrite", pass.GetBuffer(data.finalPatches));
+						command.SetComputeBufferParam(data.compute, kernelIndex, "_ElementCount", pass.GetBuffer(data.elementCountBuffer));
+						command.SetComputeVectorArrayParam(data.compute, "_CullingPlanes", cullingPlanesArray);
+						command.SetComputeTextureParam(data.compute, kernelIndex, "_TerrainHeights", pass.GetRenderTexture(data.terrainSystem.minMaxHeight));
+						command.SetComputeFloatParam(data.compute, "_MaxHiZMip", Texture2DExtensions.MipCount(data.camera.ViewSize()) - 1);
 
 						// First dispatch only needs 1 element, other dispatches are indirect
 						if (i == 0)
-							command.DispatchCompute(compute, kernelIndex, 1, 1, 1);
+							command.DispatchCompute(data.compute, kernelIndex, 1, 1, 1);
 						else
-							command.DispatchCompute(compute, kernelIndex, pass.GetBuffer(indirectDispatchBuffer), 0);
+							command.DispatchCompute(data.compute, kernelIndex, pass.GetBuffer(data.indirectDispatchBuffer), 0);
 
 						// Copy to indirect args buffer, and another buffer with 1 element for reading
 						// (As we're not sure if reading from the buffer while rendering will work
-						command.CopyCounterValue(pass.GetBuffer(dstBuffer), pass.GetBuffer(elementCountBuffer), 0);
-						command.CopyCounterValue(pass.GetBuffer(dstBuffer), pass.GetBuffer(indirectDispatchBuffer), 0);
+						command.CopyCounterValue(pass.GetBuffer(dstBuffer), pass.GetBuffer(data.elementCountBuffer), 0);
+						command.CopyCounterValue(pass.GetBuffer(dstBuffer), pass.GetBuffer(data.indirectDispatchBuffer), 0);
 
 						// Need to process indirect dispatch buffer to contain ceil(count / 64) elements
-						command.SetComputeBufferParam(compute, 3, "_IndirectArgs", pass.GetBuffer(indirectDispatchBuffer));
-						command.DispatchCompute(compute, 3, 1, 1, 1);
+						command.SetComputeBufferParam(data.compute, 3, "_IndirectArgs", pass.GetBuffer(data.indirectDispatchBuffer));
+						command.DispatchCompute(data.compute, 3, 1, 1, 1);
 
 						command.DisableShaderKeyword("HI_Z_CULL");
 					}
 				});
 			}
 
-			using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectRenderPass>("Render Grass"))
+			using (var pass = renderGraph.AddDrawProceduralIndirectRenderPass("Render Grass", (bladeCount, indirectArgsBuffer, finalPatches, indirectArgsBuffer, terrain)))
 			{
 				pass.Initialize(material, indirectArgsBuffer, MeshTopology.Points);
 
@@ -163,24 +162,24 @@ public class GrassRenderer : CameraRenderFeature
 				pass.AddRenderPassData<TemporalAAData>();
 				pass.AddRenderPassData<TerrainRenderData>();
 
-				pass.SetRenderFunction((command, pass) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					var indirectArgs = ListPool<int>.Get();
-					indirectArgs.Add(bladeCount * bladeCount); // vertex count per instance
+					indirectArgs.Add(data.bladeCount * data.bladeCount); // vertex count per instance
 					indirectArgs.Add(0); // instance count (filled in later)
 					indirectArgs.Add(0); // start vertex location
 					indirectArgs.Add(0); // start instance location
-					command.SetBufferData(pass.GetBuffer(indirectArgsBuffer), indirectArgs);
+					command.SetBufferData(pass.GetBuffer(data.Item4), indirectArgs);
 					ListPool<int>.Release(indirectArgs);
 
 					// Copy counter value to indirect args buffer
-					command.CopyCounterValue(pass.GetBuffer(finalPatches), pass.GetBuffer(indirectArgsBuffer), sizeof(int));
+					command.CopyCounterValue(pass.GetBuffer(data.finalPatches), pass.GetBuffer(data.Item4), sizeof(int));
 
 					//terrain.SetMaterialProperties(material);
 
-					pass.SetFloat("BladeCount", bladeCount);
-					pass.SetVector("_TerrainSize", (Float3)terrain.terrainData.size);
-					pass.SetVector("_TerrainPosition", (Float3)terrain.GetPosition());
+					pass.SetFloat("BladeCount", data.bladeCount);
+					pass.SetVector("_TerrainSize", (Float3)data.terrain.terrainData.size);
+					pass.SetVector("_TerrainPosition", (Float3)data.terrain.GetPosition());
 
 					//command.DrawProceduralIndirect(Matrix4x4.identity, material, 0, MeshTopology.Points, pass.GetBuffer(indirectArgsBuffer));
 				});

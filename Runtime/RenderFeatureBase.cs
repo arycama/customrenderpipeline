@@ -1,6 +1,5 @@
 ﻿using System;
 using UnityEngine;
-using UnityEngine.Rendering;
 
 /// <summary> Base class for render features</summary>
 public abstract class RenderFeatureBase : IDisposable

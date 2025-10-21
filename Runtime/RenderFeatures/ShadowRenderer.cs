@@ -41,13 +41,13 @@ public class ShadowRenderer : CameraRenderFeature
 		var spotShadows = renderGraph.GetTexture(settings.SpotShadowResolution, settings.SpotShadowResolution, GraphicsFormat.D16_UNorm, spotShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
 		renderGraph.SetResource(new ShadowData(directionalShadows, pointShadows, spotShadows));
 
-		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Render Shadows Setup"))
+		using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", (directionalShadows, pointShadows, spotShadows)))
 		{
 			pass.WriteTexture(directionalShadows);
 			pass.WriteTexture(pointShadows);
 			pass.WriteTexture(spotShadows);
 
-			pass.SetRenderFunction((directionalShadows, pointShadows, spotShadows), static (command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				command.SetRenderTarget(pass.GetRenderTexture(data.directionalShadows), pass.GetRenderTexture(data.directionalShadows), 0, CubemapFace.Unknown, -1);
 				command.ClearRenderTarget(true, false, Color.clear);
@@ -70,7 +70,7 @@ public class ShadowRenderer : CameraRenderFeature
 
 			if (request.HasCasters)
 			{
-				using (var pass = renderGraph.AddRenderPass<ShadowRenderPass>("Render Shadow"))
+				using (var pass = renderGraph.AddShadowRenderPass("Render Shadow"))
 				{
 					pass.Initialize(context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, isPointLight);
 					pass.DepthSlice = index;

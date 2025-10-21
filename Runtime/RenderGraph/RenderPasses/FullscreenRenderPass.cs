@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class FullscreenRenderPass : DrawRenderPass
+public class FullscreenRenderPass<T> : DrawRenderPass<T>
 {
 	private Material material;
 	private int passIndex;

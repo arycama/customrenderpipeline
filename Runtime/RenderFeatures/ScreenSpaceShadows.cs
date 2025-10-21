@@ -32,7 +32,7 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 
 		if (settings.UseRaytracing)
 		{
-			using var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Raytraced Shadows");
+			using var pass = renderGraph.AddRaytracingRenderPass("Raytraced Shadows");
 
 			var raytracingData = renderGraph.GetResource<RaytracingResult>();
 			pass.Initialize(shadowRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFov());
@@ -50,7 +50,7 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 		}
 		else
 		{
-			using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows");
+			using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows", (settings.MaxSamples, settings.Thickness, settings.Intensity, camera.ScaledViewSize()));
 			pass.Initialize(material, 0, 1);
 
 			pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
@@ -62,17 +62,17 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 			pass.AddRenderPassData<ViewData>();
 			pass.AddRenderPassData<FrameData>();
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetFloat("_MaxSteps", settings.MaxSamples);
-				pass.SetFloat("_Thickness", settings.Thickness);
-				pass.SetFloat("_Intensity", settings.Intensity);
-				pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(camera.scaledPixelWidth, camera.scaledPixelHeight) - 1);
+				pass.SetFloat("_MaxSteps", data.MaxSamples);
+				pass.SetFloat("_Thickness", data.Thickness);
+				pass.SetFloat("_Intensity", data.Intensity);
+				pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.Item4) - 1);
 			});
 		}
 
 		var spatialResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16_UNorm, isScreenTexture: true);
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows Spatial"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows Spatial", (settings.Intensity, settings.MaxSamples, settings.Thickness, settings.ResolveSamples, settings.ResolveSize)))
 		{
 			pass.Initialize(material, 1);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -90,20 +90,20 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 			pass.ReadRtHandle<CameraStencil>();
 			pass.AddRenderPassData<LightingData>();
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetFloat("_Intensity", settings.Intensity);
-				pass.SetFloat("_MaxSteps", settings.MaxSamples);
-				pass.SetFloat("_Thickness", settings.Thickness);
-				pass.SetInt("_ResolveSamples", settings.ResolveSamples);
-				pass.SetFloat("_ResolveSize", settings.ResolveSize);
-				pass.SetFloat("DiffuseGiStrength", settings.Intensity);
+				pass.SetFloat("_Intensity", data.Intensity);
+				pass.SetFloat("_MaxSteps", data.MaxSamples);
+				pass.SetFloat("_Thickness", data.Thickness);
+				pass.SetInt("_ResolveSamples", data.ResolveSamples);
+				pass.SetFloat("_ResolveSize", data.ResolveSize);
+				pass.SetFloat("DiffuseGiStrength", data.Intensity);
 			});
 		}
 
 		// Write final temporal result out to rgba16 (color+weight) and rgb111110 for final ambient composition
 		var (current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Screen Space Shadows Temporal"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows Temporal", (wasCreated, history, settings.Intensity, settings.MaxSamples, settings.Thickness)))
 		{
 			pass.Initialize(material, 2);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -125,13 +125,13 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadRtHandle<CameraStencil>();
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
-				pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(history));
-				pass.SetFloat("_Intensity", settings.Intensity);
-				pass.SetFloat("_MaxSteps", settings.MaxSamples);
-				pass.SetFloat("_Thickness", settings.Thickness);
+				pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
+				pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(data.history));
+				pass.SetFloat("_Intensity", data.Intensity);
+				pass.SetFloat("_MaxSteps", data.MaxSamples);
+				pass.SetFloat("_Thickness", data.Thickness);
 			});
 		}
 

@@ -113,27 +113,34 @@ public class RenderGraph : IDisposable
 		return (T)result;
 	}
 
+	public T AddRenderPass<T, K>(string name, K data) where T : RenderPass<K>, new()
+	{
+		var result = AddRenderPass<T>(name);
+		result.renderData = data;
+		return result;
+	}
+
 	public void AddProfileBeginPass(string name)
 	{
 		// TODO: There might be a more concise way to do this
-		var pass = AddRenderPass<GenericRenderPass>(name);
+		var pass = this.AddGenericRenderPass(name);
 		pass.UseProfiler = false;
 
-		pass.SetRenderFunction((command, pass) =>
+		pass.SetRenderFunction(static (command, pass) =>
 		{
-			command.BeginSample(name);
+			command.BeginSample(pass.Name);
 		});
 	}
 
 	public void AddProfileEndPass(string name)
 	{
 		// TODO: There might be a more concise way to do this
-		var pass = AddRenderPass<GenericRenderPass>(name);
+		var pass = this.AddGenericRenderPass(name);
 		pass.UseProfiler = false;
 
-		pass.SetRenderFunction((command, pass) =>
+		pass.SetRenderFunction(static (command, pass) =>
 		{
-			command.EndSample(name);
+			command.EndSample(pass.Name);
 		});
 	}
 
@@ -265,9 +272,9 @@ public class RenderGraph : IDisposable
 		// TODO: Re-investigate if lock buffer for write is worth using. Currently it causes read/write hazards where current frame data can be overridden, causing rendering issues. May need to revise our buffer handling logic
 		var buffer = BufferHandleSystem.GetResourceHandle(new BufferHandleDescriptor(1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant));
 
-		using var pass = AddRenderPass<GenericRenderPass>("Set Constant Buffer");
+		using var pass = this.AddGenericRenderPass("Set Constant Buffer", (data, buffer));
 		pass.WriteBuffer("", buffer);
-		pass.SetRenderFunction((data, buffer), static (command, pass, data) =>
+		pass.SetRenderFunction(static (command, pass, data) =>
 		{
 			var array = new NativeArray<T>(1, Allocator.Temp);
 			array[0] = data.data;

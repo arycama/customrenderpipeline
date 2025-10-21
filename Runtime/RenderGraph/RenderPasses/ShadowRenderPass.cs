@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class ShadowRenderPass : GraphicsRenderPass
+public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 {
 	private RendererList rendererList;
 	private float bias, slopeBias;

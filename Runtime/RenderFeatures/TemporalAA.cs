@@ -31,7 +31,20 @@ public partial class TemporalAA : CameraRenderFeature
 		var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(camera.pixelWidth, camera.pixelHeight, camera);
 
 		var result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-		using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal AA");
+		using var pass = renderGraph.AddFullscreenRenderPass("Temporal AA", 
+		(
+			spatialBlur: settings.SpatialBlur,
+			spatialSharpness: settings.SpatialSharpness,
+			spatialSize: settings.SpatialSize,
+			motionSharpness: settings.MotionSharpness * 0.8f,
+			hasHistory: wasCreated ? 0.0f : 1.0f,
+			stationaryBlending: settings.StationaryBlending,
+			motionBlending: settings.MotionBlending,
+			motionWeight: settings.MotionWeight,
+			scale: 1,
+			history
+		));
+
 		//var keyword = null;// viewData.Scale < 1.0f ? "UPSCALE" : null; // TODO: Implement
 		pass.Initialize(material, 0, 1);
 
@@ -47,18 +60,7 @@ public partial class TemporalAA : CameraRenderFeature
 		pass.ReadRtHandle<CameraVelocity>();
 		pass.AddRenderPassData<AutoExposureData>();
 
-		pass.SetRenderFunction((
-			spatialBlur: settings.SpatialBlur,
-			spatialSharpness: settings.SpatialSharpness,
-			spatialSize: settings.SpatialSize,
-			motionSharpness: settings.MotionSharpness * 0.8f,
-			hasHistory: wasCreated ? 0.0f : 1.0f,
-			stationaryBlending: settings.StationaryBlending,
-			motionBlending: settings.MotionBlending,
-			motionWeight: settings.MotionWeight,
-			scale: 1
-		),
-		(command, pass, data) =>
+		pass.SetRenderFunction(static (command, pass, data) =>
 		{
 			pass.SetFloat("_SpatialBlur", data.spatialSharpness);
 			pass.SetFloat("_SpatialSharpness", data.spatialSharpness);
@@ -70,8 +72,8 @@ public partial class TemporalAA : CameraRenderFeature
 			pass.SetFloat("_VelocityWeight", data.motionWeight);
 			pass.SetFloat("_Scale", data.scale);
 
-			pass.SetVector("HistoryScaleLimit", pass.GetScaleLimit2D(history));
-			pass.SetVector("WeightHistoryScaleLimit", pass.GetScaleLimit2D(history));
+			pass.SetVector("HistoryScaleLimit", pass.GetScaleLimit2D(data.history));
+			pass.SetVector("WeightHistoryScaleLimit", pass.GetScaleLimit2D(data.history));
 		});
 
 		renderGraph.SetRTHandle<CameraTarget>(result);

@@ -1,6 +1,5 @@
 ﻿using System;
 using UnityEngine;
-using UnityEngine.Experimental.Rendering;
 
 [Serializable]
 public class TerrainSettings

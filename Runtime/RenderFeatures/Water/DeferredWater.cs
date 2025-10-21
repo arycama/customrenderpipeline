@@ -31,7 +31,7 @@ public class DeferredWater : CameraRenderFeature
 
         var scatterResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
 
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Render"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Render", settings))
         {
             pass.Initialize(deferredWaterMaterial);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -61,7 +61,7 @@ public class DeferredWater : CameraRenderFeature
             pass.ReadRtHandle<CameraStencil>();
 			pass.ReadRtHandle<CameraDepthCopy>();
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, settings) =>
             {
                 var material = settings.Material;
                 pass.SetVector("_Color", material.GetColor("_Color").LinearFloat3());
@@ -95,7 +95,7 @@ public class DeferredWater : CameraRenderFeature
         if (settings.RaytracedRefractions)
         {
             // Need to set some things as globals so that hit shaders can access them..
-            using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Raytraced Refractions Setup"))
+            using (var pass = renderGraph.AddGenericRenderPass("Raytraced Refractions Setup"))
             {
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LightingSetup.Result>();
@@ -113,7 +113,7 @@ public class DeferredWater : CameraRenderFeature
                 pass.AddRenderPassData<CausticsResult>();
                 pass.AddRenderPassData<EnvironmentData>();
 
-                pass.SetRenderFunction((command, pass) =>
+                pass.SetRenderFunction(static (command, pass) =>
                 {
                     //command.SetRenderTarget(refractionResult);
                     //command.ClearRenderTarget(false, true, Color.clear);
@@ -123,7 +123,7 @@ public class DeferredWater : CameraRenderFeature
                 });
             }
 
-			using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Water Raytraced Refractions"))
+			using (var pass = renderGraph.AddRaytracingRenderPass("Water Raytraced Refractions", settings))
             {
 				var refractionResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 				var raytracingData = renderGraph.GetResource<RaytracingResult>();
@@ -147,7 +147,7 @@ public class DeferredWater : CameraRenderFeature
                 pass.ReadRtHandle<CameraStencil>();
 				pass.AddRenderPassData<EnvironmentData>();
 
-				pass.SetRenderFunction((command, pass) =>
+				pass.SetRenderFunction(static (command, pass, settings) =>
                 {
                     pass.SetVector("_Extinction", settings.Material.GetColor("_Extinction").Float3());
 
@@ -157,9 +157,9 @@ public class DeferredWater : CameraRenderFeature
                 });
             }
 
-            using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Raytraced Refractions Setup"))
+            using (var pass = renderGraph.AddGenericRenderPass("Raytraced Refractions Setup"))
             {
-                pass.SetRenderFunction((command, pass) =>
+                pass.SetRenderFunction(static (command, pass) =>
                 {
                     command.DisableShaderKeyword("UNDERWATER_LIGHTING_ON");
                 });
@@ -171,7 +171,7 @@ public class DeferredWater : CameraRenderFeature
         }
 
         var (current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Temporal"))
+        using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", (wasCreated, history, settings)))
         {
             if (settings.RaytracedRefractions)
                 pass.Keyword = "RAYTRACED_REFRACTIONS_ON";
@@ -197,13 +197,13 @@ public class DeferredWater : CameraRenderFeature
             pass.ReadRtHandle<CameraStencil>();
             pass.ReadRtHandle<CameraDepthCopy>();
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetFloat("_IsFirst", wasCreated ? 1.0f : 0.0f);
-                pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(history));
+                pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
+                pass.SetVector("_HistoryScaleLimit", pass.GetScaleLimit2D(data.history));
 
-                pass.SetVector("_Color", settings.Material.GetColor("_Color").LinearFloat3());
-                pass.SetVector("_Extinction", settings.Material.GetColor("_Extinction").Float3());
+                pass.SetVector("_Color", data.settings.Material.GetColor("_Color").LinearFloat3());
+                pass.SetVector("_Extinction", data.settings.Material.GetColor("_Extinction").Float3());
             });
         }
     }

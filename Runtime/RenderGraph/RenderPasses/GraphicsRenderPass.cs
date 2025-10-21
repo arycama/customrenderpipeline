@@ -5,7 +5,7 @@ using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 using static Math;
 
-public abstract class GraphicsRenderPass : RenderPass
+public abstract class GraphicsRenderPass<T>: RenderPass<T>
 {
 	private readonly List<(ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction)> colorTargets = new();
 	private (ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction) depthBuffer = (new ResourceHandle<RenderTexture>(-1), RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);

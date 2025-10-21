@@ -24,7 +24,7 @@ public class RainTextureUpdater : CameraRenderFeature
 	{
 		var rainTexture = renderGraph.GetTexture(settings.Resolution, settings.Resolution, UnityEngine.Experimental.Rendering.GraphicsFormat.R8G8_SNorm, isExactSize: true, hasMips: true, autoGenerateMips: true);
 
-		using var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Rain Texture");
+		using var pass = renderGraph.AddFullscreenRenderPass("Rain Texture", (settings.Resolution, settings.Size));
 		pass.Initialize(material);
 
 		pass.WriteTexture(rainTexture);
@@ -32,10 +32,10 @@ public class RainTextureUpdater : CameraRenderFeature
 		pass.AddRenderPassData<FrameData>();
 		pass.AddRenderPassData<ViewData>();
 
-		pass.SetRenderFunction((command, pass) =>
+		pass.SetRenderFunction(static (command, pass, data) =>
 		{
-			pass.SetFloat("Resolution", settings.Resolution);
-			pass.SetFloat("Size", settings.Size);
+			pass.SetFloat("Resolution", data.Resolution);
+			pass.SetFloat("Size", data.Size);
 		});
 
 		renderGraph.SetResource(new RainTextureResult(rainTexture, settings.Size));

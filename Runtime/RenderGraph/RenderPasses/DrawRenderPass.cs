@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public abstract class DrawRenderPass : GraphicsRenderPass
+public abstract class DrawRenderPass<T> : GraphicsRenderPass<T>
 {
 	public readonly MaterialPropertyBlock propertyBlock;
 

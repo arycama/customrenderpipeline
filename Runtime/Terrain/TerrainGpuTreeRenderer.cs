@@ -28,51 +28,51 @@ public class TerrainGpuTreeRenderer : MonoBehaviour, IGpuProceduralGenerator
 		if (terrain == null)
 			return;
 
-		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Terrain Tree Setup"))
+		var terrainData = terrain.terrainData;
+		var treeCount = terrainData.treeInstanceCount;
+
+		var prototypes = terrainData.treePrototypes;
+		var gameObjects = ArrayPool<GameObject>.Get(prototypes.Length);
+		for (var i = 0; i < prototypes.Length; i++)
+			gameObjects[i] = prototypes[i].prefab;
+
+		var positions = ArrayPool<Float3x4>.Get(treeCount);
+		var types = ArrayPool<int>.Get(treeCount);
+		var counts = new NativeArray<int>(prototypes.Length, Allocator.Temp);
+		var terrainPosition = (Float3)terrain.GetPosition();
+		var terrainSize = (Float3)terrainData.size;
+
+		// Fill the buffers
+		for (var i = 0; i < treeCount; i++)
 		{
-			var terrainData = terrain.terrainData;
-			var treeCount = terrainData.treeInstanceCount;
+			var instance = terrainData.GetTreeInstance(i);
+			types[i] = instance.prototypeIndex;
+			counts[instance.prototypeIndex]++;
 
-			var prototypes = terrainData.treePrototypes;
-			var gameObjects = ArrayPool<GameObject>.Get(prototypes.Length);
-			for(var i = 0; i < prototypes.Length; i++)
-				gameObjects[i] = prototypes[i].prefab;
+			SinCos(instance.rotation, out var sinTheta, out var cosTheta);
 
-			var positions = ArrayPool<Float3x4>.Get(treeCount);
-			var types = ArrayPool<int>.Get(treeCount);
-			var counts = new NativeArray<int>(prototypes.Length, Allocator.Temp);
-			var terrainPosition = (Float3)terrain.GetPosition();
-			var terrainSize = (Float3)terrainData.size;
+			var right = new Float3(cosTheta, 0, -sinTheta) * instance.widthScale;
+			var up = Float3.Up * instance.heightScale;
+			var fwd = new Float3(sinTheta, 0, cosTheta) * instance.widthScale;
+			var position = terrainSize * instance.position + terrainPosition;
+			positions[i] = new(right, up, fwd, position);
+		}
 
-			// Fill the buffers
-			for (var i = 0; i < treeCount; i++)
-			{
-				var instance = terrainData.GetTreeInstance(i);
-				types[i] = instance.prototypeIndex;
-				counts[instance.prototypeIndex]++;
+		Array.Sort(types, positions);
+		Array.Sort(types);
 
-				SinCos(instance.rotation, out var sinTheta, out var cosTheta);
+		var positionsBuffer = renderGraph.GetBuffer(treeCount, UnsafeUtility.SizeOf<Float3x4>(), isPersistent: true);
+		var typeBuffer = renderGraph.GetBuffer(treeCount, isPersistent: true);
+		var counterBufferHandle = renderGraph.GetBuffer(isPersistent: true);
+		var prefabCount = prototypes.Length;
 
-				var right = new Float3(cosTheta, 0, -sinTheta) * instance.widthScale;
-				var up = Float3.Up * instance.heightScale;
-				var fwd = new Float3(sinTheta, 0, cosTheta) * instance.widthScale;
-				var position = terrainSize * instance.position + terrainPosition;
-				positions[i] = new(right, up, fwd, position);
-			}
-
-			Array.Sort(types, positions);
-			Array.Sort(types);
-
-			var positionsBuffer = renderGraph.GetBuffer(treeCount, UnsafeUtility.SizeOf<Float3x4>(), isPersistent: true);
-			var typeBuffer = renderGraph.GetBuffer(treeCount, isPersistent: true);
-			var counterBufferHandle = renderGraph.GetBuffer(isPersistent: true);
-
+		using (var pass = renderGraph.AddGenericRenderPass("Terrain Tree Setup", (positionsBuffer, typeBuffer, positions, types, proceduralGenerationController, counterBufferHandle, gameObjects, counts, prefabCount)))
+		{
 			pass.WriteBuffer("", positionsBuffer);
 			pass.WriteBuffer("", typeBuffer);
 			pass.WriteBuffer("", counterBufferHandle);
 
-			var prefabCount = prototypes.Length;
-			pass.SetRenderFunction((positionsBuffer, typeBuffer, positions, types, proceduralGenerationController, counterBufferHandle, gameObjects, counts, prefabCount), static (command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				command.SetBufferData(pass.GetBuffer(data.positionsBuffer), data.positions);
 				command.SetBufferData(pass.GetBuffer(data.typeBuffer), data.types);

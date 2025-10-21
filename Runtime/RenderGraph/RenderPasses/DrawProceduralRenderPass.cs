@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public class DrawProceduralRenderPass : DrawRenderPass
+public class DrawProceduralRenderPass<T> : DrawRenderPass<T>
 {
 	private Material material;
 	private int passIndex;

@@ -40,7 +40,7 @@ public class WaterFft : FrameRenderFeature
         // Todo: Should this happen in constructor?
         if (!roughnessInitialized)
         {
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Generate Length to Smoothness"))
+            using (var pass = renderGraph.AddComputeRenderPass("Ocean Generate Length to Smoothness"))
             {
                 var roughnessComputeShader = Resources.Load<ComputeShader>("Utility/SmoothnessFilter");
 
@@ -49,7 +49,7 @@ public class WaterFft : FrameRenderFeature
 
                 pass.WriteTexture("_LengthToRoughnessResult", lengthToRoughness);
 
-                pass.SetRenderFunction((command, pass) =>
+                pass.SetRenderFunction(static (command, pass) =>
                 {
                     pass.SetFloat("_MaxIterations", 32);
                     pass.SetFloat("_Resolution", 256);
@@ -91,7 +91,7 @@ public class WaterFft : FrameRenderFeature
         ));
 
         // Update spectrum (TODO: Only when properties change)
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Spectrum"))
+        using (var pass = renderGraph.AddComputeRenderPass("Ocean Spectrum"))
         {
             pass.Initialize(computeShader, 4, settings.Resolution, settings.Resolution, 4);
             pass.ReadBuffer("OceanData", oceanBuffer);
@@ -103,7 +103,7 @@ public class WaterFft : FrameRenderFeature
         var displacementResult = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
         var slopeResult = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
 
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Fft Row"))
+        using (var pass = renderGraph.AddComputeRenderPass("Ocean Fft Row"))
         {
             pass.Initialize(computeShader, 0, 1, settings.Resolution, 4, false);
             pass.WriteTexture("HeightResult", heightResult);
@@ -125,7 +125,7 @@ public class WaterFft : FrameRenderFeature
 
         var normalFoamSmoothness = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R8G8B8A8_SNorm, 4, TextureDimension.Tex2DArray, hasMips: true);
 
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Fft Column"))
+        using (var pass = renderGraph.AddComputeRenderPass("Ocean Fft Column"))
         {
             pass.Initialize(computeShader, 1, 1, settings.Resolution, 4, false);
             pass.ReadTexture("Height", heightResult);
@@ -136,25 +136,25 @@ public class WaterFft : FrameRenderFeature
             pass.ReadBuffer("OceanData", oceanBuffer);
         }
 
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Calculate Normals"))
+        using (var pass = renderGraph.AddComputeRenderPass("Ocean Calculate Normals", (patchSizes, settings.Resolution, renderGraph.FrameIndex, settings.Material.GetFloat("_Smoothness"), Profile.FoamStrength, Profile.FoamDecay, Profile.FoamThreshold, oceanBuffer)))
         {
             pass.Initialize(computeShader, 2, settings.Resolution, settings.Resolution, 4);
             pass.WriteTexture("DisplacementInput", displacementCurrent);
             pass.WriteTexture("OceanNormalFoamSmoothnessWrite", normalFoamSmoothness);
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetVector("_CascadeTexelSizes", patchSizes / settings.Resolution);
-                pass.SetInt("_OceanTextureSlicePreviousOffset", ((renderGraph.FrameIndex & 1) == 0) ? 0 : 4);
-                pass.SetFloat("Smoothness", settings.Material.GetFloat("_Smoothness"));
-                pass.SetFloat("_FoamStrength", Profile.FoamStrength);
-                pass.SetFloat("_FoamDecay", Profile.FoamDecay);
-                pass.SetFloat("_FoamThreshold", Profile.FoamThreshold);
-                pass.ReadBuffer("OceanData", oceanBuffer);
+                pass.SetVector("_CascadeTexelSizes", data.patchSizes / data.Resolution);
+                pass.SetInt("_OceanTextureSlicePreviousOffset", ((data.FrameIndex & 1) == 0) ? 0 : 4);
+                pass.SetFloat("Smoothness", data.Item4);
+                pass.SetFloat("_FoamStrength", data.FoamStrength);
+                pass.SetFloat("_FoamDecay", data.FoamDecay);
+                pass.SetFloat("_FoamThreshold", data.FoamThreshold);
+                pass.ReadBuffer("OceanData", data.oceanBuffer);
             });
         }
 
-        using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Ocean Generate Filtered Mips"))
+        using (var pass = renderGraph.AddComputeRenderPass("Ocean Generate Filtered Mips", (displacementCurrent, settings.Resolution, settings.Material.GetFloat("_Smoothness"))))
         {
             pass.Initialize(computeShader, 3, (settings.Resolution * 4) >> 2, (settings.Resolution) >> 2, 1);
             pass.ReadTexture("_LengthToRoughness", lengthToRoughness);
@@ -167,14 +167,14 @@ public class WaterFft : FrameRenderFeature
                 pass.WriteTexture(smoothnessId, normalFoamSmoothness, j);
             }
 
-            pass.SetRenderFunction((command, pass) =>
+			Assert.IsTrue(renderGraph.RtHandleSystem.GetDescriptor(displacementCurrent).hasMips, "Trying to Generate Mips for a Texture without mips enabled");
+			pass.SetRenderFunction(static (command, pass, data) =>
             {
                 // TODO: Do this manually? Since this will be compute shader anyway.. could do in same pass
-                Assert.IsTrue(renderGraph.RtHandleSystem.GetDescriptor(displacementCurrent).hasMips, "Trying to Generate Mips for a Texture without mips enabled");
-                command.GenerateMips(pass.GetRenderTexture(displacementCurrent));
+                command.GenerateMips(pass.GetRenderTexture(data.displacementCurrent));
 
-                pass.SetInt("Size", settings.Resolution >> 2);
-                pass.SetFloat("Smoothness", settings.Material.GetFloat("_Smoothness"));
+                pass.SetInt("Size", data.Resolution >> 2);
+                pass.SetFloat("Smoothness", data.Item3);
             });
         }
 

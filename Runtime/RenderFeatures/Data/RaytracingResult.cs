@@ -1,5 +1,4 @@
-﻿using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering;
+﻿using UnityEngine.Rendering;
 
 public struct RaytracingResult : IRenderPassData
 {

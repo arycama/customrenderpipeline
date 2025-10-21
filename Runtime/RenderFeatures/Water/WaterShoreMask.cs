@@ -62,17 +62,17 @@ public class WaterShoreMask : FrameRenderFeature
         var invResolution = 1.0f / heightmapResolution;
 
         var src = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R32G32_SFloat);
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Water Shore Mask Blit"))
+        using (var pass = renderGraph.AddFullscreenRenderPass("Water Shore Mask Blit", (cutoff, invResolution, heightmapResolution, terrainData.heightmapTexture)))
         {
             pass.Initialize(material);
             pass.WriteTexture(src, RenderBufferLoadAction.DontCare);
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetFloat("Cutoff", cutoff);
-                pass.SetFloat("InvResolution", invResolution);
-                pass.SetFloat("Resolution", heightmapResolution);
-                pass.SetTexture("Heightmap", terrainData.heightmapTexture);
+                pass.SetFloat("Cutoff", data.cutoff);
+                pass.SetFloat("InvResolution", data.invResolution);
+                pass.SetFloat("Resolution", data.heightmapResolution);
+                pass.SetTexture("Heightmap", data.heightmapTexture);
             });
         }
 
@@ -83,42 +83,42 @@ public class WaterShoreMask : FrameRenderFeature
         {
             var offset = Mathf.Pow(2, passes - i - 1);
             var dst = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R32G32_SFloat);
+			var index = i;
 
-            using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Water Shore Mask Jump Flood"))
-            {
-                pass.Initialize(material, 1);
+			using (var pass = renderGraph.AddFullscreenRenderPass("Water Shore Mask Jump Flood", (offset, terrainData.heightmapTexture, invResolution, heightmapResolution, cutoff, index, passes, minMaxValues)))
+			{
+				pass.Initialize(material, 1);
 
-                if (i == passes - 1)
-                {
-                    pass.Keyword = "FINAL_PASS";
-                    pass.WriteBuffer("MinMaxValuesWrite", minMaxValues);
-                }
+				if (i == passes - 1)
+				{
+					pass.Keyword = "FINAL_PASS";
+					pass.WriteBuffer("MinMaxValuesWrite", minMaxValues);
+				}
 
-                pass.ReadTexture("JumpFloodInput", src);
-                pass.WriteTexture(dst, RenderBufferLoadAction.DontCare);
+				pass.ReadTexture("JumpFloodInput", src);
+				pass.WriteTexture(dst, RenderBufferLoadAction.DontCare);
 
-                var index = i;
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    pass.SetFloat("Offset", offset);
-                    pass.SetTexture("Heightmap", terrainData.heightmapTexture);
-                    pass.SetFloat("InvResolution", invResolution);
-                    pass.SetFloat("Resolution", heightmapResolution);
-                    pass.SetFloat("Cutoff", cutoff);
+				pass.SetRenderFunction(static (command, pass, data) =>
+				{
+					pass.SetFloat("Offset", data.offset);
+					pass.SetTexture("Heightmap", data.heightmapTexture);
+					pass.SetFloat("InvResolution", data.invResolution);
+					pass.SetFloat("Resolution", data.heightmapResolution);
+					pass.SetFloat("Cutoff", data.cutoff);
 
-                    if (index == passes - 1)
-                    {
-                        var testData = ArrayPool<int>.Get(4);
-                        testData[0] = 0;
-                        testData[1] = 0;
-                        testData[2] = 0;
-                        testData[3] = 0;
-                        command.SetBufferData(pass.GetBuffer(minMaxValues), testData);
-                        command.SetRandomWriteTarget(1, pass.GetBuffer(minMaxValues));
-                        ArrayPool<int>.Release(testData);
-                    }
-                });
-            }
+					if (data.index == data.passes - 1)
+					{
+						var testData = ArrayPool<int>.Get(4);
+						testData[0] = 0;
+						testData[1] = 0;
+						testData[2] = 0;
+						testData[3] = 0;
+						command.SetBufferData(pass.GetBuffer(data.minMaxValues), testData);
+						command.SetRandomWriteTarget(1, pass.GetBuffer(data.minMaxValues));
+						ArrayPool<int>.Release(testData);
+					}
+				});
+			}
 
             src = dst;
         }
@@ -126,7 +126,7 @@ public class WaterShoreMask : FrameRenderFeature
         // Final combination pass
         result = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R16G16B16A16_UNorm, isPersistent: true);
 
-        using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Water Shore Final Combine"))
+        using (var pass = renderGraph.AddFullscreenRenderPass("Water Shore Final Combine", (heightmapTexture, cutoff, invResolution, minMaxValues, resultDataBuffer, heightmapResolution)))
         {
             pass.Initialize(material, 2);
             pass.ReadTexture("JumpFloodInput", src);
@@ -134,13 +134,13 @@ public class WaterShoreMask : FrameRenderFeature
             pass.ReadBuffer("MinMaxValues", minMaxValues);
             pass.WriteBuffer("", resultDataBuffer);
 
-            pass.SetRenderFunction((command, pass) =>
+            pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetTexture("Heightmap", heightmapTexture);
-                pass.SetFloat("Cutoff", cutoff);
-                pass.SetFloat("InvResolution", invResolution);
-                command.CopyBuffer(pass.GetBuffer(minMaxValues), pass.GetBuffer(resultDataBuffer));
-                pass.SetFloat("Resolution", heightmapResolution);
+                pass.SetTexture("Heightmap", data.heightmapTexture);
+                pass.SetFloat("Cutoff", data.cutoff);
+                pass.SetFloat("InvResolution", data.invResolution);
+                command.CopyBuffer(pass.GetBuffer(data.minMaxValues), pass.GetBuffer(data.resultDataBuffer));
+                pass.SetFloat("Resolution", data.heightmapResolution);
             });
         }
 

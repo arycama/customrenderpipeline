@@ -1,18 +1,8 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
-public class SetPropertyBlockPass : RenderPass
+public class SetPropertyBlockPass<T> : RenderPass<T>
 {
-	public readonly MaterialPropertyBlock propertyBlock;
-
-	public SetPropertyBlockPass()
-	{
-		propertyBlock = new MaterialPropertyBlock();
-	}
-
 	public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
 	{
 		switch (subElement)

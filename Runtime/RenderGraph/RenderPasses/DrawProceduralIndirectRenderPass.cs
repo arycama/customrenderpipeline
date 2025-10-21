@@ -1,7 +1,6 @@
 using UnityEngine;
-using UnityEngine.Rendering;
 
-public class DrawProceduralIndirectRenderPass : DrawRenderPass
+public class DrawProceduralIndirectRenderPass<T> : DrawRenderPass<T>
 {
 	private Material material;
 	private int passIndex;

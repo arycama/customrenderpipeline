@@ -1,8 +1,7 @@
 using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
-public class BlitToScreenPass : RenderPass
+public class BlitToScreenPass<T> : RenderPass<T>
 {
 	private readonly MaterialPropertyBlock propertyBlock;
 	private Material material;

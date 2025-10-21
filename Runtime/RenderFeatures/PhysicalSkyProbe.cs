@@ -37,7 +37,8 @@ public class PhysicalSkyProbe : CameraRenderFeature
 			cameraProbeHandles.Add(camera, reflectionProbeTemp);
 		}
 
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Environment Cubemap"))
+		var time = (float)renderGraph.GetResource<TimeData>().time;
+		using (var pass = renderGraph.AddFullscreenRenderPass("Environment Cubemap", (cloudSettings, time, skySettings)))
 		{
 			var keyword = string.Empty;
 			var viewHeight = camera.transform.position.y;
@@ -63,13 +64,11 @@ public class PhysicalSkyProbe : CameraRenderFeature
 			pass.AddRenderPassData<ViewData>();
 			pass.AddRenderPassData<SkyTransmittanceData>();
 			pass.AddRenderPassData<SkyReflectionAmbientData>();
-			
-			var time = (float)pass.RenderGraph.GetResource<TimeData>().time;
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				cloudSettings.SetCloudPassData(pass, time);
-				pass.SetFloat("_Samples", skySettings.ReflectionSamples);
+				data.cloudSettings.SetCloudPassData(pass, data.time);
+				pass.SetFloat("_Samples", data.skySettings.ReflectionSamples);
 			});
 		}
 

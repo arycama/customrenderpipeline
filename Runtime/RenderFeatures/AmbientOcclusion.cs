@@ -49,7 +49,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 		if (settings.Raytracing)
 		{
 			result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-			using (var pass = renderGraph.AddRenderPass<RaytracingRenderPass>("Raytraced Ambient Occlusion"))
+			using (var pass = renderGraph.AddRaytracingRenderPass("Raytraced Ambient Occlusion", (settings.Radius, settings.Falloff)))
 			{
 				var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
@@ -61,17 +61,17 @@ public partial class AmbientOcclusion : CameraRenderFeature
 				pass.AddRenderPassData<ViewData>();
 				pass.AddRenderPassData<FrameData>();
 
-				pass.SetRenderFunction((command, pass) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					pass.SetFloat("Radius", settings.Radius);
-					pass.SetFloat("Falloff", settings.Falloff);
+					pass.SetFloat("Radius", data.Radius);
+					pass.SetFloat("Falloff", data.Falloff);
 				});
 			}
 		}
 		else
 		{
 			result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-			using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Compute"))
+			using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Compute", (settings.Radius, settings.Directions, settings.Samples, settings.Falloff, settings.MaxScreenRadius, settings.ThinOccluderCompensation)))
 			{
 				pass.Initialize(material, 0);
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -82,20 +82,20 @@ public partial class AmbientOcclusion : CameraRenderFeature
 				pass.AddRenderPassData<FrameData>();
 				pass.AddRenderPassData<ViewData>();
 
-				pass.SetRenderFunction((command, data) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					pass.SetFloat("Radius", settings.Radius);
-					pass.SetFloat("Directions", settings.Directions);
-					pass.SetFloat("Samples", settings.Samples);
-					pass.SetFloat("Falloff", settings.Falloff);
-					pass.SetFloat("MaxScreenRadius", settings.MaxScreenRadius);
-					pass.SetFloat("ThinOccluderCompensation", settings.ThinOccluderCompensation);
+					pass.SetFloat("Radius", data.Radius);
+					pass.SetFloat("Directions", data.Directions);
+					pass.SetFloat("Samples", data.Samples);
+					pass.SetFloat("Falloff", data.Falloff);
+					pass.SetFloat("MaxScreenRadius", data.MaxScreenRadius);
+					pass.SetFloat("ThinOccluderCompensation", data.ThinOccluderCompensation);
 				});
 			}
 		}
 
 		var (current, history, wasCreated) = temporalCache.GetTextures(camera.pixelWidth, camera.pixelHeight, camera);
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Temporal"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Temporal", (wasCreated, history)))
 		{
 			pass.Initialize(material, 1);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -110,15 +110,15 @@ public partial class AmbientOcclusion : CameraRenderFeature
 			pass.ReadRtHandle<PreviousCameraVelocity>();
 			pass.ReadRtHandle<PreviousCameraDepth>();
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetFloat("HasHistory", wasCreated ? 0 : 1);
-				pass.SetVector("HistoryScaleLimit", pass.GetScaleLimit2D(history));
+				pass.SetFloat("HasHistory", data.wasCreated ? 0 : 1);
+				pass.SetVector("HistoryScaleLimit", pass.GetScaleLimit2D(data.history));
 			});
 		}
 
 		var output = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Ambient Occlusion Combine"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Combine", (settings.AoStrength, current)))
 		{
 			pass.Initialize(material, 2);
 			pass.WriteTexture(output);
@@ -126,10 +126,10 @@ public partial class AmbientOcclusion : CameraRenderFeature
 			pass.ReadRtHandle<GBufferBentNormalOcclusion>();
 			pass.AddRenderPassData<TemporalAAData>();
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetFloat("Strength", settings.AoStrength);
-				pass.SetVector("InputScaleLimit", pass.GetScaleLimit2D(current));
+				pass.SetFloat("Strength", data.AoStrength);
+				pass.SetVector("InputScaleLimit", pass.GetScaleLimit2D(data.current));
 			});
 		}
 

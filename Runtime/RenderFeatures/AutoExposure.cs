@@ -54,28 +54,30 @@ public partial class AutoExposure : CameraRenderFeature
 		exposureTexture.Apply(false, false);
 
 		var histogram = renderGraph.GetBuffer(256);
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Auto Exposure"))
+		using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", 
+		(
+			minEv: settings.MinEv,
+			maxEv: settings.MaxEv,
+			adaptationSpeed: settings.AdaptationSpeed,
+			exposureCompensation: settings.ExposureCompensation,
+			iso: lensSettings.Iso,
+			aperture: lensSettings.Aperture,
+			shutterSpeed: lensSettings.ShutterSpeed,
+			histogramMin: settings.HistogramMin,
+			histogramMax: settings.HistogramMax,
+			exposureCompensationRemap: GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1),
+			meteringMode: (float)settings.MeteringMode,
+			settings.ProceduralCenter,
+			settings.ProceduralRadii,
+			settings.ProceduralSoftness
+		)))
 		{
 			pass.Initialize(computeShader, 0, camera.scaledPixelWidth, camera.scaledPixelHeight);
 			pass.ReadTexture(nameof(CameraTarget), renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteBuffer("LuminanceHistogram", histogram);
 			pass.AddRenderPassData<AutoExposureData>();
 
-			pass.SetRenderFunction(
-			(
-				minEv: settings.MinEv,
-				maxEv: settings.MaxEv,
-				adaptationSpeed: settings.AdaptationSpeed,
-				exposureCompensation: settings.ExposureCompensation,
-				iso: lensSettings.Iso,
-				aperture: lensSettings.Aperture,
-				shutterSpeed: lensSettings.ShutterSpeed,
-				histogramMin: settings.HistogramMin,
-				histogramMax: settings.HistogramMax,
-				exposureCompensationRemap: GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1)
-			),
-
-			(command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				pass.SetFloat("MinEv", data.minEv);
 				pass.SetFloat("MaxEv", data.maxEv);
@@ -86,16 +88,18 @@ public partial class AutoExposure : CameraRenderFeature
 				pass.SetFloat("ShutterSpeed", data.shutterSpeed);
 				pass.SetFloat("HistogramMin", data.histogramMin);
 				pass.SetFloat("HistogramMax", data.histogramMax);
-				pass.SetFloat("MeteringMode", (float)settings.MeteringMode);
+				pass.SetFloat("MeteringMode", data.meteringMode);
 				pass.SetVector("ExposureCompensationRemap", data.exposureCompensationRemap);
-				pass.SetVector("ProceduralCenter", settings.ProceduralCenter);
-				pass.SetVector("ProceduralRadii", settings.ProceduralRadii);
-				pass.SetFloat("ProceduralSoftness", settings.ProceduralSoftness);
+				pass.SetVector("ProceduralCenter", data.ProceduralCenter);
+				pass.SetVector("ProceduralRadii", data.ProceduralRadii);
+				pass.SetFloat("ProceduralSoftness", data.ProceduralSoftness);
 			});
 		}
 
 		var output = renderGraph.GetBuffer(1, 16, target: GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
-		using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Auto Exposure"))
+		var currentData = renderGraph.GetResource<AutoExposureData>();
+
+		using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", (settings.ExposureMode, exposureTexture, currentData.IsFirst, tonemappingSettings.PaperWhite)))
 		{
 			pass.Initialize(computeShader, 1, 1);
 			pass.ReadBuffer("LuminanceHistogram", histogram);
@@ -104,25 +108,22 @@ public partial class AutoExposure : CameraRenderFeature
 			pass.AddRenderPassData<FrameData>();
 			pass.AddRenderPassData<ViewData>();
 
-			var currentData = renderGraph.GetResource<AutoExposureData>();
-
-			pass.SetRenderFunction((settings.ExposureMode, exposureTexture), (command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				pass.SetFloat("Mode", (float)data.ExposureMode);
-				pass.SetFloat("IsFirst", currentData.IsFirst ? 1 : 0);
+				pass.SetFloat("IsFirst", data.IsFirst ? 1 : 0);
 				pass.SetTexture("ExposureCompensationTexture", data.exposureTexture);
-				pass.SetFloat("PaperWhite", tonemappingSettings.PaperWhite);
+				pass.SetFloat("PaperWhite", data.PaperWhite);
 			});
 		}
 
-		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Auto Exposure"))
+		var exposureBuffer = renderGraph.GetResource<AutoExposureData>().ExposureBuffer;
+		using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", (output, exposureBuffer, settings.DebugExposure)))
 		{
-			var exposureBuffer = pass.RenderGraph.GetResource<AutoExposureData>().ExposureBuffer;
-
 			pass.ReadBuffer("", output);
 			pass.WriteBuffer("", exposureBuffer);
 
-			pass.SetRenderFunction((output, exposureBuffer, settings.DebugExposure), static (command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				command.CopyBuffer(pass.GetBuffer(data.output), pass.GetBuffer(data.exposureBuffer));
 

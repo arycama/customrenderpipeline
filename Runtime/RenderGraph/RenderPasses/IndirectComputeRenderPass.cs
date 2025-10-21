@@ -1,9 +1,8 @@
 ﻿using System;
 using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
-public class IndirectComputeRenderPass : BaseComputeRenderPass
+public class IndirectComputeRenderPass<T> : BaseComputeRenderPass<T>
 {
 	private uint argsOffset;
 	private ResourceHandle<GraphicsBuffer> indirectBuffer;

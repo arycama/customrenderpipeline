@@ -19,7 +19,7 @@ public class DecalComposite : CameraRenderFeature
 		var bentNormalOcclusionCopy = renderGraph.GetTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 
 		// Copy the existing gbuffer textures to new ones
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Copy"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Copy"))
 		{
 			pass.Initialize(material, 0);
 
@@ -34,7 +34,7 @@ public class DecalComposite : CameraRenderFeature
 		}
 
 		// Now composite the decal buffers
-		using (var pass = renderGraph.AddRenderPass<FullscreenRenderPass>("Combine"))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Combine", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy)))
 		{
 			pass.Initialize(material, 1);
 
@@ -53,11 +53,11 @@ public class DecalComposite : CameraRenderFeature
 			pass.ReadRtHandle<DecalNormal>();
 			pass.AddRenderPassData<RainTextureResult>();
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetVector("AlbedoMetallicCopyScaleLimit", pass.GetScaleLimit2D(albedoMetallicCopy));
-				pass.SetVector("NormalRoughnessCopyScaleLimit", pass.GetScaleLimit2D(normalRoughnessCopy));
-				pass.SetVector("BentNormalOcclusionCopyScaleLimit", pass.GetScaleLimit2D(bentNormalOcclusionCopy));
+				pass.SetVector("AlbedoMetallicCopyScaleLimit", pass.GetScaleLimit2D(data.albedoMetallicCopy));
+				pass.SetVector("NormalRoughnessCopyScaleLimit", pass.GetScaleLimit2D(data.normalRoughnessCopy));
+				pass.SetVector("BentNormalOcclusionCopyScaleLimit", pass.GetScaleLimit2D(data.bentNormalOcclusionCopy));
 			});
 		}
 	}

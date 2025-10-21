@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Pool;
@@ -381,10 +380,10 @@ public partial class LightingSetup : CameraRenderFeature
 
 		// Set final matrices
 		var directionalShadowMatricesBuffer = renderGraph.GetBuffer(Max(1, directionalShadowMatrices.Count), UnsafeUtility.SizeOf<Float3x4>());
-		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Set Directional Shadow Matrices"))
+		using (var pass = renderGraph.AddGenericRenderPass("Set Directional Shadow Matrices", (directionalShadowMatrices, directionalShadowMatricesBuffer)))
 		{
 			pass.WriteBuffer("", directionalShadowMatricesBuffer);
-			pass.SetRenderFunction((directionalShadowMatrices, directionalShadowMatricesBuffer), static (command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				command.SetBufferData(pass.GetBuffer(data.directionalShadowMatricesBuffer), data.directionalShadowMatrices);
 				ListPool<Float3x4>.Release(data.directionalShadowMatrices);
@@ -392,10 +391,10 @@ public partial class LightingSetup : CameraRenderFeature
 		}
 
 		var directionalCascadeSizesBuffer = renderGraph.GetBuffer(Max(1, directionalCascadeSizes.Count), UnsafeUtility.SizeOf<Float4>());
-		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Set Directional Cascade Sizes"))
+		using (var pass = renderGraph.AddGenericRenderPass("Set Directional Cascade Sizes", (directionalCascadeSizes, directionalCascadeSizesBuffer)))
 		{
 			pass.WriteBuffer("", directionalCascadeSizesBuffer);
-			pass.SetRenderFunction((directionalCascadeSizes, directionalCascadeSizesBuffer), static (command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				command.SetBufferData(pass.GetBuffer(data.directionalCascadeSizesBuffer), data.directionalCascadeSizes);
 				ListPool<Float4>.Release(data.directionalCascadeSizes);
@@ -430,19 +429,12 @@ public partial class LightingSetup : CameraRenderFeature
 		renderGraph.SetResource(new LightingData(lightDirection0, lightColor0, lightDirection1, lightColor1, lightingData, directionalShadowMatricesBuffer, directionalCascadeSizesBuffer));
 
 		var pointLightBuffer = lightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(lightList.Count, UnsafeUtility.SizeOf<LightData>());
-		using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Set Light Data"))
+		using (var pass = renderGraph.AddGenericRenderPass("Set Light Data", (lightList, pointLightBuffer)))
 		{
 			pass.WriteBuffer("", pointLightBuffer);
-
-			pass.SetRenderFunction(
-			(
-				lightList,
-				pointLightBuffer
-			),
-			(command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				command.SetBufferData(pass.GetBuffer(data.pointLightBuffer), data.lightList);
-
 				ListPool<LightData>.Release(data.lightList);
 			});
 		}

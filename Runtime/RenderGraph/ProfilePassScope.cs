@@ -8,12 +8,12 @@ public readonly struct ProfilePassScope : IDisposable
 	public ProfilePassScope(string name, RenderGraph renderGraph)
 	{
 		// TODO: There might be a more concise way to do this
-		var pass = renderGraph.AddRenderPass<GenericRenderPass>(name);
+		var pass = renderGraph.AddGenericRenderPass(name);
 		pass.UseProfiler = false;
 
-		pass.SetRenderFunction(name, static (command, pass, name) =>
+		pass.SetRenderFunction(static (command, pass, name) =>
 		{
-			command.BeginSample(name);
+			command.BeginSample(pass.Name);
 		});
 
 		this.name = name;
@@ -23,12 +23,12 @@ public readonly struct ProfilePassScope : IDisposable
 	readonly void IDisposable.Dispose()
 	{
 		// TODO: There might be a more concise way to do this
-		var pass = renderGraph.AddRenderPass<GenericRenderPass>(name);
+		var pass = renderGraph.AddGenericRenderPass(name);
 		pass.UseProfiler = false;
 
-		pass.SetRenderFunction(name, static (command, pass, name) =>
+		pass.SetRenderFunction(static (command, pass, name) =>
 		{
-			command.EndSample(name);
+			command.EndSample(pass.Name);
 		});
 	}
 }

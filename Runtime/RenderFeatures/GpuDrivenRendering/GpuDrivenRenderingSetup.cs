@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
@@ -91,7 +90,7 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
         var positionOffset = 0;
         foreach (var data in proceduralGenerationController.instanceData)
         {
-            using (var pass = renderGraph.AddRenderPass<ComputeRenderPass>("Gpu Driven Rendering FillBuffers"))
+            using (var pass = renderGraph.AddComputeRenderPass("Gpu Driven Rendering FillBuffers", (positionOffset, data.totalCount, instanceBoundsBufferTemp, boundsData)))
             {
                 pass.Initialize(fillInstanceTypeIdShader, 0, data.totalCount);
 
@@ -105,12 +104,12 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
                 pass.ReadBuffer("_InstanceTypeIdsInput", data.instanceId);
                 pass.ReadBuffer("_InstanceTypeBounds", instanceBoundsBufferTemp);
 
-                pass.SetRenderFunction((positionOffset, data.totalCount), (command, pass, data) =>
+                pass.SetRenderFunction(static (command, pass, data) =>
                 {
                     pass.SetInt("_Offset", data.positionOffset);
                     pass.SetInt("_Count", data.totalCount);
 
-                    command.SetBufferData(pass.GetBuffer(instanceBoundsBufferTemp), boundsData);
+                    command.SetBufferData(pass.GetBuffer(data.instanceBoundsBufferTemp), data.boundsData);
                 });
 
                 positionOffset += data.totalCount;
@@ -280,38 +279,38 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
             item.Sort((draw0, draw1) => draw0.renderQueue.CompareTo(draw1.renderQueue));
         }
 
-        using (var pass = renderGraph.AddRenderPass<GenericRenderPass>("Gpu Driven Rendering Fill Buffers"))
-        {
-            lodSizesBuffer = renderGraph.GetBuffer(lodSizes.Value.Count, sizeof(float), isPersistent: true);
-            instanceTypeDataBuffer = renderGraph.GetBuffer(instanceTypeDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeData>(), isPersistent: true);
-            drawCallArgsBuffer = renderGraph.GetBuffer(drawCallArgs.Value.Count, UnsafeUtility.SizeOf<IndirectDrawIndexedArgs>(), GraphicsBuffer.Target.IndirectArguments, isPersistent: true);
-            instanceTypeLodDataBuffer = renderGraph.GetBuffer(instanceTypeLodDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeLodData>(), isPersistent: true);
-			rendererLodIndicesBuffer = renderGraph.GetBuffer(rendererLodIndices.Value.Count, isPersistent: true);
+		lodSizesBuffer = renderGraph.GetBuffer(lodSizes.Value.Count, sizeof(float), isPersistent: true);
+		instanceTypeDataBuffer = renderGraph.GetBuffer(instanceTypeDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeData>(), isPersistent: true);
+		drawCallArgsBuffer = renderGraph.GetBuffer(drawCallArgs.Value.Count, UnsafeUtility.SizeOf<IndirectDrawIndexedArgs>(), GraphicsBuffer.Target.IndirectArguments, isPersistent: true);
+		instanceTypeLodDataBuffer = renderGraph.GetBuffer(instanceTypeLodDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeLodData>(), isPersistent: true);
+		rendererLodIndicesBuffer = renderGraph.GetBuffer(rendererLodIndices.Value.Count, isPersistent: true);
 
+		using (var pass = renderGraph.AddGenericRenderPass("Gpu Driven Rendering Fill Buffers", (lodSizesBuffer, lodSizes, instanceTypeDataBuffer, instanceTypeDatas, drawCallArgsBuffer, drawCallArgs, instanceTypeLodDataBuffer, instanceTypeLodDatas, rendererLodIndicesBuffer, rendererLodIndices)))
+		{
 			pass.WriteBuffer("", lodSizesBuffer);
-            pass.WriteBuffer("", instanceTypeDataBuffer);
-            pass.WriteBuffer("", drawCallArgsBuffer);
-            pass.WriteBuffer("", instanceTypeLodDataBuffer);
-            pass.WriteBuffer("", rendererLodIndicesBuffer);
+			pass.WriteBuffer("", instanceTypeDataBuffer);
+			pass.WriteBuffer("", drawCallArgsBuffer);
+			pass.WriteBuffer("", instanceTypeLodDataBuffer);
+			pass.WriteBuffer("", rendererLodIndicesBuffer);
 
-            pass.SetRenderFunction((command, pass) =>
-            {
-                // TODO: Use lockbuffer?
-                command.SetBufferData(pass.GetBuffer(lodSizesBuffer), lodSizes.Value);
-                command.SetBufferData(pass.GetBuffer(instanceTypeDataBuffer), instanceTypeDatas.Value);
-                command.SetBufferData(pass.GetBuffer(drawCallArgsBuffer), drawCallArgs.Value);
-                command.SetBufferData(pass.GetBuffer(instanceTypeLodDataBuffer), instanceTypeLodDatas.Value);
+			pass.SetRenderFunction(static (command, pass, data) =>
+			{
+				// TODO: Use lockbuffer?
+				command.SetBufferData(pass.GetBuffer(data.lodSizesBuffer), data.lodSizes.Value);
+				command.SetBufferData(pass.GetBuffer(data.instanceTypeDataBuffer), data.instanceTypeDatas.Value);
+				command.SetBufferData(pass.GetBuffer(data.drawCallArgsBuffer), data.drawCallArgs.Value);
+				command.SetBufferData(pass.GetBuffer(data.instanceTypeLodDataBuffer), data.instanceTypeLodDatas.Value);
 
-				var b = pass.GetBuffer(rendererLodIndicesBuffer);
-				command.SetBufferData(b, rendererLodIndices.Value);
+				var b = pass.GetBuffer(data.rendererLodIndicesBuffer);
+				command.SetBufferData(b, data.rendererLodIndices.Value);
 
-                lodSizes.Dispose();
-                drawCallArgs.Dispose();
-                instanceTypeDatas.Dispose();
-                instanceTypeLodDatas.Dispose();
-				rendererLodIndices.Dispose();
-            });
-        }
+				data.lodSizes.Dispose();
+				data.drawCallArgs.Dispose();
+				data.instanceTypeDatas.Dispose();
+				data.instanceTypeLodDatas.Dispose();
+				data.rendererLodIndices.Dispose();
+			});
+		}
 
         renderGraph.SetResource(new GpuDrivenRenderingData(positionsBuffer, instanceTypeIdsBuffer, lodFadesBuffer, lodSizesBuffer, instanceTypeDataBuffer, instanceTypeLodDataBuffer, drawCallArgsBuffer, instanceBoundsBuffer, rendererLodIndicesBuffer, passDrawList, totalInstanceCount, totalRendererCount, totalLodCount), true);
     }
