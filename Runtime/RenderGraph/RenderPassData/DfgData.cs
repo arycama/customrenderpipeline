@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class DfgData : IRenderPassData
+public readonly struct DfgData : IRenderPassData
 {
 	private readonly ResourceHandle<RenderTexture> precomputeDfg, directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
 

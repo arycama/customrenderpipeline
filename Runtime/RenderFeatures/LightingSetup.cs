@@ -17,7 +17,7 @@ public partial class LightingSetup : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
-		var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+		var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 		var directionalShadowRequests = ListPool<ShadowRequest>.Get();
 		var pointShadowRequests = ListPool<ShadowRequest>.Get();
 		var spotShadowRequests = ListPool<ShadowRequest>.Get();

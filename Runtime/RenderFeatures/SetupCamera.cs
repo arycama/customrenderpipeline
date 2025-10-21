@@ -17,9 +17,9 @@ public class SetupCamera : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
-		var rawJitter = renderGraph.GetResource<TemporalAASetupData>().Jitter;
+		var rawJitter = renderGraph.GetResource<TemporalAASetupData>().jitter;
 
-		var jitter = 2.0f * rawJitter / new Vector2(camera.scaledPixelWidth, camera.scaledPixelHeight);
+		var jitter = 2.0f * rawJitter / (Float2)camera.ScaledViewSize();
 
 		var near = camera.nearClipPlane;
 		var far = camera.farClipPlane;
@@ -132,8 +132,8 @@ public class SetupCamera : CameraRenderFeature
 			previousTime = 0f;
 
 		var timeData = renderGraph.GetResource<TimeData>();
-		var renderDeltaTime = (float)(timeData.Time - previousTime);
-		previousTimeCache[camera] = timeData.Time;
+		var renderDeltaTime = (float)(timeData.time - previousTime);
+		previousTimeCache[camera] = timeData.time;
 
 	// TODO: could make some of these float3's and pack with another float
 	renderGraph.SetResource(new ViewData(renderGraph.SetConstantBuffer((

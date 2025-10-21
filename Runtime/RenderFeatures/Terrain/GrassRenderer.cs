@@ -48,7 +48,7 @@ public class GrassRenderer : CameraRenderFeature
 		var terrainResolution = terrain.terrainData.heightmapResolution;
 
 		// Culling planes
-		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
+		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
 		var height = material.GetFloat("_Height");
 		var bladeDensity = (int)material.GetFloat("_BladeDensity");
 		var bladeCount = settings.PatchSize * bladeDensity;

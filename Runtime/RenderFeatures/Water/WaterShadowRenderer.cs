@@ -14,7 +14,7 @@ public class WaterShadowRenderer : WaterRendererBase
         if (!settings.IsEnabled || (camera.cameraType != CameraType.Game && camera.cameraType != CameraType.SceneView))
             return;
 
-        var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+        var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
         var lightRotation = Quaternion.Identity;
         for (var i = 0; i < cullingResults.visibleLights.Length; i++)
         {

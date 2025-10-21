@@ -1,14 +1,14 @@
 ﻿using UnityEngine.Rendering;
 
-public class TimeData : IRenderPassData
+public readonly struct TimeData : IRenderPassData
 {
-	public double Time { get; }
-	public double PreviousTime { get; }
+	public readonly double time;
+	public readonly double previousTime;
 
 	public TimeData(double time, double previousTime)
 	{
-		Time = time;
-		PreviousTime = previousTime;
+		this.time = time;
+		this.previousTime = previousTime;
 	}
 
 	public void SetInputs(RenderPassBase pass)

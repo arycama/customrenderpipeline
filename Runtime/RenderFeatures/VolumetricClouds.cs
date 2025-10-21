@@ -64,7 +64,7 @@ public partial class VolumetricClouds : CameraRenderFeature
             pass.AddRenderPassData<SkyTransmittanceData>();
             pass.ReadRtHandle<CameraDepth>();
 
-            var time = (float)pass.RenderGraph.GetResource<TimeData>().Time;
+            var time = (float)pass.RenderGraph.GetResource<TimeData>().time;
 
             pass.SetRenderFunction((command, pass) =>
             {
@@ -94,7 +94,7 @@ public partial class VolumetricClouds : CameraRenderFeature
 			pass.ReadRtHandle<PreviousCameraDepth>();
 			pass.ReadRtHandle<PreviousCameraVelocity>();
 			pass.ReadRtHandle<CameraVelocity>();
-			var time = (float)pass.RenderGraph.GetResource<TimeData>().Time;
+			var time = (float)pass.RenderGraph.GetResource<TimeData>().time;
 
             pass.SetRenderFunction((command, pass) =>
             {

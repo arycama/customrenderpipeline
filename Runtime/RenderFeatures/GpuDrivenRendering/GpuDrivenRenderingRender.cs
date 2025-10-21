@@ -24,7 +24,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 
 		using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
 
-		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
+		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
 		var renderingData = gpuDrivenRenderer.Setup(camera.ScaledViewSize(), false, cullingPlanes, instanceData);
 
 		using var renderScope = renderGraph.AddProfileScope("Render");

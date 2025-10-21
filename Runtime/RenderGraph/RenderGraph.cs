@@ -211,30 +211,30 @@ public class RenderGraph : IDisposable
 		IsExecuting = false;
 	}
 
-	public void SetResource<T>(T resource, bool isPersistent = false) where T : IRenderPassData
+	public void SetResource<T>(T resource, bool isPersistent = false) where T : struct, IRenderPassData
 	{
 		Assert.IsFalse(IsExecuting);
 		ResourceMap.SetRenderPassData(resource, FrameIndex, isPersistent);
 	}
 
-	public void ClearResource<T>() where T : IRenderPassData
+	public void ClearResource<T>() where T : struct, IRenderPassData
 	{
 		Assert.IsFalse(IsExecuting);
 		ResourceMap.SetRenderPassData<T>(default, -1, false);
 	}
 
-	public bool IsRenderPassDataValid<T>() where T : IRenderPassData
+	public bool IsRenderPassDataValid<T>() where T : struct, IRenderPassData
 	{
 		return ResourceMap.IsRenderPassDataValid<T>(FrameIndex);
 	}
 
-	public bool TryGetResource<T>(out T resource) where T : IRenderPassData
+	public bool TryGetResource<T>(out T resource) where T : struct, IRenderPassData
 	{
 		Assert.IsFalse(IsExecuting);
 		return ResourceMap.TryGetRenderPassData<T>(FrameIndex, out resource);
 	}
 
-	public T GetResource<T>() where T : IRenderPassData
+	public T GetResource<T>() where T : struct, IRenderPassData
 	{
 		Assert.IsFalse(IsExecuting);
 		return ResourceMap.GetRenderPassData<T>(FrameIndex);

@@ -21,7 +21,7 @@ public class SunDiskRenderer : CameraRenderFeature
 			var lightData = renderGraph.GetResource<LightingData>();
 			var viewPosition = camera.transform.position;
 			var scale = 2 * Mathf.Tan(0.5f * settings.SunAngularDiameter * Mathf.Deg2Rad);
-			var matrix = Matrix4x4.TRS(viewPosition + lightData.Light0Direction, Quaternion.LookRotation(lightData.Light0Direction), Vector3.one * scale);
+			var matrix = Matrix4x4.TRS(viewPosition + lightData.light0Direction, Quaternion.LookRotation(lightData.light0Direction), Vector3.one * scale);
 
 			pass.Initialize(celestialBodyMaterial, matrix, 0, 4, 1, MeshTopology.Quads);
 
@@ -40,8 +40,8 @@ public class SunDiskRenderer : CameraRenderFeature
 			pass.SetRenderFunction((command, pass) =>
 			{
 				pass.SetFloat("AngularDiameter", settings.SunAngularDiameter);
-				pass.SetVector("Luminance", (Vector3)lightData.Light0Color);
-				pass.SetVector("Direction", (Vector3)lightData.Light0Direction);
+				pass.SetVector("Luminance", (Vector3)lightData.light0Color);
+				pass.SetVector("Direction", (Vector3)lightData.light0Direction);
 			});
 		}
 	}

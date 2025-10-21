@@ -177,7 +177,7 @@ public abstract class RenderPassBase : IDisposable
 		writeBuffers.Add((propertyName, buffer));
 	}
 
-	public void AddRenderPassData<T>(bool isOptional = false) where T : IRenderPassData
+	public void AddRenderPassData<T>(bool isOptional = false) where T : struct, IRenderPassData
 	{
 		Assert.IsFalse(RenderGraph.IsExecuting);
 		var handle = RenderGraph.ResourceMap.GetResourceHandle<T>();

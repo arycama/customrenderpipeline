@@ -1,10 +1,10 @@
 ﻿using UnityEngine.Rendering;
 
-public class CullingResultsData : IRenderPassData
+public readonly struct CullingResultsData : IRenderPassData
 {
-	public CullingResultsData(CullingResults cullingResults) => CullingResults = cullingResults;
+	public readonly CullingResults cullingResults;
 
-	public CullingResults CullingResults { get; }
+	public CullingResultsData(CullingResults cullingResults) => this.cullingResults = cullingResults;
 
 	void IRenderPassData.SetInputs(RenderPassBase pass)
 	{

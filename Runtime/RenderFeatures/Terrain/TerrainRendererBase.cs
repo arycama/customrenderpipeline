@@ -74,7 +74,7 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 
 				pass.WriteBuffer("_IndirectArgs", indirectArgsBuffer);
 				pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
-				pass.ReadTexture("_TerrainHeights", terrainSystemData.MinMaxHeights);
+				pass.ReadTexture("_TerrainHeights", terrainSystemData.minMaxHeights);
 				pass.AddRenderPassData<ViewData>();
 
 				var index = i;
@@ -88,8 +88,8 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 					passCount,
 					index,
 					QuadListIndexCount,
-					terrainSystemData.Terrain,
-					terrainSystemData.TerrainData,
+					terrainSystemData.terrain,
+					terrainSystemData.terrainData,
 					settings
 				),
 				(command, pass, data) =>
@@ -120,17 +120,17 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 					ArrayPool<Vector4>.Release(cullingPlanesArray);
 
 					// Snap to quad-sized increments on largest cell
-					var position = data.Terrain.GetPosition() - data.viewPosition;
-					var positionOffset = new Vector4(data.TerrainData.size.x, data.TerrainData.size.z, position.x, position.z);
+					var position = data.terrain.GetPosition() - data.viewPosition;
+					var positionOffset = new Vector4(data.terrainData.size.x, data.terrainData.size.z, position.x, position.z);
 					pass.SetVector("_TerrainPositionOffset", positionOffset);
 
 					pass.SetFloat("_EdgeLength", data.settings.EdgeLength * data.settings.PatchVertices);
 					pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
 
-					pass.SetFloat("_InputScale", data.TerrainData.size.y);
+					pass.SetFloat("_InputScale", data.terrainData.size.y);
 					pass.SetFloat("_InputOffset", position.y);
 
-					pass.SetInt("_MipCount", Texture2DExtensions.MipCount(data.TerrainData.heightmapResolution) - 1);
+					pass.SetInt("_MipCount", Texture2DExtensions.MipCount(data.terrainData.heightmapResolution) - 1);
 				});
 			}
 		}

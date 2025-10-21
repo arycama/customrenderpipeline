@@ -1,17 +1,17 @@
 ﻿using System.Collections.Generic;
 using UnityEngine.Rendering;
 
-public class ShadowRequestsData : IRenderPassData
+public readonly struct ShadowRequestsData : IRenderPassData
 {
-	public List<ShadowRequest> DirectionalShadowRequests { get; }
-	public List<ShadowRequest> PointShadowRequests { get; }
-	public List<ShadowRequest> SpotShadowRequests { get; }
+	public readonly List<ShadowRequest> directionalShadowRequests;
+	public readonly List<ShadowRequest> pointShadowRequests;
+	public readonly List<ShadowRequest> spotShadowRequests;
 
 	public ShadowRequestsData(List<ShadowRequest> directionalShadowRequests, List<ShadowRequest> pointShadowRequests, List<ShadowRequest> spotShadowRequests)
 	{
-		DirectionalShadowRequests = directionalShadowRequests;
-		PointShadowRequests = pointShadowRequests;
-		SpotShadowRequests = spotShadowRequests;
+		this.directionalShadowRequests = directionalShadowRequests;
+		this.pointShadowRequests = pointShadowRequests;
+		this.spotShadowRequests = spotShadowRequests;
 	}
 
 	public void SetInputs(RenderPassBase pass)

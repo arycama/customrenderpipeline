@@ -18,22 +18,22 @@ public class TerrainRenderer : TerrainRendererBase
 		if (!renderGraph.TryGetResource<TerrainRenderData>(out var terrainRenderData))
 			return;
 
-		if (terrainSystemData.Terrain == null || settings.Material == null)
+		if (terrainSystemData.terrain == null || settings.Material == null)
 			return;
 
-		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().CullingPlanes;
+		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
 		var passData = Cull(camera.transform.position, cullingPlanes);
 		var passIndex = settings.Material.FindPass("Terrain");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no Terrain Pass");
 
-		var size = terrainSystemData.TerrainData.size;
-		var position = terrainSystemData.Terrain.GetPosition() - camera.transform.position;
+		var size = terrainSystemData.terrainData.size;
+		var position = terrainSystemData.terrain.GetPosition() - camera.transform.position;
 
 		using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectIndexedRenderPass>("Terrain Render"))
 		{
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.None, RenderBufferLoadAction.DontCare);
 
-			pass.Initialize(settings.Material, terrainSystemData.IndexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
+			pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
 			pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
 
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
@@ -52,8 +52,8 @@ public class TerrainRenderer : TerrainRendererBase
 				pass.SetVector("_SpacingScale", new Vector4(size.x / settings.CellCount / settings.PatchVertices, size.z / settings.CellCount / settings.PatchVertices, position.x, position.z));
 				pass.SetFloat("_PatchUvScale", 1f / settings.CellCount);
 
-				pass.SetFloat("_HeightUvScale", 1f / settings.CellCount * (1.0f - 1f / terrainSystemData.TerrainData.heightmapResolution));
-				pass.SetFloat("_HeightUvOffset", 0.5f / terrainSystemData.TerrainData.heightmapResolution);
+				pass.SetFloat("_HeightUvScale", 1f / settings.CellCount * (1.0f - 1f / terrainSystemData.terrainData.heightmapResolution));
+				pass.SetFloat("_HeightUvOffset", 0.5f / terrainSystemData.terrainData.heightmapResolution);
 
 				pass.SetFloat("_MaxLod", Mathf.Log(settings.CellCount, 2));
 
@@ -67,7 +67,7 @@ public class TerrainRenderer : TerrainRendererBase
 			});
 		}
 
-		var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+		var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
 		using (var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Render Terrain Replacement"))
 		{

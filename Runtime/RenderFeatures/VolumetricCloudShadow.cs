@@ -34,7 +34,7 @@ public class VolumetricCloudShadow : CameraRenderFeature
         var lightRotation = Quaternion.LookRotation(Vector3.down);
 
         var atmosphereData = renderGraph.GetResource<AtmospherePropertiesAndTables>();
-        var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+        var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
         var planetRadius = physicalSkySettings.PlanetRadius * physicalSkySettings.EarthScale;
 
@@ -119,7 +119,7 @@ public class VolumetricCloudShadow : CameraRenderFeature
             pass.ReadBuffer("CloudShadowData", cloudShadowDataBuffer);
             pass.AddRenderPassData<CloudData>();
             pass.AddRenderPassData<ViewData>();
-            var time = (float)pass.RenderGraph.GetResource<TimeData>().Time;
+            var time = (float)pass.RenderGraph.GetResource<TimeData>().time;
 
             pass.SetRenderFunction((command, pass) =>
             {
@@ -151,7 +151,7 @@ public class VolumetricCloudShadow : CameraRenderFeature
             pass.AddRenderPassData<LightingData>();
 			pass.AddRenderPassData<ViewData>();
 			pass.AddRenderPassData<SkyTransmittanceData>();
-            var time = (float)pass.RenderGraph.GetResource<TimeData>().Time;
+            var time = (float)pass.RenderGraph.GetResource<TimeData>().time;
 
             pass.SetRenderFunction((command, pass) =>
             {

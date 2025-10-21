@@ -176,7 +176,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new TerrainRenderer(asset.TerrainSettings, renderGraph),
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
-			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
 			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Gbuffer");
 
@@ -194,7 +194,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
-			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
 			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Velocity");
 
@@ -214,7 +214,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
-			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
 			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("GrassVelocity");
 
@@ -259,7 +259,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			var decalNormal = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 			renderGraph.SetRTHandle<DecalNormal>(decalNormal);
 
-			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
 			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Decal");
 
@@ -354,7 +354,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		{
 			using var pass = renderGraph.AddRenderPass<ObjectRenderPass>("Render Transparent");
 
-			var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("SRPDefaultUnlit", context, cullingResults, camera, RenderQueueRange.transparent, SortingCriteria.CommonTransparent, PerObjectData.None, false);
 
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());

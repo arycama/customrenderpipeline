@@ -48,10 +48,10 @@ public class ParticleShadows : CameraRenderFeature
 		// TODO: Allocate 1 big atlas
 		// TODO: Use renderer lists to avoid allocating/rendering empty cascades
 		var requestData = renderGraph.GetResource<ShadowRequestsData>();
-		var cullingResults = renderGraph.GetResource<CullingResultsData>().CullingResults;
+		var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
 		// Allocate and clear shadow maps
-		var directionalShadowCount = Max(1, requestData.DirectionalShadowRequests.Count);
+		var directionalShadowCount = Max(1, requestData.directionalShadowRequests.Count);
 
 		// Since 3D texture arrays aren't a thing, allocate one wide texture
 		var directionalShadows = renderGraph.GetTexture(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, GraphicsFormat.R32_UInt, settings.DirectionalDepth, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true, clearFlags: RTClearFlags.Depth);
@@ -154,17 +154,17 @@ public class ParticleShadows : CameraRenderFeature
 		using (renderGraph.AddProfileScope($"Directional Shadows"))
 		{
 			// TODO: This needs to use the actual count or it will access out of bounds
-			for (var i = 0; i < requestData.DirectionalShadowRequests.Count; i++)
+			for (var i = 0; i < requestData.directionalShadowRequests.Count; i++)
 			{
 				using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
 				{
-					var request = requestData.DirectionalShadowRequests[i];
+					var request = requestData.directionalShadowRequests[i];
 					RenderShadowMap(request, directionalShadows, i, true, false, false);
 					directionalShadowSizes[i] = (request.Far - request.Near) / settings.DirectionalDepth;
 				}
 			}
 
-			ListPool<ShadowRequest>.Release(requestData.DirectionalShadowRequests);
+			ListPool<ShadowRequest>.Release(requestData.directionalShadowRequests);
 		}
 
 		// Accumulate directional shadows

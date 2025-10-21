@@ -43,8 +43,8 @@ public partial class VolumetricLighting : CameraRenderFeature
 			0f
         ));
 
-		var rawJitter = renderGraph.GetResource<TemporalAASetupData>().Jitter;
-		var jitter = 2.0f * rawJitter / new Vector2(camera.scaledPixelWidth, camera.scaledPixelHeight);
+		var rawJitter = renderGraph.GetResource<TemporalAASetupData>().jitter;
+		var jitter = 2.0f * rawJitter / (Float2)camera.ScaledViewSize();
 		var tanHalfFov = Tan(0.5f * Radians(camera.fieldOfView));
 		var pixelToWorldViewDir = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, tanHalfFov, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation));
 

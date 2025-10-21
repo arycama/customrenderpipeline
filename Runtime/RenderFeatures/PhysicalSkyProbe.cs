@@ -64,7 +64,7 @@ public class PhysicalSkyProbe : CameraRenderFeature
 			pass.AddRenderPassData<SkyTransmittanceData>();
 			pass.AddRenderPassData<SkyReflectionAmbientData>();
 			
-			var time = (float)pass.RenderGraph.GetResource<TimeData>().Time;
+			var time = (float)pass.RenderGraph.GetResource<TimeData>().time;
 
 			pass.SetRenderFunction((command, pass) =>
 			{

@@ -16,7 +16,7 @@ public class RenderResourceMap : IDisposable
 	}
 
 	// TODO: Should have a tryget method which fails if not already initialized? (Thoguh we should keep this one so that types can prefetch handles out of order
-	public RenderPassDataHandle GetResourceHandle<T>() where T : IRenderPassData
+	public RenderPassDataHandle GetResourceHandle<T>() where T : struct, IRenderPassData
 	{
 		if (!handleIndexMap.TryGetValue(typeof(T), out var handle))
 		{
@@ -54,13 +54,13 @@ public class RenderResourceMap : IDisposable
 		return false;
 	}
 
-	public bool TryGetRenderPassData<T>(int frameIndex, out T data) where T : IRenderPassData
+	public bool TryGetRenderPassData<T>(int frameIndex, out T data) where T : struct, IRenderPassData
 	{
 		var handle = GetResourceHandle<T>();
 		return TryGetRenderPassData(handle, frameIndex, out data);
 	}
 
-	public bool IsRenderPassDataValid<T>(RenderPassDataHandle handle, int frameIndex) where T : IRenderPassData
+	public bool IsRenderPassDataValid<T>(RenderPassDataHandle handle, int frameIndex) where T : struct, IRenderPassData
 	{
 		var result = handleList[handle.Index];
 
@@ -72,7 +72,7 @@ public class RenderResourceMap : IDisposable
 		return false;
 	}
 
-	public bool IsRenderPassDataValid<T>(int frameIndex) where T : IRenderPassData
+	public bool IsRenderPassDataValid<T>(int frameIndex) where T : struct, IRenderPassData
 	{
 		var handle = GetResourceHandle<T>();
 		var result = handleList[handle.Index];
@@ -85,7 +85,7 @@ public class RenderResourceMap : IDisposable
 		return false;
 	}
 
-	public T GetRenderPassData<T>(int frameIndex) where T : IRenderPassData
+	public T GetRenderPassData<T>(int frameIndex) where T : struct, IRenderPassData
 	{ 
 		var handle = GetResourceHandle<T>();
 		return GetRenderPassData<T>(handle, frameIndex);
@@ -97,7 +97,7 @@ public class RenderResourceMap : IDisposable
 		handleList[handle.Index] = (renderResource, frameIndex, isPersistent);
 	}
 
-	public void SetRenderPassData<T>(in T renderResource, int frameIndex, bool isPersistent = false) where T : IRenderPassData
+	public void SetRenderPassData<T>(in T renderResource, int frameIndex, bool isPersistent = false) where T : struct, IRenderPassData
 	{
 		var handle = GetResourceHandle<T>();
 		SetRenderPassData(handle, renderResource, frameIndex, isPersistent);

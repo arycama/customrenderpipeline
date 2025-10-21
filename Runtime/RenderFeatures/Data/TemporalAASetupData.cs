@@ -1,13 +1,13 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public class TemporalAASetupData : IRenderPassData
+public readonly struct TemporalAASetupData : IRenderPassData
 {
-    public Vector2 Jitter { get; }
+	public readonly Float2 jitter;
 
-    public TemporalAASetupData(Vector2 jitter)
+    public TemporalAASetupData(Float2 jitter)
     {
-        Jitter = jitter;
+        this.jitter = jitter;
     }
 
 	void IRenderPassData.SetInputs(RenderPassBase pass)

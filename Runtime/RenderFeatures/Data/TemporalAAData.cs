@@ -1,8 +1,21 @@
 ﻿using UnityEngine;
+using UnityEngine.Rendering;
 
-public class TemporalAAData : ConstantBufferData
+public readonly struct TemporalAAData : IRenderPassData
 {
-	public TemporalAAData(ResourceHandle<GraphicsBuffer> buffer) : base(buffer, "TemporalProperties")
+	private readonly ResourceHandle<GraphicsBuffer> buffer;
+
+	public TemporalAAData(ResourceHandle<GraphicsBuffer> buffer)
+	{
+		this.buffer = buffer;
+	}
+
+	void IRenderPassData.SetInputs(RenderPassBase pass)
+	{
+		pass.ReadBuffer("TemporalProperties", buffer);
+	}
+
+	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
 	{
 	}
 }

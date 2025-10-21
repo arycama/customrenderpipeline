@@ -17,10 +17,10 @@ public class TerrainShadowRenderer : TerrainRendererBase
 		if (!renderGraph.TryGetResource<TerrainRenderData>(out var terrainRenderData))
 			return;
 
-		var terrain = terrainSystemData.Terrain;
-		var terrainData = terrainSystemData.TerrainData;
+		var terrain = terrainSystemData.terrain;
+		var terrainData = terrainSystemData.terrainData;
 
-		if (terrainSystemData.Terrain == null || settings.Material == null)
+		if (terrainSystemData.terrain == null || settings.Material == null)
 			return;
 
 		var shadowRequestData = renderGraph.GetResource<ShadowRequestData>();
@@ -44,7 +44,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 
 		using (var pass = renderGraph.AddRenderPass<DrawProceduralIndirectIndexedRenderPass>("Terrain Render"))
 		{
-			pass.Initialize(settings.Material, terrainSystemData.IndexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, null, shadowRequestData.Bias, shadowRequestData.SlopeBias, shadowRequestData.ZClip);
+			pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, null, shadowRequestData.Bias, shadowRequestData.SlopeBias, shadowRequestData.ZClip);
 
 			pass.WriteDepth(shadowRequestData.Shadow);
 			pass.DepthSlice = shadowRequestData.CascadeIndex;

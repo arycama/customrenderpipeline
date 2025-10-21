@@ -1,8 +1,21 @@
 ﻿using UnityEngine;
+using UnityEngine.Rendering;
 
-public class FrameData : ConstantBufferData
+public readonly struct FrameData : IRenderPassData
 {
-	public FrameData(ResourceHandle<GraphicsBuffer> buffer) : base(buffer, "FrameData")
+	private readonly ResourceHandle<GraphicsBuffer> buffer;
+
+	public FrameData(ResourceHandle<GraphicsBuffer> buffer)
+	{
+		this.buffer = buffer;
+	}
+
+	void IRenderPassData.SetInputs(RenderPassBase pass)
+	{
+		pass.ReadBuffer("FrameData", buffer);
+	}
+
+	void IRenderPassData.SetProperties(RenderPassBase pass, CommandBuffer command)
 	{
 	}
 }

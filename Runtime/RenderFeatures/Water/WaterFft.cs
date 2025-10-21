@@ -85,7 +85,7 @@ public class WaterFft : FrameRenderFeature
 			spectrumStart: new Vector4(0, maxWaveNumber0, maxWaveNumber1, maxWaveNumber2),
 			spectrumEnd: new Vector4(maxWaveNumber0, maxWaveNumber1, maxWaveNumber2, maxWaveNumber3),
 			Profile.Gravity,
-            (float)timeData.Time,
+            (float)timeData.time,
             Profile.TimeScale,
             Profile.SequenceLength
         ));
