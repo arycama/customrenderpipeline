@@ -134,8 +134,9 @@ public class SetupCamera : CameraRenderFeature
 		var renderDeltaTime = (float)(timeData.time - previousTime);
 		previousTimeCache[camera] = timeData.time;
 
-	// TODO: could make some of these float3's and pack with another float
-	renderGraph.SetResource(new ViewData(renderGraph.SetConstantBuffer(new ViewDataTemp(
+		// TODO: could make some of these float3's and pack with another float
+		renderGraph.SetResource(new ViewData(renderGraph.SetConstantBuffer(new ViewDataTemp
+		(
 			worldToView,
 			worldToClip,
 			worldToPreviousClip,
@@ -173,20 +174,6 @@ public class SetupCamera : CameraRenderFeature
 			renderDeltaTime,
 			previousTransform.Item1
 		))));
-
-		using (var pass = renderGraph.AddGenericRenderPass("Set View Properties", (viewPosition, viewRotation, tanHalfFovX, tanHalfFovY, jitter)))
-		{
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetVector("ViewPosition1", data.viewPosition);
-				pass.SetVectorArray("FrustumCorners1", new Vector4[3]
-				{
-					new Float4(data.viewRotation.Rotate(new Float3(data.tanHalfFovX * (-1.0f + data.jitter.x), data.tanHalfFovY * (1.0f + data.jitter.y), 1.0f)), 0),
-					new Float4(data.viewRotation.Rotate(new Float3(data.tanHalfFovX * (3.0f + data.jitter.x), data.tanHalfFovY * (1.0f + data.jitter.y), 1.0f)), 0),
-					new Float4(data.viewRotation.Rotate(new Float3(data.tanHalfFovX * (-1.0f + data.jitter.x), data.tanHalfFovY * (-3.0f + data.jitter.y), 1.0f)), 0),
-				});
-			});
-		}
 
 		var frustumPlanes = ArrayPool<Plane>.Get(6);
 		var cameraProjMatrix = camera.projectionMatrix;
