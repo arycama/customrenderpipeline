@@ -81,7 +81,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	//color = ScreenSpaceGlobalIllumination[position.xy].rgb;
 	//color = ScreenSpaceReflections[position.xy];
 	
-	if (Purkinje)
+	if (!IsPreview && Purkinje)
 	{
 		// Lms to opponent space
 		

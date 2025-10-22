@@ -13,7 +13,7 @@ float _WeatherMapFactor, _NoiseFactor, _DetailNoiseFactor;
 
 Texture2D<float3> _Input, _History;
 Texture3D<float> _CloudNoise, _CloudDetailNoise;
-Texture2D<float> _WeatherMap;
+Texture2D<float> _WeatherMap, HighAltitudeMap;
 float _WeatherMapScale, _WeatherMapStrength, _StartHeight, _LayerThickness, _Density;
 float _NoiseScale, _NoiseStrength, _DetailNoiseStrength, _DetailNoiseScale;
 float2 _WeatherMapSpeed, _WeatherMapOffset;
@@ -21,6 +21,8 @@ float _Samples, _LightSamples, _LightDistance;
 float _TransmittanceThreshold;
 float _BackScatterPhase, _ForwardScatterPhase;
 float ScatterOctaves, ScatterAttenuation, ScatterContribution, ScatterEccentricityAttenuation;
+float HighAltitudeMapStrength, HighAltitudeMapScale, HighAltitudeMapHeight, HighAltitudeMapDensity;
+float2 HighAltitudeMapSpeed;
 
 Texture2D<float> CloudDepthTexture;
 
@@ -47,7 +49,7 @@ float CloudExtinction(float3 worldPosition, float height, bool useDetail)
 	density = saturate(Remap(density, 1.0 - _WeatherMapStrength));
 	
 	float baseNoise = _CloudNoise.SampleLevel(LinearRepeatSampler, position * _NoiseScale, 0.0);
-	density = saturate(Remap(density, baseNoise * _NoiseStrength * 2.0));
+	density = saturate(Remap(density, baseNoise * _NoiseStrength));
 	if (density <= 0.0)
 		return 0.0;
 
@@ -146,6 +148,7 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 	
 	cloudDepth = weightedDepthSum * rcp(weightSum);
 	
+	float3 ambient = GetSkyAmbient(viewHeight, viewCosAngle, _LightDirection0.y, cloudDepth) * _LightColor0 * Exposure * RcpFourPi;
 	float4 result = float2(light0, transmittance).xxxy;
 	if (result.a < 1.0)
 	{
@@ -154,26 +157,15 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 	
 		// Final lighting
 		float3 lightTransmittance = Rec709ToRec2020(TransmittanceToAtmosphere(viewHeight, rd.y, _LightDirection0.y, cloudDepth));
-		float attenuation = sunShadow ? GetDirectionalShadow(rd * cloudDepth) : 1.0;
-		result.rgb *= lightTransmittance * Rec709ToRec2020(_LightColor0) * (Exposure * attenuation);
+		result.rgb *= lightTransmittance * Rec709ToRec2020(_LightColor0) * Exposure;
 		
-		// TODO: This should use a sky convolution that does not include clouds
+		// Attenuate sky ambient by cloud coveerage
+		float3 amb = ambient;
+		if (applyCloudCoverage)
+			amb = amb * _CloudCoverage.a;
+		
 		for (float j = 0.0; j < ScatterOctaves; j++)
-		{
-			#if 0
-				float3 ambient = AmbientCsTwoLobe(-rd, _ForwardScatterPhase * pow(ScatterEccentricityAttenuation, j), _BackScatterPhase * pow(ScatterEccentricityAttenuation, j), 0.5);
-			#else
-				float3 ambient = GetSkyAmbient(viewHeight, viewCosAngle, _LightDirection0.y, cloudDepth) * _LightColor0 * Exposure;
-				
-				// Attenuate sky ambient by cloud coveerage
-				if (applyCloudCoverage)
-					ambient = ambient * _CloudCoverage.a + _CloudCoverage.rgb * _GroundColor;
-					
-				ambient *= RcpFourPi;
-			#endif
-			
-			result.rgb += ambient * pow(ScatterContribution, j) * (1 - exp2(-pow(ScatterAttenuation, j) * opticalDepth)) / pow(ScatterAttenuation, j);
-		}
+			result.rgb += amb * pow(ScatterContribution, j) * (1 - exp2(-pow(ScatterAttenuation, j) * opticalDepth)) / pow(ScatterAttenuation, j);
 		
 		if (sunShadow)
 		{
@@ -183,6 +175,38 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		{
 			result.rgb *= Rec709ToRec2020(TransmittanceToPoint1(viewHeight, viewCosAngle, cloudDepth));
 		}
+	}
+	
+	// High altitude layer
+	//if (rayIntersectsTopCloud)
+	{
+		float rayEnd = DistanceToSphereInside(ViewHeight, viewCosAngle, _PlanetRadius + HighAltitudeMapHeight);
+		
+		//float3 position = P + rd * (rayStart + rayLength) + ViewPosition;
+		float3 position = P + rd * rayEnd + ViewPosition;
+		float2 weatherPosition = position.xz / HighAltitudeMapScale + HighAltitudeMapSpeed * Time;
+	
+		float density = HighAltitudeMap.SampleLevel(LinearRepeatSampler, weatherPosition, 0.0);
+		density = saturate(Remap(density, 1.0 - HighAltitudeMapStrength));
+		density = max(0.0, density * HighAltitudeMapDensity);
+		float sampleTransmittance = exp2(-density);
+		transmittance *= sampleTransmittance;
+		float lightOpticalDepth = 0;
+		opticalDepth += density;
+	
+		float light0 = 0.0;
+		for (float j = 0.0; j < ScatterOctaves; j++)
+		{
+			float phase = lerp(CsPhase(LdotV, _BackScatterPhase * pow(ScatterEccentricityAttenuation, j)), CsPhase(LdotV, _ForwardScatterPhase * pow(ScatterEccentricityAttenuation, j)), 0.5);
+			light0 += pow(ScatterContribution, j) * phase * exp2(-pow(ScatterAttenuation, j) * (lightOpticalDepth + opticalDepth)) * (1.0 - sampleTransmittance);
+		}
+		
+		// Final lighting
+		float3 lightTransmittance = Rec709ToRec2020(TransmittanceToAtmosphere(viewHeight, rd.y, _LightDirection0.y, rayEnd));
+		result.rgb += light0 * lightTransmittance * Rec709ToRec2020(_LightColor0) * Exposure;
+		
+		for (float j = 0.0; j < ScatterOctaves; j++)
+			result.rgb += ambient * pow(ScatterContribution, j) * (1 - exp2(-pow(ScatterAttenuation, j) * opticalDepth)) / pow(ScatterAttenuation, j);
 	}
 	
 	return result;

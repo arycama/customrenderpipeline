@@ -55,7 +55,7 @@ public partial class LightingSetup : CameraRenderFeature
 
 #if UNITY_EDITOR
 					// The default scene light only has an intensity of 1, set it to sun
-					if (camera.cameraType == CameraType.SceneView && !UnityEditor.SceneView.currentDrawingSceneView.sceneLighting)
+					if ((camera.cameraType == CameraType.SceneView && !UnityEditor.SceneView.currentDrawingSceneView.sceneLighting) || camera.cameraType == CameraType.Preview)
 						lightColor0 *= 120000;
 #endif
 				}

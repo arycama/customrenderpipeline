@@ -1,4 +1,5 @@
-#pragma once
+#ifndef COLOR_INCLUDED
+#define COLOR_INCLUDED
 
 #include "Math.hlsl"
 
@@ -495,3 +496,5 @@ float4 YCoCgToRgbFastTonemapInverse(float4 tonemappedYCoCg)
 {
 	return float4(YCoCgToRgb(FastTonemapYCoCgInverse(tonemappedYCoCg.rgb)), tonemappedYCoCg.a);
 }
+
+#endif

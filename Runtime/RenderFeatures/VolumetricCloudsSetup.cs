@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 public class VolumetricCloudsSetup : FrameRenderFeature
 {
-    private readonly ResourceHandle<RenderTexture> weatherMap, noiseTexture, detailNoiseTexture;
+    private readonly ResourceHandle<RenderTexture> weatherMap, noiseTexture, detailNoiseTexture, highAltitudeTexture;
     private readonly VolumetricClouds.Settings settings;
     private readonly Material material;
 
@@ -17,14 +17,23 @@ public class VolumetricCloudsSetup : FrameRenderFeature
         weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, GraphicsFormat.R8_UNorm, isPersistent: true);
         noiseTexture = renderGraph.GetTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, GraphicsFormat.R8_UNorm, settings.NoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
         detailNoiseTexture = renderGraph.GetTexture(settings.DetailNoiseResolution.x, settings.DetailNoiseResolution.y, GraphicsFormat.R8_UNorm, settings.DetailNoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
+		highAltitudeTexture = renderGraph.GetTexture(settings.HighAltitudeMapResolution.x, settings.HighAltitudeMapResolution.y, GraphicsFormat.R8_UNorm, isPersistent: true);
 
-        // TODO: Should we seperate this into another material
-        material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };
+		// TODO: Should we seperate this into another material
+		material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public override void Render(ScriptableRenderContext context)
+	protected override void Cleanup(bool disposing)
+	{
+		renderGraph.ReleasePersistentResource(weatherMap);
+		renderGraph.ReleasePersistentResource(noiseTexture);
+		renderGraph.ReleasePersistentResource(detailNoiseTexture);
+		renderGraph.ReleasePersistentResource(highAltitudeTexture);
+	}
+
+	public override void Render(ScriptableRenderContext context)
     {
-        var result = new CloudData(weatherMap, noiseTexture, detailNoiseTexture);
+        var result = new CloudData(weatherMap, noiseTexture, detailNoiseTexture, highAltitudeTexture);
 
         if (version >= settings.Version)
             return;
@@ -46,8 +55,24 @@ public class VolumetricCloudsSetup : FrameRenderFeature
             });
         }
 
-        // Noise
-        var maxInstanceCount = 32;
+		// High altitude map
+		using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds High Altitude Map", settings))
+		{
+			pass.Initialize(material, 0);
+			pass.WriteTexture(highAltitudeTexture, RenderBufferLoadAction.DontCare);
+
+			pass.SetRenderFunction(static (command, pass, settings) =>
+			{
+				pass.SetFloat("_WeatherMapFrequency", settings.HighAltitudeMapNoiseParams.Frequency);
+				pass.SetFloat("_WeatherMapH", settings.HighAltitudeMapNoiseParams.H);
+				pass.SetFloat("_WeatherMapOctaves", settings.HighAltitudeMapNoiseParams.Octaves);
+				pass.SetFloat("_WeatherMapFactor", settings.HighAltitudeMapNoiseParams.FractalBound);
+				pass.SetVector("_WeatherMapResolution", settings.HighAltitudeMapResolution);
+			});
+		}
+
+		// Noise
+		var maxInstanceCount = 32;
         using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Noise Texture", settings))
         {
             var primitiveCount = Math.DivRoundUp(settings.NoiseResolution.z, maxInstanceCount);
@@ -89,5 +114,4 @@ public class VolumetricCloudsSetup : FrameRenderFeature
 
         renderGraph.SetResource(result, true);
     }
-
 }

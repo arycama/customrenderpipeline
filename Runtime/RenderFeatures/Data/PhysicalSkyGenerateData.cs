@@ -34,6 +34,7 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
 			pass.WriteTexture(skyTransmittance, RenderBufferLoadAction.DontCare);
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 			pass.AddRenderPassData<LightingData>();
+			pass.AddRenderPassData<ViewData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{

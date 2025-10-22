@@ -26,7 +26,16 @@ public partial class VolumetricClouds
         [field: SerializeField, Range(0.0f, 1.0f)] public float DetailStrength { get; private set; } = 1.0f;
         [field: SerializeField] public FractalNoiseParameters DetailNoiseParams { get; private set; }
 
-        [field: Header("Cloud Shadows")]
+		[field: Header("High Altitude Clouds")]
+		[field: SerializeField] public Int2 HighAltitudeMapResolution { get; private set; } = new(256, 256);
+		[field: SerializeField] public float HighAltitudeMapHeight { get; private set; } = 4096;
+		[field: SerializeField] public float HighAltitudeMapDensity { get; private set; } = 0.5f;
+		[field: SerializeField] public float HighAltitudeMapScale { get; private set; } = 32768.0f;
+		[field: SerializeField] public Float2 HighAltitudeMapSpeed { get; private set; } = Vector2.zero;
+		[field: SerializeField, Range(0.0f, 1.0f)] public float HighAltitudeMapStrength { get; private set; } = 1.0f;
+		[field: SerializeField] public FractalNoiseParameters HighAltitudeMapNoiseParams { get; private set; }
+
+		[field: Header("Cloud Shadows")]
         [field: SerializeField] public int ShadowResolution { get; private set; } = 1024;
         [field: SerializeField] public float ShadowRadius { get; private set; } = 150000.0f;
         [field: SerializeField, Range(1, 64)] public int ShadowSamples { get; private set; } = 24;
@@ -83,7 +92,14 @@ public partial class VolumetricClouds
             pass.SetVector("_DetailNoiseResolution", DetailNoiseResolution);
             pass.SetVector("_WeatherMapResolution", WeatherMapResolution);
 
-            pass.SetFloat("_BackScatterPhase", BackScatterPhase);
+			pass.SetVector("HighAltitudeMapResolution", HighAltitudeMapResolution);
+			pass.SetFloat("HighAltitudeMapScale", HighAltitudeMapScale);
+			pass.SetVector("HighAltitudeMapSpeed", HighAltitudeMapSpeed);
+			pass.SetFloat("HighAltitudeMapStrength", HighAltitudeMapStrength);
+			pass.SetFloat("HighAltitudeMapHeight", HighAltitudeMapHeight);
+			pass.SetFloat("HighAltitudeMapDensity", HighAltitudeMapDensity);
+
+			pass.SetFloat("_BackScatterPhase", BackScatterPhase);
             pass.SetFloat("_ForwardScatterPhase", ForwardScatterPhase);
 
 			pass.SetFloat("ScatterOctaves", ScatterOctaves);

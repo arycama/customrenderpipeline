@@ -1,4 +1,5 @@
-#pragma once
+#ifndef EXPOSURE_INCLUDED
+#define EXPOSURE_INCLUDED
 
 cbuffer ExposureBuffer
 {
@@ -15,3 +16,5 @@ float3 ApplyEmissiveExposureWeight(float3 emissive, float weight)
 {
 	return lerp(emissive, emissive * Exposure, weight);
 }
+
+#endif
