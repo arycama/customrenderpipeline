@@ -33,7 +33,8 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 			var draw = drawList[i];
 			using (var pass = renderGraph.AddDrawInstancedIndirectRenderPass("Gpu Driven Rendering", (draw.lodOffset, draw.objectToWorld)))
 			{
-				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, draw.passIndex, "INDIRECT_RENDERING", 0.0f, 0.0f, true, draw.indirectArgsOffset);
+				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, draw.passIndex, 0.0f, 0.0f, true, draw.indirectArgsOffset);
+				pass.AddKeyword("INDIRECT_RENDERING");
 				pass.UseProfiler = false;
 
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());

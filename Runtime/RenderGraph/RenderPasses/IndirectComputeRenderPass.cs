@@ -26,7 +26,5 @@ public class IndirectComputeRenderPass<T> : BaseComputeRenderPass<T>
 
 		foreach (var keyword in keywords)
 			Command.DisableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
-
-		keywords.Clear();
 	}
 }

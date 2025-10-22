@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class DrawProceduralIndexedRenderPass<T> : DrawRenderPass<T>
 {
@@ -22,13 +23,23 @@ public class DrawProceduralIndexedRenderPass<T> : DrawRenderPass<T>
 		this.indexBuffer = indexBuffer;
 	}
 
-	protected override void Execute()
+	public override void Reset()
 	{
-		var indices = GetBuffer(indexBuffer);
-		Command.DrawProcedural(indices, matrix, material, passIndex, topology, indices.count, 1, propertyBlock);
+		base.Reset();
 		material = null;
 		passIndex = 0;
 		matrix = default;
-		propertyBlock.Clear();
+	}
+
+	protected override void Execute()
+	{
+		foreach (var keyword in keywords)
+			Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
+
+		var indices = GetBuffer(indexBuffer);
+		Command.DrawProcedural(indices, matrix, material, passIndex, topology, indices.count, 1, PropertyBlock);
+
+		foreach (var keyword in keywords)
+			Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
 	}
 }

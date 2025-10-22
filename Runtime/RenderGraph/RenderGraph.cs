@@ -156,8 +156,6 @@ public class RenderGraph : IDisposable
 		{
 			renderPass.Run(command);
 
-			renderPass.Reset();
-
 			if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))
 			{
 				pool = new();

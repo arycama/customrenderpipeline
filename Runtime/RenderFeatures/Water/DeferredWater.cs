@@ -97,6 +97,8 @@ public class DeferredWater : CameraRenderFeature
             // Need to set some things as globals so that hit shaders can access them..
             using (var pass = renderGraph.AddGenericRenderPass("Raytraced Refractions Setup"))
             {
+				pass.AddKeyword("UNDERWATER_LIGHTING_ON");
+
                 pass.AddRenderPassData<SkyReflectionAmbientData>();
                 pass.AddRenderPassData<LightingSetup.Result>();
                 pass.AddRenderPassData<AutoExposureData>();
@@ -112,19 +114,12 @@ public class DeferredWater : CameraRenderFeature
                 pass.AddRenderPassData<OceanFftResult>();
                 pass.AddRenderPassData<CausticsResult>();
                 pass.AddRenderPassData<EnvironmentData>();
-
-                pass.SetRenderFunction(static (command, pass) =>
-                {
-                    //command.SetRenderTarget(refractionResult);
-                    //command.ClearRenderTarget(false, true, Color.clear);
-                    //command.SetRenderTarget(scatterResult);
-                    //command.ClearRenderTarget(false, true, Color.clear);
-                    command.EnableShaderKeyword("UNDERWATER_LIGHTING_ON");
-                });
             }
 
 			using (var pass = renderGraph.AddRaytracingRenderPass("Water Raytraced Refractions", settings))
             {
+				pass.AddKeyword("UNDERWATER_LIGHTING_ON");
+
 				var refractionResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 				var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
@@ -156,25 +151,13 @@ public class DeferredWater : CameraRenderFeature
                     pass.SetVector("_Extinction", material.GetColor("_Extinction").Float3());
                 });
             }
-
-            using (var pass = renderGraph.AddGenericRenderPass("Raytraced Refractions Setup"))
-            {
-                pass.SetRenderFunction(static (command, pass) =>
-                {
-                    command.DisableShaderKeyword("UNDERWATER_LIGHTING_ON");
-                });
-            }
-        }
-        else
-        {
-
         }
 
         var (current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
         using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", (wasCreated, history, settings)))
         {
             if (settings.RaytracedRefractions)
-                pass.Keyword = "RAYTRACED_REFRACTIONS_ON";
+                pass.AddKeyword("RAYTRACED_REFRACTIONS_ON");
 
             pass.Initialize(deferredWaterMaterial, 1);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);

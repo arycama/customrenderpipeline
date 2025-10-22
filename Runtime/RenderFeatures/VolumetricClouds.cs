@@ -38,6 +38,8 @@ public partial class VolumetricClouds : CameraRenderFeature
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Render", (settings, time)))
 		{
+			pass.Initialize(material, 4, 1);
+
 			// Determine pass
 			var keyword = string.Empty;
 			var viewHeight1 = camera.transform.position.y;
@@ -45,15 +47,14 @@ public partial class VolumetricClouds : CameraRenderFeature
 			{
 				if (viewHeight1 > settings.StartHeight + settings.LayerThickness)
 				{
-					keyword = "ABOVE_CLOUD_LAYER";
+					pass.AddKeyword("ABOVE_CLOUD_LAYER");
 				}
 			}
 			else
 			{
-				keyword = "BELOW_CLOUD_LAYER";
+				pass.AddKeyword("BELOW_CLOUD_LAYER");
 			}
 
-			pass.Initialize(material, 4, 1, keyword);
 			pass.WriteTexture(cloudLuminanceTemp, RenderBufferLoadAction.DontCare);
 			pass.WriteTexture(cloudTransmittanceTemp, RenderBufferLoadAction.DontCare);
 			pass.WriteTexture(cloudDepth, RenderBufferLoadAction.DontCare);

@@ -59,10 +59,16 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 
 	protected override void Execute()
 	{
-		if(rendererLists[0].isValid)
+		foreach (var keyword in keywords)
+			Command.EnableKeyword(new GlobalKeyword(keyword));
+
+		if (rendererLists[0].isValid)
 			Command.DrawRendererList(rendererLists[0]);
 
 		rendererLists.Clear();
+
+		foreach (var keyword in keywords)
+			Command.DisableKeyword(new GlobalKeyword(keyword));
 	}
 
 	public override void SetMatrix(string propertyName, Matrix4x4 value)

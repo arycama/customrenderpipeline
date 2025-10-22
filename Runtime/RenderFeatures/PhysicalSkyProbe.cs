@@ -40,21 +40,20 @@ public class PhysicalSkyProbe : CameraRenderFeature
 		var time = (float)renderGraph.GetResource<TimeData>().time;
 		using (var pass = renderGraph.AddFullscreenRenderPass("Environment Cubemap", (cloudSettings, time, skySettings)))
 		{
+			pass.Initialize(skyMaterial, skyMaterial.FindPass("Reflection Probe"), 1);
+
 			var keyword = string.Empty;
 			var viewHeight = camera.transform.position.y;
 			if (viewHeight > cloudSettings.StartHeight)
 			{
 				if (viewHeight > cloudSettings.StartHeight + cloudSettings.LayerThickness)
-				{
-					keyword = "ABOVE_CLOUD_LAYER";
-				}
+					pass.AddKeyword("ABOVE_CLOUD_LAYER");
 			}
 			else
 			{
-				keyword = "BELOW_CLOUD_LAYER";
+				pass.AddKeyword("BELOW_CLOUD_LAYER");
 			}
 
-			pass.Initialize(skyMaterial, skyMaterial.FindPass("Reflection Probe"), 1, keyword);
 			pass.WriteTexture(reflectionProbeTemp);
 
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();

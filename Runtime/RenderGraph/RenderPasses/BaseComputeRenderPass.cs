@@ -7,13 +7,11 @@ public abstract class BaseComputeRenderPass<T> : RenderPass<T>
 	protected ComputeShader computeShader;
 	protected int kernelIndex;
 	protected readonly List<(ResourceHandle<RenderTexture>, int, int)> colorBindings = new();
-	protected readonly List<string> keywords = new();
 
 	public override void Reset()
 	{
 		base.Reset();
 		colorBindings.Clear();
-		keywords.Clear();
 	}
 
 	public void WriteTexture(int propertyId, ResourceHandle<RenderTexture> rtHandle, int mip = 0)
@@ -90,11 +88,6 @@ public abstract class BaseComputeRenderPass<T> : RenderPass<T>
 	public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
 	{
 		Command.SetComputeMatrixArrayParam(computeShader, propertyName, value);
-	}
-
-	public void AddKeyword(string keyword)
-	{
-		keywords.Add(keyword);
 	}
 
 	protected sealed override void PostExecute()

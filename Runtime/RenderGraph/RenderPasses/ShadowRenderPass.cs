@@ -60,6 +60,9 @@ public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 
 	protected override void Execute()
 	{
+		foreach (var keyword in keywords)
+			Command.EnableKeyword(new GlobalKeyword(keyword));
+
 		Command.SetGlobalDepthBias(bias, slopeBias);
 		Command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
 
@@ -73,6 +76,9 @@ public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 
 		Command.SetGlobalDepthBias(0.0f, 0.0f);
 		Command.SetGlobalFloat("_ZClip", 1.0f);
+
+		foreach (var keyword in keywords)
+			Command.DisableKeyword(new GlobalKeyword(keyword));
 	}
 
 	public override void SetMatrix(string propertyName, Matrix4x4 value)

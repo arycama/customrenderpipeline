@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class FullscreenRenderPass<T> : DrawRenderPass<T>
 {
@@ -11,33 +12,29 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public virtual void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, string keyword = null)
+	public virtual void Initialize(Material material, int passIndex = 0, int primitiveCount = 1)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
 		this.primitiveCount = primitiveCount;
-		Keyword = keyword;
+	}
+
+	public override void Reset()
+	{
+		base.Reset();
+		material = null;
+		passIndex = 0;
+		primitiveCount = 1;
 	}
 
 	protected override void Execute()
 	{
-		if (!string.IsNullOrEmpty(Keyword))
-		{
-			//keyword = new LocalKeyword(material.shader, Keyword);
-			Command.EnableShaderKeyword(Keyword);
-		}
+		foreach (var keyword in keywords)
+			Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
 
-		Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount, 1, propertyBlock);
+		Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount, 1, PropertyBlock);
 
-		if (!string.IsNullOrEmpty(Keyword))
-		{
-			Command.DisableShaderKeyword(Keyword);
-			Keyword = null;
-		}
-
-		material = null;
-		passIndex = 0;
-		primitiveCount = 1;
-		propertyBlock.Clear();
+		foreach (var keyword in keywords)
+			Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
 	}
 }

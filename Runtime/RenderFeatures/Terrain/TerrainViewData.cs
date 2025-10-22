@@ -25,13 +25,13 @@ public class TerrainViewData : CameraRenderFeature
 		// This sets raytracing data on the terrain's material property block
 		using (var pass = renderGraph.AddSetPropertyBlockPass("Terrain Data Property Block Update", terrainSystem.terrain))
 		{
-			var propertyBlock = pass.propertyBlock;
+			var propertyBlock = pass.PropertyBlock;
 			terrainSystem.terrain.GetSplatMaterialPropertyBlock(propertyBlock);
 			pass.AddRenderPassData<TerrainRenderData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				var propertyBlock = pass.propertyBlock;
+				var propertyBlock = pass.PropertyBlock;
 				data.SetSplatMaterialPropertyBlock(propertyBlock);
 			});
 		}

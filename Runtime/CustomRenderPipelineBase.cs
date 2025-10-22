@@ -43,25 +43,16 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
     protected override void Dispose(bool disposing)
     {
-		try
-		{
-			// Could dispose in reverse order?
-			foreach (var renderFeature in perFrameRenderFeatures)
-				renderFeature?.Dispose();
+		// Could dispose in reverse order?
+		foreach (var renderFeature in perFrameRenderFeatures)
+			renderFeature?.Dispose();
 
-			foreach (var renderFeature in perCameraRenderFeatures)
-				renderFeature?.Dispose();
+		foreach (var renderFeature in perCameraRenderFeatures)
+			renderFeature?.Dispose();
 
-			command.Release();
+		command.Release();
 
-			renderGraph.Dispose();
-		}
-		catch(Exception ex)
-		{
-		}
-		finally
-		{
-		}
+		renderGraph.Dispose();
     }
 
 	protected abstract List<FrameRenderFeature> InitializePerFrameRenderFeatures();

@@ -3,76 +3,69 @@ using UnityEngine.Rendering;
 
 public abstract class DrawRenderPass<T> : GraphicsRenderPass<T>
 {
-	public readonly MaterialPropertyBlock propertyBlock;
-
-	public string Keyword { get; set; }
-
-	public DrawRenderPass()
-	{
-		propertyBlock = new MaterialPropertyBlock();
-	}
-
 	public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
 	{
 		switch (subElement)
 		{
 			case RenderTextureSubElement.Depth:
-				propertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Depth);
+				PropertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Depth);
 				break;
 			case RenderTextureSubElement.Stencil:
-				propertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Stencil);
+				PropertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Stencil);
 				break;
 			default:
-				propertyBlock.SetTexture(propertyName, texture);
+				PropertyBlock.SetTexture(propertyName, texture);
 				break;
 		}
 	}
 
 	public override void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
 	{
-		propertyBlock.SetBuffer(propertyName, GetBuffer(buffer));
+		PropertyBlock.SetBuffer(propertyName, GetBuffer(buffer));
 	}
 
 	public override void SetVector(int propertyName, Float4 value)
 	{
-		propertyBlock.SetVector(propertyName, value);
+		PropertyBlock.SetVector(propertyName, value);
 	}
 
 	public override void SetVectorArray(string propertyName, Vector4[] value)
 	{
-		propertyBlock.SetVectorArray(propertyName, value);
+		PropertyBlock.SetVectorArray(propertyName, value);
 	}
 
 	public override void SetFloat(string propertyName, float value)
 	{
-		propertyBlock.SetFloat(propertyName, value);
+		PropertyBlock.SetFloat(propertyName, value);
 	}
 
 	public override void SetFloatArray(string propertyName, float[] value)
 	{
-		propertyBlock.SetFloatArray(propertyName, value);
+		PropertyBlock.SetFloatArray(propertyName, value);
 	}
 
 	public override void SetInt(string propertyName, int value)
 	{
-		propertyBlock.SetInt(propertyName, value);
+		PropertyBlock.SetInt(propertyName, value);
 	}
 
 	public override void SetMatrix(string propertyName, Matrix4x4 value)
 	{
-		propertyBlock.SetMatrix(propertyName, value);
+		PropertyBlock.SetMatrix(propertyName, value);
 	}
 
 	public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value, int size, int offset)
 	{
 		var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
+
 		if (size == 0)
 			size = descriptor.Count * descriptor.Stride;
-		propertyBlock.SetConstantBuffer(propertyName, GetBuffer(value), offset, size);
+
+		PropertyBlock.SetConstantBuffer(propertyName, GetBuffer(value), offset, size);
 	}
 
 	public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
 	{
-		propertyBlock.SetMatrixArray(propertyName, value);
+		PropertyBlock.SetMatrixArray(propertyName, value);
 	}
 }

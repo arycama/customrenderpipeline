@@ -91,7 +91,7 @@ public class WaterShoreMask : FrameRenderFeature
 
 				if (i == passes - 1)
 				{
-					pass.Keyword = "FINAL_PASS";
+					pass.AddKeyword("FINAL_PASS");
 					pass.WriteBuffer("MinMaxValuesWrite", minMaxValues);
 				}
 

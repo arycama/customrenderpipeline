@@ -397,7 +397,7 @@ public class TerrainSystem : FrameRenderFeature
 
 				//command.SetBufferData(pass.GetBuffer(indicesBuffer), layers);
 				//var tempArrayId = Shader.PropertyToID("TempTerrainId");
-				//command.SetGlobalTexture("ExtraLayers", tempArrayId);
+				//pass.SetTexture("ExtraLayers", tempArrayId);
 			});
 		}
 

@@ -77,14 +77,12 @@ public class SkyLookupTables : FrameRenderFeature
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				command.SetGlobalTexture("_MiePhaseTexture", data.settings.miePhase);
-
 				data.result.SetProperties(pass, command);
+				pass.SetTexture("_MiePhaseTexture", data.settings.miePhase);
 				pass.SetFloat("_Samples", data.settings.TransmittanceSamples);
 				pass.SetVector("_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(data.settings.TransmittanceWidth, data.settings.TransmittanceHeight));
 				pass.SetFloat("_TransmittanceWidth", data.settings.TransmittanceWidth);
 				pass.SetFloat("_TransmittanceHeight", data.settings.TransmittanceHeight);
-
 			});
 		}
 

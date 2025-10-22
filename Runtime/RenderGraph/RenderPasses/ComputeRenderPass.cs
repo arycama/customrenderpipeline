@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
@@ -10,7 +9,7 @@ public class ComputeRenderPass<T> : BaseComputeRenderPass<T>
 
 	public void Initialize(ComputeShader computeShader, int kernelIndex = 0, int xThreads = 1, int yThreads = 1, int zThreads = 1, bool normalizedDispatch = true)
 	{
-		this.computeShader = computeShader ?? throw new ArgumentNullException(nameof(computeShader));
+		this.computeShader = computeShader;
 		this.kernelIndex = kernelIndex;
 		this.xThreads = xThreads;
 		this.yThreads = yThreads;
@@ -36,7 +35,5 @@ public class ComputeRenderPass<T> : BaseComputeRenderPass<T>
 
 		foreach (var keyword in keywords)
 			Command.DisableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
-
-		keywords.Clear();
 	}
 }

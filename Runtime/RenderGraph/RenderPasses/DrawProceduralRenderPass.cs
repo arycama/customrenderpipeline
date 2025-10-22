@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class DrawProceduralRenderPass<T> : DrawRenderPass<T>
 {
@@ -24,13 +25,23 @@ public class DrawProceduralRenderPass<T> : DrawRenderPass<T>
 		this.topology = topology;
 	}
 
-	protected override void Execute()
+	public override void Reset()
 	{
-		Command.DrawProcedural(matrix, material, passIndex, topology, vertexCount * primitiveCount, 1, propertyBlock);
+		base.Reset();
 		material = null;
 		passIndex = 0;
 		primitiveCount = 1;
 		matrix = default;
-		propertyBlock.Clear();
+	}
+
+	protected override void Execute()
+	{
+		foreach (var keyword in keywords)
+			Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
+
+		Command.DrawProcedural(matrix, material, passIndex, topology, vertexCount * primitiveCount, 1, PropertyBlock);
+
+		foreach (var keyword in keywords)
+			Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
 	}
 }

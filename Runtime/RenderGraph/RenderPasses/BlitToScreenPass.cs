@@ -3,7 +3,6 @@ using UnityEngine.Rendering;
 
 public class BlitToScreenPass<T> : RenderPass<T>
 {
-	private readonly MaterialPropertyBlock propertyBlock;
 	private Material material;
 	private int passIndex;
 
@@ -12,21 +11,17 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public BlitToScreenPass()
+	public void Initialize(Material material, int passIndex = 0)
 	{
-		propertyBlock = new();
+		this.material = material;
+		this.passIndex = passIndex;
 	}
 
 	public override void Reset()
 	{
 		base.Reset();
 		material = null;
-	}
-
-	public void Initialize(Material material, int passIndex = 0)
-	{
-		this.material = material;
-		this.passIndex = passIndex;
+		passIndex = 0;
 	}
 
 	public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -34,59 +29,61 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		switch (subElement)
 		{
 			case RenderTextureSubElement.Depth:
-				propertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Depth);
+				PropertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Depth);
 				break;
 			case RenderTextureSubElement.Stencil:
-				propertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Stencil);
+				PropertyBlock.SetTexture(propertyName, (RenderTexture)texture, RenderTextureSubElement.Stencil);
 				break;
 			default:
-				propertyBlock.SetTexture(propertyName, texture);
+				PropertyBlock.SetTexture(propertyName, texture);
 				break;
 		}
 	}
 
 	public override void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
 	{
-		propertyBlock.SetBuffer(propertyName, GetBuffer(buffer));
+		PropertyBlock.SetBuffer(propertyName, GetBuffer(buffer));
 	}
-
 
 	public override void SetVector(int propertyName, Float4 value)
 	{
-		propertyBlock.SetVector(propertyName, value);
+		PropertyBlock.SetVector(propertyName, value);
 	}
 
 	public override void SetVectorArray(string propertyName, Vector4[] value)
 	{
-		propertyBlock.SetVectorArray(propertyName, value);
+		PropertyBlock.SetVectorArray(propertyName, value);
 	}
 
 	public override void SetFloat(string propertyName, float value)
 	{
-		propertyBlock.SetFloat(propertyName, value);
+		PropertyBlock.SetFloat(propertyName, value);
 	}
 
 	public override void SetFloatArray(string propertyName, float[] value)
 	{
-		propertyBlock.SetFloatArray(propertyName, value);
+		PropertyBlock.SetFloatArray(propertyName, value);
 	}
 
 	public override void SetInt(string propertyName, int value)
 	{
-		propertyBlock.SetInt(propertyName, value);
+		PropertyBlock.SetInt(propertyName, value);
 	}
 
 	protected override void Execute()
 	{
-		Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3, 1, propertyBlock);
+		foreach (var keyword in keywords)
+			Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
 
-		material = null;
-		passIndex = 0;
+		Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3, 1, PropertyBlock);
+
+		foreach (var keyword in keywords)
+			Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
 	}
 
 	public override void SetMatrix(string propertyName, Matrix4x4 value)
 	{
-		propertyBlock.SetMatrix(propertyName, value);
+		PropertyBlock.SetMatrix(propertyName, value);
 	}
 
 	public override void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value, int size, int offset)
@@ -94,12 +91,12 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(value);
 		if(size == 0)
 			size = descriptor.Count * descriptor.Stride;
-		propertyBlock.SetConstantBuffer(propertyName, GetBuffer(value), offset, size);
+		PropertyBlock.SetConstantBuffer(propertyName, GetBuffer(value), offset, size);
 	}
 
 	public override void SetMatrixArray(string propertyName, Matrix4x4[] value)
 	{
-		propertyBlock.SetMatrixArray(propertyName, value);
+		PropertyBlock.SetMatrixArray(propertyName, value);
 	}
 
 	protected override void SetupTargets()

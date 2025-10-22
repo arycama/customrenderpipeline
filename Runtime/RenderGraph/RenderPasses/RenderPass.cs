@@ -46,17 +46,19 @@ public abstract class RenderPass : IDisposable
 
 	private readonly List<(RenderPassDataHandle, bool)> RenderPassDataHandles = new();
 	private readonly List<Type> readRtHandles = new();
-	public readonly MaterialPropertyBlock propertyBlock;
+	protected readonly List<string> keywords = new();
 
 	public RenderPass()
 	{
-		propertyBlock = new();
+		PropertyBlock = new();
 	}
 
-	protected CommandBuffer Command { get; private set; }
+	public MaterialPropertyBlock PropertyBlock { get; private set; }
+	public CommandBuffer Command { get; private set; }
 	public RenderGraph RenderGraph { get; set; }
 	internal string Name { get; set; }
 	internal int Index { get; set; }
+
 	public bool UseProfiler { get; set; } = true;
 
 	public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
@@ -77,6 +79,7 @@ public abstract class RenderPass : IDisposable
 	protected virtual void SetupTargets() { }
 
 	protected abstract void ExecuteRenderPassBuilder();
+
 	public virtual void Reset()
 	{
 		readTextures.Clear();
@@ -88,6 +91,8 @@ public abstract class RenderPass : IDisposable
 		Index = -1;
 		UseProfiler = true;
 		readRtHandles.Clear();
+		keywords.Clear();
+		PropertyBlock.Clear();
 	}
 
 	void IDisposable.Dispose()
@@ -109,6 +114,11 @@ public abstract class RenderPass : IDisposable
 
 	public virtual void PreExecute()
 	{
+	}
+
+	public void AddKeyword(string keyword)
+	{
+		keywords.Add(keyword);
 	}
 
 	public void ReadRtHandle<T>()
@@ -170,8 +180,10 @@ public abstract class RenderPass : IDisposable
 		Execute();
 		PostExecute();
 
-		if(UseProfiler)
+		if (UseProfiler)
 			Command.EndSample(Name);
+
+		Reset();
 	}
 
 	protected virtual void PostExecute() { }

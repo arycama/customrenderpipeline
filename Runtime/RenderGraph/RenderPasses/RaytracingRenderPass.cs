@@ -96,6 +96,9 @@ public class RaytracingRenderPass<T> : RenderPass<T>
 
 	protected override void Execute()
 	{
+		foreach (var keyword in keywords)
+			Command.EnableKeyword(new GlobalKeyword(keyword));
+
 		Command.SetGlobalFloat("_RaytracingPixelSpreadAngle", GetPixelSpreadAngle(tanHalfFov, width, height));
 		Command.SetRayTracingFloatParams(shader, "_RaytracingPixelSpreadAngle", GetPixelSpreadAngle(tanHalfFov, width, height));
 
@@ -105,6 +108,9 @@ public class RaytracingRenderPass<T> : RenderPass<T>
 		Command.SetRayTracingAccelerationStructure(shader, "SceneRaytracingAccelerationStructure", rtas);
 
 		Command.DispatchRays(shader, rayGenName, (uint)width, (uint)height, (uint)depth);
+
+		foreach (var keyword in keywords)
+			Command.DisableKeyword(new GlobalKeyword(keyword));
 	}
 
 	protected override void SetupTargets()

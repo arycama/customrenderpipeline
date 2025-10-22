@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Rendering;
 
 public class DrawInstancedIndirectRenderPass<T> : DrawRenderPass<T>
 {
@@ -15,13 +16,12 @@ public class DrawInstancedIndirectRenderPass<T> : DrawRenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Mesh mesh, int submeshIndex, Material material, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int passIndex = 0, string keyword = null, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true, int argsOffset = 0)
+	public void Initialize(Mesh mesh, int submeshIndex, Material material, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int passIndex = 0, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true, int argsOffset = 0)
 	{
 		this.mesh = mesh;
 		this.submeshIndex = submeshIndex;
 		this.material = material;
 		this.passIndex = passIndex;
-		Keyword = keyword;
 		this.indirectArgsBuffer = indirectArgsBuffer;
 		this.depthBias = depthBias;
 		this.slopeDepthBias = slopeDepthBias;
@@ -31,32 +31,30 @@ public class DrawInstancedIndirectRenderPass<T> : DrawRenderPass<T>
 		ReadBuffer("", indirectArgsBuffer);
 	}
 
+	public override void Reset()
+	{
+		base.Reset();
+		material = null;
+		passIndex = 0;
+		zClip = true;
+	}
+
 	protected override void Execute()
 	{
-		if (!string.IsNullOrEmpty(Keyword))
-		{
-			Command.EnableShaderKeyword(Keyword);
-		}
+		foreach (var keyword in keywords)
+			Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
 
 		if (depthBias != 0.0f || slopeDepthBias != 0.0f)
 			Command.SetGlobalDepthBias(depthBias, slopeDepthBias);
 
 		Command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
-		Command.DrawMeshInstancedIndirect(mesh, submeshIndex, material, passIndex, RenderGraph.BufferHandleSystem.GetResource(indirectArgsBuffer), argsOffset, propertyBlock);
+		Command.DrawMeshInstancedIndirect(mesh, submeshIndex, material, passIndex, RenderGraph.BufferHandleSystem.GetResource(indirectArgsBuffer), argsOffset, PropertyBlock);
 		Command.SetGlobalFloat("_ZClip", 1.0f);
 
 		if (depthBias != 0.0f || slopeDepthBias != 0.0f)
 			Command.SetGlobalDepthBias(0.0f, 0.0f);
 
-		if (!string.IsNullOrEmpty(Keyword))
-		{
-			Command.DisableShaderKeyword(Keyword);
-			Keyword = null;
-		}
-
-		material = null;
-		passIndex = 0;
-		propertyBlock.Clear();
-		zClip = true;
+		foreach (var keyword in keywords)
+			Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
 	}
 }

@@ -106,8 +106,7 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
-                command.SetGlobalTexture("_MiePhaseTexture", data.miePhase);
-
+                pass.SetTexture("_MiePhaseTexture", data.miePhase);
                 pass.SetFloat("_Samples", data.TransmittanceSamples);
                 pass.SetVector("_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(data.TransmittanceWidth, data.TransmittanceHeight));
             });

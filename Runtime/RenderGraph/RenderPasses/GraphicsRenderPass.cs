@@ -199,12 +199,5 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 				Command.GenerateMips(GetRenderTexture(handle));
 			}
 		}
-
-		// Reset all properties
-		depthBuffer = default;
-		colorTargets.Clear();
-		renderTargetFlags = RenderTargetFlags.None;
-		DepthSlice = -1;
-		MipLevel = 0;
 	}
 }
