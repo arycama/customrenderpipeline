@@ -34,7 +34,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 			cullingPlanes.SetCullingPlane(i, plane);
 		}
 
-		var passData = Cull(camera.transform.position, cullingPlanes);
+		var passData = Cull(camera.transform.position, cullingPlanes, camera.ViewSize());
 
 		var passIndex = settings.Material.FindPass("ShadowCaster");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no ShadowCaster Pass");

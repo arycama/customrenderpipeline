@@ -3,7 +3,7 @@ Shader "Surface/Grass"
     Properties
     {
         [IntRange] _BladeDensity("Blade Density", Range(1, 16)) = 1
-        [IntRange] _EdgeLength("Edge Length", Range(1, 4096)) = 16
+        [IntRange] _EdgeLength("Edge Length", Range(32, 128)) = 16
         [IntRange] _Factor("Tessellation Factor", Range(1, 32)) = 1
         _MainTex("Texture", 2D) = "white" {}
         _MinScale("Min Scale", Range(0, 1)) = 0.5

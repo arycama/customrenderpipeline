@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
@@ -11,7 +13,7 @@ public class QuadtreeCull
 		this.renderGraph = renderGraph;
 	}
 
-	public QuadtreeCullResult Cull(int cellCount, Float3 viewPosition, CullingPlanes cullingPlanes, int QuadListIndexCount, float edgeLength, int patchVertices, Float4 positionOffset, bool useMinMaxHeights, ResourceHandle<RenderTexture> minMaxHeights = default, float heightScale = 0f, float heightOffset = 0f, int maxHeightMips = 0)
+	public QuadtreeCullResult Cull(int cellCount, Float3 viewPosition, CullingPlanes cullingPlanes, int indexCountPerInstance, float edgeLength, int patchVertices, Float4 positionOffset, bool useHiZ, Int2 viewSize, bool useMinMaxHeights, ResourceHandle<RenderTexture> minMaxHeights = default, float heightScale = 0f, float heightOffset = 0f, int maxHeightMips = 0, float maxHeightOffset = 0)
 	{
 		var compute = Resources.Load<ComputeShader>("Utility/QuadtreeCull");
 		var indirectArgsBuffer = renderGraph.GetBuffer(5, target: GraphicsBuffer.Target.IndirectArguments);
@@ -43,8 +45,9 @@ public class QuadtreeCull
 			var isFirstPass = i == 0; // Also indicates whether this is -not- the first pass
 			var passCount = Mathf.Min(maxPassesPerDispatch, totalPassCount - i * maxPassesPerDispatch);
 			var index = i;
+			var maxMip = Texture2DExtensions.MipCount(viewSize) - 1;
 
-			using (var pass = renderGraph.AddComputeRenderPass("Terrain Quadtree Cull", 
+			using (var pass = renderGraph.AddComputeRenderPass("Terrain Quadtree Cull", new QuadtreeCullData
 			(
 				viewPosition,
 				cullingPlanes,
@@ -53,13 +56,15 @@ public class QuadtreeCull
 				isFirstPass,
 				passCount,
 				index,
-				QuadListIndexCount,
+				indexCountPerInstance,
 				edgeLength,
 				patchVertices,
 				heightScale,
 				heightOffset,
 				positionOffset,
-				maxHeightMips
+				maxHeightMips,
+				maxMip,
+				maxHeightOffset
 			)))
 			{
 				if (!isFirstPass)
@@ -95,6 +100,12 @@ public class QuadtreeCull
 				pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
 
 				pass.AddRenderPassData<ViewData>();
+
+				if(useHiZ)
+				{
+					pass.AddKeyword("HIZ_ON");
+					pass.ReadRtHandle<HiZMaxDepth>();
+				}
 
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
@@ -133,6 +144,9 @@ public class QuadtreeCull
 					pass.SetFloat("_InputOffset", data.heightOffset);
 
 					pass.SetInt("_MipCount", data.maxHeightMips);
+					pass.SetFloat("_MaxHiZMip", data.maxMip);
+
+					pass.SetFloat("MaxHeightOffset", data.maxHeightOffset);
 				});
 			}
 		}
@@ -167,6 +181,46 @@ public class QuadtreeCull
 
 		return new(indirectArgsBuffer, patchDataBuffer);
 	}
+
+	private readonly struct QuadtreeCullData
+	{
+		public readonly Float3 viewPosition;
+		public readonly CullingPlanes cullingPlanes;
+		public readonly ResourceHandle<GraphicsBuffer> indirectArgsBuffer;
+		public readonly int totalPassCount;
+		public readonly bool isFirstPass;
+		public readonly int passCount;
+		public readonly int index;
+		public readonly int QuadListIndexCount;
+		public readonly float edgeLength;
+		public readonly int patchVertices;
+		public readonly float heightScale;
+		public readonly float heightOffset;
+		public readonly Float4 positionOffset;
+		public readonly int maxHeightMips;
+		public readonly int maxMip;
+		public readonly float maxHeightOffset;
+
+		public QuadtreeCullData(Float3 viewPosition, CullingPlanes cullingPlanes, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int totalPassCount, bool isFirstPass, int passCount, int index, int quadListIndexCount, float edgeLength, int patchVertices, float heightScale, float heightOffset, Float4 positionOffset, int maxHeightMips, int maxMip, float maxHeightOffset)
+		{
+			this.viewPosition = viewPosition;
+			this.cullingPlanes = cullingPlanes;
+			this.indirectArgsBuffer = indirectArgsBuffer;
+			this.totalPassCount = totalPassCount;
+			this.isFirstPass = isFirstPass;
+			this.passCount = passCount;
+			this.index = index;
+			QuadListIndexCount = quadListIndexCount;
+			this.edgeLength = edgeLength;
+			this.patchVertices = patchVertices;
+			this.heightScale = heightScale;
+			this.heightOffset = heightOffset;
+			this.positionOffset = positionOffset;
+			this.maxHeightMips = maxHeightMips;
+			this.maxMip = maxMip;
+			this.maxHeightOffset = maxHeightOffset;
+		}
+	}
 }
 
 public readonly struct QuadtreeCullResult
@@ -180,3 +234,4 @@ public readonly struct QuadtreeCullResult
 		PatchDataBuffer = patchDataBuffer;
 	}
 }
+

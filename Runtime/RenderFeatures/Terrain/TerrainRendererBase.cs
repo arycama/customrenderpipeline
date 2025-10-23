@@ -16,7 +16,7 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 		this.quadtreeCull = quadtreeCull;
 	}
 
-	protected QuadtreeCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
+	protected QuadtreeCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes, Int2 viewSize)
 	{
 		var terrainSystemData = renderGraph.GetResource<TerrainSystemData>();
 		var terrain = terrainSystemData.terrain;
@@ -25,6 +25,6 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 		var positionOffset = new Vector4(terrainData.size.x, terrainData.size.z, position.x, position.z);
 		var mipCount = Texture2DExtensions.MipCount(terrainData.heightmapResolution) - 1;
 
-		return quadtreeCull.Cull(settings.CellCount, viewPosition, cullingPlanes, QuadListIndexCount, settings.EdgeLength, settings.PatchVertices, positionOffset, true, terrainSystemData.minMaxHeights, terrainData.size.y, position.y, mipCount);
+		return quadtreeCull.Cull(settings.CellCount, viewPosition, cullingPlanes, QuadListIndexCount, settings.EdgeLength, settings.PatchVertices, positionOffset, false, viewSize, true, terrainSystemData.minMaxHeights, terrainData.size.y, position.y, mipCount);
 	}
 }

@@ -10,14 +10,8 @@
 Texture2D _MainTex;
 float4 _Color, _Translucency;
 float _Width, _Height, BladeCount, _Smoothness, _MinScale, _Bend, _Factor, _EdgeLength;
-
-struct InstanceData
-{
-	float3 center;
-	float lod;
-	float3 extents;
-	float lodFactor;
-};
+Buffer<uint> _PatchData;
+float4 _PatchScaleOffset;
 
 struct HullInput
 {
@@ -68,35 +62,24 @@ float3x3 RotationFromAxisAngle(float3 A, float sinAngle, float cosAngle)
                     A.x * A.z * (1 - c) - A.y * s, A.y * A.z * (1 - c) + A.x * s, A.z * A.z * (1 - c) + c);
 }
 
-StructuredBuffer<InstanceData> _FinalPatches;
-
 HullInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 {
-	InstanceData data = _FinalPatches[instanceId];
+	uint cellData = _PatchData[instanceId];
+	uint dataColumn = (cellData >> 0) & 0x3FF;
+	uint dataRow = (cellData >> 10) & 0x3FF;
+	uint lod = (cellData >> 20) & 0xF;
+	int4 diffs = (cellData >> uint4(24, 26, 28, 30)) & 0x3;
 	
-	float3 position = data.center - data.extents;
-	
-	// Calculating lod.. only needs to be done one per patch but meh
-	float3 center = data.center;
-	
-	// g_tessellatedTriWidth is desired pixels per tri edge
-	float lodFactor = data.lodFactor;
-	float lod = exp2(floor(data.lod));
-	float nextLod = exp2(floor(data.lod + 1));
+	float lodFactor = 1;
+	float nextLod = exp2(lod + 1);
 	
 	uint row1 = id / BladeCount;
 	
-	bool isCulled = (id % lod != 0);// || (lod >= _MaxLod);
+	bool isCulled = (id % lod != 0);
 	bool willBeCulled = (id % 2 != 0) || (row1 % 2 != 0);
 	lodFactor = willBeCulled ? lodFactor : 1.0;
 	
-	// Could probably do most of this in a compute shader or something
-	// world position
 	uint bladeId = id;
-	float local = bladeId / BladeCount;
-	float col = frac(local);
-	float row = floor(local) / BladeCount;
-	float2 offset = float2(col, row) * data.extents.xz * 2;
 	
 	// Random offset
 	uint hash0 = PermuteState(bladeId);
@@ -111,14 +94,20 @@ HullInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	float rotation = ConstructFloat(PcgHash(hash3)) * 1;
 	float bend = ConstructFloat(PcgHash(hash4)) * 1;
 	
-	// Generate quad
-	//float3 position = 0.0;
 	// Random position
-	//position.xz += float2(offsetX, offsetY);
+	uint _VerticesPerEdge = BladeCount + 1;
+	uint column = id % _VerticesPerEdge;
+	uint row = id / _VerticesPerEdge;
+	uint x = column;
+	uint y = row;
 	
-	// Apply final world position offset
-	position.xz += offset;
+	float _RcpVerticesPerEdgeMinusOne = rcp(BladeCount);
 	
+	float2 vertex = (uint2(x, y) << lod) * _RcpVerticesPerEdgeMinusOne + (uint2(dataColumn, dataRow) << lod);
+	
+	float3 position;
+	position.xz = vertex * _PatchScaleOffset.xy + _PatchScaleOffset.zw;
+
 	float facingPhi = rotation * TwoPi;
 	float sinFacingPhi, cosFacingPhi;
 	sincos(facingPhi, sinFacingPhi, cosFacingPhi);
@@ -141,7 +130,6 @@ HullInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	
 	float terrainHeight = GetTerrainHeight(position);
 	position.y = terrainHeight;
-	
 	
 	HullInput output;
 	output.right = right * _Width * scale;

@@ -1,5 +1,6 @@
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Geometry.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/IndirectRendering.hlsl"
 
 #pragma kernel InstanceCull
 #pragma kernel IndirectArgs
@@ -8,6 +9,7 @@
 #pragma multi_compile _ FIRST
 #pragma multi_compile _ FINAL
 #pragma multi_compile _ USE_TERRAIN_HEIGHT
+#pragma multi_compile _ HIZ_ON
 
 globallycoherent RWBuffer<uint> _IndirectArgs;
 globallycoherent RWBuffer<int> _PatchDataWrite;
@@ -16,10 +18,12 @@ Buffer<uint> _IndirectArgsInput;
 Texture2D<float2> _TerrainHeights;
 Texture2D<int> _LodInput, _TempResult;
 
+float _MaxHiZMip;
+
 cbuffer Properties
 {
 	float4 _TerrainPositionOffset;
-	float _EdgeLength, _InputScale, _InputOffset, MaxWaterHeight;
+	float _EdgeLength, _InputScale, _InputOffset, MaxWaterHeight, MaxHeightOffset;
 	int _MipCount, _PassCount, _PassOffset, _TotalPassCount, _CellCount;
 };
 
@@ -64,6 +68,7 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 				
 				#ifdef USE_TERRAIN_HEIGHT
 					float2 heights = _TerrainHeights.mips[_MipCount - (i + _PassOffset)][coord] * _InputScale + _InputOffset;
+					heights.y += MaxHeightOffset; // Used to render grass and other details on terrain so they dont get culled
 					float centerHeight = 0.5 * (heights.y + heights.x);
 					float extentsY = heights.y - heights.x;
 				#else
@@ -74,7 +79,14 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 				float3 center = float3((coord + 0.5) * patchSize + _TerrainPositionOffset.zw, centerHeight).xzy;
 				float3 extents = float3(patchSize, extentsY).xzy * 0.5;
 				
-				if (FrustumCull(center, extents))
+				bool isVisible = FrustumCull(center, extents);
+
+				#ifdef HIZ_ON
+					if(!HiZCull(center, extents, ViewSize, _MaxHiZMip, HiZMaxDepth, WorldToScreen))
+						isVisible = false;
+				#endif
+				
+				if (isVisible)
 				{
 					float factor = ProjectedSphereRadius(length(extents), center, CameraAspect) * ViewSize.x * 0.5 / _EdgeLength;
 					if (factor <= 1.0 || i + _PassOffset == _TotalPassCount - 1)

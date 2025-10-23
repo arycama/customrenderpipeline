@@ -84,7 +84,7 @@ public class WaterShadowRenderer : WaterRendererBase
 
         ArrayPool<Plane>.Release(frustumPlanes);
 
-        var cullResult = Cull(viewPosition, cullingPlanes);
+        var cullResult = Cull(viewPosition, cullingPlanes, camera.ViewSize(), false);
 
         var vm = worldToLight;
         var shadowMatrix = new Matrix4x4

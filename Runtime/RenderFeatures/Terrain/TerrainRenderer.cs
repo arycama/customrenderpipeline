@@ -22,7 +22,7 @@ public class TerrainRenderer : TerrainRendererBase
 			return;
 
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
-		var passData = Cull(camera.transform.position, cullingPlanes);
+		var passData = Cull(camera.transform.position, cullingPlanes, camera.ViewSize());
 		var passIndex = settings.Material.FindPass("Terrain");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no Terrain Pass");
 
