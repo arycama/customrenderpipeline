@@ -5,11 +5,11 @@ using UnityEngine.Rendering;
 
 public class WaterRenderer : WaterRendererBase
 {
-    public WaterRenderer(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph, settings)
-    {
-    }
+	public WaterRenderer(RenderGraph renderGraph, WaterSettings settings, QuadtreeCull quadtreeCull) : base(renderGraph, settings, quadtreeCull)
+	{
+	}
 
-    public override void Render(Camera camera, ScriptableRenderContext context)
+	public override void Render(Camera camera, ScriptableRenderContext context)
     {
         if (!settings.IsEnabled || (camera.cameraType != CameraType.Game && camera.cameraType != CameraType.SceneView))
             return;

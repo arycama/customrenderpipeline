@@ -24,15 +24,18 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	private readonly TerrainSystem terrainSystem;
 	private readonly TerrainShadowRenderer terrainShadowRenderer;
 	private readonly GpuDrivenRenderer gpuDrivenRenderer;
+	private readonly QuadtreeCull quadtreeCull;
 
 	public CustomRenderPipeline(CustomRenderPipelineAsset renderPipelineAsset) : base(renderPipelineAsset)
 	{
+		quadtreeCull = new(renderGraph);
+
 		cameraTargetCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Previous Scene Color", hasMips: true, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 		cameraDepthCache = new(GraphicsFormat.D32_SFloat_S8_UInt, renderGraph, "Previous Depth", isScreenTexture: true);
 		cameraVelocityCache = new(GraphicsFormat.R16G16_SFloat, renderGraph, "Previous Velocity", isScreenTexture: true);
 
 		terrainSystem = new TerrainSystem(renderGraph, asset.TerrainSettings);
-        terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, asset.TerrainSettings);
+        terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, asset.TerrainSettings, quadtreeCull);
 		gpuDrivenRenderer = new GpuDrivenRenderer(renderGraph);
 	}
 
@@ -157,7 +160,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		}),
 
 		new TerrainViewData(renderGraph, terrainSystem),
-		new TerrainRenderer(asset.TerrainSettings, renderGraph),
+		new TerrainRenderer(renderGraph, asset.TerrainSettings, quadtreeCull),
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
 			var (cameraTarget, previousScene, currentSceneCreated) = cameraTargetCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
@@ -291,7 +294,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			}
 		}),
 
-		new WaterRenderer(renderGraph, asset.OceanSettings),
+		new WaterRenderer(renderGraph, asset.OceanSettings, quadtreeCull),
 
 		new GenerateCameraVelocity(renderGraph),
 
@@ -308,7 +311,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer, gpuDrivenRenderer),
 		new ParticleShadows(renderGraph, asset.ParticleShadows),
 		new VolumetricCloudShadow(asset.Clouds, asset.Sky, renderGraph),
-		new WaterShadowRenderer(renderGraph, asset.OceanSettings),
+		new WaterShadowRenderer(renderGraph, asset.OceanSettings, quadtreeCull),
 		new WaterCaustics(renderGraph, asset.OceanSettings),
 		
 		// Depends on light, plus ambient

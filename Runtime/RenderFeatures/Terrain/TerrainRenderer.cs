@@ -4,7 +4,7 @@ using UnityEngine.Rendering;
 
 public class TerrainRenderer : TerrainRendererBase
 {
-	public TerrainRenderer(TerrainSettings settings, RenderGraph renderGraph) : base(renderGraph, settings)
+	public TerrainRenderer(RenderGraph renderGraph, TerrainSettings settings, QuadtreeCull quadtreeCull) : base(renderGraph, settings, quadtreeCull)
 	{
 	}
 
