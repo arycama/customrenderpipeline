@@ -101,7 +101,6 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 	
 	float weightSum = 0.0, weightedDepthSum = 0.0;
 	float transmittance = 1.0;
-	float opticalDepth = 0.0;
 	float light0 = 0.0;
 	for (float i = 0.0; i < sampleCount; i++)
 	{
@@ -131,11 +130,12 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 				
 			for (j = 0.0; j < ScatterOctaves; j++)
 			{
-				float phase = lerp(CsPhase(LdotV, _BackScatterPhase * pow(ScatterEccentricityAttenuation, j)), CsPhase(LdotV, _ForwardScatterPhase * pow(ScatterEccentricityAttenuation, j)), 0.5);
-				light0 += pow(ScatterContribution, j) * phase * exp2(-pow(ScatterAttenuation, j) * (lightOpticalDepth + opticalDepth)) * (1.0 - sampleTransmittance);
+				float a = pow(ScatterAttenuation, j);
+				float b = pow(ScatterContribution, j);
+				float c = pow(ScatterEccentricityAttenuation, j);
+				float phase = lerp(CsPhase(LdotV, _BackScatterPhase * c), CsPhase(LdotV, _ForwardScatterPhase * c), 0.5);
+				light0 += b * phase * exp2(-a * lightOpticalDepth) * transmittance * (1.0 - sampleTransmittance);
 			}
-			
-			opticalDepth += extinction * dt;
 		}
 		
 		transmittance *= sampleTransmittance;
@@ -165,16 +165,12 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 			amb = amb * _CloudCoverage.a;
 		
 		for (float j = 0.0; j < ScatterOctaves; j++)
-			result.rgb += amb * pow(ScatterContribution, j) * (1 - exp2(-pow(ScatterAttenuation, j) * opticalDepth)) / pow(ScatterAttenuation, j);
+		{
+			float b = pow(ScatterContribution, j);
+			result.rgb += amb * b * (1.0 - result.a);
+		}
 		
-		if (sunShadow)
-		{
-			result.rgb *= Rec709ToRec2020(TransmittanceToPoint(viewHeight, viewCosAngle, cloudDepth));
-		}
-		else
-		{
-			result.rgb *= Rec709ToRec2020(TransmittanceToPoint1(viewHeight, viewCosAngle, cloudDepth));
-		}
+		result.rgb *= Rec709ToRec2020(sunShadow ? TransmittanceToPoint(viewHeight, viewCosAngle, cloudDepth) : TransmittanceToPoint1(viewHeight, viewCosAngle, cloudDepth));
 	}
 	
 	// High altitude layer
@@ -182,31 +178,36 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 	{
 		float rayEnd = DistanceToSphereInside(ViewHeight, viewCosAngle, _PlanetRadius + HighAltitudeMapHeight);
 		
-		//float3 position = P + rd * (rayStart + rayLength) + ViewPosition;
 		float3 position = P + rd * rayEnd + ViewPosition;
 		float2 weatherPosition = position.xz / HighAltitudeMapScale + HighAltitudeMapSpeed * Time;
 	
-		float density = HighAltitudeMap.SampleLevel(LinearRepeatSampler, weatherPosition, 0.0);
-		density = saturate(Remap(density, 1.0 - HighAltitudeMapStrength));
-		density = max(0.0, density * HighAltitudeMapDensity);
-		float sampleTransmittance = exp2(-density);
-		transmittance *= sampleTransmittance;
-		float lightOpticalDepth = 0;
-		opticalDepth += density;
+		float opticalDepth = HighAltitudeMap.SampleLevel(LinearRepeatSampler, weatherPosition, 0.0);
+		opticalDepth = saturate(Remap(opticalDepth, 1.0 - HighAltitudeMapStrength));
+		opticalDepth = max(0.0, opticalDepth * HighAltitudeMapDensity);
+		float highCloudTransmittance = exp2(-opticalDepth);
+		float highCloudOpacity = 1.0 - highCloudTransmittance;
 	
 		float light0 = 0.0;
 		for (float j = 0.0; j < ScatterOctaves; j++)
 		{
-			float phase = lerp(CsPhase(LdotV, _BackScatterPhase * pow(ScatterEccentricityAttenuation, j)), CsPhase(LdotV, _ForwardScatterPhase * pow(ScatterEccentricityAttenuation, j)), 0.5);
-			light0 += pow(ScatterContribution, j) * phase * exp2(-pow(ScatterAttenuation, j) * (lightOpticalDepth + opticalDepth)) * (1.0 - sampleTransmittance);
+			float a = pow(ScatterAttenuation, j);
+			float b = pow(ScatterContribution, j);
+			float c = pow(ScatterEccentricityAttenuation, j);
+			float phase = lerp(CsPhase(LdotV, _BackScatterPhase * c), CsPhase(LdotV, _ForwardScatterPhase * c), 0.5);
+			light0 += b * phase * exp2(-a * opticalDepth) * result.a * highCloudOpacity;
 		}
 		
 		// Final lighting
 		float3 lightTransmittance = Rec709ToRec2020(TransmittanceToAtmosphere(viewHeight, rd.y, _LightDirection0.y, rayEnd));
-		result.rgb += light0 * lightTransmittance * Rec709ToRec2020(_LightColor0) * Exposure;
+		result.rgb += light0 * lightTransmittance * Rec709ToRec2020(_LightColor0) * Exposure * result.a;
 		
 		for (float j = 0.0; j < ScatterOctaves; j++)
-			result.rgb += ambient * pow(ScatterContribution, j) * (1 - exp2(-pow(ScatterAttenuation, j) * opticalDepth)) / pow(ScatterAttenuation, j);
+		{
+			float b = pow(ScatterContribution, j);
+			result.rgb += ambient * b * result.a * highCloudOpacity;
+		}
+		
+		result.a *= highCloudTransmittance;
 	}
 	
 	return result;
