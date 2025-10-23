@@ -5,6 +5,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Pool;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
@@ -322,5 +323,68 @@ public class RenderGraph : IDisposable
 		var limitZ = (descriptor.volumeDepth - 0.5f) / resource.volumeDepth;
 
 		return new Float3(limitX, limitY, limitZ);
+	}
+
+	public ResourceHandle<GraphicsBuffer> GetGridIndexBuffer(int cellsPerRow, bool isQuad, bool alternateIndices)
+	{
+		var indexCount = cellsPerRow * cellsPerRow * (isQuad ? 4 : 6);
+		var indexBuffer = GetBuffer(indexCount, sizeof(ushort), GraphicsBuffer.Target.Index, isPersistent: true);
+
+		var indices = ListPool<ushort>.Get();
+		GraphicsUtilities.GenerateGridIndexBuffer(indices, cellsPerRow, isQuad, alternateIndices);
+
+		using (var pass = this.AddGenericRenderPass("Terrain Set Index Data", (indexBuffer, indices)))
+		{
+			pass.WriteBuffer("", indexBuffer);
+			pass.SetRenderFunction(static (command, pass, data) =>
+			{
+				command.SetBufferData(pass.GetBuffer(data.indexBuffer), data.indices);
+				ListPool<ushort>.Release(data.indices);
+			});
+		}
+
+		return indexBuffer;
+	}
+
+	public ResourceHandle<GraphicsBuffer> GetQuadIndexBuffer(int count, bool isQuad)
+	{
+		var indexCount = count * (isQuad ? 4 : 6);
+
+		var isShort = indexCount < ushort.MaxValue;
+		var size = isShort ? sizeof(ushort) : sizeof(uint);
+		var indexBuffer = GetBuffer(indexCount, size, GraphicsBuffer.Target.Index, isPersistent: true);
+
+		if (isShort)
+		{
+			var indices = ListPool<ushort>.Get();
+			GraphicsUtilities.GenerateQuadIndexBuffer(indices, count, isQuad);
+
+			using (var pass = this.AddGenericRenderPass("Terrain Set Index Data", (indexBuffer, indices)))
+			{
+				pass.WriteBuffer("", indexBuffer);
+				pass.SetRenderFunction(static (command, pass, data) =>
+				{
+					command.SetBufferData(pass.GetBuffer(data.indexBuffer), data.indices);
+					ListPool<ushort>.Release(data.indices);
+				});
+			}
+		}
+		else
+		{
+			var indices = ListPool<uint>.Get();
+			GraphicsUtilities.GenerateQuadIndexBuffer(indices, count, isQuad);
+
+			using (var pass = this.AddGenericRenderPass("Terrain Set Index Data", (indexBuffer, indices)))
+			{
+				pass.WriteBuffer("", indexBuffer);
+				pass.SetRenderFunction(static (command, pass, data) =>
+				{
+					command.SetBufferData(pass.GetBuffer(data.indexBuffer), data.indices);
+					ListPool<uint>.Release(data.indices);
+				});
+			}
+		}
+
+		return indexBuffer;
 	}
 }

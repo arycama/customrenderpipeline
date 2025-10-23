@@ -41,6 +41,7 @@ public class UnderwaterLighting : CameraRenderFeature
             pass.AddRenderPassData<ViewData>();
             pass.AddRenderPassData<FrameData>();
             pass.AddRenderPassData<CausticsResult>();
+            pass.AddRenderPassData<OceanFftResult>();
             pass.ReadRtHandle<CameraDepth>();
             pass.ReadRtHandle<CameraDepthCopy>();
                 

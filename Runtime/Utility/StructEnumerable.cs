@@ -3,7 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
-public struct StructEnumerable<T> : IEnumerable<T>
+public readonly struct StructEnumerable<T> : IEnumerable<T>
 {
 	private readonly IEnumerable<T> enumerable;
 	public int Count => enumerable.Count();

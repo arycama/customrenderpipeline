@@ -2,7 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 
-public struct StructEnumeratorHashSet<T> : IStructEnumerator<T>
+public readonly struct StructEnumeratorHashSet<T> : IStructEnumerator<T>
 {
 	private readonly IEnumerator<T> enumerator;
 

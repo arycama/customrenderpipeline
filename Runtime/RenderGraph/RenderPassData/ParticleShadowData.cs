@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public struct ParticleShadowData : IRenderPassData
+public readonly struct ParticleShadowData : IRenderPassData
 {
 	private readonly ResourceHandle<RenderTexture> directionalShadows;
 	//private readonly ResourceHandle<RenderTexture> pointShadows;

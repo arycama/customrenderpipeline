@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 
@@ -10,54 +9,21 @@ public abstract class WaterRendererBase : CameraRenderFeature
     protected int VerticesPerTileEdge => settings.PatchVertices + 1;
     protected int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
 
-    private GraphicsBuffer indexBufferInternal;
-
     public WaterRendererBase(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
     {
         this.settings = settings;
-        indexBufferInternal = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort)) { name = "Water System Index Buffer" };
-
-        var index = 0;
-        var pIndices = new ushort[QuadListIndexCount];
-        for (var y = 0; y < settings.PatchVertices; y++)
-        {
-            var rowStart = y * VerticesPerTileEdge;
-
-            for (var x = 0; x < settings.PatchVertices; x++)
-            {
-                // Can do a checkerboard flip to avoid directioanl artifacts, but will mess with the tessellation code
-                //var flip = (x & 1) == (y & 1);
-
-                //if(flip)
-                //{
-                pIndices[index++] = (ushort)(rowStart + x);
-                pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge);
-                pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
-                pIndices[index++] = (ushort)(rowStart + x + 1);
-                //}
-                //else
-                //{
-                //    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge);
-                //    pIndices[index++] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
-                //    pIndices[index++] = (ushort)(rowStart + x + 1);
-                //    pIndices[index++] = (ushort)(rowStart + x);
-                //}
-            }
-        }
-
-        indexBufferInternal.SetData(pIndices);
-        indexBuffer = renderGraph.BufferHandleSystem.ImportResource(indexBufferInternal);
-    }
+		indexBuffer = renderGraph.GetGridIndexBuffer(settings.PatchVertices, true, false);
+	}
 
     protected override void Cleanup(bool disposing)
     {
-        indexBufferInternal.Dispose();
+		renderGraph.ReleasePersistentResource(indexBuffer);
     }
 
     protected WaterCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
     {
         // TODO: Preload?
-        var compute = Resources.Load<ComputeShader>("OceanQuadtreeCull");
+        var compute = Resources.Load<ComputeShader>("Utility/QuadtreeCull");
         var indirectArgsBuffer = renderGraph.GetBuffer(5, target: GraphicsBuffer.Target.IndirectArguments);
         var patchDataBuffer = renderGraph.GetBuffer(settings.CellCount * settings.CellCount, target: GraphicsBuffer.Target.Structured);
 
@@ -192,63 +158,30 @@ public abstract class WaterRendererBase : CameraRenderFeature
         ListPool<ResourceHandle<RenderTexture>>.Release(tempIds);
         return new(indirectArgsBuffer, patchDataBuffer);
     }
-}
 
-internal struct OceanQuadtreeCulLData
-{
-	public bool isFirstPass;
-	public int QuadListIndexCount;
-	public ResourceHandle<GraphicsBuffer> indirectArgsBuffer;
-	public int passCount;
-	public int index;
-	public int totalPassCount;
-	public CullingPlanes cullingPlanes;
-	public Vector3 viewPosition;
-	public WaterSettings settings;
-
-	public OceanQuadtreeCulLData(bool isFirstPass, int quadListIndexCount, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int passCount, int index, int totalPassCount, CullingPlanes cullingPlanes, Vector3 viewPosition, WaterSettings settings)
+	private readonly struct OceanQuadtreeCulLData
 	{
-		this.isFirstPass = isFirstPass;
-		QuadListIndexCount = quadListIndexCount;
-		this.indirectArgsBuffer = indirectArgsBuffer;
-		this.passCount = passCount;
-		this.index = index;
-		this.totalPassCount = totalPassCount;
-		this.cullingPlanes = cullingPlanes;
-		this.viewPosition = viewPosition;
-		this.settings = settings;
+		public readonly bool isFirstPass;
+		public readonly int QuadListIndexCount;
+		public readonly ResourceHandle<GraphicsBuffer> indirectArgsBuffer;
+		public readonly int passCount;
+		public readonly int index;
+		public readonly int totalPassCount;
+		public readonly CullingPlanes cullingPlanes;
+		public readonly Vector3 viewPosition;
+		public readonly WaterSettings settings;
+
+		public OceanQuadtreeCulLData(bool isFirstPass, int quadListIndexCount, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int passCount, int index, int totalPassCount, CullingPlanes cullingPlanes, Vector3 viewPosition, WaterSettings settings)
+		{
+			this.isFirstPass = isFirstPass;
+			QuadListIndexCount = quadListIndexCount;
+			this.indirectArgsBuffer = indirectArgsBuffer;
+			this.passCount = passCount;
+			this.index = index;
+			this.totalPassCount = totalPassCount;
+			this.cullingPlanes = cullingPlanes;
+			this.viewPosition = viewPosition;
+			this.settings = settings;
+		}
 	}
-
-	public override bool Equals(object obj) => obj is OceanQuadtreeCulLData other && isFirstPass == other.isFirstPass && QuadListIndexCount == other.QuadListIndexCount && EqualityComparer<ResourceHandle<GraphicsBuffer>>.Default.Equals(indirectArgsBuffer, other.indirectArgsBuffer) && passCount == other.passCount && index == other.index && totalPassCount == other.totalPassCount && EqualityComparer<CullingPlanes>.Default.Equals(cullingPlanes, other.cullingPlanes) && viewPosition.Equals(other.viewPosition) && EqualityComparer<WaterSettings>.Default.Equals(settings, other.settings);
-
-	public override int GetHashCode()
-	{
-		var hash = new System.HashCode();
-		hash.Add(isFirstPass);
-		hash.Add(QuadListIndexCount);
-		hash.Add(indirectArgsBuffer);
-		hash.Add(passCount);
-		hash.Add(index);
-		hash.Add(totalPassCount);
-		hash.Add(cullingPlanes);
-		hash.Add(viewPosition);
-		hash.Add(settings);
-		return hash.ToHashCode();
-	}
-
-	public void Deconstruct(out bool isFirstPass, out int quadListIndexCount, out ResourceHandle<GraphicsBuffer> indirectArgsBuffer, out int passCount, out int index, out int totalPassCount, out CullingPlanes cullingPlanes, out Vector3 viewPosition, out WaterSettings settings)
-	{
-		isFirstPass = this.isFirstPass;
-		quadListIndexCount = QuadListIndexCount;
-		indirectArgsBuffer = this.indirectArgsBuffer;
-		passCount = this.passCount;
-		index = this.index;
-		totalPassCount = this.totalPassCount;
-		cullingPlanes = this.cullingPlanes;
-		viewPosition = this.viewPosition;
-		settings = this.settings;
-	}
-
-	public static implicit operator (bool isFirstPass, int QuadListIndexCount, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int passCount, int index, int totalPassCount, CullingPlanes cullingPlanes, Vector3 viewPosition, WaterSettings settings)(OceanQuadtreeCulLData value) => (value.isFirstPass, value.QuadListIndexCount, value.indirectArgsBuffer, value.passCount, value.index, value.totalPassCount, value.cullingPlanes, value.viewPosition, value.settings);
-	public static implicit operator OceanQuadtreeCulLData((bool isFirstPass, int QuadListIndexCount, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int passCount, int index, int totalPassCount, CullingPlanes cullingPlanes, Vector3 viewPosition, WaterSettings settings) value) => new OceanQuadtreeCulLData(value.isFirstPass, value.QuadListIndexCount, value.indirectArgsBuffer, value.passCount, value.index, value.totalPassCount, value.cullingPlanes, value.viewPosition, value.settings);
 }

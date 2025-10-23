@@ -1,10 +1,11 @@
 #include "../../Common.hlsl"
+#include "../../Lighting.hlsl"
 #include "../../Packing.hlsl"
 #include "../../Samplers.hlsl"
 #include "../../WaterCommon.hlsl"
 
 float _CausticsDepth, _CausticsCascade, _PatchSize;
-float3 _RefractiveIndex, _LightDirection0;
+float3 _RefractiveIndex;
 matrix unity_MatrixVP;
 
 float4 FragmentPrepare(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target

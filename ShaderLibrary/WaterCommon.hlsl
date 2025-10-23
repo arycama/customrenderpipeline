@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#ifndef WATER_COMMON_INCLUDED
+#define WATER_COMMON_INCLUDED
 
 #include "Atmosphere.hlsl"
 #include "Common.hlsl"
@@ -184,3 +185,5 @@ float GetWaterIlluminance(float3 position)
 	
 	return illuminance;
 }
+
+#endif

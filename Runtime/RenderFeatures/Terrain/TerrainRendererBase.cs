@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 
@@ -18,7 +16,7 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 	protected TerrainCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes)
 	{
 		// TODO: Preload?
-		var compute = Resources.Load<ComputeShader>("Terrain/TerrainQuadtreeCull");
+		var compute = Resources.Load<ComputeShader>("Utility/QuadtreeCull");
 		var indirectArgsBuffer = renderGraph.GetBuffer(5, target: GraphicsBuffer.Target.IndirectArguments);
 		var patchDataBuffer = renderGraph.GetBuffer(settings.CellCount * settings.CellCount, target: GraphicsBuffer.Target.Structured);
 
@@ -78,6 +76,8 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 
 				if (isFinalPass)
 					pass.AddKeyword("FINAL");
+
+				pass.AddKeyword("USE_TERRAIN_HEIGHT");
 
 				if (isFinalPass && !isFirstPass)
 				{
@@ -166,71 +166,34 @@ public abstract partial class TerrainRendererBase : CameraRenderFeature
 
 		return new(indirectArgsBuffer, patchDataBuffer);
 	}
-}
 
-internal struct TerrainQuadtreeCullData
-{
-	public Vector3 viewPosition;
-	public CullingPlanes cullingPlanes;
-	public ResourceHandle<GraphicsBuffer> indirectArgsBuffer;
-	public int totalPassCount;
-	public bool isFirstPass;
-	public int passCount;
-	public int index;
-	public int QuadListIndexCount;
-	public Terrain terrain;
-	public TerrainData terrainData;
-	public TerrainSettings settings;
-
-	public TerrainQuadtreeCullData(Vector3 viewPosition, CullingPlanes cullingPlanes, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int totalPassCount, bool isFirstPass, int passCount, int index, int quadListIndexCount, Terrain terrain, TerrainData terrainData, TerrainSettings settings)
+	private readonly struct TerrainQuadtreeCullData
 	{
-		this.viewPosition = viewPosition;
-		this.cullingPlanes = cullingPlanes;
-		this.indirectArgsBuffer = indirectArgsBuffer;
-		this.totalPassCount = totalPassCount;
-		this.isFirstPass = isFirstPass;
-		this.passCount = passCount;
-		this.index = index;
-		QuadListIndexCount = quadListIndexCount;
-		this.terrain = terrain;
-		this.terrainData = terrainData;
-		this.settings = settings;
+		public readonly Vector3 viewPosition;
+		public readonly CullingPlanes cullingPlanes;
+		public readonly ResourceHandle<GraphicsBuffer> indirectArgsBuffer;
+		public readonly int totalPassCount;
+		public readonly bool isFirstPass;
+		public readonly int passCount;
+		public readonly int index;
+		public readonly int QuadListIndexCount;
+		public readonly Terrain terrain;
+		public readonly TerrainData terrainData;
+		public readonly TerrainSettings settings;
+
+		public TerrainQuadtreeCullData(Vector3 viewPosition, CullingPlanes cullingPlanes, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int totalPassCount, bool isFirstPass, int passCount, int index, int quadListIndexCount, Terrain terrain, TerrainData terrainData, TerrainSettings settings)
+		{
+			this.viewPosition = viewPosition;
+			this.cullingPlanes = cullingPlanes;
+			this.indirectArgsBuffer = indirectArgsBuffer;
+			this.totalPassCount = totalPassCount;
+			this.isFirstPass = isFirstPass;
+			this.passCount = passCount;
+			this.index = index;
+			QuadListIndexCount = quadListIndexCount;
+			this.terrain = terrain;
+			this.terrainData = terrainData;
+			this.settings = settings;
+		}
 	}
-
-	public override bool Equals(object obj) => obj is TerrainQuadtreeCullData other && viewPosition.Equals(other.viewPosition) && EqualityComparer<CullingPlanes>.Default.Equals(cullingPlanes, other.cullingPlanes) && EqualityComparer<ResourceHandle<GraphicsBuffer>>.Default.Equals(indirectArgsBuffer, other.indirectArgsBuffer) && totalPassCount == other.totalPassCount && isFirstPass == other.isFirstPass && passCount == other.passCount && index == other.index && QuadListIndexCount == other.QuadListIndexCount && EqualityComparer<Terrain>.Default.Equals(terrain, other.terrain) && EqualityComparer<TerrainData>.Default.Equals(terrainData, other.terrainData) && EqualityComparer<TerrainSettings>.Default.Equals(settings, other.settings);
-
-	public override int GetHashCode()
-	{
-		var hash = new HashCode();
-		hash.Add(viewPosition);
-		hash.Add(cullingPlanes);
-		hash.Add(indirectArgsBuffer);
-		hash.Add(totalPassCount);
-		hash.Add(isFirstPass);
-		hash.Add(passCount);
-		hash.Add(index);
-		hash.Add(QuadListIndexCount);
-		hash.Add(terrain);
-		hash.Add(terrainData);
-		hash.Add(settings);
-		return hash.ToHashCode();
-	}
-
-	public void Deconstruct(out Vector3 viewPosition, out CullingPlanes cullingPlanes, out ResourceHandle<GraphicsBuffer> indirectArgsBuffer, out int totalPassCount, out bool isFirstPass, out int passCount, out int index, out int quadListIndexCount, out Terrain terrain, out TerrainData terrainData, out TerrainSettings settings)
-	{
-		viewPosition = this.viewPosition;
-		cullingPlanes = this.cullingPlanes;
-		indirectArgsBuffer = this.indirectArgsBuffer;
-		totalPassCount = this.totalPassCount;
-		isFirstPass = this.isFirstPass;
-		passCount = this.passCount;
-		index = this.index;
-		quadListIndexCount = QuadListIndexCount;
-		terrain = this.terrain;
-		terrainData = this.terrainData;
-		settings = this.settings;
-	}
-
-	public static implicit operator (Vector3 viewPosition, CullingPlanes cullingPlanes, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int totalPassCount, bool isFirstPass, int passCount, int index, int QuadListIndexCount, Terrain terrain, TerrainData terrainData, TerrainSettings settings)(TerrainQuadtreeCullData value) => (value.viewPosition, value.cullingPlanes, value.indirectArgsBuffer, value.totalPassCount, value.isFirstPass, value.passCount, value.index, value.QuadListIndexCount, value.terrain, value.terrainData, value.settings);
-	public static implicit operator TerrainQuadtreeCullData((Vector3 viewPosition, CullingPlanes cullingPlanes, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int totalPassCount, bool isFirstPass, int passCount, int index, int QuadListIndexCount, Terrain terrain, TerrainData terrainData, TerrainSettings settings) value) => new TerrainQuadtreeCullData(value.viewPosition, value.cullingPlanes, value.indirectArgsBuffer, value.totalPassCount, value.isFirstPass, value.passCount, value.index, value.QuadListIndexCount, value.terrain, value.terrainData, value.settings);
 }

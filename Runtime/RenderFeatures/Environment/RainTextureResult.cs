@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public struct RainTextureResult : IRenderPassData
+public readonly struct RainTextureResult : IRenderPassData
 {
 	private readonly ResourceHandle<RenderTexture> rainTexture;
 	private readonly float size;

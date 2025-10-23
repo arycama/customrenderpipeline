@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
 public class Rain : CameraRenderFeature
@@ -24,6 +25,7 @@ public class Rain : CameraRenderFeature
 
 	private int previousDropletCount;
 	private ResourceHandle<GraphicsBuffer> positionBuffer;
+	private ResourceHandle<GraphicsBuffer> indexBuffer;
 
 	public Rain(RenderGraph renderGraph, Settings settings) : base(renderGraph)
 	{
@@ -48,9 +50,13 @@ public class Rain : CameraRenderFeature
 		if (dropletCount != previousDropletCount)
 		{
 			if (previousDropletCount != 0)
+			{
 				renderGraph.ReleasePersistentResource(positionBuffer);
+				renderGraph.ReleasePersistentResource(indexBuffer);
+			}
 
 			positionBuffer = renderGraph.GetBuffer(dropletCount, sizeof(float) * 4, isPersistent: true);
+			indexBuffer = renderGraph.GetQuadIndexBuffer(dropletCount, false);
 			previousDropletCount = dropletCount;
 
 			// New buffer, need to initialize positions
@@ -98,9 +104,9 @@ public class Rain : CameraRenderFeature
 		}
 
 		// TODO: Index buffer, but make some common function to build/get an index buffer 
-		using (var pass = renderGraph.AddDrawProceduralRenderPass("Render", (dropletCount, settings.Radius, settings.Velocity, settings.WindAngle, settings.WindStrength, settings.WindTurbulence)))
+		using (var pass = renderGraph.AddDrawProceduralIndexedRenderPass("Render", (dropletCount, settings.Radius, settings.Velocity, settings.WindAngle, settings.WindStrength, settings.WindTurbulence)))
 		{
-			pass.Initialize(settings.Material, Float4x4.Identity, 0, 4, dropletCount, MeshTopology.Quads);
+			pass.Initialize(indexBuffer, settings.Material, Float4x4.Identity);
 
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepth);

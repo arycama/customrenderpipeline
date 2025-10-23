@@ -1,5 +1,5 @@
-#include "../../Common.hlsl"
-#include "../../Geometry.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Geometry.hlsl"
 
 #pragma kernel InstanceCull
 #pragma kernel IndirectArgs
@@ -7,8 +7,9 @@
 
 #pragma multi_compile _ FIRST
 #pragma multi_compile _ FINAL
+#pragma multi_compile _ USE_TERRAIN_HEIGHT
 
-globallycoherent RWBuffer<uint>_IndirectArgs;
+globallycoherent RWBuffer<uint> _IndirectArgs;
 globallycoherent RWBuffer<int> _PatchDataWrite;
 globallycoherent RWTexture2D<int> _LodResult, _TempResultWrite;
 Buffer<uint> _IndirectArgsInput;
@@ -18,7 +19,7 @@ Texture2D<int> _LodInput, _TempResult;
 cbuffer Properties
 {
 	float4 _TerrainPositionOffset;
-	float _EdgeLength, _InputScale, _InputOffset;
+	float _EdgeLength, _InputScale, _InputOffset, MaxWaterHeight;
 	int _MipCount, _PassCount, _PassOffset, _TotalPassCount, _CellCount;
 };
 
@@ -61,9 +62,17 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 			{
 				float2 patchSize = _TerrainPositionOffset.xy * exp2(-(i + _PassOffset));
 				
-				float2 heights = _TerrainHeights.mips[_MipCount - (i + _PassOffset)][coord] * _InputScale + _InputOffset;
-				float3 center = float3((coord + 0.5) * patchSize + _TerrainPositionOffset.zw, 0.5 * (heights.y + heights.x)).xzy;
-				float3 extents = float3(patchSize, heights.y - heights.x).xzy * 0.5;
+				#ifdef USE_TERRAIN_HEIGHT
+					float2 heights = _TerrainHeights.mips[_MipCount - (i + _PassOffset)][coord] * _InputScale + _InputOffset;
+					float centerHeight = 0.5 * (heights.y + heights.x);
+					float extentsY = heights.y - heights.x;
+				#else
+					float centerHeight = -ViewPosition.y;
+					float extentsY = MaxWaterHeight;
+				#endif
+				
+				float3 center = float3((coord + 0.5) * patchSize + _TerrainPositionOffset.zw, centerHeight).xzy;
+				float3 extents = float3(patchSize, extentsY).xzy * 0.5;
 				
 				if (FrustumCull(center, extents))
 				{

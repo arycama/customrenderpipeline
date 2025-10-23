@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 public static class GraphicsUtilities
 {
@@ -74,42 +75,107 @@ public static class GraphicsUtilities
 		return new Float2(1f / (width - 1), 1f / (height - 1));
 	}
 
-	public static GraphicsBuffer GenerateGridIndexBuffer(int count, bool alternateIndices = false)
+	public static void GenerateGridIndexBuffer(List<ushort> list, int cellsPerRow, bool isQuad, bool alternateIndices)
 	{
-		var VerticesPerTileEdge = count + 1;
-		var QuadListIndexCount = count * count * 4;
+		var indicesPerQuad = isQuad ? 4 : 6;
 
-		var indexBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Index, QuadListIndexCount, sizeof(ushort));
-
-		var pIndices = new ushort[QuadListIndexCount];
-		for (int y = 0, i = 0; y < count; y++)
+		for (int y = 0, i = 0, vi = 0; y < cellsPerRow; y++, vi++)
 		{
-			var rowStart = y * VerticesPerTileEdge;
+			var rowStart = y * (cellsPerRow + 1);
 
-			for (var x = 0; x < count; x++, i += 4)
+			for (var x = 0; x < cellsPerRow; x++, i += indicesPerQuad, vi++)
 			{
-				// Can do a checkerboard flip to avoid directioanl artifacts, but will mess with the tessellation code
+				var columnStart = rowStart + x;
+
 				var flip = alternateIndices ? (x & 1) == (y & 1) : true;
 
-				if (flip)
+				if (isQuad)
 				{
-					pIndices[i + 0] = (ushort)(rowStart + x);
-					pIndices[i + 1] = (ushort)(rowStart + x + VerticesPerTileEdge);
-					pIndices[i + 2] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
-					pIndices[i + 3] = (ushort)(rowStart + x + 1);
+					if (flip)
+					{
+						list.Add((ushort)(columnStart));
+						list.Add((ushort)(columnStart + cellsPerRow + 1));
+						list.Add((ushort)(columnStart + cellsPerRow + 2));
+						list.Add((ushort)(columnStart + 1));
+					}
+					else
+					{
+						list.Add((ushort)(columnStart + cellsPerRow + 1));
+						list.Add((ushort)(columnStart + cellsPerRow + 2));
+						list.Add((ushort)(columnStart + 1));
+						list.Add((ushort)(columnStart));
+					}
 				}
 				else
 				{
-					pIndices[i + 0] = (ushort)(rowStart + x + VerticesPerTileEdge);
-					pIndices[i + 1] = (ushort)(rowStart + x + VerticesPerTileEdge + 1);
-					pIndices[i + 2] = (ushort)(rowStart + x + 1);
-					pIndices[i + 3] = (ushort)(rowStart + x);
+					if (flip)
+					{
+						list.Add((ushort)columnStart);
+						list.Add((ushort)(columnStart + cellsPerRow + 1));
+						list.Add((ushort)(columnStart + cellsPerRow + 2));
+						list.Add((ushort)(columnStart + cellsPerRow + 2));
+						list.Add((ushort)(columnStart + 1));
+						list.Add((ushort)columnStart);
+					}
+					else
+					{
+						list.Add((ushort)columnStart);
+						list.Add((ushort)(columnStart + cellsPerRow + 1));
+						list.Add((ushort)(columnStart + 1));
+						list.Add((ushort)(columnStart + 1));
+						list.Add((ushort)(columnStart + cellsPerRow + 1));
+						list.Add((ushort)(columnStart + cellsPerRow + 2));
+					}
 				}
 			}
 		}
+	}
 
-		indexBuffer.SetData(pIndices);
-		return indexBuffer;
+	/// <summary> Generates an index buffer of quads. Eg every 4 or 6 indices will refer to a new quad. (Can support either triangle or quad topology) </summary>
+	public static void GenerateQuadIndexBuffer(List<ushort> list, int count, bool isQuad)
+	{
+		for (var i = 0; i < count; i++)
+		{
+			if (isQuad)
+			{
+				list.Add((ushort)(4 * i + 0));
+				list.Add((ushort)(4 * i + 1));
+				list.Add((ushort)(4 * i + 2));
+				list.Add((ushort)(4 * i + 3));
+			}
+			else
+			{
+				list.Add((ushort)(4 * i + 0));
+				list.Add((ushort)(4 * i + 1));
+				list.Add((ushort)(4 * i + 2));
+				list.Add((ushort)(4 * i + 0));
+				list.Add((ushort)(4 * i + 2));
+				list.Add((ushort)(4 * i + 3));
+			}
+		}
+	}
+
+	public static void GenerateQuadIndexBuffer(List<uint> list, int count, bool isQuad)
+	{
+		for (var i = 0u; i < count; i++)
+		{
+			if (isQuad)
+			{
+				list.Add(4u * i + 0u);
+				list.Add(4u * i + 1u);
+				list.Add(4u * i + 2u);
+				list.Add(4u * i + 3u);
+			}
+			else
+			{
+				list.Add(4u * i + 0u);
+				list.Add(4u * i + 1u);
+				list.Add(4u * i + 2u);
+				list.Add(4u * i + 0u);
+				list.Add(4u * i + 2u);
+				list.Add(4u * i + 3u);
+			}
+		}
 	}
 
 	public static void SafeDestroy(ref ComputeBuffer buffer)

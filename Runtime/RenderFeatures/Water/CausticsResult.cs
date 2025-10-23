@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public struct CausticsResult : IRenderPassData
+public readonly struct CausticsResult : IRenderPassData
 {
     private readonly ResourceHandle<RenderTexture> caustics;
     private readonly int cascade;

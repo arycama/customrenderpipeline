@@ -12,21 +12,21 @@ public class TerrainViewData : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
-		if (terrainSystem.terrain == null)
+		if (terrainSystem.Terrain == null)
 			return;
 
-		var position = terrainSystem.terrain.GetPosition() - camera.transform.position;
-		var size = terrainSystem.terrainData.size;
+		var position = terrainSystem.Terrain.GetPosition() - camera.transform.position;
+		var size = terrainSystem.TerrainData.size;
 		var terrainScaleOffset = new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z);
-		var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainSystem.terrainData.heightmapResolution);
+		var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainSystem.TerrainData.heightmapResolution);
 		var terrainHeightOffset = position.y;
-		renderGraph.SetResource(new TerrainRenderData(terrainSystem.diffuseArray, terrainSystem.normalMapArray, terrainSystem.maskMapArray, terrainSystem.heightmap, terrainSystem.normalmap, terrainSystem.idMap, terrainSystem.terrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainSystem.terrainData.alphamapResolution, terrainSystem.terrainLayerData, terrainSystem.aoMap));
+		renderGraph.SetResource(new TerrainRenderData(terrainSystem.diffuseArray, terrainSystem.normalMapArray, terrainSystem.maskMapArray, terrainSystem.heightmap, terrainSystem.normalmap, terrainSystem.idMap, terrainSystem.TerrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainSystem.TerrainData.alphamapResolution, terrainSystem.terrainLayerData, terrainSystem.aoMap));
 
 		// This sets raytracing data on the terrain's material property block
-		using (var pass = renderGraph.AddSetPropertyBlockPass("Terrain Data Property Block Update", terrainSystem.terrain))
+		using (var pass = renderGraph.AddSetPropertyBlockPass("Terrain Data Property Block Update", terrainSystem.Terrain))
 		{
 			var propertyBlock = pass.PropertyBlock;
-			terrainSystem.terrain.GetSplatMaterialPropertyBlock(propertyBlock);
+			terrainSystem.Terrain.GetSplatMaterialPropertyBlock(propertyBlock);
 			pass.AddRenderPassData<TerrainRenderData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
