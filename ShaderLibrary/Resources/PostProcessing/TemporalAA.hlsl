@@ -11,7 +11,7 @@ cbuffer Properties
 {
 	float4 HistoryScaleLimit, HistoryWeightScaleLimit;
 	float _HasHistory, _SpatialSharpness, _MotionSharpness, _StationaryBlending, _Scale, _SpatialBlur, _SpatialSize, _VelocityBlending, _VelocityWeight;
-	float PropertiesPadding0, PropertiesPadding1, PropertiesPadding2;
+	float PropertiesPadding0, PropertiesPadding1, PropertiesPadding2, AfterImage;
 };
 
 float Mitchell1D(float x, float B, float C)
@@ -153,9 +153,13 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 			result.rgb *= rcp(result.a);
 	}
 	
+	float3 nonReprojectedHistory = History[position.xy];
+	nonReprojectedHistory.r *= PreviousToCurrentExposure;
+	
+	//result.rgb = lerp(result.rgb, nonReprojectedHistory, AfterImage);
+	
 	FragmentOutput output;
 	output.result = float4(ICtCpToRec2020(result.rgb) / PaperWhite, 1.0);
-	//output.result.rgb = CameraTarget[position.xy];
 	output.history = float4(result.rgb, 1.0);
 	output.historyWeight = result.a;
 	return output;

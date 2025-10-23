@@ -1,8 +1,7 @@
 #pragma kernel CSMain
-//#pragma enable_d3d11_debug_symbols
 
 StructuredBuffer<float> ParticleShadowStep;
-Texture3D<uint> ParticleExtinction;
+Texture3D<float> ParticleExtinction;
 RWTexture3D<float> ParticleShadowWrite;
 uint ParticleShadowDepthInt;
 uint ParticleShadowResolutionInt;
@@ -16,8 +15,7 @@ void CSMain (uint2 id : SV_DispatchThreadID)
 	float transmittance = 1.0;
 	for (uint i = 0; i < ParticleShadowDepthInt; i++)
 	{
-		float extinction = ParticleExtinction[uint3(id, i)] / 2048.0;
-		transmittance *= exp(-extinction * step);
+		transmittance *= ParticleExtinction[uint3(id, i)];
 		ParticleShadowWrite[uint3(id.xy, i)] = transmittance;
 	}
 }

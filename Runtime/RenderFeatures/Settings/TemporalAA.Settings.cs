@@ -18,5 +18,6 @@ public partial class TemporalAA
         [field: SerializeField] public float MotionWeight { get; private set; } = 6000f;
         [field: SerializeField] public bool JitterOverride { get; private set; } = false;
         [field: SerializeField] public Vector2 JitterOverrideValue { get; private set; } = Vector2.zero;
-    }
+        [field: SerializeField, Range(0f, 1f)] public float AfterImage { get; private set; } = 0.01f;
+	}
 }

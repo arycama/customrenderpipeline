@@ -4,7 +4,6 @@
 #pragma kernel RadixCount COUNT
 #pragma kernel RadixScan SCAN
 #pragma kernel RadixScatter SCATTER
-//#pragma enable_d3d11_debug_symbols
 
 #ifdef SCAN
 const static uint threadCount = 512;

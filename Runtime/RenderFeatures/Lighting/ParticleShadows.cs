@@ -54,39 +54,12 @@ public class ParticleShadows : CameraRenderFeature
 		var directionalShadowCount = Max(1, requestData.directionalShadowRequests.Count);
 
 		// Since 3D texture arrays aren't a thing, allocate one wide texture
-		var directionalShadows = renderGraph.GetTexture(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, GraphicsFormat.R32_UInt, settings.DirectionalDepth, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true, clearFlags: RTClearFlags.Depth);
-
-		// We need a dummy texture, just use smallest format available
-		var dummy = renderGraph.GetTexture(settings.DirectionalResolution, settings.DirectionalResolution, GraphicsFormat.R8_UNorm, isExactSize: true);
-
-		//var pointShadowCount = Max(1, requestData.PointShadowRequests.Count);
-		//var pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D16_UNorm, pointShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
-
-		//var spotShadowCount = Max(1, requestData.SpotShadowRequests.Count);
-		//var spotShadows = renderGraph.GetTexture(settings.SpotShadowResolution, settings.SpotShadowResolution, GraphicsFormat.D16_UNorm, spotShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
+		var directionalShadows = renderGraph.GetTexture(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isExactSize: true, clearFlags: RTClearFlags.Color, clearColor: Color.white);
 
 		using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", directionalShadows))
 		{
-			// TODO: We should really add initial clear actions
+			pass.ReadTexture("", directionalShadows);
 			pass.WriteTexture(directionalShadows);
-			//pass.WriteTexture(pointShadows);
-			//pass.WriteTexture(spotShadows);
-
-			// Here to avoid crashes due to not being written if no dir shadows..
-			//pass.WriteTexture(dummy);
-			//pass.ReadTexture("", dummy);
-
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				command.SetRenderTarget(pass.GetRenderTexture(data), pass.GetRenderTexture(data), 0, CubemapFace.Unknown, -1);
-				command.ClearRenderTarget(false, true, Color.clear);
-
-				//command.SetRenderTarget(pass.GetRenderTexture(data.pointShadows), pass.GetRenderTexture(data.pointShadows), 0, CubemapFace.Unknown, -1);
-				//command.ClearRenderTarget(true, false, Color.clear);
-
-				//command.SetRenderTarget(pass.GetRenderTexture(data.spotShadows), pass.GetRenderTexture(data.spotShadows), 0, CubemapFace.Unknown, -1);
-				//command.ClearRenderTarget(true, false, Color.clear);
-			});
 		}
 
 		void RenderShadowMap(ShadowRequest request, ResourceHandle<RenderTexture> target, int index, bool flipY, bool zClip, bool isPointLight)
@@ -121,16 +94,15 @@ public class ParticleShadows : CameraRenderFeature
 				return;
 
 			var voxelSize = (request.Far - request.Near) / settings.DirectionalDepth;
-			using (var pass = renderGraph.AddObjectRenderPass("Particle Shadows", (dummy, target, index, settings.DirectionalResolution, settings.DirectionalDepth, zClip, voxelSize)))
+			using (var pass = renderGraph.AddObjectRenderPass("Particle Shadows", (target, index, settings.DirectionalResolution, settings.DirectionalDepth, zClip, voxelSize)))
 			{
 				cullingPrameters.cullingOptions = CullingOptions.ForceEvenIfCameraIsNotActive | CullingOptions.DisablePerObjectCulling;
 				var cullingResults = context.Cull(ref cullingPrameters);
 				pass.Initialize("ParticleShadow", context, cullingResults, particleCamera, RenderQueueRange.transparent, SortingCriteria.CommonTransparent);
+				pass.DepthSlice = -1;
 
 				// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
-				pass.WriteTexture(dummy);
-				pass.ReadTexture("", dummy);
-
+				pass.WriteTexture(directionalShadows);
 				pass.ReadTexture("ParticleShadowWrite", target);
 				pass.ReadRtHandle<CameraDepth>();
 				pass.AddRenderPassData<ViewData>(); 
@@ -144,8 +116,7 @@ public class ParticleShadows : CameraRenderFeature
 					pass.SetFloat("ParticleShadowResolution", data.DirectionalResolution);
 					pass.SetFloat("ParticleShadowIndex", data.index);
 					pass.SetFloat("ParticleVoxelSize", data.voxelSize);
-					command.ClearRandomWriteTargets();
-					command.SetRandomWriteTarget(1, pass.GetRenderTexture(data.target));
+					command.SetViewport(new Rect(data.index * data.DirectionalResolution, 0, data.DirectionalResolution, data.DirectionalResolution));
 				});
 			}
 		}

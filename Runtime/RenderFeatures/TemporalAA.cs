@@ -1,5 +1,3 @@
-using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -44,7 +42,8 @@ public partial class TemporalAA : CameraRenderFeature
 			settings.MotionBlending,
 			settings.MotionWeight,
 			scale: 1,
-			history
+			history,
+			settings.AfterImage
 		));
 
 		//var keyword = null;// viewData.Scale < 1.0f ? "UPSCALE" : null; // TODO: Implement
@@ -73,6 +72,7 @@ public partial class TemporalAA : CameraRenderFeature
 			pass.SetFloat("_VelocityBlending", data.motionBlending);
 			pass.SetFloat("_VelocityWeight", data.motionWeight);
 			pass.SetFloat("_Scale", data.scale);
+			pass.SetFloat("AfterImage", data.afterImage);
 
 			pass.SetVector("HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
 			pass.SetVector("WeightHistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
@@ -92,10 +92,11 @@ internal struct TemporalAADataStruct
 	public float stationaryBlending;
 	public float motionBlending;
 	public float motionWeight;
+	public float afterImage;
 	public int scale;
 	public ResourceHandle<RenderTexture> history;
 
-	public TemporalAADataStruct(float spatialBlur, float spatialSharpness, float spatialSize, float motionSharpness, float hasHistory, float stationaryBlending, float motionBlending, float motionWeight, int scale, ResourceHandle<RenderTexture> history)
+	public TemporalAADataStruct(float spatialBlur, float spatialSharpness, float spatialSize, float motionSharpness, float hasHistory, float stationaryBlending, float motionBlending, float motionWeight, int scale, ResourceHandle<RenderTexture> history, float afterImage)
 	{
 		this.spatialBlur = spatialBlur;
 		this.spatialSharpness = spatialSharpness;
@@ -107,40 +108,6 @@ internal struct TemporalAADataStruct
 		this.motionWeight = motionWeight;
 		this.scale = scale;
 		this.history = history;
+		this.afterImage = afterImage;
 	}
-
-	public override bool Equals(object obj) => obj is TemporalAADataStruct other && spatialBlur == other.spatialBlur && spatialSharpness == other.spatialSharpness && spatialSize == other.spatialSize && motionSharpness == other.motionSharpness && hasHistory == other.hasHistory && stationaryBlending == other.stationaryBlending && motionBlending == other.motionBlending && motionWeight == other.motionWeight && scale == other.scale && EqualityComparer<ResourceHandle<RenderTexture>>.Default.Equals(history, other.history);
-
-	public override int GetHashCode()
-	{
-		var hash = new HashCode();
-		hash.Add(spatialBlur);
-		hash.Add(spatialSharpness);
-		hash.Add(spatialSize);
-		hash.Add(motionSharpness);
-		hash.Add(hasHistory);
-		hash.Add(stationaryBlending);
-		hash.Add(motionBlending);
-		hash.Add(motionWeight);
-		hash.Add(scale);
-		hash.Add(history);
-		return hash.ToHashCode();
-	}
-
-	public void Deconstruct(out float spatialBlur, out float spatialSharpness, out float spatialSize, out float motionSharpness, out float hasHistory, out float stationaryBlending, out float motionBlending, out float motionWeight, out int scale, out ResourceHandle<RenderTexture> history)
-	{
-		spatialBlur = this.spatialBlur;
-		spatialSharpness = this.spatialSharpness;
-		spatialSize = this.spatialSize;
-		motionSharpness = this.motionSharpness;
-		hasHistory = this.hasHistory;
-		stationaryBlending = this.stationaryBlending;
-		motionBlending = this.motionBlending;
-		motionWeight = this.motionWeight;
-		scale = this.scale;
-		history = this.history;
-	}
-
-	public static implicit operator (float spatialBlur, float spatialSharpness, float spatialSize, float motionSharpness, float hasHistory, float stationaryBlending, float motionBlending, float motionWeight, int scale, ResourceHandle<RenderTexture> history)(TemporalAADataStruct value) => (value.spatialBlur, value.spatialSharpness, value.spatialSize, value.motionSharpness, value.hasHistory, value.stationaryBlending, value.motionBlending, value.motionWeight, value.scale, value.history);
-	public static implicit operator TemporalAADataStruct((float spatialBlur, float spatialSharpness, float spatialSize, float motionSharpness, float hasHistory, float stationaryBlending, float motionBlending, float motionWeight, int scale, ResourceHandle<RenderTexture> history) value) => new TemporalAADataStruct(value.spatialBlur, value.spatialSharpness, value.spatialSize, value.motionSharpness, value.hasHistory, value.stationaryBlending, value.motionBlending, value.motionWeight, value.scale, value.history);
 }
