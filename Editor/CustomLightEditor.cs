@@ -28,7 +28,7 @@ public class CustomLightEditor : LightEditor
 			switch (unit)
 			{
 				case LightUnit.Lumen:
-					intensity /= FourPi;
+					intensity *= FourPi;
 					break;
 				case LightUnit.Candela:
 					break;
@@ -50,7 +50,7 @@ public class CustomLightEditor : LightEditor
 			switch (unit)
 			{
 				case LightUnit.Lumen:
-					intensity *= FourPi;
+					intensity /= FourPi;
 					break;
 				case LightUnit.Candela:
 					break;

@@ -117,7 +117,23 @@ float4 cubic(float v)
 	return o;
 }
 
-float GetDirectionalShadow(float3 worldPosition, bool softShadows = false)
+float GetParticleShadow(float3 worldPosition)
+{
+	float viewDepth = WorldToViewPosition(worldPosition).z;
+	float fade = saturate(DirectionalFadeScale * viewDepth + DirectionalFadeOffset);
+	if (!fade)
+		return 1.0;
+		
+	float cascade = floor(DirectionalCascadeDepthParams.y * log2(viewDepth + DirectionalCascadeDepthParams.z) + DirectionalCascadeDepthParams.x);
+	float3 shadowPosition = MultiplyPoint3x4(DirectionalShadowMatrices[cascade], worldPosition);
+	
+	float3 particleShadowUv = shadowPosition;
+	particleShadowUv.x = (particleShadowUv.x + floor(cascade)) * rcp(DirectionalCascadeCount);
+	particleShadowUv.z = 1 - particleShadowUv.z;
+	return DirectionalParticleShadows.SampleLevel(TrilinearClampSampler, particleShadowUv, 0.0);
+}
+
+float GetDirectionalShadow(float3 worldPosition, bool softShadows = false, bool sampleParticleShadow = true)
 {
 	float viewDepth = WorldToViewPosition(worldPosition).z;
 	float fade = saturate(DirectionalFadeScale * viewDepth + DirectionalFadeOffset);
@@ -159,11 +175,14 @@ float GetDirectionalShadow(float3 worldPosition, bool softShadows = false)
 	}
 	
 	// Particle shadows
-	float3 particleShadowUv = shadowPosition;
-	particleShadowUv.x = (particleShadowUv.x + floor(cascade)) * rcp(DirectionalCascadeCount);
-	particleShadowUv.z = 1 - particleShadowUv.z;
-	float particleShadow = DirectionalParticleShadows.SampleLevel(TrilinearClampSampler, particleShadowUv, 0.0);
-	visibility *= particleShadow;
+	if (sampleParticleShadow)
+	{
+		float3 particleShadowUv = shadowPosition;
+		particleShadowUv.x = (particleShadowUv.x + floor(cascade)) * rcp(DirectionalCascadeCount);
+		particleShadowUv.z = 1 - particleShadowUv.z;
+		float particleShadow = DirectionalParticleShadows.SampleLevel(TrilinearClampSampler, particleShadowUv, 0.0);
+		visibility *= particleShadow;
+	}
 	
 	return lerp(1.0, visibility, fade);
 	
@@ -575,7 +594,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	#endif
 
 	float3 fssEss = dfg.x * f0 + dfg.y;
-	luminance += radiance * fssEss;
+	//luminance += radiance * fssEss;
 	
 	float3 irradiance = AmbientCosine(bentNormal, visibilityAngle);
 	
@@ -591,7 +610,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float3 fAvg = AverageFresnel(f0);
 	float3 fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
 	float3 kd = 1.0 - fssEss - fmsEms;
-	luminance += irradiance * (fmsEms + albedo * kd);
+	//luminance += irradiance * (fmsEms + albedo * kd);
 	
 	float3 irradiance1 = AmbientCosine(-bentNormal, visibilityAngle);
 	
@@ -603,7 +622,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 		irradiance1 = lerp(irradiance1 + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeAngleToVisibility(visibilityAngle));
 	#endif
 	
-	luminance += irradiance1 * translucency * kd;
+	//luminance += irradiance1 * translucency * kd;
 	
 	return float4(luminance, lerp(opacity, 1.0, fssEss.r));
 }
