@@ -29,5 +29,7 @@ public class SpeedTreeShaderGui : ShaderGUI
 		var heightProperty = FindProperty("Height", properties);
 		material.ToggleKeyword("PARALLAX_ON", heightProperty.textureValue != null && material.GetFloat("HeightScale") > 0);
 		material.renderQueue = (int)(isCutout ? RenderQueue.AlphaTest : RenderQueue.Geometry);
+
+		EditorUtility.SetDirty(material);
 	}
 }

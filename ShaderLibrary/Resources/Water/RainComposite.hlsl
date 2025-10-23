@@ -49,8 +49,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	roughness = lerp(0.0, roughness, lerp(1, factor, wetLevel));
 	normal = normalize(lerp(normal, rainNormal, wetLevel * 0.5));
 	
+	bool isTranslucent = CameraStencil[position.xy].g & 16;
+	float3 translucency = isTranslucent ? UnpackAlbedo(albedoMetallic.ba, position.xy) : 0;
+	
 	FragmentOutput output;
-	output.albedoMetallic = float4(PackAlbedo(albedo, position.xy), 0, albedoMetallic.a);
+	output.albedoMetallic = float4(PackAlbedo(albedo, position.xy), isTranslucent ? PackAlbedo(translucency, position.xy) : float2(0, albedoMetallic.a));
 	output.normalRoughness = float4(PackGBufferNormal(normal), roughness);
 	output.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal), bentNormalOcclusion.a);
 	return output;

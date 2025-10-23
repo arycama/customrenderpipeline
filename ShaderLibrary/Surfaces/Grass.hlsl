@@ -142,6 +142,7 @@ HullInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	float terrainHeight = GetTerrainHeight(position);
 	position.y = terrainHeight;
 	
+	
 	HullInput output;
 	output.right = right * _Width * scale;
 	output.up = mul(rotMat, float3(0, 1, 0)) * _Height * scale;
@@ -162,6 +163,17 @@ HullConstantOutput HullConstant(InputPatch<HullInput, 1> input)
 		if (dot(_CullingPlanes[i], float4(input[0].position, 1.0)) < -_Width * 3)
 			return output;
 	}
+	
+	float2 uv = WorldToTerrainPosition(input[0].position);
+	uint layerData = IdMap[uv * IdMapResolution];
+	
+	uint layerIndex0 = BitUnpack(layerData, 4, 0);
+	uint layerIndex1 = BitUnpack(layerData, 4, 13);
+	float blend = Remap(BitUnpack(layerData, 4, 26), 0.0, 15.0, 0.0, 0.5);
+	
+	if(layerIndex0 != 0 && layerIndex0 != 2 && layerIndex0 != 7 && layerIndex0 != 9)
+		return output;
+	
 	
 	//if (!input[0].isCulled)
 	{
