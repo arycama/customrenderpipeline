@@ -136,18 +136,16 @@ float CalculateSphereEdgeFactor(float3 corner0, float3 corner1, float targetEdge
 	return CalculateSphereEdgeFactor(r, edgeCenter, targetEdgeLength, rcpTanHalfFov, screenHeight);
 }
 
-float4 qmul(float4 q1, float4 q2)
+float4 Rotate(float4 a, float4 b)
 {
-	return float4(
-        q2.xyz * q1.w + q1.xyz * q2.w + cross(q1.xyz, q2.xyz),
-        q1.w * q2.w - dot(q1.xyz, q2.xyz)
-    );
+	return float4(a.xyz * b.w + b.xyz * a.w + cross(a.xyz, b.xyz), a.w * b.w - dot(a.xyz, b.xyz));
 }
 
-float3 RotateVector(float3 v, float4 r)
+float3 RotateVector(float4 q, float3 v)
 {
-	float4 r_c = r * float4(-1, -1, -1, 1);
-	return qmul(r, qmul(float4(v, 0), r_c)).xyz;
+	float3 qv = q.xyz;
+	float3 t = 2.0 * cross(qv, v);
+	return v + q.w * t + cross(qv, t);
 }
 
 // Quaternion that rotates between from and to
@@ -158,6 +156,31 @@ float4 FromToRotation(float3 F, float3 T)
 	result.xyz = cross(F, T) * rcpS;
 	result.w = rcp(rcpS) * 0.5;
 	return result;
+}
+
+float4 QuaternionFromCosTheta(float cosTheta, float phi)
+{
+    // Calculate sinTheta/2 and cosTheta/2 from cosTheta
+	float cosHalfTheta = sqrt((1.0 + cosTheta) * 0.5); // cos(?/2) = ?((1 + cos?)/2)
+	float sinHalfTheta = sqrt((1.0 - cosTheta) * 0.5); // sin(?/2) = ?((1 - cos?)/2)
+    
+	float sinHalfPhi, cosHalfPhi;
+	sincos(phi * 0.5, sinHalfPhi, cosHalfPhi);
+    
+	return float4(
+        cosHalfTheta * sinHalfPhi,
+        cosHalfTheta * cosHalfPhi,
+        -sinHalfTheta * sinHalfPhi,
+        cosHalfTheta * cosHalfPhi
+    );
+}
+
+float4 Quaternion(float theta, float phi)
+{
+	float sinTheta, cosTheta, sinPhi, cosPhi;
+	sincos(theta * 0.5, sinTheta, cosTheta);
+	sincos(phi * 0.5, sinPhi, cosPhi);
+	return float4(cosTheta * float2(sinPhi, cosPhi), -sinTheta * sinPhi, cosTheta * cosPhi);
 }
 
 // Calculates a rotation from (0,0,1) to baseNormal, and applies that rotation to detailNormal using shortest arc quaternion

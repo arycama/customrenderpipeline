@@ -64,3 +64,10 @@ float3 GetTerrainNormal(float3 worldPosition)
 	float2 terrainUv = WorldToTerrainPosition(worldPosition);
 	return GetTerrainNormal(terrainUv);
 }
+
+float3 GetTerrainNormalLevel(float3 worldPosition)
+{
+	float2 terrainUv = WorldToTerrainPosition(worldPosition);
+	return GetTerrainNormalLevel(terrainUv);
+}
+

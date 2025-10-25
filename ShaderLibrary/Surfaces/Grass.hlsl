@@ -8,242 +8,126 @@
 #include "../Utility.hlsl"
 
 Texture2D _MainTex;
-float4 _Color, _Translucency;
-float _Width, _Height, BladeCount, _Smoothness, _MinScale, _Bend, _Factor, _EdgeLength;
 Buffer<uint> _PatchData;
 float4 _PatchScaleOffset;
+float BladeCount;
 
-struct HullInput
+cbuffer UnityPerMaterial
 {
-	float3 right : TEXCOORD0;
-	float3 up : TEXCOORD1;
-	float3 forward : TEXCOORD2;
-	float3 position : TEXCOORD3;
-	bool isCulled : TEXCOORD4;
-	float lodFactor : TEXCOORD5;
-};
-
-struct HullConstantOutput
-{
-	float edges[4] : SV_TessFactor;
-	float inside[2] : SV_InsideTessFactor;
-	float3 center : TEXCOORD;
-};
-
-struct DomainInput
-{
-	float3 normal : NORMAL;
-	float2 uv : TEXCOORD;
-	float3 position : TEXCOORD3;
+	float4 _Color, _Translucency;
+	float _Width, _Height, _Smoothness, _MinScale, _Bend, _Factor, _EdgeLength, _Rotation;
+	float WindStrength, WindAngle, WindWavelength, WindSpeed;
 };
 
 struct FragmentInput
 {
-	float3 normal : NORMAL;
-	float2 uv : TEXCOORD;
 	float4 position : SV_POSITION;
-	float3 positionWS : POSITION1;
+	float3 worldPosition : POSITION1;
+	float2 uv : TEXCOORD;
+	float3 normal : NORMAL;
+	float3 tangent : TANGENT;
 };
 
-float3 Rotate(float3 pivot, float3 position, float3 rotationAxis, float angle)
+FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 {
-	rotationAxis = normalize(rotationAxis);
-	float3 cpa = pivot + rotationAxis * dot(rotationAxis, position - pivot);
-	return cpa + ((position - cpa) * cos(angle) + cross(rotationAxis, (position - cpa)) * sin(angle));
-}
+	uint quadId = id / 4;
+	uint vertexId = id % 4;
 
-float3x3 RotationFromAxisAngle(float3 A, float sinAngle, float cosAngle)
-{
-	float c = cosAngle;
-	float s = sinAngle;
-
-	return float3x3(A.x * A.x * (1 - c) + c, A.x * A.y * (1 - c) - A.z * s, A.x * A.z * (1 - c) + A.y * s,
-                    A.x * A.y * (1 - c) + A.z * s, A.y * A.y * (1 - c) + c, A.y * A.z * (1 - c) - A.x * s,
-                    A.x * A.z * (1 - c) - A.y * s, A.y * A.z * (1 - c) + A.x * s, A.z * A.z * (1 - c) + c);
-}
-
-HullInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
-{
 	uint cellData = _PatchData[instanceId];
 	uint dataColumn = (cellData >> 0) & 0x3FF;
 	uint dataRow = (cellData >> 10) & 0x3FF;
 	uint lod = (cellData >> 20) & 0xF;
-	int4 diffs = (cellData >> uint4(24, 26, 28, 30)) & 0x3;
 	
-	float lodFactor = 1;
-	float nextLod = exp2(lod + 1);
+	// Position
+	uint x = quadId % (uint) BladeCount;
+	uint y = quadId / (uint) BladeCount;
 	
-	uint row1 = id / BladeCount;
-	
-	bool isCulled = (id % lod != 0);
-	bool willBeCulled = (id % 2 != 0) || (row1 % 2 != 0);
-	lodFactor = willBeCulled ? lodFactor : 1.0;
-	
-	uint bladeId = id;
+	float3 centerPosition;
+	centerPosition.xz = ((uint2(x, y) << lod)) * rcp(BladeCount);
 	
 	// Random offset
-	uint hash0 = PermuteState(bladeId);
+	uint hash0 = PermuteState(quadId);
+	float offsetX = ConstructFloat(PcgHash(hash0));
+	centerPosition.x += offsetX / BladeCount;
+	
 	uint hash1 = PermuteState(hash0);
+	float offsetY = ConstructFloat(PcgHash(hash1));
+	centerPosition.z += offsetY / BladeCount;
+	
+	centerPosition.xz += (uint2(dataColumn, dataRow) << lod);
+	
+	centerPosition.xz = centerPosition.xz * _PatchScaleOffset.xy + _PatchScaleOffset.zw;
+	centerPosition.y = GetTerrainHeight(centerPosition);
+	
 	uint hash2 = PermuteState(hash1);
+	float scale = ConstructFloat(PcgHash(hash2));
+	scale = lerp(_MinScale, 1.0, scale);
+	
 	uint hash3 = PermuteState(hash2);
+	float rotation = ConstructFloat(PcgHash(hash3));
+	
 	uint hash4 = PermuteState(hash3);
-	
-	float offsetX = ConstructFloat(PcgHash(hash0)) * 1;
-	float offsetY = ConstructFloat(PcgHash(hash1)) * 1;
-	float scale = ConstructFloat(PcgHash(hash2)) * 1;
-	float rotation = ConstructFloat(PcgHash(hash3)) * 1;
-	float bend = ConstructFloat(PcgHash(hash4)) * 1;
-	
-	// Random position
-	uint _VerticesPerEdge = BladeCount + 1;
-	uint column = id % _VerticesPerEdge;
-	uint row = id / _VerticesPerEdge;
-	uint x = column;
-	uint y = row;
-	
-	float _RcpVerticesPerEdgeMinusOne = rcp(BladeCount);
-	
-	float2 vertex = (uint2(x, y) << lod) * _RcpVerticesPerEdgeMinusOne + (uint2(dataColumn, dataRow) << lod);
-	
-	float3 position;
-	position.xz = vertex * _PatchScaleOffset.xy + _PatchScaleOffset.zw;
-
-	float facingPhi = rotation * TwoPi;
-	float sinFacingPhi, cosFacingPhi;
-	sincos(facingPhi, sinFacingPhi, cosFacingPhi);
-	float3x3 facing = RotationFromAxisAngle(float3(0, 1, 0), sinFacingPhi, cosFacingPhi); // Just use fromtorotationz?
+	float bend = ConstructFloat(PcgHash(hash4));
 	
 	// Bend
-	float phi = (bend - 0.5) * 0.5 * _Bend * TwoPi;
-	float sinPhi, cosPhi;
+	float theta = bend * HalfPi * _Bend;
+	float phi = rotation * TwoPi * _Rotation;
+	
+	float _WindFrequency = TwoPi / WindWavelength;
+    
+	float3 _WindDirection = 0;
+	sincos(WindAngle * TwoPi, _WindDirection.z, _WindDirection.x);
+	
+	// Sample wind noise in wind direction space
+	float windNoise = sin(dot(centerPosition + ViewPosition, _WindDirection) * _WindFrequency + Time * WindSpeed * _WindFrequency) * 0.5 + 0.5;
+	theta -= windNoise * WindStrength * cos(WindAngle * TwoPi - phi);
+    
+	float cosTheta, sinTheta, cosPhi, sinPhi;
+	sincos(theta, sinTheta, cosTheta);
 	sincos(phi, sinPhi, cosPhi);
 	
-	float sinTheta = SinFromCos(bend);
+	float3 bitangent = float3(float2(cosPhi, sinPhi) * sinTheta, cosTheta).xzy;
+	float3 tangent = float3(-sinPhi, 0, cosPhi);
 	
-	float3x3 bending = RotationFromAxisAngle(float3(1, 0, 0), sinPhi, cosPhi);
-	float3x3 rotMat = mul(facing, bending);
+	// Terrain normal
+	float3 terrainNormal = GetTerrainNormalLevel(centerPosition);
+	bitangent = FromToRotationZ(terrainNormal.xzy, bitangent.xzy).xzy;
+	tangent = FromToRotationZ(terrainNormal.xzy, tangent.xzy).xzy;
 	
-	scale = lerp(_MinScale, 1, scale);
+	float3 normal = cross(bitangent, tangent);//	float3(float2(cosPhi, sinPhi) * cosTheta, -sinTheta).xzy;
 	
-	float3 right = mul(rotMat, float3(1, 0, 0));
-	position -= right * 0.5;
+	FragmentInput output;
+	output.normal = normal;
+	output.tangent = tangent;
+	output.uv = GetQuadTexCoord(vertexId);
 	
-	float terrainHeight = GetTerrainHeight(position);
-	position.y = terrainHeight;
+	float width = lerp(_Width, _Width * 0.05, output.uv.y * 1);
+	output.worldPosition = centerPosition;
+	output.worldPosition += (output.uv.x - 0.5) * output.tangent * width * scale;
+	output.worldPosition += (output.uv.y) * bitangent * _Height * scale;
+	output.position = WorldToClip(output.worldPosition);
 	
-	HullInput output;
-	output.right = right * _Width * scale;
-	output.up = mul(rotMat, float3(0, 1, 0)) * _Height * scale;
-	output.forward = mul(rotMat, float3(0, 0, 1)) * scale;
-	output.position = position;
-	output.isCulled = isCulled;
-	output.lodFactor = lodFactor;
-	return output;
-}
-
-HullConstantOutput HullConstant(InputPatch<HullInput, 1> input)
-{
-	HullConstantOutput output = (HullConstantOutput) 0;
-	
-	[unroll]
-	for (uint i = 0; i < min(10, _CullingPlanesCount); i++)
-	{
-		if (dot(_CullingPlanes[i], float4(input[0].position, 1.0)) < -_Width * 3)
-			return output;
-	}
-	
-	float2 uv = WorldToTerrainPosition(input[0].position);
-	uint layerData = IdMap[uv * IdMapResolution];
+	float2 terrainUv = WorldToTerrainPosition(centerPosition);
+	uint layerData = IdMap[terrainUv * IdMapResolution];
 	
 	uint layerIndex0 = BitUnpack(layerData, 4, 0);
 	uint layerIndex1 = BitUnpack(layerData, 4, 13);
 	float blend = Remap(BitUnpack(layerData, 4, 26), 0.0, 15.0, 0.0, 0.5);
 	
-	if(layerIndex0 != 0 && layerIndex0 != 2 && layerIndex0 != 7 && layerIndex0 != 9)
-		return output;
+	if (layerIndex0 != 0 && layerIndex0 != 2 && layerIndex0 != 7 && layerIndex0 != 9)
+		output.position = 0x7F800000;
 	
-	
-	//if (!input[0].isCulled)
-	{
-		output.edges[0] = 1;
-		output.edges[1] = 1;
-		output.edges[2] = 1;
-		output.edges[3] = 1;
-		output.inside[0] = 1;
-		output.inside[1] = 1;
-		output.center = input[0].position;
-	}
-		
 	return output;
-}
-
-[domain("quad")]
-[partitioning("fractional_even")]
-[outputtopology("triangle_cw")]
-[outputcontrolpoints(4)]
-[patchconstantfunc("HullConstant")]
-DomainInput Hull(InputPatch<HullInput, 1> vertices, uint id : SV_OutputControlPointID)
-{
-	HullInput input = vertices[0];
-	float3 position = input.position;
-	
-	// Center uv on x(0) so it expands out both ways
-	float2 uv = GetQuadTexCoord(id);
-	position += lerp(uv.x, 0, uv.y) * input.right + uv.y * input.up * vertices[0].lodFactor;
-	//position += uv.x * input.right + uv.y * input.up * vertices[0].lodFactor;
-	
-	DomainInput o;
-	o.position = position;
-	o.normal = normalize(input.forward);
-	o.uv = uv;
-	return o;
-}
-
-[domain("quad")]
-FragmentInput Domain(HullConstantOutput input, OutputPatch<DomainInput, 4> v, float2 uv : SV_DomainLocation)
-{
-	float4 weights = uv.xxyy * float4(-1, 1, 1, -1) + float4(1, 0, 0, 1);
-	weights = weights.zzww * weights.xyyx;
-	
-	float3 position = v[0].position * weights.x + v[1].position * weights.y + v[2].position * weights.z + v[3].position * weights.w;
-	float3 normal = v[0].normal * weights.x + v[1].normal * weights.y + v[2].normal * weights.z + v[3].normal * weights.w;
-	float2 finalUv = v[0].uv * weights.x + v[1].uv * weights.y + v[2].uv * weights.z + v[3].uv * weights.w;
-	
-	// Evaluate wind at the final world position/normal
-	float2 wind = pow(sin(input.center.x * 0.227 + Time * 3), 2) * 0.02 * pow(finalUv.y, 1);
-	
-	// and some wind
-	position.xz += wind;
-	//normal.xz += wind * 10;
-	//normal = normalize(normal);
-	
-	FragmentInput o;
-	o.positionWS = input.center;
-	o.position = WorldToClip(position);
-	o.normal = normal;
-	o.uv = finalUv;
-	return o;
 }
 
 GBufferOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 {
 	float4 tex = _MainTex.Sample(LinearClampSampler, input.uv);
-	
-	// Get X/Y position and mip of target texture.
-	float2 terrainUv = WorldToTerrainPosition(input.positionWS);
-	//float mipLevel = CalculateVirtualMipLevel(terrainUv);
-	
-	//float2 derivativeScale;
-	//float2 virtualUv = CalculateVirtualUv(terrainUv, mipLevel, derivativeScale);
-	//float4 albedoSmoothness = _VirtualTexture.Sample(sampler_VirtualTexture, virtualUv);
-	
-	//SurfaceData surface = DefaultSurface();
-	//surface.Albedo = lerp(albedoSmoothness.rgb, _Color.rgb, i.uv.y) ;
 	float3 Albedo = _Color.rgb * tex.rgb;
 	float Occlusion = lerp(0.5, 1.0, input.uv.y);
 	float roughness = SmoothnessToPerceptualRoughness(_Smoothness);
 	float3 Normal = normalize(input.normal);
-	float3 Translucency = _Translucency;
+	float3 Translucency = _Translucency.rgb * tex.rgb;
 	
 	if (!isFrontFace)
 		Normal = -Normal;

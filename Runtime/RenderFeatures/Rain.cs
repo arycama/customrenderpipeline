@@ -36,7 +36,10 @@ public class Rain : CameraRenderFeature
 	protected override void Cleanup(bool disposing)
 	{
 		if (previousDropletCount != 0)
+		{
 			renderGraph.ReleasePersistentResource(positionBuffer);
+			renderGraph.ReleasePersistentResource(indexBuffer);
+		}
 	}
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
