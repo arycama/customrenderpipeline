@@ -5,9 +5,13 @@ Shader "Surface/Grass"
         [IntRange] _BladeDensity("Blade Density", Range(1, 32)) = 1
         [IntRange] _EdgeLength("Edge Length", Range(32, 1024)) = 128
         [IntRange] _Factor("Tessellation Factor", Range(1, 32)) = 1
-        _MainTex("Texture", 2D) = "white" {}
+
+        [Toggle] Cutout("Cutout", Float) = 0
+        AlbedoOpacity("Albedo Opacity", 2D) = "white" {}
+        NormalOcclusionRoughness("Normal Occlusion Roughness", 2D) = "white" {}
+
         _MinScale("Min Scale", Range(0, 1)) = 0.5
-        _Width("Width", Range(0, 0.2)) = 0.025
+        _Width("Width", Range(0, 2)) = 0.025
         _Height("Height", Range(0, 1)) = 0.5
         _Bend("Bend", Range(0, 1)) = 0.5
         _Rotation("Rotation", Range(0, 1)) = 0.5
@@ -37,6 +41,7 @@ Shader "Surface/Grass"
             HLSLPROGRAM
             #pragma vertex Vertex
             #pragma fragment Fragment
+            #pragma shader_feature_local_fragment CUTOUT_ON
 
             #include "Grass.hlsl"
             ENDHLSL

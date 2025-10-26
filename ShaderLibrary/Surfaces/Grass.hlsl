@@ -8,7 +8,7 @@
 #include "../Utility.hlsl"
 #include "../Temporal.hlsl"
 
-Texture2D _MainTex;
+Texture2D AlbedoOpacity, NormalOcclusionRoughness;
 Buffer<uint> _PatchData, InstanceData;
 float4 _PatchScaleOffset;
 float BladeCount;
@@ -18,6 +18,7 @@ cbuffer UnityPerMaterial
 	float4 _Color, _Translucency;
 	float _Width, _Height, _Smoothness, _MinScale, _Bend, _Factor, _EdgeLength, _Rotation;
 	float WindStrength, WindAngle, WindWavelength, WindSpeed;
+	float4 AlbedoOpacity_ST;
 };
 
 struct FragmentInput
@@ -136,18 +137,27 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 
 FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 {
-	float4 tex = _MainTex.Sample(LinearClampSampler, input.uv);
-	float3 Albedo = _Color.rgb * tex.rgb;
-	float Occlusion = 1;// lerp(0.5, 1.0, input.uv.y);
-	float roughness = SmoothnessToPerceptualRoughness(_Smoothness);
-	float3 Normal = normalize(input.normal);
-	float3 Translucency = _Translucency.rgb * tex.rgb;
+	float2 uv = input.uv * AlbedoOpacity_ST.xy + AlbedoOpacity_ST.zw;
+	float4 albedoOpacity = AlbedoOpacity.Sample(SurfaceSampler, uv);
+	float4 normalOcclusionRoughness = NormalOcclusionRoughness.Sample(SurfaceSampler, uv);
 	
+	#ifdef CUTOUT_ON
+		clip(albedoOpacity.a - 0.5);
+	#endif
+	
+	float3 tangentNormal = UnpackNormalUNorm(normalOcclusionRoughness.xy);
 	if (!isFrontFace)
-		Normal = -Normal;
+		tangentNormal.z = -tangentNormal.z;
+	
+	float3 worldNormal = TangentToWorldNormal(tangentNormal, input.normal, input.tangent, 1);
+	
+	float3 albedo = _Color.rgb * albedoOpacity.rgb;
+	float occlusion = normalOcclusionRoughness.b;
+	float roughness = SmoothnessToPerceptualRoughness(_Smoothness) * normalOcclusionRoughness.a;
+	float3 translucency = _Translucency.rgb * albedoOpacity.rgb;
 		
 	FragmentOutput output;
-	output.gBuffer = OutputGBuffer(Albedo, 0, Normal, roughness, Normal, 1, 0, Translucency, input.position.xy, true);
+	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, occlusion, 0, translucency, input.position.xy, true);
 	output.velocity = CalculateVelocity(input.position.xy * RcpViewSize, input.previousPositionCS);
 	return output;
 }
