@@ -6,9 +6,10 @@
 #include "../Material.hlsl"
 #include "../Geometry.hlsl"
 #include "../Utility.hlsl"
+#include "../Temporal.hlsl"
 
 Texture2D _MainTex;
-Buffer<uint> _PatchData;
+Buffer<uint> _PatchData, InstanceData;
 float4 _PatchScaleOffset;
 float BladeCount;
 
@@ -23,78 +24,86 @@ struct FragmentInput
 {
 	float4 position : SV_POSITION;
 	float3 worldPosition : POSITION1;
+	float4 previousPositionCS : POSITION2;
 	float2 uv : TEXCOORD;
 	float3 normal : NORMAL;
 	float3 tangent : TANGENT;
 };
 
+struct FragmentOutput
+{
+	GBufferOutput gBuffer;
+	float2 velocity : SV_Target4;
+};
+
+// Rotate a vector around a unit axis by an angle
+float3 RotateAroundAxis(float3 v, float3 axis, float angle)
+{
+	float cosAngle, sinAngle;
+	sincos(angle, sinAngle, cosAngle);
+    
+	return v * cosAngle + cross(axis, v) * sinAngle;
+}
+
 FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 {
-	uint quadId = id / 4;
-	uint vertexId = id % 4;
-
+	uint quadId = id >> 2;
+	uint data = InstanceData[quadId];
+	float offsetX = BitUnpackFloat(data, 6, 0);
+	float offsetY = BitUnpackFloat(data, 6, 6);
+	float scale = BitUnpackFloat(data, 6, 12);
+	float cosTheta = BitUnpackFloat(data, 6, 18);
+	float phi = BitUnpackFloat(data, 8, 24) * TwoPi;
+	
+	// Patch
+	uint vertexId = id & 3;
 	uint cellData = _PatchData[instanceId];
 	uint dataColumn = (cellData >> 0) & 0x3FF;
 	uint dataRow = (cellData >> 10) & 0x3FF;
 	uint lod = (cellData >> 20) & 0xF;
 	
-	// Position
+	// Quad position
 	uint x = quadId % (uint) BladeCount;
 	uint y = quadId / (uint) BladeCount;
 	
 	float3 centerPosition;
 	centerPosition.xz = ((uint2(x, y) << lod)) * rcp(BladeCount);
+	centerPosition.xz += float2(offsetX, offsetY);
 	
-	// Random offset
-	uint hash0 = PermuteState(quadId);
-	float offsetX = ConstructFloat(PcgHash(hash0));
-	centerPosition.x += offsetX / BladeCount;
-	
-	uint hash1 = PermuteState(hash0);
-	float offsetY = ConstructFloat(PcgHash(hash1));
-	centerPosition.z += offsetY / BladeCount;
-	
+	// Patch position
 	centerPosition.xz += (uint2(dataColumn, dataRow) << lod);
-	
 	centerPosition.xz = centerPosition.xz * _PatchScaleOffset.xy + _PatchScaleOffset.zw;
 	centerPosition.y = GetTerrainHeight(centerPosition);
 	
-	uint hash2 = PermuteState(hash1);
-	float scale = ConstructFloat(PcgHash(hash2));
-	scale = lerp(_MinScale, 1.0, scale);
+	// Generate grass vector
+	float cosPhi, sinPhi;
+	sincos(phi, sinPhi, cosPhi);
+	float3 tangent = float3(-sinPhi, cosPhi, 0).xzy;
+	float3 normal = float3(float2(cosPhi, sinPhi) * cosTheta, -SinFromCos(cosTheta)).xzy;
 	
-	uint hash3 = PermuteState(hash2);
-	float rotation = ConstructFloat(PcgHash(hash3));
+	// Rotate to Terrain normal
+	float3 terrainNormal = GetTerrainNormalLevel(centerPosition);
+	tangent = FromToRotationZ(terrainNormal.xzy, tangent.xzy).xzy;
+	normal = FromToRotationZ(terrainNormal.xzy, normal.xzy).xzy;
 	
-	uint hash4 = PermuteState(hash3);
-	float bend = ConstructFloat(PcgHash(hash4));
-	
-	// Bend
-	float theta = bend * HalfPi * _Bend;
-	float phi = rotation * TwoPi * _Rotation;
-	
+	// Wind
+	// Precompute
 	float _WindFrequency = TwoPi / WindWavelength;
-    
+	float WindPhase = Time * WindSpeed * _WindFrequency;
+	float WindPhase1 = PreviousTime * WindSpeed * _WindFrequency;
 	float3 _WindDirection = 0;
 	sincos(WindAngle * TwoPi, _WindDirection.z, _WindDirection.x);
 	
-	// Sample wind noise in wind direction space
-	float windNoise = sin(dot(centerPosition + ViewPosition, _WindDirection) * _WindFrequency + Time * WindSpeed * _WindFrequency) * 0.5 + 0.5;
-	theta -= windNoise * WindStrength * cos(WindAngle * TwoPi - phi);
-    
-	float cosTheta, sinTheta, cosPhi, sinPhi;
-	sincos(theta, sinTheta, cosTheta);
-	sincos(phi, sinPhi, cosPhi);
+	// Wind
+	float windNoise1 = sin(dot(centerPosition + ViewPosition, _WindDirection) * _WindFrequency + WindPhase1) * 0.5 + 0.5;
+	float wind1 = windNoise1 * WindStrength * dot(_WindDirection, normal);
+	float3 normal1 = RotateAroundAxis(normal, tangent, wind1);
+	float3 bitangent1 = cross(tangent, normal1);
 	
-	float3 bitangent = float3(float2(cosPhi, sinPhi) * sinTheta, cosTheta).xzy;
-	float3 tangent = float3(-sinPhi, 0, cosPhi);
-	
-	// Terrain normal
-	float3 terrainNormal = GetTerrainNormalLevel(centerPosition);
-	bitangent = FromToRotationZ(terrainNormal.xzy, bitangent.xzy).xzy;
-	tangent = FromToRotationZ(terrainNormal.xzy, tangent.xzy).xzy;
-	
-	float3 normal = cross(bitangent, tangent);//	float3(float2(cosPhi, sinPhi) * cosTheta, -sinTheta).xzy;
+	float windNoise = sin(dot(centerPosition + ViewPosition, _WindDirection) * _WindFrequency + WindPhase) * 0.5 + 0.5;
+	float wind = windNoise * WindStrength * dot(_WindDirection, normal);
+	normal = RotateAroundAxis(normal, tangent, wind);
+	float3 bitangent = cross(tangent, normal);
 	
 	FragmentInput output;
 	output.normal = normal;
@@ -104,6 +113,11 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	float width = lerp(_Width, _Width * 0.05, output.uv.y * 1);
 	output.worldPosition = centerPosition;
 	output.worldPosition += (output.uv.x - 0.5) * output.tangent * width * scale;
+	
+	float3 previousWorldPosition = output.worldPosition;
+	previousWorldPosition += (output.uv.y) * bitangent1 * _Height * scale;
+	output.previousPositionCS = WorldToClipPrevious(previousWorldPosition);
+	
 	output.worldPosition += (output.uv.y) * bitangent * _Height * scale;
 	output.position = WorldToClip(output.worldPosition);
 	
@@ -115,22 +129,25 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	float blend = Remap(BitUnpack(layerData, 4, 26), 0.0, 15.0, 0.0, 0.5);
 	
 	if (layerIndex0 != 0 && layerIndex0 != 2 && layerIndex0 != 7 && layerIndex0 != 9)
-		output.position = 0x7F800000;
+		output.position = asfloat(0x7F800000);
 	
 	return output;
 }
 
-GBufferOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
+FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 {
 	float4 tex = _MainTex.Sample(LinearClampSampler, input.uv);
 	float3 Albedo = _Color.rgb * tex.rgb;
-	float Occlusion = lerp(0.5, 1.0, input.uv.y);
+	float Occlusion = 1;// lerp(0.5, 1.0, input.uv.y);
 	float roughness = SmoothnessToPerceptualRoughness(_Smoothness);
 	float3 Normal = normalize(input.normal);
 	float3 Translucency = _Translucency.rgb * tex.rgb;
 	
 	if (!isFrontFace)
 		Normal = -Normal;
-	
-	return OutputGBuffer(Albedo, 0, Normal, roughness, Normal, VisibilityToConeAngle(Occlusion) * RcpHalfPi, 0, Translucency, input.position.xy, true);
+		
+	FragmentOutput output;
+	output.gBuffer = OutputGBuffer(Albedo, 0, Normal, roughness, Normal, 1, 0, Translucency, input.position.xy, true);
+	output.velocity = CalculateVelocity(input.position.xy * RcpViewSize, input.previousPositionCS);
+	return output;
 }

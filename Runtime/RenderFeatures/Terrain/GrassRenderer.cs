@@ -15,22 +15,25 @@ public class GrassRenderer : CameraRenderFeature
 	}
 
 	private readonly Settings settings;
-	private readonly TerrainSystem terrainSystem;
 	private readonly QuadtreeCull quadtreeCull;
-	private ResourceHandle<GraphicsBuffer> indexBuffer;
+	private ResourceHandle<GraphicsBuffer> indexBuffer, instanceDataBuffer;
 	private int previousVertexCount;
+	private readonly ComputeShader grassDataComputeShader;
 
-	public GrassRenderer(Settings settings, TerrainSystem terrainSystem, RenderGraph renderGraph, QuadtreeCull quadtreeCull) : base(renderGraph)
+	public GrassRenderer(Settings settings, RenderGraph renderGraph, QuadtreeCull quadtreeCull) : base(renderGraph)
 	{
 		this.settings = settings;
-		this.terrainSystem = terrainSystem;
 		this.quadtreeCull = quadtreeCull;
+		this.grassDataComputeShader = Resources.Load<ComputeShader>("GpuInstancedRendering/GrassData");
 	}
 
 	protected override void Cleanup(bool disposing)
 	{
 		if (previousVertexCount != 0)
+		{
 			renderGraph.ReleasePersistentResource(indexBuffer);
+			renderGraph.ReleasePersistentResource(instanceDataBuffer);
+		}
 	}
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
@@ -50,10 +53,29 @@ public class GrassRenderer : CameraRenderFeature
 		if(vertexCount != previousVertexCount)
 		{
 			if (previousVertexCount != 0)
+			{
 				renderGraph.ReleasePersistentResource(indexBuffer);
+				renderGraph.ReleasePersistentResource(instanceDataBuffer);
+			}
 
 			indexBuffer = renderGraph.GetQuadIndexBuffer(vertexCount, false);
+			instanceDataBuffer = renderGraph.GetBuffer(vertexCount, isPersistent: true);
 			previousVertexCount = vertexCount;
+
+			// Just initialize this once, should do it whenever data changes but
+			using (var pass = renderGraph.AddComputeRenderPass("Grass Data Init", (bladeCount, material.GetFloat("_MinScale"), material.GetFloat("_Bend"))))
+			{
+				pass.Initialize(grassDataComputeShader, 0, vertexCount);
+
+				pass.WriteBuffer("InstanceData", instanceDataBuffer);
+
+				pass.SetRenderFunction((command, pass, data) =>
+				{
+					pass.SetFloat("BladeCount", data.bladeCount);
+					pass.SetFloat("MinScale", data.Item2);
+					pass.SetFloat("Bend", data.Item3);
+				});
+			}
 		}
 
 		// Need to resize buffer for visible indices
@@ -80,8 +102,6 @@ public class GrassRenderer : CameraRenderFeature
 		var size = terrainSystemData.terrainData.size;
 		var heightmapResolution = terrainSystemData.terrainData.heightmapResolution;
 
-
-
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Render Grass", 
 		(
 			bladeCount, 
@@ -104,6 +124,7 @@ public class GrassRenderer : CameraRenderFeature
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
 
 			pass.ReadBuffer("_PatchData", quadtreeCullResults.PatchDataBuffer);
+			pass.ReadBuffer("InstanceData", instanceDataBuffer);
 
 			pass.AddRenderPassData<FrameData>();
 			pass.AddRenderPassData<ViewData>();

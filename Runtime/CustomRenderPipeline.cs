@@ -240,7 +240,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new GpuDrivenRenderingRender(gpuDrivenRenderer, renderGraph),
 
-		new GrassRenderer(asset.Grass, terrainSystem, renderGraph, quadtreeCull),
+		new GrassRenderer(asset.Grass, renderGraph, quadtreeCull),
 
 		// Finalize gbuffer
 		new ScreenSpaceTerrain(renderGraph),

@@ -1,14 +1,39 @@
-// Each #kernel tells which function to compile; you can have many kernels
-#pragma kernel CSMain
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Random.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Utility.hlsl"
 
-// Create a RenderTexture with enableRandomWrite flag and set it
-// with cs.SetTexture
-RWTexture2D<float4> Result;
+#pragma kernel GrassData
 
-[numthreads(8,8,1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
+float BladeCount;
+float MinScale;
+float Bend;
+
+RWStructuredBuffer<uint> InstanceData;
+
+[numthreads(64, 1, 1)]
+void GrassData(uint id : SV_DispatchThreadID)
 {
-    // TODO: insert actual code here!
-
-    Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
+	uint hash0 = PermuteState(id);
+	float offsetX = ConstructFloat(PcgHash(hash0));
+	uint hash1 = PermuteState(hash0);
+	float offsetY = ConstructFloat(PcgHash(hash1));
+	float2 offset = float2(offsetX, offsetY) / BladeCount;
+	
+	uint hash2 = PermuteState(hash1);
+	float scale = ConstructFloat(PcgHash(hash2));
+	scale = lerp(MinScale, 1.0, scale);
+	
+	uint hash3 = PermuteState(hash2);
+	float rotation = ConstructFloat(PcgHash(hash3));
+	
+	uint hash4 = PermuteState(hash3);
+	float bend = ConstructFloat(PcgHash(hash4));
+	float cosTheta = cos(bend * HalfPi * Bend);
+	
+	uint data = BitPackFloat(offsetX, 6, 0);
+	data |= BitPackFloat(offsetY, 6, 6);
+	data |= BitPackFloat(scale, 6, 12);
+	data |= BitPackFloat(cosTheta, 6, 18);
+	data |= BitPackFloat(rotation, 8, 24);
+	
+	InstanceData[id] = data;
 }

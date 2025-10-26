@@ -185,9 +185,20 @@ uint BitPack(uint data, uint size, uint offset)
 	return (data & (Exp2Pow2(size) - 1u)) << offset;
 }
 
+uint BitPackFloat(float data, uint size, uint offset)
+{
+	uint packedData = round(data * (Exp2Pow2(size) - 1u));
+	return BitPack(packedData, size, offset);
+}
+
 uint BitUnpack(uint data, uint size, uint offset)
 {
 	return (data >> offset) & (Exp2Pow2(size) - 1u);
+}
+
+float BitUnpackFloat(uint data, uint size, uint offset)
+{
+	return BitUnpack(data, size, offset) / (float) (Exp2Pow2(size) - 1u);
 }
 
 bool Checker(float2 position)
