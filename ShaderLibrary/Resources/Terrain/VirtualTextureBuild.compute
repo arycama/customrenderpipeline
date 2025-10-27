@@ -1,9 +1,9 @@
 #pragma kernel VirtualTextureBuild
-#pragma enable_d3d11_debug_symbols
 
-#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/TerrainCommon.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Color.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Samplers.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/TerrainCommon.hlsl"
 
 RWTexture2D<float4> _AlbedoSmoothness, _NormalMetalOcclusion;
 RWTexture2D<float> _Heights;
@@ -31,11 +31,11 @@ void VirtualTextureBuild(uint2 id : SV_DispatchThreadID)
 	float2 dx = float2(scaleOffset.x / _Resolution.x, 0);
 	float2 dy = float2(0, scaleOffset.y / _Resolution.y);
 	
-	float3 worldPosition = float3(uv * TerrainSize.xz + TerrainPosition.xz, 0).xzy;
+	float3 worldPosition = float3(uv * TerrainSize.xz + TerrainPosition.xz, 0).xzy - ViewPosition;
 	
 	float height;
 	TerrainRenderResult result = RenderTerrain(worldPosition, uv, dx, dy, height, true);
-	_AlbedoSmoothness[id] = float4(result.albedo, 1.0 - result.roughness);
+	_AlbedoSmoothness[id] = float4(LinearToGamma(result.albedo), 1.0 - result.roughness);
 	_Heights[id] = height;
-	_NormalMetalOcclusion[id] = float4(0, result.normal.z, result.visibilityAngle, result.normal.x);
+	_NormalMetalOcclusion[id] = float4(0, 0.5 * result.normal.z + 0.5, result.visibilityAngle, 0.5 * result.normal.x + 0.5);
 }

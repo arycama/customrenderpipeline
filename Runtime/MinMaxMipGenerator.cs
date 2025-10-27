@@ -24,7 +24,7 @@ public class MinMaxMipGenerator : MonoBehaviour
 		minMaxMipmap.enableRandomWrite = true;
 		minMaxMipmap.useMipMap = true;
 		minMaxMipmap.autoGenerateMips = false;
-		minMaxMipmap.Create();
+		_ = minMaxMipmap.Create();
 
 		// Generate each mip level
 		for (var i = 0; i < mipCount; i++)

@@ -54,7 +54,7 @@ public class LruCache<T, K>
 		cache.RemoveFirst();
 
 		// Remove the tileId from the cache
-		lookup.Remove(result.Value.Item1);
+		_ = lookup.Remove(result.Value.Item1);
 		Count--;
 		return result.Value;
 	}

@@ -7,7 +7,6 @@
 #include "../../VirtualTexturing.hlsl"
 
 SamplerState _TrilinearClampSamplerAniso4;
-
 Texture2D<float4> BentNormalVisibility;
 
 GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
@@ -26,9 +25,9 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	TerrainRenderResult result = RenderTerrain(worldPosition, uv, ddx(worldPosition.xz), ddy(worldPosition.xz));
 	
 	result.albedo = albedoSmoothness.rgb;
-	//result.roughness = 1.0 - albedoSmoothness.a;
-	//result.normal = UnpackNormalUNorm(normalMetalOcclusion.ag);
-	//result.visibilityAngle = normalMetalOcclusion.b;
+	result.roughness = 1.0 - albedoSmoothness.a;
+	result.normal = UnpackNormalUNorm(normalMetalOcclusion.ag).xzy;
+	result.visibilityAngle = normalMetalOcclusion.b;
 	
 	float4 visibilityCone = BentNormalVisibility.Sample(SurfaceSampler, normalUv);
 	visibilityCone.xyz = normalize(visibilityCone.xyz);

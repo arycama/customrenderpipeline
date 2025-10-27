@@ -187,8 +187,6 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 
 	protected sealed override void PostExecute()
 	{
-		Command.ClearRandomWriteTargets();
-
 		foreach (var colorTarget in colorTargets)
 		{
 			var handle = colorTarget.Item1;

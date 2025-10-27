@@ -5,9 +5,9 @@
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Color.hlsl"
 //#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
  
-RWTexture2D<uint4> _AlbedoResult0, _AlbedoResult1, _NormalResult0, _NormalResult1;
-RWTexture2D<uint2> _HeightResult0, _HeightResult1;
-Texture2D _AlbedoInput, _NormalInput, _HeightInput;
+RWTexture2D<uint4> AlbedoResult0, AlbedoResult1, NormalResult0, NormalResult1;
+RWTexture2D<uint2> HeightResult0, HeightResult1;
+Texture2D AlbedoInput, NormalInput, HeightInput;
 
 #define COMPRESS_ONE_MIP_THREADGROUP_WIDTH 8
 #define COMPRESS_TWO_MIPS_THREADGROUP_WIDTH 16
@@ -670,7 +670,7 @@ void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
 	// Albedo
 	float3 blockRGB[16];
 	float blockA[16];
-	LoadTexelsRGBA(_AlbedoInput, threadIDWithinDispatch, blockRGB, blockA);
+	LoadTexelsRGBA(AlbedoInput, threadIDWithinDispatch, blockRGB, blockA);
 	
 	// Downsample from mip 0 to mip 1
 	DownsampleMip(threadIDWithinGroup, blockRGB, blockA);
@@ -682,7 +682,7 @@ void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
 		blockRGB[i] = LinearToGamma(blockRGB[i]);
 	}
 	
-	_AlbedoResult0[threadIDWithinDispatch] = CompressBC3Block(blockRGB, blockA);
+	AlbedoResult0[threadIDWithinDispatch] = CompressBC3Block(blockRGB, blockA);
 	
 	// When compressing two mips at a time, we use a group size of 16x16. This produces four 64-thread shader vectors.
     // The first shader vector will execute the code below and the other three will retire.
@@ -699,19 +699,19 @@ void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
         // Pass a scale value of 0.25 to CompressBC3 block to average the four source values contributing to each pixel
         //  in the block. See the comment in DownsampleMip, above.
 		uint4 compressed = CompressBC3Block(gs_mip1BlocksRGB[threadIndexWithinGroup], gs_mip1BlocksA[threadIndexWithinGroup]);
-		_AlbedoResult1[groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID] = compressed;
+		AlbedoResult1[groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID] = compressed;
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
 	
 	// Normal
-	LoadTexelsRGBA(_NormalInput, threadIDWithinDispatch, blockRGB, blockA);
+	LoadTexelsRGBA(NormalInput, threadIDWithinDispatch, blockRGB, blockA);
 	
 	 // Downsample from mip 0 to mip 1
 	DownsampleMip(threadIDWithinGroup, blockRGB, blockA);
 	GroupMemoryBarrierWithGroupSync();
 	
-	_NormalResult0[threadIDWithinDispatch] = CompressBC3Block(blockRGB, blockA);
+	NormalResult0[threadIDWithinDispatch] = CompressBC3Block(blockRGB, blockA);
 	
 	// When compressing two mips at a time, we use a group size of 16x16. This produces four 64-thread shader vectors.
     // The first shader vector will execute the code below and the other three will retire.
@@ -722,13 +722,13 @@ void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
         // Pass a scale value of 0.25 to CompressBC3 block to average the four source values contributing to each pixel
         //  in the block. See the comment in DownsampleMip, above.
 		uint4 compressed = CompressBC3Block(gs_mip1BlocksRGB[threadIndexWithinGroup], gs_mip1BlocksA[threadIndexWithinGroup]);
-		_NormalResult1[groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID] = compressed;
+		NormalResult1[groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID] = compressed;
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
 	
 	// Height
-	LoadTexelsRGBA(_HeightInput, threadIDWithinDispatch, blockRGB, blockA);
+	LoadTexelsRGBA(HeightInput, threadIDWithinDispatch, blockRGB, blockA);
 	
 	// Downsample from mip 0 to mip 1
 	DownsampleMip(threadIDWithinGroup, blockRGB, blockA);
@@ -741,7 +741,7 @@ void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
 		blockR[i] = blockRGB[i].r;
 	}
 	
-	_HeightResult0[threadIDWithinDispatch] = CompressBC4Block(blockR);
+	HeightResult0[threadIDWithinDispatch] = CompressBC4Block(blockR);
 	
 	// When compressing two mips at a time, we use a group size of 16x16. This produces four 64-thread shader vectors.
     // The first shader vector will execute the code below and the other three will retire.
@@ -757,6 +757,6 @@ void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
         // Pass a scale value of 0.25 to CompressBC3 block to average the four source values contributing to each pixel
         //  in the block. See the comment in DownsampleMip, above.
 		uint2 compressed = CompressBC4Block(blockR);
-		_HeightResult1[groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID] = compressed;
+		HeightResult1[groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID] = compressed;
 	}
 }

@@ -154,7 +154,6 @@ public class ParticleShadows : CameraRenderFeature
 			{
 				pass.SetInt("ParticleShadowDepthInt", data.DirectionalDepth);
 				pass.SetInt("ParticleShadowResolutionInt", data.DirectionalResolution);
-				command.ClearRandomWriteTargets();
 				command.SetBufferData(pass.GetBuffer(data.shadowSteps), data.directionalShadowSizes);
 				ArrayPool<float>.Release(data.directionalShadowSizes);
 			});

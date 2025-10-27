@@ -18,14 +18,14 @@ RWBuffer<uint> TilesToUnmap;
 // Source pixels (Not sure if this has to be RW, but it's going to be the same texture as the destination, 
 // So we might need to Ensure that only one mip can be read at a time.
 RWTexture2D<uint> SourceMip, DestMip;
-RWTexture2D<float> _IndirectionTextureMap;
+RWTexture2D<float> IndirectionTextureMap;
 
-uint CurrentMip, _MaxIndex;
+uint CurrentMip, MaxIndex;
 
 [numthreads(64, 1, 1)]
 void CopyTilesToUnmap(uint id : SV_DispatchThreadID)
 {
-	if (id < _MaxIndex)
+	if (id < MaxIndex)
 	{
 		// Get the currently mapped tile at the current position, and mark it for removal
 		TilesToUnmap[id] = MappedTiles[TileRequests[id] & 0xFFFF];
@@ -36,29 +36,25 @@ void CopyTilesToUnmap(uint id : SV_DispatchThreadID)
 [numthreads(64, 1, 1)]
 void MapNewData(uint id : SV_DispatchThreadID)
 {
-	if (id >= _MaxIndex)
-	{
+	if (id >= MaxIndex)
 		return;
-	}
 	
 	// Unmap pending data if required 
 	uint3 unmapData = (TilesToUnmap[id] >> uint3(0, 12, 24)) & uint2(0xFFF, 0xFF).xxy;
 	if (unmapData.z == CurrentMip)
 	{
-		bool isMapped = _IndirectionTextureMap[unmapData.xy];
+		bool isMapped = IndirectionTextureMap[unmapData.xy];
 		if (isMapped)
 		{
 			DestMip[unmapData.xy] = 0;
-			_IndirectionTextureMap[unmapData.xy] = 0;
+			IndirectionTextureMap[unmapData.xy] = 0;
 		}
 	}
 	
 	// Get the current data from the mip
 	uint2 data = (TileRequests[id] >> uint2(0, 16)) & 0xFFFF;
 	if (data.y != CurrentMip)
-	{
 		return;
-	}
 	
 	uint result = data.x & 0x7FF;
 	result |= (data.y & 0x1F) << 11;
@@ -67,7 +63,7 @@ void MapNewData(uint id : SV_DispatchThreadID)
 	uint2 destCoords = (DestPixels[id] >> uint2(0, 16)) & 0xFFFF;
 		
 	DestMip[destCoords] = result;
-	_IndirectionTextureMap[destCoords] = 1;
+	IndirectionTextureMap[destCoords] = 1;
 
 	// Update the MappedData with the location of this indirection texel
 	// Pack into (12, 12, 4, 4), as we don't need many mips for the latter data
@@ -85,16 +81,12 @@ void MapNewData(uint id : SV_DispatchThreadID)
 void VirtualTextureUpdate(uint2 id : SV_DispatchThreadID)
 {
 	// Return if out of bounds
-	if (any(id >= _MaxIndex))
-	{
+	if (any(id >= MaxIndex))
 		return;
-	}
 	
 	// Return if this pixel is already mapped
-	if (_IndirectionTextureMap[id])
-	{
+	if (IndirectionTextureMap[id])
 		return;
-	}
 	
 	DestMip[id] = SourceMip[id >> 1];
 }

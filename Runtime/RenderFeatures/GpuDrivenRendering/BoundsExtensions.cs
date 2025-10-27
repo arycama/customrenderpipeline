@@ -21,7 +21,7 @@ public static class BoundsExtensions
             }
             else
             {
-                result.Encapsulate(matrixPosition);
+				_ = result.Encapsulate(matrixPosition);
             }
         }
 

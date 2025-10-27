@@ -11,8 +11,8 @@ public class TerrainRenderer : TerrainRendererBase
 {
 	private readonly ResourceHandle<GraphicsBuffer> feedbackBuffer;
 
-	private GraphicsBuffer requestBuffer; // TODO: Switch this to a handle once we avoid multiple readbacks
-	private ResourceHandle<GraphicsBuffer> counterBuffer, /*requestBuffer, */tilesToUnmapBuffer, mappedTiles;
+	private GraphicsBuffer requestBuffer;
+	private ResourceHandle<GraphicsBuffer> counterBuffer, /*requestBuffer,*/ tilesToUnmapBuffer, mappedTiles;
 
 	private ResourceHandle<RenderTexture> indirectionTexture, indirectionTextureMapTexture;
 	private Texture2DArray albedoSmoothnessTexture, normalTexture, heightTexture;
@@ -29,7 +29,7 @@ public class TerrainRenderer : TerrainRendererBase
 	private int IndirectionTextureResolution => settings.VirtualResolution / settings.TileResolution;
 	private Terrain previousTerrain;
 
-	private Action<AsyncGPUReadbackRequest> counterReadbackComplete, requestReadbackComplete;
+	private readonly ComputeShader virtualTextureUpdateShader, dxtCompressCS, virtualTextureBuild, reductionComputeShader;
 
 	public TerrainRenderer(RenderGraph renderGraph, TerrainSettings settings, QuadtreeCull quadtreeCull) : base(renderGraph, settings, quadtreeCull)
 	{
@@ -72,14 +72,11 @@ public class TerrainRenderer : TerrainRendererBase
 		using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init"))
 		{
 			pass.WriteBuffer("", feedbackBuffer);
-			//pass.WriteBuffer("", requestBuffer);
 			pass.WriteBuffer("", counterBuffer);
 
 			pass.SetRenderFunction((command, pass) =>
 			{
 				command.SetBufferData(pass.GetBuffer(feedbackBuffer), new int[requestSize]);
-				//command.SetBufferData(pass.GetBuffer(requestBuffer), new int[requestSize]);
-				//command.SetBufferCounterValue(pass.GetBuffer(requestBuffer), 0u);
 				command.SetBufferData(requestBuffer, new int[requestSize]);
 				command.SetBufferCounterValue(requestBuffer, 0u);
 				command.SetBufferData(pass.GetBuffer(counterBuffer), new int[1]);
@@ -90,8 +87,10 @@ public class TerrainRenderer : TerrainRendererBase
 		mappedTiles = renderGraph.GetBuffer(settings.VirtualTileCount, sizeof(int), isPersistent: true);
 		tilesToUnmapBuffer = renderGraph.GetBuffer(settings.UpdateTileCount, sizeof(int), isPersistent: true);
 
-		counterReadbackComplete = OnCounterReadbackComplete;
-		requestReadbackComplete = OnRequestReadbackComplete;
+		reductionComputeShader = Resources.Load<ComputeShader>("Terrain/VirtualTerrain");
+		virtualTextureBuild = Resources.Load<ComputeShader>("Terrain/VirtualTextureBuild");
+		virtualTextureUpdateShader = Resources.Load<ComputeShader>("Terrain/VirtualTextureUpdate");
+		dxtCompressCS = Resources.Load<ComputeShader>("Terrain/DxtCompress");
 	}
 
 	protected override void Cleanup(bool disposing)
@@ -105,7 +104,6 @@ public class TerrainRenderer : TerrainRendererBase
 		Object.DestroyImmediate(heightTexture);
 
 		requestBuffer.Dispose();
-		//renderGraph.ReleasePersistentResource(requestBuffer);
 		renderGraph.ReleasePersistentResource(counterBuffer);
 		renderGraph.ReleasePersistentResource(mappedTiles);
 		renderGraph.ReleasePersistentResource(tilesToUnmapBuffer);
@@ -124,19 +122,22 @@ public class TerrainRenderer : TerrainRendererBase
 		if (terrainSystemData.terrain == null || settings.Material == null)
 			return;
 
+		// Used by tessellation to calculate lod
+		var size = terrainSystemData.terrainData.size;
+		var indTexSize = new Vector4(1f / size.x, 1f / size.z, size.x, size.z);
+
+		renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, indirectionTexture, settings.AnisoLevel, settings.VirtualResolution, indTexSize));
+
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
 		var passData = Cull(camera.transform.position, cullingPlanes, camera.ViewSize());
 		var passIndex = settings.Material.FindPass("Terrain");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no Terrain Pass");
 
-		var size = terrainSystemData.terrainData.size;
-		var position = terrainSystemData.terrain.GetPosition() - camera.transform.position;
-
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", (
 			VerticesPerTileEdge,
 			size,
 			settings,
-			position,
+			position: terrainSystemData.terrain.GetPosition() - camera.transform.position,
 			cullingPlanes,
 			terrainSystemData.terrainData.heightmapResolution,
 			feedbackBuffer,
@@ -154,6 +155,7 @@ public class TerrainRenderer : TerrainRendererBase
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
 			pass.AddRenderPassData<TerrainRenderData>();
 			pass.AddRenderPassData<ViewData>();
+			pass.AddRenderPassData<VirtualTextureData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -169,7 +171,7 @@ public class TerrainRenderer : TerrainRendererBase
 
 				pass.SetFloat("_HeightUvScale", 1f / data.settings.CellCount * (1.0f - 1f / data.heightmapResolution));
 				pass.SetFloat("_HeightUvOffset", 0.5f / data.heightmapResolution);
-				pass.SetFloat("_MaxLod", Mathf.Log(data.settings.CellCount, 2));
+				pass.SetFloat("_MaxLod", Math.Log2(data.settings.CellCount));
 
 				pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
 				var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
@@ -200,173 +202,136 @@ public class TerrainRenderer : TerrainRendererBase
 			});
 		}
 
-		using (var pass = renderGraph.AddGenericRenderPass("Virtual Terrain Update"))
+		using var scope = renderGraph.AddProfileScope("Virtual Terrain");
+
+		// If terrain is different, clear the LRU cache
+		if (terrainSystemData.terrain != previousTerrain || needsClear)
 		{
-			pass.AddRenderPassData<TerrainRenderData>();
-			pass.AddRenderPassData<ViewData>();
+			Array.Clear(indirectionTexturePixels, 0, indirectionTexturePixels.Length);
+			lruCache.Clear();
 
-			// Just read/write all the things for now
-			pass.WriteBuffer("", counterBuffer); 
-			pass.WriteBuffer("", tilesToUnmapBuffer);
-			pass.WriteBuffer("", mappedTiles);
-			pass.WriteTexture(indirectionTexture);
-			pass.WriteTexture(indirectionTextureMapTexture);
-
-			pass.ReadBuffer("", counterBuffer);
-			pass.ReadBuffer("", tilesToUnmapBuffer);
-			pass.ReadBuffer("", mappedTiles);
-
-			pass.ReadTexture("", indirectionTexture);
-			pass.ReadTexture("", indirectionTextureMapTexture);
-
-			pass.SetRenderFunction((command, pass) =>
+			using(var pass = renderGraph.AddComputeRenderPass("Clear Buffer"))
 			{
-				// Set shader globals
-				command.SetGlobalTexture("_VirtualTexture", albedoSmoothnessTexture);
-				command.SetGlobalTexture("_VirtualNormalTexture", normalTexture);
-				command.SetGlobalTexture("_VirtualHeightTexture", heightTexture);
-				command.SetGlobalTexture("_IndirectionTexture", pass.GetRenderTexture(indirectionTexture));
+				pass.Initialize(virtualTextureUpdateShader, 3, settings.VirtualTileCount);
+				pass.WriteBuffer("MappedTiles", mappedTiles);
+			}
 
-				// Pre-calculate some factors for looking up virtual uv coordinates
-				command.SetGlobalFloat("_AnisoLevel", settings.AnisoLevel);
-				command.SetGlobalFloat("_VirtualUvScale", settings.VirtualResolution);
-
-				// Set up references
-				var terrain = Terrain.activeTerrain;
-				if (terrain != null)
+			// TODO: Can we not just use a hardware clear?
+			var indirectionMipCount = Texture2DExtensions.MipCount(IndirectionTextureResolution) - 1;
+			for (var i = 0; i < indirectionMipCount; i++)
+			{
+				var mipSize = Texture2DExtensions.MipResolution(i, IndirectionTextureResolution);
+				using (var pass = renderGraph.AddComputeRenderPass("Clear Texture"))
 				{
-					// Used by tessellation to calculate lod
-					var size = terrain.terrainData.size;
-					var indTexSize = new Vector4(1f / size.x, 1f / size.z, size.x, size.z);
-					command.SetGlobalVector("_IndirectionTexelSize", indTexSize);
-
-					// If terrain is different, clear the LRU cache
-					if (terrain != previousTerrain || needsClear)
-					{
-						Array.Clear(indirectionTexturePixels, 0, indirectionTexturePixels.Length);
-						lruCache.Clear();
-
-						// Also need to clear the gpu copy
-						var virtualTextureUpdateShader = Resources.Load<ComputeShader>("Terrain/VirtualTextureUpdate");
-						command.SetComputeBufferParam(virtualTextureUpdateShader, 3, "MappedTiles", pass.GetBuffer(mappedTiles));
-						command.DispatchNormalized(virtualTextureUpdateShader, 3, pass.GetBuffer(mappedTiles).count, 1, 1);
-
-						var indTex = pass.GetRenderTexture(indirectionTexture);
-						for (var i = 0; i < indTex.mipmapCount; i++)
-						{
-							var width = Texture2DExtensions.MipResolution(i, indTex.width);
-							var height = Texture2DExtensions.MipResolution(i, indTex.height);
-							command.SetComputeTextureParam(virtualTextureUpdateShader, 4, "DestMip", indTex);
-							command.DispatchNormalized(virtualTextureUpdateShader, 4, width, height, 1);
-
-							command.SetComputeTextureParam(virtualTextureUpdateShader, 4, "DestMip", pass.GetRenderTexture(indirectionTextureMapTexture));
-							command.DispatchNormalized(virtualTextureUpdateShader, 4, width, height, 1);
-						}
-
-						needsClear = false;
-					}
+					pass.Initialize(virtualTextureUpdateShader, 4, mipSize, mipSize);
+					pass.WriteTexture("DestMip", indirectionTexture);
 				}
 
-				previousTerrain = terrain;
-			});
-		}
-
-		//if (terrain != null && terrain.TryGetComponent<ITerrainTextureManager>(out var terrainTextureManager))
-		ProcessRequests();
-
-		using (var pass = renderGraph.AddGenericRenderPass("Virtual Terrain Indirection Update"))
-		{
-			pass.AddRenderPassData<TerrainRenderData>();
-			pass.AddRenderPassData<ViewData>();
-
-			pass.SetRenderFunction((command, pass) =>
-			{
-				var reductionComputeShader = Resources.Load<ComputeShader>("Terrain/VirtualTerrain");
-				command.ClearRandomWriteTargets();
-				//command.SetBufferCounterValue(pass.GetBuffer(requestBuffer), 0);
-				command.SetBufferCounterValue(requestBuffer, 0u);
-				command.SetComputeBufferParam(reductionComputeShader, 0, "_VirtualFeedbackTexture", pass.GetBuffer(feedbackBuffer));
-				command.SetComputeBufferParam(reductionComputeShader, 0, "_VirtualRequests", requestBuffer);
-				//command.SetComputeBufferParam(reductionComputeShader, 0, "_VirtualRequests", pass.GetBuffer(requestBuffer));
-				command.DispatchNormalized(reductionComputeShader, 0, IndirectionTextureResolution * IndirectionTextureResolution * 4 / 3, 1, 1);
-				command.CopyCounterValue(requestBuffer, pass.GetBuffer(counterBuffer), 0);
-				//command.CopyCounterValue(pass.GetBuffer(requestBuffer), pass.GetBuffer(counterBuffer), 0);
-				command.RequestAsyncReadback(pass.GetBuffer(counterBuffer), counterReadbackComplete);
-			});
-		}
-	}
-
-	private void OnCounterReadbackComplete(AsyncGPUReadbackRequest request)
-	{
-		var size = request.GetData<int>()[0] * 4;
-		if (size > 0)
-		{
-			AsyncGPUReadback.Request(requestBuffer, size, 0, requestReadbackComplete);
-		}
-	}
-
-	private void OnRequestReadbackComplete(AsyncGPUReadbackRequest readbackRequest)
-	{
-		// For each tile request, attempt to queue it if not already cached, and not already pending
-		if (readbackRequest.hasError)
-		{
-			return;
-		}
-
-		var mipCount = (int)Math.Log2(IndirectionTextureResolution);
-		var data = readbackRequest.GetData<int>();
-		foreach (var request in data)
-		{
-			var position = Texture2DExtensions.TextureByteOffsetToCoord(request, IndirectionTextureResolution);
-
-			// We want to request the coarsest mip that is not yet rendered, to ensure there is a gradual transition to the
-			// target mip, with 1 mip changing per frame. Do this by starting from current mip, and working to coarsest
-			var previousIndex = request;
-			for (var i = position.z; i <= mipCount; i++)
-			{
-				var index = Texture2DExtensions.TextureCoordToOffset(new Vector3Int(position.x, position.y, i), IndirectionTextureResolution);
-
-				var indirectionTexturePixel = indirectionTexturePixels[index];
-				if (indirectionTexturePixel)
+				using (var pass = renderGraph.AddComputeRenderPass("Clear Texture"))
 				{
-					lruCache.Update(index);
-
-					// If this is not the targetMip, add the next coarsest mip
-					if (index != request)
-					{
-						pendingRequests.Add(previousIndex);
-					}
-
-					// Found a fallback mip, break
-					break;
-				}
-				else if (i == mipCount)
-				{
-					// Most coarse mip, add
-					pendingRequests.Add(index);
-				}
-				else
-				{
-					previousIndex = index;
-
-					position.x >>= 1;
-					position.y >>= 1;
+					pass.Initialize(virtualTextureUpdateShader, 4, mipSize, mipSize);
+					pass.WriteTexture("DestMip", indirectionTextureMapTexture);
 				}
 			}
-		}
-	}
 
-	private void ProcessRequests()
-	{
-		if (pendingRequests.Count < 1)
-		{
-			return;
+			needsClear = false;
 		}
+
+		previousTerrain = terrainSystemData.terrain;
+
+		using (var pass = renderGraph.AddComputeRenderPass("Gather Requested Pages", (requestBuffer, reductionComputeShader)))
+		{
+			var threadCount = IndirectionTextureResolution * IndirectionTextureResolution * 4 / 3;
+			pass.Initialize(reductionComputeShader, 0, threadCount);
+
+			pass.WriteBuffer("VirtualFeedbackTexture", feedbackBuffer);
+
+			pass.AddRenderPassData<TerrainRenderData>();
+			pass.AddRenderPassData<ViewData>();
+
+			pass.SetRenderFunction(static (command, pass, data) =>
+			{
+				command.ClearRandomWriteTargets(); // Clear from previous passes
+				command.SetBufferCounterValue(data.requestBuffer, 0); // Init the counter to zero before appending
+				command.SetComputeBufferParam(data.reductionComputeShader, 0, "VirtualRequests", data.requestBuffer);
+			});
+		}
+
+		using (var pass = renderGraph.AddGenericRenderPass("Copy and Readback Counter", (requestBuffer, counterBuffer, IndirectionTextureResolution, indirectionTexturePixels, lruCache, pendingRequests)))
+		{
+			pass.WriteBuffer("", counterBuffer);
+			pass.ReadBuffer("", counterBuffer);
+
+			pass.SetRenderFunction(static (command, pass, data) =>
+			{
+				// Copy the counter to a new buffer and read it back
+				command.CopyCounterValue(data.requestBuffer, pass.GetBuffer(data.counterBuffer), 0);
+				command.RequestAsyncReadback(pass.GetBuffer(data.counterBuffer), (request) =>
+				{
+					var size = request.GetData<uint>()[0] * 4;
+					if (size == 0u)
+						return;
+
+					_ = AsyncGPUReadback.Request(data.requestBuffer, (int)size, 0, (readbackRequest) =>
+					{
+						// For each tile request, attempt to queue it if not already cached, and not already pending
+						if (readbackRequest.hasError)
+						{
+							return;
+						}
+
+						var mipCount = (int)Math.Log2(data.IndirectionTextureResolution);
+						var readbackData = readbackRequest.GetData<int>();
+						foreach (var request in readbackData)
+						{
+							var position = Texture2DExtensions.TextureByteOffsetToCoord(request, data.IndirectionTextureResolution);
+
+							// We want to request the coarsest mip that is not yet rendered, to ensure there is a gradual transition to the
+							// target mip, with 1 mip changing per frame. Do this by starting from current mip, and working to coarsest
+							var previousIndex = request;
+							for (var i = position.z; i <= mipCount; i++)
+							{
+								var index = Texture2DExtensions.TextureCoordToOffset(new Vector3Int(position.x, position.y, i), data.IndirectionTextureResolution);
+
+								var indirectionTexturePixel = data.indirectionTexturePixels[index];
+								if (indirectionTexturePixel)
+								{
+									data.lruCache.Update(index);
+
+									// If this is not the targetMip, add the next coarsest mip
+									if (index != request)
+									{
+										_ = data.pendingRequests.Add(previousIndex);
+									}
+
+									// Found a fallback mip, break
+									break;
+								}
+								else if (i == mipCount)
+								{
+									// Most coarse mip, add
+									_ = data.pendingRequests.Add(index);
+								}
+								else
+								{
+									previousIndex = index;
+
+									position.x >>= 1;
+									position.y >>= 1;
+								}
+							}
+						}
+					});
+				});
+			});
+		}
+
+		if (pendingRequests.Count < 1)
+			return;
 
 		// Sort requests by mip, then distance from camera
 		// TODO: Could do this on GPU before reading back.
 		var sortedRequests = pendingRequests.OrderByDescending(rq => Texture2DExtensions.TextureByteOffsetToCoord(rq, IndirectionTextureResolution).z);
-		var virtualTextureBuild = Resources.Load<ComputeShader>("Terrain/VirtualTextureBuild");
 
 		// First, figure out which unused tiles we can use
 		var updateRect = new RectInt();
@@ -466,180 +431,161 @@ public class TerrainRenderer : TerrainRendererBase
 			}
 		}
 
-		using (var pass = renderGraph.AddGenericRenderPass("Virtual Terrain Build"))
+		// TODO: Should these be texture arrays instead?
+		var updateTempWidth = settings.TileResolution * settings.UpdateTileCount;
+		var virtualAlbedoTemp = renderGraph.GetTexture(updateTempWidth, settings.TileResolution, GraphicsFormat.R8G8B8A8_SRGB, isRandomWrite: true);
+		var virtualNormalTemp = renderGraph.GetTexture(updateTempWidth, settings.TileResolution, GraphicsFormat.R8G8B8A8_UNorm, isRandomWrite: true);
+		var virtualHeightTemp = renderGraph.GetTexture(updateTempWidth, settings.TileResolution, GraphicsFormat.R8_UNorm, isRandomWrite: true);
+
+		var scaleOffsetsBuffer = renderGraph.GetBuffer(scaleOffsets.Count, sizeof(float) * 4);
+		var dstOffsetsBuffer = renderGraph.GetBuffer(dstOffsets.Count);
+
+		var length = Math.Min(settings.UpdateTileCount, pendingRequests.Count);
+		pendingRequests.Clear();
+
+		// Build the virtual texture
+		using (var pass = renderGraph.AddComputeRenderPass("Build", (scaleOffsetsBuffer, scaleOffsets, dstOffsetsBuffer, dstOffsets, settings.TileResolution)))
 		{
+			pass.Initialize(virtualTextureBuild, 0, settings.TileResolution * length, settings.TileResolution);
+
 			pass.AddRenderPassData<TerrainRenderData>();
 			pass.AddRenderPassData<ViewData>();
 
-			var tileRequestsBuffer = renderGraph.GetBuffer(tileRequests.Count);
-			var destPixelbuffer = renderGraph.GetBuffer(destPixels.Count);
-			var scaleOffsetsBuffer = renderGraph.GetBuffer(scaleOffsets.Count, sizeof(float) * 4);
-			var dstOffsetsBuffer = renderGraph.GetBuffer(dstOffsets.Count);
+			pass.WriteTexture("_AlbedoSmoothness", virtualAlbedoTemp);
+			pass.WriteTexture("_NormalMetalOcclusion", virtualNormalTemp);
+			pass.WriteTexture("_Heights", virtualHeightTemp);
 
-			pass.WriteBuffer("", tileRequestsBuffer);
-			pass.WriteBuffer("", destPixelbuffer);
 			pass.WriteBuffer("", dstOffsetsBuffer);
 			pass.WriteBuffer("", scaleOffsetsBuffer);
-			pass.ReadBuffer("", tileRequestsBuffer);
-			pass.ReadBuffer("", destPixelbuffer);
-			pass.ReadBuffer("", dstOffsetsBuffer);
-			pass.ReadBuffer("", scaleOffsetsBuffer);
 
-			pass.SetRenderFunction((command, pass) =>
+			pass.ReadBuffer("_DstOffsets", dstOffsetsBuffer);
+			pass.ReadBuffer("_ScaleOffsets", scaleOffsetsBuffer);
+
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				// Upload the new positions
-				command.SetBufferData(pass.GetBuffer(tileRequestsBuffer), tileRequests);
-				command.SetBufferData(pass.GetBuffer(destPixelbuffer), destPixels);
-				command.SetBufferData(pass.GetBuffer(scaleOffsetsBuffer), scaleOffsets);
-				command.SetBufferData(pass.GetBuffer(dstOffsetsBuffer), dstOffsets);
+				command.SetBufferData(pass.GetBuffer(data.scaleOffsetsBuffer), data.scaleOffsets);
+				command.SetBufferData(pass.GetBuffer(data.dstOffsetsBuffer), data.dstOffsets);
 
-				//terrainTextureManager.SetShaderProperties(command, virtualTextureBuild);
+				pass.SetVector("_Resolution", new Float2(data.TileResolution, data.TileResolution));
+				pass.SetInt("_Width", data.TileResolution);
+			});
+		}
 
-				// TODO: I think this is unneccessary since the terrain render data resoure handles it
-				//if (terrain.TryGetComponent<ITerrainRenderer>(out var terrainRenderer))
-				//{
-				//	command.SetComputeTextureParam(virtualTextureBuild, 0, "_TerrainNormalMap", terrainRenderer.NormalMap);
-				//}
+		var albedoCompressedTemp = renderGraph.GetTexture((settings.TileResolution >> 2) * settings.UpdateTileCount, settings.TileResolution >> 2, GraphicsFormat.R32G32B32A32_UInt, hasMips: true);
+		var normalCompressedTemp = renderGraph.GetTexture((settings.TileResolution >> 2) * settings.UpdateTileCount, settings.TileResolution >> 2, GraphicsFormat.R32G32B32A32_UInt, hasMips: true);
+		var heightCompressedTemp = renderGraph.GetTexture((settings.TileResolution >> 2) * settings.UpdateTileCount, settings.TileResolution >> 2, GraphicsFormat.R32G32_UInt, hasMips: true);
 
-				var dxtCompressCS = Resources.Load<ComputeShader>("Terrain/DxtCompress");
+		using (var pass = renderGraph.AddComputeRenderPass("Compress"))
+		{
+			pass.Initialize(dxtCompressCS, 0, (settings.TileResolution >> 2) * length, settings.TileResolution >> 2);
 
-				// Build compute shader twice, once for base mip, and once for second mip, so we can use HW trilinear filtering
-				var length = Mathf.Min(settings.UpdateTileCount, pendingRequests.Count);
+			pass.WriteTexture("AlbedoResult0", albedoCompressedTemp, 0);
+			pass.WriteTexture("AlbedoResult1", albedoCompressedTemp, 1);
 
-				// Build the virtual texture
-				// Albedo
-				var virtualAlbedoTemp = Shader.PropertyToID("_VirtualAlbedoTemp");
-				var albedoDesc = new RenderTextureDescriptor(settings.TileResolution * settings.UpdateTileCount, settings.TileResolution, RenderTextureFormat.ARGB32) { enableRandomWrite = true, sRGB = true };
-				command.GetTemporaryRT(virtualAlbedoTemp, albedoDesc);
+			pass.WriteTexture("NormalResult0", normalCompressedTemp, 0);
+			pass.WriteTexture("NormalResult1", normalCompressedTemp, 1);
 
-				// Normal
-				var virtualNormalTemp = Shader.PropertyToID("_VirtualNormalTemp");
-				var normalDesc = new RenderTextureDescriptor(settings.TileResolution * settings.UpdateTileCount, settings.TileResolution, RenderTextureFormat.ARGB32) { enableRandomWrite = true, sRGB = false };
-				command.GetTemporaryRT(virtualNormalTemp, normalDesc);
+			pass.WriteTexture("HeightResult0", heightCompressedTemp, 0);
+			pass.WriteTexture("HeightResult1", heightCompressedTemp, 1);
 
-				// Height
-				var virtualHeightTemp = Shader.PropertyToID("_VirtualHeightTemp");
-				var heightDesc = new RenderTextureDescriptor(settings.TileResolution * settings.UpdateTileCount, settings.TileResolution, RenderTextureFormat.R8) { enableRandomWrite = true, sRGB = false };
-				command.GetTemporaryRT(virtualHeightTemp, heightDesc);
+			pass.ReadTexture("AlbedoInput", virtualAlbedoTemp);
+			pass.ReadTexture("NormalInput", virtualNormalTemp);
+			pass.ReadTexture("HeightInput", virtualHeightTemp);
+		}
 
-				//terrainTextureManager.SetShaderProperties(command, virtualTextureBuild);
+		using (var pass = renderGraph.AddGenericRenderPass("Copy", new VirtualCopyPassData(dstOffsets, settings.TileResolution, albedoCompressedTemp, normalCompressedTemp, heightCompressedTemp, albedoSmoothnessTexture, normalTexture, heightTexture)))
+		{
+			pass.ReadTexture("", albedoCompressedTemp);
+			pass.ReadTexture("", normalCompressedTemp);
+			pass.ReadTexture("", heightCompressedTemp);
 
-				command.SetComputeTextureParam(virtualTextureBuild, 0, "_AlbedoSmoothness", virtualAlbedoTemp);
-				command.SetComputeTextureParam(virtualTextureBuild, 0, "_NormalMetalOcclusion", virtualNormalTemp);
-				command.SetComputeTextureParam(virtualTextureBuild, 0, "_Heights", virtualHeightTemp);
-				command.SetComputeBufferParam(virtualTextureBuild, 0, "_ScaleOffsets", pass.GetBuffer(scaleOffsetsBuffer));
-				command.SetComputeBufferParam(virtualTextureBuild, 0, "_DstOffsets", pass.GetBuffer(dstOffsetsBuffer));
-
-				command.SetComputeVectorParam(virtualTextureBuild, "_Resolution", new Vector2(settings.TileResolution, settings.TileResolution));
-				command.SetComputeIntParam(virtualTextureBuild, "_Width", settings.TileResolution);
-
-				//command.SetComputeVectorParam(virtualTextureBuild, "TerrainPosition", terrain.GetPosition());
-
-				using (var buildScope = command.ProfilerScope("Build"))
-					command.DispatchNormalized(virtualTextureBuild, 0, settings.TileResolution * length, settings.TileResolution, 1);
-
-				// Albedo compression target
-				var albedoCompressId = Shader.PropertyToID("_VirtualAlbedoCompress");
-				var albedoCompressDesc = new RenderTextureDescriptor((settings.TileResolution >> 2) * settings.UpdateTileCount, settings.TileResolution >> 2, GraphicsFormat.R32G32B32A32_UInt, 0, 2) { enableRandomWrite = true, useMipMap = true, };
-				command.GetTemporaryRT(albedoCompressId, albedoCompressDesc);
-
-				// Normal compression target
-				var normalCompressId = Shader.PropertyToID("_VirtualNormalCompress");
-				command.GetTemporaryRT(normalCompressId, albedoCompressDesc);
-
-				// Height compression target
-				var heightCompressId = Shader.PropertyToID("_VirtualHeightCompress");
-				var heightCompressDesc = new RenderTextureDescriptor((settings.TileResolution >> 2) * settings.UpdateTileCount, settings.TileResolution >> 2, GraphicsFormat.R32G32_UInt, 0, 2) { enableRandomWrite = true, useMipMap = true, };
-				command.GetTemporaryRT(heightCompressId, heightCompressDesc);
-
-				// Albedo
-				command.SetComputeTextureParam(dxtCompressCS, 0, "_AlbedoInput", virtualAlbedoTemp);
-				command.SetComputeTextureParam(dxtCompressCS, 0, "_NormalInput", virtualNormalTemp);
-				command.SetComputeTextureParam(dxtCompressCS, 0, "_HeightInput", virtualHeightTemp);
-				command.SetComputeTextureParam(dxtCompressCS, 0, "_AlbedoResult0", albedoCompressId, 0);
-				command.SetComputeTextureParam(dxtCompressCS, 0, "_AlbedoResult1", albedoCompressId, 1);
-				command.SetComputeTextureParam(dxtCompressCS, 0, "_NormalResult0", normalCompressId, 0);
-				command.SetComputeTextureParam(dxtCompressCS, 0, "_NormalResult1", normalCompressId, 1);
-				command.SetComputeTextureParam(dxtCompressCS, 0, "_HeightResult0", heightCompressId, 0);
-				command.SetComputeTextureParam(dxtCompressCS, 0, "_HeightResult1", heightCompressId, 1);
-
-				using (var compressScope = command.ProfilerScope("Compress"))
-					command.DispatchNormalized(dxtCompressCS, 0, (settings.TileResolution >> 2) * length, settings.TileResolution >> 2, 1);
-
-				command.ReleaseTemporaryRT(virtualAlbedoTemp);
-				command.ReleaseTemporaryRT(virtualNormalTemp);
-				command.ReleaseTemporaryRT(virtualHeightTemp);
-
-				for (var j = 0; j < dstOffsets.Count; j++)
+			pass.SetRenderFunction(static (command, pass, data) =>
+			{
+				for (var j = 0; j < data.dstOffsets.Count; j++)
 				{
+					// Build compute shader twice, once for base mip, and once for second mip, so we can use HW trilinear filtering
 					for (var i = 0; i < 2; i++)
 					{
-						var mipResolution = settings.TileResolution >> i;
+						var mipResolution = data.TileResolution >> i;
 
 						// Copy albedo, normal and height
-						command.CopyTexture(albedoCompressId, 0, i, j * (mipResolution >> 2), 0, mipResolution >> 2, mipResolution >> 2, albedoSmoothnessTexture, (int)dstOffsets[j], i, 0, 0);
-						command.CopyTexture(normalCompressId, 0, i, j * (mipResolution >> 2), 0, mipResolution >> 2, mipResolution >> 2, normalTexture, (int)dstOffsets[j], i, 0, 0);
-						command.CopyTexture(heightCompressId, 0, i, j * (mipResolution >> 2), 0, mipResolution >> 2, mipResolution >> 2, heightTexture, (int)dstOffsets[j], i, 0, 0);
-					}
-				}
-
-				command.ReleaseTemporaryRT(albedoCompressId);
-				command.ReleaseTemporaryRT(normalCompressId);
-				command.ReleaseTemporaryRT(heightCompressId);
-
-				pendingRequests.Clear();
-
-				// Dispatch threads to update the indirection texture
-				var virtualTextureUpdateShader = Resources.Load<ComputeShader>("Terrain/VirtualTextureUpdate");
-				var mipCount = (int)Math.Log2(IndirectionTextureResolution);
-
-				// Only update required mips (And extents?)
-				// Max(0) because highest mip might request it's parent mip too, this is easier (and fast enough)
-				var start = Math.Max(0, mipCount - updateMip);
-
-				using (var updateScope = command.ProfilerScope("Update"))
-				{
-					// This pass copies any data to be unmapped into a temporary buffer so it can be checked while iterating over each mip in kernel #1
-					command.SetComputeBufferParam(virtualTextureUpdateShader, 0, "TileRequests", pass.GetBuffer(tileRequestsBuffer));
-					command.SetComputeBufferParam(virtualTextureUpdateShader, 0, "DestPixels", pass.GetBuffer(destPixelbuffer));
-					command.SetComputeBufferParam(virtualTextureUpdateShader, 0, "MappedTiles", pass.GetBuffer(mappedTiles));
-					command.SetComputeBufferParam(virtualTextureUpdateShader, 0, "TilesToUnmap", pass.GetBuffer(tilesToUnmapBuffer));
-					command.SetComputeIntParam(virtualTextureUpdateShader, "_MaxIndex", destPixels.Count);
-					command.DispatchNormalized(virtualTextureUpdateShader, 0, destPixels.Count, 1, 1);
-
-					// Set some buffers..
-					command.SetComputeBufferParam(virtualTextureUpdateShader, 1, "TileRequests", pass.GetBuffer(tileRequestsBuffer));
-					command.SetComputeBufferParam(virtualTextureUpdateShader, 1, "DestPixels", pass.GetBuffer(destPixelbuffer));
-					command.SetComputeBufferParam(virtualTextureUpdateShader, 1, "MappedTiles", pass.GetBuffer(mappedTiles));
-					command.SetComputeBufferParam(virtualTextureUpdateShader, 1, "TilesToUnmap", pass.GetBuffer(tilesToUnmapBuffer));
-
-					// dispatch mip updates
-					//for (var z = start; z < mipCount; z++)
-					for (var z = 0; z <= mipCount; z++)
-					{
-						command.SetComputeTextureParam(virtualTextureUpdateShader, 1, "_IndirectionTextureMap", pass.GetRenderTexture(indirectionTextureMapTexture), z);
-						command.SetComputeIntParam(virtualTextureUpdateShader, "CurrentMip", z);
-						command.SetComputeTextureParam(virtualTextureUpdateShader, 1, "DestMip", pass.GetRenderTexture(indirectionTexture), z);
-						command.SetComputeIntParam(virtualTextureUpdateShader, "_MaxIndex", tileRequests.Count);
-						command.DispatchNormalized(virtualTextureUpdateShader, 1, tileRequests.Count, 1, 1);
-					}
-
-					// Update Page Table
-
-					for (var z = mipCount - 1; z >= 0; z--)
-					{
-						command.SetComputeTextureParam(virtualTextureUpdateShader, 2, "_IndirectionTextureMap", pass.GetRenderTexture(indirectionTextureMapTexture), z);
-						command.SetComputeTextureParam(virtualTextureUpdateShader, 2, "DestMip", pass.GetRenderTexture(indirectionTexture), z);
-						command.SetComputeTextureParam(virtualTextureUpdateShader, 2, "SourceMip", pass.GetRenderTexture(indirectionTexture), z + 1);
-
-						// dispatch entire mip for now.
-						var mipSize = IndirectionTextureResolution >> z;
-						command.SetComputeIntParam(virtualTextureUpdateShader, "_MaxIndex", mipSize);
-						command.DispatchNormalized(virtualTextureUpdateShader, 2, mipSize, mipSize, 1);
+						command.CopyTexture(pass.GetRenderTexture(data.albedoCompressId), 0, i, j * (mipResolution >> 2), 0, mipResolution >> 2, mipResolution >> 2, data.albedoSmoothnessTexture, (int)data.dstOffsets[j], i, 0, 0);
+						command.CopyTexture(pass.GetRenderTexture(data.normalCompressId), 0, i, j * (mipResolution >> 2), 0, mipResolution >> 2, mipResolution >> 2, data.normalTexture, (int)data.dstOffsets[j], i, 0, 0);
+						command.CopyTexture(pass.GetRenderTexture(data.heightCompressId), 0, i, j * (mipResolution >> 2), 0, mipResolution >> 2, mipResolution >> 2, data.heightTexture, (int)data.dstOffsets[j], i, 0, 0);
 					}
 				}
 			});
 		}
+
+		// Update the indirection texture
+		var tileRequestsBuffer = renderGraph.GetBuffer(tileRequests.Count);
+		using (var pass = renderGraph.AddComputeRenderPass("Copy Tiles To Unmap", (maxIndex: destPixels.Count, tileRequestsBuffer, tileRequests)))
+		{
+			pass.Initialize(virtualTextureUpdateShader, 0, destPixels.Count);
+			pass.WriteBuffer("TilesToUnmap", tilesToUnmapBuffer);
+			pass.WriteBuffer("", tileRequestsBuffer);
+
+			pass.ReadBuffer("TileRequests", tileRequestsBuffer);
+			pass.ReadBuffer("MappedTiles", mappedTiles);
+
+			pass.SetRenderFunction(static (command, pass, data) =>
+			{
+				command.SetBufferData(pass.GetBuffer(data.tileRequestsBuffer), data.tileRequests);
+				pass.SetInt("MaxIndex", data.maxIndex);
+			});
+		}
+
+		// dispatch mip updates
+		var mipCount = (int)Math.Log2(IndirectionTextureResolution);
+		var destPixelbuffer = renderGraph.GetBuffer(destPixels.Count);
+
+		// Only update required mips (And extents?)
+		// Max(0) because highest mip might request it's parent mip too, this is easier (and fast enough)
+		//var start = Math.Max(0, mipCount - updateMip);
+		//for (var z = start; z < mipCount; z++)
+
+		for (var z = 0; z <= mipCount; z++)
+		{
+			using (var pass = renderGraph.AddComputeRenderPass("Map New Data", (currentMip: z, maxIndex: tileRequests.Count, destPixelbuffer, destPixels)))
+			{
+				pass.Initialize(virtualTextureUpdateShader, 1, tileRequests.Count);
+				pass.WriteTexture("DestMip", indirectionTexture, z);
+				pass.WriteTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
+				pass.WriteBuffer("MappedTiles", mappedTiles);
+				pass.WriteBuffer("", destPixelbuffer);
+
+				pass.ReadTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
+				pass.ReadBuffer("TilesToUnmap", tilesToUnmapBuffer);
+				pass.ReadBuffer("TileRequests", tileRequestsBuffer);
+				pass.ReadBuffer("DestPixels", destPixelbuffer);
+
+				pass.SetRenderFunction(static (command, pass, data) =>
+				{
+					command.SetBufferData(pass.GetBuffer(data.destPixelbuffer), data.destPixels);
+					pass.SetInt("CurrentMip", data.currentMip);
+					pass.SetInt("MaxIndex", data.maxIndex);
+				});
+			}
+		}
+
+		for (var z = mipCount - 1; z >= 0; z--)
+		{
+			var mipSize = IndirectionTextureResolution >> z;
+			using (var pass = renderGraph.AddComputeRenderPass("Page Table Update", mipSize))
+			{
+				pass.Initialize(virtualTextureUpdateShader, 2, mipSize, mipSize);
+				pass.WriteTexture("DestMip", indirectionTexture, z);
+				pass.ReadTexture("SourceMip", indirectionTexture, z + 1);
+				pass.ReadTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
+
+				pass.SetRenderFunction(static (command, pass, mipSize) =>
+				{
+					pass.SetInt("MaxIndex", mipSize);
+				});
+			}
+		}
+
 	}
 
 	public static void OnTerrainTextureChanged(Terrain terrain, RectInt texelRegion)
@@ -678,5 +624,63 @@ public class TerrainRenderer : TerrainRendererBase
 			}
 		}
 #endif
+	}
+
+	private struct VirtualCopyPassData
+	{
+		public List<uint> dstOffsets;
+		public int TileResolution;
+		public ResourceHandle<RenderTexture> albedoCompressId;
+		public ResourceHandle<RenderTexture> normalCompressId;
+		public ResourceHandle<RenderTexture> heightCompressId;
+		public Texture2DArray albedoSmoothnessTexture;
+		public Texture2DArray normalTexture;
+		public Texture2DArray heightTexture;
+
+		public VirtualCopyPassData(List<uint> dstOffsets, int tileResolution, ResourceHandle<RenderTexture> albedoCompressId, ResourceHandle<RenderTexture> normalCompressId, ResourceHandle<RenderTexture> heightCompressId, Texture2DArray albedoSmoothnessTexture, Texture2DArray normalTexture, Texture2DArray heightTexture)
+		{
+			this.dstOffsets = dstOffsets;
+			TileResolution = tileResolution;
+			this.albedoCompressId = albedoCompressId;
+			this.normalCompressId = normalCompressId;
+			this.heightCompressId = heightCompressId;
+			this.albedoSmoothnessTexture = albedoSmoothnessTexture;
+			this.normalTexture = normalTexture;
+			this.heightTexture = heightTexture;
+		}
+	}
+}
+
+public readonly struct VirtualTextureData : IRenderPassData
+{
+	private readonly Texture2DArray albedoSmoothness, normal, height;
+	private readonly ResourceHandle<RenderTexture> indirection;
+	private readonly float anisoLevel, virtualResolution;
+	private readonly Float4 indTexSize;
+
+	public VirtualTextureData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray height, ResourceHandle<RenderTexture> indirection, float anisoLevel, float virtualResolution, Float4 indTexSize)
+	{
+		this.albedoSmoothness = albedoSmoothness;
+		this.normal = normal;
+		this.height = height;
+		this.indirection = indirection;
+		this.anisoLevel = anisoLevel;
+		this.virtualResolution = virtualResolution;
+		this.indTexSize = indTexSize;
+	}
+
+	void IRenderPassData.SetInputs(RenderPass pass)
+	{
+		pass.ReadTexture("_IndirectionTexture", indirection);
+	}
+
+	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
+	{
+		pass.SetTexture("_VirtualTexture", albedoSmoothness);
+		pass.SetTexture("_VirtualNormalTexture", normal);
+		pass.SetTexture("_VirtualHeightTexture", height);
+		pass.SetFloat("_AnisoLevel", anisoLevel);
+		pass.SetFloat("_VirtualUvScale", virtualResolution);
+		pass.SetVector("_IndirectionTexelSize", indTexSize);
 	}
 }
