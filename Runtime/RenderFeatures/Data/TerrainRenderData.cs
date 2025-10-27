@@ -7,11 +7,11 @@ public struct TerrainRenderData : IRenderPassData
 	private readonly ResourceHandle<RenderTexture> terrainHeightmapTexture, terrainNormalMap, idMap, aoMap;
 	private readonly Texture terrainHolesTexture;
 	private Float4 terrainRemapHalfTexel, terrainScaleOffset;
-	private Float3 terrainSize;
+	private Float3 terrainSize, terrainPosition;
 	private readonly float terrainHeightScale, terrainHeightOffset, idMapResolution;
 	private readonly ResourceHandle<GraphicsBuffer> terrainLayerData;
 
-	public TerrainRenderData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray mask, ResourceHandle<RenderTexture> terrainHeightmapTexture, ResourceHandle<RenderTexture> terrainNormalMap, ResourceHandle<RenderTexture> idMap, Texture terrainHolesTexture, Float4 terrainRemapHalfTexel, Float4 terrainScaleOffset, Float3 terrainSize, float terrainHeightScale, float terrainHeightOffset, float idMapResolution, ResourceHandle<GraphicsBuffer> terrainLayerData, ResourceHandle<RenderTexture> aoMap)
+	public TerrainRenderData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray mask, ResourceHandle<RenderTexture> terrainHeightmapTexture, ResourceHandle<RenderTexture> terrainNormalMap, ResourceHandle<RenderTexture> idMap, Texture terrainHolesTexture, Float4 terrainRemapHalfTexel, Float4 terrainScaleOffset, Float3 terrainSize, float terrainHeightScale, float terrainHeightOffset, float idMapResolution, ResourceHandle<GraphicsBuffer> terrainLayerData, ResourceHandle<RenderTexture> aoMap, Float3 terrainPosition)
 	{
 		this.albedoSmoothness = albedoSmoothness;
 		this.normal = normal;
@@ -28,6 +28,7 @@ public struct TerrainRenderData : IRenderPassData
 		this.idMapResolution = idMapResolution;
 		this.terrainLayerData = terrainLayerData;
 		this.aoMap = aoMap;
+		this.terrainPosition = terrainPosition;
 	}
 
 	public readonly void SetInputs(RenderPass pass)
@@ -48,6 +49,7 @@ public struct TerrainRenderData : IRenderPassData
 		pass.SetTexture("Mask", mask);
 
 		pass.SetVector("TerrainSize", terrainSize);
+		pass.SetVector("TerrainPosition", terrainPosition);
 		pass.SetVector("_TerrainRemapHalfTexel", terrainRemapHalfTexel);
 		pass.SetVector("_TerrainScaleOffset", terrainScaleOffset);
 

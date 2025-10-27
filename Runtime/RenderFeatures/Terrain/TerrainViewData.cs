@@ -20,7 +20,7 @@ public class TerrainViewData : CameraRenderFeature
 		var terrainScaleOffset = new Vector4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z);
 		var terrainRemapHalfTexel = GraphicsUtilities.HalfTexelRemap(position.XZ(), size.XZ(), Vector2.one * terrainSystem.TerrainData.heightmapResolution);
 		var terrainHeightOffset = position.y;
-		renderGraph.SetResource(new TerrainRenderData(terrainSystem.diffuseArray, terrainSystem.normalMapArray, terrainSystem.maskMapArray, terrainSystem.heightmap, terrainSystem.normalmap, terrainSystem.idMap, terrainSystem.TerrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainSystem.TerrainData.alphamapResolution, terrainSystem.terrainLayerData, terrainSystem.aoMap));
+		renderGraph.SetResource(new TerrainRenderData(terrainSystem.diffuseArray, terrainSystem.normalMapArray, terrainSystem.maskMapArray, terrainSystem.heightmap, terrainSystem.normalmap, terrainSystem.idMap, terrainSystem.TerrainData.holesTexture, terrainRemapHalfTexel, terrainScaleOffset, size, size.y, terrainHeightOffset, terrainSystem.TerrainData.alphamapResolution, terrainSystem.terrainLayerData, terrainSystem.aoMap, terrainSystem.Terrain.GetPosition()));
 
 		// This sets raytracing data on the terrain's material property block
 		using (var pass = renderGraph.AddSetPropertyBlockPass("Terrain Data Property Block Update", terrainSystem.Terrain))

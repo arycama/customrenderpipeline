@@ -1,0 +1,41 @@
+#pragma kernel VirtualTextureBuild
+#pragma enable_d3d11_debug_symbols
+
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/TerrainCommon.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Samplers.hlsl"
+
+RWTexture2D<float4> _AlbedoSmoothness, _NormalMetalOcclusion;
+RWTexture2D<float> _Heights;
+
+Texture2DArray<float4> _TerrainSplatArray, _TerrainNormalArray, _TerrainMaskArray;
+Texture2D<uint> _TerrainControlMap;
+
+Buffer<float4> _ScaleOffsets;
+Buffer<uint> _DstOffsets;
+float4 _TexelSize;
+float2 _Resolution;
+uint _Width;
+float3 TerrainPosition;
+
+[numthreads(8, 8, 1)]
+void VirtualTextureBuild(uint2 id : SV_DispatchThreadID)
+{
+	uint dataOffset = id.x / _Width;
+	uint2 localId = uint2(id.x - dataOffset * _Width, id.y);
+	
+	float4 scaleOffset = _ScaleOffsets[dataOffset];
+	float2 uv = (localId + 0.5) / _Resolution * scaleOffset.xy + scaleOffset.zw;
+	float2 terrainUv = (uv * (_TexelSize.zw - 1.0) + 0.5) * _TexelSize.xy;
+	
+	float2 dx = float2(scaleOffset.x / _Resolution.x, 0);
+	float2 dy = float2(0, scaleOffset.y / _Resolution.y);
+	
+	float3 worldPosition = float3(uv * TerrainSize.xz + TerrainPosition.xz, 0).xzy;
+	
+	float height;
+	TerrainRenderResult result = RenderTerrain(worldPosition, uv, dx, dy, height, true);
+	_AlbedoSmoothness[id] = float4(result.albedo, 1.0 - result.roughness);
+	_Heights[id] = height;
+	_NormalMetalOcclusion[id] = float4(0, result.normal.z, result.visibilityAngle, result.normal.x);
+}

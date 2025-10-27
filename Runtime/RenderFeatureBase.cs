@@ -34,14 +34,8 @@ public abstract class RenderFeatureBase : IDisposable
 		if (!disposing)
 			Debug.LogError($"Render Feature [{GetType()}] not disposed correctly");
 
-		try
-		{
-			Cleanup(disposing);
-		}
-		finally
-		{
-			disposedValue = true;
-		}
+		Cleanup(disposing);
+		disposedValue = true;
 	}
 
 	/// <summary> Override in derived classes and put any cleanup code here (Eg free buffers, RT handles etc) </summary>

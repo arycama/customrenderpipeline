@@ -234,3 +234,26 @@ float2 GetQuadVertexPosition(uint vertexID)
 	float y = 1 - (topBit + botBit) & 1; // produces 1 for indices 0,3 and 0 for 1,2
 	return float2(x, y);
 }
+
+void Swap(inout float a, inout float b)
+{
+	float temp = a;
+	a = b;
+	b = temp;
+}
+
+void Swap(inout uint a, inout uint b)
+{
+	uint temp = a;
+	a = b;
+	b = temp;
+}
+
+void CompareSwap(inout float key0, inout uint value0, inout float key1, inout uint value1)
+{
+	if (key0 < key1)
+	{
+		Swap(key0, key1);
+		Swap(value0, value1);
+	}
+}
