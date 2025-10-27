@@ -19,8 +19,8 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float2 dy = ddy(uv);
 	
 	float3 virtualUv = CalculateVirtualUv(uv, dx, dy);
-	float4 albedoSmoothness = _VirtualTexture.SampleGrad(_TrilinearClampSamplerAniso4, virtualUv, dx, dy);
-	float4 normalMetalOcclusion = _VirtualNormalTexture.SampleGrad(_TrilinearClampSamplerAniso4, virtualUv, dx, dy);
+	float4 albedoSmoothness = VirtualTexture.SampleGrad(_TrilinearClampSamplerAniso4, virtualUv, dx, dy);
+	float4 normalMetalOcclusion = VirtualNormalTexture.SampleGrad(_TrilinearClampSamplerAniso4, virtualUv, dx, dy);
 	
 	TerrainRenderResult result = RenderTerrain(worldPosition, uv, ddx(worldPosition.xz), ddy(worldPosition.xz));
 	

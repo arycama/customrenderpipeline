@@ -9,8 +9,8 @@
 #include "../Temporal.hlsl"
 
 Texture2D AlbedoOpacity, NormalOcclusionRoughness;
-Buffer<uint> _PatchData, InstanceData;
-float4 _PatchScaleOffset;
+Buffer<uint> PatchData, InstanceData;
+float4 PatchScaleOffset;
 float BladeCount;
 
 cbuffer UnityPerMaterial
@@ -58,7 +58,7 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	
 	// Patch
 	uint vertexId = id & 3;
-	uint cellData = _PatchData[instanceId];
+	uint cellData = PatchData[instanceId];
 	uint dataColumn = (cellData >> 0) & 0x3FF;
 	uint dataRow = (cellData >> 10) & 0x3FF;
 	uint lod = (cellData >> 20) & 0xF;
@@ -73,7 +73,7 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	
 	// Patch position
 	centerPosition.xz += (uint2(dataColumn, dataRow) << lod);
-	centerPosition.xz = centerPosition.xz * _PatchScaleOffset.xy + _PatchScaleOffset.zw;
+	centerPosition.xz = centerPosition.xz * PatchScaleOffset.xy + PatchScaleOffset.zw;
 	centerPosition.y = GetTerrainHeight(centerPosition);
 	
 	// Generate grass vector

@@ -1,6 +1,7 @@
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Geometry.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/IndirectRendering.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Utility.hlsl"
 
 #pragma kernel InstanceCull
 #pragma kernel IndirectArgs
@@ -50,7 +51,7 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 			int maxThread = 1 << (i + (6 - _PassCount));
 		#endif
 		
-		int lod = 0;
+		uint lod = 0u;
 
 		if (all(groupThreadId < (uint) maxThread))
 		{
@@ -95,13 +96,12 @@ void InstanceCull(uint2 groupThreadId : SV_GroupThreadID, uint groupIndex : SV_G
 						int offset;
 						InterlockedAdd(_CellCounter, 1, offset);
 						
-						int packedData = (coord.x & 0x3FF) << 0;
-						packedData |= (coord.y & 0x3FF) << 10;
-						packedData |= (((_TotalPassCount - 1) - (i + _PassOffset)) & 0xF) << 20;
-						_CellData[offset] = packedData;
-						
 						// Lod is the max pass minus the current pass index. (Eg lod0 corresponds to the highest divided cell)
 						lod = (_TotalPassCount - 1) - (i + _PassOffset);
+						
+						uint packedData = BitPack(coord.x, 10, 0);
+						packedData |= BitPack(coord.y, 10, 10);
+						_CellData[offset] = packedData | BitPack(lod, 4, 20);
 					}
 				}
 			}

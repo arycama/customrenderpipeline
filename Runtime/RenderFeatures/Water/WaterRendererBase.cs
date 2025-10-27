@@ -29,7 +29,7 @@ public abstract class WaterRendererBase : CameraRenderFeature
 		var positionX = Math.Snap(viewPosition.x, texelSize) - viewPosition.x - settings.Size * 0.5f;
 		var positionZ = Math.Snap(viewPosition.z, texelSize) - viewPosition.z - settings.Size * 0.5f;
 		var positionOffset = new Vector4(settings.Size, settings.Size, positionX, positionZ);
-		return quadtreeCull.Cull(settings.CellCount, viewPosition, cullingPlanes, QuadListIndexCount, settings.EdgeLength, settings.PatchVertices, positionOffset, hiZ, viewSize, false);
+		return quadtreeCull.Cull(settings.CellCount, cullingPlanes, QuadListIndexCount, settings.EdgeLength * settings.PatchVertices, positionOffset, hiZ, viewSize, false);
     }
 
 	private readonly struct OceanQuadtreeCulLData

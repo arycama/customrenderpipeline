@@ -19,8 +19,6 @@ public class TerrainSystem : FrameRenderFeature
 
 	public Terrain Terrain { get; private set; }
 	public TerrainData TerrainData => Terrain.terrainData;
-	protected int VerticesPerTileEdge => settings.PatchVertices + 1;
-	protected int QuadListIndexCount => settings.PatchVertices * settings.PatchVertices * 4;
 
 	public TerrainSystem(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
 	{
@@ -81,7 +79,7 @@ public class TerrainSystem : FrameRenderFeature
 	{
 		var resolution = TerrainData.heightmapResolution;
 		minMaxHeight = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R16G16_UNorm, hasMips: true, isPersistent: true);
-		heightmap = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R16_UNorm, isPersistent: true);
+		heightmap = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R16_UNorm, hasMips: true, autoGenerateMips: true, isPersistent: true);
 		normalmap = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R8G8_SNorm, autoGenerateMips: true, hasMips: true, isPersistent: true);
 		indexBuffer = renderGraph.GetGridIndexBuffer(settings.PatchVertices, true, false);
 

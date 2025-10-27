@@ -257,3 +257,38 @@ void CompareSwap(inout float key0, inout uint value0, inout float key1, inout ui
 		Swap(value0, value1);
 	}
 }
+
+float Bilerp(float4 y, float2 i)
+{
+	float bottom = lerp(y.x, y.w, i.x);
+	float top = lerp(y.y, y.z, i.x);
+	return lerp(bottom, top, i.y);
+}
+
+float1 Bilerp(float1 v0, float1 v1, float1 v2, float1 v3, float2 i)
+{
+	float1 bottom = lerp(v0, v3, i.x);
+	float1 top = lerp(v1, v2, i.x);
+	return lerp(bottom, top, i.y);
+}
+
+float2 Bilerp(float2 v0, float2 v1, float2 v2, float2 v3, float2 i)
+{
+	float2 bottom = lerp(v0, v3, i.x);
+	float2 top = lerp(v1, v2, i.x);
+	return lerp(bottom, top, i.y);
+}
+
+float3 Bilerp(float3 v0, float3 v1, float3 v2, float3 v3, float2 i)
+{
+	float3 bottom = lerp(v0, v3, i.x);
+	float3 top = lerp(v1, v2, i.x);
+	return lerp(bottom, top, i.y);
+}
+
+float4 Bilerp(float4 v0, float4 v1, float4 v2, float4 v3, float2 i)
+{
+	float4 bottom = lerp(v0, v3, i.x);
+	float4 top = lerp(v1, v2, i.x);
+	return lerp(bottom, top, i.y);
+}

@@ -6,19 +6,20 @@ using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
+using static Math;
 
 public class TerrainRenderer : TerrainRendererBase
 {
 	private readonly ResourceHandle<GraphicsBuffer> feedbackBuffer;
 
-	private GraphicsBuffer requestBuffer;
-	private ResourceHandle<GraphicsBuffer> counterBuffer, /*requestBuffer,*/ tilesToUnmapBuffer, mappedTiles;
+	private readonly GraphicsBuffer requestBuffer;
+	private readonly ResourceHandle<GraphicsBuffer> counterBuffer, /*requestBuffer,*/ tilesToUnmapBuffer, mappedTiles;
 
-	private ResourceHandle<RenderTexture> indirectionTexture, indirectionTextureMapTexture;
-	private Texture2DArray albedoSmoothnessTexture, normalTexture, heightTexture;
+	private readonly ResourceHandle<RenderTexture> indirectionTexture, indirectionTextureMapTexture;
+	private readonly Texture2DArray albedoSmoothnessTexture, normalTexture, heightTexture;
 
 	// Flattened 2D array storing a bool for each mapped tile
-	private bool[] indirectionTexturePixels;
+	private readonly bool[] indirectionTexturePixels;
 
 	// Need to track requests so we don't request the same page multiple times
 	private readonly HashSet<int> pendingRequests = new();
@@ -119,60 +120,50 @@ public class TerrainRenderer : TerrainRendererBase
 		if (!renderGraph.TryGetResource<TerrainRenderData>(out var terrainRenderData))
 			return;
 
-		if (terrainSystemData.terrain == null || settings.Material == null)
+		var terrain = terrainSystemData.terrain;
+		var terrainData = terrain.terrainData;
+		if (terrain == null || settings.Material == null)
 			return;
 
 		// Used by tessellation to calculate lod
-		var size = terrainSystemData.terrainData.size;
+		var size = (Float3)terrainData.size;
 		var indTexSize = new Vector4(1f / size.x, 1f / size.z, size.x, size.z);
 
-		renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, indirectionTexture, settings.AnisoLevel, settings.VirtualResolution, indTexSize));
+		renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, indirectionTexture, settings.AnisoLevel, settings.VirtualResolution));
 
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
 		var passData = Cull(camera.transform.position, cullingPlanes, camera.ViewSize());
 		var passIndex = settings.Material.FindPass("Terrain");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no Terrain Pass");
 
-		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", (
-			VerticesPerTileEdge,
-			size,
-			settings,
-			position: terrainSystemData.terrain.GetPosition() - camera.transform.position,
-			cullingPlanes,
-			terrainSystemData.terrainData.heightmapResolution,
-			feedbackBuffer,
-			settings.VirtualResolution,
-			settings.AnisoLevel
-		)))
+		var heightmapResolution = terrainData.heightmapResolution;
+		renderGraph.SetResource(new TerrainQuadtreeData(renderGraph.SetConstantBuffer
+		((
+			new Float4(size.xz, (terrain.GetPosition() - camera.transform.position).XZ()),
+			GraphicsUtilities.HalfTexelRemap(heightmapResolution),
+			Rcp(settings.CellCount * settings.PatchVertices),
+			Rcp(settings.PatchVertices),
+			Rcp(settings.CellCount),
+			settings.PatchVertices + 1,
+			settings.PatchVertices
+		))));
+
+		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", (cullingPlanes, feedbackBuffer)))
 		{
 			pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.None, RenderBufferLoadAction.DontCare);
-			pass.WriteBuffer("_VirtualFeedbackTexture", feedbackBuffer);
-
-			pass.ReadTexture("_IndirectionTexture", indirectionTexture);
-			pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
+			pass.WriteBuffer("VirtualFeedbackTexture", feedbackBuffer);
+			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
+			pass.AddRenderPassData<TerrainQuadtreeData>();
 			pass.AddRenderPassData<TerrainRenderData>();
 			pass.AddRenderPassData<ViewData>();
 			pass.AddRenderPassData<VirtualTextureData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetInt("_VerticesPerEdge", data.VerticesPerTileEdge);
-				pass.SetInt("_VerticesPerEdgeMinusOne", data.VerticesPerTileEdge - 1);
-				pass.SetFloat("_RcpVerticesPerEdge", 1f / data.VerticesPerTileEdge);
-				pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (data.VerticesPerTileEdge - 1));
-
-				var scaleOffset = new Vector4(data.size.x / data.settings.CellCount, data.size.z / data.settings.CellCount, data.position.x, data.position.z);
-				pass.SetVector("_PatchScaleOffset", scaleOffset);
-				pass.SetVector("_SpacingScale", new Vector4(data.size.x / data.settings.CellCount / data.settings.PatchVertices, data.size.z / data.settings.CellCount / data.settings.PatchVertices, data.position.x, data.position.z));
-				pass.SetFloat("_PatchUvScale", 1f / data.settings.CellCount);
-
-				pass.SetFloat("_HeightUvScale", 1f / data.settings.CellCount * (1.0f - 1f / data.heightmapResolution));
-				pass.SetFloat("_HeightUvOffset", 0.5f / data.heightmapResolution);
-				pass.SetFloat("_MaxLod", Math.Log2(data.settings.CellCount));
-
+				// TODO: Put into a struct?
 				pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
 				var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
 				for (var i = 0; i < data.cullingPlanes.Count; i++)
@@ -180,9 +171,6 @@ public class TerrainRenderer : TerrainRendererBase
 
 				pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
 				ArrayPool<Vector4>.Release(cullingPlanesArray);
-
-				pass.SetFloat("_VirtualUvScale", data.VirtualResolution);
-				pass.SetFloat("_AnisoLevel", data.AnisoLevel);
 
 				command.SetRandomWriteTarget(6, pass.GetBuffer(data.feedbackBuffer));
 			});
@@ -193,7 +181,7 @@ public class TerrainRenderer : TerrainRendererBase
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("Terrain", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.None);
-			pass.WriteBuffer("_VirtualFeedbackTexture", feedbackBuffer);
+			pass.WriteBuffer("VirtualFeedbackTexture", feedbackBuffer);
 			pass.AddRenderPassData<ViewData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
@@ -205,12 +193,12 @@ public class TerrainRenderer : TerrainRendererBase
 		using var scope = renderGraph.AddProfileScope("Virtual Terrain");
 
 		// If terrain is different, clear the LRU cache
-		if (terrainSystemData.terrain != previousTerrain || needsClear)
+		if (terrain != previousTerrain || needsClear)
 		{
 			Array.Clear(indirectionTexturePixels, 0, indirectionTexturePixels.Length);
 			lruCache.Clear();
 
-			using(var pass = renderGraph.AddComputeRenderPass("Clear Buffer"))
+			using (var pass = renderGraph.AddComputeRenderPass("Clear Buffer"))
 			{
 				pass.Initialize(virtualTextureUpdateShader, 3, settings.VirtualTileCount);
 				pass.WriteBuffer("MappedTiles", mappedTiles);
@@ -237,7 +225,7 @@ public class TerrainRenderer : TerrainRendererBase
 			needsClear = false;
 		}
 
-		previousTerrain = terrainSystemData.terrain;
+		previousTerrain = terrain;
 
 		using (var pass = renderGraph.AddComputeRenderPass("Gather Requested Pages", (requestBuffer, reductionComputeShader)))
 		{
@@ -648,39 +636,5 @@ public class TerrainRenderer : TerrainRendererBase
 			this.normalTexture = normalTexture;
 			this.heightTexture = heightTexture;
 		}
-	}
-}
-
-public readonly struct VirtualTextureData : IRenderPassData
-{
-	private readonly Texture2DArray albedoSmoothness, normal, height;
-	private readonly ResourceHandle<RenderTexture> indirection;
-	private readonly float anisoLevel, virtualResolution;
-	private readonly Float4 indTexSize;
-
-	public VirtualTextureData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray height, ResourceHandle<RenderTexture> indirection, float anisoLevel, float virtualResolution, Float4 indTexSize)
-	{
-		this.albedoSmoothness = albedoSmoothness;
-		this.normal = normal;
-		this.height = height;
-		this.indirection = indirection;
-		this.anisoLevel = anisoLevel;
-		this.virtualResolution = virtualResolution;
-		this.indTexSize = indTexSize;
-	}
-
-	void IRenderPassData.SetInputs(RenderPass pass)
-	{
-		pass.ReadTexture("_IndirectionTexture", indirection);
-	}
-
-	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
-	{
-		pass.SetTexture("_VirtualTexture", albedoSmoothness);
-		pass.SetTexture("_VirtualNormalTexture", normal);
-		pass.SetTexture("_VirtualHeightTexture", height);
-		pass.SetFloat("_AnisoLevel", anisoLevel);
-		pass.SetFloat("_VirtualUvScale", virtualResolution);
-		pass.SetVector("_IndirectionTexelSize", indTexSize);
 	}
 }

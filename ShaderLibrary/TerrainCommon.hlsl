@@ -30,9 +30,29 @@ Texture2D<float> TerrainHeightmap;
 float4 _TerrainRemapHalfTexel, _TerrainScaleOffset;
 float _TerrainHeightScale, _TerrainHeightOffset, IdMapResolution;
 
+float GetTerrainHeight(float2 uv, float2 dx, float2 dy)
+{
+	return TerrainHeightmap.SampleGrad(LinearClampSampler, uv, dx, dy) * _TerrainHeightScale + _TerrainHeightOffset;
+}
+
+float GetTerrainHeight(float2 uv, float lod)
+{
+	return TerrainHeightmap.SampleLevel(TrilinearClampSampler, uv, lod) * _TerrainHeightScale + _TerrainHeightOffset;
+}
+
 float GetTerrainHeight(float2 uv)
 {
-	return TerrainHeightmap.SampleLevel(LinearClampSampler, uv, 0) * _TerrainHeightScale + _TerrainHeightOffset;
+	return TerrainHeightmap.SampleLevel(LinearClampSampler, uv, 0.0) * _TerrainHeightScale + _TerrainHeightOffset;
+}
+
+float LoadTerrainHeight(uint3 coord)
+{
+	return TerrainHeightmap.mips[coord.z][coord.xy] * _TerrainHeightScale + _TerrainHeightOffset;
+}
+
+float LoadTerrainHeight(uint2 coord)
+{
+	return LoadTerrainHeight(uint3(coord, 0));
 }
 
 float2 WorldToTerrainPositionHalfTexel(float3 worldPosition)

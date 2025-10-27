@@ -94,24 +94,15 @@ public class GrassRenderer : CameraRenderFeature
 		var mipCount = Texture2DExtensions.MipCount(terrainData.heightmapResolution) - 1;
 
 		var edgeLength = material.GetFloat("_EdgeLength");
-		var maxHeightOffset = height;
 		var cellCount = patchCounts.x;
 
-		var quadtreeCullResults = quadtreeCull.Cull(cellCount, viewPosition, cullingPlanes, vertexCount * 6, edgeLength, 1, positionOffset, true, camera.ViewSize(), true, terrainSystemData.minMaxHeights, terrainData.size.y, position.y, mipCount, maxHeightOffset);
+		var quadtreeCullResults = quadtreeCull.Cull(cellCount, cullingPlanes, vertexCount * 6, edgeLength, positionOffset, true, camera.ViewSize(), true, terrainSystemData.minMaxHeights, terrainData.size.y, position.y, mipCount, height);
 
 		var size = terrainSystemData.terrainData.size;
-		var heightmapResolution = terrainSystemData.terrainData.heightmapResolution;
-
-		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Render Grass", 
+		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Render Grass",
 		(
-			bladeCount, 
-			quadtreeCullResults, 
-			terrain,
-			size,
-			cellCount,
-			position,
-			cullingPlanes,
-			heightmapResolution
+			bladeCount,
+			patchScaleOffset: new Float4(size.x / cellCount, size.z / cellCount, position.x, position.z)
 		)))
 		{
 			pass.Initialize(material, indexBuffer, quadtreeCullResults.IndirectArgsBuffer);
@@ -123,7 +114,7 @@ public class GrassRenderer : CameraRenderFeature
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
 
-			pass.ReadBuffer("_PatchData", quadtreeCullResults.PatchDataBuffer);
+			pass.ReadBuffer("PatchData", quadtreeCullResults.PatchDataBuffer);
 			pass.ReadBuffer("InstanceData", instanceDataBuffer);
 
 			pass.AddRenderPassData<FrameData>();
@@ -134,25 +125,7 @@ public class GrassRenderer : CameraRenderFeature
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				pass.SetFloat("BladeCount", data.bladeCount);
-				pass.SetVector("_TerrainSize", (Float3)data.terrain.terrainData.size);
-				pass.SetVector("_TerrainPosition", (Float3)data.terrain.GetPosition());
-
-				var scaleOffset = new Vector4(data.size.x / data.cellCount, data.size.z / data.cellCount, data.position.x, data.position.z);
-				pass.SetVector("_PatchScaleOffset", scaleOffset);
-				//pass.SetVector("_SpacingScale", new Vector4(data.size.x / data.cellCount / data.PatchVertices, data.size.z / data.cellCount / data.PatchVertices, data.position.x, data.position.z));
-				pass.SetFloat("_PatchUvScale", 1f / data.cellCount);
-
-				pass.SetFloat("_HeightUvScale", 1f / data.cellCount * (1.0f - 1f / data.heightmapResolution));
-				pass.SetFloat("_HeightUvOffset", 0.5f / data.heightmapResolution);
-
-				pass.SetFloat("_MaxLod", Mathf.Log(data.cellCount, 2));
-
-				pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
-				var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
-				for (var i = 0; i < data.cullingPlanes.Count; i++)
-					cullingPlanesArray[i] = data.cullingPlanes.GetCullingPlaneVector4(i);
-
-				pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
+				pass.SetVector("PatchScaleOffset", data.patchScaleOffset);
 			});
 		}
 	}
