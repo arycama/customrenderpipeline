@@ -39,7 +39,7 @@ public class WaterRenderer : WaterRendererBase
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
 			pass.WriteTexture(waterTriangleNormal, RenderBufferLoadAction.DontCare);
 
-			pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
+			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
 			pass.AddRenderPassData<OceanFftResult>();
 			pass.AddRenderPassData<AtmospherePropertiesAndTables>();

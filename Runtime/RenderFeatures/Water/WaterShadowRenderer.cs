@@ -121,7 +121,7 @@ public class WaterShadowRenderer : WaterRendererBase
             pass.Initialize(settings.Material, indexBuffer, cullResult.IndirectArgsBuffer, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
             pass.WriteDepth(waterShadow);
             pass.WriteTexture(waterIlluminance, RenderBufferLoadAction.DontCare);
-            pass.ReadBuffer("_PatchData", cullResult.PatchDataBuffer);
+            pass.ReadBuffer("PatchData", cullResult.PatchDataBuffer);
 
             pass.AddRenderPassData<OceanFftResult>();
             pass.AddRenderPassData<WaterShoreMask.Result>(true);

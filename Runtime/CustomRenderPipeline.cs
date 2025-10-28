@@ -159,7 +159,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			renderGraph.SetRTHandle<CameraStencil>(cameraDepth, subElement: RenderTextureSubElement.Stencil);
 		}),
 
-		new TerrainViewData(renderGraph, terrainSystem),
+		new VirtualTerrainPreRender(renderGraph, asset.TerrainSettings),
+		new TerrainViewData(renderGraph, terrainSystem, asset.TerrainSettings),
 		new TerrainRenderer(renderGraph, asset.TerrainSettings, quadtreeCull),
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
@@ -244,6 +245,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		// Finalize gbuffer
 		new ScreenSpaceTerrain(renderGraph),
+		new VirtualTerrain(renderGraph, asset.TerrainSettings),
 
 		// Decals
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>

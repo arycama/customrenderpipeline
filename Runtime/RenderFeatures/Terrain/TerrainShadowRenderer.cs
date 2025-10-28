@@ -49,7 +49,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 			pass.WriteDepth(shadowRequestData.Shadow);
 			pass.DepthSlice = shadowRequestData.CascadeIndex;
 
-			pass.ReadBuffer("_PatchData", passData.PatchDataBuffer);
+			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
 			pass.AddRenderPassData<ShadowRequestData>();
 			pass.AddRenderPassData<TerrainRenderData>();

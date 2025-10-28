@@ -12,32 +12,17 @@ public class ScreenSpaceTerrain : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
-		var terrain = Terrain.activeTerrain;
-		if (terrain == null)
-			return;
+		using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Terrain");
 
-		var size = terrain.terrainData.size.XZ();
-		var scale = 1f / size;
-		var offset = -scale * (terrain.GetPosition().XZ() - camera.transform.position.XZ());
+		pass.Initialize(material);
+		pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+		pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
+		pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
+		pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 
-		using (var pass = renderGraph.AddFullscreenTerrainRenderPass("Screen Space Terrain", new Float4(scale, offset)))
-		{
-			pass.Initialize(material, terrain);
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
-
-			pass.ReadRtHandle<CameraDepth>();
-
-			pass.AddRenderPassData<TerrainRenderData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<VirtualTextureData>();
-
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetVector("WorldToTerrain", data);
-			});
-		}
+		pass.ReadRtHandle<CameraDepth>();
+		pass.AddRenderPassData<TerrainRenderData>();
+		pass.AddRenderPassData<ViewData>();
+		pass.AddRenderPassData<VirtualTextureData>();
 	}
 }

@@ -15,6 +15,10 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	float2 normalUv = WorldToTerrainPositionHalfTexel(worldPosition);
 	uv = WorldToTerrainPosition(worldPosition);
 	
+	// Write to feedback buffer
+	uint feedbackPosition = CalculateFeedbackBufferPosition(uv);
+	VirtualFeedbackTexture[feedbackPosition] = 1;
+	
 	float2 dx = ddx(uv);
 	float2 dy = ddy(uv);
 	
