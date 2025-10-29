@@ -1,8 +1,31 @@
-﻿#pragma kernel CopyTilesToUnmap
+﻿#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Utility.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/VirtualTexturing.hlsl"
+
+#pragma kernel CopyTilesToUnmap
 #pragma kernel MapNewData
 #pragma kernel VirtualTextureUpdate
 #pragma kernel ClearBuffer
 #pragma kernel ClearTexture
+#pragma kernel GatherRequestedPages
+
+AppendStructuredBuffer<uint> VirtualRequests;
+uint IndirectionResolution;
+
+[numthreads(1024, 1, 1)]
+void GatherRequestedPages(uint id : SV_DispatchThreadID)
+{
+	uint result = VirtualFeedbackTexture[id];
+	if (!result)
+		return;
+		
+	VirtualFeedbackTexture[id] = 0;
+	uint3 coords = TextureIndexToCoord(id, IndirectionResolution);
+	
+	uint packedCoord = BitPack(coords.x, 14, 0);
+	packedCoord |= BitPack(coords.y, 14, 14);
+	packedCoord |= BitPack(coords.z, 4, 28);
+	VirtualRequests.Append(packedCoord);
+}
 
 // Stores data to be added to the IndirectionTexture/TileCache
 // (tileCache x/y, mip, isMapped) 
@@ -25,11 +48,11 @@ uint CurrentMip, MaxIndex;
 [numthreads(64, 1, 1)]
 void CopyTilesToUnmap(uint id : SV_DispatchThreadID)
 {
-	if (id < MaxIndex)
-	{
-		// Get the currently mapped tile at the current position, and mark it for removal
-		TilesToUnmap[id] = MappedTiles[TileRequests[id] & 0xFFFF];
-	}
+	if (id >= MaxIndex)
+		return;
+		
+	// Get the currently mapped tile at the current position, and mark it for removal
+	TilesToUnmap[id] = MappedTiles[TileRequests[id] & 0xFFFF];
 }
 
 // Copies the new data to the relevant section, and marks the modified area of the texture for updating
@@ -56,20 +79,17 @@ void MapNewData(uint id : SV_DispatchThreadID)
 	if (data.y != CurrentMip)
 		return;
 	
-	uint result = data.x & 0x7FF;
-	result |= (data.y & 0x1F) << 11;
-		
 	// Unpack the first data into an X and Y coordinate
 	uint2 destCoords = (DestPixels[id] >> uint2(0, 16)) & 0xFFFF;
 		
-	DestMip[destCoords] = result;
+	DestMip[destCoords] = BitPack(data.x, 12, 0) | BitPack(data.y, 4, 12);
 	IndirectionTextureMap[destCoords] = 1;
 
 	// Update the MappedData with the location of this indirection texel
 	// Pack into (12, 12, 4, 4), as we don't need many mips for the latter data
-	uint mappedData = (destCoords.x & 0xFFF) << 0; // x coord
-	mappedData |= (destCoords.y & 0xFFF) << 12; // y coord
-	mappedData |= (data.y & 0xFF) << 24; // mip
+	uint mappedData = BitPack(destCoords.x, 12, 0); // x coord
+	mappedData |= BitPack(destCoords.y, 12, 12); // y coord
+	mappedData |= BitPack(data.y, 8, 24); // mip
 		
 	// Write to the new mip
 	MappedTiles[data.x] = mappedData;

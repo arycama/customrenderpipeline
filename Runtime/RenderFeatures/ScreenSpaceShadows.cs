@@ -40,10 +40,10 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 			pass.WriteTexture(tempResult, "HitResult");
 
 			pass.ReadRtHandle<CameraDepth>();
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<LightingData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<LightingData>();
 			pass.ReadRtHandle<GBufferNormalRoughness>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<ViewData>();
 
 			// Only here to avoid memory leaks due to it not being used..
 			pass.ReadRtHandle<HiZMinDepth>();
@@ -58,9 +58,9 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadRtHandle<HiZMinDepth>();
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<FrameData>();
+			pass.ReadResource<LightingData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<FrameData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -80,15 +80,15 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 
 			pass.ReadTexture("_Input", tempResult);
 
-			pass.AddRenderPassData<TemporalAAData>();
-			pass.AddRenderPassData<SkyReflectionAmbientData>();
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<TemporalAAData>();
+			pass.ReadResource<SkyReflectionAmbientData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<AutoExposureData>();
+			pass.ReadResource<ViewData>();
 			pass.ReadRtHandle<CameraVelocity>();
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadRtHandle<CameraStencil>();
-			pass.AddRenderPassData<LightingData>();
+			pass.ReadResource<LightingData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -115,11 +115,11 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 			//pass.ReadTexture("_BentNormalOcclusion", bentNormalOcclusion);
 			//pass.ReadTexture("RayDepth", rayDepth);
 
-			pass.AddRenderPassData<TemporalAAData>();
-			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<SkyReflectionAmbientData>();
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<TemporalAAData>();
+			pass.ReadResource<AutoExposureData>();
+			pass.ReadResource<SkyReflectionAmbientData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<ViewData>();
 			pass.ReadRtHandle<CameraVelocity>();
 			pass.ReadRtHandle<GBufferNormalRoughness>();
 			pass.ReadRtHandle<CameraDepth>();

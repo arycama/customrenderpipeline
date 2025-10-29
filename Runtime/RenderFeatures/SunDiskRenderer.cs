@@ -26,14 +26,14 @@ public class SunDiskRenderer : CameraRenderFeature
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 
-			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<AutoExposureData>();
+			pass.ReadResource<ViewData>();
 
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<TemporalAAData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<TemporalAAData>();
 
-			pass.AddRenderPassData<SkyTransmittanceData>();
-			pass.AddRenderPassData<CloudShadowDataResult>();
+			pass.ReadResource<SkyTransmittanceData>();
+			pass.ReadResource<CloudShadowDataResult>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{

@@ -5,7 +5,9 @@ using UnityEngine.Rendering;
 
 public class SkyLookupTables : FrameRenderFeature
 {
-    private readonly Sky.Settings settings;
+	private static readonly int _MiePhaseTextureId = Shader.PropertyToID("_MiePhaseTexture");
+
+	private readonly Sky.Settings settings;
     private readonly Material skyMaterial;
     private int version = -1;
     private readonly ResourceHandle<RenderTexture> transmittance, multiScatter, groundAmbient, skyAmbient;
@@ -78,7 +80,7 @@ public class SkyLookupTables : FrameRenderFeature
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				data.result.SetProperties(pass, command);
-				pass.SetTexture("_MiePhaseTexture", data.settings.miePhase);
+				pass.SetTexture(_MiePhaseTextureId, data.settings.miePhase);
 				pass.SetFloat("_Samples", data.settings.TransmittanceSamples);
 				pass.SetVector("_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(data.settings.TransmittanceWidth, data.settings.TransmittanceHeight));
 				pass.SetFloat("_TransmittanceWidth", data.settings.TransmittanceWidth);

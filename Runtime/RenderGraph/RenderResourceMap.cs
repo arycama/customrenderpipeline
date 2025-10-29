@@ -27,19 +27,24 @@ public class ResourceMapData<T> : ResourceMapData where T : struct, IRenderPassD
 public class RenderResourceMap : IDisposable
 {
 	private readonly Dictionary<Type, RenderPassDataHandle> handleIndexMap = new();
-	private readonly List<(ResourceMapData data, int frameIndex, bool isPersistent, bool hasData)> handleList = new();
+	private readonly List<ResourceMapEntry> handleList = new();
 	private bool disposedValue;
 
-	public RenderPassDataHandle GetResourceHandle<T>() where T : struct, IRenderPassData
+	public RenderPassDataHandle GetResourceHandle(Type type)
 	{
-		if (!handleIndexMap.TryGetValue(typeof(T), out var handle))
+		if (!handleIndexMap.TryGetValue(type, out var handle))
 		{
-			handle = new(handleIndexMap.Count, typeof(T));
-			handleIndexMap.Add(typeof(T), handle);
-			handleList.Add((new ResourceMapData<T>(), 0, false, false));
+			handle = new(handleIndexMap.Count, type);
+			handleIndexMap.Add(type, handle);
+			handleList.Add((null, 0, false, false));
 		}
 
 		return handle;
+	}
+
+	public RenderPassDataHandle GetResourceHandle<T>() where T : struct, IRenderPassData
+	{
+		return GetResourceHandle(typeof(T));
 	}
 
 	public bool TrySetProperties(RenderPassDataHandle handle, int frameIndex, RenderPass renderPass, CommandBuffer command)
@@ -86,9 +91,21 @@ public class RenderResourceMap : IDisposable
 	{
 		var handle = GetResourceHandle<T>();
 		var data = handleList[handle.Index];
-		var mapData = data.data as ResourceMapData<T>;
+
+		ResourceMapData<T> mapData;
+		if (!data.hasData)
+		{
+			mapData = new ResourceMapData<T>();
+			data.data = mapData;
+			data.hasData = true;
+		}
+		else
+			mapData = data.data as ResourceMapData<T>;
+
 		mapData.resource = renderResource;
-		handleList[handle.Index] = (mapData, frameIndex, isPersistent, true);
+		data.frameIndex = frameIndex;
+		data.isPersistent = isPersistent;
+		handleList[handle.Index] = data;
 	}
 
 	protected virtual void Dispose(bool disposing)
@@ -112,4 +129,34 @@ public class RenderResourceMap : IDisposable
 		Dispose(disposing: true);
 		GC.SuppressFinalize(this);
 	}
+}
+
+public struct ResourceMapEntry
+{
+	public ResourceMapData data;
+	public int frameIndex;
+	public bool isPersistent;
+	public bool hasData;
+
+	public ResourceMapEntry(ResourceMapData data, int frameIndex, bool isPersistent, bool hasData)
+	{
+		this.data = data;
+		this.frameIndex = frameIndex;
+		this.isPersistent = isPersistent;
+		this.hasData = hasData;
+	}
+
+	public override bool Equals(object obj) => obj is ResourceMapEntry other && EqualityComparer<ResourceMapData>.Default.Equals(data, other.data) && frameIndex == other.frameIndex && isPersistent == other.isPersistent && hasData == other.hasData;
+	public override int GetHashCode() => HashCode.Combine(data, frameIndex, isPersistent, hasData);
+
+	public void Deconstruct(out ResourceMapData data, out int frameIndex, out bool isPersistent, out bool hasData)
+	{
+		data = this.data;
+		frameIndex = this.frameIndex;
+		isPersistent = this.isPersistent;
+		hasData = this.hasData;
+	}
+
+	public static implicit operator (ResourceMapData data, int frameIndex, bool isPersistent, bool hasData)(ResourceMapEntry value) => (value.data, value.frameIndex, value.isPersistent, value.hasData);
+	public static implicit operator ResourceMapEntry((ResourceMapData data, int frameIndex, bool isPersistent, bool hasData) value) => new ResourceMapEntry(value.data, value.frameIndex, value.isPersistent, value.hasData);
 }

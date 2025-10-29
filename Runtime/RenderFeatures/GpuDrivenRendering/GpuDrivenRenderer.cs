@@ -37,8 +37,8 @@ public class GpuDrivenRenderer : RenderFeatureBase
             pass.WriteBuffer("_RendererInstanceIDs", visibilityPredicates);
             pass.ReadBuffer("_InstanceBounds", instanceData.instanceBounds);
 
-            pass.AddRenderPassData<FrameData>();
-            pass.AddRenderPassData<ViewData>();
+            pass.ReadResource<FrameData>();
+            pass.ReadResource<ViewData>();
             pass.ReadRtHandle<HiZMaxDepth>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
@@ -120,7 +120,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			pass.ReadBuffer("InstanceTypeDatas", instanceData.instanceTypeData);
 			pass.ReadBuffer("LodSizes", instanceData.lodSizes);
 			pass.ReadBuffer("InstanceMatrices", instanceData.positions);
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<ViewData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
             {
@@ -281,9 +281,9 @@ public class GpuDrivenRenderer : RenderFeatureBase
 				pass.WriteDepth(request.Shadow);
 				pass.DepthSlice = request.CascadeIndex;
 
-				pass.AddRenderPassData<ViewData>();
-				pass.AddRenderPassData<FrameData>();
-				pass.AddRenderPassData<ShadowRequestData>();
+				pass.ReadResource<ViewData>();
+				pass.ReadResource<FrameData>();
+				pass.ReadResource<ShadowRequestData>();
 
 				pass.ReadBuffer("_VisibleRendererInstanceIndices", renderingData.visibilityPredicates);
 				pass.ReadBuffer("_ObjectToWorld", renderingData.objectToWorld);

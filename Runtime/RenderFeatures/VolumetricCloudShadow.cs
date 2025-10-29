@@ -118,8 +118,8 @@ public class VolumetricCloudShadow : CameraRenderFeature
             pass.Initialize(material, 3);
             pass.WriteTexture(cloudShadow, RenderBufferLoadAction.DontCare);
             pass.ReadBuffer("CloudShadowData", cloudShadowDataBuffer);
-            pass.AddRenderPassData<CloudData>();
-            pass.AddRenderPassData<ViewData>();
+            pass.ReadResource<CloudData>();
+            pass.ReadResource<ViewData>();
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
@@ -139,14 +139,14 @@ public class VolumetricCloudShadow : CameraRenderFeature
         {
 			pass.Initialize(cloudCoverageComputeShader, 0, 1);
 
-            pass.AddRenderPassData<CloudData>();
-            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
+            pass.ReadResource<CloudData>();
+            pass.ReadResource<AtmospherePropertiesAndTables>();
             pass.WriteBuffer("_Result", previousCloudCoverage);
-            pass.AddRenderPassData<AutoExposureData>();
-            pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<SkyTransmittanceData>();
+            pass.ReadResource<AutoExposureData>();
+            pass.ReadResource<LightingData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<SkyTransmittanceData>();
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {

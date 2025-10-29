@@ -36,15 +36,15 @@ public partial class DepthOfField : CameraRenderFeature
 			// Need to set some things as globals so that hit shaders can access them..
 			using (var pass = renderGraph.AddGenericRenderPass("Depth of Field Raytrace Setup"))
 			{
-				pass.AddRenderPassData<SkyReflectionAmbientData>();
-				pass.AddRenderPassData<LightingSetup.Result>();
-				pass.AddRenderPassData<AutoExposureData>();
-				pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-				pass.AddRenderPassData<TerrainRenderData>(true);
-				pass.AddRenderPassData<CloudShadowDataResult>();
-				pass.AddRenderPassData<ShadowData>();
-				pass.AddRenderPassData<ViewData>();
-				pass.AddRenderPassData<FrameData>();
+				pass.ReadResource<SkyReflectionAmbientData>();
+				pass.ReadResource<LightingSetup.Result>();
+				pass.ReadResource<AutoExposureData>();
+				pass.ReadResource<AtmospherePropertiesAndTables>();
+				pass.ReadResource<TerrainRenderData>(true);
+				pass.ReadResource<CloudShadowDataResult>();
+				pass.ReadResource<ShadowData>();
+				pass.ReadResource<ViewData>();
+				pass.ReadResource<FrameData>();
 			}
 
 			using (var pass = renderGraph.AddRaytracingRenderPass("Depth of Field", 
@@ -61,11 +61,11 @@ public partial class DepthOfField : CameraRenderFeature
 				pass.WriteTexture(tempId, "HitColor");
 				//pass.WriteTexture(hitResult, "HitResult");
 
-				pass.AddRenderPassData<AtmospherePropertiesAndTables>();
+				pass.ReadResource<AtmospherePropertiesAndTables>();
 				pass.ReadRtHandle<CameraDepth>();
-				pass.AddRenderPassData<ViewData>();
-				pass.AddRenderPassData<FrameData>();
-				pass.AddRenderPassData<TerrainRenderData>(true);
+				pass.ReadResource<ViewData>();
+				pass.ReadResource<FrameData>();
+				pass.ReadResource<TerrainRenderData>(true);
 
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
@@ -93,8 +93,8 @@ public partial class DepthOfField : CameraRenderFeature
 				pass.ReadRtHandle<CameraTarget>();
 				pass.ReadRtHandle<CameraDepth>();
 				pass.ReadRtHandle<HiZMinDepth>();
-				pass.AddRenderPassData<FrameData>();
-				pass.AddRenderPassData<ViewData>();
+				pass.ReadResource<FrameData>();
+				pass.ReadResource<ViewData>();
 
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{

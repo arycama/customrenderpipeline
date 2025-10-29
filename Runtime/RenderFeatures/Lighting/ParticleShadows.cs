@@ -105,7 +105,7 @@ public class ParticleShadows : CameraRenderFeature
 				pass.WriteTexture(directionalShadows);
 				pass.ReadTexture("ParticleShadowWrite", target);
 				pass.ReadRtHandle<CameraDepth>();
-				pass.AddRenderPassData<ViewData>(); 
+				pass.ReadResource<ViewData>(); 
 
 				pass.ReadBuffer("PerCascadeData", perCascadeData);
 

@@ -90,7 +90,7 @@ void RayGeneration()
 	}
 	else
 	{
-		color = isFrontFace || isTotalInternalReflection ? 0.0 : SkyReflection.SampleLevel(LinearClampSampler, L, 0.0);
+		color = isFrontFace || isTotalInternalReflection ? 0.0 : SkyReflection.SampleLevel(LinearClampSampler, L, 0.0).rgb;
 		hitRay = L;
 		outDepth = 0.0;
 	}

@@ -347,7 +347,7 @@ float3 ICtCpToRec709(float3 iCtCp)
 float3 LinearToGamma(float3 c)
 {
 	float3 sRgbLo = c * 12.92;
-	float3 sRgbHi = pow(c, rcp(2.4)) * 1.055 - 0.055;
+	float3 sRgbHi = pow(abs(c), rcp(2.4)) * 1.055 - 0.055;
 	return (c <= 0.0031308) ? sRgbLo : sRgbHi;
 }
 

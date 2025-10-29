@@ -38,11 +38,11 @@ public class TerrainRenderer : TerrainRendererBase
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.None, RenderBufferLoadAction.DontCare);
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<TerrainQuadtreeData>();
-			pass.AddRenderPassData<TerrainRenderData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<VirtualTextureData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<TerrainQuadtreeData>();
+			pass.ReadResource<TerrainRenderData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<VirtualTextureData>();
 
 			pass.SetRenderFunction(static (command, pass, cullingPlanes) =>
 			{
@@ -62,7 +62,7 @@ public class TerrainRenderer : TerrainRendererBase
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("Terrain", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.None);
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<ViewData>();
 		}
 	}
 }

@@ -54,12 +54,12 @@ public partial class TemporalAA : CameraRenderFeature
 		pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
 		pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 		pass.WriteTexture(currentWeight, RenderBufferLoadAction.DontCare);
-		pass.AddRenderPassData<TemporalAAData>();
+		pass.ReadResource<TemporalAAData>();
 		pass.ReadRtHandle<CameraTarget>();
 		pass.ReadRtHandle<CameraStencil>();
 		pass.ReadRtHandle<CameraDepth>();
 		pass.ReadRtHandle<CameraVelocity>();
-		pass.AddRenderPassData<AutoExposureData>();
+		pass.ReadResource<AutoExposureData>();
 
 		pass.SetRenderFunction(static (command, pass, data) =>
 		{

@@ -6,7 +6,9 @@ using UnityEngine.Rendering;
 
 public class WaterShoreMask : FrameRenderFeature
 {
-    [Serializable]
+	private static int HeightmapId = Shader.PropertyToID("Heightmap");
+
+	[Serializable]
     public class Settings
     {
         [field: SerializeField] public int Resolution = 512;
@@ -72,7 +74,7 @@ public class WaterShoreMask : FrameRenderFeature
                 pass.SetFloat("Cutoff", data.cutoff);
                 pass.SetFloat("InvResolution", data.invResolution);
                 pass.SetFloat("Resolution", data.heightmapResolution);
-                pass.SetTexture("Heightmap", data.heightmapTexture);
+                pass.SetTexture(HeightmapId, data.heightmapTexture);
             });
         }
 
@@ -101,7 +103,7 @@ public class WaterShoreMask : FrameRenderFeature
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					pass.SetFloat("Offset", data.offset);
-					pass.SetTexture("Heightmap", data.heightmapTexture);
+					pass.SetTexture(HeightmapId, data.heightmapTexture);
 					pass.SetFloat("InvResolution", data.invResolution);
 					pass.SetFloat("Resolution", data.heightmapResolution);
 					pass.SetFloat("Cutoff", data.cutoff);
@@ -136,7 +138,7 @@ public class WaterShoreMask : FrameRenderFeature
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetTexture("Heightmap", data.heightmapTexture);
+                pass.SetTexture(HeightmapId, data.heightmapTexture);
                 pass.SetFloat("Cutoff", data.cutoff);
                 pass.SetFloat("InvResolution", data.invResolution);
                 command.CopyBuffer(pass.GetBuffer(data.minMaxValues), pass.GetBuffer(data.resultDataBuffer));

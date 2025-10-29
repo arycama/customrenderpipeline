@@ -37,8 +37,8 @@ public class WaterCaustics : CameraRenderFeature
 		{
 			pass.Initialize(material, 2);
 			pass.WriteTexture(temp0, RenderBufferLoadAction.DontCare);
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<OceanFftResult>();
+			pass.ReadResource<LightingData>();
+			pass.ReadResource<OceanFftResult>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -56,8 +56,8 @@ public class WaterCaustics : CameraRenderFeature
 
 			pass.WriteTexture(tempResult);
 
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<OceanFftResult>();
+			pass.ReadResource<LightingData>();
+			pass.ReadResource<OceanFftResult>();
 			pass.ReadTexture("_Input", temp0);
 
 			pass.SetRenderFunction(static (command, pass, data) =>

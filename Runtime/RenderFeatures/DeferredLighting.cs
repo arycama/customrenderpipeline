@@ -22,34 +22,34 @@ public class DeferredLighting : CameraRenderFeature
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 
-			pass.AddRenderPassData<DfgData>();
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<EnvironmentData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<ShadowData>();
-			pass.AddRenderPassData<AutoExposureData>();
+			pass.ReadResource<DfgData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<EnvironmentData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<LightingData>();
+			pass.ReadResource<ShadowData>();
+			pass.ReadResource<AutoExposureData>();
 
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadRtHandle<CameraStencil>();
 			pass.ReadRtHandle<GBufferAlbedoMetallic>();
 			pass.ReadRtHandle<GBufferNormalRoughness>();
 			pass.ReadRtHandle<GBufferBentNormalOcclusion>();
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<TemporalAAData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<TemporalAAData>();
 
-			pass.AddRenderPassData<SkyTransmittanceData>();
-			pass.AddRenderPassData<CloudShadowDataResult>();
+			pass.ReadResource<SkyTransmittanceData>();
+			pass.ReadResource<CloudShadowDataResult>();
 
-			pass.AddRenderPassData<ScreenSpaceShadows.Result>();
-			pass.AddRenderPassData<LightingSetup.Result>();
-			pass.AddRenderPassData<ClusteredLightCulling.Result>();
-			pass.AddRenderPassData<VolumetricLighting.Result>();
+			pass.ReadResource<ScreenSpaceShadows.Result>();
+			pass.ReadResource<LightingSetup.Result>();
+			pass.ReadResource<ClusteredLightCulling.Result>();
+			pass.ReadResource<VolumetricLighting.Result>();
 
-			pass.AddRenderPassData<DiffuseGlobalIllumination.Result>();
-			pass.AddRenderPassData<ScreenSpaceReflectionResult>();
+			pass.ReadResource<DiffuseGlobalIllumination.Result>();
+			pass.ReadResource<ScreenSpaceReflectionResult>();
 
-			pass.AddRenderPassData<ParticleShadowData>();
+			pass.ReadResource<ParticleShadowData>();
 		}
 
 		RenderPass(0); // No translucency

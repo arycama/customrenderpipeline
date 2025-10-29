@@ -43,11 +43,11 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 				pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 				pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 				pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
-				pass.AddRenderPassData<AutoExposureData>();
-				pass.AddRenderPassData<TemporalAAData>();
-				pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-				pass.AddRenderPassData<ViewData>();
-				pass.AddRenderPassData<FrameData>();
+				pass.ReadResource<AutoExposureData>();
+				pass.ReadResource<TemporalAAData>();
+				pass.ReadResource<AtmospherePropertiesAndTables>();
+				pass.ReadResource<ViewData>();
+				pass.ReadResource<FrameData>();
 
 				pass.ReadBuffer("_VisibleRendererInstanceIndices", renderingData.visibilityPredicates);
 				pass.ReadBuffer("_ObjectToWorld", renderingData.objectToWorld);

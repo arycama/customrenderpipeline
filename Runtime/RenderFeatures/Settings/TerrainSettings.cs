@@ -11,7 +11,6 @@ public class TerrainSettings
 	[field: SerializeField, Min(0)] public float AmbientOcclusionRadius { get; private set; } = 1;
 	[field: SerializeField, Range(1, 128)] public int AmbientOcclusionDirections { get; private set; } = 32;
 	[field: SerializeField, Range(1, 1024)] public int AmbientOcclusionSamples { get; private set; } = 32;
-	[field: SerializeField] public int TileSize { get; private set; } = 256;
     [field: SerializeField, Pow2(512)] public int TileResolution { get; private set; } = 256;
 	[field: SerializeField] public int VirtualResolution { get; private set; } = 524288;
 	[field: SerializeField, Pow2(2048)] public int VirtualTileCount { get; private set; } = 512;

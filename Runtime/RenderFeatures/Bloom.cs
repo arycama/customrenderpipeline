@@ -33,6 +33,9 @@ public class Bloom : CameraRenderFeature
 		[field: SerializeField] public Texture2D StarburstTexture { get; private set; }
 	}
 
+	private static readonly int LensDirtId = Shader.PropertyToID("LensDirt");
+	private static readonly int StarBurstId = Shader.PropertyToID("StarBurst");
+	
 	private readonly Settings settings;
 	private readonly Material material;
 
@@ -90,7 +93,7 @@ public class Bloom : CameraRenderFeature
 			pass.WriteTexture(bloomIds[i], RenderBufferLoadAction.DontCare);
 
 			pass.ReadTexture("Input", source);
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<ViewData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -99,7 +102,7 @@ public class Bloom : CameraRenderFeature
 				pass.SetFloat("DirtStrength", data.DirtStrength);
 
 				if (data.LensDirt != null)
-					pass.SetTexture("LensDirt", data.LensDirt);
+					pass.SetTexture(LensDirtId, data.LensDirt);
 
 				// Lens flare 
 				pass.SetFloat("DistortionQuality", data.DistortionQuality);
@@ -113,7 +116,7 @@ public class Bloom : CameraRenderFeature
 				pass.SetFloat("StreakStrength", data.StreakStrength);
 
 				if (data.StarburstTexture != null)
-					pass.SetTexture("StarBurst", data.StarburstTexture);
+					pass.SetTexture(StarBurstId, data.StarburstTexture);
 			});
 		}
 
@@ -156,7 +159,7 @@ public class Bloom : CameraRenderFeature
 				pass.SetFloat("DirtStrength", data.DirtStrength);
 
 				if (data.LensDirt != null)
-					pass.SetTexture("LensDirt", data.LensDirt);
+					pass.SetTexture(LensDirtId, data.LensDirt);
 
 				// Lens flare 
 				pass.SetFloat("DistortionQuality", data.DistortionQuality);
@@ -170,7 +173,7 @@ public class Bloom : CameraRenderFeature
 				pass.SetFloat("StreakStrength", data.StreakStrength);
 
 				if (data.StarburstTexture != null)
-					pass.SetTexture("StarBurst", data.StarburstTexture);
+					pass.SetTexture(StarBurstId, data.StarburstTexture);
 			});
 		}
 

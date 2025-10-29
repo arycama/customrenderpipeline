@@ -24,8 +24,8 @@ public class RainTextureUpdater : CameraRenderFeature
 
 			pass.WriteTexture(rainTexture);
 
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<ViewData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -56,7 +56,7 @@ public class RainTextureUpdater : CameraRenderFeature
 			pass.ReadRtHandle<CameraTarget>();
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadRtHandle<CameraStencil>();
-			pass.AddRenderPassData<RainTextureResult>();
+			pass.ReadResource<RainTextureResult>();
 
 			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(albedoMetallicCopy);
 			renderGraph.SetRTHandle<GBufferNormalRoughness>(normalRoughnessCopy);

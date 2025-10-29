@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 public class ScreenSpaceTerrain : CameraRenderFeature
@@ -19,10 +20,11 @@ public class ScreenSpaceTerrain : CameraRenderFeature
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
+		pass.WriteTexture(renderGraph.GetRTHandle<VirtualTerrainFeedback>());
 
 		pass.ReadRtHandle<CameraDepth>();
-		pass.AddRenderPassData<TerrainRenderData>();
-		pass.AddRenderPassData<ViewData>();
-		pass.AddRenderPassData<VirtualTextureData>();
+		pass.ReadResource<TerrainRenderData>();
+		pass.ReadResource<ViewData>();
+		pass.ReadResource<VirtualTextureData>();
 	}
 }

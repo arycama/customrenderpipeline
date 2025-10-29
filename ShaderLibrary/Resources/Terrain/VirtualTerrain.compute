@@ -4,12 +4,12 @@ AppendStructuredBuffer<uint> VirtualRequests;
 RWStructuredBuffer<uint> VirtualFeedbackTexture;
 
 [numthreads(1024, 1, 1)]
-void CSMain (uint3 id : SV_DispatchThreadID)
+void CSMain (uint id : SV_DispatchThreadID)
 {
-	uint result = VirtualFeedbackTexture[id.x];
+	uint result = VirtualFeedbackTexture[id];
 	if (!result)
 		return;
 		
-	VirtualRequests.Append(id.x);
-	VirtualFeedbackTexture[id.x] = 0;
+	VirtualRequests.Append(id);
+	VirtualFeedbackTexture[id] = 0;
 }

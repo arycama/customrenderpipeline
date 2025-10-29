@@ -201,7 +201,7 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		float3 lightTransmittance = Rec709ToRec2020(TransmittanceToAtmosphere(viewHeight, rd.y, _LightDirection0.y, rayEnd));
 		result.rgb += light0 * lightTransmittance * Rec709ToRec2020(_LightColor0) * Exposure * result.a;
 		
-		for (float j = 0.0; j < ScatterOctaves; j++)
+		for (j = 0.0; j < ScatterOctaves; j++)
 		{
 			float b = pow(ScatterContribution, j);
 			result.rgb += ambient * b * result.a * highCloudOpacity;

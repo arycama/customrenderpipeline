@@ -4,7 +4,10 @@ using UnityEngine.Rendering;
 
 public class DeferredWater : CameraRenderFeature
 {
-    private readonly WaterSettings settings;
+	private static readonly int _FoamTexId = Shader.PropertyToID("_FoamTex");
+	private static readonly int _FoamBumpId = Shader.PropertyToID("_FoamBump");
+
+	private readonly WaterSettings settings;
     private readonly Material deferredWaterMaterial;
     private readonly PersistentRTHandleCache temporalCache;
     private readonly RayTracingShader raytracingShader;
@@ -41,22 +44,22 @@ public class DeferredWater : CameraRenderFeature
             pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
             pass.WriteTexture(scatterResult);
 
-            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-            pass.AddRenderPassData<AutoExposureData>();
-            pass.AddRenderPassData<WaterShadowResult>();
-            pass.AddRenderPassData<LightingSetup.Result>();
-            pass.AddRenderPassData<ShadowData>();
-            pass.AddRenderPassData<DfgData>();
-            pass.AddRenderPassData<CloudShadowDataResult>();
-            pass.AddRenderPassData<WaterPrepassResult>();
-            pass.AddRenderPassData<UnderwaterLightingResult>();
-            pass.AddRenderPassData<LightingData>();
+            pass.ReadResource<AtmospherePropertiesAndTables>();
+            pass.ReadResource<AutoExposureData>();
+            pass.ReadResource<WaterShadowResult>();
+            pass.ReadResource<LightingSetup.Result>();
+            pass.ReadResource<ShadowData>();
+            pass.ReadResource<DfgData>();
+            pass.ReadResource<CloudShadowDataResult>();
+            pass.ReadResource<WaterPrepassResult>();
+            pass.ReadResource<UnderwaterLightingResult>();
+            pass.ReadResource<LightingData>();
 
-            pass.AddRenderPassData<OceanFftResult>();
-            pass.AddRenderPassData<WaterShoreMask.Result>(true);
-            pass.AddRenderPassData<ViewData>();
-            pass.AddRenderPassData<FrameData>();
-            pass.AddRenderPassData<CausticsResult>();
+            pass.ReadResource<OceanFftResult>();
+            pass.ReadResource<WaterShoreMask.Result>(true);
+            pass.ReadResource<ViewData>();
+            pass.ReadResource<FrameData>();
+            pass.ReadResource<CausticsResult>();
             pass.ReadRtHandle<CameraDepth>();
             pass.ReadRtHandle<CameraStencil>();
 			pass.ReadRtHandle<CameraDepthCopy>();
@@ -77,12 +80,12 @@ public class DeferredWater : CameraRenderFeature
                 pass.SetFloat("_FoamSmoothness", settings.Material.GetFloat("_FoamSmoothness"));
                 pass.SetFloat("_Smoothness", settings.Material.GetFloat("_Smoothness"));
 
-                var foamScale = settings.Material.GetTextureScale("_FoamTex");
-                var foamOffset = settings.Material.GetTextureOffset("_FoamTex");
+                var foamScale = settings.Material.GetTextureScale(_FoamTexId);
+                var foamOffset = settings.Material.GetTextureOffset(_FoamTexId);
 
                 pass.SetVector("_FoamTex_ST", new Vector4(foamScale.x, foamScale.y, foamOffset.x, foamOffset.y));
-                pass.SetTexture("_FoamTex", settings.Material.GetTexture("_FoamTex"));
-                pass.SetTexture("_FoamBump", settings.Material.GetTexture("_FoamBump"));
+                pass.SetTexture(_FoamTexId, settings.Material.GetTexture(_FoamTexId));
+                pass.SetTexture(_FoamBumpId, settings.Material.GetTexture(_FoamBumpId));
 
                 pass.SetFloat("_ShoreWaveLength", material.GetFloat("_ShoreWaveLength"));
                 pass.SetFloat("_ShoreWaveHeight", material.GetFloat("_ShoreWaveHeight"));
@@ -99,21 +102,21 @@ public class DeferredWater : CameraRenderFeature
             {
 				pass.AddKeyword("UNDERWATER_LIGHTING_ON");
 
-                pass.AddRenderPassData<SkyReflectionAmbientData>();
-                pass.AddRenderPassData<LightingSetup.Result>();
-                pass.AddRenderPassData<AutoExposureData>();
-                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<TerrainRenderData>(true);
-                pass.AddRenderPassData<CloudShadowDataResult>();
-                pass.AddRenderPassData<ShadowData>();
-                pass.AddRenderPassData<DfgData>();
-                pass.AddRenderPassData<WaterShadowResult>();
-                pass.AddRenderPassData<WaterPrepassResult>();
-                pass.AddRenderPassData<FrameData>();
-                pass.AddRenderPassData<ViewData>();
-                pass.AddRenderPassData<OceanFftResult>();
-                pass.AddRenderPassData<CausticsResult>();
-                pass.AddRenderPassData<EnvironmentData>();
+                pass.ReadResource<SkyReflectionAmbientData>();
+                pass.ReadResource<LightingSetup.Result>();
+                pass.ReadResource<AutoExposureData>();
+                pass.ReadResource<AtmospherePropertiesAndTables>();
+                pass.ReadResource<TerrainRenderData>(true);
+                pass.ReadResource<CloudShadowDataResult>();
+                pass.ReadResource<ShadowData>();
+                pass.ReadResource<DfgData>();
+                pass.ReadResource<WaterShadowResult>();
+                pass.ReadResource<WaterPrepassResult>();
+                pass.ReadResource<FrameData>();
+                pass.ReadResource<ViewData>();
+                pass.ReadResource<OceanFftResult>();
+                pass.ReadResource<CausticsResult>();
+                pass.ReadResource<EnvironmentData>();
             }
 
 			using (var pass = renderGraph.AddRaytracingRenderPass("Water Raytraced Refractions", settings))
@@ -131,16 +134,16 @@ public class DeferredWater : CameraRenderFeature
                 //pass.ReadTexture("PreviousFrame", previousFrameColor); // Temporary, cuz of leaks if we don't use it..
 
                 pass.ReadRtHandle<GBufferNormalRoughness>();
-                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-				pass.AddRenderPassData<WaterShadowResult>();
-                pass.AddRenderPassData<LightingData>();
-                pass.AddRenderPassData<ViewData>();
-                pass.AddRenderPassData<FrameData>();
-                pass.AddRenderPassData<OceanFftResult>();
-                pass.AddRenderPassData<CausticsResult>();
+                pass.ReadResource<AtmospherePropertiesAndTables>();
+				pass.ReadResource<WaterShadowResult>();
+                pass.ReadResource<LightingData>();
+                pass.ReadResource<ViewData>();
+                pass.ReadResource<FrameData>();
+                pass.ReadResource<OceanFftResult>();
+                pass.ReadResource<CausticsResult>();
                 pass.ReadRtHandle<CameraDepth>();
                 pass.ReadRtHandle<CameraStencil>();
-				pass.AddRenderPassData<EnvironmentData>();
+				pass.ReadResource<EnvironmentData>();
 
 				pass.SetRenderFunction(static (command, pass, settings) =>
                 {
@@ -169,12 +172,12 @@ public class DeferredWater : CameraRenderFeature
 			pass.ReadRtHandle<GBufferNormalRoughness>();
 			pass.ReadRtHandle<GBufferBentNormalOcclusion>();
 			pass.ReadRtHandle<GBufferAlbedoMetallic>();
-			pass.AddRenderPassData<TemporalAAData>();
-            pass.AddRenderPassData<AutoExposureData>();
-            pass.AddRenderPassData<SkyReflectionAmbientData>();
-            pass.AddRenderPassData<DfgData>();
-            pass.AddRenderPassData<ViewData>();
-            pass.AddRenderPassData<FrameData>();
+			pass.ReadResource<TemporalAAData>();
+            pass.ReadResource<AutoExposureData>();
+            pass.ReadResource<SkyReflectionAmbientData>();
+            pass.ReadResource<DfgData>();
+            pass.ReadResource<ViewData>();
+            pass.ReadResource<FrameData>();
             pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();
             pass.ReadRtHandle<CameraStencil>();

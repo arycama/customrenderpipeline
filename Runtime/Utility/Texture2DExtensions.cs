@@ -45,15 +45,15 @@ public static class Texture2DExtensions
 	}
 
 	// Converts a texture byte offset to an XYZ coordinate. (Where Z is the mip level)
-	public static Vector3Int TextureByteOffsetToCoord(int index, int resolution)
+	public static Int3 TextureByteOffsetToCoord(int index, int resolution)
 	{
 		var mip = IndexToMip(index, resolution);
 		var localMipCoord = index - MipOffset(mip, resolution);
 		var mipSize = MipResolution(mip, resolution);
-		return new Vector3Int(localMipCoord % mipSize, localMipCoord / mipSize, mip);
+		return new Int3(localMipCoord % mipSize, localMipCoord / mipSize, mip);
 	}
 
-	public static int TextureCoordToOffset(Vector3Int position, int resolution)
+	public static int TextureCoordToOffset(Int3 position, int resolution)
 	{
 		var mipSize = MipResolution(position.z, resolution);
 		var coord = position.x + position.y * mipSize;

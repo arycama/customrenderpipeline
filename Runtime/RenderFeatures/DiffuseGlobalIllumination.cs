@@ -38,16 +38,16 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             // Need to set some things as globals so that hit shaders can access them..
             using (var pass = renderGraph.AddGenericRenderPass("Specular GI Raytrace Setup"))
             {
-                pass.AddRenderPassData<SkyReflectionAmbientData>();
-                pass.AddRenderPassData<LightingSetup.Result>();
-                pass.AddRenderPassData<AutoExposureData>();
-                pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-                pass.AddRenderPassData<TerrainRenderData>(true);
-                pass.AddRenderPassData<CloudShadowDataResult>();
-                pass.AddRenderPassData<ViewData>();
-                pass.AddRenderPassData<FrameData>();
-                pass.AddRenderPassData<EnvironmentData>();
-                pass.AddRenderPassData<LightingData>();
+                pass.ReadResource<SkyReflectionAmbientData>();
+                pass.ReadResource<LightingSetup.Result>();
+                pass.ReadResource<AutoExposureData>();
+                pass.ReadResource<AtmospherePropertiesAndTables>();
+                pass.ReadResource<TerrainRenderData>(true);
+                pass.ReadResource<CloudShadowDataResult>();
+                pass.ReadResource<ViewData>();
+                pass.ReadResource<FrameData>();
+                pass.ReadResource<EnvironmentData>();
+                pass.ReadResource<LightingData>();
 			}
             using (var pass = renderGraph.AddRaytracingRenderPass("Diffuse GI Raytrace"))
             {
@@ -58,14 +58,14 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
                 pass.WriteTexture(hitResult, "HitResult");
 				pass.ReadRtHandle<GBufferNormalRoughness>();
 				pass.ReadRtHandle<PreviousCameraTarget>();
-                pass.AddRenderPassData<SkyReflectionAmbientData>();
-                pass.AddRenderPassData<LightingSetup.Result>();
-                pass.AddRenderPassData<AutoExposureData>();
-                pass.AddRenderPassData<FrameData>();
-                pass.AddRenderPassData<ViewData>();
+                pass.ReadResource<SkyReflectionAmbientData>();
+                pass.ReadResource<LightingSetup.Result>();
+                pass.ReadResource<AutoExposureData>();
+                pass.ReadResource<FrameData>();
+                pass.ReadResource<ViewData>();
                 pass.ReadRtHandle<CameraDepth>();
-                pass.AddRenderPassData<EnvironmentData>();
-                pass.AddRenderPassData<LightingData>();
+                pass.ReadResource<EnvironmentData>();
+                pass.ReadResource<LightingData>();
 			}
 		}
         else
@@ -77,13 +77,13 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
 				pass.WriteTexture(tempResult);
 				pass.WriteTexture(hitResult);
 
-				pass.AddRenderPassData<LightingSetup.Result>();
-				pass.AddRenderPassData<TemporalAAData>();
-				pass.AddRenderPassData<AutoExposureData>();
-				pass.AddRenderPassData<SkyReflectionAmbientData>();
-				pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-				pass.AddRenderPassData<ViewData>();
-				pass.AddRenderPassData<FrameData>();
+				pass.ReadResource<LightingSetup.Result>();
+				pass.ReadResource<TemporalAAData>();
+				pass.ReadResource<AutoExposureData>();
+				pass.ReadResource<SkyReflectionAmbientData>();
+				pass.ReadResource<AtmospherePropertiesAndTables>();
+				pass.ReadResource<ViewData>();
+				pass.ReadResource<FrameData>();
 				pass.ReadRtHandle<GBufferBentNormalOcclusion>();
 				pass.ReadRtHandle<CameraVelocity>();
 				pass.ReadRtHandle<HiZMinDepth>();
@@ -116,12 +116,12 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             pass.ReadTexture("_Input", tempResult);
             pass.ReadTexture("_HitResult", hitResult);
 
-            pass.AddRenderPassData<TemporalAAData>();
-            pass.AddRenderPassData<SkyReflectionAmbientData>();
-            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-            pass.AddRenderPassData<AutoExposureData>();
-            pass.AddRenderPassData<ViewData>();
-            pass.AddRenderPassData<FrameData>();
+            pass.ReadResource<TemporalAAData>();
+            pass.ReadResource<SkyReflectionAmbientData>();
+            pass.ReadResource<AtmospherePropertiesAndTables>();
+            pass.ReadResource<AutoExposureData>();
+            pass.ReadResource<ViewData>();
+            pass.ReadResource<FrameData>();
             pass.ReadRtHandle<GBufferBentNormalOcclusion>();
             pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();
@@ -155,12 +155,12 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             pass.ReadTexture("WeightInput", spatialWeight);
             pass.ReadTexture("WeightHistory", historyWeight);
 
-            pass.AddRenderPassData<TemporalAAData>();
-            pass.AddRenderPassData<AutoExposureData>();
-            pass.AddRenderPassData<SkyReflectionAmbientData>();
-            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-            pass.AddRenderPassData<ViewData>();
-            pass.AddRenderPassData<FrameData>();
+            pass.ReadResource<TemporalAAData>();
+            pass.ReadResource<AutoExposureData>();
+            pass.ReadResource<SkyReflectionAmbientData>();
+            pass.ReadResource<AtmospherePropertiesAndTables>();
+            pass.ReadResource<ViewData>();
+            pass.ReadResource<FrameData>();
             pass.ReadRtHandle<GBufferBentNormalOcclusion>();
             pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();

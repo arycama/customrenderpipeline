@@ -70,8 +70,8 @@ public class Rain : CameraRenderFeature
 				pass.WriteBuffer("Positions", positionBuffer);
 				pass.ReadBuffer("Positions", positionBuffer);
 
-				pass.AddRenderPassData<ViewData>();
-				pass.AddRenderPassData<FrameData>();
+				pass.ReadResource<ViewData>();
+				pass.ReadResource<FrameData>();
 
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
@@ -92,8 +92,8 @@ public class Rain : CameraRenderFeature
 			pass.WriteBuffer("Positions", positionBuffer);
 			pass.ReadBuffer("Positions", positionBuffer);
 
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<FrameData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<FrameData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -116,12 +116,12 @@ public class Rain : CameraRenderFeature
 
 			pass.ReadBuffer("Positions", positionBuffer);
 
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<ViewData>();
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadRtHandle<PreviousCameraTarget>();
-			pass.AddRenderPassData<EnvironmentData>();
-			pass.AddRenderPassData<LightingData>();
+			pass.ReadResource<EnvironmentData>();
+			pass.ReadResource<LightingData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{

@@ -5,7 +5,9 @@ using Object = UnityEngine.Object;
 
 public class PhysicalSkyGenerateData : CameraRenderFeature
 {
-    private readonly Sky.Settings settings;
+	private static readonly int _MiePhaseTextureId = Shader.PropertyToID("_MiePhaseTexture");
+
+	private readonly Sky.Settings settings;
     private readonly VolumetricClouds.Settings cloudSettings;
     private readonly Material skyMaterial, ggxConvolutionMaterial;
 
@@ -32,9 +34,9 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Lookup 2"));
 			pass.WriteTexture(skyTransmittance, RenderBufferLoadAction.DontCare);
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<LightingData>();
+			pass.ReadResource<ViewData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -55,10 +57,10 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Luminance LUT"));
 			pass.WriteTexture(skyLuminance, RenderBufferLoadAction.DontCare);
 			pass.ReadTexture("_SkyTransmittance", skyTransmittance);
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<SkyTransmittanceData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<LightingData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<SkyTransmittanceData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -78,10 +80,10 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
         {
             pass.Initialize(skyMaterial, skyMaterial.FindPass("CDF Lookup"));
             pass.WriteTexture(cdf, RenderBufferLoadAction.DontCare);
-            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-            pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<SkyTransmittanceData>();
+            pass.ReadResource<AtmospherePropertiesAndTables>();
+            pass.ReadResource<LightingData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<SkyTransmittanceData>();
             pass.ReadTexture("SkyLuminance", skyLuminance);
 
             pass.SetRenderFunction(static (command, pass, data) =>
@@ -100,13 +102,13 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
             pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Depth Lookup"));
             pass.WriteTexture(weightedDepth, RenderBufferLoadAction.DontCare);
 
-            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-            pass.AddRenderPassData<SkyTransmittanceData>();
-            pass.AddRenderPassData<ViewData>();
+            pass.ReadResource<AtmospherePropertiesAndTables>();
+            pass.ReadResource<SkyTransmittanceData>();
+            pass.ReadResource<ViewData>();
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetTexture("_MiePhaseTexture", data.miePhase);
+                pass.SetTexture(_MiePhaseTextureId, data.miePhase);
                 pass.SetFloat("_Samples", data.TransmittanceSamples);
                 pass.SetVector("_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(data.TransmittanceWidth, data.TransmittanceHeight));
             });

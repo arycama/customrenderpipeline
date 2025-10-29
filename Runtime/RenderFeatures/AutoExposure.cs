@@ -5,6 +5,8 @@ using Object = UnityEngine.Object;
 
 public partial class AutoExposure : CameraRenderFeature
 {
+	private static readonly int ExposureCompensationTextureId = Shader.PropertyToID("ExposureCompensationTexture");
+
 	private readonly Tonemapping.Settings tonemappingSettings;
 	private readonly Settings settings;
 	private readonly LensSettings lensSettings;
@@ -76,7 +78,7 @@ public partial class AutoExposure : CameraRenderFeature
 			pass.Initialize(computeShader, 0, camera.scaledPixelWidth, camera.scaledPixelHeight);
 			pass.ReadTexture(nameof(CameraTarget), renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteBuffer("LuminanceHistogram", histogram);
-			pass.AddRenderPassData<AutoExposureData>();
+			pass.ReadResource<AutoExposureData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -105,15 +107,15 @@ public partial class AutoExposure : CameraRenderFeature
 			pass.Initialize(computeShader, 1, 1);
 			pass.ReadBuffer("LuminanceHistogram", histogram);
 			pass.WriteBuffer("LuminanceOutput", output);
-			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<AutoExposureData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<ViewData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				pass.SetFloat("Mode", (float)data.ExposureMode);
 				pass.SetFloat("IsFirst", data.IsFirst ? 1 : 0);
-				pass.SetTexture("ExposureCompensationTexture", data.exposureTexture);
+				pass.SetTexture(ExposureCompensationTextureId, data.exposureTexture);
 				pass.SetFloat("PaperWhite", data.PaperWhite);
 			});
 		}

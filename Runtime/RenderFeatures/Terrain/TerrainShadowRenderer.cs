@@ -51,11 +51,11 @@ public class TerrainShadowRenderer : TerrainRendererBase
 
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
-			pass.AddRenderPassData<ShadowRequestData>();
-			pass.AddRenderPassData<TerrainRenderData>();
-			pass.AddRenderPassData<TerrainQuadtreeData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<VirtualTextureData>();
+			pass.ReadResource<ShadowRequestData>();
+			pass.ReadResource<TerrainRenderData>();
+			pass.ReadResource<TerrainQuadtreeData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<VirtualTextureData>();
 
 			pass.SetRenderFunction(static (command, pass, cullingPlanes) =>
 			{

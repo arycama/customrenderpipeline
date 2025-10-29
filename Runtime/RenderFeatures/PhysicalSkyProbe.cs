@@ -56,13 +56,13 @@ public class PhysicalSkyProbe : CameraRenderFeature
 
 			pass.WriteTexture(reflectionProbeTemp);
 
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<CloudData>();
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<SkyTransmittanceData>();
-			pass.AddRenderPassData<SkyReflectionAmbientData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<AutoExposureData>();
+			pass.ReadResource<CloudData>();
+			pass.ReadResource<LightingData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<SkyTransmittanceData>();
+			pass.ReadResource<SkyReflectionAmbientData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{

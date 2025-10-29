@@ -25,7 +25,7 @@ public class EnvironmentConvolve : CameraRenderFeature
 		{
 			pass.Initialize(ambientComputeShader, normalizedDispatch: false);
 			pass.WriteBuffer("_AmbientProbeOutputBuffer", ambientBufferTemp);
-			pass.AddRenderPassData<EnvironmentProbeTempResult>();
+			pass.ReadResource<EnvironmentProbeTempResult>();
 
 			pass.SetRenderFunction(static (command, pass, reflectionResolution) =>
 			{
@@ -55,7 +55,7 @@ public class EnvironmentConvolve : CameraRenderFeature
 			pass.WriteTexture(reflectionProbe);
 			pass.WriteBuffer("", ambientBuffer);
 			pass.ReadBuffer("", ambientBufferTemp);
-			pass.AddRenderPassData<EnvironmentProbeTempResult>();
+			pass.ReadResource<EnvironmentProbeTempResult>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -73,7 +73,7 @@ public class EnvironmentConvolve : CameraRenderFeature
 				pass.MipLevel = i;
 
 				pass.WriteTexture(reflectionProbe);
-				pass.AddRenderPassData<EnvironmentProbeTempResult>();
+				pass.ReadResource<EnvironmentProbeTempResult>();
 
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{

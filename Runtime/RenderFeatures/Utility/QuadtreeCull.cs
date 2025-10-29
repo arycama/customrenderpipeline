@@ -86,7 +86,7 @@ public class QuadtreeCull
 				pass.WriteBuffer("_IndirectArgs", indirectArgsBuffer);
 				pass.WriteBuffer("_PatchDataWrite", patchDataBuffer);
 
-				pass.AddRenderPassData<ViewData>();
+				pass.ReadResource<ViewData>();
 
 				if (!isFirstPass)
 					pass.ReadTexture("_TempResult", tempIds[i - 1]);

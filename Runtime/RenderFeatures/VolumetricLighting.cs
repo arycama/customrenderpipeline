@@ -58,15 +58,15 @@ public partial class VolumetricLighting : CameraRenderFeature
             pass.ReadTexture("Input", history);
 			pass.ReadBuffer("VolumetricLightingData", volumetricLightingData);
 
-            pass.AddRenderPassData<ClusteredLightCulling.Result>();
-            pass.AddRenderPassData<AutoExposureData>();
-            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-            pass.AddRenderPassData<LightingSetup.Result>();
-            pass.AddRenderPassData<ShadowData>();
-            pass.AddRenderPassData<CloudShadowDataResult>();
-            pass.AddRenderPassData<ViewData>();
+            pass.ReadResource<ClusteredLightCulling.Result>();
+            pass.ReadResource<AutoExposureData>();
+            pass.ReadResource<AtmospherePropertiesAndTables>();
+            pass.ReadResource<LightingSetup.Result>();
+            pass.ReadResource<ShadowData>();
+            pass.ReadResource<CloudShadowDataResult>();
+            pass.ReadResource<ViewData>();
             pass.ReadRtHandle<HiZMaxDepth>();
-            pass.AddRenderPassData<ParticleShadowData>();
+            pass.ReadResource<ParticleShadowData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
             {
@@ -112,8 +112,8 @@ public partial class VolumetricLighting : CameraRenderFeature
             pass.WriteTexture("Result", volumetricLight);
 			pass.ReadBuffer("VolumetricLightingData", volumetricLightingData);
 			pass.ReadTexture("Input", finalInput);
-            pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-            pass.AddRenderPassData<ViewData>();
+            pass.ReadResource<AtmospherePropertiesAndTables>();
+            pass.ReadResource<ViewData>();
 			pass.ReadRtHandle<HiZMaxDepth>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>

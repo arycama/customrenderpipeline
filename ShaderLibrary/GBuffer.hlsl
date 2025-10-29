@@ -11,7 +11,10 @@ struct GBufferOutput
 	float4 albedoMetallic : SV_Target0;
 	float4 normalRoughness : SV_Target1;
 	float4 bentNormalOcclusion : SV_Target2;
-	float3 emissive : SV_Target3;
+	
+	#ifndef EMISSION_DISABLED
+		float3 emissive : SV_Target3;
+	#endif
 };
 
 Texture2D<float4> GBufferAlbedoMetallic, GBufferNormalRoughness, GBufferBentNormalOcclusion;
@@ -84,6 +87,10 @@ GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float 
 	gbuffer.albedoMetallic = float4(PackAlbedo(albedo, screenPosition), isTranslucent ? PackAlbedo(translucency, screenPosition) : float2(0, metallic));
 	gbuffer.normalRoughness = float4(PackGBufferNormal(normal), perceptualRoughness);
 	gbuffer.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal), visibilityAngle);
-	gbuffer.emissive = emissive;
+	
+	#ifndef EMISSION_DISABLED
+		gbuffer.emissive = emissive;
+	#endif
+	
 	return gbuffer;
 }

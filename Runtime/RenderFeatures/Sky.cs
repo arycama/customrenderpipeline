@@ -36,15 +36,15 @@ public partial class Sky : CameraRenderFeature
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(skyTemp, RenderBufferLoadAction.DontCare);
 
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<CloudRenderResult>();
-			pass.AddRenderPassData<CloudShadowDataResult>();
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<ShadowData>();
-			pass.AddRenderPassData<SkyReflectionAmbientData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<SkyTransmittanceData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<AutoExposureData>();
+			pass.ReadResource<CloudRenderResult>();
+			pass.ReadResource<CloudShadowDataResult>();
+			pass.ReadResource<LightingData>();
+			pass.ReadResource<ShadowData>();
+			pass.ReadResource<SkyReflectionAmbientData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<SkyTransmittanceData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -58,15 +58,15 @@ public partial class Sky : CameraRenderFeature
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(skyTemp, RenderBufferLoadAction.Load);
 
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<CloudRenderResult>();
-			pass.AddRenderPassData<CloudShadowDataResult>();
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<ShadowData>();
-			pass.AddRenderPassData<SkyReflectionAmbientData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<SkyTransmittanceData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<AutoExposureData>();
+			pass.ReadResource<CloudRenderResult>();
+			pass.ReadResource<CloudShadowDataResult>();
+			pass.ReadResource<LightingData>();
+			pass.ReadResource<ShadowData>();
+			pass.ReadResource<SkyReflectionAmbientData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<SkyTransmittanceData>();
 			pass.ReadRtHandle<CameraDepth>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
@@ -85,16 +85,16 @@ public partial class Sky : CameraRenderFeature
 			pass.ReadTexture("_SkyInput", skyTemp);
 			pass.ReadTexture("_SkyHistory", history);
 
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<TemporalAAData>();
-			pass.AddRenderPassData<CloudRenderResult>();
-			pass.AddRenderPassData<AutoExposureData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<TemporalAAData>();
+			pass.ReadResource<CloudRenderResult>();
+			pass.ReadResource<AutoExposureData>();
 			pass.ReadRtHandle<PreviousCameraDepth>();
 			pass.ReadRtHandle<PreviousCameraVelocity>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<ViewData>();
 			pass.ReadRtHandle<CameraVelocity>();
 			pass.ReadRtHandle<CameraDepth>();
-			pass.AddRenderPassData<VolumetricLighting.Result>();
+			pass.ReadResource<VolumetricLighting.Result>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{

@@ -2,7 +2,7 @@
 #ifndef VIRTUAL_TEXTURING_INCLUDED
 #define VIRTUAL_TEXTURING_INCLUDED
 
-//#include "Packages/com.arycama.noderenderpipeline/ShaderLibrary/Core.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Utility.hlsl"
 
 // Total number of pixels in a texture
 uint PixelCount(uint resolution)
@@ -72,27 +72,28 @@ RWStructuredBuffer<uint> VirtualFeedbackTexture : register(u6);
 Texture2DArray<float4> VirtualTexture, VirtualNormalTexture;
 Texture2DArray<float> VirtualHeightTexture;
 Texture2D<uint> IndirectionTexture;
-float4 IndirectionTexture_TexelSize, VirtualTexture_TexelSize;
-float VirtualUvScale, AnisoLevel;
+float AnisoLevel, IndirectionTextureSize, RcpIndirectionTextureSize;
 
-float CalculateVirtualMipLevel(float2 dx, float2 dy)
+float CalculateMipLevel(float2 dx, float2 dy, float2 resolution, bool aniso = false, float maxAnisoLevel = 1)
 {
-	// Compute the partial derivative vectors in the RenderTarget x and y directions for TC.uvw
-	dx *= VirtualUvScale;
-	dy *= VirtualUvScale;
-	
+	dx *= resolution;
+	dy *= resolution;
+
 	float lenDxSqr = dot(dx, dx);
 	float lenDySqr = dot(dy, dy);
 	float dMaxSqr = max(lenDxSqr, lenDySqr);
 	float dMinSqr = min(lenDxSqr, lenDySqr);
-	
+
 	// Calculate mipmap levels directly from sqared distances. This uses log2(sqrt(x)) = 0.5 * log2(x) to save some sqrt's
 	float maxLevel = 0.5 * log2(dMaxSqr);
 	float minLevel = 0.5 * log2(dMinSqr);
-
-    // Calculate the log2 of the anisotropy and clamp it by the max supported. This uses log2(a/b) = log2(a)-log2(b) and min(log(a),log(b)) = log(min(a,b))
+	
+	if(!aniso)
+		return max(0.0, maxLevel);
+	
+	// Calculate the log2 of the anisotropy and clamp it by the max supported. This uses log2(a/b) = log2(a)-log2(b) and min(log(a),log(b)) = log(min(a,b))
 	float anisoLog2 = maxLevel - minLevel;
-	anisoLog2 = min(anisoLog2, AnisoLevel);
+	anisoLog2 = min(anisoLog2, maxAnisoLevel);
 
     // Adjust for anisotropy & clamp to level 0
 	return max(maxLevel - anisoLog2 - 0.5f, 0.0f); //Subtract 0.5 to compensate for trilinear mipmapping
@@ -100,9 +101,9 @@ float CalculateVirtualMipLevel(float2 dx, float2 dy)
 
 uint CalculateFeedbackBufferPosition(float2 uv, float2 dx, float2 dy)
 {
-	float mipLevel = floor(CalculateVirtualMipLevel(dx, dy));
-	float2 xy = uv * IndirectionTexture_TexelSize.zw / exp2(mipLevel);
-	return TextureCoordToOffset(float3(xy, mipLevel), IndirectionTexture_TexelSize.z);
+	uint mipLevel = (uint) CalculateMipLevel(dx, dy, IndirectionTextureSize);
+	uint2 xy = (uint2) (uv * IndirectionTextureSize) >> mipLevel;
+	return TextureCoordToOffset(uint3(xy, mipLevel), IndirectionTextureSize);
 }
 
 uint CalculateFeedbackBufferPosition(float2 uv)
@@ -112,30 +113,30 @@ uint CalculateFeedbackBufferPosition(float2 uv)
 
 float3 CalculateVirtualUv(float2 uv, float2 dx, float2 dy, out float scale)
 {
-	float mipLevel = floor(CalculateVirtualMipLevel(dx, dy));
-	float2 coords = uv * (IndirectionTexture_TexelSize.zw * exp2(-mipLevel));
+	uint mipLevel = (uint) CalculateMipLevel(dx, dy, IndirectionTextureSize);
+	uint2 coords = (uint2) (uv * IndirectionTextureSize) >> mipLevel;
 	uint pageData = IndirectionTexture.mips[mipLevel][coords];
 	
-	float index = pageData & 0x7FF;
-	float newMip = (pageData >> 11) & 0x1F;
+	float index = BitUnpack(pageData, 12, 0);
+	float newMip = BitUnpack(pageData, 4, 12);
 	
-	scale = IndirectionTexture_TexelSize.zw / exp2(newMip);
-	float2 tileUv = frac(uv * scale);
+	scale = IndirectionTextureSize * exp2(-newMip);
+	float2 tileUv = (uv * scale);
 	
 	return float3(tileUv, index);
 }
 
 float3 CalculateVirtualUv(float2 uv, inout float2 dx, inout float2 dy)
 {
-	float mipLevel = floor(CalculateVirtualMipLevel(dx, dy));
-	float2 coords = uv * (IndirectionTexture_TexelSize.zw * exp2(-mipLevel));
+	uint mipLevel = (uint) CalculateMipLevel(dx, dy, IndirectionTextureSize);
+	uint2 coords = (uint2) (uv * IndirectionTextureSize) >> mipLevel;
 	uint pageData = IndirectionTexture.mips[mipLevel][coords];
 	
-	float index = pageData & 0x7FF;
-	float newMip = (pageData >> 11) & 0x1F;
+	float index = BitUnpack(pageData, 12, 0);
+	float newMip = BitUnpack(pageData, 4, 12);
 	
-	float2 scale = IndirectionTexture_TexelSize.zw / exp2(newMip);
-	float2 tileUv = frac(uv * scale);
+	float scale = IndirectionTextureSize * exp2(-newMip);
+	float2 tileUv = (uv * scale);
 	
 	// Scale derivatives from the virtualTexture UV to a uv for indexing into the texture array
 	// by multiplying by the number of tiles at this mip

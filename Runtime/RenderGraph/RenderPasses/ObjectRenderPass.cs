@@ -5,7 +5,8 @@ using UnityEngine.Rendering.RendererUtils;
 
 public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 {
-	private List<RendererList> rendererLists = new();
+	//private List<RendererList> rendererLists = new();
+	private RendererList rendererList;
 
 	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false)
 	{
@@ -17,9 +18,11 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 			rendererConfiguration = perObjectData
 		};
 
-		rendererLists.Clear();
-		rendererLists.Add(context.CreateRendererList(rendererListDesc));
-		context.PrepareRendererListsAsync(rendererLists);
+		rendererList = context.CreateRendererList(rendererListDesc);
+
+		//rendererLists.Clear();
+		//rendererLists.Add(context.CreateRendererList(rendererListDesc));
+		//context.PrepareRendererListsAsync(rendererLists);
 	}
 
 	public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -62,10 +65,7 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 		foreach (var keyword in keywords)
 			Command.EnableKeyword(new GlobalKeyword(keyword));
 
-		if (rendererLists[0].isValid)
-			Command.DrawRendererList(rendererLists[0]);
-
-		rendererLists.Clear();
+		Command.DrawRendererList(rendererList);
 
 		foreach (var keyword in keywords)
 			Command.DisableKeyword(new GlobalKeyword(keyword));

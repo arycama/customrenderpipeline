@@ -3,6 +3,11 @@ using UnityEngine.Rendering;
 
 public struct TerrainRenderData : IRenderPassData
 {
+	private static readonly int _TerrainHolesTextureId = Shader.PropertyToID("_TerrainHolesTexture");
+	private static readonly int AlbedoSmoothnessId = Shader.PropertyToID("AlbedoSmoothness");
+	private static readonly int NormalId = Shader.PropertyToID("Normal");
+	private static readonly int MaskId = Shader.PropertyToID("Mask");
+
 	private readonly Texture2DArray albedoSmoothness, normal, mask;
 	private readonly ResourceHandle<RenderTexture> terrainHeightmapTexture, terrainNormalMap, idMap, aoMap;
 	private readonly Texture terrainHolesTexture;
@@ -42,11 +47,11 @@ public struct TerrainRenderData : IRenderPassData
 
 	public readonly void SetProperties(RenderPass pass, CommandBuffer command)
 	{
-		pass.SetTexture("_TerrainHolesTexture", terrainHolesTexture);
+		pass.SetTexture(_TerrainHolesTextureId, terrainHolesTexture);
 
-		pass.SetTexture("AlbedoSmoothness", albedoSmoothness);
-		pass.SetTexture("Normal", normal);
-		pass.SetTexture("Mask", mask);
+		pass.SetTexture(AlbedoSmoothnessId, albedoSmoothness);
+		pass.SetTexture(NormalId, normal);
+		pass.SetTexture(MaskId, mask);
 
 		pass.SetVector("TerrainSize", terrainSize);
 		pass.SetVector("TerrainPosition", terrainPosition);

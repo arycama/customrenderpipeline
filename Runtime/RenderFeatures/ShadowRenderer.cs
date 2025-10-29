@@ -118,7 +118,7 @@ public class ShadowRenderer : CameraRenderFeature
 				pass.Initialize(context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, isPointLight);
 				pass.DepthSlice = index;
 				pass.WriteDepth(target);
-				pass.AddRenderPassData<ShadowRequestData>();
+				pass.ReadResource<ShadowRequestData>();
 			}
 		}
 

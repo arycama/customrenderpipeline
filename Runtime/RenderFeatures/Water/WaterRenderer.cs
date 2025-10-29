@@ -41,12 +41,12 @@ public class WaterRenderer : WaterRendererBase
 
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
-			pass.AddRenderPassData<OceanFftResult>();
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<TemporalAAData>();
-			pass.AddRenderPassData<WaterShoreMask.Result>(true);
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<FrameData>();
+			pass.ReadResource<OceanFftResult>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<TemporalAAData>();
+			pass.ReadResource<WaterShoreMask.Result>(true);
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<FrameData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{

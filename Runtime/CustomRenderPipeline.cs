@@ -18,6 +18,13 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	private static readonly IndexedString blueNoise3DUnitIds = new("STBN/stbn_unitvec3_2Dx1D_128x128x64_", 64);
 	private static readonly IndexedString blueNoise3DCosineIds = new("STBN/stbn_unitvec3_cosine_2Dx1D_128x128x64_", 64);
 
+	private static readonly int BlueNoise1DId = Shader.PropertyToID("BlueNoise1D");
+	private static readonly int BlueNoise2DId = Shader.PropertyToID("BlueNoise2D");
+	private static readonly int BlueNoise3DId = Shader.PropertyToID("BlueNoise3D");
+	private static readonly int BlueNoise2DUnitId = Shader.PropertyToID("BlueNoise2DUnit");
+	private static readonly int BlueNoise3DUnitId = Shader.PropertyToID("BlueNoise3DUnit");
+	private static readonly int BlueNoise3DCosineId = Shader.PropertyToID("BlueNoise3DCosine");
+
 	private double previousTime;
 
 	private readonly PersistentRTHandleCache cameraTargetCache, cameraDepthCache, cameraVelocityCache;
@@ -106,12 +113,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			using var pass = renderGraph.AddGenericRenderPass("Set Per Frame Data", (blueNoise1D, blueNoise2D, blueNoise3D, blueNoise2DUnit, blueNoise3DUnit, blueNoise3DCosine));
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetTexture("BlueNoise1D", data.blueNoise1D);
-				pass.SetTexture("BlueNoise2D", data.blueNoise2D);
-				pass.SetTexture("BlueNoise3D", data.blueNoise3D);
-				pass.SetTexture("BlueNoise2DUnit", data.blueNoise2DUnit);
-				pass.SetTexture("BlueNoise3DUnit", data.blueNoise3DUnit);
-				pass.SetTexture("BlueNoise3DCosine", data.blueNoise3DCosine);
+				pass.SetTexture(BlueNoise1DId, data.blueNoise1D);
+				pass.SetTexture(BlueNoise2DId, data.blueNoise2D);
+				pass.SetTexture(BlueNoise3DId, data.blueNoise3D);
+				pass.SetTexture(BlueNoise2DUnitId, data.blueNoise2DUnit);
+				pass.SetTexture(BlueNoise3DUnitId, data.blueNoise3DUnit);
+				pass.SetTexture(BlueNoise3DCosineId, data.blueNoise3DCosine);
 			});
 		}),
 
@@ -182,9 +189,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<AutoExposureData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<AutoExposureData>();
 		}),
 
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
@@ -204,10 +211,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
 
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<TemporalAAData>();
-			pass.AddRenderPassData<AutoExposureData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<TemporalAAData>();
+			pass.ReadResource<AutoExposureData>();
 		}),
 
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
@@ -224,10 +231,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
 
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<TemporalAAData>();
-			pass.AddRenderPassData<AutoExposureData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<TemporalAAData>();
+			pass.ReadResource<AutoExposureData>();
 		}),
 
 		new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
@@ -265,13 +272,13 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.WriteTexture(decalAlbedo);
 			pass.WriteTexture(decalNormal);
 
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<AutoExposureData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<AutoExposureData>();
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadRtHandle<GBufferAlbedoMetallic>();
 			pass.ReadRtHandle<GBufferNormalRoughness>();
-			pass.AddRenderPassData<DfgData>();
+			pass.ReadResource<DfgData>();
 		}),
 
 		new DecalComposite(renderGraph),
@@ -364,23 +371,23 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepth);
 
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<DfgData>();
-			pass.AddRenderPassData<EnvironmentData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<ShadowData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<DfgData>();
+			pass.ReadResource<EnvironmentData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<LightingData>();
+			pass.ReadResource<ShadowData>();
 			pass.ReadRtHandle<CameraDepth>();
-			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<TemporalAAData>();
-			pass.AddRenderPassData<SkyTransmittanceData>();
-			pass.AddRenderPassData<CloudRenderResult>();
-			pass.AddRenderPassData<CloudShadowDataResult>();
-			pass.AddRenderPassData<VolumetricLighting.Result>();
-			pass.AddRenderPassData<LightingSetup.Result>();
-			pass.AddRenderPassData<ClusteredLightCulling.Result>();
-			pass.AddRenderPassData<ParticleShadowData>();
+			pass.ReadResource<AutoExposureData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<TemporalAAData>();
+			pass.ReadResource<SkyTransmittanceData>();
+			pass.ReadResource<CloudRenderResult>();
+			pass.ReadResource<CloudShadowDataResult>();
+			pass.ReadResource<VolumetricLighting.Result>();
+			pass.ReadResource<LightingSetup.Result>();
+			pass.ReadResource<ClusteredLightCulling.Result>();
+			pass.ReadResource<ParticleShadowData>();
 		}),
 
 		new Rain(renderGraph, asset.Rain),

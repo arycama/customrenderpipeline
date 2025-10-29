@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
+using static Math;
 
 public class VirtualTerrainPreRender : CameraRenderFeature
 {
@@ -9,7 +10,7 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 	private readonly ResourceHandle<GraphicsBuffer> feedbackBuffer;
 	private readonly Texture2DArray albedoSmoothnessTexture, normalTexture, heightTexture;
 	private readonly ResourceHandle<RenderTexture> indirectionTexture;
-	private readonly ComputeShader virtualTextureUpdateShader, dxtCompressCS, virtualTextureBuild, reductionComputeShader;
+	private readonly ComputeShader virtualTextureUpdateShader;
 
 	private bool needsClear;
 	private Terrain previousTerrain;
@@ -19,34 +20,30 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 	public VirtualTerrainPreRender(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
 	{
 		this.settings = settings;
-		var indirectionTextureResolution = settings.VirtualResolution / settings.TileSize;
-		var requestSize = indirectionTextureResolution * indirectionTextureResolution * 4 / 3;
+		var requestSize = IndirectionTextureResolution * IndirectionTextureResolution * 4 / 3;
 		feedbackBuffer = renderGraph.GetBuffer(requestSize, isPersistent: true);
 
-		indirectionTexture = renderGraph.GetTexture(indirectionTextureResolution, indirectionTextureResolution, GraphicsFormat.R16_UInt, hasMips: true, isRandomWrite: true, isPersistent: true);
+		indirectionTexture = renderGraph.GetTexture(IndirectionTextureResolution, IndirectionTextureResolution, GraphicsFormat.R16_UInt, hasMips: true, isRandomWrite: true, isPersistent: true);
 
-		albedoSmoothnessTexture = new Texture2DArray(settings.TileResolution, settings.TileResolution, settings.VirtualTileCount, TextureFormat.DXT5, 2, false)
+		albedoSmoothnessTexture = new(settings.TileResolution, settings.TileResolution, settings.VirtualTileCount, GraphicsFormat.RGBA_DXT5_SRGB, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
 		{
 			hideFlags = HideFlags.HideAndDontSave,
 			name = "Virtual AlbedoSmoothness Texture",
 		};
 
-		normalTexture = new Texture2DArray(settings.TileResolution, settings.TileResolution, settings.VirtualTileCount, TextureFormat.DXT5, 2, true)
+		normalTexture = new(settings.TileResolution, settings.TileResolution, settings.VirtualTileCount, GraphicsFormat.RGBA_DXT5_UNorm, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
 		{
 			hideFlags = HideFlags.HideAndDontSave,
 			name = "Virtual Normal Texture",
 		};
 
-		heightTexture = new Texture2DArray(settings.TileResolution, settings.TileResolution, settings.VirtualTileCount, TextureFormat.BC4, 2, true)
+		heightTexture = new(settings.TileResolution, settings.TileResolution, settings.VirtualTileCount, GraphicsFormat.R_BC4_UNorm, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
 		{
 			hideFlags = HideFlags.HideAndDontSave,
 			name = "Virtual Height Texture",
 		};
 
-		reductionComputeShader = Resources.Load<ComputeShader>("Terrain/VirtualTerrain");
-		virtualTextureBuild = Resources.Load<ComputeShader>("Terrain/VirtualTextureBuild");
 		virtualTextureUpdateShader = Resources.Load<ComputeShader>("Terrain/VirtualTextureUpdate");
-		dxtCompressCS = Resources.Load<ComputeShader>("Terrain/DxtCompress");
 
 		// Fill all buffesr with 0 (I think this should happen automatically, but
 		using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init"))
@@ -71,6 +68,9 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
+		var virtualTerrainFeedback = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32_UInt, isScreenTexture: true);
+		renderGraph.SetRTHandle<VirtualTerrainFeedback>(virtualTerrainFeedback);
+
 		// Ensure terrain system data is set
 		if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
 			return;
@@ -83,11 +83,9 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 			for (var i = 0; i < indirectionMipCount; i++)
 			{
 				var mipSize = Texture2DExtensions.MipResolution(i, IndirectionTextureResolution);
-				using (var pass = renderGraph.AddComputeRenderPass("Clear Texture"))
-				{
-					pass.Initialize(virtualTextureUpdateShader, 4, mipSize, mipSize);
-					pass.WriteTexture("DestMip", indirectionTexture);
-				}
+				using var pass = renderGraph.AddComputeRenderPass("Clear Texture");
+				pass.Initialize(virtualTextureUpdateShader, 4, mipSize, mipSize);
+				pass.WriteTexture("DestMip", indirectionTexture);
 			}
 
 			needsClear = false;
@@ -95,6 +93,6 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 
 		previousTerrain = terrainSystemData.terrain;
 
-		renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, indirectionTexture, feedbackBuffer, settings.AnisoLevel, settings.VirtualResolution));
+		renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, indirectionTexture, feedbackBuffer, settings.AnisoLevel, settings.VirtualResolution, IndirectionTextureResolution, Rcp(IndirectionTextureResolution)));
 	}
 }

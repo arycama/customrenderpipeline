@@ -6,7 +6,9 @@ using UnityEngine.Rendering;
 
 public partial class VolumetricClouds : CameraRenderFeature
 {
-    private readonly Material material;
+	private static readonly int StarsId = Shader.PropertyToID("Stars");
+
+	private readonly Material material;
     private readonly Settings settings;
     private readonly PersistentRTHandleCache cloudLuminanceTextureCache, cloudTransmittanceTextureCache;
 	private readonly Sky.Settings skySettings;
@@ -59,13 +61,13 @@ public partial class VolumetricClouds : CameraRenderFeature
 			pass.WriteTexture(cloudTransmittanceTemp, RenderBufferLoadAction.DontCare);
 			pass.WriteTexture(cloudDepth, RenderBufferLoadAction.DontCare);
 
-			pass.AddRenderPassData<CloudData>();
-			pass.AddRenderPassData<AtmospherePropertiesAndTables>();
-			pass.AddRenderPassData<CloudShadowDataResult>();
-			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<LightingData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<SkyTransmittanceData>();
+			pass.ReadResource<CloudData>();
+			pass.ReadResource<AtmospherePropertiesAndTables>();
+			pass.ReadResource<CloudShadowDataResult>();
+			pass.ReadResource<AutoExposureData>();
+			pass.ReadResource<LightingData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<SkyTransmittanceData>();
 			pass.ReadRtHandle<CameraDepth>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
@@ -102,9 +104,9 @@ public partial class VolumetricClouds : CameraRenderFeature
 			pass.ReadTexture("_TransmittanceHistory", transmittanceHistory);
 			pass.ReadTexture("CloudDepthTexture", cloudDepth);
 
-			pass.AddRenderPassData<TemporalAAData>();
-			pass.AddRenderPassData<AutoExposureData>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<TemporalAAData>();
+			pass.ReadResource<AutoExposureData>();
+			pass.ReadResource<ViewData>();
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadRtHandle<PreviousCameraDepth>();
 			pass.ReadRtHandle<PreviousCameraVelocity>();
@@ -125,7 +127,7 @@ public partial class VolumetricClouds : CameraRenderFeature
 				pass.SetInt("_MaxHeight", data.Item8.y - 1);
 
 				if (data.skySettings.StarMap != null)
-					pass.SetTexture("Stars", data.skySettings.StarMap);
+					pass.SetTexture(StarsId, data.skySettings.StarMap);
 
 				pass.SetFloat("StarExposure", data.skySettings.StarExposure);
 

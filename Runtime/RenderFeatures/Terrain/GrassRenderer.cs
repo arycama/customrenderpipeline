@@ -117,10 +117,10 @@ public class GrassRenderer : CameraRenderFeature
 			pass.ReadBuffer("PatchData", quadtreeCullResults.PatchDataBuffer);
 			pass.ReadBuffer("InstanceData", instanceDataBuffer);
 
-			pass.AddRenderPassData<FrameData>();
-			pass.AddRenderPassData<ViewData>();
-			pass.AddRenderPassData<TemporalAAData>();
-			pass.AddRenderPassData<TerrainRenderData>();
+			pass.ReadResource<FrameData>();
+			pass.ReadResource<ViewData>();
+			pass.ReadResource<TemporalAAData>();
+			pass.ReadResource<TerrainRenderData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{

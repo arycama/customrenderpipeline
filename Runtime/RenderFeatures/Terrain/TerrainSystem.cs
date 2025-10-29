@@ -8,6 +8,10 @@ using static Math;
 
 public class TerrainSystem : FrameRenderFeature
 {
+	private static readonly int HeightmapInputId = Shader.PropertyToID("HeightmapInput");
+	private static readonly int InitNormalMapInputId = Shader.PropertyToID("InitNormalMapInput");
+	private static readonly int TerrainHeightmapId = Shader.PropertyToID("TerrainHeightmap");
+
 	private readonly TerrainSettings settings;
 	public ResourceHandle<GraphicsBuffer> terrainLayerData, indexBuffer;
 	public ResourceHandle<RenderTexture> minMaxHeight, heightmap, normalmap, idMap, aoMap;
@@ -200,7 +204,7 @@ public class TerrainSystem : FrameRenderFeature
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				// Can't use pass.readTexture here since this comes from unity
-				pass.SetTexture("HeightmapInput", data);
+				pass.SetTexture(HeightmapInputId, data);
 			});
 		}
 
@@ -229,7 +233,7 @@ public class TerrainSystem : FrameRenderFeature
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				// Can't use pass.readTexture here since this comes from unity
-				pass.SetTexture("InitNormalMapInput", data.heightmapTexture);
+				pass.SetTexture(InitNormalMapInputId, data.heightmapTexture);
 
 				var scale = data.heightmapScale;
 				var height = data.y;
@@ -356,7 +360,7 @@ public class TerrainSystem : FrameRenderFeature
 				for (var i = 0; i < 8; i++)
 				{
 					var texture = i < data.alphamapTextureCount ? data.alphamapTextures[i] : Texture2D.blackTexture;
-					pass.SetTexture($"Input{i}", texture);
+					pass.SetTexture(Shader.PropertyToID($"Input{i}"), texture);
 				}
 
 				// Need to build buffer of layer to array index
@@ -386,7 +390,7 @@ public class TerrainSystem : FrameRenderFeature
 
 				pass.SetRenderFunction((System.Action<CommandBuffer, RenderPass, (TerrainData terrainData, TerrainSettings settings)>)(static (command, pass, data) =>
 				{
-					pass.SetTexture("TerrainHeightmap", data.terrainData.heightmapTexture);
+					pass.SetTexture(TerrainHeightmapId, data.terrainData.heightmapTexture);
 					pass.SetFloat("DirectionCount", data.settings.AmbientOcclusionDirections);
 					pass.SetFloat("SampleCount", data.settings.AmbientOcclusionSamples);
 					pass.SetFloat("Radius", data.settings.AmbientOcclusionRadius / data.terrainData.size.x);

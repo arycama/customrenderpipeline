@@ -71,11 +71,11 @@ public partial class Tonemapping : CameraRenderFeature
 
 		pass.ReadRtHandle<CameraTarget>();
 		pass.ReadRtHandle<CameraBloom>();
-		pass.AddRenderPassData<AutoExposureData>();
+		pass.ReadResource<AutoExposureData>();
 	
 		// Just for debug 
-		pass.AddRenderPassData<DiffuseGlobalIllumination.Result>();
-		pass.AddRenderPassData<ScreenSpaceReflectionResult>();
+		pass.ReadResource<DiffuseGlobalIllumination.Result>();
+		pass.ReadResource<ScreenSpaceReflectionResult>();
 
 		pass.SetRenderFunction(static (command, pass, data) =>
 		{

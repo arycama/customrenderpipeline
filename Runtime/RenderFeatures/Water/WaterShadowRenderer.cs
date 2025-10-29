@@ -123,11 +123,11 @@ public class WaterShadowRenderer : WaterRendererBase
             pass.WriteTexture(waterIlluminance, RenderBufferLoadAction.DontCare);
             pass.ReadBuffer("PatchData", cullResult.PatchDataBuffer);
 
-            pass.AddRenderPassData<OceanFftResult>();
-            pass.AddRenderPassData<WaterShoreMask.Result>(true);
-            pass.AddRenderPassData<ViewData>();
-            pass.AddRenderPassData<FrameData>();
-            pass.AddRenderPassData<LightingData>();
+            pass.ReadResource<OceanFftResult>();
+            pass.ReadResource<WaterShoreMask.Result>(true);
+            pass.ReadResource<ViewData>();
+            pass.ReadResource<FrameData>();
+            pass.ReadResource<LightingData>();
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {

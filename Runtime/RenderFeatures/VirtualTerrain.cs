@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -9,13 +10,13 @@ public class VirtualTerrain : CameraRenderFeature
 {
 	private readonly TerrainSettings settings;
 
-	private readonly GraphicsBuffer requestBuffer;
+	private GraphicsBuffer requestBuffer;
 	private readonly ResourceHandle<GraphicsBuffer> counterBuffer, /*requestBuffer,*/ tilesToUnmapBuffer, mappedTiles;
 
 	private readonly ResourceHandle<RenderTexture> indirectionTextureMapTexture;
 
 	// Flattened 2D array storing a bool for each mapped tile
-	private readonly bool[] indirectionTexturePixels;
+	private readonly bool[,,] indirectionTexturePixels;
 
 	// Need to track requests so we don't request the same page multiple times
 	private readonly HashSet<int> pendingRequests = new();
@@ -25,46 +26,31 @@ public class VirtualTerrain : CameraRenderFeature
 	private readonly LruCache<int, int> lruCache = new();
 
 	private int IndirectionTextureResolution => settings.VirtualResolution / settings.TileResolution;
+	private int IndirectionMipCount => Texture2DExtensions.MipCount(IndirectionTextureResolution);
+
 	private Terrain previousTerrain;
 
-	private readonly ComputeShader virtualTextureUpdateShader, dxtCompressCS, virtualTextureBuild, reductionComputeShader;
+	private readonly ComputeShader virtualTextureUpdateShader, dxtCompressCS, virtualTextureBuild;
+
+	private List<NativeArray<int>> requestArrays = new();
+	private Stack<int> availableRequestIndices = new();
+	private Queue<int> readyRequestIndices = new();
 
 	public VirtualTerrain(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
 	{
 		this.settings = settings;
 
-		var indirectionTextureResolution = settings.VirtualResolution / settings.TileSize;
-
-		// Request size is res * res * 1/3rd
-		var requestSize = indirectionTextureResolution * indirectionTextureResolution * 4 / 3;
-
 		// Contains a simple 0 or 1 indicating if a pixel is mapped.
-		indirectionTextureMapTexture = renderGraph.GetTexture(indirectionTextureResolution, indirectionTextureResolution, GraphicsFormat.R8_UNorm, hasMips: true, isRandomWrite: true, isPersistent: true);
+		indirectionTextureMapTexture = renderGraph.GetTexture(IndirectionTextureResolution, IndirectionTextureResolution, GraphicsFormat.R8_UNorm, hasMips: true, isRandomWrite: true, isPersistent: true);
 
-		indirectionTexturePixels = new bool[requestSize];
+		indirectionTexturePixels = new bool[IndirectionTextureResolution, IndirectionTextureResolution, IndirectionMipCount];
 
-		//requestBuffer = renderGraph.GetBuffer(requestSize, 4, GraphicsBuffer.Target.Append, isPersistent: true);
-		requestBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Append, requestSize, 4);
 		counterBuffer = renderGraph.GetBuffer(1, 4, GraphicsBuffer.Target.Raw, isPersistent: true);
-
-		// Fill all buffesr with 0 (I think this should happen automatically, but
-		using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init"))
-		{
-			pass.WriteBuffer("", counterBuffer);
-
-			pass.SetRenderFunction((command, pass) =>
-			{
-				command.SetBufferData(requestBuffer, new int[requestSize]);
-				command.SetBufferCounterValue(requestBuffer, 0u);
-				command.SetBufferData(pass.GetBuffer(counterBuffer), new int[1]);
-			});
-		}
 
 		// Buffer stuff
 		mappedTiles = renderGraph.GetBuffer(settings.VirtualTileCount, sizeof(int), isPersistent: true);
 		tilesToUnmapBuffer = renderGraph.GetBuffer(settings.UpdateTileCount, sizeof(int), isPersistent: true);
 
-		reductionComputeShader = Resources.Load<ComputeShader>("Terrain/VirtualTerrain");
 		virtualTextureBuild = Resources.Load<ComputeShader>("Terrain/VirtualTextureBuild");
 		virtualTextureUpdateShader = Resources.Load<ComputeShader>("Terrain/VirtualTextureUpdate");
 		dxtCompressCS = Resources.Load<ComputeShader>("Terrain/DxtCompress");
@@ -73,10 +59,13 @@ public class VirtualTerrain : CameraRenderFeature
 	protected override void Cleanup(bool disposing)
 	{
 		renderGraph.ReleasePersistentResource(indirectionTextureMapTexture);
-		requestBuffer.Dispose();
+		requestBuffer?.Dispose();
 		renderGraph.ReleasePersistentResource(counterBuffer);
 		renderGraph.ReleasePersistentResource(mappedTiles);
 		renderGraph.ReleasePersistentResource(tilesToUnmapBuffer);
+
+		//foreach (var thing in requestArrays)
+		//	thing.Dispose();
 	}
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
@@ -103,15 +92,12 @@ public class VirtualTerrain : CameraRenderFeature
 			}
 
 			// TODO: Can we not just use a hardware clear?
-			var indirectionMipCount = Texture2DExtensions.MipCount(IndirectionTextureResolution) - 1;
-			for (var i = 0; i < indirectionMipCount; i++)
+			for (var i = 0; i < IndirectionMipCount; i++)
 			{
+				using var pass = renderGraph.AddComputeRenderPass("Clear Texture");
 				var mipSize = Texture2DExtensions.MipResolution(i, IndirectionTextureResolution);
-				using (var pass = renderGraph.AddComputeRenderPass("Clear Texture"))
-				{
-					pass.Initialize(virtualTextureUpdateShader, 4, mipSize, mipSize);
-					pass.WriteTexture("DestMip", indirectionTextureMapTexture);
-				}
+				pass.Initialize(virtualTextureUpdateShader, 4, mipSize, mipSize);
+				pass.WriteTexture("DestMip", indirectionTextureMapTexture);
 			}
 
 			needsClear = false;
@@ -121,99 +107,118 @@ public class VirtualTerrain : CameraRenderFeature
 
 		var virtualTextureData = renderGraph.GetResource<VirtualTextureData>();
 
-		using (var pass = renderGraph.AddComputeRenderPass("Gather Requested Pages", (requestBuffer, reductionComputeShader)))
+		// Worst case scenario would be every pixel requesting a different patch+uv, though this is never going to happen in practice
+		// Allocate the largest we need, plus one pixel since we include the 'count' as the first element
+		var requestBufferSize = (camera.scaledPixelWidth * camera.scaledPixelHeight + 1);
+		if(requestBuffer == null || requestBuffer.count < requestBufferSize)
+		{
+			if (requestBuffer != null)
+				requestBuffer.Dispose();
+
+			requestBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Append, requestBufferSize, 4);
+
+			// Fill all buffesr with 0 (I think this should happen automatically, but
+			using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init", requestBufferSize))
+			{
+				pass.SetRenderFunction((command, pass, requestBufferSize) =>
+				{
+					command.SetBufferData(requestBuffer, new int[requestBufferSize]);
+					command.SetBufferCounterValue(requestBuffer, 1); // Init the counter to zero before appending
+				});
+			}
+		}
+
+		using (var pass = renderGraph.AddComputeRenderPass("Gather Requested Pages", (requestBuffer, virtualTextureUpdateShader, IndirectionTextureResolution)))
 		{
 			var threadCount = IndirectionTextureResolution * IndirectionTextureResolution * 4 / 3;
-			pass.Initialize(reductionComputeShader, 0, threadCount);
-
+			pass.Initialize(virtualTextureUpdateShader, 5, threadCount);
 			pass.WriteBuffer("VirtualFeedbackTexture", virtualTextureData.feedbackBuffer);
-
-			pass.AddRenderPassData<TerrainRenderData>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadRtHandle<VirtualTerrainFeedback>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				command.ClearRandomWriteTargets(); // Clear from previous passes
-				command.SetBufferCounterValue(data.requestBuffer, 0); // Init the counter to zero before appending
-				command.SetComputeBufferParam(data.reductionComputeShader, 0, "VirtualRequests", data.requestBuffer);
+				command.SetBufferCounterValue(data.requestBuffer, 1); // Init the counter to zero before appending
+				command.SetComputeBufferParam(data.virtualTextureUpdateShader, 5, "VirtualRequests", data.requestBuffer);
+				pass.SetInt("IndirectionResolution", data.IndirectionTextureResolution);
 			});
 		}
 
-		using (var pass = renderGraph.AddGenericRenderPass("Copy and Readback Counter", (requestBuffer, counterBuffer, IndirectionTextureResolution, indirectionTexturePixels, lruCache, pendingRequests)))
+		// Retrieve a stored array or fetch a new one
+		if (!availableRequestIndices.TryPop(out var requestArrayIndex))
 		{
-			pass.WriteBuffer("", counterBuffer);
-			pass.ReadBuffer("", counterBuffer);
+			requestArrayIndex = requestArrays.Count;
+			requestArrays.Add(new NativeArray<int>(requestBufferSize, Allocator.Persistent, NativeArrayOptions.UninitializedMemory));
+		}
 
+		using (var pass = renderGraph.AddGenericRenderPass("Copy Counter and readback", (requestBuffer, requestArrays[requestArrayIndex], requestArrayIndex, readyRequestIndices)))
+		{
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				// Copy the counter to a new buffer and read it back
-				command.CopyCounterValue(data.requestBuffer, pass.GetBuffer(data.counterBuffer), 0);
-				command.RequestAsyncReadback(pass.GetBuffer(data.counterBuffer), (request) =>
+				command.CopyCounterValue(data.requestBuffer, data.requestBuffer, 0);
+				command.RequestAsyncReadbackIntoNativeArray(ref data.Item2, data.requestBuffer, (request) => 
 				{
-					var size = request.GetData<uint>()[0] * 4;
-					if (size == 0u)
-						return;
-
-					_ = AsyncGPUReadback.Request(data.requestBuffer, (int)size, 0, (readbackRequest) =>
-					{
-						// For each tile request, attempt to queue it if not already cached, and not already pending
-						if (readbackRequest.hasError)
-						{
-							return;
-						}
-
-						var mipCount = (int)Math.Log2(data.IndirectionTextureResolution);
-						var readbackData = readbackRequest.GetData<int>();
-						foreach (var request in readbackData)
-						{
-							var position = Texture2DExtensions.TextureByteOffsetToCoord(request, data.IndirectionTextureResolution);
-
-							// We want to request the coarsest mip that is not yet rendered, to ensure there is a gradual transition to the
-							// target mip, with 1 mip changing per frame. Do this by starting from current mip, and working to coarsest
-							var previousIndex = request;
-							for (var i = position.z; i <= mipCount; i++)
-							{
-								var index = Texture2DExtensions.TextureCoordToOffset(new Vector3Int(position.x, position.y, i), data.IndirectionTextureResolution);
-
-								var indirectionTexturePixel = data.indirectionTexturePixels[index];
-								if (indirectionTexturePixel)
-								{
-									data.lruCache.Update(index);
-
-									// If this is not the targetMip, add the next coarsest mip
-									if (index != request)
-									{
-										_ = data.pendingRequests.Add(previousIndex);
-									}
-
-									// Found a fallback mip, break
-									break;
-								}
-								else if (i == mipCount)
-								{
-									// Most coarse mip, add
-									_ = data.pendingRequests.Add(index);
-								}
-								else
-								{
-									previousIndex = index;
-
-									position.x >>= 1;
-									position.y >>= 1;
-								}
-							}
-						}
-					});
+					data.readyRequestIndices.Enqueue(data.requestArrayIndex);
 				});
 			});
 		}
 
-		if (pendingRequests.Count < 1)
+		pendingRequests.Clear();
+		while (readyRequestIndices.TryDequeue(out var readyRequestIndex))
+		{
+			var requestArray = requestArrays[readyRequestIndex];
+
+			// First element is the number of elements
+			var count = requestArray[0];
+
+			// For each tile request, attempt to queue it if not already cached, and not already pending
+			for (var i = 0; i < count; i++)
+			{
+				var packedPosition = requestArray[i + 1];
+				var position = UnpackCoord(packedPosition);
+
+				// If texture already mapped, nothing to do. (TODO: Can we detect this on GPU somehow to avoid adding to array? Probably not since we still should update the LRU cache)
+				if (indirectionTexturePixels[position.x, position.y, position.z])
+				{
+					// Mark this pixel as currently visible so it doesn't get evicted
+					lruCache.Update(packedPosition);
+					continue;
+				}
+
+				// We want to request the coarsest mip that is not yet rendered, to ensure there is a gradual transition to the
+				// target mip, with 1 mip changing per frame. Do this by starting from current mip, and working to coarsest
+				var iterations = IndirectionMipCount - position.z;
+				for (var j = 1; j < iterations; j++)
+				{
+					var newPosition = new Int3(position.x >> 1, position.y >> 1, position.z + 1);
+					var isMapped = indirectionTexturePixels[newPosition.x, newPosition.y, newPosition.z];
+					if (isMapped)
+					{
+						// If we found a higher fallback, add the next finer tile to the queue (Which will be the previous iteration tile)
+						_ = pendingRequests.Add(PackCoord(position));
+
+						break;
+					}
+
+					position = newPosition;
+
+					if (j == iterations - 1)
+					{
+						// Most coarse mip, add
+						_ = pendingRequests.Add(PackCoord(position));
+					}
+				}
+			}
+
+			availableRequestIndices.Push(readyRequestIndex);
+		}
+
+		if (pendingRequests.Count == 0)
 			return;
 
 		// Sort requests by mip, then distance from camera
 		// TODO: Could do this on GPU before reading back.
-		var sortedRequests = pendingRequests.OrderByDescending(rq => Texture2DExtensions.TextureByteOffsetToCoord(rq, IndirectionTextureResolution).z);
+		var sortedRequests = pendingRequests.OrderByDescending(packedCoord => UnpackCoord(packedCoord).z);
 
 		// First, figure out which unused tiles we can use
 		var updateRect = new RectInt();
@@ -225,13 +230,10 @@ public class VirtualTerrain : CameraRenderFeature
 		var destPixels = new List<uint>();
 		var tileRequests = new List<uint>();
 
-		var index = 0;
-		foreach (var request in sortedRequests)
+		var tileIndex = 0;
+		foreach (var packedPosition in pendingRequests.OrderByDescending(packedCoord => UnpackCoord(packedCoord).z))
 		{
-			if (lruCache.Contains(request))
-				continue;
-
-			var position = Texture2DExtensions.TextureByteOffsetToCoord(request, IndirectionTextureResolution);
+			var position = UnpackCoord(packedPosition);
 
 			int targetIndex;
 			if (updateMip == -1)
@@ -250,11 +252,11 @@ public class VirtualTerrain : CameraRenderFeature
 			{
 				var lastTileUsed = lruCache.Remove();
 				targetIndex = lastTileUsed.Item2;
-				var lastIndex = lastTileUsed.Item1;
-				var existingPosition = Texture2DExtensions.TextureByteOffsetToCoord(lastIndex, IndirectionTextureResolution);
+				var lastPackedCoord = lastTileUsed.Item1;
+				var existingPosition = UnpackCoord(lastPackedCoord);
 
 				// Invalidate existing position
-				indirectionTexturePixels[lastIndex] = false;
+				indirectionTexturePixels[existingPosition.x, existingPosition.y, existingPosition.z] = false;
 
 				// Set the mip just before the one being removed as the minimum update, so that it can fall back to the tile before it.
 				existingPosition.x >>= 1;
@@ -291,10 +293,10 @@ public class VirtualTerrain : CameraRenderFeature
 			}
 
 			// Add new tile to cache
-			lruCache.Add(request, targetIndex);
+			lruCache.Add(packedPosition, targetIndex);
 
 			// Mark this pixel as filled in the array
-			indirectionTexturePixels[request] = true;
+			indirectionTexturePixels[position.x, position.y, position.z] = true;
 
 			var mipFactor = 1f / (settings.VirtualResolution >> position.z);
 			var uvScale = settings.TileResolution * mipFactor;
@@ -307,9 +309,76 @@ public class VirtualTerrain : CameraRenderFeature
 			dstOffsets.Add((uint)targetIndex);
 
 			// Exit if we've reached the max number of tiles for this frame
-			if (++index == settings.UpdateTileCount)
+			if (++tileIndex == settings.UpdateTileCount)
 			{
 				break;
+			}
+		}
+
+		// Update the indirection texture
+		var tileRequestsBuffer = renderGraph.GetBuffer(tileRequests.Count);
+		using (var pass = renderGraph.AddComputeRenderPass("Copy Tiles To Unmap", (maxIndex: destPixels.Count, tileRequestsBuffer, tileRequests)))
+		{
+			pass.Initialize(virtualTextureUpdateShader, 0, destPixels.Count);
+			pass.WriteBuffer("TilesToUnmap", tilesToUnmapBuffer);
+			pass.WriteBuffer("", tileRequestsBuffer);
+
+			pass.ReadBuffer("TileRequests", tileRequestsBuffer);
+			pass.ReadBuffer("MappedTiles", mappedTiles);
+
+			pass.SetRenderFunction(static (command, pass, data) =>
+			{
+				command.SetBufferData(pass.GetBuffer(data.tileRequestsBuffer), data.tileRequests);
+				pass.SetInt("MaxIndex", data.maxIndex);
+			});
+		}
+
+		// dispatch mip updates
+		var destPixelbuffer = renderGraph.GetBuffer(destPixels.Count);
+
+		// Only update required mips (And extents?)
+		// Max(0) because highest mip might request it's parent mip too, this is easier (and fast enough)
+		//var start = Math.Max(0, mipCount - updateMip);
+		//for (var z = start; z < mipCount; z++)
+
+		for (var z = 0; z < IndirectionMipCount; z++)
+		{
+			using (var pass = renderGraph.AddComputeRenderPass("Map New Data", (currentMip: z, maxIndex: tileRequests.Count, destPixelbuffer, destPixels)))
+			{
+				pass.Initialize(virtualTextureUpdateShader, 1, tileRequests.Count);
+				pass.WriteTexture("DestMip", virtualTextureData.indirection, z);
+				pass.WriteTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
+				pass.WriteBuffer("MappedTiles", mappedTiles);
+				pass.WriteBuffer("", destPixelbuffer);
+
+				pass.ReadTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
+				pass.ReadBuffer("TilesToUnmap", tilesToUnmapBuffer);
+				pass.ReadBuffer("TileRequests", tileRequestsBuffer);
+				pass.ReadBuffer("DestPixels", destPixelbuffer);
+
+				pass.SetRenderFunction(static (command, pass, data) =>
+				{
+					command.SetBufferData(pass.GetBuffer(data.destPixelbuffer), data.destPixels);
+					pass.SetInt("CurrentMip", data.currentMip);
+					pass.SetInt("MaxIndex", data.maxIndex);
+				});
+			}
+		}
+
+		for (var z = IndirectionMipCount - 2; z >= 0; z--)
+		{
+			var mipSize = IndirectionTextureResolution >> z;
+			using (var pass = renderGraph.AddComputeRenderPass("Page Table Update", mipSize))
+			{
+				pass.Initialize(virtualTextureUpdateShader, 2, mipSize, mipSize);
+				pass.WriteTexture("DestMip", virtualTextureData.indirection, z);
+				pass.ReadTexture("SourceMip", virtualTextureData.indirection, z + 1);
+				pass.ReadTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
+
+				pass.SetRenderFunction(static (command, pass, mipSize) =>
+				{
+					pass.SetInt("MaxIndex", mipSize);
+				});
 			}
 		}
 
@@ -322,16 +391,13 @@ public class VirtualTerrain : CameraRenderFeature
 		var scaleOffsetsBuffer = renderGraph.GetBuffer(scaleOffsets.Count, sizeof(float) * 4);
 		var dstOffsetsBuffer = renderGraph.GetBuffer(dstOffsets.Count);
 
-		var length = Math.Min(settings.UpdateTileCount, pendingRequests.Count);
-		pendingRequests.Clear();
-
 		// Build the virtual texture
 		using (var pass = renderGraph.AddComputeRenderPass("Build", (scaleOffsetsBuffer, scaleOffsets, dstOffsetsBuffer, dstOffsets, settings.TileResolution)))
 		{
-			pass.Initialize(virtualTextureBuild, 0, settings.TileResolution * length, settings.TileResolution);
+			pass.Initialize(virtualTextureBuild, 0, settings.TileResolution * tileIndex, settings.TileResolution);
 
-			pass.AddRenderPassData<TerrainRenderData>();
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<TerrainRenderData>();
+			pass.ReadResource<ViewData>();
 
 			pass.WriteTexture("_AlbedoSmoothness", virtualAlbedoTemp);
 			pass.WriteTexture("_NormalMetalOcclusion", virtualNormalTemp);
@@ -360,7 +426,7 @@ public class VirtualTerrain : CameraRenderFeature
 
 		using (var pass = renderGraph.AddComputeRenderPass("Compress"))
 		{
-			pass.Initialize(dxtCompressCS, 0, (settings.TileResolution >> 2) * length, settings.TileResolution >> 2);
+			pass.Initialize(dxtCompressCS, 0, (settings.TileResolution >> 2) * tileIndex, settings.TileResolution >> 2);
 
 			pass.WriteTexture("AlbedoResult0", albedoCompressedTemp, 0);
 			pass.WriteTexture("AlbedoResult1", albedoCompressedTemp, 1);
@@ -399,74 +465,31 @@ public class VirtualTerrain : CameraRenderFeature
 				}
 			});
 		}
+	}
 
-		// Update the indirection texture
-		var tileRequestsBuffer = renderGraph.GetBuffer(tileRequests.Count);
-		using (var pass = renderGraph.AddComputeRenderPass("Copy Tiles To Unmap", (maxIndex: destPixels.Count, tileRequestsBuffer, tileRequests)))
+	private static int PackCoord(Int3 coord)
+	{
+		static int BitPack(int data, int size, int offset)
 		{
-			pass.Initialize(virtualTextureUpdateShader, 0, destPixels.Count);
-			pass.WriteBuffer("TilesToUnmap", tilesToUnmapBuffer);
-			pass.WriteBuffer("", tileRequestsBuffer);
-
-			pass.ReadBuffer("TileRequests", tileRequestsBuffer);
-			pass.ReadBuffer("MappedTiles", mappedTiles);
-
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				command.SetBufferData(pass.GetBuffer(data.tileRequestsBuffer), data.tileRequests);
-				pass.SetInt("MaxIndex", data.maxIndex);
-			});
+			return (data & ((1 << size) - 1)) << offset;
 		}
 
-		// dispatch mip updates
-		var mipCount = (int)Math.Log2(IndirectionTextureResolution);
-		var destPixelbuffer = renderGraph.GetBuffer(destPixels.Count);
+		var data = BitPack(coord.x, 14, 0);
+		data |= BitPack(coord.y, 14, 14);
+		return data | BitPack(coord.z, 4, 28);
+	}
 
-		// Only update required mips (And extents?)
-		// Max(0) because highest mip might request it's parent mip too, this is easier (and fast enough)
-		//var start = Math.Max(0, mipCount - updateMip);
-		//for (var z = start; z < mipCount; z++)
-
-		for (var z = 0; z <= mipCount; z++)
+	private static Int3 UnpackCoord(int packedCoord)
+	{
+		static int BitUnpack(int data, int size, int offset)
 		{
-			using (var pass = renderGraph.AddComputeRenderPass("Map New Data", (currentMip: z, maxIndex: tileRequests.Count, destPixelbuffer, destPixels)))
-			{
-				pass.Initialize(virtualTextureUpdateShader, 1, tileRequests.Count);
-				pass.WriteTexture("DestMip", virtualTextureData.indirection, z);
-				pass.WriteTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
-				pass.WriteBuffer("MappedTiles", mappedTiles);
-				pass.WriteBuffer("", destPixelbuffer);
-
-				pass.ReadTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
-				pass.ReadBuffer("TilesToUnmap", tilesToUnmapBuffer);
-				pass.ReadBuffer("TileRequests", tileRequestsBuffer);
-				pass.ReadBuffer("DestPixels", destPixelbuffer);
-
-				pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					command.SetBufferData(pass.GetBuffer(data.destPixelbuffer), data.destPixels);
-					pass.SetInt("CurrentMip", data.currentMip);
-					pass.SetInt("MaxIndex", data.maxIndex);
-				});
-			}
+			return (data >> offset) & ((1 << size) - 1);
 		}
 
-		for (var z = mipCount - 1; z >= 0; z--)
-		{
-			var mipSize = IndirectionTextureResolution >> z;
-			using (var pass = renderGraph.AddComputeRenderPass("Page Table Update", mipSize))
-			{
-				pass.Initialize(virtualTextureUpdateShader, 2, mipSize, mipSize);
-				pass.WriteTexture("DestMip", virtualTextureData.indirection, z);
-				pass.ReadTexture("SourceMip", virtualTextureData.indirection, z + 1);
-				pass.ReadTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
-
-				pass.SetRenderFunction(static (command, pass, mipSize) =>
-				{
-					pass.SetInt("MaxIndex", mipSize);
-				});
-			}
-		}
+		var x = BitUnpack(packedCoord, 14, 0);
+		var y = BitUnpack(packedCoord, 14, 14);
+		var mip = BitUnpack(packedCoord, 4, 28);
+		return new(x, y, mip);
 	}
 
 	public static void OnTerrainTextureChanged(Terrain terrain, RectInt texelRegion)

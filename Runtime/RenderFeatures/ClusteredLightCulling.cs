@@ -74,13 +74,13 @@ public class ClusteredLightCulling : CameraRenderFeature
 		using (var pass = renderGraph.AddComputeRenderPass("Clustered Light Culling", (tileSize: settings.TileSize, rcpClusterDepth: 1.0f / settings.ClusterDepth, counterBuffer)))
 		{
 			pass.Initialize(computeShader, 0, clusterWidth, clusterHeight, settings.ClusterDepth);
-			pass.AddRenderPassData<LightingSetup.Result>();
+			pass.ReadResource<LightingSetup.Result>();
 
 			pass.WriteBuffer("LightClusterListWrite", lightList);
 			pass.WriteBuffer("LightCounter", counterBuffer);
 			pass.ReadBuffer("LightCounter", counterBuffer);
 			pass.WriteTexture("LightClusterIndicesWrite", lightClusterIndices);
-			pass.AddRenderPassData<ViewData>();
+			pass.ReadResource<ViewData>();
 			pass.ReadRtHandle<HiZMaxDepth>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>

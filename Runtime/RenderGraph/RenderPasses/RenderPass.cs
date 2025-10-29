@@ -190,10 +190,10 @@ public abstract class RenderPass : IDisposable
 
 	public override string ToString() => Name;
 
-	public void SetTexture(string propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
-	{
-		SetTexture(Shader.PropertyToID(propertyName), texture, mip, subElement);
-	}
+	//public void SetTexture(string propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+	//{
+	//	SetTexture(Shader.PropertyToID(propertyName), texture, mip, subElement);
+	//}
 
 	public void ReadTexture(int propertyId, ResourceHandle<RenderTexture> texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
 	{
@@ -219,13 +219,18 @@ public abstract class RenderPass : IDisposable
 		writeBuffers.Add((propertyName, buffer));
 	}
 
-	public void AddRenderPassData<T>(bool isOptional = false) where T : struct, IRenderPassData
+	public void ReadResource(Type type, bool isOptional = false)
 	{
 		Assert.IsFalse(RenderGraph.IsExecuting);
-		var handle = RenderGraph.ResourceMap.GetResourceHandle<T>();
+		var handle = RenderGraph.ResourceMap.GetResourceHandle(type);
 		var hasResource = RenderGraph.ResourceMap.TrySetInputs(handle, RenderGraph.FrameIndex, this);
 		Assert.IsTrue(isOptional || hasResource);
 
 		RenderPassDataHandles.Add((handle, isOptional));
+	}
+
+	public void ReadResource<T>(bool isOptional = false) where T : struct, IRenderPassData
+	{
+		ReadResource(typeof(T), isOptional);
 	}
 }
