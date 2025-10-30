@@ -23,7 +23,7 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 		var requestSize = IndirectionTextureResolution * IndirectionTextureResolution * 4 / 3;
 		feedbackBuffer = renderGraph.GetBuffer(requestSize, isPersistent: true);
 
-		indirectionTexture = renderGraph.GetTexture(IndirectionTextureResolution, IndirectionTextureResolution, GraphicsFormat.R16_UInt, hasMips: true, isRandomWrite: true, isPersistent: true);
+		indirectionTexture = renderGraph.GetTexture(IndirectionTextureResolution, IndirectionTextureResolution, GraphicsFormat.R16_UNorm, hasMips: true, isRandomWrite: true, isPersistent: true);
 
 		albedoSmoothnessTexture = new(settings.TileResolution, settings.TileResolution, settings.VirtualTileCount, GraphicsFormat.RGBA_DXT5_SRGB, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
 		{
@@ -93,6 +93,6 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 
 		previousTerrain = terrainSystemData.terrain;
 
-		renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, indirectionTexture, feedbackBuffer, settings.AnisoLevel, settings.VirtualResolution, IndirectionTextureResolution, Rcp(IndirectionTextureResolution)));
+		renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, indirectionTexture, feedbackBuffer, settings.AnisoLevel, IndirectionTextureResolution, Rcp(IndirectionTextureResolution), settings.VirtualResolution));
 	}
 }

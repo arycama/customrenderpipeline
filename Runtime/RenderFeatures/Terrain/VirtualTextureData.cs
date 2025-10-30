@@ -8,26 +8,27 @@ public readonly struct VirtualTextureData : IRenderPassData
 	private static readonly int VirtualHeightTextureId = Shader.PropertyToID("VirtualHeightTexture");
 
 	public readonly Texture2DArray albedoSmoothness, normal, height;
-	public readonly ResourceHandle<RenderTexture> indirection;
+	public readonly ResourceHandle<RenderTexture> indirectionTexture;
 	public readonly ResourceHandle<GraphicsBuffer> feedbackBuffer;
-	public readonly float anisoLevel, virtualTextureSize, indirectionTextureSize, rcpIndirectionTextureSize;
+	public readonly int indirectionTextureSize, virtualTextureSize;
+	public readonly float anisoLevel, rcpIndirectionTextureSize;
 
-	public VirtualTextureData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray height, ResourceHandle<RenderTexture> indirection, ResourceHandle<GraphicsBuffer> feedbackBuffer, float anisoLevel, float virtualTextureSize, float indirectionTextureSize, float rcpIndirectionTextureSize)
+	public VirtualTextureData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray height, ResourceHandle<RenderTexture> indirectionTexture, ResourceHandle<GraphicsBuffer> feedbackBuffer, float anisoLevel, int indirectionTextureSize, float rcpIndirectionTextureSize, int virtualTextureSize)
 	{
 		this.albedoSmoothness = albedoSmoothness;
 		this.normal = normal;
 		this.height = height;
-		this.indirection = indirection;
+		this.indirectionTexture = indirectionTexture;
 		this.anisoLevel = anisoLevel;
-		this.virtualTextureSize = virtualTextureSize;
 		this.feedbackBuffer = feedbackBuffer;
 		this.indirectionTextureSize = indirectionTextureSize;
 		this.rcpIndirectionTextureSize = rcpIndirectionTextureSize;
+		this.virtualTextureSize = virtualTextureSize;
 	}
 
 	void IRenderPassData.SetInputs(RenderPass pass)
 	{
-		pass.ReadTexture("IndirectionTexture", indirection);
+		pass.ReadTexture("IndirectionTexture", indirectionTexture);
 		pass.WriteBuffer("VirtualFeedbackTexture", feedbackBuffer);
 		pass.ReadBuffer("VirtualFeedbackTexture", feedbackBuffer);
 	}
@@ -38,9 +39,11 @@ public readonly struct VirtualTextureData : IRenderPassData
 		pass.SetTexture(VirtualNormalTextureId, normal);
 		pass.SetTexture(VirtualHeightTextureId, height);
 		pass.SetFloat("AnisoLevel", anisoLevel);
-		pass.SetFloat("VirtualTextureSize", virtualTextureSize);
 		pass.SetFloat("IndirectionTextureSize", indirectionTextureSize);
+		pass.SetInt("IndirectionTextureSizeInt", indirectionTextureSize);
 		pass.SetFloat("RcpIndirectionTextureSize", rcpIndirectionTextureSize);
-		command.SetRandomWriteTarget(6, pass.GetBuffer(feedbackBuffer));
+		pass.SetFloat("VirtualTextureSize", virtualTextureSize);
+		pass.SetInt("VirtualTextureSizeInt", virtualTextureSize);
+		command.SetRandomWriteTarget(4, pass.GetBuffer(feedbackBuffer));
 	}
 }

@@ -36,6 +36,8 @@ public class VirtualTerrain : CameraRenderFeature
 	private Stack<int> availableRequestIndices = new();
 	private Queue<int> readyRequestIndices = new();
 
+	private int maxRequestBufferSize;
+
 	public VirtualTerrain(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
 	{
 		this.settings = settings;
@@ -64,8 +66,13 @@ public class VirtualTerrain : CameraRenderFeature
 		renderGraph.ReleasePersistentResource(mappedTiles);
 		renderGraph.ReleasePersistentResource(tilesToUnmapBuffer);
 
-		//foreach (var thing in requestArrays)
-		//	thing.Dispose();
+		AsyncGPUReadback.WaitAllRequests();
+
+		foreach (var thing in requestArrays)
+		{
+			if(thing.IsCreated)
+				thing.Dispose();
+		}
 	}
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
@@ -109,16 +116,16 @@ public class VirtualTerrain : CameraRenderFeature
 
 		// Worst case scenario would be every pixel requesting a different patch+uv, though this is never going to happen in practice
 		// Allocate the largest we need, plus one pixel since we include the 'count' as the first element
-		var requestBufferSize = (camera.scaledPixelWidth * camera.scaledPixelHeight + 1);
-		if(requestBuffer == null || requestBuffer.count < requestBufferSize)
+		maxRequestBufferSize = Math.Max(maxRequestBufferSize, camera.scaledPixelWidth * camera.scaledPixelHeight + 1);
+		if(requestBuffer == null || !requestBuffer.IsValid() || requestBuffer.count < maxRequestBufferSize)
 		{
-			if (requestBuffer != null)
+			if (requestBuffer != null && requestBuffer.IsValid())
 				requestBuffer.Dispose();
 
-			requestBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Append, requestBufferSize, 4);
+			requestBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Append, maxRequestBufferSize, 4);
 
 			// Fill all buffesr with 0 (I think this should happen automatically, but
-			using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init", requestBufferSize))
+			using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init", maxRequestBufferSize))
 			{
 				pass.SetRenderFunction((command, pass, requestBufferSize) =>
 				{
@@ -145,13 +152,26 @@ public class VirtualTerrain : CameraRenderFeature
 		}
 
 		// Retrieve a stored array or fetch a new one
+		NativeArray<int> requestArray;
 		if (!availableRequestIndices.TryPop(out var requestArrayIndex))
 		{
 			requestArrayIndex = requestArrays.Count;
-			requestArrays.Add(new NativeArray<int>(requestBufferSize, Allocator.Persistent, NativeArrayOptions.UninitializedMemory));
+			requestArray = new NativeArray<int>(maxRequestBufferSize, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+			requestArrays.Add(requestArray);
+		}
+		else
+		{
+			requestArray = requestArrays[requestArrayIndex];
+
+			if (requestArray.Length < maxRequestBufferSize)
+			{
+				requestArray.Dispose();
+				requestArray = new NativeArray<int>(maxRequestBufferSize, Allocator.Persistent);
+				requestArrays[requestArrayIndex] = requestArray;
+			}
 		}
 
-		using (var pass = renderGraph.AddGenericRenderPass("Copy Counter and readback", (requestBuffer, requestArrays[requestArrayIndex], requestArrayIndex, readyRequestIndices)))
+		using (var pass = renderGraph.AddGenericRenderPass("Copy Counter and readback", (requestBuffer, requestArray, requestArrayIndex, readyRequestIndices)))
 		{
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
@@ -163,18 +183,17 @@ public class VirtualTerrain : CameraRenderFeature
 			});
 		}
 
-		pendingRequests.Clear();
 		while (readyRequestIndices.TryDequeue(out var readyRequestIndex))
 		{
-			var requestArray = requestArrays[readyRequestIndex];
+			var requestData = requestArrays[readyRequestIndex];
 
 			// First element is the number of elements
-			var count = requestArray[0];
+			var count = requestData[0];
 
 			// For each tile request, attempt to queue it if not already cached, and not already pending
 			for (var i = 0; i < count; i++)
 			{
-				var packedPosition = requestArray[i + 1];
+				var packedPosition = requestData[i + 1];
 				var position = UnpackCoord(packedPosition);
 
 				// If texture already mapped, nothing to do. (TODO: Can we detect this on GPU somehow to avoid adding to array? Probably not since we still should update the LRU cache)
@@ -226,7 +245,7 @@ public class VirtualTerrain : CameraRenderFeature
 
 		// TODO: List Pool
 		var scaleOffsets = new List<Vector4>();
-		var dstOffsets = new List<uint>();
+		var dstOffsets = new List<int>();
 		var destPixels = new List<uint>();
 		var tileRequests = new List<uint>();
 
@@ -306,7 +325,7 @@ public class VirtualTerrain : CameraRenderFeature
 			tileRequests.Add((uint)((targetIndex & 0xFFFF) | ((position.z & 0xFFFF) << 16)));
 			destPixels.Add((uint)(position.x | (position.y << 16)));
 			scaleOffsets.Add(new Vector4(uvScale, uvScale, uvOffset.x, uvOffset.y));
-			dstOffsets.Add((uint)targetIndex);
+			dstOffsets.Add(targetIndex);
 
 			// Exit if we've reached the max number of tiles for this frame
 			if (++tileIndex == settings.UpdateTileCount)
@@ -314,6 +333,8 @@ public class VirtualTerrain : CameraRenderFeature
 				break;
 			}
 		}
+
+		pendingRequests.Clear();
 
 		// Update the indirection texture
 		var tileRequestsBuffer = renderGraph.GetBuffer(tileRequests.Count);
@@ -346,7 +367,7 @@ public class VirtualTerrain : CameraRenderFeature
 			using (var pass = renderGraph.AddComputeRenderPass("Map New Data", (currentMip: z, maxIndex: tileRequests.Count, destPixelbuffer, destPixels)))
 			{
 				pass.Initialize(virtualTextureUpdateShader, 1, tileRequests.Count);
-				pass.WriteTexture("DestMip", virtualTextureData.indirection, z);
+				pass.WriteTexture("IndirectionWrite", virtualTextureData.indirectionTexture, z);
 				pass.WriteTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
 				pass.WriteBuffer("MappedTiles", mappedTiles);
 				pass.WriteBuffer("", destPixelbuffer);
@@ -371,8 +392,8 @@ public class VirtualTerrain : CameraRenderFeature
 			using (var pass = renderGraph.AddComputeRenderPass("Page Table Update", mipSize))
 			{
 				pass.Initialize(virtualTextureUpdateShader, 2, mipSize, mipSize);
-				pass.WriteTexture("DestMip", virtualTextureData.indirection, z);
-				pass.ReadTexture("SourceMip", virtualTextureData.indirection, z + 1);
+				pass.WriteTexture("DestMip", virtualTextureData.indirectionTexture, z);
+				pass.ReadTexture("SourceMip", virtualTextureData.indirectionTexture, z + 1);
 				pass.ReadTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
 
 				pass.SetRenderFunction(static (command, pass, mipSize) =>
@@ -389,10 +410,9 @@ public class VirtualTerrain : CameraRenderFeature
 		var virtualHeightTemp = renderGraph.GetTexture(updateTempWidth, settings.TileResolution, GraphicsFormat.R8_UNorm, isRandomWrite: true);
 
 		var scaleOffsetsBuffer = renderGraph.GetBuffer(scaleOffsets.Count, sizeof(float) * 4);
-		var dstOffsetsBuffer = renderGraph.GetBuffer(dstOffsets.Count);
 
 		// Build the virtual texture
-		using (var pass = renderGraph.AddComputeRenderPass("Build", (scaleOffsetsBuffer, scaleOffsets, dstOffsetsBuffer, dstOffsets, settings.TileResolution)))
+		using (var pass = renderGraph.AddComputeRenderPass("Build", (scaleOffsetsBuffer, scaleOffsets, settings.TileResolution)))
 		{
 			pass.Initialize(virtualTextureBuild, 0, settings.TileResolution * tileIndex, settings.TileResolution);
 
@@ -403,17 +423,14 @@ public class VirtualTerrain : CameraRenderFeature
 			pass.WriteTexture("_NormalMetalOcclusion", virtualNormalTemp);
 			pass.WriteTexture("_Heights", virtualHeightTemp);
 
-			pass.WriteBuffer("", dstOffsetsBuffer);
 			pass.WriteBuffer("", scaleOffsetsBuffer);
 
-			pass.ReadBuffer("_DstOffsets", dstOffsetsBuffer);
 			pass.ReadBuffer("_ScaleOffsets", scaleOffsetsBuffer);
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				// Upload the new positions
 				command.SetBufferData(pass.GetBuffer(data.scaleOffsetsBuffer), data.scaleOffsets);
-				command.SetBufferData(pass.GetBuffer(data.dstOffsetsBuffer), data.dstOffsets);
 
 				pass.SetVector("_Resolution", new Float2(data.TileResolution, data.TileResolution));
 				pass.SetInt("_Width", data.TileResolution);
@@ -532,7 +549,7 @@ public class VirtualTerrain : CameraRenderFeature
 
 	private struct VirtualCopyPassData
 	{
-		public List<uint> dstOffsets;
+		public List<int> dstOffsets;
 		public int TileResolution;
 		public ResourceHandle<RenderTexture> albedoCompressId;
 		public ResourceHandle<RenderTexture> normalCompressId;
@@ -541,7 +558,7 @@ public class VirtualTerrain : CameraRenderFeature
 		public Texture2DArray normalTexture;
 		public Texture2DArray heightTexture;
 
-		public VirtualCopyPassData(List<uint> dstOffsets, int tileResolution, ResourceHandle<RenderTexture> albedoCompressId, ResourceHandle<RenderTexture> normalCompressId, ResourceHandle<RenderTexture> heightCompressId, Texture2DArray albedoSmoothnessTexture, Texture2DArray normalTexture, Texture2DArray heightTexture)
+		public VirtualCopyPassData(List<int> dstOffsets, int tileResolution, ResourceHandle<RenderTexture> albedoCompressId, ResourceHandle<RenderTexture> normalCompressId, ResourceHandle<RenderTexture> heightCompressId, Texture2DArray albedoSmoothnessTexture, Texture2DArray normalTexture, Texture2DArray heightTexture)
 		{
 			this.dstOffsets = dstOffsets;
 			TileResolution = tileResolution;

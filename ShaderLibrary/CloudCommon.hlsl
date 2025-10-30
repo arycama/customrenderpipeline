@@ -208,8 +208,8 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		}
 		
 		result.a *= highCloudTransmittance;
-		weightedDepthSum += rayEnd * result.a;
-		weightSum += result.a;
+		//weightedDepthSum += rayEnd * result.a;
+		//weightSum += result.a;
 		cloudDepth = weightedDepthSum * rcp(weightSum);
 	}
 	

@@ -19,6 +19,8 @@ Shader "Surface/Grass"
         _Translucency("Translucency", Color) = (0, 0, 0, 1)
         _Smoothness("Smoothness", Range(0, 1)) = 0.2
 
+        TerrainMipBias("Terrain Mip Bias", Float) = 1
+
         WindStrength("Wind Strength", Range(0, 4)) = 1
         WindSpeed("Wind Speed", Range(0, 4)) = 1
         WindAngle("Wind Angle", Range(0, 1)) = 0

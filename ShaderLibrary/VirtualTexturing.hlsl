@@ -3,6 +3,7 @@
 #define VIRTUAL_TEXTURING_INCLUDED
 
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Utility.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Samplers.hlsl"
 
 // Total number of pixels in a texture
 uint PixelCount(uint resolution)
@@ -67,12 +68,13 @@ uint TextureCoordToOffset(uint3 position, uint resolution)
 }
 
 // Use register 5 for deferred compatibility. (It uses 0-4 for it's GBuffer outputs)
-RWStructuredBuffer<uint> VirtualFeedbackTexture : register(u6);
+RWStructuredBuffer<uint> VirtualFeedbackTexture : register(u4);
 
 Texture2DArray<float4> VirtualTexture, VirtualNormalTexture;
 Texture2DArray<float> VirtualHeightTexture;
-Texture2D<uint> IndirectionTexture;
-float AnisoLevel, IndirectionTextureSize, RcpIndirectionTextureSize;
+Texture2D<float> IndirectionTexture;
+float AnisoLevel, IndirectionTextureSize, RcpIndirectionTextureSize, VirtualTextureSize;
+uint IndirectionTextureSizeInt, VirtualTextureSizeInt;
 
 float CalculateMipLevel(float2 dx, float2 dy, float2 resolution, bool aniso = false, float maxAnisoLevel = 1)
 {
@@ -96,14 +98,15 @@ float CalculateMipLevel(float2 dx, float2 dy, float2 resolution, bool aniso = fa
 	anisoLog2 = min(anisoLog2, maxAnisoLevel);
 
     // Adjust for anisotropy & clamp to level 0
-	return max(maxLevel - anisoLog2 - 0.5f, 0.0f); //Subtract 0.5 to compensate for trilinear mipmapping
+	return max(0.0, maxLevel - anisoLog2);
 }
 
 uint CalculateFeedbackBufferPosition(float2 uv, float2 dx, float2 dy)
 {
-	uint mipLevel = (uint) CalculateMipLevel(dx, dy, IndirectionTextureSize);
-	uint2 xy = (uint2) (uv * IndirectionTextureSize) >> mipLevel;
-	return TextureCoordToOffset(uint3(xy, mipLevel), IndirectionTextureSize);
+	uint3 coord;
+	coord.z = (uint) CalculateMipLevel(dx, dy, VirtualTextureSize, true, AnisoLevel);
+	coord.xy = (uint2) ((IndirectionTextureSizeInt >> coord.z) * uv);
+	return TextureCoordToOffset(coord, IndirectionTextureSize);
 }
 
 uint CalculateFeedbackBufferPosition(float2 uv)
@@ -111,45 +114,36 @@ uint CalculateFeedbackBufferPosition(float2 uv)
 	return CalculateFeedbackBufferPosition(uv, ddx(uv), ddy(uv));
 }
 
-float3 CalculateVirtualUv(float2 uv, float2 dx, float2 dy, out float scale)
+float3 UnpackPageData(uint pageData, float2 uv, out float derivativeScale)
 {
-	uint mipLevel = (uint) CalculateMipLevel(dx, dy, IndirectionTextureSize);
-	uint2 coords = (uint2) (uv * IndirectionTextureSize) >> mipLevel;
-	uint pageData = IndirectionTexture.mips[mipLevel][coords];
-	
+	float mipLevel = BitUnpack(pageData, 4, 12);
+	derivativeScale = IndirectionTextureSize * exp2(-mipLevel);
 	float index = BitUnpack(pageData, 12, 0);
-	float newMip = BitUnpack(pageData, 4, 12);
-	
-	scale = IndirectionTextureSize * exp2(-newMip);
-	float2 tileUv = (uv * scale);
-	
-	return float3(tileUv, index);
+	return float3(derivativeScale * uv, index);
 }
 
-float3 CalculateVirtualUv(float2 uv, inout float2 dx, inout float2 dy)
+float3 CalculateVirtualUv(float2 uv, out float derivativeScale)
 {
-	uint mipLevel = (uint) CalculateMipLevel(dx, dy, IndirectionTextureSize);
-	uint2 coords = (uint2) (uv * IndirectionTextureSize) >> mipLevel;
-	uint pageData = IndirectionTexture.mips[mipLevel][coords];
-	
-	float index = BitUnpack(pageData, 12, 0);
-	float newMip = BitUnpack(pageData, 4, 12);
-	
-	float scale = IndirectionTextureSize * exp2(-newMip);
-	float2 tileUv = (uv * scale);
-	
-	// Scale derivatives from the virtualTexture UV to a uv for indexing into the texture array
-	// by multiplying by the number of tiles at this mip
-	dx *= scale;
-	dy *= scale;
-	
-	return float3(tileUv, index);
+	uint pageData = IndirectionTexture.Sample(PointClampSampler, uv) * 65536.0;
+	return UnpackPageData(pageData, uv, derivativeScale);
 }
 
 float3 CalculateVirtualUv(float2 uv)
 {
-	float2 dx = ddx(uv), dy = ddy(uv);
-	return CalculateVirtualUv(uv, dx, dy);
+	float derivativeScale;
+	return CalculateVirtualUv(uv, derivativeScale);
+}
+
+float3 CalculateVirtualUv(float2 uv, float2 dx, float2 dy, out float derivativeScale)
+{
+	uint pageData = IndirectionTexture.SampleGrad(PointClampSampler, uv, dx, dy) * 65536.0;
+	return UnpackPageData(pageData, uv, derivativeScale);
+}
+
+float3 CalculateVirtualUv(float2 uv, float2 dx, float2 dy)
+{
+	float derivativeScale;
+	return CalculateVirtualUv(uv, dx, dy, derivativeScale);
 }
 
 #endif

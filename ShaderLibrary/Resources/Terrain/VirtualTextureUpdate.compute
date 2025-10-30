@@ -41,11 +41,11 @@ RWBuffer<uint> TilesToUnmap;
 // Source pixels (Not sure if this has to be RW, but it's going to be the same texture as the destination, 
 // So we might need to Ensure that only one mip can be read at a time.
 RWTexture2D<uint> SourceMip, DestMip;
-RWTexture2D<float> IndirectionTextureMap;
+RWTexture2D<float> IndirectionTextureMap, IndirectionWrite;
 
 uint CurrentMip, MaxIndex;
 
-[numthreads(64, 1, 1)]
+[numthreads(128, 1, 1)]
 void CopyTilesToUnmap(uint id : SV_DispatchThreadID)
 {
 	if (id >= MaxIndex)
@@ -56,23 +56,19 @@ void CopyTilesToUnmap(uint id : SV_DispatchThreadID)
 }
 
 // Copies the new data to the relevant section, and marks the modified area of the texture for updating
-[numthreads(64, 1, 1)]
+[numthreads(128, 1, 1)]
 void MapNewData(uint id : SV_DispatchThreadID)
 {
 	if (id >= MaxIndex)
 		return;
 	
 	// Unmap pending data if required 
-	uint3 unmapData = (TilesToUnmap[id] >> uint3(0, 12, 24)) & uint2(0xFFF, 0xFF).xxy;
+	uint3 unmapData;
+	unmapData.x = BitUnpack(TilesToUnmap[id], 14, 0);
+	unmapData.y = BitUnpack(TilesToUnmap[id], 14, 14);
+	unmapData.z = BitUnpack(TilesToUnmap[id], 4, 28);
 	if (unmapData.z == CurrentMip)
-	{
-		bool isMapped = IndirectionTextureMap[unmapData.xy];
-		if (isMapped)
-		{
-			DestMip[unmapData.xy] = 0;
-			IndirectionTextureMap[unmapData.xy] = 0;
-		}
-	}
+		IndirectionTextureMap[unmapData.xy] = 0;
 	
 	// Get the current data from the mip
 	uint2 data = (TileRequests[id] >> uint2(0, 16)) & 0xFFFF;
@@ -82,14 +78,14 @@ void MapNewData(uint id : SV_DispatchThreadID)
 	// Unpack the first data into an X and Y coordinate
 	uint2 destCoords = (DestPixels[id] >> uint2(0, 16)) & 0xFFFF;
 		
-	DestMip[destCoords] = BitPack(data.x, 12, 0) | BitPack(data.y, 4, 12);
+	IndirectionWrite[destCoords] = (BitPack(data.x, 12, 0) | BitPack(data.y, 4, 12)) / 65535.0;
 	IndirectionTextureMap[destCoords] = 1;
 
 	// Update the MappedData with the location of this indirection texel
 	// Pack into (12, 12, 4, 4), as we don't need many mips for the latter data
-	uint mappedData = BitPack(destCoords.x, 12, 0); // x coord
-	mappedData |= BitPack(destCoords.y, 12, 12); // y coord
-	mappedData |= BitPack(data.y, 8, 24); // mip
+	uint mappedData = BitPack(destCoords.x, 14, 0); // x coord
+	mappedData |= BitPack(destCoords.y, 14, 14); // y coord
+	mappedData |= BitPack(data.y, 4, 28); // mip
 		
 	// Write to the new mip
 	MappedTiles[data.x] = mappedData;
@@ -111,7 +107,7 @@ void VirtualTextureUpdate(uint2 id : SV_DispatchThreadID)
 	DestMip[id] = SourceMip[id >> 1];
 }
 
-[numthreads(64, 1, 1)]
+[numthreads(128, 1, 1)]
 void ClearBuffer(uint id : SV_DispatchThreadID)
 {
 	MappedTiles[id] = 0;

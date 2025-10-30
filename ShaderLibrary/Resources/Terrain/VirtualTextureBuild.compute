@@ -12,7 +12,6 @@ Texture2DArray<float4> _TerrainSplatArray, _TerrainNormalArray, _TerrainMaskArra
 Texture2D<uint> _TerrainControlMap;
 
 Buffer<float4> _ScaleOffsets;
-Buffer<uint> _DstOffsets;
 float4 _TexelSize;
 float2 _Resolution;
 uint _Width;
@@ -35,7 +34,7 @@ void VirtualTextureBuild(uint2 id : SV_DispatchThreadID)
 	
 	float height;
 	TerrainRenderResult result = RenderTerrain(worldPosition, uv, dx, dy, height, true);
-	_AlbedoSmoothness[id] = float4(LinearToGamma(result.albedo), 1.0 - result.roughness);
+	_AlbedoSmoothness[id] = float4(LinearToGamma(result.albedo), result.roughness);
 	_Heights[id] = height;
 	_NormalMetalOcclusion[id] = float4(0, 0.5 * result.normal.z + 0.5, result.visibilityAngle, 0.5 * result.normal.x + 0.5);
 }

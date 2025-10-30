@@ -150,9 +150,9 @@ TerrainRenderResult RenderTerrain(float3 worldPosition, float2 uv, float2 dx, fl
 	{
 		uint layerIndex = indices[i];
 		LayerData layerData = TerrainLayerData[layerIndex];
-		float scale = layerData.Scale;
+		float2 scale = layerData.Scale * TerrainSize.xz;
 		float heightScale = layerData.HeightScale;
-		heights[i] *= (Mask.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale)) * heightScale;
+		heights[i] *= (Mask.SampleGrad(SurfaceSampler, float3(uv * scale, layerIndex), dx * scale, dy * scale)) * heightScale;
 	}
 	
 	// https://bertdobbelaere.github.io/sorting_networks.html
@@ -190,9 +190,9 @@ TerrainRenderResult RenderTerrain(float3 worldPosition, float2 uv, float2 dx, fl
 	{
 		uint layerIndex = indices[i];
 		LayerData layerData = TerrainLayerData[layerIndex];
-		float scale = layerData.Scale;
-		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale);
-		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(SurfaceSampler, float3(worldPosition.xz * scale, layerIndex), dx * scale, dy * scale);
+		float2 scale = layerData.Scale * TerrainSize.xz;
+		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(SurfaceSampler, float3(uv * scale, layerIndex), dx * scale, dy * scale);
+		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(SurfaceSampler, float3(uv * scale, layerIndex), dx * scale, dy * scale);
 		
 		float3 normal = UnpackNormalUNorm(currentNormalOcclusionRoughness.rg);
 		currentNormalOcclusionRoughness.rg = normal.xy / normal.z;
@@ -225,7 +225,7 @@ TerrainRenderResult RenderTerrain(float3 worldPosition, float2 uv, float2 dx, fl
 	albedo /= 1.0 - transmittance;
 	normalOcclusionRoughness.ba /= 1.0 - transmittance;
 	
-	float3 terrainNormal = sampleLevel ? GetTerrainNormalLevel(normalUv) : GetTerrainNormal(normalUv);
+	float3 terrainNormal = sampleLevel ? UnpackNormalSNorm(TerrainNormalMap.SampleGrad(SurfaceSampler, normalUv, dx, dy)).xzy : GetTerrainNormal(normalUv);
 	terrainNormal = BlendNormalRNM(terrainNormal.xzy, normal).xzy;
 	
 	TerrainRenderResult output;

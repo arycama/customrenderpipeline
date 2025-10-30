@@ -250,8 +250,6 @@ public class RenderGraph : IDisposable
 		Assert.IsFalse(IsExecuting);
 		Assert.AreEqual(0, UnsafeUtility.SizeOf<T>() % 4, "ConstantBuffer size must be a multiple of 4 bytes");
 
-		//var buffer = BufferHandleSystem.GetResourceHandle(new BufferHandleDescriptor(1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant, GraphicsBuffer.UsageFlags.LockBufferForWrite));
-
 		// TODO: Re-investigate if lock buffer for write is worth using. Currently it causes read/write hazards where current frame data can be overridden, causing rendering issues. May need to revise our buffer handling logic
 		var buffer = BufferHandleSystem.GetResourceHandle(new BufferHandleDescriptor(1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant));
 
@@ -262,9 +260,6 @@ public class RenderGraph : IDisposable
 			var array = new NativeArray<T>(1, Allocator.Temp);
 			array[0] = data.data;
 			command.SetBufferData(pass.GetBuffer(data.buffer), array);
-
-			//using var bufferData = pass.GetBuffer(data.buffer).DirectWrite<T>();
-			//bufferData.SetData(0, data.data);
 		});
 
 		return buffer;

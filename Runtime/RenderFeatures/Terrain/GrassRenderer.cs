@@ -121,6 +121,7 @@ public class GrassRenderer : CameraRenderFeature
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<TemporalAAData>();
 			pass.ReadResource<TerrainRenderData>();
+			pass.ReadResource<VirtualTextureData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{

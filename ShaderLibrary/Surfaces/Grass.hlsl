@@ -7,6 +7,7 @@
 #include "../Geometry.hlsl"
 #include "../Utility.hlsl"
 #include "../Temporal.hlsl"
+#include "../VirtualTexturing.hlsl"
 
 Texture2D AlbedoOpacity, NormalOcclusionRoughness;
 Buffer<uint> PatchData, InstanceData;
@@ -17,7 +18,7 @@ cbuffer UnityPerMaterial
 {
 	float4 _Color, _Translucency;
 	float _Width, _Height, _Smoothness, _MinScale, _Bend, _Factor, _EdgeLength, _Rotation;
-	float WindStrength, WindAngle, WindWavelength, WindSpeed;
+	float WindStrength, WindAngle, WindWavelength, WindSpeed, TerrainMipBias;
 	float4 AlbedoOpacity_ST;
 };
 
@@ -141,6 +142,15 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float4 albedoOpacity = AlbedoOpacity.Sample(SurfaceSampler, uv);
 	float4 normalOcclusionRoughness = NormalOcclusionRoughness.Sample(SurfaceSampler, uv);
 	
+	float2 terrainUv = WorldToTerrainPosition(input.worldPosition);
+	float2 dx = ddx(terrainUv) * exp2(-TerrainMipBias);
+	float2 dy = ddy(terrainUv) * exp2(-TerrainMipBias);
+	float derivativeScale;
+	float3 virtualUv = CalculateVirtualUv(terrainUv, dx, dy, derivativeScale);
+	float3 terrainAlbedo = VirtualTexture.SampleGrad(LinearRepeatSampler, virtualUv, dx * derivativeScale, dy * derivativeScale);
+	
+	albedoOpacity.rgb = lerp(terrainAlbedo, albedoOpacity.rgb, pow(input.uv.y, 1));
+	
 	#ifdef CUTOUT_ON
 		clip(albedoOpacity.a - 0.5);
 	#endif
@@ -149,12 +159,13 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	if (!isFrontFace)
 		tangentNormal.z = -tangentNormal.z;
 	
-	float3 worldNormal = TangentToWorldNormal(tangentNormal, input.normal, input.tangent, 1);
+	float3 worldNormal = normalize(input.normal);// TangentToWorldNormal(tangentNormal, input.normal, input.tangent, 1);
 	
 	float3 albedo = _Color.rgb * albedoOpacity.rgb;
-	float occlusion = normalOcclusionRoughness.b;
+	float occlusion = normalOcclusionRoughness.b; //lerp(0.5, normalOcclusionRoughness.b, input.uv.y);
 	float roughness = SmoothnessToPerceptualRoughness(_Smoothness) * normalOcclusionRoughness.a;
 	float3 translucency = _Translucency.rgb * albedoOpacity.rgb;
+	translucency.rgb = lerp(terrainAlbedo, translucency.rgb, pow(input.uv.y, 1));
 		
 	FragmentOutput output;
 	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, occlusion, 0, translucency, input.position.xy, true);

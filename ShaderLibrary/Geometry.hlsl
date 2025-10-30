@@ -110,7 +110,7 @@ bool FrustumCull(float3 center, float3 extents)
 float ProjectedSphereRadius(float radius, float3 worldPosition, float rcpTanHalfFov)
 {
 	float rcpDistance = RcpLength(worldPosition);
-	return radius * rcpDistance * rcpTanHalfFov;
+	//return radius * rcpDistance * rcpTanHalfFov;
 	return rcp(rcpDistance) < radius ? rcpTanHalfFov : radius * rcpDistance * rcpTanHalfFov;
 }
 
