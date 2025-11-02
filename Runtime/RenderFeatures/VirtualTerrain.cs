@@ -491,9 +491,9 @@ public class VirtualTerrain : CameraRenderFeature
 			return (data & ((1 << size) - 1)) << offset;
 		}
 
-		var data = BitPack(coord.x, 14, 0);
-		data |= BitPack(coord.y, 14, 14);
-		return data | BitPack(coord.z, 4, 28);
+		var data = BitPack(coord.x, 13, 0);
+		data |= BitPack(coord.y, 13, 13);
+		return data | BitPack(coord.z, 6, 26);
 	}
 
 	private static Int3 UnpackCoord(int packedCoord)
@@ -503,9 +503,9 @@ public class VirtualTerrain : CameraRenderFeature
 			return (data >> offset) & ((1 << size) - 1);
 		}
 
-		var x = BitUnpack(packedCoord, 14, 0);
-		var y = BitUnpack(packedCoord, 14, 14);
-		var mip = BitUnpack(packedCoord, 4, 28);
+		var x = BitUnpack(packedCoord, 13, 0);
+		var y = BitUnpack(packedCoord, 13, 13);
+		var mip = BitUnpack(packedCoord, 6, 26);
 		return new(x, y, mip);
 	}
 

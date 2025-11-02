@@ -21,9 +21,9 @@ void GatherRequestedPages(uint id : SV_DispatchThreadID)
 	VirtualFeedbackTexture[id] = 0;
 	uint3 coords = TextureIndexToCoord(id, IndirectionResolution);
 	
-	uint packedCoord = BitPack(coords.x, 14, 0);
-	packedCoord |= BitPack(coords.y, 14, 14);
-	packedCoord |= BitPack(coords.z, 4, 28);
+	uint packedCoord = BitPack(coords.x, 13, 0);
+	packedCoord |= BitPack(coords.y, 13, 13);
+	packedCoord |= BitPack(coords.z, 6, 26);
 	VirtualRequests.Append(packedCoord);
 }
 
@@ -40,8 +40,8 @@ RWBuffer<uint> TilesToUnmap;
 
 // Source pixels (Not sure if this has to be RW, but it's going to be the same texture as the destination, 
 // So we might need to Ensure that only one mip can be read at a time.
-RWTexture2D<uint> SourceMip, DestMip;
-RWTexture2D<float> IndirectionTextureMap, IndirectionWrite;
+RWTexture2D<uint> SourceMip, DestMip, IndirectionWrite;
+RWTexture2D<float> IndirectionTextureMap;
 
 uint CurrentMip, MaxIndex;
 
@@ -64,9 +64,9 @@ void MapNewData(uint id : SV_DispatchThreadID)
 	
 	// Unmap pending data if required 
 	uint3 unmapData;
-	unmapData.x = BitUnpack(TilesToUnmap[id], 14, 0);
-	unmapData.y = BitUnpack(TilesToUnmap[id], 14, 14);
-	unmapData.z = BitUnpack(TilesToUnmap[id], 4, 28);
+	unmapData.x = BitUnpack(TilesToUnmap[id], 13, 0);
+	unmapData.y = BitUnpack(TilesToUnmap[id], 13, 13);
+	unmapData.z = BitUnpack(TilesToUnmap[id], 6, 26);
 	if (unmapData.z == CurrentMip)
 		IndirectionTextureMap[unmapData.xy] = 0;
 	
@@ -78,14 +78,14 @@ void MapNewData(uint id : SV_DispatchThreadID)
 	// Unpack the first data into an X and Y coordinate
 	uint2 destCoords = (DestPixels[id] >> uint2(0, 16)) & 0xFFFF;
 		
-	IndirectionWrite[destCoords] = (BitPack(data.x, 12, 0) | BitPack(data.y, 4, 12)) / 65535.0;
+	IndirectionWrite[destCoords] = BitPack(data.x, 11, 0) | BitPack(data.y, 5, 11);
 	IndirectionTextureMap[destCoords] = 1;
 
 	// Update the MappedData with the location of this indirection texel
 	// Pack into (12, 12, 4, 4), as we don't need many mips for the latter data
-	uint mappedData = BitPack(destCoords.x, 14, 0); // x coord
-	mappedData |= BitPack(destCoords.y, 14, 14); // y coord
-	mappedData |= BitPack(data.y, 4, 28); // mip
+	uint mappedData = BitPack(destCoords.x, 13, 0); // x coord
+	mappedData |= BitPack(destCoords.y, 13, 13); // y coord
+	mappedData |= BitPack(data.y, 6, 26); // mip
 		
 	// Write to the new mip
 	MappedTiles[data.x] = mappedData;

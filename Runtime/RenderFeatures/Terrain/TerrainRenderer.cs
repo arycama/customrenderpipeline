@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Assertions;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using static Math;
 
@@ -64,6 +65,21 @@ public class TerrainRenderer : TerrainRendererBase
 			pass.Initialize("Terrain", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.None);
 			pass.ReadResource<ViewData>();
+		}
+
+		var terrainDepth = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true);
+		renderGraph.SetRTHandle<TerrainDepth>(terrainDepth);
+
+		var cameraDepth = renderGraph.GetRTHandle<CameraDepth>();
+		using (var pass = renderGraph.AddGenericRenderPass("Terrain Depth Copy", (cameraDepth, terrainDepth)))
+		{
+			pass.WriteTexture(terrainDepth);
+			pass.ReadRtHandle<CameraDepth>();
+
+			pass.SetRenderFunction((commmand, pass, data) =>
+			{
+				commmand.CopyTexture(pass.GetRenderTexture(cameraDepth), pass.GetRenderTexture(terrainDepth));
+			});
 		}
 	}
 }

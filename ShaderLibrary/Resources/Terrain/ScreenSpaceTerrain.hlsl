@@ -9,11 +9,12 @@
 #include "../../VirtualTexturing.hlsl"
 
 Texture2D<float4> BentNormalVisibility;
+Texture2D<float> TerrainDepth;
 
 [earlydepthstencil]
 GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
-	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
+	float3 worldPosition = worldDir * LinearEyeDepth(TerrainDepth[position.xy]);
 	float2 normalUv = WorldToTerrainPositionHalfTexel(worldPosition);
 	uv = WorldToTerrainPosition(worldPosition);
 	
@@ -21,17 +22,16 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	uint feedbackPosition = CalculateFeedbackBufferPosition(uv);
 	VirtualFeedbackTexture[feedbackPosition] = 1;
 	
-	float derivativeScale;
-	float3 virtualUv = CalculateVirtualUv(uv, derivativeScale);
+	float scale;
+	float3 virtualUv = CalculateVirtualUv(uv, scale);
 	
-	float2 dx = ddx(uv) * derivativeScale;
-	float2 dy = ddy(uv) * derivativeScale;
+	// Calculate virtual uv mip and texel coordinates
+	float2 dx = ddx(uv) * scale;
+	float2 dy = ddy(uv) * scale;
 	
-	float4 albedoSmoothness = VirtualTexture.SampleGrad(SurfaceSampler, virtualUv, dx, dy);
-	float4 normalMetalOcclusion = VirtualNormalTexture.SampleGrad(SurfaceSampler, virtualUv, dx, dy);
+	float4 albedoRoughness = VirtualTexture.SampleGrad(TrilinearClampSampler, virtualUv, dx, dy);
+	float4 normalMetalOcclusion = VirtualNormalTexture.SampleGrad(TrilinearClampSampler, virtualUv, dx, dy);
 	
-	float3 albedo = albedoSmoothness.rgb;
-	float roughness = albedoSmoothness.a;
 	float3 normal = UnpackNormalUNorm(normalMetalOcclusion.ag).xzy;
 	float visibilityAngle = normalMetalOcclusion.b;
 	
@@ -40,5 +40,5 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	visibilityCone.a = cos((0.5 * visibilityCone.a + 0.5) * HalfPi);
 	visibilityCone = SphericalCapIntersection(normal, cos(visibilityAngle * HalfPi), visibilityCone.xyz, visibilityCone.a);
 	
-	return OutputGBuffer(albedo, 0, normal, roughness, visibilityCone.xyz, FastACos(visibilityCone.a) * RcpHalfPi, 0, 0, position.xy, false);
+	return OutputGBuffer(albedoRoughness.rgb, 0, normal, albedoRoughness.a, visibilityCone.xyz, FastACos(visibilityCone.a) * RcpHalfPi, 0, 0, position.xy, false);
 }

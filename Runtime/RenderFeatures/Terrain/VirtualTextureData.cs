@@ -10,10 +10,10 @@ public readonly struct VirtualTextureData : IRenderPassData
 	public readonly Texture2DArray albedoSmoothness, normal, height;
 	public readonly ResourceHandle<RenderTexture> indirectionTexture;
 	public readonly ResourceHandle<GraphicsBuffer> feedbackBuffer;
-	public readonly int indirectionTextureSize, virtualTextureSize;
-	public readonly float anisoLevel, rcpIndirectionTextureSize;
+	public readonly int indirectionTextureSize, virtualTextureSize, tileSize;
+	public readonly float anisoLevel, rcpIndirectionTextureSize, log2TileSize;
 
-	public VirtualTextureData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray height, ResourceHandle<RenderTexture> indirectionTexture, ResourceHandle<GraphicsBuffer> feedbackBuffer, float anisoLevel, int indirectionTextureSize, float rcpIndirectionTextureSize, int virtualTextureSize)
+	public VirtualTextureData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray height, ResourceHandle<RenderTexture> indirectionTexture, ResourceHandle<GraphicsBuffer> feedbackBuffer, float anisoLevel, int indirectionTextureSize, float rcpIndirectionTextureSize, int virtualTextureSize, float log2TileSize, int tileSize)
 	{
 		this.albedoSmoothness = albedoSmoothness;
 		this.normal = normal;
@@ -24,6 +24,8 @@ public readonly struct VirtualTextureData : IRenderPassData
 		this.indirectionTextureSize = indirectionTextureSize;
 		this.rcpIndirectionTextureSize = rcpIndirectionTextureSize;
 		this.virtualTextureSize = virtualTextureSize;
+		this.log2TileSize = log2TileSize;
+		this.tileSize = tileSize;
 	}
 
 	void IRenderPassData.SetInputs(RenderPass pass)
@@ -43,7 +45,12 @@ public readonly struct VirtualTextureData : IRenderPassData
 		pass.SetInt("IndirectionTextureSizeInt", indirectionTextureSize);
 		pass.SetFloat("RcpIndirectionTextureSize", rcpIndirectionTextureSize);
 		pass.SetFloat("VirtualTextureSize", virtualTextureSize);
+		pass.SetFloat("Log2TileSize", log2TileSize);
 		pass.SetInt("VirtualTextureSizeInt", virtualTextureSize);
+
+		pass.SetFloat("VirtualTileSize", tileSize);
+		pass.SetInt("VirtualTileSizeInt", tileSize);
+
 		command.SetRandomWriteTarget(4, pass.GetBuffer(feedbackBuffer));
 	}
 }

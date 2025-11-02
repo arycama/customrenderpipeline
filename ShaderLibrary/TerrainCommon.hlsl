@@ -32,7 +32,7 @@ float _TerrainHeightScale, _TerrainHeightOffset, IdMapResolution;
 
 float GetTerrainHeight(float2 uv, float2 dx, float2 dy)
 {
-	return TerrainHeightmap.SampleGrad(LinearClampSampler, uv, dx, dy) * _TerrainHeightScale + _TerrainHeightOffset;
+	return TerrainHeightmap.SampleGrad(TrilinearClampSampler, uv, dx, dy) * _TerrainHeightScale + _TerrainHeightOffset;
 }
 
 float GetTerrainHeight(float2 uv, float lod)

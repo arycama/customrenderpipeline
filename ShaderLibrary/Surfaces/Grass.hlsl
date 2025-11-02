@@ -30,6 +30,7 @@ struct FragmentInput
 	float2 uv : TEXCOORD;
 	float3 normal : NORMAL;
 	float3 tangent : TANGENT;
+	float3 color : COLOR;
 };
 
 struct FragmentOutput
@@ -132,6 +133,9 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	
 	if (layerIndex0 != 0 && layerIndex0 != 2 && layerIndex0 != 7 && layerIndex0 != 9)
 		output.position = asfloat(0x7F800000);
+		
+	float3 virtualUv = CalculateVirtualUv(terrainUv, 0, 0);
+	output.color = VirtualTexture.SampleLevel(LinearRepeatSampler, virtualUv, 0);
 	
 	return output;
 }
@@ -142,14 +146,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float4 albedoOpacity = AlbedoOpacity.Sample(SurfaceSampler, uv);
 	float4 normalOcclusionRoughness = NormalOcclusionRoughness.Sample(SurfaceSampler, uv);
 	
-	float2 terrainUv = WorldToTerrainPosition(input.worldPosition);
-	float2 dx = ddx(terrainUv) * exp2(-TerrainMipBias);
-	float2 dy = ddy(terrainUv) * exp2(-TerrainMipBias);
-	float derivativeScale;
-	float3 virtualUv = CalculateVirtualUv(terrainUv, dx, dy, derivativeScale);
-	float3 terrainAlbedo = VirtualTexture.SampleGrad(LinearRepeatSampler, virtualUv, dx * derivativeScale, dy * derivativeScale);
-	
-	albedoOpacity.rgb = lerp(terrainAlbedo, albedoOpacity.rgb, pow(input.uv.y, 1));
+	albedoOpacity.rgb = lerp(input.color, albedoOpacity.rgb, pow(input.uv.y, 1));
 	
 	#ifdef CUTOUT_ON
 		clip(albedoOpacity.a - 0.5);
@@ -165,7 +162,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float occlusion = normalOcclusionRoughness.b; //lerp(0.5, normalOcclusionRoughness.b, input.uv.y);
 	float roughness = SmoothnessToPerceptualRoughness(_Smoothness) * normalOcclusionRoughness.a;
 	float3 translucency = _Translucency.rgb * albedoOpacity.rgb;
-	translucency.rgb = lerp(terrainAlbedo, translucency.rgb, pow(input.uv.y, 1));
+	translucency.rgb = lerp(input.color, translucency.rgb, pow(input.uv.y, 1));
 		
 	FragmentOutput output;
 	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, occlusion, 0, translucency, input.position.xy, true);
