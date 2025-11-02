@@ -232,4 +232,19 @@ public static class GraphicsUtilities
 			computeBuffer = new ComputeBuffer(size, stride, type);
 		}
 	}
+
+	/// <summary> ScaleOffset to remap from one texel range to another. Apply via texel * scaleOffset.xy + scaleOffsetzw </summary>
+	public static Float4 TexelRemap(Rect source, Rect dest)
+	{
+		var remapX = Math.RemapScaleOffset(source.min.x, source.max.x, dest.min.x, dest.max.x);
+		var remapY = Math.RemapScaleOffset(source.min.y, source.max.y, dest.min.y, dest.max.y);
+		return new Float4(remapX.x, remapY.x, remapX.y, remapY.y);
+	}
+
+	/// <summary> Calculates normalized scale offset that would go from a normalized (0 to 1) uv to the normalized coords of the dest rect</summary>
+	public static Float4 TexelRemapNormalized(Rect dest, int destResolution)
+	{
+		var rcp = 1.0f / destResolution;
+		return TexelRemap(new Rect(0, 0, 1, 1), new Rect(rcp * dest.x, rcp * dest.y, rcp * dest.width, rcp * dest.height));
+	}
 }

@@ -1,4 +1,3 @@
-#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Color.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Samplers.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/TerrainCommon.hlsl"
