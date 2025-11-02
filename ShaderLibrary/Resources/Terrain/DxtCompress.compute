@@ -5,9 +5,9 @@
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Color.hlsl"
 //#include "Packages/com.unity.render-pipelines.core/ShaderLibrary/Packing.hlsl"
  
-RWTexture2D<uint4> AlbedoResult0, AlbedoResult1, NormalResult0, NormalResult1;
-RWTexture2D<uint2> HeightResult0, HeightResult1;
-Texture2D AlbedoInput, NormalInput, HeightInput;
+RWTexture2DArray<uint4> AlbedoResult0, AlbedoResult1, NormalResult0, NormalResult1;
+RWTexture2DArray<uint2> HeightResult0, HeightResult1;
+Texture2DArray AlbedoInput, NormalInput, HeightInput;
 
 #define COMPRESS_ONE_MIP_THREADGROUP_WIDTH 8
 #define COMPRESS_TWO_MIPS_THREADGROUP_WIDTH 16
@@ -28,9 +28,9 @@ float2 TexelToUV(float2 texel, float oneOverTextureWidth)
 }
 
 // Load the 16 RGB texels that form a block
-void LoadTexelsRGB(Texture2D tex, SamplerState samp, float oneOverTextureWidth, uint2 threadIDWithinDispatch, out float3 block[16])
+void LoadTexelsRGB(Texture2DArray tex, SamplerState samp, float oneOverTextureWidth, uint3 dispatchThreadId, out float3 block[16])
 {
-	float2 uv = TexelToUV(float2(threadIDWithinDispatch * 4), oneOverTextureWidth);
+	float3 uv = float3(TexelToUV(dispatchThreadId.xy * 4, oneOverTextureWidth), dispatchThreadId.z);
 
 	float4 red = tex.GatherRed(samp, uv, int2(0, 0));
 	float4 green = tex.GatherGreen(samp, uv, int2(0, 0));
@@ -67,11 +67,11 @@ void LoadTexelsRGB(Texture2D tex, SamplerState samp, float oneOverTextureWidth, 
 
 
 // Load the 16 RGB texels that form a block, with a mip bias
-void LoadTexelsRGBBias(Texture2D tex, SamplerState samp, float oneOverTextureSize, uint2 threadIDWithinDispatch, uint mipBias, out float3 block[16])
+void LoadTexelsRGBBias(Texture2DArray tex, SamplerState samp, float oneOverTextureSize, uint3 dispatchThreadId, uint mipBias, out float3 block[16])
 {
     // We need to use Sample rather than Gather/Load for the Bias functions, because low mips will read outside
     //  the texture boundary. When reading outside the boundary, Gather/Load return 0, but Sample can clamp
-	float2 location = float2(threadIDWithinDispatch * 4) * oneOverTextureSize;
+	float3 location = float3(dispatchThreadId.xy * 4 * oneOverTextureSize, dispatchThreadId.z);
 	block[0] = tex.SampleLevel(samp, location, mipBias, int2(0, 0)).rgb;
 	block[1] = tex.SampleLevel(samp, location, mipBias, int2(1, 0)).rgb;
 	block[2] = tex.SampleLevel(samp, location, mipBias, int2(2, 0)).rgb;
@@ -91,10 +91,10 @@ void LoadTexelsRGBBias(Texture2D tex, SamplerState samp, float oneOverTextureSiz
 }
 
 // Load the 16 RGBA texels that form a block
-void LoadTexelsRGBA(Texture2D tex, uint2 threadIDWithinDispatch, out float3 blockRGB[16], out float blockA[16])
+void LoadTexelsRGBA(Texture2DArray tex, uint3 dispatchThreadId, out float3 blockRGB[16], out float blockA[16])
 {
 	float4 rgba;
-	int3 location = int3(threadIDWithinDispatch * 4, 0);
+	int4 location = int4(dispatchThreadId.xy * 4, dispatchThreadId.z, 0);
 	rgba = tex.Load(location, int2(0, 0));
 	blockRGB[0] = rgba.rgb;
 	blockA[0] = rgba.a;
@@ -146,12 +146,12 @@ void LoadTexelsRGBA(Texture2D tex, uint2 threadIDWithinDispatch, out float3 bloc
 }
 
 // Load the 16 RGBA texels that form a block, with a mip bias
-void LoadTexelsRGBABias(Texture2D tex, SamplerState samp, float oneOverTextureSize, uint2 threadIDWithinDispatch, uint mipBias, out float3 blockRGB[16], out float blockA[16])
+void LoadTexelsRGBABias(Texture2DArray tex, SamplerState samp, float oneOverTextureSize, uint3 dispatchThreadId, uint mipBias, out float3 blockRGB[16], out float blockA[16])
 {
     // We need to use Sample rather than Gather/Load for the Bias functions, because low mips will read outside
     //  the texture boundary. When reading outside the boundary, Gather/Load return 0, but Sample will clamp
 	float4 rgba;
-	float2 location = float2(threadIDWithinDispatch * 4) * oneOverTextureSize;
+	float3 location = float3(dispatchThreadId.xy * 4 * oneOverTextureSize, dispatchThreadId.z);
 	rgba = tex.SampleLevel(samp, location, mipBias, int2(0, 0));
 	blockRGB[0] = rgba.rgb;
 	blockA[0] = rgba.a;
@@ -203,9 +203,9 @@ void LoadTexelsRGBABias(Texture2D tex, SamplerState samp, float oneOverTextureSi
 }
 
 // Load the 16 UV texels that form a block
-void LoadTexelsUV(Texture2D tex, SamplerState samp, float oneOverTextureWidth, uint2 threadIDWithinDispatch, out float blockU[16], out float blockV[16])
+void LoadTexelsUV(Texture2DArray tex, SamplerState samp, float oneOverTextureWidth, uint3 dispatchThreadId, out float blockU[16], out float blockV[16])
 {
-	float2 uv = TexelToUV(float2(threadIDWithinDispatch * 4), oneOverTextureWidth);
+	float3 uv = float3(TexelToUV(dispatchThreadId.xy * 4, oneOverTextureWidth), dispatchThreadId.z);
 
 	float4 red = tex.GatherRed(samp, uv, int2(0, 0));
 	float4 green = tex.GatherGreen(samp, uv, int2(0, 0));
@@ -253,12 +253,12 @@ void LoadTexelsUV(Texture2D tex, SamplerState samp, float oneOverTextureWidth, u
 }
 
 // Load the 16 UV texels that form a block, with a mip bias
-void LoadTexelsUVBias(Texture2D tex, SamplerState samp, float oneOverTextureSize, uint2 threadIDWithinDispatch, uint mipBias, out float blockU[16], out float blockV[16])
+void LoadTexelsUVBias(Texture2DArray tex, SamplerState samp, float oneOverTextureSize, uint3 dispatchThreadId, uint mipBias, out float blockU[16], out float blockV[16])
 {
     // We need to use Sample rather than Gather/Load for the Bias functions, because low mips will read outside
     //  the texture boundary. When reading outside the boundary, Gather/Load return 0, but Sample will clamp
 	float4 rgba;
-	float2 location = float2(threadIDWithinDispatch * 4) * oneOverTextureSize;
+	float3 location = float3(dispatchThreadId.xy * 4 * oneOverTextureSize, dispatchThreadId.z);
 	rgba = tex.SampleLevel(samp, location, mipBias, int2(0, 0));
 	blockU[0] = rgba.r;
 	blockV[0] = rgba.g;
@@ -590,9 +590,9 @@ uint4 CompressBC5Block(float blockU[16], float blockV[16], float valueScale = 1.
 // Name: CalcTailMipsParams
 // Desc: Calculate parameters used in the "compress tail mips" shaders
 //--------------------------------------------------------------------------------------
-void CalcTailMipsParams(uint2 threadIDWithinDispatch, out float oneOverTextureSize, out uint2 blockID, out uint mipBias)
+void CalcTailMipsParams(uint2 dispatchThreadId, out float oneOverTextureSize, out uint2 blockID, out uint mipBias)
 {
-	blockID = threadIDWithinDispatch;
+	blockID = dispatchThreadId;
 	mipBias = 0;
 	oneOverTextureSize = 1;
 
@@ -640,7 +640,7 @@ groupshared float3 gs_mip1BlocksRGB[MIP1_BLOCKS_PER_ROW * MIP1_BLOCKS_PER_ROW][1
 groupshared float gs_mip1BlocksA[MIP1_BLOCKS_PER_ROW * MIP1_BLOCKS_PER_ROW][16];
 
 // Calculate the texels for mip level n+1
-void DownsampleMip(uint2 threadIDWithinGroup, float3 blockRGB[16], float blockA[16])
+void DownsampleMip(uint3 threadIDWithinGroup, float3 blockRGB[16], float blockA[16])
 {
     // Find the block and texel index for this thread within the group
 	uint2 blockID = threadIDWithinGroup.xy / 2;
@@ -662,15 +662,15 @@ void DownsampleMip(uint2 threadIDWithinGroup, float3 blockRGB[16], float blockA[
 }
 
 [numthreads(COMPRESS_TWO_MIPS_THREADGROUP_WIDTH, COMPRESS_TWO_MIPS_THREADGROUP_WIDTH, 1)]
-void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
-    uint2 threadIDWithinGroup : SV_GroupThreadID,
+void BC3Compress(uint3 dispatchThreadId : SV_DispatchThreadID,
+    uint3 threadIDWithinGroup : SV_GroupThreadID,
     uint threadIndexWithinGroup : SV_GroupIndex,
-    uint2 groupIDWithinDispatch : SV_GroupID)
+    uint3 groupIDWithinDispatch : SV_GroupID)
 {
 	// Albedo
 	float3 blockRGB[16];
 	float blockA[16];
-	LoadTexelsRGBA(AlbedoInput, threadIDWithinDispatch, blockRGB, blockA);
+	LoadTexelsRGBA(AlbedoInput, dispatchThreadId, blockRGB, blockA);
 	
 	// Downsample from mip 0 to mip 1
 	DownsampleMip(threadIDWithinGroup, blockRGB, blockA);
@@ -682,7 +682,7 @@ void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
 		blockRGB[i] = LinearToGamma(blockRGB[i]);
 	}
 	
-	AlbedoResult0[threadIDWithinDispatch] = CompressBC3Block(blockRGB, blockA);
+	AlbedoResult0[dispatchThreadId] = CompressBC3Block(blockRGB, blockA);
 	
 	// When compressing two mips at a time, we use a group size of 16x16. This produces four 64-thread shader vectors.
     // The first shader vector will execute the code below and the other three will retire.
@@ -699,19 +699,19 @@ void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
         // Pass a scale value of 0.25 to CompressBC3 block to average the four source values contributing to each pixel
         //  in the block. See the comment in DownsampleMip, above.
 		uint4 compressed = CompressBC3Block(gs_mip1BlocksRGB[threadIndexWithinGroup], gs_mip1BlocksA[threadIndexWithinGroup]);
-		AlbedoResult1[groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID] = compressed;
+		AlbedoResult1[uint3(groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID, dispatchThreadId.z)] = compressed;
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
 	
 	// Normal
-	LoadTexelsRGBA(NormalInput, threadIDWithinDispatch, blockRGB, blockA);
+	LoadTexelsRGBA(NormalInput, dispatchThreadId, blockRGB, blockA);
 	
 	 // Downsample from mip 0 to mip 1
 	DownsampleMip(threadIDWithinGroup, blockRGB, blockA);
 	GroupMemoryBarrierWithGroupSync();
 	
-	NormalResult0[threadIDWithinDispatch] = CompressBC3Block(blockRGB, blockA);
+	NormalResult0[dispatchThreadId] = CompressBC3Block(blockRGB, blockA);
 	
 	// When compressing two mips at a time, we use a group size of 16x16. This produces four 64-thread shader vectors.
     // The first shader vector will execute the code below and the other three will retire.
@@ -722,13 +722,13 @@ void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
         // Pass a scale value of 0.25 to CompressBC3 block to average the four source values contributing to each pixel
         //  in the block. See the comment in DownsampleMip, above.
 		uint4 compressed = CompressBC3Block(gs_mip1BlocksRGB[threadIndexWithinGroup], gs_mip1BlocksA[threadIndexWithinGroup]);
-		NormalResult1[groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID] = compressed;
+		NormalResult1[uint3(groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID, dispatchThreadId.z)] = compressed;
 	}
 	
 	GroupMemoryBarrierWithGroupSync();
 	
 	// Height
-	LoadTexelsRGBA(HeightInput, threadIDWithinDispatch, blockRGB, blockA);
+	LoadTexelsRGBA(HeightInput, dispatchThreadId, blockRGB, blockA);
 	
 	// Downsample from mip 0 to mip 1
 	DownsampleMip(threadIDWithinGroup, blockRGB, blockA);
@@ -741,7 +741,7 @@ void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
 		blockR[i] = blockRGB[i].r;
 	}
 	
-	HeightResult0[threadIDWithinDispatch] = CompressBC4Block(blockR);
+	HeightResult0[dispatchThreadId] = CompressBC4Block(blockR);
 	
 	// When compressing two mips at a time, we use a group size of 16x16. This produces four 64-thread shader vectors.
     // The first shader vector will execute the code below and the other three will retire.
@@ -757,6 +757,6 @@ void BC3Compress(uint2 threadIDWithinDispatch : SV_DispatchThreadID,
         // Pass a scale value of 0.25 to CompressBC3 block to average the four source values contributing to each pixel
         //  in the block. See the comment in DownsampleMip, above.
 		uint2 compressed = CompressBC4Block(blockR);
-		HeightResult1[groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID] = compressed;
+		HeightResult1[uint3(groupIDWithinDispatch.xy * MIP1_BLOCKS_PER_ROW + texelID, dispatchThreadId.z)] = compressed;
 	}
 }

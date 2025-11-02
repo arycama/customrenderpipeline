@@ -5,11 +5,12 @@ float3 GetFrustumCorner(uint cornerId);
 
 float4 VertexFullscreenTriangle(uint id : SV_VertexID, out float2 uv : TEXCOORD0, out float3 worldDirection : TEXCOORD1, out uint viewIndex : SV_RenderTargetArrayIndex) : SV_Position
 {
-	uv = (id << uint2(1, 0)) & 2;
+	uint localId = id % 3;
+	uv = (localId << uint2(1, 0)) & 2;
 	float4 result = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
-	worldDirection = GetFrustumCorner(id);
-	viewIndex = 0;
+	worldDirection = GetFrustumCorner(localId);
+	viewIndex = id / 3;
 	return result;
 }
 

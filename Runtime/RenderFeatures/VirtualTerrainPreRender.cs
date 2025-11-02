@@ -25,19 +25,21 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 
 		indirectionTexture = renderGraph.GetTexture(IndirectionTextureResolution, IndirectionTextureResolution, GraphicsFormat.R16_UInt, hasMips: true, isRandomWrite: true, isPersistent: true);
 
-		albedoSmoothnessTexture = new(settings.TileResolution, settings.TileResolution, settings.VirtualTileCount, GraphicsFormat.RGBA_DXT5_SRGB, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
+		var resolution = settings.TileResolution;// + 4;
+
+		albedoSmoothnessTexture = new(resolution, resolution, settings.VirtualTileCount, GraphicsFormat.RGBA_DXT5_SRGB, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
 		{
 			hideFlags = HideFlags.HideAndDontSave,
 			name = "Virtual AlbedoSmoothness Texture",
 		};
 
-		normalTexture = new(settings.TileResolution, settings.TileResolution, settings.VirtualTileCount, GraphicsFormat.RGBA_DXT5_UNorm, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
+		normalTexture = new(resolution, resolution, settings.VirtualTileCount, GraphicsFormat.RGBA_DXT5_UNorm, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
 		{
 			hideFlags = HideFlags.HideAndDontSave,
 			name = "Virtual Normal Texture",
 		};
 
-		heightTexture = new(settings.TileResolution, settings.TileResolution, settings.VirtualTileCount, GraphicsFormat.R_BC4_UNorm, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
+		heightTexture = new(resolution, resolution, settings.VirtualTileCount, GraphicsFormat.R_BC4_UNorm, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
 		{
 			hideFlags = HideFlags.HideAndDontSave,
 			name = "Virtual Height Texture",
