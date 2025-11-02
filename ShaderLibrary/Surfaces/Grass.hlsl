@@ -130,8 +130,15 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	uint layerIndex0 = BitUnpack(layerData, 4, 0);
 	uint layerIndex1 = BitUnpack(layerData, 4, 13);
 	float blend = Remap(BitUnpack(layerData, 4, 26), 0.0, 15.0, 0.0, 0.5);
+	float4 bilinearWeights = BilinearWeights(terrainUv, IdMapResolution);
+	float maxWeight = Max4(bilinearWeights);
 	
-	if (layerIndex0 != 0 && layerIndex0 != 2 && layerIndex0 != 7 && layerIndex0 != 9)
+	float layerStrength0 = (layerIndex0 == 0 || layerIndex0 == 2 || layerIndex0 == 7 || layerIndex0 == 9) * (1.0 - blend) * 1;
+	float layerStrength1 = (layerIndex1 == 0 || layerIndex1 == 2 || layerIndex1 == 7 || layerIndex1 == 9) * (blend) * 1;
+	float strength = layerStrength0 + layerStrength1;
+	
+	float rand = RandomFloat(quadId);
+	if (strength < 0.75 || rand > Remap(strength, 0.75, 1))
 		output.position = asfloat(0x7F800000);
 		
 	float3 virtualUv = CalculateVirtualUv(terrainUv, 0, 0);

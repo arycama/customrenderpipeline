@@ -30,32 +30,32 @@ cbuffer TerrainData
 	float3 TerrainSize;
 	float IdMapResolution;
 	float3 TerrainPosition;
-	float _TerrainHeightScale;
-	float4 _TerrainRemapHalfTexel;
-	float4 _TerrainScaleOffset;
+	float TerrainHeightScale;
+	float4 WorldToTerrainHalfTexel;
+	float4 WorldToTerrain;
 	float2 TerrainHeightmapUvRemap;
-	float _TerrainHeightOffset;
-	float TerrainDataPadding0;
+	float TerrainHeightOffset;
+	float TerrainHeightmapResolution;
 };
 
 float GetTerrainHeight(float2 uv, float2 dx, float2 dy)
 {
-	return TerrainHeightmap.SampleGrad(TrilinearClampSampler, uv, dx, dy) * _TerrainHeightScale + _TerrainHeightOffset;
+	return TerrainHeightmap.SampleGrad(TrilinearClampSampler, uv, dx, dy) * TerrainHeightScale + TerrainHeightOffset;
 }
 
 float GetTerrainHeight(float2 uv, float lod)
 {
-	return TerrainHeightmap.SampleLevel(TrilinearClampSampler, uv, lod) * _TerrainHeightScale + _TerrainHeightOffset;
+	return TerrainHeightmap.SampleLevel(TrilinearClampSampler, uv, lod) * TerrainHeightScale + TerrainHeightOffset;
 }
 
 float GetTerrainHeight(float2 uv)
 {
-	return TerrainHeightmap.SampleLevel(LinearClampSampler, uv, 0.0) * _TerrainHeightScale + _TerrainHeightOffset;
+	return TerrainHeightmap.SampleLevel(LinearClampSampler, uv, 0.0) * TerrainHeightScale + TerrainHeightOffset;
 }
 
 float LoadTerrainHeight(uint3 coord)
 {
-	return TerrainHeightmap.mips[coord.z][coord.xy] * _TerrainHeightScale + _TerrainHeightOffset;
+	return TerrainHeightmap.mips[coord.z][coord.xy] * TerrainHeightScale + TerrainHeightOffset;
 }
 
 float LoadTerrainHeight(uint2 coord)
@@ -65,12 +65,12 @@ float LoadTerrainHeight(uint2 coord)
 
 float2 WorldToTerrainPositionHalfTexel(float3 worldPosition)
 {
-	return worldPosition.xz * _TerrainRemapHalfTexel.xy + _TerrainRemapHalfTexel.zw;
+	return worldPosition.xz * WorldToTerrainHalfTexel.xy + WorldToTerrainHalfTexel.zw;
 }
 
 float2 WorldToTerrainPosition(float3 worldPosition)
 {
-	return worldPosition.xz * _TerrainScaleOffset.xy + _TerrainScaleOffset.zw;
+	return worldPosition.xz * WorldToTerrain.xy + WorldToTerrain.zw;
 }
 
 float GetTerrainHeight(float3 worldPosition)

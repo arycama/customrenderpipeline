@@ -34,7 +34,7 @@ public class TerrainViewData : CameraRenderFeature
 			new Float4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z),
 			GraphicsUtilities.HalfTexelRemap(terrain.terrainData.heightmapResolution),
 			position.y,
-			0f
+			(float)terrain.terrainData.heightmapResolution
 		))));
 
 		renderGraph.SetResource(new TerrainQuadtreeData(renderGraph.SetConstantBuffer

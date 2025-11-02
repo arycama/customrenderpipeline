@@ -16,7 +16,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float4 scaleOffset = ScaleOffsets[viewIndex];
 	uv = uv * scaleOffset.xy + scaleOffset.zw;
 	
-	uint4 layerData = IdMap.Gather(SurfaceSampler, uv);
+	uint4 layerData = IdMap.Gather(TrilinearRepeatSampler, uv);
 	float4 bilinearWeights = BilinearWeights(uv, IdMapResolution);
 	
 	uint indices[8];
@@ -60,8 +60,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		uint layerIndex = indices[i];
 		LayerData layerData = TerrainLayerData[layerIndex];
 		float2 scale = layerData.Scale * TerrainSize.xz;
-		float heightScale = layerData.HeightScale;
-		heights[i] *= (Mask.SampleGrad(SurfaceSampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale)) * heightScale;
+		heights[i] *= Mask.SampleGrad(TrilinearRepeatSampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale) * layerData.HeightScale;
 	}
 	
 	// https://bertdobbelaere.github.io/sorting_networks.html
@@ -100,8 +99,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		uint layerIndex = indices[i];
 		LayerData layerData = TerrainLayerData[layerIndex];
 		float2 scale = layerData.Scale * TerrainSize.xz;
-		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(SurfaceSampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale);
-		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(SurfaceSampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale);
+		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(TrilinearRepeatSampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale);
+		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(TrilinearRepeatSampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale);
 		
 		float3 normal = UnpackNormalUNorm(currentNormalOcclusionRoughness.rg);
 		currentNormalOcclusionRoughness.rg = normal.xy / normal.z;
@@ -126,7 +125,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		
 		transmittance *= currentTransmittance;
 		
-		height += currentHeight;
+		height += heightDelta;
 	}
 	
 	float3 normal = normalize(float3(normalOcclusionRoughness.rg, 1));

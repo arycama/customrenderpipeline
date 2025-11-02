@@ -12,8 +12,21 @@ RWStructuredBuffer<uint> VirtualFeedbackTexture : register(u4);
 Texture2DArray<float4> VirtualTexture, VirtualNormalTexture;
 Texture2DArray<float> VirtualHeightTexture;
 Texture2D<uint> IndirectionTexture;
-float AnisoLevel, IndirectionTextureSize, RcpIndirectionTextureSize, VirtualTextureSize, Log2TileSize, VirtualTileSize;
-uint IndirectionTextureSizeInt, VirtualTextureSizeInt, VirtualTileSizeInt;
+
+
+cbuffer VirtualTextureData
+{
+	float4 VirtualTileScaleOffset;
+	float AnisoLevel;
+	float IndirectionTextureSize;
+	float RcpIndirectionTextureSize;
+	float VirtualTextureSize;
+	float Log2TileSize;
+	float VirtualTileSize;
+	uint IndirectionTextureSizeInt;
+	uint VirtualTextureSizeInt;
+	uint VirtualTileSizeInt;
+};
 
 // Total number of pixels in a texture
 uint PixelCount(uint resolution)
@@ -105,7 +118,7 @@ float CalculateMipLevel(float2 dx, float2 dy, float2 resolution, bool aniso = fa
 uint3 CalculateIndirectionCoords(float2 uv, float2 dx, float2 dy)
 {
 	uint3 coord;
-	coord.z = CalculateMipLevel(dx, dy, VirtualTextureSize);
+	coord.z = CalculateMipLevel(dx, dy, VirtualTextureSize, true, AnisoLevel);
 	coord.xy = (IndirectionTextureSizeInt >> coord.z) * uv;
 	return coord;
 }
@@ -126,13 +139,15 @@ uint CalculateFeedbackBufferPosition(float2 uv)
 	return CalculateFeedbackBufferPosition(uv, ddx(uv), ddy(uv));
 }
 
-float3 UnpackPageData(uint3 coord, float2 uv, out float derivativeScale)
+float3 UnpackPageData(uint3 coord, float2 uv, out float scale)
 {
 	uint pageData = IndirectionTexture.mips[coord.z][coord.xy];
 	uint index = BitUnpack(pageData, 11, 0);
 	uint mipLevel = BitUnpack(pageData, 5, 11);
-	derivativeScale = IndirectionTextureSizeInt >> mipLevel;
-	return float3(frac(derivativeScale * uv), index);
+	scale = IndirectionTextureSizeInt >> mipLevel;
+	float2 offset = (coord.xy << coord.z) >> mipLevel;
+	float2 localUv = uv * scale - offset;
+	return float3(localUv * VirtualTileScaleOffset.xy + VirtualTileScaleOffset.zw, index);
 }
 
 float3 CalculateVirtualUv(float2 uv, float2 dx, float2 dy, out float derivativeScale)

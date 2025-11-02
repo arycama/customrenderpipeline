@@ -24,13 +24,8 @@ GBufferOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, flo
 	
 	float scale;
 	float3 virtualUv = CalculateVirtualUv(uv, scale);
-	
-	// Calculate virtual uv mip and texel coordinates
-	float2 dx = ddx(uv) * scale;
-	float2 dy = ddy(uv) * scale;
-	
-	float4 albedoRoughness = VirtualTexture.SampleGrad(TrilinearClampSampler, virtualUv, dx, dy);
-	float4 normalMetalOcclusion = VirtualNormalTexture.SampleGrad(TrilinearClampSampler, virtualUv, dx, dy);
+	float4 albedoRoughness = VirtualTexture.SampleGrad(TrilinearClampAniso4Sampler, virtualUv, ddx(uv) * scale, ddy(uv) * scale);
+	float4 normalMetalOcclusion = VirtualNormalTexture.SampleGrad(TrilinearClampAniso4Sampler, virtualUv, ddx(uv) * scale, ddy(uv) * scale);
 	
 	float3 normal = UnpackNormalUNorm(normalMetalOcclusion.ag).xzy;
 	float visibilityAngle = normalMetalOcclusion.b;

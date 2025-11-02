@@ -324,7 +324,16 @@ public class VirtualTerrain : CameraRenderFeature
 			tileRequests.Add((targetIndex & 0xFFFF) | ((position.z & 0xFFFF) << 16));
 			destPixels.Add(position.x | (position.y << 16));
 			dstOffsets.Add(targetIndex);
-			scaleOffsets.Add(GraphicsUtilities.TexelRemapNormalized(new Rect(position.x, position.y, 1, 1), IndirectionSize >> position.z));
+
+			var padding = 4;
+
+			var dstX = (position.x << position.z) * settings.TileResolution - (padding << position.z);
+			var dstY = (position.y << position.z) * settings.TileResolution - (padding << position.z);
+			var dstWidth = (settings.TileResolution + 2 * padding) << position.z;
+			var dstHeight = (settings.TileResolution + 2 * padding) << position.z;
+
+			var dstRect = new Rect(dstX, dstY, dstWidth, dstHeight);
+			scaleOffsets.Add(GraphicsUtilities.TexelRemapNormalized(dstRect, settings.VirtualResolution));
 
 			// Exit if we've reached the max number of tiles for this frame
 			if (++tileCount == settings.UpdateTileCount)

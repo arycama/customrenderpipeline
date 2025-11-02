@@ -95,6 +95,18 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 
 		previousTerrain = terrainSystemData.terrain;
 
-		renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, indirectionTexture, feedbackBuffer, settings.AnisoLevel, IndirectionTextureResolution, Rcp(IndirectionTextureResolution), settings.VirtualResolution, Log2(settings.TileResolution), settings.TileResolution));
+		renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, indirectionTexture, feedbackBuffer, renderGraph.SetConstantBuffer
+		((
+			GraphicsUtilities.TexelRemapNormalized(new Rect(4, 4, settings.TileResolution - 8, settings.TileResolution - 8), settings.TileResolution),
+			(float)settings.AnisoLevel,
+			(float)IndirectionTextureResolution,
+			Rcp(IndirectionTextureResolution),
+			(float)settings.VirtualResolution,
+			Log2(settings.TileResolution),
+			(float)settings.TileResolution,
+			IndirectionTextureResolution,
+			settings.VirtualResolution,
+			settings.TileResolution
+		))));
 	}
 }

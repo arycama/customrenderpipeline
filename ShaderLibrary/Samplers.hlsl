@@ -1,7 +1,7 @@
 #ifndef SAMPLERS_INCLUDED
 #define SAMPLERS_INCLUDED
 
-SamplerState PointClampSampler, PointRepeatSampler, LinearClampSampler, LinearRepeatSampler, TrilinearClampSampler, TrilinearRepeatSampler, TrilinearRepeatAniso4Sampler, TrilinearRepeatAniso16Sampler;
+SamplerState PointClampSampler, PointRepeatSampler, LinearClampSampler, LinearRepeatSampler, TrilinearClampSampler, TrilinearClampAniso4Sampler, TrilinearClampAniso8Sampler, TrilinearClampAniso16Sampler, TrilinearRepeatSampler, TrilinearRepeatAniso4Sampler, TrilinearRepeatAniso8Sampler, TrilinearRepeatAniso16Sampler;
 
 const static SamplerState SurfaceSampler = TrilinearRepeatAniso4Sampler;
 
