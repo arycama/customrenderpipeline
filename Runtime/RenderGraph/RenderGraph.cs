@@ -201,6 +201,8 @@ public class RenderGraph : IDisposable
 		BufferHandleSystem.CleanupCurrentFrame(FrameIndex);
 		RtHandleSystem.CleanupCurrentFrame(FrameIndex);
 
+		nativeRenderPasses.Clear();
+
 		if (!FrameDebugger.enabled)
 			FrameIndex++;
 	}
@@ -253,6 +255,8 @@ public class RenderGraph : IDisposable
 
 		var size = UnsafeUtility.SizeOf<T>();
 		var buffer = GetBuffer(1, size, GraphicsBuffer.Target.Constant);
+
+
 
 		using var pass = this.AddGenericRenderPass("Set Constant Buffer", (data, buffer, size));
 		pass.WriteBuffer("", buffer);
@@ -390,4 +394,61 @@ public class RenderGraph : IDisposable
 
 		return indexBuffer;
 	}
+
+	private List<RenderPassData> nativeRenderPasses = new();
+	private int nativeRenderPassIndex = -1;
+	private bool IsInRenderPass => nativeRenderPassIndex != -1;
+	private List<ResourceHandle<RenderTexture>> currentPassAttachments = new();
+
+	public void BeginNativeRenderPass(Int2 size)
+	{
+		Assert.IsFalse(IsInRenderPass);
+		nativeRenderPassIndex = nativeRenderPasses.Count;
+
+		//using var pass = this.AddGenericRenderPass("Begin Render Pass");
+
+		//pass.SetRenderFunction((command, pass) =>
+		//{
+		//	var attachments = new NativeArray<AttachmentDescriptor>();
+
+		//	for(var i = 0; i < rtHandles.Length; i++)
+		//	{
+		//		var handle = rtHandles[i];
+		//		var desc = new AttachmentDescriptor();
+
+
+		//		//attachments[i] = 
+		//	}
+
+		//	//command.BeginRenderPass(width, height, samples, attachments, 0, subpasses)
+		//});
+	}
+
+	public void EndNativeRenderPass()
+	{
+		Assert.IsTrue(IsInRenderPass);
+		nativeRenderPassIndex = -1;
+
+		currentPassAttachments.Clear();
+	}
+
+	public void WriteTexture(ResourceHandle<RenderTexture> handle)
+	{
+		if (!IsInRenderPass)
+			return;
+
+		var index = currentPassAttachments.FindIndex(item => item.Index == handle.Index);
+		if(index == -1)
+		{
+			Assert.IsFalse(currentPassAttachments.Count >= 8, "Max number of attachments (8) exceeded");
+			currentPassAttachments.Add(handle);
+		}
+	}
+}
+
+public class RenderPassData
+{
+	public List<ResourceHandle<RenderTexture>> attachments;
+	public List<AttachmentIndexArray> inputs = new();
+	public List<AttachmentIndexArray> outputs = new();
 }

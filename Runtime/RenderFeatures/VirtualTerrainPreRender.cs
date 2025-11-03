@@ -71,9 +71,6 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
-		var virtualTerrainFeedback = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32_UInt, isScreenTexture: true);
-		renderGraph.SetRTHandle<VirtualTerrainFeedback>(virtualTerrainFeedback);
-
 		// Ensure terrain system data is set
 		if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
 			return;

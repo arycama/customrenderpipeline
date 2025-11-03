@@ -92,15 +92,10 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 
 	public void AllocateFrameResources(int renderPassCount, int frameIndex)
 	{
-		foreach (var list in frameHandlesToCreate)
-			list.Clear();
 
 		// Ensure capacity
 		for (var i = frameHandlesToCreate.Count; i < renderPassCount; i++)
 			frameHandlesToCreate.Add(new());
-
-		foreach (var list in frameHandlesToFree)
-			list.Clear();
 
 		// Ensure capacity
 		for (var i = frameHandlesToFree.Count; i < renderPassCount; i++)
@@ -115,19 +110,16 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 				continue;
 
 			if (resourceHandleData.createIndex != -1)
-			{
-				if(resourceHandleData.freeIndex == -1 && !resourceHandleData.isPersistent)
-				{
-					// If the resource is not used, mark it as available immediately. TODO: Instead we should avoid running renderpasses entirely if their outputs are not used
-					// However a rnederpass might produce multiple outputs, some of which are read, and others which aren't, so we may still end up with some unused outputs.
-					resourceHandleData.freeIndex = resourceHandleData.createIndex;
-				}
-
 				frameHandlesToCreate[resourceHandleData.createIndex].Add(i);
-			}
 
 			if (resourceHandleData.freeIndex != -1)
 				frameHandlesToFree[resourceHandleData.freeIndex].Add(i);
+			else if (!resourceHandleData.isPersistent && resourceHandleData.createIndex != -1)
+			{
+				// If the resource is not used, mark it as available immediately. TODO: Instead we should avoid running renderpasses entirely if their outputs are not used
+				// However a rnederpass might produce multiple outputs, some of which are read, and others which aren't, so we may still end up with some unused outputs.
+				frameHandlesToFree[resourceHandleData.createIndex].Add(i);
+			}
 		}
 
 		for (var i = 0; i < renderPassCount; i++)
@@ -170,6 +162,8 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 				handleInfo[handle] = info;
 			}
 
+			frameHandlesToCreate[i].Clear();
+
 			// Now mark any textures that need to be released at the end of this pass as available
 			foreach (var handle in frameHandlesToFree[i])
 			{
@@ -181,6 +175,8 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 
 				this.handlesToFree.Add(handle);
 			}
+
+			frameHandlesToFree[i].Clear();
 		}
 	}
 

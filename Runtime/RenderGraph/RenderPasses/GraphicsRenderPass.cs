@@ -50,6 +50,8 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 
 	private void WriteResource(ResourceHandle<RenderTexture> rtHandle)
 	{
+		RenderGraph.WriteTexture(rtHandle);
+
 		RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
 
 		// Check that multiple targets have the same resolution

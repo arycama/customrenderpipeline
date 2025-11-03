@@ -20,7 +20,6 @@ public class ScreenSpaceTerrain : CameraRenderFeature
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
-		pass.WriteTexture(renderGraph.GetRTHandle<VirtualTerrainFeedback>());
 
 		pass.ReadRtHandle<TerrainDepth>();
 		pass.ReadResource<TerrainRenderData>();

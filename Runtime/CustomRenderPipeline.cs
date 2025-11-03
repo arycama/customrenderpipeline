@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using static Math;
+using System;
+
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -168,6 +170,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new VirtualTerrainPreRender(renderGraph, asset.TerrainSettings),
 		new TerrainViewData(renderGraph, terrainSystem, asset.TerrainSettings),
+
+		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		{
+			renderGraph.BeginNativeRenderPass(camera.ScaledViewSize());
+		}),
+
 		new TerrainRenderer(renderGraph, asset.TerrainSettings, quadtreeCull),
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
@@ -180,7 +188,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
 			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
 			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("Deferred", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
@@ -237,6 +244,11 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<TemporalAAData>();
 			pass.ReadResource<AutoExposureData>();
+		}),
+
+		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		{
+			renderGraph.EndNativeRenderPass();
 		}),
 
 		new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),

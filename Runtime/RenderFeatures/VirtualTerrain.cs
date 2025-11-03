@@ -143,7 +143,6 @@ public class VirtualTerrain : CameraRenderFeature
 			var threadCount = IndirectionSize * IndirectionSize * 4 / 3;
 			pass.Initialize(virtualTextureUpdateShader, 5, threadCount);
 			pass.WriteBuffer("VirtualFeedbackTexture", virtualTextureData.feedbackBuffer);
-			pass.ReadRtHandle<VirtualTerrainFeedback>();
 
 			pass.SetRenderFunction((Action<CommandBuffer, RenderPass, (GraphicsBuffer requestBuffer, ComputeShader virtualTextureUpdateShader, int IndirectionTextureResolution)>)(static (command, pass, data) =>
 			{
