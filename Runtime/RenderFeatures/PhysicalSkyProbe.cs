@@ -24,7 +24,7 @@ public class PhysicalSkyProbe : CameraRenderFeature
 	protected override void Cleanup(bool disposing)
 	{
 		foreach (var probe in cameraProbeHandles)
-			renderGraph.ReleasePersistentResource(probe.Value);
+			renderGraph.ReleasePersistentResource(probe.Value, -1);
 	}
 
 	public override void Render(Camera camera, ScriptableRenderContext context)

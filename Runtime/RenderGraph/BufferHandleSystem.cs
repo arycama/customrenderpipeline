@@ -4,8 +4,6 @@ public class BufferHandleSystem : ResourceHandleSystem<GraphicsBuffer, BufferHan
 {
 	protected override BufferHandleDescriptor CreateDescriptorFromResource(GraphicsBuffer resource) => new(resource.count, resource.stride, resource.target, resource.usageFlags);
 
-	protected override int ExtraFramesToKeepResource(GraphicsBuffer resource) => resource.usageFlags.HasFlag(GraphicsBuffer.UsageFlags.LockBufferForWrite) ? 3 : 0;
-
 	protected override void DestroyResource(GraphicsBuffer resource) => resource.Dispose();
 
 	protected override bool DoesResourceMatchDescriptor(GraphicsBuffer resource, BufferHandleDescriptor descriptor)

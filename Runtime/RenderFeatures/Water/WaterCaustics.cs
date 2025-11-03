@@ -18,7 +18,7 @@ public class WaterCaustics : CameraRenderFeature
 
 	protected override void Cleanup(bool disposing)
 	{
-		renderGraph.ReleasePersistentResource(indexBuffer);
+		renderGraph.ReleasePersistentResource(indexBuffer, -1);
 	}
 
 	public override void Render(Camera camera, ScriptableRenderContext context)

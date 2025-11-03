@@ -20,7 +20,7 @@ public abstract class WaterRendererBase : CameraRenderFeature
 
 	protected override void Cleanup(bool disposing)
     {
-		renderGraph.ReleasePersistentResource(indexBuffer);
+		renderGraph.ReleasePersistentResource(indexBuffer, -1);
     }
 
     protected QuadtreeCullResult Cull(Vector3 viewPosition, CullingPlanes cullingPlanes, Int2 viewSize, bool hiZ)

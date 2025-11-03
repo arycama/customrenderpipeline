@@ -67,16 +67,16 @@ public class TerrainSystem : FrameRenderFeature
 
 	private void CleanupResources()
 	{
-		renderGraph.ReleasePersistentResource(minMaxHeight);
-		renderGraph.ReleasePersistentResource(heightmap);
-		renderGraph.ReleasePersistentResource(normalmap);
-		renderGraph.ReleasePersistentResource(idMap);
-		renderGraph.ReleasePersistentResource(aoMap);
+		renderGraph.ReleasePersistentResource(minMaxHeight, -1);
+		renderGraph.ReleasePersistentResource(heightmap, -1);
+		renderGraph.ReleasePersistentResource(normalmap, -1);
+		renderGraph.ReleasePersistentResource(idMap, -1);
+		renderGraph.ReleasePersistentResource(aoMap, -1);
 		Object.DestroyImmediate(diffuseArray);
 		Object.DestroyImmediate(normalMapArray);
 		Object.DestroyImmediate(maskMapArray);
-		renderGraph.ReleasePersistentResource(terrainLayerData);
-		renderGraph.ReleasePersistentResource(indexBuffer);
+		renderGraph.ReleasePersistentResource(terrainLayerData, -1);
+		renderGraph.ReleasePersistentResource(indexBuffer, -1);
 	}
 
 	private void InitializeTerrain()

@@ -58,12 +58,12 @@ public class PrecomputeDfg : FrameRenderFeature
 
 	protected override void Cleanup(bool disposing)
 	{
-		renderGraph.ReleasePersistentResource(precomputeDfg);
-		renderGraph.ReleasePersistentResource(directionalAlbedo);
-		renderGraph.ReleasePersistentResource(averageAlbedo);
-		renderGraph.ReleasePersistentResource(directionalAlbedoMs);
-		renderGraph.ReleasePersistentResource(averageAlbedoMs);
-		renderGraph.ReleasePersistentResource(specularOcclusion);
+		renderGraph.ReleasePersistentResource(precomputeDfg, -1);
+		renderGraph.ReleasePersistentResource(directionalAlbedo, -1);
+		renderGraph.ReleasePersistentResource(averageAlbedo, -1);
+		renderGraph.ReleasePersistentResource(directionalAlbedoMs, -1);
+		renderGraph.ReleasePersistentResource(averageAlbedoMs, -1);
+		renderGraph.ReleasePersistentResource(specularOcclusion, -1);
 	}
 
 	public override void Render(ScriptableRenderContext context)

@@ -75,10 +75,17 @@ public partial class Sky : CameraRenderFeature
 			});
 		}
 
+		bool wasCreated = default;
+		ResourceHandle<RenderTexture> current, history = default;
+
 		// Reprojection
-		var (current, history, wasCreated) = textureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", new SkyTemporalData(history, wasCreated, settings.StationaryBlend, settings.MotionBlend, settings.MotionFactor, settings.DepthFactor, settings.ClampWindow, settings.MaxFrameCount, camera.ScaledViewSize())))
 		{
+			(current, history, wasCreated) = textureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+
+			pass.renderData.history = history;
+			pass.renderData.wasCreated = wasCreated;
+
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Temporal"));
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteTexture(current, RenderBufferLoadAction.DontCare);

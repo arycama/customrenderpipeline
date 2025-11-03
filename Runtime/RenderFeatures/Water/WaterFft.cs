@@ -14,7 +14,8 @@ public class WaterFft : FrameRenderFeature
     private readonly ResourceHandle<GraphicsBuffer> spectrumBuffer, dispersionBuffer;
     private readonly ResourceHandle<RenderTexture> lengthToRoughness;
     private bool roughnessInitialized;
-    private ResourceHandle<RenderTexture> displacementCurrent = new(-1);
+    private ResourceHandle<RenderTexture> displacementCurrent;
+	private bool hasHistory;
 
     private WaterProfile Profile => settings.Profile;
 
@@ -24,13 +25,15 @@ public class WaterFft : FrameRenderFeature
         spectrumBuffer = renderGraph.GetBuffer(settings.Resolution * settings.Resolution * CascadeCount, sizeof(float) * 4, GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, true);
         dispersionBuffer = renderGraph.GetBuffer(settings.Resolution * settings.Resolution * CascadeCount, sizeof(float), GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, true);
         lengthToRoughness = renderGraph.GetTexture(256, 1, GraphicsFormat.R16_UNorm, isPersistent: true);
-    }
+
+		 displacementCurrent = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R16G16B16A16_SFloat, 4, TextureDimension.Tex2DArray, hasMips: true, isPersistent: true);
+	}
 
     protected override void Cleanup(bool disposing)
     {
-        renderGraph.ReleasePersistentResource(lengthToRoughness);
-        renderGraph.ReleasePersistentResource(spectrumBuffer);
-        renderGraph.ReleasePersistentResource(dispersionBuffer);
+        renderGraph.ReleasePersistentResource(lengthToRoughness, -1);
+        renderGraph.ReleasePersistentResource(spectrumBuffer, -1);
+        renderGraph.ReleasePersistentResource(dispersionBuffer, -1);
     }
 
     public override void Render(ScriptableRenderContext context)
@@ -116,20 +119,26 @@ public class WaterFft : FrameRenderFeature
             pass.ReadBuffer("OceanDispersion", dispersionBuffer);
         }
 
-        // TODO: Why can't this use persistent texture cache
-        var displacementHistory = displacementCurrent;
-        var hasDisplacementHistory = displacementHistory.Index != -1;
-        displacementCurrent = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R16G16B16A16_SFloat, 4, TextureDimension.Tex2DArray, hasMips: true, isPersistent: true);
-        if (hasDisplacementHistory)
-            renderGraph.ReleasePersistentResource(displacementHistory);
-        else
-            displacementHistory = displacementCurrent;
+		var normalFoamSmoothness = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R8G8B8A8_SNorm, 4, TextureDimension.Tex2DArray, hasMips: true);
 
-        var normalFoamSmoothness = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R8G8B8A8_SNorm, 4, TextureDimension.Tex2DArray, hasMips: true);
+		ResourceHandle<RenderTexture> displacementHistory;
 
-        using (var pass = renderGraph.AddComputeRenderPass("Ocean Fft Column"))
+		using (var pass = renderGraph.AddComputeRenderPass("Ocean Fft Column"))
         {
-            pass.Initialize(computeShader, 1, 1, settings.Resolution, 4, false);
+			// TODO: Why can't this use persistent texture cache
+			if (hasHistory)
+			{
+				renderGraph.ReleasePersistentResource(displacementCurrent, pass.Index);
+				displacementHistory = displacementCurrent;
+				displacementCurrent = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R16G16B16A16_SFloat, 4, TextureDimension.Tex2DArray, hasMips: true, isPersistent: true);
+			}
+			else
+			{
+				displacementHistory = displacementCurrent;
+				hasHistory = true;
+			}
+
+			pass.Initialize(computeShader, 1, 1, settings.Resolution, 4, false);
             pass.ReadTexture("Height", heightResult);
             pass.ReadTexture("Displacement", displacementResult);
             pass.ReadTexture("Slope", slopeResult);
@@ -180,7 +189,7 @@ public class WaterFft : FrameRenderFeature
             });
         }
 
-        renderGraph.SetResource(new OceanFftResult(displacementCurrent, displacementHistory, normalFoamSmoothness, lengthToRoughness, oceanBuffer)); ;
+        renderGraph.SetResource(new OceanFftResult(displacementCurrent, displacementHistory, normalFoamSmoothness, lengthToRoughness, oceanBuffer));
     }
 }
 

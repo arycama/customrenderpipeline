@@ -7,14 +7,16 @@ public partial class VolumetricLighting : CameraRenderFeature
 {
     private readonly Settings settings;
     private readonly PersistentRTHandleCache colorHistory;
+	private readonly ComputeShader computeShader;
 
     public VolumetricLighting(Settings settings, RenderGraph renderGraph) : base(renderGraph)
     {
         this.settings = settings;
         colorHistory = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Volumetric Lighting", TextureDimension.Tex3D);
-    }
+        computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
+	}
 
-    protected override void Cleanup(bool disposing)
+	protected override void Cleanup(bool disposing)
     {
         colorHistory.Dispose();
     }
@@ -25,7 +27,6 @@ public partial class VolumetricLighting : CameraRenderFeature
 
 		var volumeWidth = DivRoundUp(camera.scaledPixelWidth, settings.TileSize);
         var volumeHeight = DivRoundUp(camera.scaledPixelHeight, settings.TileSize);
-		var (current, history, wasCreated) = colorHistory.GetTextures(volumeWidth, volumeHeight, camera, settings.DepthSlices);
 
 		var linearToVolumetricScale = Rcp(Log2(settings.MaxDistance / camera.nearClipPlane));
 		var volumetricLightingData = renderGraph.SetConstantBuffer(new VolumetricLightingData
@@ -49,10 +50,16 @@ public partial class VolumetricLighting : CameraRenderFeature
 		var tanHalfFov = Tan(0.5f * Radians(camera.fieldOfView));
 		var pixelToWorldViewDir = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, tanHalfFov, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation));
 
-        var computeShader = Resources.Load<ComputeShader>("VolumetricLighting");
-		using (var pass = renderGraph.AddComputeRenderPass("Volumetric Lighting", (pixelToWorldViewDir, history)))
+		ResourceHandle<RenderTexture> current, history = default;
+		bool wasCreated = false;
+
+		using (var pass = renderGraph.AddComputeRenderPass("Volumetric Lighting", (pixelToWorldViewDir, history, wasCreated)))
         {
-            pass.Initialize(computeShader, 0, volumeWidth, volumeHeight, settings.DepthSlices);
+			(current, history, wasCreated) = colorHistory.GetTextures(volumeWidth, volumeHeight, pass.Index, camera, settings.DepthSlices);
+			pass.renderData.history = history;
+			pass.renderData.wasCreated = wasCreated;
+
+			pass.Initialize(computeShader, 0, volumeWidth, volumeHeight, settings.DepthSlices);
             pass.WriteTexture("Result", current);
 
             pass.ReadTexture("Input", history);
@@ -73,6 +80,7 @@ public partial class VolumetricLighting : CameraRenderFeature
                 pass.SetMatrix("PixelToWorldViewDir", data.pixelToWorldViewDir);
 				pass.SetVector("InputScale", pass.RenderGraph.GetScale3D(data.history));
                 pass.SetVector("InputMax", pass.RenderGraph.GetLimit3D(data.history));
+				pass.SetFloat("IsFirst", data.wasCreated ? 1.0f : 0.0f);
             });
         }
 

@@ -15,9 +15,9 @@ public struct InstanceRendererData
         Count = count;
     }
 
-    public void Clear(RenderGraph renderGraph)
+    public void Clear(RenderGraph renderGraph, int passIndex)
     {
-        renderGraph.BufferHandleSystem.ReleasePersistentResource(PositionBuffer);
-        renderGraph.BufferHandleSystem.ReleasePersistentResource(InstanceTypeIdBuffer);
+        renderGraph.BufferHandleSystem.ReleasePersistentResource(PositionBuffer, passIndex);
+        renderGraph.BufferHandleSystem.ReleasePersistentResource(InstanceTypeIdBuffer, passIndex);
     }
 }

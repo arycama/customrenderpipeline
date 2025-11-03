@@ -156,10 +156,16 @@ public class DeferredWater : CameraRenderFeature
             }
         }
 
-        var (current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
+		bool wasCreated = default;
+		ResourceHandle<RenderTexture> current, history = default;
         using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", (wasCreated, history, settings)))
         {
-            if (settings.RaytracedRefractions)
+			(current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+
+			pass.renderData.history = history;
+			pass.renderData.wasCreated = wasCreated;
+
+			if (settings.RaytracedRefractions)
                 pass.AddKeyword("RAYTRACED_REFRACTIONS_ON");
 
             pass.Initialize(deferredWaterMaterial, 1);

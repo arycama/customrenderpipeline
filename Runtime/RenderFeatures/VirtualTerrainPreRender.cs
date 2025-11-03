@@ -3,6 +3,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 using static Math;
+using System.Collections.Generic;
 
 public class VirtualTerrainPreRender : CameraRenderFeature
 {
@@ -60,8 +61,8 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 
 	protected override void Cleanup(bool disposing)
 	{
-		renderGraph.ReleasePersistentResource(feedbackBuffer);
-		renderGraph.ReleasePersistentResource(indirectionTexture);
+		renderGraph.ReleasePersistentResource(feedbackBuffer, -1);
+		renderGraph.ReleasePersistentResource(indirectionTexture, -1);
 
 		Object.DestroyImmediate(albedoSmoothnessTexture);
 		Object.DestroyImmediate(normalTexture);
@@ -96,7 +97,7 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 		previousTerrain = terrainSystemData.terrain;
 
 		renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, indirectionTexture, feedbackBuffer, renderGraph.SetConstantBuffer
-		((
+		(new VirtualTextureCbufferData(
 			GraphicsUtilities.TexelRemapNormalized(new Rect(4, 4, settings.TileResolution - 8, settings.TileResolution - 8), settings.TileResolution),
 			(float)settings.AnisoLevel,
 			(float)IndirectionTextureResolution,
@@ -108,5 +109,33 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 			settings.VirtualResolution,
 			settings.TileResolution
 		))));
+	}
+}
+
+internal struct VirtualTextureCbufferData
+{
+	public Float4 Item1;
+	public float Item2;
+	public float Item3;
+	public float Item4;
+	public float Item5;
+	public float Item6;
+	public float Item7;
+	public int IndirectionTextureResolution;
+	public int VirtualResolution;
+	public int TileResolution;
+
+	public VirtualTextureCbufferData(Float4 item1, float item2, float item3, float item4, float item5, float item6, float item7, int indirectionTextureResolution, int virtualResolution, int tileResolution)
+	{
+		Item1 = item1;
+		Item2 = item2;
+		Item3 = item3;
+		Item4 = item4;
+		Item5 = item5;
+		Item6 = item6;
+		Item7 = item7;
+		IndirectionTextureResolution = indirectionTextureResolution;
+		VirtualResolution = virtualResolution;
+		TileResolution = tileResolution;
 	}
 }

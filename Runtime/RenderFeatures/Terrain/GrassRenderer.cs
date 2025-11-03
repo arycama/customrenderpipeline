@@ -31,8 +31,8 @@ public class GrassRenderer : CameraRenderFeature
 	{
 		if (previousVertexCount != 0)
 		{
-			renderGraph.ReleasePersistentResource(indexBuffer);
-			renderGraph.ReleasePersistentResource(instanceDataBuffer);
+			renderGraph.ReleasePersistentResource(indexBuffer, -1);
+			renderGraph.ReleasePersistentResource(instanceDataBuffer, -1);
 		}
 	}
 
@@ -54,8 +54,8 @@ public class GrassRenderer : CameraRenderFeature
 		{
 			if (previousVertexCount != 0)
 			{
-				renderGraph.ReleasePersistentResource(indexBuffer);
-				renderGraph.ReleasePersistentResource(instanceDataBuffer);
+				renderGraph.ReleasePersistentResource(indexBuffer, -1);
+				renderGraph.ReleasePersistentResource(instanceDataBuffer, -1);
 			}
 
 			indexBuffer = renderGraph.GetQuadIndexBuffer(vertexCount, false);

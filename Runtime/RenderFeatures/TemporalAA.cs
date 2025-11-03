@@ -27,8 +27,8 @@ public partial class TemporalAA : CameraRenderFeature
 		if (!settings.IsEnabled)
 			return;
 
-		var (current, history, wasCreated) = colorCache.GetTextures(camera.pixelWidth, camera.pixelHeight, camera);
-		var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(camera.pixelWidth, camera.pixelHeight, camera);
+		bool wasCreated = default;
+		ResourceHandle<RenderTexture> current, history = default;
 
 		var result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 		using var pass = renderGraph.AddFullscreenRenderPass("Temporal AA", new TemporalAADataStruct
@@ -48,6 +48,12 @@ public partial class TemporalAA : CameraRenderFeature
 
 		//var keyword = null;// viewData.Scale < 1.0f ? "UPSCALE" : null; // TODO: Implement
 		pass.Initialize(material, 0, 1);
+
+		(current, history, wasCreated) = colorCache.GetTextures(camera.pixelWidth, camera.pixelHeight, pass.Index, camera);
+		var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(camera.pixelWidth, camera.pixelHeight, pass.Index, camera);
+
+		pass.renderData.history = history;
+		pass.renderData.hasHistory = wasCreated ? 0f : 1f;
 
 		pass.ReadTexture("History", history);
 		pass.ReadTexture("HistoryWeight", historyWeight);

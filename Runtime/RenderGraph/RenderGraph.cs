@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
@@ -245,36 +246,43 @@ public class RenderGraph : IDisposable
 		return GetRTHandle(typeof(T)).handle;
 	}
 
-	public ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(T data) where T : struct
+	public unsafe ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(T data) where T : unmanaged
 	{
 		Assert.IsFalse(IsExecuting);
 		Assert.AreEqual(0, UnsafeUtility.SizeOf<T>() % 4, "ConstantBuffer size must be a multiple of 4 bytes");
 
-		// TODO: Re-investigate if lock buffer for write is worth using. Currently it causes read/write hazards where current frame data can be overridden, causing rendering issues. May need to revise our buffer handling logic
-		var buffer = BufferHandleSystem.GetResourceHandle(new BufferHandleDescriptor(1, UnsafeUtility.SizeOf<T>(), GraphicsBuffer.Target.Constant));
+		var size = UnsafeUtility.SizeOf<T>();
+		var buffer = GetBuffer(1, size, GraphicsBuffer.Target.Constant);
 
-		using var pass = this.AddGenericRenderPass("Set Constant Buffer", (data, buffer));
+		using var pass = this.AddGenericRenderPass("Set Constant Buffer", (data, buffer, size));
 		pass.WriteBuffer("", buffer);
 		pass.SetRenderFunction(static (command, pass, data) =>
 		{
-			var array = new NativeArray<T>(1, Allocator.Temp);
-			array[0] = data.data;
+			var array = ArrayPool<byte>.Get(data.size);
+
+			fixed (byte* arrayPtr = array)
+			{
+				byte* sourcePtr = (byte*)&data.data;
+				Buffer.MemoryCopy(sourcePtr, arrayPtr, data.size, data.size);
+			}
+
 			command.SetBufferData(pass.GetBuffer(data.buffer), array);
+			ArrayPool<byte>.Release(array);
 		});
 
 		return buffer;
 	}
 
-	public void ReleasePersistentResource(ResourceHandle<GraphicsBuffer> handle)
+	public void ReleasePersistentResource(ResourceHandle<GraphicsBuffer> handle, int passIndex)
 	{
 		Assert.IsFalse(IsExecuting);
-		BufferHandleSystem.ReleasePersistentResource(handle);
+		BufferHandleSystem.ReleasePersistentResource(handle, passIndex);
 	}
 
-	public void ReleasePersistentResource(ResourceHandle<RenderTexture> handle)
+	public void ReleasePersistentResource(ResourceHandle<RenderTexture> handle, int passIndex)
 	{
 		Assert.IsFalse(IsExecuting);
-		RtHandleSystem.ReleasePersistentResource(handle);
+		RtHandleSystem.ReleasePersistentResource(handle, passIndex);
 	}
 
 	public Float4 GetScaleLimit2D(ResourceHandle<RenderTexture> handle)

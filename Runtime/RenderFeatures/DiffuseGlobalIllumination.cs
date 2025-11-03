@@ -139,11 +139,18 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             });
         }
 
-        var (current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-        var (currentWeight, historyWeight, wasCreatedWeight) = temporalWeightCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
+		bool wasCreated = default;
+		ResourceHandle<RenderTexture> current, history = default;
+
         using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Temporal", (wasCreated, history, settings.Intensity, settings.MaxSamples, settings.Thickness)))
         {
-            pass.Initialize(material, 2);
+			(current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			var (currentWeight, historyWeight, wasCreatedWeight) = temporalWeightCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+
+			pass.renderData.wasCreated = wasCreated;
+			pass.renderData.history = history;
+
+			pass.Initialize(material, 2);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(currentWeight, RenderBufferLoadAction.DontCare);

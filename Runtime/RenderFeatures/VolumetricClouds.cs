@@ -76,9 +76,10 @@ public partial class VolumetricClouds : CameraRenderFeature
 			});
 		}
 
+		bool luminanceWasCreated = default, transmittanceWasCreated = default;
+		ResourceHandle<RenderTexture> luminanceCurrent, transmittanceCurrent, luminanceHistory = default, transmittanceHistory = default;
+
         // Reprojection+output
-        var (luminanceCurrent, luminanceHistory, luminanceWasCreated) = cloudLuminanceTextureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-        var (transmittanceCurrent, transmittanceHistory, transmittanceWasCreated) = cloudTransmittanceTextureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", new VolumetricCloudTemporalData
 		(
 			luminanceWasCreated,
@@ -94,6 +95,13 @@ public partial class VolumetricClouds : CameraRenderFeature
 			time
 		)))
 		{
+			(luminanceCurrent, luminanceHistory, luminanceWasCreated) = cloudLuminanceTextureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			(transmittanceCurrent, transmittanceHistory, transmittanceWasCreated) = cloudTransmittanceTextureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+
+			pass.renderData.luminanceWasCreated = luminanceWasCreated;
+			pass.renderData.luminanceHistory = luminanceHistory;
+			pass.renderData.transmittanceHistory = transmittanceHistory;
+
 			pass.Initialize(material, 5);
 			pass.WriteTexture(luminanceCurrent, RenderBufferLoadAction.DontCare);
 			pass.WriteTexture(transmittanceCurrent, RenderBufferLoadAction.DontCare);

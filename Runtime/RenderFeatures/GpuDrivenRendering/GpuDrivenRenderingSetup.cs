@@ -25,15 +25,15 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
 		if (!isInitialized)
 			return;
 
-        renderGraph.ReleasePersistentResource(drawCallArgsBuffer);
-        renderGraph.ReleasePersistentResource(lodSizesBuffer);
-        renderGraph.ReleasePersistentResource(instanceTypeIdsBuffer);
-        renderGraph.ReleasePersistentResource(lodFadesBuffer);
-        renderGraph.ReleasePersistentResource(positionsBuffer);
-        renderGraph.ReleasePersistentResource(instanceTypeDataBuffer);
-        renderGraph.ReleasePersistentResource(instanceTypeLodDataBuffer);
-        renderGraph.ReleasePersistentResource(instanceBoundsBuffer);
-        renderGraph.ReleasePersistentResource(rendererLodIndicesBuffer);
+        renderGraph.ReleasePersistentResource(drawCallArgsBuffer, -1);
+        renderGraph.ReleasePersistentResource(lodSizesBuffer, -1);
+        renderGraph.ReleasePersistentResource(instanceTypeIdsBuffer, -1);
+        renderGraph.ReleasePersistentResource(lodFadesBuffer, -1);
+        renderGraph.ReleasePersistentResource(positionsBuffer, -1);
+        renderGraph.ReleasePersistentResource(instanceTypeDataBuffer, -1);
+        renderGraph.ReleasePersistentResource(instanceTypeLodDataBuffer, -1);
+        renderGraph.ReleasePersistentResource(instanceBoundsBuffer, -1);
+        renderGraph.ReleasePersistentResource(rendererLodIndicesBuffer, -1);
     }
 
     public override void Render(ScriptableRenderContext context)
@@ -46,11 +46,15 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
             Cleanup(false);
 
         version = proceduralGenerationController.Version;
-        proceduralGenerationController.FreeUnusedHandles(renderGraph);
 
-        // Fill instanceId buffer. (Should be done when the object is assigned)
-        // This buffer contains the type at each index. (Eg 0, 1, 2)
-        var positionCountSum = 0;
+		using (var pass = renderGraph.AddGenericRenderPass("Free Procedural Handles"))
+		{
+			proceduralGenerationController.FreeUnusedHandles(renderGraph, pass.Index);
+		}
+
+		// Fill instanceId buffer. (Should be done when the object is assigned)
+		// This buffer contains the type at each index. (Eg 0, 1, 2)
+		var positionCountSum = 0;
         foreach (var data in proceduralGenerationController.instanceData)
             positionCountSum += data.totalCount;
 
@@ -114,8 +118,8 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
 
                 positionOffset += data.totalCount;
 
-                renderGraph.ReleasePersistentResource(data.positions);
-                renderGraph.ReleasePersistentResource(data.instanceId);
+                renderGraph.ReleasePersistentResource(data.positions, pass.Index);
+                renderGraph.ReleasePersistentResource(data.instanceId, pass.Index);
             }
         }
 

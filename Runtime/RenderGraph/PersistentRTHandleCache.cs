@@ -39,7 +39,7 @@ public class PersistentRTHandleCache : IDisposable
 	}
 
 	// Gets current texture and marks history as non-persistent
-	public (ResourceHandle<RenderTexture> current, ResourceHandle<RenderTexture> history, bool wasCreated) GetTextures(int width, int height, Camera camera, int depth = 1)
+	public (ResourceHandle<RenderTexture> current, ResourceHandle<RenderTexture> history, bool wasCreated) GetTextures(int width, int height, int passIndex, Camera camera, int depth = 1)
 	{
 		var wasCreated = !textureCache.TryGetValue(camera, out var history);
 		if (wasCreated)
@@ -66,7 +66,7 @@ public class PersistentRTHandleCache : IDisposable
 			}
 		}
 		else
-			renderGraph.ReleasePersistentResource(history);
+			renderGraph.ReleasePersistentResource(history, passIndex);
 
 		var current = renderGraph.GetTexture(width, height, format, depth, dimension, isScreenTexture, hasMips, autoGenerateMips, true, false, false, clearFlags, clearColor, clearDepth, clearStencil);
 		textureCache[camera] = current;
@@ -80,7 +80,7 @@ public class PersistentRTHandleCache : IDisposable
 			return;
 
 		foreach (var texture in textureCache)
-			renderGraph.ReleasePersistentResource(texture.Value);
+			renderGraph.ReleasePersistentResource(texture.Value, -1);
 
 		if (!disposing)
 			Debug.LogError($"Persistent RT Handle Cache [{name}] not disposed correctly");

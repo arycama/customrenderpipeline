@@ -21,7 +21,7 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 
 	public ResourceHandle<T> GetResourceHandle(V descriptor, bool isPersistent = false)
 	{
-		var handleIndex = handleInfo.Add(new(-1, -1, -1, descriptor, false, false, isPersistent, true));
+		var handleIndex = handleInfo.Add(new(-1, -1, -1, descriptor, false, isPersistent, true));
 		return new ResourceHandle<T>(handleIndex);
 	}
 
@@ -32,7 +32,7 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 
 		var resourceIndex = resources.Add((resource, -1, false));
 		var descriptor = CreateDescriptorFromResource(resource);
-		var handleIndex = handleInfo.Add(new(-1, -1, resourceIndex, descriptor, false, false, true, true));
+		var handleIndex = handleInfo.Add(new(-1, -1, resourceIndex, descriptor, false, true, true));
 		result = new ResourceHandle<T>(handleIndex);
 		importedResourceLookup.Add(resource, result);
 
@@ -54,6 +54,11 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 	public void ReadResource(ResourceHandle<T> handle, int passIndex)
 	{
 		var info = handleInfo[handle.Index];
+
+		// Persistent handles do not get freed automatically so there is no work to do
+		if (info.isPersistent)
+			return;
+
 		info.freeIndex = info.freeIndex == -1 ? passIndex : Math.Max(info.freeIndex, passIndex);
 		handleInfo[handle.Index] = info;
 	}
@@ -64,11 +69,12 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 		return resources[resourceIndex].resource;
 	}
 
-	public void ReleasePersistentResource(ResourceHandle<T> handle)
+	public void ReleasePersistentResource(ResourceHandle<T> handle, int passIndex)
 	{
 		var info = handleInfo[handle.Index];
 		Assert.IsTrue(info.isPersistent);
-		info.isReleasable = true;
+		info.freeIndex = info.freeIndex == -1 ? passIndex : Math.Max(info.freeIndex, passIndex);
+		info.isPersistent = false;
 		handleInfo[handle.Index] = info;
 	}
 
@@ -110,25 +116,18 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 
 			if (resourceHandleData.createIndex != -1)
 			{
+				if(resourceHandleData.freeIndex == -1 && !resourceHandleData.isPersistent)
+				{
+					// If the resource is not used, mark it as available immediately. TODO: Instead we should avoid running renderpasses entirely if their outputs are not used
+					// However a rnederpass might produce multiple outputs, some of which are read, and others which aren't, so we may still end up with some unused outputs.
+					resourceHandleData.freeIndex = resourceHandleData.createIndex;
+				}
+
 				frameHandlesToCreate[resourceHandleData.createIndex].Add(i);
 			}
 
-			var freePassIndex = resourceHandleData.freeIndex;
-			if (freePassIndex == -1)
-			{
-				if (resourceHandleData.isPersistent && resourceHandleData.isReleasable)
-					freePassIndex = 0;
-				else
-					continue;
-			}
-			else
-			{
-				// Do nothing for non-releasable persistent textures
-				if (resourceHandleData.isPersistent && !resourceHandleData.isReleasable)
-					continue;
-			}
-
-			frameHandlesToFree[freePassIndex].Add(i);
+			if (resourceHandleData.freeIndex != -1)
+				frameHandlesToFree[resourceHandleData.freeIndex].Add(i);
 		}
 
 		for (var i = 0; i < renderPassCount; i++)
@@ -178,7 +177,7 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 
 				// Could handle this by updating the last used index or something maybe
 				var resource = resources[resourceHandleData.resourceIndex];
-				resources[resourceHandleData.resourceIndex] = (resource.resource, frameIndex + ExtraFramesToKeepResource(resource.resource), true);
+				resources[resourceHandleData.resourceIndex] = (resource.resource, frameIndex, true);
 
 				this.handlesToFree.Add(handle);
 			}
@@ -221,7 +220,6 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 
 	protected abstract bool DoesResourceMatchDescriptor(T resource, V descriptor);
 	protected abstract void DestroyResource(T resource);
-	protected virtual int ExtraFramesToKeepResource(T resource) => 0;
 	protected abstract V CreateDescriptorFromResource(T resource);
 
 	private void Dispose(bool disposing)

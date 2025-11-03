@@ -128,11 +128,11 @@ public class ProceduralGenerationController
         return activeHandles.Add(handle);
     }
 
-    public void FreeUnusedHandles(RenderGraph renderGraph)
+    public void FreeUnusedHandles(RenderGraph renderGraph, int passIndex)
     {
         foreach(var handle in handlesToFree)
         {
-            renderGraph.ReleasePersistentResource(handle);
+            renderGraph.ReleasePersistentResource(handle, passIndex);
         }
 
         handlesToFree.Clear();

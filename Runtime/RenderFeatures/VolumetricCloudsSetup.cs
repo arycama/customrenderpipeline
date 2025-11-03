@@ -25,10 +25,10 @@ public class VolumetricCloudsSetup : FrameRenderFeature
 
 	protected override void Cleanup(bool disposing)
 	{
-		renderGraph.ReleasePersistentResource(weatherMap);
-		renderGraph.ReleasePersistentResource(noiseTexture);
-		renderGraph.ReleasePersistentResource(detailNoiseTexture);
-		renderGraph.ReleasePersistentResource(highAltitudeTexture);
+		renderGraph.ReleasePersistentResource(weatherMap, -1);
+		renderGraph.ReleasePersistentResource(noiseTexture, -1);
+		renderGraph.ReleasePersistentResource(detailNoiseTexture, -1);
+		renderGraph.ReleasePersistentResource(highAltitudeTexture, -1);
 	}
 
 	public override void Render(ScriptableRenderContext context)

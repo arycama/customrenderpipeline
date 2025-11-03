@@ -48,9 +48,12 @@ public class WaterShoreMask : FrameRenderFeature
             return;
 
         if (terrain != null)
-            renderGraph.ReleasePersistentResource(result);
+		{
+			using var pass = renderGraph.AddGenericRenderPass("Water Shore Mask Clear");
+			renderGraph.ReleasePersistentResource(result, pass.Index);
+		}
 
-        lastVersion = version;
+		lastVersion = version;
         terrain = Terrain.activeTerrain;
 
         var terrainPosition = (Float3)terrain.transform.position;

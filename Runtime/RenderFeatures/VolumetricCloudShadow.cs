@@ -24,7 +24,7 @@ public class VolumetricCloudShadow : CameraRenderFeature
 	{
 		foreach (var buffer in perCameraCoverage.Values)
 		{
-			renderGraph.ReleasePersistentResource(buffer);
+			renderGraph.ReleasePersistentResource(buffer, -1);
 		}
 	}
 

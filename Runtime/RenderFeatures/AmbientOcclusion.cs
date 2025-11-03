@@ -94,9 +94,15 @@ public partial class AmbientOcclusion : CameraRenderFeature
 			}
 		}
 
-		var (current, history, wasCreated) = temporalCache.GetTextures(camera.pixelWidth, camera.pixelHeight, camera);
+		ResourceHandle<RenderTexture> current, history = default;
+		bool wasCreated = default;
+
 		using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Temporal", (wasCreated, history)))
 		{
+			(current, history, wasCreated) = temporalCache.GetTextures(camera.pixelWidth, camera.pixelHeight, pass.Index, camera);
+			pass.renderData.wasCreated = false;
+			pass.renderData.history = history;
+
 			pass.Initialize(material, 1);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(current);

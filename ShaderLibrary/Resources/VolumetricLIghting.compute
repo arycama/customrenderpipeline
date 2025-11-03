@@ -15,6 +15,7 @@ Texture3D<float4> Input;
 
 float4x4 PixelToWorldViewDir;
 float3 InputScale, InputMax;
+bool IsFirst;
 
 [numthreads(8, 8, 8)]
 void Compute(uint3 id : SV_DispatchThreadID)
@@ -81,7 +82,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	previousClipPosition.xy = PerspectiveDivide(previousClipPosition).xy * 0.5 + 0.5;
 	
 	float3 volumeUv = float3(previousClipPosition.xy, LinearToVolumetricDepth(previousClipPosition.w));
-	if (all(saturate(volumeUv) == volumeUv))
+	if (!IsFirst && all(saturate(volumeUv) == volumeUv))
 	{
 		// TODO: Neighborood clamp? (May be expensive, probably best to combien with groupshared
 		float4 previousLuminanceExtinction = Input.SampleLevel(TrilinearClampSampler, min(volumeUv * InputScale, InputMax), 0.0);

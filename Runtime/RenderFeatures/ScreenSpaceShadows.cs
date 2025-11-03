@@ -101,10 +101,16 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 			});
 		}
 
+		bool wasCreated = default;
+		ResourceHandle<RenderTexture> current, history = default;
+
 		// Write final temporal result out to rgba16 (color+weight) and rgb111110 for final ambient composition
-		var (current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows Temporal", (wasCreated, history, settings.Intensity, settings.MaxSamples, settings.Thickness)))
 		{
+			 (current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			pass.renderData.wasCreated = wasCreated;
+			pass.renderData.history = history;
+
 			pass.Initialize(material, 2);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(current, RenderBufferLoadAction.DontCare);

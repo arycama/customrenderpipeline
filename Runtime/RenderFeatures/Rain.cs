@@ -37,8 +37,8 @@ public class Rain : CameraRenderFeature
 	{
 		if (previousDropletCount != 0)
 		{
-			renderGraph.ReleasePersistentResource(positionBuffer);
-			renderGraph.ReleasePersistentResource(indexBuffer);
+			renderGraph.ReleasePersistentResource(positionBuffer, -1);
+			renderGraph.ReleasePersistentResource(indexBuffer, -1);
 		}
 	}
 
@@ -52,19 +52,20 @@ public class Rain : CameraRenderFeature
 
 		if (dropletCount != previousDropletCount)
 		{
-			if (previousDropletCount != 0)
-			{
-				renderGraph.ReleasePersistentResource(positionBuffer);
-				renderGraph.ReleasePersistentResource(indexBuffer);
-			}
-
-			positionBuffer = renderGraph.GetBuffer(dropletCount, sizeof(float) * 4, isPersistent: true);
-			indexBuffer = renderGraph.GetQuadIndexBuffer(dropletCount, false);
-			previousDropletCount = dropletCount;
-
 			// New buffer, need to initialize positions
 			using (var pass = renderGraph.AddComputeRenderPass("Initialize", (dropletCount, settings.Radius, settings.Velocity, settings.WindAngle, settings.WindStrength, settings.WindTurbulence)))
 			{
+				if (previousDropletCount != 0)
+				{
+					renderGraph.ReleasePersistentResource(positionBuffer, pass.Index);
+					renderGraph.ReleasePersistentResource(indexBuffer, pass.Index);
+				}
+
+				positionBuffer = renderGraph.GetBuffer(dropletCount, sizeof(float) * 4, isPersistent: true);
+				indexBuffer = renderGraph.GetQuadIndexBuffer(dropletCount, false);
+				previousDropletCount = dropletCount;
+
+
 				pass.Initialize(rainComputeShader, 0, dropletCount);
 
 				pass.WriteBuffer("Positions", positionBuffer);

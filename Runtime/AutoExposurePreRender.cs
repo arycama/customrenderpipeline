@@ -16,7 +16,7 @@ public class AutoExposurePreRender : CameraRenderFeature
 	{
 		foreach (var buffer in exposureBuffers.Values)
 		{
-			renderGraph.ReleasePersistentResource(buffer);
+			renderGraph.ReleasePersistentResource(buffer, -1);
 		}
 	}
 

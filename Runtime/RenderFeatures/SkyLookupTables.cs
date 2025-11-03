@@ -25,10 +25,10 @@ public class SkyLookupTables : FrameRenderFeature
 
     protected override void Cleanup(bool disposing)
     {
-        renderGraph.ReleasePersistentResource(transmittance);
-        renderGraph.ReleasePersistentResource(multiScatter);
-        renderGraph.ReleasePersistentResource(groundAmbient);
-        renderGraph.ReleasePersistentResource(skyAmbient);
+        renderGraph.ReleasePersistentResource(transmittance, -1);
+        renderGraph.ReleasePersistentResource(multiScatter, -1);
+        renderGraph.ReleasePersistentResource(groundAmbient, -1);
+        renderGraph.ReleasePersistentResource(skyAmbient, -1);
     }
 
     public override void Render(ScriptableRenderContext context)

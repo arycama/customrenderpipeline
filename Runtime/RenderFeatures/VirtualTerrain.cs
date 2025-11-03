@@ -63,11 +63,11 @@ public class VirtualTerrain : CameraRenderFeature
 
 	protected override void Cleanup(bool disposing)
 	{
-		renderGraph.ReleasePersistentResource(indirectionTextureMapTexture);
+		renderGraph.ReleasePersistentResource(indirectionTextureMapTexture, -1);
 		requestBuffer?.Dispose();
-		renderGraph.ReleasePersistentResource(counterBuffer);
-		renderGraph.ReleasePersistentResource(mappedTiles);
-		renderGraph.ReleasePersistentResource(tilesToUnmapBuffer);
+		renderGraph.ReleasePersistentResource(counterBuffer, -1);
+		renderGraph.ReleasePersistentResource(mappedTiles, -1);
+		renderGraph.ReleasePersistentResource(tilesToUnmapBuffer, -1);
 
 		AsyncGPUReadback.WaitAllRequests();
 

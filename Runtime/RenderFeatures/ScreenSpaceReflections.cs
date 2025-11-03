@@ -139,11 +139,18 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
             });
         }
 
-        var (current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
-        var (currentWeight, historyWeight, wasCreatedWeight) = temporalWeightCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, camera);
+		bool wasCreated = default;
+		ResourceHandle<RenderTexture> current, history = default;
+       
 		using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Temporal", (wasCreated, history)))
         {
-            pass.Initialize(material, 2);
+			(current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			var (currentWeight, historyWeight, wasCreatedWeight) = temporalWeightCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+
+			pass.renderData.history = history;
+			pass.renderData.wasCreated = wasCreated;
+
+			pass.Initialize(material, 2);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 			pass.WriteTexture(currentWeight, RenderBufferLoadAction.DontCare);
