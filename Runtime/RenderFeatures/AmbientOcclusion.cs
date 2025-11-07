@@ -48,7 +48,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 		ResourceHandle<RenderTexture> result;
 		if (settings.Raytracing)
 		{
-			result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+			result = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 			using (var pass = renderGraph.AddRaytracingRenderPass("Raytraced Ambient Occlusion", (settings.Radius, settings.Falloff)))
 			{
 				var raytracingData = renderGraph.GetResource<RaytracingResult>();
@@ -70,7 +70,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 		}
 		else
 		{
-			result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+			result = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 			using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Compute", (settings.Radius, settings.Directions, settings.Samples, settings.Falloff, settings.MaxScreenRadius, settings.ThinOccluderCompensation)))
 			{
 				pass.Initialize(material, 0);
@@ -99,7 +99,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Temporal", (wasCreated, history)))
 		{
-			(current, history, wasCreated) = temporalCache.GetTextures(camera.pixelWidth, camera.pixelHeight, pass.Index, camera);
+			(current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
 			pass.renderData.wasCreated = false;
 			pass.renderData.history = history;
 
@@ -123,7 +123,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 			});
 		}
 
-		var output = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
+		var output = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Combine", (settings.AoStrength, current)))
 		{
 			pass.Initialize(material, 2);

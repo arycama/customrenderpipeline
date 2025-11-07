@@ -257,6 +257,25 @@ float GetDirectionalShadow(float3 worldPosition, bool softShadows = false, bool 
 	#endif
 }
 
+//float distance(float3 pos,float3 N, int i)
+//{
+//	float4 shrinkedpos = float4(pos - 0.005 * N, 1.0);
+//	float4 shwpos = mul(shrinkedpos, lights[i].viewproj);
+//	float d1 = shwmaps[i].Sample(sampler, shwpos.xy/shwpos.w);
+//	float d2 = shwpos.z;
+//	return abs(d1 - d2);
+// }
+
+ float3 T(float s) 
+{ 
+	return float3(0.233, 0.455, 0.649) * exp(-s*s/0.0064) +
+	float3(0.1, 0.336, 0.344) * exp(-s * s / 0.0484) +
+	float3(0.118, 0.198, 0.0) * exp(-s * s / 0.187) +
+	float3(0.113, 0.007, 0.007) * exp(-s * s / 0.567) +
+	float3(0.358, 0.004, 0.0) * exp(-s * s / 1.99) +
+	float3(0.078, 0.0, 0.0) * exp(-s * s / 7.41);
+}
+
 // TODO: Can parameters be simplified/shortened
 float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAngle, float roughness2, float f0Avg, float partLambdaV, float3 multiScatterTerm, float3 L, float3 N, float3 B, float3 worldPosition, float NdotV, float3 V, float3 diffuseTerm, float3 albedo, float3 translucency, bool isDirectional)
 {
@@ -289,6 +308,13 @@ float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAn
 	{
 		float LdotV = dot(L, V);
 		result += Ggx(roughness2, NdotL, LdotV, NdotV, partLambdaV, perceptualRoughness, f0, multiScatterTerm) * illuminance;
+		
+	//	float s = scale∗
+	//	distance(pos, Nvertex, i);
+	//	float E = max(0.3 + dot(-Nvertex, L), 0.0);
+	//	float3 transmittance = T(s)∗ lights[i].color ∗ attenuation∗ spot ∗ albedo.rgb ∗ E;
+	//// We add the contribution of this light
+	//	M += transmittance + reflectance;
 	}
 	else
 	{
