@@ -42,7 +42,9 @@ public class GrassRenderer : CameraRenderFeature
 		if (material == null)
 			return;
 
-		var terrainSystemData = renderGraph.GetResource<TerrainSystemData>();
+		if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
+			return;
+
 		var terrain = terrainSystemData.terrain;
 		if (terrain == null)
 			return;

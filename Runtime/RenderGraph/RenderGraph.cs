@@ -399,6 +399,7 @@ public class RenderGraph : IDisposable
 	private int nativeRenderPassIndex = -1;
 	private bool IsInRenderPass => nativeRenderPassIndex != -1;
 	private List<ResourceHandle<RenderTexture>> currentPassAttachments = new();
+	private List<int> currentSubPass = new();
 
 	public void BeginNativeRenderPass(Int2 size)
 	{
@@ -442,6 +443,10 @@ public class RenderGraph : IDisposable
 		{
 			Assert.IsFalse(currentPassAttachments.Count >= 8, "Max number of attachments (8) exceeded");
 			currentPassAttachments.Add(handle);
+		}
+		else
+		{
+			currentSubPass.Add(index);
 		}
 	}
 }

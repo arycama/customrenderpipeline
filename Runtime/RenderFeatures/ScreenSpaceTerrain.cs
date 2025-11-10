@@ -13,6 +13,9 @@ public class ScreenSpaceTerrain : CameraRenderFeature
 
 	public override void Render(Camera camera, ScriptableRenderContext context)
 	{
+		if (!renderGraph.TryGetResource<TerrainRenderData>(out _))
+			return;
+
 		using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Terrain");
 
 		pass.Initialize(material);

@@ -185,9 +185,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			renderGraph.SetRTHandle<CameraTarget>(cameraTarget);
 			renderGraph.SetRTHandle<PreviousCameraTarget>(previousScene);
 
-			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("Deferred", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
@@ -271,10 +271,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// Decals
 		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
 		{
-			var decalAlbedo = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+			var decalAlbedo = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 			renderGraph.SetRTHandle<DecalAlbedo>(decalAlbedo);
 
-			var decalNormal = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+			var decalNormal = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 			renderGraph.SetRTHandle<DecalNormal>(decalNormal);
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
