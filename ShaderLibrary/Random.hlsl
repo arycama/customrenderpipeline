@@ -1,7 +1,10 @@
 #pragma once
 
-#include "Common.hlsl"
 #include "Math.hlsl"
+
+Texture2D<float> BlueNoise1D;
+Texture2D<float2> BlueNoise2D, BlueNoise2DUnit;
+Texture2D<float3> BlueNoise3D, BlueNoise3DUnit, BlueNoise3DCosine;
 
 uint PcgHash(uint state)
 {

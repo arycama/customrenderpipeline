@@ -1,6 +1,7 @@
 ﻿#include "../Common.hlsl"
 #include "../Lighting.hlsl"
 #include "../GBuffer.hlsl"
+#include "../Random.hlsl"
 #include "../Temporal.hlsl"
 
 Texture2D<float4> History, Input;
@@ -31,7 +32,7 @@ float4 UnpackWeight(float4 input, out float weight)
 
 float4 FragmentCompute(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	float2 noise = BlueNoise2D[position.xy % 128];
+	float2 noise = Noise2D(position.xy);
 	float3 normalV = mul((float3x3) WorldToView, UnpackGBufferNormal(GBufferNormalRoughness[position.xy]));
 	float3 viewPosition = ComputeViewspacePosition(position.xy);
 	float3 viewV = normalize(-viewPosition);

@@ -126,7 +126,7 @@ public class DeferredWater : CameraRenderFeature
 				var refractionResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 				var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, 0.1f, 0.1f, camera.TanHalfFov());
+                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, 0.1f, 0.1f, camera.TanHalfFovY());
                 //pass.WriteTexture(refractionResult, "RefractionResult");
                 pass.WriteTexture(scatterResult, "ScatterResult");
                 //pass.WriteTexture(tempResult, "HitColor");

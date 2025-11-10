@@ -169,7 +169,7 @@ public class SetupCamera : CameraRenderFeature
 			camera.scaledPixelWidth - 1,
 			camera.scaledPixelHeight - 1,
 			camera.aspect,
-			camera.TanHalfFov(),
+			camera.TanHalfFovY(),
 			pixelToViewScaleOffset,
 			renderDeltaTime,
 			previousTransform.Item1

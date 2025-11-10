@@ -35,7 +35,7 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 			using var pass = renderGraph.AddRaytracingRenderPass("Raytraced Shadows");
 
 			var raytracingData = renderGraph.GetResource<RaytracingResult>();
-			pass.Initialize(shadowRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFov());
+			pass.Initialize(shadowRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFovY());
 
 			pass.WriteTexture(tempResult, "HitResult");
 

@@ -1,17 +1,29 @@
 ﻿#ifndef COMMON_SHADERS_INCLUDED
 #define COMMON_SHADERS_INCLUDED
 
-float3 GetFrustumCorner(uint cornerId);
-
-float4 VertexFullscreenTriangle(uint id : SV_VertexID, out float2 uv : TEXCOORD0, out float3 worldDirection : TEXCOORD1, out uint viewIndex : SV_RenderTargetArrayIndex) : SV_Position
+struct VertexFullscreenTriangleOutput
 {
+	float4 position : SV_Position;
+	float2 uv : TEXCOORD0;
+	float3 worldDirection : TEXCOORD1;
+	uint viewIndex : SV_RenderTargetArrayIndex;
+};
+
+float3 GetFrustumCorner(uint cornerId, uint viewIndex);
+
+VertexFullscreenTriangleOutput VertexFullscreenTriangle(uint id : SV_VertexID)
+{
+	VertexFullscreenTriangleOutput output;
+
 	uint localId = id % 3;
-	uv = (localId << uint2(1, 0)) & 2;
-	float4 result = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+	float2 uv = (localId << uint2(1, 0)) & 2;
+	
+	output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
-	worldDirection = GetFrustumCorner(localId);
-	viewIndex = id / 3;
-	return result;
+	output.uv = uv;
+	output.viewIndex = id / 3;
+	output.worldDirection = GetFrustumCorner(localId, output.viewIndex);
+	return output;
 }
 
 uint VertexIdPassthrough(uint id : SV_VertexID) : TEXCOORD
@@ -39,7 +51,7 @@ void FullscreenGeometryPassthrough(uint id[3], uint instanceId, inout TriangleSt
 		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 		uv.y = 1.0 - uv.y;
 		output.uv = uv;
-		output.worldDir = GetFrustumCorner(localId);
+		output.worldDir = GetFrustumCorner(localId, 0);
 		output.index = id[i] / 3 * 32 + instanceId;
 		stream.Append(output);
 	}

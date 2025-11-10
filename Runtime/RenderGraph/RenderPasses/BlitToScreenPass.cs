@@ -5,16 +5,18 @@ public class BlitToScreenPass<T> : RenderPass<T>
 {
 	private Material material;
 	private int passIndex;
+	private int viewCount;
 
 	public override string ToString()
 	{
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material, int passIndex = 0)
+	public void Initialize(Material material, int passIndex = 0, int viewCount = 1)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
+		this.viewCount = viewCount;
 	}
 
 	public override void Reset()
@@ -22,6 +24,7 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		base.Reset();
 		material = null;
 		passIndex = 0;
+		viewCount = 1;
 	}
 
 	public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -75,7 +78,7 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		foreach (var keyword in keywords)
 			Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
 
-		Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3, 1, PropertyBlock);
+		Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * viewCount, 1, PropertyBlock);
 
 		foreach (var keyword in keywords)
 			Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
@@ -101,6 +104,6 @@ public class BlitToScreenPass<T> : RenderPass<T>
 
 	protected override void SetupTargets()
 	{
-		Command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget);
+		Command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget, 0, CubemapFace.Unknown, -1);
 	}
 }

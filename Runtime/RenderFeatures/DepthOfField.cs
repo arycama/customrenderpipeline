@@ -28,7 +28,7 @@ public partial class DepthOfField : CameraRenderFeature
 		var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
 		var tempId = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32);
 		var sensorSize = lensSettings.SensorSize * 0.001f; // Convert from mm to m
-		var focalLength = 0.5f * sensorSize / camera.TanHalfFov();
+		var focalLength = 0.5f * sensorSize / camera.TanHalfFovY();
 		var apertureRadius = 0.5f * focalLength / lensSettings.Aperture;
 
 		if (settings.UseRaytracing)
@@ -57,7 +57,7 @@ public partial class DepthOfField : CameraRenderFeature
 			{
 				var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-				pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFov());
+				pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFovY());
 				pass.WriteTexture(tempId, "HitColor");
 				//pass.WriteTexture(hitResult, "HitResult");
 

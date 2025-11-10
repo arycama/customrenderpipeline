@@ -4,9 +4,9 @@
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/CommonShaders.hlsl"
 
 Texture2D<float> CameraDepth, HiZMinDepth, HiZMaxDepth;
-Texture2D<float> BlueNoise1D, PreviousCameraDepth;
-Texture2D<float2> BlueNoise2D, BlueNoise2DUnit, CameraVelocity, PreviousCameraVelocity;
-Texture2D<float3> BlueNoise3D, BlueNoise3DUnit, BlueNoise3DCosine, PreviousCameraTarget, CameraTarget;
+Texture2D<float> PreviousCameraDepth;
+Texture2D<float2> CameraVelocity, PreviousCameraVelocity;
+Texture2D<float3> PreviousCameraTarget, CameraTarget;
 Texture2D<uint2> CameraStencil;
 
 cbuffer FrameData
@@ -176,7 +176,7 @@ float2 GetLodFade(uint instanceID)
 	#endif
 }
 
-float3 GetFrustumCorner(uint id)
+float3 GetFrustumCorner(uint id, uint viewIndex)
 {
 	return FrustumCorners[id].xyz;
 }

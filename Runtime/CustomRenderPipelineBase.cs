@@ -89,6 +89,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 			}
 		}
 
+        Camera mainCamera = null;
 		foreach (var camera in cameras)
         {
 			camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
@@ -119,6 +120,8 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
                     command.DrawRendererList(data.wireOverlay);
                 });
+
+                mainCamera = camera;
             }
         }
 
@@ -126,6 +129,10 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
         context.ExecuteCommandBuffer(command);
 		command.Clear();
+
+        if (mainCamera != null && mainCamera.stereoEnabled)
+            context.StereoEndRender(mainCamera);
+
 		context.Submit();
 
         renderGraph.CleanupCurrentFrame();

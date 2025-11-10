@@ -58,7 +58,7 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
             {
                 var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFov());
+                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFovY());
                 pass.WriteTexture(tempResult, "HitColor");
                 pass.WriteTexture(hitResult, "HitResult");
 				pass.ReadRtHandle<GBufferNormalRoughness>();

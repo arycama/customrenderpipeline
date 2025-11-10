@@ -29,7 +29,7 @@ public partial class LightingSetup : CameraRenderFeature
 		Float3 lightColor0 = Float3.Zero, lightColor1 = Float3.Zero, lightDirection0 = Float3.Up, lightDirection1 = Float3.Up;
 		var dirLightCount = 0;
 
-		var tanHalfFov = camera.TanHalfFov();
+		var tanHalfFov = camera.TanHalfFovY();
 		var cameraTransform = camera.transform.WorldRigidTransform();
 		var cameraToWorld = camera.transform.localToWorldMatrix;
 		var cameraInverseTranslation = Matrix4x4.Translate(camera.transform.position);
