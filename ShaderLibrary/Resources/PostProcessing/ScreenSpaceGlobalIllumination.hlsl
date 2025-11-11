@@ -23,6 +23,9 @@ struct TraceResult
 
 TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
+	float thicknessScale = rcp(1.0 + _Thickness);
+	float thicknessOffset = -Near * rcp(Far - Near) * (_Thickness * thicknessScale);
+
 	float depth = HiZMinDepth[position.xy];
 	float linearDepth = LinearEyeDepth(depth);
 	float3 worldPosition = worldDir * linearDepth;
@@ -37,7 +40,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float3 L = FromToRotationZ(N, noise3DCosine);
 	
 	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);
+	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, thicknessScale, thicknessOffset, HiZMinDepth, _MaxMip, validHit);
 
 	float outDepth;
 	float3 color, hitRay;

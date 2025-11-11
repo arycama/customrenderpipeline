@@ -81,10 +81,10 @@ float2 FastACosPos(float2 x) { return (-0.156583 * abs(x) + HalfPi) * sqrt(1.0 -
 float3 FastACosPos(float3 x) { return (-0.156583 * abs(x) + HalfPi) * sqrt(1.0 - abs(x)); }
 float4 FastACosPos(float4 x) { return (-0.156583 * abs(x) + HalfPi) * sqrt(1.0 - abs(x)); }
 
-float1 FastSign(float1 x) { return x > 0.0 ? 1.0 : -1.0; };
-float2 FastSign(float2 x) { return x > 0.0 ? 1.0 : -1.0; };
-float3 FastSign(float3 x) { return x > 0.0 ? 1.0 : -1.0; };
-float4 FastSign(float4 x) { return x > 0.0 ? 1.0 : -1.0; };
+float1 FastSign(float1 x) { return x >= 0.0 ? 1.0 : -1.0; };
+float2 FastSign(float2 x) { return x >= 0.0 ? 1.0 : -1.0; };
+float3 FastSign(float3 x) { return x >= 0.0 ? 1.0 : -1.0; };
+float4 FastSign(float4 x) { return x >= 0.0 ? 1.0 : -1.0; };
 
 float FastACos(float inX)
 {

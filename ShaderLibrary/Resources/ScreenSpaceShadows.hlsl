@@ -13,6 +13,9 @@ cbuffer Properties
 
 float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
+	float thicknessScale = rcp(1.0 + _Thickness);
+	float thicknessOffset = -Near * rcp(Far - Near) * (_Thickness * thicknessScale);
+	
 	float depth = HiZMinDepth[position.xy];
 	float linearDepth = LinearEyeDepth(depth);
 	float3 worldPosition = worldDir * linearDepth;
@@ -22,7 +25,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float3 L = _LightDirection0;// FromToRotationZ(_LightDirection0, localL);
 
 	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);
+	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, thicknessScale, thicknessOffset, HiZMinDepth, _MaxMip, validHit);
 	
 	float outDepth;
 	float3 hitRay;

@@ -19,6 +19,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float phi = offset * TwoPi;
 	float _MaxSteps = 64;
 	float _Thickness = 0.1;
+	float thicknessScale = rcp(1.0 + _Thickness);
+	float thicknessOffset = -Near * rcp(Far - Near) * (_Thickness * thicknessScale);
 	
 	float3 worldPosition = _FocusDistance * worldDir;
 	
@@ -34,7 +36,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 		float4 rayOriginClipSpace = MultiplyPointProj(WorldToPixel, rayOrigin);
 		
 		bool validHit;
-		float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);
+		float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, _MaxSteps, thicknessScale, thicknessOffset, HiZMinDepth, _MaxMip, validHit);
 		
 		//bool validHit;
 		//float3 rayPos = ScreenSpaceRaytrace(float4(position.xy, depth, linearDepth), L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);

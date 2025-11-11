@@ -76,7 +76,11 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
 		}
         else
         {
-			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, settings.Thickness, camera.ScaledViewSize())))
+			var thicknessScale = 1.0f / (1.0f + settings.Thickness);
+			var thicknessOffset = -camera.nearClipPlane / (camera.farClipPlane - camera.nearClipPlane) * (settings.Thickness * thicknessScale);
+			var maxMip = Texture2DExtensions.MipCount(camera.ScaledViewSize()) - 1;
+
+			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip)))
 			{
 				pass.Initialize(material);
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -99,8 +103,9 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					pass.SetFloat("_MaxSteps", data.MaxSamples);
-					pass.SetFloat("_Thickness", data.Thickness);
-					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.Item3) - 1);
+					pass.SetFloat("ThicknessScale", data.thicknessScale);
+					pass.SetFloat("ThicknessOffset", data.thicknessOffset);
+					pass.SetFloat("_MaxMip", data.maxMip);
 				});
 			}
         }
