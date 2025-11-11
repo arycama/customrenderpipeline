@@ -102,10 +102,10 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
 				pass.ReadRtHandle<PreviousCameraTarget>();
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					pass.SetFloat("_MaxSteps", data.MaxSamples);
+					pass.SetInt("MaxSteps", data.MaxSamples);
 					pass.SetFloat("ThicknessScale", data.thicknessScale);
 					pass.SetFloat("ThicknessOffset", data.thicknessOffset);
-					pass.SetFloat("_MaxMip", data.maxMip);
+					pass.SetInt("MaxMip", data.maxMip);
 				});
 			}
         }

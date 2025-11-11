@@ -13,8 +13,8 @@
 cbuffer Properties
 {
 	float4 PreviousCameraTargetScaleLimit;
-	float _MaxSteps, _Thickness, _ResolveSize, _MaxMip, ThicknessScale, ThicknessOffset;
-    uint _ResolveSamples;
+	float  _Thickness, _ResolveSize, ThicknessScale, ThicknessOffset;
+	uint _ResolveSamples, MaxSteps, MaxMip;
 };
 
 struct TraceResult
@@ -46,7 +46,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	
 	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, ThicknessScale, ThicknessOffset, HiZMinDepth, _MaxMip, validHit);
+	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, MaxSteps, ThicknessScale, ThicknessOffset, HiZMinDepth, MaxMip, validHit);
 	
 	float outDepth;
 	float3 color, hitRay;
