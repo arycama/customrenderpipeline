@@ -174,7 +174,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	SpatialResult output;
 	output.result = result;
 	output.rayLength = avgRayLength;
-	output.weight = result.a * rcp(_ResolveSamples + 1.0);
+	output.weight = totalWeight * rcp(_ResolveSamples + 1.0);
 	return output;
 }
 
@@ -192,13 +192,20 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 {
 	float4 minValue, maxValue, current;
 	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, current);
+	float currentWeight = WeightInput[position.xy];
 	
 	float rayLength = RayDepth[position.xy];
 	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
 	worldPosition += normalize(worldDir) * rayLength;
 	
-	float2 historyUv = uv - CameraVelocity[position.xy];
+	float4 previousClipPosition = WorldToClipPrevious(worldPosition);
+	
+	float2 velocity = CameraVelocity[position.xy];
+	velocity = CalculateVelocity(uv, previousClipPosition);
+	
+	float2 historyUv = uv - velocity;
 	float4 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
+	float historyWeight = WeightHistory[position.xy];
 	
 	history.rgb = ClipToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
 	history.a = clamp(history.a, minValue.a, maxValue.a);
@@ -206,19 +213,20 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
 		// Weigh current and history
-		//current.rgb *= current.a;
-		//history.rgb *= history.a;
+		current *= currentWeight;
+		history *= historyWeight;
 		current = lerp(history, current, 0.05);
+		currentWeight = lerp(historyWeight, currentWeight, 0.05);
 		
 		// Remove weight and store
-		//if (current.a)
-		//	current *= rcp(current.a);
+		if (currentWeight)
+			current *= rcp(currentWeight);
 	}
 	
 	current = IsInfOrNaN(current) ? 0 : current;
 	
 	TemporalOutput result;
 	result.color = current;
-	result.weight = 1;
+	result.weight = currentWeight;
 	return result;
 }

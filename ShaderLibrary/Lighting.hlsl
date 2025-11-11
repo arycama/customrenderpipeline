@@ -616,7 +616,8 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	
 	#ifdef SCREENSPACE_REFLECTIONS_ON
 		float4 ssr = ScreenSpaceReflections[pixelCoordinate];
-		radiance = lerp(radiance + ssr.rgb * SpecularGiStrength, lerp(radiance, ssr.rgb, ssr.a * SpecularGiStrength), specularOcclusion);
+		//radiance = lerp(radiance + ssr.rgb * SpecularGiStrength, lerp(radiance, ssr.rgb, ssr.a * SpecularGiStrength), specularOcclusion);
+		radiance = lerp(radiance, ssr.rgb, ssr.a * SpecularGiStrength);
 	#endif
 
 	float3 fssEss = dfg.x * f0 + dfg.y;
