@@ -46,7 +46,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	
 	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(float3(position.xy, depth), worldPosition, L, MaxSteps, ThicknessScale, ThicknessOffset, HiZMinDepth, MaxMip, validHit);
+	float3 rayPos = ScreenSpaceRaytrace(float3(position.xy, depth), worldPosition, L, MaxSteps * 4, ThicknessScale, ThicknessOffset, HiZMinDepth, MaxMip, validHit);
 	
 	float outDepth;
 	float3 color, hitRay;
@@ -75,6 +75,8 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 		hitRay = L;
 		outDepth = 0.0;
 	}
+	
+	rcpPdf = 1;
 	
     TraceResult output;
 	output.color = float4(color, rcpPdf);
@@ -223,6 +225,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 			current *= rcp(currentWeight);
 	}
 	
+	current = _TemporalInput[position.xy];
 	current = IsInfOrNaN(current) ? 0 : current;
 	
 	TemporalOutput result;
