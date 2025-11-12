@@ -36,7 +36,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 		float4 rayOriginClipSpace = MultiplyPointProj(WorldToPixel, rayOrigin);
 		
 		bool validHit;
-		float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, _MaxSteps, thicknessScale, thicknessOffset, HiZMinDepth, _MaxMip, validHit);
+		float3 rayPos = ScreenSpaceRaytrace(MultiplyPointProj(WorldToPixel, rayOrigin).xyz, rayOrigin, rayDirection, _MaxSteps, thicknessScale, thicknessOffset, HiZMinDepth, _MaxMip, validHit);
 		
 		//bool validHit;
 		//float3 rayPos = ScreenSpaceRaytrace(float4(position.xy, depth, linearDepth), L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);

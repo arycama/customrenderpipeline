@@ -41,12 +41,12 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
 	float2 u = Noise2D(position.xy);
-	float roughness = max(1e-3, Sq(normalRoughness.a));
+	float roughness = max(1e-12, Sq(normalRoughness.a));
 	float rcpPdf;
 	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	
 	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, MaxSteps, ThicknessScale, ThicknessOffset, HiZMinDepth, MaxMip, validHit);
+	float3 rayPos = ScreenSpaceRaytrace(float3(position.xy, depth), worldPosition, L, MaxSteps, ThicknessScale, ThicknessOffset, HiZMinDepth, MaxMip, validHit);
 	
 	float outDepth;
 	float3 color, hitRay;
@@ -104,7 +104,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
 	
-	float roughness = max(1e-3, Sq(normalRoughness.a));
+	float roughness = max(1e-6, Sq(normalRoughness.a));
 
 	float4 albedoMetallic = GBufferAlbedoMetallic[position.xy];
     float3 f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
