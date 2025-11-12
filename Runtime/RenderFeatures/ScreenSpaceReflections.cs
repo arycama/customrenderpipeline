@@ -80,7 +80,7 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
 			var thicknessOffset = -camera.nearClipPlane / (camera.farClipPlane - camera.nearClipPlane) * (settings.Thickness * thicknessScale);
 			var maxMip = Texture2DExtensions.MipCount(camera.ScaledViewSize()) - 1;
 
-			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip)))
+			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip, settings.Thickness)))
 			{
 				pass.Initialize(material);
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -103,6 +103,7 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					pass.SetInt("MaxSteps", data.MaxSamples);
+					pass.SetFloat("Thickness", data.Thickness);
 					pass.SetFloat("ThicknessScale", data.thicknessScale);
 					pass.SetFloat("ThicknessOffset", data.thicknessOffset);
 					pass.SetInt("MaxMip", data.maxMip);

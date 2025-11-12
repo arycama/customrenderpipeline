@@ -79,7 +79,6 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	// Convert normal length back to smoothness
 	smoothness = LengthToSmoothness(smoothness * 0.25);
-	smoothness = 1;//_Smoothness;
 	 
 	// Foam calculations
 	
