@@ -8,7 +8,7 @@ Shader "Surface/Grass"
 
         [Toggle] Cutout("Cutout", Float) = 0
         AlbedoOpacity("Albedo Opacity", 2D) = "white" {}
-        NormalOcclusionRoughness("Normal Occlusion Roughness", 2D) = "white" {}
+        NormalOcclusionRoughness("Normal Occlusion Roughness", 2D) = "linearGrey" {}
 
         _MinScale("Min Scale", Range(0, 1)) = 0.5
         _Width("Width", Range(0, 2)) = 0.025

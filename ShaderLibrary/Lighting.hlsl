@@ -116,15 +116,14 @@ float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAn
 		//	M += transmittance + reflectance;
 		//#else
 
-		#if 1
+		#if 0
 			// http://blog.stevemcauley.com/2011/12/03/energy-conserving-wrapped-diffuse/
 			float wrap = 0.5;
 			float wrappedNdotL = saturate((-dot(N, L) + wrap) / Sq(1 + wrap));
 			float scatter = GgxDistribution(roughness2, saturate(dot(-V, L)));
 			result += wrappedNdotL * scatter * translucency* diffuseTerm;
-		#elif 0
-			if(NdotL < 0.0)
-				result += translucency ? pow(translucency, rcp(-NdotL)) * diffuseTerm : 0;
+		#elif 1
+			result += translucency * -NdotL * diffuseTerm;
 		#else
 			float3 lr = L + 2 * N * -NdotL;
 				

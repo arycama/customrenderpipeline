@@ -10,6 +10,7 @@
 #include "../VirtualTexturing.hlsl"
 
 Texture2D AlbedoOpacity, NormalOcclusionRoughness;
+Texture2D<float> GrassCoverage;
 Buffer<uint> PatchData, InstanceData;
 float4 PatchScaleOffset;
 float BladeCount;
@@ -51,6 +52,7 @@ float3 RotateAroundAxis(float3 v, float3 axis, float angle)
 FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 {
 	uint quadId = id >> 2;
+		
 	uint data = InstanceData[quadId];
 	float offsetX = BitUnpackFloat(data, 6, 0);
 	float offsetY = BitUnpackFloat(data, 6, 6);
@@ -76,6 +78,18 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	// Patch position
 	centerPosition.xz += (uint2(dataColumn, dataRow) << lod);
 	centerPosition.xz = centerPosition.xz * PatchScaleOffset.xy + PatchScaleOffset.zw;
+	
+	float2 terrainUv = WorldToTerrainPosition(centerPosition);
+	float strength = GrassCoverage.SampleLevel(LinearClampSampler, terrainUv, 0.0);
+	
+	FragmentInput output = (FragmentInput)0;
+	float rand = RandomFloat(quadId);
+	if (rand > strength)
+	{
+		output.position = asfloat(0x7F800000);
+		return output;
+	}
+		
 	centerPosition.y = GetTerrainHeight(centerPosition);
 	
 	// Generate grass vector
@@ -108,12 +122,12 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	normal = RotateAroundAxis(normal, tangent, wind);
 	float3 bitangent = cross(tangent, normal);
 	
-	FragmentInput output;
 	output.normal = normal;
 	output.tangent = tangent;
 	output.uv = GetQuadTexCoord(vertexId);
 	
 	float width = lerp(_Width, _Width * 0.05, output.uv.y * 1);
+	//float width = _Width; // lerp(_Width, _Width * 0.05, output.uv.y * 1);
 	output.worldPosition = centerPosition;
 	output.worldPosition += (output.uv.x - 0.5) * output.tangent * width * scale;
 	
@@ -124,23 +138,6 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	output.worldPosition += (output.uv.y) * bitangent * _Height * scale;
 	output.position = WorldToClip(output.worldPosition);
 	
-	float2 terrainUv = WorldToTerrainPosition(centerPosition);
-	uint layerData = IdMap[terrainUv * IdMapResolution];
-	
-	uint layerIndex0 = BitUnpack(layerData, 4, 0);
-	uint layerIndex1 = BitUnpack(layerData, 4, 13);
-	float blend = Remap(BitUnpack(layerData, 4, 26), 0.0, 15.0, 0.0, 0.5);
-	float4 bilinearWeights = BilinearWeights(terrainUv, IdMapResolution);
-	float maxWeight = Max4(bilinearWeights);
-	
-	float layerStrength0 = (layerIndex0 == 0 || layerIndex0 == 2 || layerIndex0 == 7 || layerIndex0 == 9) * (1.0 - blend) * 1;
-	float layerStrength1 = (layerIndex1 == 0 || layerIndex1 == 2 || layerIndex1 == 7 || layerIndex1 == 9) * (blend) * 1;
-	float strength = layerStrength0 + layerStrength1;
-	
-	float rand = RandomFloat(quadId);
-	if (strength < 0.75 || rand > Remap(strength, 0.75, 1))
-		output.position = asfloat(0x7F800000);
-		
 	float3 virtualUv = CalculateVirtualUv(terrainUv, 0, 0);
 	output.color = VirtualTexture.SampleLevel(LinearRepeatSampler, virtualUv, 0);
 	
@@ -153,7 +150,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float4 albedoOpacity = AlbedoOpacity.Sample(SurfaceSampler, uv);
 	float4 normalOcclusionRoughness = NormalOcclusionRoughness.Sample(SurfaceSampler, uv);
 	
-	albedoOpacity.rgb = lerp(input.color, albedoOpacity.rgb, pow(input.uv.y, 1));
+	albedoOpacity.rgb = lerp(input.color, albedoOpacity.rgb, smoothstep(0, 0.5, input.uv.y));
 	
 	#ifdef CUTOUT_ON
 		clip(albedoOpacity.a - 0.5);
@@ -163,13 +160,13 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	if (!isFrontFace)
 		tangentNormal.z = -tangentNormal.z;
 	
-	float3 worldNormal = normalize(input.normal);// TangentToWorldNormal(tangentNormal, input.normal, input.tangent, 1);
+	float3 worldNormal = TangentToWorldNormal(tangentNormal, input.normal, input.tangent, 1);
 	
 	float3 albedo = _Color.rgb * albedoOpacity.rgb;
 	float occlusion = normalOcclusionRoughness.b; //lerp(0.5, normalOcclusionRoughness.b, input.uv.y);
-	float roughness = SmoothnessToPerceptualRoughness(_Smoothness) * normalOcclusionRoughness.a;
-	float3 translucency = _Translucency.rgb * albedoOpacity.rgb;
-	translucency.rgb = lerp(input.color, translucency.rgb, pow(input.uv.y, 1));
+	float roughness = 1 - ((1 - normalOcclusionRoughness.a) * _Smoothness);
+	float3 translucency = _Translucency.rgb * albedoOpacity.rgb * 2;
+	translucency.rgb = lerp(input.color, translucency.rgb, smoothstep(0, 0.5, input.uv.y));
 		
 	FragmentOutput output;
 	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, occlusion, 0, translucency, input.position.xy, true);
