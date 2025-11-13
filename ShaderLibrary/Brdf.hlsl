@@ -1,4 +1,5 @@
-#pragma once
+#ifndef BRDF_INCLUDED
+#define BRDF_INCLUDED
 
 #include "Common.hlsl"
 #include "Material.hlsl"
@@ -111,3 +112,5 @@ float3 EnergyCompensationFactor(float3 f0, float perceptualRoughness, float Ndot
 	float3 fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
 	return 1.0 - fssEss - fmsEms;
 }
+
+#endif

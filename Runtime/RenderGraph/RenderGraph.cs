@@ -36,6 +36,7 @@ public class RenderGraph : IDisposable
 
 	public int FrameIndex { get; private set; }
 	public bool IsExecuting { get; private set; }
+	public bool IsDisposing { get; private set; }
 
 	public RenderGraph(CustomRenderPipelineBase renderPipeline)
 	{
@@ -73,6 +74,8 @@ public class RenderGraph : IDisposable
 
 		if (!disposing)
 			Debug.LogError("Render Graph not disposed correctly");
+
+		IsDisposing = true;
 
 		emptyBuffer.Dispose();
 		Object.DestroyImmediate(emptyTexture);
@@ -279,13 +282,13 @@ public class RenderGraph : IDisposable
 
 	public void ReleasePersistentResource(ResourceHandle<GraphicsBuffer> handle, int passIndex)
 	{
-		Assert.IsFalse(IsExecuting);
+		Assert.IsTrue(!IsExecuting || IsDisposing);
 		BufferHandleSystem.ReleasePersistentResource(handle, passIndex);
 	}
 
 	public void ReleasePersistentResource(ResourceHandle<RenderTexture> handle, int passIndex)
 	{
-		Assert.IsFalse(IsExecuting);
+		Assert.IsTrue(!IsExecuting || IsDisposing);
 		RtHandleSystem.ReleasePersistentResource(handle, passIndex);
 	}
 
