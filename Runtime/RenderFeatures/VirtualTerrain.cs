@@ -85,6 +85,9 @@ public class VirtualTerrain : CameraRenderFeature
 			return;
 
 		var terrain = terrainSystemData.terrain;
+		if (terrain == null)
+			return;
+
 		var terrainData = terrain.terrainData;
 
 		using var scope = renderGraph.AddProfileScope("Virtual Terrain");
