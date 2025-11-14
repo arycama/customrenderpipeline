@@ -2,7 +2,7 @@
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Samplers.hlsl"
 
-float3 GetFrustumCorner(uint cornerId, uint viewIndex)
+float3 GetFrustumCorner(uint id)
 {
 	return 0; // Unused
 }

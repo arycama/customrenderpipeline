@@ -130,8 +130,6 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
         context.ExecuteCommandBuffer(command);
 		command.Clear();
 
-        if (mainCamera != null && mainCamera.stereoEnabled)
-            context.StereoEndRender(mainCamera);
 
 		context.Submit();
 

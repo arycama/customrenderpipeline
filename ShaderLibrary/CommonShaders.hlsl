@@ -9,7 +9,7 @@ struct VertexFullscreenTriangleOutput
 	uint viewIndex : SV_RenderTargetArrayIndex;
 };
 
-float3 GetFrustumCorner(uint cornerId, uint viewIndex);
+float3 GetFrustumCorner(uint id);
 
 VertexFullscreenTriangleOutput VertexFullscreenTriangle(uint id : SV_VertexID)
 {
@@ -22,7 +22,7 @@ VertexFullscreenTriangleOutput VertexFullscreenTriangle(uint id : SV_VertexID)
 	uv.y = 1.0 - uv.y;
 	output.uv = uv;
 	output.viewIndex = id / 3;
-	output.worldDirection = GetFrustumCorner(localId, output.viewIndex);
+	output.worldDirection = GetFrustumCorner(id);
 	return output;
 }
 
@@ -51,7 +51,7 @@ void FullscreenGeometryPassthrough(uint id[3], uint instanceId, inout TriangleSt
 		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 		uv.y = 1.0 - uv.y;
 		output.uv = uv;
-		output.worldDir = GetFrustumCorner(localId, 0);
+		output.worldDir = GetFrustumCorner(id[i]);
 		output.index = id[i] / 3 * 32 + instanceId;
 		stream.Append(output);
 	}

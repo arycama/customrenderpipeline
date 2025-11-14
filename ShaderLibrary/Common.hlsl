@@ -176,7 +176,7 @@ float2 GetLodFade(uint instanceID)
 	#endif
 }
 
-float3 GetFrustumCorner(uint id, uint viewIndex)
+float3 GetFrustumCorner(uint id)
 {
 	return FrustumCorners[id].xyz;
 }
