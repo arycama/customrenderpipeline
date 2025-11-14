@@ -13,29 +13,36 @@ cbuffer Properties
 
 float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
+	float thicknessScale = rcp(1.0 + _Thickness);
+	float thicknessOffset = -Near * rcp(Far - Near) * (_Thickness * thicknessScale);
+	
 	float depth = HiZMinDepth[position.xy];
 	float linearDepth = LinearEyeDepth(depth);
 	float3 worldPosition = worldDir * linearDepth;
 	
 	float2 u = Noise2D(position.xy);
 	float3 localL = SampleConeUniform(u.x, u.y, SunCosAngle);
-	float3 L = _LightDirection0;// FromToRotationZ(_LightDirection0, localL);
+	float3 L = FromToRotationZ(_LightDirection0, localL);
+	
+	float3 pixelPosition = MultiplyPointProj(WorldToPixel, worldPosition + L * 0.01).xyz;
 
-	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);
+	float3 rayPos = ScreenSpaceRaytrace(pixelPosition, worldPosition + L * 0.01, L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip);
 	
 	float outDepth;
 	float3 hitRay;
-	if (validHit)
+	bool validHit;
+	if (rayPos.z > 0.0)
 	{
 		float3 worldHit = MultiplyPointProj(PixelToWorld, rayPos);
 		hitRay = worldHit - worldPosition;
 		outDepth = Linear01Depth(depth);
+		validHit = true;
 	}
 	else
 	{
 		hitRay = L;
 		outDepth = 0.0;
+		validHit = false;
 	}
 
 	return float4(rayPos, validHit); // float4(hitRay, outDepth);
@@ -51,7 +58,7 @@ float _IsFirst;
 
 float FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	return _Input[position.xy].w == 0;
+	//return _Input[position.xy].w == 0;
 	
 	float rcpVLength = RcpLength(worldDir);
 	float3 V = -worldDir * rcpVLength;
@@ -102,7 +109,7 @@ Texture2D<float> _TemporalInput, _History;
 
 float FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
-	return _TemporalInput[position.xy];
+	//return _TemporalInput[position.xy];
 	
 	float minValue, maxValue, result;
 	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, result);

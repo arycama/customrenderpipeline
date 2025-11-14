@@ -13,8 +13,8 @@
 cbuffer Properties
 {
 	float4 PreviousCameraTargetScaleLimit;
-	float _MaxSteps, _Thickness, _ResolveSize, _MaxMip;
-    uint _ResolveSamples;
+	float  _Thickness, _ResolveSize, Thickness;
+	uint _ResolveSamples, MaxSteps, MaxMip;
 };
 
 struct TraceResult
@@ -41,16 +41,15 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
 	float2 u = Noise2D(position.xy);
-	float roughness = max(1e-3, Sq(normalRoughness.a));
+	float roughness = max(1e-6, Sq(normalRoughness.a));
 	float rcpPdf;
 	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	
-	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(worldPosition, L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);
+	float3 rayPos = ScreenSpaceRaytrace(float3(position.xy, depth), worldPosition, L, MaxSteps, Thickness, HiZMinDepth, MaxMip);
 	
 	float outDepth;
 	float3 color, hitRay;
-	if(validHit)
+	if(rayPos.z > 0.0)
 	{
 		float2 velocity = CameraVelocity[rayPos.xy];
 		float2 hitUv = rayPos.xy * RcpViewSize - velocity;
@@ -104,7 +103,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
 	
-	float roughness = max(1e-3, Sq(normalRoughness.a));
+	float roughness = max(1e-6, Sq(normalRoughness.a));
 
 	float4 albedoMetallic = GBufferAlbedoMetallic[position.xy];
     float3 f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
@@ -174,7 +173,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	SpatialResult output;
 	output.result = result;
 	output.rayLength = avgRayLength;
-	output.weight = result.a * rcp(_ResolveSamples + 1.0);
+	output.weight = totalWeight * rcp(_ResolveSamples + 1.0);
 	return output;
 }
 
@@ -192,13 +191,20 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 {
 	float4 minValue, maxValue, current;
 	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, current);
+	float currentWeight = WeightInput[position.xy];
 	
 	float rayLength = RayDepth[position.xy];
 	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
 	worldPosition += normalize(worldDir) * rayLength;
 	
-	float2 historyUv = uv - CameraVelocity[position.xy];
+	float4 previousClipPosition = WorldToClipPrevious(worldPosition);
+	
+	float2 velocity = CameraVelocity[position.xy];
+	velocity = CalculateVelocity(uv, previousClipPosition);
+	
+	float2 historyUv = uv - velocity;
 	float4 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
+	float historyWeight = WeightHistory[position.xy];
 	
 	history.rgb = ClipToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
 	history.a = clamp(history.a, minValue.a, maxValue.a);
@@ -206,19 +212,20 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
 		// Weigh current and history
-		//current.rgb *= current.a;
-		//history.rgb *= history.a;
+		current *= currentWeight;
+		history *= historyWeight;
 		current = lerp(history, current, 0.05);
+		currentWeight = lerp(historyWeight, currentWeight, 0.05);
 		
 		// Remove weight and store
-		//if (current.a)
-		//	current *= rcp(current.a);
+		if (currentWeight)
+			current *= rcp(currentWeight);
 	}
 	
 	current = IsInfOrNaN(current) ? 0 : current;
 	
 	TemporalOutput result;
 	result.color = current;
-	result.weight = 1;
+	result.weight = currentWeight;
 	return result;
 }

@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
@@ -19,12 +20,16 @@ public class GrassRenderer : CameraRenderFeature
 	private ResourceHandle<GraphicsBuffer> indexBuffer, instanceDataBuffer;
 	private int previousVertexCount;
 	private readonly ComputeShader grassDataComputeShader;
+	private bool isInitialized;
+	private ResourceHandle<RenderTexture> coverageMap;
+	private Material grassCoverageMaterial;
 
 	public GrassRenderer(Settings settings, RenderGraph renderGraph, QuadtreeCull quadtreeCull) : base(renderGraph)
 	{
 		this.settings = settings;
 		this.quadtreeCull = quadtreeCull;
 		this.grassDataComputeShader = Resources.Load<ComputeShader>("GpuInstancedRendering/GrassData");
+		grassCoverageMaterial = new Material(Shader.Find("Hidden/Grass Coverage")){ hideFlags = HideFlags.HideAndDontSave };
 	}
 
 	protected override void Cleanup(bool disposing)
@@ -80,6 +85,20 @@ public class GrassRenderer : CameraRenderFeature
 			}
 		}
 
+		// Calculate coverage map if needed
+		if(!isInitialized)
+		{
+			coverageMap = renderGraph.GetTexture(terrain.terrainData.alphamapResolution, terrain.terrainData.alphamapResolution, GraphicsFormat.R8_UNorm, isPersistent: true);
+			
+			using(var pass = renderGraph.AddFullscreenRenderPass("Grass Coverage Init"))
+			{
+				pass.Initialize(grassCoverageMaterial);
+				pass.WriteTexture(coverageMap);
+				pass.ReadResource<TerrainRenderData>();
+				isInitialized = true;
+			}
+		}
+
 		// Need to resize buffer for visible indices
 		var patchCounts = Vector2Int.FloorToInt(terrain.terrainData.size.XZ() / settings.PatchSize);
 		var terrainResolution = terrain.terrainData.heightmapResolution;
@@ -118,6 +137,7 @@ public class GrassRenderer : CameraRenderFeature
 
 			pass.ReadBuffer("PatchData", quadtreeCullResults.PatchDataBuffer);
 			pass.ReadBuffer("InstanceData", instanceDataBuffer);
+			pass.ReadTexture("GrassCoverage", coverageMap);
 
 			pass.ReadResource<FrameData>();
 			pass.ReadResource<ViewData>();
