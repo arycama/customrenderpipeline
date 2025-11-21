@@ -121,10 +121,10 @@ public partial class LightingSetup : CameraRenderFeature
 					var topRight = new Line2D(topRightNear.xy, topRightFar.xy);
 					var bottomRight = new Line2D(bottomRightNear.xy, bottomRightFar.xy);
 
-					var bottomLeftRay = new Ray2D(bottomLeftNear.xy, Float2.Normalize(bottomLeftFar.xy - bottomLeftNear.xy));
-					var topLeftRay = new Ray2D(topLeftNear.xy, Float2.Normalize(topLeftFar.xy - topLeftNear.xy));
-					var topRightRay = new Ray2D(topRightNear.xy, Float2.Normalize(topRightFar.xy - topRightNear.xy));
-					var bottomRightRay = new Ray2D(bottomRightNear.xy, Float2.Normalize(bottomRightFar.xy - bottomRightNear.xy));
+					var bottomLeftRay = new Ray2D(bottomLeftNear.xy, (bottomLeftFar.xy - bottomLeftNear.xy).Normalized);
+					var topLeftRay = new Ray2D(topLeftNear.xy, (topLeftFar.xy - topLeftNear.xy).Normalized);
+					var topRightRay = new Ray2D(topRightNear.xy, (topRightFar.xy - topRightNear.xy).Normalized);
+					var bottomRightRay = new Ray2D(bottomRightNear.xy, (bottomRightFar.xy - bottomRightNear.xy).Normalized);
 
 					float GetFrustumDepth(int j)
 					{
