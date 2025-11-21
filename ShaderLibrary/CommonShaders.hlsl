@@ -6,7 +6,12 @@ struct VertexFullscreenTriangleOutput
 	float4 position : SV_Position;
 	float2 uv : TEXCOORD0;
 	float3 worldDirection : TEXCOORD1;
-	uint viewIndex : SV_RenderTargetArrayIndex;
+	
+	#ifdef UNITY_STEREO_INSTANCING_ENABLED
+		uint viewIndex : SV_RenderTargetArrayIndex;
+	#else
+		uint viewIndex : TEXCOORD10;
+	#endif
 };
 
 float3 GetFrustumCorner(uint id);
@@ -36,7 +41,12 @@ struct GeometryVolumeRenderOutput
 	float4 position : SV_Position;
 	float2 uv : TEXCOORD0;
 	float3 worldDir : TEXCOORD1;
-	uint index : SV_RenderTargetArrayIndex;
+	
+	#ifdef UNITY_STEREO_INSTANCING_ENABLED
+		uint viewIndex : SV_RenderTargetArrayIndex;
+	#else
+		uint viewIndex : TEXCOORD10;
+	#endif
 };
 
 void FullscreenGeometryPassthrough(uint id[3], uint instanceId, inout TriangleStream<GeometryVolumeRenderOutput> stream)
@@ -52,7 +62,7 @@ void FullscreenGeometryPassthrough(uint id[3], uint instanceId, inout TriangleSt
 		uv.y = 1.0 - uv.y;
 		output.uv = uv;
 		output.worldDir = GetFrustumCorner(id[i]);
-		output.index = id[i] / 3 * 32 + instanceId;
+		output.viewIndex = id[i] / 3 * 32 + instanceId;
 		stream.Append(output);
 	}
 }

@@ -115,8 +115,8 @@ static const float ST2084Max = 10000.0;
 
 float3 LinearToST2084(float3 rec2020)
 {
-	float3 Y = pow(rec2020 / ST2084Max, ST2084_M1);
-	return pow((Y * ST2084_C2 + ST2084_C1) * rcp(Y * ST2084_C3 + 1.0), ST2084_M2);
+	float3 Y = pow(abs(rec2020 / ST2084Max), ST2084_M1);
+	return pow(abs((Y * ST2084_C2 + ST2084_C1) * rcp(Y * ST2084_C3 + 1.0)), ST2084_M2);
 }
 
 float3 ST2084ToLinear(float3 linearCol)

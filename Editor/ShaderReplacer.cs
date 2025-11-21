@@ -7,6 +7,7 @@ public class ShaderReplacer : ScriptableWizard
 {
 	[SerializeField] private Shader source;
 	[SerializeField] private Shader destination;
+	[SerializeField] private bool debugInfo;
 
 	[MenuItem("Tools/Shader Replacer")]
 	public static void OnMenuSelect()
@@ -34,6 +35,11 @@ public class ShaderReplacer : ScriptableWizard
 
 			if (material.shader == source)
 			{
+				if(debugInfo)
+				{
+					Debug.Log(path);
+				}
+
 				material.shader = destination;
 				EditorUtility.SetDirty(material);
 			}
