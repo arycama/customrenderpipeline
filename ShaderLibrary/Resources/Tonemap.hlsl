@@ -181,7 +181,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 			color = Rec2020ToP3D65(color);
 			
 			// Apply gamma 2.2
-			color = pow(color / MaxLuminance, rcp(2.2));
+			color = pow(abs(color / MaxLuminance), rcp(2.2));
 			break;
 		}
 	}

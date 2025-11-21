@@ -8,6 +8,7 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 	//private List<RendererList> rendererLists = new();
 	private RendererList rendererList;
 	private uint instanceMultiplier;
+	private bool isStereo;
 
 	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false)
 	{
@@ -21,6 +22,8 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 
 		rendererList = context.CreateRendererList(rendererListDesc);
 		instanceMultiplier = camera.stereoEnabled ? 2u : 1u;
+
+		isStereo = camera.stereoEnabled;
 
         //rendererLists.Clear();
         //rendererLists.Add(context.CreateRendererList(rendererListDesc));
@@ -70,7 +73,13 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 		if (instanceMultiplier != 1u)
 			Command.SetInstanceMultiplier(instanceMultiplier);
 
+		//if (isStereo)
+		//	Command.EnableShaderKeyword("UNITY_STEREO_INSTANCING_ENABLED");
+
 		Command.DrawRendererList(rendererList);
+
+        //if (isStereo)
+        //    Command.DisableShaderKeyword("UNITY_STEREO_INSTANCING_ENABLED");
 
         if (instanceMultiplier != 1u)
             Command.SetInstanceMultiplier(1u);
