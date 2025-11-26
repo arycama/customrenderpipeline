@@ -92,9 +92,6 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 		adaptedEv = averageEv;
 	
 	adaptedEv = clamp(adaptedEv, MinEv, MaxEv);
-	
-	if(IsFirst)
-		adaptedEv = averageEv;
 
 	if (Mode == 1.0)
 		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
