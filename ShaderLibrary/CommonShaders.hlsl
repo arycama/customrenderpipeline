@@ -7,7 +7,7 @@ struct VertexFullscreenTriangleOutput
 	float2 uv : TEXCOORD0;
 	float3 worldDirection : TEXCOORD1;
 	
-	#ifdef UNITY_STEREO_INSTANCING_ENABLED
+	#if defined(UNITY_STEREO_INSTANCING_ENABLED) || !defined(GRAPHICS_API_VULKAN)
 		uint viewIndex : SV_RenderTargetArrayIndex;
 	#else
 		uint viewIndex : TEXCOORD10;
@@ -42,7 +42,7 @@ struct GeometryVolumeRenderOutput
 	float2 uv : TEXCOORD0;
 	float3 worldDir : TEXCOORD1;
 	
-	#ifdef UNITY_STEREO_INSTANCING_ENABLED
+	#if defined(UNITY_STEREO_INSTANCING_ENABLED) || !defined(GRAPHICS_API_VULKAN)
 		uint viewIndex : SV_RenderTargetArrayIndex;
 	#else
 		uint viewIndex : TEXCOORD10;
