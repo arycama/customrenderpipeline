@@ -88,8 +88,11 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	float previousEv = ExposureToEV100(previousExposure) + PreviousExposureCompensation;
 	float adaptedEv = lerp(averageEv, previousEv, exp(-RenderDeltaTime * AdaptationSpeed));
 	
-	adaptedEv = clamp(adaptedEv, MinEv, MaxEv);
+	if (IsFirst)
+		adaptedEv = averageEv;
 	
+	adaptedEv = clamp(adaptedEv, MinEv, MaxEv);
+
 	if (Mode == 1.0)
 		adaptedEv = ComputeEV100(Aperture, ShutterSpeed, Iso);
 		
@@ -103,7 +106,7 @@ void LuminanceHistogramAverage(uint groupIndex : SV_GroupIndex)
 	
 	float currentExposure = EV100ToExposure(adaptedEv - exposureCompensation);
 	
-	if (IsFirst || IsInfOrNaN(currentExposure) || currentExposure == 0.0)
+	if (IsInfOrNaN(currentExposure) || currentExposure == 0.0)
 		currentExposure = 1.0;
 	
 	if (previousExposure == 0.0 || IsInfOrNaN(previousExposure))
