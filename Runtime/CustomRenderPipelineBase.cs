@@ -25,6 +25,9 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
     protected abstract bool UseSrpBatching { get; }
 
+    /// <summary> If set to false, manually call RtHandleSystem.SetScreenSize with the desired camera width/height, used for XR where the resolution needs to come from the XRSubsystem display </summary>
+    protected virtual bool UseDefaultCameraResolution => true;
+
     public CustomRenderPipelineBase()
     {
 #if UNITY_EDITOR
@@ -89,14 +92,14 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 			}
 		}
 
-        Camera mainCamera = null;
 		foreach (var camera in cameras)
         {
 			camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 
             using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
 
-            renderGraph.RtHandleSystem.SetScreenSize(Math.Max(camera.pixelWidth, camera.scaledPixelWidth), Math.Max(camera.pixelHeight, camera.scaledPixelHeight));
+            if(UseDefaultCameraResolution)
+                renderGraph.RtHandleSystem.SetScreenSize(Math.Max(camera.pixelWidth, camera.scaledPixelWidth), Math.Max(camera.pixelHeight, camera.scaledPixelHeight));
 
             foreach (var cameraRenderFeature in perCameraRenderFeatures)
             {
@@ -120,8 +123,6 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
                     command.DrawRendererList(data.wireOverlay);
                 });
-
-                mainCamera = camera;
             }
         }
 

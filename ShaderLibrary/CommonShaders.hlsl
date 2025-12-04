@@ -1,20 +1,49 @@
 ﻿#ifndef COMMON_SHADERS_INCLUDED
 #define COMMON_SHADERS_INCLUDED
 
+uint GetViewId();
+
+struct VertexFullscreenTriangleMinimalOutput
+{
+	float4 position : SV_Position;
+	float2 uv : TEXCOORD0;
+	
+	#if defined(VOLUME_RENDER) || defined(STEREO_INSTANCING_ON)
+		uint viewIndex : SV_RenderTargetArrayIndex;
+	#endif
+};
+
 struct VertexFullscreenTriangleOutput
 {
 	float4 position : SV_Position;
 	float2 uv : TEXCOORD0;
 	float3 worldDirection : TEXCOORD1;
 	
-	#ifdef UNITY_STEREO_INSTANCING_ENABLED
+	#if defined(VOLUME_RENDER) || defined(STEREO_INSTANCING_ON)
 		uint viewIndex : SV_RenderTargetArrayIndex;
-	#else
-		uint viewIndex : TEXCOORD10;
 	#endif
 };
 
 float3 GetFrustumCorner(uint id);
+
+VertexFullscreenTriangleMinimalOutput VertexFullscreenTriangleMinimal(uint id : SV_VertexID)
+{
+	VertexFullscreenTriangleMinimalOutput output;
+
+	uint localId = id % 3;
+	float2 uv = (localId << uint2(1, 0)) & 2;
+	
+	output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+	uv.y = 1.0 - uv.y;
+	output.uv = uv;
+	
+	// If using stereo instancing or rendering to a volume texture, every 3 vertices makes a triangle for a seperate layer
+	#if defined(VOLUME_RENDER) || defined(STEREO_INSTANCING_ON)
+		output.viewIndex = id / 3;
+	#endif
+	
+	return output;
+}
 
 VertexFullscreenTriangleOutput VertexFullscreenTriangle(uint id : SV_VertexID)
 {
@@ -26,7 +55,11 @@ VertexFullscreenTriangleOutput VertexFullscreenTriangle(uint id : SV_VertexID)
 	output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
 	output.uv = uv;
-	output.viewIndex = id / 3;
+	
+	#if defined(VOLUME_RENDER) || defined(STEREO_INSTANCING_ON)
+		output.viewIndex = id / 3;
+	#endif
+	
 	output.worldDirection = GetFrustumCorner(id);
 	return output;
 }
@@ -42,10 +75,10 @@ struct GeometryVolumeRenderOutput
 	float2 uv : TEXCOORD0;
 	float3 worldDir : TEXCOORD1;
 	
-	#ifdef UNITY_STEREO_INSTANCING_ENABLED
+	// TODO: Isn't this always true for geometry shaders since there's no point using it for one slice? 
+	// Actaully.. even in our main pipeline is this even used anywhere, since we can just use sv_rendertargetarrayindex anyway which is more efficient and doesn't require the use of geo shaders?
+	#if defined(VOLUME_RENDER) || defined(STEREO_INSTANCING_ON)
 		uint viewIndex : SV_RenderTargetArrayIndex;
-	#else
-		uint viewIndex : TEXCOORD10;
 	#endif
 };
 
@@ -62,7 +95,13 @@ void FullscreenGeometryPassthrough(uint id[3], uint instanceId, inout TriangleSt
 		uv.y = 1.0 - uv.y;
 		output.uv = uv;
 		output.worldDir = GetFrustumCorner(id[i]);
-		output.viewIndex = id[i] / 3 * 32 + instanceId;
+		
+		// TODO: Isn't this always true for geometry shaders since there's no point using it for one slice? 
+		// Actaully.. even in our main pipeline is this even used anywhere, since we can just use sv_rendertargetarrayindex anyway which is more efficient and doesn't require the use of geo shaders?
+		#if defined(VOLUME_RENDER) || defined(STEREO_INSTANCING_ON)
+			output.viewIndex = id[i] / 3 * 32 + instanceId;
+		#endif
+			
 		stream.Append(output);
 	}
 }

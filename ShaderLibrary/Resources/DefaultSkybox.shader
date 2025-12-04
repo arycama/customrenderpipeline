@@ -10,9 +10,8 @@ Shader "Hidden/Default Skybox"
 		Pass
 		{
 			HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
 			#pragma fragment Fragment
-			#pragma multi_compile_instancing
 			#include "DefaultSkybox.hlsl"
 			ENDHLSL
 		}

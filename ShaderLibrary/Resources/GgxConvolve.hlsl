@@ -7,9 +7,9 @@ Texture2D<float3> Input;
 float RcpSamples, RcpOmegaP, PerceptualRoughness, Roughness;
 uint Samples;
 
-float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
-	float3 N = OctahedralUvToNormal(uv);
+	float3 N = OctahedralUvToNormal(input.uv);
 	float3 localV = float3(0.0, 0.0, 1.0);
 	
 	float3 result = 0.0;

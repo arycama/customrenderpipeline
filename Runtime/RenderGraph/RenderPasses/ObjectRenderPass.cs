@@ -7,8 +7,7 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 {
 	//private List<RendererList> rendererLists = new();
 	private RendererList rendererList;
-	private uint instanceMultiplier;
-	private bool isStereo;
+	private SinglePassStereoMode stereoMode;
 
 	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false)
 	{
@@ -21,9 +20,10 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 		};
 
 		rendererList = context.CreateRendererList(rendererListDesc);
-		instanceMultiplier = camera.stereoEnabled ? 2u : 1u;
 
-		isStereo = camera.stereoEnabled;
+		stereoMode = camera.stereoEnabled
+            ? SystemInfo.supportsMultiview ? SinglePassStereoMode.Multiview : SinglePassStereoMode.Instancing
+            : SinglePassStereoMode.None;
 
         //rendererLists.Clear();
         //rendererLists.Add(context.CreateRendererList(rendererListDesc));
@@ -70,19 +70,31 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 		foreach (var keyword in keywords)
 			Command.EnableKeyword(new GlobalKeyword(keyword));
 
-		if (instanceMultiplier != 1u)
-			Command.SetInstanceMultiplier(instanceMultiplier);
+		if (stereoMode == SinglePassStereoMode.Instancing)
+		{
+            Command.SetInstanceMultiplier(2u);
+            Command.EnableShaderKeyword("STEREO_INSTANCING_ON");
+			Command.SetSinglePassStereo(SinglePassStereoMode.Instancing);
+        }
+        else if(stereoMode == SinglePassStereoMode.Multiview)
+		{
+            Command.EnableShaderKeyword("STEREO_MULTIVIEW_ON");
+			Command.SetSinglePassStereo(SinglePassStereoMode.Multiview);
+        }
 
-		//if (isStereo)
-		//	Command.EnableShaderKeyword("UNITY_STEREO_INSTANCING_ENABLED");
+        Command.DrawRendererList(rendererList);
 
-		Command.DrawRendererList(rendererList);
-
-        //if (isStereo)
-        //    Command.DisableShaderKeyword("UNITY_STEREO_INSTANCING_ENABLED");
-
-        if (instanceMultiplier != 1u)
+		if (stereoMode == SinglePassStereoMode.Instancing)
+		{
+            Command.SetSinglePassStereo(SinglePassStereoMode.None);
+            Command.DisableShaderKeyword("STEREO_INSTANCING_ON");
             Command.SetInstanceMultiplier(1u);
+        }
+        else if(stereoMode == SinglePassStereoMode.Multiview)
+		{
+            Command.SetSinglePassStereo(SinglePassStereoMode.None);
+            Command.DisableShaderKeyword("STEREO_MULTIVIEW_ON");
+        }
 
         foreach (var keyword in keywords)
 			Command.DisableKeyword(new GlobalKeyword(keyword));

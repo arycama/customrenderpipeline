@@ -81,13 +81,7 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		foreach (var keyword in keywords)
 			Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
 
-        //if (isStereo)
-        //    Command.EnableShaderKeyword("UNITY_STEREO_INSTANCING_ENABLED");
-
         Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * viewCount, 1, PropertyBlock);
-
-        //if (isStereo)
-        //    Command.DisableShaderKeyword("UNITY_STEREO_INSTANCING_ENABLED");
 
 		foreach (var keyword in keywords)
 			Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));

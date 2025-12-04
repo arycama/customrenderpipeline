@@ -5,7 +5,7 @@ Shader "Hidden/GgxConvolve"
         Pass 
         {
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment Fragment
             #include "GgxConvolve.hlsl"
             ENDHLSL

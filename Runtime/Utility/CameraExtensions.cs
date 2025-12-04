@@ -14,11 +14,14 @@ public static class CameraExtensions
 
 	public static Int2 ScaledViewSize(this Camera camera) => new(camera.scaledPixelWidth, camera.scaledPixelHeight);
 
-    public static Float4x4 GetGpuViewProjectionMatrix(this Camera camera, Camera.StereoscopicEye eye = Camera.StereoscopicEye.Left, bool renderIntoTexture = true)
+    public static Float4x4 GetGpuViewProjectionMatrix(this Camera camera, bool renderIntoTexture = true)
     {
-        var worldToView = camera.stereoEnabled ? camera.GetStereoViewMatrix(eye) : camera.worldToCameraMatrix;
-        var viewToClip = camera.stereoEnabled ? camera.GetStereoProjectionMatrix(eye) : camera.projectionMatrix;
-        return GL.GetGPUProjectionMatrix(viewToClip, renderIntoTexture) * worldToView;
+        return GL.GetGPUProjectionMatrix(camera.projectionMatrix, renderIntoTexture) * camera.worldToCameraMatrix;
+    }
+
+    public static Float4x4 GetStereoGpuViewProjectionMatrix(this Camera camera, Camera.StereoscopicEye eye = Camera.StereoscopicEye.Left, bool renderIntoTexture = true)
+    {
+        return camera.stereoEnabled ? GL.GetGPUProjectionMatrix(camera.GetStereoProjectionMatrix(eye), renderIntoTexture) * camera.GetStereoViewMatrix(eye) : camera.GetGpuViewProjectionMatrix(renderIntoTexture);
     }
 
     public static Float3 GetViewPosition(this Camera camera, Camera.StereoscopicEye eye = Camera.StereoscopicEye.Left)
