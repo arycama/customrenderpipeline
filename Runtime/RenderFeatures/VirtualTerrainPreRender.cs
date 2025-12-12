@@ -1,11 +1,9 @@
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 using static Math;
-using System.Collections.Generic;
 
-public class VirtualTerrainPreRender : CameraRenderFeature
+public class VirtualTerrainPreRender : ViewRenderFeature
 {
 	private readonly TerrainSettings settings;
 	private readonly ResourceHandle<GraphicsBuffer> feedbackBuffer;
@@ -24,7 +22,7 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 		var requestSize = IndirectionTextureResolution * IndirectionTextureResolution * 4 / 3;
 		feedbackBuffer = renderGraph.GetBuffer(requestSize, isPersistent: true);
 
-		indirectionTexture = renderGraph.GetTexture(IndirectionTextureResolution, IndirectionTextureResolution, GraphicsFormat.R16_UInt, hasMips: true, isRandomWrite: true, isPersistent: true);
+		indirectionTexture = renderGraph.GetTexture(IndirectionTextureResolution, GraphicsFormat.R16_UInt, hasMips: true, isRandomWrite: true, isPersistent: true);
 
 		var resolution = settings.TileResolution;// + 4;
 
@@ -69,8 +67,8 @@ public class VirtualTerrainPreRender : CameraRenderFeature
 		Object.DestroyImmediate(heightTexture);
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		// Ensure terrain system data is set
 		if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
 			return;

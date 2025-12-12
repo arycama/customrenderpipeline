@@ -6,7 +6,7 @@ using UnityEngine.Pool;
 using UnityEngine.Rendering;
 using static Math;
 
-public partial class LightingSetup : CameraRenderFeature
+public partial class LightingSetup : ViewRenderFeature
 {
 	private readonly LightingSettings settings;
 
@@ -15,8 +15,8 @@ public partial class LightingSetup : CameraRenderFeature
 		this.settings = settings;
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 		var directionalShadowRequests = ListPool<ShadowRequest>.Get();
 		var pointShadowRequests = ListPool<ShadowRequest>.Get();
@@ -29,12 +29,11 @@ public partial class LightingSetup : CameraRenderFeature
 		Float3 lightColor0 = Float3.Zero, lightColor1 = Float3.Zero, lightDirection0 = Float3.Up, lightDirection1 = Float3.Up;
 		var dirLightCount = 0;
 
-		var tanHalfFov = camera.TanHalfFovY();
-		var cameraTransform = camera.transform.WorldRigidTransform();
-		var cameraToWorld = camera.transform.localToWorldMatrix;
-		var cameraInverseTranslation = Matrix4x4.Translate(camera.transform.position);
+		var cameraTransform = viewRenderData.transform;
+		var cameraToWorld = viewRenderData.camera.transform.localToWorldMatrix;
+		var cameraInverseTranslation = Matrix4x4.Translate(viewRenderData.camera.transform.position);
 
-		var n = camera.nearClipPlane;
+		var n = viewRenderData.near;
 		var f = settings.DirectionalShadowDistance;
 		var m = (float)settings.DirectionalCascadeCount;
 		var c = Pow(Max(1e-3f, settings.CascadeUniformity), 2.2f);
@@ -55,7 +54,7 @@ public partial class LightingSetup : CameraRenderFeature
 
 #if UNITY_EDITOR
 					// The default scene light only has an intensity of 1, set it to sun
-					if ((camera.cameraType == CameraType.SceneView && !UnityEditor.SceneView.currentDrawingSceneView.sceneLighting) || camera.cameraType == CameraType.Preview)
+					if ((viewRenderData.camera.cameraType == CameraType.SceneView && !UnityEditor.SceneView.currentDrawingSceneView.sceneLighting) || viewRenderData.camera.cameraType == CameraType.Preview)
 						lightColor0 *= 120000;
 #endif
 				}
@@ -83,13 +82,13 @@ public partial class LightingSetup : CameraRenderFeature
 					var lightRotation = (Quaternion)visibleLight.light.transform.rotation;
 					var lightInverse = lightRotation.Inverse;
 					var lightViewMatrix = Matrix4x4.Rotate(lightInverse);
-					var lightView = lightInverse.Rotate(camera.transform.position);
+					var lightView = lightInverse.Rotate(viewRenderData.transform.position);
 
-					var viewPosition = camera.transform.position;
-					var viewToWorld = (Float4x4)camera.transform.localToWorldMatrix;
-					var viewRight = camera.transform.right;
-					var viewUp = camera.transform.up;
-					var viewForward = camera.transform.forward;
+					var viewPosition = viewRenderData.transform.position;
+					var viewToWorld = (Float4x4)viewRenderData.camera.transform.localToWorldMatrix;
+					var viewRight = viewRenderData.transform.rotation.Right;
+					var viewUp = viewRenderData.transform.rotation.Up;
+					var viewForward = viewRenderData.transform.rotation.Forward;
 
 					var lightForward = light.transform.forward;
 
@@ -101,11 +100,11 @@ public partial class LightingSetup : CameraRenderFeature
 						lightViewMatrix = new Float4x4(Quaternion.LookRotation(light.transform.forward, up).Inverse);
 					}
 
-					var viewToLight = lightViewMatrix * camera.transform.localToWorldMatrix;
+					var viewToLight = lightViewMatrix * viewRenderData.camera.transform.localToWorldMatrix;
 
 					//var viewToLight = lightViewMatrix.Mul(viewToWorld);
 
-					Float3 GetCorner(FrustumCorner corner) => viewToLight.MultiplyPoint3x4(Geometry.GetFrustumCorner(tanHalfFov, camera.aspect, n, f, corner));
+					Float3 GetCorner(FrustumCorner corner) => viewToLight.MultiplyPoint3x4(Geometry.GetFrustumCorner(viewRenderData.tanHalfFov, n, f, corner));
 
 					var bottomLeftNear = GetCorner(FrustumCorner.BottomLeftNear);
 					var topLeftNear = GetCorner(FrustumCorner.TopLeftNear);
@@ -139,7 +138,7 @@ public partial class LightingSetup : CameraRenderFeature
 					{
 						var near = GetFrustumDepth(cascade);
 						var far = GetFrustumDepth(cascade + 1);
-						return Geometry.GetFrustumBounds(tanHalfFov, camera.aspect, near, far, viewToLight);
+						return Geometry.GetFrustumBounds(viewRenderData.tanHalfFov, near, far, viewToLight);
 					}
 
 					// Move the start of the cascade forwards to avoid overlap
@@ -175,7 +174,7 @@ public partial class LightingSetup : CameraRenderFeature
 						var near = GetFrustumDepth(j);
 						var far = GetFrustumDepth(j + 1);
 
-						var viewLightBounds = Geometry.GetFrustumBounds(tanHalfFov, camera.aspect, near, far, viewToLight);
+						var viewLightBounds = Geometry.GetFrustumBounds(viewRenderData.tanHalfFov, near, far, viewToLight);
 						var cascadeViewMatrix = lightViewMatrix;
 
 						var bounds = GetAdjustedBounds(j);
@@ -269,7 +268,7 @@ public partial class LightingSetup : CameraRenderFeature
 						}
 
 						var projectionMatrix = Float4x4.Ortho(viewLightBounds);
-						var shadowSplitData = CalculateShadowSplitData(projectionMatrix * cascadeViewMatrix, visibleLight.localToWorldMatrix.Forward(), camera, true);
+						var shadowSplitData = CalculateShadowSplitData(projectionMatrix * cascadeViewMatrix, visibleLight.localToWorldMatrix.Forward(), viewRenderData.camera, true);
 						shadowSplitData.shadowCascadeBlendCullingFactor = 1;
 
 						var relativeViewMatrix = cascadeViewMatrix * cameraInverseTranslation;
@@ -307,8 +306,8 @@ public partial class LightingSetup : CameraRenderFeature
 						var viewMatrix = Matrix4x4Extensions.WorldToLocal(light.transform.position, rotation);
 						var projectionMatrix = Float4x4.Perspective(90, 1, light.shadowNearPlane, light.range);
 						var viewProjectionMatrix = projectionMatrix * viewMatrix;
-						var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, forward, camera, true);
-						var viewMatrixRws = Matrix4x4Extensions.WorldToLocal(light.transform.position - camera.transform.position, rotation);
+						var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, forward, viewRenderData.camera, true);
+						var viewMatrixRws = Matrix4x4Extensions.WorldToLocal(light.transform.position - viewRenderData.transform.position, rotation);
 						viewMatrixRws.SetRow(1, -viewMatrixRws.GetRow(1));
 
 						pointShadowRequests.Add(new(i, viewMatrixRws, projectionMatrix, shadowSplitData, index, light.transform.position, hasShadowBounds, light.shadowNearPlane, light.range, light.transform.position, light.transform.rotation, 90, 1));
@@ -323,8 +322,8 @@ public partial class LightingSetup : CameraRenderFeature
 					var projectionMatrix = Float4x4.Perspective(light.spotAngle, size.x / size.y, light.shadowNearPlane, light.range);
 
 					var viewProjectionMatrix = projectionMatrix * viewMatrix;
-					var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, forward, camera, true);
-					var viewMatrixRws = Matrix4x4Extensions.WorldToLocal(light.transform.position - camera.transform.position, light.transform.rotation);
+					var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, forward, viewRenderData.camera, true);
+					var viewMatrixRws = Matrix4x4Extensions.WorldToLocal(light.transform.position - viewRenderData.transform.position, light.transform.rotation);
 
 					shadowIndex = (uint)spotShadowRequests.Count;
 					var shadowRequest = new ShadowRequest(i, viewMatrixRws, projectionMatrix, shadowSplitData, -1, light.transform.position, hasShadowBounds, light.shadowNearPlane, light.range, light.transform.position, light.transform.rotation, light.spotAngle, size.x / size.y);
@@ -363,7 +362,7 @@ public partial class LightingSetup : CameraRenderFeature
 
 			var lightToWorld = visibleLight.localToWorldMatrix;
 			var pointLightData = new LightData(
-				lightToWorld.GetPosition() - camera.transform.position,
+				lightToWorld.GetPosition() - viewRenderData.transform.position,
 				light.range,
 				(Vector4)visibleLight.finalColor,
 				(uint)light.type,

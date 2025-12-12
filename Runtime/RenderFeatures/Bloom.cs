@@ -1,11 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
-public class Bloom : CameraRenderFeature
+public class Bloom : ViewRenderFeature
 {
 	[Serializable]
 	public class Settings
@@ -45,28 +44,28 @@ public class Bloom : CameraRenderFeature
 		material = new Material(Shader.Find("Hidden/Bloom")) { hideFlags = HideFlags.HideAndDontSave };
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		renderGraph.AddProfileBeginPass("Bloom");
 
 		var bloomIds = ListPool<ResourceHandle<RenderTexture>>.Get();
 
 		// Need to queue up all the textures first
-		var mipCount = Mathf.Min(settings.MaxMips, (int)Mathf.Log(Mathf.Max(camera.pixelWidth, camera.pixelHeight), 2));
+		var mipCount = Mathf.Min(settings.MaxMips, (int)Mathf.Log(Mathf.Max(viewRenderData.viewSize.x, viewRenderData.viewSize.y), 2));
 		for (var i = 0; i < mipCount; i++)
 		{
-			var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
-			var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
+			var width = Mathf.Max(1, viewRenderData.viewSize.x >> (i + 1));
+			var height = Mathf.Max(1, viewRenderData.viewSize.y >> (i + 1));
 
-			var resultId = renderGraph.GetTexture(width, height, GraphicsFormat.B10G11R11_UFloatPack32);
+			var resultId = renderGraph.GetTexture(new(width, height), GraphicsFormat.B10G11R11_UFloatPack32);
 			bloomIds.Add(resultId);
 		}
 
 		// Downsample
 		for (var i = 0; i < mipCount; i++)
 		{
-			var width = Mathf.Max(1, camera.pixelWidth >> (i + 1));
-			var height = Mathf.Max(1, camera.pixelHeight >> (i + 1));
+			var width = Mathf.Max(1, viewRenderData.viewSize.x >> (i + 1));
+			var height = Mathf.Max(1, viewRenderData.viewSize.y >> (i + 1));
 
 			var source = i > 0 ? bloomIds[i - 1] : renderGraph.GetRTHandle<CameraTarget>();
 
@@ -124,8 +123,8 @@ public class Bloom : CameraRenderFeature
 		for (var i = mipCount - 1; i > 0; i--)
 		{
 			var input = bloomIds[i];
-			var width = Mathf.Max(1, camera.pixelWidth >> i);
-			var height = Mathf.Max(1, camera.pixelHeight >> i);
+			var width = Mathf.Max(1, viewRenderData.viewSize.x >> i);
+			var height = Mathf.Max(1, viewRenderData.viewSize.y >> i);
 
 			using var pass = renderGraph.AddFullscreenRenderPass("Bloom Up", new BloomData
 			(

@@ -1,7 +1,6 @@
 using UnityEngine;
-using UnityEngine.Rendering;
 
-public class SunDiskRenderer : CameraRenderFeature
+public class SunDiskRenderer : ViewRenderFeature
 {
 	private readonly LightingSettings settings;
 	private readonly Material celestialBodyMaterial;
@@ -12,10 +11,10 @@ public class SunDiskRenderer : CameraRenderFeature
 		celestialBodyMaterial = new Material(Shader.Find("Surface/Celestial Body")){ hideFlags = HideFlags.HideAndDontSave };
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		var lightData = renderGraph.GetResource<LightingData>();
-		var viewPosition = camera.transform.position;
+		var viewPosition = viewRenderData.transform.position;
 		var scale = 2 * Mathf.Tan(0.5f * settings.SunAngularDiameter * Mathf.Deg2Rad);
 		var matrix = Matrix4x4.TRS(viewPosition + lightData.light0Direction, Quaternion.LookRotation(lightData.light0Direction), Vector3.one * scale);
 

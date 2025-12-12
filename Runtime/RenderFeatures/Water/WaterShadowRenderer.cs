@@ -9,9 +9,9 @@ public class WaterShadowRenderer : WaterRendererBase
 	{
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
+	public override void Render(ViewRenderData viewRenderData)
     {
-        if (!settings.IsEnabled || (camera.cameraType != CameraType.Game && camera.cameraType != CameraType.SceneView))
+        if (!settings.IsEnabled || (viewRenderData.camera.cameraType != CameraType.Game && viewRenderData.camera.cameraType != CameraType.SceneView))
             return;
 
         var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
@@ -27,7 +27,7 @@ public class WaterShadowRenderer : WaterRendererBase
         }
 
 		// TODO: Should be able to simply just define a box and not even worry about view position since we translate it anyway
-		var viewPosition = camera.transform.position;
+		var viewPosition = viewRenderData.transform.position;
         var size = new Vector3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
         var min = new Vector3(-settings.ShadowRadius, -settings.Profile.MaxWaterHeight - viewPosition.y, -settings.ShadowRadius);
 
@@ -84,7 +84,7 @@ public class WaterShadowRenderer : WaterRendererBase
 
         ArrayPool<Plane>.Release(frustumPlanes);
 
-        var cullResult = Cull(viewPosition, cullingPlanes, camera.ViewSize(), false);
+        var cullResult = Cull(viewPosition, cullingPlanes, viewRenderData.viewSize, false);
 
         var vm = worldToLight;
         var shadowMatrix = new Matrix4x4
@@ -107,8 +107,8 @@ public class WaterShadowRenderer : WaterRendererBase
             m33 = 1.0f
         };
 
-        var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.D16_UNorm, isExactSize: true, clearFlags: RTClearFlags.Depth);
-        var waterIlluminance = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.R16_UNorm, isExactSize: true);
+        var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.D16_UNorm, isExactSize: true, clearFlags: RTClearFlags.Depth);
+        var waterIlluminance = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.R16_UNorm, isExactSize: true);
 
         var passIndex = settings.Material.FindPass("WaterShadow");
         Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");

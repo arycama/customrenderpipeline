@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
-using UnityEngine.Rendering;
 
-public partial class Tonemapping : CameraRenderFeature
+public partial class Tonemapping : ViewRenderFeature
 {
 	private Material material;
 	private Settings settings;
@@ -37,8 +36,8 @@ public partial class Tonemapping : CameraRenderFeature
 		previousNormalize = settings.NormalizeLmsr;
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		if(settings.NormalizeLmsr != previousNormalize)
 		{
 			RgbToLmsr = CalculateRgbToLMSR(settings.NormalizeLmsr);
@@ -65,7 +64,7 @@ public partial class Tonemapping : CameraRenderFeature
 		}
 
 
-		using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (settings, camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb));
+		using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb));
 
 		pass.Initialize(material);
 

@@ -14,10 +14,10 @@ public class VolumetricCloudsSetup : FrameRenderFeature
     {
         this.settings = settings;
 
-        weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution.x, settings.WeatherMapResolution.y, GraphicsFormat.R8_UNorm, isPersistent: true);
-        noiseTexture = renderGraph.GetTexture(settings.NoiseResolution.x, settings.NoiseResolution.y, GraphicsFormat.R8_UNorm, settings.NoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
-        detailNoiseTexture = renderGraph.GetTexture(settings.DetailNoiseResolution.x, settings.DetailNoiseResolution.y, GraphicsFormat.R8_UNorm, settings.DetailNoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
-		highAltitudeTexture = renderGraph.GetTexture(settings.HighAltitudeMapResolution.x, settings.HighAltitudeMapResolution.y, GraphicsFormat.R8_UNorm, isPersistent: true);
+        weatherMap = renderGraph.GetTexture(settings.WeatherMapResolution, GraphicsFormat.R8_UNorm, isPersistent: true);
+        noiseTexture = renderGraph.GetTexture(settings.NoiseResolution.xy, GraphicsFormat.R8_UNorm, settings.NoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
+        detailNoiseTexture = renderGraph.GetTexture(settings.DetailNoiseResolution.xy, GraphicsFormat.R8_UNorm, settings.DetailNoiseResolution.z, TextureDimension.Tex3D, isPersistent: true);
+		highAltitudeTexture = renderGraph.GetTexture(settings.HighAltitudeMapResolution, GraphicsFormat.R8_UNorm, isPersistent: true);
 
 		// TODO: Should we seperate this into another material
 		material = new Material(Shader.Find("Hidden/Volumetric Clouds")) { hideFlags = HideFlags.HideAndDontSave };

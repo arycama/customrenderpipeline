@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class AmbientOcclusion : CameraRenderFeature
+public partial class AmbientOcclusion : ViewRenderFeature
 {
 	[Serializable]
 	public class Settings
@@ -38,8 +38,8 @@ public partial class AmbientOcclusion : CameraRenderFeature
 		temporalCache.Dispose();
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		if (!settings.AmbientOcclusion)
 			return;
 
@@ -48,12 +48,12 @@ public partial class AmbientOcclusion : CameraRenderFeature
 		ResourceHandle<RenderTexture> result;
 		if (settings.Raytracing)
 		{
-			result = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+			result = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 			using (var pass = renderGraph.AddRaytracingRenderPass("Raytraced Ambient Occlusion", (settings.Radius, settings.Falloff)))
 			{
 				var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-				pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.fieldOfView);
+				pass.Initialize(ambientOcclusionRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, viewRenderData.viewSize.x, viewRenderData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewRenderData.tanHalfFov.y);
 				pass.WriteTexture(result, "HitResult");
 
 				pass.ReadRtHandle<CameraDepth>();
@@ -70,7 +70,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 		}
 		else
 		{
-			result = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+			result = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 			using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Compute", (settings.Radius, settings.Directions, settings.Samples, settings.Falloff, settings.MaxScreenRadius, settings.ThinOccluderCompensation)))
 			{
 				pass.Initialize(material, 0);
@@ -99,7 +99,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Temporal", (wasCreated, history)))
 		{
-			(current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			(current, history, wasCreated) = temporalCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 			pass.renderData.wasCreated = false;
 			pass.renderData.history = history;
 
@@ -123,7 +123,7 @@ public partial class AmbientOcclusion : CameraRenderFeature
 			});
 		}
 
-		var output = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
+		var output = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Combine", (settings.AoStrength, current)))
 		{
 			pass.Initialize(material, 2);

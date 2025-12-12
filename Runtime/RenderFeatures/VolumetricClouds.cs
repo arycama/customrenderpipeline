@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class VolumetricClouds : CameraRenderFeature
+public partial class VolumetricClouds : ViewRenderFeature
 {
 	private static readonly int StarsId = Shader.PropertyToID("Stars");
 
@@ -29,13 +29,13 @@ public partial class VolumetricClouds : CameraRenderFeature
         cloudTransmittanceTextureCache.Dispose();
 	}
 
-    public override void Render(Camera camera, ScriptableRenderContext context)
+    public override void Render(ViewRenderData viewRenderData)
     {
 		renderGraph.AddProfileBeginPass("Clouds");
 
-        var cloudLuminanceTemp = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
-        var cloudTransmittanceTemp = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16_UNorm, isScreenTexture: true);
-        var cloudDepth = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16_SFloat, isScreenTexture: true);
+        var cloudLuminanceTemp = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+        var cloudTransmittanceTemp = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_UNorm, isScreenTexture: true);
+        var cloudDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
 		var time = (float)renderGraph.GetResource<TimeData>().time;
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Render", (settings, time)))
@@ -44,7 +44,7 @@ public partial class VolumetricClouds : CameraRenderFeature
 
 			// Determine pass
 			var keyword = string.Empty;
-			var viewHeight1 = camera.transform.position.y;
+			var viewHeight1 = viewRenderData.transform.position.y;
 			if (viewHeight1 > settings.StartHeight)
 			{
 				if (viewHeight1 > settings.StartHeight + settings.LayerThickness)
@@ -89,14 +89,14 @@ public partial class VolumetricClouds : CameraRenderFeature
 			settings.DepthThreshold,
 			luminanceHistory, 
 			transmittanceHistory,
-			camera.ScaledViewSize(),
+			viewRenderData.viewSize,
 			skySettings,
 			settings,
 			time
 		)))
 		{
-			(luminanceCurrent, luminanceHistory, luminanceWasCreated) = cloudLuminanceTextureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
-			(transmittanceCurrent, transmittanceHistory, transmittanceWasCreated) = cloudTransmittanceTextureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			(luminanceCurrent, luminanceHistory, luminanceWasCreated) = cloudLuminanceTextureCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+			(transmittanceCurrent, transmittanceHistory, transmittanceWasCreated) = cloudTransmittanceTextureCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 
 			pass.renderData.luminanceWasCreated = luminanceWasCreated;
 			pass.renderData.luminanceHistory = luminanceHistory;

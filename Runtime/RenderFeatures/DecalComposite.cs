@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class DecalComposite : CameraRenderFeature
+public class DecalComposite : ViewRenderFeature
 {
 	private readonly Material material;
 
@@ -10,8 +10,8 @@ public class DecalComposite : CameraRenderFeature
 		material = new Material(Shader.Find("Hidden/Decal Composite")) { hideFlags = HideFlags.HideAndDontSave };
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		using var scope = renderGraph.AddProfileScope("Decal Composite");
 
 		var albedoMetallicCopy = renderGraph.GetTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());

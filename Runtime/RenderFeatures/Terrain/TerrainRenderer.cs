@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using static Math;
 
 public class TerrainRenderer : TerrainRendererBase
 {
@@ -12,8 +9,8 @@ public class TerrainRenderer : TerrainRendererBase
 	{
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		// Ensure terrain system data is set
 		if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
 			return;
@@ -29,7 +26,7 @@ public class TerrainRenderer : TerrainRendererBase
 
 		// Used by tessellation to calculate lod
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
-		var passData = Cull(camera.transform.position, cullingPlanes, camera.ViewSize());
+		var passData = Cull(viewRenderData.transform.position, cullingPlanes, viewRenderData.viewSize);
 		var passIndex = settings.Material.FindPass("Terrain");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no Terrain Pass");
 
@@ -61,12 +58,12 @@ public class TerrainRenderer : TerrainRendererBase
 		using (var pass = renderGraph.AddObjectRenderPass("Render Terrain Replacement"))
 		{
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
-			pass.Initialize("Terrain", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque);
+			pass.Initialize("Terrain", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.None);
 			pass.ReadResource<ViewData>();
 		}
 
-		var terrainDepth = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true);
+		var terrainDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true);
 		renderGraph.SetRTHandle<TerrainDepth>(terrainDepth);
 
 		var cameraDepth = renderGraph.GetRTHandle<CameraDepth>();

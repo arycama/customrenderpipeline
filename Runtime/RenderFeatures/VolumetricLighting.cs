@@ -3,7 +3,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using static Math;
 
-public partial class VolumetricLighting : CameraRenderFeature
+public partial class VolumetricLighting : ViewRenderFeature
 {
     private readonly Settings settings;
     private readonly PersistentRTHandleCache colorHistory;
@@ -21,20 +21,20 @@ public partial class VolumetricLighting : CameraRenderFeature
         colorHistory.Dispose();
     }
 
-    public override void Render(Camera camera, ScriptableRenderContext context)
+    public override void Render(ViewRenderData viewRenderData)
     {
 		renderGraph.AddProfileBeginPass("Volumetric Lighting");
 
-		var volumeWidth = DivRoundUp(camera.scaledPixelWidth, settings.TileSize);
-        var volumeHeight = DivRoundUp(camera.scaledPixelHeight, settings.TileSize);
+		var volumeWidth = DivRoundUp(viewRenderData.viewSize.x, settings.TileSize);
+        var volumeHeight = DivRoundUp(viewRenderData.viewSize.y, settings.TileSize);
 
-		var linearToVolumetricScale = Rcp(Log2(settings.MaxDistance / camera.nearClipPlane));
+		var linearToVolumetricScale = Rcp(Log2(settings.MaxDistance / viewRenderData.near));
 		var volumetricLightingData = renderGraph.SetConstantBuffer(new VolumetricLightingData
 		(
 			linearToVolumetricScale,
-			-Log2(camera.nearClipPlane) * linearToVolumetricScale,
-			(Log2(settings.MaxDistance) - Log2(camera.nearClipPlane)) / settings.DepthSlices,
-			Log2(camera.nearClipPlane),
+			-Log2(viewRenderData.near) * linearToVolumetricScale,
+			(Log2(settings.MaxDistance) - Log2(viewRenderData.near)) / settings.DepthSlices,
+			Log2(viewRenderData.near),
 			volumeWidth,
 			volumeHeight,
 			settings.DepthSlices,
@@ -46,16 +46,15 @@ public partial class VolumetricLighting : CameraRenderFeature
 		));
 
 		var rawJitter = renderGraph.GetResource<TemporalAASetupData>().jitter;
-		var jitter = 2.0f * rawJitter / (Float2)camera.ScaledViewSize();
-		var tanHalfFov = Tan(0.5f * Radians(camera.fieldOfView));
-		var pixelToWorldViewDir = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(volumeWidth, volumeHeight, jitter, tanHalfFov, camera.aspect, Matrix4x4.Rotate(camera.transform.rotation));
+		var jitter = 2.0f * rawJitter / (Float2)viewRenderData.viewSize;
+		var pixelToWorldViewDir = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(new(volumeWidth, volumeHeight), jitter, viewRenderData.tanHalfFov, Matrix4x4.Rotate(viewRenderData.transform.rotation));
 
 		ResourceHandle<RenderTexture> current, history = default;
 		bool wasCreated = false;
 
 		using (var pass = renderGraph.AddComputeRenderPass("Volumetric Lighting", (pixelToWorldViewDir, history, wasCreated)))
         {
-			(current, history, wasCreated) = colorHistory.GetTextures(volumeWidth, volumeHeight, pass.Index, camera, settings.DepthSlices);
+			(current, history, wasCreated) = colorHistory.GetTextures(new(volumeWidth, volumeHeight), pass.Index, viewRenderData.viewId, settings.DepthSlices);
 			pass.renderData.history = history;
 			pass.renderData.wasCreated = wasCreated;
 
@@ -88,7 +87,7 @@ public partial class VolumetricLighting : CameraRenderFeature
 		var finalInput = current;
 		if (settings.BlurSigma > 0)
 		{
-			var filterX = renderGraph.GetTexture(volumeWidth, volumeHeight, GraphicsFormat.R16G16B16A16_SFloat, settings.DepthSlices, TextureDimension.Tex3D);
+			var filterX = renderGraph.GetTexture(new(volumeWidth, volumeHeight), GraphicsFormat.R16G16B16A16_SFloat, settings.DepthSlices, TextureDimension.Tex3D);
 			using (var pass = renderGraph.AddComputeRenderPass("Filter X"))
 			{
 				pass.Initialize(computeShader, 1, volumeWidth, volumeHeight, settings.DepthSlices);
@@ -99,7 +98,7 @@ public partial class VolumetricLighting : CameraRenderFeature
 			}
 
 			// Filter Y
-			var filterY = renderGraph.GetTexture(volumeWidth, volumeHeight, GraphicsFormat.R16G16B16A16_SFloat, settings.DepthSlices, TextureDimension.Tex3D);
+			var filterY = renderGraph.GetTexture(new(volumeWidth, volumeHeight), GraphicsFormat.R16G16B16A16_SFloat, settings.DepthSlices, TextureDimension.Tex3D);
 			using (var pass = renderGraph.AddComputeRenderPass("Filter Y"))
 			{
 				pass.Initialize(computeShader, 2, volumeWidth, volumeHeight, settings.DepthSlices);
@@ -113,7 +112,7 @@ public partial class VolumetricLighting : CameraRenderFeature
 		}
 
 		// Accumulate
-		var volumetricLight = renderGraph.GetTexture(volumeWidth, volumeHeight, GraphicsFormat.R16G16B16A16_SFloat, settings.DepthSlices, TextureDimension.Tex3D);
+		var volumetricLight = renderGraph.GetTexture(new(volumeWidth, volumeHeight), GraphicsFormat.R16G16B16A16_SFloat, settings.DepthSlices, TextureDimension.Tex3D);
 		using (var pass = renderGraph.AddComputeRenderPass("Accumulate", pixelToWorldViewDir))
         {
             pass.Initialize(computeShader, 3, volumeWidth, volumeHeight, 1);

@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
-using UnityEngine.Rendering;
 
-public class TemporalAASetup : CameraRenderFeature
+public class TemporalAASetup : ViewRenderFeature
 {
 	private readonly TemporalAA.Settings settings;
 
@@ -10,8 +9,8 @@ public class TemporalAASetup : CameraRenderFeature
 		this.settings = settings;
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		var sampleIndex = renderGraph.FrameIndex % settings.SampleCount + 1;
 
 		Vector2 jitter;
@@ -66,8 +65,8 @@ public class TemporalAASetup : CameraRenderFeature
 		(
 			renderGraph.SetConstantBuffer(new TemporalAABufferData
 			(
-				new Vector4(jitter.x, jitter.y, jitter.x / camera.scaledPixelWidth, jitter.y / camera.scaledPixelHeight),
-				new Vector4(previousJitter.x, previousJitter.y, previousJitter.x / camera.scaledPixelWidth, previousJitter.y / camera.scaledPixelHeight),
+				new Vector4(jitter.x, jitter.y, jitter.x / viewRenderData.viewSize.x, jitter.y / viewRenderData.viewSize.y),
+				new Vector4(previousJitter.x, previousJitter.y, previousJitter.x / viewRenderData.viewSize.x, previousJitter.y / viewRenderData.viewSize.y),
 				crossWeightSum,
 				boxWeightSum,
 				weights[4] * rcpCrossWeightSum,

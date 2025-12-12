@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class ScreenSpaceShadows : CameraRenderFeature
+public partial class ScreenSpaceShadows : ViewRenderFeature
 {
 	private readonly Material material;
 	private readonly Settings settings;
@@ -24,18 +24,18 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 		temporalCache.Dispose();
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		using var scope = renderGraph.AddProfileScope("Screen Space Shadows");
 
-		var tempResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+		var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 
 		if (settings.UseRaytracing)
 		{
 			using var pass = renderGraph.AddRaytracingRenderPass("Raytraced Shadows");
 
 			var raytracingData = renderGraph.GetResource<RaytracingResult>();
-			pass.Initialize(shadowRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFovY());
+			pass.Initialize(shadowRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, viewRenderData.viewSize.x, viewRenderData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewRenderData.tanHalfFov.y);
 
 			pass.WriteTexture(tempResult, "HitResult");
 
@@ -50,7 +50,7 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 		}
 		else
 		{
-			using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows", (settings.MaxSamples, settings.Thickness, settings.Intensity, camera.ScaledViewSize()));
+			using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows", (settings.MaxSamples, settings.Thickness, settings.Intensity, viewRenderData.viewSize));
 			pass.Initialize(material, 0, 1);
 
 			pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
@@ -71,7 +71,7 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 			});
 		}
 
-		var spatialResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16_UNorm, isScreenTexture: true);
+		var spatialResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_UNorm, isScreenTexture: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows Spatial", (settings.Intensity, settings.MaxSamples, settings.Thickness, settings.ResolveSamples, settings.ResolveSize)))
 		{
 			pass.Initialize(material, 1);
@@ -107,7 +107,7 @@ public partial class ScreenSpaceShadows : CameraRenderFeature
 		// Write final temporal result out to rgba16 (color+weight) and rgb111110 for final ambient composition
 		using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows Temporal", (wasCreated, history, settings.Intensity, settings.MaxSamples, settings.Thickness)))
 		{
-			 (current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			 (current, history, wasCreated) = temporalCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 			pass.renderData.wasCreated = wasCreated;
 			pass.renderData.history = history;
 

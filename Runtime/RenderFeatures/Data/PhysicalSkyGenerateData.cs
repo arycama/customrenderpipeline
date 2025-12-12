@@ -3,7 +3,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
-public class PhysicalSkyGenerateData : CameraRenderFeature
+public class PhysicalSkyGenerateData : ViewRenderFeature
 {
 	private static readonly int _MiePhaseTextureId = Shader.PropertyToID("_MiePhaseTexture");
 
@@ -24,12 +24,12 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
         Object.DestroyImmediate(ggxConvolutionMaterial);
     }
 
-    public override void Render(Camera camera, ScriptableRenderContext context)
+    public override void Render(ViewRenderData viewRenderData)
     {
 		renderGraph.AddProfileBeginPass("Sky Precompute");
 
         // Sky transmittance
-        var skyTransmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, 2, TextureDimension.Tex2DArray);
+        var skyTransmittance = renderGraph.GetTexture(new(settings.TransmittanceWidth, settings.TransmittanceHeight), GraphicsFormat.B10G11R11_UFloatPack32, 2, TextureDimension.Tex2DArray);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Sky Transmittance", (settings.TransmittanceSamples, settings.TransmittanceWidth, settings.TransmittanceHeight)))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Lookup 2"));
@@ -51,7 +51,7 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
         renderGraph.SetResource(new SkyTransmittanceData(skyTransmittance, settings.TransmittanceWidth, settings.TransmittanceHeight)); ;
 
         // Sky luminance
-        var skyLuminance = renderGraph.GetTexture(settings.LuminanceWidth, settings.LuminanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, 2, TextureDimension.Tex2DArray);
+        var skyLuminance = renderGraph.GetTexture(new(settings.LuminanceWidth, settings.LuminanceHeight), GraphicsFormat.B10G11R11_UFloatPack32, 2, TextureDimension.Tex2DArray);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Sky Luminance", (settings.LuminanceSamples, settings.LuminanceWidth, settings.LuminanceHeight, settings.TransmittanceWidth, settings.TransmittanceHeight)))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Luminance LUT"));
@@ -73,7 +73,7 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
 			});
 		}
 
-        var cdf = renderGraph.GetTexture(settings.CdfWidth, settings.CdfHeight, GraphicsFormat.R32_SFloat, dimension: TextureDimension.Tex2DArray, volumeDepth: 6);
+        var cdf = renderGraph.GetTexture(new(settings.CdfWidth, settings.CdfHeight), GraphicsFormat.R32_SFloat, dimension: TextureDimension.Tex2DArray, volumeDepth: 6);
 
         // CDF
         using (var pass = renderGraph.AddFullscreenRenderPass("Atmosphere CDF", (settings.CdfSamples, settings.CdfWidth, settings.CdfHeight, settings.LuminanceWidth, settings.LuminanceHeight)))
@@ -96,7 +96,7 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
             });
         }
 
-        var weightedDepth = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.R32_SFloat);
+        var weightedDepth = renderGraph.GetTexture(new(settings.TransmittanceWidth, settings.TransmittanceHeight), GraphicsFormat.R32_SFloat);
         using (var pass = renderGraph.AddFullscreenRenderPass("Atmosphere Transmittance", (settings.miePhase, settings.TransmittanceSamples, settings.TransmittanceWidth, settings.TransmittanceHeight)))
         {
             pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Depth Lookup"));
@@ -115,7 +115,7 @@ public class PhysicalSkyGenerateData : CameraRenderFeature
         }
 
         var keyword = string.Empty;
-        var viewHeight = camera.transform.position.y;
+        var viewHeight = viewRenderData.transform.position.y;
         if (viewHeight > cloudSettings.StartHeight)
         {
             if (viewHeight > cloudSettings.StartHeight + cloudSettings.LayerThickness)

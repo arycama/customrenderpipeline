@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class ClusteredLightCulling : CameraRenderFeature
+public class ClusteredLightCulling : ViewRenderFeature
 {
 	[Serializable]
 	public class Settings
@@ -56,17 +56,17 @@ public class ClusteredLightCulling : CameraRenderFeature
 		}
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
-		var clusterWidth = Math.DivRoundUp(camera.scaledPixelWidth, settings.TileSize);
-		var clusterHeight = Math.DivRoundUp(camera.scaledPixelHeight, settings.TileSize);
+	public override void Render(ViewRenderData viewRenderData)
+    {
+		var clusterWidth = Math.DivRoundUp(viewRenderData.viewSize.x, settings.TileSize);
+		var clusterHeight = Math.DivRoundUp(viewRenderData.viewSize.y, settings.TileSize);
 		var clusterCount = clusterWidth * clusterHeight * settings.ClusterDepth;
 
-		var clusterScale = settings.ClusterDepth / Mathf.Log(camera.farClipPlane / camera.nearClipPlane, 2f);
-		var clusterBias = -(settings.ClusterDepth * Mathf.Log(camera.nearClipPlane, 2f) / Mathf.Log(camera.farClipPlane / camera.nearClipPlane, 2f));
+		var clusterScale = settings.ClusterDepth / Mathf.Log(viewRenderData.far / viewRenderData.near, 2f);
+		var clusterBias = -(settings.ClusterDepth * Mathf.Log(viewRenderData.near, 2f) / Mathf.Log(viewRenderData.far / viewRenderData.near, 2f));
 
 		var computeShader = Resources.Load<ComputeShader>("ClusteredLightCulling");
-		var lightClusterIndices = renderGraph.GetTexture(clusterWidth, clusterHeight, GraphicsFormat.R32G32_SInt, settings.ClusterDepth, TextureDimension.Tex3D);
+		var lightClusterIndices = renderGraph.GetTexture(new(clusterWidth, clusterHeight), GraphicsFormat.R32G32_SInt, settings.ClusterDepth, TextureDimension.Tex3D);
 
 		var lightList = renderGraph.GetBuffer(clusterCount * settings.MaxLightsPerTile);
 		var counterBuffer = renderGraph.GetBuffer();

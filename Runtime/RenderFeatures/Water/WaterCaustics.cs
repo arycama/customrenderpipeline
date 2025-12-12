@@ -1,9 +1,8 @@
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using static Math;
 
-public class WaterCaustics : CameraRenderFeature
+public class WaterCaustics : ViewRenderFeature
 {
 	private readonly WaterSettings settings;
 	private readonly Material material;
@@ -21,8 +20,8 @@ public class WaterCaustics : CameraRenderFeature
 		renderGraph.ReleasePersistentResource(indexBuffer, -1);
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		if (!settings.IsEnabled)
 			return;
 
@@ -32,7 +31,7 @@ public class WaterCaustics : CameraRenderFeature
 		var patchSizes = new Vector4(Profile.PatchSize / Math.Pow(Profile.CascadeScale, 0f), Profile.PatchSize / Math.Pow(Profile.CascadeScale, 1f), Profile.PatchSize / Math.Pow(Profile.CascadeScale, 2f), Profile.PatchSize / Math.Pow(Profile.CascadeScale, 3f));
 		var patchSize = patchSizes[settings.CasuticsCascade];
 
-		var temp0 = renderGraph.GetTexture(129, 129, GraphicsFormat.R16G16B16A16_SFloat, isExactSize: true);
+		var temp0 = renderGraph.GetTexture(129, GraphicsFormat.R16G16B16A16_SFloat, isExactSize: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Caustics Prepare", (settings.CausticsDepth, settings.CasuticsCascade, patchSize)))
 		{
 			pass.Initialize(material, 2);
@@ -49,7 +48,7 @@ public class WaterCaustics : CameraRenderFeature
 			});
 		}
 
-		var tempResult = renderGraph.GetTexture(settings.CasuticsResolution * 2, settings.CasuticsResolution * 2, GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true, clearFlags: RTClearFlags.Color);
+		var tempResult = renderGraph.GetTexture(settings.CasuticsResolution * 2, GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true, clearFlags: RTClearFlags.Color);
 		using (var pass = renderGraph.AddDrawProceduralIndexedRenderPass("Ocean Caustics Render", (patchSize, settings.CausticsDepth, settings.CasuticsCascade)))
 		{
 			pass.Initialize(indexBuffer, material, Matrix4x4.identity, 0);
@@ -73,7 +72,7 @@ public class WaterCaustics : CameraRenderFeature
 			});
 		}
 
-		var result = renderGraph.GetTexture(settings.CasuticsResolution, settings.CasuticsResolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true, isExactSize: true);
+		var result = renderGraph.GetTexture(settings.CasuticsResolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true, isExactSize: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Caustics Blit"))
 		{
 			pass.Initialize(material, 1);

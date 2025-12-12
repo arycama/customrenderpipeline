@@ -75,26 +75,26 @@ public static class Matrix4x4Extensions
 		};
 	}
 
-	public static Matrix4x4 PixelToNearClip(int width, int height, Vector2 jitter, float tanHalfFov, float aspect, bool flip = false, bool halfTexel = false)
+	public static Matrix4x4 PixelToNearClip(Int2 size, Vector2 jitter, Float2 tanHalfFov, bool flip = false, bool halfTexel = false)
 	{
-		var m00 = aspect * tanHalfFov * 2.0f / width;
-		var m11 = tanHalfFov * 2.0f / height;
-		var m12 = -(tanHalfFov + tanHalfFov * jitter.y);
+		var m00 = 2.0f * tanHalfFov.x / size.x;
+		var m11 = 2.0f * tanHalfFov.y / size.y;
+		var m12 = -(tanHalfFov.y + tanHalfFov.y * jitter.y);
 
 		return new Matrix4x4
 		{
 			m00 = m00,
 			m11 = flip ? -m11 : m11,
-			m02 = -(aspect * tanHalfFov + tanHalfFov * aspect * jitter.x) + (halfTexel ? (0.5f * m00) : 0.0f),
+			m02 = -(tanHalfFov.x + tanHalfFov.x * jitter.x) + (halfTexel ? (0.5f * m00) : 0.0f),
 			m12 = (flip ? -m12 : m12) + (halfTexel ? 0.5f * (flip ? -m11 : m11) : 0.0f),
 			m22 = 1.0f,
 			m33 = 1.0f
 		};
 	}
 
-	public static Matrix4x4 PixelToWorldViewDirectionMatrix(int width, int height, Vector2 jitter, float tanHalfFov, float aspect, Matrix4x4 viewToWorld, bool flip = false, bool halfTexel = false)
+	public static Matrix4x4 PixelToWorldViewDirectionMatrix(Int2 size, Vector2 jitter, Float2 tanHalfFov, Matrix4x4 viewToWorld, bool flip = false, bool halfTexel = false)
 	{
-		return viewToWorld * PixelToNearClip(width, height, jitter, tanHalfFov, aspect, flip, halfTexel);
+		return viewToWorld * PixelToNearClip(size, jitter, tanHalfFov, flip, halfTexel);
 	}
 
 	// Returns an ortho matrix where the view is centered in the XY, and at 0 in the Z

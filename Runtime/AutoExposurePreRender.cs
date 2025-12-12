@@ -1,8 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
 
-public class AutoExposurePreRender : CameraRenderFeature
+public class AutoExposurePreRender : ViewRenderFeature
 {
 	private readonly Dictionary<int, ResourceHandle<GraphicsBuffer>> exposureBuffers = new();
 	private Tonemapping.Settings settings;
@@ -20,13 +19,13 @@ public class AutoExposurePreRender : CameraRenderFeature
 		}
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
-		var isFirst = !exposureBuffers.TryGetValue(camera.GetHashCode(), out var exposureBuffer);
+	public override void Render(ViewRenderData viewRenderData)
+    {
+		var isFirst = !exposureBuffers.TryGetValue(viewRenderData.viewId, out var exposureBuffer);
 		if (isFirst)
 		{
 			exposureBuffer = renderGraph.GetBuffer(1, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, GraphicsBuffer.UsageFlags.None, true);
-			exposureBuffers.Add(camera.GetHashCode(), exposureBuffer);
+			exposureBuffers.Add(viewRenderData.viewId, exposureBuffer);
 		}
 
 		using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", exposureBuffer))

@@ -2,7 +2,7 @@
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class CameraVelocityDilate : CameraRenderFeature
+public class CameraVelocityDilate : ViewRenderFeature
 {
 	private readonly Material material;
 
@@ -11,9 +11,9 @@ public class CameraVelocityDilate : CameraRenderFeature
 		material = new Material(Shader.Find("Hidden/Camera Motion Vectors")) { hideFlags = HideFlags.HideAndDontSave };
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
-		var result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.R16G16_SFloat);
+	public override void Render(ViewRenderData viewRenderData)
+    {
+		var result = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16_SFloat);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Velocity Dilate"))
 		{
 			pass.Initialize(material, 1);

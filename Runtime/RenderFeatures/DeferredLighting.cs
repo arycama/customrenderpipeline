@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.Rendering;
 
-public class DeferredLighting : CameraRenderFeature
+public class DeferredLighting : ViewRenderFeature
 {
 	private readonly Material material;
 	private readonly Sky.Settings skySettings;
@@ -12,8 +12,8 @@ public class DeferredLighting : CameraRenderFeature
 		this.skySettings = skySettings;
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		void RenderPass(int index)
 		{
 			using var pass = renderGraph.AddFullscreenRenderPass("Deferred Lighting");

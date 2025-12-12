@@ -24,9 +24,9 @@ public class WaterFft : FrameRenderFeature
         this.settings = settings;
         spectrumBuffer = renderGraph.GetBuffer(settings.Resolution * settings.Resolution * CascadeCount, sizeof(float) * 4, GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, true);
         dispersionBuffer = renderGraph.GetBuffer(settings.Resolution * settings.Resolution * CascadeCount, sizeof(float), GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.None, true);
-        lengthToRoughness = renderGraph.GetTexture(256, 1, GraphicsFormat.R16_UNorm, isPersistent: true);
+        lengthToRoughness = renderGraph.GetTexture(new(256, 1), GraphicsFormat.R16_UNorm, isPersistent: true);
 
-		 displacementCurrent = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R16G16B16A16_SFloat, 4, TextureDimension.Tex2DArray, hasMips: true, isPersistent: true);
+		 displacementCurrent = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.R16G16B16A16_SFloat, 4, TextureDimension.Tex2DArray, hasMips: true, isPersistent: true);
 	}
 
     protected override void Cleanup(bool disposing)
@@ -104,9 +104,9 @@ public class WaterFft : FrameRenderFeature
             pass.WriteBuffer("OceanDispersionWrite", dispersionBuffer);
         }
 
-        var heightResult = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32_SFloat, 4, TextureDimension.Tex2DArray);
-        var displacementResult = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
-        var slopeResult = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
+        var heightResult = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.R32G32_SFloat, 4, TextureDimension.Tex2DArray);
+        var displacementResult = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
+        var slopeResult = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.R32G32B32A32_SFloat, 4, TextureDimension.Tex2DArray);
 
         using (var pass = renderGraph.AddComputeRenderPass("Ocean Fft Row"))
         {
@@ -119,7 +119,7 @@ public class WaterFft : FrameRenderFeature
             pass.ReadBuffer("OceanDispersion", dispersionBuffer);
         }
 
-		var normalFoamSmoothness = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R8G8B8A8_SNorm, 4, TextureDimension.Tex2DArray, hasMips: true);
+		var normalFoamSmoothness = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.R8G8B8A8_SNorm, 4, TextureDimension.Tex2DArray, hasMips: true);
 
 		ResourceHandle<RenderTexture> displacementHistory;
 
@@ -130,7 +130,7 @@ public class WaterFft : FrameRenderFeature
 			{
 				renderGraph.ReleasePersistentResource(displacementCurrent, pass.Index);
 				displacementHistory = displacementCurrent;
-				displacementCurrent = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.R16G16B16A16_SFloat, 4, TextureDimension.Tex2DArray, hasMips: true, isPersistent: true);
+				displacementCurrent = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.R16G16B16A16_SFloat, 4, TextureDimension.Tex2DArray, hasMips: true, isPersistent: true);
 			}
 			else
 			{

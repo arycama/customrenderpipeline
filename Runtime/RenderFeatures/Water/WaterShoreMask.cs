@@ -66,7 +66,7 @@ public class WaterShoreMask : FrameRenderFeature
         var cutoff = Mathf.InverseLerp(terrainPosition.y, terrainPosition.y + terrainSize.y * 2.0f, 0.0f);
         var invResolution = 1.0f / heightmapResolution;
 
-        var src = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R32G32_SFloat);
+        var src = renderGraph.GetTexture(heightmapResolution, GraphicsFormat.R32G32_SFloat);
         using (var pass = renderGraph.AddFullscreenRenderPass("Water Shore Mask Blit", (cutoff, invResolution, heightmapResolution, terrainData.heightmapTexture)))
         {
             pass.Initialize(material);
@@ -87,7 +87,7 @@ public class WaterShoreMask : FrameRenderFeature
         for (var i = 0; i < passes; i++)
         {
             var offset = Mathf.Pow(2, passes - i - 1);
-            var dst = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R32G32_SFloat);
+            var dst = renderGraph.GetTexture(heightmapResolution, GraphicsFormat.R32G32_SFloat);
 			var index = i;
 
 			using (var pass = renderGraph.AddFullscreenRenderPass("Water Shore Mask Jump Flood", (offset, terrainData.heightmapTexture, invResolution, heightmapResolution, cutoff, index, passes, minMaxValues)))
@@ -129,7 +129,7 @@ public class WaterShoreMask : FrameRenderFeature
         }
 
         // Final combination pass
-        result = renderGraph.GetTexture(heightmapResolution, heightmapResolution, GraphicsFormat.R16G16B16A16_UNorm, isPersistent: true);
+        result = renderGraph.GetTexture(heightmapResolution, GraphicsFormat.R16G16B16A16_UNorm, isPersistent: true);
 
         using (var pass = renderGraph.AddFullscreenRenderPass("Water Shore Final Combine", (heightmapTexture, cutoff, invResolution, minMaxValues, resultDataBuffer, heightmapResolution)))
         {

@@ -1,9 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
-public partial class AutoExposure : CameraRenderFeature
+public partial class AutoExposure : ViewRenderFeature
 {
 	private static readonly int ExposureCompensationTextureId = Shader.PropertyToID("ExposureCompensationTexture");
 
@@ -41,8 +40,8 @@ public partial class AutoExposure : CameraRenderFeature
 		Object.DestroyImmediate(exposureTexture);
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		// TODO: Only do when changed
 		var exposurePixels = exposureTexture.GetRawTextureData<float>();
 		for (var i = 0; i < settings.ExposureResolution; i++)
@@ -75,7 +74,7 @@ public partial class AutoExposure : CameraRenderFeature
 			settings.ProceduralSoftness
 		)))
 		{
-			pass.Initialize(computeShader, 0, camera.scaledPixelWidth, camera.scaledPixelHeight);
+			pass.Initialize(computeShader, 0, viewRenderData.viewSize.x, viewRenderData.viewSize.y);
 			pass.ReadTexture(nameof(CameraTarget), renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteBuffer("LuminanceHistogram", histogram);
 			pass.ReadResource<AutoExposureData>();

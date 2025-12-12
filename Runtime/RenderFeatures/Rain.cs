@@ -1,9 +1,8 @@
 using System;
 using UnityEngine;
-using UnityEngine.Pool;
 using UnityEngine.Rendering;
 
-public class Rain : CameraRenderFeature
+public class Rain : ViewRenderFeature
 {
 	[Serializable]
 	public class Settings
@@ -42,8 +41,8 @@ public class Rain : CameraRenderFeature
 		}
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		var dropletCount = (int)(settings.DropletCount * settings.WetLevel * (4.0f / 3.0f) * Math.Pi * Math.Pow(settings.Radius, 3));
 		if (settings.Material == null || dropletCount == 0)
 			return;

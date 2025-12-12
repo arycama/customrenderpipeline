@@ -17,10 +17,10 @@ public class SkyLookupTables : FrameRenderFeature
         this.settings = settings;
         skyMaterial = new Material(Shader.Find("Hidden/Physical Sky Tables")) { hideFlags = HideFlags.HideAndDontSave };
 
-        transmittance = renderGraph.GetTexture(settings.TransmittanceWidth, settings.TransmittanceHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
-        multiScatter = renderGraph.GetTexture(settings.MultiScatterWidth, settings.MultiScatterHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
-        groundAmbient = renderGraph.GetTexture(settings.AmbientGroundWidth, 1, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
-        skyAmbient = renderGraph.GetTexture(settings.AmbientSkyWidth, settings.AmbientSkyHeight, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
+        transmittance = renderGraph.GetTexture(new(settings.TransmittanceWidth, settings.TransmittanceHeight), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
+        multiScatter = renderGraph.GetTexture(new(settings.MultiScatterWidth, settings.MultiScatterHeight), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
+        groundAmbient = renderGraph.GetTexture(new(settings.AmbientGroundWidth, 1), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
+        skyAmbient = renderGraph.GetTexture(new(settings.AmbientSkyWidth, settings.AmbientSkyHeight), GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true);
     }
 
     protected override void Cleanup(bool disposing)

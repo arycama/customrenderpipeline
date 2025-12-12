@@ -6,7 +6,7 @@ using UnityEngine.Rendering;
 
 public class PersistentRTHandleCache : IDisposable
 {
-	private readonly Dictionary<Camera, ResourceHandle<RenderTexture>> textureCache = new();
+	private readonly Dictionary<int, ResourceHandle<RenderTexture>> textureCache = new();
 
 	private readonly GraphicsFormat format;
 	private readonly TextureDimension dimension;
@@ -39,9 +39,9 @@ public class PersistentRTHandleCache : IDisposable
 	}
 
 	// Gets current texture and marks history as non-persistent
-	public (ResourceHandle<RenderTexture> current, ResourceHandle<RenderTexture> history, bool wasCreated) GetTextures(int width, int height, int passIndex, Camera camera, int depth = 1)
+	public (ResourceHandle<RenderTexture> current, ResourceHandle<RenderTexture> history, bool wasCreated) GetTextures(Int2 size, int passIndex, int viewId, int depth = 1)
 	{
-		var wasCreated = !textureCache.TryGetValue(camera, out var history);
+		var wasCreated = !textureCache.TryGetValue(viewId, out var history);
 		if (wasCreated)
 		{
 			switch (dimension)
@@ -68,8 +68,8 @@ public class PersistentRTHandleCache : IDisposable
 		else
 			renderGraph.ReleasePersistentResource(history, passIndex);
 
-		var current = renderGraph.GetTexture(width, height, format, depth, dimension, isScreenTexture, hasMips, autoGenerateMips, true, false, false, clearFlags, clearColor, clearDepth, clearStencil);
-		textureCache[camera] = current;
+		var current = renderGraph.GetTexture(size, format, depth, dimension, isScreenTexture, hasMips, autoGenerateMips, true, false, false, clearFlags, clearColor, clearDepth, clearStencil);
+		textureCache[viewId] = current;
 
 		return (current, history, wasCreated);
 	}

@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class TemporalAA : CameraRenderFeature
+public partial class TemporalAA : ViewRenderFeature
 {
 	private readonly Settings settings;
 	private readonly PersistentRTHandleCache colorCache, weightCache;
@@ -22,15 +22,15 @@ public partial class TemporalAA : CameraRenderFeature
 		weightCache.Dispose();
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		if (!settings.IsEnabled)
 			return;
 
 		bool wasCreated = default;
 		ResourceHandle<RenderTexture> current, history = default;
 
-		var result = renderGraph.GetTexture(camera.pixelWidth, camera.pixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+		var result = renderGraph.GetTexture(viewRenderData.screenSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 		using var pass = renderGraph.AddFullscreenRenderPass("Temporal AA", new TemporalAADataStruct
 		(
 			settings.SpatialBlur,
@@ -49,8 +49,8 @@ public partial class TemporalAA : CameraRenderFeature
 		//var keyword = null;// viewData.Scale < 1.0f ? "UPSCALE" : null; // TODO: Implement
 		pass.Initialize(material, 0, 1);
 
-		(current, history, wasCreated) = colorCache.GetTextures(camera.pixelWidth, camera.pixelHeight, pass.Index, camera);
-		var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(camera.pixelWidth, camera.pixelHeight, pass.Index, camera);
+		(current, history, wasCreated) = colorCache.GetTextures(viewRenderData.screenSize, pass.Index, viewRenderData.viewId);
+		var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(viewRenderData.screenSize, pass.Index, viewRenderData.viewId);
 
 		pass.renderData.history = history;
 		pass.renderData.hasHistory = wasCreated ? 0f : 1f;

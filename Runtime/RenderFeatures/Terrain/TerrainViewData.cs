@@ -1,9 +1,7 @@
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Rendering;
 using static Math;
 
-public class TerrainViewData : CameraRenderFeature
+public class TerrainViewData : ViewRenderFeature
 {
 	private readonly TerrainSystem terrainSystem;
 	private readonly TerrainSettings settings;
@@ -14,13 +12,13 @@ public class TerrainViewData : CameraRenderFeature
 		this.settings = settings;
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		var terrain = terrainSystem.Terrain;
 		if (terrain == null)
 			return;
 
-		var position = terrainSystem.Terrain.GetPosition() - camera.transform.position;
+		var position = terrainSystem.Terrain.GetPosition() - viewRenderData.transform.position;
 		var size = (Float3)terrain.terrainData.size;
 
 		renderGraph.SetResource<TerrainRenderData>(new
@@ -41,7 +39,7 @@ public class TerrainViewData : CameraRenderFeature
 				(float)terrainSystem.TerrainData.alphamapResolution,
 				terrainSystem.Terrain.GetPosition(),
 				size.y,
-				GraphicsUtilities.HalfTexelRemap(position.XZ(), size.xz, Vector2.one * terrainSystem.TerrainData.heightmapResolution),
+				GraphicsUtilities.HalfTexelRemap(position.xz, size.xz, Vector2.one * terrainSystem.TerrainData.heightmapResolution),
 				new Float4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z),
 				GraphicsUtilities.HalfTexelRemap(terrain.terrainData.heightmapResolution),
 				position.y,
@@ -51,7 +49,7 @@ public class TerrainViewData : CameraRenderFeature
 
 		renderGraph.SetResource(new TerrainQuadtreeData(renderGraph.SetConstantBuffer
 		((
-			new Float4(size.xz, (terrain.GetPosition() - camera.transform.position).XZ()),
+			new Float4(size.xz, position.xz),
 			GraphicsUtilities.HalfTexelRemap(terrain.terrainData.heightmapResolution),
 			Rcp(settings.CellCount * settings.PatchVertices),
 			Rcp(settings.PatchVertices),

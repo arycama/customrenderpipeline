@@ -1,5 +1,3 @@
-using UnityEngine;
-
 public static class Texture2DExtensions
 {
 	// Resolution of a texture resolution at a mip level

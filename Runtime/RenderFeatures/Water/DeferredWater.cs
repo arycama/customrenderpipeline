@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class DeferredWater : CameraRenderFeature
+public class DeferredWater : ViewRenderFeature
 {
 	private static readonly int _FoamTexId = Shader.PropertyToID("_FoamTex");
 	private static readonly int _FoamBumpId = Shader.PropertyToID("_FoamBump");
@@ -25,14 +25,14 @@ public class DeferredWater : CameraRenderFeature
         temporalCache.Dispose();
     }
 
-    public override void Render(Camera camera, ScriptableRenderContext context)
+    public override void Render(ViewRenderData viewRenderData)
     {
-		if (!settings.IsEnabled || (camera.cameraType != CameraType.Game && camera.cameraType != CameraType.SceneView))
+		if (!settings.IsEnabled || (viewRenderData.camera.cameraType != CameraType.Game && viewRenderData.camera.cameraType != CameraType.SceneView))
 			return;
 
 		using var scope = renderGraph.AddProfileScope("Deferred Water");
 
-        var scatterResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+        var scatterResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Render", settings))
         {
@@ -123,10 +123,10 @@ public class DeferredWater : CameraRenderFeature
             {
 				pass.AddKeyword("UNDERWATER_LIGHTING_ON");
 
-				var refractionResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+				var refractionResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 				var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, 0.1f, 0.1f, camera.TanHalfFovY());
+                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewRenderData.viewSize.x, viewRenderData.viewSize.y, 1, 0.1f, 0.1f, viewRenderData.tanHalfFov.y);
                 //pass.WriteTexture(refractionResult, "RefractionResult");
                 pass.WriteTexture(scatterResult, "ScatterResult");
                 //pass.WriteTexture(tempResult, "HitColor");
@@ -160,7 +160,7 @@ public class DeferredWater : CameraRenderFeature
 		ResourceHandle<RenderTexture> current, history = default;
         using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", (wasCreated, history, settings)))
         {
-			(current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			(current, history, wasCreated) = temporalCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 
 			pass.renderData.history = history;
 			pass.renderData.wasCreated = wasCreated;

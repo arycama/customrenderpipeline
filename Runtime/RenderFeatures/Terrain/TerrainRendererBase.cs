@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-public abstract partial class TerrainRendererBase : CameraRenderFeature
+public abstract partial class TerrainRendererBase : ViewRenderFeature
 {
 	protected readonly TerrainSettings settings;
 	protected readonly QuadtreeCull quadtreeCull;

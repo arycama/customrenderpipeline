@@ -1,8 +1,7 @@
-using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-public class RainTextureUpdater : CameraRenderFeature
+public class RainTextureUpdater : ViewRenderFeature
 {
 	private readonly Rain.Settings settings;
 	private readonly Material material, compositeMaterial;
@@ -14,9 +13,9 @@ public class RainTextureUpdater : CameraRenderFeature
 		compositeMaterial = new Material(Shader.Find("Hidden/Rain Composite")) { hideFlags = HideFlags.HideAndDontSave };
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
-		var rainTexture = renderGraph.GetTexture(settings.Resolution, settings.Resolution, UnityEngine.Experimental.Rendering.GraphicsFormat.R8G8_SNorm, isExactSize: true, hasMips: true, autoGenerateMips: true);
+	public override void Render(ViewRenderData viewRenderData)
+    {
+		var rainTexture = renderGraph.GetTexture(settings.Resolution, UnityEngine.Experimental.Rendering.GraphicsFormat.R8G8_SNorm, isExactSize: true, hasMips: true, autoGenerateMips: true);
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Rain Texture", (settings.Resolution, settings.Size)))
 		{

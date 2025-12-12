@@ -1,10 +1,8 @@
 using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Pool;
-using UnityEngine.Rendering;
 
-public class GrassRenderer : CameraRenderFeature
+public class GrassRenderer : ViewRenderFeature
 {
 	[Serializable]
 	public class Settings
@@ -41,8 +39,8 @@ public class GrassRenderer : CameraRenderFeature
 		}
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		var material = settings.Material;
 		if (material == null)
 			return;
@@ -88,7 +86,7 @@ public class GrassRenderer : CameraRenderFeature
 		// Calculate coverage map if needed
 		if(!isInitialized)
 		{
-			coverageMap = renderGraph.GetTexture(terrain.terrainData.alphamapResolution, terrain.terrainData.alphamapResolution, GraphicsFormat.R8_UNorm, isPersistent: true);
+			coverageMap = renderGraph.GetTexture(terrain.terrainData.alphamapResolution, GraphicsFormat.R8_UNorm, isPersistent: true);
 			
 			using(var pass = renderGraph.AddFullscreenRenderPass("Grass Coverage Init"))
 			{
@@ -107,17 +105,15 @@ public class GrassRenderer : CameraRenderFeature
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
 		var height = material.GetFloat("_Height");
 
-		var viewPosition = camera.transform.position;
-
-		var terrainData = terrainSystemData.terrainData;
-		var position = terrain.GetPosition() - viewPosition;
+        var terrainData = terrainSystemData.terrainData;
+		var position = terrain.GetPosition() - viewRenderData.transform.position;
 		var positionOffset = new Vector4(terrainData.size.x, terrainData.size.z, position.x, position.z);
 		var mipCount = Texture2DExtensions.MipCount(terrainData.heightmapResolution) - 1;
 
 		var edgeLength = material.GetFloat("_EdgeLength");
 		var cellCount = patchCounts.x;
 
-		var quadtreeCullResults = quadtreeCull.Cull(cellCount, cullingPlanes, vertexCount * 6, edgeLength, positionOffset, true, camera.ViewSize(), true, terrainSystemData.minMaxHeights, terrainData.size.y, position.y, mipCount, height);
+		var quadtreeCullResults = quadtreeCull.Cull(cellCount, cullingPlanes, vertexCount * 6, edgeLength, positionOffset, true, viewRenderData.viewSize, true, terrainSystemData.minMaxHeights, terrainData.size.y, position.y, mipCount, height);
 
 		var size = terrainSystemData.terrainData.size;
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Render Grass",

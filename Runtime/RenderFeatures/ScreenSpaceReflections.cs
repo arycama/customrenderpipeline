@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class ScreenSpaceReflections : CameraRenderFeature
+public partial class ScreenSpaceReflections : ViewRenderFeature
 {
     private readonly Material material;
     private readonly Settings settings;
@@ -26,15 +26,15 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
 		temporalWeightCache.Dispose();
 	}
 
-    public override void Render(Camera camera, ScriptableRenderContext context)
+    public override void Render(ViewRenderData viewRenderData)
     {
 		using var scope = renderGraph.AddProfileScope("Specular Global Illumination");
 
         // Must be screen texture since we use stencil to skip sky pixels
-        var tempResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+        var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 
         // Slight fuzzyness with 16 bits, probably due to depth.. would like to investigate
-        var hitResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+        var hitResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 
         if (settings.UseRaytracing)
         {
@@ -58,7 +58,7 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
             {
                 var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFovY());
+                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewRenderData.viewSize.x, viewRenderData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewRenderData.tanHalfFov.y);
                 pass.WriteTexture(tempResult, "HitColor");
                 pass.WriteTexture(hitResult, "HitResult");
 				pass.ReadRtHandle<GBufferNormalRoughness>();
@@ -77,8 +77,8 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
         else
         {
 			var thicknessScale = 1.0f / (1.0f + settings.Thickness);
-			var thicknessOffset = -camera.nearClipPlane / (camera.farClipPlane - camera.nearClipPlane) * (settings.Thickness * thicknessScale);
-			var maxMip = Texture2DExtensions.MipCount(camera.ScaledViewSize()) - 1;
+			var thicknessOffset = -viewRenderData.near / (viewRenderData.far - viewRenderData.near) * (settings.Thickness * thicknessScale);
+			var maxMip = Texture2DExtensions.MipCount(viewRenderData.viewSize) - 1;
 
 			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip, settings.Thickness)))
 			{
@@ -111,9 +111,9 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
 			}
         }
 
-        var spatialResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-        var spatialWeight = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16_UNorm, isScreenTexture: true);
-		var rayDepth = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16_SFloat, isScreenTexture: true);
+        var spatialResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var spatialWeight = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_UNorm, isScreenTexture: true);
+		var rayDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddFullscreenRenderPass("Specular GI Spatial", (settings.ResolveSamples, settings.ResolveSize, settings.Intensity)))
         {
             pass.Initialize(material, 1);
@@ -150,8 +150,8 @@ public partial class ScreenSpaceReflections : CameraRenderFeature
        
 		using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Temporal", (wasCreated, history)))
         {
-			(current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
-			var (currentWeight, historyWeight, wasCreatedWeight) = temporalWeightCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			(current, history, wasCreated) = temporalCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+			var (currentWeight, historyWeight, wasCreatedWeight) = temporalWeightCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 
 			pass.renderData.history = history;
 			pass.renderData.wasCreated = wasCreated;

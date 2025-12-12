@@ -82,9 +82,9 @@ public class TerrainSystem : FrameRenderFeature
 	private void InitializeTerrain()
 	{
 		var resolution = TerrainData.heightmapResolution;
-		minMaxHeight = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R16G16_UNorm, hasMips: true, isPersistent: true);
-		heightmap = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R16_UNorm, hasMips: true, autoGenerateMips: true, isPersistent: true);
-		normalmap = renderGraph.GetTexture(resolution, resolution, GraphicsFormat.R8G8_SNorm, autoGenerateMips: true, hasMips: true, isPersistent: true);
+		minMaxHeight = renderGraph.GetTexture(resolution, GraphicsFormat.R16G16_UNorm, hasMips: true, isPersistent: true);
+		heightmap = renderGraph.GetTexture(resolution, GraphicsFormat.R16_UNorm, hasMips: true, autoGenerateMips: true, isPersistent: true);
+		normalmap = renderGraph.GetTexture(resolution, GraphicsFormat.R8G8_SNorm, autoGenerateMips: true, hasMips: true, isPersistent: true);
 		indexBuffer = renderGraph.GetGridIndexBuffer(settings.PatchVertices, true, false);
 
 		InitializeHeightmap();
@@ -103,8 +103,8 @@ public class TerrainSystem : FrameRenderFeature
 		}
 
 		var idMapResolution = TerrainData.alphamapResolution;
-		idMap = renderGraph.GetTexture(idMapResolution, idMapResolution, GraphicsFormat.R32_UInt, isPersistent: true);
-		aoMap = renderGraph.GetTexture(TerrainData.heightmapResolution, TerrainData.heightmapResolution, GraphicsFormat.R8G8B8A8_SNorm, isPersistent: true);
+		idMap = renderGraph.GetTexture(idMapResolution, GraphicsFormat.R32_UInt, isPersistent: true);
+		aoMap = renderGraph.GetTexture(TerrainData.heightmapResolution, GraphicsFormat.R8G8B8A8_SNorm, isPersistent: true);
 
 		// Process any alphamap modifications
 		var alphamapModifiers = Terrain.GetComponents<ITerrainAlphamapModifier>();

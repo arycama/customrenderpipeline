@@ -9,19 +9,19 @@ public class WaterRenderer : WaterRendererBase
 	{
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
+	public override void Render(ViewRenderData viewRenderData)
     {
-        if (!settings.IsEnabled || (camera.cameraType != CameraType.Game && camera.cameraType != CameraType.SceneView))
+        if (!settings.IsEnabled || (viewRenderData.camera.cameraType != CameraType.Game && viewRenderData.camera.cameraType != CameraType.SceneView))
             return;
 
-        var passData = Cull(camera.transform.position, renderGraph.GetResource<CullingPlanesData>().cullingPlanes, camera.ViewSize(), true);
+        var passData = Cull(viewRenderData.transform.position, renderGraph.GetResource<CullingPlanesData>().cullingPlanes, viewRenderData.viewSize, true);
 
         // Writes (worldPos - displacementPos).xz. Uv coord is reconstructed later from delta and worldPosition (reconstructed from depth)
-        var oceanRenderResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);
+        var oceanRenderResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);
 
         // Also write triangleNormal to another texture with oct encoding. This allows reconstructing the derivative correctly to avoid mip issues on edges,
         // As well as backfacing triangle detection for rendering under the surface
-        var waterTriangleNormal = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16_UNorm, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+        var waterTriangleNormal = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16_UNorm, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 
         var passIndex = settings.Material.FindPass("Water");
         Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
@@ -30,7 +30,7 @@ public class WaterRenderer : WaterRendererBase
         var resolution = settings.Resolution;
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
 
-		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Ocean Render", (VerticesPerTileEdge, renderGraph.FrameIndex, settings, camera, cullingPlanes)))
+		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Ocean Render", (VerticesPerTileEdge, renderGraph.FrameIndex, settings, viewRenderData.transform, cullingPlanes)))
 		{
 			pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
 
@@ -57,8 +57,8 @@ public class WaterRenderer : WaterRendererBase
 
 				// Snap to quad-sized increments on largest cell
 				var texelSize = data.settings.Size / (float)data.settings.PatchVertices;
-				var positionX = Math.Snap(data.camera.transform.position.x, texelSize) - data.camera.transform.position.x - data.settings.Size * 0.5f;
-				var positionZ = Math.Snap(data.camera.transform.position.z, texelSize) - data.camera.transform.position.z - data.settings.Size * 0.5f;
+				var positionX = Math.Snap(data.transform.position.x, texelSize) - data.transform.position.x - data.settings.Size * 0.5f;
+				var positionZ = Math.Snap(data.transform.position.z, texelSize) - data.transform.position.z - data.settings.Size * 0.5f;
 				pass.SetVector("_PatchScaleOffset", new Vector4(data.settings.Size / (float)data.settings.CellCount, data.settings.Size / (float)data.settings.CellCount, positionX, positionZ));
 
 				pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);

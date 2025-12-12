@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class UnderwaterLighting : CameraRenderFeature
+public class UnderwaterLighting : ViewRenderFeature
 {
     private readonly WaterSettings settings;
     private readonly Material underwaterLightingMaterial;
@@ -13,12 +13,12 @@ public class UnderwaterLighting : CameraRenderFeature
         underwaterLightingMaterial = new Material(Shader.Find("Hidden/Underwater Lighting 1")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public override void Render(Camera camera, ScriptableRenderContext context)
+    public override void Render(ViewRenderData viewRenderData)
     {
-		if (!settings.IsEnabled || (camera.cameraType != CameraType.Game && camera.cameraType != CameraType.SceneView))
+		if (!settings.IsEnabled || (viewRenderData.camera.cameraType != CameraType.Game && viewRenderData.camera.cameraType != CameraType.SceneView))
 			return;
 
-        var underwaterResultId = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+        var underwaterResultId = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
         using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Underwater Lighting", settings))
         {

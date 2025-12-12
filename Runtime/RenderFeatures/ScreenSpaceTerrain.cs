@@ -1,8 +1,7 @@
 using UnityEngine;
-using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class ScreenSpaceTerrain : CameraRenderFeature
+public class ScreenSpaceTerrain : ViewRenderFeature
 {
 	private readonly Material material;
 
@@ -11,8 +10,8 @@ public class ScreenSpaceTerrain : CameraRenderFeature
 		material = new Material(Shader.Find("Hidden/Screen Space Terrain")) { hideFlags = HideFlags.HideAndDontSave };
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		if (!renderGraph.TryGetResource<TerrainRenderData>(out _))
 			return;
 

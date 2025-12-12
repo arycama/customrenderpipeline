@@ -3,7 +3,6 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using static Math;
-using System;
 
 
 #if UNITY_EDITOR
@@ -134,36 +133,36 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new GpuDrivenRenderingSetup(renderGraph, DependencyResolver.Resolve<ProceduralGenerationController>()),
 	};
 
-	protected override List<CameraRenderFeature> InitializePerCameraRenderFeatures() => new()
+	protected override List<ViewRenderFeature> InitializePerCameraRenderFeatures() => new()
 	{
-		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
-			if (!camera.TryGetCullingParameters(out var cullingParameters))
+			if (!viewRenderData.camera.TryGetCullingParameters(out var cullingParameters))
 				return;
 
 			// For text mesh pro, cbfed rewriting all their shaders
-			context.SetupCameraProperties(camera);
+			viewRenderData.context.SetupCameraProperties(viewRenderData.camera);
 
 #if UNITY_EDITOR
-			if (camera.cameraType == CameraType.SceneView)
-				ScriptableRenderContext.EmitWorldGeometryForSceneView(camera);
+			if (viewRenderData.camera.cameraType == CameraType.SceneView)
+				ScriptableRenderContext.EmitWorldGeometryForSceneView(viewRenderData.camera);
 			else
 #endif
-			ScriptableRenderContext.EmitGeometryForCamera(camera);
+			ScriptableRenderContext.EmitGeometryForCamera(viewRenderData.camera);
 
 			cullingParameters.shadowDistance = asset.LightingSettings.DirectionalShadowDistance;
 			cullingParameters.cullingOptions = CullingOptions.NeedsLighting | CullingOptions.DisablePerObjectCulling | CullingOptions.ShadowCasters;
 
-			renderGraph.SetResource(new CullingResultsData(context.Cull(ref cullingParameters)));
+			renderGraph.SetResource(new CullingResultsData(viewRenderData.context.Cull(ref cullingParameters)));
 		}),
 
 		new TemporalAASetup(renderGraph, asset.TemporalAASettings),
 		new AutoExposurePreRender(renderGraph, asset.Tonemapping),
 		new SetupCamera(renderGraph, asset.Sky),
 
-		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
-			var cameraDepth = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true, clearFlags: RTClearFlags.DepthStencil);
+			var cameraDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true, clearFlags: RTClearFlags.DepthStencil);
 			renderGraph.SetRTHandle<CameraDepth>(cameraDepth, subElement: RenderTextureSubElement.Depth);
 			renderGraph.SetRTHandle<CameraStencil>(cameraDepth, subElement: RenderTextureSubElement.Stencil);
 		}),
@@ -171,26 +170,26 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new VirtualTerrainPreRender(renderGraph, asset.TerrainSettings),
 		new TerrainViewData(renderGraph, terrainSystem, asset.TerrainSettings),
 
-		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
-			renderGraph.BeginNativeRenderPass(camera.ScaledViewSize());
+			renderGraph.BeginNativeRenderPass(viewRenderData.viewSize);
 		}),
 
 		new TerrainRenderer(renderGraph, asset.TerrainSettings, quadtreeCull),
-		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			using var pass = renderGraph.AddObjectRenderPass("Gbuffer");
 
-			var (cameraTarget, previousScene, currentSceneCreated) = cameraTargetCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			var (cameraTarget, previousScene, currentSceneCreated) = cameraTargetCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 			renderGraph.SetRTHandle<CameraTarget>(cameraTarget);
 			renderGraph.SetRTHandle<PreviousCameraTarget>(previousScene);
 
-			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
-			pass.Initialize("Deferred", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
+			pass.Initialize("Deferred", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
@@ -202,17 +201,17 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<AutoExposureData>();
 		}),
 
-		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			using var pass = renderGraph.AddObjectRenderPass("Velocity");
 
-			var (velocity, previousVelocity, currentVelocityCreated) = cameraVelocityCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			var (velocity, previousVelocity, currentVelocityCreated) = cameraVelocityCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 			renderGraph.SetRTHandle<CameraVelocity>(velocity);
 			renderGraph.SetRTHandle<PreviousCameraVelocity>(previousVelocity);
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
-			pass.Initialize("MotionVectors", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.MotionVectors, false);
+			pass.Initialize("MotionVectors", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.MotionVectors, false);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
@@ -226,13 +225,13 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<AutoExposureData>();
 		}),
 
-		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
 			using var pass = renderGraph.AddObjectRenderPass("GrassVelocity");
 
-			pass.Initialize("GrassVelocity", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, false);
+			pass.Initialize("GrassVelocity", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, false);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
@@ -246,7 +245,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<AutoExposureData>();
 		}),
 
-		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			renderGraph.EndNativeRenderPass();
 		}),
@@ -254,7 +253,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
 
 		// This is just here to avoid memory leaks when GPU driven rendering isn't used.
-        new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+        new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			using var pass = renderGraph.AddGenericRenderPass("HiZ Read Temp");
 			pass.ReadRtHandle<HiZMaxDepth>();
@@ -269,19 +268,19 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new VirtualTerrain(renderGraph, asset.TerrainSettings),
 
 		// Decals
-		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
-			var decalAlbedo = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+			var decalAlbedo = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 			renderGraph.SetRTHandle<DecalAlbedo>(decalAlbedo);
 
-			var decalNormal = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+			var decalNormal = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 			renderGraph.SetRTHandle<DecalNormal>(decalNormal);
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
 			using var pass = renderGraph.AddObjectRenderPass("Decal");
 
-			pass.Initialize("Decal", context, cullingResults, camera, RenderQueueRange.opaque, SortingCriteria.QuantizedFrontToBack, PerObjectData.None);
+			pass.Initialize("Decal", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.QuantizedFrontToBack, PerObjectData.None);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(decalAlbedo);
 			pass.WriteTexture(decalNormal);
@@ -298,14 +297,14 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new DecalComposite(renderGraph),
 
         // Copy scene depth (Required for underwater lighting)
-		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			ResourceHandle<RenderTexture> cameraDepthCopy = default;
 
             // TODO: Could avoid this by using another depth texture for water.. will require some extra logic in other passes though
             using var pass = renderGraph.AddGenericRenderPass("Copy Depth Texture", (renderGraph.GetRTHandle<CameraDepth>(), cameraDepthCopy));
 
-			var (depthCopy, previousDepthCopy, depthCopyCreated) = cameraDepthCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			var (depthCopy, previousDepthCopy, depthCopyCreated) = cameraDepthCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 			renderGraph.SetRTHandle<PreviousCameraDepth>(previousDepthCopy);
 			renderGraph.SetRTHandle<CameraDepthCopy>(depthCopy, subElement: RenderTextureSubElement.Depth);
 
@@ -359,7 +358,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// TODO: Could render clouds after deferred, then sky after that
 		new DeferredLighting(renderGraph, asset.Sky),
 
-		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
             // Generate for next frame
             using (var pass = renderGraph.AddGenericRenderPass("Generate Color Pyramid", renderGraph.GetRTHandle<CameraTarget>()))
@@ -378,12 +377,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new VolumetricClouds(asset.Clouds, renderGraph, asset.Sky),
 		new Sky(renderGraph, asset.Sky),
 
-		new GenericCameraRenderFeature(renderGraph, (camera, context) =>
+		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			using var pass = renderGraph.AddObjectRenderPass("Render Transparent");
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
-			pass.Initialize("SRPDefaultUnlit", context, cullingResults, camera, RenderQueueRange.transparent, SortingCriteria.CommonTransparent, PerObjectData.None, false);
+			pass.Initialize("SRPDefaultUnlit", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.transparent, SortingCriteria.CommonTransparent, PerObjectData.None, false);
 
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepth);
@@ -458,53 +457,4 @@ internal struct FrameDataStruct
 		this.sinSigmaSq = sinSigmaSq;
 		Item17 = item17;
 	}
-
-	public override bool Equals(object obj) => obj is FrameDataStruct other && EqualityComparer<Float4x4>.Default.Equals(overlayMatrix, other.overlayMatrix) && Item2 == other.Item2 && Item3 == other.Item3 && Item4 == other.Item4 && Item5 == other.Item5 && Item6 == other.Item6 && sunCosAngle == other.sunCosAngle && Item8 == other.Item8 && Item9 == other.Item9 && Item10 == other.Item10 && Item11 == other.Item11 && Item12 == other.Item12 && Item13 == other.Item13 && Item14 == other.Item14 && Item15 == other.Item15 && sinSigmaSq == other.sinSigmaSq && Item17 == other.Item17;
-
-	public override int GetHashCode()
-	{
-		var hash = new System.HashCode();
-		hash.Add(overlayMatrix);
-		hash.Add(Item2);
-		hash.Add(Item3);
-		hash.Add(Item4);
-		hash.Add(Item5);
-		hash.Add(Item6);
-		hash.Add(sunCosAngle);
-		hash.Add(Item8);
-		hash.Add(Item9);
-		hash.Add(Item10);
-		hash.Add(Item11);
-		hash.Add(Item12);
-		hash.Add(Item13);
-		hash.Add(Item14);
-		hash.Add(Item15);
-		hash.Add(sinSigmaSq);
-		hash.Add(Item17);
-		return hash.ToHashCode();
-	}
-
-	public void Deconstruct(out Float4x4 overlayMatrix, out float item2, out float item3, out float item4, out float item5, out float item6, out float sunCosAngle, out float item8, out float item9, out float item10, out float item11, out float item12, out float item13, out int item14, out int item15, out float sinSigmaSq, out float item17)
-	{
-		overlayMatrix = this.overlayMatrix;
-		item2 = Item2;
-		item3 = Item3;
-		item4 = Item4;
-		item5 = Item5;
-		item6 = Item6;
-		sunCosAngle = this.sunCosAngle;
-		item8 = Item8;
-		item9 = Item9;
-		item10 = Item10;
-		item11 = Item11;
-		item12 = Item12;
-		item13 = Item13;
-		item14 = Item14;
-		item15 = Item15;
-		sinSigmaSq = this.sinSigmaSq;
-		item17 = Item17;
-	}
-
-	public static implicit operator (Float4x4 overlayMatrix, float, float, float, float, float, float sunCosAngle, float, float, float, float, float, float, int, int, float sinSigmaSq, float)(FrameDataStruct value) => (value.overlayMatrix, value.Item2, value.Item3, value.Item4, value.Item5, value.Item6, value.sunCosAngle, value.Item8, value.Item9, value.Item10, value.Item11, value.Item12, value.Item13, value.Item14, value.Item15, value.sinSigmaSq, value.Item17);
-	public static implicit operator FrameDataStruct((Float4x4 overlayMatrix, float, float, float, float, float, float sunCosAngle, float, float, float, float, float, float, int, int, float sinSigmaSq, float) value) => new FrameDataStruct(value.overlayMatrix, value.Item2, value.Item3, value.Item4, value.Item5, value.Item6, value.sunCosAngle, value.Item8, value.Item9, value.Item10, value.Item11, value.Item12, value.Item13, value.Item14, value.Item15, value.sinSigmaSq, value.Item17);
 }

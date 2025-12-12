@@ -1,8 +1,7 @@
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering;
 
-public class GenerateHiZ : CameraRenderFeature
+public class GenerateHiZ : ViewRenderFeature
 {
 	private readonly IndexedShaderPropertyId resultIds = new("_Result");
 	private readonly ComputeShader computeShader;
@@ -14,22 +13,22 @@ public class GenerateHiZ : CameraRenderFeature
 		this.mode = mode;
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		using var scope = renderGraph.AddProfileScope("Generate HiZ");
 
 		var kernel = (int)mode * 2;
-		var mipCount = Texture2DExtensions.MipCount(camera.scaledPixelWidth, camera.scaledPixelHeight);
+		var mipCount = Texture2DExtensions.MipCount(viewRenderData.viewSize);
 		var maxMipsPerPass = 6;
 		var hasSecondPass = mipCount > maxMipsPerPass;
 
 		// Set is screen to true to get exact fit
-		var result = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R32_SFloat, hasMips: true, isScreenTexture: true);
+		var result = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R32_SFloat, hasMips: true, isScreenTexture: true);
 
 		// First pass
-		using (var pass = renderGraph.AddComputeRenderPass("Hi Z First Pass", (camera.ScaledViewSize(), hasSecondPass ? maxMipsPerPass : mipCount, renderGraph.GetRTHandle<CameraDepth>())))
+		using (var pass = renderGraph.AddComputeRenderPass("Hi Z First Pass", (viewRenderData.viewSize, hasSecondPass ? maxMipsPerPass : mipCount, renderGraph.GetRTHandle<CameraDepth>())))
 		{
-			pass.Initialize(computeShader, kernel, camera.scaledPixelWidth, camera.scaledPixelHeight);
+			pass.Initialize(computeShader, kernel, viewRenderData.viewSize.x, viewRenderData.viewSize.y);
 			pass.ReadTexture("_Input", renderGraph.GetRTHandle<CameraDepth>());
 
 			for (var i = 0; i < maxMipsPerPass; i++)
@@ -51,9 +50,9 @@ public class GenerateHiZ : CameraRenderFeature
 		// Second pass if needed
 		if (hasSecondPass)
 		{
-			using (var pass = renderGraph.AddComputeRenderPass("Hi Z Second Pass", (camera.ScaledViewSize(), maxMipsPerPass, mipCount)))
+			using (var pass = renderGraph.AddComputeRenderPass("Hi Z Second Pass", (viewRenderData.viewSize, maxMipsPerPass, mipCount)))
 			{
-				pass.Initialize(computeShader, kernel + 1, camera.scaledPixelWidth >> (maxMipsPerPass - 1), camera.scaledPixelHeight >> (maxMipsPerPass - 1));
+				pass.Initialize(computeShader, kernel + 1, viewRenderData.viewSize.x >> (maxMipsPerPass - 1), viewRenderData.viewSize.y >> (maxMipsPerPass - 1));
 
 				for (var i = 0; i < maxMipsPerPass; i++)
 				{

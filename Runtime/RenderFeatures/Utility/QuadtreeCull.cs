@@ -44,7 +44,7 @@ public class QuadtreeCull
 		if (dispatchCount > 1)
 		{
 			// If more than one dispatch, we need to write lods out to a temp texture first. Otherwise they are done via shared memory so no texture is needed
-			tempLodId = renderGraph.GetTexture(cellCount, cellCount, GraphicsFormat.R16_UInt);
+			tempLodId = renderGraph.GetTexture(cellCount, GraphicsFormat.R16_UInt);
 			lodIndirectArgsBuffer = renderGraph.GetBuffer(3, target: GraphicsBuffer.Target.IndirectArguments);
 		}
 
@@ -52,7 +52,7 @@ public class QuadtreeCull
 		for (var i = 0; i < dispatchCount - 1; i++)
 		{
 			var tempResolution = 1 << ((i + 1) * (maxPassesPerDispatch - 1));
-			tempIds.Add(renderGraph.GetTexture(tempResolution, tempResolution, GraphicsFormat.R16_UInt));
+			tempIds.Add(renderGraph.GetTexture(tempResolution, GraphicsFormat.R16_UInt));
 		}
 
 		var patchDataBuffer = renderGraph.GetBuffer(cellCount * cellCount, target: GraphicsBuffer.Target.Structured);

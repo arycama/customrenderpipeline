@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
-using UnityEngine.Rendering;
 
-public class GpuDrivenRenderingRender : CameraRenderFeature
+public class GpuDrivenRenderingRender : ViewRenderFeature
 {
 	private GpuDrivenRenderer gpuDrivenRenderer;
 
@@ -10,9 +9,9 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 		this.gpuDrivenRenderer = gpuDrivenRenderer;
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
-		if (camera.cameraType != CameraType.SceneView && camera.cameraType != CameraType.Game && camera.cameraType != CameraType.Reflection)
+	public override void Render(ViewRenderData viewRenderData)
+    {
+		if (viewRenderData.camera.cameraType != CameraType.SceneView && viewRenderData.camera.cameraType != CameraType.Game && viewRenderData.camera.cameraType != CameraType.Reflection)
 			return;
 
 		if (!renderGraph.ResourceMap.TryGetResource<GpuDrivenRenderingData>(renderGraph.FrameIndex, out var instanceData))
@@ -24,7 +23,7 @@ public class GpuDrivenRenderingRender : CameraRenderFeature
 		using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
 
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
-		var renderingData = gpuDrivenRenderer.Setup(camera.ScaledViewSize(), false, cullingPlanes, instanceData);
+		var renderingData = gpuDrivenRenderer.Setup(viewRenderData.viewSize, false, cullingPlanes, instanceData);
 
 		using var renderScope = renderGraph.AddProfileScope("Render");
 

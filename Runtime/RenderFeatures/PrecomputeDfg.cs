@@ -13,8 +13,8 @@ public class PrecomputeDfg : FrameRenderFeature
 	{
 		precomputeDfgMaterial = new Material(Shader.Find("Hidden/PrecomputeDfg")) { hideFlags = HideFlags.HideAndDontSave };
 
-		precomputeDfg = renderGraph.GetTexture(32, 32, GraphicsFormat.R16G16_UNorm, isPersistent: true, isExactSize: true);
-		directionalAlbedo = renderGraph.GetTexture(32, 32, GraphicsFormat.R16_UNorm, isPersistent: true, isExactSize: true);
+		precomputeDfg = renderGraph.GetTexture(32, GraphicsFormat.R16G16_UNorm, isPersistent: true, isExactSize: true);
+		directionalAlbedo = renderGraph.GetTexture(32, GraphicsFormat.R16_UNorm, isPersistent: true, isExactSize: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Precompute Dfg"))
 		{
 			pass.Initialize(precomputeDfgMaterial, 0);
@@ -22,7 +22,7 @@ public class PrecomputeDfg : FrameRenderFeature
 			pass.WriteTexture(directionalAlbedo);
 		}
 
-		averageAlbedo = renderGraph.GetTexture(32, 1, GraphicsFormat.R16_UNorm, isPersistent: true);
+		averageAlbedo = renderGraph.GetTexture(new(32, 1), GraphicsFormat.R16_UNorm, isPersistent: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Average Albedo"))
 		{
 			pass.Initialize(precomputeDfgMaterial, 1);
@@ -30,7 +30,7 @@ public class PrecomputeDfg : FrameRenderFeature
 			pass.ReadTexture("DirectionalAlbedo", directionalAlbedo);
 		}
 
-		directionalAlbedoMs = renderGraph.GetTexture(16, 16, GraphicsFormat.R16_UNorm, 16, TextureDimension.Tex3D, isPersistent: true);
+		directionalAlbedoMs = renderGraph.GetTexture(16, GraphicsFormat.R16_UNorm, 16, TextureDimension.Tex3D, isPersistent: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Directional Albedo Ms"))
 		{
 			pass.Initialize(precomputeDfgMaterial, 2);
@@ -38,7 +38,7 @@ public class PrecomputeDfg : FrameRenderFeature
 			pass.ReadTexture("DirectionalAlbedo", directionalAlbedo);
 		}
 
-		averageAlbedoMs = renderGraph.GetTexture(16, 16, GraphicsFormat.R16_UNorm, isPersistent: true);
+		averageAlbedoMs = renderGraph.GetTexture(16, GraphicsFormat.R16_UNorm, isPersistent: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Average Albedo Ms"))
 		{
 			pass.Initialize(precomputeDfgMaterial, 3);
@@ -46,7 +46,7 @@ public class PrecomputeDfg : FrameRenderFeature
 			pass.ReadTexture("DirectionalAlbedoMs", directionalAlbedoMs);
 		}
 
-		specularOcclusion = renderGraph.GetTexture(32, 32, GraphicsFormat.R16_UNorm, 32 * 32, TextureDimension.Tex3D, isPersistent: true);
+		specularOcclusion = renderGraph.GetTexture(32, GraphicsFormat.R16_UNorm, 32 * 32, TextureDimension.Tex3D, isPersistent: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Specular Occlusion"))
 		{
 			pass.Initialize(precomputeDfgMaterial, 4, 32);

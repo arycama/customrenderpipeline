@@ -2,7 +2,7 @@
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class DiffuseGlobalIllumination : CameraRenderFeature
+public partial class DiffuseGlobalIllumination : ViewRenderFeature
 {
     private readonly Material material;
     private readonly Settings settings;
@@ -26,12 +26,12 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
         temporalWeightCache.Dispose();
     }
 
-    public override void Render(Camera camera, ScriptableRenderContext context)
+    public override void Render(ViewRenderData viewRenderData)
     {
 		using var scope = renderGraph.AddProfileScope("Diffuse Global Illumination");
 
-        var tempResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
-        var hitResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+        var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+        var hitResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
 
         if (settings.UseRaytracing)
         {
@@ -53,7 +53,7 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
             {
                 var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, camera.scaledPixelWidth, camera.scaledPixelHeight, 1, raytracingData.Bias, raytracingData.DistantBias, camera.TanHalfFovY());
+                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewRenderData.viewSize.x, viewRenderData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewRenderData.tanHalfFov.y);
                 pass.WriteTexture(tempResult, "HitColor");
                 pass.WriteTexture(hitResult, "HitResult");
 				pass.ReadRtHandle<GBufferNormalRoughness>();
@@ -70,7 +70,7 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
 		}
         else
         {
-			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Trace", (settings.Intensity, settings.MaxSamples, settings.Thickness, camera.ScaledViewSize(), settings.ConeAngle, camera.TanHalfFovY())))
+			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Trace", (settings.Intensity, settings.MaxSamples, settings.Thickness, viewRenderData.viewSize, settings.ConeAngle, viewRenderData.tanHalfFov.y)))
 			{
 				pass.Initialize(material);
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
@@ -97,14 +97,14 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
 					pass.SetFloat("_MaxSteps", data.MaxSamples);
 					pass.SetFloat("_Thickness", data.Thickness);
 					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.Item4) - 1);
-					pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * data.ConeAngle * Mathf.Deg2Rad) * (data.Item4.y / data.Item6 * 0.5f));
+					pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * data.ConeAngle * Mathf.Deg2Rad) * (data.viewSize.y / data.Item6 * 0.5f));
 				});
 			}
         }
 
-        var spatialResult = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-        var spatialWeight = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16_UNorm, isScreenTexture: true);
-        var rayDepth = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.R16_SFloat, isScreenTexture: true);
+        var spatialResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var spatialWeight = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_UNorm, isScreenTexture: true);
+        var rayDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Spatial", (settings.Intensity, settings.MaxSamples, settings.Thickness, settings.ResolveSamples, settings.ResolveSize)))
         {
             pass.Initialize(material, 1);
@@ -144,8 +144,8 @@ public partial class DiffuseGlobalIllumination : CameraRenderFeature
 
         using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Temporal", (wasCreated, history, settings.Intensity, settings.MaxSamples, settings.Thickness)))
         {
-			(current, history, wasCreated) = temporalCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
-			var (currentWeight, historyWeight, wasCreatedWeight) = temporalWeightCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			(current, history, wasCreated) = temporalCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+			var (currentWeight, historyWeight, wasCreatedWeight) = temporalWeightCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 
 			pass.renderData.wasCreated = wasCreated;
 			pass.renderData.history = history;

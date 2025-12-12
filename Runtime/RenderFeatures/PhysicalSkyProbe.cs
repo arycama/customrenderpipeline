@@ -1,9 +1,8 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering;
 
-public class PhysicalSkyProbe : CameraRenderFeature
+public class PhysicalSkyProbe : ViewRenderFeature
 {
 	public override string ProfilerNameOverride => "Ggx Convolve";
 
@@ -11,7 +10,7 @@ public class PhysicalSkyProbe : CameraRenderFeature
 	private readonly EnvironmentLightingSettings environmentLighting;
 	private readonly VolumetricClouds.Settings cloudSettings;
 	private readonly Sky.Settings skySettings;
-	private readonly Dictionary<Camera, ResourceHandle<RenderTexture>> cameraProbeHandles = new();
+	private readonly Dictionary<int, ResourceHandle<RenderTexture>> cameraProbeHandles = new();
 
 	public PhysicalSkyProbe(RenderGraph renderGraph, EnvironmentLightingSettings environmentLighting, VolumetricClouds.Settings cloudSettings, Sky.Settings skySettings) : base(renderGraph)
 	{
@@ -27,14 +26,14 @@ public class PhysicalSkyProbe : CameraRenderFeature
 			renderGraph.ReleasePersistentResource(probe.Value, -1);
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		using var scope = renderGraph.AddProfileScope("Environment Probe Update");
 
-		if(!cameraProbeHandles.TryGetValue(camera, out var reflectionProbeTemp))
+		if(!cameraProbeHandles.TryGetValue(viewRenderData.viewId, out var reflectionProbeTemp))
 		{
-			reflectionProbeTemp = renderGraph.GetTexture(environmentLighting.Resolution, environmentLighting.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true, isPersistent: true, isExactSize: true);
-			cameraProbeHandles.Add(camera, reflectionProbeTemp);
+			reflectionProbeTemp = renderGraph.GetTexture(environmentLighting.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true, isPersistent: true, isExactSize: true);
+			cameraProbeHandles.Add(viewRenderData.viewId, reflectionProbeTemp);
 		}
 
 		var time = (float)renderGraph.GetResource<TimeData>().time;
@@ -43,7 +42,7 @@ public class PhysicalSkyProbe : CameraRenderFeature
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Reflection Probe"), 1);
 
 			var keyword = string.Empty;
-			var viewHeight = camera.transform.position.y;
+			var viewHeight = viewRenderData.transform.position.y;
 			if (viewHeight > cloudSettings.StartHeight)
 			{
 				if (viewHeight > cloudSettings.StartHeight + cloudSettings.LayerThickness)

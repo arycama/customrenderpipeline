@@ -18,6 +18,12 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
 		ScreenHeight = Math.Max(height, ScreenHeight);
 	}
 
+	public void ResetScreenSize()
+	{
+		ScreenWidth = 0;
+		ScreenHeight = 0;
+	}
+
 	protected override void DestroyResource(RenderTexture resource) => Object.DestroyImmediate(resource);
 
 	protected override RtHandleDescriptor CreateDescriptorFromResource(RenderTexture resource) => new(resource.width, resource.height, resource.graphicsFormat, resource.volumeDepth, resource.dimension, false, resource.useMipMap, resource.autoGenerateMips);

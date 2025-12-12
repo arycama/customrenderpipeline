@@ -1,8 +1,7 @@
 ﻿using UnityEngine;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering;
 
-public class EnvironmentConvolve : CameraRenderFeature
+public class EnvironmentConvolve : ViewRenderFeature
 {
 	public override string ProfilerNameOverride => "Ggx Convolve";
 
@@ -15,8 +14,8 @@ public class EnvironmentConvolve : CameraRenderFeature
 		this.settings = settings;
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		using var scope = renderGraph.AddProfileScope("Environment Probe Convolve");
 
 		var ambientComputeShader = Resources.Load<ComputeShader>("AmbientProbe");
@@ -46,7 +45,7 @@ public class EnvironmentConvolve : CameraRenderFeature
 			});
 		}
 
-		var reflectionProbe = renderGraph.GetTexture(settings.Resolution, settings.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true);
+		var reflectionProbe = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true);
 		var ambientBuffer = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
 		var reflectionProbeTemp = renderGraph.GetResource<EnvironmentProbeTempResult>();
 

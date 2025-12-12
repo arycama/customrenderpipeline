@@ -4,7 +4,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
-public partial class Sky : CameraRenderFeature
+public partial class Sky : ViewRenderFeature
 {
 	private readonly Settings settings;
 	private readonly Material skyMaterial;
@@ -25,11 +25,11 @@ public partial class Sky : CameraRenderFeature
 		textureCache.Dispose();
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		renderGraph.AddProfileBeginPass("Sky");
 
-		var skyTemp = renderGraph.GetTexture(camera.scaledPixelWidth, camera.scaledPixelHeight, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+		var skyTemp = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Render Sky", settings.RenderSamples))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Render Sky"));
@@ -79,9 +79,9 @@ public partial class Sky : CameraRenderFeature
 		ResourceHandle<RenderTexture> current, history = default;
 
 		// Reprojection
-		using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", new SkyTemporalData(history, wasCreated, settings.StationaryBlend, settings.MotionBlend, settings.MotionFactor, settings.DepthFactor, settings.ClampWindow, settings.MaxFrameCount, camera.ScaledViewSize())))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", new SkyTemporalData(history, wasCreated, settings.StationaryBlend, settings.MotionBlend, settings.MotionFactor, settings.DepthFactor, settings.ClampWindow, settings.MaxFrameCount, viewRenderData.viewSize)))
 		{
-			(current, history, wasCreated) = textureCache.GetTextures(camera.scaledPixelWidth, camera.scaledPixelHeight, pass.Index, camera);
+			(current, history, wasCreated) = textureCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 
 			pass.renderData.history = history;
 			pass.renderData.wasCreated = wasCreated;

@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
-using System;
 
 
 #if UNITY_EDITOR
@@ -11,22 +10,20 @@ using UnityEditorInternal;
 public abstract class CustomRenderPipelineBase : RenderPipeline
 {
     private List<FrameRenderFeature> perFrameRenderFeatures;
-    private List<CameraRenderFeature> perCameraRenderFeatures;
+    private List<ViewRenderFeature> perCameraRenderFeatures;
 
     private readonly CommandBuffer command;
 
     protected readonly RenderGraph renderGraph;
     private bool isInitialized;
     private readonly bool renderDocLoaded;
+    private readonly List<ViewRenderData> viewRenderDatas = new();
 
     public bool IsDisposingFromRenderDoc { get; protected set; }
 
     protected abstract SupportedRenderingFeatures SupportedRenderingFeatures { get; }
 
     protected abstract bool UseSrpBatching { get; }
-
-    /// <summary> If set to false, manually call RtHandleSystem.SetScreenSize with the desired camera width/height, used for XR where the resolution needs to come from the XRSubsystem display </summary>
-    protected virtual bool UseDefaultCameraResolution => true;
 
     public CustomRenderPipelineBase()
     {
@@ -60,7 +57,26 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
 	protected abstract List<FrameRenderFeature> InitializePerFrameRenderFeatures();
 
-	protected abstract List<CameraRenderFeature> InitializePerCameraRenderFeatures();
+	protected abstract List<ViewRenderFeature> InitializePerCameraRenderFeatures();
+
+    /// <summary> Creates a list of render loops that will be rendered </summary>
+    protected virtual void CollectViewRenderData(List<Camera> cameras, ScriptableRenderContext context, List<ViewRenderData> viewRenderDatas)
+    {
+        // Calculate max screen size
+        int screenWidth = 0, screenHeight = 0;
+        foreach(var camera in cameras)
+        {
+            screenWidth = Math.Max(screenWidth, camera.scaledPixelWidth);
+            screenHeight = Math.Max(screenHeight, camera.scaledPixelHeight);
+        }
+
+        foreach(var camera in cameras)
+        {
+            // Somewhat hacky.. but this is kind of required to deal with some unity hacks so meh
+            camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
+            viewRenderDatas.Add(new ViewRenderData(camera.ViewSize(), new(screenWidth, screenHeight), camera.nearClipPlane, camera.farClipPlane, camera.TanHalfFov(), camera.transform.WorldRigidTransform(), camera, context));
+        }
+    }
 
 	protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
@@ -84,7 +100,10 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 			isInitialized = true;
 		}
 
-		using (renderGraph.AddProfileScope("Prepare Frame"))
+        viewRenderDatas.Clear();
+        CollectViewRenderData(cameras, context, viewRenderDatas);
+
+        using (renderGraph.AddProfileScope("Prepare Frame"))
 		{
 			foreach (var frameRenderFeature in perFrameRenderFeatures)
 			{
@@ -92,25 +111,23 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 			}
 		}
 
-		foreach (var camera in cameras)
+		foreach (var viewRenderData in viewRenderDatas)
         {
-			camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
 
             using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
 
-            if(UseDefaultCameraResolution)
-                renderGraph.RtHandleSystem.SetScreenSize(Math.Max(camera.pixelWidth, camera.scaledPixelWidth), Math.Max(camera.pixelHeight, camera.scaledPixelHeight));
+            renderGraph.RtHandleSystem.SetScreenSize(viewRenderData.viewSize.x, viewRenderData.viewSize.y);
 
             foreach (var cameraRenderFeature in perCameraRenderFeatures)
             {
-                cameraRenderFeature.Render(camera, context);
+                cameraRenderFeature.Render(viewRenderData);
             }
 
             // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
-            if (camera.cameraType == CameraType.Game && camera == Camera.main)
+            if (viewRenderData.camera.cameraType == CameraType.Game && viewRenderData.camera == Camera.main)
             {
-				var wireOverlay = context.CreateWireOverlayRendererList(camera);
-				var uiOverlay = context.CreateUIOverlayRendererList(camera);
+				var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
+				var uiOverlay = context.CreateUIOverlayRendererList(viewRenderData.camera);
 
 				using var pass = renderGraph.AddGenericRenderPass("UI Overlay", (uiOverlay, wireOverlay));
                 pass.UseProfiler = false;

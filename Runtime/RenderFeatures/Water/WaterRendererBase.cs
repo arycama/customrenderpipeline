@@ -1,8 +1,6 @@
 ﻿using UnityEngine;
-using UnityEngine.Experimental.Rendering;
-using UnityEngine.Pool;
 
-public abstract class WaterRendererBase : CameraRenderFeature
+public abstract class WaterRendererBase : ViewRenderFeature
 {
     protected ResourceHandle<GraphicsBuffer> indexBuffer;
     protected WaterSettings settings;

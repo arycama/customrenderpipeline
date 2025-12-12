@@ -6,7 +6,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class VirtualTerrain : CameraRenderFeature
+public class VirtualTerrain : ViewRenderFeature
 {
 	private readonly TerrainSettings settings;
 
@@ -44,7 +44,7 @@ public class VirtualTerrain : CameraRenderFeature
 		this.settings = settings;
 
 		// Contains a simple 0 or 1 indicating if a pixel is mapped.
-		indirectionTextureMapTexture = renderGraph.GetTexture(IndirectionSize, IndirectionSize, GraphicsFormat.R8_UNorm, hasMips: true, isRandomWrite: true, isPersistent: true);
+		indirectionTextureMapTexture = renderGraph.GetTexture(IndirectionSize, GraphicsFormat.R8_UNorm, hasMips: true, isRandomWrite: true, isPersistent: true);
 
 		indirectionTexturePixels = new bool[IndirectionSize, IndirectionSize, IndirectionMips];
 
@@ -78,8 +78,8 @@ public class VirtualTerrain : CameraRenderFeature
 		}
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		// Ensure terrain system data is set
 		if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
 			return;
@@ -122,7 +122,7 @@ public class VirtualTerrain : CameraRenderFeature
 
 		// Worst case scenario would be every pixel requesting a different patch+uv, though this is never going to happen in practice
 		// Allocate the largest we need, plus one pixel since we include the 'count' as the first element
-		maxRequestBufferSize = Math.Max(maxRequestBufferSize, camera.scaledPixelWidth * camera.scaledPixelHeight + 1);
+		maxRequestBufferSize = Math.Max(maxRequestBufferSize, viewRenderData.viewSize.x * viewRenderData.viewSize.y + 1);
 		if(requestBuffer == null || !requestBuffer.IsValid() || requestBuffer.count < maxRequestBufferSize)
 		{
 			if (requestBuffer != null && requestBuffer.IsValid())
@@ -413,9 +413,9 @@ public class VirtualTerrain : CameraRenderFeature
 
 		// TODO: Should these be texture arrays instead?
 		var updateTempWidth = settings.TileResolution;
-		var virtualAlbedoTemp = renderGraph.GetTexture(settings.TileResolution, settings.TileResolution, GraphicsFormat.R8G8B8A8_SRGB, settings.UpdateTileCount, TextureDimension.Tex2DArray, isExactSize: true);
-		var virtualNormalTemp = renderGraph.GetTexture(settings.TileResolution, settings.TileResolution, GraphicsFormat.R8G8B8A8_UNorm, settings.UpdateTileCount, TextureDimension.Tex2DArray, isExactSize: true);
-		var virtualHeightTemp = renderGraph.GetTexture(settings.TileResolution, settings.TileResolution, GraphicsFormat.R8_UNorm, settings.UpdateTileCount, TextureDimension.Tex2DArray, isExactSize: true);
+		var virtualAlbedoTemp = renderGraph.GetTexture(settings.TileResolution, GraphicsFormat.R8G8B8A8_SRGB, settings.UpdateTileCount, TextureDimension.Tex2DArray, isExactSize: true);
+		var virtualNormalTemp = renderGraph.GetTexture(settings.TileResolution, GraphicsFormat.R8G8B8A8_UNorm, settings.UpdateTileCount, TextureDimension.Tex2DArray, isExactSize: true);
+		var virtualHeightTemp = renderGraph.GetTexture(settings.TileResolution, GraphicsFormat.R8_UNorm, settings.UpdateTileCount, TextureDimension.Tex2DArray, isExactSize: true);
 
 		var scaleOffsetsBuffer = renderGraph.GetBuffer(scaleOffsets.Count, sizeof(float) * 4);
 
@@ -449,9 +449,9 @@ public class VirtualTerrain : CameraRenderFeature
 			});
 		}
 
-		var albedoCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, settings.TileResolution >> 2, GraphicsFormat.R32G32B32A32_UInt, settings.UpdateTileCount, TextureDimension.Tex2DArray, hasMips: true);
-		var normalCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, settings.TileResolution >> 2, GraphicsFormat.R32G32B32A32_UInt, settings.UpdateTileCount, TextureDimension.Tex2DArray, hasMips: true);
-		var heightCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, settings.TileResolution >> 2, GraphicsFormat.R32G32_UInt, settings.UpdateTileCount, TextureDimension.Tex2DArray, hasMips: true);
+		var albedoCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, GraphicsFormat.R32G32B32A32_UInt, settings.UpdateTileCount, TextureDimension.Tex2DArray, hasMips: true);
+		var normalCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, GraphicsFormat.R32G32B32A32_UInt, settings.UpdateTileCount, TextureDimension.Tex2DArray, hasMips: true);
+		var heightCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, GraphicsFormat.R32G32_UInt, settings.UpdateTileCount, TextureDimension.Tex2DArray, hasMips: true);
 
 		using (var pass = renderGraph.AddComputeRenderPass("Compress"))
 		{

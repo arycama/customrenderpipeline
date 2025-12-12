@@ -7,7 +7,7 @@ using UnityEngine.Rendering;
 using static Math;
 using Object = UnityEngine.Object;
 
-public class ParticleShadows : CameraRenderFeature
+public class ParticleShadows : ViewRenderFeature
 {
 	[Serializable]
 	public class Settings
@@ -41,8 +41,8 @@ public class ParticleShadows : CameraRenderFeature
 		cameras.Clear();
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		using var renderShadowsScope = renderGraph.AddProfileScope("Particle Shadows");
 
 		// TODO: Allocate 1 big atlas
@@ -54,7 +54,7 @@ public class ParticleShadows : CameraRenderFeature
 		var directionalShadowCount = Max(1, requestData.directionalShadowRequests.Count);
 
 		// Since 3D texture arrays aren't a thing, allocate one wide texture
-		var directionalShadows = renderGraph.GetTexture(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isExactSize: true, clearFlags: RTClearFlags.Color, clearColor: Color.white);
+		var directionalShadows = renderGraph.GetTexture(new(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isExactSize: true, clearFlags: RTClearFlags.Color, clearColor: Color.white);
 
 		using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", directionalShadows))
 		{
@@ -65,7 +65,7 @@ public class ParticleShadows : CameraRenderFeature
 		void RenderShadowMap(ShadowRequest request, ResourceHandle<RenderTexture> target, int index, bool flipY, bool zClip, bool isPointLight)
 		{
 			var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
-			var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, camera.transform.position, 0, request.LightPosition, 0));
+			var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, viewRenderData.transform.position, 0, request.LightPosition, 0));
 
 			while (cameras.Count <= index)
 			{
@@ -97,8 +97,8 @@ public class ParticleShadows : CameraRenderFeature
 			using (var pass = renderGraph.AddObjectRenderPass("Particle Shadows", (target, index, settings.DirectionalResolution, settings.DirectionalDepth, zClip, voxelSize)))
 			{
 				cullingPrameters.cullingOptions = CullingOptions.ForceEvenIfCameraIsNotActive | CullingOptions.DisablePerObjectCulling;
-				var cullingResults = context.Cull(ref cullingPrameters);
-				pass.Initialize("ParticleShadow", context, cullingResults, particleCamera, RenderQueueRange.transparent, SortingCriteria.CommonTransparent);
+				var cullingResults = viewRenderData.context.Cull(ref cullingPrameters);
+				pass.Initialize("ParticleShadow", viewRenderData.context, cullingResults, particleCamera, RenderQueueRange.transparent, SortingCriteria.CommonTransparent);
 				pass.DepthSlice = -1;
 
 				// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
@@ -139,7 +139,7 @@ public class ParticleShadows : CameraRenderFeature
 		}
 
 		// Accumulate directional shadows
-		var result = renderGraph.GetTexture(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true);
+		var result = renderGraph.GetTexture(new(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true);
 		var shadowSteps = renderGraph.GetBuffer(directionalShadowCount);
 
 		using (var pass = renderGraph.AddComputeRenderPass("Particle Shadow Directional Accumulate", (settings.DirectionalDepth, settings.DirectionalResolution, shadowSteps, directionalShadowSizes)))

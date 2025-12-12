@@ -3,13 +3,13 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public class VolumetricCloudShadow : CameraRenderFeature
+public class VolumetricCloudShadow : ViewRenderFeature
 {
     private readonly VolumetricClouds.Settings settings;
     private readonly Sky.Settings physicalSkySettings;
     private readonly Material material;
     private readonly ComputeShader cloudCoverageComputeShader;
-	private Dictionary<Camera, ResourceHandle<GraphicsBuffer>> perCameraCoverage = new();
+	private Dictionary<int, ResourceHandle<GraphicsBuffer>> perCameraCoverage = new();
 
     public VolumetricCloudShadow(VolumetricClouds.Settings settings, Sky.Settings physicalSkySettings, RenderGraph renderGraph) : base(renderGraph)
     {
@@ -28,7 +28,7 @@ public class VolumetricCloudShadow : CameraRenderFeature
 		}
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
+	public override void Render(ViewRenderData viewRenderData)
     {
         var lightDirection = Vector3.up;
         var lightRotation = Quaternion.LookRotation(Vector3.down);
@@ -54,7 +54,7 @@ public class VolumetricCloudShadow : CameraRenderFeature
         var radius = settings.ShadowRadius;
         var resolution = settings.ShadowResolution;
         var res = new Vector4(resolution, resolution, 1f / resolution, 1f / resolution);
-        var cameraPosition = camera.transform.position;
+        var cameraPosition = viewRenderData.transform.position;
         var texelSize = radius * 2.0f / resolution;
         var snappedCameraPosition = new Vector3(Mathf.Floor(cameraPosition.x / texelSize) * texelSize, Mathf.Floor(cameraPosition.y / texelSize) * texelSize, Mathf.Floor(cameraPosition.z / texelSize) * texelSize);
 
@@ -109,7 +109,7 @@ public class VolumetricCloudShadow : CameraRenderFeature
         var invViewProjection = invViewMatrix * inverseProjectionMatrix;
         var worldToShadow = projectionMatrix * viewMatrix;
 
-        var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32);
+        var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32);
         var cloudShadowDataBuffer = renderGraph.SetConstantBuffer((invViewProjection, -lightDirection, 1f / depth, 1f / settings.Density, (float)settings.ShadowSamples, 0.0f, 0.0f));
 		var time = (float)renderGraph.GetResource<TimeData>().time;
 
@@ -128,11 +128,11 @@ public class VolumetricCloudShadow : CameraRenderFeature
         }
 
         // Cloud coverage
-		var isFirst = !perCameraCoverage.TryGetValue(camera, out var previousCloudCoverage);
+		var isFirst = !perCameraCoverage.TryGetValue(viewRenderData.viewId, out var previousCloudCoverage);
 		if (isFirst)
 		{
 			previousCloudCoverage = renderGraph.GetBuffer(1, 16, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource, GraphicsBuffer.UsageFlags.None, true);
-			perCameraCoverage.Add(camera, previousCloudCoverage);
+			perCameraCoverage.Add(viewRenderData.viewId, previousCloudCoverage);
 		}
 
 		using (var pass = renderGraph.AddComputeRenderPass("Cloud Coverage", (settings, time, isFirst)))

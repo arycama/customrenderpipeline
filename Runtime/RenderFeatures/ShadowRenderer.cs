@@ -4,7 +4,7 @@ using UnityEngine.Pool;
 using UnityEngine.Rendering;
 using static Math;
 
-public class ShadowRenderer : CameraRenderFeature
+public class ShadowRenderer : ViewRenderFeature
 {
 	private readonly LightingSettings settings;
 	private readonly TerrainShadowRenderer terrainShadowRenderer;
@@ -21,8 +21,8 @@ public class ShadowRenderer : CameraRenderFeature
 		this.gpuDrivenRenderer = gpuDrivenRenderer;
 	}
 
-	public override void Render(Camera camera, ScriptableRenderContext context)
-	{
+	public override void Render(ViewRenderData viewRenderData)
+    {
 		using var renderShadowsScope = renderGraph.AddProfileScope("Render Shadows");
 
 		// TODO: Allocate 1 big atlas
@@ -32,13 +32,13 @@ public class ShadowRenderer : CameraRenderFeature
 
 		// Allocate and clear shadow maps
 		var directionalShadowCount = Max(1, requestData.directionalShadowRequests.Count);
-		var directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, directionalShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
+		var directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, directionalShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
 
 		var pointShadowCount = Max(1, requestData.pointShadowRequests.Count);
-		var pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, settings.PointShadowResolution, GraphicsFormat.D16_UNorm, pointShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
+		var pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, GraphicsFormat.D16_UNorm, pointShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
 
 		var spotShadowCount = Max(1, requestData.spotShadowRequests.Count);
-		var spotShadows = renderGraph.GetTexture(settings.SpotShadowResolution, settings.SpotShadowResolution, GraphicsFormat.D16_UNorm, spotShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
+		var spotShadows = renderGraph.GetTexture(settings.SpotShadowResolution, GraphicsFormat.D16_UNorm, spotShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
 		renderGraph.SetResource(new ShadowData(directionalShadows, pointShadows, spotShadows));
 
 		using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", (directionalShadows, pointShadows, spotShadows)))
@@ -67,7 +67,7 @@ public class ShadowRenderer : CameraRenderFeature
 				using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
 				{
 					var request = requestData.directionalShadowRequests[i];
-					RenderShadowMap(request, BatchCullingProjectionType.Orthographic, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false, false, camera, context, cullingResults);
+					RenderShadowMap(request, BatchCullingProjectionType.Orthographic, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false, false, viewRenderData, cullingResults);
 				}
 			}
 
@@ -82,7 +82,7 @@ public class ShadowRenderer : CameraRenderFeature
 				using (renderGraph.AddProfileScope(pointLightIds[i]))
 				{
 					var request = requestData.pointShadowRequests[i];
-					RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, true, camera, context, cullingResults);
+					RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, true, viewRenderData, cullingResults);
 				}
 			}
 			ListPool<ShadowRequest>.Release(requestData.pointShadowRequests);
@@ -95,7 +95,7 @@ public class ShadowRenderer : CameraRenderFeature
 				using (renderGraph.AddProfileScope(SpotLightIds[i]))
 				{
 					var request = requestData.spotShadowRequests[i];
-					RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, false, camera, context, cullingResults);
+					RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, false, viewRenderData, cullingResults);
 				}
 			}
 
@@ -103,25 +103,25 @@ public class ShadowRenderer : CameraRenderFeature
 		}
 	}
 
-	void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip, bool isPointLight, Camera camera, ScriptableRenderContext context, CullingResults cullingResults)
+	void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip, bool isPointLight, ViewRenderData viewRenderData, CullingResults cullingResults)
 	{
 		var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
-		var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, camera.transform.position, 0, request.LightPosition, 0));
+		var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, viewRenderData.transform.position, 0, request.LightPosition, 0));
 		var shadowRequestData = new ShadowRequestData(request, bias, slopeBias, target, index, perCascadeData, zClip);
 		renderGraph.SetResource(shadowRequestData);
-		terrainShadowRenderer.Render(camera, context);
+		terrainShadowRenderer.Render(viewRenderData);
 
 		if (request.HasCasters)
 		{
 			using (var pass = renderGraph.AddShadowRenderPass("Render Shadow"))
 			{
-				pass.Initialize(context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, isPointLight);
+				pass.Initialize(viewRenderData.context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, isPointLight);
 				pass.DepthSlice = index;
 				pass.WriteDepth(target);
 				pass.ReadResource<ShadowRequestData>();
 			}
 		}
 
-		gpuDrivenRenderer.RenderShadow(camera.transform.position, shadowRequestData, camera.ScaledViewSize());
+		gpuDrivenRenderer.RenderShadow(viewRenderData.transform.position, shadowRequestData, viewRenderData.viewSize);
 	}
 }
