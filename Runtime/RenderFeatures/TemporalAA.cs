@@ -30,7 +30,7 @@ public partial class TemporalAA : ViewRenderFeature
 		bool wasCreated = default;
 		ResourceHandle<RenderTexture> current, history = default;
 
-		var result = renderGraph.GetTexture(viewRenderData.screenSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+		var result = renderGraph.GetTexture(renderGraph.RtHandleSystem.ScreenSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 		using var pass = renderGraph.AddFullscreenRenderPass("Temporal AA", new TemporalAADataStruct
 		(
 			settings.SpatialBlur,
@@ -49,8 +49,8 @@ public partial class TemporalAA : ViewRenderFeature
 		//var keyword = null;// viewData.Scale < 1.0f ? "UPSCALE" : null; // TODO: Implement
 		pass.Initialize(material, 0, 1);
 
-		(current, history, wasCreated) = colorCache.GetTextures(viewRenderData.screenSize, pass.Index, viewRenderData.viewId);
-		var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(viewRenderData.screenSize, pass.Index, viewRenderData.viewId);
+		(current, history, wasCreated) = colorCache.GetTextures(renderGraph.RtHandleSystem.ScreenSize, pass.Index, viewRenderData.viewId);
+		var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(renderGraph.RtHandleSystem.ScreenSize, pass.Index, viewRenderData.viewId);
 
 		pass.renderData.history = history;
 		pass.renderData.hasHistory = wasCreated ? 0f : 1f;

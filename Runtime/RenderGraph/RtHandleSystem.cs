@@ -8,8 +8,9 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
 {
 	public int ScreenWidth { get; private set; }
 	public int ScreenHeight { get; private set; }
+	public Int2 ScreenSize => new(ScreenWidth, ScreenHeight);
 
-	public void SetScreenSize(int width, int height)
+    public void SetScreenSize(int width, int height)
 	{
 		Assert.IsTrue(width > 0);
 		Assert.IsTrue(height > 0);

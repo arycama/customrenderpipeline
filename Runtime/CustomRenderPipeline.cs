@@ -137,9 +137,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	{
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
-			if (!viewRenderData.camera.TryGetCullingParameters(out var cullingParameters))
-				return;
-
 			// For text mesh pro, cbfed rewriting all their shaders
 			viewRenderData.context.SetupCameraProperties(viewRenderData.camera);
 
@@ -150,6 +147,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 #endif
 			ScriptableRenderContext.EmitGeometryForCamera(viewRenderData.camera);
 
+			var cullingParameters = viewRenderData.cullingParameters;
 			cullingParameters.shadowDistance = asset.LightingSettings.DirectionalShadowDistance;
 			cullingParameters.cullingOptions = CullingOptions.NeedsLighting | CullingOptions.DisablePerObjectCulling | CullingOptions.ShadowCasters;
 

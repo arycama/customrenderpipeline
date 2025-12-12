@@ -62,19 +62,15 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
     /// <summary> Creates a list of render loops that will be rendered </summary>
     protected virtual void CollectViewRenderData(List<Camera> cameras, ScriptableRenderContext context, List<ViewRenderData> viewRenderDatas)
     {
-        // Calculate max screen size
-        int screenWidth = 0, screenHeight = 0;
         foreach(var camera in cameras)
         {
-            screenWidth = Math.Max(screenWidth, camera.scaledPixelWidth);
-            screenHeight = Math.Max(screenHeight, camera.scaledPixelHeight);
-        }
+            if (!camera.TryGetCullingParameters(out var cullingParameters))
+                continue;
 
-        foreach(var camera in cameras)
-        {
             // Somewhat hacky.. but this is kind of required to deal with some unity hacks so meh
             camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
-            viewRenderDatas.Add(new ViewRenderData(camera.ViewSize(), new(screenWidth, screenHeight), camera.nearClipPlane, camera.farClipPlane, camera.TanHalfFov(), camera.transform.WorldRigidTransform(), camera, context));
+            viewRenderDatas.Add(new ViewRenderData(camera.ViewSize(), camera.nearClipPlane, camera.farClipPlane, camera.TanHalfFov(), camera.transform.WorldRigidTransform(), camera, context, cullingParameters));
+            renderGraph.RtHandleSystem.SetScreenSize(camera.ViewSize().x, camera.ViewSize().y);
         }
     }
 
@@ -113,11 +109,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
 		foreach (var viewRenderData in viewRenderDatas)
         {
-
             using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
-
-            renderGraph.RtHandleSystem.SetScreenSize(viewRenderData.viewSize.x, viewRenderData.viewSize.y);
-
             foreach (var cameraRenderFeature in perCameraRenderFeatures)
             {
                 cameraRenderFeature.Render(viewRenderData);
