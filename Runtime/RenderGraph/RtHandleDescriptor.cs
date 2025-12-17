@@ -5,6 +5,7 @@ using UnityEngine.Rendering;
 
 public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 {
+	// TODO: Should we just use the Builtin renderTextureDescriptor struct?
 	public int width;
 	public int height;
 	public GraphicsFormat format;
@@ -19,8 +20,9 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 	public Color clearColor;
 	public float clearDepth;
 	public uint clearStencil;
+	public VRTextureUsage vrTextureUsage;
 
-	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, RTClearFlags clearFlags = RTClearFlags.None, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u)
+	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, RTClearFlags clearFlags = RTClearFlags.None, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrTextureUsage = VRTextureUsage.None)
 	{
 		this.width = width;
 		this.height = height;
@@ -36,6 +38,7 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 		this.clearColor = clearColor;
 		this.clearDepth = clearDepth;
 		this.clearStencil = clearStencil;
+		this.vrTextureUsage = vrTextureUsage;
 	}
 
 	public readonly override string ToString() => $"{width}x{height}x{volumeDepth} {format} {dimension}";
@@ -73,16 +76,10 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 			stencilFormat = stencilFormat,
 			useMipMap = hasMips,
 			volumeDepth = volumeDepth,
+			vrUsage = vrTextureUsage
 		};
 
-		if (!result.Create())
-		{
-			Debug.LogError($"Failed to create RenderTexture {this}");
-		}
-		else
-		{
-			//Debug.Log($"Creating RenderTexture {this}");
-		}
+		Assert.IsTrue(result.Create());
 
 		return result;
 	}
