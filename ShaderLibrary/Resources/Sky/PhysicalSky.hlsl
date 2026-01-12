@@ -46,16 +46,16 @@ float3 SampleLuminance(float3 rayDirection, float xi, uint colorIndex, bool rayI
 	return ((lightTransmittance * (scatter.xyz * RayleighPhase(LdotV) + scatter.w * CsPhase(LdotV, _MiePhase)) + multiScatter * (scatter.xyz + scatter.w) * RcpFourPi) * _LightColor0 * Exposure + cloud) * viewTransmittance * weight;
 }
 
-float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 {
 	#ifdef REFLECTION_PROBE
-		float3 rayDirection = OctahedralUvToNormal(uv);
+		float3 rayDirection = OctahedralUvToNormal(input.uv);
 	#else
-		float rcpRdLength = RcpLength(worldDir);
-		float3 rayDirection = worldDir * rcpRdLength;
+		float rcpRdLength = RcpLength(input.worldDirection);
+		float3 rayDirection = input.worldDirection * rcpRdLength;
 	#endif
 	
-	float2 offsets = Noise2D(position.xy);
+	float2 offsets = Noise2D(input.position.xy);
 	float viewCosAngle = rayDirection.y;
 	uint colorIndex = offsets.y < (1.0 / 3.0) ? 0 : (offsets.y < 2.0 / 3.0 ? 1 : 2);
 	float3 luminance = 0.0;
@@ -80,8 +80,8 @@ float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 		luminance = clouds.rgb;
 		float cloudTransmittance = clouds.a;
 	#else
-		float cloudTransmittance = CloudTransmittanceTexture[position.xy]; // TODO: Combine with distance?
-		float cloudDistance = LinearEyeDepth(CloudDepthTexture[position.xy]) * rcp(rcpRdLength); // TODO: Should this just be single channel
+		float cloudTransmittance = CloudTransmittanceTexture[input.position.xy]; // TODO: Combine with distance?
+		float cloudDistance = LinearEyeDepth(CloudDepthTexture[input.position.xy]) * rcp(rcpRdLength); // TODO: Should this just be single channel
 	#endif
 	
 	bool rayIntersectsGround = RayIntersectsGround(ViewHeight, viewCosAngle);
@@ -100,7 +100,7 @@ float4 FragmentRender(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 	}
 	else
 	{
-		float sceneDistance = LinearEyeDepth(CameraDepth[position.xy]) * rcp(rcpRdLength);
+		float sceneDistance = LinearEyeDepth(CameraDepth[input.position.xy]) * rcp(rcpRdLength);
 		
 		if(cloudTransmittance < 1.0)
 		{
@@ -203,11 +203,11 @@ struct FragmentOutput
 	float4 temporal : SV_Target1;
 };
 
-FragmentOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+FragmentOutput FragmentTemporal(VertexFullscreenTriangleMinimalOutput input)
 {
 	float3 mean = 0.0, stdDev = 0.0, current = 0.0;
 	
-	float centerDepthRaw = CameraDepth[position.xy];
+	float centerDepthRaw = CameraDepth[input.position.xy];
 	float centerDepth = LinearEyeDepth(centerDepthRaw);
 	float weightSum = 0.0;
 	float depthWeightSum = 0.0;
@@ -219,7 +219,7 @@ FragmentOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 		for (int x = -1; x <= 1; x++, i++)
 		{
 			float weight = GetBoxFilterWeight(i);
-			uint2 coord = clamp(position.xy + int2(x, y), 0, ViewSizeMinusOne);
+			uint2 coord = clamp(input.position.xy + int2(x, y), 0, ViewSizeMinusOne);
 			
 			float depth = LinearEyeDepth(CameraDepth[coord]);
 			
@@ -244,14 +244,14 @@ FragmentOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float3 minValue = mean - stdDev;
 	float3 maxValue = mean + stdDev;
 	
-	float2 motion = CameraVelocity[position.xy];
-	float2 historyUv = uv - motion;
+	float2 motion = CameraVelocity[input.position.xy];
+	float2 historyUv = input.uv - motion;
 	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
 		float4 bilinearWeights = BilinearWeights(historyUv, ViewSize);
 	
-		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, uv));
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, input.uv));
 		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, historyUv));
 	
 		float4 historyR = _SkyHistory.GatherRed(LinearClampSampler, ClampScaleTextureUv(historyUv, _SkyHistoryScaleLimit)) * PreviousToCurrentExposure;
@@ -279,7 +279,7 @@ FragmentOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	current = ICtCpToRec2020(current) / PaperWhite;
 	
 	// Sample vol lighting and output. Vol light.a is applied to scene if it contains additional fog
-	float4 volumetricLighting = SampleVolumetricLight(position.xy, centerDepth);
+	float4 volumetricLighting = SampleVolumetricLight(input.position.xy, centerDepth);
 	current += Rec709ToRec2020(volumetricLighting.rgb);
 	
 	output.frame = float4(current, volumetricLighting.a);

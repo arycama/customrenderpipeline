@@ -11,16 +11,16 @@ cbuffer Properties
 	float _MaxSteps, _Thickness, _Intensity, _MaxMip;
 };
 
-float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float4 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 {
 	float thicknessScale = rcp(1.0 + _Thickness);
 	float thicknessOffset = -Near * rcp(Far - Near) * (_Thickness * thicknessScale);
 	
-	float depth = HiZMinDepth[position.xy];
+	float depth = HiZMinDepth[input.position.xy];
 	float linearDepth = LinearEyeDepth(depth);
-	float3 worldPosition = worldDir * linearDepth;
+	float3 worldPosition = input.worldDirection * linearDepth;
 	
-	float2 u = Noise2D(position.xy);
+	float2 u = Noise2D(input.position.xy);
 	float3 localL = SampleConeUniform(u.x, u.y, SunCosAngle);
 	float3 L = FromToRotationZ(_LightDirection0, localL);
 	
@@ -56,24 +56,24 @@ Texture2D<float4> _Input;
 float4 _HistoryScaleLimit;
 float _IsFirst;
 
-float FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float FragmentSpatial(VertexFullscreenTriangleOutput input) : SV_Target
 {
 	//return _Input[position.xy].w == 0;
 	
-	float rcpVLength = RcpLength(worldDir);
-	float3 V = -worldDir * rcpVLength;
+	float rcpVLength = RcpLength(input.worldDirection);
+	float3 V = -input.worldDirection * rcpVLength;
 	
-	float4 normalRoughness = GBufferNormalRoughness[position.xy];
+	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
 	float NdotV;
 	
-	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
-	float phi = Noise1D(position.xy) * TwoPi;
+	float3 worldPosition = input.worldDirection * LinearEyeDepth(CameraDepth[input.position.xy]);
+	float phi = Noise1D(input.position.xy) * TwoPi;
 	
 	float result = 0.0, weightSum = 0.0;
 	for (uint i = 0; i <= _ResolveSamples; i++)
 	{
 		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
-		float2 coord = clamp(floor(position.xy + u), 0.0, ViewSizeMinusOne) + 0.5;
+		float2 coord = clamp(floor(input.position.xy + u), 0.0, ViewSizeMinusOne) + 0.5;
 		float4 hitData = _Input[coord];
 		
 		// For misses, we just store the ray direction, since it represents a hit at an infinite distance (eg probe)
@@ -107,14 +107,12 @@ float FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, floa
 Texture2D<float> RayDepth;
 Texture2D<float> _TemporalInput, _History;
 
-float FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float FragmentTemporal(VertexFullscreenTriangleOutput input) : SV_Target
 {
-	//return _TemporalInput[position.xy];
-	
 	float minValue, maxValue, result;
-	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, result);
+	TemporalNeighborhood(_TemporalInput, input.position.xy, minValue, maxValue, result);
 	
-	float2 historyUv = uv - CameraVelocity[position.xy];
+	float2 historyUv = input.uv - CameraVelocity[input.position.xy];
 	float history = _History.Sample(LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
 
 	history = clamp(history, minValue, maxValue);

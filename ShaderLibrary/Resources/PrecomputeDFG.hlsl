@@ -8,9 +8,9 @@ struct PrecomputeDfgOutput
 	float averageAlbedo : SV_Target1;
 };
 
-PrecomputeDfgOutput FragmentDirectionalAlbedo(float4 position : SV_Position, float2 uv : TEXCOORD0)
+PrecomputeDfgOutput FragmentDirectionalAlbedo(VertexFullscreenTriangleMinimalOutput input)
 {
-	uv = RemapHalfTexelTo01(uv, 32);
+	float2 uv = RemapHalfTexelTo01(input.uv, 32);
 	
 	float NdotV = max(1e-3, uv.x);
 	float perceptualRoughness = uv.y;
@@ -48,7 +48,7 @@ PrecomputeDfgOutput FragmentDirectionalAlbedo(float4 position : SV_Position, flo
 	return output;
 }
 
-float FragmentAverageAlbedo(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+float FragmentAverageAlbedo(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
 	float samples = 32;
 
@@ -56,17 +56,17 @@ float FragmentAverageAlbedo(float4 position : SV_Position, float2 uv : TEXCOORD0
 	for (float x = 0; x < samples; x++)
 	{
 		float cosTheta = x / (samples - 1);
-		result += (1.0 - DirectionalAlbedo[uint2(x, position.x)]) * cosTheta;
+		result += (1.0 - DirectionalAlbedo[uint2(x, input.position.x)]) * cosTheta;
 	}
 
 	return 1.0 - result / samples * 2.0;
 }
 
-float FragmentDirectionalAlbedoMultiScattered(float4 position : SV_Position, float2 uv0 : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float FragmentDirectionalAlbedoMultiScattered(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 {
 	uint resolution = 16;
 	
-	float3 uv = float3(uv0, (index + 0.5) / resolution);
+	float3 uv = float3(input.uv, (input.viewIndex + 0.5) / resolution);
 	uv = RemapHalfTexelTo01(uv, resolution);
 	
 	float NdotV = max(1e-3, uv.x);	
@@ -109,7 +109,7 @@ float FragmentDirectionalAlbedoMultiScattered(float4 position : SV_Position, flo
 	return 1.0 - (result + multiScatterResult * multiScatterTerm);
 }
 
-float FragmentAverageAlbedoMultiScattered(float4 position : SV_Position) : SV_Target
+float FragmentAverageAlbedoMultiScattered(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
 	float samples = 16;
 
@@ -117,20 +117,20 @@ float FragmentAverageAlbedoMultiScattered(float4 position : SV_Position) : SV_Ta
 	for (float x = 0; x < samples; x++)
 	{
 		float cosTheta = x / (samples - 1);
-		result += (1.0 - DirectionalAlbedoMs[uint3(x, position.x, position.y)]) * cosTheta;
+		result += (1.0 - DirectionalAlbedoMs[uint3(x, input.position.xy)]) * cosTheta;
 	}
 
 	return 1.0 - 2.0 * result / samples;
 }
 
-float FragmentSpecularOcclusion(float4 position : SV_Position, float2 uv0 : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float FragmentSpecularOcclusion(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 {
 	float resolution = 32;
 
-	float z = index % resolution;
-	float w = index / resolution;
+	float z = input.viewIndex % resolution;
+	float w = input.viewIndex / resolution;
 	
-	float4 uv = float4(uv0, float2(z + 0.5, w + 0.5) / resolution);
+	float4 uv = float4(input.uv, float2(z + 0.5, w + 0.5) / resolution);
 	uv = RemapHalfTexelTo01(uv, 32);
 	
 	float NdotV = uv.w;

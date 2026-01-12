@@ -41,13 +41,13 @@ struct FragmentOutput
 	float3 luminance : SV_Target4;
 };
 
-FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 {
-	float depth = CameraDepth[position.xy];
-	float4 waterNormalFoamRoughness = _WaterNormalFoam[position.xy];
+	float depth = CameraDepth[input.position.xy];
+	float4 waterNormalFoamRoughness = _WaterNormalFoam[input.position.xy];
 	
-	float rcpLenV = RcpLength(worldDir);
-	float3 V = -worldDir * rcpLenV;
+	float rcpLenV = RcpLength(input.worldDirection);
+	float3 V = -input.worldDirection * rcpLenV;
 	
 	float linearDepth = LinearEyeDepth(depth);
 	float waterDistance = linearDepth * rcp(rcpLenV);
@@ -85,7 +85,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	// Sample underwater depth with an offset based on fake refraction calculated from normal
 	float distortion = _RefractOffset * 0.5 / TanHalfFov / linearDepth;
 	float2 uvOffset = N.xz * distortion;
-	float2 refractionUv = uvOffset * ViewSize + position.xy;
+	float2 refractionUv = uvOffset * ViewSize + input.position.xy;
 	float2 refractedPositionSS = clamp(refractionUv, 0.5, ViewSize - 0.5);
 	float underwaterDepth = CameraDepthCopy[refractedPositionSS];
 	
@@ -112,8 +112,8 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	if (underwaterDepth > depth)
 	{
 		uvOffset = 0.0;
-		underwaterDepth = CameraDepthCopy[position.xy];
-		refractedPositionSS = position.xy;
+		underwaterDepth = CameraDepthCopy[input.position.xy];
+		refractedPositionSS = input.position.xy;
 	}
 	
 	float3 underwaterPositionWS = PixelToWorldPosition(float3(refractedPositionSS, underwaterDepth));
@@ -121,7 +121,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float3 underwaterV = normalize(worldPosition - underwaterPositionWS);
 	
 	// Select random channel
-	float2 noise = Noise2D(position.xy);
+	float2 noise = Noise2D(input.position.xy);
 	uint channelIndex = noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2);
 	float3 c = _Extinction;
 	float cp = Select(_Extinction, channelIndex);
@@ -158,12 +158,12 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	float3 underwater = 0.0;
 	if (underwaterDepth)
 	{
-		underwater = _UnderwaterResult.Sample(LinearClampSampler, ClampScaleTextureUv(uv + uvOffset, _UnderwaterResultScaleLimit));
+		underwater = _UnderwaterResult.Sample(LinearClampSampler, ClampScaleTextureUv(input.uv + uvOffset, _UnderwaterResultScaleLimit));
 		underwater *= exp(-_Extinction * maxUnderwaterDistance);
 	}
 
 	FragmentOutput output;
-	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam), 0.0, position.xy, false);
+	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam), 0.0, input.position.xy, false);
 	output.luminance = Rec2020ToICtCp(luminance * PaperWhite);
 	return output;
 }
@@ -174,12 +174,12 @@ struct TemporalOutput
 	float4 scene : SV_Target1;
 };
 
-TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 {
 	float3 minValue, maxValue, result;
-	TemporalNeighborhood(_ScatterInput, position.xy, minValue, maxValue, result);
+	TemporalNeighborhood(_ScatterInput, input.position.xy, minValue, maxValue, result);
 
-	float2 historyUv = uv - CameraVelocity[position.xy];
+	float2 historyUv = input.uv - CameraVelocity[input.position.xy];
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
 		float3 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
@@ -189,8 +189,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	}
 	
 	// Apply roughness to transmission
-	float4 normalRoughness = GBufferNormalRoughness[position.xy];
-	float3 V = normalize(-worldDir);
+	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
+	float3 V = normalize(-input.worldDirection);
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	float kd = EnergyCompensationFactor(0.02, normalRoughness.a, NdotV).r;

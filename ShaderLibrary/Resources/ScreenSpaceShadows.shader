@@ -35,7 +35,7 @@ Shader "Hidden/Screen Space Shadows"
         Pass
         {
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentTemporal
             #include "ScreenSpaceShadows.hlsl"
             ENDHLSL

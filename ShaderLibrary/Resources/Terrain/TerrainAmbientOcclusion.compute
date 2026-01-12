@@ -8,5 +8,10 @@ RWTexture2D<float4> Result;
 void CSMain(uint2 id : SV_DispatchThreadID)
 {
 	float2 uv = (id + 0.5) / Resolution;
-	Result[id] = Fragment(float4(id + 0.5, 0, 0), uv, 0);
+	
+	VertexFullscreenTriangleMinimalOutput input;
+	input.position = float4(id + 0.5, 0, 0);
+	input.uv = uv;
+	
+	Result[id] = Fragment(input);
 }

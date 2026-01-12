@@ -16,7 +16,7 @@ Shader "Hidden/Physical Sky Tables"
             Name "Transmittance Lookup"
 
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentTransmittanceLut
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
@@ -27,8 +27,7 @@ Shader "Hidden/Physical Sky Tables"
             Name "CDF Lookup"
 
             HLSLPROGRAM
-            #pragma vertex VertexIdPassthrough
-            #pragma geometry GeometryCubemapRender
+            #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentCdfLookup
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
@@ -39,8 +38,7 @@ Shader "Hidden/Physical Sky Tables"
             Name "Luminance LUT"
 
             HLSLPROGRAM
-            #pragma vertex VertexIdPassthrough
-            #pragma geometry GeometryVolumeRender2
+            #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentLuminance
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
@@ -51,8 +49,7 @@ Shader "Hidden/Physical Sky Tables"
             Name "Transmittance Depth Lookup"
 
             HLSLPROGRAM
-            #pragma vertex VertexIdPassthrough
-            #pragma geometry GeometryVolumeRender
+            #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentTransmittanceDepthLut
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
@@ -63,8 +60,7 @@ Shader "Hidden/Physical Sky Tables"
             Name "Transmittance Lookup 2"
 
             HLSLPROGRAM
-            #pragma vertex VertexIdPassthrough
-            #pragma geometry GeometryVolumeRender2
+            #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentTransmittanceLut2
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL

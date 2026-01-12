@@ -65,7 +65,7 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 		var isStencil = GraphicsFormatUtility.IsStencilFormat(format);
 		var graphicsFormat = isDepth ? GraphicsFormat.None : format;
 		var depthFormat = isDepth ? format : GraphicsFormat.None;
-		var stencilFormat = (!isDepth && isStencil) ? GraphicsFormat.R8_UInt : GraphicsFormat.None;
+		var stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None;
 
 		var result = new RenderTexture(width, height, graphicsFormat, depthFormat)
 		{

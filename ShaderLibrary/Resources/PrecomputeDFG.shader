@@ -11,7 +11,7 @@ Shader "Hidden/PrecomputeDfg"
         {
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentDirectionalAlbedo
             #include "PrecomputeDFG.hlsl"
             ENDHLSL
@@ -20,7 +20,7 @@ Shader "Hidden/PrecomputeDfg"
         Pass 
         {
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentAverageAlbedo
             #include "PrecomputeDFG.hlsl"
             ENDHLSL
@@ -30,8 +30,7 @@ Shader "Hidden/PrecomputeDfg"
         {
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex VertexIdPassthrough
-            #pragma geometry GeometryVolumeRender16
+            #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentDirectionalAlbedoMultiScattered
             #include "PrecomputeDFG.hlsl"
             ENDHLSL
@@ -40,7 +39,7 @@ Shader "Hidden/PrecomputeDfg"
         Pass 
         {
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentAverageAlbedoMultiScattered
             #include "PrecomputeDFG.hlsl"
             ENDHLSL
@@ -50,8 +49,7 @@ Shader "Hidden/PrecomputeDfg"
         {
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex VertexIdPassthrough
-            #pragma geometry GeometryVolumeRender
+            #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentSpecularOcclusion
             #include "PrecomputeDFG.hlsl"
             ENDHLSL

@@ -17,10 +17,10 @@ struct GeometryOutput
 	uint index : SV_RenderTargetArrayIndex;
 };
 
-float3 FragmentWeatherMap(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float3 FragmentWeatherMap(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
 	float result = 0.0;
-	float2 samplePosition = position.xy / _WeatherMapResolution;
+	float2 samplePosition = input.position.xy / _WeatherMapResolution;
 
 	float2 w = fwidth(samplePosition);
 	float sum = 0.0;
@@ -39,9 +39,9 @@ float3 FragmentWeatherMap(float4 position : SV_Position, float2 uv : TEXCOORD0, 
 	return result;
 }
 
-float3 FragmentNoise(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float3 FragmentNoise(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 {
-	float3 samplePosition = float3(position.xy, index + 0.5) / _NoiseResolution;
+	float3 samplePosition = float3(input.position.xy, input.viewIndex + 0.5) / _NoiseResolution;
 
 	float3 w = fwidth(samplePosition);
 	float sum = 0.0;
@@ -76,10 +76,10 @@ float3 FragmentNoise(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	return result;
 }
 
-float3 FragmentDetailNoise(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float3 FragmentDetailNoise(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 {
 	float result = 0.0;
-	float3 samplePosition = float3(position.xy, index + 0.5) / _DetailNoiseResolution;
+	float3 samplePosition = float3(input.position.xy, input.viewIndex + 0.5) / _DetailNoiseResolution;
 
 	float3 w = fwidth(samplePosition);
 	float sum = 0.0;

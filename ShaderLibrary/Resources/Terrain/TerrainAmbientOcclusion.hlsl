@@ -27,12 +27,12 @@ float4 UnpackWeight(float4 input, out float weight)
 	return input;
 }
 
-float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float4 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
-	float3 normal = UnpackNormalSNorm(TerrainNormalMap[position.xy]).xzy;
+	float3 normal = UnpackNormalSNorm(TerrainNormalMap[input.position.xy]).xzy;
 	
-	float2 coord = floor(position.xy);
-	float3 worldPosition = float3(RemapHalfTexelTo01(uv, Resolution), TerrainHeightmap[position.xy] / kmaxHeight).xzy * TerrainSize;
+	float2 coord = floor(input.position.xy);
+	float3 worldPosition = float3(RemapHalfTexelTo01(input.uv, Resolution), TerrainHeightmap[input.position.xy] / kmaxHeight).xzy * TerrainSize;
 	
 	float correction = 0.0;
 	float4 result = 0.0;
@@ -59,7 +59,7 @@ float4 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 			float horizonCosAngle = cos((2 * side - 1) * HalfPi + n);
 			for (float k = 0.5; k < SampleCount; k++)
 			{
-				float2 sampleUv = uv + (2 * side - 1) * k / SampleCount * Radius * direction;
+				float2 sampleUv = input.uv + (2 * side - 1) * k / SampleCount * Radius * direction;
 				if (any(saturate(sampleUv) != sampleUv))
 					break;
 					

@@ -11,10 +11,10 @@ struct FragmentOutput
 
 Buffer<float4> ScaleOffsets;
 
-FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint viewIndex : SV_RenderTargetArrayIndex)
+FragmentOutput Fragment(VertexFullscreenTriangleVolumeOutput input)
 {
-	float4 scaleOffset = ScaleOffsets[viewIndex];
-	uv = uv * scaleOffset.xy + scaleOffset.zw;
+	float4 scaleOffset = ScaleOffsets[input.viewIndex];
+	float2 uv = input.uv * scaleOffset.xy + scaleOffset.zw;
 	
 	uint4 layerData = IdMap.Gather(TrilinearRepeatSampler, uv);
 	float4 bilinearWeights = BilinearWeights(uv, IdMapResolution);

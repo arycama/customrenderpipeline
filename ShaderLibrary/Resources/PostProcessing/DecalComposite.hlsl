@@ -14,30 +14,30 @@ Texture2D<float4> AlbedoMetallicCopy, NormalRoughnessCopy, BentNormalOcclusionCo
 
 float4 AlbedoMetallicCopyScaleLimit, NormalRoughnessCopyScaleLimit, BentNormalOcclusionCopyScaleLimit;
 
-FragmentOutput FragmentCopy(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+FragmentOutput FragmentCopy(VertexFullscreenTriangleMinimalOutput input)
 {
 	FragmentOutput output;
-	output.albedoMetallic = GBufferAlbedoMetallic[position.xy];
-	output.normalRoughness = GBufferNormalRoughness[position.xy];
-	output.bentNormalOcclusion = GBufferBentNormalOcclusion[position.xy];
+	output.albedoMetallic = GBufferAlbedoMetallic[input.position.xy];
+	output.normalRoughness = GBufferNormalRoughness[input.position.xy];
+	output.bentNormalOcclusion = GBufferBentNormalOcclusion[input.position.xy];
 	return output;
 }
 
-FragmentOutput FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+FragmentOutput FragmentCombine(VertexFullscreenTriangleOutput input)
 {
-	float depth = CameraDepth[position.xy];
+	float depth = CameraDepth[input.position.xy];
 	float eyeDepth = LinearEyeDepth(depth);
-	float3 worldPosition = worldDir * eyeDepth;
+	float3 worldPosition = input.worldDirection * eyeDepth;
 	
-	float4 albedoMetallic = AlbedoMetallicCopy[position.xy];
-	float4 normalRoughness = NormalRoughnessCopy[position.xy];
-	float4 bentNormalOcclusion = BentNormalOcclusionCopy[position.xy];
+	float4 albedoMetallic = AlbedoMetallicCopy[input.position.xy];
+	float4 normalRoughness = NormalRoughnessCopy[input.position.xy];
+	float4 bentNormalOcclusion = BentNormalOcclusionCopy[input.position.xy];
 	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion);
 	
-	float4 decal = DecalAlbedo[position.xy];
-	float4 decalNormal = DecalNormal[position.xy];
+	float4 decal = DecalAlbedo[input.position.xy];
+	float4 decalNormal = DecalNormal[input.position.xy];
 	
-	float3 albedo = UnpackAlbedo(albedoMetallic.rg, position.xy);
+	float3 albedo = UnpackAlbedo(albedoMetallic.rg, input.position.xy);
 	float3 normal = UnpackGBufferNormal(normalRoughness);
 	float roughness = normalRoughness.a;
 	
@@ -51,7 +51,7 @@ FragmentOutput FragmentCombine(float4 position : SV_Position, float2 uv : TEXCOO
 	float visibilityAngle = lerp(bentNormalOcclusion.a, 1.0, decal.a); // TODO: Write out visibilityConeAngle from dbuffer pass
 
 	FragmentOutput output;
-	output.albedoMetallic = float4(PackAlbedo(albedo, position.xy), 0, albedoMetallic.a);
+	output.albedoMetallic = float4(PackAlbedo(albedo, input.position.xy), 0, albedoMetallic.a);
 	output.normalRoughness = float4(PackGBufferNormal(normal), roughness);
 	output.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal), visibilityAngle);
 	return output;

@@ -8,21 +8,21 @@ float4 DepthScaleLimit, CameraTargetScaleLimit;
 float3 _DefocusU, _DefocusV;
 float _ApertureRadius, _FocusDistance, _MaxMip, _SampleCount, _Test, _TaaEnabled;
 
-float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 {
 	//_FocusDistance = LinearEyeDepth(CameraDepth[ViewSize / 2]);
 
 	float3 color = 0;
 	float weightSum = 0;
 	
-	float offset = Noise1D(position.xy);
+	float offset = Noise1D(input.position.xy);
 	float phi = offset * TwoPi;
 	float _MaxSteps = 64;
 	float _Thickness = 0.1;
 	float thicknessScale = rcp(1.0 + _Thickness);
 	float thicknessOffset = -Near * rcp(Far - Near) * (_Thickness * thicknessScale);
 	
-	float3 worldPosition = _FocusDistance * worldDir;
+	float3 worldPosition = _FocusDistance * input.worldDirection;
 	
 	for (float i = 0.0; i < _SampleCount; i++)
 	{

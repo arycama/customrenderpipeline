@@ -54,25 +54,5 @@ public class DeferredLighting : ViewRenderFeature
 
 		RenderPass(0); // No translucency
 		RenderPass(1); // Translucency
-
-		//  Final pass renders background and composites the sky, clouds and volumetric lighting
-		// TODO: this currently renders before the sun/moon disk meaning some pixels are overwritten. Could instead use a stencil bit to avoid
-		//using (var pass = renderGraph.AddFullscreenRenderPass("Render Sky"))
-		//{
-		//	pass.Initialize(material, 2);
-		//	pass.WriteTexture(renderGraph.GetResource<CameraTargetData>());
-		//	pass.WriteDepth(renderGraph.GetResource<CameraDepthData>(), RenderTargetFlags.ReadOnlyDepthStencil);
-		//	pass.AddRenderPassData<CloudRenderResult>();
-		//	pass.AddRenderPassData<AutoExposureData>();
-		//	pass.AddRenderPassData<SkyResultData>();
-		//	pass.AddRenderPassData<TemporalAAData>();
-		//	pass.AddRenderPassData<VolumetricLighting.Result>();
-
-		//	pass.SetRenderFunction(static (command, pass) =>
-		//	{
-		//		if (skySettings.StarMap)
-		//			pass.SetTexture("Stars", skySettings.StarMap);
-		//	});
-		//}
 	}
 }

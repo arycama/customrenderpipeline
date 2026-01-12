@@ -18,7 +18,7 @@ Shader "Hidden/Camera Motion Vectors"
             }
 
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment Fragment
             #include "CameraMotionVectors.hlsl"
             ENDHLSL
@@ -29,7 +29,7 @@ Shader "Hidden/Camera Motion Vectors"
             Name "Velocity Pre-Dilate"
 
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentPreDilate
             #include "CameraMotionVectors.hlsl"
             ENDHLSL

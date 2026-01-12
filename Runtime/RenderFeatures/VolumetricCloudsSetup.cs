@@ -75,8 +75,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
 		var maxInstanceCount = 32;
         using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Noise Texture", settings))
         {
-            var primitiveCount = Math.DivRoundUp(settings.NoiseResolution.z, maxInstanceCount);
-            pass.Initialize(material, 1, primitiveCount);
+            pass.Initialize(material, 1, settings.NoiseResolution.z);
             pass.DepthSlice = -1;
             pass.WriteTexture(noiseTexture, RenderBufferLoadAction.DontCare);
 
@@ -97,8 +96,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
         // Detail
         using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Detail Noise Texture", settings))
         {
-            var primitiveCount = Math.DivRoundUp(settings.DetailNoiseResolution.z, maxInstanceCount);
-            pass.Initialize(material, 2, primitiveCount);
+            pass.Initialize(material, 2, settings.DetailNoiseResolution.z);
             pass.DepthSlice = -1;
             pass.WriteTexture(detailNoiseTexture, RenderBufferLoadAction.DontCare);
 

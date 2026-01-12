@@ -19,10 +19,10 @@ const static float3 _PlanetCenter = float3(0.0, -_PlanetRadius - ViewPosition.y,
 TextureCube<float3> Stars;
 float StarExposure;
 
-FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 {
 	#ifdef CLOUD_SHADOW
-		float3 P = position.x * _CloudShadowToWorld._m00_m10_m20 + position.y * _CloudShadowToWorld._m01_m11_m21 + _CloudShadowToWorld._m03_m13_m23;
+		float3 P = input.position.x * _CloudShadowToWorld._m00_m10_m20 + input.position.y * _CloudShadowToWorld._m01_m11_m21 + _CloudShadowToWorld._m03_m13_m23;
 		float3 rd = _CloudShadowViewDirection;
 		float ViewHeight = distance(_PlanetCenter, P);
 		float3 N = normalize(P - _PlanetCenter);
@@ -30,10 +30,10 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 		float2 offsets = 0.5;//Noise2D(position.xy);
 	#else
 		float3 P = 0.0;
-		float rcpRdLength = RcpLength(worldDir);
-		float3 rd = worldDir * rcpRdLength;
+		float rcpRdLength = RcpLength(input.worldDirection);
+		float3 rd = input.worldDirection * rcpRdLength;
 		float viewCosAngle = rd.y;
-		float2 offsets = Noise2D(position.xy);
+		float2 offsets = Noise2D(input.position.xy);
 	#endif
 	
 	FragmentOutput output;
@@ -59,20 +59,20 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	#endif
 	
 	#ifndef CLOUD_SHADOW
-	float sceneDepth = CameraDepth[position.xy];
-	if (sceneDepth != 0.0)
-	{
-		float sceneDistance = LinearEyeDepth(sceneDepth) * rcp(rcpRdLength);
-		if (sceneDistance < rayStart)
+		float sceneDepth = CameraDepth[input.position.xy];
+		if (sceneDepth != 0.0)
 		{
-			output.luminance = float4(Rec2020ToICtCp(0.0), 1.0);
-			output.transmittance = 1.0;
-			output.depth = 0.0;
-			return output;
-		}
+			float sceneDistance = LinearEyeDepth(sceneDepth) * rcp(rcpRdLength);
+			if (sceneDistance < rayStart)
+			{
+				output.luminance = float4(Rec2020ToICtCp(0.0), 1.0);
+				output.transmittance = 1.0;
+				output.depth = 0.0;
+				return output;
+			}
 		
-		rayEnd = min(sceneDistance, rayEnd);
-	}
+			rayEnd = min(sceneDistance, rayEnd);
+		}
 	#endif
 	
 	#ifdef CLOUD_SHADOW
@@ -113,18 +113,18 @@ struct TemporalOutput
 	float4 frameResult : SV_Target2; // Blend One SrcAlpha
 };
 
-TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 {
-	int2 pixelId = (int2) position.xy;
+	int2 pixelId = (int2) input.position.xy;
 	
 	float depth = CloudDepthTexture[pixelId]; //CameraDepth[position.xy];
 	//float2 motion = depth ? CameraVelocity[position.xy] : CalculateVelocity(uv, CloudDepthTexture[pixelId]);
-	float2 motion = CalculateVelocity(uv, CloudDepthTexture[pixelId]);
+	float2 motion = CalculateVelocity(input.uv, CloudDepthTexture[pixelId]);
 	
-	float2 historyUv = uv - motion;
+	float2 historyUv = input.uv - motion;
 	float4 mean = 0.0, stdDev = 0.0, current = 0.0;
 	
-	float rawDepth = CameraDepth[position.xy];
+	float rawDepth = CameraDepth[input.position.xy];
 	float centerDepth = LinearEyeDepth(rawDepth);
 	float weightSum = 0.0;
 	float depthWeightSum = 0.0;
@@ -164,7 +164,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	{
 		float4 bilinearWeights  = BilinearWeights(historyUv, ViewSize);
 	
-		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, uv));
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, input.uv));
 		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, historyUv));
 	
 		float4 historyR = _History.GatherRed(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit)) * PreviousToCurrentExposure;
@@ -194,8 +194,8 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 		
 	if (!rawDepth)
 	{
-		float3 stars = Stars.Sample(TrilinearClampSampler, worldDir) * Exposure * 2;
-		stars *= TransmittanceToAtmosphere(ViewHeight, worldDir.y);
+		float3 stars = Stars.Sample(TrilinearClampSampler, input.worldDirection) * Exposure * 2;
+		stars *= TransmittanceToAtmosphere(ViewHeight, normalize(input.worldDirection).y);
 		current.rgb += Rec709ToRec2020(stars) * StarExposure;
 	}
 	

@@ -4,9 +4,9 @@
 float _Samples;
 float2 _CdfSize;
 
-float3 FragmentTransmittanceLut(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float3 FragmentTransmittanceLut(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
-	uv = RemapHalfTexelTo01(uv, float2(_TransmittanceWidth, _TransmittanceHeight));
+	float2 uv = RemapHalfTexelTo01(input.uv, float2(_TransmittanceWidth, _TransmittanceHeight));
 	
 	float viewHeight = ViewHeightFromUv(uv.x);
 	
@@ -16,11 +16,11 @@ float3 FragmentTransmittanceLut(float4 position : SV_Position, float2 uv : TEXCO
 	return SampleAtmosphere(viewHeight, viewCosAngle, 0.0, _Samples, rayLength, true, true, false).transmittance;
 }
 
-float3 FragmentTransmittanceLut2(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float3 FragmentTransmittanceLut2(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 {
-	uv = RemapHalfTexelTo01(uv, float2(_TransmittanceWidth, _TransmittanceHeight));
+	float2 uv = RemapHalfTexelTo01(input.uv, float2(_TransmittanceWidth, _TransmittanceHeight));
 	
-	bool rayIntersectsGround = index == 1;
+	bool rayIntersectsGround = input.viewIndex == 1;
 	
 	float rayLength;
 	float viewCosAngle = ViewCosAngleFromUv(uv.y, ViewHeight, rayIntersectsGround, rayLength);
@@ -29,16 +29,16 @@ float3 FragmentTransmittanceLut2(float4 position : SV_Position, float2 uv : TEXC
 	return SampleAtmosphere(ViewHeight, viewCosAngle, 0.0, _Samples, rayLength, true, true, rayIntersectsGround).transmittance;
 }
 
-float FragmentTransmittanceDepthLut(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float FragmentTransmittanceDepthLut(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 {
 	return 0.5;
 }
 
-float3 FragmentLuminance(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float3 FragmentLuminance(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 {
-	uv = RemapHalfTexelTo01(uv, SkyLuminanceSize);
+	float2 uv = RemapHalfTexelTo01(input.uv, SkyLuminanceSize);
 	
-	bool rayIntersectsGround = index == 1;
+	bool rayIntersectsGround = input.viewIndex == 1;
 	float rayLength;
 	float viewCosAngle = ViewCosAngleFromUv(uv.y, ViewHeight, rayIntersectsGround, rayLength);
 	rayLength *= uv.x;
@@ -46,26 +46,26 @@ float3 FragmentLuminance(float4 position : SV_Position, float2 uv : TEXCOORD0, f
 	return SampleAtmosphere(ViewHeight, viewCosAngle, _LightDirection0.y, _Samples, rayLength, true, false, rayIntersectsGround).luminance;
 }
 
-float FragmentCdfLookup(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1, uint index : SV_RenderTargetArrayIndex) : SV_Target
+float FragmentCdfLookup(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 {
-	uv = RemapHalfTexelTo01(uv, _CdfSize.xy);
+	float2 uv = RemapHalfTexelTo01(input.uv, _CdfSize.xy);
 
-	bool rayIntersectsGround = index > 2;
+	bool rayIntersectsGround = input.viewIndex > 2;
 	float rayLength;
 	float viewCosAngle = ViewCosAngleFromUv(uv.y, ViewHeight, rayIntersectsGround, rayLength);
 	
 	float3 maxLuminance = LuminanceToAtmosphere(ViewHeight, viewCosAngle, rayIntersectsGround);
-	float targetLuminance = maxLuminance[index % 3] * uv.x;
+	float targetLuminance = maxLuminance[input.viewIndex % 3] * uv.x;
 
 	float a = 0.0;
 	float b = rayLength;
 
-	float fa = LuminanceToPoint(ViewHeight, viewCosAngle, a, rayIntersectsGround, rayLength)[index % 3] - targetLuminance;
+	float fa = LuminanceToPoint(ViewHeight, viewCosAngle, a, rayIntersectsGround, rayLength)[input.viewIndex % 3] - targetLuminance;
 
 	for (float i = 0.0; i < _Samples; i++)
 	{
 		float c = (a + b) * 0.5;
-		float fc = LuminanceToPoint(ViewHeight, viewCosAngle, c, rayIntersectsGround, rayLength)[index % 3] - targetLuminance;
+		float fc = LuminanceToPoint(ViewHeight, viewCosAngle, c, rayIntersectsGround, rayLength)[input.viewIndex % 3] - targetLuminance;
     
 		if (sign(fc) == sign(fa))
 		{

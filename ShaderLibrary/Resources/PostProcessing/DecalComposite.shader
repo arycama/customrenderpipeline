@@ -20,7 +20,7 @@ Shader "Hidden/Decal Composite"
 
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentCopy
             #include "DecalComposite.hlsl"
             ENDHLSL

@@ -33,7 +33,7 @@ public class PrecomputeDfg : FrameRenderFeature
 		directionalAlbedoMs = renderGraph.GetTexture(16, GraphicsFormat.R16_UNorm, 16, TextureDimension.Tex3D, isPersistent: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Directional Albedo Ms"))
 		{
-			pass.Initialize(precomputeDfgMaterial, 2);
+			pass.Initialize(precomputeDfgMaterial, 2, 16);
 			pass.WriteTexture(directionalAlbedoMs);
 			pass.ReadTexture("DirectionalAlbedo", directionalAlbedo);
 		}
@@ -49,7 +49,7 @@ public class PrecomputeDfg : FrameRenderFeature
 		specularOcclusion = renderGraph.GetTexture(32, GraphicsFormat.R16_UNorm, 32 * 32, TextureDimension.Tex3D, isPersistent: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Specular Occlusion"))
 		{
-			pass.Initialize(precomputeDfgMaterial, 4, 32);
+			pass.Initialize(precomputeDfgMaterial, 4, 32 * 32);
 			pass.WriteTexture(specularOcclusion);
 		}
 

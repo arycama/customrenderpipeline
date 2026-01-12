@@ -21,25 +21,25 @@ struct TraceResult
 	float4 hit : SV_Target1;
 };
 
-TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+TraceResult Fragment(VertexFullscreenTriangleOutput input)
 {
 	float thicknessScale = rcp(1.0 + _Thickness);
 	float thicknessOffset = -Near * rcp(Far - Near) * (_Thickness * thicknessScale);
 
-	float depth = HiZMinDepth[position.xy];
+	float depth = HiZMinDepth[input.position.xy];
 	float linearDepth = LinearEyeDepth(depth);
-	float3 worldPosition = worldDir * linearDepth;
+	float3 worldPosition = input.worldDirection * linearDepth;
 	float3 V = normalize(-worldPosition);
 	
-	float3 noise3DCosine = Noise3DCosine(position.xy);
+	float3 noise3DCosine = Noise3DCosine(input.position.xy);
 	
 	float NdotV;
-	float3 N = GBufferNormal(position.xy, GBufferNormalRoughness, V, NdotV);
+	float3 N = GBufferNormal(input.position.xy, GBufferNormalRoughness, V, NdotV);
 	
 	float rcpPdf = Pi * rcp(noise3DCosine.z);
 	float3 L = FromToRotationZ(N, noise3DCosine);
 	
-	float3 rayPos = ScreenSpaceRaytrace(float3(position.xy, depth), worldPosition, L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip);
+	float3 rayPos = ScreenSpaceRaytrace(float3(input.position.xy, depth), worldPosition, L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip);
 
 	float outDepth;
 	float3 color, hitRay;
@@ -84,16 +84,16 @@ struct SpatialResult
 	float weight : SV_Target2;
 };
 
-SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 {
-	float3 V = -worldDir * RcpLength(worldDir);
+	float3 V = -input.worldDirection * RcpLength(input.worldDirection);
 	
-	float4 normalRoughness = GBufferNormalRoughness[position.xy];
+	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
-	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
-	float phi = Noise1D(position.xy) * TwoPi;
+	float3 worldPosition = input.worldDirection * LinearEyeDepth(CameraDepth[input.position.xy]);
+	float phi = Noise1D(input.position.xy) * TwoPi;
 	
 	float4 result = 0.0;
 	float nonHitWeight = 0.0;
@@ -101,7 +101,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	for (uint i = 0; i <= _ResolveSamples; i++)
 	{
 		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
-		float2 coord = clamp(floor(position.xy + u), 0.0, ViewSize - 1.0) + 0.5;
+		float2 coord = clamp(floor(input.position.xy + u), 0.0, ViewSize - 1.0) + 0.5;
 		float4 hitData = _HitResult[coord];
 		
 		// Don't denoise from sky pixels

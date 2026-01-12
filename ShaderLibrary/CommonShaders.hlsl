@@ -13,6 +13,13 @@ struct VertexFullscreenTriangleMinimalOutput
 	#endif
 };
 
+struct VertexFullscreenTriangleVolumeOutput
+{
+	float4 position : SV_Position;
+	float2 uv : TEXCOORD0;
+	uint viewIndex : SV_RenderTargetArrayIndex;
+};
+
 struct VertexFullscreenTriangleOutput
 {
 	float4 position : SV_Position;
@@ -41,6 +48,23 @@ VertexFullscreenTriangleMinimalOutput VertexFullscreenTriangleMinimal(uint id : 
 	#if defined(VOLUME_RENDER) || defined(STEREO_INSTANCING_ON)
 		output.viewIndex = id / 3;
 	#endif
+	
+	return output;
+}
+
+VertexFullscreenTriangleVolumeOutput VertexFullscreenTriangleVolume(uint id : SV_VertexID)
+{
+	VertexFullscreenTriangleVolumeOutput output;
+
+	uint localId = id % 3;
+	float2 uv = (localId << uint2(1, 0)) & 2;
+	
+	output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+	uv.y = 1.0 - uv.y;
+	output.uv = uv;
+	
+	// TODO: Will need to handle this specially for android
+	output.viewIndex = id / 3;
 	
 	return output;
 }

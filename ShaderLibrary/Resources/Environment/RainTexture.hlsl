@@ -29,10 +29,10 @@ float2 hash22(float2 p)
 	return frac((p3.xx + p3.yz) * p3.zy);
 }
 
-float2 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
+float2 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
 	float resolution = 16.0;
-	uv = uv * resolution;
+	float2 uv = input.uv * resolution;
 	float2 p0 = floor(uv);
 
 	float2 circles = 0.0;

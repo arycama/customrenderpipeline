@@ -11,7 +11,7 @@ Shader "Hidden/Terrain Ambient Occlusion"
         {
             HLSLPROGRAM
             #pragma target 5.0
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment Fragment
             #include "TerrainAmbientOcclusion.hlsl"
             ENDHLSL
