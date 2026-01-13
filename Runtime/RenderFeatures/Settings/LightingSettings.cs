@@ -11,15 +11,6 @@ public class LightingSettings
 	[field: SerializeField] public bool MicroShadows { get; private set; } = true;
 	[field: SerializeField, Range(1e-3f, 180)] public float SunAngularDiameter { get; private set; } = 0.52f;
 
-	[field: SerializeField, Range(0, 0.4999f)] public float SpaceWastingTolerance { get; private set; } = 0.25f;
-	[field: SerializeField, Range(1, 8)] public int MaxLengthPartitions { get; private set; } = 4;
-	[field: SerializeField, Range(1, 4)] public int MaxTransverseParitions { get; private set; } = 2;
-	[field: SerializeField, Min(0)] public float FootprintTolerance { get; private set; } = 0.25f;
-	[field: SerializeField] public float MaxTheta { get; private set; } = Math.HalfPi;
-
-	[field: SerializeField] public bool SnapTexels { get; private set; } = true;
-	[field: SerializeField] public bool UseCloseFit { get; private set; } = true;
-	[field: SerializeField] public bool UseOverlapFix { get; private set; } = true;
 	[field: SerializeField, Range(0, 2)] public float CascadeUniformity { get; private set; } = 0.5f;
 	[field: SerializeField, Range(1, 8)] public int DirectionalCascadeCount { get; private set; } = 4;
 	[field: SerializeField] public float DirectionalShadowDistance { get; private set; } = 128;

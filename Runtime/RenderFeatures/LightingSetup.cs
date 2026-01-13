@@ -73,8 +73,6 @@ public partial class LightingSetup : ViewRenderFeature
 			if (light.shadows != LightShadows.None)
 			{
 				var hasShadowBounds = cullingResults.GetShadowCasterBounds(i, out var shadowCasterBounds);
-				//var worldShadowBounds = (Bounds)shadowCasterBounds;
-				//var viewBounds = worldShadowBounds.Transform3x4(camera.transform.worldToLocalMatrix);
 
 				if (light.type == LightType.Directional)
 				{
@@ -82,48 +80,7 @@ public partial class LightingSetup : ViewRenderFeature
 					var lightRotation = (Quaternion)visibleLight.light.transform.rotation;
 					var lightInverse = lightRotation.Inverse;
 					var lightViewMatrix = Matrix4x4.Rotate(lightInverse);
-					var lightView = lightInverse.Rotate(viewRenderData.transform.position);
-
-					var viewPosition = viewRenderData.transform.position;
-					var viewToWorld = (Float4x4)viewRenderData.camera.transform.localToWorldMatrix;
-					var viewRight = viewRenderData.transform.rotation.Right;
-					var viewUp = viewRenderData.transform.rotation.Up;
-					var viewForward = viewRenderData.transform.rotation.Forward;
-
-					var lightForward = light.transform.forward;
-
-					//var lightViewMatrix = new Float4x4(light.transform.WorldRotation().Inverse);
-
-					if (settings.UseCloseFit)
-					{
-						var up = Float3.Cross(lightForward, viewForward);
-						lightViewMatrix = new Float4x4(Quaternion.LookRotation(light.transform.forward, up).Inverse);
-					}
-
 					var viewToLight = lightViewMatrix * viewRenderData.camera.transform.localToWorldMatrix;
-
-					//var viewToLight = lightViewMatrix.Mul(viewToWorld);
-
-					Float3 GetCorner(FrustumCorner corner) => viewToLight.MultiplyPoint3x4(Geometry.GetFrustumCorner(viewRenderData.tanHalfFov, n, f, corner));
-
-					var bottomLeftNear = GetCorner(FrustumCorner.BottomLeftNear);
-					var topLeftNear = GetCorner(FrustumCorner.TopLeftNear);
-					var topRightNear = GetCorner(FrustumCorner.TopRightNear);
-					var bottomRightNear = GetCorner(FrustumCorner.BottomRightNear);
-					var bottomLeftFar = GetCorner(FrustumCorner.BottomLeftFar);
-					var topLeftFar = GetCorner(FrustumCorner.TopLeftFar);
-					var topRightFar = GetCorner(FrustumCorner.TopRightFar);
-					var bottomRightFar = GetCorner(FrustumCorner.BottomRightFar);
-
-					var bottomLeft = new Line2D(bottomLeftNear.xy, bottomLeftFar.xy);
-					var topLeft = new Line2D(topLeftNear.xy, topLeftFar.xy);
-					var topRight = new Line2D(topRightNear.xy, topRightFar.xy);
-					var bottomRight = new Line2D(bottomRightNear.xy, bottomRightFar.xy);
-
-					var bottomLeftRay = new Ray2D(bottomLeftNear.xy, (bottomLeftFar.xy - bottomLeftNear.xy).Normalized);
-					var topLeftRay = new Ray2D(topLeftNear.xy, (topLeftFar.xy - topLeftNear.xy).Normalized);
-					var topRightRay = new Ray2D(topRightNear.xy, (topRightFar.xy - topRightNear.xy).Normalized);
-					var bottomRightRay = new Ray2D(bottomRightNear.xy, (bottomRightFar.xy - bottomRightNear.xy).Normalized);
 
 					float GetFrustumDepth(int j)
 					{
@@ -132,40 +89,6 @@ public partial class LightingSetup : ViewRenderFeature
 						var N = n - Rcp(c);
 						var x = j / m;
 						return L * Exp2(M * x) + N;
-					}
-
-					Bounds GetCascadeBounds(int cascade)
-					{
-						var near = GetFrustumDepth(cascade);
-						var far = GetFrustumDepth(cascade + 1);
-						return Geometry.GetFrustumBounds(viewRenderData.tanHalfFov, near, far, viewToLight);
-					}
-
-					// Move the start of the cascade forwards to avoid overlap
-					// However, also ensure it does not get pushed beyond the edge of the current boundary to avoid too much squishing in oblique cases
-					var boundsLimit = GetCascadeBounds(settings.DirectionalCascadeCount);
-
-					Bounds GetAdjustedBounds(int cascade)
-					{
-						var j = cascade;
-						var bounds = GetCascadeBounds(j);
-						if (j > 0)
-						{
-							var previousBounds = GetCascadeBounds(j - 1);
-							var nextBounds = GetCascadeBounds(j + 1);
-							if (previousBounds.Max.x > bounds.Min.x)
-							{
-								// Only apply if this bounds start is behind the next bounds start. This will be true outside of oblique cases
-								if (bounds.Min.x < boundsLimit.Min.x)
-								{
-									var minValue = Min(nextBounds.Min.x, Min(previousBounds.Max.x, boundsLimit.Min.x));
-									bounds.Min = new Float3(minValue, bounds.Min.yz);
-
-								}
-							}
-						}
-
-						return bounds;
 					}
 
 					for (var j = 0; j < settings.DirectionalCascadeCount; j++)
@@ -177,95 +100,8 @@ public partial class LightingSetup : ViewRenderFeature
 						var viewLightBounds = Geometry.GetFrustumBounds(viewRenderData.tanHalfFov, near, far, viewToLight);
 						var cascadeViewMatrix = lightViewMatrix;
 
-						var bounds = GetAdjustedBounds(j);
-						if (settings.UseOverlapFix)
-						{
-							if (bounds.Min.x < boundsLimit.Min.x)
-							{
-								// We need to expand the segment height to cover the newly visible region. To do this, Get the distance from each segment corner of the view frustum to the middle point and compute the new min max
-								if (j < settings.DirectionalCascadeCount - 1)
-								{
-									// While current bounds max and next bounds min should generally be the same, there are cases where the current bounds max is limited, but we don't want to extend more than neccessary
-									// So use the next bounds min as the max width to keep it conservative
-									var nextAdjustedBounds = GetAdjustedBounds(j + 1);
-									// Find out where the segments intersect our current max value.. 
-									var currentLine = new Line2D(new Float2(nextAdjustedBounds.Min.x, 0), new Float2(nextAdjustedBounds.Min.x, 1));
-
-									var hit0 = currentLine.IntersectLine(bottomLeft);
-									var hit1 = currentLine.IntersectLine(topLeft);
-									var hit2 = currentLine.IntersectLine(topRight);
-									var hit3 = currentLine.IntersectLine(bottomRight);
-
-									var minY = Min(Min(hit0.y, hit1.y), Min(hit2.y, hit3.y));
-									var maxY = Max(Max(hit0.y, hit1.y), Max(hit2.y, hit3.y));
-
-									// Clamp min max to not be smaller than original
-									minY = Min(minY, bounds.Min.y);
-									maxY = Max(maxY, bounds.Max.y);
-
-									bounds.center.y = 0.5f * (maxY + minY);
-									bounds.extents.y = 0.5f * (maxY - minY);
-								}
-							}
-
-							// Need to calculate the min/max depth of each cascade. To do this, find where the four frustum segments intersect our max plane and take the max depth
-							var minLine = new Line2D(new Float2(bounds.Min.x, 0), new Float2(bounds.Min.x, 1));
-							var maxLine = new Line2D(new Float2(bounds.Max.x, 0), new Float2(bounds.Max.x, 1));
-
-							var t0 = Max(minLine.DistanceAlongRay(bottomLeftRay), maxLine.DistanceAlongRay(bottomLeftRay)) / Float2.Distance(bottomLeftNear.xy, bottomLeftFar.xy);
-							var t1 = Max(minLine.DistanceAlongRay(topLeftRay), maxLine.DistanceAlongRay(topLeftRay)) / Float2.Distance(topLeftNear.xy, topLeftFar.xy);
-							var t2 = Max(minLine.DistanceAlongRay(topRightRay), maxLine.DistanceAlongRay(topRightRay)) / Float2.Distance(topRightNear.xy, topRightFar.xy);
-							var t3 = Max(minLine.DistanceAlongRay(bottomRightRay), maxLine.DistanceAlongRay(bottomRightRay)) / Float2.Distance(bottomRightNear.xy, bottomRightFar.xy);
-
-							var z0 = Lerp(bottomLeftNear.z, bottomLeftFar.z, t0);
-							var z1 = Lerp(topLeftNear.z, topLeftFar.z, t1);
-							var z2 = Lerp(topRightNear.z, topRightFar.z, t2);
-							var z3 = Lerp(bottomRightNear.z, bottomRightFar.z, t3);
-
-							var minZ = Min(Min(z0, z1), Min(z2, z3));
-							var maxZ = Max(Max(z0, z1), Max(z2, z3));
-
-							// Also test against the 8 frustum corners if they are within the bounds. 
-							var rect = new Rect(bounds.Min.xy, bounds.Size.xy);
-
-							void CheckCorner(Float3 corner)
-							{
-								if (rect.Contains(corner.xy))
-								{
-									minZ = Min(minZ, corner.z);
-									maxZ = Max(maxZ, corner.z);
-								}
-							}
-
-							CheckCorner(bottomLeftNear);
-							CheckCorner(topLeftNear);
-							CheckCorner(topRightNear);
-							CheckCorner(bottomRightNear);
-							CheckCorner(bottomLeftFar);
-							CheckCorner(topLeftFar);
-							CheckCorner(topRightFar);
-							CheckCorner(bottomRightFar);
-
-							bounds.center.z = 0.5f * (maxZ + minZ);
-							bounds.extents.z = 0.5f * (maxZ - minZ);
-
-							viewLightBounds = bounds;
-
-							//projectionMatrix = Float4x4.Ortho(bounds);
-							//var viewProjection = projectionMatrix.Mul(lightViewMatrix);
-						}
-
-						// Further limit shadow bounds to the size of the shadow bounds in cascade space
-						//var cascadeBounds = worldShadowBounds.Transform3x4(cascadeViewMatrix);
-						//viewLightBounds = viewLightBounds.Shrink(cascadeBounds);
-
 						// Snap to texels to avoid shimmering
 						var worldUnitsPerTexel = viewLightBounds.Size.xy / settings.DirectionalShadowResolution;
-						if (settings.SnapTexels)
-						{
-							viewLightBounds.center.x = Floor(viewLightBounds.center.x / worldUnitsPerTexel.x) * worldUnitsPerTexel.x;
-							viewLightBounds.center.y = Floor(viewLightBounds.center.y / worldUnitsPerTexel.y) * worldUnitsPerTexel.y;
-						}
 
 						var projectionMatrix = Float4x4.Ortho(viewLightBounds);
 						var shadowSplitData = CalculateShadowSplitData(projectionMatrix * cascadeViewMatrix, visibleLight.localToWorldMatrix.Forward(), viewRenderData.camera, true);
@@ -285,7 +121,6 @@ public partial class LightingSetup : ViewRenderFeature
 						var filterSize = Float2.Max(worldUnitsPerTexel, settings.DirectionalBlockerDistance * Radians(settings.SunAngularDiameter) * 0.5f);
 						var filterRadius = Float2.Min(settings.DirectionalMaxFilterSize, Float2.Ceil(filterSize * settings.DirectionalShadowResolution * 0.5f));
 						var rcpFilterSize = worldUnitsPerTexel / filterSize;
-						//directionalCascadeSizes.Add(new Float4(filterRadius, rcpFilterSize));
 						directionalCascadeSizes.Add(new Float4(rcpFilterSize, filterRadius));
 					}
 				}

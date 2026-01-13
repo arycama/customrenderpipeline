@@ -41,30 +41,36 @@ float GetDirectionalShadow(float3 worldPosition, bool softShadows = false, bool 
 	float2 localUv = shadowPosition.xy * DirectionalShadowResolution;
 	float2 texelCenter = floor(localUv) + 0.5;
 	
-	float visibility;
-	if (softShadows)
+	float visibility = 1.0;
+	if(shadowPosition.z > 0.0 && shadowPosition.z < 1.0)
 	{
-		float visibilitySum = 0, weightSum = 0;
-		for (float y = -radiusPixels.y; y <= radiusPixels.y; y++)
+		if (softShadows)
 		{
-			for (float x = -radiusPixels.x; x <= radiusPixels.x; x++)
+			float visibilitySum = 0, weightSum = 0;
+			for (float y = -radiusPixels.y; y <= radiusPixels.y; y++)
 			{
-				float2 coord = clamp(texelCenter + float2(x, y), 0.5, DirectionalShadowResolution - 0.5);
-				float d = DirectionalShadows[int3(coord, cascade)];
-				float2 delta = localUv - coord;
-				float2 weights = saturate(1.0 - abs(delta) * rcpFilterSize);
-				float weight = weights.x * weights.y;
-				bool isVisible = d < shadowPosition.z;
-				visibilitySum += isVisible * weight;
-				weightSum += weight;
+				for (float x = -radiusPixels.x; x <= radiusPixels.x; x++)
+				{
+					float2 coord = texelCenter + float2(x, y);
+					float d = DirectionalShadows[int3(coord, cascade)];
+				
+					d = DirectionalShadows.SampleCmpLevelZero(PointClampCompareSampler, float3(coord / DirectionalShadowResolution, cascade), shadowPosition.z);
+				
+					float2 delta = localUv - coord;
+					float2 weights = saturate(1.0 - abs(delta) * rcpFilterSize);
+					float weight = weights.x * weights.y;
+					bool isVisible = d < shadowPosition.z;
+					visibilitySum += d * weight;
+					weightSum += weight;
+				}
 			}
-		}
 	
-		visibility = weightSum ? visibilitySum / weightSum : 1;
-	}
-	else
-	{
-		visibility = DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(shadowPosition.xy, cascade), shadowPosition.z);
+			visibility = weightSum ? visibilitySum / weightSum : 1;
+		}
+		else
+		{
+			visibility = DirectionalShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(shadowPosition.xy, cascade), shadowPosition.z);
+		}
 	}
 	
 	// Particle shadows
