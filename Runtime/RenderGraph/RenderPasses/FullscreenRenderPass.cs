@@ -37,24 +37,28 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
 		foreach (var keyword in keywords)
 			Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
 
+        int instanceMultiplier;
         if (stereoMode == SinglePassStereoMode.Instancing)
         {
             Command.EnableShaderKeyword("STEREO_INSTANCING_ON");
-            Command.SetInstanceMultiplier(2u);
             Command.SetSinglePassStereo(SinglePassStereoMode.Instancing);
+            instanceMultiplier = 2;
         }
-        else if (stereoMode == SinglePassStereoMode.Multiview)
+        else
         {
-            Command.EnableShaderKeyword("STEREO_MULTIVIEW_ON");
-            Command.SetSinglePassStereo(SinglePassStereoMode.Multiview);
+            instanceMultiplier = 1;
+            if (stereoMode == SinglePassStereoMode.Multiview)
+            {
+                Command.EnableShaderKeyword("STEREO_MULTIVIEW_ON");
+                Command.SetSinglePassStereo(SinglePassStereoMode.Multiview);
+            }
         }
 
-        Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount, 1, PropertyBlock);
+        Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount * instanceMultiplier, 1, PropertyBlock);
 
         if (stereoMode == SinglePassStereoMode.Instancing)
         {
             Command.SetSinglePassStereo(SinglePassStereoMode.None);
-            Command.SetInstanceMultiplier(1u);
             Command.DisableShaderKeyword("STEREO_INSTANCING_ON");
         }
         else if (stereoMode == SinglePassStereoMode.Multiview)
