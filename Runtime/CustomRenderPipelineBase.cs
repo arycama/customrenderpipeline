@@ -140,8 +140,12 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
         context.ExecuteCommandBuffer(command);
 		command.Clear();
 
-
-		context.Submit();
+//#if UNITY_EDITOR
+//        if (!context.SubmitForRenderPassValidation())
+//            Debug.LogError("Render Pass Validation Failed");
+//        else
+//#endif
+            context.Submit();
 
         renderGraph.CleanupCurrentFrame();
     }
