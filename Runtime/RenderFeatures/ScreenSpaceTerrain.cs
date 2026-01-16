@@ -18,7 +18,7 @@ public class ScreenSpaceTerrain : ViewRenderFeature
 		using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Terrain");
 
 		pass.Initialize(material);
-		pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+		pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());

@@ -32,13 +32,13 @@ public class ShadowRenderer : ViewRenderFeature
 
 		// Allocate and clear shadow maps
 		var directionalShadowCount = Max(1, requestData.directionalShadowRequests.Count);
-		var directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, directionalShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
+		var directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, directionalShadowCount, TextureDimension.Tex2DArray, isExactSize: true, clearFlags: RTClearFlags.Depth);
 
 		var pointShadowCount = Max(1, requestData.pointShadowRequests.Count);
-		var pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, GraphicsFormat.D16_UNorm, pointShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
+		var pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, GraphicsFormat.D16_UNorm, pointShadowCount, TextureDimension.Tex2DArray, isExactSize: true, clearFlags: RTClearFlags.Depth);
 
 		var spotShadowCount = Max(1, requestData.spotShadowRequests.Count);
-		var spotShadows = renderGraph.GetTexture(settings.SpotShadowResolution, GraphicsFormat.D16_UNorm, spotShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
+		var spotShadows = renderGraph.GetTexture(settings.SpotShadowResolution, GraphicsFormat.D16_UNorm, spotShadowCount, TextureDimension.Tex2DArray, isExactSize: true, clearFlags: RTClearFlags.Depth);
 		renderGraph.SetResource(new ShadowData(directionalShadows, pointShadows, spotShadows));
 
 		using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", (directionalShadows, pointShadows, spotShadows)))
@@ -46,18 +46,6 @@ public class ShadowRenderer : ViewRenderFeature
 			pass.WriteTexture(directionalShadows);
 			pass.WriteTexture(pointShadows);
 			pass.WriteTexture(spotShadows);
-
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				command.SetRenderTarget(pass.GetRenderTexture(data.directionalShadows), pass.GetRenderTexture(data.directionalShadows), 0, CubemapFace.Unknown, -1);
-				command.ClearRenderTarget(true, false, Color.clear);
-
-				command.SetRenderTarget(pass.GetRenderTexture(data.pointShadows), pass.GetRenderTexture(data.pointShadows), 0, CubemapFace.Unknown, -1);
-				command.ClearRenderTarget(true, false, Color.clear);
-
-				command.SetRenderTarget(pass.GetRenderTexture(data.spotShadows), pass.GetRenderTexture(data.spotShadows), 0, CubemapFace.Unknown, -1);
-				command.ClearRenderTarget(true, false, Color.clear);
-			});
 		}
 
 		using (renderGraph.AddProfileScope($"Directional Shadows"))

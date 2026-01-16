@@ -43,7 +43,7 @@ public class RainTextureUpdater : ViewRenderFeature
 		{
 			pass.Initialize(compositeMaterial);
 
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(albedoMetallicCopy);
 			pass.WriteTexture(normalRoughnessCopy);
 			pass.WriteTexture(bentNormalOcclusionCopy);

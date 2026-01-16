@@ -23,7 +23,7 @@ public class DecalComposite : ViewRenderFeature
 		{
 			pass.Initialize(material, 0);
 
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(albedoMetallicCopy);
 			pass.WriteTexture(normalRoughnessCopy);
 			pass.WriteTexture(bentNormalOcclusionCopy);
@@ -38,7 +38,7 @@ public class DecalComposite : ViewRenderFeature
 		{
 			pass.Initialize(material, 1);
 
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());

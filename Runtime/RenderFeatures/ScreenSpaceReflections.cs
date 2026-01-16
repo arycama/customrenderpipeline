@@ -83,7 +83,7 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip, settings.Thickness)))
 			{
 				pass.Initialize(material);
-				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 				pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
 				pass.WriteTexture(hitResult, RenderBufferLoadAction.DontCare);
 				pass.ReadTexture("", renderGraph.GetRTHandle<CameraDepth>());
@@ -117,7 +117,7 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
         using (var pass = renderGraph.AddFullscreenRenderPass("Specular GI Spatial", (settings.ResolveSamples, settings.ResolveSize, settings.Intensity)))
         {
             pass.Initialize(material, 1);
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
             pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
 			pass.WriteTexture(spatialWeight, RenderBufferLoadAction.DontCare);
@@ -157,7 +157,7 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 			pass.renderData.wasCreated = wasCreated;
 
 			pass.Initialize(material, 2);
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 			pass.WriteTexture(currentWeight, RenderBufferLoadAction.DontCare);
 

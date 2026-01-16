@@ -23,7 +23,7 @@ public class UnderwaterLighting : ViewRenderFeature
         using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Underwater Lighting", settings))
         {
             pass.Initialize(underwaterLightingMaterial);
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(underwaterResultId, RenderBufferLoadAction.DontCare);
 
             pass.ReadRtHandle<GBufferAlbedoMetallic>();

@@ -74,7 +74,7 @@ public partial class AmbientOcclusion : ViewRenderFeature
 			using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Compute", (settings.Radius, settings.Directions, settings.Samples, settings.Falloff, settings.MaxScreenRadius, settings.ThinOccluderCompensation)))
 			{
 				pass.Initialize(material, 0);
-				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 				pass.WriteTexture(result);
 
 				pass.ReadRtHandle<CameraDepth>();
@@ -104,7 +104,7 @@ public partial class AmbientOcclusion : ViewRenderFeature
 			pass.renderData.history = history;
 
 			pass.Initialize(material, 1);
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), RenderTargetFlags.ReadOnlyDepthStencil);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(current);
 			pass.ReadTexture("Input", result);
 			pass.ReadTexture("History", history);
