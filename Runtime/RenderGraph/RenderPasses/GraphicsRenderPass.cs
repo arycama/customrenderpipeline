@@ -163,7 +163,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
                     actualResolution = new(actualTarget.width, actualTarget.height);
 
                 // TODO: Only assign target if transient
-                attachments[index] = new AttachmentDescriptor(descriptor.format) { loadAction = loadAction, storeAction = item.Item3, loadStoreTarget = target };
+                attachments[index] = new AttachmentDescriptor(descriptor.format) { loadAction = loadAction, storeAction = item.Item3, loadStoreTarget = target, clearColor = descriptor.clearColor };
 				colorOutputs[i] = index;
             }
 		}
