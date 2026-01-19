@@ -58,10 +58,10 @@ public abstract class RenderPass : IDisposable
 	public RenderGraph RenderGraph { get; set; }
 	internal string Name { get; set; }
 	internal int Index { get; set; }
-
 	public bool UseProfiler { get; set; } = true;
+    public virtual bool IsNativeRenderPass => false;
 
-	public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
+    public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
 	public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);
 	public abstract void SetVector(int propertyId, Float4 value);
 	public abstract void SetVectorArray(string propertyName, Vector4[] value);

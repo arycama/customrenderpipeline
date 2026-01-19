@@ -10,7 +10,7 @@ using Object = UnityEngine.Object;
 
 public class RenderGraph : IDisposable
 {
-	private readonly Dictionary<Type, Stack<RenderPass>> renderPassPool = new();
+    private readonly Dictionary<Type, Stack<RenderPass>> renderPassPool = new();
 
 	private bool disposedValue;
 	private readonly List<RenderPass> renderPasses = new();
@@ -32,7 +32,9 @@ public class RenderGraph : IDisposable
 	public ResourceHandle<RenderTexture> EmptyCubemap { get; }
 	public ResourceHandle<RenderTexture> EmptyCubemapArray { get; }
 
-	public int FrameIndex { get; private set; }
+    public NativeRenderPassSystem NativeRenderPassData { get; } = new();
+
+    public int FrameIndex { get; private set; }
 	public bool IsExecuting { get; private set; }
 	public bool IsDisposing { get; private set; }
 
@@ -157,16 +159,25 @@ public class RenderGraph : IDisposable
 
 		foreach (var renderPass in renderPasses)
 		{
-			renderPass.Run(command);
+            // If previous pass was a native pass, IsInNativeRenderPass will be true, but we'll need to manually end the pass
+            if (NativeRenderPassData.IsInNativeRenderPass && !renderPass.IsNativeRenderPass)
+                NativeRenderPassData.EndRenderPass(command);
 
-			if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))
-			{
-				pool = new();
-				renderPassPool.Add(renderPass.GetType(), pool);
-			}
+            renderPass.Run(command);
+
+            // Re-add the pass to the pool
+            if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))
+            {
+                pool = new();
+                renderPassPool.Add(renderPass.GetType(), pool);
+            }
 
 			pool.Push(renderPass);
 		}
+
+        // If last pass was a render pass, we need to end it
+        if(NativeRenderPassData.IsInNativeRenderPass)
+            command.EndRenderPass();
 
 		IsExecuting = false;
 	}
@@ -202,7 +213,7 @@ public class RenderGraph : IDisposable
 		BufferHandleSystem.CleanupCurrentFrame(FrameIndex);
 		RtHandleSystem.CleanupCurrentFrame(FrameIndex);
 
-		nativeRenderPasses.Clear();
+		//nativeRenderPasses.Clear();
 
 		if (!FrameDebugger.enabled)
 			FrameIndex++;
@@ -396,65 +407,58 @@ public class RenderGraph : IDisposable
 		return indexBuffer;
 	}
 
-	private List<RenderPassData> nativeRenderPasses = new();
-	private int nativeRenderPassIndex = -1;
-	private bool IsInRenderPass => nativeRenderPassIndex != -1;
-	private List<ResourceHandle<RenderTexture>> currentPassAttachments = new();
-	private List<int> currentSubPass = new();
+	//private List<RenderPassData> nativeRenderPasses = new();
+	//private int nativeRenderPassIndex = -1;
+	//private bool IsInRenderPass => nativeRenderPassIndex != -1;
+	//private List<ResourceHandle<RenderTexture>> currentPassAttachments = new();
+	//private List<int> currentSubPass = new();
 
-	public void BeginNativeRenderPass(Int2 size)
-	{
-		Assert.IsFalse(IsInRenderPass);
-		nativeRenderPassIndex = nativeRenderPasses.Count;
+	//public void BeginNativeRenderPass(Int2 size)
+	//{
+	//	Assert.IsFalse(IsInRenderPass);
+	//	nativeRenderPassIndex = nativeRenderPasses.Count;
 
-		//using var pass = this.AddGenericRenderPass("Begin Render Pass");
+	//	//using var pass = this.AddGenericRenderPass("Begin Render Pass");
 
-		//pass.SetRenderFunction((command, pass) =>
-		//{
-		//	var attachments = new NativeArray<AttachmentDescriptor>();
+	//	//pass.SetRenderFunction((command, pass) =>
+	//	//{
+	//	//	var attachments = new NativeArray<AttachmentDescriptor>();
 
-		//	for(var i = 0; i < rtHandles.Length; i++)
-		//	{
-		//		var handle = rtHandles[i];
-		//		var desc = new AttachmentDescriptor();
+	//	//	for(var i = 0; i < rtHandles.Length; i++)
+	//	//	{
+	//	//		var handle = rtHandles[i];
+	//	//		var desc = new AttachmentDescriptor();
 
 
-		//		//attachments[i] = 
-		//	}
+	//	//		//attachments[i] = 
+	//	//	}
 
-		//	//command.BeginRenderPass(width, height, samples, attachments, 0, subpasses)
-		//});
-	}
+	//	//	//command.BeginRenderPass(width, height, samples, attachments, 0, subpasses)
+	//	//});
+	//}
 
-	public void EndNativeRenderPass()
-	{
-		Assert.IsTrue(IsInRenderPass);
-		nativeRenderPassIndex = -1;
+	//public void EndNativeRenderPass()
+	//{
+	//	Assert.IsTrue(IsInRenderPass);
+	//	nativeRenderPassIndex = -1;
 
-		currentPassAttachments.Clear();
-	}
+	//	currentPassAttachments.Clear();
+	//}
 
-	public void WriteTexture(ResourceHandle<RenderTexture> handle)
-	{
-		if (!IsInRenderPass)
-			return;
+	//public void WriteTexture(ResourceHandle<RenderTexture> handle)
+	//{
+	//	if (!IsInRenderPass)
+	//		return;
 
-		var index = currentPassAttachments.FindIndex(item => item.Index == handle.Index);
-		if(index == -1)
-		{
-			Assert.IsFalse(currentPassAttachments.Count >= 8, "Max number of attachments (8) exceeded");
-			currentPassAttachments.Add(handle);
-		}
-		else
-		{
-			currentSubPass.Add(index);
-		}
-	}
-}
-
-public class RenderPassData
-{
-	public List<ResourceHandle<RenderTexture>> attachments;
-	public List<AttachmentIndexArray> inputs = new();
-	public List<AttachmentIndexArray> outputs = new();
+	//	var index = currentPassAttachments.FindIndex(item => item.Index == handle.Index);
+	//	if(index == -1)
+	//	{
+	//		Assert.IsFalse(currentPassAttachments.Count >= 8, "Max number of attachments (8) exceeded");
+	//		currentPassAttachments.Add(handle);
+	//	}
+	//	else
+	//	{
+	//		currentSubPass.Add(index);
+	//	}
+	//}
 }

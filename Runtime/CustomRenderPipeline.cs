@@ -168,10 +168,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new VirtualTerrainPreRender(renderGraph, asset.TerrainSettings),
 		new TerrainViewData(renderGraph, terrainSystem, asset.TerrainSettings),
 
-		new GenericViewRenderFeature(renderGraph, viewRenderData =>
-		{
-			renderGraph.BeginNativeRenderPass(viewRenderData.viewSize);
-		}),
+		//new GenericViewRenderFeature(renderGraph, viewRenderData =>
+		//{
+		//	renderGraph.BeginNativeRenderPass(viewRenderData.viewSize);
+		//}),
 
 		new TerrainRenderer(renderGraph, asset.TerrainSettings, quadtreeCull),
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
@@ -243,10 +243,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<AutoExposureData>();
 		}),
 
-		new GenericViewRenderFeature(renderGraph, viewRenderData =>
-		{
-			renderGraph.EndNativeRenderPass();
-		}),
+		//new GenericViewRenderFeature(renderGraph, viewRenderData =>
+		//{
+		//	renderGraph.EndNativeRenderPass();
+		//}),
 
 		new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
 

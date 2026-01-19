@@ -19,6 +19,8 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 	public int MipLevel { get; set; }
 	public CubemapFace CubemapFace { get; set; } = CubemapFace.Unknown;
 
+    public override bool IsNativeRenderPass => true;
+
 	public override void Reset()
 	{
 		base.Reset();
@@ -51,7 +53,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 
 	private void WriteResource(ResourceHandle<RenderTexture> rtHandle)
 	{
-		RenderGraph.WriteTexture(rtHandle);
+		//RenderGraph.WriteTexture(rtHandle);
 
 		RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
 
@@ -95,10 +97,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 		if (hasDepthBuffer)
 			attachmentCount++;
 
-		var attachments = new NativeArray<AttachmentDescriptor>(attachmentCount, Allocator.Temp);
-        var colorOutputs = new AttachmentIndexArray(colorTargets.Count);
 		var actualResolution = new Int2(0, 0);
-
         if (hasDepthBuffer)
 		{
 			var depthDesc = RenderGraph.RtHandleSystem.GetDescriptor(depthBuffer.Item1);
@@ -123,9 +122,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
             }
 
             actualResolution = new(actualDepthTexture.width, actualDepthTexture.height);
-
-            // TODO: Only assign target if transient
-            attachments[0] = new AttachmentDescriptor(depthDesc.format) { loadAction = depthLoadAction, storeAction = depthStoreAction, loadStoreTarget = depthTarget };
+            RenderGraph.NativeRenderPassData.SetDepthTarget(depthDesc.format, depthLoadAction, depthStoreAction, depthTarget);
         }
 
 		if (colorTargets.Count == 0)
@@ -162,27 +159,19 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 				else
                     actualResolution = new(actualTarget.width, actualTarget.height);
 
-                // TODO: Only assign target if transient
-                attachments[index] = new AttachmentDescriptor(descriptor.format) { loadAction = loadAction, storeAction = item.Item3, loadStoreTarget = target, clearColor = descriptor.clearColor };
-				colorOutputs[i] = index;
+                RenderGraph.NativeRenderPassData.AddAttachment(descriptor.format, loadAction, item.Item3, target, descriptor.clearColor);
             }
 		}
 
-        var subPasses = new NativeArray<SubPassDescriptor>(1, Allocator.Temp);
-		{
-			subPasses[0] = new SubPassDescriptor() { colorOutputs = colorOutputs, flags = flags };
-		}
+        RenderGraph.NativeRenderPassData.SetSize(new(actualResolution.x, actualResolution.y, 1));
+        RenderGraph.NativeRenderPassData.SetSubPassFlags(flags);
+        RenderGraph.NativeRenderPassData.BeginRenderPass(Command);
 
-		var depthIndex = hasDepthBuffer ? 0 : -1;
-		Command.BeginRenderPass(actualResolution.x, actualResolution.y, 1, attachments, depthIndex, subPasses);
-
-		Command.SetViewport(new Rect(0, 0, resolution.Value.x >> MipLevel, resolution.Value.y >> MipLevel));
+        Command.SetViewport(new Rect(0, 0, resolution.Value.x >> MipLevel, resolution.Value.y >> MipLevel));
 	}
 
 	protected sealed override void PostExecute()
 	{
-		Command.EndRenderPass();
-
 		foreach (var colorTarget in colorTargets)
 		{
 			var handle = colorTarget.Item1;
