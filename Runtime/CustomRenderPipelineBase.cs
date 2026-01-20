@@ -69,10 +69,13 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
             if (!camera.TryGetCullingParameters(out var cullingParameters))
                 continue;
 
+            var screenSize = camera.targetTexture == null ? new Int2(Screen.width, Screen.height) : new Int2(camera.targetTexture.width, camera.targetTexture.height);
+            var target = (RenderTargetIdentifier)(camera.targetTexture == null ? BuiltinRenderTextureType.CameraTarget : camera.targetTexture);
+
             // Somewhat hacky.. but this is kind of required to deal with some unity hacks so meh
             camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
-            viewRenderDatas.Add(new ViewRenderData(camera.ViewSize(), camera.nearClipPlane, camera.farClipPlane, camera.TanHalfFov(), camera.transform.WorldRigidTransform(), camera, context, cullingParameters, BuiltinRenderTextureType.CameraTarget, VRTextureUsage.None, SinglePassStereoMode.None, 1, string.Empty, GraphicsFormat.R8G8B8A8_SRGB, new Int2(Screen.width, Screen.height), 1));
-            renderGraph.RtHandleSystem.SetScreenSize(camera.ViewSize().x, camera.ViewSize().y);
+            viewRenderDatas.Add(new ViewRenderData(camera.ViewSize(), camera.nearClipPlane, camera.farClipPlane, camera.TanHalfFov(), camera.transform.WorldRigidTransform(), camera, context, cullingParameters, target, VRTextureUsage.None, SinglePassStereoMode.None, 1, string.Empty, GraphicsFormat.R8G8B8A8_SRGB, screenSize, 1));
+            renderGraph.RtHandleSystem.SetScreenSize(screenSize.x, screenSize.y);
         }
     }
 

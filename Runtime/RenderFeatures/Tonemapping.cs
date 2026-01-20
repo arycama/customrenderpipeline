@@ -66,7 +66,7 @@ public partial class Tonemapping : ViewRenderFeature
 
 		using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb));
 
-		pass.Initialize(material, viewRenderData.target, 0, viewRenderData.instanceMultiplier);
+		pass.Initialize(material, viewRenderData.target, viewRenderData.format, viewRenderData.screenSize, 0, viewRenderData.viewCount);
 
 		pass.ReadRtHandle<CameraTarget>();
 		pass.ReadRtHandle<CameraBloom>();
