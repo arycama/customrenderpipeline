@@ -116,6 +116,5 @@ public class BlitToScreenPass<T> : RenderPass<T>
         RenderGraph.NativeRenderPassData.AddAttachment(format, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, target);
         RenderGraph.NativeRenderPassData.SetSize(new(size.x, size.y, viewCount));
         RenderGraph.NativeRenderPassData.BeginRenderPass(Command);
-        //Command.SetRenderTarget(target, 0, CubemapFace.Unknown, -1);
 	}
 }
