@@ -15,8 +15,9 @@ public readonly struct ViewRenderData : IRenderPassData
     public readonly RenderTargetIdentifier target;
     public readonly VRTextureUsage vrTextureUsage;
     public readonly SinglePassStereoMode stereoMode;
+    public readonly int instanceMultiplier;
 
-    public ViewRenderData(Int2 viewSize, float near, float far, Float2 tanHalfFov, RigidTransform transform, Camera camera, ScriptableRenderContext context, ScriptableCullingParameters cullingParameters, RenderTargetIdentifier target, VRTextureUsage vrTextureUsage, SinglePassStereoMode stereoMode)
+    public ViewRenderData(Int2 viewSize, float near, float far, Float2 tanHalfFov, RigidTransform transform, Camera camera, ScriptableRenderContext context, ScriptableCullingParameters cullingParameters, RenderTargetIdentifier target, VRTextureUsage vrTextureUsage, SinglePassStereoMode stereoMode, int instanceMultiplier)
     {
         this.viewSize = viewSize;
         this.near = near;
@@ -30,6 +31,7 @@ public readonly struct ViewRenderData : IRenderPassData
         this.target = target;
         this.vrTextureUsage = vrTextureUsage;
         this.stereoMode = stereoMode;
+        this.instanceMultiplier = instanceMultiplier;
     }
 
     void IRenderPassData.SetInputs(RenderPass pass)

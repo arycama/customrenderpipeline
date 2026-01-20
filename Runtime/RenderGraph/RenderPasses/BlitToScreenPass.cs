@@ -4,22 +4,21 @@ using UnityEngine.Rendering;
 public class BlitToScreenPass<T> : RenderPass<T>
 {
 	private Material material;
-	private int passIndex;
+    private RenderTargetIdentifier target;
+    private int passIndex;
 	private int viewCount;
-	private bool isStereo;
 
 	public override string ToString()
 	{
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material, int passIndex = 0, int viewCount = 1)
+	public void Initialize(Material material, RenderTargetIdentifier target, int passIndex = 0, int viewCount = 1)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
 		this.viewCount = viewCount;
-
-		//isStereo = camera.stereoEnabled;
+        this.target = target;
     }
 
 	public override void Reset()
@@ -107,6 +106,6 @@ public class BlitToScreenPass<T> : RenderPass<T>
 
 	protected override void SetupTargets()
 	{
-		Command.SetRenderTarget(BuiltinRenderTextureType.CameraTarget, 0, CubemapFace.Unknown, -1);
+		Command.SetRenderTarget(target, 0, CubemapFace.Unknown, -1);
 	}
 }
