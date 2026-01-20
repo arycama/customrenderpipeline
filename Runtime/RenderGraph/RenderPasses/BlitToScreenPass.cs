@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 public class BlitToScreenPass<T> : RenderPass<T>
@@ -7,18 +8,24 @@ public class BlitToScreenPass<T> : RenderPass<T>
     private RenderTargetIdentifier target;
     private int passIndex;
 	private int viewCount;
+    private GraphicsFormat format;
+    private Int2 size;
+
+    public override bool IsNativeRenderPass => true;
 
 	public override string ToString()
 	{
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material, RenderTargetIdentifier target, int passIndex = 0, int viewCount = 1)
+	public void Initialize(Material material, RenderTargetIdentifier target, GraphicsFormat format, Int2 size, int passIndex = 0, int viewCount = 1)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
 		this.viewCount = viewCount;
-        this.target = target;
+        this.target = new RenderTargetIdentifier(target, 0, CubemapFace.Unknown, -1);
+        this.format = format;
+        this.size = size;
     }
 
 	public override void Reset()
@@ -106,6 +113,9 @@ public class BlitToScreenPass<T> : RenderPass<T>
 
 	protected override void SetupTargets()
 	{
-		Command.SetRenderTarget(target, 0, CubemapFace.Unknown, -1);
+        RenderGraph.NativeRenderPassData.AddAttachment(format, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, target);
+        RenderGraph.NativeRenderPassData.SetSize(new(size.x, size.y, viewCount));
+        RenderGraph.NativeRenderPassData.BeginRenderPass(Command);
+        //Command.SetRenderTarget(target, 0, CubemapFace.Unknown, -1);
 	}
 }

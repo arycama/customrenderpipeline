@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 /// <summary> Contains data for a single view inside a rendering loop </summary>
@@ -16,8 +17,12 @@ public readonly struct ViewRenderData : IRenderPassData
     public readonly VRTextureUsage vrTextureUsage;
     public readonly SinglePassStereoMode stereoMode;
     public readonly int instanceMultiplier;
+    public readonly string stereoKeyword;
+    public readonly GraphicsFormat format;
+    public readonly Int2 screenSize;
+    public readonly int viewCount;
 
-    public ViewRenderData(Int2 viewSize, float near, float far, Float2 tanHalfFov, RigidTransform transform, Camera camera, ScriptableRenderContext context, ScriptableCullingParameters cullingParameters, RenderTargetIdentifier target, VRTextureUsage vrTextureUsage, SinglePassStereoMode stereoMode, int instanceMultiplier)
+    public ViewRenderData(Int2 viewSize, float near, float far, Float2 tanHalfFov, RigidTransform transform, Camera camera, ScriptableRenderContext context, ScriptableCullingParameters cullingParameters, RenderTargetIdentifier target, VRTextureUsage vrTextureUsage, SinglePassStereoMode stereoMode, int instanceMultiplier, string stereoKeyword, GraphicsFormat format, Int2 screenSize, int viewCount)
     {
         this.viewSize = viewSize;
         this.near = near;
@@ -32,6 +37,10 @@ public readonly struct ViewRenderData : IRenderPassData
         this.vrTextureUsage = vrTextureUsage;
         this.stereoMode = stereoMode;
         this.instanceMultiplier = instanceMultiplier;
+        this.stereoKeyword = stereoKeyword;
+        this.format = format;
+        this.screenSize = screenSize;
+        this.viewCount = viewCount;
     }
 
     void IRenderPassData.SetInputs(RenderPass pass)
