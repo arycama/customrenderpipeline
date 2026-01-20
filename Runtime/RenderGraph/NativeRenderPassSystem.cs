@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -10,6 +11,13 @@ public class NativeRenderPassSystem
     public bool IsInNativeRenderPass { get; private set; }
 
     private NativeRenderPassData previousPassData = new();
+    private bool hasPreviousPassData;
+
+    public void Clear()
+    {
+        previousPassData.Reset();
+        hasPreviousPassData = false;
+    }
 
     public void BeginRenderPass(CommandBuffer command, NativeRenderPassData currentPassData)
     {
@@ -39,35 +47,29 @@ public class NativeRenderPassSystem
             subPasses[0] = new SubPassDescriptor() { colorOutputs = colorOutputs, flags = currentPassData.flags };
         }
 
-        if (IsInNativeRenderPass)
+        if (hasPreviousPassData && IsInNativeRenderPass)
         {
             if (!currentPassData.MatchesPass(previousPassData))
             {
                 command.EndRenderPass();
                 command.BeginRenderPass(currentPassData.size.x, currentPassData.size.y, currentPassData.size.z, 1, attachments, depthIndex, subPasses);
-
-                // Swap current and previous
-                (previousPassData, currentPassData) = (currentPassData, previousPassData);
             }
         }
         else
         {
             command.BeginRenderPass(currentPassData.size.x, currentPassData.size.y, currentPassData.size.z, 1, attachments, depthIndex, subPasses);
-
-            // Swap current and previous
-            (previousPassData, currentPassData) = (currentPassData, previousPassData);
-
             IsInNativeRenderPass = true;
         }
 
-        // Reset
-        currentPassData.Reset();
+        currentPassData.CopyFrom(previousPassData);
+        hasPreviousPassData = true;
     }
 
     public void EndRenderPass(CommandBuffer command)
     {
         command.EndRenderPass();
         IsInNativeRenderPass = false;
+        hasPreviousPassData = false;
     }
 }
 
@@ -126,5 +128,18 @@ public class NativeRenderPassData
         }
 
         return true;
+    }
+
+    public void CopyFrom(NativeRenderPassData other)
+    {
+        colorAttachments.Clear();
+
+        size = other.size; 
+        depthAttachment = other.depthAttachment;
+        hasDepthAttachment = other.hasDepthAttachment;
+        flags = other.flags;
+
+        foreach(var colorAttachment in other.colorAttachments)
+            colorAttachments.Add(colorAttachment);
     }
 }

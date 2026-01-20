@@ -155,23 +155,20 @@ public class RenderGraph : IDisposable
 		BufferHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 		RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 
-        // Detect and queue up native renderPasses
-        //foreach (var renderPass in renderPasses)
-        //{
-        //    if (!renderPass.IsNativeRenderPass)
-        //        continue;
-
-
-        //}
-
         IsExecuting = true;
 
-		foreach (var renderPass in renderPasses)
+        // Detect and queue up native renderPasses
+        foreach (var renderPass in renderPasses)
+            renderPass.SetupRenderPassData();
+
+        foreach (var renderPass in renderPasses)
 		{
+
             // If previous pass was a native pass, IsInNativeRenderPass will be true, but we'll need to manually end the pass
             if (RenderPassSystem.IsInNativeRenderPass && !renderPass.IsNativeRenderPass)
                 RenderPassSystem.EndRenderPass(command);
 
+            //renderPass.SetupRenderPassData();
             renderPass.Run(command);
 
             // Re-add the pass to the pool
@@ -186,7 +183,9 @@ public class RenderGraph : IDisposable
 
         // If last pass was a render pass, we need to end it
         if(RenderPassSystem.IsInNativeRenderPass)
-            command.EndRenderPass();
+            RenderPassSystem.EndRenderPass(command);
+
+        RenderPassSystem.Clear();
 
 		IsExecuting = false;
 	}

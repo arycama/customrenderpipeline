@@ -130,6 +130,8 @@ public abstract class RenderPass : IDisposable
 		handleData.SetInputs(this);
 	}
 
+    public virtual void SetupRenderPassData() { }
+
 	public void Run(CommandBuffer command)
 	{
 		Command = command;

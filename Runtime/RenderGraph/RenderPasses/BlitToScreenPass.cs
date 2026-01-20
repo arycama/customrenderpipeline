@@ -111,11 +111,17 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		PropertyBlock.SetMatrixArray(propertyName, value);
 	}
 
-	protected override void SetupTargets()
-	{
+    public override void SetupRenderPassData()
+    {
         nativeRenderPassData.AddAttachment(format, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, target);
         nativeRenderPassData.SetSize(new(size.x, size.y, viewCount));
+    }
+
+    protected override void SetupTargets()
+    {
         RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData);
+        nativeRenderPassData.Reset();
         //Command.SetRenderTarget(target, 0, CubemapFace.Unknown, -1);
-	}
+
+    }
 }
