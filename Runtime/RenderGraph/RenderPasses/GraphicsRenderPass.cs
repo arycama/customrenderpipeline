@@ -122,7 +122,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
             }
 
             actualResolution = new(actualDepthTexture.width, actualDepthTexture.height);
-            RenderGraph.NativeRenderPassData.SetDepthTarget(depthDesc.format, depthLoadAction, depthStoreAction, depthTarget);
+            nativeRenderPassData.SetDepthTarget(depthDesc.format, depthLoadAction, depthStoreAction, depthTarget);
         }
 
 		if (colorTargets.Count == 0)
@@ -159,13 +159,13 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 				else
                     actualResolution = new(actualTarget.width, actualTarget.height);
 
-                RenderGraph.NativeRenderPassData.AddAttachment(descriptor.format, loadAction, item.Item3, target, descriptor.clearColor);
+                nativeRenderPassData.AddAttachment(descriptor.format, loadAction, item.Item3, target, descriptor.clearColor);
             }
 		}
 
-        RenderGraph.NativeRenderPassData.SetSize(new(actualResolution.x, actualResolution.y, 1));
-        RenderGraph.NativeRenderPassData.SetSubPassFlags(flags);
-        RenderGraph.NativeRenderPassData.BeginRenderPass(Command);
+        nativeRenderPassData.SetSize(new(actualResolution.x, actualResolution.y, 1));
+        nativeRenderPassData.SetSubPassFlags(flags);
+        RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData);
 
         Command.SetViewport(new Rect(0, 0, resolution.Value.x >> MipLevel, resolution.Value.y >> MipLevel));
 	}

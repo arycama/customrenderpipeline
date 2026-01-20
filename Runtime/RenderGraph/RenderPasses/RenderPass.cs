@@ -48,7 +48,9 @@ public abstract class RenderPass : IDisposable
 	private readonly List<Type> readRtHandles = new();
 	protected readonly List<string> keywords = new();
 
-	public RenderPass()
+    public NativeRenderPassData nativeRenderPassData = new();
+
+    public RenderPass()
 	{
 		PropertyBlock = new();
 	}

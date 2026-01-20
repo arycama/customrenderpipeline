@@ -32,7 +32,7 @@ public class RenderGraph : IDisposable
 	public ResourceHandle<RenderTexture> EmptyCubemap { get; }
 	public ResourceHandle<RenderTexture> EmptyCubemapArray { get; }
 
-    public NativeRenderPassSystem NativeRenderPassData { get; } = new();
+    public NativeRenderPassSystem RenderPassSystem { get; } = new();
 
     public int FrameIndex { get; private set; }
 	public bool IsExecuting { get; private set; }
@@ -155,13 +155,22 @@ public class RenderGraph : IDisposable
 		BufferHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 		RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 
-		IsExecuting = true;
+        // Detect and queue up native renderPasses
+        //foreach (var renderPass in renderPasses)
+        //{
+        //    if (!renderPass.IsNativeRenderPass)
+        //        continue;
+
+
+        //}
+
+        IsExecuting = true;
 
 		foreach (var renderPass in renderPasses)
 		{
             // If previous pass was a native pass, IsInNativeRenderPass will be true, but we'll need to manually end the pass
-            if (NativeRenderPassData.IsInNativeRenderPass && !renderPass.IsNativeRenderPass)
-                NativeRenderPassData.EndRenderPass(command);
+            if (RenderPassSystem.IsInNativeRenderPass && !renderPass.IsNativeRenderPass)
+                RenderPassSystem.EndRenderPass(command);
 
             renderPass.Run(command);
 
@@ -176,7 +185,7 @@ public class RenderGraph : IDisposable
 		}
 
         // If last pass was a render pass, we need to end it
-        if(NativeRenderPassData.IsInNativeRenderPass)
+        if(RenderPassSystem.IsInNativeRenderPass)
             command.EndRenderPass();
 
 		IsExecuting = false;
