@@ -82,17 +82,6 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		PropertyBlock.SetInt(propertyName, value);
 	}
 
-	protected override void Execute()
-	{
-		foreach (var keyword in keywords)
-			Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
-
-        Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * viewCount, 1, PropertyBlock);
-
-		foreach (var keyword in keywords)
-			Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
-	}
-
 	public override void SetMatrix(string propertyName, Matrix4x4 value)
 	{
 		PropertyBlock.SetMatrix(propertyName, value);
@@ -119,9 +108,28 @@ public class BlitToScreenPass<T> : RenderPass<T>
 
     protected override void SetupTargets()
     {
-        RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData);
-        nativeRenderPassData.Reset();
-        //Command.SetRenderTarget(target, 0, CubemapFace.Unknown, -1);
+        if (IsRenderPassStart)
+            RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData);
+    }
 
+    protected override void Execute()
+    {
+        foreach (var keyword in keywords)
+            Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
+
+        Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * viewCount, 1, PropertyBlock);
+
+        foreach (var keyword in keywords)
+            Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
+    }
+
+    protected override void PostExecute()
+    {
+        if (IsRenderPassEnd)
+            RenderGraph.RenderPassSystem.EndRenderPass(Command);
+
+        IsRenderPassStart = false;
+        IsRenderPassEnd = false;
+        nativeRenderPassData.Reset();
     }
 }

@@ -8,19 +8,12 @@ using UnityEngine.Rendering;
 
 public class NativeRenderPassSystem
 {
-    public bool IsInNativeRenderPass { get; private set; }
-
-    private NativeRenderPassData previousPassData = new();
-    private bool hasPreviousPassData;
-
-    public void Clear()
-    {
-        previousPassData.Reset();
-        hasPreviousPassData = false;
-    }
+    private bool isInNativeRenderPass;
 
     public void BeginRenderPass(CommandBuffer command, NativeRenderPassData currentPassData)
     {
+        //Assert.IsFalse(isInNativeRenderPass);
+
         var attachmentCount = currentPassData.colorAttachments.Count;
         if (currentPassData.hasDepthAttachment)
             attachmentCount++;
@@ -47,29 +40,22 @@ public class NativeRenderPassSystem
             subPasses[0] = new SubPassDescriptor() { colorOutputs = colorOutputs, flags = currentPassData.flags };
         }
 
-        if (hasPreviousPassData && IsInNativeRenderPass)
-        {
-            if (!currentPassData.MatchesPass(previousPassData))
-            {
-                command.EndRenderPass();
-                command.BeginRenderPass(currentPassData.size.x, currentPassData.size.y, currentPassData.size.z, 1, attachments, depthIndex, subPasses);
-            }
-        }
-        else
-        {
-            command.BeginRenderPass(currentPassData.size.x, currentPassData.size.y, currentPassData.size.z, 1, attachments, depthIndex, subPasses);
-            IsInNativeRenderPass = true;
-        }
+        if (isInNativeRenderPass)
+            Debug.LogError("Starting a render pass without ending one");
 
-        currentPassData.CopyFrom(previousPassData);
-        hasPreviousPassData = true;
+        command.BeginRenderPass(currentPassData.size.x, currentPassData.size.y, currentPassData.size.z, 1, attachments, depthIndex, subPasses);
+        isInNativeRenderPass = true;
     }
 
     public void EndRenderPass(CommandBuffer command)
     {
+        // Assert.IsTrue(isInNativeRenderPass);
+
+        if (!isInNativeRenderPass)
+            Debug.LogError("Ending a render pass without being in one");
+
         command.EndRenderPass();
-        IsInNativeRenderPass = false;
-        hasPreviousPassData = false;
+        isInNativeRenderPass = false;
     }
 }
 

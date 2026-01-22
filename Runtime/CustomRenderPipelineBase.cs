@@ -2,6 +2,8 @@
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Assertions;
+
 
 
 
@@ -81,6 +83,8 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
 	protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
+        Assert.IsFalse(renderGraph.IsExecuting);
+
 #if UNITY_EDITOR
 		// When renderdoc is loaded, all renderTextures become un-created.. but Unity does not dispose the render pipeline until the next frame
 		// To avoid errors/leaks/crashes, check to see if renderDoc.IsLoaded has changed, and skip rendering for one frame.. this allows Unity to

@@ -61,7 +61,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 	protected override List<FrameRenderFeature> InitializePerFrameRenderFeatures() => new()
 	{
-		new RaytracingSystem(renderGraph, asset.RayTracingSettings),
+        new GenericFrameRenderFeature(renderGraph, "", context =>
+        {
+            renderGraph.DebugRenderPasses = asset.RenderGraphDebug;
+        }),
+
+        new RaytracingSystem(renderGraph, asset.RayTracingSettings),
 
 		new GenericFrameRenderFeature(renderGraph, "Per Frame Data", context =>
 		{
