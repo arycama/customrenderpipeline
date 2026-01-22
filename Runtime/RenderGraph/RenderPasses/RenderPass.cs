@@ -64,6 +64,7 @@ public abstract class RenderPass : IDisposable
     public virtual bool IsNativeRenderPass => false;
     public bool IsRenderPassStart { get; set; } = false;
     public bool IsRenderPassEnd { get; set; } = false;
+    public bool AllowNewSubPass { get; set; } = false;
 
     public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
 	public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);

@@ -96,15 +96,22 @@ public class NativeRenderPassData
         hasDepthAttachment = false;
     }
 
-    public bool MatchesPass(NativeRenderPassData other)
+    /// <summary>
+    /// Checks if this pass can merge with another pass, possibly as a subpass
+    /// </summary>
+    /// <param name="other"></param>
+    /// <returns></returns>
+    public bool CanMergeWithPass(NativeRenderPassData other)
     {
-        var isEqual = size == other.size &&
+        return size == other.size &&
             hasDepthAttachment == other.hasDepthAttachment &&
             flags == other.flags &&
-            depthAttachment.loadStoreTarget == other.depthAttachment.loadStoreTarget &&
-            colorAttachments.Count == other.colorAttachments.Count;
+            depthAttachment.loadStoreTarget == other.depthAttachment.loadStoreTarget;
+    }
 
-        if (!isEqual)
+    public bool CanMergeWithSubPass(NativeRenderPassData other)
+    {
+        if (colorAttachments.Count != other.colorAttachments.Count)
             return false;
 
         for (var i = 0; i < colorAttachments.Count; i++)
@@ -116,16 +123,8 @@ public class NativeRenderPassData
         return true;
     }
 
-    public void CopyFrom(NativeRenderPassData other)
+    public bool CanMergeWithPassAndSubPass(NativeRenderPassData other)
     {
-        colorAttachments.Clear();
-
-        size = other.size; 
-        depthAttachment = other.depthAttachment;
-        hasDepthAttachment = other.hasDepthAttachment;
-        flags = other.flags;
-
-        foreach(var colorAttachment in other.colorAttachments)
-            colorAttachments.Add(colorAttachment);
+        return CanMergeWithPass(other) && CanMergeWithSubPass(other);
     }
 }

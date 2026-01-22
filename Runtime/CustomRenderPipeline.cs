@@ -173,17 +173,13 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new VirtualTerrainPreRender(renderGraph, asset.TerrainSettings),
 		new TerrainViewData(renderGraph, terrainSystem, asset.TerrainSettings),
 
-		//new GenericViewRenderFeature(renderGraph, viewRenderData =>
-		//{
-		//	renderGraph.BeginNativeRenderPass(viewRenderData.viewSize);
-		//}),
-
 		new TerrainRenderer(renderGraph, asset.TerrainSettings, quadtreeCull),
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
-			using var pass = renderGraph.AddObjectRenderPass("Gbuffer");
+			using var pass = renderGraph.AddObjectRenderPass("GBuffer");
+            pass.AllowNewSubPass = true;
 
-			var (cameraTarget, previousScene, currentSceneCreated) = cameraTargetCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+            var (cameraTarget, previousScene, currentSceneCreated) = cameraTargetCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 			renderGraph.SetRTHandle<CameraTarget>(cameraTarget);
 			renderGraph.SetRTHandle<PreviousCameraTarget>(previousScene);
 
@@ -207,8 +203,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			using var pass = renderGraph.AddObjectRenderPass("Velocity");
+            pass.AllowNewSubPass = true;
 
-			var (velocity, previousVelocity, currentVelocityCreated) = cameraVelocityCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+            var (velocity, previousVelocity, currentVelocityCreated) = cameraVelocityCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 			renderGraph.SetRTHandle<CameraVelocity>(velocity);
 			renderGraph.SetRTHandle<PreviousCameraVelocity>(previousVelocity);
 
@@ -233,8 +230,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
 			using var pass = renderGraph.AddObjectRenderPass("GrassVelocity");
+            pass.AllowNewSubPass = true;
 
-			pass.Initialize("GrassVelocity", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, false);
+            pass.Initialize("GrassVelocity", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, false);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
@@ -248,12 +246,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<AutoExposureData>();
 		}),
 
-		//new GenericViewRenderFeature(renderGraph, viewRenderData =>
-		//{
-		//	renderGraph.EndNativeRenderPass();
-		//}),
-
-		new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
+        new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
 
 		// This is just here to avoid memory leaks when GPU driven rendering isn't used.
         new GenericViewRenderFeature(renderGraph, viewRenderData =>

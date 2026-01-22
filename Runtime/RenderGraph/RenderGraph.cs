@@ -179,7 +179,7 @@ public class RenderGraph : IDisposable
 
             var isPreviousPassNativeRenderPass = previousRenderPass != null && previousRenderPass.IsNativeRenderPass;
             var previousRenderPassData = isPreviousPassNativeRenderPass ? previousRenderPass.nativeRenderPassData : null;
-            var canMergeWithPreviousPass = isPreviousPassNativeRenderPass && currentRenderPass.nativeRenderPassData.MatchesPass(previousRenderPassData);
+            var canMergeWithPreviousPass = isPreviousPassNativeRenderPass && currentRenderPass.nativeRenderPassData.CanMergeWithPassAndSubPass(previousRenderPassData);
 
             // Start renderpass if this is the first pass, or if the previous was not a renderpass, or if the previous was a renderpass and could not be merged
             if (isFirstPass || !isPreviousPassNativeRenderPass || !canMergeWithPreviousPass)
@@ -203,7 +203,7 @@ public class RenderGraph : IDisposable
             var nextRenderPass = isLastPass ? null : renderPasses[i + 1];
             var isNextPassNativeRenderPass = nextRenderPass != null && nextRenderPass.IsNativeRenderPass;
             var nextRenderPassData = isNextPassNativeRenderPass ? nextRenderPass.nativeRenderPassData : null;
-            var canMergeWithNextPass = isNextPassNativeRenderPass && currentRenderPass.nativeRenderPassData.MatchesPass(nextRenderPassData);
+            var canMergeWithNextPass = isNextPassNativeRenderPass && currentRenderPass.nativeRenderPassData.CanMergeWithPassAndSubPass(nextRenderPassData);
 
             // End renderpass if this is the last pass, or the next pass is not a renderpass, or the next can not be merged with the current
             if (isLastPass || !isNextPassNativeRenderPass || !canMergeWithNextPass)
@@ -215,6 +215,8 @@ public class RenderGraph : IDisposable
                 if(DebugRenderPasses)
                     Debug.Log($"Ending Render Pass {renderPassCount - 1} with pass {i} ({currentRenderPass.Name})");
             }
+
+            currentRenderPass.AllowNewSubPass = false;
         }
 
         foreach (var renderPass in renderPasses)
