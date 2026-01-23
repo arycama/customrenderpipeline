@@ -48,7 +48,7 @@ public abstract class RenderPass : IDisposable
 	private readonly List<Type> readRtHandles = new();
 	protected readonly List<string> keywords = new();
 
-    public NativeRenderPassData nativeRenderPassData = new();
+    public NativeRenderSubPassData nativeRenderPassData = new();
 
     public RenderPass()
 	{
@@ -62,7 +62,10 @@ public abstract class RenderPass : IDisposable
 	internal int Index { get; set; }
 	public bool UseProfiler { get; set; } = true;
     public virtual bool IsNativeRenderPass => false;
+
+    // TODO: Maybe a bitmask or something for these?
     public bool IsRenderPassStart { get; set; } = false;
+    public bool IsNextSubPass { get; set; } = false;
     public bool IsRenderPassEnd { get; set; } = false;
     public bool AllowNewSubPass { get; set; } = false;
 
@@ -98,7 +101,8 @@ public abstract class RenderPass : IDisposable
 		readRtHandles.Clear();
 		keywords.Clear();
 		PropertyBlock.Clear();
-	}
+        AllowNewSubPass = false;
+    }
 
 	void IDisposable.Dispose()
 	{
@@ -164,7 +168,10 @@ public abstract class RenderPass : IDisposable
 			SetBuffer(buffer.Item1, buffer.Item2);
 
         if (IsNativeRenderPass && IsRenderPassStart)
+        {
             RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData);
+            IsRenderPassStart = false;
+        }
 
         SetupTargets();
 
@@ -191,11 +198,18 @@ public abstract class RenderPass : IDisposable
 
         if(IsNativeRenderPass)
         {
-            if (IsRenderPassEnd)
-                RenderGraph.RenderPassSystem.EndRenderPass(Command);
+            if(IsNextSubPass)
+            {
+                command.NextSubPass();
+                IsNextSubPass = false;
+            }
 
-            IsRenderPassStart = false;
-            IsRenderPassEnd = false;
+            if (IsRenderPassEnd)
+            {
+                Command.EndRenderPass();
+                IsRenderPassEnd = false;
+            }
+
             nativeRenderPassData.Reset();
         }
         
