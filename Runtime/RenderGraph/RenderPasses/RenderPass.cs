@@ -163,7 +163,10 @@ public abstract class RenderPass : IDisposable
 		foreach (var buffer in writeBuffers)
 			SetBuffer(buffer.Item1, buffer.Item2);
 
-		SetupTargets();
+        if (IsNativeRenderPass && IsRenderPassStart)
+            RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData);
+
+        SetupTargets();
 
 		// Set any data from each pass
 		foreach (var renderPassDataHandle in RenderPassDataHandles)
@@ -185,7 +188,18 @@ public abstract class RenderPass : IDisposable
 		writeBuffers.Clear();
 
 		Execute();
-		PostExecute();
+
+        if(IsNativeRenderPass)
+        {
+            if (IsRenderPassEnd)
+                RenderGraph.RenderPassSystem.EndRenderPass(Command);
+
+            IsRenderPassStart = false;
+            IsRenderPassEnd = false;
+            nativeRenderPassData.Reset();
+        }
+        
+        PostExecute();
 
 		if (UseProfiler)
 			Command.EndSample(Name);

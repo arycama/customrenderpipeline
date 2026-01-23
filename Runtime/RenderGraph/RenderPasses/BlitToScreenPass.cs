@@ -106,12 +106,6 @@ public class BlitToScreenPass<T> : RenderPass<T>
         nativeRenderPassData.SetSize(new(size.x, size.y, viewCount));
     }
 
-    protected override void SetupTargets()
-    {
-        if (IsRenderPassStart)
-            RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData);
-    }
-
     protected override void Execute()
     {
         foreach (var keyword in keywords)
@@ -121,15 +115,5 @@ public class BlitToScreenPass<T> : RenderPass<T>
 
         foreach (var keyword in keywords)
             Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
-    }
-
-    protected override void PostExecute()
-    {
-        if (IsRenderPassEnd)
-            RenderGraph.RenderPassSystem.EndRenderPass(Command);
-
-        IsRenderPassStart = false;
-        IsRenderPassEnd = false;
-        nativeRenderPassData.Reset();
     }
 }

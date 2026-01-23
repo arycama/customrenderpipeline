@@ -169,21 +169,11 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 
     protected override void SetupTargets()
 	{
-        if(IsRenderPassStart)
-            RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData);
-
         Command.SetViewport(new Rect(0, 0, resolution.Value.x >> MipLevel, resolution.Value.y >> MipLevel));
 	}
 
 	protected sealed override void PostExecute()
 	{
-        if (IsRenderPassEnd)
-            RenderGraph.RenderPassSystem.EndRenderPass(Command);
-
-        IsRenderPassStart = false;
-        IsRenderPassEnd = false;
-        nativeRenderPassData.Reset();
-
         foreach (var colorTarget in colorTargets)
 		{
 			var handle = colorTarget.Item1;
