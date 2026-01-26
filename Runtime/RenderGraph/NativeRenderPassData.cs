@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
@@ -29,7 +30,7 @@ public class NativeRenderPassData
         depthAttachment = new AttachmentDescriptor(format) { loadAction = loadAction, storeAction = storeAction, loadStoreTarget = loadStoreTarget };
 
         while (subPasses.Count <= subPass)
-            subPasses.Add(new SubPassData());
+            subPasses.Add(SubPassData.Create());
     }
 
     public void AddColorOutput(int subPass, GraphicsFormat format, RenderBufferLoadAction loadAction, RenderBufferStoreAction storeAction, RenderTargetIdentifier loadStoreTarget, Color clearColor = default)
@@ -44,11 +45,11 @@ public class NativeRenderPassData
         }
 
         while (subPasses.Count <= subPass)
-            subPasses.Add(new SubPassData());
+            subPasses.Add(SubPassData.Create());
 
         // TODO: Are we able to directly assign instead of this
         var subpassOutput = subPasses[subPass];
-        subpassOutput.AddAttachment(index);
+        subpassOutput.AddOutput(index);
         subPasses[subPass] = subpassOutput;
     }
 
@@ -68,7 +69,7 @@ public class NativeRenderPassData
     public bool CanMergeWithPass(NativeRenderPassData other)
     {
         // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
-        if (size != other.size || depthAttachment.HasValue != other.depthAttachment.HasValue) 
+        if (size != other.size || depthAttachment.HasValue != other.depthAttachment.HasValue)
             return false;
 
         if (depthAttachment.HasValue && other.depthAttachment.HasValue && depthAttachment.Value.loadStoreTarget != other.depthAttachment.Value.loadStoreTarget)
@@ -100,11 +101,9 @@ public class NativeRenderPassData
     }
 }
 
-public struct SubPassData
+public struct SubpassAttachmentIndexArray
 {
     private int a0, a1, a2, a3, a4, a5, a6, a7;
-
-    public SubPassFlags flags;
     public int Count { get; private set; }
 
     public int this[int index]
@@ -172,6 +171,41 @@ public struct SubPassData
     public void Clear()
     {
         Count = 0;
+    }
+}
+
+public struct SubPassData
+{
+    //public SubpassAttachmentIndexArray inputs, outputs;
+    public NativeList<int> inputs, outputs;
+    public SubPassFlags flags;
+
+    public static SubPassData Create()
+    {
+        return new SubPassData { inputs = new NativeList<int>(8, Allocator.Temp), outputs = new NativeList<int>(8, Allocator.Temp) };
+    }
+
+    public SubPassDescriptor Descriptor => new()
+    {
+        flags = flags,
+        colorOutputs = new(outputs.AsArray()),
+        inputs = new(inputs.AsArray())
+    };
+
+    public void AddInput(int index)
+    {
+        inputs.Add(index);
+    }
+
+    public void AddOutput(int index)
+    {
+        outputs.Add(index);
+    }
+
+    public void Clear()
+    {
+        inputs.Clear();
+        outputs.Clear();
         flags = SubPassFlags.None;
     }
 }
