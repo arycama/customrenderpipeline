@@ -1,7 +1,9 @@
 ﻿public struct ResourceHandleData<V, T> where V : IResourceDescriptor<T>
 {
 	public int createIndex;
+	public int createIndex1;
 	public int freeIndex;
+	public int freeIndex1;
 	public int resourceIndex;
 	public V descriptor;
 	public bool isAssigned;
@@ -17,5 +19,7 @@
 		this.isAssigned = isAssigned;
 		this.isPersistent = isPersistent;
 		this.isUsed = isUsed;
-	}
+        createIndex1 = -1;
+        freeIndex1 = -1;
+    }
 }

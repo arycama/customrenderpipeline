@@ -18,12 +18,12 @@ public class PersistentRTHandleCache : IDisposable
 	private bool disposedValue;
 	private readonly bool isScreenTexture;
 	private readonly bool autoGenerateMips;
-	private readonly RTClearFlags clearFlags;
+	private readonly bool clear;
 	private readonly float clearDepth;
 	private readonly uint clearStencil;
 	private readonly Color clearColor;
 
-	public PersistentRTHandleCache(GraphicsFormat format, RenderGraph renderGraph, string name = "", TextureDimension dimension = TextureDimension.Tex2D, bool hasMips = false, bool isScreenTexture = false, bool autoGenerateMips = false, RTClearFlags clearFlags = RTClearFlags.None, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u)
+	public PersistentRTHandleCache(GraphicsFormat format, RenderGraph renderGraph, string name = "", TextureDimension dimension = TextureDimension.Tex2D, bool hasMips = false, bool isScreenTexture = false, bool autoGenerateMips = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u)
 	{
 		this.format = format;
 		this.dimension = dimension;
@@ -32,7 +32,7 @@ public class PersistentRTHandleCache : IDisposable
 		this.hasMips = hasMips;
 		this.isScreenTexture = isScreenTexture;
 		this.autoGenerateMips = autoGenerateMips;
-		this.clearFlags = clearFlags;
+		this.clear = clear;
 		this.clearColor = clearColor;
 		this.clearDepth = clearDepth;
 		this.clearStencil = clearStencil;
@@ -68,7 +68,7 @@ public class PersistentRTHandleCache : IDisposable
 		else
 			renderGraph.ReleasePersistentResource(history, passIndex);
 
-		var current = renderGraph.GetTexture(size, format, depth, dimension, isScreenTexture, hasMips, autoGenerateMips, true, false, false, clearFlags, clearColor, clearDepth, clearStencil);
+		var current = renderGraph.GetTexture(size, format, depth, dimension, isScreenTexture, hasMips, autoGenerateMips, true, false, false, clear, clearColor, clearDepth, clearStencil);
 		textureCache[viewId] = current;
 
 		return (current, history, wasCreated);

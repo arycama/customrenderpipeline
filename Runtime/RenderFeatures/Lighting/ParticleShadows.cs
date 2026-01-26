@@ -54,13 +54,7 @@ public class ParticleShadows : ViewRenderFeature
 		var directionalShadowCount = Max(1, requestData.directionalShadowRequests.Count);
 
 		// Since 3D texture arrays aren't a thing, allocate one wide texture
-		var directionalShadows = renderGraph.GetTexture(new(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isExactSize: true, clearFlags: RTClearFlags.Color, clearColor: Color.white);
-
-		using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", directionalShadows))
-		{
-			pass.ReadTexture("", directionalShadows);
-			pass.WriteTexture(directionalShadows);
-		}
+		var directionalShadows = renderGraph.GetTexture(new(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isExactSize: true, clear: true, clearColor: Color.white);
 
 		void RenderShadowMap(ShadowRequest request, ResourceHandle<RenderTexture> target, int index, bool flipY, bool zClip, bool isPointLight)
 		{
@@ -99,7 +93,6 @@ public class ParticleShadows : ViewRenderFeature
 				cullingPrameters.cullingOptions = CullingOptions.ForceEvenIfCameraIsNotActive | CullingOptions.DisablePerObjectCulling;
 				var cullingResults = viewRenderData.context.Cull(ref cullingPrameters);
 				pass.Initialize("ParticleShadow", viewRenderData.context, cullingResults, particleCamera, RenderQueueRange.transparent, SortingCriteria.CommonTransparent);
-				pass.DepthSlice = -1;
 
 				// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
 				pass.WriteTexture(directionalShadows);

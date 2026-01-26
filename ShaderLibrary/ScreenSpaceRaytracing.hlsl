@@ -4,7 +4,7 @@
 #include "Random.hlsl"
 #include "Lighting.hlsl"
 
-float3 ScreenSpaceRaytrace(float3 rayOrigin, float3 worldPosition, float3 L, uint maxSteps, float thickness, Texture2D<float> hiZDepth, uint maxMip)
+float3 ScreenSpaceRaytrace(float3 rayOrigin, float3 worldPosition, float3 L, uint maxSteps, float thickness, Texture2D<float> hiZDepth, uint maxMip, bool skyIsMiss = true)
 {
 	float thicknessScale = rcp(1.0 + thickness);
 	float thicknessOffset = -Near * rcp(Far - Near) * (thickness * thicknessScale);
@@ -27,6 +27,12 @@ float3 ScreenSpaceRaytrace(float3 rayOrigin, float3 worldPosition, float3 L, uin
 		
 		if (mip == 0 && any(bounds.xyz < 0 || bounds.xyz >= float3(ViewSize, 1.0)))
 			return 0;
+			
+		//if (skyIsMiss && mip == 0 && bounds.z <= 0.0)
+		//	return 0;
+		
+		//if (mip == 0 && any(bounds.xy < 0 || bounds.xy >= ViewSize))
+		//	return 0;
 		
 		if (dists.z <= minT || rayTowardsEye)
 		{
@@ -55,5 +61,8 @@ float3 ScreenSpaceRaytrace(float3 rayOrigin, float3 worldPosition, float3 L, uin
 		}
 	}
     
+	if(!skyIsMiss)
+		return float3(currentCell, 0);
+		
 	return 0;
 }

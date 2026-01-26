@@ -70,7 +70,7 @@ public class WaterShoreMask : FrameRenderFeature
         using (var pass = renderGraph.AddFullscreenRenderPass("Water Shore Mask Blit", (cutoff, invResolution, heightmapResolution, terrainData.heightmapTexture)))
         {
             pass.Initialize(material);
-            pass.WriteTexture(src, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(src);
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
@@ -101,7 +101,7 @@ public class WaterShoreMask : FrameRenderFeature
 				}
 
 				pass.ReadTexture("JumpFloodInput", src);
-				pass.WriteTexture(dst, RenderBufferLoadAction.DontCare);
+				pass.WriteTexture(dst);
 
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{

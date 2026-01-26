@@ -33,7 +33,7 @@ public class TerrainRenderer : TerrainRendererBase
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", cullingPlanes))
 		{
 			pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.None, RenderBufferLoadAction.DontCare);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
 			pass.ReadResource<AtmospherePropertiesAndTables>();

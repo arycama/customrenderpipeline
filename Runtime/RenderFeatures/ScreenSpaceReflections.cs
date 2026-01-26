@@ -31,10 +31,10 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 		using var scope = renderGraph.AddProfileScope("Specular Global Illumination");
 
         // Must be screen texture since we use stencil to skip sky pixels
-        var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+        var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clear: true);
 
         // Slight fuzzyness with 16 bits, probably due to depth.. would like to investigate
-        var hitResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+        var hitResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clear: true);
 
         if (settings.UseRaytracing)
         {
@@ -84,8 +84,8 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 			{
 				pass.Initialize(material);
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-				pass.WriteTexture(tempResult, RenderBufferLoadAction.DontCare);
-				pass.WriteTexture(hitResult, RenderBufferLoadAction.DontCare);
+				pass.WriteTexture(tempResult);
+				pass.WriteTexture(hitResult);
 				pass.ReadTexture("", renderGraph.GetRTHandle<CameraDepth>());
 
 				pass.ReadResource<SkyReflectionAmbientData>();
@@ -118,9 +118,9 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
         {
             pass.Initialize(material, 1);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
-            pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
-			pass.WriteTexture(spatialWeight, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(spatialResult);
+            pass.WriteTexture(rayDepth);
+			pass.WriteTexture(spatialWeight);
 
 			pass.ReadTexture("_Input", tempResult);
             pass.ReadTexture("_HitResult", hitResult);
@@ -158,8 +158,8 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 
 			pass.Initialize(material, 2);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
-			pass.WriteTexture(currentWeight, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(current);
+			pass.WriteTexture(currentWeight);
 
 			pass.ReadTexture("_TemporalInput", spatialResult);
             pass.ReadTexture("_History", history);

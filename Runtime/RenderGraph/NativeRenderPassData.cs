@@ -48,22 +48,20 @@ public class NativeRenderPassData
         subPasses[subPassIndex] = subPass;
     }
 
-    public void WriteDepth(int subPass, GraphicsFormat format, RenderBufferLoadAction loadAction, RenderBufferStoreAction storeAction, RenderTargetIdentifier loadStoreTarget)
+    public void WriteDepth(int subPass, AttachmentDescriptor attachment)
     {
-        depthAttachment = new AttachmentDescriptor(format) { loadAction = loadAction, storeAction = storeAction, loadStoreTarget = loadStoreTarget };
-
+        depthAttachment = attachment;
         while (subPasses.Count <= subPass)
             subPasses.Add(SubPassData.Create());
     }
 
-    public void WriteColor(int subPass, GraphicsFormat format, RenderBufferLoadAction loadAction, RenderBufferStoreAction storeAction, RenderTargetIdentifier loadStoreTarget, Color clearColor = default)
+    public void WriteColor(int subPass, AttachmentDescriptor attachment)
     {
-        var index = colorAttachments.FindIndex(element => element.loadStoreTarget == loadStoreTarget);
+        var index = colorAttachments.FindIndex(element => element.loadStoreTarget == attachment.loadStoreTarget);
 
         if (index == -1)
         {
             index = colorAttachments.Count;
-            var attachment = new AttachmentDescriptor(format) { loadAction = loadAction, storeAction = storeAction, loadStoreTarget = loadStoreTarget, clearColor = clearColor };
             colorAttachments.Add(attachment);
         }
 

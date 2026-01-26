@@ -57,9 +57,9 @@ public partial class TemporalAA : ViewRenderFeature
 
 		pass.ReadTexture("History", history);
 		pass.ReadTexture("HistoryWeight", historyWeight);
-		pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
-		pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
-		pass.WriteTexture(currentWeight, RenderBufferLoadAction.DontCare);
+		pass.WriteTexture(result);
+		pass.WriteTexture(current);
+		pass.WriteTexture(currentWeight);
 		pass.ReadResource<TemporalAAData>();
 		pass.ReadRtHandle<CameraTarget>();
 		pass.ReadRtHandle<CameraStencil>();

@@ -35,12 +35,12 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 		
 		float4 rayOriginClipSpace = MultiplyPointProj(WorldToPixel, rayOrigin);
 		
-		float3 rayPos = ScreenSpaceRaytrace(MultiplyPointProj(WorldToPixel, rayOrigin).xyz, rayOrigin, rayDirection, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip);
+		float3 rayPos = ScreenSpaceRaytrace(MultiplyPointProj(WorldToPixel, rayOrigin).xyz, rayOrigin, rayDirection, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, false);
 		
 		//bool validHit;
 		//float3 rayPos = ScreenSpaceRaytrace(float4(position.xy, depth, linearDepth), L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);
 		
-		if (!rayPos.z)
+		if (all(!rayPos))
 			continue;
 			
 		float3 worldHit = PixelToWorldPosition(rayPos);
@@ -60,7 +60,7 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	if (weightSum)
 		color *= rcp(weightSum);
 	
-	//color = CameraTarget[position.xy];
+	//color = CameraTarget[input.position.xy];
 	return (color);
 	return _TaaEnabled ? Rec2020ToICtCp(color) : color;
 }

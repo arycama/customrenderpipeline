@@ -33,7 +33,7 @@ public class PhysicalSkyGenerateData : ViewRenderFeature
 		using (var pass = renderGraph.AddFullscreenRenderPass("Sky Transmittance", (settings.TransmittanceSamples, settings.TransmittanceWidth, settings.TransmittanceHeight)))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Lookup 2"), 2);
-			pass.WriteTexture(skyTransmittance, RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(skyTransmittance);
 			pass.ReadResource<AtmospherePropertiesAndTables>();
 			pass.ReadResource<LightingData>();
 			pass.ReadResource<ViewData>();
@@ -55,7 +55,7 @@ public class PhysicalSkyGenerateData : ViewRenderFeature
 		using (var pass = renderGraph.AddFullscreenRenderPass("Sky Luminance", (settings.LuminanceSamples, settings.LuminanceWidth, settings.LuminanceHeight, settings.TransmittanceWidth, settings.TransmittanceHeight)))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Luminance LUT"), 2);
-			pass.WriteTexture(skyLuminance, RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(skyLuminance);
 			pass.ReadTexture("_SkyTransmittance", skyTransmittance);
 			pass.ReadResource<AtmospherePropertiesAndTables>();
 			pass.ReadResource<LightingData>();
@@ -79,7 +79,7 @@ public class PhysicalSkyGenerateData : ViewRenderFeature
         using (var pass = renderGraph.AddFullscreenRenderPass("Atmosphere CDF", (settings.CdfSamples, settings.CdfWidth, settings.CdfHeight, settings.LuminanceWidth, settings.LuminanceHeight)))
         {
             pass.Initialize(skyMaterial, skyMaterial.FindPass("CDF Lookup"), 6);
-            pass.WriteTexture(cdf, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(cdf);
             pass.ReadResource<AtmospherePropertiesAndTables>();
             pass.ReadResource<LightingData>();
 			pass.ReadResource<ViewData>();
@@ -100,7 +100,7 @@ public class PhysicalSkyGenerateData : ViewRenderFeature
         using (var pass = renderGraph.AddFullscreenRenderPass("Atmosphere Transmittance", (settings.miePhase, settings.TransmittanceSamples, settings.TransmittanceWidth, settings.TransmittanceHeight)))
         {
             pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Depth Lookup"), 32);
-            pass.WriteTexture(weightedDepth, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(weightedDepth);
 
             pass.ReadResource<AtmospherePropertiesAndTables>();
             pass.ReadResource<SkyTransmittanceData>();

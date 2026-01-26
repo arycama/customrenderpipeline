@@ -89,7 +89,7 @@ public class Bloom : ViewRenderFeature
 			));
 
 			pass.Initialize(material, i == settings.FlareMip ? 0 : 1);
-			pass.WriteTexture(bloomIds[i], RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(bloomIds[i]);
 
 			pass.ReadTexture("Input", source);
 			pass.ReadResource<ViewData>();

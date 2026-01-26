@@ -30,33 +30,30 @@ public class ShadowRenderer : ViewRenderFeature
 		var requestData = renderGraph.GetResource<ShadowRequestsData>();
 		var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
-		// Allocate and clear shadow maps
 		var directionalShadowCount = Max(1, requestData.directionalShadowRequests.Count);
-		var directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, directionalShadowCount, TextureDimension.Tex2DArray, isExactSize: true, clearFlags: RTClearFlags.Depth);
-
-		var pointShadowCount = Max(1, requestData.pointShadowRequests.Count);
-		var pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, GraphicsFormat.D16_UNorm, pointShadowCount, TextureDimension.Tex2DArray, isExactSize: true, clearFlags: RTClearFlags.Depth);
-
-		var spotShadowCount = Max(1, requestData.spotShadowRequests.Count);
-		var spotShadows = renderGraph.GetTexture(settings.SpotShadowResolution, GraphicsFormat.D16_UNorm, spotShadowCount, TextureDimension.Tex2DArray, isExactSize: true, clearFlags: RTClearFlags.Depth);
-		renderGraph.SetResource(new ShadowData(directionalShadows, pointShadows, spotShadows));
-
-		using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", (directionalShadows, pointShadows, spotShadows)))
-		{
-			pass.WriteTexture(directionalShadows);
-			pass.WriteTexture(pointShadows);
-			pass.WriteTexture(spotShadows);
-		}
-
+		var directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, directionalShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
 		using (renderGraph.AddProfileScope($"Directional Shadows"))
 		{
-			for (var i = 0; i < requestData.directionalShadowRequests.Count; i++)
+            using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", directionalShadows))
+            {
+                pass.WriteTexture(directionalShadows);
+
+                if (requestData.directionalShadowRequests.Count > 0)
+                {
+                    pass.SetRenderFunction(static (command, pass, directionalShadows) =>
+                    {
+                        command.SetRenderTarget(pass.GetRenderTexture(directionalShadows), 0, CubemapFace.Unknown, -1);
+                        command.ClearRenderTarget(true, false, default);
+                    });
+                }
+            }
+
+            for (var i = 0; i < requestData.directionalShadowRequests.Count; i++)
 			{
 				using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
 				{
 					var request = requestData.directionalShadowRequests[i];
-                    var isLast = i == requestData.directionalShadowRequests.Count - 1;
-					RenderShadowMap(request, BatchCullingProjectionType.Orthographic, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false, false, viewRenderData, cullingResults, isLast);
+					RenderShadowMap(request, BatchCullingProjectionType.Orthographic, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false, false, viewRenderData, cullingResults);
 				}
 			}
 
@@ -64,37 +61,70 @@ public class ShadowRenderer : ViewRenderFeature
 			//ListPool<ShadowRequest>.Release(requestData.DirectionalShadowRequests);
 		}
 
-		using (renderGraph.AddProfileScope("Point Shadows"))
+        var pointShadowCount = Max(1, requestData.pointShadowRequests.Count);
+        var pointShadows = renderGraph.GetTexture(settings.PointShadowResolution, GraphicsFormat.D16_UNorm, pointShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
+        using (renderGraph.AddProfileScope("Point Shadows"))
 		{
-			for (var i = 0; i < requestData.pointShadowRequests.Count; i++)
+            using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", pointShadows))
+            {
+                pass.WriteTexture(pointShadows);
+
+                if (requestData.directionalShadowRequests.Count > 0)
+                {
+                    pass.SetRenderFunction(static (command, pass, pointShadows) =>
+                    {
+                        command.SetRenderTarget(pass.GetRenderTexture(pointShadows), 0, CubemapFace.Unknown, -1);
+                        command.ClearRenderTarget(true, false, default);
+                    });
+                }
+            }
+
+            for (var i = 0; i < requestData.pointShadowRequests.Count; i++)
 			{
 				using (renderGraph.AddProfileScope(pointLightIds[i]))
 				{
 					var request = requestData.pointShadowRequests[i];
-                    var isLast = i == requestData.pointShadowRequests.Count - 1;
-                    RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, true, viewRenderData, cullingResults, isLast);
+                    RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, true, viewRenderData, cullingResults);
 				}
 			}
 			ListPool<ShadowRequest>.Release(requestData.pointShadowRequests);
 		}
 
-		using (renderGraph.AddProfileScope("Spot Shadows"))
+        var spotShadowCount = Max(1, requestData.spotShadowRequests.Count);
+        var spotShadows = renderGraph.GetTexture(settings.SpotShadowResolution, GraphicsFormat.D16_UNorm, spotShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
+
+        using (renderGraph.AddProfileScope("Spot Shadows"))
 		{
-			for (var i = 0; i < requestData.spotShadowRequests.Count; i++)
+            using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", spotShadows))
+            {
+                pass.WriteTexture(spotShadows);
+
+                if (requestData.spotShadowRequests.Count > 0)
+                {
+                    pass.SetRenderFunction(static (command, pass, spotShadows) =>
+                    {
+                        command.SetRenderTarget(pass.GetRenderTexture(spotShadows), 0, CubemapFace.Unknown, -1);
+                        command.ClearRenderTarget(true, false, default);
+                    });
+                }
+            }
+
+            for (var i = 0; i < requestData.spotShadowRequests.Count; i++)
 			{
 				using (renderGraph.AddProfileScope(SpotLightIds[i]))
 				{
 					var request = requestData.spotShadowRequests[i];
-                    var isLast = i == requestData.spotShadowRequests.Count - 1;
-                    RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, false, viewRenderData, cullingResults, isLast);
+                    RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, false, viewRenderData, cullingResults);
 				}
 			}
 
 			ListPool<ShadowRequest>.Release(requestData.spotShadowRequests);
 		}
-	}
 
-	void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip, bool isPointLight, ViewRenderData viewRenderData, CullingResults cullingResults, bool isLastSlice)
+        renderGraph.SetResource(new ShadowData(directionalShadows, pointShadows, spotShadows));
+    }
+
+    void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip, bool isPointLight, ViewRenderData viewRenderData, CullingResults cullingResults)
 	{
 		var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
 		var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, viewRenderData.transform.position, 0, request.LightPosition, 0));
@@ -114,19 +144,5 @@ public class ShadowRenderer : ViewRenderFeature
 		}
 
 		gpuDrivenRenderer.RenderShadow(viewRenderData.transform.position, shadowRequestData, viewRenderData.viewSize);
-
-        // We need to clear each slice, but after a clear, the flag will be set to none, but since we're setting individual slices active, it won't clear the whole texture, so need to manually reset the flag each pass except the last one
-        if (!isLastSlice)
-        {
-            using (var pass = renderGraph.AddGenericRenderPass("Render Shadow"))
-            {
-                pass.SetRenderFunction((command, pass) =>
-                {
-                    var depthDesc = renderGraph.RtHandleSystem.GetDescriptor(target);
-                    depthDesc.clearFlags = RTClearFlags.Depth;
-                    renderGraph.RtHandleSystem.SetDescriptor(target, depthDesc);
-                });
-            }
-        }
     }
 }

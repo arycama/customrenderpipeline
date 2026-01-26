@@ -8,11 +8,11 @@ using static Math;
 
 public abstract class GraphicsRenderPass<T>: RenderPass<T>
 {
-	private readonly List<(ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction)> colorTargets = new();
-	private (ResourceHandle<RenderTexture>, RenderBufferLoadAction, RenderBufferStoreAction) depthBuffer = (new ResourceHandle<RenderTexture>(-1), RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
+	private readonly List<ResourceHandle<RenderTexture>> colorTargets = new();
+    private ResourceHandle<RenderTexture>? depthBuffer;
 
 	private SubPassFlags flags;
-	private Vector2Int? resolution;
+	private Int2? resolution;
 	private bool isScreenPass;
 
 	public int DepthSlice { get; set; } = -1;
@@ -25,7 +25,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 	{
 		base.Reset();
 		colorTargets.Clear();
-		depthBuffer = (new ResourceHandle<RenderTexture>(-1), RenderBufferLoadAction.DontCare, RenderBufferStoreAction.DontCare);
+        depthBuffer = default;
 		flags = default;
 		resolution = null;
 		isScreenPass = default;
@@ -34,39 +34,38 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 		CubemapFace = CubemapFace.Unknown;
 	}
 
-	public void WriteTexture(ResourceHandle<RenderTexture> rtHandle, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
+	public void WriteTexture(ResourceHandle<RenderTexture> rtHandle)
 	{
-		colorTargets.Add((rtHandle, loadAction, storeAction));
+		colorTargets.Add(rtHandle);
 		WriteResource(rtHandle);
 	}
 
-	public void WriteDepth(ResourceHandle<RenderTexture> rtHandle, SubPassFlags renderTargetFlags = SubPassFlags.None, RenderBufferLoadAction loadAction = RenderBufferLoadAction.Load, RenderBufferStoreAction storeAction = RenderBufferStoreAction.Store)
+	public void WriteDepth(ResourceHandle<RenderTexture> rtHandle, SubPassFlags flags = SubPassFlags.None)
 	{
-		this.flags = renderTargetFlags;
-		depthBuffer = (rtHandle, loadAction, storeAction);
+		this.flags = flags;
+		depthBuffer = rtHandle;
 		WriteResource(rtHandle);
 
 		// Since depth textures are 'read' during rendering for comparisons, we also mark it as read if it's depth or stencil can be modified
-		if (renderTargetFlags != SubPassFlags.ReadOnlyDepthStencil)
+		if (flags != SubPassFlags.ReadOnlyDepthStencil)
 			RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
 	}
 
 	private void WriteResource(ResourceHandle<RenderTexture> rtHandle)
 	{
-		//RenderGraph.WriteTexture(rtHandle);
-
 		RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
 
 		// Check that multiple targets have the same resolution
 		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(rtHandle);
 		if (!resolution.HasValue)
 		{
-			resolution = new Vector2Int(descriptor.width, descriptor.height);
+			resolution = new(descriptor.width, descriptor.height);
 			isScreenPass = descriptor.isScreenTexture;
 		}
 		else
 		{
-			if (resolution != new Vector2Int(descriptor.width, descriptor.height))
+            // These are if statements/exceptions instead of asserts since they use the pass name to avoid constructing strings every frame and allocating gc
+			if (resolution.Value != new Int2(descriptor.width, descriptor.height))
 				throw new InvalidOperationException($"Render Pass {Name} is attempting to write to multiple textures with different resolutions");
 
 			if (isScreenPass && !descriptor.isScreenTexture)
@@ -79,88 +78,46 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 
     public override void SetupRenderPassData()
     {
-        var targetCount = Max(1, colorTargets.Count);
-        using var targetsScope = ArrayPool<RenderTargetIdentifier>.Get(targetCount, out var targets);
-
-        var hasDepthBuffer = depthBuffer.Item1.Index != -1;
-        Assert.IsTrue(hasDepthBuffer || targetCount > 0);
-
-        var actualDepthTexture = GetRenderTexture(hasDepthBuffer ? depthBuffer.Item1 : colorTargets[0].Item1);
-        var depthTarget = new RenderTargetIdentifier(actualDepthTexture, MipLevel, CubemapFace, DepthSlice);
-        var depthLoadAction = hasDepthBuffer ? depthBuffer.Item2 : RenderBufferLoadAction.DontCare;
-        var depthStoreAction = hasDepthBuffer ? depthBuffer.Item3 : RenderBufferStoreAction.DontCare;
-
-        var clearDepth = 1f;
-        var clearStencil = 0u;
-
-        var attachmentCount = colorTargets.Count;
-        if (hasDepthBuffer)
-            attachmentCount++;
+        // TODO: Just cull pass instead?
+        Assert.IsTrue(depthBuffer.HasValue || colorTargets.Count > 0);
 
         var actualResolution = new Int2(0, 0);
-        if (hasDepthBuffer)
+        if (depthBuffer.HasValue)
         {
-            var depthDesc = RenderGraph.RtHandleSystem.GetDescriptor(depthBuffer.Item1);
-            if (depthDesc.clearFlags != RTClearFlags.None)
+            var handleData = RenderGraph.RtHandleSystem.GetHandleData(depthBuffer.Value);
+            var target = GetRenderTexture(depthBuffer.Value);
+            var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
             {
-                if (depthDesc.clearFlags.HasFlag(RTClearFlags.Depth))
-                {
-                    clearDepth = depthDesc.clearDepth;
-                    depthLoadAction = RenderBufferLoadAction.Clear;
-                }
+                loadAction = handleData.createIndex1 == Index ? handleData.descriptor.clear ? RenderBufferLoadAction.Clear : RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
+                storeAction = handleData.freeIndex1 == Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                loadStoreTarget = new RenderTargetIdentifier(target, MipLevel, CubemapFace, DepthSlice),
+                clearColor = handleData.descriptor.clearColor
+            };
 
-                if (depthDesc.clearFlags.HasFlag(RTClearFlags.Stencil))
-                {
-                    clearStencil = depthDesc.clearStencil;
-                    depthLoadAction = RenderBufferLoadAction.Clear;
-                }
-
-                depthDesc.clearFlags = RTClearFlags.None;
-
-                // Now that the texture is cleared, the desc no longer needs clearing
-                RenderGraph.RtHandleSystem.SetDescriptor(depthBuffer.Item1, depthDesc);
-            }
-
-            actualResolution = new(actualDepthTexture.width, actualDepthTexture.height);
-            nativeRenderPassData.WriteDepth(0, depthDesc.format, depthLoadAction, depthStoreAction, depthTarget);
+            nativeRenderPassData.WriteDepth(0, descriptor);
+            actualResolution = new(target.width, target.height);
         }
 
-        if (colorTargets.Count == 0)
+        for (var i = 0; i < colorTargets.Count; i++)
         {
-            targets[0] = depthTarget;
-        }
-        else
-        {
-            for (var i = 0; i < colorTargets.Count; i++)
-            {
-                var item = colorTargets[i];
-                var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(item.Item1);
-                Assert.AreEqual(new Vector2Int(descriptor.width, descriptor.height), resolution.Value);
+            var colorTarget = colorTargets[i];
+            var handleData = RenderGraph.RtHandleSystem.GetHandleData(colorTarget);
 
-                var actualTarget = GetRenderTexture(item.Item1);
-                var target = new RenderTargetIdentifier(actualTarget, MipLevel, CubemapFace, DepthSlice);
-                var loadAction = item.Item2;
+            Assert.AreEqual(new Int2(handleData.descriptor.width, handleData.descriptor.height), resolution.Value);
 
-                targets[i] = target;
+            var target = GetRenderTexture(colorTarget);
+            var descriptor = new AttachmentDescriptor(handleData.descriptor.format) 
+            { 
+                loadAction = handleData.createIndex1 == Index ? handleData.descriptor.clear ? RenderBufferLoadAction.Clear : RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
+                storeAction = handleData.freeIndex1 == Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                loadStoreTarget = new RenderTargetIdentifier(target, MipLevel, CubemapFace, DepthSlice),
+                clearColor = handleData.descriptor.clearColor 
+            };
 
-                if (descriptor.clearFlags.HasFlag(RTClearFlags.Color))
-                {
-                    descriptor.clearFlags = RTClearFlags.None;
+            nativeRenderPassData.WriteColor(0, descriptor);
 
-                    // Now that the texture is cleared, the desc no longer needs clearing
-                    RenderGraph.RtHandleSystem.SetDescriptor(item.Item1, descriptor);
-
-                    loadAction = RenderBufferLoadAction.Clear;
-                }
-
-                var index = i;
-                if (hasDepthBuffer)
-                    index++;
-                else
-                    actualResolution = new(actualTarget.width, actualTarget.height);
-
-                nativeRenderPassData.WriteColor(0, descriptor.format, loadAction, item.Item3, target, descriptor.clearColor);
-            }
+            if (!depthBuffer.HasValue)
+                actualResolution = new(target.width, target.height);
         }
 
         nativeRenderPassData.SetSize(new(actualResolution.x, actualResolution.y, 1));
@@ -176,12 +133,11 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 	{
         foreach (var colorTarget in colorTargets)
 		{
-			var handle = colorTarget.Item1;
-			var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(handle);
+            var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(colorTarget);
 			if (descriptor.autoGenerateMips)
 			{
 				Assert.IsTrue(descriptor.hasMips, "Trying to Generate Mips for a Texture without mips enabled");
-				Command.GenerateMips(GetRenderTexture(handle));
+				Command.GenerateMips(GetRenderTexture(colorTarget));
 			}
 		}
 	}

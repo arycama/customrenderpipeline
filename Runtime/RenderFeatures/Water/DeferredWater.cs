@@ -171,7 +171,7 @@ public class DeferredWater : ViewRenderFeature
             pass.Initialize(deferredWaterMaterial, 1);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.ReadTexture("_ScatterInput", scatterResult);
-            pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(current);
             pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
             pass.ReadTexture("_History", history);
 

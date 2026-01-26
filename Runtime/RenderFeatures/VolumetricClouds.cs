@@ -57,9 +57,9 @@ public partial class VolumetricClouds : ViewRenderFeature
 				pass.AddKeyword("BELOW_CLOUD_LAYER");
 			}
 
-			pass.WriteTexture(cloudLuminanceTemp, RenderBufferLoadAction.DontCare);
-			pass.WriteTexture(cloudTransmittanceTemp, RenderBufferLoadAction.DontCare);
-			pass.WriteTexture(cloudDepth, RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(cloudLuminanceTemp);
+			pass.WriteTexture(cloudTransmittanceTemp);
+			pass.WriteTexture(cloudDepth);
 
 			pass.ReadResource<CloudData>();
 			pass.ReadResource<AtmospherePropertiesAndTables>();
@@ -103,8 +103,8 @@ public partial class VolumetricClouds : ViewRenderFeature
 			pass.renderData.transmittanceHistory = transmittanceHistory;
 
 			pass.Initialize(material, 5);
-			pass.WriteTexture(luminanceCurrent, RenderBufferLoadAction.DontCare);
-			pass.WriteTexture(transmittanceCurrent, RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(luminanceCurrent);
+			pass.WriteTexture(transmittanceCurrent);
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.ReadTexture("_Input", cloudLuminanceTemp);
 			pass.ReadTexture("_InputTransmittance", cloudTransmittanceTemp);

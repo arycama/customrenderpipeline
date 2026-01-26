@@ -38,7 +38,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	{
 		quadtreeCull = new(renderGraph);
 
-		cameraTargetCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Previous Scene Color", hasMips: true, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+		cameraTargetCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Previous Scene Color", hasMips: true, isScreenTexture: true, clear: true);
 		cameraDepthCache = new(GraphicsFormat.D32_SFloat_S8_UInt, renderGraph, "Previous Depth", isScreenTexture: true);
 		cameraVelocityCache = new(GraphicsFormat.R16G16_SFloat, renderGraph, "Previous Velocity", isScreenTexture: true);
 
@@ -165,7 +165,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
-			var cameraDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true, clearFlags: RTClearFlags.DepthStencil);
+			var cameraDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true, clear: true);
 			renderGraph.SetRTHandle<CameraDepth>(cameraDepth, subElement: RenderTextureSubElement.Depth);
 			renderGraph.SetRTHandle<CameraStencil>(cameraDepth, subElement: RenderTextureSubElement.Stencil);
 		}),
@@ -190,10 +190,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("Deferred", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>(), RenderBufferLoadAction.DontCare);
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>(), RenderBufferLoadAction.DontCare);
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>(), RenderBufferLoadAction.DontCare);
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>(), RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 
 			pass.ReadResource<FrameData>();
 			pass.ReadResource<ViewData>();
@@ -266,10 +266,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// Decals
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
-			var decalAlbedo = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+			var decalAlbedo = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true, clear: true);
 			renderGraph.SetRTHandle<DecalAlbedo>(decalAlbedo);
 
-			var decalNormal = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+			var decalNormal = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true, clear: true);
 			renderGraph.SetRTHandle<DecalNormal>(decalNormal);
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;

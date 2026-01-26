@@ -88,7 +88,7 @@ public partial class DepthOfField : ViewRenderFeature
 			)))
 			{
 				pass.Initialize(material);
-				pass.WriteTexture(tempId, RenderBufferLoadAction.DontCare);
+				pass.WriteTexture(tempId);
 
 				pass.ReadRtHandle<CameraTarget>();
 				pass.ReadRtHandle<CameraDepth>();

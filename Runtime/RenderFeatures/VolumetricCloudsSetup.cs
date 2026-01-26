@@ -43,7 +43,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
         using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Weather Map", settings))
         {
             pass.Initialize(material, 0);
-            pass.WriteTexture(weatherMap, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(weatherMap);
 
             pass.SetRenderFunction(static (command, pass, settings) =>
             {
@@ -59,7 +59,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
 		using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds High Altitude Map", settings))
 		{
 			pass.Initialize(material, 0);
-			pass.WriteTexture(highAltitudeTexture, RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(highAltitudeTexture);
 
 			pass.SetRenderFunction(static (command, pass, settings) =>
 			{
@@ -70,14 +70,10 @@ public class VolumetricCloudsSetup : FrameRenderFeature
 				pass.SetVector("_WeatherMapResolution", settings.HighAltitudeMapResolution);
 			});
 		}
-
-		// Noise
-		var maxInstanceCount = 32;
         using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Noise Texture", settings))
         {
             pass.Initialize(material, 1, settings.NoiseResolution.z);
-            pass.DepthSlice = -1;
-            pass.WriteTexture(noiseTexture, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(noiseTexture);
 
             pass.SetRenderFunction(static (command, pass, settings) =>
             {
@@ -97,8 +93,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
         using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Detail Noise Texture", settings))
         {
             pass.Initialize(material, 2, settings.DetailNoiseResolution.z);
-            pass.DepthSlice = -1;
-            pass.WriteTexture(detailNoiseTexture, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(detailNoiseTexture);
 
             pass.SetRenderFunction(static (command, pass, settings) =>
             {

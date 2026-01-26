@@ -24,7 +24,7 @@ public class UnderwaterLighting : ViewRenderFeature
         {
             pass.Initialize(underwaterLightingMaterial);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(underwaterResultId, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(underwaterResultId);
 
             pass.ReadRtHandle<GBufferAlbedoMetallic>();
             pass.ReadRtHandle<GBufferNormalRoughness>();

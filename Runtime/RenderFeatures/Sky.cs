@@ -34,7 +34,7 @@ public partial class Sky : ViewRenderFeature
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Render Sky"));
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-			pass.WriteTexture(skyTemp, RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(skyTemp);
 
 			pass.ReadResource<AtmospherePropertiesAndTables>();
 			pass.ReadResource<AutoExposureData>();
@@ -56,7 +56,7 @@ public partial class Sky : ViewRenderFeature
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Render Scene"));
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-			pass.WriteTexture(skyTemp, RenderBufferLoadAction.Load);
+			pass.WriteTexture(skyTemp);
 
 			pass.ReadResource<AtmospherePropertiesAndTables>();
 			pass.ReadResource<AutoExposureData>();
@@ -89,7 +89,7 @@ public partial class Sky : ViewRenderFeature
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Temporal"));
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
-			pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(current);
 			pass.ReadTexture("_SkyInput", skyTemp);
 			pass.ReadTexture("_SkyHistory", history);
 

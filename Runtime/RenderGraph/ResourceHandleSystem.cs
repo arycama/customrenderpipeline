@@ -78,10 +78,25 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 		handleInfo[handle.Index] = info;
 	}
 
-	public V GetDescriptor(ResourceHandle<T> handle)
+    public ResourceHandleData<V, T> GetHandleData(ResourceHandle<T> handle)
+    {
+        return handleInfo[handle.Index];
+    }
+
+    public V GetDescriptor(ResourceHandle<T> handle)
 	{
 		return handleInfo[handle.Index].descriptor;
 	}
+
+    public int GetCreateIndex(ResourceHandle<T> handle)
+    {
+        return handleInfo[handle.Index].createIndex;
+    }
+
+    public int GetFreeIndex(ResourceHandle<T> handle)
+    {
+        return handleInfo[handle.Index].freeIndex;
+    }
 
 	public void SetDescriptor(ResourceHandle<T> handle, V descriptor)
 	{
@@ -92,7 +107,6 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 
 	public void AllocateFrameResources(int renderPassCount, int frameIndex)
 	{
-
 		// Ensure capacity
 		for (var i = frameHandlesToCreate.Count; i < renderPassCount; i++)
 			frameHandlesToCreate.Add(new());
@@ -155,9 +169,13 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 					resourceIndex = resources.Add((result, -1, false));
 				}
 
+                // Save these because some other pass functionality needs them. TODO: Figure out a way to avoid duplicating this data
+                info.createIndex1 = info.createIndex;
+                info.freeIndex1 = info.freeIndex;
+
 				info.isAssigned = true;
 				info.createIndex = -1;
-				info.freeIndex = -1;
+                info.freeIndex = -1;
 				info.resourceIndex = resourceIndex;
 				handleInfo[handle] = info;
 			}

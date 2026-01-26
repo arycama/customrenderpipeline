@@ -74,7 +74,7 @@ public class SkyLookupTables : FrameRenderFeature
 		using (var pass = renderGraph.AddFullscreenRenderPass("Atmosphere Transmittance", (settings.miePhase, result, settings)))
 		{
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Lookup"));
-			pass.WriteTexture(transmittance, RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(transmittance);
 			result.SetInputs(pass);
 
 			pass.SetRenderFunction(static (command, pass, data) =>

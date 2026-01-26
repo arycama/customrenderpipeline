@@ -30,8 +30,8 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
     {
 		using var scope = renderGraph.AddProfileScope("Diffuse Global Illumination");
 
-        var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
-        var hitResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clearFlags: RTClearFlags.Color);
+        var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clear: true);
+        var hitResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clear: true);
 
         if (settings.UseRaytracing)
         {
@@ -109,9 +109,9 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
         {
             pass.Initialize(material, 1);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(spatialResult, RenderBufferLoadAction.DontCare);
-            pass.WriteTexture(rayDepth, RenderBufferLoadAction.DontCare);
-            pass.WriteTexture(spatialWeight, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(spatialResult);
+            pass.WriteTexture(rayDepth);
+            pass.WriteTexture(spatialWeight);
 
             pass.ReadTexture("_Input", tempResult);
             pass.ReadTexture("_HitResult", hitResult);
@@ -152,8 +152,8 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
 
 			pass.Initialize(material, 2);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
-            pass.WriteTexture(currentWeight, RenderBufferLoadAction.DontCare);
+            pass.WriteTexture(current);
+            pass.WriteTexture(currentWeight);
 
             pass.ReadTexture("_TemporalInput", spatialResult);
             pass.ReadTexture("_History", history);

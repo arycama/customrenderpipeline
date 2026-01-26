@@ -16,14 +16,14 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 	public bool autoGenerateMips;
 	public bool enableRandomWrite;
 	public bool isExactSize;
-	public RTClearFlags clearFlags;
+	public bool clear;
 	public Color clearColor;
 	public float clearDepth;
 	public uint clearStencil;
 	public VRTextureUsage vrTextureUsage;
 	public bool isTransient;
 
-	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, RTClearFlags clearFlags = RTClearFlags.None, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrTextureUsage = VRTextureUsage.None, bool isTransient = false)
+	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrTextureUsage = VRTextureUsage.None, bool isTransient = false)
 	{
 		this.width = width;
 		this.height = height;
@@ -35,7 +35,7 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 		this.autoGenerateMips = autoGenerateMips;
 		this.enableRandomWrite = enableRandomWrite;
 		this.isExactSize = isExactSize;
-		this.clearFlags= clearFlags;
+		this.clear = clear;
 		this.clearColor = clearColor;
 		this.clearDepth = clearDepth;
 		this.clearStencil = clearStencil;

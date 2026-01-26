@@ -32,7 +32,7 @@ public class RaytracingRenderPass<T> : RenderPass<T>
 		RenderGraph.RtHandleSystem.WriteResource(rtHandle, Index);
 
 		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(rtHandle);
-		descriptor = new RtHandleDescriptor(descriptor.width, descriptor.height, descriptor.format, descriptor.volumeDepth, descriptor.dimension, descriptor.isScreenTexture, descriptor.hasMips, descriptor.autoGenerateMips, true, descriptor.isExactSize, descriptor.clearFlags, descriptor.clearColor, descriptor.clearDepth, descriptor.clearStencil);
+		descriptor = new RtHandleDescriptor(descriptor.width, descriptor.height, descriptor.format, descriptor.volumeDepth, descriptor.dimension, descriptor.isScreenTexture, descriptor.hasMips, descriptor.autoGenerateMips, true, descriptor.isExactSize, descriptor.clear, descriptor.clearColor, descriptor.clearDepth, descriptor.clearStencil);
 		colorBindings.Add((rtHandle, propertyId));
 		RenderGraph.RtHandleSystem.SetDescriptor(rtHandle, descriptor);
 	}

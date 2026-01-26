@@ -35,7 +35,7 @@ public class WaterCaustics : ViewRenderFeature
 		using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Caustics Prepare", (settings.CausticsDepth, settings.CasuticsCascade, patchSize)))
 		{
 			pass.Initialize(material, 2);
-			pass.WriteTexture(temp0, RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(temp0);
 			pass.ReadResource<LightingData>();
 			pass.ReadResource<OceanFftResult>();
 
@@ -48,7 +48,7 @@ public class WaterCaustics : ViewRenderFeature
 			});
 		}
 
-		var tempResult = renderGraph.GetTexture(settings.CasuticsResolution * 2, GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true, clearFlags: RTClearFlags.Color);
+		var tempResult = renderGraph.GetTexture(settings.CasuticsResolution * 2, GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true, clear: true);
 		using (var pass = renderGraph.AddDrawProceduralIndexedRenderPass("Ocean Caustics Render", (patchSize, settings.CausticsDepth, settings.CasuticsCascade)))
 		{
 			pass.Initialize(indexBuffer, material, Matrix4x4.identity, 0);
@@ -77,7 +77,7 @@ public class WaterCaustics : ViewRenderFeature
 		{
 			pass.Initialize(material, 1);
 			pass.ReadTexture("_MainTex", tempResult);
-			pass.WriteTexture(result, RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(result);
 		}
 
 		renderGraph.SetResource(new CausticsResult(result, settings.CasuticsCascade, settings.CausticsDepth));
