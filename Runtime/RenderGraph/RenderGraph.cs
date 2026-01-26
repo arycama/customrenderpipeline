@@ -197,7 +197,7 @@ public class RenderGraph : IDisposable
                     currentSubPass++;
 
                     foreach (var attachment in currentPassData.colorAttachments)
-                        subPassStart.nativeRenderPassData.AddColorOutput(currentSubPass, attachment.graphicsFormat, attachment.loadAction, attachment.storeAction, attachment.loadStoreTarget, attachment.clearColor);
+                        subPassStart.nativeRenderPassData.WriteColor(currentSubPass, attachment.graphicsFormat, attachment.loadAction, attachment.storeAction, attachment.loadStoreTarget, attachment.clearColor);
 
                     if (DebugRenderPasses)
                         Debug.Log($"Creating new subpass {currentSubPass} for renderPass {renderPassCount - 1} ({currentRenderPass.Name})");

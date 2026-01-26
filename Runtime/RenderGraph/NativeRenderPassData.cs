@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
-using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -57,7 +56,7 @@ public class NativeRenderPassData
             subPasses.Add(SubPassData.Create());
     }
 
-    public void AddColorOutput(int subPass, GraphicsFormat format, RenderBufferLoadAction loadAction, RenderBufferStoreAction storeAction, RenderTargetIdentifier loadStoreTarget, Color clearColor = default)
+    public void WriteColor(int subPass, GraphicsFormat format, RenderBufferLoadAction loadAction, RenderBufferStoreAction storeAction, RenderTargetIdentifier loadStoreTarget, Color clearColor = default)
     {
         var index = colorAttachments.FindIndex(element => element.loadStoreTarget == loadStoreTarget);
 
@@ -71,10 +70,24 @@ public class NativeRenderPassData
         while (subPasses.Count <= subPass)
             subPasses.Add(SubPassData.Create());
 
-        // TODO: Are we able to directly assign instead of this
-        var subpassOutput = subPasses[subPass];
-        subpassOutput.AddOutput(index);
-        subPasses[subPass] = subpassOutput;
+        subPasses[subPass].AddOutput(index);
+    }
+
+    public void ReadColor(int subPass, GraphicsFormat format, RenderBufferLoadAction loadAction, RenderBufferStoreAction storeAction, RenderTargetIdentifier loadStoreTarget, Color clearColor = default)
+    {
+        var index = colorAttachments.FindIndex(element => element.loadStoreTarget == loadStoreTarget);
+
+        if (index == -1)
+        {
+            index = colorAttachments.Count;
+            var attachment = new AttachmentDescriptor(format) { loadAction = loadAction, storeAction = storeAction, loadStoreTarget = loadStoreTarget, clearColor = clearColor };
+            colorAttachments.Add(attachment);
+        }
+
+        while (subPasses.Count <= subPass)
+            subPasses.Add(SubPassData.Create());
+
+        subPasses[subPass].AddInput(index);
     }
 
     public void Reset()

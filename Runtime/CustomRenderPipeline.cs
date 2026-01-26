@@ -405,8 +405,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		new Rain(renderGraph, asset.Rain),
 		new AutoExposure(asset.AutoExposureSettings, asset.LensSettings, renderGraph, asset.Tonemapping),
-		new CameraVelocityDilate(renderGraph),
         new DepthOfField(asset.DepthOfFieldSettings, asset.LensSettings, renderGraph, asset.TemporalAASettings),
+		new CameraVelocityDilate(renderGraph),
 		new TemporalAA(asset.TemporalAASettings, renderGraph),
 		new Bloom(renderGraph, asset.Bloom),
 		new Tonemapping(renderGraph, asset.Tonemapping, asset.Bloom),

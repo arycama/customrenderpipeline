@@ -159,7 +159,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
                 else
                     actualResolution = new(actualTarget.width, actualTarget.height);
 
-                nativeRenderPassData.AddColorOutput(0, descriptor.format, loadAction, item.Item3, target, descriptor.clearColor);
+                nativeRenderPassData.WriteColor(0, descriptor.format, loadAction, item.Item3, target, descriptor.clearColor);
             }
         }
 
