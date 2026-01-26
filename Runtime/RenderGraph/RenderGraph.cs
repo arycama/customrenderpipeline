@@ -32,8 +32,6 @@ public class RenderGraph : IDisposable
     public ResourceHandle<RenderTexture> EmptyCubemap { get; }
     public ResourceHandle<RenderTexture> EmptyCubemapArray { get; }
 
-    public NativeRenderPassSystem RenderPassSystem { get; } = new();
-
     public int FrameIndex { get; private set; }
     public bool IsExecuting { get; private set; }
     public bool IsDisposing { get; private set; }

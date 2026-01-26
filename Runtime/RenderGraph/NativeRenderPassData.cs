@@ -13,6 +13,30 @@ public class NativeRenderPassData
     public readonly List<AttachmentDescriptor> colorAttachments = new();
     public readonly List<SubPassData> subPasses = new();
 
+    public RenderPassDescriptor GetDescriptor(string name)
+    {
+        var attachmentCount = colorAttachments.Count;
+        var hasDepth = depthAttachment.HasValue;
+        if (hasDepth)
+            attachmentCount++;
+
+        var attachments = new NativeArray<AttachmentDescriptor>(attachmentCount, Allocator.Temp);
+
+        for (var i = 0; i < colorAttachments.Count; i++)
+            attachments[i] = colorAttachments[i];
+
+        if (hasDepth)
+            attachments[attachmentCount - 1] = depthAttachment.Value;
+
+        var subPasses = new NativeArray<SubPassDescriptor>(this.subPasses.Count, Allocator.Temp);
+
+       for (var i = 0; i < this.subPasses.Count; i++)
+            subPasses[i] = this.subPasses[i].Descriptor;
+
+        var depthIndex = depthAttachment.HasValue ? attachmentCount - 1 : -1;
+        return new RenderPassDescriptor(size.x, size.y, attachments, subPasses, size.z, 1, depthIndex, -1, name);
+    }
+
     public void SetSize(Int3 size)
     {
         this.size = size;
@@ -101,82 +125,8 @@ public class NativeRenderPassData
     }
 }
 
-public struct SubpassAttachmentIndexArray
-{
-    private int a0, a1, a2, a3, a4, a5, a6, a7;
-    public int Count { get; private set; }
-
-    public int this[int index]
-    {
-        readonly get
-        {
-            Assert.IsTrue(index > -1 && index < Count);
-
-            return index switch
-            {
-                0 => a0,
-                1 => a1,
-                2 => a2,
-                3 => a3,
-                4 => a4,
-                5 => a5,
-                6 => a6,
-                7 => a7,
-            };
-        }
-
-        set
-        {
-            Assert.IsTrue(index > -1 && index < 8);
-
-            if (Count < index)
-                Count = index;
-
-            switch (index)
-            {
-                case 0:
-                    a0 = index;
-                    break;
-                case 1:
-                    a1 = index;
-                    break;
-                case 2:
-                    a2 = index;
-                    break;
-                case 3:
-                    a3 = index;
-                    break;
-                case 4:
-                    a4 = index;
-                    break;
-                case 5:
-                    a5 = index;
-                    break;
-                case 6:
-                    a6 = index;
-                    break;
-                case 7:
-                    a7 = index;
-                    break;
-            }
-        }
-    }
-
-    public void AddAttachment(int index)
-    {
-        Assert.IsTrue(Count < 7);
-        this[Count++] = index;
-    }
-
-    public void Clear()
-    {
-        Count = 0;
-    }
-}
-
 public struct SubPassData
 {
-    //public SubpassAttachmentIndexArray inputs, outputs;
     public NativeList<int> inputs, outputs;
     public SubPassFlags flags;
 

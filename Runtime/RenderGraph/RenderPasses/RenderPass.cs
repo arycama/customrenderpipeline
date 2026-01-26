@@ -171,7 +171,7 @@ public abstract class RenderPass : IDisposable
         {
             if (IsRenderPassStart)
             {
-                RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData, Name);
+                nativeRenderPassData.GetDescriptor(Name).BeginRenderPass(Command);
                 IsRenderPassStart = false;
             }
 
