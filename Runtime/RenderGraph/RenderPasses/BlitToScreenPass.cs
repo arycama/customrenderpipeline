@@ -102,7 +102,7 @@ public class BlitToScreenPass<T> : RenderPass<T>
 
     public override void SetupRenderPassData()
     {
-        nativeRenderPassData.AddAttachment(format, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, target);
+        nativeRenderPassData.AddColorOutput(0, format, RenderBufferLoadAction.DontCare, RenderBufferStoreAction.Store, target);
         nativeRenderPassData.SetSize(new(size.x, size.y, viewCount));
     }
 

@@ -48,7 +48,7 @@ public abstract class RenderPass : IDisposable
 	private readonly List<Type> readRtHandles = new();
 	protected readonly List<string> keywords = new();
 
-    public NativeRenderSubPassData nativeRenderPassData = new();
+    public NativeRenderPassData nativeRenderPassData = new();
 
     public RenderPass()
 	{
@@ -169,7 +169,7 @@ public abstract class RenderPass : IDisposable
 
         if (IsNativeRenderPass && IsRenderPassStart)
         {
-            RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData);
+            RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData, Name);
             IsRenderPassStart = false;
         }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Text;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Assertions;
@@ -6,45 +7,49 @@ using UnityEngine.Rendering;
 
 public class NativeRenderPassSystem
 {
-    public void BeginRenderPass(CommandBuffer command, NativeRenderSubPassData currentPassData)
+    public void BeginRenderPass(CommandBuffer command, NativeRenderPassData currentPassData, string name)
     {
         var attachmentCount = currentPassData.colorAttachments.Count;
-        if (currentPassData.depthAttachment.HasValue)
+        var hasDepth = currentPassData.depthAttachment.HasValue;
+        if (hasDepth)
             attachmentCount++;
 
         var attachments = new NativeArray<AttachmentDescriptor>(attachmentCount, Allocator.Temp);
 
-        if (currentPassData.depthAttachment.HasValue)
+        if (hasDepth)
             attachments[0] = currentPassData.depthAttachment.Value;
 
         for (var i = 0; i < currentPassData.colorAttachments.Count; i++)
         {
             var index = i;
-            if (currentPassData.depthAttachment.HasValue)
+            if (hasDepth)
                 index++;
 
             attachments[index] = currentPassData.colorAttachments[i];
         }
 
-        var colorOutputs = new AttachmentIndexArray(currentPassData.subPassOutputs.Count);
-        for (var i = 0; i < currentPassData.subPassOutputs.Count; i++)
+        Assert.IsFalse(currentPassData.subPasses.Count == 0);
+
+        var subPasses = new NativeArray<SubPassDescriptor>(currentPassData.subPasses.Count, Allocator.Temp);
+
+        for (var i = 0; i < currentPassData.subPasses.Count; i++)
         {
-            var output = currentPassData.subPassOutputs[i];
+            var subpass = currentPassData.subPasses[i];
+            var subpassOutputs = new AttachmentIndexArray(subpass.Count);
 
-            // We store depth as the first attachment if available, so need to increment all the indices by 1 in this case
-            if (currentPassData.depthAttachment.HasValue)
-                output += 1;
+            for(var j = 0; j < subpass.Count; j++)
+            {
+                // We store depth as the first attachment if available, so need to increment all the indices by 1 in this case
+                var value = subpass[j];
+                Assert.IsFalse(value == -1);
+                subpassOutputs[j] = value + (hasDepth ? 1 : 0);
+            }
 
-            colorOutputs[i] = output;
+            subPasses[i] = new SubPassDescriptor() { colorOutputs = subpassOutputs, flags = currentPassData.flags };
         }
-
-        var subPasses = new NativeArray<SubPassDescriptor>(1, Allocator.Temp);
-        {
-            subPasses[0] = new SubPassDescriptor() { colorOutputs = colorOutputs, flags = currentPassData.flags };
-        }
-
         
         var depthIndex = currentPassData.depthAttachment.HasValue ? 0 : -1;
-        command.BeginRenderPass(currentPassData.size.x, currentPassData.size.y, currentPassData.size.z, 1, attachments, depthIndex, subPasses);
+        var debugName = Encoding.UTF8.GetBytes(name);
+        command.BeginRenderPass(currentPassData.size.x, currentPassData.size.y, currentPassData.size.z, 1, attachments, depthIndex, subPasses, debugName);
     }
 }

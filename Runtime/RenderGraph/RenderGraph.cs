@@ -165,6 +165,7 @@ public class RenderGraph : IDisposable
         }
 
         // Detect and queue up native renderPasses
+        var subPassIndices = new Dictionary<RenderTargetIdentifier, int>();
         for (var i = 0; i < renderPasses.Count; i++)
         {
             var isFirstPass = i == 0;
@@ -193,6 +194,18 @@ public class RenderGraph : IDisposable
                     {
                         // Create new subpass, insert next subpass instruction
                         currentRenderPass.IsNextSubPass = true;
+
+                        // Need a list of attachments for the current subpass
+                        foreach(var attachment in currentPassData.colorAttachments)
+                        {
+                            if(!subPassIndices.ContainsKey(attachment.loadStoreTarget))
+                            {
+                                var index = subPassIndices.Count;
+                                subPassIndices.Add(attachment.loadStoreTarget, index);
+                            }
+                        }
+
+
                     }
                     else
                     {

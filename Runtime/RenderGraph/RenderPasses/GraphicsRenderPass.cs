@@ -122,7 +122,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
             }
 
             actualResolution = new(actualDepthTexture.width, actualDepthTexture.height);
-            nativeRenderPassData.SetDepthTarget(depthDesc.format, depthLoadAction, depthStoreAction, depthTarget);
+            nativeRenderPassData.WriteDepth(0, depthDesc.format, depthLoadAction, depthStoreAction, depthTarget);
         }
 
         if (colorTargets.Count == 0)
@@ -159,7 +159,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
                 else
                     actualResolution = new(actualTarget.width, actualTarget.height);
 
-                nativeRenderPassData.AddAttachment(descriptor.format, loadAction, item.Item3, target, descriptor.clearColor);
+                nativeRenderPassData.AddColorOutput(0, descriptor.format, loadAction, item.Item3, target, descriptor.clearColor);
             }
         }
 
