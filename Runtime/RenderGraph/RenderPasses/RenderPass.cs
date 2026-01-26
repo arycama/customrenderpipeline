@@ -167,10 +167,19 @@ public abstract class RenderPass : IDisposable
 		foreach (var buffer in writeBuffers)
 			SetBuffer(buffer.Item1, buffer.Item2);
 
-        if (IsNativeRenderPass && IsRenderPassStart)
+        if (IsNativeRenderPass)
         {
-            RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData, Name);
-            IsRenderPassStart = false;
+            if (IsRenderPassStart)
+            {
+                RenderGraph.RenderPassSystem.BeginRenderPass(Command, nativeRenderPassData, Name);
+                IsRenderPassStart = false;
+            }
+
+            if (IsNextSubPass)
+            {
+                command.NextSubPass();
+                IsNextSubPass = false;
+            }
         }
 
         SetupTargets();
@@ -198,12 +207,6 @@ public abstract class RenderPass : IDisposable
 
         if(IsNativeRenderPass)
         {
-            if(IsNextSubPass)
-            {
-                command.NextSubPass();
-                IsNextSubPass = false;
-            }
-
             if (IsRenderPassEnd)
             {
                 Command.EndRenderPass();

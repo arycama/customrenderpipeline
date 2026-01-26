@@ -190,10 +190,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("Deferred", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>(), RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>(), RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>(), RenderBufferLoadAction.DontCare);
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>(), RenderBufferLoadAction.DontCare);
 
 			pass.ReadResource<FrameData>();
 			pass.ReadResource<ViewData>();

@@ -33,12 +33,12 @@ public class NativeRenderPassData
 
     public void AddColorOutput(int subPass, GraphicsFormat format, RenderBufferLoadAction loadAction, RenderBufferStoreAction storeAction, RenderTargetIdentifier loadStoreTarget, Color clearColor = default)
     {
-        var attachment = new AttachmentDescriptor(format) { loadAction = loadAction, storeAction = storeAction, loadStoreTarget = loadStoreTarget, clearColor = clearColor };
-        var index = colorAttachments.IndexOf(attachment);
+        var index = colorAttachments.FindIndex(element => element.loadStoreTarget == loadStoreTarget);
 
         if (index == -1)
         {
             index = colorAttachments.Count;
+            var attachment = new AttachmentDescriptor(format) { loadAction = loadAction, storeAction = storeAction, loadStoreTarget = loadStoreTarget, clearColor = clearColor };
             colorAttachments.Add(attachment);
         }
 
