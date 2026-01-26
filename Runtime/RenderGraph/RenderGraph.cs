@@ -18,6 +18,7 @@ public class RenderGraph : IDisposable
     private readonly GraphicsBuffer emptyBuffer;
     private readonly RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
     private readonly Dictionary<Type, RTHandleData> rtHandles = new();
+    private readonly List<NativeRenderPassData> renderPassDescriptors = new();
 
     public RTHandleSystem RtHandleSystem { get; }
     public BufferHandleSystem BufferHandleSystem { get; }
@@ -163,9 +164,11 @@ public class RenderGraph : IDisposable
         }
 
         // Detect and queue up native renderPasses
-        RenderPass subPassStart = null;
+        //RenderPass subPassStart = null;
         var currentSubPass = 0;
         var renderPassCount = 0;
+        renderPassDescriptors.Clear();
+        NativeRenderPassData targetPassData = null;
 
         for (var i = 0; i < renderPasses.Count; i++)
         {
@@ -184,7 +187,7 @@ public class RenderGraph : IDisposable
 
             if (canMergeWithPreviousPass)
             {
-                if (currentPassData.CanMergeWithSubPass(subPassStart.nativeRenderPassData, currentSubPass))
+                if (currentPassData.CanMergeWithSubPass(targetPassData, currentSubPass))
                 {
                     // Merge with existing subpass, nothing to do here
                     if (DebugRenderPasses)
@@ -197,7 +200,7 @@ public class RenderGraph : IDisposable
                     currentSubPass++;
 
                     foreach (var attachment in currentPassData.colorAttachments)
-                        subPassStart.nativeRenderPassData.WriteColor(currentSubPass, attachment);
+                        targetPassData.WriteColor(currentSubPass, attachment);
 
                     if (DebugRenderPasses)
                         Debug.Log($"Creating new subpass {currentSubPass} for renderPass {renderPassCount - 1} ({currentRenderPass.Name})");
@@ -205,10 +208,14 @@ public class RenderGraph : IDisposable
                 else
                 {
                     // Can't make a new subpass, need to end previous renderpass and start a new one
-                    // TODO: Call end renderpass data on previous
                     currentRenderPass.IsRenderPassStart = true;
-                    subPassStart = currentRenderPass;
                     currentSubPass = 0;
+
+                    currentRenderPass.RenderPassIndex = renderPassCount++;
+                    targetPassData = new NativeRenderPassData();
+                    renderPassDescriptors.Add(targetPassData);
+
+                    currentPassData.CopyTo(targetPassData);
 
                     if (DebugRenderPasses)
                         Debug.Log($"Starting Render Pass {renderPassCount} with pass {i} ({currentRenderPass.Name})");
@@ -217,14 +224,17 @@ public class RenderGraph : IDisposable
             else
             {
                 // Can't merge, need to end previous and start a new pass.
+                currentRenderPass.IsRenderPassStart = true;
+                currentSubPass = 0;
+
+                currentRenderPass.RenderPassIndex = renderPassCount++;
+                targetPassData = new NativeRenderPassData();
+                renderPassDescriptors.Add(targetPassData);
+
+                currentPassData.CopyTo(targetPassData);
+
                 if (DebugRenderPasses)
                     Debug.Log($"Starting Render Pass {renderPassCount} with pass {i} ({currentRenderPass.Name})");
-
-                renderPassCount++;
-
-                currentRenderPass.IsRenderPassStart = true;
-                subPassStart = currentRenderPass;
-                currentSubPass = 0;
             }
 
             // Detect end conditions
@@ -271,6 +281,11 @@ public class RenderGraph : IDisposable
         }
 
         IsExecuting = false;
+    }
+
+    public RenderPassDescriptor GetRenderPassDescriptor(int index, string name)
+    {
+        return renderPassDescriptors[index].GetDescriptor(name);
     }
 
     public ResourceHandle<RenderTexture> GetTexture(RtHandleDescriptor descriptor, bool isPersistent = false)

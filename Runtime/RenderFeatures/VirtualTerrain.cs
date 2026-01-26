@@ -10,7 +10,7 @@ public class VirtualTerrain : ViewRenderFeature
 {
 	private readonly TerrainSettings settings;
 
-	private GraphicsBuffer requestBuffer;
+	private List<GraphicsBuffer> requestBuffers = new();
 	private readonly ResourceHandle<GraphicsBuffer> counterBuffer, /*requestBuffer,*/ tilesToUnmapBuffer, mappedTiles;
 
 	private readonly ResourceHandle<RenderTexture> indirectionTextureMapTexture;
@@ -64,12 +64,16 @@ public class VirtualTerrain : ViewRenderFeature
 	protected override void Cleanup(bool disposing)
 	{
 		renderGraph.ReleasePersistentResource(indirectionTextureMapTexture, -1);
-		requestBuffer?.Dispose();
 		renderGraph.ReleasePersistentResource(counterBuffer, -1);
 		renderGraph.ReleasePersistentResource(mappedTiles, -1);
 		renderGraph.ReleasePersistentResource(tilesToUnmapBuffer, -1);
 
 		AsyncGPUReadback.WaitAllRequests();
+
+        foreach(var buffer in requestBuffers)
+        {
+            buffer.Dispose();
+        }
 
 		foreach (var thing in requestArrays)
 		{
@@ -123,23 +127,60 @@ public class VirtualTerrain : ViewRenderFeature
 		// Worst case scenario would be every pixel requesting a different patch+uv, though this is never going to happen in practice
 		// Allocate the largest we need, plus one pixel since we include the 'count' as the first element
 		maxRequestBufferSize = Math.Max(maxRequestBufferSize, viewRenderData.viewSize.x * viewRenderData.viewSize.y + 1);
-		if(requestBuffer == null || !requestBuffer.IsValid() || requestBuffer.count < maxRequestBufferSize)
-		{
-			if (requestBuffer != null && requestBuffer.IsValid())
-				requestBuffer.Dispose();
 
-			requestBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Append, maxRequestBufferSize, 4);
+        // Retrieve a stored array or fetch a new one
+        NativeArray<int> requestArray;
+        GraphicsBuffer requestBuffer;
+        if (!availableRequestIndices.TryPop(out var requestArrayIndex))
+        {
+            requestArrayIndex = requestArrays.Count;
+            requestArray = new NativeArray<int>(maxRequestBufferSize, Allocator.Persistent, NativeArrayOptions.ClearMemory);
+            requestArrays.Add(requestArray);
 
-			// Fill all buffesr with 0 (I think this should happen automatically, but
-			using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init", maxRequestBufferSize))
-			{
-				pass.SetRenderFunction((command, pass, requestBufferSize) =>
-				{
-					command.SetBufferData(requestBuffer, new int[requestBufferSize]);
-					command.SetBufferCounterValue(requestBuffer, 1); // Init the counter to zero before appending
-				});
-			}
-		}
+            requestBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Append, maxRequestBufferSize, 4);
+
+            // Fill all buffesr with 0 (I think this should happen automatically, but
+            using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init", maxRequestBufferSize))
+            {
+                pass.SetRenderFunction((command, pass, requestBufferSize) =>
+                {
+                    command.SetBufferData(requestBuffer, new int[requestBufferSize]);
+                    command.SetBufferCounterValue(requestBuffer, 1); // Init the counter to zero before appending
+                });
+            }
+            requestBuffers.Add(requestBuffer);
+        }
+        else
+        {
+            requestArray = requestArrays[requestArrayIndex];
+
+            if (requestArray.Length < maxRequestBufferSize)
+            {
+                requestArray.Dispose();
+                requestArray = new NativeArray<int>(maxRequestBufferSize, Allocator.Persistent);
+                requestArrays[requestArrayIndex] = requestArray;
+            }
+
+            requestBuffer = requestBuffers[requestArrayIndex];
+            if (requestBuffer == null || !requestBuffer.IsValid() || requestBuffer.count < maxRequestBufferSize)
+            {
+                if (requestBuffer != null && requestBuffer.IsValid())
+                    requestBuffer.Dispose();
+
+                requestBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Append, maxRequestBufferSize, 4);
+                requestBuffers[requestArrayIndex] = requestBuffer;
+
+                // Fill all buffesr with 0 (I think this should happen automatically, but
+                using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init", maxRequestBufferSize))
+                {
+                    pass.SetRenderFunction((command, pass, requestBufferSize) =>
+                    {
+                        command.SetBufferData(requestBuffer, new int[requestBufferSize]);
+                        command.SetBufferCounterValue(requestBuffer, 1); // Init the counter to zero before appending
+                    });
+                }
+            }
+        }
 
 		using (var pass = renderGraph.AddComputeRenderPass("Gather Requested Pages", (requestBuffer, virtualTextureUpdateShader, IndirectionSize)))
 		{
@@ -156,36 +197,16 @@ public class VirtualTerrain : ViewRenderFeature
 			}));
 		}
 
-		// Retrieve a stored array or fetch a new one
-		NativeArray<int> requestArray;
-		if (!availableRequestIndices.TryPop(out var requestArrayIndex))
-		{
-			requestArrayIndex = requestArrays.Count;
-			requestArray = new NativeArray<int>(maxRequestBufferSize, Allocator.Persistent, NativeArrayOptions.ClearMemory);
-			requestArrays.Add(requestArray);
-		}
-		else
-		{
-			requestArray = requestArrays[requestArrayIndex];
-
-			if (requestArray.Length < maxRequestBufferSize)
-			{
-				requestArray.Dispose();
-				requestArray = new NativeArray<int>(maxRequestBufferSize, Allocator.Persistent);
-				requestArrays[requestArrayIndex] = requestArray;
-			}
-		}
-
 		using (var pass = renderGraph.AddGenericRenderPass("Copy Counter and readback", (requestBuffer, requestArray, requestArrayIndex, readyRequestIndices)))
 		{
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				command.CopyCounterValue(data.requestBuffer, data.requestBuffer, 0);
-				command.RequestAsyncReadbackIntoNativeArray(ref data.Item2, data.requestBuffer, (request) => 
-				{
-					data.readyRequestIndices.Enqueue(data.requestArrayIndex);
-				});
-			});
+                command.RequestAsyncReadbackIntoNativeArray(ref data.Item2, data.requestBuffer, (request) =>
+                {
+                    data.readyRequestIndices.Enqueue(data.requestArrayIndex);
+                });
+            });
 		}
 
 		while (readyRequestIndices.TryDequeue(out var readyRequestIndex))

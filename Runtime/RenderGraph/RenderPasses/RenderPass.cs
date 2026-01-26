@@ -68,6 +68,7 @@ public abstract class RenderPass : IDisposable
     public bool IsNextSubPass { get; set; } = false;
     public bool IsRenderPassEnd { get; set; } = false;
     public bool AllowNewSubPass { get; set; } = false;
+    public int RenderPassIndex { get; set; } = -1;
 
     public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
 	public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);
@@ -171,8 +172,9 @@ public abstract class RenderPass : IDisposable
         {
             if (IsRenderPassStart)
             {
-                nativeRenderPassData.GetDescriptor(Name).BeginRenderPass(Command);
+                RenderGraph.GetRenderPassDescriptor(RenderPassIndex, Name).BeginRenderPass(Command);
                 IsRenderPassStart = false;
+                RenderPassIndex = -1;
             }
 
             if (IsNextSubPass)

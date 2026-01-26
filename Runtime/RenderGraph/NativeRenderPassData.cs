@@ -134,6 +134,18 @@ public class NativeRenderPassData
     {
         return CanMergeWithPass(other) && CanMergeWithSubPass(other, subPassIndex);
     }
+
+    public void CopyTo(NativeRenderPassData other)
+    {
+        other.size = size;
+        other.depthAttachment = depthAttachment;
+
+        other.colorAttachments.Clear();
+        other.colorAttachments.AddRange(colorAttachments);
+
+        other.subPasses.Clear();
+        other.subPasses.AddRange(subPasses);
+    }
 }
 
 public struct SubPassData
