@@ -63,19 +63,19 @@ public class TerrainRenderer : TerrainRendererBase
 			pass.ReadResource<ViewData>();
 		}
 
-		var terrainDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true);
-		renderGraph.SetRTHandle<TerrainDepth>(terrainDepth);
+		//var terrainDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true);
+		//renderGraph.SetRTHandle<TerrainDepth>(terrainDepth);
 
-		var cameraDepth = renderGraph.GetRTHandle<CameraDepth>();
-		using (var pass = renderGraph.AddGenericRenderPass("Terrain Depth Copy", (cameraDepth, terrainDepth)))
-		{
-			pass.WriteTexture(terrainDepth);
-			pass.ReadRtHandle<CameraDepth>();
+		//var cameraDepth = renderGraph.GetRTHandle<CameraDepth>();
+		//using (var pass = renderGraph.AddGenericRenderPass("Terrain Depth Copy", (cameraDepth, terrainDepth)))
+		//{
+		//	pass.WriteTexture(terrainDepth);
+		//	pass.ReadRtHandle<CameraDepth>();
 
-			pass.SetRenderFunction((commmand, pass, data) =>
-			{
-				commmand.CopyTexture(pass.GetRenderTexture(cameraDepth), pass.GetRenderTexture(terrainDepth));
-			});
-		}
+		//	pass.SetRenderFunction((commmand, pass, data) =>
+		//	{
+		//		commmand.CopyTexture(pass.GetRenderTexture(cameraDepth), pass.GetRenderTexture(terrainDepth));
+		//	});
+		//}
 	}
 }

@@ -9,12 +9,12 @@
 #include "../../VirtualTexturing.hlsl"
 
 Texture2D<float4> BentNormalVisibility;
-Texture2D<float> TerrainDepth;
+//Texture2D<float> TerrainDepth;
 
 [earlydepthstencil]
 GBufferOutput Fragment(VertexFullscreenTriangleOutput input)
 {
-	float3 worldPosition = input.worldDirection * LinearEyeDepth(TerrainDepth[input.position.xy]);
+	float3 worldPosition = input.worldDirection * LinearEyeDepth(CameraDepth[input.position.xy]);
 	float2 normalUv = WorldToTerrainPositionHalfTexel(worldPosition);
 	float2 uv = WorldToTerrainPosition(worldPosition);
 	

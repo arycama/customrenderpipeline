@@ -87,6 +87,7 @@ public partial class Sky : ViewRenderFeature
 			pass.renderData.wasCreated = wasCreated;
 
 			pass.Initialize(skyMaterial, skyMaterial.FindPass("Temporal"));
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteTexture(current, RenderBufferLoadAction.DontCare);
 			pass.ReadTexture("_SkyInput", skyTemp);

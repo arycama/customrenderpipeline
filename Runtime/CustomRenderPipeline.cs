@@ -376,14 +376,15 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			using var pass = renderGraph.AddObjectRenderPass("Render Transparent");
+            pass.AllowNewSubPass = true;
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("SRPDefaultUnlit", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.transparent, SortingCriteria.CommonTransparent, PerObjectData.None, false);
 
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepth);
+			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 
-			pass.ReadResource<FrameData>();
+            pass.ReadResource<FrameData>();
 			pass.ReadResource<DfgData>();
 			pass.ReadResource<EnvironmentData>();
 			pass.ReadResource<ViewData>();

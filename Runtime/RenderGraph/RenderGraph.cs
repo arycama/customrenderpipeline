@@ -166,7 +166,8 @@ public class RenderGraph : IDisposable
 
         // Detect and queue up native renderPasses
         RenderPass subPassStart = null;
-        int currentSubPass = 0;
+        var currentSubPass = 0;
+        var renderPassCount = 0;
 
         for (var i = 0; i < renderPasses.Count; i++)
         {
@@ -183,37 +184,46 @@ public class RenderGraph : IDisposable
             var previousRenderPassData = isPreviousPassNativeRenderPass ? previousRenderPass.nativeRenderPassData : null;
             var canMergeWithPreviousPass = isPreviousPassNativeRenderPass && currentPassData.CanMergeWithPass(previousRenderPassData);
 
-            if(canMergeWithPreviousPass)
+            if (canMergeWithPreviousPass)
             {
-                if(currentPassData.CanMergeWithSubPass(previousRenderPassData))
+                if (currentPassData.CanMergeWithSubPass(previousRenderPassData))
                 {
                     // Merge with existing subpass, nothing to do here
+                    if (DebugRenderPasses)
+                        Debug.Log($"Merging pass {i} with renderPass {renderPassCount - 1} ({currentRenderPass.Name})");
+                }
+                else if (currentRenderPass.AllowNewSubPass)
+                {
+                    // Create new subpass, insert next subpass instruction
+                    currentRenderPass.IsNextSubPass = true;
+                    currentSubPass++;
+
+                    foreach (var attachment in currentPassData.colorAttachments)
+                        subPassStart.nativeRenderPassData.AddColorOutput(currentSubPass, attachment.graphicsFormat, attachment.loadAction, attachment.storeAction, attachment.loadStoreTarget, attachment.clearColor);
+
+                    if (DebugRenderPasses)
+                        Debug.Log($"Creating new subpass {currentSubPass} for renderPass {renderPassCount - 1} ({currentRenderPass.Name})");
                 }
                 else
                 {
-                    // Attempt to create a new subpass (No need to check if can merge with pass since we did that in the outer branch)
-                    if (currentRenderPass.AllowNewSubPass)
-                    {
-                        // Create new subpass, insert next subpass instruction
-                        currentRenderPass.IsNextSubPass = true;
-                        currentSubPass++;
+                    // Can't make a new subpass, need to end previous renderpass and start a new one
+                    // TODO: Call end renderpass data on previous
+                    currentRenderPass.IsRenderPassStart = true;
+                    subPassStart = currentRenderPass;
+                    currentSubPass = 0;
 
-                        foreach (var attachment in currentPassData.colorAttachments)
-                            subPassStart.nativeRenderPassData.AddColorOutput(currentSubPass, attachment.graphicsFormat, attachment.loadAction, attachment.storeAction, attachment.loadStoreTarget, attachment.clearColor);
-                    }
-                    else
-                    {
-                        // Can't make a new subpass, need to end previous renderpass and start a new one
-                        // TODO: Call end renderpass data on previous
-                        currentRenderPass.IsRenderPassStart = true;
-                        subPassStart = currentRenderPass;
-                        currentSubPass = 0;
-                    }
+                    if (DebugRenderPasses)
+                        Debug.Log($"Starting Render Pass {renderPassCount} with pass {i} ({currentRenderPass.Name})");
                 }
             }
             else
             {
                 // Can't merge, need to end previous and start a new pass.
+                if (DebugRenderPasses)
+                    Debug.Log($"Starting Render Pass {renderPassCount} with pass {i} ({currentRenderPass.Name})");
+
+                renderPassCount++;
+
                 currentRenderPass.IsRenderPassStart = true;
                 subPassStart = currentRenderPass;
                 currentSubPass = 0;
@@ -226,7 +236,7 @@ public class RenderGraph : IDisposable
             var nextRenderPassData = isNextPassNativeRenderPass ? nextRenderPass.nativeRenderPassData : null;
 
             bool canMergeWithNextPass;
-            if(nextRenderPass.AllowNewSubPass)
+            if (nextRenderPass.AllowNewSubPass)
             {
                 // If we can start a new subpass, we only need to end if the pass is not compatible (Assume we can always make new subpasses for now)
                 canMergeWithNextPass = isNextPassNativeRenderPass && currentPassData.CanMergeWithPass(nextRenderPassData);
@@ -241,6 +251,9 @@ public class RenderGraph : IDisposable
             if (isLastPass || !isNextPassNativeRenderPass || !canMergeWithNextPass)
             {
                 currentRenderPass.IsRenderPassEnd = true;
+
+                if (DebugRenderPasses)
+                    Debug.Log($"Ending Render Pass {renderPassCount - 1} with pass {i} ({currentRenderPass.Name})");
             }
         }
 

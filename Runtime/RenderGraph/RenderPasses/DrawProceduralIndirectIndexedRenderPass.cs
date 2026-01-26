@@ -49,9 +49,13 @@ public class DrawProceduralIndirectIndexedRenderPass<T> : DrawRenderPass<T>
 		if (depthBias != 0.0f || slopeDepthBias != 0.0f)
 			Command.SetGlobalDepthBias(depthBias, slopeDepthBias);
 
-		Command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
+        if(!zClip)
+		    Command.SetGlobalFloat("_ZClip", 0.0f);
+
 		Command.DrawProceduralIndirect(GetBuffer(indexBuffer), Matrix4x4.identity, material, passIndex, topology, GetBuffer(indirectArgsBuffer), argsOffset, PropertyBlock);
-		Command.SetGlobalFloat("_ZClip", 1.0f);
+
+        if(!zClip)
+		    Command.SetGlobalFloat("_ZClip", 1.0f);
 
 		if (depthBias != 0.0f || slopeDepthBias != 0.0f)
 			Command.SetGlobalDepthBias(0.0f, 0.0f);

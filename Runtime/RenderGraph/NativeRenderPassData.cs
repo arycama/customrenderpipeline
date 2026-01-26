@@ -67,7 +67,13 @@ public class NativeRenderPassData
     public bool CanMergeWithPass(NativeRenderPassData other)
     {
         // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
-        return size == other.size && depthAttachment == other.depthAttachment;
+        if (size != other.size || depthAttachment.HasValue != other.depthAttachment.HasValue) 
+            return false;
+
+        if (depthAttachment.HasValue && other.depthAttachment.HasValue && depthAttachment.Value.loadStoreTarget != other.depthAttachment.Value.loadStoreTarget)
+            return false;
+
+        return true;
     }
 
     public bool CanMergeWithSubPass(NativeRenderPassData other)
