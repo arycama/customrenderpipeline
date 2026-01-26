@@ -58,7 +58,6 @@ public class NativeRenderPassData
     public void WriteColor(int subPass, AttachmentDescriptor attachment)
     {
         var index = colorAttachments.FindIndex(element => element.loadStoreTarget == attachment.loadStoreTarget);
-
         if (index == -1)
         {
             index = colorAttachments.Count;
@@ -71,14 +70,12 @@ public class NativeRenderPassData
         subPasses[subPass].AddOutput(index);
     }
 
-    public void ReadColor(int subPass, GraphicsFormat format, RenderBufferLoadAction loadAction, RenderBufferStoreAction storeAction, RenderTargetIdentifier loadStoreTarget, Color clearColor = default)
+    public void ReadColor(int subPass, AttachmentDescriptor attachment)
     {
-        var index = colorAttachments.FindIndex(element => element.loadStoreTarget == loadStoreTarget);
-
+        var index = colorAttachments.FindIndex(element => element.loadStoreTarget == attachment.loadStoreTarget);
         if (index == -1)
         {
             index = colorAttachments.Count;
-            var attachment = new AttachmentDescriptor(format) { loadAction = loadAction, storeAction = storeAction, loadStoreTarget = loadStoreTarget, clearColor = clearColor };
             colorAttachments.Add(attachment);
         }
 
@@ -113,6 +110,18 @@ public class NativeRenderPassData
         return true;
     }
 
+    public bool CanMergeWithPass(RenderPassData other)
+    {
+        // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
+        if (size != other.size || depthAttachment.HasValue != other.depthAttachment.HasValue)
+            return false;
+
+        if (depthAttachment.HasValue && other.depthAttachment.HasValue && depthAttachment.Value.loadStoreTarget != other.depthAttachment.Value.loadStoreTarget)
+            return false;
+
+        return true;
+    }
+
     public bool CanMergeWithSubPass(NativeRenderPassData other, int subPassIndex)
     {
         var subPass = subPasses[0];
@@ -130,9 +139,31 @@ public class NativeRenderPassData
         return true;
     }
 
+    public bool CanMergeWithSubPass(RenderPassData other)
+    {
+        var subPass = subPasses[0];
+
+        // A subpass can only merge with another sub pass if they have the exact same flags, color attachment count -and- output indices
+        if (subPass.flags != other.flags || colorAttachments.Count != other.colorAttachments.Count)
+            return false;
+
+        for (var i = 0; i < colorAttachments.Count; i++)
+        {
+            if (colorAttachments[i].loadStoreTarget != other.colorAttachments[i].loadStoreTarget)
+                return false;
+        }
+
+        return true;
+    }
+
     public bool CanMergeWithPassAndSubPass(NativeRenderPassData other, int subPassIndex)
     {
         return CanMergeWithPass(other) && CanMergeWithSubPass(other, subPassIndex);
+    }
+
+    public bool CanMergeWithPassAndSubPass(RenderPassData other)
+    {
+        return CanMergeWithPass(other) && CanMergeWithSubPass(other);
     }
 
     public void CopyTo(NativeRenderPassData other)
@@ -145,40 +176,5 @@ public class NativeRenderPassData
 
         other.subPasses.Clear();
         other.subPasses.AddRange(subPasses);
-    }
-}
-
-public struct SubPassData
-{
-    public NativeList<int> inputs, outputs;
-    public SubPassFlags flags;
-
-    public static SubPassData Create()
-    {
-        return new SubPassData { inputs = new NativeList<int>(8, Allocator.Temp), outputs = new NativeList<int>(8, Allocator.Temp) };
-    }
-
-    public SubPassDescriptor Descriptor => new()
-    {
-        flags = flags,
-        colorOutputs = new(outputs.AsArray()),
-        inputs = new(inputs.AsArray())
-    };
-
-    public void AddInput(int index)
-    {
-        inputs.Add(index);
-    }
-
-    public void AddOutput(int index)
-    {
-        outputs.Add(index);
-    }
-
-    public void Clear()
-    {
-        inputs.Clear();
-        outputs.Clear();
-        flags = SubPassFlags.None;
     }
 }

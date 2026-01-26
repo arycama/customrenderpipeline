@@ -94,7 +94,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
                 clearColor = handleData.descriptor.clearColor
             };
 
-            nativeRenderPassData.WriteDepth(0, descriptor);
+            nativeRenderPassData.WriteDepth(descriptor);
             actualResolution = new(target.width, target.height);
         }
 
@@ -114,14 +114,14 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
                 clearColor = handleData.descriptor.clearColor 
             };
 
-            nativeRenderPassData.WriteColor(0, descriptor);
+            nativeRenderPassData.WriteColor(descriptor);
 
             if (!depthBuffer.HasValue)
                 actualResolution = new(target.width, target.height);
         }
 
         nativeRenderPassData.SetSize(new(actualResolution.x, actualResolution.y, 1));
-        nativeRenderPassData.SetSubPassFlags(0, flags);
+        nativeRenderPassData.SetSubPassFlags(flags);
     }
 
     protected override void SetupTargets()

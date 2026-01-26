@@ -172,18 +172,17 @@ public class RenderGraph : IDisposable
 
         for (var i = 0; i < renderPasses.Count; i++)
         {
-            var isFirstPass = i == 0;
-            var previousRenderPass = isFirstPass ? null : renderPasses[i - 1];
             var currentRenderPass = renderPasses[i];
-
             if (!currentRenderPass.IsNativeRenderPass)
                 continue;
+
+            var isFirstPass = i == 0;
+            var previousRenderPass = isFirstPass ? null : renderPasses[i - 1];
 
             // Detect start or next subpass conditions
             var currentPassData = currentRenderPass.nativeRenderPassData;
             var isPreviousPassNativeRenderPass = previousRenderPass != null && previousRenderPass.IsNativeRenderPass;
-            var previousRenderPassData = isPreviousPassNativeRenderPass ? previousRenderPass.nativeRenderPassData : null;
-            var canMergeWithPreviousPass = isPreviousPassNativeRenderPass && currentPassData.CanMergeWithPass(previousRenderPassData);
+            var canMergeWithPreviousPass = isPreviousPassNativeRenderPass && targetPassData.CanMergeWithPass(currentPassData);
 
             if (canMergeWithPreviousPass)
             {
@@ -247,18 +246,21 @@ public class RenderGraph : IDisposable
             if (nextRenderPass.AllowNewSubPass)
             {
                 // If we can start a new subpass, we only need to end if the pass is not compatible (Assume we can always make new subpasses for now)
-                canMergeWithNextPass = isNextPassNativeRenderPass && currentPassData.CanMergeWithPass(nextRenderPassData);
+                canMergeWithNextPass = isNextPassNativeRenderPass && targetPassData.CanMergeWithPass(nextRenderPassData);
             }
             else
             {
                 // If subpass creation is not allowed, we can only merge if both the pass and subpass match.
-                canMergeWithNextPass = isNextPassNativeRenderPass && currentPassData.CanMergeWithPassAndSubPass(nextRenderPassData, 0);
+                canMergeWithNextPass = isNextPassNativeRenderPass && targetPassData.CanMergeWithPassAndSubPass(nextRenderPassData);
             }
 
             // End renderpass if this is the last pass, or the next pass is not a renderpass, or the next can not be merged with the current
             if (isLastPass || !isNextPassNativeRenderPass || !canMergeWithNextPass)
             {
                 currentRenderPass.IsRenderPassEnd = true;
+
+                if(isLastPass || !isNextPassNativeRenderPass)
+                    targetPassData = null;
 
                 if (DebugRenderPasses)
                     Debug.Log($"Ending Render Pass {renderPassCount - 1} with pass {i} ({currentRenderPass.Name})");
