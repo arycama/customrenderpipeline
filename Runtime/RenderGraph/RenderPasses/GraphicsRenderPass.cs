@@ -1,17 +1,14 @@
 using System;
 using System.Collections.Generic;
-using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
-using static Math;
 
 public abstract class GraphicsRenderPass<T>: RenderPass<T>
 {
 	private readonly List<ResourceHandle<RenderTexture>> colorTargets = new();
     private ResourceHandle<RenderTexture>? depthBuffer;
 
-	private SubPassFlags flags;
 	private Int2? resolution;
 	private bool isScreenPass;
 
@@ -94,7 +91,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
                 clearColor = handleData.descriptor.clearColor
             };
 
-            nativeRenderPassData.WriteDepth(descriptor);
+            depthAttachment = descriptor;
             actualResolution = new(target.width, target.height);
         }
 
@@ -114,14 +111,13 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
                 clearColor = handleData.descriptor.clearColor 
             };
 
-            nativeRenderPassData.WriteColor(descriptor);
+            colorAttachments.Add(descriptor);
 
             if (!depthBuffer.HasValue)
                 actualResolution = new(target.width, target.height);
         }
 
-        nativeRenderPassData.SetSize(new(actualResolution.x, actualResolution.y, 1));
-        nativeRenderPassData.SetSubPassFlags(flags);
+        size = new(actualResolution.x, actualResolution.y, 1);
     }
 
     protected override void SetupTargets()

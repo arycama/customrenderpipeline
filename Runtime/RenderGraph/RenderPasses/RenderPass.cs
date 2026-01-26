@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
@@ -48,7 +49,10 @@ public abstract class RenderPass : IDisposable
 	private readonly List<Type> readRtHandles = new();
 	protected readonly List<string> keywords = new();
 
-    public RenderPassData nativeRenderPassData = new();
+    public Int3 size;
+    public AttachmentDescriptor? depthAttachment;
+    public readonly List<AttachmentDescriptor> colorAttachments = new();
+    public SubPassFlags flags;
 
     public RenderPass()
 	{
@@ -140,7 +144,7 @@ public abstract class RenderPass : IDisposable
 
     public virtual void SetupRenderPassData() { }
 
-	public void Run(CommandBuffer command)
+    public void Run(CommandBuffer command)
 	{
 		Command = command;
 
@@ -215,7 +219,9 @@ public abstract class RenderPass : IDisposable
                 IsRenderPassEnd = false;
             }
 
-            nativeRenderPassData.Reset();
+            size = 0;
+            colorAttachments.Clear();
+            depthAttachment = null;
         }
         
         PostExecute();
