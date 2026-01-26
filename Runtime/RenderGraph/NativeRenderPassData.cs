@@ -9,7 +9,6 @@ public class NativeRenderPassData
 {
     public Int3 size;
     public AttachmentDescriptor? depthAttachment;
-    public SubPassFlags flags;
     public readonly List<AttachmentDescriptor> colorAttachments = new();
     public readonly List<SubPassData> subPasses = new();
 
@@ -18,9 +17,11 @@ public class NativeRenderPassData
         this.size = size;
     }
 
-    public void SetSubPassFlags(SubPassFlags flags)
+    public void SetSubPassFlags(int subPassIndex, SubPassFlags flags)
     {
-        this.flags = flags;
+        var subPass = subPasses[subPassIndex];
+        subPass.flags = flags;
+        subPasses[subPassIndex] = subPass;
     }
 
     public void WriteDepth(int subPass, GraphicsFormat format, RenderBufferLoadAction loadAction, RenderBufferStoreAction storeAction, RenderTargetIdentifier loadStoreTarget)
@@ -76,10 +77,12 @@ public class NativeRenderPassData
         return true;
     }
 
-    public bool CanMergeWithSubPass(NativeRenderPassData other)
+    public bool CanMergeWithSubPass(NativeRenderPassData other, int subPassIndex)
     {
+        var subPass = subPasses[0];
+
         // A subpass can only merge with another sub pass if they have the exact same flags, color attachment count -and- output indices
-        if (flags != other.flags || colorAttachments.Count != other.colorAttachments.Count)
+        if (subPass.flags != other.subPasses[subPassIndex].flags || colorAttachments.Count != other.colorAttachments.Count)
             return false;
 
         for (var i = 0; i < colorAttachments.Count; i++)
@@ -91,15 +94,17 @@ public class NativeRenderPassData
         return true;
     }
 
-    public bool CanMergeWithPassAndSubPass(NativeRenderPassData other)
+    public bool CanMergeWithPassAndSubPass(NativeRenderPassData other, int subPassIndex)
     {
-        return CanMergeWithPass(other) && CanMergeWithSubPass(other);
+        return CanMergeWithPass(other) && CanMergeWithSubPass(other, subPassIndex);
     }
 }
 
 public struct SubPassData
 {
     private int a0, a1, a2, a3, a4, a5, a6, a7;
+
+    public SubPassFlags flags;
     public int Count { get; private set; }
 
     public int this[int index]
@@ -167,5 +172,6 @@ public struct SubPassData
     public void Clear()
     {
         Count = 0;
+        flags = SubPassFlags.None;
     }
 }

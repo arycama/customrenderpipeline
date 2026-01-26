@@ -164,7 +164,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
         }
 
         nativeRenderPassData.SetSize(new(actualResolution.x, actualResolution.y, 1));
-        nativeRenderPassData.SetSubPassFlags(flags);
+        nativeRenderPassData.SetSubPassFlags(0, flags);
     }
 
     protected override void SetupTargets()

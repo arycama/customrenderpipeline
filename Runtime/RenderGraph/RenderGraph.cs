@@ -186,7 +186,7 @@ public class RenderGraph : IDisposable
 
             if (canMergeWithPreviousPass)
             {
-                if (currentPassData.CanMergeWithSubPass(previousRenderPassData))
+                if (currentPassData.CanMergeWithSubPass(subPassStart.nativeRenderPassData, currentSubPass))
                 {
                     // Merge with existing subpass, nothing to do here
                     if (DebugRenderPasses)
@@ -244,7 +244,7 @@ public class RenderGraph : IDisposable
             else
             {
                 // If subpass creation is not allowed, we can only merge if both the pass and subpass match.
-                canMergeWithNextPass = isNextPassNativeRenderPass && currentPassData.CanMergeWithPassAndSubPass(nextRenderPassData);
+                canMergeWithNextPass = isNextPassNativeRenderPass && currentPassData.CanMergeWithPassAndSubPass(nextRenderPassData, 0);
             }
 
             // End renderpass if this is the last pass, or the next pass is not a renderpass, or the next can not be merged with the current

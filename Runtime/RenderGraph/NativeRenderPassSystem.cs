@@ -45,7 +45,7 @@ public class NativeRenderPassSystem
                 subpassOutputs[j] = value + (hasDepth ? 1 : 0);
             }
 
-            subPasses[i] = new SubPassDescriptor() { colorOutputs = subpassOutputs, flags = currentPassData.flags };
+            subPasses[i] = new SubPassDescriptor() { colorOutputs = subpassOutputs, flags = subpass.flags };
         }
         
         var depthIndex = currentPassData.depthAttachment.HasValue ? 0 : -1;

@@ -92,7 +92,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 		if (!renderDocLoaded && RenderDoc.IsLoaded())
         {
             IsDisposingFromRenderDoc = true;
-            return;
+            return; 
         }
 #endif
 
