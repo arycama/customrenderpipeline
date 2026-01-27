@@ -19,7 +19,7 @@ public class RenderGraph : IDisposable
     private readonly GraphicsBuffer emptyBuffer;
     private readonly RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
     private readonly Dictionary<Type, RTHandleData> rtHandles = new();
-    private readonly List<RenderPassDescriptor> renderPassDescriptors = new();
+    private readonly NativeRenderPassSystem nativeRenderPassSystem = new();
 
     public RTHandleSystem RtHandleSystem { get; }
     public BufferHandleSystem BufferHandleSystem { get; }
@@ -164,146 +164,7 @@ public class RenderGraph : IDisposable
             renderPass.SetupRenderPassData();
         }
 
-        // Detect and queue up native renderPasses
-        //RenderPass subPassStart = null;
-        var currentSubPass = 0;
-        renderPassDescriptors.Clear();
-
-        Int3 size = 0;
-        AttachmentDescriptor? depthAttachment = null;
-        List<AttachmentDescriptor> colorAttachments = new();
-        List<SubPassData> subPasses = new();
-
-        bool CanMergeWithPass(RenderPass pass)
-        {
-            // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
-            if (size != pass.size || depthAttachment.HasValue != pass.depthAttachment.HasValue)
-                return false;
-
-            if (depthAttachment.HasValue && pass.depthAttachment.HasValue && depthAttachment.Value.loadStoreTarget != pass.depthAttachment.Value.loadStoreTarget)
-                return false;
-
-            return true;
-        }
-
-        bool CanMergeWithSubPass(RenderPass pass, int subPassIndex)
-        {
-            // A subpass can only merge with another sub pass if they have the exact same flags, color attachment count -and- output indices
-            if (pass.flags != subPasses[subPassIndex].flags || colorAttachments.Count != pass.colorAttachments.Count)
-                return false;
-
-            for (var i = 0; i < colorAttachments.Count; i++)
-            {
-                if (colorAttachments[i].loadStoreTarget != pass.colorAttachments[i].loadStoreTarget)
-                    return false;
-            }
-
-            return true;
-        }
-
-        for (var i = 0; i < renderPasses.Count; i++)
-        {
-            var pass = renderPasses[i];
-            if (!pass.IsNativeRenderPass)
-                continue;
-
-            // Detect start or next subpass conditions
-            var canMergeWithPreviousPass = i > 0 && renderPasses[i - 1].IsNativeRenderPass && CanMergeWithPass(pass);
-            var canMergeWithSubPass = subPasses.Count > 0 && CanMergeWithSubPass(pass, currentSubPass);
-
-            if (canMergeWithPreviousPass && !canMergeWithSubPass && pass.AllowNewSubPass)
-            {
-                // Create new subpass, insert next subpass instruction
-                pass.IsNextSubPass = true;
-                currentSubPass++;
-                subPasses.Add(SubPassData.Create());
-
-                foreach (var attachment in pass.colorAttachments)
-                {
-                    var index = colorAttachments.FindIndex(element => element.loadStoreTarget == attachment.loadStoreTarget);
-                    if (index == -1)
-                    {
-                        index = colorAttachments.Count;
-                        colorAttachments.Add(attachment);
-                    }
-
-                    subPasses[currentSubPass].AddOutput(index);
-                }
-            }
-
-            if (canMergeWithPreviousPass && !canMergeWithSubPass && !pass.AllowNewSubPass || !canMergeWithPreviousPass)
-            {
-                // Can't make a new subpass, need to end previous renderpass and start a new one
-                pass.IsRenderPassStart = true;
-                currentSubPass = 0;
-
-                pass.RenderPassIndex = renderPassDescriptors.Count;
-                colorAttachments.Clear();
-                subPasses.Clear();
-                size = pass.size;
-                depthAttachment = pass.depthAttachment;
-                subPasses.Add(SubPassData.Create());
-
-                foreach (var attachment in pass.colorAttachments)
-                {
-                    subPasses[0].AddOutput(colorAttachments.Count);
-                    colorAttachments.Add(attachment);
-                }
-
-                // TODO: Also write inputs
-            }
-
-            // Detect end conditions
-            var isLastPass = i == renderPasses.Count - 1;
-            var nextPass = isLastPass ? null : renderPasses[i + 1];
-            var isNextPassNativeRenderPass = nextPass != null && nextPass.IsNativeRenderPass;
-
-            bool canMergeWithNextPass;
-            if (nextPass.AllowNewSubPass)
-            {
-                // If we can start a new subpass, we only need to end if the pass is not compatible (Assume we can always make new subpasses for now)
-                canMergeWithNextPass = isNextPassNativeRenderPass && CanMergeWithPass(nextPass);
-            }
-            else
-            {
-                // If subpass creation is not allowed, we can only merge if both the pass and subpass match.
-                canMergeWithNextPass = isNextPassNativeRenderPass && CanMergeWithPass(nextPass) && CanMergeWithSubPass(nextPass, 0);
-            }
-
-            // End renderpass if this is the last pass, or the next pass is not a renderpass, or the next can not be merged with the current
-            if (isLastPass || !isNextPassNativeRenderPass || !canMergeWithNextPass)
-            {
-                pass.IsRenderPassEnd = true;
-
-                var attachmentCount = colorAttachments.Count;
-                var hasDepth = depthAttachment.HasValue;
-                if (hasDepth)
-                    attachmentCount++;
-
-                var attachments = new NativeArray<AttachmentDescriptor>(attachmentCount, Allocator.Temp);
-
-                for (var j = 0; j < colorAttachments.Count; j++)
-                    attachments[j] = colorAttachments[j];
-
-                if (hasDepth)
-                    attachments[attachmentCount - 1] = depthAttachment.Value;
-
-                var subPassesResult = new NativeArray<SubPassDescriptor>(subPasses.Count, Allocator.Temp);
-
-                for (var j = 0; j < subPasses.Count; j++)
-                    subPassesResult[j] = subPasses[j].Descriptor;
-
-                var depthIndex = depthAttachment.HasValue ? attachmentCount - 1 : -1;
-                var descriptor = new RenderPassDescriptor(size.x, size.y, attachments, subPassesResult, size.z, 1, depthIndex, -1, pass.Name);
-                renderPassDescriptors.Add(descriptor);
-
-                if (isLastPass || !isNextPassNativeRenderPass)
-                {
-                    colorAttachments.Clear();
-                    subPasses.Clear();
-                }
-            }
-        }
+        nativeRenderPassSystem.CreateNativeRenderPasses(renderPasses);
 
         foreach (var renderPass in renderPasses)
         {
@@ -323,9 +184,9 @@ public class RenderGraph : IDisposable
         IsExecuting = false;
     }
 
-    public RenderPassDescriptor GetRenderPassDescriptor(int index, string name)
+    public void BeginNativeRenderPass(int index, CommandBuffer command)
     {
-        return renderPassDescriptors[index];
+        nativeRenderPassSystem.BeginNativeRenderPass(index, command);
     }
 
     public ResourceHandle<RenderTexture> GetTexture(RtHandleDescriptor descriptor, bool isPersistent = false)
