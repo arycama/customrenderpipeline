@@ -90,6 +90,7 @@ public class RenderGraph : IDisposable
         ResourceMap.Dispose();
         RtHandleSystem.Dispose();
         BufferHandleSystem.Dispose();
+        nativeRenderPassSystem.Dispose();
         disposedValue = true;
     }
 

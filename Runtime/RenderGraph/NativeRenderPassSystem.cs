@@ -1,21 +1,27 @@
+using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine.Rendering;
 
-public class NativeRenderPassSystem
+public class NativeRenderPassSystem : IDisposable
 {
     private Int3 size;
     private AttachmentDescriptor? depthAttachment;
     private bool isInRenderPass;
     private string passName;
 
-    private SubPassData currentSubPass;
+    private NativeList<int> inputs = new(8, Allocator.Persistent), outputs = new(8, Allocator.Persistent);
+    private SubPassFlags flags;
 
-    private readonly List<AttachmentDescriptor> colorAttachments = new();
-    private readonly List<SubPassData> subPasses = new();
+    private readonly NativeList<AttachmentDescriptor> colorAttachments = new(8, Allocator.Persistent);
+    private readonly NativeList<SubPassDescriptor> subPasses = new(Allocator.Persistent);
     private readonly List<RenderPassDescriptor> renderPassDescriptors = new();
 
-    public int RenderPassCount => renderPassDescriptors.Count;
+    public void Dispose()
+    {
+        inputs.Dispose();
+        outputs.Dispose();
+    }
 
     public void BeginNativeRenderPass(int index, CommandBuffer command)
     {
@@ -24,59 +30,41 @@ public class NativeRenderPassSystem
 
     private void BeginRenderPass(RenderPass pass)
     {
-        passName = pass.Name;
-
-        // Can't make a new subpass, need to end previous renderpass and start a new one
-        pass.IsRenderPassStart = true;
         isInRenderPass = true;
 
-        pass.RenderPassIndex = RenderPassCount;
+        pass.IsRenderPassStart = true;
+        pass.RenderPassIndex = renderPassDescriptors.Count;
+
+        passName = pass.Name;
         size = pass.size;
         depthAttachment = pass.depthAttachment;
+        flags = pass.flags;
+        colorAttachments.CopyFrom(pass.colorAttachments);
 
-        currentSubPass = new SubPassData(new NativeList<int>(8, Allocator.Temp), new NativeList<int>(8, Allocator.Temp), pass.flags);
-
-        foreach (var attachment in pass.colorAttachments)
-        {
-            currentSubPass.AddOutput(colorAttachments.Count);
-            colorAttachments.Add(attachment);
-        }
+        for(var i = 0; i < pass.colorAttachments.Length; i++)
+            outputs.Add(i);
 
         // TODO: Also write inputs
     }
 
     private void EndRenderPass(RenderPass pass)
     {
-        EndSubPass(currentSubPass);
+        EndSubPass();
 
         pass.IsRenderPassEnd = true;
         isInRenderPass = false;
 
-        // Add descriptor to list
-        var attachmentCount = colorAttachments.Count;
-        var hasDepth = depthAttachment.HasValue;
-        if (hasDepth)
-            attachmentCount++;
+        var depthIndex = -1;
+        if (depthAttachment.HasValue)
+        {
+            depthIndex = colorAttachments.Length;
+            colorAttachments.Add(depthAttachment.Value);
+        }
 
-        var attachments = new NativeArray<AttachmentDescriptor>(attachmentCount, Allocator.Temp);
-
-        for (var j = 0; j < colorAttachments.Count; j++)
-            attachments[j] = colorAttachments[j];
-
-        if (hasDepth)
-            attachments[attachmentCount - 1] = depthAttachment.Value;
-
-        var subPassesResult = new NativeArray<SubPassDescriptor>(subPasses.Count, Allocator.Temp);
-
-        for (var j = 0; j < subPasses.Count; j++)
-            subPassesResult[j] = subPasses[j].Descriptor;
-
-        var depthIndex = depthAttachment.HasValue ? attachmentCount - 1 : -1;
-        renderPassDescriptors.Add(new(size.x, size.y, attachments, subPassesResult, size.z, 1, depthIndex, -1, passName));
+        renderPassDescriptors.Add(new(size.x, size.y, new(colorAttachments.AsArray(), Allocator.Temp), new(subPasses.AsArray(), Allocator.Temp), size.z, 1, depthIndex, -1, passName));
 
         colorAttachments.Clear();
         subPasses.Clear();
-        size = 0;
         depthAttachment = null;
         passName = null;
     }
@@ -85,24 +73,41 @@ public class NativeRenderPassSystem
     {
         // Create new subpass, insert next subpass instruction
         pass.IsNextSubPass = true;
-        currentSubPass = new SubPassData(new NativeList<int>(8, Allocator.Temp), new NativeList<int>(8, Allocator.Temp), pass.flags);
 
         foreach (var attachment in pass.colorAttachments)
         {
-            var index = colorAttachments.FindIndex(element => element.loadStoreTarget == attachment.loadStoreTarget);
+            var index = -1;
+            for (var i = 0; i < colorAttachments.Length; i++)
+            {
+                if (colorAttachments[i].loadStoreTarget != attachment.loadStoreTarget)
+                    continue;
+
+                index = i;
+                break;
+            }
+
             if (index == -1)
             {
-                index = colorAttachments.Count;
+                index = colorAttachments.Length;
                 colorAttachments.Add(attachment);
             }
 
-            currentSubPass.AddOutput(index);
+            outputs.Add(index);
         }
     }
 
-    private void EndSubPass(SubPassData subPass)
+    private void EndSubPass()
     {
-        subPasses.Add(subPass);
+        subPasses.Add(new()
+        {
+            colorOutputs = new AttachmentIndexArray(outputs.AsArray()),
+            inputs = new AttachmentIndexArray(inputs.AsArray()),
+            flags = flags
+        });
+
+        outputs.Clear();
+        inputs.Clear();
+        flags = SubPassFlags.None;
     }
 
     public void CreateNativeRenderPasses(List<RenderPass> renderPasses)
@@ -113,60 +118,59 @@ public class NativeRenderPassSystem
         renderPassDescriptors.Clear();
 
         RenderPass previousPass = null;
-        for (var i = 0; i < renderPasses.Count; i++)
+        foreach (var pass in renderPasses)
         {
-            var pass = renderPasses[i];
+            var canMergePass = false;
             if (pass.IsNativeRenderPass)
             {
-                // Detect start or next subpass conditions
                 // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
-                var canMergeWithPass = isInRenderPass &&
-                    size == pass.size &&
-                    depthAttachment.HasValue == pass.depthAttachment.HasValue &&
-                    (!depthAttachment.HasValue || !pass.depthAttachment.HasValue || depthAttachment.Value.loadStoreTarget == pass.depthAttachment.Value.loadStoreTarget);
+                canMergePass = isInRenderPass && size == pass.size && depthAttachment.HasValue == pass.depthAttachment.HasValue && (!depthAttachment.HasValue || !pass.depthAttachment.HasValue || depthAttachment.Value.loadStoreTarget == pass.depthAttachment.Value.loadStoreTarget);
 
-                if (canMergeWithPass)
+                if (canMergePass)
                 {
                     // If flags and attachements are identical, keep using the same subpass
-                    var canMergeWithSubPass = pass.flags == currentSubPass.flags && colorAttachments.Count == pass.colorAttachments.Count;
-                    if (canMergeWithSubPass)
-                        for (var j = 0; j < colorAttachments.Count; j++)
-                            if (colorAttachments[j].loadStoreTarget != pass.colorAttachments[j].loadStoreTarget)
-                            {
-                                canMergeWithSubPass = false;
-                                break;
-                            }
+                    var canMergeSubPass = flags == pass.flags && colorAttachments.Length == pass.colorAttachments.Length;
+                    if (canMergeSubPass)
+                    {
+                        for (var i = 0; i < colorAttachments.Length; i++)
+                        {
+                            if (colorAttachments[i].loadStoreTarget == pass.colorAttachments[i].loadStoreTarget)
+                                continue;
 
-                    // Otherwise we need to start a new subpass if possible, otherwise a new render pass.
-                    if (!canMergeWithSubPass)
+                            canMergeSubPass = false;
+                            break;
+                        }
+                    }
+
+                    if (!canMergeSubPass)
                     {
                         if (pass.AllowNewSubPass)
                         {
-                            EndSubPass(currentSubPass);
+                            EndSubPass();
                             BeginSubpass(pass);
                         }
                         else
                         {
-                            if (previousPass != null && previousPass.IsNativeRenderPass)
-                                EndRenderPass(previousPass);
-                            BeginRenderPass(pass);
+                            canMergePass = false;
                         }
                     }
                 }
-                else
-                {
-                    if (previousPass != null && previousPass.IsNativeRenderPass)
-                        EndRenderPass(previousPass);
-                    BeginRenderPass(pass);
-                }
             }
-            else if (previousPass != null && previousPass.IsNativeRenderPass)
-                EndRenderPass(previousPass);
+
+            if(!canMergePass)
+            {
+                if (isInRenderPass)
+                    EndRenderPass(previousPass);
+
+                if(pass.IsNativeRenderPass)
+                    BeginRenderPass(pass);
+            }
 
             previousPass = pass;
         }
 
-        if (previousPass != null && previousPass.IsNativeRenderPass)
+        // The frame may end on a final renderpass, in which case we need to end it
+        if (isInRenderPass)
             EndRenderPass(previousPass);
     }
 }

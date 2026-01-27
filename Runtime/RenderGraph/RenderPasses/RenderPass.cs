@@ -51,7 +51,7 @@ public abstract class RenderPass : IDisposable
 
     public Int3 size;
     public AttachmentDescriptor? depthAttachment;
-    public readonly List<AttachmentDescriptor> colorAttachments = new();
+    public readonly NativeList<AttachmentDescriptor> colorAttachments = new(8, Allocator.Persistent);
     public SubPassFlags flags;
 
     public RenderPass()
@@ -111,8 +111,9 @@ public abstract class RenderPass : IDisposable
 
 	void IDisposable.Dispose()
 	{
-		// TODO: Should anything be done here?
-	}
+        // TODO: Should anything be done here?
+        //colorAttachments.Dispose();
+    }
 
 	public GraphicsBuffer GetBuffer(ResourceHandle<GraphicsBuffer> handle)
 	{
