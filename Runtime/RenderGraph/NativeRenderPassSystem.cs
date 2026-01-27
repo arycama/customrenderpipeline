@@ -41,10 +41,11 @@ public class NativeRenderPassSystem : IDisposable
         flags = pass.flags;
         colorAttachments.CopyFrom(pass.colorAttachments);
 
-        for(var i = 0; i < pass.colorAttachments.Length; i++)
-            outputs.Add(i);
+        for (var i = 0; i < pass.inputs.Length; i++)
+            inputs.Add(i);
 
-        // TODO: Also write inputs
+        for (var i = 0; i < pass.outputs.Length; i++)
+            outputs.Add(i);
     }
 
     private void EndRenderPass(RenderPass pass)
@@ -74,7 +75,7 @@ public class NativeRenderPassSystem : IDisposable
         // Create new subpass, insert next subpass instruction
         pass.IsNextSubPass = true;
 
-        foreach (var attachment in pass.colorAttachments)
+        foreach (var attachment in pass.outputs)
         {
             var index = -1;
             for (var i = 0; i < colorAttachments.Length; i++)
@@ -93,6 +94,27 @@ public class NativeRenderPassSystem : IDisposable
             }
 
             outputs.Add(index);
+        }
+
+        foreach (var attachment in pass.inputs)
+        {
+            var index = -1;
+            for (var i = 0; i < colorAttachments.Length; i++)
+            {
+                if (colorAttachments[i].loadStoreTarget != attachment.loadStoreTarget)
+                    continue;
+
+                index = i;
+                break;
+            }
+
+            if (index == -1)
+            {
+                index = colorAttachments.Length;
+                colorAttachments.Add(attachment);
+            }
+
+            inputs.Add(index);
         }
     }
 

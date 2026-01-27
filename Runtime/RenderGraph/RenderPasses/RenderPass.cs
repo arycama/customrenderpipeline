@@ -52,6 +52,8 @@ public abstract class RenderPass : IDisposable
     public Int3 size;
     public AttachmentDescriptor? depthAttachment;
     public readonly NativeList<AttachmentDescriptor> colorAttachments = new(8, Allocator.Persistent);
+    public readonly NativeList<AttachmentDescriptor> inputs = new(8, Allocator.Persistent);
+    public readonly NativeList<AttachmentDescriptor> outputs = new(8, Allocator.Persistent);
     public SubPassFlags flags;
 
     public RenderPass()
@@ -111,11 +113,13 @@ public abstract class RenderPass : IDisposable
 
 	void IDisposable.Dispose()
 	{
-        // TODO: Should anything be done here?
+        // TODO: Disposing of these causes some issues since it seems they try to get read, we might need to dispose in a different order
         //colorAttachments.Dispose();
+        //inputs.Dispose();
+        //outputs.Dispose();
     }
 
-	public GraphicsBuffer GetBuffer(ResourceHandle<GraphicsBuffer> handle)
+    public GraphicsBuffer GetBuffer(ResourceHandle<GraphicsBuffer> handle)
 	{
 		Assert.IsTrue(RenderGraph.IsExecuting);
 		return RenderGraph.BufferHandleSystem.GetResource(handle);
@@ -222,6 +226,8 @@ public abstract class RenderPass : IDisposable
 
             size = 0;
             colorAttachments.Clear();
+            inputs.Clear();
+            outputs.Clear();
             depthAttachment = null;
         }
         

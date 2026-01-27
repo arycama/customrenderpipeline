@@ -7,6 +7,7 @@ using UnityEngine.Rendering;
 public abstract class GraphicsRenderPass<T>: RenderPass<T>
 {
 	private readonly List<ResourceHandle<RenderTexture>> colorTargets = new();
+	private readonly List<ResourceHandle<RenderTexture>> frameBufferInputs = new();
     private ResourceHandle<RenderTexture>? depthBuffer;
 
 	private Int2? resolution;
@@ -22,6 +23,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 	{
 		base.Reset();
 		colorTargets.Clear();
+        frameBufferInputs.Clear();
         depthBuffer = default;
 		flags = default;
 		resolution = null;
@@ -37,7 +39,13 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 		WriteResource(rtHandle);
 	}
 
-	public void WriteDepth(ResourceHandle<RenderTexture> rtHandle, SubPassFlags flags = SubPassFlags.None)
+    public void ReadFrameBuffer(ResourceHandle<RenderTexture> rtHandle)
+    {
+        frameBufferInputs.Add(rtHandle);
+        RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
+    }
+
+    public void WriteDepth(ResourceHandle<RenderTexture> rtHandle, SubPassFlags flags = SubPassFlags.None)
 	{
 		this.flags = flags;
 		depthBuffer = rtHandle;
@@ -95,9 +103,8 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
             actualResolution = new(target.width, target.height);
         }
 
-        for (var i = 0; i < colorTargets.Count; i++)
+        foreach (var colorTarget in colorTargets)
         {
-            var colorTarget = colorTargets[i];
             var handleData = RenderGraph.RtHandleSystem.GetHandleData(colorTarget);
 
             Assert.AreEqual(new Int2(handleData.descriptor.width, handleData.descriptor.height), resolution.Value);
@@ -112,9 +119,26 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
             };
 
             colorAttachments.Add(descriptor);
+            outputs.Add(descriptor);
 
             if (!depthBuffer.HasValue)
                 actualResolution = new(target.width, target.height);
+        }
+
+        foreach(var input in frameBufferInputs)
+        {
+            var handleData = RenderGraph.RtHandleSystem.GetHandleData(input);
+
+            var target = GetRenderTexture(input);
+            var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+            {
+                loadAction = RenderBufferLoadAction.Load,
+                storeAction = handleData.freeIndex1 == Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                loadStoreTarget = new RenderTargetIdentifier(target, MipLevel, CubemapFace, DepthSlice),
+            };
+
+            colorAttachments.Add(descriptor);
+            inputs.Add(descriptor);
         }
 
         size = new(actualResolution.x, actualResolution.y, 1);

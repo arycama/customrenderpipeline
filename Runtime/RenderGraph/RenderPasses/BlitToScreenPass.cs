@@ -102,7 +102,9 @@ public class BlitToScreenPass<T> : RenderPass<T>
 
     public override void SetupRenderPassData()
     {
-        colorAttachments.Add(new AttachmentDescriptor(format) { loadStoreTarget = target, storeAction = RenderBufferStoreAction.Store });
+        var descriptor = new AttachmentDescriptor(format) { loadStoreTarget = target, storeAction = RenderBufferStoreAction.Store };
+        colorAttachments.Add(descriptor);
+        outputs.Add(descriptor);
         base.size = new(size.x, size.y, viewCount);
     }
 
