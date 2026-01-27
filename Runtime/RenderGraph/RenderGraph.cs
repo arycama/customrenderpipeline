@@ -159,11 +159,6 @@ public class RenderGraph : IDisposable
 
         IsExecuting = true;
 
-        foreach (var renderPass in renderPasses)
-        {
-            renderPass.SetupRenderPassData();
-        }
-
         nativeRenderPassSystem.CreateNativeRenderPasses(renderPasses);
 
         foreach (var renderPass in renderPasses)
