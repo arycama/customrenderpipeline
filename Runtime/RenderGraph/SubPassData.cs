@@ -6,9 +6,11 @@ public struct SubPassData
     public NativeList<int> inputs, outputs;
     public SubPassFlags flags;
 
-    public static SubPassData Create()
+    public SubPassData(NativeList<int> inputs, NativeList<int> outputs, SubPassFlags flags)
     {
-        return new SubPassData { inputs = new NativeList<int>(8, Allocator.Temp), outputs = new NativeList<int>(8, Allocator.Temp) };
+        this.inputs = inputs;
+        this.outputs = outputs;
+        this.flags = flags;
     }
 
     public SubPassDescriptor Descriptor => new()
