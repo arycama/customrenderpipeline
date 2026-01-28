@@ -51,7 +51,6 @@ public abstract class RenderPass : IDisposable
 
     public Int3 size;
     public AttachmentDescriptor? depthAttachment;
-    public readonly NativeList<AttachmentDescriptor> colorAttachments = new(8, Allocator.Persistent);
     public readonly NativeList<AttachmentDescriptor> inputs = new(8, Allocator.Persistent);
     public readonly NativeList<AttachmentDescriptor> outputs = new(8, Allocator.Persistent);
     public SubPassFlags flags;
@@ -115,7 +114,6 @@ public abstract class RenderPass : IDisposable
     public void Release()
     {
         // We currently use disposable so we can put these in using statements.. even though not really needed, but we cant dispose the actual attachments here.
-        colorAttachments.Dispose();
         inputs.Dispose();
         outputs.Dispose();
     }
@@ -220,7 +218,6 @@ public abstract class RenderPass : IDisposable
             }
 
             size = 0;
-            colorAttachments.Clear();
             inputs.Clear();
             outputs.Clear();
             depthAttachment = null;

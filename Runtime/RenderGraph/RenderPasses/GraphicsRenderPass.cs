@@ -118,7 +118,6 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
                 clearColor = handleData.descriptor.clearColor 
             };
 
-            colorAttachments.Add(descriptor);
             outputs.Add(descriptor);
 
             if (!depthBuffer.HasValue)
@@ -134,10 +133,9 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
             {
                 loadAction = RenderBufferLoadAction.Load,
                 storeAction = handleData.freeIndex1 == Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
-                loadStoreTarget = new RenderTargetIdentifier(target, MipLevel, CubemapFace, DepthSlice),
+                loadStoreTarget = new RenderTargetIdentifier(target, 0, CubemapFace.Unknown, -1),
             };
 
-            colorAttachments.Add(descriptor);
             inputs.Add(descriptor);
         }
 
