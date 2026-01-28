@@ -76,7 +76,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
             // Somewhat hacky.. but this is kind of required to deal with some unity hacks so meh
             camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
-            viewRenderDatas.Add(new ViewRenderData(camera.ViewSize(), camera.nearClipPlane, camera.farClipPlane, camera.TanHalfFov(), camera.transform.WorldRigidTransform(), camera, context, cullingParameters, target, VRTextureUsage.None, SinglePassStereoMode.None, 1, string.Empty, GraphicsFormat.R8G8B8A8_SRGB, screenSize, 1));
+            viewRenderDatas.Add(new ViewRenderData(camera.ViewSize(), camera.nearClipPlane, camera.farClipPlane, camera.TanHalfFov(), camera.transform.WorldRigidTransform(), camera, context, cullingParameters, target, VRTextureUsage.None, SinglePassStereoMode.None, 1, string.Empty, GraphicsFormat.R8G8B8A8_SRGB, screenSize, 1, false));
             renderGraph.RtHandleSystem.SetScreenSize(screenSize.x, screenSize.y);
         }
     }

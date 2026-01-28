@@ -21,8 +21,9 @@ public readonly struct ViewRenderData : IRenderPassData
     public readonly GraphicsFormat format;
     public readonly Int2 screenSize;
     public readonly int viewCount;
+    public readonly bool requiresMirrorBlit;
 
-    public ViewRenderData(Int2 viewSize, float near, float far, Float2 tanHalfFov, RigidTransform transform, Camera camera, ScriptableRenderContext context, ScriptableCullingParameters cullingParameters, RenderTargetIdentifier target, VRTextureUsage vrTextureUsage, SinglePassStereoMode stereoMode, int instanceMultiplier, string stereoKeyword, GraphicsFormat format, Int2 screenSize, int viewCount)
+    public ViewRenderData(Int2 viewSize, float near, float far, Float2 tanHalfFov, RigidTransform transform, Camera camera, ScriptableRenderContext context, ScriptableCullingParameters cullingParameters, RenderTargetIdentifier target, VRTextureUsage vrTextureUsage, SinglePassStereoMode stereoMode, int instanceMultiplier, string stereoKeyword, GraphicsFormat format, Int2 screenSize, int viewCount, bool requiresMirrorBlit)
     {
         this.viewSize = viewSize;
         this.near = near;
@@ -41,6 +42,7 @@ public readonly struct ViewRenderData : IRenderPassData
         this.format = format;
         this.screenSize = screenSize;
         this.viewCount = viewCount;
+        this.requiresMirrorBlit = requiresMirrorBlit;
     }
 
     void IRenderPassData.SetInputs(RenderPass pass)
