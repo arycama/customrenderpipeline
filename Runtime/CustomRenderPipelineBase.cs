@@ -32,11 +32,11 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
     public CustomRenderPipelineBase()
     {
 #if UNITY_EDITOR
-		renderDocLoaded = RenderDoc.IsLoaded();
+        renderDocLoaded = RenderDoc.IsLoaded();
 #endif
 
-		// TODO: Can probably move some of this to the asset class
-		GraphicsSettings.lightsUseLinearIntensity = true;
+        // TODO: Can probably move some of this to the asset class
+        GraphicsSettings.lightsUseLinearIntensity = true;
         GraphicsSettings.lightsUseColorTemperature = true;
         GraphicsSettings.realtimeDirectRectangularAreaLights = true;
 
@@ -47,26 +47,26 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
     protected override void Dispose(bool disposing)
     {
-		// Could dispose in reverse order?
-		foreach (var renderFeature in perFrameRenderFeatures)
-			renderFeature?.Dispose();
+        // Could dispose in reverse order?
+        foreach (var renderFeature in perFrameRenderFeatures)
+            renderFeature?.Dispose();
 
-		foreach (var renderFeature in perCameraRenderFeatures)
-			renderFeature?.Dispose();
+        foreach (var renderFeature in perCameraRenderFeatures)
+            renderFeature?.Dispose();
 
-		command.Release();
+        command.Release();
 
-		renderGraph.Dispose();
+        renderGraph.Dispose();
     }
 
-	protected abstract List<FrameRenderFeature> InitializePerFrameRenderFeatures();
+    protected abstract List<FrameRenderFeature> InitializePerFrameRenderFeatures();
 
-	protected abstract List<ViewRenderFeature> InitializePerCameraRenderFeatures();
+    protected abstract List<ViewRenderFeature> InitializePerCameraRenderFeatures();
 
     /// <summary> Creates a list of render loops that will be rendered </summary>
     protected virtual void CollectViewRenderData(List<Camera> cameras, ScriptableRenderContext context, List<ViewRenderData> viewRenderDatas)
     {
-        foreach(var camera in cameras)
+        foreach (var camera in cameras)
         {
             if (!camera.TryGetCullingParameters(out var cullingParameters))
                 continue;
@@ -81,42 +81,42 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
         }
     }
 
-	protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
+    protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
         Assert.IsFalse(renderGraph.IsExecuting);
 
 #if UNITY_EDITOR
-		// When renderdoc is loaded, all renderTextures become un-created.. but Unity does not dispose the render pipeline until the next frame
-		// To avoid errors/leaks/crashes, check to see if renderDoc.IsLoaded has changed, and skip rendering for one frame.. this allows Unity to
-		// dispose the render pipeline, and then recreate it on the next frame, which will clear/re-initialize all textures..
-		if (!renderDocLoaded && RenderDoc.IsLoaded())
+        // When renderdoc is loaded, all renderTextures become un-created.. but Unity does not dispose the render pipeline until the next frame
+        // To avoid errors/leaks/crashes, check to see if renderDoc.IsLoaded has changed, and skip rendering for one frame.. this allows Unity to
+        // dispose the render pipeline, and then recreate it on the next frame, which will clear/re-initialize all textures..
+        if (!renderDocLoaded && RenderDoc.IsLoaded())
         {
             IsDisposingFromRenderDoc = true;
-            return; 
+            return;
         }
 #endif
 
-		GraphicsSettings.useScriptableRenderPipelineBatching = UseSrpBatching;
+        GraphicsSettings.useScriptableRenderPipelineBatching = UseSrpBatching;
 
-		if (!isInitialized)
-		{
-			perFrameRenderFeatures = InitializePerFrameRenderFeatures();
-			perCameraRenderFeatures = InitializePerCameraRenderFeatures();
-			isInitialized = true;
-		}
+        if (!isInitialized)
+        {
+            perFrameRenderFeatures = InitializePerFrameRenderFeatures();
+            perCameraRenderFeatures = InitializePerCameraRenderFeatures();
+            isInitialized = true;
+        }
 
         viewRenderDatas.Clear();
         CollectViewRenderData(cameras, context, viewRenderDatas);
 
         using (renderGraph.AddProfileScope("Prepare Frame"))
-		{
-			foreach (var frameRenderFeature in perFrameRenderFeatures)
-			{
-				frameRenderFeature.Render(context);
-			}
-		}
+        {
+            foreach (var frameRenderFeature in perFrameRenderFeatures)
+            {
+                frameRenderFeature.Render(context);
+            }
+        }
 
-		foreach (var viewRenderData in viewRenderDatas)
+        foreach (var viewRenderData in viewRenderDatas)
         {
             using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
             foreach (var cameraRenderFeature in perCameraRenderFeatures)
@@ -127,10 +127,10 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
             // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
             if (viewRenderData.camera.cameraType == CameraType.Game && viewRenderData.camera == Camera.main)
             {
-				var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
-				var uiOverlay = context.CreateUIOverlayRendererList(viewRenderData.camera);
+                var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
+                var uiOverlay = context.CreateUIOverlayRendererList(viewRenderData.camera);
 
-				using var pass = renderGraph.AddGenericRenderPass("UI Overlay", (uiOverlay, wireOverlay));
+                using var pass = renderGraph.AddGenericRenderPass("UI Overlay", (uiOverlay, wireOverlay));
                 pass.UseProfiler = false;
 
                 pass.SetRenderFunction(static (command, pass, data) =>
@@ -144,16 +144,18 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
             }
         }
 
-		renderGraph.Execute(command);
+        renderGraph.Execute(command);
 
         context.ExecuteCommandBuffer(command);
-		command.Clear();
+        command.Clear();
 
-//#if UNITY_EDITOR
-//        if (!context.SubmitForRenderPassValidation())
-//            Debug.LogError("Render Pass Validation Failed");
-//        else
-//#endif
+#if UNITY_EDITOR
+        if (!context.SubmitForRenderPassValidation())
+        {
+            Debug.LogError("Render Pass Validation Failed");
+        }
+        else
+#endif
             context.Submit();
 
         renderGraph.CleanupCurrentFrame();

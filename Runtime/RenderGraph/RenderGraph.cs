@@ -37,8 +37,8 @@ public class RenderGraph : IDisposable
     public int FrameIndex { get; private set; }
     public bool IsExecuting { get; private set; }
     public bool IsDisposing { get; private set; }
-
     public bool DebugRenderPasses { get; set; }
+    public bool IsInRenderPass { get; private set; }
 
     public RenderGraph(CustomRenderPipelineBase renderPipeline)
     {
@@ -86,6 +86,14 @@ public class RenderGraph : IDisposable
         Object.DestroyImmediate(empty3DTexture);
         Object.DestroyImmediate(emptyCubemap);
         Object.DestroyImmediate(emptyCubemapArray);
+
+        foreach(var items in renderPassPool.Values)
+        {
+            foreach(var item in items)
+            {
+                item.Release();
+            }
+        }
 
         ResourceMap.Dispose();
         RtHandleSystem.Dispose();
@@ -162,6 +170,8 @@ public class RenderGraph : IDisposable
 
         nativeRenderPassSystem.CreateNativeRenderPasses(renderPasses);
 
+        Assert.IsFalse(IsInRenderPass);
+
         foreach (var renderPass in renderPasses)
         {
             //renderPass.SetupRenderPassData();
@@ -177,12 +187,29 @@ public class RenderGraph : IDisposable
             pool.Push(renderPass);
         }
 
+        Assert.IsFalse(IsInRenderPass);
+
         IsExecuting = false;
     }
 
     public void BeginNativeRenderPass(int index, CommandBuffer command)
     {
+        Assert.IsFalse(IsInRenderPass);
         nativeRenderPassSystem.BeginNativeRenderPass(index, command);
+        IsInRenderPass = true;
+    }
+
+    public void NextSubPass(CommandBuffer command)
+    {
+        Assert.IsTrue(IsInRenderPass);
+        command.NextSubPass();
+    }
+
+    public void EndRenderPass(CommandBuffer command)
+    {
+        Assert.IsTrue(IsInRenderPass);
+        command.EndRenderPass();
+        IsInRenderPass = false;
     }
 
     public ResourceHandle<RenderTexture> GetTexture(RtHandleDescriptor descriptor, bool isPersistent = false)

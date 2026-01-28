@@ -40,14 +40,14 @@ public abstract class RenderPass<T> : RenderPass
 
 public abstract class RenderPass : IDisposable
 {
-	// TODO: Convert to handles and remove
-	protected readonly List<(int, ResourceHandle<RenderTexture>, int, RenderTextureSubElement)> readTextures = new();
-	protected readonly List<(string, ResourceHandle<GraphicsBuffer>, int size, int offset)> readBuffers = new();
-	protected readonly List<(string, ResourceHandle<GraphicsBuffer>)> writeBuffers = new();
+    // TODO: Convert to handles and remove
+    protected readonly List<(int, ResourceHandle<RenderTexture>, int, RenderTextureSubElement)> readTextures = new();
+    protected readonly List<(string, ResourceHandle<GraphicsBuffer>, int size, int offset)> readBuffers = new();
+    protected readonly List<(string, ResourceHandle<GraphicsBuffer>)> writeBuffers = new();
 
-	private readonly List<(RenderPassDataHandle, bool)> RenderPassDataHandles = new();
-	private readonly List<Type> readRtHandles = new();
-	protected readonly List<string> keywords = new();
+    private readonly List<(RenderPassDataHandle, bool)> RenderPassDataHandles = new();
+    private readonly List<Type> readRtHandles = new();
+    protected readonly List<string> keywords = new();
 
     public Int3 size;
     public AttachmentDescriptor? depthAttachment;
@@ -57,19 +57,18 @@ public abstract class RenderPass : IDisposable
     public SubPassFlags flags;
 
     public RenderPass()
-	{
-		PropertyBlock = new();
-	}
+    {
+        PropertyBlock = new();
+    }
 
-	public MaterialPropertyBlock PropertyBlock { get; private set; }
-	public CommandBuffer Command { get; private set; }
-	public RenderGraph RenderGraph { get; set; }
-	internal string Name { get; set; }
-	internal int Index { get; set; }
-	public bool UseProfiler { get; set; } = true;
+    public MaterialPropertyBlock PropertyBlock { get; private set; }
+    public CommandBuffer Command { get; private set; }
+    public RenderGraph RenderGraph { get; set; }
+    internal string Name { get; set; }
+    internal int Index { get; set; }
+    public bool UseProfiler { get; set; } = true;
     public virtual bool IsNativeRenderPass => false;
 
-    // TODO: Maybe a bitmask or something for these?
     public bool IsRenderPassStart { get; set; } = false;
     public bool IsNextSubPass { get; set; } = false;
     public bool IsRenderPassEnd { get; set; } = false;
@@ -77,46 +76,48 @@ public abstract class RenderPass : IDisposable
     public int RenderPassIndex { get; set; } = -1;
 
     public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
-	public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);
-	public abstract void SetVector(int propertyId, Float4 value);
-	public abstract void SetVectorArray(string propertyName, Vector4[] value);
-	public abstract void SetFloat(string propertyName, float value);
-	public abstract void SetFloatArray(string propertyName, float[] value);
-	public abstract void SetInt(string propertyName, int value);
-	public abstract void SetMatrix(string propertyName, Matrix4x4 value);
-	public abstract void SetMatrixArray(string propertyName, Matrix4x4[] value);
-	public abstract void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value, int size, int offset);
+    public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);
+    public abstract void SetVector(int propertyId, Float4 value);
+    public abstract void SetVectorArray(string propertyName, Vector4[] value);
+    public abstract void SetFloat(string propertyName, float value);
+    public abstract void SetFloatArray(string propertyName, float[] value);
+    public abstract void SetInt(string propertyName, int value);
+    public abstract void SetMatrix(string propertyName, Matrix4x4 value);
+    public abstract void SetMatrixArray(string propertyName, Matrix4x4[] value);
+    public abstract void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value, int size, int offset);
 
-	public void SetVector(string propertyName, Float4 value) => SetVector(Shader.PropertyToID(propertyName), value);
+    public void SetVector(string propertyName, Float4 value) => SetVector(Shader.PropertyToID(propertyName), value);
 
-	protected abstract void Execute();
+    protected abstract void Execute();
 
-	protected virtual void SetupTargets() { }
+    protected virtual void SetupTargets() { }
 
-	protected abstract void ExecuteRenderPassBuilder();
+    protected abstract void ExecuteRenderPassBuilder();
 
-	public virtual void Reset()
-	{
-		readTextures.Clear();
-		readBuffers.Clear();
-		writeBuffers.Clear();
-		RenderPassDataHandles.Clear();
-		Command = null;
-		Name = null;
-		Index = -1;
-		UseProfiler = true;
-		readRtHandles.Clear();
-		keywords.Clear();
-		PropertyBlock.Clear();
+    public virtual void Reset()
+    {
+        readTextures.Clear();
+        readBuffers.Clear();
+        writeBuffers.Clear();
+        RenderPassDataHandles.Clear();
+        Command = null;
+        Name = null;
+        Index = -1;
+        UseProfiler = true;
+        readRtHandles.Clear();
+        keywords.Clear();
+        PropertyBlock.Clear();
         AllowNewSubPass = false;
     }
 
-	void IDisposable.Dispose()
-	{
-        // TODO: Disposing of these causes some issues since it seems they try to get read, we might need to dispose in a different order
-        //colorAttachments.Dispose();
-        //inputs.Dispose();
-        //outputs.Dispose();
+    void IDisposable.Dispose() { }
+
+    public void Release()
+    {
+        // We currently use disposable so we can put these in using statements.. even though not really needed, but we cant dispose the actual attachments here.
+        colorAttachments.Dispose();
+        inputs.Dispose();
+        outputs.Dispose();
     }
 
     public GraphicsBuffer GetBuffer(ResourceHandle<GraphicsBuffer> handle)
@@ -129,10 +130,6 @@ public abstract class RenderPass : IDisposable
 	{
 		Assert.IsTrue(RenderGraph.IsExecuting);
 		return RenderGraph.RtHandleSystem.GetResource(handle);
-	}
-
-	public virtual void PreExecute()
-	{
 	}
 
 	public void AddKeyword(string keyword)
@@ -155,8 +152,6 @@ public abstract class RenderPass : IDisposable
 
 		if(UseProfiler)
 			Command.BeginSample(Name);
-
-		PreExecute();
 
 		// Move into some OnPreRender thing in buffer/RTHandles? 
 		foreach (var texture in readTextures)
@@ -188,7 +183,7 @@ public abstract class RenderPass : IDisposable
 
             if (IsNextSubPass)
             {
-                command.NextSubPass();
+                RenderGraph.NextSubPass(Command);
                 IsNextSubPass = false;
             }
         }
@@ -220,7 +215,7 @@ public abstract class RenderPass : IDisposable
         {
             if (IsRenderPassEnd)
             {
-                Command.EndRenderPass();
+                RenderGraph.EndRenderPass(command);
                 IsRenderPassEnd = false;
             }
 
