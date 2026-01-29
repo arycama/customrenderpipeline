@@ -16,6 +16,8 @@ public class NativeRenderPassSystem : IDisposable
     private NativeList<AttachmentDescriptor> inputs = new(8, Allocator.Persistent), outputs = new(8, Allocator.Persistent);
     private SubPassFlags flags;
 
+    private int startPassIndex, endPassIndex;
+
     private readonly NativeList<AttachmentDescriptor> colorAttachments = new(8, Allocator.Persistent);
     private readonly NativeList<SubPassDescriptor> subPasses = new(Allocator.Persistent);
     private readonly List<RenderPassDescriptor> renderPassDescriptors = new();
@@ -39,6 +41,8 @@ public class NativeRenderPassSystem : IDisposable
     private void BeginRenderPass(RenderPass pass)
     {
         isInRenderPass = true;
+
+        startPassIndex = pass.Index;
 
         pass.IsRenderPassStart = true;
         pass.RenderPassIndex = renderPassDescriptors.Count;
@@ -70,6 +74,7 @@ public class NativeRenderPassSystem : IDisposable
             var target = renderGraph.RtHandleSystem.GetResource(pass.colorTargets[0]);
             size = new(target.width, target.height, target.volumeDepth);
         }
+
     }
 
     private void BeginSubpass(RenderPass pass)
@@ -132,6 +137,8 @@ public class NativeRenderPassSystem : IDisposable
     private void EndRenderPass(RenderPass pass)
     {
         EndSubPass();
+
+        endPassIndex = pass.Index;
 
         pass.IsRenderPassEnd = true;
         isInRenderPass = false;
