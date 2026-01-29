@@ -1,10 +1,13 @@
 using System;
 using System.Collections.Generic;
 using Unity.Collections;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 public class NativeRenderPassSystem : IDisposable
 {
+    private readonly RenderGraph renderGraph;
+
     private Int3 size;
     private AttachmentDescriptor? depthAttachment;
     private bool isInRenderPass;
@@ -16,6 +19,11 @@ public class NativeRenderPassSystem : IDisposable
     private readonly NativeList<AttachmentDescriptor> colorAttachments = new(8, Allocator.Persistent);
     private readonly NativeList<SubPassDescriptor> subPasses = new(Allocator.Persistent);
     private readonly List<RenderPassDescriptor> renderPassDescriptors = new();
+
+    public NativeRenderPassSystem(RenderGraph renderGraph)
+    {
+        this.renderGraph = renderGraph;
+    }
 
     public void Dispose()
     {
@@ -129,11 +137,89 @@ public class NativeRenderPassSystem : IDisposable
         flags = SubPassFlags.None;
     }
 
+    private void SetupRenderPassData(RenderPass pass)
+    {
+        if (pass.OutputsToCameraTarget)
+        {
+            {
+                var descriptor = new AttachmentDescriptor(pass.FrameBufferFormat) { loadStoreTarget = pass.FrameBufferTarget, storeAction = RenderBufferStoreAction.Store };
+                pass.outputs.Add(descriptor);
+            }
+
+            foreach (var input in pass.frameBufferInputs)
+            {
+                var handleData = renderGraph.RtHandleSystem.GetHandleData(input);
+
+                var target = renderGraph.RtHandleSystem.GetResource(input);
+                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+                {
+                    loadAction = RenderBufferLoadAction.Load,
+                    storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                    loadStoreTarget = new RenderTargetIdentifier(target, 0, CubemapFace.Unknown, -1),
+                };
+
+                pass.inputs.Add(descriptor);
+            }
+        }
+        else
+        {
+            // TODO: Just cull pass instead?
+            //Assert.IsTrue(depthBuffer.HasValue || colorTargets.Count > 0);
+
+            if (pass.depthBuffer.HasValue)
+            {
+                var handleData = renderGraph.RtHandleSystem.GetHandleData(pass.depthBuffer.Value);
+                var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value);
+                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+                {
+                    loadAction = handleData.createIndex1 == pass.Index ? handleData.descriptor.clear ? RenderBufferLoadAction.Clear : RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
+                    storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                    loadStoreTarget = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice),
+                    clearColor = handleData.descriptor.clearColor
+                };
+
+                pass.depthAttachment = descriptor;
+                pass.size = new(target.width, target.height, target.volumeDepth);
+            }
+
+            foreach (var colorTarget in pass.colorTargets)
+            {
+                var handleData = renderGraph.RtHandleSystem.GetHandleData(colorTarget);
+
+                var target = renderGraph.RtHandleSystem.GetResource(colorTarget);
+                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+                {
+                    loadAction = handleData.createIndex1 == pass.Index ? handleData.descriptor.clear ? RenderBufferLoadAction.Clear : RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
+                    storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                    loadStoreTarget = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice),
+                    clearColor = handleData.descriptor.clearColor
+                };
+
+                pass.outputs.Add(descriptor);
+
+                if (!pass.depthBuffer.HasValue)
+                    pass.size = new(target.width, target.height, target.volumeDepth);
+            }
+
+            foreach (var input in pass.frameBufferInputs)
+            {
+                var handleData = renderGraph.RtHandleSystem.GetHandleData(input);
+
+                var target = renderGraph.RtHandleSystem.GetResource(input);
+                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+                {
+                    loadAction = RenderBufferLoadAction.Load,
+                    storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                    loadStoreTarget = new RenderTargetIdentifier(target, 0, CubemapFace.Unknown, -1),
+                };
+
+                pass.inputs.Add(descriptor);
+            }
+        }
+    }
+
     public void CreateNativeRenderPasses(List<RenderPass> renderPasses)
     {
-        foreach (var renderPass in renderPasses)
-            renderPass.SetupRenderPassData();
-
         renderPassDescriptors.Clear();
 
         RenderPass previousPass = null;
@@ -142,6 +228,8 @@ public class NativeRenderPassSystem : IDisposable
             var canMergePass = false;
             if (pass.IsNativeRenderPass)
             {
+                SetupRenderPassData(pass);
+
                 // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
                 canMergePass = isInRenderPass && size == pass.size;
 

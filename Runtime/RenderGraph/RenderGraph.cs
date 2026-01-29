@@ -19,7 +19,7 @@ public class RenderGraph : IDisposable
     private readonly GraphicsBuffer emptyBuffer;
     private readonly RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
     private readonly Dictionary<Type, RTHandleData> rtHandles = new();
-    private readonly NativeRenderPassSystem nativeRenderPassSystem = new();
+    private readonly NativeRenderPassSystem nativeRenderPassSystem;
 
     public RTHandleSystem RtHandleSystem { get; }
     public BufferHandleSystem BufferHandleSystem { get; }
@@ -44,6 +44,7 @@ public class RenderGraph : IDisposable
     {
         RtHandleSystem = new();
         BufferHandleSystem = new();
+        nativeRenderPassSystem = new(this);
 
         emptyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" };
         emptyTexture = new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, };
