@@ -66,7 +66,44 @@ public class NativeRenderPassSystem : IDisposable
             inputs.Add(descriptor);
         }
 
-        outputs.CopyFrom(pass.outputs.AsArray());
+        if (pass.OutputsToCameraTarget)
+        {
+            var descriptor = new AttachmentDescriptor(pass.FrameBufferFormat) { loadStoreTarget = pass.FrameBufferTarget, storeAction = RenderBufferStoreAction.Store };
+            outputs.Add(descriptor);
+        }
+        else
+        {
+            if (pass.depthBuffer.HasValue)
+            {
+                var handleData = renderGraph.RtHandleSystem.GetHandleData(pass.depthBuffer.Value);
+                var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value);
+                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+                {
+                    loadAction = handleData.createIndex1 == pass.Index ? handleData.descriptor.clear ? RenderBufferLoadAction.Clear : RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
+                    storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                    loadStoreTarget = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice),
+                    clearColor = handleData.descriptor.clearColor
+                };
+
+                depthAttachment = descriptor;
+            }
+
+            foreach (var colorTarget in pass.colorTargets)
+            {
+                var handleData = renderGraph.RtHandleSystem.GetHandleData(colorTarget);
+
+                var target = renderGraph.RtHandleSystem.GetResource(colorTarget);
+                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+                {
+                    loadAction = handleData.createIndex1 == pass.Index ? handleData.descriptor.clear ? RenderBufferLoadAction.Clear : RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
+                    storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                    loadStoreTarget = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice),
+                    clearColor = handleData.descriptor.clearColor
+                };
+
+                outputs.Add(descriptor);
+            }
+        }
     }
 
     private void EndRenderPass(RenderPass pass)
@@ -153,12 +190,7 @@ public class NativeRenderPassSystem : IDisposable
 
     private void SetupRenderPassData(RenderPass pass)
     {
-        if (pass.OutputsToCameraTarget)
-        {
-            var descriptor = new AttachmentDescriptor(pass.FrameBufferFormat) { loadStoreTarget = pass.FrameBufferTarget, storeAction = RenderBufferStoreAction.Store };
-            pass.outputs.Add(descriptor);
-        }
-        else
+        if (!pass.OutputsToCameraTarget)
         {
             if (pass.depthBuffer.HasValue)
             {
@@ -178,19 +210,7 @@ public class NativeRenderPassSystem : IDisposable
 
             foreach (var colorTarget in pass.colorTargets)
             {
-                var handleData = renderGraph.RtHandleSystem.GetHandleData(colorTarget);
-
                 var target = renderGraph.RtHandleSystem.GetResource(colorTarget);
-                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
-                {
-                    loadAction = handleData.createIndex1 == pass.Index ? handleData.descriptor.clear ? RenderBufferLoadAction.Clear : RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
-                    storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
-                    loadStoreTarget = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice),
-                    clearColor = handleData.descriptor.clearColor
-                };
-
-                pass.outputs.Add(descriptor);
-
                 if (!pass.depthBuffer.HasValue)
                     pass.size = new(target.width, target.height, target.volumeDepth);
             }
@@ -237,7 +257,9 @@ public class NativeRenderPassSystem : IDisposable
                 {
                     // If flags and attachements are identical, keep using the same subpass
                     var inputCount = pass.frameBufferInputs.Count;
-                    var canPassMergeWithSubPass = pass.flags == flags && inputCount == inputs.Length && pass.outputs.Length == outputs.Length;
+                    var outputCount = pass.OutputsToCameraTarget ? 1 : pass.colorTargets.Count;
+
+                    var canPassMergeWithSubPass = pass.flags == flags && inputCount == inputs.Length && outputCount == outputs.Length;
                     if (canPassMergeWithSubPass)
                     {
                         // Check if all the inputs and outputs are equal (And in identical order) since this must be true for the pass to merge
@@ -253,13 +275,23 @@ public class NativeRenderPassSystem : IDisposable
 
                         if (canPassMergeWithSubPass)
                         {
-                            for (var i = 0; i < pass.outputs.Length; i++)
+                            if (pass.OutputsToCameraTarget)
                             {
-                                if (pass.outputs[i].loadStoreTarget == outputs[i].loadStoreTarget)
-                                    continue;
+                                if (pass.FrameBufferTarget != outputs[0].loadStoreTarget)
+                                    canPassMergeWithSubPass = false;
+                            }
+                            else
+                            {
+                                for (var i = 0; i < pass.colorTargets.Count; i++)
+                                {
+                                    var target = renderGraph.RtHandleSystem.GetResource(pass.colorTargets[i]);
+                                    var targetIdentifier = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice);
+                                    if (targetIdentifier == outputs[i].loadStoreTarget)
+                                        continue;
 
-                                canPassMergeWithSubPass = false;
-                                break;
+                                    canPassMergeWithSubPass = false;
+                                    break;
+                                }
                             }
                         }
                     }

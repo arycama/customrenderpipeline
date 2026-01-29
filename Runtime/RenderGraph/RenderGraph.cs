@@ -88,14 +88,6 @@ public class RenderGraph : IDisposable
         Object.DestroyImmediate(emptyCubemap);
         Object.DestroyImmediate(emptyCubemapArray);
 
-        foreach(var items in renderPassPool.Values)
-        {
-            foreach(var item in items)
-            {
-                item.Release();
-            }
-        }
-
         ResourceMap.Dispose();
         RtHandleSystem.Dispose();
         BufferHandleSystem.Dispose();

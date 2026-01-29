@@ -52,7 +52,6 @@ public abstract class RenderPass : IDisposable
 
     public Int3 size;
     public AttachmentDescriptor? depthAttachment;
-    public readonly NativeList<AttachmentDescriptor> outputs = new(8, Allocator.Persistent);
     public SubPassFlags flags;
 
     public readonly List<ResourceHandle<RenderTexture>> frameBufferInputs = new();
@@ -125,11 +124,6 @@ public abstract class RenderPass : IDisposable
     }
 
     void IDisposable.Dispose() { }
-
-    public void Release()
-    {
-        outputs.Dispose();
-    }
 
     public GraphicsBuffer GetBuffer(ResourceHandle<GraphicsBuffer> handle)
 	{
@@ -235,7 +229,6 @@ public abstract class RenderPass : IDisposable
             }
 
             size = 0;
-            outputs.Clear();
             depthAttachment = null;
         }
         
