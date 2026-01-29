@@ -51,7 +51,21 @@ public class NativeRenderPassSystem : IDisposable
 
     private void BeginSubpass(RenderPass pass)
     {
-        inputs.CopyFrom(pass.inputs.AsArray());
+        foreach (var input in pass.frameBufferInputs)
+        {
+            var handleData = renderGraph.RtHandleSystem.GetHandleData(input);
+
+            var target = renderGraph.RtHandleSystem.GetResource(input);
+            var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+            {
+                loadAction = RenderBufferLoadAction.Load,
+                storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                loadStoreTarget = new RenderTargetIdentifier(target, 0, CubemapFace.Unknown, -1),
+            };
+
+            inputs.Add(descriptor);
+        }
+
         outputs.CopyFrom(pass.outputs.AsArray());
     }
 
@@ -141,31 +155,11 @@ public class NativeRenderPassSystem : IDisposable
     {
         if (pass.OutputsToCameraTarget)
         {
-            {
-                var descriptor = new AttachmentDescriptor(pass.FrameBufferFormat) { loadStoreTarget = pass.FrameBufferTarget, storeAction = RenderBufferStoreAction.Store };
-                pass.outputs.Add(descriptor);
-            }
-
-            foreach (var input in pass.frameBufferInputs)
-            {
-                var handleData = renderGraph.RtHandleSystem.GetHandleData(input);
-
-                var target = renderGraph.RtHandleSystem.GetResource(input);
-                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
-                {
-                    loadAction = RenderBufferLoadAction.Load,
-                    storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
-                    loadStoreTarget = new RenderTargetIdentifier(target, 0, CubemapFace.Unknown, -1),
-                };
-
-                pass.inputs.Add(descriptor);
-            }
+            var descriptor = new AttachmentDescriptor(pass.FrameBufferFormat) { loadStoreTarget = pass.FrameBufferTarget, storeAction = RenderBufferStoreAction.Store };
+            pass.outputs.Add(descriptor);
         }
         else
         {
-            // TODO: Just cull pass instead?
-            //Assert.IsTrue(depthBuffer.HasValue || colorTargets.Count > 0);
-
             if (pass.depthBuffer.HasValue)
             {
                 var handleData = renderGraph.RtHandleSystem.GetHandleData(pass.depthBuffer.Value);
@@ -199,21 +193,6 @@ public class NativeRenderPassSystem : IDisposable
 
                 if (!pass.depthBuffer.HasValue)
                     pass.size = new(target.width, target.height, target.volumeDepth);
-            }
-
-            foreach (var input in pass.frameBufferInputs)
-            {
-                var handleData = renderGraph.RtHandleSystem.GetHandleData(input);
-
-                var target = renderGraph.RtHandleSystem.GetResource(input);
-                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
-                {
-                    loadAction = RenderBufferLoadAction.Load,
-                    storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
-                    loadStoreTarget = new RenderTargetIdentifier(target, 0, CubemapFace.Unknown, -1),
-                };
-
-                pass.inputs.Add(descriptor);
             }
         }
     }
@@ -257,13 +236,15 @@ public class NativeRenderPassSystem : IDisposable
                 if (canMergePass)
                 {
                     // If flags and attachements are identical, keep using the same subpass
-                    var canPassMergeWithSubPass = pass.flags == flags && pass.inputs.Length == inputs.Length && pass.outputs.Length == outputs.Length;
+                    var inputCount = pass.frameBufferInputs.Count;
+                    var canPassMergeWithSubPass = pass.flags == flags && inputCount == inputs.Length && pass.outputs.Length == outputs.Length;
                     if (canPassMergeWithSubPass)
                     {
                         // Check if all the inputs and outputs are equal (And in identical order) since this must be true for the pass to merge
-                        for (var i = 0; i < pass.inputs.Length; i++)
+                        for (var i = 0; i < inputCount; i++)
                         {
-                            if (pass.inputs[i].loadStoreTarget == inputs[i].loadStoreTarget)
+                            var loadStoreTarget = renderGraph.RtHandleSystem.GetResource(pass.frameBufferInputs[i]);
+                            if (loadStoreTarget == inputs[i].loadStoreTarget)
                                 continue;
 
                             canPassMergeWithSubPass = false;
