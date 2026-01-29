@@ -50,7 +50,6 @@ public abstract class RenderPass : IDisposable
     private readonly List<Type> readRtHandles = new();
     protected readonly List<string> keywords = new();
 
-    public Int3 size;
     public SubPassFlags flags;
 
     public readonly List<ResourceHandle<RenderTexture>> frameBufferInputs = new();
@@ -219,15 +218,11 @@ public abstract class RenderPass : IDisposable
 
 		Execute();
 
-        if(IsNativeRenderPass)
+        // TODO: These two conditions are somewhat redundant since IsRenderPassEnd will only ever be true for native render passes
+        if(IsNativeRenderPass && IsRenderPassEnd)
         {
-            if (IsRenderPassEnd)
-            {
-                RenderGraph.EndRenderPass(command);
-                IsRenderPassEnd = false;
-            }
-
-            size = 0;
+            RenderGraph.EndRenderPass(command);
+            IsRenderPassEnd = false;
         }
         
         PostExecute();

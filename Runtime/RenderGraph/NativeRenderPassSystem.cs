@@ -44,10 +44,13 @@ public class NativeRenderPassSystem : IDisposable
         pass.RenderPassIndex = renderPassDescriptors.Count;
 
         passName = pass.Name;
-        size = pass.size;
         flags = pass.flags;
 
-        if (pass.depthBuffer.HasValue)
+        if(pass.OutputsToCameraTarget)
+        {
+            size = pass.FrameBufferSize;
+        }
+        else if (pass.depthBuffer.HasValue)
         {
             var handleData = renderGraph.RtHandleSystem.GetHandleData(pass.depthBuffer.Value);
             var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value);
@@ -59,6 +62,13 @@ public class NativeRenderPassSystem : IDisposable
                 loadStoreTarget = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice),
                 clearColor = handleData.descriptor.clearColor
             };
+
+            size = new(target.width, target.height, target.volumeDepth);
+        }
+        else
+        {
+            var target = renderGraph.RtHandleSystem.GetResource(pass.colorTargets[0]);
+            size = new(target.width, target.height, target.volumeDepth);
         }
     }
 
@@ -201,26 +211,6 @@ public class NativeRenderPassSystem : IDisposable
         flags = SubPassFlags.None;
     }
 
-    private void SetupRenderPassData(RenderPass pass)
-    {
-        if (!pass.OutputsToCameraTarget)
-        {
-            if (pass.depthBuffer.HasValue)
-            {
-                var handleData = renderGraph.RtHandleSystem.GetHandleData(pass.depthBuffer.Value);
-                var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value);
-                pass.size = new(target.width, target.height, target.volumeDepth);
-            }
-
-            foreach (var colorTarget in pass.colorTargets)
-            {
-                var target = renderGraph.RtHandleSystem.GetResource(colorTarget);
-                if (!pass.depthBuffer.HasValue)
-                    pass.size = new(target.width, target.height, target.volumeDepth);
-            }
-        }
-    }
-
     public void CreateNativeRenderPasses(List<RenderPass> renderPasses)
     {
         renderPassDescriptors.Clear();
@@ -231,10 +221,19 @@ public class NativeRenderPassSystem : IDisposable
             var canMergePass = false;
             if (pass.IsNativeRenderPass)
             {
-                SetupRenderPassData(pass);
+                Int3 passSize;
+                if(pass.OutputsToCameraTarget)
+                {
+                    passSize = pass.FrameBufferSize;
+                }
+                else
+                {
+                    var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.HasValue ? pass.depthBuffer.Value : pass.colorTargets[0]);
+                    passSize = new(target.width, target.height, target.volumeDepth);
+                }
 
                 // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
-                canMergePass = isInRenderPass && size == pass.size;
+                canMergePass = isInRenderPass && size == passSize;
 
                 if (canMergePass)
                 {

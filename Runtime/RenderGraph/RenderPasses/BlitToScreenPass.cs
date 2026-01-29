@@ -15,12 +15,10 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material, Int3 size, int passIndex = 0)
+	public void Initialize(Material material, int passIndex = 0)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
-        this.FrameBufferSize = size;
-        this.size = size;
     }
 
 	public override void Reset()
@@ -99,7 +97,7 @@ public class BlitToScreenPass<T> : RenderPass<T>
         foreach (var keyword in keywords)
             Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
 
-        Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * size.z, 1, PropertyBlock);
+        Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * FrameBufferSize.z, 1, PropertyBlock);
 
         foreach (var keyword in keywords)
             Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
