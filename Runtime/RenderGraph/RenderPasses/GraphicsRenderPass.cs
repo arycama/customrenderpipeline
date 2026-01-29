@@ -144,7 +144,9 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 
     protected override void SetupTargets()
 	{
-        Command.SetViewport(new Rect(0, 0, resolution.Value.x >> MipLevel, resolution.Value.y >> MipLevel));
+        var viewportSize = new Int2(resolution.Value.x >> MipLevel, resolution.Value.y >> MipLevel);
+        if(viewportSize != size.xy)
+            Command.SetViewport(new Rect(0, 0, viewportSize.x, viewportSize.y));
 	}
 
 	protected sealed override void PostExecute()
