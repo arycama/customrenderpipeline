@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Assertions;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 public abstract class RenderPass<T> : RenderPass
@@ -55,6 +56,14 @@ public abstract class RenderPass : IDisposable
     public readonly NativeList<AttachmentDescriptor> outputs = new(8, Allocator.Persistent);
     public SubPassFlags flags;
 
+    private readonly List<ResourceHandle<RenderTexture>> frameBufferInputs = new();
+    protected readonly List<ResourceHandle<RenderTexture>> colorTargets = new();
+    protected ResourceHandle<RenderTexture>? depthBuffer;
+
+    public int DepthSlice { get; set; } = -1;
+    public int MipLevel { get; set; }
+    public CubemapFace CubemapFace { get; set; } = CubemapFace.Unknown;
+
     public RenderPass()
     {
         PropertyBlock = new();
@@ -67,12 +76,16 @@ public abstract class RenderPass : IDisposable
     internal int Index { get; set; }
     public bool UseProfiler { get; set; } = true;
     public virtual bool IsNativeRenderPass => false;
+    public virtual bool OutputsToCameraTarget => false;
 
     public bool IsRenderPassStart { get; set; } = false;
     public bool IsNextSubPass { get; set; } = false;
     public bool IsRenderPassEnd { get; set; } = false;
     public bool AllowNewSubPass { get; set; } = false;
     public int RenderPassIndex { get; set; } = -1;
+    public RenderTargetIdentifier FrameBufferTarget { get; set; }
+    public GraphicsFormat FrameBufferFormat { get; set; }
+    public Int3 FrameBufferSize { get; set; }
 
     public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
     public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);
@@ -107,6 +120,9 @@ public abstract class RenderPass : IDisposable
         keywords.Clear();
         PropertyBlock.Clear();
         AllowNewSubPass = false;
+        frameBufferInputs.Clear();
+		colorTargets.Clear();
+        depthBuffer = default;
     }
 
     void IDisposable.Dispose() { }
@@ -142,7 +158,95 @@ public abstract class RenderPass : IDisposable
 		handleData.SetInputs(this);
 	}
 
-    public virtual void SetupRenderPassData() { }
+    public void ReadFrameBuffer(ResourceHandle<RenderTexture> rtHandle)
+    {
+        frameBufferInputs.Add(rtHandle);
+        RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
+    }
+
+    public void SetupRenderPassData() 
+    {
+        if (!IsNativeRenderPass)
+            return;
+
+        if(OutputsToCameraTarget)
+        {
+            {
+                var descriptor = new AttachmentDescriptor(FrameBufferFormat) { loadStoreTarget = FrameBufferTarget, storeAction = RenderBufferStoreAction.Store };
+                outputs.Add(descriptor);
+            }
+
+            foreach (var input in frameBufferInputs)
+            {
+                var handleData = RenderGraph.RtHandleSystem.GetHandleData(input);
+
+                var target = GetRenderTexture(input);
+                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+                {
+                    loadAction = RenderBufferLoadAction.Load,
+                    storeAction = handleData.freeIndex1 == Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                    loadStoreTarget = new RenderTargetIdentifier(target, 0, CubemapFace.Unknown, -1),
+                };
+
+                inputs.Add(descriptor);
+            }
+        }
+        else
+        {
+            // TODO: Just cull pass instead?
+            Assert.IsTrue(depthBuffer.HasValue || colorTargets.Count > 0);
+
+            if (depthBuffer.HasValue)
+            {
+                var handleData = RenderGraph.RtHandleSystem.GetHandleData(depthBuffer.Value);
+                var target = GetRenderTexture(depthBuffer.Value);
+                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+                {
+                    loadAction = handleData.createIndex1 == Index ? handleData.descriptor.clear ? RenderBufferLoadAction.Clear : RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
+                    storeAction = handleData.freeIndex1 == Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                    loadStoreTarget = new RenderTargetIdentifier(target, MipLevel, CubemapFace, DepthSlice),
+                    clearColor = handleData.descriptor.clearColor
+                };
+
+                depthAttachment = descriptor;
+                size = new(target.width, target.height, target.volumeDepth);
+            }
+
+            foreach (var colorTarget in colorTargets)
+            {
+                var handleData = RenderGraph.RtHandleSystem.GetHandleData(colorTarget);
+
+                var target = GetRenderTexture(colorTarget);
+                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+                {
+                    loadAction = handleData.createIndex1 == Index ? handleData.descriptor.clear ? RenderBufferLoadAction.Clear : RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
+                    storeAction = handleData.freeIndex1 == Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                    loadStoreTarget = new RenderTargetIdentifier(target, MipLevel, CubemapFace, DepthSlice),
+                    clearColor = handleData.descriptor.clearColor
+                };
+
+                outputs.Add(descriptor);
+
+                if (!depthBuffer.HasValue)
+                    size = new(target.width, target.height, target.volumeDepth);
+            }
+
+            foreach (var input in frameBufferInputs)
+            {
+                var handleData = RenderGraph.RtHandleSystem.GetHandleData(input);
+
+                var target = GetRenderTexture(input);
+                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
+                {
+                    loadAction = RenderBufferLoadAction.Load,
+                    storeAction = handleData.freeIndex1 == Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                    loadStoreTarget = new RenderTargetIdentifier(target, 0, CubemapFace.Unknown, -1),
+                };
+
+                inputs.Add(descriptor);
+            }
+        }
+    }
 
     public void Run(CommandBuffer command)
 	{

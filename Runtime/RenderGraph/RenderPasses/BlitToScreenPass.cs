@@ -1,16 +1,12 @@
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 public class BlitToScreenPass<T> : RenderPass<T>
 {
 	private Material material;
-    private RenderTargetIdentifier target;
     private int passIndex;
-    private GraphicsFormat format;
 
-    private readonly List<ResourceHandle<RenderTexture>> frameBufferInputs = new();
+    public override bool OutputsToCameraTarget => true;
 
     public override bool IsNativeRenderPass => true;
 
@@ -19,12 +15,11 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material, RenderTargetIdentifier target, GraphicsFormat format, Int3 size, int passIndex = 0)
+	public void Initialize(Material material, Int3 size, int passIndex = 0)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
-        this.target = new RenderTargetIdentifier(target, 0, CubemapFace.Unknown, -1);
-        this.format = format;
+        this.FrameBufferSize = size;
         this.size = size;
     }
 
@@ -33,7 +28,6 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		base.Reset();
 		material = null;
 		passIndex = 0;
-        frameBufferInputs.Clear();
     }
 
     public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -100,29 +94,6 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		PropertyBlock.SetMatrixArray(propertyName, value);
 	}
 
-    public override void SetupRenderPassData()
-    {
-        {
-            var descriptor = new AttachmentDescriptor(format) { loadStoreTarget = target, storeAction = RenderBufferStoreAction.Store };
-            outputs.Add(descriptor);
-        }
-
-        foreach (var input in frameBufferInputs)
-        {
-            var handleData = RenderGraph.RtHandleSystem.GetHandleData(input);
-
-            var target = GetRenderTexture(input);
-            var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
-            {
-                loadAction = RenderBufferLoadAction.Load,
-                storeAction = handleData.freeIndex1 == Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
-                loadStoreTarget = new RenderTargetIdentifier(target, 0, CubemapFace.Unknown, -1),
-            };
-
-            inputs.Add(descriptor);
-        }
-    }
-
     protected override void Execute()
     {
         foreach (var keyword in keywords)
@@ -132,11 +103,5 @@ public class BlitToScreenPass<T> : RenderPass<T>
 
         foreach (var keyword in keywords)
             Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
-    }
-
-    public void ReadFrameBuffer(ResourceHandle<RenderTexture> rtHandle)
-    {
-        frameBufferInputs.Add(rtHandle);
-        RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
     }
 }
