@@ -45,8 +45,21 @@ public class NativeRenderPassSystem : IDisposable
 
         passName = pass.Name;
         size = pass.size;
-        depthAttachment = pass.depthAttachment;
         flags = pass.flags;
+
+        if (pass.depthBuffer.HasValue)
+        {
+            var handleData = renderGraph.RtHandleSystem.GetHandleData(pass.depthBuffer.Value);
+            var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value);
+
+            depthAttachment = new AttachmentDescriptor(handleData.descriptor.format)
+            {
+                loadAction = handleData.createIndex1 == pass.Index ? handleData.descriptor.clear ? RenderBufferLoadAction.Clear : RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
+                storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
+                loadStoreTarget = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice),
+                clearColor = handleData.descriptor.clearColor
+            };
+        }
     }
 
     private void BeginSubpass(RenderPass pass)
@@ -196,15 +209,6 @@ public class NativeRenderPassSystem : IDisposable
             {
                 var handleData = renderGraph.RtHandleSystem.GetHandleData(pass.depthBuffer.Value);
                 var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value);
-                var descriptor = new AttachmentDescriptor(handleData.descriptor.format)
-                {
-                    loadAction = handleData.createIndex1 == pass.Index ? handleData.descriptor.clear ? RenderBufferLoadAction.Clear : RenderBufferLoadAction.DontCare : RenderBufferLoadAction.Load,
-                    storeAction = handleData.freeIndex1 == pass.Index ? RenderBufferStoreAction.DontCare : RenderBufferStoreAction.Store,
-                    loadStoreTarget = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice),
-                    clearColor = handleData.descriptor.clearColor
-                };
-
-                pass.depthAttachment = descriptor;
                 pass.size = new(target.width, target.height, target.volumeDepth);
             }
 
@@ -235,18 +239,18 @@ public class NativeRenderPassSystem : IDisposable
                 if (canMergePass)
                 {
                     // We allow some subpasses to have no depth attachment, by setting the flags to readonlydepthstencil
-                    if (depthAttachment.HasValue && !pass.depthAttachment.HasValue)
+                    if (depthAttachment.HasValue && !pass.depthBuffer.HasValue)
                     {
                         pass.flags |= SubPassFlags.ReadOnlyDepthStencil;
                     }
 
-                    if (!depthAttachment.HasValue && pass.depthAttachment.HasValue)
+                    if (!depthAttachment.HasValue && pass.depthBuffer.HasValue)
                     {
                         // TODO: In this case, we should set the current as the depth attachment and set previous passes to readonly depth stencil
                         canMergePass = false;
                     }
 
-                    if (depthAttachment.HasValue && pass.depthAttachment.HasValue && depthAttachment.Value.loadStoreTarget != pass.depthAttachment.Value.loadStoreTarget)
+                    if (depthAttachment.HasValue && pass.depthBuffer.HasValue && depthAttachment.Value.loadStoreTarget != new RenderTargetIdentifier(renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value), pass.MipLevel, pass.CubemapFace, pass.DepthSlice))
                     {
                         // If both passes have depth texutres that do not match, do not merge them
                         canMergePass = false;

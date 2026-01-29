@@ -51,7 +51,6 @@ public abstract class RenderPass : IDisposable
     protected readonly List<string> keywords = new();
 
     public Int3 size;
-    public AttachmentDescriptor? depthAttachment;
     public SubPassFlags flags;
 
     public readonly List<ResourceHandle<RenderTexture>> frameBufferInputs = new();
@@ -229,7 +228,6 @@ public abstract class RenderPass : IDisposable
             }
 
             size = 0;
-            depthAttachment = null;
         }
         
         PostExecute();
