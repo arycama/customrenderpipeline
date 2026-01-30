@@ -42,7 +42,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
         renderGraph = new(this);
 
-        command = new CommandBuffer() { name = "Render Camera" };
+        command = new CommandBuffer();// { name = "Render Camera" };
     }
 
     protected override void Dispose(bool disposing)
@@ -149,13 +149,13 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
         context.ExecuteCommandBuffer(command);
         command.Clear();
 
-#if UNITY_EDITOR
-        if (!context.SubmitForRenderPassValidation())
-        {
-            Debug.LogError("Render Pass Validation Failed");
-        }
-        else
-#endif
+//#if UNITY_EDITOR
+//        if (!context.SubmitForRenderPassValidation())
+//        {
+//            Debug.LogError("Render Pass Validation Failed");
+//        }
+//        else
+//#endif
             context.Submit();
 
         renderGraph.CleanupCurrentFrame();

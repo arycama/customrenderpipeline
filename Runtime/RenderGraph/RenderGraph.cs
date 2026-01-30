@@ -131,25 +131,25 @@ public class RenderGraph : IDisposable
     public void AddProfileBeginPass(string name)
     {
         // TODO: There might be a more concise way to do this
-        var pass = this.AddGenericRenderPass(name);
-        pass.UseProfiler = false;
+        //var pass = this.AddGenericRenderPass(name);
+        //pass.UseProfiler = false;
 
-        pass.SetRenderFunction(static (command, pass) =>
-        {
-            command.BeginSample(pass.Name);
-        });
+        //pass.SetRenderFunction(static (command, pass) =>
+        //{
+        //    command.BeginSample(pass.Name);
+        //});
     }
 
     public void AddProfileEndPass(string name)
     {
         // TODO: There might be a more concise way to do this
-        var pass = this.AddGenericRenderPass(name);
-        pass.UseProfiler = false;
+        //var pass = this.AddGenericRenderPass(name);
+        //pass.UseProfiler = false;
 
-        pass.SetRenderFunction(static (command, pass) =>
-        {
-            command.EndSample(pass.Name);
-        });
+        //pass.SetRenderFunction(static (command, pass) =>
+        //{
+        //    command.EndSample(pass.Name);
+        //});
     }
 
     public ProfilePassScope AddProfileScope(string name) => new(name, this);

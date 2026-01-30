@@ -157,8 +157,8 @@ public abstract class RenderPass : IDisposable
 	{
 		Command = command;
 
-		if(UseProfiler)
-			Command.BeginSample(Name);
+		//if(UseProfiler)
+		//	Command.BeginSample(Name);
 
 		// Move into some OnPreRender thing in buffer/RTHandles? 
 		foreach (var texture in readTextures)
@@ -183,8 +183,8 @@ public abstract class RenderPass : IDisposable
         {
             if (IsRenderPassStart)
             {
-                context.ExecuteCommandBuffer(Command);
-                Command.Clear();
+                //context.ExecuteCommandBuffer(Command);
+                //Command.Clear();
 
                 RenderGraph.BeginNativeRenderPass(RenderPassIndex, Command);
                 IsRenderPassStart = false;
@@ -228,14 +228,14 @@ public abstract class RenderPass : IDisposable
             RenderGraph.EndRenderPass(command);
             IsRenderPassEnd = false;
 
-            context.ExecuteCommandBuffer(command);
-            command.Clear();
+            //context.ExecuteCommandBuffer(command);
+            //command.Clear();
         }
         
         PostExecute();
 
-		if (UseProfiler)
-			Command.EndSample(Name);
+		//if (UseProfiler)
+		//	Command.EndSample(Name);
 
 		Reset();
 	}

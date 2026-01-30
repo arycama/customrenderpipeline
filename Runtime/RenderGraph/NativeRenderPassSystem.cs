@@ -107,7 +107,7 @@ public class NativeRenderPassSystem : IDisposable
                 // TODO: what happens if we use don't care for frameBuffer output, does it still get stored (possibly in an optimal way?)
                 attachments[i] = new(colorAttachment.frameBufferFormat)
                 {
-                    storeAction = RenderBufferStoreAction.Store,
+                    //storeAction = RenderBufferStoreAction.Store,
                     loadStoreTarget = colorAttachment.target
                 };
             }
@@ -117,7 +117,7 @@ public class NativeRenderPassSystem : IDisposable
                 var attachment = new AttachmentDescriptor(handleData.descriptor.format);
 
                 // If the handle was created before this native render pass started, we need to load the contents. Otherwise it can be cleared or discarded
-                var requiresLoad = handleData.createIndex1 < startPassIndex;
+                var requiresLoad = handleData.createIndex1 < startPassIndex || handleData.createIndex1 == -1;
                 if (requiresLoad)
                     attachment.loadAction = RenderBufferLoadAction.Load;
                 else if (handleData.descriptor.clear)
@@ -127,7 +127,7 @@ public class NativeRenderPassSystem : IDisposable
                 }
 
                 // If the handle gets freed before this native render pass ends, we can discard the contents, otherwise they must be stored as another pass is going to use it
-                var requiresStore = handleData.freeIndex1 > endPassIndex;
+                var requiresStore = handleData.freeIndex1 > endPassIndex || handleData.freeIndex1 == -1;
                 if (requiresStore)
                     attachment.storeAction = RenderBufferStoreAction.Store;
 
@@ -146,7 +146,7 @@ public class NativeRenderPassSystem : IDisposable
             var attachment = new AttachmentDescriptor(handleData.descriptor.format);
 
             // If the handle was created before this native render pass started, we need to load the contents. Otherwise it can be cleared or discarded
-            var requiresLoad = handleData.createIndex1 < startPassIndex;
+            var requiresLoad = handleData.createIndex1 < startPassIndex || handleData.createIndex1 == -1;
             if (requiresLoad)
                 attachment.loadAction = RenderBufferLoadAction.Load;
             else if (handleData.descriptor.clear)
@@ -157,7 +157,7 @@ public class NativeRenderPassSystem : IDisposable
             }
 
             // If the handle gets freed before this native render pass ends, we can discard the contents, otherwise they must be stored as another pass is going to use it
-            var requiresStore = handleData.freeIndex1 > endPassIndex;
+            var requiresStore = handleData.freeIndex1 > endPassIndex || handleData.freeIndex1 == -1;
             if (requiresStore)
                 attachment.storeAction = RenderBufferStoreAction.Store;
 
