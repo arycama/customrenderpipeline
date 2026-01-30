@@ -1,14 +1,14 @@
 public readonly struct ResourceHandle<T>
 {
-	public int Index { get; }
+	public readonly int index;
 
 	public ResourceHandle(int index)
 	{
-		Index = index;
+		this.index = index;
 	}
 
 	public override int GetHashCode()
 	{
-		return Index;
+		return index;
 	}
 }

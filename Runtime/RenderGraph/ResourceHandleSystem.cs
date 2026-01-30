@@ -42,67 +42,67 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 	public void WriteResource(ResourceHandle<T> handle, int passIndex)
 	{
 		// Persistent handles that have already been created don't need to write a create-index
-		var info = handleInfo[handle.Index];
+		var info = handleInfo[handle.index];
 		if (info.isPersistent && info.isAssigned)
 			return;
 
 		// Initialize or update the index
 		info.createIndex = info.createIndex == -1 ? passIndex : Math.Min(passIndex, info.createIndex);
-		handleInfo[handle.Index] = info;
+		handleInfo[handle.index] = info;
 	}
 
 	public void ReadResource(ResourceHandle<T> handle, int passIndex)
 	{
-		var info = handleInfo[handle.Index];
+		var info = handleInfo[handle.index];
 
 		// Persistent handles do not get freed automatically so there is no work to do
 		if (info.isPersistent)
 			return;
 
 		info.freeIndex = info.freeIndex == -1 ? passIndex : Math.Max(info.freeIndex, passIndex);
-		handleInfo[handle.Index] = info;
+		handleInfo[handle.index] = info;
 	}
 
 	public T GetResource(ResourceHandle<T> handle)
 	{
-		var resourceIndex = handleInfo[handle.Index].resourceIndex;
+		var resourceIndex = handleInfo[handle.index].resourceIndex;
 		return resources[resourceIndex].resource;
 	}
 
 	public void ReleasePersistentResource(ResourceHandle<T> handle, int passIndex)
 	{
-		var info = handleInfo[handle.Index];
+		var info = handleInfo[handle.index];
 		Assert.IsTrue(info.isPersistent);
 		info.freeIndex = info.freeIndex == -1 ? passIndex : Math.Max(info.freeIndex, passIndex);
 		info.isPersistent = false;
-		handleInfo[handle.Index] = info;
+		handleInfo[handle.index] = info;
 	}
 
     public ResourceHandleData<V, T> GetHandleData(ResourceHandle<T> handle)
     {
-        return handleInfo[handle.Index];
+        return handleInfo[handle.index];
     }
 
     public V GetDescriptor(ResourceHandle<T> handle)
 	{
-		return handleInfo[handle.Index].descriptor;
+		return handleInfo[handle.index].descriptor;
 	}
 
     public int GetCreateIndex(ResourceHandle<T> handle)
     {
-        return handleInfo[handle.Index].createIndex;
+        return handleInfo[handle.index].createIndex;
     }
 
     public int GetFreeIndex(ResourceHandle<T> handle)
     {
-        return handleInfo[handle.Index].freeIndex;
+        return handleInfo[handle.index].freeIndex;
     }
 
 	public void SetDescriptor(ResourceHandle<T> handle, V descriptor)
 	{
-		var info = handleInfo[handle.Index];
+		var info = handleInfo[handle.index];
 		info.descriptor = descriptor;
-		handleInfo[handle.Index] = info;
+		handleInfo[handle.index] = info;
 	}
 
 	public void AllocateFrameResources(int renderPassCount, int frameIndex)
