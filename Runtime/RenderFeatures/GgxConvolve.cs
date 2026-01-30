@@ -20,76 +20,76 @@ public class EnvironmentConvolve : ViewRenderFeature
 
 		var ambientComputeShader = Resources.Load<ComputeShader>("AmbientProbe");
 		var ambientBufferTemp = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
-		using (var pass = renderGraph.AddComputeRenderPass("Ambient Convolve", settings.Resolution))
-		{
-			pass.Initialize(ambientComputeShader, normalizedDispatch: false);
-			pass.WriteBuffer("_AmbientProbeOutputBuffer", ambientBufferTemp);
-			pass.ReadResource<EnvironmentProbeTempResult>();
+        using (var pass = renderGraph.AddComputeRenderPass("Ambient Convolve", settings.Resolution))
+        {
+            pass.Initialize(ambientComputeShader, normalizedDispatch: false);
+            pass.WriteBuffer("_AmbientProbeOutputBuffer", ambientBufferTemp);
+            pass.ReadResource<EnvironmentProbeTempResult>();
 
-			pass.SetRenderFunction(static (command, pass, reflectionResolution) =>
-			{
-				// Prefiltered importance sampling, use lower MIP-map levels for fetching samples with low probabilities in order to reduce the variance.
-				// Ref: http://http.developer.nvidia.com/GPUGems3/gpugems3_ch20.html
-				// Must match compute shader
-				var sampleCount = 512;
+            pass.SetRenderFunction(static (command, pass, reflectionResolution) =>
+            {
+                // Prefiltered importance sampling, use lower MIP-map levels for fetching samples with low probabilities in order to reduce the variance.
+                // Ref: http://http.developer.nvidia.com/GPUGems3/gpugems3_ch20.html
+                // Must match compute shader
+                var sampleCount = 512;
 
-				// Solid angle associated with the texel of the cubemap
-				var omegaP = Math.FourPi / (6.0f * reflectionResolution * reflectionResolution);
+                // Solid angle associated with the texel of the cubemap
+                var omegaP = Math.FourPi / (6.0f * reflectionResolution * reflectionResolution);
 
-				// Solid angle associated with the sample
-				var pdf = Math.Rcp(Math.FourPi);
-				var omegaS = Math.Rcp(sampleCount * pdf);
+                // Solid angle associated with the sample
+                var pdf = Math.Rcp(Math.FourPi);
+                var omegaS = Math.Rcp(sampleCount * pdf);
 
-				var mipLevel = 0.5f * Math.Log2(omegaS / omegaP);
-				pass.SetFloat("_MipLevel", mipLevel);
-			});
-		}
+                var mipLevel = 0.5f * Math.Log2(omegaS / omegaP);
+                pass.SetFloat("_MipLevel", mipLevel);
+            });
+        }
 
-		var reflectionProbe = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true);
+        var reflectionProbe = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true);
 		var ambientBuffer = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
 		var reflectionProbeTemp = renderGraph.GetResource<EnvironmentProbeTempResult>();
 
-		using (var pass = renderGraph.AddGenericRenderPass("Ambient Buffer Copy", (reflectionProbeTemp.TempProbe, ambientBufferTemp, reflectionProbe, ambientBuffer)))
-		{
-			pass.WriteTexture(reflectionProbe);
-			pass.WriteBuffer("", ambientBuffer);
-			pass.ReadBuffer("", ambientBufferTemp);
-			pass.ReadResource<EnvironmentProbeTempResult>();
+        using (var pass = renderGraph.AddGenericRenderPass("Ambient Buffer Copy", (reflectionProbeTemp.TempProbe, ambientBufferTemp, reflectionProbe, ambientBuffer)))
+        {
+            pass.WriteTexture(reflectionProbe);
+            pass.WriteBuffer("", ambientBuffer);
+            pass.ReadBuffer("", ambientBufferTemp);
+            pass.ReadResource<EnvironmentProbeTempResult>();
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				command.CopyBuffer(pass.GetBuffer(data.ambientBufferTemp), pass.GetBuffer(data.ambientBuffer));
-				command.CopyTexture(pass.GetRenderTexture(data.TempProbe), 0, 0, pass.GetRenderTexture(data.reflectionProbe), 0, 0);
-			});
-		}
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                command.CopyBuffer(pass.GetBuffer(data.ambientBufferTemp), pass.GetBuffer(data.ambientBuffer));
+                command.CopyTexture(pass.GetRenderTexture(data.TempProbe), 0, 0, pass.GetRenderTexture(data.reflectionProbe), 0, 0);
+            });
+        }
 
-		const int mipLevels = 6;
-		for (var i = 1; i < 7; i++)
-		{
-			using (var pass = renderGraph.AddFullscreenRenderPass("Ggx Convolve", (i, envResolution: settings.Resolution, settings.Samples)))
-			{
-				pass.Initialize(convolveMaterial);
-				pass.MipLevel = i;
+        const int mipLevels = 6;
+        for (var i = 1; i < 7; i++)
+        {
+            using (var pass = renderGraph.AddFullscreenRenderPass("Ggx Convolve", (i, envResolution: settings.Resolution, settings.Samples)))
+            {
+                pass.Initialize(convolveMaterial);
+                pass.MipLevel = i;
 
-				pass.WriteTexture(reflectionProbe);
-				pass.ReadResource<EnvironmentProbeTempResult>();
+                pass.WriteTexture(reflectionProbe);
+                pass.ReadResource<EnvironmentProbeTempResult>();
 
-				pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					var perceptualRoughness = Math.Saturate(data.i / (float)mipLevels);
-					var mipPerceptualRoughness = Math.Saturate(1.7f / 1.4f - Math.Sqrt(2.89f / 1.96f - 2.8f / 1.96f * perceptualRoughness));
-					var mipRoughness = mipPerceptualRoughness * mipPerceptualRoughness;
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    var perceptualRoughness = Math.Saturate(data.i / (float)mipLevels);
+                    var mipPerceptualRoughness = Math.Saturate(1.7f / 1.4f - Math.Sqrt(2.89f / 1.96f - 2.8f / 1.96f * perceptualRoughness));
+                    var mipRoughness = mipPerceptualRoughness * mipPerceptualRoughness;
 
-					pass.SetInt("Samples", data.Samples);
-					pass.SetFloat("RcpSamples", Math.Rcp(data.Samples));
-					pass.SetFloat("Level", data.i);
-					pass.SetFloat("RcpOmegaP", data.envResolution * data.envResolution / (4.0f * Math.Pi * data.Samples));
-					pass.SetFloat("PerceptualRoughness", mipPerceptualRoughness);
-					pass.SetFloat("Roughness", mipRoughness);
-				});
-			}
-		}
+                    pass.SetInt("Samples", data.Samples);
+                    pass.SetFloat("RcpSamples", Math.Rcp(data.Samples));
+                    pass.SetFloat("Level", data.i);
+                    pass.SetFloat("RcpOmegaP", data.envResolution * data.envResolution / (4.0f * Math.Pi * data.Samples));
+                    pass.SetFloat("PerceptualRoughness", mipPerceptualRoughness);
+                    pass.SetFloat("Roughness", mipRoughness);
+                });
+            }
+        }
 
-		renderGraph.SetResource(new EnvironmentData(reflectionProbe, ambientBuffer));
+        renderGraph.SetResource(new EnvironmentData(reflectionProbe, ambientBuffer));
 	}
 }

@@ -154,7 +154,7 @@ public class RenderGraph : IDisposable
 
     public ProfilePassScope AddProfileScope(string name) => new(name, this);
 
-    public void Execute(CommandBuffer command)
+    public void Execute(CommandBuffer command, ScriptableRenderContext context)
     {
         BufferHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
         RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
@@ -168,7 +168,7 @@ public class RenderGraph : IDisposable
         foreach (var renderPass in renderPasses)
         {
             //renderPass.SetupRenderPassData();
-            renderPass.Run(command);
+            renderPass.Run(command, context);
 
             // Re-add the pass to the pool
             if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))

@@ -153,7 +153,7 @@ public abstract class RenderPass : IDisposable
         RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
     }
 
-    public void Run(CommandBuffer command)
+    public void Run(CommandBuffer command, ScriptableRenderContext context)
 	{
 		Command = command;
 
@@ -183,6 +183,9 @@ public abstract class RenderPass : IDisposable
         {
             if (IsRenderPassStart)
             {
+                context.ExecuteCommandBuffer(Command);
+                Command.Clear();
+
                 RenderGraph.BeginNativeRenderPass(RenderPassIndex, Command);
                 IsRenderPassStart = false;
                 RenderPassIndex = -1;
@@ -191,6 +194,7 @@ public abstract class RenderPass : IDisposable
             if (IsNextSubPass)
             {
                 RenderGraph.NextSubPass(Command);
+
                 IsNextSubPass = false;
             }
         }
@@ -223,6 +227,9 @@ public abstract class RenderPass : IDisposable
         {
             RenderGraph.EndRenderPass(command);
             IsRenderPassEnd = false;
+
+            context.ExecuteCommandBuffer(command);
+            command.Clear();
         }
         
         PostExecute();

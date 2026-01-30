@@ -144,7 +144,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
             }
         }
 
-        renderGraph.Execute(command);
+        renderGraph.Execute(command, context);
 
         context.ExecuteCommandBuffer(command);
         command.Clear();
