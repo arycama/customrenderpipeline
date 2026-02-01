@@ -26,7 +26,7 @@ public class GrassRenderer : ViewRenderFeature
 	{
 		this.settings = settings;
 		this.quadtreeCull = quadtreeCull;
-		this.grassDataComputeShader = Resources.Load<ComputeShader>("GpuInstancedRendering/GrassData");
+		grassDataComputeShader = Resources.Load<ComputeShader>("GpuInstancedRendering/GrassData");
 		grassCoverageMaterial = new Material(Shader.Find("Hidden/Grass Coverage")){ hideFlags = HideFlags.HideAndDontSave };
 	}
 

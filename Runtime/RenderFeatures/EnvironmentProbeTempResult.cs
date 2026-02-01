@@ -5,7 +5,7 @@ public readonly struct EnvironmentProbeTempResult : IRenderPassData
 {
 	public ResourceHandle<RenderTexture> TempProbe { get; }
 
-	public EnvironmentProbeTempResult(ResourceHandle<RenderTexture> tempProbe) => this.TempProbe = tempProbe;
+	public EnvironmentProbeTempResult(ResourceHandle<RenderTexture> tempProbe) => TempProbe = tempProbe;
 
 	void IRenderPassData.SetInputs(RenderPass pass)
 	{

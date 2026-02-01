@@ -173,6 +173,8 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
                 info.createIndex1 = info.createIndex;
                 info.freeIndex1 = info.freeIndex;
 
+                Assert.AreNotEqual(resourceIndex, -1);
+
 				info.isAssigned = true;
 				info.createIndex = -1;
                 info.freeIndex = -1;
@@ -187,11 +189,13 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 			{
 				var resourceHandleData = handleInfo[handle];
 
-				// Could handle this by updating the last used index or something maybe
-				var resource = resources[resourceHandleData.resourceIndex];
+                Assert.AreNotEqual(resourceHandleData.resourceIndex, -1);
+
+                // Could handle this by updating the last used index or something maybe
+                var resource = resources[resourceHandleData.resourceIndex];
 				resources[resourceHandleData.resourceIndex] = (resource.resource, frameIndex, true);
 
-				this.handlesToFree.Add(handle);
+				handlesToFree.Add(handle);
 			}
 
 			frameHandlesToFree[i].Clear();

@@ -52,7 +52,7 @@ public class TerrainSystem : FrameRenderFeature
 
 	private void TerrainCallbacks_heightmapChanged(Terrain terrain, RectInt heightRegion, bool synched)
 	{
-		if (terrain != this.Terrain)
+		if (terrain != Terrain)
 			return;
 
 		InitializeHeightmap();
@@ -61,7 +61,7 @@ public class TerrainSystem : FrameRenderFeature
 
 	private void TerrainCallbacks_textureChanged(Terrain terrain, string textureName, RectInt texelRegion, bool synched)
 	{
-		if (terrain == this.Terrain && textureName == TerrainData.AlphamapTextureName)
+		if (terrain == Terrain && textureName == TerrainData.AlphamapTextureName)
 			InitializeIdMap(true, texelRegion);
 	}
 

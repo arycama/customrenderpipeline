@@ -25,7 +25,7 @@ float4 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	float3 L = FromToRotationZ(_LightDirection0, localL);
 	
 	float3 pixelPosition = MultiplyPointProj(WorldToPixel, worldPosition + L * 0.01).xyz;
-
+	
 	float3 rayPos = ScreenSpaceRaytrace(pixelPosition, worldPosition + L * 0.01, L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip);
 	
 	float outDepth;
@@ -58,7 +58,7 @@ float _IsFirst;
 
 float FragmentSpatial(VertexFullscreenTriangleOutput input) : SV_Target
 {
-	//return _Input[position.xy].w == 0;
+	return _Input[input.position.xy].w == 0;
 	
 	float rcpVLength = RcpLength(input.worldDirection);
 	float3 V = -input.worldDirection * rcpVLength;
@@ -107,7 +107,7 @@ float FragmentSpatial(VertexFullscreenTriangleOutput input) : SV_Target
 Texture2D<float> RayDepth;
 Texture2D<float> _TemporalInput, _History;
 
-float FragmentTemporal(VertexFullscreenTriangleOutput input) : SV_Target
+float FragmentTemporal(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
 	float minValue, maxValue, result;
 	TemporalNeighborhood(_TemporalInput, input.position.xy, minValue, maxValue, result);

@@ -9,9 +9,9 @@ public readonly struct AutoExposureData : IRenderPassData
 
 	public AutoExposureData(ResourceHandle<GraphicsBuffer> exposureBuffer, bool isFirst, float maxLuminance)
 	{
-		this.ExposureBuffer = exposureBuffer;
+		ExposureBuffer = exposureBuffer;
 		IsFirst = isFirst;
-        this.paperWhite = maxLuminance;
+        paperWhite = maxLuminance;
     }
 
 	public readonly void SetInputs(RenderPass pass)

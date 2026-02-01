@@ -29,7 +29,7 @@ public class Rain : ViewRenderFeature
 	public Rain(RenderGraph renderGraph, Settings settings) : base(renderGraph)
 	{
 		this.settings = settings;
-		this.rainComputeShader = Resources.Load<ComputeShader>("Water/Rain");
+		rainComputeShader = Resources.Load<ComputeShader>("Water/Rain");
 	}
 
 	protected override void Cleanup(bool disposing)

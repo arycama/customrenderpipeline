@@ -56,7 +56,7 @@ public class ParticleShadows : ViewRenderFeature
 		// Since 3D texture arrays aren't a thing, allocate one wide texture
 		var directionalShadows = renderGraph.GetTexture(new(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isExactSize: true, clear: true, clearColor: Color.white);
 
-		void RenderShadowMap(ShadowRequest request, ResourceHandle<RenderTexture> target, int index, bool flipY, bool zClip, bool isPointLight)
+        void RenderShadowMap(ShadowRequest request, ResourceHandle<RenderTexture> target, int index, bool flipY, bool zClip, bool isPointLight)
 		{
 			var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
 			var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, viewRenderData.transform.position, 0, request.LightPosition, 0));
@@ -117,16 +117,36 @@ public class ParticleShadows : ViewRenderFeature
 		var directionalShadowSizes = ArrayPool<float>.Get(directionalShadowCount);
 		using (renderGraph.AddProfileScope($"Directional Shadows"))
 		{
-			// TODO: This needs to use the actual count or it will access out of bounds
-			for (var i = 0; i < requestData.directionalShadowRequests.Count; i++)
-			{
-				using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
-				{
-					var request = requestData.directionalShadowRequests[i];
-					RenderShadowMap(request, directionalShadows, i, true, false, false);
-					directionalShadowSizes[i] = (request.Far - request.Near) / settings.DirectionalDepth;
-				}
-			}
+            if (requestData.directionalShadowRequests.Count == 0)
+            {
+                // Dummy pass
+                using (var pass = renderGraph.AddGenericRenderPass("Shadow Dummy Pass"))
+                {
+                    pass.WriteTexture(directionalShadows);
+                    //pass.WriteTexture(result);
+                    //pass.ReadTexture("", directionalShadows);
+                    //pass.ReadTexture("", result);
+
+                    pass.SetRenderFunction((command, pass) =>
+                    {
+                        command.SetRenderTarget(pass.GetRenderTexture(directionalShadows), 0, CubemapFace.Unknown, -1);
+                        command.ClearRenderTarget(false, true, Color.white);
+                    });
+                }
+            }
+            else
+            {
+                // TODO: This needs to use the actual count or it will access out of bounds
+                for (var i = 0; i < requestData.directionalShadowRequests.Count; i++)
+                {
+                    using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
+                    {
+                        var request = requestData.directionalShadowRequests[i];
+                        RenderShadowMap(request, directionalShadows, i, true, false, false);
+                        directionalShadowSizes[i] = (request.Far - request.Near) / settings.DirectionalDepth;
+                    }
+                }
+            }
 
 			ListPool<ShadowRequest>.Release(requestData.directionalShadowRequests);
 		}
@@ -135,7 +155,7 @@ public class ParticleShadows : ViewRenderFeature
 		var result = renderGraph.GetTexture(new(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true);
 		var shadowSteps = renderGraph.GetBuffer(directionalShadowCount);
 
-		using (var pass = renderGraph.AddComputeRenderPass("Particle Shadow Directional Accumulate", (settings.DirectionalDepth, settings.DirectionalResolution, shadowSteps, directionalShadowSizes)))
+        using (var pass = renderGraph.AddComputeRenderPass("Particle Shadow Directional Accumulate", (settings.DirectionalDepth, settings.DirectionalResolution, shadowSteps, directionalShadowSizes)))
 		{
 			pass.Initialize(accumulateShader, 0, settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution, 1);
 			pass.ReadBuffer("ParticleShadowStep", shadowSteps);
