@@ -7,21 +7,45 @@ public class EnvironmentConvolve : ViewRenderFeature
 
 	private readonly Material convolveMaterial;
 	private readonly EnvironmentLightingSettings settings;
+    private ResourceHandle<RenderTexture> reflectionProbe;
+    private int previousResolution;
+    private ResourceHandle<GraphicsBuffer> ambientBuffer;
 
 	public EnvironmentConvolve(RenderGraph renderGraph, EnvironmentLightingSettings settings) : base(renderGraph)
 	{
 		convolveMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
 		this.settings = settings;
-	}
 
-	public override void Render(ViewRenderData viewRenderData)
+        reflectionProbe = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true, isPersistent: true);
+        previousResolution = settings.Resolution;
+
+        ambientBuffer = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, GraphicsBuffer.UsageFlags.None, true);
+    }
+
+    protected override void Cleanup(bool disposing)
     {
-		using var scope = renderGraph.AddProfileScope("Environment Probe Convolve");
+        renderGraph.ReleasePersistentResource(reflectionProbe, -1);
+        renderGraph.ReleasePersistentResource(ambientBuffer, -1);
+    }
+
+    public override void Render(ViewRenderData viewRenderData)
+    {
+        if (!renderGraph.TryGetResource<EnvironmentProbeTempResult>(out var reflectionProbeTemp))
+            return;
+
+        using var scope = renderGraph.AddProfileScope("Environment Probe Convolve");
 
 		var ambientComputeShader = Resources.Load<ComputeShader>("AmbientProbe");
 		var ambientBufferTemp = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Structured | GraphicsBuffer.Target.CopySource);
         using (var pass = renderGraph.AddComputeRenderPass("Ambient Convolve", settings.Resolution))
         {
+            if (settings.Resolution != previousResolution)
+            {
+                renderGraph.ReleasePersistentResource(reflectionProbe, pass.Index);
+                reflectionProbe = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true, isPersistent: true);
+                previousResolution = settings.Resolution;
+            }
+
             pass.Initialize(ambientComputeShader, normalizedDispatch: false);
             pass.WriteBuffer("_AmbientProbeOutputBuffer", ambientBufferTemp);
             pass.ReadResource<EnvironmentProbeTempResult>();
@@ -44,10 +68,6 @@ public class EnvironmentConvolve : ViewRenderFeature
                 pass.SetFloat("_MipLevel", mipLevel);
             });
         }
-
-        var reflectionProbe = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true);
-		var ambientBuffer = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
-		var reflectionProbeTemp = renderGraph.GetResource<EnvironmentProbeTempResult>();
 
         using (var pass = renderGraph.AddGenericRenderPass("Ambient Buffer Copy", (reflectionProbeTemp.TempProbe, ambientBufferTemp, reflectionProbe, ambientBuffer)))
         {
@@ -90,6 +110,6 @@ public class EnvironmentConvolve : ViewRenderFeature
             }
         }
 
-        renderGraph.SetResource(new EnvironmentData(reflectionProbe, ambientBuffer));
+        renderGraph.SetResource(new EnvironmentData(reflectionProbe, ambientBuffer), true);
 	}
 }
