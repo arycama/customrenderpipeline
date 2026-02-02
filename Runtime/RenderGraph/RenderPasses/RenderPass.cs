@@ -157,8 +157,8 @@ public abstract class RenderPass : IDisposable
 	{
 		Command = command;
 
-		//if(UseProfiler)
-		//	Command.BeginSample(Name);
+		if(UseProfiler)
+			Command.BeginSample(Name);
 
 		// Move into some OnPreRender thing in buffer/RTHandles? 
 		foreach (var texture in readTextures)
@@ -183,8 +183,13 @@ public abstract class RenderPass : IDisposable
         {
             if (IsRenderPassStart)
             {
-                //context.ExecuteCommandBuffer(Command);
-                //Command.Clear();
+                if (RenderGraph.EnableRenderPassValidation)
+                {
+                    // If render pass validation is enabled, for some reason it breaks if incompatible commands are in the same command buffer even if they are outside of the renderpass start/end. Work around this by manually executing and clearing the command buffer.
+                    // This messes with profiling markers however, so only enable when needed
+                    context.ExecuteCommandBuffer(Command);
+                    Command.Clear();
+                }
 
                 RenderGraph.BeginNativeRenderPass(RenderPassIndex, Command);
                 IsRenderPassStart = false;
@@ -228,14 +233,19 @@ public abstract class RenderPass : IDisposable
             RenderGraph.EndRenderPass(command);
             IsRenderPassEnd = false;
 
-            //context.ExecuteCommandBuffer(command);
-            //command.Clear();
+            // If render pass validation is enabled, for some reason it breaks if incompatible commands are in the same command buffer even if they are outside of the renderpass start/end. Work around this by manually executing and clearing the command buffer.
+            // This messes with profiling markers however, so only enable when needed
+            if (RenderGraph.EnableRenderPassValidation)
+            {
+                context.ExecuteCommandBuffer(command);
+                command.Clear();
+            }
         }
         
         PostExecute();
 
-		//if (UseProfiler)
-		//	Command.EndSample(Name);
+		if (UseProfiler)
+			Command.EndSample(Name);
 
 		Reset();
 	}

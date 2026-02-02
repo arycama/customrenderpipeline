@@ -13,15 +13,12 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public virtual void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, bool isStereo = false)
+	public virtual void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
 		this.primitiveCount = primitiveCount;
-
-		stereoMode = isStereo
-            ? SystemInfo.supportsMultiview ? SinglePassStereoMode.Multiview : SinglePassStereoMode.Instancing
-            : SinglePassStereoMode.None;
+        this.stereoMode = stereoMode;
     }
 
 	public override void Reset()

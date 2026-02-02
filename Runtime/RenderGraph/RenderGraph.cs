@@ -39,6 +39,7 @@ public class RenderGraph : IDisposable
     public bool IsDisposing { get; private set; }
     public bool DebugRenderPasses { get; set; }
     public bool IsInRenderPass { get; private set; }
+    public bool EnableRenderPassValidation { get; set; }
 
     public RenderGraph(CustomRenderPipelineBase renderPipeline)
     {
@@ -131,25 +132,25 @@ public class RenderGraph : IDisposable
     public void AddProfileBeginPass(string name)
     {
         // TODO: There might be a more concise way to do this
-        //var pass = this.AddGenericRenderPass(name);
-        //pass.UseProfiler = false;
+        var pass = this.AddGenericRenderPass(name);
+        pass.UseProfiler = false;
 
-        //pass.SetRenderFunction(static (command, pass) =>
-        //{
-        //    command.BeginSample(pass.Name);
-        //});
+        pass.SetRenderFunction(static (command, pass) =>
+        {
+            command.BeginSample(pass.Name);
+        });
     }
 
     public void AddProfileEndPass(string name)
     {
         // TODO: There might be a more concise way to do this
-        //var pass = this.AddGenericRenderPass(name);
-        //pass.UseProfiler = false;
+        var pass = this.AddGenericRenderPass(name);
+        pass.UseProfiler = false;
 
-        //pass.SetRenderFunction(static (command, pass) =>
-        //{
-        //    command.EndSample(pass.Name);
-        //});
+        pass.SetRenderFunction(static (command, pass) =>
+        {
+            command.EndSample(pass.Name);
+        });
     }
 
     public ProfilePassScope AddProfileScope(string name) => new(name, this);
@@ -218,9 +219,9 @@ public class RenderGraph : IDisposable
         return RtHandleSystem.GetResourceHandle(descriptor, isPersistent);
     }
 
-    public ResourceHandle<RenderTexture> GetTexture(Int2 size, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false, bool isRandomWrite = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrTextureUsage = VRTextureUsage.None, bool isTransient = false)
+    public ResourceHandle<RenderTexture> GetTexture(Int2 size, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false, bool isRandomWrite = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrTextureUsage = VRTextureUsage.None)
     {
-        return GetTexture(new RtHandleDescriptor(size.x, size.y, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isRandomWrite, isExactSize, clear, clearColor, clearDepth, clearStencil, vrTextureUsage, isTransient), isPersistent);
+        return GetTexture(new RtHandleDescriptor(size.x, size.y, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isRandomWrite, isExactSize, clear, clearColor, clearDepth, clearStencil, vrTextureUsage), isPersistent);
     }
 
     public ResourceHandle<GraphicsBuffer> GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)

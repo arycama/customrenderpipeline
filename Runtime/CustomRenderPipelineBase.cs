@@ -4,11 +4,8 @@ using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Assertions;
 
-
-
-
 #if UNITY_EDITOR
-using UnityEditorInternal;
+    using UnityEditorInternal;
 #endif
 
 public abstract class CustomRenderPipelineBase : RenderPipeline
@@ -149,13 +146,13 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
         context.ExecuteCommandBuffer(command);
         command.Clear();
 
-//#if UNITY_EDITOR
-//        if (!context.SubmitForRenderPassValidation())
-//        {
-//            Debug.LogError("Render Pass Validation Failed");
-//        }
-//        else
-//#endif
+#if UNITY_EDITOR
+        if (renderGraph.EnableRenderPassValidation && !context.SubmitForRenderPassValidation())
+        {
+            Debug.LogError("Render Pass Validation Failed");
+        }
+        else
+#endif
             context.Submit();
 
         renderGraph.CleanupCurrentFrame();
