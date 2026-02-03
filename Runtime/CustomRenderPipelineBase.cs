@@ -25,6 +25,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
     protected abstract SupportedRenderingFeatures SupportedRenderingFeatures { get; }
 
     protected abstract bool UseSrpBatching { get; }
+    protected virtual bool RenderUiOverlay { get; } = true;
 
     public CustomRenderPipelineBase()
     {
@@ -122,7 +123,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
             }
 
             // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
-            if (viewRenderData.camera.cameraType == CameraType.Game && viewRenderData.camera == Camera.main)
+            if (RenderUiOverlay && viewRenderData.camera.cameraType == CameraType.Game && viewRenderData.camera == Camera.main)
             {
                 var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
                 var uiOverlay = context.CreateUIOverlayRendererList(viewRenderData.camera);
