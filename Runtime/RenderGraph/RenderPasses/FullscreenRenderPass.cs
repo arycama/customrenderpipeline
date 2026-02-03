@@ -3,36 +3,36 @@ using UnityEngine.Rendering;
 
 public class FullscreenRenderPass<T> : DrawRenderPass<T>
 {
-	private Material material;
-	private int passIndex;
-	private int primitiveCount;
-	private SinglePassStereoMode stereoMode;
+    private Material material;
+    private int passIndex;
+    private int primitiveCount;
+    private SinglePassStereoMode stereoMode;
 
-	public override string ToString()
-	{
-		return $"{Name} {material} {passIndex}";
-	}
+    public override string ToString()
+    {
+        return $"{Name} {material} {passIndex}";
+    }
 
-	public virtual void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None)
-	{
-		this.material = material;
-		this.passIndex = passIndex;
-		this.primitiveCount = primitiveCount;
+    public virtual void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None)
+    {
+        this.material = material;
+        this.passIndex = passIndex;
+        this.primitiveCount = primitiveCount;
         this.stereoMode = stereoMode;
     }
 
-	public override void Reset()
-	{
-		base.Reset();
-		material = null;
-		passIndex = 0;
-		primitiveCount = 1;
-	}
+    public override void Reset()
+    {
+        base.Reset();
+        material = null;
+        passIndex = 0;
+        primitiveCount = 1;
+    }
 
-	protected override void Execute()
-	{
-		foreach (var keyword in keywords)
-			Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
+    protected override void Execute()
+    {
+        foreach (var keyword in keywords)
+            Command.EnableShaderKeyword(keyword);
 
         int instanceMultiplier;
         if (stereoMode == SinglePassStereoMode.Instancing)
@@ -65,6 +65,6 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
         }
 
         foreach (var keyword in keywords)
-			Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
-	}
+            Command.DisableShaderKeyword(keyword);
+    }
 }

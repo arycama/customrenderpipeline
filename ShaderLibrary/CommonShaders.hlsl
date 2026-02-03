@@ -40,7 +40,7 @@ VertexFullscreenTriangleMinimalOutput VertexFullscreenTriangleMinimal(uint id : 
 	uint localId = id % 3;
 	float2 uv = (localId << uint2(1, 0)) & 2;
 	
-	output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+	output.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
 	uv.y = 1.0 - uv.y;
 	output.uv = uv;
 	
