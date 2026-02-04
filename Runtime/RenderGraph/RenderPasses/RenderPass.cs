@@ -153,6 +153,29 @@ public abstract class RenderPass : IDisposable
         RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
     }
 
+    public void ReadFrameDepth(ResourceHandle<RenderTexture> rtHandle)
+    {
+        if (depthBuffer == null)
+        {
+            depthBuffer = rtHandle;
+            flags = SubPassFlags.ReadOnlyDepthStencil;
+        }
+        else if(depthBuffer.HasValue)
+        {
+            if(depthBuffer.Value == rtHandle)
+            {
+                flags = SubPassFlags.ReadOnlyDepthStencil;
+            }
+            else
+            {
+                Debug.LogError("Trying to read frame depth with a mismatched depth buffer");
+            }
+        }
+
+        frameBufferInputs.Add(rtHandle);
+        RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
+    }
+
     public void Run(CommandBuffer command, ScriptableRenderContext context)
 	{
 		Command = command;

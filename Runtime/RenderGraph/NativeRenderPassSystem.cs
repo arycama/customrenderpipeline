@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
+using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
 public class NativeRenderPassSystem : IDisposable
@@ -9,16 +10,17 @@ public class NativeRenderPassSystem : IDisposable
     private readonly RenderGraph renderGraph;
 
     private Int3 size;
-    private AttachmentData? depthAttachment;
+    private AttachmentData? subPassDepth;
     private bool isInRenderPass;
     private string passName;
+    private int depthIndex = -1;
 
     private NativeList<AttachmentData> inputs = new(8, Allocator.Persistent), outputs = new(8, Allocator.Persistent);
     private SubPassFlags flags;
 
     private int startPassIndex, endPassIndex;
 
-    private readonly NativeList<AttachmentData> colorAttachments = new(8, Allocator.Persistent);
+    private readonly NativeList<AttachmentData> attachments = new(8, Allocator.Persistent);
     private readonly NativeList<SubPassDescriptor> subPasses = new(Allocator.Persistent);
     private readonly List<RenderPassDescriptor> renderPassDescriptors = new();
 
@@ -48,27 +50,23 @@ public class NativeRenderPassSystem : IDisposable
         pass.RenderPassIndex = renderPassDescriptors.Count;
 
         passName = pass.Name;
-        flags = pass.flags;
 
         if (pass.OutputsToCameraTarget)
         {
             size = pass.FrameBufferSize;
         }
-        else if (pass.depthBuffer.HasValue)
-        {
-            var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value);
-            depthAttachment = new(pass.depthBuffer.Value, new(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice));
-            size = new(target.width, target.height, target.volumeDepth);
-        }
         else
         {
-            var target = renderGraph.RtHandleSystem.GetResource(pass.colorTargets[0]);
+            // Get size from depth buffer if assigned, otherwise from the first color target
+            var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer ?? pass.colorTargets[0]);
             size = new(target.width, target.height, target.volumeDepth);
         }
     }
 
     private void BeginSubpass(RenderPass pass)
     {
+        flags = pass.flags;
+
         foreach (var input in pass.frameBufferInputs)
         {
             var target = renderGraph.RtHandleSystem.GetResource(input);
@@ -82,11 +80,103 @@ public class NativeRenderPassSystem : IDisposable
         else
         {
             if (pass.depthBuffer.HasValue)
-                depthAttachment = new(pass.depthBuffer.Value, new(renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value), pass.MipLevel, pass.CubemapFace, pass.DepthSlice));
+            {
+                // If depth is not assigned, assign it, otherwise ensure it matches
+                if (depthIndex == -1)
+                {
+                    subPassDepth = new(pass.depthBuffer.Value, new(renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value), pass.MipLevel, pass.CubemapFace, pass.DepthSlice));
+                }
+                else
+                {
+                    Assert.IsTrue(attachments[depthIndex].handle == pass.depthBuffer.Value);
+                }
+            }
 
             foreach (var colorTarget in pass.colorTargets)
                 outputs.Add(new(colorTarget, new(renderGraph.RtHandleSystem.GetResource(colorTarget), pass.MipLevel, pass.CubemapFace, pass.DepthSlice)));
         }
+    }
+
+    private void EndSubPass()
+    {
+        // Add depth first if needed
+        if (subPassDepth.HasValue)
+        {
+            var input = subPassDepth.Value;
+            var index = -1;
+            for (var j = 0; j < attachments.Length; j++)
+                if (attachments[j].target == input.target)
+                {
+                    index = j;
+                    break;
+                }
+
+            if (index == -1)
+            {
+                index = attachments.Length;
+                attachments.Add(input);
+            }
+
+            depthIndex = index;
+        }
+
+        var subPassInputs = new AttachmentIndexArray(inputs.Length);
+        {
+            for (var i = 0; i < inputs.Length; i++)
+            {
+                var input = inputs[i];
+                var index = -1;
+                for (var j = 0; j < attachments.Length; j++)
+                    if (attachments[j].target == input.target)
+                    {
+                        index = j;
+                        break;
+                    }
+
+                if (index == -1)
+                {
+                    index = attachments.Length;
+                    attachments.Add(input);
+                }
+
+                subPassInputs[i] = index;
+            }
+        }
+
+        var subPassOutputs = new AttachmentIndexArray(outputs.Length);
+        {
+            for (var i = 0; i < outputs.Length; i++)
+            {
+                var output = outputs[i];
+                var index = -1;
+                for (var j = 0; j < attachments.Length; j++)
+                    if (attachments[j].target == output.target)
+                    {
+                        index = j;
+                        break;
+                    }
+
+                if (index == -1)
+                {
+                    index = attachments.Length;
+                    attachments.Add(output);
+                }
+
+                subPassOutputs[i] = index;
+            }
+        }
+
+        subPasses.Add(new()
+        {
+            inputs = subPassInputs,
+            colorOutputs = subPassOutputs,
+            flags = flags
+        });
+
+        outputs.Clear();
+        inputs.Clear();
+        flags = SubPassFlags.None;
+        subPassDepth = null;
     }
 
     private void EndRenderPass(RenderPass pass)
@@ -98,10 +188,10 @@ public class NativeRenderPassSystem : IDisposable
         pass.IsRenderPassEnd = true;
         isInRenderPass = false;
 
-        var attachments = new NativeArray<AttachmentDescriptor>(depthAttachment.HasValue ? colorAttachments.Length + 1 : colorAttachments.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-        for (var i = 0; i < colorAttachments.Length; i++)
+        var attachments = new NativeArray<AttachmentDescriptor>(this.attachments.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
+        for (var i = 0; i < this.attachments.Length; i++)
         {
-            var colorAttachment = colorAttachments[i];
+            var colorAttachment = this.attachments[i];
             if (colorAttachment.isFrameBufferOutput)
             {
                 // TODO: what happens if we use don't care for frameBuffer output, does it still get stored (possibly in an optimal way?)
@@ -139,101 +229,12 @@ public class NativeRenderPassSystem : IDisposable
             }
         }
 
-        // Handle depth buffer if assigned
-        if (depthAttachment.HasValue)
-        {
-            var handleData = renderGraph.RtHandleSystem.GetHandleData(depthAttachment.Value.handle);
-            var attachment = new AttachmentDescriptor(handleData.descriptor.format);
+        renderPassDescriptors.Add(new(size.x, size.y, attachments, new(subPasses.AsArray(), Allocator.Temp), size.z, 1, depthIndex, -1, passName));
 
-            // If the handle was created before this native render pass started, we need to load the contents. Otherwise it can be cleared or discarded
-            var requiresLoad = handleData.createIndex1 < startPassIndex || handleData.createIndex1 == -1;
-            if (requiresLoad)
-                attachment.loadAction = RenderBufferLoadAction.Load;
-            else if (handleData.descriptor.clear)
-            {
-                attachment.loadAction = RenderBufferLoadAction.Clear;
-                attachment.clearDepth = handleData.descriptor.clearDepth;
-                attachment.clearStencil = handleData.descriptor.clearStencil;
-            }
-
-            // If the handle gets freed before this native render pass ends, we can discard the contents, otherwise they must be stored as another pass is going to use it
-            var requiresStore = handleData.freeIndex1 > endPassIndex || handleData.freeIndex1 == -1;
-            if (requiresStore)
-                attachment.storeAction = RenderBufferStoreAction.Store;
-
-            // If the handle is created and freed during the renderpass, we can avoid allocating a target entirely. (TODO: The render target system may still create a texture which may be unused)
-            if (requiresLoad || requiresStore)
-                attachment.loadStoreTarget = depthAttachment.Value.target;
-
-            attachments[^1] = attachment;
-        }
-
-        renderPassDescriptors.Add(new(size.x, size.y, attachments, new(subPasses.AsArray(), Allocator.Temp), size.z, 1, depthAttachment.HasValue ? colorAttachments.Length : -1, -1, passName));
-
-        colorAttachments.Clear();
+        this.attachments.Clear();
         subPasses.Clear();
-        depthAttachment = null;
         passName = null;
-    }
-
-    private void EndSubPass()
-    {
-        var subPassInputs = new AttachmentIndexArray(inputs.Length);
-        {
-            for (var i = 0; i < inputs.Length; i++)
-            {
-                var input = inputs[i];
-                var index = -1;
-                for (var j = 0; j < colorAttachments.Length; j++)
-                    if (colorAttachments[j].target == input.target)
-                    {
-                        index = j;
-                        break;
-                    }
-
-                if (index == -1)
-                {
-                    index = colorAttachments.Length;
-                    colorAttachments.Add(input);
-                }
-
-                subPassInputs[i] = index;
-            }
-        }
-
-        var subPassOutputs = new AttachmentIndexArray(outputs.Length);
-        {
-            for (var i = 0; i < outputs.Length; i++)
-            {
-                var output = outputs[i];
-                var index = -1;
-                for (var j = 0; j < colorAttachments.Length; j++)
-                    if (colorAttachments[j].target == output.target)
-                    {
-                        index = j;
-                        break;
-                    }
-
-                if (index == -1)
-                {
-                    index = colorAttachments.Length;
-                    colorAttachments.Add(output);
-                }
-
-                subPassOutputs[i] = index;
-            }
-        }
-
-        subPasses.Add(new()
-        {
-            inputs = subPassInputs,
-            colorOutputs = subPassOutputs,
-            flags = flags
-        });
-
-        outputs.Clear();
-        inputs.Clear();
-        flags = SubPassFlags.None;
+        depthIndex = -1;
     }
 
     public void CreateNativeRenderPasses(List<RenderPass> renderPasses)
@@ -263,18 +264,12 @@ public class NativeRenderPassSystem : IDisposable
                 if (canMergePass)
                 {
                     // We allow some subpasses to have no depth attachment, by setting the flags to readonlydepthstencil
-                    if (depthAttachment.HasValue && !pass.depthBuffer.HasValue)
+                    if (!pass.depthBuffer.HasValue)
                     {
-                        pass.flags |= SubPassFlags.ReadOnlyDepthStencil;
+                        pass.flags = SubPassFlags.ReadOnlyDepthStencil;
                     }
 
-                    if (!depthAttachment.HasValue && pass.depthBuffer.HasValue)
-                    {
-                        // TODO: In this case, we should set the current as the depth attachment and set previous passes to readonly depth stencil
-                        canMergePass = false;
-                    }
-
-                    if (depthAttachment.HasValue && pass.depthBuffer.HasValue && depthAttachment.Value.target != new RenderTargetIdentifier(renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value), pass.MipLevel, pass.CubemapFace, pass.DepthSlice))
+                    if (depthIndex != -1 && pass.depthBuffer.HasValue && attachments[depthIndex].target != new RenderTargetIdentifier(renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value), pass.MipLevel, pass.CubemapFace, pass.DepthSlice))
                     {
                         // If both passes have depth texutres that do not match, do not merge them
                         canMergePass = false;

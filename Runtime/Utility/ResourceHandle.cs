@@ -1,4 +1,6 @@
-public readonly struct ResourceHandle<T>
+using System;
+
+public readonly struct ResourceHandle<T> : IEquatable<ResourceHandle<T>>
 {
 	public readonly int index;
 
@@ -7,8 +9,13 @@ public readonly struct ResourceHandle<T>
 		this.index = index;
 	}
 
-	public override int GetHashCode()
-	{
-		return index;
-	}
+    public static bool operator ==(ResourceHandle<T> left, ResourceHandle<T> right) => left.index == right.index;
+
+    public static bool operator !=(ResourceHandle<T> left, ResourceHandle<T> right) => left.index != right.index;
+
+    public override bool Equals(object obj) => obj is ResourceHandle<T> handle && Equals(handle);
+
+    public bool Equals(ResourceHandle<T> other) => index == other.index;
+
+    public override int GetHashCode() => index;
 }
