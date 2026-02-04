@@ -282,14 +282,15 @@ public class NativeRenderPassSystem : IDisposable
                     var inputCount = pass.frameBufferInputs.Count;
                     var outputCount = pass.OutputsToCameraTarget ? 1 : pass.colorTargets.Count;
 
-                    var canPassMergeWithSubPass = pass.flags == flags && inputCount == inputs.Length && outputCount == outputs.Length;
+                    var canPassMergeWithSubPass = subPasses.Length < 8 && pass.flags == flags && inputCount == inputs.Length && outputCount == outputs.Length;
                     if (canPassMergeWithSubPass)
                     {
                         // Check if all the inputs and outputs are equal (And in identical order) since this must be true for the pass to merge
                         for (var i = 0; i < inputCount; i++)
                         {
-                            var loadStoreTarget = renderGraph.RtHandleSystem.GetResource(pass.frameBufferInputs[i]);
-                            if (loadStoreTarget == inputs[i].target)
+                            var target = renderGraph.RtHandleSystem.GetResource(pass.frameBufferInputs[i]);
+                            var targetIdentifier = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice);
+                            if (targetIdentifier == inputs[i].target)
                                 continue;
 
                             canPassMergeWithSubPass = false;
