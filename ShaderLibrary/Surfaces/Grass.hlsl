@@ -163,7 +163,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float3 worldNormal = TangentToWorldNormal(tangentNormal, input.normal, input.tangent, 1);
 	
 	float3 albedo = _Color.rgb * albedoOpacity.rgb;
-	float occlusion = normalOcclusionRoughness.b; //lerp(0.5, normalOcclusionRoughness.b, input.uv.y);
+	float occlusion = 1;//normalOcclusionRoughness.b; //lerp(0.5, normalOcclusionRoughness.b, input.uv.y);
 	float roughness = 1 - ((1 - normalOcclusionRoughness.a) * _Smoothness);
 	float3 translucency = _Translucency.rgb * albedoOpacity.rgb * 2;
 	translucency.rgb = lerp(input.color, translucency.rgb, smoothstep(0, 0.5, input.uv.y));

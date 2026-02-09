@@ -64,11 +64,11 @@ float4 FragmentCompute(VertexFullscreenTriangleOutput input) : SV_Target
 		{
 			// Find the intersection with the next pixel, and use that as the starting point for the ray
 			float2 rayDir = omega * (2.0 * side - 1.0);
-			float minT = Min2(FastSign(rayDir) * (0.5 + 0.01) / rayDir);
-			float2 rayStart = input.position.xy + minT * rayDir;
+			float minT = Min2(FastSign(rayDir) / rayDir);
+			float2 rayStart = minT * rayDir + input.position.xy;
 			
 			// Clamp end point to screen boundaries to avoid wasting samples outside and to avoid issues reading out of bounds depth
-			float2 rayEnd = clamp(rayStart + rayDir * scaling, 0.0, ViewSize);
+			float2 rayEnd = clamp(rayStart + rayDir * scaling, 0.5, ViewSize - 0.5);
 			float2 ds = (rayEnd - rayStart) / Samples;
 		
 			float minHorizonCosAngle = cos((2 * side - 1) * HalfPi + n);

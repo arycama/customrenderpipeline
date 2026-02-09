@@ -467,7 +467,7 @@ float4 SphericalCapIntersection(float3 a, float cosA, float3 b, float cosB)
 {
 	float cosC = dot(a, b);
 	if (cosC <= CosineAddition(cosA, cosB))
-		return float4(a, 0);
+		return float4(a, 1.0);
 
 	// Cone a fully inside cone b, return cone a
 	if (cosB <= CosineAddition(cosA, cosC))
