@@ -43,12 +43,16 @@ float4 FragmentCompute(VertexFullscreenTriangleOutput input) : SV_Target
 
 	float correction = 0.0;
 	float4 result = 0.0;
+	#ifdef SINGLE_SAMPLE
+	{
+	float phi = Pi * noise.x;
+	#else
 	for (float i = 0.0; i < Directions; i++)
 	{
 		float phi = Pi / Directions * (i + noise.x);
-		float2 omega = float2(cos(phi), sin(phi));
+		#endif
 		
-		float3 directionV = float3(omega, 0);
+		float3 directionV = float3(cos(phi), sin(phi), 0);
 		float3 orthoDirectionV = FromToRotationZ(-viewV, directionV);
 		float3 axisV = normalize(cross(directionV, viewV));
 		float3 projNormalV = ProjectOnPlane(normalV, axisV);
@@ -63,7 +67,7 @@ float4 FragmentCompute(VertexFullscreenTriangleOutput input) : SV_Target
 		for (float side = 0; side < 2; side++)
 		{
 			// Find the intersection with the next pixel, and use that as the starting point for the ray
-			float2 rayDir = omega * (2.0 * side - 1.0);
+			float2 rayDir = directionV.xy * (2.0 * side - 1.0);
 			float minT = Min2(FastSign(rayDir) / rayDir);
 			float2 rayStart = minT * rayDir + input.position.xy;
 			
@@ -127,7 +131,7 @@ float4 FragmentCompute(VertexFullscreenTriangleOutput input) : SV_Target
 		
 		// Calculated by repeating the above while keeping horizonCosAngle at -1
 		correction += (n * sin(n) + cosN) * weight;
-		result.xyz += SphericalToCartesian(phi, cosTheta, sinTheta) * weight;
+		result.xyz += SphericalToCartesian(directionV.x, directionV.y, cosTheta, sinTheta) * weight;
 	}
 	
 	float3 bentNormalV = FromToRotationZ(-viewV, result.xyz * float3(1, 1, -1));

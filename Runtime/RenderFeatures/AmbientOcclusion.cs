@@ -82,6 +82,9 @@ public partial class AmbientOcclusion : ViewRenderFeature
 				pass.ReadResource<FrameData>();
 				pass.ReadResource<ViewData>();
 
+                if (settings.Directions == 1)
+                    pass.AddKeyword("SINGLE_SAMPLE");
+
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					pass.SetFloat("Radius", data.Radius);

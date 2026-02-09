@@ -466,6 +466,7 @@ float SphericalCapIntersectionCosAngle(float3 a, float cosA, float3 b, float cos
 float4 SphericalCapIntersection(float3 a, float cosA, float3 b, float cosB)
 {
 	float cosC = dot(a, b);
+	// Cones do not intersect at all, return cone a with cosAngle of 1 (Angle of zero)
 	if (cosC <= CosineAddition(cosA, cosB))
 		return float4(a, 1.0);
 

@@ -79,21 +79,12 @@ float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAn
 	float illuminance = saturate(NdotL);
 	if (isDirectional)
 	{
-		//float sinSigmaSq = SinSigmaSq;
 		if (MicroShadows)
 		{
-			illuminance *= Sq(saturate(saturate(dot(B, L)) / cosVisibilityAngle));
-		//	float4 intersectionResult = SphericalCapIntersection(B, cosVisibilityAngle, L, SunCosAngle);
-		//	if (intersectionResult.a == 0)
-		//		sinSigmaSq = 0;
-		//	else
-		//	{
-		//		float cosTheta = dot(intersectionResult.xyz, N);
-		//		sinSigmaSq = 1.0 - Sq(intersectionResult.a);
-		//	}
+			float4 intersectionResult = SphericalCapIntersection(B, cosVisibilityAngle, L, SunCosAngle);
+			float intersectionSolidAngle = ConeCosAngleToSolidAngle(intersectionResult.a);
+			illuminance *= ConeCosAngleToSolidAngle(intersectionResult.a) * SunRcpSolidAngle;
 		}
-		
-		//illuminance = DiskIlluminance(NdotL, sinSigmaSq) * SunRcpSolidAngle;
 	}
 	
 	diffuseTerm *= DirectionalAlbedoMs.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float3(abs(NdotL), perceptualRoughness, f0Avg), 16), 0.0);
