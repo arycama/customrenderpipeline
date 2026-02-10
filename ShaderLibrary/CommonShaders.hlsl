@@ -40,7 +40,7 @@ VertexFullscreenTriangleMinimalOutput VertexFullscreenTriangleMinimal(uint id : 
 	uint localId = id % 3;
 	float2 uv = (localId << uint2(1, 0)) & 2;
 	
-	output.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
+	output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
 	output.uv = uv;
 	
@@ -59,7 +59,7 @@ VertexFullscreenTriangleVolumeOutput VertexFullscreenTriangleVolume(uint id : SV
 	uint localId = id % 3;
 	float2 uv = (localId << uint2(1, 0)) & 2;
 	
-	output.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
+	output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
 	output.uv = uv;
 	
@@ -76,7 +76,7 @@ VertexFullscreenTriangleOutput VertexFullscreenTriangle(uint id : SV_VertexID)
 	uint localId = id % 3;
 	float2 uv = (localId << uint2(1, 0)) & 2;
 	
-	output.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
+	output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
 	output.uv = uv;
 	
@@ -115,7 +115,7 @@ void FullscreenGeometryPassthrough(uint id[3], uint instanceId, inout TriangleSt
 		float2 uv = (localId << uint2(1, 0)) & 2;
 		
 		GeometryVolumeRenderOutput output;
-		output.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
+		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 		uv.y = 1.0 - uv.y;
 		output.uv = uv;
 		output.worldDir = GetFrustumCorner(id[i]);
