@@ -38,7 +38,12 @@ VertexFullscreenTriangleMinimalOutput VertexFullscreenTriangleMinimal(uint id : 
 	VertexFullscreenTriangleMinimalOutput output;
 
 	uint localId = id % 3;
-	float2 uv = (localId << uint2(1, 0)) & 2;
+	
+	#ifdef FLIP
+		float2 uv = (localId << uint2(1, 0)) & 2;
+	#else
+		float2 uv = (localId << uint2(0, 1)) & 2;
+	#endif
 	
 	output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
@@ -57,7 +62,12 @@ VertexFullscreenTriangleVolumeOutput VertexFullscreenTriangleVolume(uint id : SV
 	VertexFullscreenTriangleVolumeOutput output;
 
 	uint localId = id % 3;
-	float2 uv = (localId << uint2(1, 0)) & 2;
+	
+	#ifdef FLIP
+		float2 uv = (localId << uint2(1, 0)) & 2;
+	#else
+		float2 uv = (localId << uint2(0, 1)) & 2;
+	#endif
 	
 	output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
@@ -74,7 +84,12 @@ VertexFullscreenTriangleOutput VertexFullscreenTriangle(uint id : SV_VertexID)
 	VertexFullscreenTriangleOutput output;
 
 	uint localId = id % 3;
-	float2 uv = (localId << uint2(1, 0)) & 2;
+	
+	#ifdef FLIP
+		float2 uv = (localId << uint2(1, 0)) & 2;
+	#else
+		float2 uv = (localId << uint2(0, 1)) & 2;
+	#endif
 	
 	output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 	uv.y = 1.0 - uv.y;
