@@ -5,6 +5,8 @@ using UnityEngine.Rendering;
 
 public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 {
+    private static int resourceCount;
+
 	// TODO: Should we just use the Builtin renderTextureDescriptor struct?
 	public int width;
 	public int height;
@@ -67,17 +69,21 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 		var depthFormat = isDepth ? format : GraphicsFormat.None;
 		var stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None;
 
-		var result = new RenderTexture(width, height, graphicsFormat, depthFormat)
-		{
-			autoGenerateMips = false, // Always false, we manually handle mip generation if needed
-			dimension = dimension,
-			enableRandomWrite = enableRandomWrite,
-			hideFlags = HideFlags.HideAndDontSave,
-			stencilFormat = stencilFormat,
-			useMipMap = hasMips,
-			volumeDepth = volumeDepth,
-			vrUsage = vrTextureUsage
-		};
+        var result = new RenderTexture(width, height, graphicsFormat, depthFormat)
+        {
+            autoGenerateMips = false, // Always false, we manually handle mip generation if needed
+            dimension = dimension,
+            enableRandomWrite = enableRandomWrite,
+            hideFlags = HideFlags.HideAndDontSave,
+            stencilFormat = stencilFormat,
+            useMipMap = hasMips,
+            volumeDepth = volumeDepth,
+            vrUsage = vrTextureUsage,
+
+#if UNITY_EDITOR
+            name = $"{resourceCount++} {ToString()}"
+#endif
+        };
 
 		Assert.IsTrue(result.Create());
 
