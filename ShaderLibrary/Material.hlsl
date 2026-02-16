@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#ifndef MATERIAL_INCLUDED
+#define MATERIAL_INCLUDED
 
 // Todo: a lot of this stuff should go into some kind of textureSampling.hlsl file. This file should be concerned with material specific things such as converting roughness, occlusion, etc
 
@@ -179,3 +180,5 @@ float LengthToSmoothness(float normalLength)
 	float perceptualRoughness = LengthToPerceptualRoughness(normalLength);
 	return PerceptualRoughnessToSmoothness(perceptualRoughness);
 }
+
+#endif

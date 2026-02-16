@@ -194,6 +194,14 @@ float3 FromToRotationZ(float3 baseNormal, float3 detailNormal)
 	return (dot(t, u) * rcp(t.z)) * t - u;
 }
 
+float3 FromToRotationZInverse(float3 baseNormal, float3 detailNormal)
+{
+	float3 t = baseNormal + float3(0, 0, 1);
+	float k = dot(detailNormal, t) / (dot(t, t) - t.z);
+	float3 u = k * t - detailNormal;
+	return u * float3(-1, -1, 1);
+}
+
 float3 SampleConeUniform(float u1, float u2, float cosTheta)
 {
 	float r0 = lerp(cosTheta, 1.0, u1);
