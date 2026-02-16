@@ -97,7 +97,8 @@ public class BlitToScreenPass<T> : RenderPass<T>
         foreach (var keyword in keywords)
             Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
 
-        Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * FrameBufferSize.z, 1, PropertyBlock);
+        var primitiveCount = SystemInfo.supportsMultiview ? 3 : 3 * FrameBufferSize.z;
+        Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, primitiveCount, 1, PropertyBlock);
 
         foreach (var keyword in keywords)
             Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
