@@ -100,11 +100,11 @@ float3 UnpackNormalRGBNoScale(float4 packedNormal)
     return packedNormal.rgb * 2.0 - 1.0;
 }
 
-float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
+half3 UnpackNormalAG(half4 packedNormal, half scale = 1.0h)
 {
-    float3 normal;
-    normal.xy = packedNormal.ag * 2.0 - 1.0;
-    normal.z = max(1.0e-16, sqrt(1.0 - saturate(dot(normal.xy, normal.xy))));
+    half3 normal;
+    normal.xy = packedNormal.ag * 2.0h - 1.0h;
+    normal.z = max(1.0e-16h, sqrt(1.0h - saturate(dot(normal.xy, normal.xy))));
 
     // must scale after reconstruction of normal.z which also
     // mirrors UnpackNormalRGB(). This does imply normal is not returned
@@ -118,22 +118,22 @@ float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
 }
 
 // Unpack normal as DXT5nm (1, y, 0, x) or BC5 (x, y, 0, 1)
-float3 UnpackNormalMapRGorAG(float4 packedNormal, float scale = 1.0)
+half3 UnpackNormalMapRGorAG(half4 packedNormal, half scale = 1.0h)
 {
     // Convert to (?, y, 0, x)
     packedNormal.a *= packedNormal.r;
     return UnpackNormalAG(packedNormal, scale);
 }
 
-float3 UnpackNormal(float4 packedNormal)
+half3 UnpackNormal(half4 packedNormal)
 {
 	#if defined(UNITY_ASTC_NORMALMAP_ENCODING)
-		return UnpackNormalAG(packedNormal, 1.0);
+		return UnpackNormalAG(packedNormal, 1.0h);
 	#elif defined(UNITY_NO_DXT5nm)
 		return UnpackNormalRGBNoScale(packedNormal);
 	#else
 		// Compiler will optimize the scale away
-		return UnpackNormalMapRGorAG(packedNormal, 1.0);
+		return UnpackNormalMapRGorAG(packedNormal, 1.0h);
 	#endif
 }
 
