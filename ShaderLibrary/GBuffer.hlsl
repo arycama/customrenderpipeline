@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Common.hlsl"
 #include "Color.hlsl"
 #include "Geometry.hlsl"
 #include "Material.hlsl"

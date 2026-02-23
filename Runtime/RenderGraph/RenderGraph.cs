@@ -293,16 +293,12 @@ public class RenderGraph : IDisposable
         pass.WriteBuffer("", buffer);
         pass.SetRenderFunction(static (command, pass, data) =>
         {
-            var array = ArrayPool<byte>.Get(data.size);
-
-            fixed (byte* arrayPtr = array)
+            var array = new NativeArray<T>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
             {
-                byte* sourcePtr = (byte*)&data.data;
-                Buffer.MemoryCopy(sourcePtr, arrayPtr, data.size, data.size);
+                array[0] = data.data;
             }
 
             command.SetBufferData(pass.GetBuffer(data.buffer), array);
-            ArrayPool<byte>.Release(array);
         });
 
         return buffer;

@@ -7,6 +7,7 @@ Shader "Hidden/GgxConvolve"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment Fragment
+            #define FLIP
             #include "GgxConvolve.hlsl"
             ENDHLSL
         }

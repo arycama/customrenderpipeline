@@ -143,17 +143,21 @@ float4 Rotate(float4 a, float4 b)
 	return float4(a.xyz * b.w + b.xyz * a.w + cross(a.xyz, b.xyz), a.w * b.w - dot(a.xyz, b.xyz));
 }
 
-float3 RotateVector(float4 q, float3 a)
+float3 RotateVector(float4 q, float3 v)
 {
-	float3 t = 2.0 * cross(q.xyz, a);
-	return a + q.w * t + cross(q.xyz, t);
+	float3 qv = q.xyz;
+	float3 t = 2.0 * cross(qv, v);
+	return v + q.w * t + cross(qv, t);
 }
 
 // Quaternion that rotates between from and to
-float4 FromToRotation(float3 a, float3 b)
+float4 FromToRotation(float3 F, float3 T)
 {
-	float d = rsqrt(2.0 * dot(a, b) + 2.0);
-	return float4(cross(a, b), dot(a, b) + 1.0) * d;
+	float rcpS = rsqrt(dot(F, T) * 2.0 + 2.0);
+	float4 result;
+	result.xyz = cross(F, T) * rcpS;
+	result.w = rcp(rcpS) * 0.5;
+	return result;
 }
 
 float4 QuaternionFromCosTheta(float cosTheta, float phi)
@@ -183,17 +187,19 @@ float4 Quaternion(float theta, float phi)
 
 // Calculates a rotation from (0,0,1) to baseNormal, and applies that rotation to detailNormal using shortest arc quaternion
 // https://blog.selfshadow.com/publications/blending-in-detail/
-float3 FromToRotationZ(float3 t, float3 u)
+float3 FromToRotationZ(float3 baseNormal, float3 detailNormal)
 {
-	t.z += 1.0;
-	u.xy = -u.xy;
+	float3 t = baseNormal + float2(0, 1).xxy;
+	float3 u = detailNormal * float2(-1, 1).xxy;
 	return (dot(t, u) * rcp(t.z)) * t - u;
 }
 
-float3 FromToRotationZInverse(float3 t, float3 u)
+float3 FromToRotationZInverse(float3 baseNormal, float3 detailNormal)
 {
-	t.z += 1.0;
-	return (dot(t, u) * rcp(t.z) * t - u) * float2(-1, 1).xxy;
+	float3 t = baseNormal + float3(0, 0, 1);
+	float k = dot(detailNormal, t) / (dot(t, t) - t.z);
+	float3 u = k * t - detailNormal;
+	return u * float3(-1, -1, 1);
 }
 
 float3 SampleConeUniform(float u1, float u2, float cosTheta)

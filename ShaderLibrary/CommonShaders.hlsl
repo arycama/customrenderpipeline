@@ -38,10 +38,16 @@ VertexFullscreenTriangleMinimalOutput VertexFullscreenTriangleMinimal(uint id : 
 	VertexFullscreenTriangleMinimalOutput output;
 
 	uint localId = id % 3;
-	float2 uv = (localId << uint2(1, 0)) & 2;
 	
-	output.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
-	uv.y = 1.0 - uv.y;
+	#ifdef FLIP
+		float2 uv = (localId << uint2(1, 0)) & 2;
+		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+		uv.y = 1.0 - uv.y;
+	#else
+		float2 uv = (localId << uint2(0, 1)) & 2;
+		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+	#endif
+	
 	output.uv = uv;
 	
 	// If using stereo instancing or rendering to a volume texture, every 3 vertices makes a triangle for a seperate layer
@@ -57,10 +63,16 @@ VertexFullscreenTriangleVolumeOutput VertexFullscreenTriangleVolume(uint id : SV
 	VertexFullscreenTriangleVolumeOutput output;
 
 	uint localId = id % 3;
-	float2 uv = (localId << uint2(1, 0)) & 2;
 	
-	output.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
-	uv.y = 1.0 - uv.y;
+	#ifdef FLIP
+		float2 uv = (localId << uint2(1, 0)) & 2;
+		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+		uv.y = 1.0 - uv.y;
+	#else
+		float2 uv = (localId << uint2(0, 1)) & 2;
+		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+	#endif
+	
 	output.uv = uv;
 	
 	// TODO: Will need to handle this specially for android
@@ -74,10 +86,16 @@ VertexFullscreenTriangleOutput VertexFullscreenTriangle(uint id : SV_VertexID)
 	VertexFullscreenTriangleOutput output;
 
 	uint localId = id % 3;
-	float2 uv = (localId << uint2(1, 0)) & 2;
 	
-	output.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
-	uv.y = 1.0 - uv.y;
+	#ifdef FLIP
+		float2 uv = (localId << uint2(1, 0)) & 2;
+		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+		uv.y = 1.0 - uv.y;
+	#else
+		float2 uv = (localId << uint2(0, 1)) & 2;
+		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
+	#endif
+	
 	output.uv = uv;
 	
 	#if defined(VOLUME_RENDER) || defined(STEREO_INSTANCING_ON)
@@ -115,7 +133,7 @@ void FullscreenGeometryPassthrough(uint id[3], uint instanceId, inout TriangleSt
 		float2 uv = (localId << uint2(1, 0)) & 2;
 		
 		GeometryVolumeRenderOutput output;
-		output.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
+		output.position = float3(uv * 2.0 - 1.0, 1.0).xyzz;
 		uv.y = 1.0 - uv.y;
 		output.uv = uv;
 		output.worldDir = GetFrustumCorner(id[i]);
