@@ -19,6 +19,7 @@ Shader "Hidden/Screen Space Shadows"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #define FLIP
             #include "ScreenSpaceShadows.hlsl"
             ENDHLSL
         }
@@ -28,6 +29,7 @@ Shader "Hidden/Screen Space Shadows"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSpatial
+            #define FLIP
             #include "ScreenSpaceShadows.hlsl"
             ENDHLSL
         }
@@ -37,6 +39,7 @@ Shader "Hidden/Screen Space Shadows"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentTemporal
+            #define FLIP
             #include "ScreenSpaceShadows.hlsl"
             ENDHLSL
         }

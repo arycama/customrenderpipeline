@@ -23,6 +23,7 @@ Shader "Hidden/Underwater Lighting 1"
             #pragma fragment Fragment
             #pragma target 5.0
             #define UNDERWATER_LIGHTING_ON
+            #define FLIP
             #include "UnderwaterLighting.hlsl"
             ENDHLSL
         }

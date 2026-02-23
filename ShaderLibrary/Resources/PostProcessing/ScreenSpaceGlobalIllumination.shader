@@ -18,6 +18,7 @@ Shader "Hidden/ScreenSpaceGlobalIllumination"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #define FLIP
             #include "ScreenSpaceGlobalIllumination.hlsl"
             ENDHLSL
         }
@@ -27,6 +28,7 @@ Shader "Hidden/ScreenSpaceGlobalIllumination"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSpatial
+            #define FLIP
             #include "ScreenSpaceGlobalIllumination.hlsl"
             ENDHLSL
         }
@@ -36,6 +38,7 @@ Shader "Hidden/ScreenSpaceGlobalIllumination"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
+            #define FLIP
             #include "ScreenSpaceGlobalIllumination.hlsl"
             ENDHLSL
         }

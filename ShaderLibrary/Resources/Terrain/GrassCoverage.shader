@@ -12,6 +12,7 @@ Shader "Hidden/Grass Coverage"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #define FLIP
             #include "GrassCoverage.hlsl"
             ENDHLSL
         }

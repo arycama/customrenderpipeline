@@ -28,6 +28,7 @@ Shader "Hidden/Water Caustics"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentBlit
+            #define FLIP
             #include "WaterCaustics.hlsl"
             ENDHLSL
         }
@@ -39,6 +40,7 @@ Shader "Hidden/Water Caustics"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentPrepare
+            #define FLIP
             #include "WaterCaustics.hlsl"
             ENDHLSL
         }

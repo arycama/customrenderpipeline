@@ -31,6 +31,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	private readonly TerrainShadowRenderer terrainShadowRenderer;
 	private readonly GpuDrivenRenderer gpuDrivenRenderer;
 	private readonly QuadtreeCull quadtreeCull;
+    private readonly EnvironmentConvolve environmentConvolve;
 
 	public CustomRenderPipeline(CustomRenderPipelineAsset renderPipelineAsset) : base(renderPipelineAsset)
 	{
@@ -43,6 +44,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		terrainSystem = new TerrainSystem(renderGraph, asset.TerrainSettings);
         terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, asset.TerrainSettings, quadtreeCull);
 		gpuDrivenRenderer = new GpuDrivenRenderer(renderGraph);
+        environmentConvolve = new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting);
 	}
 
 	protected override void Dispose(bool disposing)
@@ -324,10 +326,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// Light processing
 		new LightingSetup(renderGraph, asset.LightingSettings),
 		new PhysicalSkyGenerateData(asset.Sky, asset.Clouds, renderGraph),
-		new PhysicalSkyProbe(renderGraph, asset.EnvironmentLighting, asset.Clouds, asset.Sky),
-		new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting),
+        new PhysicalSkyProbe(renderGraph, asset.EnvironmentLighting, asset.Clouds, asset.Sky, environmentConvolve),
+        environmentConvolve,
 
-		new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer, gpuDrivenRenderer),
+        new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer, gpuDrivenRenderer),
 		new ParticleShadows(renderGraph, asset.ParticleShadows),
 		new VolumetricCloudShadow(asset.Clouds, asset.Sky, renderGraph),
 		new WaterShadowRenderer(renderGraph, asset.OceanSettings, quadtreeCull),

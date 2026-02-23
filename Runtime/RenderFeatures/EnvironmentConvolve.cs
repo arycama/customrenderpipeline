@@ -4,18 +4,18 @@ using UnityEngine.Experimental.Rendering;
 
 public class EnvironmentConvolve : ViewRenderFeature
 {
-	public override string ProfilerNameOverride => "Ggx Convolve";
+    public override string ProfilerNameOverride => "Ggx Convolve";
 
-	private readonly Material convolveMaterial;
-	private readonly EnvironmentLightingSettings settings;
+    private readonly Material convolveMaterial;
+    private readonly EnvironmentLightingSettings settings;
     private readonly Dictionary<int, (ResourceHandle<RenderTexture> reflection, ResourceHandle<GraphicsBuffer> ambient)> viewBuffers = new();
 
     private readonly Dictionary<int, (int requested, int current)> viewIndexGenerationCounter = new();
 
-	public EnvironmentConvolve(RenderGraph renderGraph, EnvironmentLightingSettings settings) : base(renderGraph)
-	{
-		convolveMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
-		this.settings = settings;
+    public EnvironmentConvolve(RenderGraph renderGraph, EnvironmentLightingSettings settings) : base(renderGraph)
+    {
+        convolveMaterial = new Material(Shader.Find("Hidden/GgxConvolve")) { hideFlags = HideFlags.HideAndDontSave };
+        this.settings = settings;
     }
 
     public void UpdateView(int viewId)
@@ -51,7 +51,6 @@ public class EnvironmentConvolve : ViewRenderFeature
             reflection = viewBuffer.reflection;
             ambient = viewBuffer.ambient;
         }
-
 
         if (viewIndexGenerationCounter.TryGetValue(viewRenderData.viewId, out var viewIndexGeneration) && viewIndexGeneration.requested > viewIndexGeneration.current)
         {
@@ -128,7 +127,8 @@ public class EnvironmentConvolve : ViewRenderFeature
                     });
                 }
             }
-
-            renderGraph.SetResource(new EnvironmentData(reflectionProbe, ambientBuffer, settings.Resolution), true);
         }
+
+        renderGraph.SetResource(new EnvironmentData(reflection, ambient, settings.Resolution), true);
+    }
 }
