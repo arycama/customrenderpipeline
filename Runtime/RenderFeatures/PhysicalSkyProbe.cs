@@ -67,7 +67,8 @@ public class PhysicalSkyProbe : ViewRenderFeature
 			{
 				data.cloudSettings.SetCloudPassData(pass, data.time);
 				pass.SetFloat("_Samples", data.skySettings.ReflectionSamples);
-			});
+				pass.SetFloat("Resolution", data.skySettings.ReflectionResolution);
+            });
 		}
 
 		renderGraph.SetResource(new EnvironmentProbeTempResult(reflectionProbeTemp));

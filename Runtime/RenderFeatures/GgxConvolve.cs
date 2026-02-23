@@ -106,10 +106,11 @@ public class EnvironmentConvolve : ViewRenderFeature
                     pass.SetFloat("RcpOmegaP", data.envResolution * data.envResolution / (4.0f * Math.Pi * data.Samples));
                     pass.SetFloat("PerceptualRoughness", mipPerceptualRoughness);
                     pass.SetFloat("Roughness", mipRoughness);
+                    pass.SetFloat("Resolution", data.envResolution);
                 });
             }
         }
 
-        renderGraph.SetResource(new EnvironmentData(reflectionProbe, ambientBuffer), true);
+        renderGraph.SetResource(new EnvironmentData(reflectionProbe, ambientBuffer, settings.Resolution), true);
 	}
 }

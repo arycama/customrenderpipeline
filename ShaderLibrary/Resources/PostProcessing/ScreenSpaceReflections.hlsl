@@ -38,10 +38,10 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	
 	float4 normalRoughness = GBufferNormalRoughness[position.xy];
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV, ViewToWorld, WorldToView);
 	
 	float2 u = Noise2D(position.xy);
-	float roughness = max(1e-6, Sq(normalRoughness.a));
+	float roughness = max(1e-3, Sq(normalRoughness.b));
 	float rcpPdf;
 	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	
@@ -98,12 +98,12 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	
 	float4 normalRoughness = GBufferNormalRoughness[position.xy];
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV, ViewToWorld, WorldToView);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
 	
-	float roughness = max(1e-6, Sq(normalRoughness.a));
+	float roughness = max(1e-3, Sq(normalRoughness.b));
 
 	float4 albedoMetallic = GBufferAlbedoMetallic[position.xy];
     float3 f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
@@ -144,7 +144,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 		float LdotV = dot(L, V);
 		float weight = GgxSingleScatter(roughness2, NdotL, LdotV, NdotV, partLambdaV, f0) * NdotL;
 		float4 hitColor = _Input[coord];
-		float weightOverPdf = weight* hitColor.w;
+		float weightOverPdf = weight * hitColor.w;
 		
 		if (hasHit)
 		{

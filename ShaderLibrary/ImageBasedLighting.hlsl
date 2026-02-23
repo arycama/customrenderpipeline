@@ -8,6 +8,7 @@
 
 Texture3D<float> SpecularOcclusion;
 Texture2D<float3> SkyReflection;
+float SkyReflectionSize;
 
 cbuffer AmbientShBuffer
 {

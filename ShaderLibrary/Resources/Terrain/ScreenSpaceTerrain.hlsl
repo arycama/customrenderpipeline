@@ -35,5 +35,6 @@ GBufferOutput Fragment(VertexFullscreenTriangleOutput input)
 	visibilityCone.a = cos((0.5 * visibilityCone.a + 0.5) * HalfPi);
 	visibilityCone = SphericalCapIntersection(normal, cos(visibilityAngle * HalfPi), visibilityCone.xyz, visibilityCone.a);
 	
-	return OutputGBuffer(albedoRoughness.rgb, 0, normal, albedoRoughness.a, visibilityCone.xyz, FastACos(visibilityCone.a) * RcpHalfPi, 0, 0, input.position.xy, false);
+	float3 V = normalize(-input.worldDirection);
+	return OutputGBuffer(albedoRoughness.rgb, 0, normal, albedoRoughness.a, visibilityCone.xyz, FastACos(visibilityCone.a) * RcpHalfPi, 0, 0, input.position.xy, V, false, WorldToView);
 }

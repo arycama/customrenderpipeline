@@ -32,8 +32,10 @@ float4 UnpackWeight(float4 input, out float weight)
 
 float4 FragmentCompute(VertexFullscreenTriangleOutput input) : SV_Target
 {
+	float3 V = normalize(-input.worldDirection);
+
 	float2 noise = Noise2D(input.position.xy);
-	float3 normalV = mul((float3x3) WorldToView, UnpackGBufferNormal(GBufferNormalRoughness[input.position.xy]));
+	float3 normalV = mul((float3x3) WorldToView, UnpackGBufferNormal(GBufferNormalRoughness[input.position.xy], V, ViewToWorld, WorldToView));
 	float3 viewPosition = ComputeViewspacePosition(input.position.xy);
 	float3 viewV = normalize(-viewPosition);
 
@@ -214,16 +216,19 @@ float4 FragmentTemporal(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	return result;
 }
 
-float4 FragmentCombine(VertexFullscreenTriangleMinimalOutput input) : SV_Target
+float4 FragmentCombine(VertexFullscreenTriangleOutput input) : SV_Target
 {
+	float3 V = normalize(-input.worldDirection);
+
 	float4 result = Input[input.position.xy];
 	result.xyz = normalize(result.xyz);
 	result.a = VisibilityToConeCosAngle(pow(ConeAngleToVisibility(result.a), Strength));
 	
 	// Combine with existing cone 
 	float4 bentNormalOcclusion = GBufferBentNormalOcclusion[input.position.xy];
-	bentNormalOcclusion.xyz = UnpackGBufferNormal(bentNormalOcclusion);
+	bentNormalOcclusion.a = bentNormalOcclusion.b;
+	bentNormalOcclusion.xyz = UnpackGBufferNormal(bentNormalOcclusion, V, ViewToWorld, WorldToView);
 	
 	result = SphericalCapIntersection(bentNormalOcclusion.xyz, cos(bentNormalOcclusion.a * HalfPi), result.xyz, result.w);
-	return float4(PackGBufferNormal(result.xyz), FastACos(result.a) * RcpHalfPi);
+	return float4(PackGBufferNormal(result.xyz, V, WorldToView), FastACos(result.a) * RcpHalfPi, 0);
 }

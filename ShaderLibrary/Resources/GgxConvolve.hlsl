@@ -4,11 +4,12 @@
 #include "../Samplers.hlsl"
 
 Texture2D<float3> Input;
-float RcpSamples, RcpOmegaP, PerceptualRoughness, Roughness;
+float RcpSamples, RcpOmegaP, PerceptualRoughness, Roughness, Resolution;
 uint Samples;
 
 float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
+	input.uv = Remap(input.uv, 0, 1, 0 + rcp(Resolution), 1.0 - rcp(Resolution));
 	float3 N = OctahedralUvToNormal(input.uv);
 	float3 localV = float3(0.0, 0.0, 1.0);
 	
@@ -23,6 +24,8 @@ float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 		float2 uv = NormalToOctahedralUv(L);
 		float mipLevel = 0.5 * log2(rcp(pdf) * RcpOmegaP) + PerceptualRoughness;
 		
+		float mipPadding = exp2(-ceil(mipLevel));
+		uv = Remap(uv, 0, 1, 0 + rcp(Resolution * mipPadding), 1.0 - rcp(Resolution * mipPadding));
 		float3 color = Input.SampleLevel(TrilinearClampSampler, uv, mipLevel);
 		result += weightOverPdf * color;
 	}

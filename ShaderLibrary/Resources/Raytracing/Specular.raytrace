@@ -35,9 +35,9 @@ void RayGeneration()
 	float3 V = normalize(-worldPosition);
 	
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV, ViewToWorld, WorldToView);
 	
-	float roughness = Sq(normalRoughness.a);
+	float roughness = Sq(normalRoughness.b);
 	float rcpPdf;
 	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	

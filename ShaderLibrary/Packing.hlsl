@@ -42,6 +42,47 @@ float3 HemiOctahedralUvToNormal(float2 uv)
 	return normalize(float3(val, 1.0 - dot(abs(val), 1.0)));
 }
 
+float2 NormalToHemiOctahedralUvPrecise(float3 v, const in int n = 1023.0)
+{
+	float2 s = 2.0 * NormalToHemiOctahedralUv(v) - 1.0; // Remap to the square
+	
+	// Each snorm’s max value interpreted as an integer,
+	// e.g., 127.0 for snorm8
+	float M = float(1 << ((n / 2) - 1)) - 1.0;
+	
+	// Remap components to snorm(n/2) precision...with floor instead
+	// of round (see equation 1)
+	s = floor(clamp(s, -1.0, +1.0) * M) * (1.0 / M);
+	float2 bestRepresentation = s;
+	float highestCosine = dot(HemiOctahedralUvToNormal(0.5 * s + 0.5), v);
+	
+	// Test all combinations of floor and ceil and keep the best.
+	// Note that at +/- 1, this will exit the square... but that
+	// will be a worse encoding and never win.
+	for (int i = 0; i <= 1; ++i)
+	{
+		for (int j = 0; j <= 1; ++j)
+		{
+			// This branch will be evaluated at compile time
+			if ((i != 0) || (j != 0))
+			{
+				// Offset the bit pattern (which is stored in floating
+				// point!) to effectively change the rounding mode
+				// (when i or j is 0: floor, when it is one: ceiling)
+				float2 candidate = float2(i, j) * (1 / M) + s;
+				float cosine = dot(HemiOctahedralUvToNormal(0.5 * candidate + 0.5), v);
+				if (cosine > highestCosine)
+				{
+					bestRepresentation = candidate;
+					highestCosine = cosine;
+				}
+			}
+		}
+	}
+	
+	return 0.5 * bestRepresentation + 0.5;
+}
+
 float2 NormalToOctahedralUv(float3 n)
 {
 	n *= rcp(dot(abs(n), 1.0));
@@ -56,6 +97,47 @@ float3 OctahedralUvToNormal(float2 uv)
 	float t = saturate(-n.z);
 	n.xy += n.xy >= 0.0 ? -t : t;
 	return normalize(n);
+}
+
+float2 NormalToOctahedralUvPrecise(float3 v, const in int n)
+{
+	float2 s = 2.0 * NormalToOctahedralUv(v) - 1.0; // Remap to the square
+	
+	// Each snorm’s max value interpreted as an integer,
+	// e.g., 127.0 for snorm8
+	float M = float(1 << ((n / 2) - 1)) - 1.0;
+	
+	// Remap components to snorm(n/2) precision...with floor instead
+	// of round (see equation 1)
+	s = floor(clamp(s, -1.0, +1.0) * M) * (1.0 / M);
+	float2 bestRepresentation = s;
+	float highestCosine = dot(OctahedralUvToNormal(0.5 * s + 0.5), v);
+	
+	// Test all combinations of floor and ceil and keep the best.
+	// Note that at +/- 1, this will exit the square... but that
+	// will be a worse encoding and never win.
+	for (int i = 0; i <= 1; ++i)
+	{
+		for (int j = 0; j <= 1; ++j)
+		{
+			// This branch will be evaluated at compile time
+			if ((i != 0) || (j != 0))
+			{
+				// Offset the bit pattern (which is stored in floating
+				// point!) to effectively change the rounding mode
+				// (when i or j is 0: floor, when it is one: ceiling)
+				float2 candidate = float2(i, j) * (1 / M) + s;
+				float cosine = dot(OctahedralUvToNormal(0.5 * candidate + 0.5), v);
+				if (cosine > highestCosine)
+				{
+					bestRepresentation = candidate;
+					highestCosine = cosine;
+				}
+			}
+		}
+	}
+	
+	return bestRepresentation;
 }
 
 uint Float3ToR11G11B10(float3 rgb)
@@ -89,22 +171,22 @@ float3 UnpackNormalUNorm(float2 packedNormal, float scale = 1.0)
 // Unpack from normal map
 float3 UnpackNormalRGB(float4 packedNormal, float scale = 1.0)
 {
-    float3 normal;
-    normal.xyz = packedNormal.rgb * 2.0 - 1.0;
-    normal.xy *= scale;
-    return normal;
+	float3 normal;
+	normal.xyz = packedNormal.rgb * 2.0 - 1.0;
+	normal.xy *= scale;
+	return normal;
 }
 
 float3 UnpackNormalRGBNoScale(float4 packedNormal)
 {
-    return packedNormal.rgb * 2.0 - 1.0;
+	return packedNormal.rgb * 2.0 - 1.0;
 }
 
 float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
 {
-    float3 normal;
-    normal.xy = packedNormal.ag * 2.0 - 1.0;
-    normal.z = max(1.0e-16, sqrt(1.0 - saturate(dot(normal.xy, normal.xy))));
+	float3 normal;
+	normal.xy = packedNormal.ag * 2.0 - 1.0;
+	normal.z = max(1.0e-16, sqrt(1.0 - saturate(dot(normal.xy, normal.xy))));
 
     // must scale after reconstruction of normal.z which also
     // mirrors UnpackNormalRGB(). This does imply normal is not returned
@@ -113,28 +195,28 @@ float3 UnpackNormalAG(float4 packedNormal, float scale = 1.0)
     // then we should consider using UnpackDerivativeNormalAG() instead like
     // HDRP does since derivatives do not use renormalization and unlike tangent space
     // normals allow you to blend, accumulate and scale contributions correctly.
-    normal.xy *= scale;
-    return normal;
+	normal.xy *= scale;
+	return normal;
 }
 
 // Unpack normal as DXT5nm (1, y, 0, x) or BC5 (x, y, 0, 1)
 float3 UnpackNormalMapRGorAG(float4 packedNormal, float scale = 1.0)
 {
     // Convert to (?, y, 0, x)
-    packedNormal.a *= packedNormal.r;
-    return UnpackNormalAG(packedNormal, scale);
+	packedNormal.a *= packedNormal.r;
+	return UnpackNormalAG(packedNormal, scale);
 }
 
 float3 UnpackNormal(float4 packedNormal)
 {
-	#if defined(UNITY_ASTC_NORMALMAP_ENCODING)
+#if defined(UNITY_ASTC_NORMALMAP_ENCODING)
 		return UnpackNormalAG(packedNormal, 1.0);
-	#elif defined(UNITY_NO_DXT5nm)
+#elif defined(UNITY_NO_DXT5nm)
 		return UnpackNormalRGBNoScale(packedNormal);
-	#else
+#else
 		// Compiler will optimize the scale away
-		return UnpackNormalMapRGorAG(packedNormal, 1.0);
-	#endif
+	return UnpackNormalMapRGorAG(packedNormal, 1.0);
+#endif
 }
 
 #endif
