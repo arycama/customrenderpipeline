@@ -11,13 +11,15 @@ public class PhysicalSkyProbe : ViewRenderFeature
 	private readonly VolumetricClouds.Settings cloudSettings;
 	private readonly Sky.Settings skySettings;
 	private readonly Dictionary<int, ResourceHandle<RenderTexture>> cameraProbeHandles = new();
+    private readonly EnvironmentConvolve environmentConvolve;
 
-	public PhysicalSkyProbe(RenderGraph renderGraph, EnvironmentLightingSettings environmentLighting, VolumetricClouds.Settings cloudSettings, Sky.Settings skySettings) : base(renderGraph)
+	public PhysicalSkyProbe(RenderGraph renderGraph, EnvironmentLightingSettings environmentLighting, VolumetricClouds.Settings cloudSettings, Sky.Settings skySettings, EnvironmentConvolve environmentConvolve) : base(renderGraph)
 	{
         skyMaterial = new Material(Shader.Find("Hidden/Physical Sky")) { hideFlags = HideFlags.HideAndDontSave };
 		this.environmentLighting = environmentLighting;
 		this.cloudSettings = cloudSettings;
 		this.skySettings = skySettings;
+        this.environmentConvolve = environmentConvolve;
 	}
 
 	protected override void Cleanup(bool disposing)
@@ -67,9 +69,11 @@ public class PhysicalSkyProbe : ViewRenderFeature
 			{
 				data.cloudSettings.SetCloudPassData(pass, data.time);
 				pass.SetFloat("_Samples", data.skySettings.ReflectionSamples);
-			});
+				pass.SetFloat("Resolution", data.skySettings.ReflectionResolution);
+            });
 		}
 
 		renderGraph.SetResource(new EnvironmentProbeTempResult(reflectionProbeTemp));
-	}
+        environmentConvolve.UpdateView(viewRenderData.viewId);
+    }
 }

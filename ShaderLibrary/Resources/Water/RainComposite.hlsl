@@ -14,6 +14,8 @@ float RainTextureSize, WetLevel;
 
 FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
+	float3 V = normalize(-worldDir);
+
 	float depth = CameraDepth[position.xy];
 	float eyeDepth = LinearEyeDepth(depth);
 	float3 worldPosition = worldDir * eyeDepth;
@@ -35,11 +37,11 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	float4 normalRoughness = GBufferNormalRoughness[screenUv];
 	float4 bentNormalOcclusion = GBufferBentNormalOcclusion[screenUv];
-	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion);
+	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion, V, ViewToWorld, WorldToView);
 	
 	float3 albedo = UnpackAlbedo(albedoMetallic.rg, screenUv, a0.xy, a1.xy);
-	float3 normal = UnpackGBufferNormal(normalRoughness);
-	float roughness = normalRoughness.a;
+	float3 normal = UnpackGBufferNormal(normalRoughness, V, ViewToWorld, WorldToView);
+	float roughness = normalRoughness.b;
 	
 	// Approx from https://seblagarde.wordpress.com/2013/04/14/water-drop-3b-physically-based-wet-surfaces/
 	float porosity = saturate((roughness - 0.5) / 0.4);
@@ -54,7 +56,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	FragmentOutput output;
 	output.albedoMetallic = float4(PackAlbedo(albedo, position.xy), isTranslucent ? PackAlbedo(translucency, position.xy) : float2(0, albedoMetallic.a));
-	output.normalRoughness = float4(PackGBufferNormal(normal), roughness);
-	output.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal), bentNormalOcclusion.a);
+	output.normalRoughness = float4(PackGBufferNormal(normal, V, WorldToView), roughness, 0);
+	output.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal, V, WorldToView), bentNormalOcclusion.b, 0);
 	return output;
 }

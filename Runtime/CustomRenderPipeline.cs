@@ -4,11 +4,9 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using static Math;
 
-
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
-
 public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelineAsset>
 {
 	private static readonly IndexedString blueNoise1DIds = new("STBN/stbn_vec1_2Dx1D_128x128x64_", 64);
@@ -33,6 +31,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	private readonly TerrainShadowRenderer terrainShadowRenderer;
 	private readonly GpuDrivenRenderer gpuDrivenRenderer;
 	private readonly QuadtreeCull quadtreeCull;
+    private readonly EnvironmentConvolve environmentConvolve;
 
 	public CustomRenderPipeline(CustomRenderPipelineAsset renderPipelineAsset) : base(renderPipelineAsset)
 	{
@@ -45,6 +44,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		terrainSystem = new TerrainSystem(renderGraph, asset.TerrainSettings);
         terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, asset.TerrainSettings, quadtreeCull);
 		gpuDrivenRenderer = new GpuDrivenRenderer(renderGraph);
+        environmentConvolve = new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting);
 	}
 
 	protected override void Dispose(bool disposing)
@@ -184,8 +184,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			renderGraph.SetRTHandle<PreviousCameraTarget>(previousScene);
 
 			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("Deferred", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, true);
@@ -326,10 +326,10 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// Light processing
 		new LightingSetup(renderGraph, asset.LightingSettings),
 		new PhysicalSkyGenerateData(asset.Sky, asset.Clouds, renderGraph),
-		new PhysicalSkyProbe(renderGraph, asset.EnvironmentLighting, asset.Clouds, asset.Sky),
-		new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting),
+        new PhysicalSkyProbe(renderGraph, asset.EnvironmentLighting, asset.Clouds, asset.Sky, environmentConvolve),
+        environmentConvolve,
 
-		new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer, gpuDrivenRenderer),
+        new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer, gpuDrivenRenderer),
 		new ParticleShadows(renderGraph, asset.ParticleShadows),
 		new VolumetricCloudShadow(asset.Clouds, asset.Sky, renderGraph),
 		new WaterShadowRenderer(renderGraph, asset.OceanSettings, quadtreeCull),

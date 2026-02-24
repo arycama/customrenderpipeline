@@ -16,6 +16,8 @@ Texture2D<float3> CloudTexture;
 	#define SCENE
 #endif
 
+float Resolution;
+
 float3 SampleLuminance(float3 rayDirection, float xi, uint colorIndex, bool rayIntersectsGround, float maxRayLength, float3 maxLuminance)
 {
 	float viewCosAngle = rayDirection.y;
@@ -49,6 +51,7 @@ float3 SampleLuminance(float3 rayDirection, float xi, uint colorIndex, bool rayI
 float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 {
 	#ifdef REFLECTION_PROBE
+		input.uv = Remap(input.uv, 0, 1, 0 + rcp(Resolution), 1.0 - rcp(Resolution));
 		float3 rayDirection = OctahedralUvToNormal(input.uv);
 	#else
 		float rcpRdLength = RcpLength(input.worldDirection);

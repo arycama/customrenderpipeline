@@ -25,6 +25,8 @@ FragmentOutput FragmentCopy(VertexFullscreenTriangleMinimalOutput input)
 
 FragmentOutput FragmentCombine(VertexFullscreenTriangleOutput input)
 {
+	float3 V = normalize(-input.worldDirection);
+
 	float depth = CameraDepth[input.position.xy];
 	float eyeDepth = LinearEyeDepth(depth);
 	float3 worldPosition = input.worldDirection * eyeDepth;
@@ -32,13 +34,13 @@ FragmentOutput FragmentCombine(VertexFullscreenTriangleOutput input)
 	float4 albedoMetallic = AlbedoMetallicCopy[input.position.xy];
 	float4 normalRoughness = NormalRoughnessCopy[input.position.xy];
 	float4 bentNormalOcclusion = BentNormalOcclusionCopy[input.position.xy];
-	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion);
+	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion, V, ViewToWorld, WorldToView);
 	
 	float4 decal = DecalAlbedo[input.position.xy];
 	float4 decalNormal = DecalNormal[input.position.xy];
 	
 	float3 albedo = UnpackAlbedo(albedoMetallic.rg, input.position.xy);
-	float3 normal = UnpackGBufferNormal(normalRoughness);
+	float3 normal = UnpackGBufferNormal(normalRoughness, V, ViewToWorld, WorldToView);
 	float roughness = normalRoughness.a;
 	
 	albedo = lerp(albedo, decal.rgb, decal.a);
@@ -48,12 +50,12 @@ FragmentOutput FragmentCombine(VertexFullscreenTriangleOutput input)
 	bentNormal = lerp(bentNormal, decalNormal.xyz, decal.a); // Can skip normalize due to octahedral encode
 	
 	roughness = lerp(roughness, decalNormal.a, decal.a);
-	float visibilityAngle = lerp(bentNormalOcclusion.a, 1.0, decal.a); // TODO: Write out visibilityConeAngle from dbuffer pass
+	float visibilityAngle = lerp(bentNormalOcclusion.b, 1.0, decal.a); // TODO: Write out visibilityConeAngle from dbuffer pass
 
 	FragmentOutput output;
 	output.albedoMetallic = float4(PackAlbedo(albedo, input.position.xy), 0, albedoMetallic.a);
-	output.normalRoughness = float4(PackGBufferNormal(normal), roughness);
-	output.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal), visibilityAngle);
+	output.normalRoughness = float4(PackGBufferNormal(normal, V, WorldToView), roughness, 0);
+	output.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal, V, WorldToView), visibilityAngle, 0);
 	return output;
 	
 	// TODO: Implement

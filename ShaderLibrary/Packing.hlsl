@@ -42,6 +42,47 @@ float3 HemiOctahedralUvToNormal(float2 uv)
 	return normalize(float3(val, 1.0 - dot(abs(val), 1.0)));
 }
 
+float2 NormalToHemiOctahedralUvPrecise(float3 v, const in int n = 1023.0)
+{
+	float2 s = 2.0 * NormalToHemiOctahedralUv(v) - 1.0; // Remap to the square
+	
+	// Each snorm’s max value interpreted as an integer,
+	// e.g., 127.0 for snorm8
+	float M = float(1 << ((n / 2) - 1)) - 1.0;
+	
+	// Remap components to snorm(n/2) precision...with floor instead
+	// of round (see equation 1)
+	s = floor(clamp(s, -1.0, +1.0) * M) * (1.0 / M);
+	float2 bestRepresentation = s;
+	float highestCosine = dot(HemiOctahedralUvToNormal(0.5 * s + 0.5), v);
+	
+	// Test all combinations of floor and ceil and keep the best.
+	// Note that at +/- 1, this will exit the square... but that
+	// will be a worse encoding and never win.
+	for (int i = 0; i <= 1; ++i)
+	{
+		for (int j = 0; j <= 1; ++j)
+		{
+			// This branch will be evaluated at compile time
+			if ((i != 0) || (j != 0))
+			{
+				// Offset the bit pattern (which is stored in floating
+				// point!) to effectively change the rounding mode
+				// (when i or j is 0: floor, when it is one: ceiling)
+				float2 candidate = float2(i, j) * (1 / M) + s;
+				float cosine = dot(HemiOctahedralUvToNormal(0.5 * candidate + 0.5), v);
+				if (cosine > highestCosine)
+				{
+					bestRepresentation = candidate;
+					highestCosine = cosine;
+				}
+			}
+		}
+	}
+	
+	return 0.5 * bestRepresentation + 0.5;
+}
+
 float2 NormalToOctahedralUv(float3 n)
 {
 	n *= rcp(dot(abs(n), 1.0));
@@ -56,6 +97,47 @@ float3 OctahedralUvToNormal(float2 uv)
 	float t = saturate(-n.z);
 	n.xy += n.xy >= 0.0 ? -t : t;
 	return normalize(n);
+}
+
+float2 NormalToOctahedralUvPrecise(float3 v, const in int n)
+{
+	float2 s = 2.0 * NormalToOctahedralUv(v) - 1.0; // Remap to the square
+	
+	// Each snorm’s max value interpreted as an integer,
+	// e.g., 127.0 for snorm8
+	float M = float(1 << ((n / 2) - 1)) - 1.0;
+	
+	// Remap components to snorm(n/2) precision...with floor instead
+	// of round (see equation 1)
+	s = floor(clamp(s, -1.0, +1.0) * M) * (1.0 / M);
+	float2 bestRepresentation = s;
+	float highestCosine = dot(OctahedralUvToNormal(0.5 * s + 0.5), v);
+	
+	// Test all combinations of floor and ceil and keep the best.
+	// Note that at +/- 1, this will exit the square... but that
+	// will be a worse encoding and never win.
+	for (int i = 0; i <= 1; ++i)
+	{
+		for (int j = 0; j <= 1; ++j)
+		{
+			// This branch will be evaluated at compile time
+			if ((i != 0) || (j != 0))
+			{
+				// Offset the bit pattern (which is stored in floating
+				// point!) to effectively change the rounding mode
+				// (when i or j is 0: floor, when it is one: ceiling)
+				float2 candidate = float2(i, j) * (1 / M) + s;
+				float cosine = dot(OctahedralUvToNormal(0.5 * candidate + 0.5), v);
+				if (cosine > highestCosine)
+				{
+					bestRepresentation = candidate;
+					highestCosine = cosine;
+				}
+			}
+		}
+	}
+	
+	return bestRepresentation;
 }
 
 uint Float3ToR11G11B10(float3 rgb)
@@ -104,7 +186,7 @@ half3 UnpackNormalAG(half4 packedNormal, half scale = 1.0h)
 {
     half3 normal;
     normal.xy = packedNormal.ag * 2.0h - 1.0h;
-    normal.z = max(1.0e-16h, sqrt(1.0h - saturate(dot(normal.xy, normal.xy))));
+	normal.z = sqrt(saturate(1.0h - dot(normal.xy, normal.xy)));
 
     // must scale after reconstruction of normal.z which also
     // mirrors UnpackNormalRGB(). This does imply normal is not returned

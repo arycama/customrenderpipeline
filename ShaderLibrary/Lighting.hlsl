@@ -325,6 +325,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float3 iblR = GetSpecularDominantDir(N, R, roughness, NdotV);
 	float iblMipLevel = PerceptualRoughnessToMipmapLevel(perceptualRoughness);
 	float2 skyUv = NormalToOctahedralUv(iblR);
+	skyUv = Remap(skyUv, 0, 1, 0 + rcp(SkyReflectionSize), 1.0 - rcp(SkyReflectionSize));
 	float3 radiance = SkyReflection.SampleLevel(TrilinearClampSampler, skyUv, iblMipLevel) * rStrength;
 	
 	float BdotR = dot(bentNormal, R);

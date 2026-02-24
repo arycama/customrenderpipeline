@@ -12,6 +12,7 @@ Shader "Hidden/Terrain Id Map"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #define FLIP
             #include "TerrainIdMap.hlsl"
             ENDHLSL
         }

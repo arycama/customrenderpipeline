@@ -40,12 +40,12 @@ void RayGeneration()
 	float3 V = normalize(-worldPosition);
 	
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV, ViewToWorld, WorldToView);
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	//worldPosition = PlanetCurveInverse(worldPosition);
 	
-	float roughness = Sq(normalRoughness.a);
+	float roughness = Sq(normalRoughness.b);
 	
 	bool isFrontFace;
 	float3 triangleNormal = GetTriangleNormal(position.xy, V, isFrontFace);

@@ -168,8 +168,10 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float3 translucency = _Translucency.rgb * albedoOpacity.rgb * 2;
 	translucency.rgb = lerp(input.color, translucency.rgb, smoothstep(0, 0.5, input.uv.y));
 		
+	float3 V = normalize(-input.worldPosition);
+		
 	FragmentOutput output;
-	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, occlusion, 0, translucency, input.position.xy, true);
+	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, occlusion, 0, translucency, input.position.xy, V, true, WorldToView);
 	output.velocity = CalculateVelocity(input.position.xy * RcpViewSize, input.previousPositionCS);
 	return output;
 }

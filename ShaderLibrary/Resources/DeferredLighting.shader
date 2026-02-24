@@ -26,6 +26,7 @@ Shader "Hidden/Deferred Lighting"
             #define SCREEN_SPACE_SHADOWS
             #define SCREENSPACE_REFLECTIONS_ON
             #define SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
+            #define FLIP
             #include "DeferredLighting.hlsl"
             ENDHLSL
         }
@@ -49,6 +50,7 @@ Shader "Hidden/Deferred Lighting"
             #define SCREENSPACE_REFLECTIONS_ON
             #define SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
             #define TRANSLUCENCY
+            #define FLIP
             #include "DeferredLighting.hlsl"
             ENDHLSL
         }

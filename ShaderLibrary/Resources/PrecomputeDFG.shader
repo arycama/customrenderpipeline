@@ -13,6 +13,7 @@ Shader "Hidden/PrecomputeDfg"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentDirectionalAlbedo
+            #define FLIP
             #include "PrecomputeDFG.hlsl"
             ENDHLSL
         }
@@ -22,6 +23,7 @@ Shader "Hidden/PrecomputeDfg"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentAverageAlbedo
+            #define FLIP
             #include "PrecomputeDFG.hlsl"
             ENDHLSL
         }
@@ -32,6 +34,7 @@ Shader "Hidden/PrecomputeDfg"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentDirectionalAlbedoMultiScattered
+            #define FLIP
             #include "PrecomputeDFG.hlsl"
             ENDHLSL
         }
@@ -41,6 +44,7 @@ Shader "Hidden/PrecomputeDfg"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentAverageAlbedoMultiScattered
+            #define FLIP
             #include "PrecomputeDFG.hlsl"
             ENDHLSL
         }
@@ -51,6 +55,7 @@ Shader "Hidden/PrecomputeDfg"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentSpecularOcclusion
+            #define FLIP
             #include "PrecomputeDFG.hlsl"
             ENDHLSL
         }

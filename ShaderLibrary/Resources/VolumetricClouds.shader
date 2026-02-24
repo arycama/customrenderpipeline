@@ -13,6 +13,7 @@ Shader "Hidden/Volumetric Clouds"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentWeatherMap
+            #define FLIP
             #include "VolumetricCloudsTextures.hlsl"
             ENDHLSL
         }
@@ -25,6 +26,7 @@ Shader "Hidden/Volumetric Clouds"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentNoise
+            #define FLIP
             #include "VolumetricCloudsTextures.hlsl"
             ENDHLSL
         }
@@ -37,6 +39,7 @@ Shader "Hidden/Volumetric Clouds"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentDetailNoise
+            #define FLIP
             #include "VolumetricCloudsTextures.hlsl"
             ENDHLSL
         }
@@ -50,6 +53,7 @@ Shader "Hidden/Volumetric Clouds"
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #define CLOUD_SHADOW
+            #define FLIP
             #include "VolumetricClouds.hlsl"
             ENDHLSL
         }
@@ -63,6 +67,7 @@ Shader "Hidden/Volumetric Clouds"
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #pragma multi_compile _ BELOW_CLOUD_LAYER ABOVE_CLOUD_LAYER
+            #define FLIP
             #include "VolumetricClouds.hlsl"
             ENDHLSL
         }
@@ -79,6 +84,7 @@ Shader "Hidden/Volumetric Clouds"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
+            #define FLIP
             #include "VolumetricClouds.hlsl"
             ENDHLSL
         }

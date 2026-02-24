@@ -69,7 +69,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	worldNormal = TangentToWorldNormal(tangentNormal, worldNormal, tangent, 1.0);
 	
 	float3 V = -normalize(worldPosition);
-	float3 gbufferNormal = GBufferNormal(input.position.xy, GBufferNormalRoughness, V);
+	float3 gbufferNormal = GBufferNormal(input.position.xy, GBufferNormalRoughness, V, ViewToWorld, WorldToView);
 	worldNormal = normalize(lerp(worldNormal, gbufferNormal, NormalBlend));
 	
 	// TODO: Compile define?
@@ -82,7 +82,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float3 geoNormal = normalize(cross(ddy(worldPosition), ddx(worldPosition)));
 	
 	// Approx from https://seblagarde.wordpress.com/2013/04/14/water-drop-3b-physically-based-wet-surfaces/
-	float roughness = GBufferNormalRoughness[input.position.xy].a;
+	float roughness = GBufferNormalRoughness[input.position.xy].b;
 	float porosity = saturate((roughness - 0.5) / 0.4);
 	float wetLevel = saturate(dot(geoNormal, float3(0, 1, 0)));
 	
