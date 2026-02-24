@@ -18,9 +18,9 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	 
 	float3 albedo = UnpackAlbedo(albedoMetallic.rg, position.xy);
 	float metallic = albedoMetallic.a;
-	float3 normal = GBufferNormal(position.xy, GBufferNormalRoughness, V, ViewToWorld, WorldToView);
+	float3 normal = GBufferNormal(position.xy, GBufferNormalRoughness, V);
 	float perceptualRoughness = normalRoughness.b;
-	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion, V, ViewToWorld, WorldToView);
+	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion, V);
 	float visibilityAngle = bentNormalOcclusion.b * HalfPi;
 	
 	float3 f0 = lerp(0.04, albedo.rgb, metallic);

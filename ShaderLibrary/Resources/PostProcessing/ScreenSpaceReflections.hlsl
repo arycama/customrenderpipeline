@@ -38,7 +38,7 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	
 	float4 normalRoughness = GBufferNormalRoughness[position.xy];
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV, ViewToWorld, WorldToView);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
 	float2 u = Noise2D(position.xy);
 	float roughness = max(1e-3, Sq(normalRoughness.b));
@@ -98,7 +98,7 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	
 	float4 normalRoughness = GBufferNormalRoughness[position.xy];
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV, ViewToWorld, WorldToView);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
 	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
 	float phi = Noise1D(position.xy) * TwoPi;
