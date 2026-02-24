@@ -9,7 +9,7 @@ public class ReloadRenderPipeline
 	[MenuItem("Tools/Reload Render Pipeline")]
 	public static void OnReloadRenderPipelineSelected()
 	{
-		if (GraphicsSettings.defaultRenderPipeline is CustomRenderPipelineAsset customRenderPipelineAsset)
+		if (GraphicsSettings.defaultRenderPipeline is CustomRenderPipelineAssetBase customRenderPipelineAsset)
 			customRenderPipelineAsset.ReloadRenderPipeline();
 	}
 }
