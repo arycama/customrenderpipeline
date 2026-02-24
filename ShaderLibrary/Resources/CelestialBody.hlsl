@@ -34,7 +34,7 @@ float4 CloudTextureScaleLimit, SkyTextureScaleLimit;
 float3 Fragment(FragmentInput input) : SV_Target
 {
 	float2 delta = input.uv - 0.5;
-	clip(Sq(0.5) - SqrLength(delta));
+	clip(Sq(0.5h) - SqrLength(delta));
 	
 	float3 V = TransformPixelToViewDirection(input.position.xy, true);
 	if (RayIntersectsGround(ViewHeight, -V.y))

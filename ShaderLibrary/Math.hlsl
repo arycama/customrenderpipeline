@@ -29,6 +29,11 @@ float2 Sq(float2 x) { return x * x; }
 float3 Sq(float3 x) { return x * x; }
 float4 Sq(float4 x) { return x * x; }
 
+half1 Sq(half1 x) { return x * x; }
+half2 Sq(half2 x) { return x * x; }
+half3 Sq(half3 x) { return x * x; }
+half4 Sq(half4 x) { return x * x; }
+
 float1 Cb(float1 x) { return x * x * x; }
 float2 Cb(float2 x) { return x * x * x; }
 float3 Cb(float3 x) { return x * x * x; }
