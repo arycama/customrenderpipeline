@@ -8,19 +8,21 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
     private int primitiveCount;
     private SinglePassStereoMode stereoMode;
     private bool flip;
+    private bool foveated;
 
     public override string ToString()
     {
         return $"{Name} {material} {passIndex}";
     }
 
-    public virtual void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None, bool flip = false)
+    public virtual void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None, bool flip = false, bool foveated = false)
     {
         this.material = material;
         this.passIndex = passIndex;
         this.primitiveCount = primitiveCount;
         this.stereoMode = stereoMode;
         this.flip = flip;
+        this.foveated = foveated;
     }
 
     public override void Reset()
@@ -56,7 +58,13 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
         if (flip)
             Command.EnableShaderKeyword("FLIP");
 
+        if(foveated)
+            Command.SetFoveatedRenderingMode(FoveatedRenderingMode.Enabled);
+
         Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, 3 * primitiveCount * instanceMultiplier, 1, PropertyBlock);
+
+        if (foveated)
+            Command.SetFoveatedRenderingMode(FoveatedRenderingMode.Disabled);
 
         if (flip)
             Command.DisableShaderKeyword("FLIP");

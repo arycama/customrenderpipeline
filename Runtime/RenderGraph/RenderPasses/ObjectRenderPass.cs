@@ -7,9 +7,12 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 	//private List<RendererList> rendererLists = new();
 	private RendererList rendererList;
 	private SinglePassStereoMode stereoMode;
+    private bool foveated;
 
-	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false)
+	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false, bool foveated = false)
 	{
+        this.foveated = foveated;
+
 		var rendererListDesc = new RendererListDesc(new ShaderTagId(tag), cullingResults, camera)
 		{
 			renderQueueRange = renderQueueRange,
@@ -81,9 +84,15 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 			Command.SetSinglePassStereo(SinglePassStereoMode.Multiview);
         }
 
+        if (foveated)
+            Command.SetFoveatedRenderingMode(FoveatedRenderingMode.Enabled);
+
         Command.DrawRendererList(rendererList);
 
-		if (stereoMode == SinglePassStereoMode.Instancing)
+        if (foveated)
+            Command.SetFoveatedRenderingMode(FoveatedRenderingMode.Disabled);
+
+        if (stereoMode == SinglePassStereoMode.Instancing)
 		{
             Command.SetSinglePassStereo(SinglePassStereoMode.None);
             Command.DisableShaderKeyword("STEREO_INSTANCING_ON");

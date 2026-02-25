@@ -6,6 +6,7 @@ public class BlitToScreenPass<T> : RenderPass<T>
 	private Material material;
     private int passIndex;
     private bool flip;
+    private bool foveated;
 
     public override bool OutputsToCameraTarget => true;
 
@@ -16,11 +17,12 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material, int passIndex = 0, bool flip = false)
+	public void Initialize(Material material, int passIndex = 0, bool flip = false, bool foveated = false)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
         this.flip = flip;
+        this.foveated = foveated;
     }
 
 	public override void Reset()
@@ -102,8 +104,14 @@ public class BlitToScreenPass<T> : RenderPass<T>
         if (flip)
             Command.EnableShaderKeyword("FLIP");
 
+        if (foveated)
+            Command.SetFoveatedRenderingMode(FoveatedRenderingMode.Enabled);
+
         var primitiveCount = SystemInfo.supportsMultiview ? 3 : 3 * FrameBufferSize.z;
         Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, primitiveCount, 1, PropertyBlock);
+
+        if (foveated)
+            Command.SetFoveatedRenderingMode(FoveatedRenderingMode.Disabled);
 
         if (flip)
             Command.DisableShaderKeyword("FLIP");
