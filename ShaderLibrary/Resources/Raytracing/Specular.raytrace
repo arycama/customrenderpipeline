@@ -35,7 +35,7 @@ void RayGeneration()
 	float3 V = normalize(-worldPosition);
 	
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV, ViewToWorld, WorldToView);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	
 	float roughness = Sq(normalRoughness.b);
 	float rcpPdf;

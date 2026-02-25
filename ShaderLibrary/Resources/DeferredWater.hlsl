@@ -192,7 +192,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
 	float3 V = normalize(-input.worldDirection);
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV, ViewToWorld, WorldToView);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	float kd = EnergyCompensationFactor(0.02, normalRoughness.b, NdotV).r;
 	
 	TemporalOutput output;

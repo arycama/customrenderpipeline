@@ -21,9 +21,9 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	//uint stencil = Stencil[input.position.xy].g;
 
 	float3 albedo = UnpackAlbedo(albedoMetallic.rg, input.position.xy);
-	float3 normal = GBufferNormal(input.position.xy, GBufferNormalRoughness, V, ViewToWorld, WorldToView);
+	float3 normal = GBufferNormal(input.position.xy, GBufferNormalRoughness, V);
 	float perceptualRoughness = normalRoughness.b;
-	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion, V, ViewToWorld, WorldToView);
+	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion, V);
 	float visibilityAngle = bentNormalOcclusion.b * HalfPi;
 	
 	#ifdef TRANSLUCENCY

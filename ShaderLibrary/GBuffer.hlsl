@@ -19,41 +19,78 @@ struct GBufferOutput
 
 Texture2D<float4> GBufferAlbedoMetallic, GBufferNormalRoughness, GBufferBentNormalOcclusion;
 
-float2 PackGBufferNormal(float3 N, float3 V, float3x3 worldToView)
+float3 PackNormalMajorAxis(float3 inNormal)
 {
-	N = mul(worldToView, N);
-	V = mul(worldToView, V);
-	return NormalToHemiOctahedralUv(FromToRotationZInverse(-V, -N));
+	uint index = 2;
+	if (abs(inNormal.x) >= abs(inNormal.y) && abs(inNormal.x) >= abs(inNormal.z))
+		index = 0;
+	else if (abs(inNormal.y) > abs(inNormal.z))
+		index = 1;
+		
+	float3 normal = inNormal;
+	normal = index == 0 ? normal.yzx : normal;
+	normal = index == 1 ? normal.xzy : normal;
+	float s = normal.z > 0.0 ? 1.0 : -1.0;
+	float3 packedNormal;
+	packedNormal.xy = normal.xy * s;
+	packedNormal.z = index / 2.0f;
+	return packedNormal;
 }
 
-float3 UnpackGBufferNormal(float4 data, float3 V, float3x3 ViewToWorld, float3x3 worldToView)
+float2 PackGBufferNormal(float3 N, float3 V)
 {
-	V = mul(worldToView, V);
-	float3 N = HemiOctahedralUvToNormal(data.xy);
-	return mul(ViewToWorld, normalize(FromToRotationZ(-V, -N)));
+	// Ref https://michaldrobot.com/wp-content/uploads/2014/05/gcn_alu_opt_digitaldragons2014.pdf
+	uint index = CubeMapFaceID(V) * 0.5;
+	V = index == 0 ? V.yzx : index == 1 ? V.xzy : V;
+	N = index == 0 ? N.yzx : index == 1 ? N.xzy : N;
+	
+	float s = FastSign(V.z);
+	V *= s;
+	N *= s;
+	
+	N = FromToRotationZInverse(V, N);
+	return NormalToHemiOctahedralUv(N);
 }
 
-float3 GBufferNormal(float4 data, float3 V, out float NdotV, float3x3 ViewToWorld, float3x3 worldToView)
+float3 UnpackGBufferNormal(float4 data, float3 V)
 {
-	float3 N = UnpackGBufferNormal(data, V, ViewToWorld, worldToView);
+	float3 N = HemiOctahedralUvToNormal(data.rg);
+	
+	// Ref https://michaldrobot.com/wp-content/uploads/2014/05/gcn_alu_opt_digitaldragons2014.pdf
+	uint index = CubeMapFaceID(V) * 0.5;
+	V = index == 0u ? V.yzx : index == 1u ? V.xzy : V;
+	
+	float s = FastSign(V.z);
+	V *= s;
+	N *= s;
+	
+	N = FromToRotationZ(V, N);
+	N = index == 0u ? N.zxy : index == 1u ? N.xzy : N;
+    
+	return N;
+}
+
+float3 GBufferNormal(float4 data, float3 V, out float NdotV)
+{
+	float3 N = UnpackGBufferNormal(data, V);
 	return GetViewClampedNormal(N, V, NdotV);
 }
 
-float3 GBufferNormal(float4 data, float3 V, float3x3 ViewToWorld, float3x3 worldToView)
+float3 GBufferNormal(float4 data, float3 V)
 {
 	float NdotV;
-	return GBufferNormal(data, V, NdotV, ViewToWorld, worldToView);
+	return GBufferNormal(data, V, NdotV);
 }
 
-float3 GBufferNormal(uint2 coord, Texture2D<float4> tex, float3 V, out float NdotV, float3x3 ViewToWorld, float3x3 worldToView)
+float3 GBufferNormal(uint2 coord, Texture2D<float4> tex, float3 V, out float NdotV)
 {
-	return GBufferNormal(tex[coord], V, NdotV, ViewToWorld, worldToView);
+	return GBufferNormal(tex[coord], V, NdotV);
 }
 
-float3 GBufferNormal(uint2 coord, Texture2D<float4> tex, float3 V, float3x3 ViewToWorld, float3x3 worldToView)
+float3 GBufferNormal(uint2 coord, Texture2D<float4> tex, float3 V)
 {
 	float NdotV;
-	return GBufferNormal(coord, tex, V, NdotV, ViewToWorld, worldToView);
+	return GBufferNormal(coord, tex, V, NdotV);
 }
 
 float2 PackAlbedo(float3 rgb, float2 screenPosition)
@@ -89,8 +126,8 @@ GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float 
 {
 	GBufferOutput gbuffer;
 	gbuffer.albedoMetallic = float4(PackAlbedo(albedo, screenPosition), isTranslucent ? PackAlbedo(translucency, screenPosition) : float2(0, metallic));
-	gbuffer.normalRoughness = float4(PackGBufferNormal(normal, V, worldToView), perceptualRoughness, 0);
-	gbuffer.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal, V, worldToView), visibilityAngle, 0);
+	gbuffer.normalRoughness = float4(PackGBufferNormal(normal, V), perceptualRoughness, 0);
+	gbuffer.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal, V), visibilityAngle, 0);
 	
 	#ifndef EMISSION_DISABLED
 		gbuffer.emissive = emissive;
