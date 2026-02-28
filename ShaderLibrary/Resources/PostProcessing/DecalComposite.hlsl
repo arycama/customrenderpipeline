@@ -34,13 +34,13 @@ FragmentOutput FragmentCombine(VertexFullscreenTriangleOutput input)
 	float4 albedoMetallic = AlbedoMetallicCopy[input.position.xy];
 	float4 normalRoughness = NormalRoughnessCopy[input.position.xy];
 	float4 bentNormalOcclusion = BentNormalOcclusionCopy[input.position.xy];
-	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion, V);
+	float3 bentNormal = GBufferNormal(bentNormalOcclusion, V);
 	
 	float4 decal = DecalAlbedo[input.position.xy];
 	float4 decalNormal = DecalNormal[input.position.xy];
 	
 	float3 albedo = UnpackAlbedo(albedoMetallic.rg, input.position.xy);
-	float3 normal = UnpackGBufferNormal(normalRoughness, V);
+	float3 normal = GBufferNormal(normalRoughness, V);
 	float roughness = normalRoughness.a;
 	
 	albedo = lerp(albedo, decal.rgb, decal.a);

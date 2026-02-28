@@ -237,13 +237,12 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 	return attenuation;
 }
 
-float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAngle, float3 albedo, float3 N, float3 bentNormal, float3 worldPosition, float3 translucency, uint2 pixelCoordinate, float eyeDepth, float opacity = 1.0, bool isWater = false, bool softShadows = false)
+float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAngle, float3 albedo, float3 N, float NdotV, float3 bentNormal, float3 worldPosition, float3 translucency, uint2 pixelCoordinate, float eyeDepth, float opacity = 1.0, bool isWater = false, bool softShadows = false)
 {
 	albedo = max(0.0, Rec709ToRec2020(albedo));
 	translucency = max(0.0, Rec709ToRec2020(translucency));
 
 	float3 V = normalize(-worldPosition);
-	float NdotV = dot(N, V);
 	
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 	float roughness2 = Sq(roughness);

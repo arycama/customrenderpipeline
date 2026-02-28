@@ -171,7 +171,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float3 V = normalize(-input.worldPosition);
 		
 	FragmentOutput output;
-	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, occlusion, 0, translucency, input.position.xy, V, true, WorldToView);
+	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, occlusion, 0, translucency, input.position.xy, V, true);
 	output.velocity = CalculateVelocity(input.position.xy * RcpViewSize, input.previousPositionCS);
 	return output;
 }

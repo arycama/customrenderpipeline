@@ -18,12 +18,12 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
 	float4 bentNormalOcclusion = GBufferBentNormalOcclusion[input.position.xy];
 	uint stencil = CameraStencil[input.position.xy].g;
-	//uint stencil = Stencil[input.position.xy].g;
 
 	float3 albedo = UnpackAlbedo(albedoMetallic.rg, input.position.xy);
-	float3 normal = GBufferNormal(input.position.xy, GBufferNormalRoughness, V);
+	float NdotV;
+	float3 normal = GBufferNormal(input.position.xy, GBufferNormalRoughness, V, NdotV);
 	float perceptualRoughness = normalRoughness.b;
-	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion, V);
+	float3 bentNormal = GBufferNormal(bentNormalOcclusion, V);
 	float visibilityAngle = bentNormalOcclusion.b * HalfPi;
 	
 	#ifdef TRANSLUCENCY
@@ -42,11 +42,11 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	float3 f0 = lerp(0.04, albedo.rgb, metallic);
 	albedo = lerp(albedo.rgb, 0, metallic);
 	
-	float3 result = EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, bentNormal, worldPosition, translucency, input.position.xy, eyeDepth, 1.0, isWater, true);
+	float3 result = EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, NdotV, bentNormal, worldPosition, translucency, input.position.xy, eyeDepth, 1.0, isWater, true).rgb;
 	
 	//return 0.5 * normal + 0.5;
 	
 	// Sky is added elsewhere but since it involves an RGB multiply which we can't do without dual source blending, apply it here. Even though this happens before cloud opacity, order doesn't matter for transmittance simple it is multiplicative
-	result *= Rec709ToRec2020(TransmittanceToPoint(ViewHeight, -V.y, eyeDepth * rcp(rcpVLength)));
+	//result *= Rec709ToRec2020(TransmittanceToPoint(ViewHeight, -V.y, eyeDepth * rcp(rcpVLength)));
 	return result;
 }

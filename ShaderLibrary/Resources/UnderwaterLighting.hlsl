@@ -20,7 +20,8 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	float metallic = albedoMetallic.a;
 	float3 normal = GBufferNormal(position.xy, GBufferNormalRoughness, V);
 	float perceptualRoughness = normalRoughness.b;
-	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion, V);
+	float NdotV;
+	float3 bentNormal = GBufferNormal(bentNormalOcclusion, V, NdotV);
 	float visibilityAngle = bentNormalOcclusion.b * HalfPi;
 	
 	float3 f0 = lerp(0.04, albedo.rgb, metallic);
@@ -29,7 +30,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	// TODO: Support?
 	float3 translucency = 0;
 	
-	float3 result = EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, bentNormal, worldPosition, translucency, position.xy, eyeDepth).rgb + CameraTarget[position.xy];
+	float3 result = EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, NdotV, bentNormal, worldPosition, translucency, position.xy, eyeDepth).rgb + CameraTarget[position.xy];
 	
 	float waterDepth = LinearEyeDepth(CameraDepth[position.xy]);
 	result *= Rec709ToRec2020(TransmittanceToPoint(ViewHeight, -V.y, waterDepth * rcp(rcpVLength)));

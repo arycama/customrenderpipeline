@@ -19,27 +19,8 @@ struct GBufferOutput
 
 Texture2D<float4> GBufferAlbedoMetallic, GBufferNormalRoughness, GBufferBentNormalOcclusion;
 
-float3 PackNormalMajorAxis(float3 inNormal)
-{
-	uint index = 2;
-	if (abs(inNormal.x) >= abs(inNormal.y) && abs(inNormal.x) >= abs(inNormal.z))
-		index = 0;
-	else if (abs(inNormal.y) > abs(inNormal.z))
-		index = 1;
-		
-	float3 normal = inNormal;
-	normal = index == 0 ? normal.yzx : normal;
-	normal = index == 1 ? normal.xzy : normal;
-	float s = normal.z > 0.0 ? 1.0 : -1.0;
-	float3 packedNormal;
-	packedNormal.xy = normal.xy * s;
-	packedNormal.z = index / 2.0f;
-	return packedNormal;
-}
-
 float2 PackGBufferNormal(float3 N, float3 V)
 {
-	// Ref https://michaldrobot.com/wp-content/uploads/2014/05/gcn_alu_opt_digitaldragons2014.pdf
 	uint index = CubeMapFaceID(V) * 0.5;
 	V = index == 0 ? V.yzx : index == 1 ? V.xzy : V;
 	N = index == 0 ? N.yzx : index == 1 ? N.xzy : N;
@@ -47,16 +28,19 @@ float2 PackGBufferNormal(float3 N, float3 V)
 	float s = FastSign(V.z);
 	V *= s;
 	N *= s;
-	
 	N = FromToRotationZInverse(V, N);
+	
+	if (N.z < 0)
+		N = float3(N.xy * RcpSinFromCos(N.z), 0.0);
+	
 	return NormalToHemiOctahedralUv(N);
 }
 
-float3 UnpackGBufferNormal(float4 data, float3 V)
+float3 GBufferNormal(float4 data, float3 V, out float NdotV)
 {
 	float3 N = HemiOctahedralUvToNormal(data.rg);
+	NdotV = N.z;
 	
-	// Ref https://michaldrobot.com/wp-content/uploads/2014/05/gcn_alu_opt_digitaldragons2014.pdf
 	uint index = CubeMapFaceID(V) * 0.5;
 	V = index == 0u ? V.yzx : index == 1u ? V.xzy : V;
 	
@@ -68,12 +52,6 @@ float3 UnpackGBufferNormal(float4 data, float3 V)
 	N = index == 0u ? N.zxy : index == 1u ? N.xzy : N;
     
 	return N;
-}
-
-float3 GBufferNormal(float4 data, float3 V, out float NdotV)
-{
-	float3 N = UnpackGBufferNormal(data, V);
-	return GetViewClampedNormal(N, V, NdotV);
 }
 
 float3 GBufferNormal(float4 data, float3 V)
@@ -122,7 +100,7 @@ float3 UnpackAlbedo(float2 enc, float2 screenPosition)
 	return UnpackAlbedo(enc, screenPosition, a0, a1);
 }
 
-GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float perceptualRoughness, float3 bentNormal, float visibilityAngle, float3 emissive, float3 translucency, float2 screenPosition, float3 V, bool isTranslucent, float3x3 worldToView)
+GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float perceptualRoughness, float3 bentNormal, float visibilityAngle, float3 emissive, float3 translucency, float2 screenPosition, float3 V, bool isTranslucent)
 {
 	GBufferOutput gbuffer;
 	gbuffer.albedoMetallic = float4(PackAlbedo(albedo, screenPosition), isTranslucent ? PackAlbedo(translucency, screenPosition) : float2(0, metallic));

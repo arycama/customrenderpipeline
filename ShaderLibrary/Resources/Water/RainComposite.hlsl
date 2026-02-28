@@ -37,10 +37,10 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, fl
 	
 	float4 normalRoughness = GBufferNormalRoughness[screenUv];
 	float4 bentNormalOcclusion = GBufferBentNormalOcclusion[screenUv];
-	float3 bentNormal = UnpackGBufferNormal(bentNormalOcclusion, V);
+	float3 bentNormal = GBufferNormal(bentNormalOcclusion, V);
 	
 	float3 albedo = UnpackAlbedo(albedoMetallic.rg, screenUv, a0.xy, a1.xy);
-	float3 normal = UnpackGBufferNormal(normalRoughness, V);
+	float3 normal = GBufferNormal(normalRoughness, V);
 	float roughness = normalRoughness.b;
 	
 	// Approx from https://seblagarde.wordpress.com/2013/04/14/water-drop-3b-physically-based-wet-surfaces/

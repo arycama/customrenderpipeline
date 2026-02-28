@@ -163,7 +163,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	}
 
 	FragmentOutput output;
-	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam), 0.0, input.position.xy, V, false, WorldToView);
+	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam), 0.0, input.position.xy, V, false);
 	output.luminance = Rec2020ToICtCp(luminance * PaperWhite);
 	return output;
 }
@@ -182,10 +182,14 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	float2 historyUv = input.uv - CameraVelocity[input.position.xy];
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
-		float3 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
-		history.r *= PreviousToCurrentExposure;
-		history = ClipToAABB(history, result, minValue, maxValue);
-		result = lerp(history, result, 0.05);
+		float3 history = _History.Sample(PointClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
+		
+		if(any(history != 0))
+		{
+			//history.r *= PreviousToCurrentExposure;
+			//history = ClipToAABB(history, result, minValue, maxValue);
+			//result = lerp(history, result, 0.05);
+		}
 	}
 	
 	// Apply roughness to transmission
