@@ -1,4 +1,5 @@
-#pragma once 
+#ifndef GT7_TONEMAP_INCLUDED
+#define GT7_TONEMAP_INCLUDED
 
 //
 // Sample implementation of the GT7 Tone Mapping operator.
@@ -39,7 +40,7 @@
 // -----------------------------------------------------------------------------
 // Defines the SDR reference white level used in our tone mapping (typically 250 nits).
 // -----------------------------------------------------------------------------
-#define GRAN_TURISMO_SDR_PAPER_WHITE 80.0f // cd/m^2
+#define GRAN_TURISMO_SDR_PAPER_WHITE 250.0f // cd/m^2
 
 // -----------------------------------------------------------------------------
 // Gran Turismo luminance-scale conversion helpers.
@@ -98,11 +99,7 @@ struct GTToneMappingCurveV2
 	float toeStrength_;
 	float kA_, kB_, kC_;
 
-	void initializeCurve(float monitorIntensity,
-                         float alpha,
-                         float grayPoint,
-                         float linearSection,
-                         float toeStrength)
+	void initializeCurve(float monitorIntensity, float alpha, float grayPoint, float linearSection, float toeStrength)
 	{
 		peakIntensity_ = monitorIntensity;
 		alpha_ = alpha;
@@ -146,8 +143,7 @@ struct GTToneMappingCurveV2
 // EOTF / inverse-EOTF for ST-2084 (PQ).
 // Note: Introduce exponentScaleFactor to allow scaling of the exponent in the EOTF for Jzazbz.
 // -----------------------------------------------------------------------------
-float
-eotfSt2084(float n, float exponentScaleFactor = 1.0f)
+float eotfSt2084(float n, float exponentScaleFactor = 1.0f)
 {
 	if (n < 0.0f)
 	{
@@ -185,8 +181,7 @@ eotfSt2084(float n, float exponentScaleFactor = 1.0f)
 	return physicalValueToFrameBufferValue(l * pqC);
 }
 
-float
-inverseEotfSt2084(float v, float exponentScaleFactor = 1.0f)
+float inverseEotfSt2084(float v, float exponentScaleFactor = 1.0f)
 {
 	float m1 = 0.1593017578125f;
 	float m2 = 78.84375f * exponentScaleFactor;
@@ -264,7 +259,7 @@ void rgbToJzazbz(float3 rgb, out float3 jab) // Input: linear Rec.2020
 	jab[2] = 0.199076f * lPQ + 1.096799f * mPQ - 1.295875f * sPQ;
 }
 
-void jzazbzToRgb(float3 jab, float3 rgb) // Output: linear Rec.2020
+void jzazbzToRgb(float3 jab, out float3 rgb) // Output: linear Rec.2020
 {
 	float jz = jab[0] + 1.6295499532821566e-11f;
 	float iz = jz / (0.44f + 0.56f * jz);
@@ -287,30 +282,28 @@ void jzazbzToRgb(float3 jab, float3 rgb) // Output: linear Rec.2020
 // -----------------------------------------------------------------------------
 // Unified color space (UCS): ICtCp or Jzazbz.
 // -----------------------------------------------------------------------------
-//#if TONE_MAPPING_UCS == TONE_MAPPING_UCS_ICTCP
-void rgbToUcs(float3 rgb, out float3 ucs)
-{
-    rgbToICtCp(rgb, ucs);
-}
+#if TONE_MAPPING_UCS == TONE_MAPPING_UCS_ICTCP
+    void rgbToUcs(float3 rgb, out float3 ucs)
+    {
+        rgbToICtCp(rgb, ucs);
+    }
 
-void ucsToRgb( float3 ucs, out float3 rgb)
-{
-    iCtCpToRgb(ucs, rgb);
-}
-//#elif TONE_MAPPING_UCS == TONE_MAPPING_UCS_JZAZBZ
-//void
-//rgbToUcs( float3 rgb, float3 ucs)
-//{
-//    rgbToJzazbz(rgb, ucs);
-//}
-//void
-//ucsToRgb( float3 ucs, float3 rgb)
-//{
-//    jzazbzToRgb(ucs, rgb);
-//}
-//#else
-//#error "Unsupported TONE_MAPPING_UCS value. Please define TONE_MAPPING_UCS as either TONE_MAPPING_UCS_ICTCP or TONE_MAPPING_UCS_JZAZBZ."
-//#endif
+    void ucsToRgb(float3 ucs, out float3 rgb)
+    {
+        iCtCpToRgb(ucs, rgb);
+    }
+#elif TONE_MAPPING_UCS == TONE_MAPPING_UCS_JZAZBZ
+    void rgbToUcs(float3 rgb, out float3 ucs)
+    {
+        rgbToJzazbz(rgb, ucs);
+    }
+    void ucsToRgb(float3 ucs, out float3 rgb)
+    {
+        jzazbzToRgb(ucs, rgb);
+    }
+#else
+    #error "Unsupported TONE_MAPPING_UCS value. Please define TONE_MAPPING_UCS as either TONE_MAPPING_UCS_ICTCP or TONE_MAPPING_UCS_JZAZBZ."
+#endif
 
 // -----------------------------------------------------------------------------
 // GT7 Tone Mapping class.
@@ -345,8 +338,8 @@ struct GT7ToneMapping
 		float3 rgb =
 		{
 			framebufferLuminanceTarget_,
-            framebufferLuminanceTarget_,
-            framebufferLuminanceTarget_
+                         framebufferLuminanceTarget_,
+                         framebufferLuminanceTarget_
 		};
 		rgbToUcs(rgb, ucs);
 		framebufferLuminanceTargetUcs_ =
@@ -386,8 +379,8 @@ struct GT7ToneMapping
     //         - in HDR mode: mapped to [0, framebufferLuminanceTarget_], ready for PQ inverse-EOTF
     // Note: framebufferLuminanceTarget_ represents the display's target peak luminance converted to a frame buffer value.
     //       The returned values are suitable for applying the appropriate OETF to generate final output signal.
-	float3 applyToneMapping(float3 rgb) 
-    {
+	void applyToneMapping(float3 rgb, out float3 output)
+	{
         // Convert to UCS to separate luminance and chroma.
 		float3 ucs;
 		rgbToUcs(rgb, ucs);
@@ -396,131 +389,36 @@ struct GT7ToneMapping
 		float3 skewedRgb =
 		{
 			curve_.evaluateCurve(rgb[0]),
-			curve_.evaluateCurve(rgb[1]),
-			curve_.evaluateCurve(rgb[2])
+                               curve_.evaluateCurve(rgb[1]),
+                               curve_.evaluateCurve(rgb[2])
 		};
 
 		float3 skewedUcs;
 		rgbToUcs(skewedRgb, skewedUcs);
 
-		float chromaScale = chromaCurve(ucs[0] / framebufferLuminanceTargetUcs_, fadeStart_, fadeEnd_);
+		float chromaScale =
+            chromaCurve(ucs[0] / framebufferLuminanceTargetUcs_, fadeStart_, fadeEnd_);
 
 		float3 scaledUcs =
 		{
 			skewedUcs[0], // Luminance from skewed color
-            ucs[1] * chromaScale, // Scaled chroma components
-            ucs[2] * chromaScale
+                                     ucs[1] * chromaScale, // Scaled chroma components
+                                     ucs[2] * chromaScale
 		};
 
         // Convert back to RGB.
 		float3 scaledRgb;
-        ucsToRgb(scaledUcs, scaledRgb);
+		ucsToRgb(scaledUcs, scaledRgb);
 
         // Final blend between per-channel and UCS-scaled results.
-		float3 outValue;
-        for (int i = 0; i < 3; ++i)
-        {
+		for (int i = 0; i < 3; ++i)
+		{
 			float blended = (1.0f - blendRatio_) * skewedRgb[i] + blendRatio_ * scaledRgb[i];
             // When using SDR, apply the correction factor.
             // When using HDR, sdrCorrectionFactor_ is 1.0f, so it has no effect.
-            outValue[i] = sdrCorrectionFactor_ * min(blended, framebufferLuminanceTarget_);
-        }
-		
-		return outValue;
+			output[i] = sdrCorrectionFactor_ * min(blended, framebufferLuminanceTarget_);
+		}
 	}
 };
 
-// -----------------------------------------------------------------------------
-// Below: Test harness for GT7ToneMapping
-// Includes test input data, utilities for printing results,
-// and main() entry point for SDR / HDR tone mapping evaluation.
-// -----------------------------------------------------------------------------
-
-//#include <array>
-//#include <cstdio>
-
-//using RGB = std::array < float, 3>;
-//using RGBArray = std::array < RGB, 3>;
-
-//void
-//printRGB(char* label, size_t index, RGB& rgb)
-//{
-//	printf(
-//        "%-30s[%zu]: R = %10.3f, G = %10.3f, B = %10.3f\n", label, index, rgb[0], rgb[1], rgb[2]);
-//}
-
-//void
-//printRGBPhysical(char* label, size_t index, RGB& rgb)
-//{
-//	printf("%-30s[%zu]: R = %10.3f, G = %10.3f, B = %10.3f\n",
-//           label,
-//           index,
-//           frameBufferValueToPhysicalValue(rgb[0]),
-//           frameBufferValueToPhysicalValue(rgb[1]),
-//           frameBufferValueToPhysicalValue(rgb[2]));
-//}
-
-//void
-//printToneMappingResult(GT7ToneMapping& toneMapper, size_t index, RGB& input)
-//{
-//	floatout[3];
-//	toneMapper.applyToneMapping(input.data(), out);
-
-//	RGB output = { out[0], out[1], out[2] };
-
-//	printRGB("Input  (frame buffer)", index, input);
-//	printRGB("Output (frame buffer)", index, output);
-//	printRGBPhysical("Input  (physical [cd/m^2])", index, input);
-//	printRGBPhysical("Output (physical [cd/m^2])", index, output);
-//	printf("\n");
-//}
-
-//// Test input colors in linear Rec. 2020 space (frame buffer values)
-//RGBArray inputs =
-//{
-//	{ { 0.5f, 1.23f, 0.75f }, { 12.3f, 34.3f, 56.9f }, { 1504.7f, 64.51f, 0.5f } }
-//};
-
-//void
-//testSDR()
-//{
-//	GT7ToneMapping toneMapper;
-//	toneMapper.initializeAsSDR();
-
-//	printf("# SDR Tone Mapping\n");
-//	for (size_t i = 0; i < inputs.size(); ++i)
-//	{
-//		printToneMappingResult(toneMapper, i, inputs[i]);
-//	}
-//}
-
-//void
-//testHDR(float f)
-//{
-//	GT7ToneMapping toneMapper;
-//	toneMapper.initializeAsHDR(f);
-
-//	printf("# Target Luminance: %.1f [cd/m^2]\n", f);
-//	for (size_t i = 0; i < inputs.size(); ++i)
-//	{
-//		printToneMappingResult(toneMapper, i, inputs[i]);
-//	}
-//}
-
-//int
-//main()
-//{
-//    // Run tone mapping test using SDR settings (standard dynamic range)
-//	testSDR();
-
-//    // Run tone mapping test for HDR display with 1000 cd/m^2 peak luminance
-//	testHDR(1000.0f);
-
-//    // Run tone mapping test for HDR display with 4000 cd/m^2 peak luminance
-//	testHDR(4000.0f);
-
-//    // Run tone mapping test for HDR display with 10000 cd/m^2 peak luminance
-//	testHDR(10000.0f);
-
-//	return 0;
-//}
+#endif

@@ -1,4 +1,4 @@
-#include "../Common.hlsl"
+﻿#include "../Common.hlsl"
 #include "../Color.hlsl"
 #include "../Exposure.hlsl"
 #include "../Material.hlsl"
@@ -17,6 +17,7 @@ float BloomStrength, MinLuminance, MaxLuminance;
 float4x4 RgbToLmsr, LmsToRgb;
 float Purkinje;
 float3 RodInputStrength;
+float Hdr;
 
 float3 T(float3 A, float3 Ks)
 {
@@ -127,17 +128,26 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 		color += Rec709ToRec2020(deltaC) * Exposure;
 	}
 	
-	color *= PaperWhite;
+	color *= PaperWhite * sqrt(2.0);
 	
 	if (Tonemap)
 	{
-		color /= PaperWhite;
+		color /= PaperWhite * sqrt(2.0);
 	
-		GT7ToneMapping toneMapper;
-		toneMapper.initializeAsHDR(MaxLuminance);
-		color = toneMapper.applyToneMapping(color);
+		if(Hdr)
+		{
+			GT7ToneMapping toneMapper;
+			toneMapper.initializeAsHDR(MaxLuminance);
+			toneMapper.applyToneMapping(color, color);
+		}
+		else
+		{
+			GT7ToneMapping toneMapper;
+			toneMapper.initializeAsSDR();
+			toneMapper.applyToneMapping(color, color);
+		}
 		
-		color *= PaperWhite;
+		color *= PaperWhite * sqrt(2.0);
 	
 		//color = Rec2020ToICtCp(color);
 		//color.r = LinearToST2084(BT2390EETF(ST2084ToLinear(color), MinLuminance, MaxLuminance));
@@ -145,13 +155,13 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	}
 	
 	if (IsPreview)
-		return color / PaperWhite;
+		return color / (PaperWhite * sqrt(2.0));
 	
 	switch (ColorGamut)
 	{
 		// Return linear sRGB, hardware will convert to gmama
 		case ColorGamutSRGB:
-			color = Rec2020ToRec709(color / PaperWhite);
+			color = Rec2020ToRec709(color / (PaperWhite * sqrt(2.0)));
 			break;
 		
 		case ColorGamutRec709:

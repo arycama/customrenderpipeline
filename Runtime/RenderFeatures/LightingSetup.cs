@@ -98,27 +98,23 @@ public partial class LightingSetup : ViewRenderFeature
 						var far = GetFrustumDepth(j + 1);
 
 						var viewLightBounds = Geometry.GetFrustumBounds(viewRenderData.tanHalfFov, near, far, viewToLight);
-						var cascadeViewMatrix = lightViewMatrix;
-
-						// Snap to texels to avoid shimmering
-						var worldUnitsPerTexel = viewLightBounds.Size.xy / settings.DirectionalShadowResolution;
-
 						var projectionMatrix = Float4x4.Ortho(viewLightBounds);
-						var shadowSplitData = CalculateShadowSplitData(projectionMatrix * cascadeViewMatrix, visibleLight.localToWorldMatrix.Forward(), viewRenderData.camera, true);
+						var shadowSplitData = CalculateShadowSplitData(projectionMatrix * lightViewMatrix, visibleLight.localToWorldMatrix.Forward(), viewRenderData.camera, true);
 						shadowSplitData.shadowCascadeBlendCullingFactor = 1;
 
-						var relativeViewMatrix = cascadeViewMatrix * cameraInverseTranslation;
+						var relativeViewMatrix = lightViewMatrix * cameraInverseTranslation;
 
 						var worldViewPosition = viewLightBounds.center;
 						worldViewPosition.z = viewLightBounds.Min.z;
-						worldViewPosition = cascadeViewMatrix.inverse.MultiplyPoint3x4(worldViewPosition);
-						var viewRotation = cascadeViewMatrix.inverse.rotation;
+						worldViewPosition = lightViewMatrix.inverse.MultiplyPoint3x4(worldViewPosition);
+						var viewRotation = lightViewMatrix.inverse.rotation;
 
 						directionalShadowRequests.Add(new(i, relativeViewMatrix, projectionMatrix, shadowSplitData, -1, Float3.Zero, hasShadowBounds, 0, viewLightBounds.Size.z, worldViewPosition, viewRotation, viewLightBounds.Size.x, viewLightBounds.Size.y));
 						directionalShadowMatrices.Add((Float3x4)MatrixExtensions.ConvertToAtlasMatrix(projectionMatrix * relativeViewMatrix));
 
 						// Note it could be max(cascadeTexelSize * 0.5, but this means we'd get no anti-aliasing on the min filter size)
-						var filterSize = Float2.Max(worldUnitsPerTexel, settings.DirectionalBlockerDistance * Radians(settings.SunAngularDiameter) * 0.5f);
+                        var worldUnitsPerTexel = viewLightBounds.Size.xy / settings.DirectionalShadowResolution;
+                        var filterSize = Float2.Max(worldUnitsPerTexel, settings.DirectionalBlockerDistance * Radians(settings.SunAngularDiameter) * 0.5f);
 						var filterRadius = Float2.Min(settings.DirectionalMaxFilterSize, Float2.Ceil(filterSize * settings.DirectionalShadowResolution * 0.5f));
 						var rcpFilterSize = worldUnitsPerTexel / filterSize;
 						directionalCascadeSizes.Add(new Float4(rcpFilterSize, filterRadius));

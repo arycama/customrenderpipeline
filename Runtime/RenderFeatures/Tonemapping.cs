@@ -63,8 +63,7 @@ public partial class Tonemapping : ViewRenderFeature
 			colorGamut = hdrSettings.displayColorGamut;
 		}
 
-
-		using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb));
+		using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb, hdrEnabled));
 
 		pass.Initialize(material, 0);
         pass.FrameBufferSize = new Int3(viewRenderData.viewSize, viewRenderData.viewCount);
@@ -92,6 +91,7 @@ public partial class Tonemapping : ViewRenderFeature
 			pass.SetMatrix("RgbToLmsr", data.RgbToLmsr);
 			pass.SetMatrix("LmrToRgb", data.LmsToRgb);
 			pass.SetFloat("Purkinje", data.settings.Purkinje ? 1 : 0);
+			pass.SetFloat("Hdr", data.hdrEnabled ? 1 : 0);
 			pass.SetVector("RodInputStrength", data.settings.RodColor.LinearFloat3());
 		});
 	}

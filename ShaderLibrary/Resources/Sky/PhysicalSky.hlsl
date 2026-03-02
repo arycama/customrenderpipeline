@@ -193,7 +193,7 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 		return float4(luminance, 0.05);
 	#endif
 	
-	return float4(Rec2020ToICtCp(luminance * PaperWhite), 1.0);
+	return float4(Rec2020ToICtCp(luminance * PaperWhite * sqrt(2.0)), 1.0);
 }
 
 float4 _SkyHistoryScaleLimit;
@@ -279,7 +279,7 @@ FragmentOutput FragmentTemporal(VertexFullscreenTriangleMinimalOutput input)
 	FragmentOutput output;
 	output.temporal = float4(current, 1.0);
 	
-	current = ICtCpToRec2020(current) / PaperWhite;
+	current = ICtCpToRec2020(current) / (PaperWhite * sqrt(2.0));
 	
 	// Sample vol lighting and output. Vol light.a is applied to scene if it contains additional fog
 	float4 volumetricLighting = SampleVolumetricLight(input.position.xy, centerDepth);

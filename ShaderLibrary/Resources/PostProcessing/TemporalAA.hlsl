@@ -79,7 +79,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 		[unroll]
 		for (int x = -1; x <= 1; x++, i++)
 		{
-			float3 color = Rec2020ToICtCp(CameraTarget[clamp(centerCoord + int2(x, y), 0, MaxScreenSize)] * PaperWhite);
+			float3 color = Rec2020ToICtCp(CameraTarget[clamp(centerCoord + int2(x, y), 0, MaxScreenSize)] * PaperWhite * sqrt(2.0));
 			
 			#ifdef UPSCALE
 				float _BlendSharpness = 0.5;
@@ -159,7 +159,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	//result.rgb = lerp(result.rgb, nonReprojectedHistory, AfterImage);
 	
 	FragmentOutput output;
-	output.result = float4(ICtCpToRec2020(result.rgb) / PaperWhite, 1.0);
+	output.result = float4(ICtCpToRec2020(result.rgb) / (PaperWhite * sqrt(2.0)), 1.0);
 	output.history = float4(result.rgb, 1.0);
 	output.historyWeight = result.a;
 	return output;

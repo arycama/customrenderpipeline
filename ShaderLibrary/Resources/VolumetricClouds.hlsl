@@ -92,7 +92,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	#ifdef CLOUD_SHADOW
 		output.result = float3(cloudDistance * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a);
 	#else
-		output.luminance = float4(Rec2020ToICtCp(result.rgb * PaperWhite), 1.0);
+		output.luminance = float4(Rec2020ToICtCp(result.rgb * PaperWhite * sqrt(2.0)), 1.0);
 		output.transmittance = result.a;
 		output.depth = LinearToDeviceDepth(cloudDistance * rcpRdLength);
 	#endif
@@ -190,7 +190,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	output.luminance = float4(current.rgb, 1.0);
 	output.transmittance = current.a;
 	
-	current.rgb = ICtCpToRec2020(current.rgb) / PaperWhite;
+	current.rgb = ICtCpToRec2020(current.rgb) / (PaperWhite * sqrt(2.0));
 		
 	if (!rawDepth)
 	{
