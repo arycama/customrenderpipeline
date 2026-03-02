@@ -128,11 +128,13 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                 var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
                 var uiOverlay = context.CreateUIOverlayRendererList(viewRenderData.camera);
 
-                using var pass = renderGraph.AddGenericRenderPass("UI Overlay", (uiOverlay, wireOverlay));
+                using var pass = renderGraph.AddGenericRenderPass("UI Overlay", (uiOverlay, wireOverlay, viewRenderData.camera));
                 pass.UseProfiler = false;
 
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
+                    command.SetRenderTarget(data.camera.targetTexture);
+
                     command.EnableShaderKeyword("UI_OVERLAY_RENDERING");
                     command.DrawRendererList(data.uiOverlay);
                     command.DisableShaderKeyword("UI_OVERLAY_RENDERING");
