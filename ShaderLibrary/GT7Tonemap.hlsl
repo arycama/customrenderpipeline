@@ -357,7 +357,7 @@ struct GT7ToneMapping
 	}
 
     // Initialize for SDR (Standard Dynamic Range) display.
-	void initializeAsSDR()
+	void initializeAsSDR(float brightness)
 	{
         // Regarding SDR output:
         // First, in GT (Gran Turismo), it is assumed that a maximum value of 1.0 in SDR output
@@ -369,8 +369,8 @@ struct GT7ToneMapping
         //
         // * These adjustments ensure that the visual appearance (in terms of brightness)
         //   stays generally consistent across both HDR and SDR outputs for the same rendered content.
-		sdrCorrectionFactor_ = 1.0f / physicalValueToFrameBufferValue(GRAN_TURISMO_SDR_PAPER_WHITE);
-		initializeParameters(GRAN_TURISMO_SDR_PAPER_WHITE);
+		sdrCorrectionFactor_ = 1.0f / physicalValueToFrameBufferValue(brightness);
+		initializeParameters(brightness);
 	}
 
     // Input:  linear Rec.2020 RGB (frame buffer values)
