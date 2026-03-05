@@ -143,7 +143,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 		else
 		{
 			GT7ToneMapping toneMapper;
-			toneMapper.initializeAsSDR();
+			toneMapper.initializeAsSDR(250);
 			toneMapper.applyToneMapping(color, color);
 		}
 		
