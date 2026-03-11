@@ -346,10 +346,11 @@ float3x3 TangentToWorldMatrix(float3 worldNormal, float3 worldTangent, float bit
 	return transpose(WorldToTangentMatrix(worldNormal, worldTangent, bitangentSign));
 }
 
-float3 TangentToWorldNormal(float3 tangentNormal, float3 worldNormal, float3 worldTangent, float bitangentSign)
+float3 TangentToWorldNormal(float3 tangentNormal, float3 worldNormal, float3 worldTangent, float bitangentSign, bool doNormalize = true)
 {
 	float3x3 tangentToWorld = TangentToWorldMatrix(worldNormal, worldTangent, bitangentSign);
-	return normalize(mul(tangentToWorld, tangentNormal));
+	float3 result = mul(tangentToWorld, tangentNormal);
+	return doNormalize ? normalize(result) : result;
 }
 
 float CosAngle(float3 a, float3 b)
