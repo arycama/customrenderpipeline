@@ -145,19 +145,14 @@ float4 Rotate(float4 a, float4 b)
 
 float3 RotateVector(float4 q, float3 v)
 {
-	float3 qv = q.xyz;
-	float3 t = 2.0 * cross(qv, v);
-	return v + q.w * t + cross(qv, t);
+	float3 t = 2.0 * cross(q.xyz, v);
+	return v + q.w * t + cross(q.xyz, t);
 }
 
 // Quaternion that rotates between from and to
 float4 FromToRotation(float3 F, float3 T)
 {
-	float rcpS = rsqrt(dot(F, T) * 2.0 + 2.0);
-	float4 result;
-	result.xyz = cross(F, T) * rcpS;
-	result.w = rcp(rcpS) * 0.5;
-	return result;
+	return rsqrt(2.0 * dot(F, T) + 2.0) * float4(cross(F, T), dot(F, T) + 1.0);
 }
 
 float4 QuaternionFromCosTheta(float cosTheta, float phi)

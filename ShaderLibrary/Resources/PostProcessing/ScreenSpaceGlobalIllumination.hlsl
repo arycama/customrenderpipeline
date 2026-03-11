@@ -34,7 +34,7 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 	float3 noise3DCosine = Noise3DCosine(input.position.xy);
 	
 	float NdotV;
-	float3 N = GBufferNormal(input.position.xy, GBufferNormalRoughness, V, NdotV);
+	float3 N = GBufferNormal(input.position.xy, GBufferNormalRoughness, V, NdotV, WorldToView, ViewToWorld);
 	
 	float rcpPdf = Pi * rcp(noise3DCosine.z);
 	float3 L = FromToRotationZ(N, noise3DCosine);
@@ -90,7 +90,7 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 	
 	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV, WorldToView, ViewToWorld);
 	
 	float3 worldPosition = input.worldDirection * LinearEyeDepth(CameraDepth[input.position.xy]);
 	float phi = Noise1D(input.position.xy) * TwoPi;

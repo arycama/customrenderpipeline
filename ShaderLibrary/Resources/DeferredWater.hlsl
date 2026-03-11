@@ -163,7 +163,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	}
 
 	FragmentOutput output;
-	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam), 0.0, input.position.xy, V, false);
+	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam), 0.0, input.position.xy, V, false, WorldToView);
 	output.luminance = Rec2020ToICtCp(luminance * PaperWhite * sqrt(2.0));
 	return output;
 }
@@ -196,7 +196,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
 	float3 V = normalize(-input.worldDirection);
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV, WorldToView, ViewToWorld);
 	float kd = EnergyCompensationFactor(0.02, normalRoughness.b, NdotV).r;
 	
 	TemporalOutput output;

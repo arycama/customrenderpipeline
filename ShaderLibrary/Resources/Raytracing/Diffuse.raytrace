@@ -29,7 +29,7 @@ void RayGeneration()
 	float3 V = normalize(-worldPosition);
 	
 	float NdotV;
-	float3 N = GBufferNormal(position, GBufferNormalRoughness, V, NdotV);
+	float3 N = GBufferNormal(position, GBufferNormalRoughness, V, NdotV, WorldToView, ViewToWorld);
 	
 	float3 noise3DCosine = Noise3DCosine(position);
 	float rcpPdf = Pi * rcp(noise3DCosine.z);
