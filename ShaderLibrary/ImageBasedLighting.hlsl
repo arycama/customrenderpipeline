@@ -12,7 +12,7 @@ float SkyReflectionSize;
 
 cbuffer AmbientShBuffer
 {
-	float4 AmbientSh[9];
+	float4 AmbientSh[7];
 };
 
 float3 AmbientCosine(float3 N, float visibilityAngle = HalfPi)

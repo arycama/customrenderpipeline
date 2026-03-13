@@ -5,10 +5,16 @@
 #include "../Temporal.hlsl"
 
 Texture2D<uint2> Stencil;
+Texture2D<float> CameraDepthCopy;
 
 float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 {
-	float depth = CameraDepth[input.position.xy];
+	#ifdef UNDERWATER_LIGHTING_ON
+		float depth = CameraDepthCopy[input.position.xy];
+	#else
+		float depth = CameraDepth[input.position.xy];
+	#endif
+	
 	float eyeDepth = LinearEyeDepth(depth);
 	float3 worldPosition = input.worldDirection * eyeDepth;
 	float rcpVLength = RcpLength(input.worldDirection);
@@ -45,6 +51,13 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	float3 result = EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, NdotV, bentNormal, worldPosition, translucency, input.position.xy, eyeDepth, 1.0, isWater, true).rgb;
 	
 	// Sky is added elsewhere but since it involves an RGB multiply which we can't do without dual source blending, apply it here. Even though this happens before cloud opacity, order doesn't matter for transmittance simple it is multiplicative
-	result *= Rec709ToRec2020(TransmittanceToPoint(ViewHeight, -V.y, eyeDepth * rcp(rcpVLength)));
+	#ifdef UNDERWATER_LIGHTING_ON
+		result += CameraTarget[input.position.xy];
+		float waterDepth = LinearEyeDepth(CameraDepth[input.position.xy]);
+		result *= Rec709ToRec2020(TransmittanceToPoint(ViewHeight, -V.y, waterDepth * rcp(rcpVLength)));
+	#else
+		result *= Rec709ToRec2020(TransmittanceToPoint(ViewHeight, -V.y, eyeDepth * rcp(rcpVLength)));
+	#endif
+	
 	return result;
 }

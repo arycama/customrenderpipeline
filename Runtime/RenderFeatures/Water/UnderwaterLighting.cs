@@ -5,12 +5,12 @@ using UnityEngine.Rendering;
 public class UnderwaterLighting : ViewRenderFeature
 {
     private readonly WaterSettings settings;
-    private readonly Material underwaterLightingMaterial;
+    private readonly Material material;
 
     public UnderwaterLighting(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
     {
         this.settings = settings;
-        underwaterLightingMaterial = new Material(Shader.Find("Hidden/Underwater Lighting 1")) { hideFlags = HideFlags.HideAndDontSave };
+        material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
     public override void Render(ViewRenderData viewRenderData)
@@ -19,10 +19,11 @@ public class UnderwaterLighting : ViewRenderFeature
 			return;
 
         var underwaterResultId = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+        var passIndex = material.FindPass("Deferred Lighting (Underwater)");
 
         using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Underwater Lighting", settings))
         {
-            pass.Initialize(underwaterLightingMaterial);
+            pass.Initialize(material, passIndex);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(underwaterResultId);
 
@@ -44,7 +45,9 @@ public class UnderwaterLighting : ViewRenderFeature
             pass.ReadResource<OceanFftResult>();
             pass.ReadRtHandle<CameraDepth>();
             pass.ReadRtHandle<CameraDepthCopy>();
-                
+            pass.ReadResource<EnvironmentData>();
+            pass.ReadResource<LightingData>();
+            
             pass.SetRenderFunction(static (command, pass, settings) =>
             {
                 pass.SetVector("_WaterExtinction", settings.Material.GetColor("_Extinction").Float3());

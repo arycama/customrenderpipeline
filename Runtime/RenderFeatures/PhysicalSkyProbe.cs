@@ -64,8 +64,9 @@ public class PhysicalSkyProbe : ViewRenderFeature
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<SkyTransmittanceData>();
 			pass.ReadResource<SkyReflectionAmbientData>();
+			pass.ReadResource<CloudShadowDataResult>();
 
-			pass.SetRenderFunction(static (command, pass, data) =>
+            pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				data.cloudSettings.SetCloudPassData(pass, data.time);
 				pass.SetFloat("_Samples", data.skySettings.ReflectionSamples);

@@ -326,13 +326,15 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// Light processing
 		new LightingSetup(renderGraph, asset.LightingSettings),
 		new PhysicalSkyGenerateData(asset.Sky, asset.Clouds, renderGraph),
-        new PhysicalSkyProbe(renderGraph, asset.EnvironmentLighting, asset.Clouds, asset.Sky, environmentConvolve),
-        environmentConvolve,
-
+        
         new ShadowRenderer(renderGraph, asset.LightingSettings, terrainShadowRenderer, gpuDrivenRenderer),
 		new ParticleShadows(renderGraph, asset.ParticleShadows),
 		new VolumetricCloudShadow(asset.Clouds, asset.Sky, renderGraph),
-		new WaterShadowRenderer(renderGraph, asset.OceanSettings, quadtreeCull),
+
+        new PhysicalSkyProbe(renderGraph, asset.EnvironmentLighting, asset.Clouds, asset.Sky, environmentConvolve),
+        environmentConvolve,
+
+        new WaterShadowRenderer(renderGraph, asset.OceanSettings, quadtreeCull),
 		new WaterCaustics(renderGraph, asset.OceanSettings),
 		
 		// Depends on light, plus ambient

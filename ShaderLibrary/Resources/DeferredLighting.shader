@@ -9,6 +9,8 @@ Shader "Hidden/Deferred Lighting"
 
         Pass
         {
+            Name "Deferred Lighting"
+
             // Render if 0 and 16 are non-zero
             Stencil
             {
@@ -33,6 +35,8 @@ Shader "Hidden/Deferred Lighting"
 
         Pass
         {
+            Name "Deferred Lighting (Translucent)"
+
             Stencil
             {
                 Ref 16
@@ -50,6 +54,29 @@ Shader "Hidden/Deferred Lighting"
             #define SCREENSPACE_REFLECTIONS_ON
             #define SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
             #define TRANSLUCENCY
+            #define FLIP
+            #include "DeferredLighting.hlsl"
+            ENDHLSL
+        }
+
+         Pass
+        {
+            Name "Deferred Lighting (Underwater)"
+
+            //Blend One One
+
+            Stencil
+            {
+                Ref 11
+                Comp Equal
+                //ReadMask 5
+            }
+
+            HLSLPROGRAM
+            #pragma vertex VertexFullscreenTriangle
+            #pragma fragment Fragment
+            #pragma target 5.0
+            #define UNDERWATER_LIGHTING_ON
             #define FLIP
             #include "DeferredLighting.hlsl"
             ENDHLSL

@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Pool;
@@ -337,45 +336,4 @@ internal struct LightingDataStruct
 		Item12 = item12;
 		Item13 = item13;
 	}
-
-	public override bool Equals(object obj) => obj is LightingDataStruct other && lightDirection0.Equals(other.lightDirection0) && Count == other.Count && lightColor0.Equals(other.lightColor0) && dirLightCount == other.dirLightCount && lightDirection1.Equals(other.lightDirection1) && Item6 == other.Item6 && lightColor1.Equals(other.lightColor1) && DirectionalBlockerDistance == other.DirectionalBlockerDistance && EqualityComparer<Float4>.Default.Equals(Item9, other.Item9) && fadeScale == other.fadeScale && fadeOffset == other.fadeOffset && Item12 == other.Item12 && Item13 == other.Item13;
-
-	public override int GetHashCode()
-	{
-		var hash = new HashCode();
-		hash.Add(lightDirection0);
-		hash.Add(Count);
-		hash.Add(lightColor0);
-		hash.Add(dirLightCount);
-		hash.Add(lightDirection1);
-		hash.Add(Item6);
-		hash.Add(lightColor1);
-		hash.Add(DirectionalBlockerDistance);
-		hash.Add(Item9);
-		hash.Add(fadeScale);
-		hash.Add(fadeOffset);
-		hash.Add(Item12);
-		hash.Add(Item13);
-		return hash.ToHashCode();
-	}
-
-	public void Deconstruct(out Float3 lightDirection0, out int count, out Float3 lightColor0, out int dirLightCount, out Float3 lightDirection1, out float item6, out Float3 lightColor1, out float directionalBlockerDistance, out Float4 item9, out float fadeScale, out float fadeOffset, out float item12, out float item13)
-	{
-		lightDirection0 = this.lightDirection0;
-		count = Count;
-		lightColor0 = this.lightColor0;
-		dirLightCount = this.dirLightCount;
-		lightDirection1 = this.lightDirection1;
-		item6 = Item6;
-		lightColor1 = this.lightColor1;
-		directionalBlockerDistance = DirectionalBlockerDistance;
-		item9 = Item9;
-		fadeScale = this.fadeScale;
-		fadeOffset = this.fadeOffset;
-		item12 = Item12;
-		item13 = Item13;
-	}
-
-	public static implicit operator (Float3 lightDirection0, int Count, Float3 lightColor0, int dirLightCount, Float3 lightDirection1, float, Float3 lightColor1, float DirectionalBlockerDistance, Float4, float fadeScale, float fadeOffset, float, float)(LightingDataStruct value) => (value.lightDirection0, value.Count, value.lightColor0, value.dirLightCount, value.lightDirection1, value.Item6, value.lightColor1, value.DirectionalBlockerDistance, value.Item9, value.fadeScale, value.fadeOffset, value.Item12, value.Item13);
-	public static implicit operator LightingDataStruct((Float3 lightDirection0, int Count, Float3 lightColor0, int dirLightCount, Float3 lightDirection1, float, Float3 lightColor1, float DirectionalBlockerDistance, Float4, float fadeScale, float fadeOffset, float, float) value) => new LightingDataStruct(value.lightDirection0, value.Count, value.lightColor0, value.dirLightCount, value.lightDirection1, value.Item6, value.lightColor1, value.DirectionalBlockerDistance, value.Item9, value.fadeScale, value.fadeOffset, value.Item12, value.Item13);
 }

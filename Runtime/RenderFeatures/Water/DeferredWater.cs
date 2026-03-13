@@ -15,7 +15,7 @@ public class DeferredWater : ViewRenderFeature
     public DeferredWater(RenderGraph renderGraph, WaterSettings settings) : base(renderGraph)
     {
         this.settings = settings;
-        deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water 1")) { hideFlags = HideFlags.HideAndDontSave };
+        deferredWaterMaterial = new Material(Shader.Find("Hidden/Deferred Water")) { hideFlags = HideFlags.HideAndDontSave };
         temporalCache = new PersistentRTHandleCache(GraphicsFormat.A2B10G10R10_UNormPack32, renderGraph, "Water Scatter Temporal", isScreenTexture: true);
         raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Refraction");
     }
@@ -54,6 +54,7 @@ public class DeferredWater : ViewRenderFeature
             pass.ReadResource<WaterPrepassResult>();
             pass.ReadResource<UnderwaterLightingResult>();
             pass.ReadResource<LightingData>();
+            pass.ReadResource<EnvironmentData>();
 
             pass.ReadResource<OceanFftResult>();
             pass.ReadResource<WaterShoreMask.Result>(true);

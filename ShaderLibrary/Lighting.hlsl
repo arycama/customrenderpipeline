@@ -27,18 +27,6 @@ cbuffer CloudCoverage
 	float4 _CloudCoverage;
 };
 
-float CloudTransmittance(float3 positionWS)
-{
-	float3 coords = MultiplyPoint3x4(_WorldToCloudShadow, positionWS);
-	if (any(saturate(coords.xy) != coords.xy) || coords.z < 0.0)
-		return 1.0;
-	
-	float3 shadowData = _CloudShadow.SampleLevel(LinearClampSampler, ClampScaleTextureUv(coords.xy, _CloudShadowScaleLimit), 0.0);
-	float depth = max(0.0, coords.z - shadowData.r) * _CloudShadowDepthInvScale;
-	float transmittance = exp2(-depth * shadowData.g * _CloudShadowExtinctionInvScale);
-	return max(transmittance, shadowData.b);
-}
-
 // Screen space buffers
 Texture2D<float> ScreenSpaceShadows;
 float4 ScreenSpaceShadowsScaleLimit;
@@ -52,23 +40,16 @@ Texture2D<float4> ScreenSpaceReflections;
 float4 ScreenSpaceReflectionsScaleLimit;
 float SpecularGiStrength;
 
-//float distance(float3 pos, float3 N, int i)
-//{
-//	float4 shrinkedpos = float4(pos - 0.005 * N, 1.0);
-//	float4 shwpos = mul(shrinkedpos, lights[i].viewproj);
-//	float d1 = shwmaps[i].Sample(sampler, shwpos.xy / shwpos.w);
-//	float d2 = shwpos.z;
-//	return abs(d1 - d2);
-//}
-
- float3 T(float s) 
-{ 
-	return float3(0.233, 0.455, 0.649) * exp(-s*s/0.0064) +
-	float3(0.1, 0.336, 0.344) * exp(-s * s / 0.0484) +
-	float3(0.118, 0.198, 0.0) * exp(-s * s / 0.187) +
-	float3(0.113, 0.007, 0.007) * exp(-s * s / 0.567) +
-	float3(0.358, 0.004, 0.0) * exp(-s * s / 1.99) +
-	float3(0.078, 0.0, 0.0) * exp(-s * s / 7.41);
+float CloudTransmittance(float3 positionWS)
+{
+	float3 coords = MultiplyPoint3x4(_WorldToCloudShadow, positionWS);
+	if (any(saturate(coords.xy) != coords.xy) || coords.z < 0.0)
+		return 1.0;
+	
+	float3 shadowData = _CloudShadow.SampleLevel(LinearClampSampler, ClampScaleTextureUv(coords.xy, _CloudShadowScaleLimit), 0.0);
+	float depth = max(0.0, coords.z - shadowData.r) * _CloudShadowDepthInvScale;
+	float transmittance = exp2(-depth * shadowData.g * _CloudShadowExtinctionInvScale);
+	return max(transmittance, shadowData.b);
 }
 
 // TODO: Can parameters be simplified/shortened

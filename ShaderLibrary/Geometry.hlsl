@@ -182,16 +182,16 @@ float4 Quaternion(float theta, float phi)
 
 // Calculates a rotation from (0,0,1) to baseNormal, and applies that rotation to detailNormal using shortest arc quaternion
 // https://blog.selfshadow.com/publications/blending-in-detail/
-float3 FromToRotationZ(float3 baseNormal, float3 detailNormal)
+float3 FromToRotationZ(float3 t, float3 u)
 {
-	float3 t = baseNormal + float2(0, 1).xxy;
-	float3 u = detailNormal * float2(-1, 1).xxy;
+	t.z += 1.0;
+	u.xy = -u.xy;
 	return (dot(t, u) * rcp(t.z)) * t - u;
 }
 
-float3 FromToRotationZInverse(float3 baseNormal, float3 detailNormal)
+float3 FromToRotationZInverse(float3 t, float3 detailNormal)
 {
-	float3 t = baseNormal + float3(0, 0, 1);
+	t = t + float3(0, 0, 1);
 	float k = dot(detailNormal, t) / (dot(t, t) - t.z);
 	float3 u = k * t - detailNormal;
 	return u * float3(-1, -1, 1);

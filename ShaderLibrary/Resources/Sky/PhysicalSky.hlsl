@@ -11,11 +11,6 @@
 
 Texture2D<float> CloudTransmittanceTexture;
 Texture2D<float3> CloudTexture;
-
-#ifdef __INTELLISENSE__
-	#define SCENE
-#endif
-
 float Resolution;
 
 float3 SampleLuminance(float3 rayDirection, float xi, uint colorIndex, bool rayIntersectsGround, float maxRayLength, float3 maxLuminance)

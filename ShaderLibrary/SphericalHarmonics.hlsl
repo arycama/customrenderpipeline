@@ -38,7 +38,7 @@ float3 CosineZonalHarmonics(float visibilityAperture)
 	return zonalHarmonics;
 }
 
-float3 EvaluateSh(float3 N, float4 sh[9], float3 zh)
+float3 EvaluateSh(float3 N, float4 sh[7], float3 zh)
 {
 	float3 irradiance = 0.0;
 	irradiance.r = dot(sh[0].xyz * zh.y, N) + sh[0].w * zh.x;

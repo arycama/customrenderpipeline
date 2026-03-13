@@ -1,4 +1,4 @@
-Shader "Hidden/Deferred Water 1"
+Shader "Hidden/Deferred Water"
 {
     SubShader
     {
