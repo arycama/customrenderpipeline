@@ -54,9 +54,9 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	#ifdef UNDERWATER_LIGHTING_ON
 		result += CameraTarget[input.position.xy];
 		float waterDepth = LinearEyeDepth(CameraDepth[input.position.xy]);
-		result *= Rec709ToRec2020(TransmittanceToPoint(ViewHeight, -V.y, waterDepth * rcp(rcpVLength)));
+		result *= TransmittanceToPoint(ViewHeight, -V.y, waterDepth * rcp(rcpVLength));
 	#else
-		result *= Rec709ToRec2020(TransmittanceToPoint(ViewHeight, -V.y, eyeDepth * rcp(rcpVLength)));
+		result *= TransmittanceToPoint(ViewHeight, -V.y, eyeDepth * rcp(rcpVLength));
 	#endif
 	
 	return result;

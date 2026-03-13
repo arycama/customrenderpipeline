@@ -69,7 +69,7 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	
 	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition));
 	float phase = lerp(HgPhase(-LdotV, ForwardScatterPhase), HgPhase(-LdotV, -BackwardScatterPhase), ScatterBlend);
-	lighting += shadow * phase * Rec709ToRec2020(_LightColor0) * lightTransmittance * Exposure;
+	lighting += shadow * phase * _LightColor0 * lightTransmittance * Exposure;
 	
 	float2 pixelPosition = (output.position.xy / output.position.w * 0.5 + 0.5) * ViewSize;
 	
@@ -104,7 +104,7 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 		
 		float LdotV = dot(L, V);
 		float phase = lerp(HgPhase(-LdotV, ForwardScatterPhase), HgPhase(-LdotV, -BackwardScatterPhase), ScatterBlend);
-		lighting += attenuation * phase * Rec709ToRec2020(light.color) * Exposure;
+		lighting += attenuation * phase * light.color * Exposure;
 	}
 	
 	output.lighting = lighting;
@@ -134,7 +134,7 @@ float4 Fragment(FragmentInput input) : SV_Target
 	
 	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(input.worldPosition));
 	float phase = lerp(HgPhase(-LdotV, ForwardScatterPhase), HgPhase(-LdotV, -BackwardScatterPhase), ScatterBlend);
-	lighting += shadow * phase * Rec709ToRec2020(_LightColor0) * lightTransmittance * Exposure;
+	lighting += shadow * phase * _LightColor0 * lightTransmittance * Exposure;
 	
 	uint3 clusterIndex;
 	clusterIndex.xy = input.position.xy / TileSize;
@@ -167,7 +167,7 @@ float4 Fragment(FragmentInput input) : SV_Target
 		
 		float LdotV = dot(L, V);
 		float phase = lerp(HgPhase(-LdotV, ForwardScatterPhase), HgPhase(-LdotV, -BackwardScatterPhase), ScatterBlend);
-		lighting += attenuation * phase * Rec709ToRec2020(light.color) * Exposure;
+		lighting += attenuation * phase * light.color * Exposure;
 	}
 	
 		float3 result = opacity * lighting;

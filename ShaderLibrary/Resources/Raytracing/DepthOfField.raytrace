@@ -69,5 +69,5 @@ void RayGeneration()
 	if (weightSum)
 		color *= rcp(weightSum);
 	
-	HitColor[position] = Rec709ToRec2020(color);
+	HitColor[position] = color;
 }

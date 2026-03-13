@@ -142,7 +142,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	float factor = GetWaterIlluminance(P);
 	
 	float3 atmosphereTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, waterDistance);
-	float3 sunColor = Rec709ToRec2020(_LightColor0) * Exposure * atmosphereTransmittance;
+	float3 sunColor = _LightColor0 * Exposure * atmosphereTransmittance;
 	float LdotV = dot(_LightDirection0, -underwaterV);
 	float phase = CsPhase(LdotV, _WaterMiePhase);
 	float3 directLight = sunColor * factor * shadow * phase * transmittance;

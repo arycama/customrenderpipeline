@@ -1,6 +1,7 @@
 #ifndef ATMOSPHERE_INCLUDED
 #define ATMOSPHERE_INCLUDED
 
+#include "Color.hlsl"
 #include "Geometry.hlsl"
 #include "Material.hlsl" 
 #include "Samplers.hlsl" 

@@ -194,9 +194,9 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 		
 	if (!rawDepth)
 	{
-		float3 stars = Stars.Sample(TrilinearClampSampler, input.worldDirection) * Exposure * 2;
+		float3 stars = Stars.Sample(TrilinearClampSampler, input.worldDirection) * StarExposure * Exposure;
 		stars *= TransmittanceToAtmosphere(ViewHeight, normalize(input.worldDirection).y);
-		current.rgb += Rec709ToRec2020(stars) * StarExposure;
+		current.rgb += stars;
 	}
 	
 	output.frameResult = current;

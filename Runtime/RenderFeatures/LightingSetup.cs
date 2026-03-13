@@ -194,7 +194,7 @@ public partial class LightingSetup : ViewRenderFeature
 			var pointLightData = new LightData(
 				lightToWorld.GetPosition() - viewRenderData.transform.position,
 				light.range,
-				(Vector4)visibleLight.finalColor,
+				ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3()),
 				(uint)light.type,
 				lightToWorld.Right(),
 				angleScale,
@@ -243,11 +243,11 @@ public partial class LightingSetup : ViewRenderFeature
 		(
 			lightDirection0,
 			directionalShadowRequests.Count,
-			lightColor0,
+			ColorspaceUtility.Rec709ToRec2020(lightColor0),
 			dirLightCount,
 			lightDirection1,
 			settings.DirectionalMaxFilterSize,
-			lightColor1,
+            ColorspaceUtility.Rec709ToRec2020(lightColor1),
 			settings.DirectionalBlockerDistance,
 			new Float4(E, F, G, 0),
 			fadeScale,

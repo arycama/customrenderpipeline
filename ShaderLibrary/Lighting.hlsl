@@ -240,7 +240,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float diffuseTerm = averageAlbedoMs ? viewDirectionalAlbedoMs * rcp(averageAlbedoMs) : 0.0; // TODO: Bake into DFG?
 	
 	// Direct lighting
-	float3 lightTransmittance = Rec709ToRec2020(TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition)));
+	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition));
 	
 	float shadow = GetDirectionalShadow(worldPosition, softShadows) * CloudTransmittance(worldPosition);
 	
@@ -253,7 +253,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 		lightTransmittance *= WaterShadow(worldPosition, _LightDirection0) * GetCaustics(worldPosition + ViewPosition, _LightDirection0);
 	#endif
 	
-	float3 luminance = EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, _LightDirection0, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, true) * (Rec709ToRec2020(_LightColor0) * lightTransmittance * Exposure) * shadow;
+	float3 luminance = EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, _LightDirection0, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, true) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
 	
 	uint3 clusterIndex;
 	clusterIndex.xy = pixelCoordinate / TileSize;
@@ -284,7 +284,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 		if (!attenuation)
 			continue;
 		
-		luminance += EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, L, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, false) * (Rec709ToRec2020(light.color) * Exposure * attenuation);
+		luminance += EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, L, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, false) * (light.color * Exposure * attenuation);
 	}
 	
 	// Indirect Lighting

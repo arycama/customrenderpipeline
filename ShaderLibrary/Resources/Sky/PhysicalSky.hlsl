@@ -122,9 +122,6 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 			luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance);
 		}
 	}
-	
-	luminance = Rec709ToRec2020(luminance);
-	
 	#else
 		float3 currentLuminance = maxLuminance;
 		float offset = offsets.x;
@@ -156,13 +153,11 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 			}
 		}
 
-		luminance = Rec709ToRec2020(luminance);
-		
 		if (rayIntersectsGround)
 		{
-			float3 transmittance = Rec709ToRec2020(TransmittanceToPoint(ViewHeight, viewCosAngle, maxRayLength, true, maxRayLength));
+			float3 transmittance = TransmittanceToPoint(ViewHeight, viewCosAngle, maxRayLength, true, maxRayLength);
 			float lightCosAngleAtDistance = LightCosAngleAtDistance(ViewHeight, viewCosAngle, _LightDirection0.y, maxRayLength);
-			float3 lightTransmittance = Rec709ToRec2020(TransmittanceToAtmosphere(ViewHeight, viewCosAngle, _LightDirection0.y, maxRayLength));
+			float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, viewCosAngle, _LightDirection0.y, maxRayLength);
 			
 			#ifndef REFLECTION_PROBE
 				float attenuation = CloudTransmittance(rayDirection * maxRayLength);
@@ -170,13 +165,12 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 				lightTransmittance *= attenuation;
 			#endif
 			
-			float3 groundLighting = lightTransmittance * saturate(lightCosAngleAtDistance) * RcpPi * Rec709ToRec2020(_LightColor0) * Exposure;			
-			float3 groundAmbient = GetGroundAmbient(ViewHeight, viewCosAngle, _LightDirection0.y, maxRayLength) * Rec709ToRec2020(_LightColor0) * Exposure;
+			float3 groundLighting = lightTransmittance * saturate(lightCosAngleAtDistance) * RcpPi * _LightColor0 * Exposure;			
+			float3 groundAmbient = GetGroundAmbient(ViewHeight, viewCosAngle, _LightDirection0.y, maxRayLength) * _LightColor0 * Exposure;
 			groundAmbient = groundAmbient * _CloudCoverage.a + _CloudCoverage.rgb * RcpPi;
 			
 			groundLighting += groundAmbient;
-			
-			luminance += groundLighting * Rec709ToRec2020(_GroundColor) * transmittance * cloudTransmittance;
+			luminance += groundLighting * _GroundColor * transmittance * cloudTransmittance;
 		}
 	#endif
 	
@@ -278,7 +272,7 @@ FragmentOutput FragmentTemporal(VertexFullscreenTriangleMinimalOutput input)
 	
 	// Sample vol lighting and output. Vol light.a is applied to scene if it contains additional fog
 	float4 volumetricLighting = SampleVolumetricLight(input.position.xy, centerDepth);
-	current += Rec709ToRec2020(volumetricLighting.rgb);
+	current += volumetricLighting.rgb;
 	
 	output.frame = float4(current, volumetricLighting.a);
 	return output;
