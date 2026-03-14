@@ -160,7 +160,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		}),
 
 		new TemporalAASetup(renderGraph, asset.TemporalAASettings),
-		new AutoExposurePreRender(renderGraph, asset.Tonemapping),
+		new AutoExposurePreRender(renderGraph, asset.Tonemapping, asset.LensSettings, asset.AutoExposureSettings),
 		new SetupCamera(renderGraph, asset.Sky),
 
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
@@ -184,7 +184,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			renderGraph.SetRTHandle<PreviousCameraTarget>(previousScene);
 
 			renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
+			renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
 			renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;

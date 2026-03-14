@@ -4,12 +4,16 @@ using UnityEngine;
 public class AutoExposurePreRender : ViewRenderFeature
 {
 	private readonly Dictionary<int, ResourceHandle<GraphicsBuffer>> exposureBuffers = new();
-	private Tonemapping.Settings settings;
+	private readonly Tonemapping.Settings settings;
+	private readonly LensSettings lensSettings;
+    private readonly AutoExposure.Settings autoExposureSettings;
 
-	public AutoExposurePreRender(RenderGraph renderGraph, Tonemapping.Settings settings) : base(renderGraph)
+	public AutoExposurePreRender(RenderGraph renderGraph, Tonemapping.Settings settings, LensSettings lensSettings, AutoExposure.Settings autoExposureSettings) : base(renderGraph)
 	{
 		this.settings = settings;
-	}
+        this.lensSettings = lensSettings;
+        this.autoExposureSettings = autoExposureSettings;
+    }
 
 	protected override void Cleanup(bool disposing)
 	{
@@ -28,21 +32,23 @@ public class AutoExposurePreRender : ViewRenderFeature
 			exposureBuffers.Add(viewRenderData.viewId, exposureBuffer);
 		}
 
-		using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", exposureBuffer))
-		{
-			// For first pass, set to 1.0f 
-			if (isFirst)
-			{
-				pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					var initialData = ArrayPool<Vector4>.Get(1);
-					initialData[0] = new Vector4(1.0f, 0.0f, 0.0f, 0.0f);
-					command.SetBufferData(pass.GetBuffer(data), initialData);
-					ArrayPool<Vector4>.Release(initialData);
-				});
-			}
+        using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", (exposureBuffer, lensSettings, autoExposureSettings.ExposureCompensation)))
+        {
+            if (isFirst)
+            {
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    var initialEv100 = PhysicalCameraUtility.ComputeEV100(data.lensSettings.Aperture, data.lensSettings.ShutterSpeed, data.lensSettings.Iso) - data.ExposureCompensation;
+                    var initialExposure = PhysicalCameraUtility.EV100ToExposure(initialEv100);
 
-			renderGraph.SetResource(new AutoExposureData(exposureBuffer, isFirst, settings.PaperWhite));
-		}
+                    var initialData = ArrayPool<Vector4>.Get(1);
+                    initialData[0] = new Vector4(initialExposure, Math.Rcp(initialExposure), 1.0f, data.ExposureCompensation);
+                    command.SetBufferData(pass.GetBuffer(data.exposureBuffer), initialData);
+                    ArrayPool<Vector4>.Release(initialData);
+                });
+            }
+
+            renderGraph.SetResource(new AutoExposureData(exposureBuffer, isFirst, settings.PaperWhite));
+        }
 	}
 }

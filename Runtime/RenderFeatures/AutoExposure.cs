@@ -135,13 +135,9 @@ public partial class AutoExposure : ViewRenderFeature
 					{
 						var data = readback.GetData<float>();
 						var exposure = data[0];
-						var sensitivity = 100.0f;
-						var lensAttenuation = 0.65f;
-						var lensImperfectionExposureScale = 78.0f / (sensitivity * lensAttenuation);
-						var reflectedLightMeterConstant = 12.5f;
 						var exposureCompensation = data[3];
-						var ev100 = -Math.Log2(lensImperfectionExposureScale * exposure) + exposureCompensation;
-						var luminance = Math.Exp2(ev100) * (reflectedLightMeterConstant / sensitivity);
+						var ev100 = PhysicalCameraUtility.ExposureToEV100(exposure) + exposureCompensation;
+                        var luminance = PhysicalCameraUtility.EV100ToLuminance(ev100);
 						Debug.Log($"EV: {ev100}. ({luminance} cd/m^2)");
 					});
 				}

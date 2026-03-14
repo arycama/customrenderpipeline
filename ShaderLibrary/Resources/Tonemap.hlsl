@@ -18,6 +18,7 @@ float4x4 RgbToLmsr, LmsToRgb;
 float Purkinje;
 float3 RodInputStrength;
 float Hdr;
+float IsFirst;
 
 float3 T(float3 A, float3 Ks)
 {
@@ -78,6 +79,9 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, -1), CameraBloomScaleLimit)) * 0.0625;
 	
 	color = lerp(color, bloom, BloomStrength);
+	
+	if(IsFirst)
+		color *= PreviousToCurrentExposure;
 	
 	//color = ScreenSpaceGlobalIllumination[position.xy].rgb;
 	//color = ScreenSpaceReflections[position.xy];

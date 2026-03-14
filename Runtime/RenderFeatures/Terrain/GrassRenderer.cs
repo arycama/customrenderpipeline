@@ -7,7 +7,7 @@ public class GrassRenderer : ViewRenderFeature
 	[Serializable]
 	public class Settings
 	{
-		[field: SerializeField] public bool Update { get; private set; } = true;
+		[field: SerializeField] public bool Enabled { get; private set; } = true;
 		[field: SerializeField] public bool CastShadow { get; private set; } = false;
 		[field: SerializeField] public int PatchSize { get; private set; } = 32;
 		[field: SerializeField] public Material Material { get; private set; }
@@ -41,6 +41,9 @@ public class GrassRenderer : ViewRenderFeature
 
 	public override void Render(ViewRenderData viewRenderData)
     {
+        if (!settings.Enabled)
+            return;
+
 		var material = settings.Material;
 		if (material == null)
 			return;

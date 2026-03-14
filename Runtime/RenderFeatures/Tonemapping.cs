@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 
 public partial class Tonemapping : ViewRenderFeature
 {
@@ -9,6 +10,7 @@ public partial class Tonemapping : ViewRenderFeature
 	private Matrix4x4 LmsToRgb;
 
 	private bool previousNormalize;
+    private HashSet<int> renderedViewIndices = new();
 
 	public Tonemapping(RenderGraph renderGraph, Settings settings, Bloom.Settings bloomSettings) : base(renderGraph)
 	{
@@ -63,7 +65,8 @@ public partial class Tonemapping : ViewRenderFeature
 			colorGamut = hdrSettings.displayColorGamut;
 		}
 
-		using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb, hdrEnabled));
+        var isFirst = renderedViewIndices.Add(viewRenderData.viewId);
+        using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb, hdrEnabled, isFirst));
 
 		pass.Initialize(material, 0);
         pass.FrameBufferSize = new Int3(viewRenderData.viewSize, viewRenderData.viewCount);
@@ -93,7 +96,8 @@ public partial class Tonemapping : ViewRenderFeature
 			pass.SetFloat("Purkinje", data.settings.Purkinje ? 1 : 0);
 			pass.SetFloat("Hdr", data.hdrEnabled ? 1 : 0);
 			pass.SetVector("RodInputStrength", data.settings.RodColor.LinearFloat3());
-		});
+            pass.SetFloat("IsFirst", data.isFirst ? 1 : 0);
+        });
 	}
 
 	private Matrix4x4 CalculateRgbToLMSR(bool normalize)
