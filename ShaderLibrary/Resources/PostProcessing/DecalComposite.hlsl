@@ -41,7 +41,7 @@ FragmentOutput FragmentCombine(VertexFullscreenTriangleOutput input)
 	
 	float3 albedo = UnpackAlbedo(albedoMetallic.rg, input.position.xy);
 	float3 normal = GBufferNormal(normalRoughness, V, WorldToView, ViewToWorld);
-	float roughness = normalRoughness.a;
+	float roughness = normalRoughness.b;
 	
 	albedo = lerp(albedo, decal.rgb, decal.a);
 	

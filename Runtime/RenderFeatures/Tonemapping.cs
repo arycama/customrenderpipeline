@@ -74,13 +74,15 @@ public partial class Tonemapping : ViewRenderFeature
         pass.FrameBufferFormat = viewRenderData.format;
 
         pass.ReadRtHandle<CameraTarget>();
-		pass.ReadRtHandle<CameraBloom>();
-		pass.ReadResource<AutoExposureData>();
-	
-		// Just for debug 
-		pass.ReadResource<DiffuseGlobalIllumination.Result>();
-		pass.ReadResource<ScreenSpaceReflectionResult>();
 
+        if(renderGraph.TryGetRTHandle<CameraBloom>(out _))
+        {
+            pass.ReadRtHandle<CameraBloom>();
+            pass.AddKeyword("BLOOM_ON");
+        }
+
+        pass.ReadResource<AutoExposureData>();
+	
 		pass.SetRenderFunction(static (command, pass, data) =>
 		{
 			pass.SetFloat("Tonemap", data.settings.Tonemap ? 1 : 0);

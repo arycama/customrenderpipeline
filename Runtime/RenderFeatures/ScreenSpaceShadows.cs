@@ -26,6 +26,9 @@ public partial class ScreenSpaceShadows : ViewRenderFeature
 
 	public override void Render(ViewRenderData viewRenderData)
     {
+        if (settings.Intensity == 0)
+            return;
+
 		using var scope = renderGraph.AddProfileScope("Screen Space Shadows");
 
 		var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);

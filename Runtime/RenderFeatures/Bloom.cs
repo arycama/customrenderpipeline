@@ -46,6 +46,9 @@ public class Bloom : ViewRenderFeature
 
 	public override void Render(ViewRenderData viewRenderData)
     {
+        if (settings.BloomStrength == 0)
+            return;
+
 		renderGraph.AddProfileBeginPass("Bloom");
 
 		var bloomIds = ListPool<ResourceHandle<RenderTexture>>.Get();

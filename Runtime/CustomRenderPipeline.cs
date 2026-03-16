@@ -277,7 +277,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			using var pass = renderGraph.AddObjectRenderPass("Decal");
 
 			pass.Initialize("Decal", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.QuantizedFrontToBack, PerObjectData.None);
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepth);
 			pass.WriteTexture(decalAlbedo);
 			pass.WriteTexture(decalNormal);
 

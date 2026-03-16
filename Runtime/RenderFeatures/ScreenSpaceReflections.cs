@@ -28,6 +28,9 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 
     public override void Render(ViewRenderData viewRenderData)
     {
+        if (settings.Intensity == 0)
+            return;
+
 		using var scope = renderGraph.AddProfileScope("Specular Global Illumination");
 
         // Must be screen texture since we use stencil to skip sky pixels

@@ -30,7 +30,7 @@ public class VirtualTerrain : ViewRenderFeature
 
 	private Terrain previousTerrain;
 
-	private readonly ComputeShader virtualTextureUpdateShader, dxtCompressCS, virtualTextureBuild;
+	private readonly ComputeShader virtualTextureUpdateShader, dxtCompressCS;
 
 	private List<NativeArray<int>> requestArrays = new();
 	private Stack<int> availableRequestIndices = new();
@@ -54,7 +54,6 @@ public class VirtualTerrain : ViewRenderFeature
 		mappedTiles = renderGraph.GetBuffer(settings.VirtualTileCount, sizeof(int), isPersistent: true);
 		tilesToUnmapBuffer = renderGraph.GetBuffer(settings.UpdateTileCount, sizeof(int), isPersistent: true);
 
-		virtualTextureBuild = Resources.Load<ComputeShader>("Terrain/VirtualTextureBuild");
 		virtualTextureUpdateShader = Resources.Load<ComputeShader>("Terrain/VirtualTextureUpdate");
 		dxtCompressCS = Resources.Load<ComputeShader>("Terrain/DxtCompress");
 

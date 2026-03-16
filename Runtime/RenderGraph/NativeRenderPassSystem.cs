@@ -197,7 +197,7 @@ public class NativeRenderPassSystem : IDisposable
                 // TODO: what happens if we use don't care for frameBuffer output, does it still get stored (possibly in an optimal way?)
                 attachments[i] = new(colorAttachment.frameBufferFormat)
                 {
-                    //storeAction = RenderBufferStoreAction.Store,
+                    storeAction = RenderBufferStoreAction.Store,
                     loadStoreTarget = colorAttachment.target
                 };
             }

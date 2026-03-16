@@ -39,21 +39,30 @@ void LuminanceBuildHistogram(uint groupIndex : SV_GroupIndex, uint2 threadId : S
     
 	GroupMemoryBarrierWithGroupSync();
     
-	if (all(threadId <= ViewSizeMinusOne))
+	[unroll]
+	for (uint y = 0; y < 2; y++)
 	{
-		float3 color = CameraTarget[threadId];
-		float luminance = Rec2020Luminance(color) * RcpExposure;
+		[unroll]
+		for (uint x = 0; x < 2; x++)
+		{
+			uint2 coord = threadId * 2 + uint2(x, y);
+			if (all(coord <= ViewSizeMinusOne))
+			{
+				float3 color = CameraTarget[coord];
+				float luminance = Rec2020Luminance(color) * RcpExposure;
 		
-		if (IsInfOrNaN(luminance))
-			luminance = 0;
+				if (IsInfOrNaN(luminance))
+					luminance = 0;
 			
-		float ev100 = LuminanceToEV100(luminance);
-		ev100 = clamp(ev100, MinEv, MaxEv);
+				float ev100 = LuminanceToEV100(luminance);
+				ev100 = clamp(ev100, MinEv, MaxEv);
 		
-		uint binIndex = luminance ? round(Remap(ev100, MinEv, MaxEv, 1.0, 255.0)) : 0;
-		InterlockedAdd(HistogramShared[binIndex], 1);
+				uint binIndex = luminance ? round(Remap(ev100, MinEv, MaxEv, 1.0, 255.0)) : 0;
+				InterlockedAdd(HistogramShared[binIndex], 1);
+			}
+		}
 	}
-    
+	
 	GroupMemoryBarrierWithGroupSync();
 
 	if (any(threadId > ViewSizeMinusOne))

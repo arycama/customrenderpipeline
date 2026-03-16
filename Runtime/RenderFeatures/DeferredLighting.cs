@@ -41,15 +41,29 @@ public class DeferredLighting : ViewRenderFeature
 			pass.ReadResource<SkyTransmittanceData>();
 			pass.ReadResource<CloudShadowDataResult>();
 
-			pass.ReadResource<ScreenSpaceShadows.Result>();
 			pass.ReadResource<LightingSetup.Result>();
 			pass.ReadResource<ClusteredLightCulling.Result>();
 			pass.ReadResource<VolumetricLighting.Result>();
 
-			pass.ReadResource<DiffuseGlobalIllumination.Result>();
-			pass.ReadResource<ScreenSpaceReflectionResult>();
+            pass.ReadResource<ParticleShadowData>();
 
-			pass.ReadResource<ParticleShadowData>();
+            if(renderGraph.TryGetResource<DiffuseGlobalIllumination.Result>(out _))
+            {
+                pass.ReadResource<DiffuseGlobalIllumination.Result>();
+                pass.AddKeyword("SCREEN_SPACE_GLOBAL_ILLUMINATION_ON");
+            }
+
+            if (renderGraph.TryGetResource<ScreenSpaceReflectionResult>(out _))
+            {
+                pass.ReadResource<ScreenSpaceReflectionResult>();
+                pass.AddKeyword("SCREENSPACE_REFLECTIONS_ON");
+            }
+
+            if (renderGraph.TryGetResource<ScreenSpaceShadows.Result>(out _))
+            {
+                pass.ReadResource<ScreenSpaceShadows.Result>();
+                pass.AddKeyword("SCREEN_SPACE_GLOBAL_ILLUMINATION_ON");
+            }
 		}
 
 		RenderPass(0); // No translucency

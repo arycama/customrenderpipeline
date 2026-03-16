@@ -281,6 +281,13 @@ public class RenderGraph : IDisposable
         return GetRTHandle(typeof(T)).handle;
     }
 
+    public bool TryGetRTHandle<T>(out ResourceHandle<RenderTexture> handle) where T : IRtHandleId
+    {
+        var result = rtHandles.TryGetValue(typeof(T), out var data);
+        handle = data.handle;
+        return result;
+    }
+
     public unsafe ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(T data) where T : unmanaged
     {
         Assert.IsFalse(IsExecuting);

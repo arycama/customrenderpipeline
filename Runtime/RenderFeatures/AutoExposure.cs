@@ -74,7 +74,7 @@ public partial class AutoExposure : ViewRenderFeature
 			settings.ProceduralSoftness
 		)))
 		{
-			pass.Initialize(computeShader, 0, viewRenderData.viewSize.x, viewRenderData.viewSize.y);
+			pass.Initialize(computeShader, 0, viewRenderData.viewSize.x >> 1, viewRenderData.viewSize.y >> 1);
 			pass.ReadTexture(nameof(CameraTarget), renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteBuffer("LuminanceHistogram", histogram);
 			pass.ReadResource<AutoExposureData>();
@@ -180,47 +180,4 @@ internal struct AutoExposureStructData
 		ProceduralRadii = proceduralRadii;
 		ProceduralSoftness = proceduralSoftness;
 	}
-
-	public override bool Equals(object obj) => obj is AutoExposureStructData other && minEv == other.minEv && maxEv == other.maxEv && adaptationSpeed == other.adaptationSpeed && exposureCompensation == other.exposureCompensation && iso == other.iso && aperture == other.aperture && shutterSpeed == other.shutterSpeed && histogramMin == other.histogramMin && histogramMax == other.histogramMax && EqualityComparer<Float4>.Default.Equals(exposureCompensationRemap, other.exposureCompensationRemap) && meteringMode == other.meteringMode && EqualityComparer<Float2>.Default.Equals(ProceduralCenter, other.ProceduralCenter) && EqualityComparer<Float2>.Default.Equals(ProceduralRadii, other.ProceduralRadii) && ProceduralSoftness == other.ProceduralSoftness;
-
-	public override int GetHashCode()
-	{
-		var hash = new System.HashCode();
-		hash.Add(minEv);
-		hash.Add(maxEv);
-		hash.Add(adaptationSpeed);
-		hash.Add(exposureCompensation);
-		hash.Add(iso);
-		hash.Add(aperture);
-		hash.Add(shutterSpeed);
-		hash.Add(histogramMin);
-		hash.Add(histogramMax);
-		hash.Add(exposureCompensationRemap);
-		hash.Add(meteringMode);
-		hash.Add(ProceduralCenter);
-		hash.Add(ProceduralRadii);
-		hash.Add(ProceduralSoftness);
-		return hash.ToHashCode();
-	}
-
-	public void Deconstruct(out float minEv, out float maxEv, out float adaptationSpeed, out float exposureCompensation, out float iso, out float aperture, out float shutterSpeed, out float histogramMin, out float histogramMax, out Float4 exposureCompensationRemap, out float meteringMode, out Float2 proceduralCenter, out Float2 proceduralRadii, out float proceduralSoftness)
-	{
-		minEv = this.minEv;
-		maxEv = this.maxEv;
-		adaptationSpeed = this.adaptationSpeed;
-		exposureCompensation = this.exposureCompensation;
-		iso = this.iso;
-		aperture = this.aperture;
-		shutterSpeed = this.shutterSpeed;
-		histogramMin = this.histogramMin;
-		histogramMax = this.histogramMax;
-		exposureCompensationRemap = this.exposureCompensationRemap;
-		meteringMode = this.meteringMode;
-		proceduralCenter = ProceduralCenter;
-		proceduralRadii = ProceduralRadii;
-		proceduralSoftness = ProceduralSoftness;
-	}
-
-	public static implicit operator (float minEv, float maxEv, float adaptationSpeed, float exposureCompensation, float iso, float aperture, float shutterSpeed, float histogramMin, float histogramMax, Float4 exposureCompensationRemap, float meteringMode, Float2 ProceduralCenter, Float2 ProceduralRadii, float ProceduralSoftness)(AutoExposureStructData value) => (value.minEv, value.maxEv, value.adaptationSpeed, value.exposureCompensation, value.iso, value.aperture, value.shutterSpeed, value.histogramMin, value.histogramMax, value.exposureCompensationRemap, value.meteringMode, value.ProceduralCenter, value.ProceduralRadii, value.ProceduralSoftness);
-	public static implicit operator AutoExposureStructData((float minEv, float maxEv, float adaptationSpeed, float exposureCompensation, float iso, float aperture, float shutterSpeed, float histogramMin, float histogramMax, Float4 exposureCompensationRemap, float meteringMode, Float2 ProceduralCenter, Float2 ProceduralRadii, float ProceduralSoftness) value) => new AutoExposureStructData(value.minEv, value.maxEv, value.adaptationSpeed, value.exposureCompensation, value.iso, value.aperture, value.shutterSpeed, value.histogramMin, value.histogramMax, value.exposureCompensationRemap, value.meteringMode, value.ProceduralCenter, value.ProceduralRadii, value.ProceduralSoftness);
 }
