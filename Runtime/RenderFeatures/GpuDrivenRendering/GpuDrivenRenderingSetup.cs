@@ -285,7 +285,7 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
 
 		lodSizesBuffer = renderGraph.GetBuffer(lodSizes.Value.Count, sizeof(float), isPersistent: true);
 		instanceTypeDataBuffer = renderGraph.GetBuffer(instanceTypeDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeData>(), isPersistent: true);
-		drawCallArgsBuffer = renderGraph.GetBuffer(drawCallArgs.Value.Count, UnsafeUtility.SizeOf<IndirectDrawIndexedArgs>(), GraphicsBuffer.Target.IndirectArguments, isPersistent: true);
+		drawCallArgsBuffer = renderGraph.GetBuffer(drawCallArgs.Value.Count * 5, 4, GraphicsBuffer.Target.IndirectArguments, isPersistent: true);
 		instanceTypeLodDataBuffer = renderGraph.GetBuffer(instanceTypeLodDatas.Value.Count, UnsafeUtility.SizeOf<InstanceTypeLodData>(), isPersistent: true);
 		rendererLodIndicesBuffer = renderGraph.GetBuffer(rendererLodIndices.Value.Count, isPersistent: true);
 

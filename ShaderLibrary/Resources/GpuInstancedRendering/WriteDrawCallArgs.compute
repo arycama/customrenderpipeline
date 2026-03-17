@@ -5,7 +5,7 @@
 #pragma kernel WriteDrawCallArgs
 
 StructuredBuffer<uint> RendererLodIndices, LodCounts;
-RWStructuredBuffer<IndirectDrawIndexedArgs> DrawCallArgs;
+RWBuffer<uint> DrawCallArgs;
 uint MaxThread;
 
 [numthreads(1024, 1, 1)]
@@ -16,5 +16,5 @@ void WriteDrawCallArgs(uint dispatchThreadId : SV_DispatchThreadID)
 
 	uint lodIndex = RendererLodIndices[dispatchThreadId];
 	uint lodCount = LodCounts[lodIndex];
-	DrawCallArgs[dispatchThreadId].instanceCount = lodCount;
+	DrawCallArgs[5 * dispatchThreadId + 1] = lodCount;
 }

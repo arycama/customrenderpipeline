@@ -12,7 +12,7 @@ RWStructuredBuffer<float3x4> _ObjectToWorldWrite;
 StructuredBuffer<uint> Input, InputIndices;
 StructuredBuffer<float3x4> _Positions;
 
-RWStructuredBuffer<uint> ThreadGroupsWrite;
+RWBuffer<uint> ThreadGroupsWrite;
 StructuredBuffer<uint> TotalInstanceCount;
 
 uint DivRoundUp(uint x, uint y)

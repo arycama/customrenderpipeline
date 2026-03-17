@@ -133,9 +133,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new SkyLookupTables(asset.Sky, renderGraph),
 		new WaterFft(renderGraph, asset.OceanSettings),
 		terrainSystem,
-        new ProceduralGenerationGpu(renderGraph, DependencyResolver.Resolve<ProceduralGenerationController>()),
+        new ProceduralGenerationGpu(renderGraph, RenderPipelineDependencyResolver.Resolve<ProceduralGenerationController>()),
 		new WaterShoreMask(renderGraph, asset.WaterShoreMaskSettings),
-        new GpuDrivenRenderingSetup(renderGraph, DependencyResolver.Resolve<ProceduralGenerationController>()),
+        new GpuDrivenRenderingSetup(renderGraph, RenderPipelineDependencyResolver.Resolve<ProceduralGenerationController>()),
 	};
 
 	protected override List<ViewRenderFeature> InitializePerCameraRenderFeatures() => new()
@@ -344,9 +344,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new UnderwaterLighting(renderGraph, asset.OceanSettings),
 		new DeferredWater(renderGraph, asset.OceanSettings),
 
-		// Do rain after water so we can get raindrops on the water surface
-		new RainTextureUpdater(renderGraph, asset.Rain),
-
 		// Could do SSR+SSGI+SSSSS here too, all the screen passes
 		new AmbientOcclusion(renderGraph, asset.AmbientOcclusionSettings),
 		new ScreenSpaceShadows(renderGraph, asset.ScreenSpaceShadows, asset.LightingSettings),
@@ -405,10 +402,13 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<ParticleShadowData>();
 		}),
 
-		new Rain(renderGraph, asset.Rain),
+        // Do rain after water so we can get raindrops on the water surface
+		new RainTextureUpdater(renderGraph, asset.Rain),
+
+        new Rain(renderGraph, asset.Rain),
 		new AutoExposure(asset.AutoExposureSettings, asset.LensSettings, renderGraph, asset.Tonemapping),
         new DepthOfField(asset.DepthOfFieldSettings, asset.LensSettings, renderGraph, asset.TemporalAASettings),
-		new CameraVelocityDilate(renderGraph),
+		new CameraVelocityDilate(renderGraph, asset.TemporalAASettings),
 		new TemporalAA(asset.TemporalAASettings, renderGraph),
 		new Bloom(renderGraph, asset.Bloom),
 		new Tonemapping(renderGraph, asset.Tonemapping, asset.Bloom),

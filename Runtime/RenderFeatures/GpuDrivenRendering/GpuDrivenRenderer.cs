@@ -86,7 +86,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
             });
         }
 
-		var maxCount = renderGraph.GetBuffer(4, target: GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
+		var maxCount = renderGraph.GetBuffer(1, 16, target: GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination);
 		using (var pass = renderGraph.AddGenericRenderPass("Copy Count", (maxCount, totalInstanceCountBuffer)))
 		{
 			pass.WriteBuffer("", maxCount);
@@ -160,7 +160,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			});
 		}
 
-		var threadGroups = renderGraph.GetBuffer(6, target: GraphicsBuffer.Target.IndirectArguments);
+		var threadGroups = renderGraph.GetBuffer(3, target: GraphicsBuffer.Target.IndirectArguments);
         using (var pass = renderGraph.AddComputeRenderPass("ComputeThreadCount"))
         {
             pass.Initialize(instanceCopyData, 0, 1, 1, 1, false);

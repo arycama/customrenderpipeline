@@ -12,9 +12,9 @@
 #pragma multi_compile _ USE_TERRAIN_HEIGHT
 #pragma multi_compile _ HIZ_ON
 
-globallycoherent RWBuffer<uint> _IndirectArgs;
-globallycoherent RWBuffer<int> _PatchDataWrite;
-globallycoherent RWTexture2D<int> _LodResult, _TempResultWrite;
+RWBuffer<uint> _IndirectArgs;
+RWStructuredBuffer<int> _PatchDataWrite;
+RWTexture2D<int> _LodResult, _TempResultWrite;
 Buffer<uint> _IndirectArgsInput;
 Texture2D<float2> _TerrainHeights;
 Texture2D<int> _LodInput, _TempResult;

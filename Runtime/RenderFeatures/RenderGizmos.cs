@@ -15,7 +15,7 @@ public class RenderGizmos : ViewRenderFeature
 		var preImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PreImageEffects);
 		var postImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PostImageEffects);
 
-		using var pass = renderGraph.AddGenericRenderPass("", (preImageEffects, postImageEffects));
+		using var pass = renderGraph.AddGenericRenderPass("Render Gizmos", (preImageEffects, postImageEffects));
 		pass.SetRenderFunction(static (command, pass, data) =>
 		{
 			command.DrawRendererList(data.preImageEffects);

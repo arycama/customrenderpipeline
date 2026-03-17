@@ -43,16 +43,16 @@ float Filter(float x)
 	return ((1 + k) * pow(c, p) - k) * Sq(c);
 }
 
-FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
+FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 {
 	#ifdef UPSCALE
-		uint2 centerCoord = (uint2)(position.xy * _Scale - _Jitter.xy);
+		uint2 centerCoord = (uint2)(input.position.xy * _Scale - _Jitter.xy);
 	#else
-		uint2 centerCoord = (uint2)position.xy;
+		uint2 centerCoord = (uint2) input.position.xy;
 	#endif
 
 	float2 velocity = CameraVelocity[centerCoord];
-	float2 historyUv = uv - velocity;
+	float2 historyUv = input.uv - velocity;
 	
 	float2 f = frac(historyUv * ViewSize - 0.5);
 	float2 w = (f * f - f) * _MotionSharpness;
@@ -84,7 +84,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 			#ifdef UPSCALE
 				float _BlendSharpness = 0.5;
 				float filterSize = 4.0 / 3.0;
-				float2 delta = (floor(position.xy * _Scale - _Jitter.xy) + 0.5 + float2(x, y) + _Jitter.xy) / _Scale - position.xy;
+				float2 delta = (floor(input.position.xy * _Scale - _Jitter.xy) + 0.5 + float2(x, y) + _Jitter.xy) / _Scale - input.position.xy;
 				//float weight = Mitchell1D(delta.x * _SpatialSize, _SpatialBlur, _SpatialSharpness * 8) * Mitchell1D(delta.y * _SpatialSize, _SpatialBlur, _SpatialSharpness * 8);
 				float weight = Filter(delta.x) * Filter(delta.y);
 			#else
@@ -123,7 +123,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 	minValue = max(minValue, mean - stdDev);
 	maxValue = min(maxValue, mean + stdDev);
 	
-	uint stencil = CameraStencil[position.xy].g;
+	uint stencil = CameraStencil[input.position.xy].g;
 	bool isResponsive = stencil & 64;
 	
 	if (_HasHistory && all(saturate(historyUv) == historyUv))
@@ -153,7 +153,7 @@ FragmentOutput Fragment(float4 position : SV_Position, float2 uv : TEXCOORD)
 			result.rgb *= rcp(result.a);
 	}
 	
-	float3 nonReprojectedHistory = History[position.xy];
+	float3 nonReprojectedHistory = History[input.position.xy];
 	nonReprojectedHistory.r *= PreviousToCurrentExposure;
 	
 	//result.rgb = lerp(result.rgb, nonReprojectedHistory, AfterImage);

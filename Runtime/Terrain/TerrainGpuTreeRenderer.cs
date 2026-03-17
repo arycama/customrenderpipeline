@@ -11,7 +11,7 @@ public class TerrainGpuTreeRenderer : MonoBehaviour, IGpuProceduralGenerator
 
 	private void OnEnable()
 	{
-		proceduralGenerationController = DependencyResolver.Resolve<ProceduralGenerationController>();
+		proceduralGenerationController = RenderPipelineDependencyResolver.Resolve<ProceduralGenerationController>();
 		proceduralGenerationController.AddGenerator(this);
 	}
 

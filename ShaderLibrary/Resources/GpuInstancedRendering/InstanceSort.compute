@@ -12,7 +12,8 @@ const static uint threadCount = 128;
 #endif
 
 RWStructuredBuffer<uint> KeysResult, DataResult, CountResult, TotalSumsResult, ScanResult;
-StructuredBuffer<uint> Keys, Data, TotalGroupCount, GroupCounts, TotalSums, GroupScans;
+StructuredBuffer<uint> Keys, Data, GroupCounts, TotalSums, GroupScans;
+Buffer<uint> TotalGroupCount;
 uint BitIndex;
 
 groupshared uint sharedSums[threadCount];

@@ -125,7 +125,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	uint channelIndex = noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2);
 	float3 c = _Extinction;
 	float cp = Select(_Extinction, channelIndex);
-	float l = _LightDirection0.y;
+	float l = saturate(_LightDirection0.y);
 	float v = underwaterV.y;
 	float b = maxUnderwaterDistance;
 

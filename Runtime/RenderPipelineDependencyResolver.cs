@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-public static class DependencyResolver
+public static class RenderPipelineDependencyResolver
 {
 	private static readonly Dictionary<Type, object> globalDependencies = new();
 

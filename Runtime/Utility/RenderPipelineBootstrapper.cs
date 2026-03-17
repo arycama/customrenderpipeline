@@ -8,6 +8,6 @@ public static class RenderPipelineBootstrapper
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void Init()
     {
-        DependencyResolver.AddGlobalDependency(new ProceduralGenerationController());
+        RenderPipelineDependencyResolver.AddGlobalDependency(new ProceduralGenerationController());
     }
 }

@@ -15,6 +15,9 @@ public class RainTextureUpdater : ViewRenderFeature
 
 	public override void Render(ViewRenderData viewRenderData)
     {
+        if (settings.WetLevel == 0)
+            return;
+
 		var rainTexture = renderGraph.GetTexture(settings.Resolution, UnityEngine.Experimental.Rendering.GraphicsFormat.R8G8_SNorm, isExactSize: true, hasMips: true, autoGenerateMips: true);
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Rain Texture", (settings.Resolution, settings.Size)))

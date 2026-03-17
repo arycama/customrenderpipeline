@@ -89,7 +89,7 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 				pass.WriteTexture(tempResult);
 				pass.WriteTexture(hitResult);
-				pass.ReadTexture("", renderGraph.GetRTHandle<CameraDepth>());
+				pass.ReadRtHandle<CameraDepth>();
 
 				pass.ReadResource<SkyReflectionAmbientData>();
 				pass.ReadResource<TemporalAAData>();
