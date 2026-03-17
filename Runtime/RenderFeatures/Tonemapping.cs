@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public partial class Tonemapping : ViewRenderFeature
@@ -66,7 +67,7 @@ public partial class Tonemapping : ViewRenderFeature
 		}
 
         var isFirst = renderedViewIndices.Add(viewRenderData.viewId);
-        using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb, hdrEnabled, isFirst));
+        using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", new Pass0Data(settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb, hdrEnabled, isFirst));
 
 		pass.Initialize(material, 0);
         pass.FrameBufferSize = new Int3(viewRenderData.viewSize, viewRenderData.viewCount);
@@ -1775,4 +1776,28 @@ public partial class Tonemapping : ViewRenderFeature
         64.2119f,
         64.304f
 	};
+
+    private readonly struct Pass0Data
+    {
+        public readonly Tonemapping.Settings settings;
+        public readonly Camera camera;
+        public readonly Bloom.Settings bloomSettings;
+        public readonly ColorGamut colorGamut;
+        public readonly Matrix4x4 RgbToLmsr;
+        public readonly Matrix4x4 LmsToRgb;
+        public readonly bool hdrEnabled;
+        public readonly bool isFirst;
+
+        public Pass0Data(Tonemapping.Settings settings, Camera camera, Bloom.Settings bloomSettings, ColorGamut colorGamut, Matrix4x4 rgbToLmsr, Matrix4x4 lmsToRgb, bool hdrEnabled, bool isFirst)
+        {
+            this.settings = settings;
+            this.camera = camera;
+            this.bloomSettings = bloomSettings;
+            this.colorGamut = colorGamut;
+            RgbToLmsr = rgbToLmsr;
+            LmsToRgb = lmsToRgb;
+            this.hdrEnabled = hdrEnabled;
+            this.isFirst = isFirst;
+        }
+    }
 }

@@ -1,19 +1,24 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.RendererUtils;
 
 public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 {
-	//private List<RendererList> rendererLists = new();
-	private RendererList rendererList;
+	private readonly List<RendererList> rendererLists = new();
 	private SinglePassStereoMode stereoMode;
     private bool foveated;
+    private ScriptableRenderContext context;
 
 	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false, bool foveated = false)
 	{
+        this.context = context;
         this.foveated = foveated;
+        stereoMode = camera.stereoEnabled
+            ? SystemInfo.supportsMultiview ? SinglePassStereoMode.Multiview : SinglePassStereoMode.Instancing
+            : SinglePassStereoMode.None;
 
-		var rendererListDesc = new RendererListDesc(new ShaderTagId(tag), cullingResults, camera)
+        var rendererListDesc = new RendererListDesc(new ShaderTagId(tag), cullingResults, camera)
 		{
 			renderQueueRange = renderQueueRange,
 			sortingCriteria = sortingCriteria,
@@ -21,15 +26,10 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 			rendererConfiguration = perObjectData
 		};
 
-		rendererList = context.CreateRendererList(rendererListDesc);
-
-		stereoMode = camera.stereoEnabled
-            ? SystemInfo.supportsMultiview ? SinglePassStereoMode.Multiview : SinglePassStereoMode.Instancing
-            : SinglePassStereoMode.None;
-
-        //rendererLists.Clear();
-        //rendererLists.Add(context.CreateRendererList(rendererListDesc));
-        //context.PrepareRendererListsAsync(rendererLists);
+		var rendererList = context.CreateRendererList(rendererListDesc);
+        rendererLists.Clear();
+        rendererLists.Add(rendererList);
+        context.PrepareRendererListsAsync(rendererLists);
     }
 
 	public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -69,7 +69,11 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 
 	protected override void Execute()
 	{
-		foreach (var keyword in keywords)
+        var status = context.QueryRendererListStatus(rendererLists[0]);
+        if (status == RendererListStatus.kRendererListProcessing)
+            Debug.Log("Still Processing");
+
+        foreach (var keyword in keywords)
 			Command.EnableKeyword(new GlobalKeyword(keyword));
 
 		if (stereoMode == SinglePassStereoMode.Instancing)
@@ -87,7 +91,7 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
         if (foveated)
             Command.SetFoveatedRenderingMode(FoveatedRenderingMode.Enabled);
 
-        Command.DrawRendererList(rendererList);
+        Command.DrawRendererList(rendererLists[0]);
 
         if (foveated)
             Command.SetFoveatedRenderingMode(FoveatedRenderingMode.Disabled);

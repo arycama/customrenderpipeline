@@ -119,14 +119,14 @@ public class ParticleShadows : ViewRenderFeature
             if (requestData.directionalShadowRequests.Count == 0)
             {
                 // Dummy pass
-                using (var pass = renderGraph.AddGenericRenderPass("Shadow Dummy Pass"))
+                using (var pass = renderGraph.AddGenericRenderPass("Shadow Dummy Pass", directionalShadows))
                 {
                     pass.WriteTexture(directionalShadows);
                     //pass.WriteTexture(result);
                     //pass.ReadTexture("", directionalShadows);
                     //pass.ReadTexture("", result);
 
-                    pass.SetRenderFunction((command, pass) =>
+                    pass.SetRenderFunction(static (command, pass, directionalShadows) =>
                     {
                         command.SetRenderTarget(pass.GetRenderTexture(directionalShadows), 0, CubemapFace.Unknown, -1);
                         command.ClearRenderTarget(false, true, Color.white);

@@ -11,6 +11,7 @@ public class GpuDrivenRenderingRender : ViewRenderFeature
 
 	public override void Render(ViewRenderData viewRenderData)
     {
+        return;
 		if (viewRenderData.camera.cameraType != CameraType.SceneView && viewRenderData.camera.cameraType != CameraType.Game && viewRenderData.camera.cameraType != CameraType.Reflection)
 			return;
 

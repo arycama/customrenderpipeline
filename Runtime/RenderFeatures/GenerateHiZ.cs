@@ -40,8 +40,8 @@ public class GenerateHiZ : ViewRenderFeature
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				pass.SetInt("_Width", data.Item1.x);
-				pass.SetInt("_Height", data.Item1.y);
+				pass.SetInt("_Width", data.viewSize.x);
+				pass.SetInt("_Height", data.viewSize.y);
 				pass.SetInt("_MaxMip", data.Item2);
 				pass.SetVector("_InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.Item3));
 			});
@@ -66,8 +66,8 @@ public class GenerateHiZ : ViewRenderFeature
 
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					pass.SetInt("_Width", data.Item1.x >> (data.maxMipsPerPass - 1));
-					pass.SetInt("_Height", data.Item1.y >> (data.maxMipsPerPass - 1));
+					pass.SetInt("_Width", data.viewSize.x >> (data.maxMipsPerPass - 1));
+					pass.SetInt("_Height", data.viewSize.y >> (data.maxMipsPerPass - 1));
 					pass.SetInt("_MaxMip", data.mipCount - data.maxMipsPerPass);
 				});
 			}

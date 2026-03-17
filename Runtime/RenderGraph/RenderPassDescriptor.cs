@@ -23,5 +23,10 @@ public readonly struct RenderPassDescriptor
         this.debugNameUtf8 = debugNameUtf8 ?? throw new ArgumentNullException(nameof(debugNameUtf8));
     }
 
-    public readonly void BeginRenderPass(CommandBuffer command) => command.BeginRenderPass(width, height, depth, samples, attachments, depthAttachmentIndex, shadingRateImageAttachmentIndex, subpasses, Encoding.UTF8.GetBytes(debugNameUtf8));
+    public readonly void BeginRenderPass(CommandBuffer command)
+    {
+        Span<byte> buffer = stackalloc byte[Encoding.UTF8.GetByteCount(debugNameUtf8)];
+        _ = Encoding.UTF8.GetBytes(debugNameUtf8, buffer);
+        command.BeginRenderPass(width, height, depth, samples, attachments, depthAttachmentIndex, shadingRateImageAttachmentIndex, subpasses, buffer);
+    }
 }

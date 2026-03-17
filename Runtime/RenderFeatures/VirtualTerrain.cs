@@ -32,14 +32,16 @@ public class VirtualTerrain : ViewRenderFeature
 
 	private readonly ComputeShader virtualTextureUpdateShader, dxtCompressCS;
 
-	private List<NativeArray<int>> requestArrays = new();
-	private Stack<int> availableRequestIndices = new();
-	private Queue<int> readyRequestIndices = new();
+	private readonly List<NativeArray<int>> requestArrays = new();
+	private readonly Stack<int> availableRequestIndices = new();
+	private readonly Queue<int> readyRequestIndices = new();
+    private readonly Queue<int> pendingRequestIndices = new();
 
 	private int maxRequestBufferSize;
 	private readonly Material virtualTextureBuildMaterial;
+    private readonly Action<AsyncGPUReadbackRequest> OnReadbackComplete;
 
-	public VirtualTerrain(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
+    public VirtualTerrain(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
 	{
 		this.settings = settings;
 
@@ -58,6 +60,8 @@ public class VirtualTerrain : ViewRenderFeature
 		dxtCompressCS = Resources.Load<ComputeShader>("Terrain/DxtCompress");
 
 		virtualTextureBuildMaterial = new Material(Shader.Find("Hidden/Virtual Texture Build")) { hideFlags = HideFlags.HideAndDontSave };
+
+        OnReadbackComplete = ReadbackRequestComplete;
 	}
 
 	protected override void Cleanup(bool disposing)
@@ -139,12 +143,12 @@ public class VirtualTerrain : ViewRenderFeature
             requestBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Append, maxRequestBufferSize, 4);
 
             // Fill all buffesr with 0 (I think this should happen automatically, but
-            using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init", maxRequestBufferSize))
+            using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init", (maxRequestBufferSize, requestBuffer)))
             {
-                pass.SetRenderFunction((command, pass, requestBufferSize) =>
+                pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    command.SetBufferData(requestBuffer, new int[requestBufferSize]);
-                    command.SetBufferCounterValue(requestBuffer, 1); // Init the counter to zero before appending
+                    command.SetBufferData(data.requestBuffer, new int[data.maxRequestBufferSize]);
+                    command.SetBufferCounterValue(data.requestBuffer, 1); // Init the counter to zero before appending
                 });
             }
             requestBuffers.Add(requestBuffer);
@@ -170,12 +174,12 @@ public class VirtualTerrain : ViewRenderFeature
                 requestBuffers[requestArrayIndex] = requestBuffer;
 
                 // Fill all buffesr with 0 (I think this should happen automatically, but
-                using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init", maxRequestBufferSize))
+                using (var pass = renderGraph.AddGenericRenderPass("Virtual Texture Init", (maxRequestBufferSize, requestBuffer)))
                 {
-                    pass.SetRenderFunction((command, pass, requestBufferSize) =>
+                    pass.SetRenderFunction(static (command, pass, data) =>
                     {
-                        command.SetBufferData(requestBuffer, new int[requestBufferSize]);
-                        command.SetBufferCounterValue(requestBuffer, 1); // Init the counter to zero before appending
+                        command.SetBufferData(data.requestBuffer, new int[data.maxRequestBufferSize]);
+                        command.SetBufferCounterValue(data.requestBuffer, 1); // Init the counter to zero before appending
                     });
                 }
             }
@@ -187,24 +191,22 @@ public class VirtualTerrain : ViewRenderFeature
 			pass.Initialize(virtualTextureUpdateShader, 5, threadCount);
 			pass.WriteBuffer("VirtualFeedbackTexture", virtualTextureData.feedbackBuffer);
 
-			pass.SetRenderFunction((Action<CommandBuffer, RenderPass, (GraphicsBuffer requestBuffer, ComputeShader virtualTextureUpdateShader, int IndirectionTextureResolution)>)(static (command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				command.ClearRandomWriteTargets(); // Clear from previous passes
 				command.SetBufferCounterValue(data.requestBuffer, 1); // Init the counter to zero before appending
 				command.SetComputeBufferParam(data.virtualTextureUpdateShader, 5, "VirtualRequests", data.requestBuffer);
-				pass.SetInt("IndirectionResolution", data.IndirectionTextureResolution);
-			}));
+				pass.SetInt("IndirectionResolution", data.IndirectionSize);
+			});
 		}
 
-		using (var pass = renderGraph.AddGenericRenderPass("Copy Counter and readback", (requestBuffer, requestArray, requestArrayIndex, readyRequestIndices)))
+		using (var pass = renderGraph.AddGenericRenderPass("Copy Counter and readback", (requestBuffer, requestArray, requestArrayIndex, pendingRequestIndices, OnReadbackComplete)))
 		{
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				command.CopyCounterValue(data.requestBuffer, data.requestBuffer, 0);
-                command.RequestAsyncReadbackIntoNativeArray(ref data.Item2, data.requestBuffer, (request) =>
-                {
-                    data.readyRequestIndices.Enqueue(data.requestArrayIndex);
-                });
+                data.pendingRequestIndices.Enqueue(data.requestArrayIndex);
+                command.CopyCounterValue(data.requestBuffer, data.requestBuffer, 0);
+                command.RequestAsyncReadbackIntoNativeArray(ref data.requestArray, data.requestBuffer, data.OnReadbackComplete);
             });
 		}
 
@@ -516,7 +518,15 @@ public class VirtualTerrain : ViewRenderFeature
 		}
 	}
 
-	private static int PackCoord(Int3 coord)
+    private void ReadbackRequestComplete(AsyncGPUReadbackRequest request)
+    {
+        if (!pendingRequestIndices.TryDequeue(out var requestArrayIndex))
+            throw new InvalidOperationException("Trying to ready an request that does not exist");
+
+        readyRequestIndices.Enqueue(requestArrayIndex);
+    }
+
+    private static int PackCoord(Int3 coord)
 	{
 		static int BitPack(int data, int size, int offset)
 		{

@@ -101,7 +101,7 @@ public partial class DepthOfField : ViewRenderFeature
 					pass.SetFloat("_FocusDistance", data.focusDistance);
 					pass.SetFloat("_ApertureRadius", data.apertureRadius);
 					pass.SetFloat("_SampleCount", data.SampleCount);
-					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.Item5) - 1);
+					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.viewSize) - 1);
 					pass.SetFloat("_TaaEnabled", data.Item4);
 				});
 			}

@@ -99,8 +99,8 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
 					pass.SetFloat("_Intensity", data.Intensity);
 					pass.SetFloat("_MaxSteps", data.MaxSamples);
 					pass.SetFloat("_Thickness", data.Thickness);
-					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.Item4) - 1);
-					pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * data.ConeAngle * Mathf.Deg2Rad) * (data.viewSize.y / data.Item6 * 0.5f));
+					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.viewSize) - 1);
+					pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * data.ConeAngle * Mathf.Deg2Rad) * (data.viewSize.y / data.y * 0.5f));
 				});
 			}
         }

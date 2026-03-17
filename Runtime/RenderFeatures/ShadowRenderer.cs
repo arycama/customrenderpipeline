@@ -143,6 +143,6 @@ public class ShadowRenderer : ViewRenderFeature
 			}
 		}
 
-		gpuDrivenRenderer.RenderShadow(viewRenderData.transform.position, shadowRequestData, viewRenderData.viewSize);
+		//gpuDrivenRenderer.RenderShadow(viewRenderData.transform.position, shadowRequestData, viewRenderData.viewSize);
     }
 }

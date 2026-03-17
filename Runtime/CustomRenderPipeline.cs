@@ -225,27 +225,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<AutoExposureData>();
 		}),
 
-		new GenericViewRenderFeature(renderGraph, viewRenderData =>
-		{
-			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
-
-			using var pass = renderGraph.AddObjectRenderPass("GrassVelocity");
-            pass.AllowNewSubPass = true;
-
-            pass.Initialize("GrassVelocity", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque, PerObjectData.None, false);
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
-
-			pass.ReadResource<FrameData>();
-			pass.ReadResource<ViewData>();
-			pass.ReadResource<TemporalAAData>();
-			pass.ReadResource<AutoExposureData>();
-		}),
-
         new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
 
 		// This is just here to avoid memory leaks when GPU driven rendering isn't used.
@@ -311,7 +290,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				command.CopyTexture(pass.GetRenderTexture(data.Item1), pass.GetRenderTexture(data.Item2));
+				command.CopyTexture(pass.GetRenderTexture(data.Item1), pass.GetRenderTexture(data.cameraDepthCopy));
 			});
 		}),
 

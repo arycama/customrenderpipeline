@@ -1,12 +1,14 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
 public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 {
-	private RendererList rendererList;
-	private float bias, slopeBias;
+    private RendererList rendererList;
+    private float bias, slopeBias;
 	private bool zClip;
 	private bool isPointLight;
+    private ScriptableRenderContext context;
 
 	public void Initialize(ScriptableRenderContext context, CullingResults cullingResults, int lightIndex, BatchCullingProjectionType projectionType, ShadowSplitData shadowSplitData, float bias, float slopeBias, bool zClip, bool isPointLight)
 	{
@@ -14,10 +16,11 @@ public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 		this.slopeBias = slopeBias;
 		this.zClip = zClip;
 		this.isPointLight = isPointLight;
+        this.context = context;
 
         var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, lightIndex);
         rendererList = context.CreateShadowRendererList(ref shadowDrawingSettings);
-	}
+    }
 
 	public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
 	{
@@ -65,7 +68,7 @@ public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 		if (isPointLight)
 			Command.EnableShaderKeyword("POINT_LIGHT");
 
-		Command.DrawRendererList(rendererList);
+        Command.DrawRendererList(rendererList);
 
 		if (isPointLight)
 			Command.DisableShaderKeyword("POINT_LIGHT");

@@ -70,7 +70,7 @@ public partial class ScreenSpaceShadows : ViewRenderFeature
 				pass.SetFloat("_MaxSteps", data.MaxSamples);
 				pass.SetFloat("_Thickness", data.Thickness);
 				pass.SetFloat("_Intensity", data.Intensity);
-				pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.Item4) - 1);
+				pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.viewSize) - 1);
 			});
 		}
 
