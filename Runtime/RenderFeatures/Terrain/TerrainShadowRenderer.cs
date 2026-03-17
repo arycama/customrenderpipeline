@@ -35,7 +35,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 
 		var passData = Cull(viewRenderData.transform.position, cullingPlanes, viewRenderData.viewSize);
 
-		var passIndex = settings.Material.FindPass("ShadowCaster");
+		var passIndex = shadowRequestData.ZClip ? settings.Material.FindPass("PointShadow") : settings.Material.FindPass("DirectionalShadow");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no ShadowCaster Pass");
 
 		var size = terrainData.size;
@@ -58,15 +58,15 @@ public class TerrainShadowRenderer : TerrainRendererBase
 
 			pass.SetRenderFunction(static (command, pass, cullingPlanes) =>
 			{
-				pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
+                // TODO: Put into a struct?
+                pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);
+                var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
+                for (var i = 0; i < cullingPlanes.Count; i++)
+                    cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
 
-				var cullingPlanesArray = ArrayPool<Vector4>.Get(cullingPlanes.Count);
-				for (var i = 0; i < cullingPlanes.Count; i++)
-					cullingPlanesArray[i] = cullingPlanes.GetCullingPlaneVector4(i);
-
-				pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
-				ArrayPool<Vector4>.Release(cullingPlanesArray);
-			});
+                pass.SetVectorArray("_CullingPlanes", cullingPlanesArray);
+                ArrayPool<Vector4>.Release(cullingPlanesArray);
+            });
 		}
 	}
 }

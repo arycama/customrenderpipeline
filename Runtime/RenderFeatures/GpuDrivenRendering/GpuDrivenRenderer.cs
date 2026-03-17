@@ -252,7 +252,8 @@ public class GpuDrivenRenderer : RenderFeatureBase
 		if (!renderGraph.ResourceMap.TryGetResource<GpuDrivenRenderingData>(renderGraph.FrameIndex, out var instanceData))
 			return;
 
-		if (!instanceData.rendererDrawCallData.TryGetValue("ShadowCaster", out var drawList))
+        var passName = request.ZClip ? "PointShadow" : "DirectionalShadow";
+        if (!instanceData.rendererDrawCallData.TryGetValue(passName, out var drawList))
 			return;
 
 		var cullingPlanes = new CullingPlanes() { Count = request.ShadowRequest.ShadowSplitData.cullingPlaneCount };

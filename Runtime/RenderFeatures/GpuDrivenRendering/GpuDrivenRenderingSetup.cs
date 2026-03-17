@@ -239,7 +239,7 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
                                 continue;
 
                             // Skip non-motion vector passes if motion vectors enabled (Except shadow caster passes)
-                            if (materialHasMotionVectors && passName != "MotionVectors" && passName != "ShadowCaster")
+                            if (materialHasMotionVectors && passName != "MotionVectors" && passName != "ShadowCaster" && passName != "DirectionalShadow" && passName != "PointShadow")
                                 continue;
 
                             // Get the draw list for the current pass, or create if it doesn't yet exist

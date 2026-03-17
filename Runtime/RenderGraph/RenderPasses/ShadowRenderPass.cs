@@ -15,12 +15,12 @@ public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 		this.zClip = zClip;
 		this.isPointLight = isPointLight;
 
-		var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, lightIndex, projectionType)
+		var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, lightIndex)
 		{
 			splitData = shadowSplitData
 		};
 
-		rendererList = context.CreateShadowRendererList(ref shadowDrawingSettings);
+        rendererList = context.CreateShadowRendererList(ref shadowDrawingSettings);
 	}
 
 	public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
@@ -64,7 +64,7 @@ public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 			Command.EnableKeyword(new GlobalKeyword(keyword));
 
 		Command.SetGlobalDepthBias(bias, slopeBias);
-		Command.SetGlobalFloat("_ZClip", zClip ? 1.0f : 0.0f);
+		Command.SetGlobalInt("ZClip", zClip ? 1 : 0);
 
 		if (isPointLight)
 			Command.EnableShaderKeyword("POINT_LIGHT");
@@ -75,7 +75,7 @@ public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 			Command.DisableShaderKeyword("POINT_LIGHT");
 
 		Command.SetGlobalDepthBias(0.0f, 0.0f);
-		Command.SetGlobalFloat("_ZClip", 1.0f);
+		Command.SetGlobalInt("ZClip", 1);
 
 		foreach (var keyword in keywords)
 			Command.DisableKeyword(new GlobalKeyword(keyword));

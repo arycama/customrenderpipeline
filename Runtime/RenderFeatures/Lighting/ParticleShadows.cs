@@ -104,7 +104,6 @@ public class ParticleShadows : ViewRenderFeature
 
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					pass.SetFloat("_ZClip", data.zClip ? 1.0f : 0.0f);
 					pass.SetFloat("ParticleShadowDepth", data.DirectionalDepth);
 					pass.SetFloat("ParticleShadowResolution", data.DirectionalResolution);
 					pass.SetFloat("ParticleShadowIndex", data.index);

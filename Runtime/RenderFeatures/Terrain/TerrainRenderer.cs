@@ -36,7 +36,6 @@ public class TerrainRenderer : TerrainRendererBase
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
-			pass.ReadResource<AtmospherePropertiesAndTables>();
 			pass.ReadResource<TerrainQuadtreeData>();
 			pass.ReadResource<TerrainRenderData>();
 			pass.ReadResource<ViewData>();

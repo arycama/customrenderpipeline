@@ -55,7 +55,8 @@ public class TerrainViewData : ViewRenderFeature
 			Rcp(settings.PatchVertices),
 			Rcp(settings.CellCount),
 			settings.PatchVertices + 1,
-			settings.PatchVertices
+			settings.PatchVertices,
+            0
 		))));
 	}
 }
