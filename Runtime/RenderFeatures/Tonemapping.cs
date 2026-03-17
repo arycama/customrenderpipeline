@@ -1,23 +1,27 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 public partial class Tonemapping : ViewRenderFeature
 {
-	private Material material;
-	private Settings settings;
-    private Bloom.Settings bloomSettings;
+	private readonly Material material;
+	private readonly Material lutMaterial;
+	private readonly Settings settings;
+    private readonly Bloom.Settings bloomSettings;
 	private Matrix4x4 RgbToLmsr;
 	private Matrix4x4 LmsToRgb;
 
 	private bool previousNormalize;
-    private HashSet<int> renderedViewIndices = new();
+    private readonly HashSet<int> renderedViewIndices = new();
 
 	public Tonemapping(RenderGraph renderGraph, Settings settings, Bloom.Settings bloomSettings) : base(renderGraph)
 	{
 		this.settings = settings;
 		this.bloomSettings = bloomSettings;
 		material = new Material(Shader.Find("Hidden/Tonemap")) { hideFlags = HideFlags.HideAndDontSave };
+		lutMaterial = new Material(Shader.Find("Hidden/Color Grading Lut")) { hideFlags = HideFlags.HideAndDontSave };
 
 		var hdrSettings = HDROutputSettings.main;
 		if (hdrSettings.available)
@@ -67,40 +71,61 @@ public partial class Tonemapping : ViewRenderFeature
 		}
 
         var isFirst = renderedViewIndices.Add(viewRenderData.viewId);
-        using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", new Pass0Data(settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb, hdrEnabled, isFirst));
-
-		pass.Initialize(material, 0);
-        pass.FrameBufferSize = new Int3(viewRenderData.viewSize, viewRenderData.viewCount);
-        pass.FrameBufferTarget = viewRenderData.target;
-        pass.FrameBufferFormat = viewRenderData.format;
-
-        pass.ReadRtHandle<CameraTarget>();
-
-        if(renderGraph.TryGetRTHandle<CameraBloom>(out _))
+        var lut = renderGraph.GetTexture(settings.LutResolution, GraphicsFormat.A2B10G10R10_UNormPack32, settings.LutResolution, TextureDimension.Tex3D, isExactSize: true);
+        using(var pass = renderGraph.AddFullscreenRenderPass("Color Grading Lut", (settings.LutResolution, settings.MaxLuminance, settings.PaperWhite)))
         {
-            pass.ReadRtHandle<CameraBloom>();
-            pass.AddKeyword("BLOOM_ON");
+            pass.Initialize(lutMaterial, 0, settings.LutResolution);
+            pass.WriteTexture(lut);
+
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                pass.SetFloat("Resolution", data.LutResolution);
+                pass.SetFloat("MaxLuminance", data.MaxLuminance);
+                pass.SetFloat("PaperWhite", data.PaperWhite);
+            });
         }
 
-        pass.ReadResource<AutoExposureData>();
-	
-		pass.SetRenderFunction(static (command, pass, data) =>
-		{
-			pass.SetFloat("Tonemap", data.settings.Tonemap ? 1 : 0);
-			pass.SetFloat("MinLuminance", data.settings.MinLuminance);
-			pass.SetFloat("MaxLuminance", data.settings.MaxLuminance);
-			pass.SetFloat("PaperWhite", data.settings.PaperWhite);
-			pass.SetFloat("IsSceneView", data.camera.cameraType == CameraType.SceneView ? 1 : 0);
-			pass.SetFloat("IsPreview", data.camera.cameraType == CameraType.Preview ? 1 : 0);
-			pass.SetFloat("BloomStrength", data.bloomSettings.BloomStrength);
-			pass.SetFloat("ColorGamut", (int)data.colorGamut);
-			pass.SetMatrix("RgbToLmsr", data.RgbToLmsr);
-			pass.SetMatrix("LmrToRgb", data.LmsToRgb);
-			pass.SetFloat("Purkinje", data.settings.Purkinje ? 1 : 0);
-			pass.SetFloat("Hdr", data.hdrEnabled ? 1 : 0);
-			pass.SetVector("RodInputStrength", data.settings.RodColor.LinearFloat3());
-            pass.SetFloat("IsFirst", data.isFirst ? 1 : 0);
-        });
+        using (var pass = renderGraph.AddBlitToScreenPass("Tonemapping", new Pass0Data(settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb, hdrEnabled, isFirst)))
+        {
+            pass.Initialize(material, 0);
+            pass.FrameBufferSize = new Int3(viewRenderData.viewSize, viewRenderData.viewCount);
+            pass.FrameBufferTarget = viewRenderData.target;
+            pass.FrameBufferFormat = viewRenderData.format;
+
+            pass.ReadRtHandle<CameraTarget>();
+
+            if (renderGraph.TryGetRTHandle<CameraBloom>(out _))
+            {
+                pass.ReadRtHandle<CameraBloom>();
+                pass.AddKeyword("BLOOM_ON");
+            }
+
+            pass.ReadTexture("ColorGradingLut", lut);
+            pass.ReadResource<AutoExposureData>();
+
+            if (settings.UseLut)
+                pass.AddKeyword("USE_LUT");
+
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                pass.SetFloat("LutResolution", data.settings.LutResolution);
+                pass.SetFloat("UseLut", data.settings.UseLut ? 1 : 0);
+                pass.SetFloat("Tonemap", data.settings.Tonemap ? 1 : 0);
+                pass.SetFloat("MinLuminance", data.settings.MinLuminance);
+                pass.SetFloat("MaxLuminance", data.settings.MaxLuminance);
+                pass.SetFloat("PaperWhite", data.settings.PaperWhite);
+                pass.SetFloat("IsSceneView", data.camera.cameraType == CameraType.SceneView ? 1 : 0);
+                pass.SetFloat("IsPreview", data.camera.cameraType == CameraType.Preview ? 1 : 0);
+                pass.SetFloat("BloomStrength", data.bloomSettings.BloomStrength);
+                pass.SetFloat("ColorGamut", (int)data.colorGamut);
+                pass.SetMatrix("RgbToLmsr", data.RgbToLmsr);
+                pass.SetMatrix("LmrToRgb", data.LmsToRgb);
+                pass.SetFloat("Purkinje", data.settings.Purkinje ? 1 : 0);
+                pass.SetFloat("Hdr", data.hdrEnabled ? 1 : 0);
+                pass.SetVector("RodInputStrength", data.settings.RodColor.LinearFloat3());
+                pass.SetFloat("IsFirst", data.isFirst ? 1 : 0);
+            });
+        }
 	}
 
 	private Matrix4x4 CalculateRgbToLMSR(bool normalize)

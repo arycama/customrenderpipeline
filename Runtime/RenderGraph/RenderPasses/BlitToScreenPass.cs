@@ -99,7 +99,7 @@ public class BlitToScreenPass<T> : RenderPass<T>
     protected override void Execute()
     {
         foreach (var keyword in keywords)
-            Command.EnableKeyword(material, new LocalKeyword(material.shader, keyword));
+            Command.EnableShaderKeyword(keyword);
 
         if (flip)
             Command.EnableShaderKeyword("FLIP");
@@ -117,6 +117,6 @@ public class BlitToScreenPass<T> : RenderPass<T>
             Command.DisableShaderKeyword("FLIP");
 
         foreach (var keyword in keywords)
-            Command.DisableKeyword(material, new LocalKeyword(material.shader, keyword));
+            Command.DisableShaderKeyword(keyword);
     }
 }

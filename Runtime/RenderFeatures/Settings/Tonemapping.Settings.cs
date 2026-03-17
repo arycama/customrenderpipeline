@@ -7,11 +7,14 @@ public partial class Tonemapping
 	public class Settings
 	{
 		[field: Header("Settings")]
-		[field: SerializeField] public float PaperWhite = 160.0f;
+        [field: SerializeField] public int LutResolution { get; private set; } = 32;
+
+        [field: SerializeField] public float PaperWhite = 160.0f;
 		[field: SerializeField] public float MinLuminance { get; private set; } = 0;
 		[field: SerializeField] public float MaxLuminance { get; private set; } = 1000;
 		[field: SerializeField] public bool Hdr { get; private set; } = true;
 		[field: SerializeField] public bool Tonemap { get; private set; } = true;
+		[field: SerializeField] public bool UseLut { get; private set; } = true;
 		[field: SerializeField] public HDRDisplayBitDepth BitDepth { get; private set; } = HDRDisplayBitDepth.BitDepth10;
 
 		[field: Header("Purkinje")]
