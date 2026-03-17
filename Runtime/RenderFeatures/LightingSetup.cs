@@ -1,4 +1,5 @@
 ﻿using System;
+using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Pool;
@@ -8,13 +9,21 @@ using static Math;
 public partial class LightingSetup : ViewRenderFeature
 {
 	private readonly LightingSettings settings;
+    private readonly NativeList<LightShadowCasterCullingInfo> perLightInfos = new(1, Allocator.Persistent);
+    private readonly NativeList<ShadowSplitData> splitBuffer = new(1, Allocator.Persistent);
 
-	public LightingSetup(RenderGraph renderGraph, LightingSettings settings) : base(renderGraph)
+    public LightingSetup(RenderGraph renderGraph, LightingSettings settings) : base(renderGraph)
 	{
 		this.settings = settings;
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+    protected override void Cleanup(bool disposing)
+    {
+        perLightInfos.Dispose();
+        splitBuffer.Dispose();
+    }
+
+    public override void Render(ViewRenderData viewRenderData)
     {
 		var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 		var directionalShadowRequests = ListPool<ShadowRequest>.Get();
@@ -37,13 +46,13 @@ public partial class LightingSetup : ViewRenderFeature
 		var m = (float)settings.DirectionalCascadeCount;
 		var c = Pow(Max(1e-3f, settings.CascadeUniformity), 2.2f);
 
-		for (var i = 0; i < cullingResults.visibleLights.Length; i++)
+        perLightInfos.Clear();
+        splitBuffer.Clear();
+
+        for (var i = 0; i < cullingResults.visibleLights.Length; i++)
 		{
 			var visibleLight = cullingResults.visibleLights[i];
-			var light = visibleLight.light;
-			var shadowIndex = uint.MaxValue;
-
-			if (visibleLight.lightType == LightType.Directional)
+            if (visibleLight.lightType == LightType.Directional)
 			{
 				dirLightCount++;
 				if (dirLightCount == 1)
@@ -62,13 +71,19 @@ public partial class LightingSetup : ViewRenderFeature
 					lightDirection1 = -visibleLight.localToWorldMatrix.Forward();
 					lightColor1 = visibleLight.finalColor.Float3();
 				}
-			}
+            }
 
-			// TODO: May need adjusting for spot lights?
-			var angleScale = 0f;
-			var angleOffset = 1f;
+            // TODO: May need adjusting for spot lights?
+            var angleScale = 0f;
+            var angleOffset = 1f;
+            var light = visibleLight.light;
+            var shadowIndex = uint.MaxValue;
 
-			var size = light.areaSize;
+            BatchCullingProjectionType projectionType;
+            ushort splitExclusionMask = 0;
+            RangeInt splitRange = new RangeInt(0, 0);
+
+            var size = light.areaSize;
 			if (light.shadows != LightShadows.None)
 			{
 				var hasShadowBounds = cullingResults.GetShadowCasterBounds(i, out var shadowCasterBounds);
@@ -90,7 +105,8 @@ public partial class LightingSetup : ViewRenderFeature
 						return L * Exp2(M * x) + N;
 					}
 
-					for (var j = 0; j < settings.DirectionalCascadeCount; j++)
+                    splitRange = new RangeInt(splitBuffer.Length, settings.DirectionalCascadeCount);
+                    for (var j = 0; j < settings.DirectionalCascadeCount; j++)
 					{
 						// Transform camera split bounds to light space
 						var near = GetFrustumDepth(j);
@@ -117,14 +133,17 @@ public partial class LightingSetup : ViewRenderFeature
 						var filterRadius = Float2.Min(settings.DirectionalMaxFilterSize, Float2.Ceil(filterSize * settings.DirectionalShadowResolution * 0.5f));
 						var rcpFilterSize = worldUnitsPerTexel / filterSize;
 						directionalCascadeSizes.Add(new Float4(rcpFilterSize, filterRadius));
+
+                        splitBuffer.Add(shadowSplitData);
 					}
-				}
+                }
 
 				if (visibleLight.lightType == LightType.Point)
 				{
 					shadowIndex = (uint)pointShadowRequests.Count;
+                    splitRange = new RangeInt(splitBuffer.Length, 6);
 
-					for (var j = 0; j < 6; j++)
+                    for (var j = 0; j < 6; j++)
 					{
 						// To undo unity's builtin inverted culling for point shadows, swap the top/bottom faces of the cubemap and flip the y axis. (This must also be done in the shader)
 						var index = j;
@@ -141,32 +160,37 @@ public partial class LightingSetup : ViewRenderFeature
 						viewMatrixRws.SetRow(1, -viewMatrixRws.GetRow(1));
 
 						pointShadowRequests.Add(new(i, viewMatrixRws, projectionMatrix, shadowSplitData, index, light.transform.position, hasShadowBounds, light.shadowNearPlane, light.range, light.transform.position, light.transform.rotation, 90, 1));
-					}
-				}
+                        splitBuffer.Add(shadowSplitData);
+                    }
+                }
 
-				// TODO: Box/Pyramid/Area/Disc
-				if (visibleLight.lightType == LightType.Spot)
+                // TODO: Box/Pyramid/Area/Disc
+                if (visibleLight.lightType == LightType.Spot)
 				{
-					var forward = light.transform.forward;
-					var viewMatrix = Matrix4x4Extensions.WorldToLocal(light.transform.position, light.transform.rotation);
+                    var viewMatrix = Matrix4x4Extensions.WorldToLocal(light.transform.position, light.transform.rotation);
 					var projectionMatrix = Float4x4.Perspective(light.spotAngle, size.x / size.y, light.shadowNearPlane, light.range);
 
 					var viewProjectionMatrix = projectionMatrix * viewMatrix;
-					var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, forward, viewRenderData.camera, true);
+					var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, light.transform.forward, viewRenderData.camera, true);
 					var viewMatrixRws = Matrix4x4Extensions.WorldToLocal(light.transform.position - viewRenderData.transform.position, light.transform.rotation);
 
 					shadowIndex = (uint)spotShadowRequests.Count;
 					var shadowRequest = new ShadowRequest(i, viewMatrixRws, projectionMatrix, shadowSplitData, -1, light.transform.position, hasShadowBounds, light.shadowNearPlane, light.range, light.transform.position, light.transform.rotation, light.spotAngle, size.x / size.y);
 					spotShadowRequests.Add(shadowRequest);
-				}
-			}
+
+                    splitRange = new RangeInt(splitBuffer.Length, 1);
+                    splitBuffer.Add(shadowSplitData);
+                }
+            }
 
 			switch (light.type)
 			{
 				case LightType.Directional:
-					break;
+                    projectionType = BatchCullingProjectionType.Orthographic;
+                    break;
 				case LightType.Point:
-					break;
+                    projectionType = BatchCullingProjectionType.Perspective;
+                    break;
 				case LightType.Spot:
 					var halfAngle = Radians(light.spotAngle) * 0.5f;
 					var innerConePercent = light.innerSpotAngle / visibleLight.spotAngle;
@@ -175,17 +199,23 @@ public partial class LightingSetup : ViewRenderFeature
 					angleScale = Rcp(Max(1e-4f, cosSpotInnerHalfAngle - cosSpotOuterHalfAngle));
 					angleOffset = -cosSpotOuterHalfAngle * angleScale;
 					size.x = size.y = Rcp(Tan(halfAngle));
-					break;
+                    projectionType = BatchCullingProjectionType.Perspective;
+                    break;
 				case LightType.Pyramid:
-					break;
+                    projectionType = BatchCullingProjectionType.Perspective;
+                    break;
 				case LightType.Box:
-					break;
+                    projectionType = BatchCullingProjectionType.Orthographic;
+                    break;
 				case LightType.Rectangle:
-					break;
+                    projectionType = BatchCullingProjectionType.Perspective;
+                    break;
 				case LightType.Tube:
-					break;
+                    projectionType = BatchCullingProjectionType.Perspective;
+                    break;
 				case LightType.Disc:
-					break;
+                    projectionType = BatchCullingProjectionType.Perspective;
+                    break;
 				default:
 					throw new ArgumentOutOfRangeException(nameof(light.type));
 			}
@@ -206,7 +236,24 @@ public partial class LightingSetup : ViewRenderFeature
 				1.0f + light.range / (light.shadowNearPlane - light.range),
 				light.shadowNearPlane * light.range / (light.range - light.shadowNearPlane));
 			lightList.Add(pointLightData);
-		}
+
+            var lightShadowCasterCullingInfo = new LightShadowCasterCullingInfo()
+            {
+                projectionType = projectionType,
+                splitExclusionMask = splitExclusionMask,
+                splitRange = splitRange
+            };
+
+            perLightInfos.Add(lightShadowCasterCullingInfo);
+        }
+
+        var infos = new ShadowCastersCullingInfos()
+        {
+            perLightInfos = perLightInfos.AsArray(),
+            splitBuffer = splitBuffer.AsArray()
+        };
+
+        viewRenderData.context.CullShadowCasters(cullingResults, infos);
 
 		// Set final matrices
 		var directionalShadowMatricesBuffer = renderGraph.GetBuffer(Max(1, directionalShadowMatrices.Count), UnsafeUtility.SizeOf<Float3x4>());

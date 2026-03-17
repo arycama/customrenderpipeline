@@ -15,11 +15,7 @@ public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 		this.zClip = zClip;
 		this.isPointLight = isPointLight;
 
-		var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, lightIndex)
-		{
-			splitData = shadowSplitData
-		};
-
+        var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, lightIndex);
         rendererList = context.CreateShadowRendererList(ref shadowDrawingSettings);
 	}
 
