@@ -52,6 +52,11 @@ float CloudTransmittance(float3 positionWS)
 	return max(transmittance, shadowData.b);
 }
 
+half WrappedDiffuse(half NdotL, half wrap)
+{
+	return saturate((NdotL + wrap) / (Sq(1 + wrap)));
+}
+
 // TODO: Can parameters be simplified/shortened
 float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAngle, float roughness2, float f0Avg, float partLambdaV, float3 multiScatterTerm, float3 L, float3 N, float3 B, float3 worldPosition, float NdotV, float3 V, float diffuseTerm, float3 albedo, float3 translucency, bool isDirectional)
 {
@@ -73,12 +78,12 @@ float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAn
 	
 	if (NdotL > 0.0)
 	{
-		result += diffuseTerm * albedo * illuminance;
+		result += diffuseTerm * albedo * illuminance * (1.0 - translucency);
 		
 		float LdotV = dot(L, V);
 		result += Ggx(roughness2, NdotL, LdotV, NdotV, partLambdaV, perceptualRoughness, f0, multiScatterTerm) * illuminance;
 	}
-	else
+	//else
 	{
 		//#if 0
 		//	float s = scale ∗ distance(pos, Nvertex, i);
@@ -95,7 +100,8 @@ float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAn
 			float scatter = GgxDistribution(roughness2, saturate(dot(-V, L)));
 			result += wrappedNdotL * scatter * translucency* diffuseTerm;
 		#elif 1
-			result += translucency * -NdotL * diffuseTerm;
+			result += (WrappedDiffuse(saturate(-NdotL), 0.5) + WrappedDiffuse(saturate(NdotL), 0.5)) * 0.5 * translucency;
+			//result += translucency * -NdotL * diffuseTerm;
 		#else
 			float3 lr = L + 2 * N * -NdotL;
 				
@@ -218,7 +224,7 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 	return attenuation;
 }
 
-float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAngle, float3 albedo, float3 N, float NdotV, float3 bentNormal, float3 worldPosition, float3 translucency, uint2 pixelCoordinate, float eyeDepth, float opacity = 1.0, bool isWater = false, bool softShadows = false)
+float4 EvaluateLighting(float3 f0, float perceptualRoughness, float cosVisibilityAngle, float3 albedo, float3 N, float NdotV, float3 bentNormal, float3 worldPosition, float3 translucency, uint2 pixelCoordinate, float eyeDepth, float opacity = 1.0, bool isWater = false, bool softShadows = false)
 {
 	albedo = max(0.0, Rec709ToRec2020(albedo));
 	translucency = max(0.0, Rec709ToRec2020(translucency));
@@ -253,7 +259,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 		lightTransmittance *= WaterShadow(worldPosition, _LightDirection0) * GetCaustics(worldPosition + ViewPosition, _LightDirection0);
 	#endif
 	
-	float3 luminance = EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, _LightDirection0, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, true) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
+	float3 luminance = EvaluateLight(perceptualRoughness, f0, cosVisibilityAngle, roughness2, f0Avg, partLambdaV, multiScatterTerm, _LightDirection0, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, true) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
 	
 	uint3 clusterIndex;
 	clusterIndex.xy = pixelCoordinate / TileSize;
@@ -284,7 +290,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 		if (!attenuation)
 			continue;
 		
-		luminance += EvaluateLight(perceptualRoughness, f0, cos(visibilityAngle), roughness2, f0Avg, partLambdaV, multiScatterTerm, L, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, false) * (light.color * Exposure * attenuation);
+		luminance += EvaluateLight(perceptualRoughness, f0, cosVisibilityAngle, roughness2, f0Avg, partLambdaV, multiScatterTerm, L, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, false) * (light.color * Exposure * attenuation);
 	}
 	
 	// Indirect Lighting
@@ -309,7 +315,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float3 radiance = SkyReflection.SampleLevel(TrilinearClampSampler, skyUv, iblMipLevel) * rStrength;
 	
 	float BdotR = dot(bentNormal, R);
-	float specularOcclusion = GetSpecularOcclusion(visibilityAngle, BdotR, perceptualRoughness, dot(N, R));
+	float specularOcclusion = GetSpecularOcclusion(cosVisibilityAngle, BdotR, perceptualRoughness, dot(N, R));
 	radiance *= specularOcclusion;
 	
 	#ifdef UNDERWATER_LIGHTING_ON
@@ -324,7 +330,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float3 fssEss = dfg.x * f0 + dfg.y;
 	luminance += radiance * fssEss;
 	
-	float3 irradiance = AmbientCosine(bentNormal, visibilityAngle);
+	float3 irradiance = AmbientCosine(bentNormal, cosVisibilityAngle);
 	
 	#ifdef UNDERWATER_LIGHTING_ON
 		irradiance *= underwaterTransmittance;
@@ -332,7 +338,7 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float4 ssgi = ScreenSpaceGlobalIllumination[pixelCoordinate];
-		irradiance = lerp(irradiance + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeAngleToVisibility(visibilityAngle));
+		irradiance = lerp(irradiance + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeCosAngleToVisibility(cosVisibilityAngle));
 	#endif
 	
 	float3 fAvg = AverageFresnel(f0);
@@ -340,14 +346,14 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float visibilityAn
 	float3 kd = 1.0 - fssEss - fmsEms;
 	luminance += irradiance * (fmsEms + albedo * kd);
 	
-	float3 irradiance1 = AmbientCosine(-bentNormal, visibilityAngle);
+	float3 irradiance1 = AmbientCosine(-bentNormal, cosVisibilityAngle);
 	
 	#ifdef UNDERWATER_LIGHTING_ON
 		irradiance1 *= underwaterTransmittance;
 	#endif
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-		irradiance1 = lerp(irradiance1 + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeAngleToVisibility(visibilityAngle));
+		irradiance1 = lerp(irradiance1 + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeCosAngleToVisibility(cosVisibilityAngle));
 	#endif
 	
 	luminance += irradiance1 * translucency * kd;

@@ -83,10 +83,10 @@ float3 UnpackAlbedo(float2 enc, float2 screenPosition)
 	return UnpackAlbedo(enc, screenPosition, a0, a1);
 }
 
-GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float perceptualRoughness, float3 bentNormal, float visibilityAngle, float3 emissive, float3 translucency, float2 screenPosition, float3 V, bool isTranslucent, matrix worldToView)
+GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float perceptualRoughness, float3 bentNormal, float visibilityAngle, float3 emissive, float translucency, float2 screenPosition, float3 V, matrix worldToView)
 {
 	GBufferOutput gbuffer;
-	gbuffer.albedoMetallic = float4(PackAlbedo(albedo, screenPosition), isTranslucent ? PackAlbedo(translucency, screenPosition) : float2(0, metallic));
+	gbuffer.albedoMetallic = float4(PackAlbedo(albedo, screenPosition), translucency, metallic);
 	gbuffer.normalRoughness = float4(PackGBufferNormal(normal, V, worldToView), perceptualRoughness, 0);
 	gbuffer.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal, V, worldToView), visibilityAngle, 0);
 	

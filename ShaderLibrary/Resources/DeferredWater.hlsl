@@ -163,7 +163,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	}
 
 	FragmentOutput output;
-	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 1.0, underwater * (1.0 - foam), 0.0, input.position.xy, V, false, WorldToView);
+	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 0.0, underwater * (1.0 - foam), 0.0, input.position.xy, V, WorldToView);
 	output.luminance = Rec2020ToICtCp(luminance * PaperWhite * sqrt(2.0));
 	return output;
 }

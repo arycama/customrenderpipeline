@@ -147,7 +147,7 @@ float FragmentSpecularOcclusion(VertexFullscreenTriangleVolumeOutput input) : SV
 	float cosBeta = uv.y;
 	float BdotR = CosineDifference(NdotV, cosBeta);
 	float3 B = float3(SinFromCos(BdotR), 0, BdotR);
-	float visibilityCosAngle = cos(uv.x * HalfPi);
+	float visibilityCosAngle = uv.x;
 	
 	uint samples = 1024;
 	

@@ -15,9 +15,9 @@ cbuffer AmbientShBuffer
 	float4 AmbientSh[7];
 };
 
-float3 AmbientCosine(float3 N, float visibilityAngle = HalfPi)
+float3 AmbientCosine(float3 N, float cosVisibilityAngle = HalfPi)
 {
-	return EvaluateSh(N, AmbientSh, CosineZonalHarmonics(visibilityAngle));
+	return EvaluateSh(N, AmbientSh, CosineZonalHarmonics(cosVisibilityAngle));
 }
 
 float3 AmbientIsotropic(float3 V)
@@ -174,9 +174,9 @@ float3 ImportanceSampleGGX(float a, float3 N, float3 V, float2 u, float NdotV, o
 	return reflect(-V, H);
 }
 
-float GetSpecularOcclusion(float visibilityAngle, float BdotR, float perceptualRoughness, float NdotR)
+float GetSpecularOcclusion(float cosVisibilityAngle, float BdotR, float perceptualRoughness, float NdotR)
 {
-	float4 uv = Remap01ToHalfTexel(float4(visibilityAngle * RcpHalfPi, BdotR, perceptualRoughness, NdotR), 32);
+	float4 uv = Remap01ToHalfTexel(float4(cosVisibilityAngle, BdotR, perceptualRoughness, NdotR), 32);
 
 	// 4D LUT
 	float3 uvw0;

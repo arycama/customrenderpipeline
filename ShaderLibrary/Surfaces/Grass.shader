@@ -9,12 +9,12 @@ Shader "Surface/Grass"
         [Toggle] Cutout("Cutout", Float) = 0
         AlbedoOpacity("Albedo Opacity", 2D) = "white" {}
         NormalOcclusionRoughness("Normal Occlusion Roughness", 2D) = "linearGrey" {}
+        Translucency("Translucency", 2D) = "black" {}
 
         _MinScale("Min Scale", Range(0, 1)) = 0.5
         _Width("Width", Range(0, 2)) = 0.025
         _Height("Height", Range(0, 1)) = 0.5
         _Bend("Bend", Range(0, 1)) = 0.5
-        _Rotation("Rotation", Range(0, 1)) = 0.5
         _Color("Color", Color) = (1, 1, 1, 1)
         _Translucency("Translucency", Color) = (0, 0, 0, 1)
         _Smoothness("Smoothness", Range(0, 1)) = 0.2

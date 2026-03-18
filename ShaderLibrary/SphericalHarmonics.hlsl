@@ -23,13 +23,13 @@ float3 CornetteShanksZonalHarmonics(float g)
 	return float3(1.0, g, 0.5 * (3.0 * Sq(g) - 1.0)) / 4.0;
 }
 
-float3 CosineZonalHarmonics(float visibilityAperture)
+float3 CosineZonalHarmonics(float cosVisibilityAngle)
 {
 	float3 zonalHarmonics = float3(1.0, 2.0 / 3.0, 0.25);
 	
 	// Eq 23: https://www.activision.com/cdn/research/Practical_Real_Time_Strategies_for_Accurate_Indirect_Occlusion_NEW%20VERSION_COLOR.pdf
-	float a = saturate(sin(visibilityAperture));
-	float b = saturate(cos(visibilityAperture)); // Some weird cases can cause this to go slightly negative
+	float a = SinFromCos(cosVisibilityAngle);
+	float b = cosVisibilityAngle; // Some weird cases can cause this to go slightly negative
 	
 	// Calculate the zonal harmonics expansion for V(x, ?i)*(n.l)
 	zonalHarmonics.x *= Sq(a);

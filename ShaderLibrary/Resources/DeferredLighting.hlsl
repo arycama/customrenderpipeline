@@ -30,13 +30,14 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	float3 normal = GBufferNormal(input.position.xy, GBufferNormalRoughness, V, NdotV, WorldToView, ViewToWorld);
 	float perceptualRoughness = normalRoughness.b;
 	float3 bentNormal = GBufferNormal(bentNormalOcclusion, V, WorldToView, ViewToWorld);
-	float visibilityAngle = bentNormalOcclusion.b * HalfPi;
+	float cosVisibilityAngle = bentNormalOcclusion.b;
 	
 	#ifdef TRANSLUCENCY
 		if (!(stencil & 16))
-			albedoMetallic.ba = 0.5;
+			albedoMetallic.ba = 0.0;
 		
-		float3 translucency = UnpackAlbedo(albedoMetallic.ba, input.position.xy);
+		float3 translucency = albedo * albedoMetallic.b;
+		albedo = albedo - translucency;
 		float metallic = 0;
 		bool isWater = false;
 	#else
@@ -48,7 +49,7 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	float3 f0 = lerp(0.04, albedo.rgb, metallic);
 	albedo = lerp(albedo.rgb, 0, metallic);
 	
-	float3 result = EvaluateLighting(f0, perceptualRoughness, visibilityAngle, albedo, normal, NdotV, bentNormal, worldPosition, translucency, input.position.xy, eyeDepth, 1.0, isWater, true).rgb;
+	float3 result = EvaluateLighting(f0, perceptualRoughness, cosVisibilityAngle, albedo, normal, NdotV, bentNormal, worldPosition, translucency, input.position.xy, eyeDepth, 1.0, isWater, true).rgb;
 	
 	// Sky is added elsewhere but since it involves an RGB multiply which we can't do without dual source blending, apply it here. Even though this happens before cloud opacity, order doesn't matter for transmittance simple it is multiplicative
 	#ifdef UNDERWATER_LIGHTING_ON

@@ -9,7 +9,7 @@
 #include "../Temporal.hlsl"
 #include "../VirtualTexturing.hlsl"
 
-Texture2D AlbedoOpacity, NormalOcclusionRoughness;
+Texture2D AlbedoOpacity, NormalOcclusionRoughness, Translucency;
 Texture2D<float> GrassCoverage;
 Buffer<uint> PatchData, InstanceData;
 float4 PatchScaleOffset;
@@ -18,7 +18,7 @@ float BladeCount;
 cbuffer UnityPerMaterial
 {
 	float4 _Color, _Translucency;
-	float _Width, _Height, _Smoothness, _MinScale, _Bend, _Factor, _EdgeLength, _Rotation;
+	float _Width, _Height, _Smoothness;
 	float WindStrength, WindAngle, WindWavelength, WindSpeed, TerrainMipBias;
 	float4 AlbedoOpacity_ST;
 };
@@ -126,8 +126,8 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	output.tangent = tangent;
 	output.uv = GetQuadTexCoord(vertexId);
 	
-	float width = lerp(_Width, _Width * 0.05, output.uv.y * 1);
-	//float width = _Width; // lerp(_Width, _Width * 0.05, output.uv.y * 1);
+	//float width = lerp(_Width, _Width * 0.05, output.uv.y * 1);
+	float width = _Width; // lerp(_Width, _Width * 0.05, output.uv.y * 1);
 	output.worldPosition = centerPosition;
 	output.worldPosition += (output.uv.x - 0.5) * output.tangent * width * scale;
 	
@@ -150,10 +150,8 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float4 albedoOpacity = AlbedoOpacity.Sample(SurfaceSampler, uv);
 	float4 normalOcclusionRoughness = NormalOcclusionRoughness.Sample(SurfaceSampler, uv);
 	
-	albedoOpacity.rgb = lerp(input.color, albedoOpacity.rgb, smoothstep(0, 0.5, input.uv.y));
-	
 	#ifdef CUTOUT_ON
-		clip(albedoOpacity.a - 0.5);
+		clip(albedoOpacity.a - 0.65);
 	#endif
 	
 	float3 tangentNormal = UnpackNormalUNorm(normalOcclusionRoughness.xy);
@@ -162,16 +160,19 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	
 	float3 worldNormal = TangentToWorldNormal(tangentNormal, input.normal, input.tangent, 1);
 	
-	float3 albedo = _Color.rgb * albedoOpacity.rgb;
-	float occlusion = 1;//normalOcclusionRoughness.b; //lerp(0.5, normalOcclusionRoughness.b, input.uv.y);
-	float roughness = 1 - ((1 - normalOcclusionRoughness.a) * _Smoothness);
-	float3 translucency = _Translucency.rgb * albedoOpacity.rgb * 2;
-	translucency.rgb = lerp(input.color, translucency.rgb, smoothstep(0, 0.5, input.uv.y));
+	float3 albedo = albedoOpacity.rgb;
+	float occlusion = normalOcclusionRoughness.b;
+	float roughness = normalOcclusionRoughness.a;
+	float3 translucency = Translucency.Sample(SurfaceSampler, uv);
 		
+	albedo += translucency;
+	float t = dot(translucency, albedo) / SqrLength(albedo);
+	
+	albedo = lerp(input.color, albedo, smoothstep(0, 0.5, input.uv.y));
 	float3 V = normalize(-input.worldPosition);
 		
 	FragmentOutput output;
-	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, occlusion, 0, translucency, input.position.xy, V, true, WorldToView);
+	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, 1.0 - occlusion, 0, t, input.position.xy, V, WorldToView);
 	output.velocity = CalculateVelocity(input.position.xy * RcpViewSize, input.previousPositionCS);
 	return output;
 }
