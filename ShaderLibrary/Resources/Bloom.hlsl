@@ -1,4 +1,5 @@
 #include "../Common.hlsl"
+#include "../Color.hlsl"
 #include "../Material.hlsl"
 #include "../Samplers.hlsl"
 
@@ -23,6 +24,13 @@ float Window_Cubic(float _x, float _center, float _radius)
 {
 	_x = min(abs(_x - _center) / _radius, 1.0);
 	return 1.0 - _x * _x * (3.0 - 2.0 * _x);
+}
+
+float KarisAverage(float3 col)
+{
+    // Formula is 1 / (1 + luma)
+	float luma = Rec2020Luminance(col) * 0.25f;
+	return 1.0f / (1.0f + luma);
 }
 
 float3 textureDistorted(float2 uv, float2 direction, float2 distortion)
@@ -131,10 +139,35 @@ float3 FragmentDownsample(float4 position : SV_Position, float2 uv : TEXCOORD0) 
 	float3 l = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(-1.0, -1.0), InputScaleLimit), 0);
 	float3 m = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(1.0, -1.0), InputScaleLimit), 0);
 	
-	float3 color = e * 0.125;
-	color += (a + c + g + i) * 0.03125;
-	color += (b + d + f + h) * 0.0625;
-	color += (j + k + l + m) * 0.125;
+	//float3 color = e * 0.125;
+	//color += (a + c + g + i) * 0.03125;
+	//color += (b + d + f + h) * 0.0625;
+	//color += (j + k + l + m) * 0.125;
+	
+	float3 color;
+	
+	#ifdef FIRST
+		// We are writing to mip 0, so we need to apply Karis average to each block
+		// of 4 samples to prevent fireflies (very bright subpixels, leads to pulsating
+		// artifacts).
+		float3 groups[5];
+		groups[0] = (a + b + d + e) * (0.125f / 4.0f);
+		groups[1] = (b + c + e + f) * (0.125f / 4.0f);
+		groups[2] = (d + e + g + h) * (0.125f / 4.0f);
+		groups[3] = (e + f + h + i) * (0.125f / 4.0f);
+		groups[4] = (j + k + l + m) * (0.5f / 4.0f);
+		groups[0] *= KarisAverage(groups[0]);
+		groups[1] *= KarisAverage(groups[1]);
+		groups[2] *= KarisAverage(groups[2]);
+		groups[3] *= KarisAverage(groups[3]);
+		groups[4] *= KarisAverage(groups[4]);
+		color = groups[0] + groups[1] + groups[2] + groups[3] + groups[4];
+	#else
+		color = e * 0.125;
+		color += (a + c + g + i) * 0.03125;
+		color += (b + d + f + h) * 0.0625;
+		color += (j + k + l + m) * 0.125;
+	#endif
 	
 	#ifdef FIRST
 		color += LensFlare(uv);

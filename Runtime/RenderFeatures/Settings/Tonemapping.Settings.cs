@@ -11,10 +11,10 @@ public partial class Tonemapping
         [field: SerializeField, Range(0, 1)] public float ShoulderCompression { get; private set; } = 0.75f;
         [field: SerializeField, Range(0, 1)] public float LinearStart { get; private set; } = 0.538f;
         [field: SerializeField, Range(0, 1)] public float ShoulderStart { get; private set; } = 0.444f;
-        [field: SerializeField, Min(1)] public float ToeStrength { get; private set; } = 1.28f;
+        [field: SerializeField, Range(1, 2)] public float ToeStrength { get; private set; } = 1.28f;
         [field: SerializeField, Min(0)] public float FadeStart { get; private set; } = 0.98f;
         [field: SerializeField, Min(0)] public float FadeEnd { get; private set; } = 1.16f;
-        [field: SerializeField, Range(0, 1)] public float BlendRatio { get; private set; } = 0.6f;
+        [field: SerializeField, Range(0, 1)] public float HuePreservation { get; private set; } = 0.4f;
 
         [field: SerializeField] public int LutResolution { get; private set; } = 32;
         [field: SerializeField] public bool UseLut { get; private set; } = true;

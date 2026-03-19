@@ -114,7 +114,7 @@ public partial class Tonemapping : ViewRenderFeature
                 pass.SetFloat("ToeStrength", data.settings.ToeStrength);
                 pass.SetFloat("FadeStart", data.settings.FadeStart);
                 pass.SetFloat("FadeEnd", data.settings.FadeEnd);
-                pass.SetFloat("BlendRatio", data.settings.BlendRatio);
+                pass.SetFloat("HuePreservation", data.settings.HuePreservation);
                 pass.SetFloat("LutResolution", data.settings.LutResolution);
                 pass.SetFloat("UseLut", data.settings.UseLut ? 1 : 0);
                 pass.SetFloat("Tonemap", data.settings.Tonemap ? 1 : 0);
