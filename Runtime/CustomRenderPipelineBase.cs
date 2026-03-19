@@ -122,13 +122,21 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                 cameraRenderFeature.Render(viewRenderData);
             }
 
+            var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
+            using (var pass = renderGraph.AddGenericRenderPass("Wire Overlay", wireOverlay))
+            {
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    command.DrawRendererList(data);
+                });
+            }
+
             // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
             if (RenderUiOverlay && viewRenderData.camera.cameraType == CameraType.Game && viewRenderData.camera == Camera.main)
             {
-                var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
                 var uiOverlay = context.CreateUIOverlayRendererList(viewRenderData.camera);
 
-                using var pass = renderGraph.AddGenericRenderPass("UI Overlay", (uiOverlay, wireOverlay, viewRenderData.camera));
+                using var pass = renderGraph.AddGenericRenderPass("UI Overlay", (uiOverlay, viewRenderData.camera));
                 pass.UseProfiler = false;
 
                 pass.SetRenderFunction(static (command, pass, data) =>
@@ -138,8 +146,6 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                     command.EnableShaderKeyword("UI_OVERLAY_RENDERING");
                     command.DrawRendererList(data.uiOverlay);
                     command.DisableShaderKeyword("UI_OVERLAY_RENDERING");
-
-                    command.DrawRendererList(data.wireOverlay);
                 });
             }
         }

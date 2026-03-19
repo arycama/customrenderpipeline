@@ -116,7 +116,7 @@ static const float ST2084Max = 10000.0;
 float3 LinearToST2084(float3 rec2020)
 {
 	float3 Y = pow(abs(rec2020 / ST2084Max), ST2084_M1);
-	return pow(abs((Y * ST2084_C2 + ST2084_C1) * rcp(Y * ST2084_C3 + 1.0)), ST2084_M2);
+	return pow(abs((ST2084_C2 * Y + ST2084_C1) * rcp(ST2084_C3 * Y + 1.0)), ST2084_M2);
 }
 
 float3 ST2084ToLinear(float3 linearCol)
@@ -300,7 +300,6 @@ float3 LMSToRec2020(float3 lms)
 
 float3 ICtCpToRec2020(float3 iCtCp)
 {
-	iCtCp.gb -= 0.5;
 	float3 pqLms = ICtCpToLMS(iCtCp);
 	float3 lms = ST2084ToLinear(pqLms);
 	return LMSToRec2020(lms);
@@ -401,7 +400,6 @@ float3 Rec2020ToICtCp(float3 rec2020)
 	float3 lms = Rec2020ToLMS(rec2020);
 	float3 lmsPq = LinearToST2084(lms);
 	float3 result = LMSToICtCp(lmsPq);
-	result.gb += 0.5;
 	return result;
 }
 

@@ -379,7 +379,7 @@ struct GT7ToneMapping
     //         - in HDR mode: mapped to [0, framebufferLuminanceTarget_], ready for PQ inverse-EOTF
     // Note: framebufferLuminanceTarget_ represents the display's target peak luminance converted to a frame buffer value.
     //       The returned values are suitable for applying the appropriate OETF to generate final output signal.
-	void applyToneMapping(float3 rgb, out float3 output)
+	float3 applyToneMapping(float3 rgb)
 	{
         // Convert to UCS to separate luminance and chroma.
 		float3 ucs;
@@ -411,14 +411,56 @@ struct GT7ToneMapping
 		ucsToRgb(scaledUcs, scaledRgb);
 
         // Final blend between per-channel and UCS-scaled results.
+		float3 output;
 		for (int i = 0; i < 3; ++i)
 		{
-			float blended = (1.0f - blendRatio_) * skewedRgb[i] + blendRatio_ * scaledRgb[i];
-            // When using SDR, apply the correction factor.
-            // When using HDR, sdrCorrectionFactor_ is 1.0f, so it has no effect.
-			output[i] = sdrCorrectionFactor_ * min(blended, framebufferLuminanceTarget_);
+			float blended = lerp(skewedRgb[i], scaledRgb[i], blendRatio_);
+			output[i] = min(blended, framebufferLuminanceTarget_);
 		}
+		
+		return output;
 	}
 };
+
+//float3 Gt7Tonemap(float3 rgb, float maxLuminance)
+//{
+//	float peakIntensity = maxLuminance / 100.0;
+//	float alpha = 0.25;
+//	float midPoint = 0.538;
+//	float linearSection = 0.444;
+//	float toeStrength = 1.28;
+//	float blendRatio = 0.6;
+//	float fadeStart = 0.98;
+//	float fadeEnd = 1.16;
+	
+//    // Constants for the shoulder region.
+//	float k = (linearSection - 1.0f) / (alpha - 1.0f);
+//	float kA = peakIntensity * linearSection + peakIntensity * k;
+//	float kB = -peakIntensity * k * exp(linearSection / k);
+//	float kC = -1.0 / (k * peakIntensity);
+	
+//	// Separate luminance and chroma.
+//	float3 iCtCp = Rec2020ToICtCp(rgb);
+
+//    // Per-channel tone mapping ( "skewed" color).
+//	float3 weightLinear = smoothstep(0.0, midPoint, rgb);
+//	float3 toeMapped = midPoint * pow(rgb / midPoint, toeStrength);
+//	float3 toeLinear = lerp(toeMapped, rgb, weightLinear);
+//	float3 shoulder = kA + kB * exp(rgb * kC);
+//	float3 skewedRgb = (rgb < (linearSection * peakIntensity)) ? toeLinear : shoulder;
+	
+//	float3 skewedICtCp = Rec2020ToICtCp(100.0 * skewedRgb);
+
+//	float framebufferLuminanceTargetUcs = Rec2020ToICtCp(100.0 * peakIntensity).x;
+//	float chromaScale = 1.0 - smoothstep(fadeStart, fadeEnd, iCtCp[0] / framebufferLuminanceTargetUcs);
+//	float3 scaledICtCp = float3(skewedICtCp.x, iCtCp.yz * chromaScale);
+
+//    // Convert back to rgb
+//	float3 scaledRgb = ICtCpToRec2020(scaledICtCp) / 100.0;
+
+//    // Final blend between per-channel and UCS-scaled results.
+//	return lerp(skewedRgb, scaledRgb, blendRatio);
+//}
+
 
 #endif
