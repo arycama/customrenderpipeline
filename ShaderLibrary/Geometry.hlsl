@@ -59,8 +59,8 @@ bool SolveQuadraticEquation(float a, float b, float c, out float2 roots)
 	float det = Sq(b) - 4.0 * a * c;
 
 	float sqrtDet = sqrt(det);
-	roots.x = (-b - sign(a) * sqrtDet) * rcp(2.0 * a);
-	roots.y = (-b + sign(a) * sqrtDet) * rcp(2.0 * a);
+	roots.x = (-b - FastSign(a) * sqrtDet) * rcp(2.0 * a);
+	roots.y = (-b + FastSign(a) * sqrtDet) * rcp(2.0 * a);
 
 	return det >= 0.0;
 }
@@ -360,7 +360,7 @@ float CosAngle(float3 a, float3 b)
 
 float3 SignedAngle(float3 a, float3 b, float3 axis)
 {
-	return Angle(a, b) * sign(dot(axis, cross(a, b)));
+	return Angle(a, b) * FastSign(dot(axis, cross(a, b)));
 }
 
 // Computes sin(thetaA + thetaB)

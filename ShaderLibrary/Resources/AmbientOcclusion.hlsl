@@ -60,7 +60,7 @@ float4 FragmentCompute(VertexFullscreenTriangleOutput input) : SV_Target
 		float3 projNormalV = ProjectOnPlane(normalV, axisV);
 		float weight = length(projNormalV);
 		
-		float sgnN = sign(dot(orthoDirectionV, projNormalV));
+		float sgnN = FastSign(dot(orthoDirectionV, projNormalV));
 		float cosN = saturate(dot(projNormalV / weight, viewV));
 		float n = sgnN * FastACos(cosN);
 		float cosTheta = 0, sinTheta = 0;

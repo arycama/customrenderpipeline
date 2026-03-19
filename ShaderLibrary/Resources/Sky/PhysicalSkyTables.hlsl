@@ -67,7 +67,7 @@ float FragmentCdfLookup(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 		float c = (a + b) * 0.5;
 		float fc = LuminanceToPoint(ViewHeight, viewCosAngle, c, rayIntersectsGround, rayLength)[input.viewIndex % 3] - targetLuminance;
     
-		if (sign(fc) == sign(fa))
+		if (FastSign(fc) == FastSign(fa))
 		{
 			a = c;
 			fa = fc;
