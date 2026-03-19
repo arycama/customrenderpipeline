@@ -62,5 +62,5 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	
 	//color = CameraTarget[input.position.xy];
 	return (color);
-	return _TaaEnabled ? Rec2020ToICtCp(color) : color;
+	return _TaaEnabled ? Rec2020ToICtCp(color) + float2(0.0, 0.5).xyy : color;
 }

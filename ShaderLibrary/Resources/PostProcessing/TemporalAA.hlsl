@@ -79,7 +79,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 		[unroll]
 		for (int x = -1; x <= 1; x++, i++)
 		{
-			float3 color = Rec2020ToICtCp(CameraTarget[clamp(centerCoord + int2(x, y), 0, MaxScreenSize)] * PaperWhite * sqrt(2.0));
+			float3 color = Rec2020ToICtCp(CameraTarget[clamp(centerCoord + int2(x, y), 0, MaxScreenSize)] * PaperWhite * sqrt(2.0) + float2(0.0, 0.5).xyy);
 			
 			#ifdef UPSCALE
 				float _BlendSharpness = 0.5;
@@ -159,7 +159,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	//result.rgb = lerp(result.rgb, nonReprojectedHistory, AfterImage);
 	
 	FragmentOutput output;
-	output.result = float4(ICtCpToRec2020(result.rgb) / (PaperWhite * sqrt(2.0)), 1.0);
+	output.result = float4(ICtCpToRec2020(result.rgb - float2(0.0, 0.5).xyy) / (PaperWhite * sqrt(2.0)), 1.0);
 	output.history = float4(result.rgb, 1.0);
 	output.historyWeight = result.a;
 	return output;

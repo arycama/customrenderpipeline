@@ -164,7 +164,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 
 	FragmentOutput output;
 	output.gbuffer = OutputGBuffer(foam, 0.0, N, perceptualRoughness, N, 0.0, underwater * (1.0 - foam), 0.0, input.position.xy, V, WorldToView);
-	output.luminance = Rec2020ToICtCp(luminance * PaperWhite * sqrt(2.0));
+	output.luminance = Rec2020ToICtCp(luminance * PaperWhite * sqrt(2.0)) + float2(0.0, 0.5).xyy;
 	return output;
 }
 
@@ -201,6 +201,6 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	
 	TemporalOutput output;
 	output.temporal = float4(result, 1.0);
-	output.scene = float4(ICtCpToRec2020(result) / (PaperWhite * sqrt(2.0)), kd);
+	output.scene = float4(ICtCpToRec2020(result - float2(0.0, 0.5).xyy) / (PaperWhite * sqrt(2.0)), kd);
 	return output;
 }
