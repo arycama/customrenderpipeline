@@ -128,7 +128,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	
 	if (_HasHistory && all(saturate(historyUv) == historyUv))
 	{
-		float3 historySample = History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, HistoryScaleLimit)).rgb;
+		float3 historySample = History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, HistoryScaleLimit)).rgb - float2(0.0, 0.5).xyy;
 		historySample.r *= PreviousToCurrentExposure;
 		float historyWeight = HistoryWeight.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, HistoryWeightScaleLimit));
 		
@@ -158,9 +158,10 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	
 	//result.rgb = lerp(result.rgb, nonReprojectedHistory, AfterImage);
 	
+	
 	FragmentOutput output;
-	output.result = float4(ICtCpToRec2020(result.rgb - float2(0.0, 0.5).xyy) / (PaperWhite * sqrt(2.0)), 1.0);
-	output.history = float4(result.rgb, 1.0);
+	output.result = float4(ICtCpToRec2020(result.rgb) / (PaperWhite * sqrt(2.0)), 1.0);
+	output.history = float4(result.rgb + float2(0.0, 0.5).xyy, 1.0);
 	output.historyWeight = result.a;
 	return output;
 }
