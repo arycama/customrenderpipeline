@@ -79,7 +79,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 		[unroll]
 		for (int x = -1; x <= 1; x++, i++)
 		{
-			float3 color = Rec2020ToICtCp(CameraTarget[clamp(centerCoord + int2(x, y), 0, MaxScreenSize)] * PaperWhite * sqrt(2.0) + float2(0.0, 0.5).xyy);
+			float3 color = Rec2020ToICtCp(CameraTarget[clamp(centerCoord + int2(x, y), 0, MaxScreenSize)] * PaperWhite * sqrt(2.0));
 			
 			#ifdef UPSCALE
 				float _BlendSharpness = 0.5;

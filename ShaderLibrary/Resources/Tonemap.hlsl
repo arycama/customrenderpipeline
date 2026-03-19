@@ -21,6 +21,7 @@ float Hdr;
 float IsFirst;
 float UseLut;
 float LutResolution;
+float ShoulderCompression, LinearStart, ShoulderStart, ToeStrength, FadeStart, FadeEnd, BlendRatio;
 
 Texture3D<float3> ColorGradingLut;
 
@@ -145,7 +146,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 		if (Tonemap)
 		{
-			color = Gt7Tonemap(color, MaxLuminance, Hdr, PaperWhite * sqrt(2));
+			color = Gt7Tonemap(color, MaxLuminance, Hdr, PaperWhite * sqrt(2), 250.0, ShoulderCompression, LinearStart, ShoulderStart, ToeStrength, FadeStart, FadeEnd, BlendRatio);
 		}
 	//#endif
 	

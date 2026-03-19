@@ -108,6 +108,13 @@ public partial class Tonemapping : ViewRenderFeature
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
+                pass.SetFloat("ShoulderCompression", data.settings.ShoulderCompression);
+                pass.SetFloat("LinearStart", data.settings.LinearStart);
+                pass.SetFloat("ShoulderStart", data.settings.ShoulderStart);
+                pass.SetFloat("ToeStrength", data.settings.ToeStrength);
+                pass.SetFloat("FadeStart", data.settings.FadeStart);
+                pass.SetFloat("FadeEnd", data.settings.FadeEnd);
+                pass.SetFloat("BlendRatio", data.settings.BlendRatio);
                 pass.SetFloat("LutResolution", data.settings.LutResolution);
                 pass.SetFloat("UseLut", data.settings.UseLut ? 1 : 0);
                 pass.SetFloat("Tonemap", data.settings.Tonemap ? 1 : 0);

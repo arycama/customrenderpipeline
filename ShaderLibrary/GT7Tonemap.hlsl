@@ -4,29 +4,22 @@
 #include "Color.hlsl"
 
 // All parameters are in nits
-float3 Gt7Tonemap(float3 color, float maxLuminance, bool hdr = true, float paperWhite = 100.0, float sdrBrightness = 250.0)
+float3 Gt7Tonemap(float3 color, float maxLuminance, bool hdr = true, float paperWhite = 100.0, float sdrBrightness = 250.0, float shoulderCompression = 0.75, float linearStart = 0.538, float shoulderStart = 0.444, float toeStrength = 1.28, float fadeStart = 0.98, float fadeEnd = 1.16, float blendRatio = 0.6)
 {
 	// Curve parameters
-	float alpha = 0.25;
-	float grayPoint = 0.538 * paperWhite;
-	float linearSection = 0.444 ;
-	float toeStrength = 1.280;
+	linearStart *= paperWhite;
+	shoulderStart *= maxLuminance;
 	
-    // Default parameters.
-	float fadeStart = 0.98;
-	float fadeEnd = 1.16;
-	float blendRatio = 0.6;
-    
     // Initialize the curve
-	float3 toeMapped = grayPoint * pow(color / grayPoint, toeStrength);
-	float3 weightLinear = smoothstep(0.0, grayPoint, color);
-	float3 toeLinear = lerp(toeMapped, color, weightLinear);
+	float3 toeMapped = pow(color, toeStrength) * pow(linearStart, 1.0 - toeStrength);
+	float3 weightLinear = smoothstep(0.0, linearStart, color);
+	float3 toe = lerp(toeMapped, color, weightLinear);
 	
-	float k = (linearSection * maxLuminance - 1.0) / (alpha - 1.0) * maxLuminance;
-	float3 shoulder = k * (1.0 - exp((linearSection * maxLuminance - color) / k)) + linearSection * maxLuminance;
+	float k = (maxLuminance - shoulderStart) / shoulderCompression;
+	float3 shoulder = (1.0 - exp((shoulderStart - color) / k)) * k + shoulderStart;
 
     // Per-channel tone mapping ("skewed" color).
-	float3 skewedRgb = color < linearSection * maxLuminance ? toeLinear : shoulder;
+	float3 skewedRgb = color < linearStart ? toe : color > shoulderStart ? shoulder : color;
 	float3 skewedICtCp = Rec2020ToICtCp(skewedRgb);
 	float3 iCtCp = Rec2020ToICtCp(color);
 	
@@ -37,7 +30,6 @@ float3 Gt7Tonemap(float3 color, float maxLuminance, bool hdr = true, float paper
     // Convert back to RGB.
 	float3 scaledRgb = ICtCpToRec2020(scaledICtCp);
 	color = lerp(skewedRgb, scaledRgb, blendRatio);
-	color = min(maxLuminance, color);
 	
 	if(!hdr)
 		color = color * paperWhite / sdrBrightness;
