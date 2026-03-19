@@ -145,11 +145,9 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 		if (Tonemap)
 		{
-		color /= PaperWhite * sqrt(2);
-			GT7ToneMapping toneMapper;
-			toneMapper.initializeAsHDR(MaxLuminance);
-			color = toneMapper.applyToneMapping(color);
-		color *= PaperWhite * sqrt(2);
+			color /= PaperWhite * sqrt(2);
+			color = Gt7Tonemap(color, MaxLuminance, Hdr);
+			color *= PaperWhite * sqrt(2);
 			//color = Rec2020ToICtCp(color);
 			//color.r = LinearToST2084(BT2390EETF(ST2084ToLinear(color), MinLuminance, MaxLuminance));
 			//color = ICtCpToRec2020(color);

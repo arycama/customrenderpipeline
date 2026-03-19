@@ -13,9 +13,7 @@ float3 Fragment(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 	float3 uv = float3(RemapHalfTexelTo01(input.uv, Resolution), input.viewIndex / (Resolution - 1.0));
 	float3 rgb = Rec709ToRec2020(uv);
 	
-	GT7ToneMapping gt7;
-	gt7.initializeAsHDR(MaxLuminance);
-	rgb = gt7.applyToneMapping(rgb);
+	rgb = Gt7Tonemap(rgb, MaxLuminance, true);
 	rgb = Rec2020ToRec709(rgb);
 	return rgb;
 }

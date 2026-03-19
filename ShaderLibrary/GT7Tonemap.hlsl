@@ -1,28 +1,6 @@
 #ifndef GT7_TONEMAP_INCLUDED
 #define GT7_TONEMAP_INCLUDED
 
-#define GRAN_TURISMO_SDR_PAPER_WHITE 250.0f // cd/m^2
-#define REFERENCE_LUMINANCE 100.0f // cd/m^2 <-> 1.0f
-
-float
-frameBufferValueToPhysicalValue(float fbValue)
-{
-    // Converts linear frame-buffer value to physical luminance (cd/m^2)
-    // where 1.0 corresponds to REFERENCE_LUMINANCE (e.g., 100 cd/m^2).
-    return fbValue * REFERENCE_LUMINANCE;
-}
-
-float
-physicalValueToFrameBufferValue(float physical)
-{
-    // Converts physical luminance (cd/m^2) to a linear frame-buffer value,
-    // where 1.0 corresponds to REFERENCE_LUMINANCE (e.g., 100 cd/m^2).
-    return physical / REFERENCE_LUMINANCE;
-}
-
-// -----------------------------------------------------------------------------
-// Utility functions.
-// -----------------------------------------------------------------------------
 float
 smoothStep(float x, float edge0, float edge1)
 {
@@ -142,7 +120,7 @@ eotfSt2084(float n, float exponentScaleFactor = 1.0f)
     l = pow(l, 1.0f / m1);
 
     // Convert absolute luminance (cd/m^2) into the frame-buffer linear scale.
-    return physicalValueToFrameBufferValue(l * pqC);
+    return l * pqC / 100.0;
 }
 
 float
@@ -156,7 +134,7 @@ inverseEotfSt2084(float v, float exponentScaleFactor = 1.0f)
     float pqC = 10000.0f;
 
     // Convert the frame-buffer linear scale into absolute luminance (cd/m^2).
-    float physical = frameBufferValueToPhysicalValue(v);
+    float physical = v * 100;
     float y        = physical / pqC; // Normalize for the ST-2084 curve
 
     float ym = pow(y, m1);
@@ -201,111 +179,65 @@ float3 iCtCpToRgb(float3 ictCp) // Output: linear Rec.2020
 	return rgb;
 }
 
-
-// -----------------------------------------------------------------------------
-// GT7 Tone Mapping class.
-// -----------------------------------------------------------------------------
-struct GT7ToneMapping
+float3 Gt7Tonemap(float3 color, float physicalTargetLuminance, bool hdr)
 {
-    float sdrCorrectionFactor_;
-
-    float framebufferLuminanceTarget_;
-    float framebufferLuminanceTargetUcs_; // Target luminance in UCS space
-    GTToneMappingCurveV2 curve_;
-
-    float blendRatio_;
-    float fadeStart_;
-    float fadeEnd_;
-
-    // Initializes the tone mapping curve and related parameters based on the target display luminance.
-    // This method should not be called directly. Use initializeAsHDR() or initializeAsSDR() instead.
-    void initializeParameters(float physicalTargetLuminance)
-    {
-        framebufferLuminanceTarget_ = physicalValueToFrameBufferValue(physicalTargetLuminance);
-
-        // Initialize the curve (slightly different parameters from GT Sport).
-        curve_.initializeCurve(framebufferLuminanceTarget_, 0.25f, 0.538f, 0.444f, 1.280f);
-
-        // Default parameters.
-        blendRatio_ = 0.6f;
-        fadeStart_  = 0.98f;
-        fadeEnd_    = 1.16f;
-
-        float3 rgb = { framebufferLuminanceTarget_,
-                         framebufferLuminanceTarget_,
-                         framebufferLuminanceTarget_ };
-		float3 ucs = rgbToICtCp(rgb);
-        framebufferLuminanceTargetUcs_ =
-            ucs[0]; // Use the first UCS component (I or Jz) as luminance
-    }
-
-    // Initialize for HDR (High Dynamic Range) display.
-    // Input: target display peak luminance in nits (range: 250 to 10,000)
-    // Note: The lower limit is 250 because the parameters for GTToneMappingCurveV2
-    //       were determined based on an SDR paper white assumption of 250 nits (GRAN_TURISMO_SDR_PAPER_WHITE).
-    void initializeAsHDR(float physicalTargetLuminance)
-    {
-        sdrCorrectionFactor_ = 1.0f;
-        initializeParameters(physicalTargetLuminance);
-    }
-
-    // Initialize for SDR (Standard Dynamic Range) display.
-    void initializeAsSDR()
-    {
-        // Regarding SDR output:
-        // First, in GT (Gran Turismo), it is assumed that a maximum value of 1.0 in SDR output
-        // corresponds to GRAN_TURISMO_SDR_PAPER_WHITE (typically 250 nits).
-        // Therefore, tone mapping for SDR output is performed based on GRAN_TURISMO_SDR_PAPER_WHITE.
-        // However, in the sRGB standard, 1.0f corresponds to 100 nits,
-        // so we need to "undo" the tone-mapped values accordingly.
-        // To match the sRGB range, the tone-mapped values are scaled using sdrCorrectionFactor_.
-        //
-        // * These adjustments ensure that the visual appearance (in terms of brightness)
-        //   stays generally consistent across both HDR and SDR outputs for the same rendered content.
-        sdrCorrectionFactor_ = 1.0f / physicalValueToFrameBufferValue(GRAN_TURISMO_SDR_PAPER_WHITE);
-        initializeParameters(GRAN_TURISMO_SDR_PAPER_WHITE);
-    }
-
-    // Input:  linear Rec.2020 RGB (frame buffer values)
-    // Output: tone-mapped RGB (frame buffer values);
-    //         - in SDR mode: mapped to [0, 1], ready for sRGB OETF
-    //         - in HDR mode: mapped to [0, framebufferLuminanceTarget_], ready for PQ inverse-EOTF
-    // Note: framebufferLuminanceTarget_ represents the display's target peak luminance converted to a frame buffer value.
-    //       The returned values are suitable for applying the appropriate OETF to generate final output signal.
-    float3 applyToneMapping(float3 rgb)
-    {
-        // Convert to UCS to separate luminance and chroma.
-        float3 ucs = rgbToICtCp(rgb);
-
-        // Per-channel tone mapping ("skewed" color).
-        float3 skewedRgb = { curve_.evaluateCurve(rgb[0]),
-                               curve_.evaluateCurve(rgb[1]),
-                               curve_.evaluateCurve(rgb[2]) };
-
-        float3 skewedUcs = rgbToICtCp(skewedRgb);
-
-        float chromaScale =
-            chromaCurve(ucs[0] / framebufferLuminanceTargetUcs_, fadeStart_, fadeEnd_);
-
-        float3 scaledUcs = { skewedUcs[0],         // Luminance from skewed color
-                                     ucs[1] * chromaScale, // Scaled chroma components
-                                     ucs[2] * chromaScale };
-
-        // Convert back to RGB.
-        float3 scaledRgb = iCtCpToRgb(scaledUcs);
-
-        // Final blend between per-channel and UCS-scaled results.
-        for (int i = 0; i < 3; ++i)
-        {
-            float blended = (1.0f - blendRatio_) * skewedRgb[i] + blendRatio_ * scaledRgb[i];
-            // When using SDR, apply the correction factor.
-            // When using HDR, sdrCorrectionFactor_ is 1.0f, so it has no effect.
-			rgb[i] = sdrCorrectionFactor_ * min(blended, framebufferLuminanceTarget_);
-		}
+	float sdrCorrectionFactor = hdr ? 1.0 : 1.0f / (250.0 / 100.0);
         
-		return rgb;
+	float framebufferLuminanceTarget_;
+	float framebufferLuminanceTargetUcs_; // Target luminance in UCS space
+	GTToneMappingCurveV2 curve_;
+        
+	framebufferLuminanceTarget_ = physicalTargetLuminance / 100.0;
+
+    // Initialize the curve (slightly different parameters from GT Sport).
+	curve_.initializeCurve(framebufferLuminanceTarget_, 0.25f, 0.538f, 0.444f, 1.280f);
+
+    // Default parameters.
+	float blendRatio_ = 0.6f;
+	float fadeStart_ = 0.98f;
+	float fadeEnd_ = 1.16f;
+
+	float3 rgb =
+	{
+		framebufferLuminanceTarget_,
+                        framebufferLuminanceTarget_,
+                        framebufferLuminanceTarget_
+	};
+	float3 ucs1 = rgbToICtCp(rgb);
+	framebufferLuminanceTargetUcs_ =
+        ucs1[0]; // Use the first UCS component (I or Jz) as luminance
+
+    // Convert to UCS to separate luminance and chroma.
+	float3 ucs = rgbToICtCp(color);
+
+    // Per-channel tone mapping ("skewed" color).
+    float3 skewedRgb = { curve_.evaluateCurve(color[0]),
+                            curve_.evaluateCurve(color[1]),
+                            curve_.evaluateCurve(color[2]) };
+
+    float3 skewedUcs = rgbToICtCp(skewedRgb);
+
+    float chromaScale =
+        chromaCurve(ucs[0] / framebufferLuminanceTargetUcs_, fadeStart_, fadeEnd_);
+
+    float3 scaledUcs = { skewedUcs[0],         // Luminance from skewed color
+                                    ucs[1] * chromaScale, // Scaled chroma components
+                                    ucs[2] * chromaScale };
+
+    // Convert back to RGB.
+    float3 scaledRgb = iCtCpToRgb(scaledUcs);
+
+    // Final blend between per-channel and UCS-scaled results.
+    for (int i = 0; i < 3; ++i)
+    {
+        float blended = (1.0f - blendRatio_) * skewedRgb[i] + blendRatio_ * scaledRgb[i];
+        // When using SDR, apply the correction factor.
+        // When using HDR, sdrCorrectionFactor_ is 1.0f, so it has no effect.
+		color[i] = sdrCorrectionFactor * min(blended, framebufferLuminanceTarget_);
 	}
-};
+        
+	return color;
+}
 
 //float3 Gt7Tonemap(float3 rgb, float maxLuminance)
 //{
