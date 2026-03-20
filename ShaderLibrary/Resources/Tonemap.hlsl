@@ -146,7 +146,7 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 		if (Tonemap)
 		{
-		color = Gt7Tonemap(color, MaxLuminance, Hdr, PaperWhite * sqrt(2), 250.0, ShoulderCompression, LinearStart, ShoulderStart, ToeStrength, FadeStart, FadeEnd, HuePreservation);
+		color = Gt7Tonemap(color, MaxLuminance, PaperWhite * sqrt(2), ShoulderCompression, LinearStart, ShoulderStart, ToeStrength, FadeStart, FadeEnd, HuePreservation);
 	}
 	//#endif
 	

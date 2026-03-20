@@ -4,11 +4,10 @@
 #include "Color.hlsl"
 
 // All parameters are in nits
-float3 Gt7Tonemap(float3 color, float peakBrightness, bool hdr = true, float paperWhite = 100.0, float sdrBrightness = 250.0, float shoulderCompression = 0.75, float linearStart = 0.538, float shoulderStart = 0.444, float toeStrength = 1.28, float fadeStart = 0.98, float fadeEnd = 1.16, float huePreservation = 0.4)
+float3 Gt7Tonemap(float3 color, float peakBrightness, float paperWhite = 100.0, float shoulderCompression = 0.75, float linearStart = 0.538, float shoulderStart = 0.444, float toeStrength = 1.28, float fadeStart = 0.98, float fadeEnd = 1.16, float huePreservation = 0.4)
 {
-	// Curve parameters
 	linearStart *= paperWhite;
-	shoulderStart *= paperWhite;
+	shoulderStart *= peakBrightness;
 	
     // Initialize the curve
 	float3 toeMapped = pow(color, toeStrength) * pow(linearStart, 1.0 - toeStrength);
@@ -27,14 +26,9 @@ float3 Gt7Tonemap(float3 color, float peakBrightness, bool hdr = true, float pap
 	float chromaScale = smoothstep(fadeEnd, fadeStart, iCtCp.x / framebufferLuminanceTargetICtCp);
 	float3 scaledICtCp = float3(skewedICtCp.x, iCtCp.yz * chromaScale);
 
-    // Convert back to RGB.
+    // Convert back to rgb
 	float3 scaledRgb = ICtCpToRec2020(scaledICtCp);
-	color = lerp(scaledRgb, skewedRgb, huePreservation);
-	
-	if(!hdr)
-		color = color * paperWhite / sdrBrightness;
-	
-	return color;
+	return lerp(skewedRgb, scaledRgb, huePreservation);
 }
 
 #endif
