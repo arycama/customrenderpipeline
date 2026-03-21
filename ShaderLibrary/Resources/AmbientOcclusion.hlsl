@@ -229,6 +229,6 @@ float4 FragmentCombine(VertexFullscreenTriangleOutput input) : SV_Target
 	bentNormalOcclusion.a = bentNormalOcclusion.b;
 	bentNormalOcclusion.xyz = GBufferNormal(bentNormalOcclusion, V, WorldToView, ViewToWorld);
 	
-	result = SphericalCapIntersection(bentNormalOcclusion.xyz, cos(bentNormalOcclusion.a * HalfPi), result.xyz, result.w);
-	return float4(PackGBufferNormal(result.xyz, V, WorldToView), FastACos(result.a) * RcpHalfPi, 0);
+	result = SphericalCapIntersection(bentNormalOcclusion.xyz, bentNormalOcclusion.a, result.xyz, result.w);
+	return float4(PackGBufferNormal(result.xyz, V, WorldToView), result.a, 0);
 }

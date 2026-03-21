@@ -4,21 +4,17 @@
 #include "Color.hlsl"
 
 // All parameters are in nits
-float3 Gt7Tonemap(float3 color, float peakBrightness, float paperWhite = 100.0, float shoulderCompression = 0.75, float linearStart = 0.538, float shoulderStart = 0.444, float toeStrength = 1.28, float fadeStart = 0.98, float fadeEnd = 1.16, float huePreservation = 0.4)
+float3 Gt7Tonemap(float3 color, float peakBrightness, float paperWhite = 100.0, float maxInputLuminance = 10000, float linearStart = 0.18, float fadeStart = 0.98, float fadeEnd = 1.16, float huePreservation = 0.4)
 {
-	linearStart *= paperWhite;
-	shoulderStart *= peakBrightness;
+	float c = max(2.0, (maxInputLuminance - paperWhite) / (peakBrightness - paperWhite));
 	
     // Initialize the curve
-	float3 toeMapped = pow(color, toeStrength) * pow(linearStart, 1.0 - toeStrength);
-	float3 weightLinear = smoothstep(0.0, linearStart, color);
-	float3 toe = lerp(toeMapped, color, weightLinear);
+	float3 toe = 2.0 * Sq(color) / linearStart - pow(color, 3.0) / Sq(linearStart);
+	float3 shoulder = paperWhite + (peakBrightness - paperWhite) * (1.0 - pow(max(0.0, 1.0 - (color - paperWhite) / (c * (peakBrightness - paperWhite))), c));
 	
-	float k = (peakBrightness - shoulderStart) / shoulderCompression;
-	float3 shoulder = (1.0 - exp((shoulderStart - color) / k)) * k + shoulderStart;
-
     // Per-channel tone mapping ("skewed" color).
-	float3 skewedRgb = color < linearStart ? toe : color > shoulderStart ? shoulder : color;
+	float3 skewedRgb = color < linearStart ? toe : color > paperWhite ? shoulder : color;
+	
 	float3 skewedICtCp = Rec2020ToICtCp(skewedRgb);
 	float3 iCtCp = Rec2020ToICtCp(color);
 	
@@ -28,7 +24,7 @@ float3 Gt7Tonemap(float3 color, float peakBrightness, float paperWhite = 100.0, 
 
     // Convert back to rgb
 	float3 scaledRgb = ICtCpToRec2020(scaledICtCp);
-	return lerp(skewedRgb, scaledRgb, huePreservation);
+	return lerp(scaledRgb, skewedRgb, huePreservation);
 }
 
 #endif

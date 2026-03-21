@@ -19,45 +19,9 @@ float Purkinje;
 float3 RodInputStrength;
 float Hdr;
 float IsFirst;
-float UseLut;
 float LutResolution;
-float ShoulderCompression, LinearStart, ShoulderStart, ToeStrength, FadeStart, FadeEnd, HuePreservation;
-
+float MaxInputLuminance, LinearStart, FadeStart, FadeEnd, HuePreservation;
 Texture3D<float3> ColorGradingLut;
-
-float3 T(float3 A, float3 Ks)
-{
-	return (A - Ks) / (1.0 - Ks);
-}
-
-float3 P(float3 B, float3 Ks, float3 L_max)
-{
-	float3 TB2 = T(B, Ks) * T(B, Ks);
-	float3 TB3 = TB2 * T(B, Ks);
-
-	return lerp((TB3 - 2 * TB2 + T(B, Ks)), (2.0 * TB3 - 3.0 * TB2 + 1.0), Ks) + (-2.0 * TB3 + 3.0 * TB2) * L_max;
-}
-
-// Ref: https://www.itu.int/dms_pub/itu-r/opb/rep/R-REP-BT.2390-4-2018-PDF-E.pdf page 21
-float3 BT2390EETF(float3 x, float minLimit, float maxLimit)
-{
-	float3 E_0 = LinearToST2084(x);
-	 
-    // For the following formulas we are assuming L_B = 0 and L_W = 10000 -- see original paper for full formulation
-	float3 E_1 = E_0;
-	float3 L_min = LinearToST2084(minLimit);
-	float3 L_max = LinearToST2084(maxLimit);
-	float3 Ks = 1.5 * L_max - 0.5; // Knee start
-	float3 b = L_min;
-
-	float3 E_2 = E_1 < Ks ? E_1 : P(E_1, Ks, L_max);
-	float3 E3Part = (1.0 - E_2);
-	float3 E3Part2 = E3Part * E3Part;
-	float3 E_3 = E_2 + b * (E3Part2 * E3Part2);
-	float3 E_4 = E_3; // Is like this because PQ(L_W)=  1 and PQ(L_B) = 0
-
-	return ST2084ToLinear(E_4);
-}
 
 float3x3 Diag(float3 m)
 {
@@ -89,8 +53,6 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 	
 	if(IsFirst)
 		color *= PreviousToCurrentExposure;
-	
-	color *= PaperWhite * sqrt(2.0);
 	
 	//#ifdef USE_LUT
 	//	color = Rec2020ToICtCp(color);
@@ -144,11 +106,16 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 			color += Rec709ToRec2020(deltaC) * Exposure;
 		}
 	
-		if (Tonemap)
-		{
-		color = Gt7Tonemap(color, MaxLuminance, PaperWhite * sqrt(2), ShoulderCompression, LinearStart, ShoulderStart, ToeStrength, FadeStart, FadeEnd, HuePreservation);
-	}
-	//#endif
+	color *= PaperWhite * sqrt(2.0);
+	#ifdef TONEMAP
+		color = Rec2020ToICtCp(color);
+		color.yz += 0.5;
+		color = Remap01ToHalfTexel(color, LutResolution);
+		color = ColorGradingLut.Sample(TrilinearClampSampler, color);
+	#else
+		//color = Gt7Tonemap(color, MaxLuminance, PaperWhite * sqrt(2), MaxInputLuminance, LinearStart, FadeStart, FadeEnd, HuePreservation);
+		color = min(color, MaxLuminance);
+	#endif
 	
 	if (IsPreview)
 		return color / (PaperWhite * sqrt(2.0));
@@ -173,7 +140,10 @@ float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 wor
 		
 		case ColorGamutHDR10:
 		{
-			color = LinearToST2084(color);
+			#ifndef TONEMAP
+				color = LinearToST2084(color);
+			#endif
+			
 			break;
 		}
 		

@@ -8,10 +8,8 @@ public partial class Tonemapping
 	{
 		[field: Header("Settings")]
         [field: SerializeField] public bool Tonemap { get; private set; } = true;
-        [field: SerializeField, Range(0, 1)] public float ShoulderCompression { get; private set; } = 0.75f;
-        [field: SerializeField, Range(0, 1)] public float LinearStart { get; private set; } = 0.538f;
-        [field: SerializeField, Range(0, 1)] public float ShoulderStart { get; private set; } = 0.444f;
-        [field: SerializeField, Range(1, 2)] public float ToeStrength { get; private set; } = 1.28f;
+        [field: SerializeField] public float MaxInputLuminance { get; private set; } = 10000.0f;
+        [field: SerializeField, Range(0, 100)] public float LinearStart { get; private set; } = 18;
         [field: SerializeField, Min(0)] public float FadeStart { get; private set; } = 0.98f;
         [field: SerializeField, Min(0)] public float FadeEnd { get; private set; } = 1.16f;
         [field: SerializeField, Range(0, 1)] public float HuePreservation { get; private set; } = 0.4f;

@@ -15,8 +15,11 @@ public partial class Tonemapping : ViewRenderFeature
 
 	private bool previousNormalize;
     private readonly HashSet<int> renderedViewIndices = new();
+    private ResourceHandle<RenderTexture> colorLut;
+    private int previousLutResolution;
+    private int previousSettingsHash;
 
-	public Tonemapping(RenderGraph renderGraph, Settings settings, Bloom.Settings bloomSettings) : base(renderGraph)
+    public Tonemapping(RenderGraph renderGraph, Settings settings, Bloom.Settings bloomSettings) : base(renderGraph)
 	{
 		this.settings = settings;
 		this.bloomSettings = bloomSettings;
@@ -41,11 +44,52 @@ public partial class Tonemapping : ViewRenderFeature
 		rgbToLms.SetRow(3, new Vector4(0, 0, 0, 1));
 		LmsToRgb = Matrix4x4.Inverse(rgbToLms);
 		previousNormalize = settings.NormalizeLmsr;
-	}
 
-	public override void Render(ViewRenderData viewRenderData)
+		UpdateLut(true);
+    }
+
+    private void UpdateLut(bool initialize = false)
     {
-		if(settings.NormalizeLmsr != previousNormalize)
+        var currentSettings =
+        (
+            (float)settings.LutResolution,
+            settings.MaxLuminance,
+            settings.PaperWhite,
+            settings.MaxInputLuminance,
+            settings.LinearStart,
+            settings.FadeStart,
+            settings.FadeEnd,
+            settings.HuePreservation
+        );
+
+        var settingsHash = currentSettings.GetHashCode();
+        if (!initialize && previousLutResolution == settings.LutResolution && settingsHash == previousSettingsHash)
+            return;
+
+        var properties = renderGraph.SetConstantBuffer(currentSettings);
+        using var pass = renderGraph.AddFullscreenRenderPass("Color Grading Lut", (settings.LutResolution, settings.MaxLuminance, settings.PaperWhite));
+
+        if (initialize || previousLutResolution != settings.LutResolution)
+        {
+            if (!initialize)
+                renderGraph.ReleasePersistentResource(colorLut, pass.RenderPassIndex);
+
+            colorLut = renderGraph.GetTexture(settings.LutResolution, GraphicsFormat.A2B10G10R10_UNormPack32, settings.LutResolution, TextureDimension.Tex3D, isExactSize: true, isPersistent: true);
+            previousLutResolution = settings.LutResolution;
+        }
+
+        previousSettingsHash = settingsHash;
+
+        pass.Initialize(lutMaterial, 0, settings.LutResolution);
+        pass.WriteTexture(colorLut);
+        pass.ReadBuffer("Properties", properties);
+    }
+
+    public override void Render(ViewRenderData viewRenderData)
+    {
+        UpdateLut();
+
+        if (settings.NormalizeLmsr != previousNormalize)
 		{
 			RgbToLmsr = CalculateRgbToLMSR(settings.NormalizeLmsr);
 			var rgbToLms = RgbToLmsr;
@@ -71,20 +115,6 @@ public partial class Tonemapping : ViewRenderFeature
 		}
 
         var isFirst = renderedViewIndices.Add(viewRenderData.viewId);
-        var lut = renderGraph.GetTexture(settings.LutResolution, GraphicsFormat.A2B10G10R10_UNormPack32, settings.LutResolution, TextureDimension.Tex3D, isExactSize: true);
-        using(var pass = renderGraph.AddFullscreenRenderPass("Color Grading Lut", (settings.LutResolution, settings.MaxLuminance, settings.PaperWhite)))
-        {
-            pass.Initialize(lutMaterial, 0, settings.LutResolution);
-            pass.WriteTexture(lut);
-
-            pass.SetRenderFunction(static (command, pass, data) =>
-            {
-                pass.SetFloat("Resolution", data.LutResolution);
-                pass.SetFloat("MaxLuminance", data.MaxLuminance);
-                pass.SetFloat("PaperWhite", data.PaperWhite);
-            });
-        }
-
         using (var pass = renderGraph.AddBlitToScreenPass("Tonemapping", new Pass0Data(settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb, hdrEnabled, isFirst)))
         {
             pass.Initialize(material, 0);
@@ -100,25 +130,21 @@ public partial class Tonemapping : ViewRenderFeature
                 pass.AddKeyword("BLOOM_ON");
             }
 
-            pass.ReadTexture("ColorGradingLut", lut);
+            pass.ReadTexture("ColorGradingLut", colorLut);
             pass.ReadResource<AutoExposureData>();
 
-            if (settings.UseLut)
-                pass.AddKeyword("USE_LUT");
+            if (settings.Tonemap)
+                pass.AddKeyword("TONEMAP");
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetFloat("ShoulderCompression", data.settings.ShoulderCompression);
+                pass.SetFloat("MaxInputLuminance", data.settings.MaxInputLuminance);
                 pass.SetFloat("LinearStart", data.settings.LinearStart);
-                pass.SetFloat("ShoulderStart", data.settings.ShoulderStart);
-                pass.SetFloat("ToeStrength", data.settings.ToeStrength);
                 pass.SetFloat("FadeStart", data.settings.FadeStart);
                 pass.SetFloat("FadeEnd", data.settings.FadeEnd);
                 pass.SetFloat("HuePreservation", data.settings.HuePreservation);
+
                 pass.SetFloat("LutResolution", data.settings.LutResolution);
-                pass.SetFloat("UseLut", data.settings.UseLut ? 1 : 0);
-                pass.SetFloat("Tonemap", data.settings.Tonemap ? 1 : 0);
-                pass.SetFloat("MinLuminance", data.settings.MinLuminance);
                 pass.SetFloat("MaxLuminance", data.settings.MaxLuminance);
                 pass.SetFloat("PaperWhite", data.settings.PaperWhite);
                 pass.SetFloat("IsSceneView", data.camera.cameraType == CameraType.SceneView ? 1 : 0);
