@@ -10,14 +10,15 @@ public class FoliageShaderGui : ShaderGUI
 
         var material = materialEditor.target as Material;
 
-        var opacityProperty = FindProperty("Opacity", properties);
-        var opacity = opacityProperty.textureValue;
-        var isCutout = opacity != null;
-        material.ToggleKeyword("CUTOUT_ON", isCutout);
-        material.SetFloat("DoubleSided", isCutout ? 0 : 2);
-        material.SetInteger("StencilRef", isCutout ? 17 : 1);
-        material.SetInteger("StencilRefMotion", isCutout ? 19 : 3);
-        material.renderQueue = (int)(isCutout ? RenderQueue.AlphaTest : RenderQueue.Geometry);
+        var hasHeight = FindProperty("Height", properties).textureValue != null;
+        material.ToggleKeyword("PARALLAX_ON", hasHeight);
+
+        var hasOpacity = FindProperty("Opacity", properties).textureValue != null;
+        material.ToggleKeyword("CUTOUT_ON", hasOpacity);
+        material.SetFloat("DoubleSided", hasOpacity ? 0 : 2);
+        material.SetInteger("StencilRef", hasOpacity ? 17 : 1);
+        material.SetInteger("StencilRefMotion", hasOpacity ? 19 : 3);
+        material.renderQueue = (int)(hasOpacity ? RenderQueue.AlphaTest : RenderQueue.Geometry);
 
         EditorUtility.SetDirty(material);
     }

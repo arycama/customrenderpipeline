@@ -93,8 +93,8 @@ public class SmoothnessFilterImporter : AssetPostprocessor
 		var mipCount = texture.mipmapCount;
         for (var i = 0; i < mipCount; i++)
         {
-            var mipWidth = width >> i;
-            var mipHeight = height >> i;
+            var mipWidth = Math.Max(1, width >> i);
+            var mipHeight = Math.Max(1, height >> i);
 
             computeShader.SetInt("_Mip", i);
             computeShader.SetTexture(mipNormalAndSmoothnessKernel, "Result", result, i);

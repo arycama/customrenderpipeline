@@ -47,7 +47,10 @@ public class DrawInstancedIndirectRenderPass<T> : DrawRenderPass<T>
 		if (depthBias != 0.0f || slopeDepthBias != 0.0f)
 			Command.SetGlobalDepthBias(depthBias, slopeDepthBias);
 
-		Command.DrawMeshInstancedIndirect(mesh, submeshIndex, material, passIndex, RenderGraph.BufferHandleSystem.GetResource(indirectArgsBuffer), argsOffset, PropertyBlock);
+        if (mesh == null)
+            return;
+		
+        Command.DrawMeshInstancedIndirect(mesh, submeshIndex, material, passIndex, RenderGraph.BufferHandleSystem.GetResource(indirectArgsBuffer), argsOffset, PropertyBlock);
 
 		if (depthBias != 0.0f || slopeDepthBias != 0.0f)
 			Command.SetGlobalDepthBias(0.0f, 0.0f);

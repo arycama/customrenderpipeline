@@ -1,4 +1,4 @@
-Texture2DArray<float4> Input;
+Texture2DArray<float> Input;
 float Cutoff, MaxDistance, InvResolution;
 int Resolution;
 
@@ -10,7 +10,7 @@ Texture2DArray<float> Distance;
 
 StructuredBuffer<float> MinMaxValues;
 SamplerState LinearClampSampler, PointClampSampler;
-Texture2DArray<float4> Input1, Input2, Input3, Input4, Input5, Input6, Input7;
+Texture2DArray<float4> Input0, Input1, Input2, Input3, Input4, Input5, Input6, Input7;
 
 struct FragmentInput
 {
@@ -42,7 +42,7 @@ float1 InvLerp(float1 t, float1 x, float1 y)
 int2 Fragment(FragmentInput input) : SV_Target
 {
 	int3 pos = int3(input.position.xy, input.viewIndex);
-	float height = Input[pos].a;
+	float height = Input[pos];
 	int2 nearestPoint = -1;
 	float minDist = -1;
 	bool hasMinDist = false;
@@ -57,7 +57,7 @@ int2 Fragment(FragmentInput input) : SV_Target
 			if (any(coord.xy < 0 || coord.xy >= Resolution))
 				continue;
 
-			float neighborHeight = Input[coord].a;
+			float neighborHeight = Input[coord];
 				
 			#ifdef JUMP_FLOOD
 				coord.xy = JumpFloodInput[coord];
@@ -82,7 +82,7 @@ int2 Fragment(FragmentInput input) : SV_Target
 	}
 
 	#ifdef FINAL_PASS
-		if (Input[pos].a < Cutoff)
+		if (Input[pos] < Cutoff)
 		{
 			InterlockedMax(MinMaxValuesWrite[0], asuint(-minDist));
 		}
@@ -103,7 +103,7 @@ float FragmentDistance(FragmentInput input) : SV_Target
 	float dist = length(delta);
 
 	// Invert the distance if outside the surface
-	if (Input[pos].a < Cutoff)
+	if (Input[pos] < Cutoff)
 		dist = -dist;
 	
 	float minDistance = MinMaxValues[0];
@@ -124,7 +124,7 @@ FragmentOutput FragmentCombine(FragmentInput input)
 
 	// Invert the distance if outside the surface
 	int2 delta = seed - input.uv;
-	float height = Input[pos].a;
+	float height = Input[pos];
 	if (height < Cutoff)
 	{
 		pos.xy = seed;
@@ -133,11 +133,11 @@ FragmentOutput FragmentCombine(FragmentInput input)
 
 	FragmentOutput output;
 	//output.output[0] = float4(Input[pos].rgb, signedDistance);
-	output.output[0] = float4(Input[pos].rgb, height >= Cutoff);
+	output.output[0] = Input0[pos];
 	output.output[1] = Input1[pos];
 	output.output[2] = Input2[pos];
-	output.output[3] = Input3[pos];
-	output.output[4] = Input4[int3(input.position.xy, input.viewIndex)];
+	output.output[3] = signedDistance;
+	output.output[4] = Input4[pos];
 	output.output[5] = Input5[pos];
 	output.output[6] = Input6[pos];
 	output.output[7] = Input7[pos];

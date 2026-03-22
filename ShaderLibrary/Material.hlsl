@@ -63,12 +63,24 @@ float SpecularAntiAliasing(float perceptualRoughness, float3 worldNormal)
 	return RoughnessToPerceptualRoughness(filteredRoughness);
 }
 
-float2 Parallax(float2 uv, float3 tangentViewDirection, float heightScale, Texture2D<float> Height, SamplerState samplerState, float bias = 0.42)
+float3 Parallax(float2 uv, float3 viewDir, float heightScale, Texture2D<float> Height, SamplerState samplerState, float bias = 0.42)
 {
-	float height = (Height.Sample(samplerState, uv) - 0.5) * heightScale;
-	half3 v = normalize(tangentViewDirection);
-	v.z += bias;
-	return uv + height * (v.xy / v.z);
+	float3 ro = float3(uv.xy, 0.0);
+	float height1 = Height.Sample(SurfaceSampler, uv) - 0.5;
+	float outHeight = height1;
+	//return IntersectRayPlane(ro, viewDir, float3(0, 0, height1), float3(0, 0, 1));
+		
+	half3 v = -viewDir;
+	//v.z += 0.42;
+	return float3(uv.xy + height1 * (v.xy / v.z), height1);
+	
+	//height = Height.Sample(SurfaceSampler, float3(uv.xy, uv.z)) - 0.5;
+	//return height * viewDir.xy + uv.xy;
+
+	//float height = (Height.Sample(samplerState, uv) - 0.5) * heightScale;
+	//half3 v = normalize(tangentViewDirection);
+	//v.z += bias;
+	//return uv + height * (v.xy / v.z);
 }
 
 float3 Parallax(float2 uv, float3 tangentViewDirection, float scale, float offset, float parallaxSamples, Texture2D<float> heightTexture, SamplerState samplerState, float bias = 0.42)
@@ -125,7 +137,7 @@ float3 Parallax(float2 uv, float3 tangentViewDirection, float scale, float offse
 		return IntersectRayPlane(ro, rd, float3(0, 0, height), float3(0, 0, 1));
 		
 		half3 v = -rd;
-		//v.z += bias;
+		v.z += bias;
 		return float3(uv + height * (v.xy / v.z), height);
 	}
 }
