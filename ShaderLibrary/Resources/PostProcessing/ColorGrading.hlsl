@@ -19,6 +19,10 @@ float3 Tonemap(float3 color, float peakBrightness, float paperWhite = 100.0, flo
 	float3 toe = 2.0 * Sq(color) / linearStart - pow(color, 3.0) / Sq(linearStart);
 	float c = max(2.0, (maxInputLuminance - paperWhite) / (peakBrightness - paperWhite));
 	float3 shoulder = paperWhite + (peakBrightness - paperWhite) * (1.0 - pow(max(0.0, 1.0 - (color - paperWhite) / (c * (peakBrightness - paperWhite))), c));
+	//shoulder = peakBrightness - (peakBrightness - paperWhite) * exp((paperWhite - color) / (peakBrightness - paperWhite));
+	
+	// Hyperbola with infinite convergence
+	shoulder = paperWhite + (color - paperWhite) / (1.0 + (color - paperWhite) / (peakBrightness - paperWhite));
 	
 	// Color volume mapping similar to GT7: https://blog.selfshadow.com/publications/s2025-shading-course/pdi/s2025_pbs_pdi_slides.pdf
 	float3 iCtCp = Rec2020ToICtCp(color);
@@ -41,31 +45,12 @@ float3 Fragment(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 	uv.yz -= 0.5;
 	float3 color = ICtCpToRec2020(uv);
 	color = Tonemap(color, MaxLuminance, PaperWhite, MaxInputLuminance, LinearStart, FadeStart, FadeEnd, HuePreservation);
+	color = LinearToST2084(color);
 	
-	// Color gamut
 	#if defined(SRGB) || defined(REC709)
+		color = ST2084ToLinear(color);
 		color = Rec2020ToRec709(color);
-	#endif
-	
-	#ifdef P3D65G22
-		color = Rec2020ToP3D65(color);
-	#endif
-	
-	// Transfer function
-	#ifdef SRGB
-		color /= PaperWhite;
-	#endif
-	
-	#ifdef REC709
-		color /= kReferenceLuminanceWhiteForRec709;
-	#endif
-	
-	#ifdef HDR10
-		color = LinearToST2084(color);
-	#endif
-	
-	#ifdef P3D65G22
-		color = pow(abs(color / MaxLuminance), rcp(2.2));
+		color /= MaxLuminance;
 	#endif
 	
 	return color;
