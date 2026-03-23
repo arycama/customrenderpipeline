@@ -14,8 +14,7 @@ public partial class Tonemapping
         [field: SerializeField, Min(0)] public float FadeEnd { get; private set; } = 1.16f;
         [field: SerializeField, Range(0, 1)] public float HuePreservation { get; private set; } = 0.4f;
 
-        [field: SerializeField] public int LutResolution { get; private set; } = 32;
-        [field: SerializeField] public bool UseLut { get; private set; } = true;
+        [field: SerializeField, Pow2(64)] public int LutResolution { get; private set; } = 32;
 
         [field: SerializeField] public bool Hdr { get; private set; } = true;
         [field: SerializeField] public float PaperWhite { get; private set; } = 160.0f;

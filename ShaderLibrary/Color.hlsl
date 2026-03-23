@@ -121,10 +121,10 @@ float3 LinearToST2084(float3 rec2020)
 
 float3 ST2084ToLinear(float3 linearCol)
 {
-	float3 colToPow = pow(max(0, linearCol), 1.0 / ST2084_M2);
+	float3 colToPow = pow(abs(linearCol), 1.0 / ST2084_M2);
 	float3 numerator = max(colToPow - ST2084_C1, 0.0);
 	float3 denominator = ST2084_C2 - (ST2084_C3 * colToPow);
-	float3 linearColor = pow(numerator / denominator, 1.0 / ST2084_M1);
+	float3 linearColor = pow(abs(numerator / denominator), 1.0 / ST2084_M1);
 	linearColor *= ST2084Max;
 	return linearColor;
 }
