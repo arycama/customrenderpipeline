@@ -45,13 +45,6 @@ float3 Fragment(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 	uv.yz -= 0.5;
 	float3 color = ICtCpToRec2020(uv);
 	color = Tonemap(color, MaxLuminance, PaperWhite, MaxInputLuminance, LinearStart, FadeStart, FadeEnd, HuePreservation);
-	color = LinearToST2084(color);
-	
-	#if defined(SRGB) || defined(REC709)
-		color = ST2084ToLinear(color);
-		color = Rec2020ToRec709(color);
-		color /= MaxLuminance;
-	#endif
-	
+	color = LinearToST2084(color);	
 	return color;
 }
