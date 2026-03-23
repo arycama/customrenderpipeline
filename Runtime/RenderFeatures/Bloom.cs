@@ -10,7 +10,7 @@ public class Bloom : ViewRenderFeature
 	public class Settings
 	{
 		[field: SerializeField, Range(0f, 1f)] public float BloomStrength { get; private set; } = 0.125f;
-		[field: SerializeField, Range(2, 12)] public int MaxMips { get; private set; } = 6;
+		[field: SerializeField, Range(1, 12)] public int MaxMips { get; private set; } = 6;
 		[field: SerializeField] public Texture2D LensDirt { get; private set; }
 		[field: SerializeField, Range(0f, 1f)] public float DirtStrength { get; private set; } = 0.04f;
 

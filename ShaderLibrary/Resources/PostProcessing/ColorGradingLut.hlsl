@@ -53,7 +53,7 @@ float3 Fragment(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 	
 	// Transfer function
 	#ifdef SRGB
-		color /= MaxLuminance;
+		color /= PaperWhite;
 	#endif
 	
 	#ifdef REC709
