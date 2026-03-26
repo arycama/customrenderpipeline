@@ -2,6 +2,7 @@
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Gbuffer.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Geometry.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/ImageBasedLighting.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Samplers.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/SpaceTransforms.hlsl"
@@ -93,7 +94,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float NdotV;
 	float3 N = GetViewClampedNormal(worldNormal, V, NdotV);
 	
-	// Energy compensation
+	// Energy compensation (TODO: Just use fresnel?)
 	gbufferAlbedo *= EnergyCompensationFactor(0.02, normalOcclusionRoughness.a, NdotV);
 	
 	albedoOpacity.rgb = lerp(albedoOpacity.rgb, gbufferAlbedo, Transparency);

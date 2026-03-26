@@ -26,6 +26,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
     protected abstract bool UseSrpBatching { get; }
     protected virtual bool RenderUiOverlay { get; } = true;
+    protected virtual bool RenderWireframe { get; } = true;
 
     public CustomRenderPipelineBase()
     {
@@ -122,13 +123,16 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                 cameraRenderFeature.Render(viewRenderData);
             }
 
-            var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
-            using (var pass = renderGraph.AddGenericRenderPass("Wire Overlay", wireOverlay))
+            if (RenderWireframe)
             {
-                pass.SetRenderFunction(static (command, pass, data) =>
+                var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
+                using (var pass = renderGraph.AddGenericRenderPass("Wire Overlay", wireOverlay))
                 {
-                    command.DrawRendererList(data);
-                });
+                    pass.SetRenderFunction(static (command, pass, data) =>
+                    {
+                        command.DrawRendererList(data);
+                    });
+                }
             }
 
             // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility

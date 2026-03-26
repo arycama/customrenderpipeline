@@ -7,14 +7,18 @@ Shader "Hidden/PrecomputeDfg"
         ZTest Off
         ZWrite Off
 
+        HLSLINCLUDE
+        #pragma editor_sync_compilation
+        #pragma target 5.0
+        #define FLIP
+        #include "PrecomputeDFG.hlsl"
+        ENDHLSL
+
         Pass 
         {
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentDirectionalAlbedo
-            #define FLIP
-            #include "PrecomputeDFG.hlsl"
             ENDHLSL
         }
 
@@ -23,19 +27,14 @@ Shader "Hidden/PrecomputeDfg"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentAverageAlbedo
-            #define FLIP
-            #include "PrecomputeDFG.hlsl"
             ENDHLSL
         }
 
         Pass 
         {
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentDirectionalAlbedoMultiScattered
-            #define FLIP
-            #include "PrecomputeDFG.hlsl"
             ENDHLSL
         }
         
@@ -44,19 +43,14 @@ Shader "Hidden/PrecomputeDfg"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentAverageAlbedoMultiScattered
-            #define FLIP
-            #include "PrecomputeDFG.hlsl"
             ENDHLSL
         }
 
         Pass 
         {
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentSpecularOcclusion
-            #define FLIP
-            #include "PrecomputeDFG.hlsl"
             ENDHLSL
         }
     }

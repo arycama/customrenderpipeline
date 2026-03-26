@@ -1,23 +1,23 @@
 #ifndef BRDF_INCLUDED
 #define BRDF_INCLUDED
 
-#include "Common.hlsl"
 #include "Material.hlsl"
 #include "Math.hlsl"
 #include "Samplers.hlsl"
 
 Texture2D<float> DirectionalAlbedo, AverageAlbedo, AverageAlbedoMs;
-Texture2D<float2> PrecomputedDfg;
-Texture3D<float> DirectionalAlbedoMs;
 
 float LambdaGgx(float roughness2, float cosTheta)
 {
-	return 0.5 * sqrt(1.0 + roughness2 * (rcp(Sq(cosTheta)) - 1.0)) - 0.5;
+	return sqrt((Sq(rcp(cosTheta)) - 1.0) * roughness2 + 1.0) * 0.5 - 0.5;
 }
 
-float GgxG1(float roughness2, float cosTheta)
+float GgxG1(float a2, float NdotL, float LdotH)
 {
-	return rcp(1.0 + LambdaGgx(roughness2, cosTheta));
+	float cosThetaV2 = Sq(NdotL);
+	float tanThetaV2 = (1.0 - cosThetaV2) / cosThetaV2;
+	//return 2 / (1 + sqrt(1.0 + a2 * tanThetaV2));
+	return ((LdotH * NdotL) > 0) ? 2 / (1 + sqrt(1.0 + a2 * tanThetaV2)) : 0;
 }
 
 float GgxG2(float roughness2, float cosThetaI, float cosThetaO)
@@ -25,7 +25,7 @@ float GgxG2(float roughness2, float cosThetaI, float cosThetaO)
 	return rcp(1.0 + LambdaGgx(roughness2, cosThetaI) + LambdaGgx(roughness2, cosThetaO));
 }
 
-float GetPartLambdaV(float roughness2, float NdotV)
+half GetPartLambdaV(half roughness2, half NdotV)
 {
 	return sqrt((-NdotV * roughness2 + NdotV) * NdotV + roughness2);
 }
@@ -34,6 +34,16 @@ float GgxDistribution(float roughness2, float NdotH)
 {
 	float denom = Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0);
 	return roughness2 ? (denom ? roughness2 * rcp(denom) : 0.0) : (NdotH == 1);
+}
+
+float GgxD(float a2, float NdotH)
+{
+	return (NdotH > 0.0) ? a2 / (Pi * Sq((a2 - 1) * Sq(NdotH) + 1.0)) : 0.0;
+}
+
+float GgxG(float roughness2, half NdotL, half LdotH, half NdotV, half VdotH)
+{
+	return GgxG1(roughness2, NdotL, LdotH) * GgxG1(roughness2, NdotV, VdotH);
 }
 
 float GgxV(float NdotL, float NdotV, float roughness2, float partLambdaV)
@@ -51,14 +61,27 @@ float GgxDv(float roughness2, float NdotH, float NdotL, float NdotV, float partL
 	return denom ? roughness2 * rcp(denom) : 0.0;
 }
 
-float FresnelTerm(float LdotH)
+half3 FresnelFull(half c, half3 iorRatio)
 {
-	return pow(1.0 - LdotH, 5.0);
+	half3 g = sqrt(Sq(iorRatio) - 1.0h + Sq(c));
+	return 0.5h * (Sq(g - c) / Sq(g + c)) * (1.0h + Sq(c * (g + c) - 1.0h) / Sq(c * (g - c) + 1.0h));
 }
 
-float3 Fresnel(float LdotH, float3 f0)
+half FresnelTerm(half LdotH)
 {
-	return lerp(f0, 1.0, FresnelTerm(LdotH));
+	return pow(1.0h - LdotH, 5.0h);
+}
+
+half3 Fresnel(half LdotH, half3 reflectivity)
+{
+	return lerp(reflectivity, 1.0h, FresnelTerm(LdotH));
+}
+
+half3 FresnelTir(half cosTheta, half3 reflectivity)
+{
+	half3 sinThetaSq = Sq(ReflectivityToRcpIorRatio(reflectivity)) * (1.0h - Sq(cosTheta));
+	cosTheta = reflectivity < 0.0h ? sqrt(1.0h - sinThetaSq) : cosTheta;
+	return sinThetaSq < 1.0h ? Fresnel(cosTheta, reflectivity) : 1.0h;
 }
 
 float3 GgxSingleScatter(float roughness2, float NdotL, float LdotV, float NdotV, float partLambdaV, float3 f0)
@@ -103,14 +126,9 @@ float3 Ggx(float roughness2, float NdotL, float LdotV, float NdotV, float partLa
 //	return float4(specular, diffuse) * NdotL; // RcpPi is multiplied outside of this function
 //}
 
-float3 EnergyCompensationFactor(float3 f0, float perceptualRoughness, float NdotV)
+half WrappedDiffuse(half NdotL, half wrap)
 {
-	float2 dfg = PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
-	float3 fssEss = dfg.x * f0 + dfg.y;
-	float3 fAvg = AverageFresnel(f0);
-	float ems = 1.0 - dfg.x - dfg.y;
-	float3 fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
-	return 1.0 - fssEss - fmsEms;
+	return saturate((NdotL + wrap) / (Sq(1 + wrap)));
 }
 
 #endif

@@ -14,7 +14,7 @@ PrecomputeDfgOutput FragmentDirectionalAlbedo(VertexFullscreenTriangleMinimalOut
 {
 	float2 uv = RemapHalfTexelTo01(input.uv, 32);
 	
-	float NdotV = max(1e-3, uv.x);
+	float NdotV = uv.x;
 	float perceptualRoughness = uv.y;
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
 	float roughness2 = Sq(roughness);
@@ -44,6 +44,9 @@ PrecomputeDfgOutput FragmentDirectionalAlbedo(VertexFullscreenTriangleMinimalOut
 	
 	result /= samples;
 
+	if (all(uv.xy == 0.0))
+		result = float2(0.0, 1.0);
+	
 	PrecomputeDfgOutput output;
 	output.dfg = float2(result.x, result.y - result.x);
 	output.averageAlbedo = 1.0 - result.y;

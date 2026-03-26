@@ -52,11 +52,6 @@ float CloudTransmittance(float3 positionWS)
 	return max(transmittance, shadowData.b);
 }
 
-half WrappedDiffuse(half NdotL, half wrap)
-{
-	return saturate((NdotL + wrap) / (Sq(1 + wrap)));
-}
-
 // TODO: Can parameters be simplified/shortened
 float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAngle, float roughness2, float f0Avg, float partLambdaV, float3 multiScatterTerm, float3 L, float3 N, float3 B, float3 worldPosition, float NdotV, float3 V, float diffuseTerm, float3 albedo, float3 translucency, bool isDirectional)
 {

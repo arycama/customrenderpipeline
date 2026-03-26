@@ -409,29 +409,26 @@ float3 Rec709ToICtCp(float3 rec709)
 	return Rec2020ToICtCp(rec2020);
 }
 
-float3 RgbToYCoCg(float3 rgb)
+half3 RgbToYCoCg(half3 rgb)
 {
-	float yCoCgChromaBias = 128.0 / 255.0;
-
-	float3 yCoCg;
-	yCoCg.x = dot(rgb, float3(0.25, 0.5, 0.25));
-	yCoCg.y = dot(rgb, float3(0.5, 0.0, -0.5)) + yCoCgChromaBias;
-	yCoCg.z = dot(rgb, float3(-0.25, 0.5, -0.25)) + yCoCgChromaBias;
+	half3 yCoCg;
+	yCoCg.y = rgb.r - rgb.b;
+	half temp = yCoCg.y * 0.5h + rgb.b;
+	yCoCg.z = rgb.g - temp;
+	yCoCg.x = yCoCg.z * 0.5h + temp;
+	yCoCg.yz += 127.0h / 255.0h;
 	return yCoCg;
 }
 
-float3 YCoCgToRgb(float3 yCoCg)
+half3 YCoCgToRgb(half3 yCoCg)
 {
-	float yCoCgChromaBias = 128.0 / 255.0;
+	yCoCg.yz -= 127.0h / 255.0h;
 
-	float y = yCoCg.x;
-	float co = yCoCg.y - yCoCgChromaBias;
-	float cg = yCoCg.z - yCoCgChromaBias;
-
-	float3 rgb;
-	rgb.r = y + co - cg;
-	rgb.g = y + cg;
-	rgb.b = y - co - cg;
+	half3 rgb;
+	half temp = -yCoCg.z * 0.5h + yCoCg.x;
+	rgb.g = yCoCg.z + temp;
+	rgb.b = -trunc(yCoCg.g  * 127.5) / 255.0 + temp;
+	rgb.r = rgb.b + yCoCg.y;
 	return rgb;
 }
 

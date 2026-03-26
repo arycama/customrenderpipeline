@@ -3,6 +3,11 @@
 
 #include "Math.hlsl"
 
+float1 Quantize(float1 a, float bits) { return floor(a * (exp2(bits) - 1.0) + 0.5); }
+float2 Quantize(float2 a, float bits) { return floor(a * (exp2(bits) - 1.0) + 0.5); }
+float3 Quantize(float3 a, float bits) { return floor(a * (exp2(bits) - 1.0) + 0.5); }
+float4 Quantize(float4 a, float bits) { return floor(a * (exp2(bits) - 1.0) + 0.5); }
+
 // Pack float2 (each of 12 bit) in 888
 float3 PackFloat2To888(float2 f)
 {
@@ -146,6 +151,28 @@ half3 UnpackNormal(half4 packedNormal)
 		// Compiler will optimize the scale away
 		return UnpackNormalMapRGorAG(packedNormal, 1.0h);
 	#endif
+}
+
+float4 EncodeFloatRGBA(float v)
+{
+	float4 enc = frac(float4(1.0, 255.0, 65025.0, 16581375.0) * v);
+	return enc - enc.yzww * float4(1.0 / 255.0, 1.0 / 255.0, 1.0 / 255.0, 0.0);
+}
+
+float DecodeFloatRGBA(float4 rgba)
+{
+	return dot(rgba, float4(1.0, 1 / 255.0, 1 / 65025.0, 1 / 16581375.0));
+}
+
+float3 EncodeFloatRGB(float v)
+{
+	float3 enc = frac(float3(1.0, 255.0, 65025.0) * v);
+	return enc - enc.yzz * float3(1.0 / 255.0, 1.0 / 255.0, 1.0 / 255.0);
+}
+
+float DecodeFloatRGB(float3 rgb)
+{
+	return dot(rgb, float3(1.0, 1 / 255.0, 1 / 65025.0));
 }
 
 #endif

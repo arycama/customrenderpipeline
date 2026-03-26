@@ -6,25 +6,112 @@
 #include "Math.hlsl"
 #include "Geometry.hlsl"
 #include "Samplers.hlsl"
+#include "Utility.hlsl"
+
+// Ior = Index of refraction
+const static half AirIor = 1.0h; // Actually 1.000293, but this is a close enough approximation used in all games and allows some simplifications
+const static half DefaultDielectricIor = 1.5h; // Most dielectrics are around this value, so it is used to calculate the default spec color of 0.04%
 
 Texture2D<float> _LengthToRoughness;
 
-float SmoothnessToPerceptualRoughness(float smoothness)
+struct Material
 {
-	return 1.0 - smoothness;
+	half3 albedo;
+	half roughness;
+	float3 normal;
+	half metallic;
+	half occlusion;
+	half opacity;
+	half3 emission;
+	half ior;
+	
+	bool hasMetallic;
+	bool isBackFace;
+	bool applyUnderwaterFog;
+	bool refractedEnvironment;
+	half translucency;
+	bool isFade;
+	bool isThinSurface;
+};
+
+Material CreateMaterial(half3 albedo = 1.0h, half roughness = 1.0h, float3 normal = float3(0.0, 1.0, 0.0), half metallic = 0.0h, half occlusion = 1.0h, half opacity = 1.0h, half3 emission = 0.0h, bool hasMetallic = false, bool isBackface = false, half ior = 1.5h, bool applyUnderwaterFog = true, bool refractedEnvironment = false, half translucency = 0.0h, bool isFade = false, bool isThinSurface = false)
+{
+	Material material;
+	material.albedo = albedo;
+	material.roughness = roughness;
+	material.normal = normal;
+	material.metallic = metallic;
+	material.occlusion = occlusion;
+	material.opacity = opacity;
+	material.emission = emission;
+	material.hasMetallic = hasMetallic;
+	material.isBackFace = isBackface;
+	material.ior = ior;
+	material.applyUnderwaterFog = applyUnderwaterFog;
+	material.refractedEnvironment = refractedEnvironment;
+	material.translucency = translucency;
+	material.isFade = isFade;
+	material.isThinSurface = isThinSurface;
+	return material;
 }
 
-float PerceptualRoughnessToSmoothness(float perceptualRoughness)
+half3 IorToReflectivity(half3 destIor, half3 srcIor = AirIor)
 {
-	return 1.0 - perceptualRoughness;
+	return Flip(Sq((srcIor - destIor) * rcp(srcIor + destIor)), destIor < srcIor);
 }
 
-float PerceptualRoughnessToRoughness(float perceptualRoughness)
+half3 ReflectivityToIor(half3 reflectivity, half3 srcIor = AirIor)
+{
+	half3 r = rsqrt(abs(reflectivity));
+	return (r * srcIor + srcIor) * rcp(r - 1.0h);
+}
+
+half3 GetReflectivity(half3 color, half metallic, half opacity = 1.0, half3 destIor = DefaultDielectricIor, half3 srcIor = AirIor)
+{
+	return lerp(IorToReflectivity(destIor, srcIor), color, metallic * opacity);
+}
+
+half3 GetAlbedo(half3 color, half metallic, half opacity = 1.0h)
+{
+	return lerp(color * opacity, 0.0h, metallic);
+}
+
+// Returns destIor / srcIor, use for fresnel
+half3 ReflectivityToIorRatio(half3 reflectivity)
+{
+	half3 r = rsqrt(abs(reflectivity));
+	half3 numerator = r + 1.0h;
+	half3 denominator = r - 1.0h;
+	SignSwap(numerator, denominator, reflectivity);
+	return reflectivity ? numerator * rcp(denominator) : 1.0;
+}
+
+// Returns srcIor / destIor, use for refract
+half3 ReflectivityToRcpIorRatio(half3 reflectivity)
+{
+	half3 r = rsqrt(abs(reflectivity));
+	half3 numerator = r - 1.0h;
+	half3 denominator = r + 1.0h;
+	SignSwap(numerator, denominator, reflectivity);
+	return reflectivity ? numerator * rcp(denominator) : 1.0;
+}
+
+half SmoothnessToPerceptualRoughness(half smoothness)
+{
+	return 1.0h - smoothness;
+}
+
+half PerceptualRoughnessToSmoothness(half perceptualRoughness)
+{
+	return 1.0h - perceptualRoughness;
+}
+
+half PerceptualRoughnessToRoughness(half perceptualRoughness)
 {
 	return Sq(perceptualRoughness);
 } 
 
-float RoughnessToPerceptualRoughness(float roughness)
+half RoughnessToPerceptualRoughness(half roughness)
 {
 	return sqrt(roughness);
 }
@@ -34,14 +121,16 @@ float2 ClampScaleTextureUv(float2 uv, float4 scaleLimit)
 	return min(uv * scaleLimit.xy, scaleLimit.zw);
 }
 
+// Rotates backfacing normals so they do not point away from the camera
 float3 GetViewClampedNormal(float3 N, float3 V, out float NdotV)
 {
+	// Due to smoothed normals, interpolation and normal maps, normals can end up pointing away from the view which causes issues with highlights
+	// This rotates the normal towards the view vector so that NdotV is zero, if needed, to avoid issues in the PBR math
 	NdotV = dot(N, V);
-	return N;
-	if (NdotV < 0)
+	if (NdotV < 0.0)
 	{
 		N = (N - NdotV * V) * RcpSinFromCos(NdotV);
-		NdotV = 0;
+		NdotV = 0.0;
 	}
 	
 	return N;

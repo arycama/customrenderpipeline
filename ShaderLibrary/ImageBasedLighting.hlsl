@@ -6,6 +6,19 @@
 #include "Samplers.hlsl"
 #include "SphericalHarmonics.hlsl"
 
+Texture2D<float2> PrecomputedDfg;
+Texture3D<float> DirectionalAlbedoMs;
+
+float3 EnergyCompensationFactor(float3 f0, float perceptualRoughness, float NdotV)
+{
+	float2 dfg = PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
+	float3 fssEss = dfg.x * f0 + dfg.y;
+	float3 fAvg = AverageFresnel(f0);
+	float ems = 1.0 - dfg.x - dfg.y;
+	float3 fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
+	return 1.0 - fssEss - fmsEms;
+}
+
 Texture3D<float> SpecularOcclusion;
 Texture2D<float3> SkyReflection;
 float SkyReflectionSize;
@@ -228,7 +241,7 @@ float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 localV, out flo
 	float3 localH = SampleGgxVndf(roughness, u, localV);
 	float3 localL = reflect(-localV, localH);
 	pdf = 0.25 * GgxDistribution(roughness2, localH.z) * rcp(dot(localV, localH.z));
-	weightOverPdf = GgxG2(roughness2, localL.z, localV.z) * rcp(GgxG1(roughness2, localV.z));
+	weightOverPdf = GgxG2(roughness2, localL.z, localV.z) * rcp(GgxG1(roughness2, localV.z, 1.0));
 	return localL;
 }
 
