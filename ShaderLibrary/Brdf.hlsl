@@ -93,14 +93,14 @@ float3 GgxSingleScatter(float roughness2, float NdotL, float LdotV, float NdotV,
 	return ggx * Fresnel(LdotH, f0);
 }
 
-float3 AverageFresnel(float3 f0)
+half3 AverageFresnel(half3 reflectivity)
 {
-	return (20 * rcp(21.0)) * f0 + rcp(21.0);
+	return (20 * rcp(21.0)) * reflectivity + rcp(21.0);
 }
 
-float AverageFresnel(float f0)
+half AverageFresnel(half reflectivity)
 {
-	return AverageFresnel(f0).r;
+	return AverageFresnel(reflectivity).r;
 }
 
 float3 GgxMultiScatterTerm(float3 f0, float perceptualRoughness, float NdotV, float ems)
@@ -129,6 +129,52 @@ float3 Ggx(float roughness2, float NdotL, float LdotV, float NdotV, float partLa
 half WrappedDiffuse(half NdotL, half wrap)
 {
 	return saturate((NdotL + wrap) / (Sq(1 + wrap)));
+}
+
+half3 GgxBrdf(half a2, half3 reflectivity, half3 N, half3 L, half NdotL, half3 V, half NdotV, half opacity = 1.0h, bool isBackfacing = false)
+{
+	if (isBackfacing)
+	{
+		L = reflect(L, -N);
+		NdotL = -NdotL;
+	}
+	
+	half3 H = normalize(L + V);
+	half LdotV = dot(L, V);
+	half NdotH = dot(N, H);
+	half LdotH = dot(L, H);
+	half VdotH = dot(V, H);
+		
+	half dv = GgxDv(a2, NdotH, NdotL, NdotV, GetPartLambdaV(a2, NdotV));
+	half3 F = Fresnel(LdotH, reflectivity);
+	
+	if (isBackfacing)
+		F = 1.0 - F;
+	
+	half3 specular = dv * F * NdotL;
+		
+	if (isBackfacing)
+		specular *= 1.0 - opacity;
+			
+	return specular;
+}
+
+half3 GgxBtdf(half a2, half3 N, half NdotV, half3 L, half3 V, half reflectivity, half NdotL)
+{
+	half iorRatio = ReflectivityToIorRatio(reflectivity).r;
+	half3 H = normalize(L + V * iorRatio);
+	
+	half LdotH = dot(L, H);
+	half NdotH = dot(N, H);
+	half VdotH = dot(V, H);
+	
+	half3 F = FresnelTir(abs(LdotH), reflectivity);
+	half G = GgxG2(a2, NdotL, NdotV);
+	half D = GgxD(a2, abs(NdotH));
+	
+	half dv = GgxDv(a2, NdotH, NdotL, NdotV, GetPartLambdaV(a2, NdotV));
+	
+	return abs(LdotH) * abs(VdotH) / Sq(LdotH + iorRatio * VdotH) * (1.0h - F) * dv * 4.0h * NdotL * RcpPi;
 }
 
 #endif
