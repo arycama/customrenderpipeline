@@ -77,11 +77,11 @@ half3 Fresnel(half LdotH, half3 reflectivity)
 	return lerp(reflectivity, 1.0h, FresnelTerm(LdotH));
 }
 
-half3 FresnelTir(half cosTheta, half3 reflectivity)
+half FresnelTir(half LdotH, half reflectivity)
 {
-	half3 sinThetaSq = Sq(ReflectivityToRcpIorRatio(reflectivity)) * (1.0h - Sq(cosTheta));
-	cosTheta = reflectivity < 0.0h ? sqrt(1.0h - sinThetaSq) : cosTheta;
-	return sinThetaSq < 1.0h ? Fresnel(cosTheta, reflectivity) : 1.0h;
+	half sinThetaSq = Sq(ReflectivityToRcpIorRatio(reflectivity).r) * (1.0h - Sq(LdotH));
+	LdotH = reflectivity < 0.0h ? sqrt(1.0h - sinThetaSq) : LdotH;
+	return sinThetaSq < 1.0h ? Fresnel(LdotH, reflectivity).r : 1.0h;
 }
 
 float3 GgxSingleScatter(float roughness2, float NdotL, float LdotV, float NdotV, float partLambdaV, float3 f0)
