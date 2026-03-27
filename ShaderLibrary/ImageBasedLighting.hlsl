@@ -240,7 +240,7 @@ float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 localV, out flo
 	float roughness2 = Sq(roughness);
 	float3 localH = SampleGgxVndf(roughness, u, localV);
 	float3 localL = reflect(-localV, localH);
-	pdf = 0.25 * GgxDistribution(roughness2, localH.z) * rcp(dot(localV, localH.z));
+	pdf = 0.25 * GgxD(roughness2, localH.z) * rcp(dot(localV, localH.z));
 	weightOverPdf = GgxG2(roughness2, localL.z, localV.z) * rcp(GgxG1(roughness2, localV.z, 1.0));
 	return localL;
 }

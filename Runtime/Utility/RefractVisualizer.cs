@@ -9,6 +9,10 @@ public class RefractVisualizer : MonoBehaviour
     [Range(0, 2)] public float no = 1.5f;
     public bool showTest = false;
 
+    public float NdotVp;
+    public float LdotVp;
+    public float VdotVp;
+
     public float NdotL;
     public float NdotV;
     public float LdotV;
@@ -29,23 +33,26 @@ public class RefractVisualizer : MonoBehaviour
 
     private void OnDrawGizmos()
 	{
+        var eta = ni <= no ? no / ni : ni / no;
+
         var N = Float3.Up;
-        var L = Quaternion.Euler(lightRotation).Forward;
         var V = Quaternion.Euler(viewRotation).Forward;
+        var L = Quaternion.Euler(lightRotation).Forward;
         var Htest = Quaternion.Euler(halfRotation).Forward;
+        var vp = Float3.Refract(-V, N, 1 / eta);
 
         NdotL = Float3.Dot(N, L);
         NdotV = Float3.Dot(N, V);
         LdotV = Float3.Dot(L, V);
 
-        var eta = no / ni;
+        Gizmos.color = Color.coral;
+        Gizmos.DrawLine(Float3.Zero, vp);
+        NdotVp = Float3.Dot(N, vp);
+        LdotVp = Float3.Dot(L, vp);
+        VdotVp = Float3.Dot(V, vp);
 
         hLenSq0 = Float3.SquareMagnitude(L + V * eta);
-        var H = Float3.Normalize(ni * L + no * V);
-
-        if (no > ni)
-            H = -H;
-
+        var H = -Float3.Normalize(L + V * eta);
         VdotH = Float3.Dot(V, H);
 
         //if (VdotH > 0.0)
@@ -89,15 +96,8 @@ public class RefractVisualizer : MonoBehaviour
         hLenSq1 = 1 + 2 * eta * LdotV + eta * eta;
 
         var denom = Math.Sqrt(hLenSq1);
-        NdotH1 = (NdotL + NdotV * eta) / denom;
-        VdotH1 = (LdotV + eta) / denom;
-        LdotH1 = (1 + eta * LdotV) / denom;
-
-        if(no > ni)
-        {
-            NdotH1 = -NdotH1;
-            VdotH1 = -VdotH1;
-            LdotH1 = -LdotH1;
-        }
+        NdotH1 = (-eta * NdotV - NdotL) / denom;
+        VdotH1 = (-LdotV - eta) / denom;
+        LdotH1 = (-eta * LdotV - 1) / denom;
     }
 }

@@ -92,7 +92,7 @@ float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAn
 			// http://blog.stevemcauley.com/2011/12/03/energy-conserving-wrapped-diffuse/
 			float wrap = 0.5;
 			float wrappedNdotL = saturate((-dot(N, L) + wrap) / Sq(1 + wrap));
-			float scatter = GgxDistribution(roughness2, saturate(dot(-V, L)));
+			float scatter = GgxD(roughness2, saturate(dot(-V, L)));
 			result += wrappedNdotL * scatter * translucency* diffuseTerm;
 		#elif 1
 			result += (WrappedDiffuse(saturate(-NdotL), 0.5) + WrappedDiffuse(saturate(NdotL), 0.5)) * 0.5 * translucency;

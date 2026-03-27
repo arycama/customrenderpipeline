@@ -16,7 +16,6 @@ float GgxG1(float a2, float NdotL, float LdotH)
 {
 	float cosThetaV2 = Sq(NdotL);
 	float tanThetaV2 = (1.0 - cosThetaV2) / cosThetaV2;
-	//return 2 / (1 + sqrt(1.0 + a2 * tanThetaV2));
 	return ((LdotH * NdotL) > 0) ? 2 / (1 + sqrt(1.0 + a2 * tanThetaV2)) : 0;
 }
 
@@ -30,15 +29,9 @@ half GetPartLambdaV(half roughness2, half NdotV)
 	return sqrt((-NdotV * roughness2 + NdotV) * NdotV + roughness2);
 }
 
-float GgxDistribution(float roughness2, float NdotH)
+half GgxD(half roughness2, half NdotH)
 {
-	float denom = Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0);
-	return roughness2 ? (denom ? roughness2 * rcp(denom) : 0.0) : (NdotH == 1);
-}
-
-float GgxD(float a2, float NdotH)
-{
-	return (NdotH > 0.0) ? a2 / (Pi * Sq((a2 - 1) * Sq(NdotH) + 1.0)) : 0.0;
+	return (NdotH > 0.0) ? roughness2 * rcp(Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0)) : 0.0;
 }
 
 float GgxG(float roughness2, half NdotL, half LdotH, half NdotV, half VdotH)
@@ -57,7 +50,7 @@ float GgxDv(float roughness2, float NdotH, float NdotL, float NdotV, float partL
 {
 	float s2 = Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0);
 	float lambdaL = NdotV * GetPartLambdaV(roughness2, NdotL);
-	float denom = TwoPi * (NdotL * partLambdaV + lambdaL) * s2;
+	float denom = 2.0 * (NdotL * partLambdaV + lambdaL) * s2;
 	return denom ? roughness2 * rcp(denom) : 0.0;
 }
 
@@ -159,22 +152,121 @@ half3 GgxBrdf(half a2, half3 reflectivity, half3 N, half3 L, half NdotL, half3 V
 	return specular;
 }
 
-half3 GgxBtdf(half a2, half3 N, half NdotV, half3 L, half3 V, half reflectivity, half NdotL)
+half GgxBtdf(half roughness2, half NdotL, half LdotV, half NdotV, half reflectivity = 0.04)
 {
+	// Assume NdotL is positive and NdotV is negative. 
 	half iorRatio = ReflectivityToIorRatio(reflectivity).r;
-	
-	half LdotV = dot(L, V);
-	half rcpDenominator = rsqrt(1.0h + 2.0h * iorRatio * LdotV + Sq(iorRatio)); // Can this be combined with rcpLenLv
-	half NdotH = SignFlip((NdotL + iorRatio * NdotV), -reflectivity) * rcpDenominator;
-	half VdotH = -SignFlip(iorRatio + LdotV, -reflectivity) * rcpDenominator;
-	half LdotH = SignFlip(1.0h + iorRatio * LdotV, -reflectivity) * rcpDenominator;
+	half rcpDenominator = rsqrt(1.0h + 2.0h * iorRatio * LdotV + Sq(iorRatio));
+	half NdotH = (-iorRatio * NdotV - NdotL) * rcpDenominator; // Negative backfaces are fine
+	half VdotH = -(-iorRatio - LdotV) * rcpDenominator; // Invert to make positive for microfacet functions
+	half LdotH = (-iorRatio * LdotV - 1.0h) * rcpDenominator;
 
-	if (NdotH <= 0.0 || LdotH <= 0.0 || NdotH <= 0.0)
-		return 0;
+	// If H is backfacing wrt L, the light will hit another slope first, assuming a convex heightfield with no overhangs
+	if (LdotH <= 0.0h)
+		return 0.0h;
 		
-	half dv = GgxDv(a2, NdotH, NdotL, -NdotV, GetPartLambdaV(a2, abs(NdotV)));
-	half f = 1.0 - Fresnel(LdotH, reflectivity);
-	return f * dv * 4.0h * LdotH * VdotH * Sq(ReflectivityToIor(reflectivity)) * rcp(Sq(LdotH + iorRatio * VdotH));
+	half dv = GgxDv(roughness2, abs(NdotH), NdotL, -NdotV, GetPartLambdaV(roughness2, -NdotV));
+	half f = 1.0 - FresnelTir(LdotH, reflectivity);
+	return f * dv * 4.0h * LdotH * VdotH * Sq(ReflectivityToIor(reflectivity)) * rcp(Sq(iorRatio * VdotH + LdotH));
 }
+
+half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 L, float NdotV, float3 V, float opacity, bool isBackface, bool isThinSurface)
+{
+	// NdotL will always be in the same hemisphere as L, and NdotV must be negative in refractive cases.
+	// Note reflectivity is rgb but this is only used for metals, which have no transmittance, so the red channel is used in most places, rgb is only used for reflection
+	// TODO: Handle this more explicitly, eg maybe pass in an rgb reflection reflectivity and scatter reflectivity?
+	bool isBrdf = !isBackface && NdotV >= 0.0h && NdotL > 0.0h;
+	bool isFlippedBrdf = false; // (isBackface && NdotV <= 0.0h && NdotL < 0.0h); // TODO: Only used for water currently and we don't want sunset highlights to show up on underwater waves, make configurable
+	bool isThin = !isBackface && NdotV >= 0.0h && isThinSurface && NdotL < 0.0h;
+	bool isVolume = (isBackface && NdotV <= 0.0h && NdotL > 0.0h) || isThin;
+	
+	// If no valid cases, return
+	half a2 = Sq(roughness);
+	half iorRatio = ReflectivityToIorRatio(reflectivity).r;
+	half LdotV = dot(L, V);
+	half rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
+	
+	// Setup vectors, suffix of r is for refracted, or second layer. Other vectors always relate to the final outgoing layer, which for single layer bsdfs is simply L and V.
+	half NdotH, LdotH, VdotH, NdotLr, NdotVr, LdotVr;
+	if (isBrdf || isFlippedBrdf)
+	{
+		NdotH = (NdotL + NdotV) * rcpLenLv;
+		LdotH = LdotV * rcpLenLv + rcpLenLv;
+	}
+	
+	if (isFlippedBrdf)
+	{
+		// This is used when we are inside a volume (eg water) and rendering a light that is also underwater, which bounces off of the water surface.
+		// We use the convention that normals always point outside, and NdotV is stored relative to this to detect backfaces, so both NdotL and NdotV are negative.
+		// They need to be flipped since the brdf expects a positive result. We could also use abs, but for now we want to be explicit and have configurations so angles are positive
+		// in all valid situations. A negative NdotV or NdotL vector should be able to skip rendering entirely instead of relying on clamp/abs. 
+		NdotL = -NdotL;
+		NdotV = -NdotV;
+	}
+	
+	if (isThin)
+	{
+		// Calculate the dot products with the refracted view vector R directly without computing H
+		half rcpIorRatio = rcp(iorRatio);
+		NdotLr = -NdotL;
+		NdotVr = -sqrt(1.0 - Sq(rcpIorRatio) * (1.0 - Sq(NdotV)));
+		LdotVr = rcpIorRatio * LdotV + NdotL * (-rcpIorRatio * NdotV - NdotVr);
+		
+		NdotL = -NdotVr;
+		LdotV = NdotV * NdotVr - rcpIorRatio * (1 - Sq(NdotV));
+	}
+	
+	if (isVolume)
+	{
+		if (!isThin)
+			NdotV = -NdotV;
+	
+		// Btdf uses a refracted half-vector which is the vector that refracts L perfectly onto V. The dot products must be relative to this half vector.
+		// Computing the actual vector can be avoided by rescaling the dot products to give equivalent results.
+		half rcpDenominator = rsqrt(1.0h + 2.0h * iorRatio * LdotV + Sq(iorRatio)); // Can this be combined with rcpLenLv
+		NdotH = (iorRatio * NdotV - NdotL) * rcpDenominator;
+		VdotH = -(-iorRatio - LdotV) * rcpDenominator;
+		LdotH = (-iorRatio * LdotV - 1.0h) * rcpDenominator;
+		
+		// If H is backfacing wrt L, the light will hit another slope first, assuming a convex heightfield with no overhangs
+		if (LdotH <= 0.0h)
+			return 0.0h;
+	}
+	
+	half partLambdaV = GetPartLambdaV(a2, NdotV);
+	
+	// Smith-GGX joint DV term. (V = G2 / (4 * NdotL * NdotV) This also has the interesting property of being valid for NdotV == 0, which means we can rotate incorrectly backfacing normals/geometry so that NdotV == 0, and still perform the BRDF which keeps them looking consistent with the rest of the front-facing geometry. (This also works for environment reflections which are also valid for NdotV == 0)
+	half dv = GgxDv(a2, NdotH, NdotL, NdotV, partLambdaV);
+	
+	// Calcuilate fresnel. Schlick-fresnel is used for all cases, but in the case of a BTDF we use a variant that handles TIR which correctly attenuates refractions on backfaces that should not be visible.
+	// Note the rgb variant is used, but this is only required for metals. Optimising for the dielectric case means divergence though, so rgb is used for both cases to avoid seperate shader paths or variants.
+	half f = Fresnel(LdotH, reflectivity);
+	
+	if (isVolume)
+		f = 1.0h - f;
+	
+	half3 bsdf = dv * f;
+	if (isVolume)
+	{
+		// The multiply by 4 is because we calculate the G term of this from the DV term which includes the division by 4 * NdotL * NdotV. The latter two terms also appear in the BTDF denominator,
+		// but cancel out, so they are not needed.
+		// TODO: LdotH is always negative but in theory should always be clamped to the hemisphere of the microfacet normal. VdotH should be the opposite, eg never in the same hemisphere
+		// not sure if maybe we should flip so VdotH is negative and LdotH is positive as that seems to make more sense. 
+		// TODO: The denonimator could be combined with the DV term denominator to save a rcp and possibly improve precision for fp16.
+		// TODO: Something about the formulation still causes some incorrect scattered highlights in the distance. These aren't noticable for current use case since water attenuates it, but should be fixed for correctness and to avoid artifacts.
+		bsdf *= 4.0h * LdotH * VdotH * Sq(ReflectivityToIor(reflectivity)) * rcp(Sq(LdotH + iorRatio * VdotH));
+	}
+	
+	if (isThin)
+	{
+		// Secondary layer, used for thin, transparent surfaces
+		bsdf *= GgxBtdf(a2, NdotLr, LdotVr, NdotVr, reflectivity.r) * NdotLr;
+		bsdf *= (1.0h - opacity);
+	}
+	
+	// TODO: Combine NdotL product with diffuse
+	return bsdf * saturate(NdotL) * RcpPi;
+}
+
 
 #endif
