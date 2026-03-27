@@ -57,7 +57,7 @@ float GgxDv(float roughness2, float NdotH, float NdotL, float NdotV, float partL
 {
 	float s2 = Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0);
 	float lambdaL = NdotV * GetPartLambdaV(roughness2, NdotL);
-	float denom = 2.0 * (NdotL * partLambdaV + lambdaL) * s2;
+	float denom = TwoPi * (NdotL * partLambdaV + lambdaL) * s2;
 	return denom ? roughness2 * rcp(denom) : 0.0;
 }
 
@@ -162,19 +162,19 @@ half3 GgxBrdf(half a2, half3 reflectivity, half3 N, half3 L, half NdotL, half3 V
 half3 GgxBtdf(half a2, half3 N, half NdotV, half3 L, half3 V, half reflectivity, half NdotL)
 {
 	half iorRatio = ReflectivityToIorRatio(reflectivity).r;
-	half3 H = normalize(L + V * iorRatio);
 	
-	half LdotH = dot(L, H);
-	half NdotH = dot(N, H);
-	half VdotH = dot(V, H);
-	
-	half3 F = FresnelTir(abs(LdotH), reflectivity);
-	half G = GgxG2(a2, NdotL, NdotV);
-	half D = GgxD(a2, abs(NdotH));
-	
-	half dv = GgxDv(a2, NdotH, NdotL, NdotV, GetPartLambdaV(a2, NdotV));
-	
-	return abs(LdotH) * abs(VdotH) / Sq(LdotH + iorRatio * VdotH) * (1.0h - F) * dv * 4.0h * NdotL * RcpPi;
+	half LdotV = dot(L, V);
+	half rcpDenominator = rsqrt(1.0h + 2.0h * iorRatio * LdotV + Sq(iorRatio)); // Can this be combined with rcpLenLv
+	half NdotH = SignFlip((NdotL + iorRatio * NdotV), -reflectivity) * rcpDenominator;
+	half VdotH = -SignFlip(iorRatio + LdotV, -reflectivity) * rcpDenominator;
+	half LdotH = SignFlip(1.0h + iorRatio * LdotV, -reflectivity) * rcpDenominator;
+
+	if (NdotH <= 0.0 || LdotH <= 0.0 || NdotH <= 0.0)
+		return 0;
+		
+	half dv = GgxDv(a2, NdotH, NdotL, -NdotV, GetPartLambdaV(a2, abs(NdotV)));
+	half f = 1.0 - Fresnel(LdotH, reflectivity);
+	return f * dv * 4.0h * LdotH * VdotH * Sq(ReflectivityToIor(reflectivity)) * rcp(Sq(LdotH + iorRatio * VdotH));
 }
 
 #endif
