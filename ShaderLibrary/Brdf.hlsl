@@ -16,7 +16,7 @@ float GgxG1(float a2, float NdotL, float LdotH)
 {
 	float cosThetaV2 = Sq(NdotL);
 	float tanThetaV2 = (1.0 - cosThetaV2) / cosThetaV2;
-	return ((LdotH * NdotL) > 0) ? 2 / (1 + sqrt(1.0 + a2 * tanThetaV2)) : 0;
+	return 2 / (1 + sqrt(1.0 + a2 * tanThetaV2));
 }
 
 float GgxG2(float roughness2, float cosThetaI, float cosThetaO)
@@ -31,7 +31,14 @@ half GetPartLambdaV(half roughness2, half NdotV)
 
 half GgxD(half roughness2, half NdotH)
 {
-	return (NdotH > 0.0) ? roughness2 * rcp(Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0)) : 0.0;
+	return roughness2 * rcp(Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0h));
+}
+
+half GgxD(half roughness, half NdotH, half3 N, half3 H)
+{
+	// Version using Lagrange's identity to avoid precision issues with half
+	half a = NdotH * roughness;
+	return Sq(roughness * rcp(SqrLength(cross(N, H)) + Sq(a)));
 }
 
 float GgxG(float roughness2, half NdotL, half LdotH, half NdotV, half VdotH)
@@ -43,21 +50,30 @@ float GgxV(float NdotL, float NdotV, float roughness2, float partLambdaV)
 {
 	float lambdaV = NdotL * partLambdaV;
 	float lambdaL = NdotV * GetPartLambdaV(roughness2, NdotL);
-	return 0.5 * rcp(lambdaV + lambdaL);
+	return 0.5h * rcp(lambdaV + lambdaL);
 }
 
-float GgxDv(float roughness2, float NdotH, float NdotL, float NdotV, float partLambdaV)
+half GgxVFast(float roughness, float NdotV, float NdotL)
 {
-	float s2 = Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0);
-	float lambdaL = NdotV * GetPartLambdaV(roughness2, NdotL);
-	float denom = 2.0 * (NdotL * partLambdaV + lambdaL) * s2;
-	return denom ? roughness2 * rcp(denom) : 0.0;
+	float a = roughness;
+	float GGXV = NdotL * (NdotV * (1.0 - a) + a);
+	float GGXL = NdotV * (NdotL * (1.0 - a) + a);
+	return 0.5 / (GGXV + GGXL);
+}
+
+half GgxDv(half roughness2, half NdotH, half NdotL, half NdotV, half partLambdaV)
+{
+	half s2 = Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0h);
+	half lambdaL = NdotV * GetPartLambdaV(roughness2, NdotL);
+	half denom = 2.0h * (NdotL * partLambdaV + lambdaL) * s2;
+	return roughness2 * rcp(denom);
+	return denom ? roughness2 * rcp(denom) : 0.0h;
 }
 
 half3 FresnelFull(half c, half3 iorRatio)
 {
 	half3 g = sqrt(Sq(iorRatio) - 1.0h + Sq(c));
-	return 0.5h * (Sq(g - c) / Sq(g + c)) * (1.0h + Sq(c * (g + c) - 1.0h) / Sq(c * (g - c) + 1.0h));
+	return 0.5h * Sq((g - c) / (g + c)) * (1.0h + Sq((c * (g + c) - 1.0h) / (c * (g - c) + 1.0h)));
 }
 
 half FresnelTerm(half LdotH)
@@ -112,75 +128,12 @@ float3 Ggx(float roughness2, float NdotL, float LdotV, float NdotV, float partLa
 	return GgxSingleScatter(roughness2, NdotL, LdotV, NdotV, partLambdaV, f0) + DirectionalAlbedo.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float2(NdotL, perceptualRoughness), 32), 0.0) * multiScatterTerm;
 }
 
-//float4 BrdfDirect(float NdotL, float perceptualRoughness, float f0Avg, float roughness2, float LdotV, float NdotV, float partLambdaV)
-//{
-//	float diffuse = DirectionalAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float3(NdotL, perceptualRoughness, f0Avg), 16));
-//	float3 specular = Ggx(roughness2, NdotL, LdotV, NdotV, partLambdaV, perceptualRoughness);
-//	return float4(specular, diffuse) * NdotL; // RcpPi is multiplied outside of this function
-//}
-
 half WrappedDiffuse(half NdotL, half wrap)
 {
 	return saturate((NdotL + wrap) / (Sq(1 + wrap)));
 }
 
-half3 GgxBrdf(half a2, half3 reflectivity, half3 N, half3 L, half NdotL, half3 V, half NdotV, half opacity = 1.0h, bool isBackfacing = false)
-{
-	if (isBackfacing)
-	{
-		L = reflect(L, -N);
-		NdotL = -NdotL;
-	}
-	
-	half3 H = normalize(L + V);
-	half LdotV = dot(L, V);
-	half NdotH = dot(N, H);
-	half LdotH = dot(L, H);
-	half VdotH = dot(V, H);
-		
-	half dv = GgxDv(a2, NdotH, NdotL, NdotV, GetPartLambdaV(a2, NdotV));
-	half3 F = Fresnel(LdotH, reflectivity);
-	
-	if (isBackfacing)
-		F = 1.0 - F;
-	
-	half3 specular = dv * F * NdotL;
-		
-	if (isBackfacing)
-		specular *= 1.0 - opacity;
-			
-	return specular;
-}
-
-half GgxBtdf(half roughness2, half3 N, half3 L, half3 V, half ni, half no)
-{
-	half NdotL = dot(N, L);
-	half NdotV = dot(N, V);
-	half LdotV = dot(L, V);
-	half3 H = normalize(L * ni + V * no);
-	
-	if (no > ni)
-		H = -H;
-
-	//half rcpDenominator = rsqrt(1.0h + 2.0h * iorRatio * LdotV + Sq(iorRatio));
-	//half NdotH = (iorRatio * abs(NdotV) - abs(NdotL)) * rcpDenominator; // Negative backfaces are fine
-	//half LdotH = (-iorRatio * LdotV - 1.0h) * rcpDenominator;
-	//half VdotH = -(-iorRatio - LdotV) * rcpDenominator; // Invert to make positive for microfacet functions
-	
-	float NdotH = dot(N, -H);
-	float LdotH = max(0.0, dot(L, H));
-	float VdotH = max(0.0, dot(V, -H));
-
-	// If H is backfacing wrt L, the light will hit another slope first, assuming a convex heightfield with no overhangs
-	if (LdotH < 0.0h || VdotH < 0.0h)
-		return 0.0h;
-	
-	half dv = GgxDv(roughness2, abs(NdotH), abs(NdotL), abs(NdotV), GetPartLambdaV(roughness2, abs(NdotV)));
-	half f = 1.0 - Fresnel(abs(LdotH), IorToReflectivity(no, ni));
-	return f * dv * 4.0h * abs(LdotH) * abs(VdotH) * rcp(Sq(no / ni * VdotH + LdotH)) * Sq(ni / no);
-}
-
-half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 L, float NdotV, float3 V, bool isBackface, bool isThinSurface, float3 transmittance = 1.0)
+half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half LdotV, bool isBackface, bool isThinSurface, half3 transmittance = 1.0)
 {
 	// NdotL will always be in the same hemisphere as L, and NdotV must be negative in refractive cases.
 	// Note reflectivity is rgb but this is only used for metals, which have no transmittance, so the red channel is used in most places, rgb is only used for reflection
@@ -188,13 +141,12 @@ half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 
 	bool isBrdf = !isBackface && NdotV >= 0.0h && NdotL > 0.0h;
 	bool isFlippedBrdf = false; // (isBackface && NdotV <= 0.0h && NdotL < 0.0h); // TODO: Only used for water currently and we don't want sunset highlights to show up on underwater waves, make configurable
 	bool isThin = !isBackface && NdotV >= 0.0h && isThinSurface && NdotL < 0.0h;
-	bool isVolume = (isBackface && NdotV <= 0.0h && NdotL > 0.0h) || isThin;
+	bool isVolume = (isBackface && NdotV <= 0.0h && NdotL > 0.0h);
 	
 	// If no valid cases, return
 	half a2 = Sq(roughness);
 	half iorRatio = ReflectivityToIorRatio(reflectivity).r;
 	half rcpIorRatio = ReflectivityToRcpIorRatio(reflectivity).r;
-	half LdotV = dot(L, V);
 	half rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
 	
 	// Setup vectors, t is for transmitted/second layer. Other vectors always relate to the final outgoing layer, which for single layer bsdfs is simply L and V.
@@ -215,59 +167,36 @@ half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 
 		NdotV = -NdotV;
 	}
 	
-	float3 Lt = L;
-	L = refract(-V, N, 1.0 / 1.5);
-	float3 Vt = -L;
-	float3 Ht = -normalize(Lt + Vt * iorRatio);
-	float3 Nt = -N;
-	
 	if (isThin)
 	{
+		reflectivity = -reflectivity;
+		Swap(iorRatio, rcpIorRatio);
+	
 		// Calculate the dot products with the refracted view vector R directly without computing H
-		NdotLt = -NdotL;
-		NdotVt = -sqrt(1.0 - Sq(rcpIorRatio) * (1.0 - Sq(NdotV)));
-		LdotVt = rcpIorRatio * LdotV + NdotL * (-rcpIorRatio * NdotV - NdotVt);
-		
-		LdotV = NdotV * NdotVt - rcpIorRatio * (1 - Sq(NdotV));
-		
 		// Optimize for thin surface, LdotH and NdotV are equal, and NdotVt == NdotL == VdotH
-		//LdotH = NdotV;
-		//NdotL = VdotH = -NdotVt;
-		NdotL = -dot(N, L);
-		LdotV = dot(L, V);
+		NdotLt = -NdotL;
+		NdotVt = sqrt(saturate(1.0h - Sq(iorRatio) * (1.0h - Sq(NdotV))));
+		LdotVt = (iorRatio * LdotV - NdotL * (iorRatio * NdotV - NdotVt));
 		
-		NdotLt = dot(Nt, Lt);
-		NdotVt = dot(Nt, Vt);
-		LdotVt = dot(Lt, Vt);
+		NdotL = LdotH = NdotVt;
+		VdotH = NdotV;
+		NdotH = 1.0h;
 	}
 	
 	if (isVolume)
 	{
-		if (!isThin)
-			NdotV = -NdotV;
+		NdotV = -NdotV;
 	
 		// Btdf uses a refracted half-vector which is the vector that refracts L perfectly onto V. The dot products must be relative to this half vector.
 		// Computing the actual vector can be avoided by rescaling the dot products to give equivalent results.
 		half rcpDenominator = rsqrt(1.0h + 2.0h * iorRatio * LdotV + Sq(iorRatio)); // Can this be combined with rcpLenLv
 		NdotH = (iorRatio * NdotV - NdotL) * rcpDenominator;
-		
-		if (!isThin)
-		{
-			LdotH = (-iorRatio * LdotV - 1.0h) * rcpDenominator;
-			VdotH = -(-iorRatio - LdotV) * rcpDenominator;
+		LdotH = (-iorRatio * LdotV - 1.0h) * rcpDenominator;
+		VdotH = -(-iorRatio - LdotV) * rcpDenominator;
 			
-			// If H is backfacing wrt L, the light will hit another slope first, assuming a convex heightfield with no overhangs
-			if (LdotH <= 0.0h)
-				return 0.0h;
-		}
-		else
-		{
-			L = -Vt;
-			float3 H = -normalize(L + V * rcpIorRatio);
-			NdotH = (dot(N, H));
-			LdotH = (dot(L, H));
-			VdotH = (dot(V, H));
-		}
+		// If H is backfacing wrt L, the light will hit another slope first, assuming a convex heightfield with no overhangs
+		if (LdotH <= 0.0h)
+			return 0.0h;
 	}
 	
 	half partLambdaV = GetPartLambdaV(a2, NdotV);
@@ -279,11 +208,11 @@ half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 
 	// Note the rgb variant is used, but this is only required for metals. Optimising for the dielectric case means divergence though, so rgb is used for both cases to avoid seperate shader paths or variants.
 	half f = Fresnel(LdotH, reflectivity);
 	
-	if (isVolume)
+	if (isVolume || isThin)
 		f = 1.0h - f;
 	
 	half3 bsdf = dv * f;
-	if (isVolume)
+	if (isVolume || isThin)
 	{
 		// The multiply by 4 is because we calculate the G term of this from the DV term which includes the division by 4 * NdotL * NdotV. The latter two terms also appear in the BTDF denominator,
 		// but cancel out, so they are not needed.
@@ -296,30 +225,14 @@ half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 
 	
 	if (isThin)
 	{
-		// Secondary layer, used for thin, transparent surfaces
-		bsdf = GgxBtdf(a2, N, L, V, 1.5, 1.0) * abs(NdotL);
-		bsdf *= GgxBtdf(a2, Nt, Lt, Vt, 1.0, 1.5) * NdotLt * transmittance;
-		
-		return bsdf;
-		
-		// Assume NdotLt is positive and NdotVt is negative. 
-		half rcpDenominator = rsqrt(1.0h + 2.0h * iorRatio * LdotVt + Sq(iorRatio));
-		half NdotHt = (iorRatio * abs(NdotVt) - abs(NdotLt)) * rcpDenominator; // Negative backfaces are fine
-		half LdotHt = (-iorRatio * LdotVt - 1.0h) * rcpDenominator;
-		half VdotHt = -(-iorRatio - LdotVt) * rcpDenominator; // Invert to make positive for microfacet functions
-		
-		NdotLt = dot(Nt, Lt);
-		NdotHt = dot(Nt, Ht);
-		LdotHt = dot(Lt, Ht);
-		VdotHt = -dot(Vt, Ht);
-
-		// If H is backfacing wrt L, the light will hit another slope first, assuming a convex heightfield with no overhangs
-		if (LdotH > 0.0h)
-		{
-			half dv = GgxDv(a2, NdotHt, NdotLt, NdotVt, GetPartLambdaV(a2, NdotVt));
-			half f = 1.0 - Fresnel(LdotHt, reflectivity);
-			//bsdf *=  f * dv * 4.0h * LdotHt * VdotHt * rcp(Sq(iorRatio * VdotHt + LdotHt)) * NdotLt * transmittance;
-		}
+		half rcpDenominator = rsqrt(1.0h + 2.0h * rcpIorRatio * LdotVt + Sq(rcpIorRatio));
+		half NdotHt = -(rcpIorRatio * -NdotVt + NdotLt) * rcpDenominator; // Negative backfaces are fine
+		half LdotHt = -(rcpIorRatio * LdotVt + 1.0h) * rcpDenominator;
+		half VdotHt = (rcpIorRatio + LdotVt) * rcpDenominator; // Invert to make positive for microfacet functions
+	
+		half dv = GgxDv(a2, NdotHt, NdotLt, NdotVt, GetPartLambdaV(a2, NdotVt));
+		half f = 1.0 - Fresnel(LdotHt, reflectivity);
+		bsdf *= f * dv * 4.0h * LdotHt * VdotHt * Sq(ReflectivityToIor(-reflectivity)) * rcp(Sq(rcpIorRatio * VdotHt + LdotHt)) * NdotLt * transmittance;
 	}
 	
 	// TODO: Combine NdotL product with diffuse
