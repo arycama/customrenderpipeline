@@ -32,9 +32,10 @@ struct Material
 	half translucency;
 	bool isFade;
 	bool isThinSurface;
+	bool transmission;
 };
 
-Material CreateMaterial(half3 albedo = 1.0h, half roughness = 1.0h, float3 normal = float3(0.0, 1.0, 0.0), half metallic = 0.0h, half occlusion = 1.0h, half opacity = 1.0h, half3 emission = 0.0h, bool hasMetallic = false, bool isBackface = false, half ior = 1.5h, bool applyUnderwaterFog = true, bool refractedEnvironment = false, half translucency = 0.0h, bool isFade = false, bool isThinSurface = false)
+Material CreateMaterial(half3 albedo = 1.0h, half roughness = 1.0h, float3 normal = float3(0.0, 1.0, 0.0), half metallic = 0.0h, half occlusion = 1.0h, half opacity = 1.0h, half3 emission = 0.0h, bool hasMetallic = false, bool isBackface = false, half ior = 1.5h, bool applyUnderwaterFog = true, bool refractedEnvironment = false, half translucency = 0.0h, bool isFade = false, bool isThinSurface = false, bool transmission = false)
 {
 	Material material;
 	material.albedo = albedo;
@@ -52,6 +53,7 @@ Material CreateMaterial(half3 albedo = 1.0h, half roughness = 1.0h, float3 norma
 	material.translucency = translucency;
 	material.isFade = isFade;
 	material.isThinSurface = isThinSurface;
+	material.transmission = transmission;
 	return material;
 }
 

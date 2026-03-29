@@ -1,3 +1,4 @@
+using Mono.Cecil.Cil;
 using UnityEngine;
 
 public class RefractVisualizer : MonoBehaviour
@@ -7,97 +8,84 @@ public class RefractVisualizer : MonoBehaviour
     public Float3 halfRotation;
     [Range(0, 2)] public float ni = 1.0f;
     [Range(0, 2)] public float no = 1.5f;
-    public bool showTest = false;
 
-    public float NdotVp;
-    public float LdotVp;
-    public float VdotVp;
+    public bool incoming, outgoing, incomingRefract, outgoingRefract;
 
-    public float NdotL;
-    public float NdotV;
-    public float LdotV;
-
-    public float hLenSq0;
-    public float hLenSq1;
-
-    public float VdotH;
-
-    public float NdotH0;
-    public float NdotH1;
-
-    public float VdotH0;
-    public float VdotH1;
-
-    public float LdotH0;
-    public float LdotH1;
+    public float NdotL, NdotV, NdotH, LdotV, LdotH, VdotH, NdotLt, NdotVt, NdotHt, LdotVt, LdotHt, VdotHt;
 
     private void OnDrawGizmos()
-	{
-        var eta = ni <= no ? no / ni : ni / no;
-
+    {
+        // Top layer
         var N = Float3.Up;
         var V = Quaternion.Euler(viewRotation).Forward;
-        var L = Quaternion.Euler(lightRotation).Forward;
-        var Htest = Quaternion.Euler(halfRotation).Forward;
-        var vp = Float3.Refract(-V, N, 1 / eta);
+        var L = Float3.Refract(-V, N, ni, no); // Incomign direction is refracted view vector
+        var H = Float3.Normalize(L + V * ni / no);
+
+        if (ni > no)
+            H = -H;
+
+        Gizmos.matrix = transform.localToWorldMatrix;
+
+        if (outgoing)
+        {
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawLine(Float3.Zero, N);
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(Float3.Zero, L);
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(Float3.Zero, V);
+            Gizmos.color = Color.white;
+            Gizmos.DrawLine(Float3.Zero, H);
+        }
+
+        if(outgoingRefract)
+        {
+            // Ni and no refer to reractive indices wrt the normal, eg ni = refractive index the normal poitns to, no is the backfacing ior
+            var T = Float3.Refract(-L, H, no, ni);
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawLine(Float3.Zero, T);
+        }
 
         NdotL = Float3.Dot(N, L);
         NdotV = Float3.Dot(N, V);
+        NdotH = Float3.Dot(N, H);
         LdotV = Float3.Dot(L, V);
-
-        Gizmos.color = Color.coral;
-        Gizmos.DrawLine(Float3.Zero, vp);
-        NdotVp = Float3.Dot(N, vp);
-        LdotVp = Float3.Dot(L, vp);
-        VdotVp = Float3.Dot(V, vp);
-
-        hLenSq0 = Float3.SquareMagnitude(L + V * eta);
-        var H = -Float3.Normalize(L + V * eta);
+        LdotH = Float3.Dot(L, H);
         VdotH = Float3.Dot(V, H);
 
-        //if (VdotH > 0.0)
-        //{
-        //    H = -H;
-        //    VdotH = -VdotH;
-        //}
+        // Bottom layer
+        var Nt = -N;
+        var Vt = -L; // Outgoing direction is refracted view vectr
+        var Lt = Quaternion.Euler(lightRotation).Forward;
+        var Ht = Float3.Normalize(Lt * ni + Vt * no);
 
-        var Rp = Float3.Refract(-L, H, 1.0f / eta);
+        if (no > ni)
+            Ht = -Ht;
 
-        Gizmos.matrix = transform.localToWorldMatrix;
-        Gizmos.color = Color.cyan;
-        Gizmos.DrawLine(Float3.Zero, N);
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawLine(Float3.Zero, L);
-        Gizmos.color = Color.green;
-        Gizmos.DrawLine(Float3.Zero, V * 2);
+        NdotLt = Float3.Dot(Nt, Lt);
+        NdotVt = Float3.Dot(Nt, Vt);
+        NdotHt = Float3.Dot(Nt, Ht);
+        LdotVt = Float3.Dot(Lt, Vt);
+        LdotHt = Float3.Dot(Lt, Ht);
+        VdotHt = Float3.Dot(Vt, Ht);
 
-        // Refracted half vector
-        Gizmos.color = Color.white;
-        Gizmos.DrawLine(Float3.Zero, H);
-
-        // Calcualted refracted ray
-        Gizmos.color = Color.magenta;
-        Gizmos.DrawLine(Float3.Zero, Rp);
-
-        if (showTest)
+        if (incoming)
         {
-            Gizmos.color = Color.orange;
-            Gizmos.DrawLine(Float3.Zero, Htest);
-
-            Gizmos.color = Color.darkGray;
-            Gizmos.DrawLine(Float3.Zero, Float3.Refract(-L, Htest, 1 / eta));
+            Gizmos.color = Color.cyan;
+            Gizmos.DrawLine(Float3.Zero, Nt);
+            Gizmos.color = Color.yellow;
+            Gizmos.DrawLine(Float3.Zero, Lt);
+            Gizmos.color = Color.red;
+            Gizmos.DrawLine(Float3.Zero, Vt);
+            Gizmos.color = Color.white;
+            Gizmos.DrawLine(Float3.Zero, Ht);
         }
 
-        // Save some valeus for comparison
-        NdotH0 = Float3.Dot(N, H);
-        LdotH0 = Float3.Dot(L, H);
-        VdotH0 = Float3.Dot(V, H);
-
-        hLenSq1 = 1 + 2 * eta * LdotV + eta * eta;
-
-        var denom = Math.Sqrt(hLenSq1);
-        NdotH1 = (-eta * NdotV - NdotL) / denom;
-        VdotH1 = (-LdotV - eta) / denom;
-        LdotH1 = (-eta * LdotV - 1) / denom;
+        if (incomingRefract)
+        {
+            var T = Float3.Refract(-Lt, Ht, ni, no);
+            Gizmos.color = Color.magenta;
+            Gizmos.DrawLine(Float3.Zero, T);
+        }
     }
 }

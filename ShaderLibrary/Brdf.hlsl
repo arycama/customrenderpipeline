@@ -152,25 +152,35 @@ half3 GgxBrdf(half a2, half3 reflectivity, half3 N, half3 L, half NdotL, half3 V
 	return specular;
 }
 
-half GgxBtdf(half roughness2, half NdotL, half LdotV, half NdotV, half reflectivity = 0.04)
+half GgxBtdf(half roughness2, half3 N, half3 L, half3 V, half ni, half no)
 {
-	// Assume NdotL is positive and NdotV is negative. 
-	half iorRatio = ReflectivityToIorRatio(reflectivity).r;
-	half rcpDenominator = rsqrt(1.0h + 2.0h * iorRatio * LdotV + Sq(iorRatio));
-	half NdotH = (-iorRatio * NdotV - NdotL) * rcpDenominator; // Negative backfaces are fine
-	half VdotH = -(-iorRatio - LdotV) * rcpDenominator; // Invert to make positive for microfacet functions
-	half LdotH = (-iorRatio * LdotV - 1.0h) * rcpDenominator;
+	half NdotL = dot(N, L);
+	half NdotV = dot(N, V);
+	half LdotV = dot(L, V);
+	half3 H = normalize(L * ni + V * no);
+	
+	if (no > ni)
+		H = -H;
+
+	//half rcpDenominator = rsqrt(1.0h + 2.0h * iorRatio * LdotV + Sq(iorRatio));
+	//half NdotH = (iorRatio * abs(NdotV) - abs(NdotL)) * rcpDenominator; // Negative backfaces are fine
+	//half LdotH = (-iorRatio * LdotV - 1.0h) * rcpDenominator;
+	//half VdotH = -(-iorRatio - LdotV) * rcpDenominator; // Invert to make positive for microfacet functions
+	
+	float NdotH = dot(N, -H);
+	float LdotH = max(0.0, dot(L, H));
+	float VdotH = max(0.0, dot(V, -H));
 
 	// If H is backfacing wrt L, the light will hit another slope first, assuming a convex heightfield with no overhangs
-	if (LdotH <= 0.0h)
+	if (LdotH < 0.0h || VdotH < 0.0h)
 		return 0.0h;
-		
-	half dv = GgxDv(roughness2, abs(NdotH), NdotL, -NdotV, GetPartLambdaV(roughness2, -NdotV));
-	half f = 1.0 - FresnelTir(LdotH, reflectivity);
-	return f * dv * 4.0h * LdotH * VdotH * Sq(ReflectivityToIor(reflectivity)) * rcp(Sq(iorRatio * VdotH + LdotH));
+	
+	half dv = GgxDv(roughness2, abs(NdotH), abs(NdotL), abs(NdotV), GetPartLambdaV(roughness2, abs(NdotV)));
+	half f = 1.0 - Fresnel(abs(LdotH), IorToReflectivity(no, ni));
+	return f * dv * 4.0h * abs(LdotH) * abs(VdotH) * rcp(Sq(no / ni * VdotH + LdotH)) * Sq(ni / no);
 }
 
-half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 L, float NdotV, float3 V, float opacity, bool isBackface, bool isThinSurface)
+half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 L, float NdotV, float3 V, bool isBackface, bool isThinSurface, float3 transmittance = 1.0)
 {
 	// NdotL will always be in the same hemisphere as L, and NdotV must be negative in refractive cases.
 	// Note reflectivity is rgb but this is only used for metals, which have no transmittance, so the red channel is used in most places, rgb is only used for reflection
@@ -183,11 +193,12 @@ half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 
 	// If no valid cases, return
 	half a2 = Sq(roughness);
 	half iorRatio = ReflectivityToIorRatio(reflectivity).r;
+	half rcpIorRatio = ReflectivityToRcpIorRatio(reflectivity).r;
 	half LdotV = dot(L, V);
 	half rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
 	
-	// Setup vectors, suffix of r is for refracted, or second layer. Other vectors always relate to the final outgoing layer, which for single layer bsdfs is simply L and V.
-	half NdotH, LdotH, VdotH, NdotLr, NdotVr, LdotVr;
+	// Setup vectors, t is for transmitted/second layer. Other vectors always relate to the final outgoing layer, which for single layer bsdfs is simply L and V.
+	half NdotH, LdotH, VdotH, NdotLt, NdotVt, LdotVt;
 	if (isBrdf || isFlippedBrdf)
 	{
 		NdotH = (NdotL + NdotV) * rcpLenLv;
@@ -204,16 +215,30 @@ half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 
 		NdotV = -NdotV;
 	}
 	
+	float3 Lt = L;
+	L = refract(-V, N, 1.0 / 1.5);
+	float3 Vt = -L;
+	float3 Ht = -normalize(Lt + Vt * iorRatio);
+	float3 Nt = -N;
+	
 	if (isThin)
 	{
 		// Calculate the dot products with the refracted view vector R directly without computing H
-		half rcpIorRatio = rcp(iorRatio);
-		NdotLr = -NdotL;
-		NdotVr = -sqrt(1.0 - Sq(rcpIorRatio) * (1.0 - Sq(NdotV)));
-		LdotVr = rcpIorRatio * LdotV + NdotL * (-rcpIorRatio * NdotV - NdotVr);
+		NdotLt = -NdotL;
+		NdotVt = -sqrt(1.0 - Sq(rcpIorRatio) * (1.0 - Sq(NdotV)));
+		LdotVt = rcpIorRatio * LdotV + NdotL * (-rcpIorRatio * NdotV - NdotVt);
 		
-		NdotL = -NdotVr;
-		LdotV = NdotV * NdotVr - rcpIorRatio * (1 - Sq(NdotV));
+		LdotV = NdotV * NdotVt - rcpIorRatio * (1 - Sq(NdotV));
+		
+		// Optimize for thin surface, LdotH and NdotV are equal, and NdotVt == NdotL == VdotH
+		//LdotH = NdotV;
+		//NdotL = VdotH = -NdotVt;
+		NdotL = -dot(N, L);
+		LdotV = dot(L, V);
+		
+		NdotLt = dot(Nt, Lt);
+		NdotVt = dot(Nt, Vt);
+		LdotVt = dot(Lt, Vt);
 	}
 	
 	if (isVolume)
@@ -225,12 +250,24 @@ half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 
 		// Computing the actual vector can be avoided by rescaling the dot products to give equivalent results.
 		half rcpDenominator = rsqrt(1.0h + 2.0h * iorRatio * LdotV + Sq(iorRatio)); // Can this be combined with rcpLenLv
 		NdotH = (iorRatio * NdotV - NdotL) * rcpDenominator;
-		VdotH = -(-iorRatio - LdotV) * rcpDenominator;
-		LdotH = (-iorRatio * LdotV - 1.0h) * rcpDenominator;
 		
-		// If H is backfacing wrt L, the light will hit another slope first, assuming a convex heightfield with no overhangs
-		if (LdotH <= 0.0h)
-			return 0.0h;
+		if (!isThin)
+		{
+			LdotH = (-iorRatio * LdotV - 1.0h) * rcpDenominator;
+			VdotH = -(-iorRatio - LdotV) * rcpDenominator;
+			
+			// If H is backfacing wrt L, the light will hit another slope first, assuming a convex heightfield with no overhangs
+			if (LdotH <= 0.0h)
+				return 0.0h;
+		}
+		else
+		{
+			L = -Vt;
+			float3 H = -normalize(L + V * rcpIorRatio);
+			NdotH = (dot(N, H));
+			LdotH = (dot(L, H));
+			VdotH = (dot(V, H));
+		}
 	}
 	
 	half partLambdaV = GetPartLambdaV(a2, NdotV);
@@ -260,12 +297,33 @@ half3 GgxBsdf(half roughness, half3 reflectivity, float3 N, float NdotL, float3 
 	if (isThin)
 	{
 		// Secondary layer, used for thin, transparent surfaces
-		bsdf *= GgxBtdf(a2, NdotLr, LdotVr, NdotVr, reflectivity.r) * NdotLr;
-		bsdf *= (1.0h - opacity);
+		bsdf = GgxBtdf(a2, N, L, V, 1.5, 1.0) * abs(NdotL);
+		bsdf *= GgxBtdf(a2, Nt, Lt, Vt, 1.0, 1.5) * NdotLt * transmittance;
+		
+		return bsdf;
+		
+		// Assume NdotLt is positive and NdotVt is negative. 
+		half rcpDenominator = rsqrt(1.0h + 2.0h * iorRatio * LdotVt + Sq(iorRatio));
+		half NdotHt = (iorRatio * abs(NdotVt) - abs(NdotLt)) * rcpDenominator; // Negative backfaces are fine
+		half LdotHt = (-iorRatio * LdotVt - 1.0h) * rcpDenominator;
+		half VdotHt = -(-iorRatio - LdotVt) * rcpDenominator; // Invert to make positive for microfacet functions
+		
+		NdotLt = dot(Nt, Lt);
+		NdotHt = dot(Nt, Ht);
+		LdotHt = dot(Lt, Ht);
+		VdotHt = -dot(Vt, Ht);
+
+		// If H is backfacing wrt L, the light will hit another slope first, assuming a convex heightfield with no overhangs
+		if (LdotH > 0.0h)
+		{
+			half dv = GgxDv(a2, NdotHt, NdotLt, NdotVt, GetPartLambdaV(a2, NdotVt));
+			half f = 1.0 - Fresnel(LdotHt, reflectivity);
+			//bsdf *=  f * dv * 4.0h * LdotHt * VdotHt * rcp(Sq(iorRatio * VdotHt + LdotHt)) * NdotLt * transmittance;
+		}
 	}
 	
 	// TODO: Combine NdotL product with diffuse
-	return bsdf * saturate(NdotL) * RcpPi;
+	return bsdf * saturate(NdotL);
 }
 
 
