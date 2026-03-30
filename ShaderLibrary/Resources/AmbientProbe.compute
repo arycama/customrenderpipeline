@@ -7,6 +7,7 @@
 #include "../SphericalHarmonics.hlsl"
 
 #pragma kernel AmbientProbe
+#pragma editor_sync_compilation
 
 float _MipLevel;
 static const uint _SampleCount = 512;

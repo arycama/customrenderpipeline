@@ -9,6 +9,7 @@ public class ColorGrading : FrameRenderFeature
     public class Settings
     {
         [field: Header("Color Grading")]
+        [field: SerializeField] public bool Update { get; private set; }
         [field: SerializeField] public ColorAdjustmentsSettings ColorAdjustments { get; private set; }
         [field: SerializeField] public WhiteBalanceSettings WhiteBalance { get; private set; }
         [field: SerializeField] public SplitToningSettings SplitToning { get; private set; }
@@ -79,7 +80,7 @@ public class ColorGrading : FrameRenderFeature
         );
 
         var settingsHash = currentSettings.GetHashCode();
-        if (!initialize && previousLutResolution == settings.Resolution && settingsHash == previousSettingsHash && colorGamut == previousColorGamut)
+        if (!settings.Update && !initialize && previousLutResolution == settings.Resolution && settingsHash == previousSettingsHash && colorGamut == previousColorGamut)
             return;
 
         previousSettingsHash = settingsHash;

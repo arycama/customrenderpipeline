@@ -25,6 +25,7 @@ Shader "Hidden/Deferred Lighting"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma editor_sync_compilation
             #pragma multi_compile _ SCREEN_SPACE_SHADOWS
             #pragma multi_compile _ SCREENSPACE_REFLECTIONS_ON
             #pragma multi_compile _ SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
@@ -50,6 +51,7 @@ Shader "Hidden/Deferred Lighting"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma editor_sync_compilation
             #pragma multi_compile _ SCREEN_SPACE_SHADOWS
             #pragma multi_compile _ SCREENSPACE_REFLECTIONS_ON
             #pragma multi_compile _ SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
@@ -75,6 +77,7 @@ Shader "Hidden/Deferred Lighting"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma editor_sync_compilation
             #pragma target 5.0
             #define UNDERWATER_LIGHTING_ON
             #define FLIP
