@@ -37,7 +37,6 @@ float2 ClampScaleTextureUv(float2 uv, float4 scaleLimit)
 float3 GetViewClampedNormal(float3 N, float3 V, out float NdotV)
 {
 	NdotV = dot(N, V);
-	return N;
 	if (NdotV < 0)
 	{
 		N = (N - NdotV * V) * RcpSinFromCos(NdotV);

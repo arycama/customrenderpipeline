@@ -71,9 +71,11 @@ cbuffer PerCascadeData
 	matrix WorldToShadowClip;
 	matrix ShadowViewToShadowClip;
 	float3 ShadowViewPosition;
-	float PerCascadeDataPadding0;
+	float ShadowNear;
 	float3 ShadowLightPosition;
-	float PerCascadeDataPadding1;
+	float ShadowFar;
+	float3 ShadowForward;
+	float PerCascadeDataPadding0;
 };
 
 // TODO: Should this be ifdef-d out in instanced/indirect passes?

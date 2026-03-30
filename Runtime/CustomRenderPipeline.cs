@@ -198,9 +198,11 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<FrameData>();
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<AutoExposureData>();
+		    pass.ReadResource<VirtualTextureData>();
+		    pass.ReadResource<TerrainRenderData>();
 		}),
 
-		new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			using var pass = renderGraph.AddObjectRenderPass("Velocity");
             pass.AllowNewSubPass = true;
@@ -223,6 +225,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<TemporalAAData>();
 			pass.ReadResource<AutoExposureData>();
+		    pass.ReadResource<VirtualTextureData>();
+		    pass.ReadResource<TerrainRenderData>();
 		}),
 
         new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
@@ -379,6 +383,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<LightingSetup.Result>();
 			pass.ReadResource<ClusteredLightCulling.Result>();
 			pass.ReadResource<ParticleShadowData>();
+		    pass.ReadResource<TerrainRenderData>();
 		}),
 
         // Do rain after water so we can get raindrops on the water surface

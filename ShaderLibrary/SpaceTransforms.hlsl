@@ -69,6 +69,12 @@ float3 ObjectToWorld(float3 position, uint instanceId, bool cameraRelative = tru
 	return MultiplyPoint3x4(objectToWorld, position);
 }
 
+float3 ObjectToWorldVector(float3 direction, uint instanceId)
+{
+	float3x4 objectToWorld = GetObjectToWorld(instanceId);
+	return MultiplyVector(objectToWorld, direction);
+}
+
 float3 ObjectToWorldDirection(float3 direction, uint instanceId)
 {
 	float3x4 objectToWorld = GetObjectToWorld(instanceId);
@@ -183,7 +189,7 @@ float4 WorldToClipPrevious(float3 position)
 
 float LinearToDeviceDepth(float eyeDepth)
 {
-	return (1.0 - eyeDepth * rcp(Far)) * rcp(eyeDepth * (rcp(Near) - rcp(Far)));
+	return rcp(eyeDepth) * ViewToClip._m23 + ViewToClip._m22;
 }
 
 float Linear01ToDeviceDepth(float depth)

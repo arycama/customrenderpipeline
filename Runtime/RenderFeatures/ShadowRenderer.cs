@@ -31,7 +31,7 @@ public class ShadowRenderer : ViewRenderFeature
 		var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
 		var directionalShadowCount = Max(1, requestData.directionalShadowRequests.Count);
-		var directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, GraphicsFormat.D16_UNorm, directionalShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
+		var directionalShadows = renderGraph.GetTexture(settings.DirectionalShadowResolution, settings.Use32Bit ? GraphicsFormat.D32_SFloat : GraphicsFormat.D16_UNorm, directionalShadowCount, TextureDimension.Tex2DArray, isExactSize: true);
 		using (renderGraph.AddProfileScope($"Directional Shadows"))
 		{
             using (var pass = renderGraph.AddGenericRenderPass("Render Shadows Setup", directionalShadows))
@@ -127,7 +127,7 @@ public class ShadowRenderer : ViewRenderFeature
     void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip, bool isPointLight, ViewRenderData viewRenderData, CullingResults cullingResults)
 	{
 		var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
-		var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, viewRenderData.transform.position, 0, request.LightPosition, 0));
+		var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, viewRenderData.transform.position, request.Near, request.LightPosition, request.Far, request.ViewRotation.Forward, 0));
 		var shadowRequestData = new ShadowRequestData(request, bias, slopeBias, target, index, perCascadeData, zClip);
 
         renderGraph.SetResource(shadowRequestData);
