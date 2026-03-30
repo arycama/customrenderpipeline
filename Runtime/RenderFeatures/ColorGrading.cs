@@ -8,7 +8,14 @@ public class ColorGrading : FrameRenderFeature
     [Serializable]
     public class Settings
     {
-        [field: Header("Settings")]
+        [field: Header("Color Grading")]
+        [field: SerializeField] public ColorAdjustmentsSettings ColorAdjustments { get; private set; }
+        [field: SerializeField] public WhiteBalanceSettings WhiteBalance { get; private set; }
+        [field: SerializeField] public SplitToningSettings SplitToning { get; private set; }
+        [field: SerializeField] public ChannelMixerSettings ChannelMixer { get; private set; }
+        [field: SerializeField] public ShadowsMidtonesHighlightsSettings ShadowsMidtonesHighlights { get; private set; }
+
+        [field: Header("Tonemapping")]
         [field: SerializeField] public Texture3D CustomLut { get; private set; }
         [field: SerializeField, Tooltip("Output brightness of a a white surface (Eg paper)")] public float PaperWhite { get; private set; } = 160.0f;
         [field: SerializeField, Tooltip("Max brightness of the display")] public float SdrLuminance { get; private set; } = 250;
@@ -102,6 +109,23 @@ public class ColorGrading : FrameRenderFeature
             pass.SetFloat("FadeStart", data.FadeStart);
             pass.SetFloat("FadeEnd", data.FadeEnd);
             pass.SetFloat("HuePreservation", data.HuePreservation);
+
+            pass.SetFloat("PostExposure", Math.Exp2(settings.ColorAdjustments.PostExposure));
+            pass.SetVector("ColorFilter", settings.ColorAdjustments.ColorFilter.LinearFloat3());
+            pass.SetFloat("Contrast", settings.ColorAdjustments.Contrast * 0.01f + 1f);
+            pass.SetFloat("HueShift", settings.ColorAdjustments.HueShift / 360f);
+            pass.SetFloat("Saturation", settings.ColorAdjustments.Saturation * 0.01f + 1f);
+            pass.SetVector("WhiteBalance", ColorspaceUtility.ColorBalanceToLMSCoeffs(settings.WhiteBalance.Temperature, settings.WhiteBalance.Tint));
+
+            var splitColor = settings.SplitToning.Shadows;
+            splitColor.a = settings.SplitToning.Balance * 0.01f;
+
+            pass.SetVector("SplitToningShadows", (Vector4)splitColor);
+            pass.SetVector("SplitToningHighlights", (Vector4)settings.SplitToning.Highlights);
+
+            pass.SetVector("ChannelMixerRed", settings.ChannelMixer.Red);
+            pass.SetVector("ChannelMixerGreen", settings.ChannelMixer.Green);
+            pass.SetVector("ChannelMixerBlue", settings.ChannelMixer.Blue);
         });
     }
 
@@ -110,4 +134,50 @@ public class ColorGrading : FrameRenderFeature
         UpdateLut();
         renderGraph.SetRTHandle<ColorGradingTexture>(colorLut);
     }
+}
+
+[Serializable]
+public class ColorAdjustmentsSettings
+{
+    [field: SerializeField] public float PostExposure { get; private set; } = 0.0f;
+    [field: SerializeField, Range(-100, 100)] public float Contrast { get; private set; } = 0.0f;
+    [field: SerializeField, ColorUsage(false)] public Color ColorFilter { get; private set; } = Color.white;
+    [field: SerializeField, Range(-180, 180)] public float HueShift { get; private set; } = 0.0f;
+    [field: SerializeField, Range(-100, 100)] public float Saturation { get; private set; } = 0.0f;
+}
+
+[Serializable]
+public class WhiteBalanceSettings
+{
+    [field: SerializeField, Range(-100, 100)] public float Temperature { get; private set; } = 0.0f;
+    [field: SerializeField, Range(-100, 100)] public float Tint { get; private set; } = 0.0f;
+}
+
+[Serializable]
+public class SplitToningSettings
+{
+    [field: SerializeField, ColorUsage(false)] public Color Shadows { get; private set; } = Color.gray;
+    [field: SerializeField, ColorUsage(false)] public Color Highlights { get; private set; } = Color.gray;
+    [field: SerializeField, Range(-100, 100)] public float Balance { get; private set; } = 0.0f;
+}
+
+[Serializable]
+public class ChannelMixerSettings
+{
+    [field: SerializeField] public Float3 Red { get; private set; } = Float3.Right;
+    [field: SerializeField] public Float3 Green { get; private set; } = Float3.Up;
+    [field: SerializeField] public Float3 Blue { get; private set; } = Float3.Forward;
+}
+
+[Serializable]
+public class ShadowsMidtonesHighlightsSettings
+{
+    [field: SerializeField, ColorUsage(false, true)] public Color Shadows { get; private set; } = Color.white;
+    [field: SerializeField, ColorUsage(false, true)] public Color Midtones { get; private set; } = Color.white;
+    [field: SerializeField, ColorUsage(false, true)] public Color Highlights { get; private set; } = Color.white;
+
+    [field: SerializeField, Range(0f, 2f)] public float ShadowsStart { get; private set; } = 0.0f;
+    [field: SerializeField, Range(0f, 2f)] public float ShadowsEnd { get; private set; } = 0.3f;
+    [field: SerializeField, Range(0f, 2f)] public float HighlightsStart { get; private set; } = 0.55f;
+    [field: SerializeField, Range(0f, 2f)] public float HighlightsEnd { get; private set; } = 1.0f;
 }
