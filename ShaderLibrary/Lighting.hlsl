@@ -52,11 +52,6 @@ float CloudTransmittance(float3 positionWS)
 	return max(transmittance, shadowData.b);
 }
 
-half WrappedDiffuse(half NdotL, half wrap)
-{
-	return saturate((NdotL + wrap) / (Sq(1 + wrap)));
-}
-
 // TODO: Can parameters be simplified/shortened
 float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAngle, float roughness2, float f0Avg, float partLambdaV, float3 multiScatterTerm, float3 L, float3 N, float3 B, float3 worldPosition, float NdotV, float3 V, float diffuseTerm, float3 albedo, float3 translucency, bool isDirectional)
 {
@@ -97,7 +92,7 @@ float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAn
 			// http://blog.stevemcauley.com/2011/12/03/energy-conserving-wrapped-diffuse/
 			float wrap = 0.5;
 			float wrappedNdotL = saturate((-dot(N, L) + wrap) / Sq(1 + wrap));
-			float scatter = GgxDistribution(roughness2, saturate(dot(-V, L)));
+			float scatter = GgxD(roughness2, saturate(dot(-V, L)));
 			result += wrappedNdotL * scatter * translucency* diffuseTerm;
 		#elif 1
 			result += (WrappedDiffuse(saturate(-NdotL), 0.5) + WrappedDiffuse(saturate(NdotL), 0.5)) * 0.5 * translucency;

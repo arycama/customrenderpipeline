@@ -5,7 +5,6 @@
 #include "../MatrixUtils.hlsl"
 #include "../PhysicalCamera.hlsl"
 #include "../Samplers.hlsl"
-#include "../GT7Tonemap.hlsl"
 
 // For ssr/ssgi debug only
 #include "../Lighting.hlsl"

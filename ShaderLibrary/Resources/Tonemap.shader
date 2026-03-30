@@ -12,6 +12,7 @@ Shader "Hidden/Tonemap"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
+            #pragma editor_sync_compilation
             #pragma multi_compile _ BLOOM_ON
             #pragma multi_compile _ TONEMAP
             #define FLIP

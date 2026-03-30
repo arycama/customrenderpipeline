@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Math.hlsl"
+#include "Utility.hlsl"
 
 // TODO: Move to a common place or pass as args
 float4 _CullingPlanes[6];
@@ -353,6 +354,11 @@ float3 TangentToWorldNormal(float3 tangentNormal, float3 worldNormal, float3 wor
 	return doNormalize ? normalize(result) : result;
 }
 
+float3 TangentToWorldNormal(float3 tangentNormal, float3 worldNormal, float4 worldTangent, bool doNormalize = true)
+{
+	return TangentToWorldNormal(tangentNormal, worldNormal, worldTangent.xyz, worldTangent.w, doNormalize);
+}
+
 float CosAngle(float3 a, float3 b)
 {
 	return dot(a, b);
@@ -513,4 +519,23 @@ bool RayAABBIntersection(
     
     // Check if the ray misses the AABB or starts inside it
 	return t_min < t_max && t_max > 0.0;
+}
+
+half3x3 GetLocalFrame(half3 localZ)
+{
+	half x = localZ.x;
+	half y = localZ.y;
+	half z = localZ.z;
+	half sz = FastSign(z);
+	half a = 1 / (sz + z);
+	half ya = y * a;
+	half b = x * ya;
+	half c = x * sz;
+
+	half3 localX = half3(c * x * a - 1, sz * b, c);
+	half3 localY = half3(b, y * ya - sz, y);
+
+    // Note: due to the quaternion formulation, the generated frame is rotated by 180 degrees,
+    // s.t. if localZ = {0, 0, 1}, then localX = {-1, 0, 0} and localY = {0, -1, 0}.
+	return half3x3(localX, localY, localZ);
 }

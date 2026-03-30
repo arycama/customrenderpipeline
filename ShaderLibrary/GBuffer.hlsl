@@ -54,25 +54,23 @@ float3 GBufferNormal(uint2 coord, Texture2D<float4> tex, float3 V, matrix worldT
 	return GBufferNormal(coord, tex, V, NdotV, worldToView, viewToWorld);
 }
 
-float2 PackAlbedo(float3 rgb, float2 screenPosition)
+half2 PackAlbedo(half3 rgb, float2 screenPosition)
 {
-	float3 yCoCg = RgbToYCoCg(rgb);
+	half3 yCoCg = RgbToYCoCg(rgb);
 	return Checker(screenPosition) ? yCoCg.xy : yCoCg.xz;
 }
 
-float3 UnpackAlbedo(float2 enc, float2 screenPosition, float2 a0, float2 a1)
+half3 UnpackAlbedo(half2 enc, float2 screenPosition, half2 a0, half2 a1)
 {
-	float threshold = 30.0 / 255.0;
-	float2 lum = float2(a0.x, a1.x);
-	float2 w = 1.0 - step(threshold, abs(lum - enc.x));
-	float W = w.x + w.y;
+	half2 lum = half2(a0.x, a1.x);
+	half2 w = 1.0h - saturate((abs(lum - enc.x) - 30.0h / 255.0h) * HalfMax);
+	half W = w.x + w.y;
+	half coCg = W ? (w.x * a0.y + w.y * a1.y) / W : a0.y;
 	
-	// handle the special case where all the weights are zero
-	w.x = (W == 0.0) ? 1.0 : w.x;
-	W = (W == 0.0) ? 1.0 : W;
-	float chroma = (w.x * a0.y + w.y * a1.y) / W;
-
-	float3 yCoCg = Checker(screenPosition) ? float3(enc.rg, chroma) : float3(enc.r, chroma, enc.g);
+	half3 yCoCg = half3(enc, coCg);
+	if (!Checker(screenPosition))
+		yCoCg.yz = yCoCg.zy;
+		
 	return YCoCgToRgb(yCoCg);
 }
 

@@ -121,10 +121,10 @@ float3 LinearToST2084(float3 rec2020)
 
 float3 ST2084ToLinear(float3 linearCol)
 {
-	float3 colToPow = pow(max(0, linearCol), 1.0 / ST2084_M2);
+	float3 colToPow = pow(abs(linearCol), 1.0 / ST2084_M2);
 	float3 numerator = max(colToPow - ST2084_C1, 0.0);
 	float3 denominator = ST2084_C2 - (ST2084_C3 * colToPow);
-	float3 linearColor = pow(numerator / denominator, 1.0 / ST2084_M1);
+	float3 linearColor = pow(abs(numerator / denominator), 1.0 / ST2084_M1);
 	linearColor *= ST2084Max;
 	return linearColor;
 }
@@ -409,29 +409,26 @@ float3 Rec709ToICtCp(float3 rec709)
 	return Rec2020ToICtCp(rec2020);
 }
 
-float3 RgbToYCoCg(float3 rgb)
+half3 RgbToYCoCg(half3 rgb)
 {
-	float yCoCgChromaBias = 128.0 / 255.0;
-
-	float3 yCoCg;
-	yCoCg.x = dot(rgb, float3(0.25, 0.5, 0.25));
-	yCoCg.y = dot(rgb, float3(0.5, 0.0, -0.5)) + yCoCgChromaBias;
-	yCoCg.z = dot(rgb, float3(-0.25, 0.5, -0.25)) + yCoCgChromaBias;
+	half3 yCoCg;
+	yCoCg.y = rgb.r - rgb.b;
+	half temp = yCoCg.y * 0.5h + rgb.b;
+	yCoCg.z = rgb.g - temp;
+	yCoCg.x = yCoCg.z * 0.5h + temp;
+	yCoCg.yz += 127.0h / 255.0h;
 	return yCoCg;
 }
 
-float3 YCoCgToRgb(float3 yCoCg)
+half3 YCoCgToRgb(half3 yCoCg)
 {
-	float yCoCgChromaBias = 128.0 / 255.0;
+	yCoCg.yz -= 127.0h / 255.0h;
 
-	float y = yCoCg.x;
-	float co = yCoCg.y - yCoCgChromaBias;
-	float cg = yCoCg.z - yCoCgChromaBias;
-
-	float3 rgb;
-	rgb.r = y + co - cg;
-	rgb.g = y + cg;
-	rgb.b = y - co - cg;
+	half3 rgb;
+	half temp = -yCoCg.z * 0.5h + yCoCg.x;
+	rgb.g = yCoCg.z + temp;
+	rgb.b = -trunc(yCoCg.g  * 127.5) / 255.0 + temp;
+	rgb.r = rgb.b + yCoCg.y;
 	return rgb;
 }
 
@@ -493,6 +490,28 @@ float3 YCoCgToRgbFastTonemapInverse(float3 tonemappedYCoCg)
 float4 YCoCgToRgbFastTonemapInverse(float4 tonemappedYCoCg)
 {
 	return float4(YCoCgToRgb(FastTonemapYCoCgInverse(tonemappedYCoCg.rgb)), tonemappedYCoCg.a);
+}
+
+float3 RgbToHsv(float3 c)
+{
+	const float4 K = float4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+	float4 p = lerp(float4(c.bg, K.wz), float4(c.gb, K.xy), step(c.b, c.g));
+	float4 q = lerp(float4(p.xyw, c.r), float4(c.r, p.yzx), step(p.x, c.r));
+	float d = q.x - min(q.w, q.y);
+	const float e = 1.0e-4;
+	return float3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+float3 HsvToRgb(float3 c)
+{
+	const float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+	float3 p = abs(frac(c.xxx + K.xyz) * 6.0 - K.www);
+	return c.z * lerp(K.xxx, saturate(p - K.xxx), c.y);
+}
+
+float RotateHue(float value, float low, float hi)
+{
+	return (value < low) ? value + hi : (value > hi) ? value - hi : value;
 }
 
 #endif

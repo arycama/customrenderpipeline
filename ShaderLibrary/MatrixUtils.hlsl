@@ -1,4 +1,5 @@
-#pragma once
+#ifndef MATRIX_UTILS_INCLUDED
+#define MATRIX_UTILS_INCLUDED
 
 // Normalize if bool is set to true
 float3 ConditionalNormalize(float3 input, bool doNormalize)
@@ -180,3 +181,5 @@ float4x4 FastInverse(float4x4 m)
 		float4(0, 0, 0, 1)
 	);
 }
+
+#endif

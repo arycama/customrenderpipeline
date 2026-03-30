@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SPHERICAL_HARMONICS_INCLUDED
+#define SPHERICAL_HARMONICS_INCLUDED
 
 #include "Math.hlsl"
 
@@ -58,3 +59,5 @@ float3 EvaluateSh(float3 N, float4 sh[7], float3 zh)
 	// Max(0) required since some zonal harmonics+ringing artifacts can cause negative values
 	return max(0.0, irradiance);
 }
+
+#endif
