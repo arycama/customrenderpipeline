@@ -206,7 +206,7 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 	
 	// Calcuilate fresnel. Schlick-fresnel is used for all cases, but in the case of a BTDF we use a variant that handles TIR which correctly attenuates refractions on backfaces that should not be visible.
 	// Note the rgb variant is used, but this is only required for metals. Optimising for the dielectric case means divergence though, so rgb is used for both cases to avoid seperate shader paths or variants.
-	half f = Fresnel(LdotH, reflectivity);
+	half3 f = Fresnel(LdotH, reflectivity);
 	
 	if (isVolume || isThin)
 		f = 1.0h - f;
@@ -231,7 +231,7 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 		half VdotHt = (rcpIorRatio + LdotVt) * rcpDenominator; // Invert to make positive for microfacet functions
 	
 		half dv = GgxDv(a2, NdotHt, NdotLt, NdotVt, GetPartLambdaV(a2, NdotVt));
-		half f = 1.0 - Fresnel(LdotHt, reflectivity);
+		half3 f = 1.0 - Fresnel(LdotHt, reflectivity);
 		bsdf *= f * dv * 4.0h * LdotHt * VdotHt * Sq(ReflectivityToIor(-reflectivity)) * rcp(Sq(rcpIorRatio * VdotHt + LdotHt)) * NdotLt * transmittance;
 	}
 	
