@@ -97,15 +97,15 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
         GraphicsSettings.useScriptableRenderPipelineBatching = UseSrpBatching;
 
+        viewRenderDatas.Clear();
+        CollectViewRenderData(cameras, context, viewRenderDatas);
+
         if (!isInitialized)
         {
             perFrameRenderFeatures = InitializePerFrameRenderFeatures();
             perCameraRenderFeatures = InitializePerCameraRenderFeatures();
             isInitialized = true;
         }
-
-        viewRenderDatas.Clear();
-        CollectViewRenderData(cameras, context, viewRenderDatas);
 
         using (renderGraph.AddProfileScope("Prepare Frame"))
         {

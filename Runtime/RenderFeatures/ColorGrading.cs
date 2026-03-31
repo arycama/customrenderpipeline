@@ -50,22 +50,17 @@ public class ColorGrading : FrameRenderFeature
 
     private void UpdateLut(bool initialize = false)
     {
-        var hdrSettings = HDROutputSettings.main;
-        float maxLuminance;
-        ColorGamut colorGamut;
-        if (hdrSettings.available)
+        var hdrSettings = renderGraph.GetResource<HdrOutputData>();
+
+        if (hdrSettings.hdrAvailable)
         {
-            hdrSettings.RequestHDRModeChange(true);
-            hdrSettings.automaticHDRTonemapping = false;
-            hdrSettings.paperWhiteNits = settings.PaperWhite;
-            maxLuminance = hdrSettings.maxToneMapLuminance;
-            colorGamut = hdrSettings.displayColorGamut;
+            hdrSettings.settings.RequestHDRModeChange(true);
+            hdrSettings.settings.automaticHDRTonemapping = false;
+            hdrSettings.settings.paperWhiteNits = settings.PaperWhite;
         }
-        else
-        {
-            colorGamut = ColorGamut.sRGB;
-            maxLuminance = settings.SdrLuminance;
-        }
+
+        var maxLuminance = hdrSettings.peakLuminance;
+        var colorGamut = hdrSettings.colorGamut;
 
         var currentSettings =
         (
@@ -135,50 +130,4 @@ public class ColorGrading : FrameRenderFeature
         UpdateLut();
         renderGraph.SetRTHandle<ColorGradingTexture>(colorLut);
     }
-}
-
-[Serializable]
-public class ColorAdjustmentsSettings
-{
-    [field: SerializeField] public float PostExposure { get; private set; } = 0.0f;
-    [field: SerializeField, Range(-100, 100)] public float Contrast { get; private set; } = 0.0f;
-    [field: SerializeField, ColorUsage(false)] public Color ColorFilter { get; private set; } = Color.white;
-    [field: SerializeField, Range(-180, 180)] public float HueShift { get; private set; } = 0.0f;
-    [field: SerializeField, Range(-100, 100)] public float Saturation { get; private set; } = 0.0f;
-}
-
-[Serializable]
-public class WhiteBalanceSettings
-{
-    [field: SerializeField, Range(-100, 100)] public float Temperature { get; private set; } = 0.0f;
-    [field: SerializeField, Range(-100, 100)] public float Tint { get; private set; } = 0.0f;
-}
-
-[Serializable]
-public class SplitToningSettings
-{
-    [field: SerializeField, ColorUsage(false)] public Color Shadows { get; private set; } = Color.gray;
-    [field: SerializeField, ColorUsage(false)] public Color Highlights { get; private set; } = Color.gray;
-    [field: SerializeField, Range(-100, 100)] public float Balance { get; private set; } = 0.0f;
-}
-
-[Serializable]
-public class ChannelMixerSettings
-{
-    [field: SerializeField] public Float3 Red { get; private set; } = Float3.Right;
-    [field: SerializeField] public Float3 Green { get; private set; } = Float3.Up;
-    [field: SerializeField] public Float3 Blue { get; private set; } = Float3.Forward;
-}
-
-[Serializable]
-public class ShadowsMidtonesHighlightsSettings
-{
-    [field: SerializeField, ColorUsage(false, true)] public Color Shadows { get; private set; } = Color.white;
-    [field: SerializeField, ColorUsage(false, true)] public Color Midtones { get; private set; } = Color.white;
-    [field: SerializeField, ColorUsage(false, true)] public Color Highlights { get; private set; } = Color.white;
-
-    [field: SerializeField, Range(0f, 2f)] public float ShadowsStart { get; private set; } = 0.0f;
-    [field: SerializeField, Range(0f, 2f)] public float ShadowsEnd { get; private set; } = 0.3f;
-    [field: SerializeField, Range(0f, 2f)] public float HighlightsStart { get; private set; } = 0.55f;
-    [field: SerializeField, Range(0f, 2f)] public float HighlightsEnd { get; private set; } = 1.0f;
 }
