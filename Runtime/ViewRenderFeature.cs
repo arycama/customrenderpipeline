@@ -3,5 +3,5 @@ public abstract class ViewRenderFeature : RenderFeatureBase
 {
 	public ViewRenderFeature(RenderGraph renderGraph) : base(renderGraph) { }
 
-	public abstract void Render(ViewRenderData renderLoopData);
+	public abstract void Render(ViewRenderData viewRenderData);
 }
