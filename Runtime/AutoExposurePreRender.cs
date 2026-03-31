@@ -4,11 +4,11 @@ using UnityEngine;
 public class AutoExposurePreRender : ViewRenderFeature
 {
 	private readonly Dictionary<int, ResourceHandle<GraphicsBuffer>> exposureBuffers = new();
-	private readonly Tonemapping.Settings settings;
+	private readonly ColorGrading.Settings settings;
 	private readonly LensSettings lensSettings;
     private readonly AutoExposure.Settings autoExposureSettings;
 
-	public AutoExposurePreRender(RenderGraph renderGraph, Tonemapping.Settings settings, LensSettings lensSettings, AutoExposure.Settings autoExposureSettings) : base(renderGraph)
+	public AutoExposurePreRender(RenderGraph renderGraph, ColorGrading.Settings settings, LensSettings lensSettings, AutoExposure.Settings autoExposureSettings) : base(renderGraph)
 	{
 		this.settings = settings;
         this.lensSettings = lensSettings;

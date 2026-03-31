@@ -6,616 +6,527 @@ using UnityEngine.Rendering;
 
 public partial class Tonemapping : ViewRenderFeature
 {
-	private readonly Material material;
-	private readonly Material lutMaterial;
-	private readonly Settings settings;
+    private readonly Material tonemapMaterial;
+    private readonly ColorGrading.Settings colorGradingSettings;
     private readonly Bloom.Settings bloomSettings;
-	private Matrix4x4 RgbToLmsr;
-	private Matrix4x4 LmsToRgb;
+    private Matrix4x4 RgbToLmsr;
+    private Matrix4x4 LmsToRgb;
 
-	private bool previousNormalize;
+    private bool previousNormalize;
     private readonly HashSet<int> renderedViewIndices = new();
     private ResourceHandle<RenderTexture> colorLut;
     private int previousLutResolution;
     private int previousSettingsHash;
 
-    public Tonemapping(RenderGraph renderGraph, Settings settings, Bloom.Settings bloomSettings) : base(renderGraph)
-	{
-		this.settings = settings;
-		this.bloomSettings = bloomSettings;
-		material = new Material(Shader.Find("Hidden/Tonemap")) { hideFlags = HideFlags.HideAndDontSave };
-		lutMaterial = new Material(Shader.Find("Hidden/Color Grading Lut")) { hideFlags = HideFlags.HideAndDontSave };
-
-		var hdrSettings = HDROutputSettings.main;
-		if (hdrSettings.available)
-		{
-			var gamut = hdrSettings.displayColorGamut;
-			var primaries = ColorGamutUtility.GetColorPrimaries(gamut);
-			var transfer = ColorGamutUtility.GetTransferFunction(gamut);
-			var whitePoint = ColorGamutUtility.GetWhitePoint(gamut);
-
-			hdrSettings.paperWhiteNits = settings.PaperWhite;
-			hdrSettings.automaticHDRTonemapping = false;
-			//Debug.Log($"HDR Display Info: Min Nits {hdrSettings.minToneMapLuminance}, Max Nits {hdrSettings.maxToneMapLuminance}, Paper White {hdrSettings.paperWhiteNits}, Max Full Frame Nits {hdrSettings.maxFullFrameToneMapLuminance}, Gamut {hdrSettings.displayColorGamut}, Primaries {primaries}, Transfer {transfer}, WhitePoint {whitePoint}");
-		}
-
-		RgbToLmsr = CalculateRgbToLMSR(settings.NormalizeLmsr);
-		var rgbToLms = RgbToLmsr;
-		rgbToLms.SetRow(3, new Vector4(0, 0, 0, 1));
-		LmsToRgb = Matrix4x4.Inverse(rgbToLms);
-		previousNormalize = settings.NormalizeLmsr;
-
-		UpdateLut(true);
-    }
-
-    private void UpdateLut(bool initialize = false)
+    public Tonemapping(RenderGraph renderGraph, ColorGrading.Settings colorGradingSettings, Bloom.Settings bloomSettings) : base(renderGraph)
     {
-        var currentSettings =
-        (
-            (float)settings.LutResolution,
-            settings.MaxLuminance,
-            settings.PaperWhite,
-            settings.MaxInputLuminance,
-            settings.LinearStart,
-            settings.FadeStart,
-            settings.FadeEnd,
-            settings.HuePreservation
-        );
-
-        var settingsHash = currentSettings.GetHashCode();
-        if (!initialize && previousLutResolution == settings.LutResolution && settingsHash == previousSettingsHash)
-            return;
-
-        var properties = renderGraph.SetConstantBuffer(currentSettings);
-        using var pass = renderGraph.AddFullscreenRenderPass("Color Grading Lut", (settings.LutResolution, settings.MaxLuminance, settings.PaperWhite));
-
-        if (initialize || previousLutResolution != settings.LutResolution)
-        {
-            if (!initialize)
-                renderGraph.ReleasePersistentResource(colorLut, pass.RenderPassIndex);
-
-            colorLut = renderGraph.GetTexture(settings.LutResolution, GraphicsFormat.A2B10G10R10_UNormPack32, settings.LutResolution, TextureDimension.Tex3D, isExactSize: true, isPersistent: true);
-            previousLutResolution = settings.LutResolution;
-        }
-
-        previousSettingsHash = settingsHash;
-
-        pass.Initialize(lutMaterial, 0, settings.LutResolution);
-        pass.WriteTexture(colorLut);
-        pass.ReadBuffer("Properties", properties);
+        this.colorGradingSettings = colorGradingSettings;
+        this.bloomSettings = bloomSettings;
+        tonemapMaterial = new Material(Shader.Find("Hidden/Tonemap")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
     public override void Render(ViewRenderData viewRenderData)
     {
-        UpdateLut();
-
-        if (settings.NormalizeLmsr != previousNormalize)
-		{
-			RgbToLmsr = CalculateRgbToLMSR(settings.NormalizeLmsr);
-			var rgbToLms = RgbToLmsr;
-			rgbToLms.SetRow(3, new Vector4(0, 0, 0, 1));
-			LmsToRgb = Matrix4x4.Inverse(rgbToLms);
-			previousNormalize = settings.NormalizeLmsr;
-		}
-
-		var hdrSettings = HDROutputSettings.main;
-		var hdrEnabled = settings.Hdr && hdrSettings.available;
-		var colorGamut = ColorGamut.sRGB;
-		if (hdrEnabled)
-		{
-			hdrSettings.RequestHDRModeChange(settings.Hdr);
-			hdrSettings.automaticHDRTonemapping = false;
-			hdrSettings.paperWhiteNits = settings.PaperWhite;
-
-#if UNITY_EDITOR
-			UnityEditor.PlayerSettings.hdrBitDepth = settings.BitDepth;
-#endif
-
-			colorGamut = hdrSettings.displayColorGamut;
-		}
+        var hdrSettings = renderGraph.GetResource<HdrOutputData>();
 
         var isFirst = renderedViewIndices.Add(viewRenderData.viewId);
-        using (var pass = renderGraph.AddBlitToScreenPass("Tonemapping", new Pass0Data(settings, viewRenderData.camera, bloomSettings, colorGamut, RgbToLmsr, LmsToRgb, hdrEnabled, isFirst)))
+        using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (
+            viewRenderData.viewSize,
+            GraphicsUtilities.HalfTexelRemap(colorGradingSettings.Resolution),
+            colorGradingSettings.PaperWhite * Math.Sqrt(2.0f),
+            bloomSettings.BloomStrength,
+            hdrSettings.peakLuminance));
+
+        pass.Initialize(tonemapMaterial, 0);
+        pass.FrameBufferSize = new Int3(viewRenderData.viewSize, viewRenderData.viewCount);
+        pass.FrameBufferTarget = viewRenderData.target;
+        pass.FrameBufferFormat = viewRenderData.format;
+
+        pass.ReadRtHandle<CameraTarget>();
+
+        pass.ReadRtHandle<ColorGradingTexture>();
+
+        if (bloomSettings.BloomStrength > 0.0f)
         {
-            pass.Initialize(material, 0);
-            pass.FrameBufferSize = new Int3(viewRenderData.viewSize, viewRenderData.viewCount);
-            pass.FrameBufferTarget = viewRenderData.target;
-            pass.FrameBufferFormat = viewRenderData.format;
-
-            pass.ReadRtHandle<CameraTarget>();
-
-            if (renderGraph.TryGetRTHandle<CameraBloom>(out _))
-            {
-                pass.ReadRtHandle<CameraBloom>();
-                pass.AddKeyword("BLOOM_ON");
-            }
-
-            pass.ReadTexture("ColorGradingLut", colorLut);
-            pass.ReadResource<AutoExposureData>();
-
-            if (settings.Tonemap)
-                pass.AddKeyword("TONEMAP");
-
-            pass.SetRenderFunction(static (command, pass, data) =>
-            {
-                pass.SetFloat("MaxInputLuminance", data.settings.MaxInputLuminance);
-                pass.SetFloat("LinearStart", data.settings.LinearStart);
-                pass.SetFloat("FadeStart", data.settings.FadeStart);
-                pass.SetFloat("FadeEnd", data.settings.FadeEnd);
-                pass.SetFloat("HuePreservation", data.settings.HuePreservation);
-
-                pass.SetFloat("LutResolution", data.settings.LutResolution);
-                pass.SetFloat("MaxLuminance", data.settings.MaxLuminance);
-                pass.SetFloat("PaperWhite", data.settings.PaperWhite);
-                pass.SetFloat("IsSceneView", data.camera.cameraType == CameraType.SceneView ? 1 : 0);
-                pass.SetFloat("IsPreview", data.camera.cameraType == CameraType.Preview ? 1 : 0);
-                pass.SetFloat("BloomStrength", data.bloomSettings.BloomStrength);
-                pass.SetFloat("ColorGamut", (int)data.colorGamut);
-                pass.SetMatrix("RgbToLmsr", data.RgbToLmsr);
-                pass.SetMatrix("LmrToRgb", data.LmsToRgb);
-                pass.SetFloat("Purkinje", data.settings.Purkinje ? 1 : 0);
-                pass.SetFloat("Hdr", data.hdrEnabled ? 1 : 0);
-                pass.SetVector("RodInputStrength", data.settings.RodColor.LinearFloat3());
-                pass.SetFloat("IsFirst", data.isFirst ? 1 : 0);
-            });
+            pass.ReadRtHandle<CameraBloom>();
+            pass.AddKeyword("BLOOM");
         }
-	}
 
-	private Matrix4x4 CalculateRgbToLMSR(bool normalize)
-	{
-		//const int CieD65Interval = 1;
-		//const int CIE_D65_START = 390;
-		//const int CIE_D65_END = 790;
-		const int CIE_D65_COUNT = 401;
-		const int CIE_LMSR_COUNT = 401;
+		var colorGamut = hdrSettings.colorGamut;
+        pass.AddKeyword(colorGamut.ToString().ToUpperInvariant());
 
-		var l = Float3.Zero;
-		var m = Float3.Zero;
-		var s = Float3.Zero;
-		var r = Float3.Zero;
+        // Unity does some annoying tonemapping in scene view, to get consistent results between scene and game mode, need to reverse it
+        if (viewRenderData.camera.cameraType == CameraType.SceneView)
+            pass.AddKeyword("SCENE_VIEW");
 
-		for (var j = 0; j < 3; j++)
-		{
-			for (var w = 0; w < CIE_LMSR_COUNT; w++)
-			{
-				l[j] += CieLmsr[w].x * CieD65[w] * Rec709Reflectance[w][j];
-				m[j] += CieLmsr[w].y * CieD65[w] * Rec709Reflectance[w][j];
-				s[j] += CieLmsr[w].z * CieD65[w] * Rec709Reflectance[w][j];
-				r[j] += CieLmsr[w].w * CieD65[w] * Rec709Reflectance[w][j];
-			}
-		}
+        if (viewRenderData.camera.cameraType == CameraType.Preview)
+            pass.AddKeyword("PREVIEW");
 
-		float norm = CIE_LMSR_COUNT;
-		if (normalize)
-		{
-			norm = 0.0f;
-			for (var i = 0; i < CIE_D65_COUNT; i++)
-			{
-				norm += CieY[i] * CieD65[i];
-			}
-		}
-		norm = 1.0f / norm;
+        pass.SetRenderFunction((command, pass, data) =>
+        {
+            pass.SetVector("Resolution", data.viewSize);
+            pass.SetVector("LutScaleOffset", data.Item2);
+            pass.SetFloat("PaperWhite", data.Item3);
+            pass.SetFloat("BloomStrength", data.Item4);
+            pass.SetFloat("MaxLuminance", data.Item5);
+        });
+    }
 
-		var result = new Matrix4x4();
-		result.SetRow(0, new Float4(l * norm, 0));
-		result.SetRow(1, new Float4(m * norm, 0));
-		result.SetRow(2, new Float4(s * norm, 0));
-		result.SetRow(3, new Float4(r * norm, 1));
-		return result;
-	}
+    private Matrix4x4 CalculateRgbToLMSR(bool normalize)
+    {
+        //const int CieD65Interval = 1;
+        //const int CIE_D65_START = 390;
+        //const int CIE_D65_END = 790;
+        const int CIE_D65_COUNT = 401;
+        const int CIE_LMSR_COUNT = 401;
 
-	// CIE 1931 reflectance spectrum for Rec.709 from 390nm to 790nm
-	// Data source: http://scottburns.us/fast-rgb-to-spectrum-conversion-for-reflectances/
-	private static readonly Float3[] Rec709Reflectance = new Float3[401]
-	{
-		new(0.028818291f, 0.011877002f, 0.959304707f),
-		new(0.028818291f, 0.011877002f, 0.959304707f),
-		new(0.028818291f, 0.011877002f, 0.959304707f),
-		new(0.028818291f, 0.011877002f, 0.959304707f),
-		new(0.028818291f, 0.011877002f, 0.959304707f),
-		new(0.028818291f, 0.011877002f, 0.959304707f),
-		new(0.028818291f, 0.011877002f, 0.959304707f),
-		new(0.028818291f, 0.011877002f, 0.959304707f),
-		new(0.028818291f, 0.011877002f, 0.959304707f),
-		new(0.028818291f, 0.011877002f, 0.959304707f),
-		new(0.028818291f, 0.011877002f, 0.959304707f),
-		new(0.028811021f, 0.011877002f, 0.959311977f),
-		new(0.028802781f, 0.011877002f, 0.959320217f),
-		new(0.028793521f, 0.011877002f, 0.959329477f),
-		new(0.028782960f, 0.011877002f, 0.959340038f),
-		new(0.028770917f, 0.011877002f, 0.959352080f),
-		new(0.028757342f, 0.011877002f, 0.959365656f),
-		new(0.028741827f, 0.011877002f, 0.959381171f),
-		new(0.028724190f, 0.011877002f, 0.959398808f),
-		new(0.028704048f, 0.011877002f, 0.959418950f),
-		new(0.028681031f, 0.011886657f, 0.959432313f),
-		new(0.028654760f, 0.011897721f, 0.959447519f),
-		new(0.028624766f, 0.011910316f, 0.959464919f),
-		new(0.028590487f, 0.011924700f, 0.959484814f),
-		new(0.028551637f, 0.011941085f, 0.959507279f),
-		new(0.028507641f, 0.011959757f, 0.959532602f),
-		new(0.028457679f, 0.011980956f, 0.959561366f),
-		new(0.028401308f, 0.012005032f, 0.959593661f),
-		new(0.028337507f, 0.012032367f, 0.959630128f),
-		new(0.028265518f, 0.012063369f, 0.959671114f),
-		new(0.028184712f, 0.012098436f, 0.959716853f),
-		new(0.028093938f, 0.012138183f, 0.959767881f),
-		new(0.027992225f, 0.012183090f, 0.959824687f),
-		new(0.027878758f, 0.012233713f, 0.959887532f),
-		new(0.027752728f, 0.012290715f, 0.959956560f),
-		new(0.027613202f, 0.012354682f, 0.960032118f),
-		new(0.027459639f, 0.012426334f, 0.960114030f),
-		new(0.027291406f, 0.012506237f, 0.960202360f),
-		new(0.027108029f, 0.012595103f, 0.960296871f),
-		new(0.026909351f, 0.012693590f, 0.960397062f),
-		new(0.026695068f, 0.012802303f, 0.960502632f),
-		new(0.026465327f, 0.012922024f, 0.960612653f),
-		new(0.026219780f, 0.013053697f, 0.960726528f),
-		new(0.025958190f, 0.013198476f, 0.960843339f),
-		new(0.025680593f, 0.013357408f, 0.960962004f),
-		new(0.025387006f, 0.013531737f, 0.961081261f),
-		new(0.025077520f, 0.013722843f, 0.961199642f),
-		new(0.024752635f, 0.013932033f, 0.961315337f),
-		new(0.024412905f, 0.014160874f, 0.961426226f),
-		new(0.024058830f, 0.014411037f, 0.961530138f),
-		new(0.023691176f, 0.014684282f, 0.961624548f),
-		new(0.023310840f, 0.014982637f, 0.961706529f),
-		new(0.022918745f, 0.015308115f, 0.961773146f),
-		new(0.022516080f, 0.015663026f, 0.961820900f),
-		new(0.022103926f, 0.016049824f, 0.961846257f),
-		new(0.021683511f, 0.016471404f, 0.961845091f),
-		new(0.021256027f, 0.016930724f, 0.961813257f),
-		new(0.020822729f, 0.017431474f, 0.961745804f),
-		new(0.020384772f, 0.017977408f, 0.961637827f),
-		new(0.019943276f, 0.018573130f, 0.961483602f),
-		new(0.019499471f, 0.019223505f, 0.961277031f),
-		new(0.019054471f, 0.019934375f, 0.961011161f),
-		new(0.018609424f, 0.020711793f, 0.960678791f),
-		new(0.018165471f, 0.021562842f, 0.960271695f),
-		new(0.017723519f, 0.022495442f, 0.959781047f),
-		new(0.017284601f, 0.023518720f, 0.959196687f),
-		new(0.016849621f, 0.024643089f, 0.958507298f),
-		new(0.016419409f, 0.025880449f, 0.957700149f),
-		new(0.015994666f, 0.027244468f, 0.956760874f),
-		new(0.015576139f, 0.028750929f, 0.955672940f),
-		new(0.015164369f, 0.030417962f, 0.954417677f),
-		new(0.014759893f, 0.032266650f, 0.952973465f),
-		new(0.014363270f, 0.034321187f, 0.951315551f),
-		new(0.013974834f, 0.036609597f, 0.949415576f),
-		new(0.013594951f, 0.039164589f, 0.947240469f),
-		new(0.013223980f, 0.042024179f, 0.944751849f),
-		new(0.012862081f, 0.045232687f, 0.941905240f),
-		new(0.012509509f, 0.048841513f, 0.938648986f),
-		new(0.012166415f, 0.052910539f, 0.934923054f),
-		new(0.011832836f, 0.057509680f, 0.930657491f),
-		new(0.011508938f, 0.062721079f, 0.925769991f),
-		new(0.011194664f, 0.068641244f, 0.920164100f),
-		new(0.010890006f, 0.075385301f, 0.913724701f),
-		new(0.010594921f, 0.083088729f, 0.906316358f),
-		new(0.010309243f, 0.091912392f, 0.897778373f),
-		new(0.010032852f, 0.102044876f, 0.887922279f),
-		new(0.009765620f, 0.113708114f, 0.876526273f),
-		new(0.009507356f, 0.127159828f, 0.863332823f),
-		new(0.009257866f, 0.142696430f, 0.848045711f),
-		new(0.009016900f, 0.160651591f, 0.830331517f),
-		new(0.008784129f, 0.181390517f, 0.809825361f),
-		new(0.008559389f, 0.205290227f, 0.786150391f),
-		new(0.008342333f, 0.232698734f, 0.758958940f),
-		new(0.008132602f, 0.263880897f, 0.727986508f),
-		new(0.007929888f, 0.298929894f, 0.693140225f),
-		new(0.007733877f, 0.337660526f, 0.654605604f),
-		new(0.007544324f, 0.379519416f, 0.612936267f),
-		new(0.007361023f, 0.423563429f, 0.569075555f),
-		new(0.007183855f, 0.468553426f, 0.524262725f),
-		new(0.007012745f, 0.513160591f, 0.479826671f),
-		new(0.006847712f, 0.556197975f, 0.436954319f),
-		new(0.006688746f, 0.596774501f, 0.396536760f),
-		new(0.006535881f, 0.634336924f, 0.359127201f),
-		new(0.006389133f, 0.668637252f, 0.324973622f),
-		new(0.006248471f, 0.699655061f, 0.294096474f),
-		new(0.006113831f, 0.727519207f, 0.266366969f),
-		new(0.005985160f, 0.752443966f, 0.241570880f),
-		new(0.005862418f, 0.774683948f, 0.219453641f),
-		new(0.005745439f, 0.794504131f, 0.199750437f),
-		new(0.005634161f, 0.812162229f, 0.182203618f),
-		new(0.005528477f, 0.827899667f, 0.166571863f),
-		new(0.005428285f, 0.841936088f, 0.152635634f),
-		new(0.005333500f, 0.854469313f, 0.140197194f),
-		new(0.005244008f, 0.865675487f, 0.129080512f),
-		new(0.005159746f, 0.875710212f, 0.119130050f),
-		new(0.005080630f, 0.884710460f, 0.110208918f),
-		new(0.005006586f, 0.892796076f, 0.102197347f),
-		new(0.004937545f, 0.900072521f, 0.094989942f),
-		new(0.004873420f, 0.906632179f, 0.088494410f),
-		new(0.004814165f, 0.912555819f, 0.082630025f),
-		new(0.004759755f, 0.917913767f, 0.077326487f),
-		new(0.004710142f, 0.922768547f, 0.072521320f),
-		new(0.004665292f, 0.927174110f, 0.068160607f),
-		new(0.004625163f, 0.931178591f, 0.064196255f),
-		new(0.004589756f, 0.934823889f, 0.060586364f),
-		new(0.004559076f, 0.938146992f, 0.057293941f),
-		new(0.004533115f, 0.941180584f, 0.054286310f),
-		new(0.004511878f, 0.943953492f, 0.051534640f),
-		new(0.004495412f, 0.946491400f, 0.049013197f),
-		new(0.004483749f, 0.948816965f, 0.046699295f),
-		new(0.004476933f, 0.950950467f, 0.044572609f),
-		new(0.004475011f, 0.952909752f, 0.042615247f),
-		new(0.004478088f, 0.954710433f, 0.040811489f),
-		new(0.004486263f, 0.956366386f, 0.039147361f),
-		new(0.004499670f, 0.957890048f, 0.037610292f),
-		new(0.004518465f, 0.959292655f, 0.036188889f),
-		new(0.004542805f, 0.960584215f, 0.034872990f),
-		new(0.004572880f, 0.961773573f, 0.033653556f),
-		new(0.004608895f, 0.962868623f, 0.032522492f),
-		new(0.004651090f, 0.963876448f, 0.031472471f),
-		new(0.004699746f, 0.964803350f, 0.030496912f),
-		new(0.004755186f, 0.965655044f, 0.029589778f),
-		new(0.004817721f, 0.966436842f, 0.028745446f),
-		new(0.004887673f, 0.967153428f, 0.027958907f),
-		new(0.004965447f, 0.967808972f, 0.027225590f),
-		new(0.005051466f, 0.968407165f, 0.026541377f),
-		new(0.005146221f, 0.968951191f, 0.025902595f),
-		new(0.005250261f, 0.969443961f, 0.025305785f),
-		new(0.005364196f, 0.969887939f, 0.024747872f),
-		new(0.005488688f, 0.970285274f, 0.024226044f),
-		new(0.005624523f, 0.970637837f, 0.023737647f),
-		new(0.005772524f, 0.970947128f, 0.023280354f),
-		new(0.005933641f, 0.971214249f, 0.022852116f),
-		new(0.006108994f, 0.971440082f, 0.022450930f),
-		new(0.006299756f, 0.971625195f, 0.022075054f),
-		new(0.006507247f, 0.971769994f, 0.021722764f),
-		new(0.006733051f, 0.971874423f, 0.021392531f),
-		new(0.006978854f, 0.971938200f, 0.021082950f),
-		new(0.007246538f, 0.971960799f, 0.020792667f),
-		new(0.007538270f, 0.971941249f, 0.020520485f),
-		new(0.007856514f, 0.971878264f, 0.020265225f),
-		new(0.008204064f, 0.971770126f, 0.020025813f),
-		new(0.008583947f, 0.971614816f, 0.019801239f),
-		new(0.008999675f, 0.971409878f, 0.019590449f),
-		new(0.009455237f, 0.971152241f, 0.019392523f),
-		new(0.009955215f, 0.970838189f, 0.019206597f),
-		new(0.010504749f, 0.970463452f, 0.019031800f),
-		new(0.011109803f, 0.970022766f, 0.018867431f),
-		new(0.011777308f, 0.969510027f, 0.018712665f),
-		new(0.012515126f, 0.968918048f, 0.018566825f),
-		new(0.013332373f, 0.968238420f, 0.018429206f),
-		new(0.014239681f, 0.967461152f, 0.018299166f),
-		new(0.015249411f, 0.966574582f, 0.018176005f),
-		new(0.016375927f, 0.965564859f, 0.018059211f),
-		new(0.017636162f, 0.964415670f, 0.017948165f),
-		new(0.019050053f, 0.963107683f, 0.017842261f),
-		new(0.020640980f, 0.961618056f, 0.017740960f),
-		new(0.022436706f, 0.959919497f, 0.017643792f),
-		new(0.024470247f, 0.957979541f, 0.017550207f),
-		new(0.026781156f, 0.955759173f, 0.017459665f),
-		new(0.029416764f, 0.953211636f, 0.017371594f),
-		new(0.032434165f, 0.950280250f, 0.017285579f),
-		new(0.035902660f, 0.946896161f, 0.017201171f),
-		new(0.039906710f, 0.942975375f, 0.017117908f),
-		new(0.044549637f, 0.938415042f, 0.017035312f),
-		new(0.049957946f, 0.933089100f, 0.016952945f),
-		new(0.056288019f, 0.926841641f, 0.016870331f),
-		new(0.063732852f, 0.919480119f, 0.016787020f),
-		new(0.072532236f, 0.910765162f, 0.016702592f),
-		new(0.082984390f, 0.900398982f, 0.016616618f),
-		new(0.095460490f, 0.888010848f, 0.016528651f),
-		new(0.110421040f, 0.873140755f, 0.016438193f),
-		new(0.128430384f, 0.855224817f, 0.016344788f),
-		new(0.150174712f, 0.833577319f, 0.016247957f),
-		new(0.176468480f, 0.807384293f, 0.016147214f),
-		new(0.208235667f, 0.775722345f, 0.016041975f),
-		new(0.246440024f, 0.737628435f, 0.015931528f),
-		new(0.291908018f, 0.692276903f, 0.015815065f),
-		new(0.344984668f, 0.639323614f, 0.015691704f),
-		new(0.405003302f, 0.579436097f, 0.015560587f),
-		new(0.469770292f, 0.514808650f, 0.015421044f),
-		new(0.535622243f, 0.449104730f, 0.015273012f),
-		new(0.598446474f, 0.386436255f, 0.015117256f),
-		new(0.655118405f, 0.329926299f, 0.014955281f),
-		new(0.704188549f, 0.281022574f, 0.014788861f),
-		new(0.745606932f, 0.239773366f, 0.014619686f),
-		new(0.780098645f, 0.205452132f, 0.014449208f),
-		new(0.808669226f, 0.177052183f, 0.014278574f),
-		new(0.832329195f, 0.153562082f, 0.014108706f),
-		new(0.851973460f, 0.134086206f, 0.013940317f),
-		new(0.868355627f, 0.117870335f, 0.013774022f),
-		new(0.882088371f, 0.104301317f, 0.013610295f),
-		new(0.893665842f, 0.092884622f, 0.013449518f),
-		new(0.903484049f, 0.083223919f, 0.013292015f),
-		new(0.911858005f, 0.075003924f, 0.013138054f),
-		new(0.919041310f, 0.067970837f, 0.012987836f),
-		new(0.925236892f, 0.061921566f, 0.012841525f),
-		new(0.930609071f, 0.056691665f, 0.012699247f),
-		new(0.935290842f, 0.052148021f, 0.012561120f),
-		new(0.939390513f, 0.048182279f, 0.012427191f),
-		new(0.942996767f, 0.044705727f, 0.012297489f),
-		new(0.946182355f, 0.041645556f, 0.012172072f),
-		new(0.949008025f, 0.038941093f, 0.012050866f),
-		new(0.951523919f, 0.036542201f, 0.011933864f),
-		new(0.953772082f, 0.034406857f, 0.011821045f),
-		new(0.955787697f, 0.032499914f, 0.011712372f),
-		new(0.957600446f, 0.030791764f, 0.011607774f),
-		new(0.959235683f, 0.029257157f, 0.011507144f),
-		new(0.960714776f, 0.027874770f, 0.011410438f),
-		new(0.962055945f, 0.026626454f, 0.011317586f),
-		new(0.963275107f, 0.025496410f, 0.011228468f),
-		new(0.964300437f, 0.024471080f, 0.011228468f),
-		new(0.965232800f, 0.023538717f, 0.011228468f),
-		new(0.966082492f, 0.022689026f, 0.011228468f),
-		new(0.966858432f, 0.021913087f, 0.011228468f),
-		new(0.967568415f, 0.021203103f, 0.011228468f),
-		new(0.968219303f, 0.020552216f, 0.011228468f),
-		new(0.968817046f, 0.019954474f, 0.011228468f),
-		new(0.969366905f, 0.019404615f, 0.011228468f),
-		new(0.969873478f, 0.018898043f, 0.011228468f),
-		new(0.970340909f, 0.018430612f, 0.011228468f),
-		new(0.970772869f, 0.017998652f, 0.011228468f),
-		new(0.971172383f, 0.017599138f, 0.011228468f),
-		new(0.971542180f, 0.017229342f, 0.011228468f),
-		new(0.971884776f, 0.016886746f, 0.011228468f),
-		new(0.972202337f, 0.016569185f, 0.011228468f),
-		new(0.972496890f, 0.016274633f, 0.011228468f),
-		new(0.972770257f, 0.016001266f, 0.011228468f),
-		new(0.973023999f, 0.015747524f, 0.011228468f),
-		new(0.973259632f, 0.015511892f, 0.011228468f),
-		new(0.973478536f, 0.015292988f, 0.011228468f),
-		new(0.973681941f, 0.015089583f, 0.011228468f),
-		new(0.973870951f, 0.014900573f, 0.011228468f),
-		new(0.974046776f, 0.014724748f, 0.011228468f),
-		new(0.974210313f, 0.014561212f, 0.011228468f),
-		new(0.974362517f, 0.014409008f, 0.011228468f),
-		new(0.974504245f, 0.014267281f, 0.011228468f),
-		new(0.974636162f, 0.014135364f, 0.011228468f),
-		new(0.974759150f, 0.014012377f, 0.011228468f),
-		new(0.974873710f, 0.013897817f, 0.011228468f),
-		new(0.974980528f, 0.013790999f, 0.011228468f),
-		new(0.975080171f, 0.013691356f, 0.011228468f),
-		new(0.975173072f, 0.013598455f, 0.011228468f),
-		new(0.975259696f, 0.013511832f, 0.011228468f),
-		new(0.975340480f, 0.013431048f, 0.011228468f),
-		new(0.975415806f, 0.013355721f, 0.011228468f),
-		new(0.975486006f, 0.013285522f, 0.011228468f),
-		new(0.975551437f, 0.013220092f, 0.011228468f),
-		new(0.975612438f, 0.013159090f, 0.011228468f),
-		new(0.975669295f, 0.013102234f, 0.011228468f),
-		new(0.975722246f, 0.013049283f, 0.011228468f),
-		new(0.975771580f, 0.012999949f, 0.011228468f),
-		new(0.975817540f, 0.012953989f, 0.011228468f),
-		new(0.975860350f, 0.012911179f, 0.011228468f),
-		new(0.975900220f, 0.012871310f, 0.011228468f),
-		new(0.975937277f, 0.012834253f, 0.011228468f),
-		new(0.975971818f, 0.012799711f, 0.011228468f),
-		new(0.976003931f, 0.012767598f, 0.011228468f),
-		new(0.976033845f, 0.012737685f, 0.011228468f),
-		new(0.976061665f, 0.012709865f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f),
-		new(0.976087481f, 0.012684050f, 0.011228468f)
-	};
+        var l = Float3.Zero;
+        var m = Float3.Zero;
+        var s = Float3.Zero;
+        var r = Float3.Zero;
 
-	// Cone (LMS) data from: Stockman & Sharpe (2000) / 2-deg fundamentals based on the
-	// Stiles & Burch 10-deg CMFs (adjusted to 2-deg). Data source: http://www.cvrl.org/cones.htm
-	// Rod (R)  data from: CIE (1951) Scotopic V'(λ). Data source: http://www.cvrl.org/lumindex.htm
-	private static readonly Float4[] CieLmsr = new Float4[401] 
-	{
+        for (var j = 0; j < 3; j++)
+        {
+            for (var w = 0; w < CIE_LMSR_COUNT; w++)
+            {
+                l[j] += CieLmsr[w].x * CieD65[w] * Rec709Reflectance[w][j];
+                m[j] += CieLmsr[w].y * CieD65[w] * Rec709Reflectance[w][j];
+                s[j] += CieLmsr[w].z * CieD65[w] * Rec709Reflectance[w][j];
+                r[j] += CieLmsr[w].w * CieD65[w] * Rec709Reflectance[w][j];
+            }
+        }
+
+        float norm = CIE_LMSR_COUNT;
+        if (normalize)
+        {
+            norm = 0.0f;
+            for (var i = 0; i < CIE_D65_COUNT; i++)
+            {
+                norm += CieY[i] * CieD65[i];
+            }
+        }
+        norm = 1.0f / norm;
+
+        var result = new Matrix4x4();
+        result.SetRow(0, new Float4(l * norm, 0));
+        result.SetRow(1, new Float4(m * norm, 0));
+        result.SetRow(2, new Float4(s * norm, 0));
+        result.SetRow(3, new Float4(r * norm, 1));
+        return result;
+    }
+
+    // CIE 1931 reflectance spectrum for Rec.709 from 390nm to 790nm
+    // Data source: http://scottburns.us/fast-rgb-to-spectrum-conversion-for-reflectances/
+    private static readonly Float3[] Rec709Reflectance = new Float3[401]
+    {
+        new(0.028818291f, 0.011877002f, 0.959304707f),
+        new(0.028818291f, 0.011877002f, 0.959304707f),
+        new(0.028818291f, 0.011877002f, 0.959304707f),
+        new(0.028818291f, 0.011877002f, 0.959304707f),
+        new(0.028818291f, 0.011877002f, 0.959304707f),
+        new(0.028818291f, 0.011877002f, 0.959304707f),
+        new(0.028818291f, 0.011877002f, 0.959304707f),
+        new(0.028818291f, 0.011877002f, 0.959304707f),
+        new(0.028818291f, 0.011877002f, 0.959304707f),
+        new(0.028818291f, 0.011877002f, 0.959304707f),
+        new(0.028818291f, 0.011877002f, 0.959304707f),
+        new(0.028811021f, 0.011877002f, 0.959311977f),
+        new(0.028802781f, 0.011877002f, 0.959320217f),
+        new(0.028793521f, 0.011877002f, 0.959329477f),
+        new(0.028782960f, 0.011877002f, 0.959340038f),
+        new(0.028770917f, 0.011877002f, 0.959352080f),
+        new(0.028757342f, 0.011877002f, 0.959365656f),
+        new(0.028741827f, 0.011877002f, 0.959381171f),
+        new(0.028724190f, 0.011877002f, 0.959398808f),
+        new(0.028704048f, 0.011877002f, 0.959418950f),
+        new(0.028681031f, 0.011886657f, 0.959432313f),
+        new(0.028654760f, 0.011897721f, 0.959447519f),
+        new(0.028624766f, 0.011910316f, 0.959464919f),
+        new(0.028590487f, 0.011924700f, 0.959484814f),
+        new(0.028551637f, 0.011941085f, 0.959507279f),
+        new(0.028507641f, 0.011959757f, 0.959532602f),
+        new(0.028457679f, 0.011980956f, 0.959561366f),
+        new(0.028401308f, 0.012005032f, 0.959593661f),
+        new(0.028337507f, 0.012032367f, 0.959630128f),
+        new(0.028265518f, 0.012063369f, 0.959671114f),
+        new(0.028184712f, 0.012098436f, 0.959716853f),
+        new(0.028093938f, 0.012138183f, 0.959767881f),
+        new(0.027992225f, 0.012183090f, 0.959824687f),
+        new(0.027878758f, 0.012233713f, 0.959887532f),
+        new(0.027752728f, 0.012290715f, 0.959956560f),
+        new(0.027613202f, 0.012354682f, 0.960032118f),
+        new(0.027459639f, 0.012426334f, 0.960114030f),
+        new(0.027291406f, 0.012506237f, 0.960202360f),
+        new(0.027108029f, 0.012595103f, 0.960296871f),
+        new(0.026909351f, 0.012693590f, 0.960397062f),
+        new(0.026695068f, 0.012802303f, 0.960502632f),
+        new(0.026465327f, 0.012922024f, 0.960612653f),
+        new(0.026219780f, 0.013053697f, 0.960726528f),
+        new(0.025958190f, 0.013198476f, 0.960843339f),
+        new(0.025680593f, 0.013357408f, 0.960962004f),
+        new(0.025387006f, 0.013531737f, 0.961081261f),
+        new(0.025077520f, 0.013722843f, 0.961199642f),
+        new(0.024752635f, 0.013932033f, 0.961315337f),
+        new(0.024412905f, 0.014160874f, 0.961426226f),
+        new(0.024058830f, 0.014411037f, 0.961530138f),
+        new(0.023691176f, 0.014684282f, 0.961624548f),
+        new(0.023310840f, 0.014982637f, 0.961706529f),
+        new(0.022918745f, 0.015308115f, 0.961773146f),
+        new(0.022516080f, 0.015663026f, 0.961820900f),
+        new(0.022103926f, 0.016049824f, 0.961846257f),
+        new(0.021683511f, 0.016471404f, 0.961845091f),
+        new(0.021256027f, 0.016930724f, 0.961813257f),
+        new(0.020822729f, 0.017431474f, 0.961745804f),
+        new(0.020384772f, 0.017977408f, 0.961637827f),
+        new(0.019943276f, 0.018573130f, 0.961483602f),
+        new(0.019499471f, 0.019223505f, 0.961277031f),
+        new(0.019054471f, 0.019934375f, 0.961011161f),
+        new(0.018609424f, 0.020711793f, 0.960678791f),
+        new(0.018165471f, 0.021562842f, 0.960271695f),
+        new(0.017723519f, 0.022495442f, 0.959781047f),
+        new(0.017284601f, 0.023518720f, 0.959196687f),
+        new(0.016849621f, 0.024643089f, 0.958507298f),
+        new(0.016419409f, 0.025880449f, 0.957700149f),
+        new(0.015994666f, 0.027244468f, 0.956760874f),
+        new(0.015576139f, 0.028750929f, 0.955672940f),
+        new(0.015164369f, 0.030417962f, 0.954417677f),
+        new(0.014759893f, 0.032266650f, 0.952973465f),
+        new(0.014363270f, 0.034321187f, 0.951315551f),
+        new(0.013974834f, 0.036609597f, 0.949415576f),
+        new(0.013594951f, 0.039164589f, 0.947240469f),
+        new(0.013223980f, 0.042024179f, 0.944751849f),
+        new(0.012862081f, 0.045232687f, 0.941905240f),
+        new(0.012509509f, 0.048841513f, 0.938648986f),
+        new(0.012166415f, 0.052910539f, 0.934923054f),
+        new(0.011832836f, 0.057509680f, 0.930657491f),
+        new(0.011508938f, 0.062721079f, 0.925769991f),
+        new(0.011194664f, 0.068641244f, 0.920164100f),
+        new(0.010890006f, 0.075385301f, 0.913724701f),
+        new(0.010594921f, 0.083088729f, 0.906316358f),
+        new(0.010309243f, 0.091912392f, 0.897778373f),
+        new(0.010032852f, 0.102044876f, 0.887922279f),
+        new(0.009765620f, 0.113708114f, 0.876526273f),
+        new(0.009507356f, 0.127159828f, 0.863332823f),
+        new(0.009257866f, 0.142696430f, 0.848045711f),
+        new(0.009016900f, 0.160651591f, 0.830331517f),
+        new(0.008784129f, 0.181390517f, 0.809825361f),
+        new(0.008559389f, 0.205290227f, 0.786150391f),
+        new(0.008342333f, 0.232698734f, 0.758958940f),
+        new(0.008132602f, 0.263880897f, 0.727986508f),
+        new(0.007929888f, 0.298929894f, 0.693140225f),
+        new(0.007733877f, 0.337660526f, 0.654605604f),
+        new(0.007544324f, 0.379519416f, 0.612936267f),
+        new(0.007361023f, 0.423563429f, 0.569075555f),
+        new(0.007183855f, 0.468553426f, 0.524262725f),
+        new(0.007012745f, 0.513160591f, 0.479826671f),
+        new(0.006847712f, 0.556197975f, 0.436954319f),
+        new(0.006688746f, 0.596774501f, 0.396536760f),
+        new(0.006535881f, 0.634336924f, 0.359127201f),
+        new(0.006389133f, 0.668637252f, 0.324973622f),
+        new(0.006248471f, 0.699655061f, 0.294096474f),
+        new(0.006113831f, 0.727519207f, 0.266366969f),
+        new(0.005985160f, 0.752443966f, 0.241570880f),
+        new(0.005862418f, 0.774683948f, 0.219453641f),
+        new(0.005745439f, 0.794504131f, 0.199750437f),
+        new(0.005634161f, 0.812162229f, 0.182203618f),
+        new(0.005528477f, 0.827899667f, 0.166571863f),
+        new(0.005428285f, 0.841936088f, 0.152635634f),
+        new(0.005333500f, 0.854469313f, 0.140197194f),
+        new(0.005244008f, 0.865675487f, 0.129080512f),
+        new(0.005159746f, 0.875710212f, 0.119130050f),
+        new(0.005080630f, 0.884710460f, 0.110208918f),
+        new(0.005006586f, 0.892796076f, 0.102197347f),
+        new(0.004937545f, 0.900072521f, 0.094989942f),
+        new(0.004873420f, 0.906632179f, 0.088494410f),
+        new(0.004814165f, 0.912555819f, 0.082630025f),
+        new(0.004759755f, 0.917913767f, 0.077326487f),
+        new(0.004710142f, 0.922768547f, 0.072521320f),
+        new(0.004665292f, 0.927174110f, 0.068160607f),
+        new(0.004625163f, 0.931178591f, 0.064196255f),
+        new(0.004589756f, 0.934823889f, 0.060586364f),
+        new(0.004559076f, 0.938146992f, 0.057293941f),
+        new(0.004533115f, 0.941180584f, 0.054286310f),
+        new(0.004511878f, 0.943953492f, 0.051534640f),
+        new(0.004495412f, 0.946491400f, 0.049013197f),
+        new(0.004483749f, 0.948816965f, 0.046699295f),
+        new(0.004476933f, 0.950950467f, 0.044572609f),
+        new(0.004475011f, 0.952909752f, 0.042615247f),
+        new(0.004478088f, 0.954710433f, 0.040811489f),
+        new(0.004486263f, 0.956366386f, 0.039147361f),
+        new(0.004499670f, 0.957890048f, 0.037610292f),
+        new(0.004518465f, 0.959292655f, 0.036188889f),
+        new(0.004542805f, 0.960584215f, 0.034872990f),
+        new(0.004572880f, 0.961773573f, 0.033653556f),
+        new(0.004608895f, 0.962868623f, 0.032522492f),
+        new(0.004651090f, 0.963876448f, 0.031472471f),
+        new(0.004699746f, 0.964803350f, 0.030496912f),
+        new(0.004755186f, 0.965655044f, 0.029589778f),
+        new(0.004817721f, 0.966436842f, 0.028745446f),
+        new(0.004887673f, 0.967153428f, 0.027958907f),
+        new(0.004965447f, 0.967808972f, 0.027225590f),
+        new(0.005051466f, 0.968407165f, 0.026541377f),
+        new(0.005146221f, 0.968951191f, 0.025902595f),
+        new(0.005250261f, 0.969443961f, 0.025305785f),
+        new(0.005364196f, 0.969887939f, 0.024747872f),
+        new(0.005488688f, 0.970285274f, 0.024226044f),
+        new(0.005624523f, 0.970637837f, 0.023737647f),
+        new(0.005772524f, 0.970947128f, 0.023280354f),
+        new(0.005933641f, 0.971214249f, 0.022852116f),
+        new(0.006108994f, 0.971440082f, 0.022450930f),
+        new(0.006299756f, 0.971625195f, 0.022075054f),
+        new(0.006507247f, 0.971769994f, 0.021722764f),
+        new(0.006733051f, 0.971874423f, 0.021392531f),
+        new(0.006978854f, 0.971938200f, 0.021082950f),
+        new(0.007246538f, 0.971960799f, 0.020792667f),
+        new(0.007538270f, 0.971941249f, 0.020520485f),
+        new(0.007856514f, 0.971878264f, 0.020265225f),
+        new(0.008204064f, 0.971770126f, 0.020025813f),
+        new(0.008583947f, 0.971614816f, 0.019801239f),
+        new(0.008999675f, 0.971409878f, 0.019590449f),
+        new(0.009455237f, 0.971152241f, 0.019392523f),
+        new(0.009955215f, 0.970838189f, 0.019206597f),
+        new(0.010504749f, 0.970463452f, 0.019031800f),
+        new(0.011109803f, 0.970022766f, 0.018867431f),
+        new(0.011777308f, 0.969510027f, 0.018712665f),
+        new(0.012515126f, 0.968918048f, 0.018566825f),
+        new(0.013332373f, 0.968238420f, 0.018429206f),
+        new(0.014239681f, 0.967461152f, 0.018299166f),
+        new(0.015249411f, 0.966574582f, 0.018176005f),
+        new(0.016375927f, 0.965564859f, 0.018059211f),
+        new(0.017636162f, 0.964415670f, 0.017948165f),
+        new(0.019050053f, 0.963107683f, 0.017842261f),
+        new(0.020640980f, 0.961618056f, 0.017740960f),
+        new(0.022436706f, 0.959919497f, 0.017643792f),
+        new(0.024470247f, 0.957979541f, 0.017550207f),
+        new(0.026781156f, 0.955759173f, 0.017459665f),
+        new(0.029416764f, 0.953211636f, 0.017371594f),
+        new(0.032434165f, 0.950280250f, 0.017285579f),
+        new(0.035902660f, 0.946896161f, 0.017201171f),
+        new(0.039906710f, 0.942975375f, 0.017117908f),
+        new(0.044549637f, 0.938415042f, 0.017035312f),
+        new(0.049957946f, 0.933089100f, 0.016952945f),
+        new(0.056288019f, 0.926841641f, 0.016870331f),
+        new(0.063732852f, 0.919480119f, 0.016787020f),
+        new(0.072532236f, 0.910765162f, 0.016702592f),
+        new(0.082984390f, 0.900398982f, 0.016616618f),
+        new(0.095460490f, 0.888010848f, 0.016528651f),
+        new(0.110421040f, 0.873140755f, 0.016438193f),
+        new(0.128430384f, 0.855224817f, 0.016344788f),
+        new(0.150174712f, 0.833577319f, 0.016247957f),
+        new(0.176468480f, 0.807384293f, 0.016147214f),
+        new(0.208235667f, 0.775722345f, 0.016041975f),
+        new(0.246440024f, 0.737628435f, 0.015931528f),
+        new(0.291908018f, 0.692276903f, 0.015815065f),
+        new(0.344984668f, 0.639323614f, 0.015691704f),
+        new(0.405003302f, 0.579436097f, 0.015560587f),
+        new(0.469770292f, 0.514808650f, 0.015421044f),
+        new(0.535622243f, 0.449104730f, 0.015273012f),
+        new(0.598446474f, 0.386436255f, 0.015117256f),
+        new(0.655118405f, 0.329926299f, 0.014955281f),
+        new(0.704188549f, 0.281022574f, 0.014788861f),
+        new(0.745606932f, 0.239773366f, 0.014619686f),
+        new(0.780098645f, 0.205452132f, 0.014449208f),
+        new(0.808669226f, 0.177052183f, 0.014278574f),
+        new(0.832329195f, 0.153562082f, 0.014108706f),
+        new(0.851973460f, 0.134086206f, 0.013940317f),
+        new(0.868355627f, 0.117870335f, 0.013774022f),
+        new(0.882088371f, 0.104301317f, 0.013610295f),
+        new(0.893665842f, 0.092884622f, 0.013449518f),
+        new(0.903484049f, 0.083223919f, 0.013292015f),
+        new(0.911858005f, 0.075003924f, 0.013138054f),
+        new(0.919041310f, 0.067970837f, 0.012987836f),
+        new(0.925236892f, 0.061921566f, 0.012841525f),
+        new(0.930609071f, 0.056691665f, 0.012699247f),
+        new(0.935290842f, 0.052148021f, 0.012561120f),
+        new(0.939390513f, 0.048182279f, 0.012427191f),
+        new(0.942996767f, 0.044705727f, 0.012297489f),
+        new(0.946182355f, 0.041645556f, 0.012172072f),
+        new(0.949008025f, 0.038941093f, 0.012050866f),
+        new(0.951523919f, 0.036542201f, 0.011933864f),
+        new(0.953772082f, 0.034406857f, 0.011821045f),
+        new(0.955787697f, 0.032499914f, 0.011712372f),
+        new(0.957600446f, 0.030791764f, 0.011607774f),
+        new(0.959235683f, 0.029257157f, 0.011507144f),
+        new(0.960714776f, 0.027874770f, 0.011410438f),
+        new(0.962055945f, 0.026626454f, 0.011317586f),
+        new(0.963275107f, 0.025496410f, 0.011228468f),
+        new(0.964300437f, 0.024471080f, 0.011228468f),
+        new(0.965232800f, 0.023538717f, 0.011228468f),
+        new(0.966082492f, 0.022689026f, 0.011228468f),
+        new(0.966858432f, 0.021913087f, 0.011228468f),
+        new(0.967568415f, 0.021203103f, 0.011228468f),
+        new(0.968219303f, 0.020552216f, 0.011228468f),
+        new(0.968817046f, 0.019954474f, 0.011228468f),
+        new(0.969366905f, 0.019404615f, 0.011228468f),
+        new(0.969873478f, 0.018898043f, 0.011228468f),
+        new(0.970340909f, 0.018430612f, 0.011228468f),
+        new(0.970772869f, 0.017998652f, 0.011228468f),
+        new(0.971172383f, 0.017599138f, 0.011228468f),
+        new(0.971542180f, 0.017229342f, 0.011228468f),
+        new(0.971884776f, 0.016886746f, 0.011228468f),
+        new(0.972202337f, 0.016569185f, 0.011228468f),
+        new(0.972496890f, 0.016274633f, 0.011228468f),
+        new(0.972770257f, 0.016001266f, 0.011228468f),
+        new(0.973023999f, 0.015747524f, 0.011228468f),
+        new(0.973259632f, 0.015511892f, 0.011228468f),
+        new(0.973478536f, 0.015292988f, 0.011228468f),
+        new(0.973681941f, 0.015089583f, 0.011228468f),
+        new(0.973870951f, 0.014900573f, 0.011228468f),
+        new(0.974046776f, 0.014724748f, 0.011228468f),
+        new(0.974210313f, 0.014561212f, 0.011228468f),
+        new(0.974362517f, 0.014409008f, 0.011228468f),
+        new(0.974504245f, 0.014267281f, 0.011228468f),
+        new(0.974636162f, 0.014135364f, 0.011228468f),
+        new(0.974759150f, 0.014012377f, 0.011228468f),
+        new(0.974873710f, 0.013897817f, 0.011228468f),
+        new(0.974980528f, 0.013790999f, 0.011228468f),
+        new(0.975080171f, 0.013691356f, 0.011228468f),
+        new(0.975173072f, 0.013598455f, 0.011228468f),
+        new(0.975259696f, 0.013511832f, 0.011228468f),
+        new(0.975340480f, 0.013431048f, 0.011228468f),
+        new(0.975415806f, 0.013355721f, 0.011228468f),
+        new(0.975486006f, 0.013285522f, 0.011228468f),
+        new(0.975551437f, 0.013220092f, 0.011228468f),
+        new(0.975612438f, 0.013159090f, 0.011228468f),
+        new(0.975669295f, 0.013102234f, 0.011228468f),
+        new(0.975722246f, 0.013049283f, 0.011228468f),
+        new(0.975771580f, 0.012999949f, 0.011228468f),
+        new(0.975817540f, 0.012953989f, 0.011228468f),
+        new(0.975860350f, 0.012911179f, 0.011228468f),
+        new(0.975900220f, 0.012871310f, 0.011228468f),
+        new(0.975937277f, 0.012834253f, 0.011228468f),
+        new(0.975971818f, 0.012799711f, 0.011228468f),
+        new(0.976003931f, 0.012767598f, 0.011228468f),
+        new(0.976033845f, 0.012737685f, 0.011228468f),
+        new(0.976061665f, 0.012709865f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f),
+        new(0.976087481f, 0.012684050f, 0.011228468f)
+    };
+
+    // Cone (LMS) data from: Stockman & Sharpe (2000) / 2-deg fundamentals based on the
+    // Stiles & Burch 10-deg CMFs (adjusted to 2-deg). Data source: http://www.cvrl.org/cones.htm
+    // Rod (R)  data from: CIE (1951) Scotopic V'(λ). Data source: http://www.cvrl.org/lumindex.htm
+    private static readonly Float4[] CieLmsr = new Float4[401]
+    {
         new(4.15003E-04f, 3.68349E-04f, 9.54729E-03f, 0.0022090000f),
         new(5.02650E-04f, 4.48015E-04f, 1.14794E-02f, 0.0025470000f),
         new(6.07367E-04f, 5.43965E-04f, 1.37986E-02f, 0.0029390000f),
@@ -1007,22 +918,22 @@ public partial class Tonemapping : ViewRenderFeature
         new(2.35645E-05f, 1.84258E-06f, 0, 0.0000001551f),
         new(2.21026E-05f, 1.73528E-06f, 0, 0.0000001468f),
         new(2.07321E-05f, 1.63433E-06f, 0, 0.0000001390f),
-		new(1.94444E-05f, 1.53910E-06f, 0, 0),
-		new(1.82351E-05f, 1.44932E-06f, 0, 0),
-		new(1.71008E-05f, 1.36478E-06f, 0, 0),
-		new(1.60380E-05f, 1.28526E-06f, 0, 0),
-		new(1.50432E-05f, 1.21054E-06f, 0, 0),
-		new(1.41127E-05f, 1.14038E-06f, 0, 0),
-		new(1.32420E-05f, 1.07446E-06f, 0, 0),
-		new(1.24263E-05f, 1.01247E-06f, 0, 0),
-		new(1.16618E-05f, 9.54130E-07f, 0, 0),
-		new(1.09446E-05f, 8.99170E-07f, 0, 0),
-	};
+        new(1.94444E-05f, 1.53910E-06f, 0, 0),
+        new(1.82351E-05f, 1.44932E-06f, 0, 0),
+        new(1.71008E-05f, 1.36478E-06f, 0, 0),
+        new(1.60380E-05f, 1.28526E-06f, 0, 0),
+        new(1.50432E-05f, 1.21054E-06f, 0, 0),
+        new(1.41127E-05f, 1.14038E-06f, 0, 0),
+        new(1.32420E-05f, 1.07446E-06f, 0, 0),
+        new(1.24263E-05f, 1.01247E-06f, 0, 0),
+        new(1.16618E-05f, 9.54130E-07f, 0, 0),
+        new(1.09446E-05f, 8.99170E-07f, 0, 0),
+    };
 
-	// CIE 1931 2-deg, XYZ CMFs, Y only
-	// Data source: http://www.cvrl.org/cmfs.htm
-	private static readonly float[] CieY = new float[401]
-	{
+    // CIE 1931 2-deg, XYZ CMFs, Y only
+    // Data source: http://www.cvrl.org/cmfs.htm
+    private static readonly float[] CieY = new float[401]
+    {
         0.000120000000f,
         0.000134984000f,
         0.000151492000f,
@@ -1424,14 +1335,14 @@ public partial class Tonemapping : ViewRenderFeature
         0.000008592362f,
         0.000008009133f,
         0.000007465700f,
-	};
+    };
 
-	// CIE Standard Illuminant D65 relative spectral power distribution,
-	// from 390nm to 790nm, at 1nm intervals
-	// https://en.wikipedia.org/wiki/Illuminant_D65
-	// https://www.rit.edu/cos/colorscience/rc_useful_data.php
-	private static readonly float[] CieD65 = new float[401]
-	{
+    // CIE Standard Illuminant D65 relative spectral power distribution,
+    // from 390nm to 790nm, at 1nm intervals
+    // https://en.wikipedia.org/wiki/Illuminant_D65
+    // https://www.rit.edu/cos/colorscience/rc_useful_data.php
+    private static readonly float[] CieD65 = new float[401]
+    {
         54.6482f,
         57.4589f,
         60.2695f,
@@ -1833,29 +1744,5 @@ public partial class Tonemapping : ViewRenderFeature
         64.1198f,
         64.2119f,
         64.304f
-	};
-
-    private readonly struct Pass0Data
-    {
-        public readonly Tonemapping.Settings settings;
-        public readonly Camera camera;
-        public readonly Bloom.Settings bloomSettings;
-        public readonly ColorGamut colorGamut;
-        public readonly Matrix4x4 RgbToLmsr;
-        public readonly Matrix4x4 LmsToRgb;
-        public readonly bool hdrEnabled;
-        public readonly bool isFirst;
-
-        public Pass0Data(Tonemapping.Settings settings, Camera camera, Bloom.Settings bloomSettings, ColorGamut colorGamut, Matrix4x4 rgbToLmsr, Matrix4x4 lmsToRgb, bool hdrEnabled, bool isFirst)
-        {
-            this.settings = settings;
-            this.camera = camera;
-            this.bloomSettings = bloomSettings;
-            this.colorGamut = colorGamut;
-            RgbToLmsr = rgbToLmsr;
-            LmsToRgb = lmsToRgb;
-            this.hdrEnabled = hdrEnabled;
-            this.isFirst = isFirst;
-        }
-    }
+    };
 }

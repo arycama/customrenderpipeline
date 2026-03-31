@@ -27,6 +27,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
     protected abstract bool UseSrpBatching { get; }
     protected virtual bool RenderUiOverlay { get; } = true;
     protected virtual bool RenderWireframe { get; } = true;
+    protected virtual float SdrLuminance { get; } = 250f;
 
     public CustomRenderPipelineBase()
     {
@@ -65,6 +66,12 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
     /// <summary> Creates a list of render loops that will be rendered </summary>
     protected virtual void CollectViewRenderData(List<Camera> cameras, ScriptableRenderContext context, List<ViewRenderData> viewRenderDatas)
     {
+        var hdrSettings = HDROutputSettings.main;
+        var hdrAvailable = hdrSettings.available;
+        var colorGamut = hdrAvailable ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
+        var peakLuminance = hdrAvailable ? hdrSettings.maxToneMapLuminance : SdrLuminance;
+        renderGraph.SetResource<HdrOutputData>(new(colorGamut, peakLuminance, hdrAvailable, hdrSettings), true);
+
         foreach (var camera in cameras)
         {
             if (!camera.TryGetCullingParameters(out var cullingParameters))

@@ -10,177 +10,65 @@
 #include "../Lighting.hlsl"
 
 Texture2D<float3> CameraBloom;
-float IsSceneView, ColorGamut, Tonemap, IsPreview;
-float4 CameraBloomScaleLimit, CameraBloom_TexelSize, CameraTargetScaleLimit;
-float BloomStrength, MinLuminance, MaxLuminance;
-float4x4 RgbToLmsr, LmsToRgb;
-float Purkinje;
-float3 RodInputStrength;
-float Hdr;
-float IsFirst;
-float LutResolution;
-float MaxInputLuminance, LinearStart, FadeStart, FadeEnd, HuePreservation;
-Texture3D<float3> ColorGradingLut;
+Texture3D<float3> ColorGradingTexture;
+float4 CameraBloomScaleLimit, CameraBloom_TexelSize;
 
-float3x3 Diag(float3 m)
+//cbuffer Properties
+
+	float2 Resolution;
+	float2 LutScaleOffset;
+	//float PaperWhite;
+	float BloomStrength;
+	float MaxLuminance;
+
+
+float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
-	return float3x3(m.x, 0, 0, 0, m.y, 0, 0, 0, m.z);
-}
-
-float3 Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
-{
-	if (!IsSceneView && !IsPreview)
-		uv.y = 1 - uv.y;
-
-	float3 color = CameraTarget.Sample(LinearClampSampler, ClampScaleTextureUv(uv, CameraTargetScaleLimit));
+	float2 position = input.position.xy;
 	
-	#ifdef BLOOM_ON
-		float3 bloom = CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, 1), CameraBloomScaleLimit)) * 0.0625;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, 1), CameraBloomScaleLimit)) * 0.125;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, 1), CameraBloomScaleLimit)) * 0.0625;
-
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, 0), CameraBloomScaleLimit)) * 0.125;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, 0), CameraBloomScaleLimit)) * 0.25;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, 0), CameraBloomScaleLimit)) * 0.125;
-
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, -1), CameraBloomScaleLimit)) * 0.0625;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, -1), CameraBloomScaleLimit)) * 0.125;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, -1), CameraBloomScaleLimit)) * 0.0625;
+	#ifndef SCENE_VIEW
+		position.y = ViewSize.y - position.y;
+	#endif
 	
+	float3 color = CameraTarget[position];
+	
+	#ifdef BLOOM
+		float3 bloom = SampleBloom(input.uv, viewIndex, CameraBloom, CameraBloom_TexelSize.xy, CameraBloomScaleLimit);
 		color = lerp(color, bloom, BloomStrength);
 	#endif
 	
-	if(IsFirst)
-		color *= PreviousToCurrentExposure;
+	color *= PaperWhite;
+	color = Rec2020ToICtCp(color);
+	color.yz += 0.5;
+	color = LutScaleOffset.x * color + LutScaleOffset.y;
+	color = ColorGradingTexture.Sample(TrilinearClampSampler, color);
 	
-	//#ifdef USE_LUT
-	//	color = Rec2020ToICtCp(color);
-	//	color = Remap01ToHalfTexel(color, LutResolution);
-	//	color = ColorGradingLut.Sample(TrilinearClampSampler, color);
-	//	color = ICtCpToRec2020(color);
-	//#else
-		if (!IsPreview && Purkinje)
-		{
-			// Lms to opponent space
-		
-			// Some out of gamut colors can produce negative values, leading to nans)
-			float3 c = max(0, Rec2020ToRec709(color * RcpExposure));
-			float4 q = mul((float4x3) RgbToLmsr, c); // lmsr
-		
-			float3 m = float3(0.63721, 0.39242, 1.6064); // maximal cone sensitivity
-			float3 k = RodInputStrength;//		float3(0.2, 0.2, 0.29); // rod input strength
-			float3 g = rsqrt(1.0 + 0.33 / m * (q.xyz + k * q.w));
-		
-			float3x3 A = float3x3(-1, 1, 0, -1, -1, 1, 1, 1, 0);
-			float3 qHat = q.xyz;
-			float3 o = mul(A, qHat); // not actually used
-		
-			float K = 45.0; // Scaling constant
-			float S = 10.0; // Static saturation
-			float k3 = 0.6; // Surround strength of opponent signal
-			float rw = 0.139; // Ratio of responses for white light
-			float p = 0.6189; // Relative weight of L cones
-		
-			float3x3 rodMatrix = float3x3(
-				-(k3 + rw), 1 + k3 * rw, 0,
-				p * k3, (1 - p) * k3, 1,
-				p * S, (1 - p) * S, 0);
-		
-			float3 deltaO = K / S * mul(mul(mul(rodMatrix, Diag(k)), Diag(rcp(m))), g) * q.w;
-			float3x3 mHat = Inverse((float3x3) RgbToLmsr);
-			float3x3 invA = Inverse(A);
-			float3 deltaC = mul(mul(mHat, invA), deltaO);
-		
-			float3 scotopicColor = Rec709ToRec2020(deltaC) * Exposure;
-		
-			float scotopicStart = 1e-6;
-			float scotopicEnd = 1e-3;
-			float mesopicStart = scotopicEnd;
-			float mesopicEnd = sqrt(10);
-			float photopicStart = mesopicEnd;
-			float photopicEnd = 1e+8;
-		
-			float luminance = EV100ToLuminance(ExposureToEV100(Exposure) + PreviousExposureCompensation);
-		
-			color += Rec709ToRec2020(deltaC) * Exposure;
-		}
-	
-	color *= PaperWhite * sqrt(2.0);
-	#ifdef TONEMAP
-		color = Rec2020ToICtCp(color);
-		color.yz += 0.5;
-		color = Remap01ToHalfTexel(color, LutResolution);
-		color = ColorGradingLut.Sample(TrilinearClampSampler, color);
+	#ifdef PREVIEW
+		color = ST2084ToLinear(color);
+		color = Rec2020ToRec709(color);
+		color /= MaxLuminance;
+		color = LinearToGamma(color);
 	#else
-		//color = Gt7Tonemap(color, MaxLuminance, PaperWhite * sqrt(2), MaxInputLuminance, LinearStart, FadeStart, FadeEnd, HuePreservation);
-		color = min(color, MaxLuminance);
+		#if defined(SRGB) || defined(REC709)
+			color = ST2084ToLinear(color);
+			color = Rec2020ToRec709(color);
+			color /= MaxLuminance;
+		#endif
+	
+		#ifdef REC709
+			color *= MaxLuminance / kReferenceLuminanceWhiteForRec709;
+		#endif
 	#endif
 	
-	if (IsPreview)
-		return color / (PaperWhite * sqrt(2.0));
+	#ifdef SCENE_VIEW
+		#ifdef REC709
+			color /= SceneViewNitsForPaperWhite / kReferenceLuminanceWhiteForRec709;
+		#endif
 	
-	switch (ColorGamut)
-	{
-		// Return linear sRGB, hardware will convert to gmama
-		case ColorGamutSRGB:
-			color = Rec2020ToRec709(color / (PaperWhite * sqrt(2.0)));
-			break;
-		
-		case ColorGamutRec709:
-			color = Rec2020ToRec709(color);
-			color = color / kReferenceLuminanceWhiteForRec709;
-			break;
-		
-		case ColorGamutRec2020:
-			break;
-			
-		case ColorGamutDisplayP3:
-			break;
-		
-		case ColorGamutHDR10:
-		{
-			#ifndef TONEMAP
-				color = LinearToST2084(color);
-			#endif
-			
-			break;
-		}
-		
-		case ColorGamutDolbyHDR:
-			break;
-		
-		case ColorGamutP3D65G22:
-		{
-			// The HDR scene is in Rec.709, but the display is P3
-			// TODO: Rec2020toP3?
-			color = Rec2020ToP3D65(color);
-			
-			// Apply gamma 2.2
-			color = pow(abs(color / MaxLuminance), rcp(2.2));
-			break;
-		}
-	}
-	
-	// When in scene view, Unity converts the output to sRGB, renders editor content, then applies the above transfer function at the end.
-	// To maintain our own tonemapping, we need to perform the inverse of this.
-	if (IsSceneView)
-	{
-		switch (ColorGamut)
-		{
-			case ColorGamutRec709:
-				//color *= kReferenceLuminanceWhiteForRec709 / SceneViewNitsForPaperWhite;
-				break;
-		
-			case ColorGamutHDR10:
-				//color = ST2084ToLinear(color) / PaperWhite;
-				color = Rec2020ToRec709(ST2084ToLinear(color)) / SceneViewNitsForPaperWhite;
-				break;
-		
-			case ColorGamutP3D65G22:
-				//color = P3D65ToRec709(pow(color, 2.2) * SceneViewMaxDisplayNits / SceneViewNitsForPaperWhite);
-				break;
-		}
-	}
+		#ifdef HDR10
+			color = Rec2020ToRec709(ST2084ToLinear(color)) / SceneViewNitsForPaperWhite;
+		#endif
+	#endif
 	
 	return color;
 }

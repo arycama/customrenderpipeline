@@ -36,9 +36,9 @@ public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 	[field: SerializeField] public Bloom.Settings Bloom { get; private set; }
 	[field: SerializeField] public DepthOfField.Settings DepthOfFieldSettings { get; private set; }
 	[field: SerializeField] public TemporalAA.Settings TemporalAASettings { get; private set; }
-	[field: SerializeField] public Tonemapping.Settings Tonemapping { get; private set; }
+	[field: SerializeField] public ColorGrading.Settings ColorGrading { get; private set; }
 
-	public override Type pipelineType => typeof(CustomRenderPipeline);
+    public override Type pipelineType => typeof(CustomRenderPipeline);
 
 	public override bool UseSrpBatching => useSrpBatching;
 

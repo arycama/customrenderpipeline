@@ -6,13 +6,13 @@ public partial class AutoExposure : ViewRenderFeature
 {
 	private static readonly int ExposureCompensationTextureId = Shader.PropertyToID("ExposureCompensationTexture");
 
-	private readonly Tonemapping.Settings tonemappingSettings;
+	private readonly ColorGrading.Settings tonemappingSettings;
 	private readonly Settings settings;
 	private readonly LensSettings lensSettings;
 	private readonly ComputeShader computeShader;
 	private readonly Texture2D exposureTexture;
 
-	public AutoExposure(Settings settings, LensSettings lensSettings, RenderGraph renderGraph, Tonemapping.Settings tonemappingSettings) : base(renderGraph)
+	public AutoExposure(Settings settings, LensSettings lensSettings, RenderGraph renderGraph, ColorGrading.Settings tonemappingSettings) : base(renderGraph)
 	{
 		this.settings = settings;
 		this.lensSettings = lensSettings;

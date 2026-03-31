@@ -33,6 +33,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	private readonly QuadtreeCull quadtreeCull;
     private readonly EnvironmentConvolve environmentConvolve;
 
+    protected override float SdrLuminance => asset.ColorGrading.SdrLuminance;
+
 	public CustomRenderPipeline(CustomRenderPipelineAsset renderPipelineAsset) : base(renderPipelineAsset)
 	{
 		quadtreeCull = new(renderGraph);
@@ -136,7 +138,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new ProceduralGenerationGpu(renderGraph, RenderPipelineDependencyResolver.Resolve<ProceduralGenerationController>()),
 		new WaterShoreMask(renderGraph, asset.WaterShoreMaskSettings),
         new GpuDrivenRenderingSetup(renderGraph, RenderPipelineDependencyResolver.Resolve<ProceduralGenerationController>()),
-	};
+
+        new ColorGrading(renderGraph, asset.ColorGrading)
+    };
 
 	protected override List<ViewRenderFeature> InitializePerCameraRenderFeatures() => new()
 	{
@@ -160,7 +164,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		}),
 
 		new TemporalAASetup(renderGraph, asset.TemporalAASettings),
-		new AutoExposurePreRender(renderGraph, asset.Tonemapping, asset.LensSettings, asset.AutoExposureSettings),
+		new AutoExposurePreRender(renderGraph, asset.ColorGrading, asset.LensSettings, asset.AutoExposureSettings),
 		new SetupCamera(renderGraph, asset.Sky),
 
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
@@ -390,12 +394,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new RainTextureUpdater(renderGraph, asset.Rain),
 
         new Rain(renderGraph, asset.Rain),
-		new AutoExposure(asset.AutoExposureSettings, asset.LensSettings, renderGraph, asset.Tonemapping),
+		new AutoExposure(asset.AutoExposureSettings, asset.LensSettings, renderGraph, asset.ColorGrading),
         new DepthOfField(asset.DepthOfFieldSettings, asset.LensSettings, renderGraph, asset.TemporalAASettings),
 		new CameraVelocityDilate(renderGraph, asset.TemporalAASettings),
 		new TemporalAA(asset.TemporalAASettings, renderGraph),
 		new Bloom(renderGraph, asset.Bloom),
-		new Tonemapping(renderGraph, asset.Tonemapping, asset.Bloom),
+		new Tonemapping(renderGraph, asset.ColorGrading, asset.Bloom),
 		new RenderGizmos(renderGraph),
 	};
 }
