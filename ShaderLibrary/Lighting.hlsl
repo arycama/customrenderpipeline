@@ -40,6 +40,73 @@ Texture2D<float4> ScreenSpaceReflections;
 float4 ScreenSpaceReflectionsScaleLimit;
 float SpecularGiStrength;
 
+struct LightingInput
+{
+	// TODO: A lot of these fields are shared with material struct, should we just nest material here? 
+	// Though some fields need transforming, eg N, albedo, opacity
+	half3 worldPosition; // Needed for shadow receiving, maybe convert to view space so we have view depth as viewPosition.z
+	half3 V;
+	half3 N;
+	half NdotV;
+	float viewDepth;
+	
+	half perceptualRoughness;
+	half roughness;
+	half3 albedo;
+	half3 reflectivity;
+	half3 vertexAmbient;
+	half3 emission;
+	half diffuseOpacity;
+	half specularOpacity;
+	half translucency;
+	half3 transmittance;
+	bool transmission;
+	half3 bentNormal;
+	half cosVisibilityAngle;
+	
+	bool isVolume;
+	bool refractedEnvironment;
+	bool isThinSurface;
+	bool thinSurfaceApprox; // TODO: Support, or maybe control with a define
+};
+
+// Converts material and geometry into a struct for lighting
+LightingInput CreateLightingInput(Material material, float3 worldPosition, float3 V, half3 vertexAmbient, float viewDepth)
+{
+	LightingInput output;
+	output.worldPosition = worldPosition;
+	output.V = V;
+	output.N = GetViewClampedNormal(material.normal, V, output.NdotV);
+	output.bentNormal = material.bentNormal;
+	output.viewDepth = viewDepth;
+	
+	// For backfacing surfaces (Eg underwater surface) we store the flipped normal, but the btdf expects the normal to point away from camera, and uses NdotV < 0 to detect this
+	if (material.isBackFace)
+	{
+		output.N = -output.N;
+		output.NdotV = -output.NdotV;
+	}
+	
+	output.perceptualRoughness = max(0.089h, material.roughness);
+	output.roughness = PerceptualRoughnessToRoughness(output.perceptualRoughness);
+	output.diffuseOpacity = material.opacity;
+	output.specularOpacity = material.isFade ? material.opacity : 1.0; // In theory, reducing IOR to 1.0 should also achieve this, split sum and fresnel approximation stops this from fully fading objects
+	output.reflectivity = GetReflectivity(material.albedo, material.metallic, material.opacity, material.ior);
+	output.translucency = material.translucency;
+	output.albedo = GetAlbedo(material.albedo, material.metallic, material.opacity);
+	output.cosVisibilityAngle = material.cosVisibilityAngle;
+	output.vertexAmbient = vertexAmbient;
+	output.emission = material.emission;
+	output.transmission = material.transmission;
+	output.transmittance = lerp(1.0, output.albedo * output.translucency, material.opacity);
+	
+	// TODO: Maybe handle this another way? Could move refracted skybox sampling out of the lighting function and apply later
+	output.refractedEnvironment = material.refractedEnvironment;
+	output.isVolume = material.isBackFace;
+	output.isThinSurface = material.isThinSurface;
+	return output;
+}
+
 float CloudTransmittance(float3 positionWS)
 {
 	float3 coords = MultiplyPoint3x4(_WorldToCloudShadow, positionWS);
@@ -219,46 +286,46 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 	return attenuation;
 }
 
-float4 EvaluateLighting(float3 f0, float perceptualRoughness, float cosVisibilityAngle, float3 albedo, float3 N, float NdotV, float3 bentNormal, float3 worldPosition, float3 translucency, uint2 pixelCoordinate, float eyeDepth, float opacity = 1.0, bool isWater = false, bool softShadows = false)
+float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater = false, bool softShadows = false)
 {
-	albedo = max(0.0, Rec709ToRec2020(albedo));
-	translucency = max(0.0, Rec709ToRec2020(translucency));
+	input.albedo = max(0.0, Rec709ToRec2020(input.albedo));
+	input.translucency = max(0.0, Rec709ToRec2020(input.translucency));
 
-	float3 V = normalize(-worldPosition);
+	float3 V = normalize(-input.worldPosition);
 	
-	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
+	float roughness = PerceptualRoughnessToRoughness(input.perceptualRoughness);
 	float roughness2 = Sq(roughness);
-	float partLambdaV = GetPartLambdaV(roughness2, NdotV);
+	float partLambdaV = GetPartLambdaV(roughness2, input.NdotV);
 	
-	float f0Avg = dot(f0, 1.0 / 3.0);
-	float2 dfg = PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotV, perceptualRoughness), 32));
+	float f0Avg = dot(input.reflectivity, 1.0 / 3.0);
+	float2 dfg = PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(input.NdotV, input.perceptualRoughness), 32));
 	float ems = 1.0 - dfg.x - dfg.y;
-	float3 multiScatterTerm = GgxMultiScatterTerm(f0, perceptualRoughness, NdotV, ems);
+	float3 multiScatterTerm = GgxMultiScatterTerm(input.reflectivity, input.perceptualRoughness, input.NdotV, ems);
 	
 	// Can combine below into 1 lookup
-	float viewDirectionalAlbedoMs = DirectionalAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float3(NdotV, perceptualRoughness, f0Avg), 16));
-	float averageAlbedoMs = AverageAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(perceptualRoughness, f0Avg), 16));
+	float viewDirectionalAlbedoMs = DirectionalAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float3(input.NdotV, input.perceptualRoughness, f0Avg), 16));
+	float averageAlbedoMs = AverageAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(input.perceptualRoughness, f0Avg), 16));
 	float diffuseTerm = averageAlbedoMs ? viewDirectionalAlbedoMs * rcp(averageAlbedoMs) : 0.0; // TODO: Bake into DFG?
 	
 	// Direct lighting
-	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition));
+	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(input.worldPosition));
 	
-	float shadow = GetDirectionalShadow(worldPosition, softShadows) * CloudTransmittance(worldPosition);
+	float shadow = GetDirectionalShadow(input.worldPosition, softShadows) * CloudTransmittance(input.worldPosition);
 	
 	#ifdef SCREEN_SPACE_SHADOWS
 		shadow = min(shadow, lerp(1.0, ScreenSpaceShadows[pixelCoordinate], ScreenSpaceShadowsIntensity));
 	#endif
 	
 	#ifdef UNDERWATER_LIGHTING_ON
-		float3 underwaterTransmittance = exp(-_WaterShadowExtinction * max(0.0, -(worldPosition.y + ViewPosition.y)));
-		lightTransmittance *= WaterShadow(worldPosition, _LightDirection0) * GetCaustics(worldPosition + ViewPosition, _LightDirection0);
+		float3 underwaterTransmittance = exp(-_WaterShadowExtinction * max(0.0, -(input.worldPosition.y + ViewPosition.y)));
+		lightTransmittance *= WaterShadow(input.worldPosition, _LightDirection0) * GetCaustics(input.worldPosition + ViewPosition, _LightDirection0);
 	#endif
 	
-	float3 luminance = EvaluateLight(perceptualRoughness, f0, cosVisibilityAngle, roughness2, f0Avg, partLambdaV, multiScatterTerm, _LightDirection0, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, true) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
+	float3 luminance = EvaluateLight(input.perceptualRoughness, input.reflectivity, input.cosVisibilityAngle, roughness2, f0Avg, partLambdaV, multiScatterTerm, _LightDirection0, input.N, input.bentNormal, input.worldPosition, input.NdotV, V, diffuseTerm, input.albedo, input.translucency, true) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
 	
 	uint3 clusterIndex;
 	clusterIndex.xy = pixelCoordinate / TileSize;
-	clusterIndex.z = log2(eyeDepth) * ClusterScale + ClusterBias;
+	clusterIndex.z = log2(input.viewDepth) * ClusterScale + ClusterBias;
 	
 	uint2 lightOffsetAndCount = LightClusterIndices[clusterIndex];
 	uint startOffset = lightOffsetAndCount.x;
@@ -270,27 +337,27 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float cosVisibilit
 		uint index = LightClusterList[startOffset + i];
 		LightData light = PointLights[index];
 		
-		float3 lightVector = light.position - worldPosition;
+		float3 lightVector = light.position - input.worldPosition;
 		float sqrLightDist = dot(lightVector, lightVector);
 		if (sqrLightDist >= Sq(light.range))
 			continue;
 		
 		float rcpLightDist = rsqrt(sqrLightDist);
 		float3 L = lightVector * rcpLightDist;
-		float NdotL = dot(N, L);
+		float NdotL = dot(input.N, L);
 		if (NdotL <= 0.0)
 			continue;
 		
-		float attenuation = GetLightAttenuation(light, worldPosition, 0.5, false);
+		float attenuation = GetLightAttenuation(light, input.worldPosition, 0.5, false);
 		if (!attenuation)
 			continue;
 		
-		luminance += EvaluateLight(perceptualRoughness, f0, cosVisibilityAngle, roughness2, f0Avg, partLambdaV, multiScatterTerm, L, N, bentNormal, worldPosition, NdotV, V, diffuseTerm, albedo, translucency, false) * (light.color * Exposure * attenuation);
+		luminance += EvaluateLight(input.perceptualRoughness, input.reflectivity, input.cosVisibilityAngle, roughness2, f0Avg, partLambdaV, multiScatterTerm, L, input.N, input.bentNormal, input.worldPosition, input.NdotV, V, diffuseTerm, input.albedo, input.translucency, false) * (light.color * Exposure * attenuation);
 	}
 	
 	// Indirect Lighting
-	float3 iblN = N;
-	float3 R = reflect(-V, N);
+	float3 iblN = input.N;
+	float3 R = reflect(-V, input.N);
 	float3 rStrength = 1.0;
 	
 	// Reflection correction for water
@@ -298,19 +365,19 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float cosVisibilit
 	{
 		iblN = float3(0.0, 1.0, 0.0);
 		float NdotR = dot(iblN, -R);
-		float2 dfg = PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotR, perceptualRoughness), 32));
-		rStrength = dfg.x * f0 + dfg.y;
+		float2 dfg = PrecomputedDfg.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(NdotR, input.perceptualRoughness), 32));
+		rStrength = dfg.x * input.reflectivity + dfg.y;
 		R = reflect(R, iblN);
 	}
 	
-	float3 iblR = GetSpecularDominantDir(N, R, roughness, NdotV);
-	float iblMipLevel = PerceptualRoughnessToMipmapLevel(perceptualRoughness);
+	float3 iblR = GetSpecularDominantDir(input.N, R, roughness, input.NdotV);
+	float iblMipLevel = PerceptualRoughnessToMipmapLevel(input.perceptualRoughness);
 	float2 skyUv = NormalToOctahedralUv(iblR);
 	skyUv = Remap(skyUv, 0, 1, 0 + rcp(SkyReflectionSize), 1.0 - rcp(SkyReflectionSize));
 	float3 radiance = SkyReflection.SampleLevel(TrilinearClampSampler, skyUv, iblMipLevel) * rStrength;
 	
-	float BdotR = dot(bentNormal, R);
-	float specularOcclusion = GetSpecularOcclusion(cosVisibilityAngle, BdotR, perceptualRoughness, dot(N, R));
+	float BdotR = dot(input.bentNormal, R);
+	float specularOcclusion = GetSpecularOcclusion(input.cosVisibilityAngle, BdotR, input.perceptualRoughness, dot(input.N, R));
 	radiance *= specularOcclusion;
 	
 	#ifdef UNDERWATER_LIGHTING_ON
@@ -322,10 +389,10 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float cosVisibilit
 		radiance = lerp(radiance + ssr.rgb * SpecularGiStrength, lerp(radiance, ssr.rgb, ssr.a * SpecularGiStrength), specularOcclusion);
 	#endif
 
-	float3 fssEss = dfg.x * f0 + dfg.y;
+	float3 fssEss = dfg.x * input.reflectivity+ dfg.y;
 	luminance += radiance * fssEss;
 	
-	float3 irradiance = AmbientCosine(bentNormal, cosVisibilityAngle);
+	float3 irradiance = AmbientCosine(input.bentNormal, input.cosVisibilityAngle);
 	
 	#ifdef UNDERWATER_LIGHTING_ON
 		irradiance *= underwaterTransmittance;
@@ -333,27 +400,27 @@ float4 EvaluateLighting(float3 f0, float perceptualRoughness, float cosVisibilit
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float4 ssgi = ScreenSpaceGlobalIllumination[pixelCoordinate];
-		irradiance = lerp(irradiance + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeCosAngleToVisibility(cosVisibilityAngle));
+		irradiance = lerp(irradiance + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeCosAngleToVisibility(input.cosVisibilityAngle));
 	#endif
 	
-	float3 fAvg = AverageFresnel(f0);
+	float3 fAvg = AverageFresnel(input.reflectivity);
 	float3 fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
 	float3 kd = 1.0 - fssEss - fmsEms;
-	luminance += irradiance * (fmsEms + albedo * kd);
+	luminance += irradiance * (fmsEms + input.albedo * kd);
 	
-	float3 irradiance1 = AmbientCosine(-bentNormal, cosVisibilityAngle);
+	float3 irradiance1 = AmbientCosine(-input.bentNormal, input.cosVisibilityAngle);
 	
 	#ifdef UNDERWATER_LIGHTING_ON
 		irradiance1 *= underwaterTransmittance;
 	#endif
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-		irradiance1 = lerp(irradiance1 + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeCosAngleToVisibility(cosVisibilityAngle));
+		irradiance1 = lerp(irradiance1 + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeCosAngleToVisibility(input.cosVisibilityAngle));
 	#endif
 	
-	luminance += irradiance1 * translucency * kd;
+	luminance += irradiance1 * input.translucency * kd;
 	
-	return float4(luminance, lerp(opacity, 1.0, fssEss.r));
+	return float4(luminance, lerp(input.diffuseOpacity, 1.0, fssEss.r));
 }
 
 #endif
