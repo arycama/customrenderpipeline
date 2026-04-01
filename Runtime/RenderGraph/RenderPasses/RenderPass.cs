@@ -78,6 +78,7 @@ public abstract class RenderPass : IDisposable
     public GraphicsFormat FrameBufferFormat { get; set; }
     public Int2 Size { get; protected set; }
     public int ViewCount { get; set; }
+	public int AntiAliasing { get; protected set; } = 1;
 
     public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
     public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);

@@ -22,9 +22,10 @@ public readonly struct ViewRenderData : IRenderPassData
     public readonly GraphicsFormat format;
     public readonly int viewCount;
     public readonly bool requiresMirrorBlit;
+    public readonly int samples;
     public readonly IntPtr? foveatedRenderingInfo;
 
-    public ViewRenderData(Int2 viewSize, float near, float far, Float2 tanHalfFov, RigidTransform transform, Camera camera, ScriptableRenderContext context, ScriptableCullingParameters cullingParameters, RenderTargetIdentifier target, VRTextureUsage vrTextureUsage, SinglePassStereoMode stereoMode, int instanceMultiplier, string stereoKeyword, GraphicsFormat format, int viewCount, bool requiresMirrorBlit, IntPtr? foveatedRenderingInfo = null)
+    public ViewRenderData(Int2 viewSize, float near, float far, Float2 tanHalfFov, RigidTransform transform, Camera camera, ScriptableRenderContext context, ScriptableCullingParameters cullingParameters, RenderTargetIdentifier target, VRTextureUsage vrTextureUsage, SinglePassStereoMode stereoMode, int instanceMultiplier, string stereoKeyword, GraphicsFormat format, int viewCount, bool requiresMirrorBlit, int samples = 1, IntPtr? foveatedRenderingInfo = null)
     {
         this.viewSize = viewSize;
         this.near = near;
@@ -43,6 +44,7 @@ public readonly struct ViewRenderData : IRenderPassData
         this.format = format;
         this.viewCount = viewCount;
         this.requiresMirrorBlit = requiresMirrorBlit;
+        this.samples = samples;
         this.foveatedRenderingInfo = foveatedRenderingInfo;
     }
 

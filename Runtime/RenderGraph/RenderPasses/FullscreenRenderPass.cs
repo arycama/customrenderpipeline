@@ -13,12 +13,13 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
         return $"{Name} {material} {passIndex}";
     }
 
-    public virtual void Initialize(Material material, Int2 size, int viewCount = 1, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None)
+    public virtual void Initialize(Material material, Int2 size, int viewCount = 1, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None, int antiAliasing = 1)
     {
         this.material = material;
         this.passIndex = passIndex;
         this.primitiveCount = primitiveCount;
         this.stereoMode = stereoMode;
+        AntiAliasing = antiAliasing;
         Size = size;
         ViewCount = viewCount;
     }
