@@ -168,7 +168,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	albedo += translucency;
 	float t = dot(translucency, albedo) / SqrLength(albedo);
 	
-	albedo = lerp(input.color, albedo, smoothstep(0, 0.5, input.uv.y));
+	//albedo = lerp(input.color, albedo, smoothstep(0, 0.5, input.uv.y));
 	float3 V = normalize(-input.worldPosition);
 		
 	FragmentOutput output;

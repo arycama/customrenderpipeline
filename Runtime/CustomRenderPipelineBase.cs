@@ -21,6 +21,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
     private readonly List<ViewRenderData> viewRenderDatas = new();
 
     public bool IsDisposingFromRenderDoc { get; protected set; }
+    public bool IsDisposing { get; private set; }
 
     protected abstract SupportedRenderingFeatures SupportedRenderingFeatures { get; }
 
@@ -47,6 +48,8 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
     protected override void Dispose(bool disposing)
     {
+        IsDisposing = true;
+
         // Could dispose in reverse order?
         foreach (var renderFeature in perFrameRenderFeatures)
             renderFeature?.Dispose();

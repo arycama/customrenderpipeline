@@ -120,61 +120,23 @@ float CloudTransmittance(float3 positionWS)
 }
 
 // TODO: Can parameters be simplified/shortened
-float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAngle, float roughness2, float f0Avg, float partLambdaV, float3 multiScatterTerm, float3 L, float3 N, float3 B, float3 worldPosition, float NdotV, float3 V, float diffuseTerm, float3 albedo, float3 translucency, bool isDirectional)
+float3 EvaluateLight(float perceptualRoughness, float3 f0, float cosVisibilityAngle, float roughness2, float f0Avg, float partLambdaV, float3 multiScatterTerm, float3 L, float3 N, float3 B, float3 worldPosition, float NdotV, float3 V, float diffuseTerm, float3 albedo, float translucency, bool isDirectional)
 {
 	float NdotL = dot(N, L);
-	
-	float illuminance = saturate(NdotL);
-	if (isDirectional)
-	{
-		if (MicroShadows)
-		{
-			float4 intersectionResult = SphericalCapIntersection(B, cosVisibilityAngle, L, SunCosAngle);
-			float intersectionSolidAngle = ConeCosAngleToSolidAngle(intersectionResult.a);
-			illuminance *= ConeCosAngleToSolidAngle(intersectionResult.a) * SunRcpSolidAngle;
-		}
-	}
 	
 	diffuseTerm *= DirectionalAlbedoMs.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float3(abs(NdotL), perceptualRoughness, f0Avg), 16), 0.0);
 	float3 result = 0.0;
 	
 	if (NdotL > 0.0)
 	{
-		result += diffuseTerm * albedo * illuminance * (1.0 - translucency);
+		result += diffuseTerm * (1.0 - translucency) * albedo * NdotL;
 		
 		float LdotV = dot(L, V);
-		result += Ggx(roughness2, NdotL, LdotV, NdotV, partLambdaV, perceptualRoughness, f0, multiScatterTerm) * illuminance;
+		result += Ggx(roughness2, NdotL, LdotV, NdotV, partLambdaV, perceptualRoughness, f0, multiScatterTerm) * NdotL;
 	}
-	//else
+	else
 	{
-		//#if 0
-		//	float s = scale ∗ distance(pos, Nvertex, i);
-		//	float E = max(0.3 + dot(-Nvertex, L), 0.0);
-		//	float3 transmittance = T(s)∗ lights[i].color ∗ attenuation∗ spot ∗ albedo.rgb ∗ E;
-		//	// We add the contribution of this light
-		//	M += transmittance + reflectance;
-		//#else
-
-		#if 0
-			// http://blog.stevemcauley.com/2011/12/03/energy-conserving-wrapped-diffuse/
-			float wrap = 0.5;
-			float wrappedNdotL = saturate((-dot(N, L) + wrap) / Sq(1 + wrap));
-			float scatter = GgxD(roughness2, saturate(dot(-V, L)));
-			result += wrappedNdotL * scatter * translucency* diffuseTerm;
-		#elif 1
-			result += (WrappedDiffuse(saturate(-NdotL), 0.5) + WrappedDiffuse(saturate(NdotL), 0.5)) * 0.5 * translucency;
-			//result += translucency * -NdotL * diffuseTerm;
-		#else
-			float3 lr = L + 2 * N * -NdotL;
-				
-			float LdotV = saturate(dot(lr, V));
-			float rcpLenLv = rsqrt(2.0 + 2.0 * LdotV);
-			float NdotH = (-NdotL + NdotV) * rcpLenLv;
-			float ggx = GgxDv(roughness2, NdotH, -NdotL, NdotV, partLambdaV);
-			float LdotH = LdotV * rcpLenLv + rcpLenLv;
-		
-			result += ggx * (1 - Fresnel(LdotH, f0)) * -NdotL * translucency;
-		#endif
+		result += diffuseTerm * translucency * albedo * -NdotL;
 	}
 	
 	return RcpPi * result;
@@ -289,10 +251,7 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater = false, bool softShadows = false)
 {
 	input.albedo = max(0.0, Rec709ToRec2020(input.albedo));
-	input.translucency = max(0.0, Rec709ToRec2020(input.translucency));
 
-	float3 V = normalize(-input.worldPosition);
-	
 	float roughness = PerceptualRoughnessToRoughness(input.perceptualRoughness);
 	float roughness2 = Sq(roughness);
 	float partLambdaV = GetPartLambdaV(roughness2, input.NdotV);
@@ -308,7 +267,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	float diffuseTerm = averageAlbedoMs ? viewDirectionalAlbedoMs * rcp(averageAlbedoMs) : 0.0; // TODO: Bake into DFG?
 	
 	// Direct lighting
-	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(input.worldPosition));
+	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -input.V.y, _LightDirection0.y, length(input.worldPosition));
 	
 	float shadow = GetDirectionalShadow(input.worldPosition, softShadows) * CloudTransmittance(input.worldPosition);
 	
@@ -321,7 +280,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 		lightTransmittance *= WaterShadow(input.worldPosition, _LightDirection0) * GetCaustics(input.worldPosition + ViewPosition, _LightDirection0);
 	#endif
 	
-	float3 luminance = EvaluateLight(input.perceptualRoughness, input.reflectivity, input.cosVisibilityAngle, roughness2, f0Avg, partLambdaV, multiScatterTerm, _LightDirection0, input.N, input.bentNormal, input.worldPosition, input.NdotV, V, diffuseTerm, input.albedo, input.translucency, true) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
+	float3 luminance = EvaluateLight(input.perceptualRoughness, input.reflectivity, input.cosVisibilityAngle, roughness2, f0Avg, partLambdaV, multiScatterTerm, _LightDirection0, input.N, input.bentNormal, input.worldPosition, input.NdotV, input.V, diffuseTerm, input.albedo, input.translucency, true) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
 	
 	uint3 clusterIndex;
 	clusterIndex.xy = pixelCoordinate / TileSize;
@@ -352,12 +311,12 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 		if (!attenuation)
 			continue;
 		
-		luminance += EvaluateLight(input.perceptualRoughness, input.reflectivity, input.cosVisibilityAngle, roughness2, f0Avg, partLambdaV, multiScatterTerm, L, input.N, input.bentNormal, input.worldPosition, input.NdotV, V, diffuseTerm, input.albedo, input.translucency, false) * (light.color * Exposure * attenuation);
+		luminance += EvaluateLight(input.perceptualRoughness, input.reflectivity, input.cosVisibilityAngle, roughness2, f0Avg, partLambdaV, multiScatterTerm, L, input.N, input.bentNormal, input.worldPosition, input.NdotV, input.V, diffuseTerm, input.albedo, input.translucency, false) * (light.color * Exposure * attenuation);
 	}
 	
 	// Indirect Lighting
 	float3 iblN = input.N;
-	float3 R = reflect(-V, input.N);
+	float3 R = reflect(-input.V, input.N);
 	float3 rStrength = 1.0;
 	
 	// Reflection correction for water
@@ -406,7 +365,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	float3 fAvg = AverageFresnel(input.reflectivity);
 	float3 fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
 	float3 kd = 1.0 - fssEss - fmsEms;
-	luminance += irradiance * (fmsEms + input.albedo * kd);
+	luminance += irradiance * (fmsEms + input.albedo * (1.0 - input.translucency) * kd);
 	
 	float3 irradiance1 = AmbientCosine(-input.bentNormal, input.cosVisibilityAngle);
 	
@@ -418,7 +377,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 		irradiance1 = lerp(irradiance1 + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeCosAngleToVisibility(input.cosVisibilityAngle));
 	#endif
 	
-	luminance += irradiance1 * input.translucency * kd;
+	luminance += irradiance1 * input.translucency * input.albedo * kd;
 	
 	return float4(luminance, lerp(input.diffuseOpacity, 1.0, fssEss.r));
 }

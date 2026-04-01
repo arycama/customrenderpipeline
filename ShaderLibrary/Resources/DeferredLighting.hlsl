@@ -32,7 +32,6 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	float3 bentNormal = GBufferNormal(bentNormalOcclusion, V, WorldToView, ViewToWorld);
 	float cosVisibilityAngle = bentNormalOcclusion.b;
 	
-	
 	#ifdef TRANSLUCENCY
 		if (!(stencil & 16))
 			albedoMetallic.ba = 0.0;
@@ -41,7 +40,7 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 		float metallic = 0;
 		bool isWater = false;
 		bool hasMetallic = false;
-		bool isThinSurface = true;
+		bool isThinSurface = false;
 	#else
 		float translucency = 0;
 		float metallic = albedoMetallic.a;
@@ -50,10 +49,7 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 		bool isThinSurface = false;
 	#endif
 	
-	float3 f0 = lerp(0.04, albedo.rgb, metallic);
-	albedo = lerp(albedo.rgb, 0, metallic);
-	
-	Material material = CreateMaterial(albedo, perceptualRoughness, normal, metallic, cosVisibilityAngle, 1.0, 0.0, hasMetallic, false, 1.5, false, false, translucency, false, isThinSurface, isThinSurface);
+	Material material = CreateMaterial(albedo, perceptualRoughness, normal, bentNormal, metallic, cosVisibilityAngle, 1.0, 0.0, hasMetallic, false, 1.5, false, false, translucency, false, isThinSurface, isThinSurface);
 	LightingInput lightingInput = CreateLightingInput(material, worldPosition, V, 0.0, eyeDepth);
 	
 	float3 result = EvaluateLighting(lightingInput, input.position.xy, isWater, true).rgb;
