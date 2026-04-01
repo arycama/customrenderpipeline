@@ -15,7 +15,7 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
         return $"{Name} {material} {passIndex}";
     }
 
-    public virtual void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None, bool flip = false, bool foveated = false)
+    public virtual void Initialize(Material material, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None, bool flip = false, bool foveated = false, int antiAliasing = 1)
     {
         this.material = material;
         this.passIndex = passIndex;
@@ -23,6 +23,7 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
         this.stereoMode = stereoMode;
         this.flip = flip;
         this.foveated = foveated;
+        this.Samples = antiAliasing;
     }
 
     public override void Reset()

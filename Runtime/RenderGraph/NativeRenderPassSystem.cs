@@ -14,6 +14,7 @@ public class NativeRenderPassSystem : IDisposable
     private bool isInRenderPass;
     private string passName;
     private int depthIndex = -1;
+    private int samples;
 
     private NativeList<AttachmentData> inputs = new(8, Allocator.Persistent), outputs = new(8, Allocator.Persistent);
     private SubPassFlags flags;
@@ -54,12 +55,14 @@ public class NativeRenderPassSystem : IDisposable
         if (pass.OutputsToCameraTarget)
         {
             size = pass.FrameBufferSize;
+            samples = pass.Samples;
         }
         else
         {
             // Get size from depth buffer if assigned, otherwise from the first color target
             var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer ?? pass.colorTargets[0]);
             size = new(target.width, target.height, target.volumeDepth);
+            samples = target.antiAliasing;
         }
     }
 
@@ -218,18 +221,26 @@ public class NativeRenderPassSystem : IDisposable
 
                 // If the handle gets freed before this native render pass ends, we can discard the contents, otherwise they must be stored as another pass is going to use it
                 var requiresStore = handleData.freeIndex1 > endPassIndex || handleData.freeIndex1 == -1;
-                if (requiresStore)
-                    attachment.storeAction = RenderBufferStoreAction.Store;
+                
+                // Resolve takes priority over store if the attachment has anti aliasing
+                var requiresResolve = handleData.descriptor.resolveTarget != null;
+                if (requiresResolve)
+                    attachment.storeAction = RenderBufferStoreAction.Resolve;
+                else if (requiresStore)
+                        attachment.storeAction = RenderBufferStoreAction.Store;
 
                 // If the handle is created and freed during the renderpass, we can avoid allocating a target entirely. (TODO: The render target system may still create a texture which may be unused)
-                if (requiresLoad || requiresStore)
+                if (requiresLoad || (requiresStore && !requiresResolve))
                     attachment.loadStoreTarget = colorAttachment.target;
+
+                if (requiresResolve)
+                    attachment.resolveTarget = handleData.descriptor.resolveTarget.Value;
 
                 attachments[i] = attachment;
             }
         }
 
-        renderPassDescriptors.Add(new(size.x, size.y, attachments, new(subPasses.AsArray(), Allocator.Temp), size.z, 1, depthIndex, -1, passName));
+        renderPassDescriptors.Add(new(size.x, size.y, attachments, new(subPasses.AsArray(), Allocator.Temp), size.z, samples, depthIndex, -1, passName));
 
         this.attachments.Clear();
         subPasses.Clear();
@@ -248,18 +259,21 @@ public class NativeRenderPassSystem : IDisposable
             if (pass.IsNativeRenderPass)
             {
                 Int3 passSize;
+                int passSamples;
                 if (pass.OutputsToCameraTarget)
                 {
                     passSize = pass.FrameBufferSize;
+                    passSamples = pass.Samples;
                 }
                 else
                 {
                     var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer ?? pass.colorTargets[0]);
                     passSize = new(target.width, target.height, target.volumeDepth);
+                    passSamples = target.antiAliasing;
                 }
 
-                // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
-                canMergePass = isInRenderPass && size == passSize;
+                // Passes can merge if they have the same size, sample count and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
+                canMergePass = isInRenderPass && size == passSize && samples == passSamples;
 
                 if (canMergePass)
                 {

@@ -124,7 +124,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
         foreach (var viewRenderData in viewRenderDatas)
         {
-            using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
+            //using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
             foreach (var cameraRenderFeature in perCameraRenderFeatures)
             {
                 cameraRenderFeature.Render(viewRenderData);

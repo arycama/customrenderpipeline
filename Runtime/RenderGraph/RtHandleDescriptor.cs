@@ -23,8 +23,10 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 	public float clearDepth;
 	public uint clearStencil;
 	public VRTextureUsage vrTextureUsage;
+    public int antiAliasing;
+    public RenderTargetIdentifier? resolveTarget;
 
-	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrTextureUsage = VRTextureUsage.None)
+	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrTextureUsage = VRTextureUsage.None, int antiAliasing = 1, RenderTargetIdentifier? resolveTarget = null)
 	{
 		this.width = width;
 		this.height = height;
@@ -41,7 +43,9 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 		this.clearDepth = clearDepth;
 		this.clearStencil = clearStencil;
 		this.vrTextureUsage = vrTextureUsage;
-	}
+        this.antiAliasing = antiAliasing;
+        this.resolveTarget = resolveTarget;
+    }
 
 	public readonly override string ToString() => $"{width}x{height}x{volumeDepth} {format} {dimension}";
 
@@ -79,6 +83,7 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
             useMipMap = hasMips,
             volumeDepth = volumeDepth,
             vrUsage = vrTextureUsage,
+            antiAliasing = antiAliasing,
 
 #if UNITY_EDITOR
             name = $"{resourceCount++} {ToString()}"

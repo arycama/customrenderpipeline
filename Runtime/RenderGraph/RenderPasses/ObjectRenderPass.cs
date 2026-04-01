@@ -10,13 +10,15 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
     private bool foveated;
     private ScriptableRenderContext context;
 
-	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false, bool foveated = false)
+	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false, bool foveated = false, int antiAliasing = 1)
 	{
         this.context = context;
         this.foveated = foveated;
         stereoMode = camera.stereoEnabled
             ? SystemInfo.supportsMultiview ? SinglePassStereoMode.Multiview : SinglePassStereoMode.Instancing
             : SinglePassStereoMode.None;
+
+        this.Samples = antiAliasing;
 
         var rendererListDesc = new RendererListDesc(new ShaderTagId(tag), cullingResults, camera)
 		{
