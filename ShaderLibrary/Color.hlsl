@@ -412,10 +412,9 @@ float3 Rec709ToICtCp(float3 rec709)
 half3 RgbToYCoCg(half3 rgb)
 {
 	half3 yCoCg;
-	yCoCg.y = rgb.r - rgb.b;
-	half temp = yCoCg.y * 0.5h + rgb.b;
-	yCoCg.z = rgb.g - temp;
-	yCoCg.x = yCoCg.z * 0.5h + temp;
+	yCoCg.x = dot(rgb, half3(0.25h, 0.5h, 0.25h));
+	yCoCg.y = dot(rgb, half3(0.5h, 0.0h, -0.5h));
+	yCoCg.z = dot(rgb, half3(-0.25h, 0.5h, -0.25h));
 	yCoCg.yz += 127.0h / 255.0h;
 	return yCoCg;
 }
@@ -425,10 +424,9 @@ half3 YCoCgToRgb(half3 yCoCg)
 	yCoCg.yz -= 127.0h / 255.0h;
 
 	half3 rgb;
-	half temp = -yCoCg.z * 0.5h + yCoCg.x;
-	rgb.g = yCoCg.z + temp;
-	rgb.b = -trunc(yCoCg.g  * 127.5) / 255.0 + temp;
-	rgb.r = rgb.b + yCoCg.y;
+	rgb.r = yCoCg.x + yCoCg.y - yCoCg.z;
+	rgb.g = yCoCg.x + yCoCg.z;
+	rgb.b = yCoCg.x - yCoCg.y - yCoCg.z;
 	return rgb;
 }
 
