@@ -56,7 +56,7 @@ float3 GBufferNormal(uint2 coord, Texture2D<float4> tex, float3 V, matrix worldT
 
 half2 PackAlbedo(half3 rgb, float2 screenPosition)
 {
-	half3 yCoCg = RgbToYCoCg(rgb);
+	half3 yCoCg = RgbToYCbCr(rgb);
 	return Checker(screenPosition) ? yCoCg.xy : yCoCg.xz;
 }
 
@@ -71,7 +71,7 @@ half3 UnpackAlbedo(half2 enc, float2 screenPosition, half2 a0, half2 a1)
 	if (!Checker(screenPosition))
 		yCoCg.yz = yCoCg.zy;
 		
-	return YCoCgToRgb(yCoCg);
+	return YCbCrToRgb(yCoCg);
 }
 
 float3 UnpackAlbedo(float2 enc, float2 screenPosition)

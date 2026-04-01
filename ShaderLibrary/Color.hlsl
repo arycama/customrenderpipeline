@@ -409,24 +409,24 @@ float3 Rec709ToICtCp(float3 rec709)
 	return Rec2020ToICtCp(rec2020);
 }
 
-half3 RgbToYCoCg(half3 rgb)
+half3 RgbToYCbCr(half3 rgb)
 {
-	half3 yCoCg;
-	yCoCg.x = dot(rgb, half3(0.25h, 0.5h, 0.25h));
-	yCoCg.y = dot(rgb, half3(0.5h, 0.0h, -0.5h));
-	yCoCg.z = dot(rgb, half3(-0.25h, 0.5h, -0.25h));
-	yCoCg.yz += 127.0h / 255.0h;
-	return yCoCg;
+	half3 yCbCr;
+	yCbCr.x = 0.2126h * rgb.r + 0.7152h * rgb.g + 0.0722h * rgb.b;
+	yCbCr.y = (rgb.b - yCbCr.x) / 1.8556h;
+	yCbCr.z = (rgb.r - yCbCr.x) / 1.5748h;
+	yCbCr.yz += 127.0h / 255.0h;
+	return yCbCr;
 }
 
-half3 YCoCgToRgb(half3 yCoCg)
+half3 YCbCrToRgb(half3 yCbCr)
 {
-	yCoCg.yz -= 127.0h / 255.0h;
-
+	yCbCr.yz -= 127.0h / 255.0h;
+    
 	half3 rgb;
-	rgb.r = yCoCg.x + yCoCg.y - yCoCg.z;
-	rgb.g = yCoCg.x + yCoCg.z;
-	rgb.b = yCoCg.x - yCoCg.y - yCoCg.z;
+	rgb.r = yCbCr.x + 1.5748h * yCbCr.z;
+	rgb.g = yCbCr.x - (0.2126h * 1.5748h / 0.7152h) * yCbCr.z - (0.0722h * 1.1772h / 0.7152h) * yCbCr.y;
+	rgb.b = yCbCr.x + 1.8556h * yCbCr.y;
 	return rgb;
 }
 
@@ -468,26 +468,6 @@ float3 FastTonemapYCoCg(float3 yCoCg)
 float3 FastTonemapYCoCgInverse(float3 yCoCg)
 {
 	return FastTonemapInverse(yCoCg, yCoCg.r);
-}
-
-float3 RgbToYCoCgFastTonemap(float3 rgb)
-{
-	return FastTonemapYCoCg(RgbToYCoCg(rgb));
-}
-
-float4 RgbToYCoCgFastTonemap(float4 rgb)
-{
-	return float4(FastTonemapYCoCg(RgbToYCoCg(rgb.rgb)), rgb.a);
-}
-
-float3 YCoCgToRgbFastTonemapInverse(float3 tonemappedYCoCg)
-{
-	return YCoCgToRgb(FastTonemapYCoCgInverse(tonemappedYCoCg));
-}
-
-float4 YCoCgToRgbFastTonemapInverse(float4 tonemappedYCoCg)
-{
-	return float4(YCoCgToRgb(FastTonemapYCoCgInverse(tonemappedYCoCg.rgb)), tonemappedYCoCg.a);
 }
 
 float3 RgbToHsv(float3 c)

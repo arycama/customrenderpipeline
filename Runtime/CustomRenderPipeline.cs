@@ -343,7 +343,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
             // Generate for next frame
-            using (var pass = renderGraph.AddGenericRenderPass("Generate Color Pyramid", renderGraph.GetRTHandle<CameraTarget>()))
+            var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
+            using (var pass = renderGraph.AddGenericRenderPass("Generate Color Pyramid", cameraTarget))
 			{
 				pass.ReadRtHandle<CameraTarget>();
 				pass.SetRenderFunction(static (command, pass, cameraTarget) =>
@@ -359,7 +360,23 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new VolumetricClouds(asset.Clouds, renderGraph, asset.Sky),
 		new Sky(renderGraph, asset.Sky),
 
-		new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        {
+            // Generate for next frame
+            var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
+            var previousCameraTarget = renderGraph.GetRTHandle<PreviousCameraTarget>();
+            using (var pass = renderGraph.AddGenericRenderPass("Generate Color Pyramid", (cameraTarget, previousCameraTarget)))
+            {
+                pass.ReadRtHandle<CameraTarget>();
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    command.CopyTexture(pass.GetRenderTexture(data.cameraTarget), 0, 0, pass.GetRenderTexture(data.previousCameraTarget), 0, 0);
+                    command.GenerateMips(pass.GetRenderTexture(data.previousCameraTarget));
+                });
+            }
+        }),
+
+        new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			using var pass = renderGraph.AddObjectRenderPass("Render Transparent");
             pass.AllowNewSubPass = true;
@@ -369,6 +386,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepth);
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
+
+            pass.ReadRtHandle<PreviousCameraTarget>();
 
             pass.ReadResource<FrameData>();
 			pass.ReadResource<DfgData>();

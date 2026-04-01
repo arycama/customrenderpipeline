@@ -40,7 +40,7 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 		float metallic = 0;
 		bool isWater = false;
 		bool hasMetallic = false;
-		bool isThinSurface = false;
+		bool isThinSurface = true;
 	#else
 		float translucency = 0;
 		float metallic = albedoMetallic.a;

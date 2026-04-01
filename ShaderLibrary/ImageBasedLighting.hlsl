@@ -250,3 +250,9 @@ float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 localV, out flo
 	float pdf;
 	return ImportanceSampleGgxVndf(roughness, u, localV, weightOverPdf, pdf);
 }
+
+// https://seblagarde.wordpress.com/2015/07/14/siggraph-2014-moving-frostbite-to-physically-based-rendering/ (4-9-3-DistanceBasedRoughnessLobeBounding.pdf, page 3)
+float GetSpecularLobeTanHalfAngle(float roughness, float percentOfVolume = 0.75)
+{
+	return tan(radians(90 * roughness * roughness / (1.0 + roughness * roughness)));
+}

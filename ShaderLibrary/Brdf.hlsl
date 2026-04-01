@@ -138,20 +138,35 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 	// NdotL will always be in the same hemisphere as L, and NdotV must be negative in refractive cases.
 	// Note reflectivity is rgb but this is only used for metals, which have no transmittance, so the red channel is used in most places, rgb is only used for reflection
 	// TODO: Handle this more explicitly, eg maybe pass in an rgb reflection reflectivity and scatter reflectivity?
-	bool isBrdf = !isBackface && NdotV >= 0.0h && NdotL > 0.0h;
+	bool isBrdf = false;//!isBackface && NdotV >= 0.0h && NdotL > 0.0h;
 	bool isFlippedBrdf = false; // (isBackface && NdotV <= 0.0h && NdotL < 0.0h); // TODO: Only used for water currently and we don't want sunset highlights to show up on underwater waves, make configurable
-	bool isThin = !isBackface && NdotV >= 0.0h && isThinSurface && NdotL < 0.0h;
+	bool isThin = false;//!isBackface && NdotV >= 0.0h && isThinSurface && NdotL < 0.0h;
 	bool isVolume = (isBackface && NdotV <= 0.0h && NdotL > 0.0h);
+	bool isThinApprox = !isBackface && NdotV >= 0.0h && isThinSurface && NdotL < 0.0h;
 	
 	// If no valid cases, return
-	half a2 = Sq(roughness);
+	if(!isBrdf && !isFlippedBrdf && !isThin && !isVolume && !isThinApprox)
+		return 0.0;
+	
 	half iorRatio = ReflectivityToIorRatio(reflectivity).r;
 	half rcpIorRatio = ReflectivityToRcpIorRatio(reflectivity).r;
 	half rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
 	
-	// Setup vectors, t is for transmitted/second layer. Other vectors always relate to the final outgoing layer, which for single layer bsdfs is simply L and V.
 	half NdotH, LdotH, VdotH, NdotLt, NdotVt, LdotVt;
-	if (isBrdf || isFlippedBrdf)
+	if (isThinApprox)
+	{
+		LdotV = LdotV - 2.0 * NdotL * NdotV;
+		rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
+		NdotL = -NdotL;
+		roughness = ((roughness) * (0.65 * iorRatio - 0.35));
+	}
+	else
+		return 0;
+	
+	half a2 = Sq(roughness);
+	
+	// Setup vectors, t is for transmitted/second layer. Other vectors always relate to the final outgoing layer, which for single layer bsdfs is simply L and V.
+	if (isBrdf || isFlippedBrdf || isThinApprox)
 	{
 		NdotH = (NdotL + NdotV) * rcpLenLv;
 		LdotH = LdotV * rcpLenLv + rcpLenLv;
@@ -208,7 +223,7 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 	// Note the rgb variant is used, but this is only required for metals. Optimising for the dielectric case means divergence though, so rgb is used for both cases to avoid seperate shader paths or variants.
 	half3 f = Fresnel(LdotH, reflectivity);
 	
-	if (isVolume || isThin)
+	if (isVolume || isThin || isThinApprox)
 		f = 1.0h - f;
 	
 	half3 bsdf = dv * f;
@@ -233,6 +248,11 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 		half dv = GgxDv(a2, NdotHt, NdotLt, NdotVt, GetPartLambdaV(a2, NdotVt));
 		half3 f = 1.0 - Fresnel(LdotHt, reflectivity);
 		bsdf *= f * dv * 4.0h * LdotHt * VdotHt * Sq(ReflectivityToIor(-reflectivity)) * rcp(Sq(rcpIorRatio * VdotHt + LdotHt)) * NdotLt * transmittance;
+	}
+	
+	if(isThinApprox)
+	{
+		bsdf *= transmittance;
 	}
 	
 	// TODO: Combine NdotL product with diffuse

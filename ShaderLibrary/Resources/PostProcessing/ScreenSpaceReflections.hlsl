@@ -23,12 +23,6 @@ struct TraceResult
     float4 hit : SV_Target1;
 };
 
-// https://seblagarde.wordpress.com/2015/07/14/siggraph-2014-moving-frostbite-to-physically-based-rendering/ (4-9-3-DistanceBasedRoughnessLobeBounding.pdf, page 3)
-float GetSpecularLobeTanHalfAngle(float roughness, float percentOfVolume = 0.75)
-{
-	return tan(radians(90 * roughness * roughness / (1.0 + roughness * roughness)));
-}
-
 TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
 {
 	float depth = HiZMinDepth[position.xy];
