@@ -100,7 +100,7 @@ GBufferOutput OutputGBuffer(Material material, float2 screenPosition, float3 V, 
 	GBufferOutput gbuffer;
 	gbuffer.albedoMetallic = float4(PackAlbedo(material.albedo, screenPosition), material.translucency, material.metallic);
 	gbuffer.normalRoughness = float4(PackGBufferNormal(material.normal, V, worldToView), material.roughness, 0);
-	gbuffer.bentNormalOcclusion = float4(PackGBufferNormal(material.bentNormal, V, worldToView), material.cosVisibilityAngle, 0);
+	gbuffer.bentNormalOcclusion = float4(PackGBufferNormal(material.bentNormal, V, worldToView), material.occlusion, 0);
 	
 	#ifndef EMISSION_DISABLED
 		gbuffer.emissive = material.emission;

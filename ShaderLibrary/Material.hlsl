@@ -20,7 +20,7 @@ struct Material
 	half roughness;
 	float3 normal;
 	half metallic;
-	half cosVisibilityAngle;
+	half occlusion;
 	half opacity;
 	half3 emission;
 	half ior;
@@ -36,7 +36,7 @@ struct Material
 	bool transmission;
 };
 
-Material CreateMaterial(half3 albedo = 1.0h, half roughness = 1.0h, half3 normal = half3(0.0h, 1.0h, 0.0h), half3 bentNormal = half3(0.0h, 1.0h, 0.0h), half metallic = 0.0h, half cosVisibilityAngle = 0.0h, half opacity = 1.0h, half3 emission = 0.0h, bool hasMetallic = false, bool isBackface = false, half ior = 1.5h, bool applyUnderwaterFog = true, bool refractedEnvironment = false, half translucency = 0.0h, bool isFade = false, bool isThinSurface = false, bool transmission = false)
+Material CreateMaterial(half3 albedo = 1.0h, half roughness = 1.0h, half3 normal = half3(0.0h, 1.0h, 0.0h), half3 bentNormal = half3(0.0h, 1.0h, 0.0h), half metallic = 0.0h, half occlusion = 1.0h, half opacity = 1.0h, half3 emission = 0.0h, bool hasMetallic = false, bool isBackface = false, half ior = 1.5h, bool applyUnderwaterFog = true, bool refractedEnvironment = false, half translucency = 0.0h, bool isFade = false, bool isThinSurface = false, bool transmission = false)
 {
 	Material material;
 	material.albedo = albedo;
@@ -44,7 +44,7 @@ Material CreateMaterial(half3 albedo = 1.0h, half roughness = 1.0h, half3 normal
 	material.normal = normal;
 	material.bentNormal = bentNormal;
 	material.metallic = metallic;
-	material.cosVisibilityAngle = cosVisibilityAngle;
+	material.occlusion = occlusion;
 	material.opacity = opacity;
 	material.emission = emission;
 	material.hasMetallic = hasMetallic;

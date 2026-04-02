@@ -98,7 +98,7 @@ LightingInput CreateLightingInput(Material material, float3 worldPosition, float
 	output.reflectivity = GetReflectivity(material.albedo, material.metallic, material.opacity, material.ior);
 	output.translucency = material.translucency;
 	output.albedo = GetAlbedo(material.albedo, material.metallic, material.opacity);
-	output.cosVisibilityAngle = material.cosVisibilityAngle;
+	output.cosVisibilityAngle = material.occlusion;
 	output.vertexAmbient = vertexAmbient;
 	output.emission = material.emission;
 	output.transmission = material.transmission;
