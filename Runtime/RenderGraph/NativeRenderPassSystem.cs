@@ -4,6 +4,7 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
+using UnityEngine.XR;
 
 public class NativeRenderPassSystem : IDisposable
 {
@@ -70,12 +71,13 @@ public class NativeRenderPassSystem : IDisposable
         foreach (var input in pass.frameBufferInputs)
         {
             var target = renderGraph.RtHandleSystem.GetResource(input);
-            inputs.Add(new(input, new(target, 0, CubemapFace.Unknown, -1)));
+            // TODO: Why are these just using default values?
+            inputs.Add(new(input, new(target, 0, CubemapFace.Unknown, -1), default, false, 0, CubemapFace.Unknown, -1));
         }
 
         if (pass.OutputsToCameraTarget)
         {
-            outputs.Add(new(default, pass.FrameBufferTarget, pass.FrameBufferFormat, true));
+            outputs.Add(new(default, pass.FrameBufferTarget, pass.FrameBufferFormat, true, 0, CubemapFace.Unknown, -1));
         }
         else
         {
@@ -84,7 +86,8 @@ public class NativeRenderPassSystem : IDisposable
                 // If depth is not assigned, assign it, otherwise ensure it matches
                 if (depthIndex == -1)
                 {
-                    subPassDepth = new(pass.depthBuffer.Value, new(renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value), pass.MipLevel, pass.CubemapFace, pass.DepthSlice));
+                    var depthBufferFormat = renderGraph.RtHandleSystem.GetHandleData(pass.depthBuffer.Value).descriptor.format;
+                    subPassDepth = new(pass.depthBuffer.Value, new(renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value), pass.MipLevel, pass.CubemapFace, pass.DepthSlice), depthBufferFormat, false, pass.MipLevel, pass.CubemapFace, pass.DepthSlice);
                 }
                 else
                 {
@@ -93,7 +96,10 @@ public class NativeRenderPassSystem : IDisposable
             }
 
             foreach (var colorTarget in pass.colorTargets)
-                outputs.Add(new(colorTarget, new(renderGraph.RtHandleSystem.GetResource(colorTarget), pass.MipLevel, pass.CubemapFace, pass.DepthSlice)));
+            {
+                var format = renderGraph.RtHandleSystem.GetHandleData(colorTarget).descriptor.format;
+                outputs.Add(new(colorTarget, new(renderGraph.RtHandleSystem.GetResource(colorTarget), pass.MipLevel, pass.CubemapFace, pass.DepthSlice), format, false, pass.MipLevel, pass.CubemapFace, pass.DepthSlice));
+            }
         }
     }
 
@@ -269,10 +275,14 @@ public class NativeRenderPassSystem : IDisposable
                         pass.flags = SubPassFlags.ReadOnlyDepthStencil;
                     }
 
-                    if (depthIndex != -1 && pass.depthBuffer.HasValue && attachments[depthIndex].target != new RenderTargetIdentifier(renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value), pass.MipLevel, pass.CubemapFace, pass.DepthSlice))
+                    if (depthIndex != -1 && pass.depthBuffer.HasValue)
                     {
-                        // If both passes have depth texutres that do not match, do not merge them
-                        canMergePass = false;
+                        var depthAttachment = attachments[depthIndex];
+                        if (depthAttachment.handle != pass.depthBuffer.Value || depthAttachment.mipLevel != pass.MipLevel || depthAttachment.cubemapFace != pass.CubemapFace || depthAttachment.depthSlice != pass.DepthSlice)
+                        {
+                            // If both passes have depth texutres that do not match, do not merge them
+                            canMergePass = false;
+                        }
                     }
                 }
 
@@ -288,9 +298,8 @@ public class NativeRenderPassSystem : IDisposable
                         // Check if all the inputs and outputs are equal (And in identical order) since this must be true for the pass to merge
                         for (var i = 0; i < inputCount; i++)
                         {
-                            var target = renderGraph.RtHandleSystem.GetResource(pass.frameBufferInputs[i]);
-                            var targetIdentifier = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice);
-                            if (targetIdentifier == inputs[i].target)
+                            var input = inputs[i];
+                            if (pass.frameBufferInputs[i] == input.handle && pass.MipLevel == input.mipLevel && pass.CubemapFace == input.cubemapFace && pass.DepthSlice == input.depthSlice)
                                 continue;
 
                             canPassMergeWithSubPass = false;
@@ -308,9 +317,8 @@ public class NativeRenderPassSystem : IDisposable
                             {
                                 for (var i = 0; i < pass.colorTargets.Count; i++)
                                 {
-                                    var target = renderGraph.RtHandleSystem.GetResource(pass.colorTargets[i]);
-                                    var targetIdentifier = new RenderTargetIdentifier(target, pass.MipLevel, pass.CubemapFace, pass.DepthSlice);
-                                    if (targetIdentifier == outputs[i].target)
+                                    var output = outputs[i];
+                                    if (pass.colorTargets[i] == output.handle && pass.MipLevel == output.mipLevel && pass.CubemapFace == output.cubemapFace && pass.DepthSlice == output.depthSlice)
                                         continue;
 
                                     canPassMergeWithSubPass = false;

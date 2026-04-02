@@ -221,8 +221,7 @@ public abstract class RenderPass : IDisposable
 
             if (IsNextSubPass)
             {
-                RenderGraph.NextSubPass(Command);
-
+                command.NextSubPass();
                 IsNextSubPass = false;
             }
         }
@@ -253,7 +252,7 @@ public abstract class RenderPass : IDisposable
         // TODO: These two conditions are somewhat redundant since IsRenderPassEnd will only ever be true for native render passes
         if(IsNativeRenderPass && IsRenderPassEnd)
         {
-            RenderGraph.EndRenderPass(command);
+            command.EndRenderPass();
             IsRenderPassEnd = false;
 
             // If render pass validation is enabled, for some reason it breaks if incompatible commands are in the same command buffer even if they are outside of the renderpass start/end. Work around this by manually executing and clearing the command buffer.

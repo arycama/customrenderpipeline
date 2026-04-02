@@ -138,7 +138,7 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 	// NdotL will always be in the same hemisphere as L, and NdotV must be negative in refractive cases.
 	// Note reflectivity is rgb but this is only used for metals, which have no transmittance, so the red channel is used in most places, rgb is only used for reflection
 	// TODO: Handle this more explicitly, eg maybe pass in an rgb reflection reflectivity and scatter reflectivity?
-	bool isBrdf = false;//!isBackface && NdotV >= 0.0h && NdotL > 0.0h;
+	bool isBrdf = !isBackface && NdotV >= 0.0h && NdotL > 0.0h;
 	bool isFlippedBrdf = false; // (isBackface && NdotV <= 0.0h && NdotL < 0.0h); // TODO: Only used for water currently and we don't want sunset highlights to show up on underwater waves, make configurable
 	bool isThin = false;//!isBackface && NdotV >= 0.0h && isThinSurface && NdotL < 0.0h;
 	bool isVolume = (isBackface && NdotV <= 0.0h && NdotL > 0.0h);
@@ -160,8 +160,6 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 		NdotL = -NdotL;
 		roughness = ((roughness) * (0.65 * iorRatio - 0.35));
 	}
-	else
-		return 0;
 	
 	half a2 = Sq(roughness);
 	

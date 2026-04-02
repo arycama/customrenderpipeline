@@ -37,7 +37,6 @@ public class RenderGraph : IDisposable
     public int FrameIndex { get; private set; }
     public bool IsExecuting { get; private set; }
     public bool DebugRenderPasses { get; set; }
-    public bool IsInRenderPass { get; private set; }
     public bool EnableRenderPassValidation { get; set; }
 
     public RenderGraph(CustomRenderPipelineBase renderPipeline)
@@ -157,18 +156,17 @@ public class RenderGraph : IDisposable
         BufferHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
         RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 
-        IsExecuting = true;
-
         nativeRenderPassSystem.CreateNativeRenderPasses(renderPasses);
-
-        Assert.IsFalse(IsInRenderPass);
+        IsExecuting = true;
 
         foreach (var renderPass in renderPasses)
         {
-            //renderPass.SetupRenderPassData();
             renderPass.Run(command, context);
+        }
 
-            // Re-add the pass to the pool
+        // Re-add the passes to the pool
+        foreach (var renderPass in renderPasses)
+        {
             if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))
             {
                 pool = new();
@@ -178,29 +176,12 @@ public class RenderGraph : IDisposable
             pool.Push(renderPass);
         }
 
-        Assert.IsFalse(IsInRenderPass);
-
         IsExecuting = false;
     }
 
     public void BeginNativeRenderPass(int index, CommandBuffer command)
     {
-        Assert.IsFalse(IsInRenderPass);
         nativeRenderPassSystem.BeginNativeRenderPass(index, command);
-        IsInRenderPass = true;
-    }
-
-    public void NextSubPass(CommandBuffer command)
-    {
-        Assert.IsTrue(IsInRenderPass);
-        command.NextSubPass();
-    }
-
-    public void EndRenderPass(CommandBuffer command)
-    {
-        Assert.IsTrue(IsInRenderPass);
-        command.EndRenderPass();
-        IsInRenderPass = false;
     }
 
     public ResourceHandle<RenderTexture> GetTexture(RtHandleDescriptor descriptor, bool isPersistent = false)
