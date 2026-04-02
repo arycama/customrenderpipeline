@@ -55,7 +55,7 @@ float3 Tonemap(float3 color, float peakBrightness, float paperWhite = 100.0, flo
 
     // Convert back to rgb
 	float3 scaledRgb = ICtCpToRec2020(scaledICtCp);
-	return lerp(scaledRgb, skewedRgb, huePreservation);
+	return lerp(skewedRgb, scaledRgb, huePreservation);
 }
 
 float3 Fragment(VertexFullscreenTriangleVolumeOutput input) : SV_Target
