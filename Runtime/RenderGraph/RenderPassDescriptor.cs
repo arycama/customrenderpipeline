@@ -7,9 +7,9 @@ public readonly struct RenderPassDescriptor
 {
     readonly Int2 size;
     readonly int viewCount, samples, depthAttachmentIndex, shadingRateImageAttachmentIndex;
-    readonly NativeArray<AttachmentData> attachments;
+    public readonly NativeArray<AttachmentData> attachments;
     readonly NativeArray<SubPassDescriptor> subpasses;
-    readonly int startPassIndex, endPassIndex;
+    public readonly int startPassIndex, endPassIndex;
     readonly string debugName;
 
     public RenderPassDescriptor(Int2 size, NativeArray<AttachmentData> attachments, NativeArray<SubPassDescriptor> subpasses, int startPassIndex, int endPassIndex, int viewCount = 1, int samples = 1, int depthAttachmentIndex = -1, int shadingRateImageAttachmentIndex = -1, string debugName = default)
