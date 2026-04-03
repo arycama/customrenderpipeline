@@ -329,7 +329,7 @@ public class TerrainSystem : FrameRenderFeature
 		using (var pass = renderGraph.AddFullscreenRenderPass("Terrain Layer Data Init", (TerrainData.alphamapLayers, (Float3)Terrain.terrainData.size, terrainLayers.Count, TerrainData.alphamapLayers, TerrainData.alphamapTextureCount, TerrainData.alphamapTextures)))
 		{
 			//var indicesBuffer = renderGraph.GetBuffer(terrainLayers.Count);
-			pass.Initialize(generateIdMapMaterial);
+			pass.Initialize(generateIdMapMaterial, idMapResolution);
 			pass.WriteTexture(idMap);
 			pass.ReadTexture("TerrainNormalMap", normalmap);
 			//pass.WriteBuffer("ProceduralIndices", indicesBuffer);
@@ -384,22 +384,22 @@ public class TerrainSystem : FrameRenderFeature
 		{
 			using (var pass = renderGraph.AddFullscreenRenderPass("Terrain AO Map", (TerrainData, settings)))
 			{
-				pass.Initialize(terrainAmbientOcclusionMaterial);
+				pass.Initialize(terrainAmbientOcclusionMaterial, TerrainData.heightmapResolution);
 				pass.WriteTexture(aoMap);
 				pass.ReadTexture("TerrainNormalMap", normalmap);
 
-				pass.SetRenderFunction((System.Action<CommandBuffer, RenderPass, (TerrainData terrainData, TerrainSettings settings)>)(static (command, pass, data) =>
+				pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					pass.SetTexture(TerrainHeightmapId, data.terrainData.heightmapTexture);
+					pass.SetTexture(TerrainHeightmapId, data.TerrainData.heightmapTexture);
 					pass.SetFloat("DirectionCount", data.settings.AmbientOcclusionDirections);
 					pass.SetFloat("SampleCount", data.settings.AmbientOcclusionSamples);
-					pass.SetFloat("Radius", data.settings.AmbientOcclusionRadius / data.terrainData.size.x);
-					pass.SetFloat("Resolution", data.terrainData.heightmapResolution);
+					pass.SetFloat("Radius", data.settings.AmbientOcclusionRadius / data.TerrainData.size.x);
+					pass.SetFloat("Resolution", data.TerrainData.heightmapResolution);
 
 					var kmaxHeight = 32766.0f / 65535.0f;
-					pass.SetFloat("TerrainHeightmapScaleY", data.terrainData.heightmapScale.y / kmaxHeight);
-					pass.SetVector("TerrainHeightmapScale", (Float3)data.terrainData.heightmapScale);
-					pass.SetVector("TerrainSize", (Float3)data.terrainData.size);
+					pass.SetFloat("TerrainHeightmapScaleY", data.TerrainData.heightmapScale.y / kmaxHeight);
+					pass.SetVector("TerrainHeightmapScale", (Float3)data.TerrainData.heightmapScale);
+					pass.SetVector("TerrainSize", (Float3)data.TerrainData.size);
 
 					//if (texelRegion.HasValue)
 					//{
@@ -411,7 +411,7 @@ public class TerrainSystem : FrameRenderFeature
 					{
 						pass.SetVector("UvScaleOffset", new Vector4(1, 1, 0, 0));
 					}
-				}));
+				});
 			}
 		}
 	}

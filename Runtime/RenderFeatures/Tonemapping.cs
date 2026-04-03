@@ -37,8 +37,7 @@ public partial class Tonemapping : ViewRenderFeature
             bloomSettings.BloomStrength,
             hdrSettings.peakLuminance));
 
-        pass.Initialize(tonemapMaterial, 0);
-        pass.FrameBufferSize = new Int3(viewRenderData.viewSize, viewRenderData.viewCount);
+        pass.Initialize(tonemapMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 0);
         pass.FrameBufferTarget = viewRenderData.target;
         pass.FrameBufferFormat = viewRenderData.format;
 

@@ -92,7 +92,7 @@ public class ParticleShadows : ViewRenderFeature
 			{
 				cullingPrameters.cullingOptions = CullingOptions.ForceEvenIfCameraIsNotActive | CullingOptions.DisablePerObjectCulling;
 				var cullingResults = viewRenderData.context.Cull(ref cullingPrameters);
-				pass.Initialize("ParticleShadow", viewRenderData.context, cullingResults, particleCamera, RenderQueueRange.transparent, SortingCriteria.CommonTransparent);
+				pass.Initialize("ParticleShadow", viewRenderData.context, cullingResults, particleCamera, RenderQueueRange.transparent, settings.DirectionalResolution, settings.DirectionalDepth, SortingCriteria.CommonTransparent);
 
 				// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
 				pass.WriteTexture(directionalShadows);

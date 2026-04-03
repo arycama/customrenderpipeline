@@ -5,16 +5,16 @@ using UnityEngine.Rendering;
 
 public readonly struct RenderPassDescriptor
 {
-    readonly int width, height, depth, samples, depthAttachmentIndex, shadingRateImageAttachmentIndex;
+    readonly Int2 size;
+    readonly int viewCount, samples, depthAttachmentIndex, shadingRateImageAttachmentIndex;
     readonly NativeArray<AttachmentDescriptor> attachments;
     readonly NativeArray<SubPassDescriptor> subpasses;
     readonly string debugNameUtf8;
 
-    public RenderPassDescriptor(int width, int height, NativeArray<AttachmentDescriptor> attachments, NativeArray<SubPassDescriptor> subpasses, int depth = 1, int samples = 1, int depthAttachmentIndex = -1, int shadingRateImageAttachmentIndex = -1, string debugNameUtf8 = default)
+    public RenderPassDescriptor(Int2 size, NativeArray<AttachmentDescriptor> attachments, NativeArray<SubPassDescriptor> subpasses, int viewCount = 1, int samples = 1, int depthAttachmentIndex = -1, int shadingRateImageAttachmentIndex = -1, string debugNameUtf8 = default)
     {
-        this.width = width;
-        this.height = height;
-        this.depth = depth;
+        this.size = size;
+        this.viewCount = viewCount;
         this.samples = samples;
         this.depthAttachmentIndex = depthAttachmentIndex;
         this.shadingRateImageAttachmentIndex = shadingRateImageAttachmentIndex;
@@ -27,6 +27,6 @@ public readonly struct RenderPassDescriptor
     {
         Span<byte> buffer = stackalloc byte[Encoding.UTF8.GetByteCount(debugNameUtf8)];
         _ = Encoding.UTF8.GetBytes(debugNameUtf8, buffer);
-        command.BeginRenderPass(width, height, depth, samples, attachments, depthAttachmentIndex, shadingRateImageAttachmentIndex, subpasses, buffer);
+        command.BeginRenderPass(size.x, size.y, viewCount, samples, attachments, depthAttachmentIndex, shadingRateImageAttachmentIndex, subpasses, buffer);
     }
 }

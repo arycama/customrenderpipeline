@@ -69,7 +69,7 @@ public class WaterShoreMask : FrameRenderFeature
         var src = renderGraph.GetTexture(heightmapResolution, GraphicsFormat.R32G32_SFloat);
         using (var pass = renderGraph.AddFullscreenRenderPass("Water Shore Mask Blit", (cutoff, invResolution, heightmapResolution, terrainData.heightmapTexture)))
         {
-            pass.Initialize(material);
+            pass.Initialize(material, heightmapResolution);
             pass.WriteTexture(src);
 
             pass.SetRenderFunction(static (command, pass, data) =>

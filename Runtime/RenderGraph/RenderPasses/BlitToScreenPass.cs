@@ -17,9 +17,11 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material, int passIndex = 0, bool flip = false, bool foveated = false)
+	public void Initialize(Material material, Int2 viewSize, int viewCount = 1, int passIndex = 0, bool flip = false, bool foveated = false)
 	{
 		this.material = material;
+        Size = viewSize;
+        ViewCount = viewCount;
 		this.passIndex = passIndex;
         this.flip = flip;
         this.foveated = foveated;
@@ -107,7 +109,7 @@ public class BlitToScreenPass<T> : RenderPass<T>
         if (foveated)
             Command.SetFoveatedRenderingMode(FoveatedRenderingMode.Enabled);
 
-        var primitiveCount = SystemInfo.supportsMultiview ? 3 : 3 * FrameBufferSize.z;
+        var primitiveCount = SystemInfo.supportsMultiview ? 3 : 3 * ViewCount;
         Command.DrawProcedural(Matrix4x4.identity, material, passIndex, MeshTopology.Triangles, primitiveCount, 1, PropertyBlock);
 
         if (foveated)

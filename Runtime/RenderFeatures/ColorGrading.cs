@@ -92,7 +92,7 @@ public class ColorGrading : FrameRenderFeature
         }
 
         pass.AddKeyword(colorGamut.ToString().ToUpperInvariant());
-        pass.Initialize(material, 0, settings.Resolution);
+        pass.Initialize(material, settings.Resolution, settings.Resolution, 0, settings.Resolution);
         pass.WriteTexture(colorLut);
 
         pass.SetRenderFunction((command, pass, data) =>

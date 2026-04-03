@@ -57,7 +57,7 @@ public class TerrainRenderer : TerrainRendererBase
 		using (var pass = renderGraph.AddObjectRenderPass("Render Terrain Replacement"))
 		{
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
-			pass.Initialize("Terrain", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, SortingCriteria.CommonOpaque);
+			pass.Initialize("Terrain", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonOpaque);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.None);
 			pass.ReadResource<ViewData>();
 		}

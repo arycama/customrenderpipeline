@@ -22,7 +22,7 @@ public class RainTextureUpdater : ViewRenderFeature
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Rain Texture", (settings.Resolution, settings.Size)))
 		{
-			pass.Initialize(material);
+			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
 
 			pass.WriteTexture(rainTexture);
 
@@ -44,7 +44,7 @@ public class RainTextureUpdater : ViewRenderFeature
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Composite", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy, settings.WetLevel)))
 		{
-			pass.Initialize(compositeMaterial);
+			pass.Initialize(compositeMaterial, viewRenderData.viewSize, viewRenderData.viewCount);
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(albedoMetallicCopy);

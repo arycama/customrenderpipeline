@@ -53,7 +53,7 @@ public class ShadowRenderer : ViewRenderFeature
 				using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
 				{
 					var request = requestData.directionalShadowRequests[i];
-					RenderShadowMap(request, BatchCullingProjectionType.Orthographic, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false, false, viewRenderData, cullingResults);
+					RenderShadowMap(request, BatchCullingProjectionType.Orthographic, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false, false, viewRenderData, cullingResults, settings.DirectionalShadowResolution, settings.DirectionalCascadeCount);
 				}
 			}
 
@@ -84,7 +84,7 @@ public class ShadowRenderer : ViewRenderFeature
 				using (renderGraph.AddProfileScope(pointLightIds[i]))
 				{
 					var request = requestData.pointShadowRequests[i];
-                    RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, true, viewRenderData, cullingResults);
+                    RenderShadowMap(request, BatchCullingProjectionType.Perspective, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, true, viewRenderData, cullingResults, settings.PointShadowResolution, pointShadowCount);
 				}
 			}
 			ListPool<ShadowRequest>.Release(requestData.pointShadowRequests);
@@ -114,7 +114,7 @@ public class ShadowRenderer : ViewRenderFeature
 				using (renderGraph.AddProfileScope(SpotLightIds[i]))
 				{
 					var request = requestData.spotShadowRequests[i];
-                    RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, false, viewRenderData, cullingResults);
+                    RenderShadowMap(request, BatchCullingProjectionType.Perspective, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, false, viewRenderData, cullingResults, settings.SpotShadowResolution, spotShadowCount);
 				}
 			}
 
@@ -124,7 +124,7 @@ public class ShadowRenderer : ViewRenderFeature
         renderGraph.SetResource(new ShadowData(directionalShadows, pointShadows, spotShadows));
     }
 
-    void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip, bool isPointLight, ViewRenderData viewRenderData, CullingResults cullingResults)
+    void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip, bool isPointLight, ViewRenderData viewRenderData, CullingResults cullingResults, Int2 resolution, int viewCount)
 	{
 		var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
 		var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, viewRenderData.transform.position, request.Near, request.LightPosition, request.Far, request.ViewRotation.Forward, 0));
@@ -136,7 +136,7 @@ public class ShadowRenderer : ViewRenderFeature
 		{
 			using (var pass = renderGraph.AddShadowRenderPass("Render Shadow"))
 			{
-				pass.Initialize(viewRenderData.context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, isPointLight);
+				pass.Initialize(viewRenderData.context, cullingResults, request.LightIndex, projectionType, request.ShadowSplitData, bias, slopeBias, zClip, isPointLight, resolution, viewCount);
 				pass.DepthSlice = index;
 				pass.WriteDepth(target);
 				pass.ReadResource<ShadowRequestData>();

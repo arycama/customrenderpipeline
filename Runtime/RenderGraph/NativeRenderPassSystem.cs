@@ -9,7 +9,8 @@ public class NativeRenderPassSystem : IDisposable
 {
     private readonly RenderGraph renderGraph;
 
-    private Int3 size;
+    private Int2 size;
+    private int viewCount;
     private AttachmentData? subPassDepth;
     private bool isInRenderPass;
     private string passName;
@@ -40,7 +41,7 @@ public class NativeRenderPassSystem : IDisposable
         renderPassDescriptors[index].BeginRenderPass(command);
     }
 
-    private void BeginRenderPass(RenderPass pass, Int3 passSize)
+    private void BeginRenderPass(RenderPass pass)
     {
         isInRenderPass = true;
 
@@ -50,16 +51,8 @@ public class NativeRenderPassSystem : IDisposable
         pass.RenderPassIndex = renderPassDescriptors.Count;
 
         passName = pass.Name;
-
-        if (pass.OutputsToCameraTarget)
-        {
-            // TODO: This should just use pass size
-            size = pass.FrameBufferSize;
-        }
-        else
-        {
-            size = passSize;
-        }
+        size = pass.Size;
+        viewCount = pass.ViewCount;
     }
 
     private void BeginSubpass(RenderPass pass)
@@ -256,7 +249,7 @@ public class NativeRenderPassSystem : IDisposable
             }
         }
 
-        renderPassDescriptors.Add(new(size.x, size.y, attachments, new(subPasses.AsArray(), Allocator.Temp), size.z, 1, depthIndex, -1, passName));
+        renderPassDescriptors.Add(new(size, attachments, new(subPasses.AsArray(), Allocator.Temp), pass.ViewCount, 1, depthIndex, -1, passName));
 
         this.attachments.Clear();
         subPasses.Clear();
@@ -272,23 +265,10 @@ public class NativeRenderPassSystem : IDisposable
         foreach (var pass in renderPasses)
         {
             var canMergePass = false;
-            Int3? passSize = default;
             if (pass.IsNativeRenderPass)
             {
-                if (pass.OutputsToCameraTarget)
-                {
-                    passSize = pass.FrameBufferSize;
-                }
-                else
-                {
-                    // TODO: REplace with pass size property
-                    // Get size from depth buffer if assigned, otherwise from the first color target
-                    var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer ?? pass.colorTargets[0]);
-                    passSize = new(target.width, target.height, target.volumeDepth);
-                }
-
                 // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
-                canMergePass = isInRenderPass && size == passSize;
+                canMergePass = isInRenderPass && size == pass.Size && viewCount == pass.ViewCount;
 
                 if (canMergePass)
                 {
@@ -374,7 +354,7 @@ public class NativeRenderPassSystem : IDisposable
 
                 if (pass.IsNativeRenderPass)
                 {
-                    BeginRenderPass(pass, passSize.Value);
+                    BeginRenderPass(pass);
                     BeginSubpass(pass);
                 }
             }

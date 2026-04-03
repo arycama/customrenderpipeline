@@ -81,7 +81,8 @@ public abstract class RenderPass : IDisposable
     public int RenderPassIndex { get; set; } = -1;
     public RenderTargetIdentifier FrameBufferTarget { get; set; }
     public GraphicsFormat FrameBufferFormat { get; set; }
-    public Int3 FrameBufferSize { get; set; }
+    public Int2 Size { get; protected set; }
+    public int ViewCount { get; set; }
 
     public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
     public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);
