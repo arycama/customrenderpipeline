@@ -5,15 +5,12 @@ using UnityEngine.Rendering;
 
 public abstract class GraphicsRenderPass<T>: RenderPass<T>
 {
-	private bool isScreenPass;
-
     public override bool IsNativeRenderPass => true;
 
 	public override void Reset()
 	{
 		base.Reset();
 		flags = default;
-		isScreenPass = default;
 		DepthSlice = -1;
 		MipLevel = 0;
 		CubemapFace = CubemapFace.Unknown;
