@@ -10,9 +10,9 @@ public readonly struct RenderPassDescriptor
     readonly NativeArray<AttachmentData> attachments;
     readonly NativeArray<SubPassDescriptor> subpasses;
     readonly int startPassIndex, endPassIndex;
-    readonly string debugNameUtf8;
+    readonly string debugName;
 
-    public RenderPassDescriptor(Int2 size, NativeArray<AttachmentData> attachments, NativeArray<SubPassDescriptor> subpasses, int startPassIndex, int endPassIndex, int viewCount = 1, int samples = 1, int depthAttachmentIndex = -1, int shadingRateImageAttachmentIndex = -1, string debugNameUtf8 = default)
+    public RenderPassDescriptor(Int2 size, NativeArray<AttachmentData> attachments, NativeArray<SubPassDescriptor> subpasses, int startPassIndex, int endPassIndex, int viewCount = 1, int samples = 1, int depthAttachmentIndex = -1, int shadingRateImageAttachmentIndex = -1, string debugName = default)
     {
         this.size = size;
         this.viewCount = viewCount;
@@ -23,7 +23,7 @@ public readonly struct RenderPassDescriptor
         this.subpasses = subpasses;
         this.startPassIndex = startPassIndex;
         this.endPassIndex = endPassIndex;
-        this.debugNameUtf8 = debugNameUtf8 ?? throw new ArgumentNullException(nameof(debugNameUtf8));
+        this.debugName = debugName;
     }
 
     public readonly void BeginRenderPass(CommandBuffer command, RenderGraph renderGraph)
@@ -77,8 +77,8 @@ public readonly struct RenderPassDescriptor
             }
         }
 
-        Span<byte> buffer = stackalloc byte[Encoding.UTF8.GetByteCount(debugNameUtf8)];
-        _ = Encoding.UTF8.GetBytes(debugNameUtf8, buffer);
-        command.BeginRenderPass(size.x, size.y, viewCount, samples, attachments, depthAttachmentIndex, shadingRateImageAttachmentIndex, subpasses, buffer);
+        Span<byte> debugNameUtf8 = stackalloc byte[Encoding.UTF8.GetByteCount(debugName)];
+        _ = Encoding.UTF8.GetBytes(debugName, debugNameUtf8);
+        command.BeginRenderPass(size.x, size.y, viewCount, samples, attachments, depthAttachmentIndex, shadingRateImageAttachmentIndex, subpasses, debugNameUtf8);
     }
 }

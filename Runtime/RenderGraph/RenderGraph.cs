@@ -21,10 +21,12 @@ public class RenderGraph : IDisposable
 
     private Int2 size;
     private int viewCount;
+    private int mipLevel;
     private AttachmentData? subPassDepth;
     private bool isInRenderPass;
     private string passName;
     private int depthIndex = -1;
+    private int subPassIndex = -1;
 
     private NativeList<AttachmentData> inputs = new(8, Allocator.Persistent), outputs = new(8, Allocator.Persistent);
     private SubPassFlags flags;
@@ -138,7 +140,7 @@ public class RenderGraph : IDisposable
             if (currentPass.IsNativeRenderPass)
             {
                 // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
-                canMergePass = isInRenderPass && size == currentPass.Size && viewCount == currentPass.ViewCount;
+                canMergePass = isInRenderPass && size == currentPass.Size && viewCount == currentPass.ViewCount && mipLevel == currentPass.MipLevel;
 
                 if (canMergePass)
                 {
@@ -165,8 +167,8 @@ public class RenderGraph : IDisposable
                     var inputCount = currentPass.frameBufferInputs.Count;
                     var outputCount = currentPass.OutputsToCameraTarget ? 1 : currentPass.colorTargets.Count;
 
-                    var canPassMergeWithSubPass = subPasses.Length < 8 && currentPass.flags == flags && inputCount == inputs.Length && outputCount == outputs.Length;
-                    if (canPassMergeWithSubPass)
+                    var canMergeSubPass = subPasses.Length < 8 && currentPass.flags == flags && inputCount == inputs.Length && outputCount == outputs.Length;
+                    if (canMergeSubPass)
                     {
                         // Check if all the inputs and outputs are equal (And in identical order) since this must be true for the pass to merge
                         for (var i = 0; i < inputCount; i++)
@@ -175,16 +177,16 @@ public class RenderGraph : IDisposable
                             if (currentPass.frameBufferInputs[i] == input.handle && currentPass.MipLevel == input.mipLevel && currentPass.CubemapFace == input.cubemapFace && currentPass.DepthSlice == input.depthSlice)
                                 continue;
 
-                            canPassMergeWithSubPass = false;
+                            canMergeSubPass = false;
                             break;
                         }
 
-                        if (canPassMergeWithSubPass)
+                        if (canMergeSubPass)
                         {
                             if (currentPass.OutputsToCameraTarget)
                             {
                                 if (currentPass.FrameBufferTarget != outputs[0].frameBufferTarget)
-                                    canPassMergeWithSubPass = false;
+                                    canMergeSubPass = false;
                             }
                             else
                             {
@@ -194,25 +196,17 @@ public class RenderGraph : IDisposable
                                     if (currentPass.colorTargets[i] == output.handle && currentPass.MipLevel == output.mipLevel && currentPass.CubemapFace == output.cubemapFace && currentPass.DepthSlice == output.depthSlice)
                                         continue;
 
-                                    canPassMergeWithSubPass = false;
+                                    canMergeSubPass = false;
                                     break;
                                 }
                             }
                         }
                     }
 
-                    if (!canPassMergeWithSubPass)
+                    if (!canMergeSubPass)
                     {
-                        if (currentPass.AllowNewSubPass)
-                        {
-                            EndSubPass();
-                            currentPass.IsNextSubPass = true;
-                            BeginSubpass(currentPass);
-                        }
-                        else
-                        {
-                            canMergePass = false;
-                        }
+                        EndSubPass();
+                        BeginSubpass(currentPass);
                     }
                 }
             }
@@ -224,6 +218,7 @@ public class RenderGraph : IDisposable
 
                 if (currentPass.IsNativeRenderPass)
                 {
+                    // Begin render pass
                     BeginRenderPass(currentPass);
                     BeginSubpass(currentPass);
                 }
@@ -236,6 +231,8 @@ public class RenderGraph : IDisposable
                 renderPassIndices.Add(renderPassDescriptors.Count);
             else
                 renderPassIndices.Add(-1);
+
+            subPassIndices.Add(subPassIndex);
         }
 
         currentPass = result;
@@ -275,11 +272,13 @@ public class RenderGraph : IDisposable
         passName = pass.Name;
         size = pass.Size;
         viewCount = pass.ViewCount;
+        mipLevel = pass.MipLevel;
     }
 
     private void BeginSubpass(RenderPass pass)
     {
         flags = pass.flags;
+        subPassIndex++;
 
         foreach (var input in pass.frameBufferInputs)
         {
@@ -424,11 +423,13 @@ public class RenderGraph : IDisposable
         subPasses.Clear();
         passName = null;
         depthIndex = -1;
+        subPassIndex = -1;
     }
 
     public void Execute(CommandBuffer command, ScriptableRenderContext context)
     {
-        // If this is the first pass, either add 0 (Eg current count) or -1 if not a native render pass
+        subPassIndices.Add(subPassIndex);
+
         if (previousPass.IsNativeRenderPass)
             renderPassIndices.Add(renderPassDescriptors.Count);
         else
@@ -448,29 +449,37 @@ public class RenderGraph : IDisposable
         IsExecuting = true;
 
         var previousNativePassIndex = -1;
+        var previousSubPassIndex = -1;
         for (var i = 0; i < renderPasses.Count; i++)
         {
             var renderPass = renderPasses[i];
             var currentNativePassIndex = renderPassIndices[i];
+            var currentSubPassIndex = subPassIndices[i];
 
             // Begin a new pass if the index has increased
-            if (currentNativePassIndex != -1 && currentNativePassIndex != previousNativePassIndex)
-                renderPassDescriptors[currentNativePassIndex].BeginRenderPass(command, this);
+            if (currentNativePassIndex != -1)
+            {
+                if (currentNativePassIndex != previousNativePassIndex)
+                {
+                    renderPassDescriptors[currentNativePassIndex].BeginRenderPass(command, this);
+                    previousSubPassIndex = 0;
+                }
 
-            // Incremnt subpass if needed. (TODO: Handle this with previousSubPassIndex array
-            if (renderPass.IsNextSubPass)
-                command.NextSubPass();
+                // Incremnt subpass if needed
+                if (currentSubPassIndex > previousSubPassIndex)
+                    command.NextSubPass();
+            }
 
             renderPass.Run(command, context);
 
             // End pass if needed
-            if(i < renderPasses.Count - 1)
+            if (i < renderPasses.Count - 1)
             {
                 var nextNativePassIndex = renderPassIndices[i + 1];
-                if(currentNativePassIndex != -1 && nextNativePassIndex != currentNativePassIndex)
+                if (currentNativePassIndex != -1 && nextNativePassIndex != currentNativePassIndex)
                     command.EndRenderPass();
             }
-            else if(currentNativePassIndex != -1)
+            else if (currentNativePassIndex != -1)
             {
                 command.EndRenderPass();
             }
@@ -479,9 +488,11 @@ public class RenderGraph : IDisposable
             renderPass.PostExecute();
 
             previousNativePassIndex = currentNativePassIndex;
+            previousSubPassIndex = currentSubPassIndex;
         }
 
         renderPassIndices.Clear();
+        subPassIndices.Clear();
         renderPassDescriptors.Clear();
 
         foreach (var renderPass in renderPasses)

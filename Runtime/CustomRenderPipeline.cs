@@ -176,7 +176,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			using var pass = renderGraph.AddObjectRenderPass("GBuffer");
-            pass.AllowNewSubPass = true;
 
             var (cameraTarget, previousScene, currentSceneCreated) = cameraTargetCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 			renderGraph.SetRTHandle<CameraTarget>(cameraTarget);
@@ -204,7 +203,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			using var pass = renderGraph.AddObjectRenderPass("Velocity");
-            pass.AllowNewSubPass = true;
 
             var (velocity, previousVelocity, currentVelocityCreated) = cameraVelocityCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 			renderGraph.SetRTHandle<CameraVelocity>(velocity);
@@ -374,7 +372,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			using var pass = renderGraph.AddObjectRenderPass("Render Transparent");
-            pass.AllowNewSubPass = true;
 
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("SRPDefaultUnlit", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.transparent, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonTransparent, PerObjectData.None, false);

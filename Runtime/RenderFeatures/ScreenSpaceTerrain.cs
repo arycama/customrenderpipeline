@@ -16,7 +16,6 @@ public class ScreenSpaceTerrain : ViewRenderFeature
 			return;
 
 		using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Terrain");
-        pass.AllowNewSubPass = true;
 
 		pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
 		pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);

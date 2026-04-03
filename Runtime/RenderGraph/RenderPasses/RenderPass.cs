@@ -74,8 +74,6 @@ public abstract class RenderPass : IDisposable
     public virtual bool IsNativeRenderPass => false;
     public virtual bool OutputsToCameraTarget => false;
 
-    public bool IsNextSubPass { get; set; } = false;
-    public bool AllowNewSubPass { get; set; } = false;
     public RenderTargetIdentifier FrameBufferTarget { get; set; }
     public GraphicsFormat FrameBufferFormat { get; set; }
     public Int2 Size { get; protected set; }
@@ -113,11 +111,9 @@ public abstract class RenderPass : IDisposable
         readRtHandles.Clear();
         keywords.Clear();
         PropertyBlock.Clear();
-        AllowNewSubPass = false;
         frameBufferInputs.Clear();
 		colorTargets.Clear();
         depthBuffer = default;
-        IsNextSubPass = false;
     }
 
     void IDisposable.Dispose() { }
