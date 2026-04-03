@@ -153,10 +153,11 @@ public class RenderGraph : IDisposable
 
     public void Execute(CommandBuffer command, ScriptableRenderContext context)
     {
+        nativeRenderPassSystem.CreateNativeRenderPasses(renderPasses);
+
         BufferHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
         RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 
-        nativeRenderPassSystem.CreateNativeRenderPasses(renderPasses);
         IsExecuting = true;
 
         foreach (var renderPass in renderPasses)
