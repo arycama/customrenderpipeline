@@ -137,7 +137,7 @@ public class RaytracingRenderPass<T> : RenderPass<T>
 		Command.SetRayTracingMatrixArrayParam(shader, propertyName, value);
 	}
 
-	protected sealed override void PostExecute()
+    public sealed override void PostExecute()
 	{
 		foreach (var colorTarget in colorBindings)
 		{

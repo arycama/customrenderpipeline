@@ -51,7 +51,7 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
         Command.SetViewport(new Rect(0, 0, viewportSize.x, viewportSize.y));
 	}
 
-	protected sealed override void PostExecute()
+	public sealed override void PostExecute()
 	{
         foreach (var colorTarget in colorTargets)
 		{

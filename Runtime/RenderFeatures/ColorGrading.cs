@@ -84,7 +84,7 @@ public class ColorGrading : FrameRenderFeature
         if (initialize || previousLutResolution != settings.Resolution || colorGamut != previousColorGamut)
         {
             if (!initialize)
-                renderGraph.ReleasePersistentResource(colorLut, pass.RenderPassIndex);
+                renderGraph.ReleasePersistentResource(colorLut, pass.Index);
 
             colorLut = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.A2B10G10R10_UNormPack32, settings.Resolution, TextureDimension.Tex3D, isExactSize: true, isPersistent: true);
             previousLutResolution = settings.Resolution;

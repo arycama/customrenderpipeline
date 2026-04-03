@@ -12,6 +12,8 @@ public class RenderGraph : IDisposable
 
     private bool disposedValue;
     private readonly List<RenderPass> renderPasses = new();
+    private readonly List<int> renderPassIndices = new();
+    private readonly List<int> subPassIndices = new();
 
     private readonly GraphicsBuffer emptyBuffer;
     private readonly RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
@@ -50,8 +52,6 @@ public class RenderGraph : IDisposable
 
     public int FrameIndex { get; private set; }
     public bool IsExecuting { get; private set; }
-    public bool DebugRenderPasses { get; set; }
-    public bool EnableRenderPassValidation { get; set; }
 
     public RenderGraph(CustomRenderPipelineBase renderPipeline)
     {
@@ -133,7 +133,110 @@ public class RenderGraph : IDisposable
         renderPasses.Add(result);
 
         if (currentPass != null)
-            CreateNativeRenderPass(currentPass);
+        {
+            var canMergePass = false;
+            if (currentPass.IsNativeRenderPass)
+            {
+                // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
+                canMergePass = isInRenderPass && size == currentPass.Size && viewCount == currentPass.ViewCount;
+
+                if (canMergePass)
+                {
+                    // We allow some subpasses to have no depth attachment, by setting the flags to readonlydepthstencil
+                    if (!currentPass.depthBuffer.HasValue)
+                    {
+                        currentPass.flags = SubPassFlags.ReadOnlyDepthStencil;
+                    }
+
+                    if (depthIndex != -1 && currentPass.depthBuffer.HasValue)
+                    {
+                        var depthAttachment = attachments[depthIndex];
+                        if (depthAttachment.handle != currentPass.depthBuffer.Value || depthAttachment.mipLevel != currentPass.MipLevel || depthAttachment.cubemapFace != currentPass.CubemapFace || depthAttachment.depthSlice != currentPass.DepthSlice)
+                        {
+                            // If both passes have depth texutres that do not match, do not merge them
+                            canMergePass = false;
+                        }
+                    }
+                }
+
+                if (canMergePass)
+                {
+                    // If flags and attachements are identical, keep using the same subpass
+                    var inputCount = currentPass.frameBufferInputs.Count;
+                    var outputCount = currentPass.OutputsToCameraTarget ? 1 : currentPass.colorTargets.Count;
+
+                    var canPassMergeWithSubPass = subPasses.Length < 8 && currentPass.flags == flags && inputCount == inputs.Length && outputCount == outputs.Length;
+                    if (canPassMergeWithSubPass)
+                    {
+                        // Check if all the inputs and outputs are equal (And in identical order) since this must be true for the pass to merge
+                        for (var i = 0; i < inputCount; i++)
+                        {
+                            var input = inputs[i];
+                            if (currentPass.frameBufferInputs[i] == input.handle && currentPass.MipLevel == input.mipLevel && currentPass.CubemapFace == input.cubemapFace && currentPass.DepthSlice == input.depthSlice)
+                                continue;
+
+                            canPassMergeWithSubPass = false;
+                            break;
+                        }
+
+                        if (canPassMergeWithSubPass)
+                        {
+                            if (currentPass.OutputsToCameraTarget)
+                            {
+                                if (currentPass.FrameBufferTarget != outputs[0].frameBufferTarget)
+                                    canPassMergeWithSubPass = false;
+                            }
+                            else
+                            {
+                                for (var i = 0; i < currentPass.colorTargets.Count; i++)
+                                {
+                                    var output = outputs[i];
+                                    if (currentPass.colorTargets[i] == output.handle && currentPass.MipLevel == output.mipLevel && currentPass.CubemapFace == output.cubemapFace && currentPass.DepthSlice == output.depthSlice)
+                                        continue;
+
+                                    canPassMergeWithSubPass = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!canPassMergeWithSubPass)
+                    {
+                        if (currentPass.AllowNewSubPass)
+                        {
+                            EndSubPass();
+                            currentPass.IsNextSubPass = true;
+                            BeginSubpass(currentPass);
+                        }
+                        else
+                        {
+                            canMergePass = false;
+                        }
+                    }
+                }
+            }
+
+            if (!canMergePass)
+            {
+                if (isInRenderPass)
+                    EndRenderPass(previousPass);
+
+                if (currentPass.IsNativeRenderPass)
+                {
+                    BeginRenderPass(currentPass);
+                    BeginSubpass(currentPass);
+                }
+            }
+
+            previousPass = currentPass;
+
+            // If this is the first pass, either add 0 (Eg current count) or -1 if not a native render pass
+            if (previousPass.IsNativeRenderPass)
+                renderPassIndices.Add(renderPassDescriptors.Count);
+            else
+                renderPassIndices.Add(-1);
+        }
 
         currentPass = result;
 
@@ -168,12 +271,7 @@ public class RenderGraph : IDisposable
     private void BeginRenderPass(RenderPass pass)
     {
         isInRenderPass = true;
-
         startPassIndex = pass.Index;
-
-        pass.IsRenderPassStart = true;
-        pass.RenderPassIndex = renderPassDescriptors.Count;
-
         passName = pass.Name;
         size = pass.Size;
         viewCount = pass.ViewCount;
@@ -320,125 +418,22 @@ public class RenderGraph : IDisposable
         EndSubPass();
 
         endPassIndex = pass.Index;
-
-        pass.IsRenderPassEnd = true;
         isInRenderPass = false;
-
         renderPassDescriptors.Add(new(size, new(attachments.AsArray(), Allocator.Temp), new(subPasses.AsArray(), Allocator.Temp), startPassIndex, endPassIndex, pass.ViewCount, 1, depthIndex, -1, passName));
-
         attachments.Clear();
         subPasses.Clear();
         passName = null;
         depthIndex = -1;
     }
 
-    private void CreateNativeRenderPass(RenderPass pass)
-    {
-        var canMergePass = false;
-        if (pass.IsNativeRenderPass)
-        {
-            // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
-            canMergePass = isInRenderPass && size == pass.Size && viewCount == pass.ViewCount;
-
-            if (canMergePass)
-            {
-                // We allow some subpasses to have no depth attachment, by setting the flags to readonlydepthstencil
-                if (!pass.depthBuffer.HasValue)
-                {
-                    pass.flags = SubPassFlags.ReadOnlyDepthStencil;
-                }
-
-                if (depthIndex != -1 && pass.depthBuffer.HasValue)
-                {
-                    var depthAttachment = attachments[depthIndex];
-                    if (depthAttachment.handle != pass.depthBuffer.Value || depthAttachment.mipLevel != pass.MipLevel || depthAttachment.cubemapFace != pass.CubemapFace || depthAttachment.depthSlice != pass.DepthSlice)
-                    {
-                        // If both passes have depth texutres that do not match, do not merge them
-                        canMergePass = false;
-                    }
-                }
-            }
-
-            if (canMergePass)
-            {
-                // If flags and attachements are identical, keep using the same subpass
-                var inputCount = pass.frameBufferInputs.Count;
-                var outputCount = pass.OutputsToCameraTarget ? 1 : pass.colorTargets.Count;
-
-                var canPassMergeWithSubPass = subPasses.Length < 8 && pass.flags == flags && inputCount == inputs.Length && outputCount == outputs.Length;
-                if (canPassMergeWithSubPass)
-                {
-                    // Check if all the inputs and outputs are equal (And in identical order) since this must be true for the pass to merge
-                    for (var i = 0; i < inputCount; i++)
-                    {
-                        var input = inputs[i];
-                        if (pass.frameBufferInputs[i] == input.handle && pass.MipLevel == input.mipLevel && pass.CubemapFace == input.cubemapFace && pass.DepthSlice == input.depthSlice)
-                            continue;
-
-                        canPassMergeWithSubPass = false;
-                        break;
-                    }
-
-                    if (canPassMergeWithSubPass)
-                    {
-                        if (pass.OutputsToCameraTarget)
-                        {
-                            if (pass.FrameBufferTarget != outputs[0].frameBufferTarget)
-                                canPassMergeWithSubPass = false;
-                        }
-                        else
-                        {
-                            for (var i = 0; i < pass.colorTargets.Count; i++)
-                            {
-                                var output = outputs[i];
-                                if (pass.colorTargets[i] == output.handle && pass.MipLevel == output.mipLevel && pass.CubemapFace == output.cubemapFace && pass.DepthSlice == output.depthSlice)
-                                    continue;
-
-                                canPassMergeWithSubPass = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (!canPassMergeWithSubPass)
-                {
-                    if (pass.AllowNewSubPass)
-                    {
-                        EndSubPass();
-                        pass.IsNextSubPass = true;
-                        BeginSubpass(pass);
-                    }
-                    else
-                    {
-                        canMergePass = false;
-                    }
-                }
-            }
-        }
-
-        if (!canMergePass)
-        {
-            if (isInRenderPass)
-                EndRenderPass(previousPass);
-
-            if (pass.IsNativeRenderPass)
-            {
-                BeginRenderPass(pass);
-                BeginSubpass(pass);
-            }
-        }
-
-        previousPass = pass;
-    }
-
-    public void BeginNativeRenderPass(int index, CommandBuffer command)
-    {
-        renderPassDescriptors[index].BeginRenderPass(command, this);
-    }
-
     public void Execute(CommandBuffer command, ScriptableRenderContext context)
     {
+        // If this is the first pass, either add 0 (Eg current count) or -1 if not a native render pass
+        if (previousPass.IsNativeRenderPass)
+            renderPassIndices.Add(renderPassDescriptors.Count);
+        else
+            renderPassIndices.Add(-1);
+
         currentPass = null;
 
         // The frame may end on a final renderpass, in which case we need to end it
@@ -452,14 +447,50 @@ public class RenderGraph : IDisposable
 
         IsExecuting = true;
 
-        foreach (var renderPass in renderPasses)
+        var previousNativePassIndex = -1;
+        for (var i = 0; i < renderPasses.Count; i++)
         {
+            var renderPass = renderPasses[i];
+            var currentNativePassIndex = renderPassIndices[i];
+
+            // Begin a new pass if the index has increased
+            if (currentNativePassIndex != -1 && currentNativePassIndex != previousNativePassIndex)
+                renderPassDescriptors[currentNativePassIndex].BeginRenderPass(command, this);
+
+            // Incremnt subpass if needed. (TODO: Handle this with previousSubPassIndex array
+            if (renderPass.IsNextSubPass)
+                command.NextSubPass();
+
             renderPass.Run(command, context);
+
+            // End pass if needed
+            if(i < renderPasses.Count - 1)
+            {
+                var nextNativePassIndex = renderPassIndices[i + 1];
+                if(currentNativePassIndex != -1 && nextNativePassIndex != currentNativePassIndex)
+                    command.EndRenderPass();
+            }
+            else if(currentNativePassIndex != -1)
+            {
+                command.EndRenderPass();
+            }
+
+            // TODO: Handle differently?
+            renderPass.PostExecute();
+
+            previousNativePassIndex = currentNativePassIndex;
         }
+
+        renderPassIndices.Clear();
+        renderPassDescriptors.Clear();
+
+        foreach (var renderPass in renderPasses)
+            renderPass.Reset();
 
         // Re-add the passes to the pool
         foreach (var renderPass in renderPasses)
         {
+
             if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))
             {
                 pool = new();
@@ -470,8 +501,6 @@ public class RenderGraph : IDisposable
         }
 
         IsExecuting = false;
-
-        renderPassDescriptors.Clear();
     }
 
     public void CleanupCurrentFrame()
