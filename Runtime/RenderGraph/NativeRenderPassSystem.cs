@@ -4,7 +4,6 @@ using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
-using UnityEngine.XR;
 
 public class NativeRenderPassSystem : IDisposable
 {
@@ -41,7 +40,7 @@ public class NativeRenderPassSystem : IDisposable
         renderPassDescriptors[index].BeginRenderPass(command);
     }
 
-    private void BeginRenderPass(RenderPass pass)
+    private void BeginRenderPass(RenderPass pass, Int3 passSize)
     {
         isInRenderPass = true;
 
@@ -54,13 +53,12 @@ public class NativeRenderPassSystem : IDisposable
 
         if (pass.OutputsToCameraTarget)
         {
+            // TODO: This should just use pass size
             size = pass.FrameBufferSize;
         }
         else
         {
-            // Get size from depth buffer if assigned, otherwise from the first color target
-            var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer ?? pass.colorTargets[0]);
-            size = new(target.width, target.height, target.volumeDepth);
+            size = passSize;
         }
     }
 
@@ -70,9 +68,8 @@ public class NativeRenderPassSystem : IDisposable
 
         foreach (var input in pass.frameBufferInputs)
         {
-            var target = renderGraph.RtHandleSystem.GetResource(input);
             // TODO: Why are these just using default values?
-            inputs.Add(new(input, new(target, 0, CubemapFace.Unknown, -1), default, false, 0, CubemapFace.Unknown, -1));
+            inputs.Add(new(input, default, default, false, 0, CubemapFace.Unknown, -1));
         }
 
         if (pass.OutputsToCameraTarget)
@@ -86,8 +83,7 @@ public class NativeRenderPassSystem : IDisposable
                 // If depth is not assigned, assign it, otherwise ensure it matches
                 if (depthIndex == -1)
                 {
-                    var depthBufferFormat = renderGraph.RtHandleSystem.GetHandleData(pass.depthBuffer.Value).descriptor.format;
-                    subPassDepth = new(pass.depthBuffer.Value, new(renderGraph.RtHandleSystem.GetResource(pass.depthBuffer.Value), pass.MipLevel, pass.CubemapFace, pass.DepthSlice), depthBufferFormat, false, pass.MipLevel, pass.CubemapFace, pass.DepthSlice);
+                    subPassDepth = new(pass.depthBuffer.Value, default, default, false, pass.MipLevel, pass.CubemapFace, pass.DepthSlice);
                 }
                 else
                 {
@@ -97,8 +93,7 @@ public class NativeRenderPassSystem : IDisposable
 
             foreach (var colorTarget in pass.colorTargets)
             {
-                var format = renderGraph.RtHandleSystem.GetHandleData(colorTarget).descriptor.format;
-                outputs.Add(new(colorTarget, new(renderGraph.RtHandleSystem.GetResource(colorTarget), pass.MipLevel, pass.CubemapFace, pass.DepthSlice), format, false, pass.MipLevel, pass.CubemapFace, pass.DepthSlice));
+                outputs.Add(new(colorTarget, default, default, false, pass.MipLevel, pass.CubemapFace, pass.DepthSlice));
             }
         }
     }
@@ -111,7 +106,7 @@ public class NativeRenderPassSystem : IDisposable
             var input = subPassDepth.Value;
             var index = -1;
             for (var j = 0; j < attachments.Length; j++)
-                if (attachments[j].target == input.target)
+                if (attachments[j].handle == input.handle)
                 {
                     index = j;
                     break;
@@ -133,7 +128,7 @@ public class NativeRenderPassSystem : IDisposable
                 var input = inputs[i];
                 var index = -1;
                 for (var j = 0; j < attachments.Length; j++)
-                    if (attachments[j].target == input.target)
+                    if (attachments[j].handle == input.handle)
                     {
                         index = j;
                         break;
@@ -151,16 +146,34 @@ public class NativeRenderPassSystem : IDisposable
 
         var subPassOutputs = new AttachmentIndexArray(outputs.Length);
         {
+            // Find the index of each output in the existing attachments array if it exists
             for (var i = 0; i < outputs.Length; i++)
             {
                 var output = outputs[i];
                 var index = -1;
                 for (var j = 0; j < attachments.Length; j++)
-                    if (attachments[j].target == output.target)
+                {
+                    var attachment = attachments[j];
+
+                    if (output.isFrameBufferOutput)
                     {
-                        index = j;
-                        break;
+                        // If this is a framebuffer output, the existing attachment must also be a framebuffer attachment pointing to the same target
+                        if (!attachment.isFrameBufferOutput)
+                            continue;
+
+                        if (attachment.frameBufferTarget != output.frameBufferTarget)
+                            continue;
                     }
+                    else
+                    {
+                        // Otherwise check if the handles match
+                        if (output.handle != attachment.handle)
+                            continue;
+                    }
+
+                    index = j;
+                    break;
+                }
 
                 if (index == -1)
                 {
@@ -203,8 +216,8 @@ public class NativeRenderPassSystem : IDisposable
                 // TODO: what happens if we use don't care for frameBuffer output, does it still get stored (possibly in an optimal way?)
                 attachments[i] = new(colorAttachment.frameBufferFormat)
                 {
-                    storeAction = RenderBufferStoreAction.Store,
-                    loadStoreTarget = colorAttachment.target
+                    //storeAction = RenderBufferStoreAction.Store,
+                    loadStoreTarget = colorAttachment.frameBufferTarget
                 };
             }
             else
@@ -229,7 +242,15 @@ public class NativeRenderPassSystem : IDisposable
 
                 // If the handle is created and freed during the renderpass, we can avoid allocating a target entirely. (TODO: The render target system may still create a texture which may be unused)
                 if (requiresLoad || requiresStore)
-                    attachment.loadStoreTarget = colorAttachment.target;
+                {
+                    if (colorAttachment.isFrameBufferOutput)
+                        attachment.loadStoreTarget = colorAttachment.frameBufferTarget;
+                    else
+                    {
+                        var target = renderGraph.RtHandleSystem.GetResource(colorAttachment.handle);
+                        attachment.loadStoreTarget = new(target, colorAttachment.mipLevel, colorAttachment.cubemapFace, colorAttachment.depthSlice);
+                    }
+                }
 
                 attachments[i] = attachment;
             }
@@ -251,15 +272,17 @@ public class NativeRenderPassSystem : IDisposable
         foreach (var pass in renderPasses)
         {
             var canMergePass = false;
+            Int3? passSize = default;
             if (pass.IsNativeRenderPass)
             {
-                Int3 passSize;
                 if (pass.OutputsToCameraTarget)
                 {
                     passSize = pass.FrameBufferSize;
                 }
                 else
                 {
+                    // TODO: REplace with pass size property
+                    // Get size from depth buffer if assigned, otherwise from the first color target
                     var target = renderGraph.RtHandleSystem.GetResource(pass.depthBuffer ?? pass.colorTargets[0]);
                     passSize = new(target.width, target.height, target.volumeDepth);
                 }
@@ -310,7 +333,7 @@ public class NativeRenderPassSystem : IDisposable
                         {
                             if (pass.OutputsToCameraTarget)
                             {
-                                if (pass.FrameBufferTarget != outputs[0].target)
+                                if (pass.FrameBufferTarget != outputs[0].frameBufferTarget)
                                     canPassMergeWithSubPass = false;
                             }
                             else
@@ -351,7 +374,7 @@ public class NativeRenderPassSystem : IDisposable
 
                 if (pass.IsNativeRenderPass)
                 {
-                    BeginRenderPass(pass);
+                    BeginRenderPass(pass, passSize.Value);
                     BeginSubpass(pass);
                 }
             }
