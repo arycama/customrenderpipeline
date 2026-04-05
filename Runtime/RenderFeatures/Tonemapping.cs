@@ -53,7 +53,19 @@ public partial class Tonemapping : ViewRenderFeature
         }
 
 		var colorGamut = hdrSettings.colorGamut;
-        pass.AddKeyword(colorGamut.ToString().ToUpperInvariant());
+        var keyword = colorGamut switch
+        {
+            ColorGamut.sRGB => "SRGB",
+            ColorGamut.Rec709 => "REC709",
+            ColorGamut.Rec2020 => "REC2020",
+            ColorGamut.DisplayP3 => "DISPLAYP3",
+            ColorGamut.HDR10 => "HDR10",
+            ColorGamut.DolbyHDR => "DOLBYHDR",
+            ColorGamut.P3D65G22 => "P3D65G22",
+            _ => throw new NotImplementedException(colorGamut.ToString()),
+        };
+
+        pass.AddKeyword(keyword);
 
         // Unity does some annoying tonemapping in scene view, to get consistent results between scene and game mode, need to reverse it
         if (viewRenderData.camera.cameraType == CameraType.SceneView)

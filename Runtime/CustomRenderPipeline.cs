@@ -28,6 +28,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 	private readonly PersistentRTHandleCache cameraTargetCache, cameraDepthCache, cameraVelocityCache;
 	private readonly TerrainSystem terrainSystem;
+    private readonly VirtualTerrain virtualTextureUpdate;
 	private readonly TerrainShadowRenderer terrainShadowRenderer;
 	private readonly GpuDrivenRenderer gpuDrivenRenderer;
 	private readonly QuadtreeCull quadtreeCull;
@@ -44,6 +45,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		cameraVelocityCache = new(GraphicsFormat.R16G16_SFloat, renderGraph, "Previous Velocity", isScreenTexture: true);
 
 		terrainSystem = new TerrainSystem(renderGraph, asset.TerrainSettings);
+        virtualTextureUpdate = new VirtualTerrain(renderGraph, asset.TerrainSettings, terrainSystem);
         terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, asset.TerrainSettings, quadtreeCull);
 		gpuDrivenRenderer = new GpuDrivenRenderer(renderGraph);
         environmentConvolve = new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting);
@@ -56,16 +58,19 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		cameraTargetCache.Dispose();
 		cameraDepthCache.Dispose();
 		cameraVelocityCache.Dispose();
-		terrainSystem.Dispose();
 		terrainShadowRenderer.Dispose();
 		gpuDrivenRenderer.Dispose();
 	} 
 
 	protected override List<FrameRenderFeature> InitializePerFrameRenderFeatures() => new()
 	{
+        terrainSystem,
+        virtualTextureUpdate,
+
         new GenericFrameRenderFeature(renderGraph, "", context =>
         {
             renderGraph.DebugRenderPasses = asset.RenderGraphDebug;
+            QualitySettings.maxQueuedFrames = asset.MaxQueuedFrames;
         }),
 
         new RaytracingSystem(renderGraph, asset.RayTracingSettings),
@@ -78,7 +83,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			// TODO: Move this into light setup
 			var sunCosAngle = AngularDiameterToConeCosAngle(Radians(asset.LightingSettings.SunAngularDiameter));
 			var sinSigmaSq = (float)Square(Sin(Radians(asset.LightingSettings.SunAngularDiameter / 2.0)));
-
 
 #if UNITY_EDITOR
 			var time = EditorApplication.isPlaying && !EditorApplication.isPaused ? Time.unscaledTimeAsDouble : EditorApplication.timeSinceStartup;
@@ -134,7 +138,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new VolumetricCloudsSetup(asset.Clouds, renderGraph),
 		new SkyLookupTables(asset.Sky, renderGraph),
 		new WaterFft(renderGraph, asset.OceanSettings),
-		terrainSystem,
+		
         new ProceduralGenerationGpu(renderGraph, RenderPipelineDependencyResolver.Resolve<ProceduralGenerationController>()),
 		new WaterShoreMask(renderGraph, asset.WaterShoreMaskSettings),
         new GpuDrivenRenderingSetup(renderGraph, RenderPipelineDependencyResolver.Resolve<ProceduralGenerationController>()),
@@ -174,7 +178,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			renderGraph.SetRTHandle<CameraStencil>(cameraDepth, subElement: RenderTextureSubElement.Stencil);
 		}),
 
-		new VirtualTerrainPreRender(renderGraph, asset.TerrainSettings),
 		new TerrainViewData(renderGraph, terrainSystem, asset.TerrainSettings),
 
 		new TerrainRenderer(renderGraph, asset.TerrainSettings, quadtreeCull),
@@ -202,8 +205,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<FrameData>();
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<AutoExposureData>();
-		    pass.ReadResource<VirtualTextureData>();
-		    pass.ReadResource<TerrainRenderData>();
+		    pass.ReadResource<VirtualTextureData>(true);
+		    pass.ReadResource<TerrainRenderData>(true);
 		}),
 
         new GenericViewRenderFeature(renderGraph, viewRenderData =>
@@ -229,8 +232,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<TemporalAAData>();
 			pass.ReadResource<AutoExposureData>();
-		    pass.ReadResource<VirtualTextureData>();
-		    pass.ReadResource<TerrainRenderData>();
+		    pass.ReadResource<VirtualTextureData>(true);
+		    pass.ReadResource<TerrainRenderData>(true);
 		}),
 
         new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
@@ -248,7 +251,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
 		// Finalize gbuffer
 		new ScreenSpaceTerrain(renderGraph),
-		new VirtualTerrain(renderGraph, asset.TerrainSettings),
+		new VirtualTerrainReadback(renderGraph, asset.TerrainSettings, virtualTextureUpdate),
 
 		// Decals
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
@@ -360,21 +363,22 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new VolumetricClouds(asset.Clouds, renderGraph, asset.Sky),
 		new Sky(renderGraph, asset.Sky),
 
-        new GenericViewRenderFeature(renderGraph, viewRenderData =>
-        {
-            // Generate for next frame
-            var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
-            var previousCameraTarget = renderGraph.GetRTHandle<PreviousCameraTarget>();
-            using (var pass = renderGraph.AddGenericRenderPass("Generate Color Pyramid", (cameraTarget, previousCameraTarget)))
-            {
-                pass.ReadRtHandle<CameraTarget>();
-                pass.SetRenderFunction(static (command, pass, data) =>
-                {
-                    command.CopyTexture(pass.GetRenderTexture(data.cameraTarget), 0, 0, pass.GetRenderTexture(data.previousCameraTarget), 0, 0);
-                    command.GenerateMips(pass.GetRenderTexture(data.previousCameraTarget));
-                });
-            }
-        }),
+        //new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        //{
+        //    // Generate for next frame
+        //    var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
+        //    var previousCameraTarget = renderGraph.GetRTHandle<PreviousCameraTarget>();
+        //    using (var pass = renderGraph.AddGenericRenderPass("Generate Color Pyramid", (cameraTarget, previousCameraTarget)))
+        //    {
+        //        pass.ReadRtHandle<CameraTarget>();
+
+        //        pass.SetRenderFunction(static (command, pass, data) =>
+        //        {
+        //            command.CopyTexture(pass.GetRenderTexture(data.cameraTarget), 0, 0, pass.GetRenderTexture(data.previousCameraTarget), 0, 0);
+        //            command.GenerateMips(pass.GetRenderTexture(data.previousCameraTarget));
+        //        });
+        //    }
+        //}),
 
         new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
@@ -387,7 +391,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepth);
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 
-            pass.ReadRtHandle<PreviousCameraTarget>();
+            //pass.ReadRtHandle<PreviousCameraTarget>();
 
             pass.ReadResource<FrameData>();
 			pass.ReadResource<DfgData>();
@@ -406,7 +410,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<LightingSetup.Result>();
 			pass.ReadResource<ClusteredLightCulling.Result>();
 			pass.ReadResource<ParticleShadowData>();
-		    pass.ReadResource<TerrainRenderData>();
+		    pass.ReadResource<VirtualTextureData>(true);
+		    pass.ReadResource<TerrainRenderData>(true);
 		}),
 
         // Do rain after water so we can get raindrops on the water surface
