@@ -10,13 +10,16 @@ public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 	private bool isPointLight;
     private ScriptableRenderContext context;
 
-	public void Initialize(ScriptableRenderContext context, CullingResults cullingResults, int lightIndex, BatchCullingProjectionType projectionType, ShadowSplitData shadowSplitData, float bias, float slopeBias, bool zClip, bool isPointLight)
+	public void Initialize(ScriptableRenderContext context, CullingResults cullingResults, int lightIndex, BatchCullingProjectionType projectionType, ShadowSplitData shadowSplitData, float bias, float slopeBias, bool zClip, bool isPointLight, Int2 size, int viewCount)
 	{
 		this.bias = bias;
 		this.slopeBias = slopeBias;
 		this.zClip = zClip;
 		this.isPointLight = isPointLight;
         this.context = context;
+
+        Size = size;
+        ViewCount = viewCount;
 
         var shadowDrawingSettings = new ShadowDrawingSettings(cullingResults, lightIndex);
         rendererList = context.CreateShadowRendererList(ref shadowDrawingSettings);

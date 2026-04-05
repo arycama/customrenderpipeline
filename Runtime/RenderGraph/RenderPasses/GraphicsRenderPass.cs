@@ -5,17 +5,12 @@ using UnityEngine.Rendering;
 
 public abstract class GraphicsRenderPass<T>: RenderPass<T>
 {
-	private Int2? resolution;
-	private bool isScreenPass;
-
     public override bool IsNativeRenderPass => true;
 
 	public override void Reset()
 	{
 		base.Reset();
 		flags = default;
-		resolution = null;
-		isScreenPass = default;
 		DepthSlice = -1;
 		MipLevel = 0;
 		CubemapFace = CubemapFace.Unknown;
@@ -44,32 +39,19 @@ public abstract class GraphicsRenderPass<T>: RenderPass<T>
 
 		// Check that multiple targets have the same resolution
 		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(rtHandle);
-		if (!resolution.HasValue)
-		{
-			resolution = new(descriptor.width, descriptor.height);
-			isScreenPass = descriptor.isScreenTexture;
-		}
-		else
-		{
-            // These are if statements/exceptions instead of asserts since they use the pass name to avoid constructing strings every frame and allocating gc
-			if (resolution.Value != new Int2(descriptor.width, descriptor.height))
-				throw new InvalidOperationException($"Render Pass {Name} is attempting to write to multiple textures with different resolutions");
 
-			if (isScreenPass && !descriptor.isScreenTexture)
-				throw new InvalidOperationException($"Render Pass {Name} is setting multiple targets in pass that are not marked as screen textures");
-
-			if (!isScreenPass && !descriptor.isExactSize)
-				throw new InvalidOperationException($"Render Pass {Name} is setting multiple targets in pass that are not marked as exact size textures");
-		}
+        // These are if statements/exceptions instead of asserts since they use the pass name to avoid constructing strings every frame and allocating gc
+		if (Size != new Int2(descriptor.width, descriptor.height))
+			throw new InvalidOperationException($"{Name} is attempting to write to a texture whose resolution does not match the pass");
 	}
 
     protected override void SetupTargets()
 	{
-        var viewportSize = new Int2(resolution.Value.x >> MipLevel, resolution.Value.y >> MipLevel);
+        var viewportSize = new Int2(Size.x >> MipLevel, Size.y >> MipLevel);
         Command.SetViewport(new Rect(0, 0, viewportSize.x, viewportSize.y));
 	}
 
-	protected sealed override void PostExecute()
+	public sealed override void PostExecute()
 	{
         foreach (var colorTarget in colorTargets)
 		{

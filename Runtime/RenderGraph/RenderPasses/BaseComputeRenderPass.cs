@@ -90,7 +90,7 @@ public abstract class BaseComputeRenderPass<T> : RenderPass<T>
 		Command.SetComputeMatrixArrayParam(computeShader, propertyName, value);
 	}
 
-	protected sealed override void PostExecute()
+    public sealed override void PostExecute()
 	{
 		foreach (var colorTarget in colorBindings)
 		{

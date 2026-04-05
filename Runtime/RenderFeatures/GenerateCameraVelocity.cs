@@ -14,7 +14,7 @@ public class GenerateCameraVelocity : ViewRenderFeature
     {
 		using (var pass = renderGraph.AddFullscreenRenderPass("Camera Velocity"))
 		{
-			pass.Initialize(material);
+			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.ReadResource<ViewData>();

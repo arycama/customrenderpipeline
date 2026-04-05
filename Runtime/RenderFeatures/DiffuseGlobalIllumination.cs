@@ -75,7 +75,7 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
         {
 			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Trace", (settings.Intensity, settings.MaxSamples, settings.Thickness, viewRenderData.viewSize, settings.ConeAngle, viewRenderData.tanHalfFov.y)))
 			{
-				pass.Initialize(material);
+				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 				pass.WriteTexture(tempResult);
 				pass.WriteTexture(hitResult);

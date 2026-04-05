@@ -83,6 +83,11 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
         return handleInfo[handle.index];
     }
 
+    public void SetHandleData(ResourceHandle<T> handle, ResourceHandleData<V, T> data)
+    {
+        handleInfo[handle.index] = data;
+    }
+
     public V GetDescriptor(ResourceHandle<T> handle)
 	{
 		return handleInfo[handle.index].descriptor;

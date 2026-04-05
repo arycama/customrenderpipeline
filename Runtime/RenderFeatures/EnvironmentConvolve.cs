@@ -105,7 +105,7 @@ public class EnvironmentConvolve : ViewRenderFeature
             {
                 using (var pass = renderGraph.AddFullscreenRenderPass("Ggx Convolve", (i, envResolution: settings.Resolution, settings.Samples)))
                 {
-                    pass.Initialize(convolveMaterial);
+                    pass.Initialize(convolveMaterial, settings.Resolution);
                     pass.MipLevel = i;
 
                     pass.WriteTexture(reflection);

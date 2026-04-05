@@ -17,7 +17,7 @@ public class PrecomputeDfg : FrameRenderFeature
 		directionalAlbedo = renderGraph.GetTexture(32, GraphicsFormat.R16_UNorm, isPersistent: true, isExactSize: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Precompute Dfg"))
 		{
-			pass.Initialize(precomputeDfgMaterial, 0);
+			pass.Initialize(precomputeDfgMaterial, 32, 1, 0);
 			pass.WriteTexture(precomputeDfg);
 			pass.WriteTexture(directionalAlbedo);
 		}
@@ -25,7 +25,7 @@ public class PrecomputeDfg : FrameRenderFeature
 		averageAlbedo = renderGraph.GetTexture(new(32, 1), GraphicsFormat.R16_UNorm, isPersistent: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Average Albedo"))
 		{
-			pass.Initialize(precomputeDfgMaterial, 1);
+			pass.Initialize(precomputeDfgMaterial, new(32, 1), 1, 1);
 			pass.WriteTexture(averageAlbedo);
 			pass.ReadTexture("DirectionalAlbedo", directionalAlbedo);
 		}
@@ -33,7 +33,7 @@ public class PrecomputeDfg : FrameRenderFeature
 		directionalAlbedoMs = renderGraph.GetTexture(16, GraphicsFormat.R16_UNorm, 16, TextureDimension.Tex3D, isPersistent: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Directional Albedo Ms"))
 		{
-			pass.Initialize(precomputeDfgMaterial, 2, 16);
+			pass.Initialize(precomputeDfgMaterial, 16, 16, 2, 16);
 			pass.WriteTexture(directionalAlbedoMs);
 			pass.ReadTexture("DirectionalAlbedo", directionalAlbedo);
 		}
@@ -41,7 +41,7 @@ public class PrecomputeDfg : FrameRenderFeature
 		averageAlbedoMs = renderGraph.GetTexture(16, GraphicsFormat.R16_UNorm, isPersistent: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Average Albedo Ms"))
 		{
-			pass.Initialize(precomputeDfgMaterial, 3);
+			pass.Initialize(precomputeDfgMaterial, 16, 1, 3);
 			pass.WriteTexture(averageAlbedoMs);
 			pass.ReadTexture("DirectionalAlbedoMs", directionalAlbedoMs);
 		}
@@ -49,7 +49,7 @@ public class PrecomputeDfg : FrameRenderFeature
 		specularOcclusion = renderGraph.GetTexture(32, GraphicsFormat.R16_UNorm, 32 * 32, TextureDimension.Tex3D, isPersistent: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Specular Occlusion"))
 		{
-			pass.Initialize(precomputeDfgMaterial, 4, 32 * 32);
+			pass.Initialize(precomputeDfgMaterial, 32, 32 * 32, 4, 32 * 32);
 			pass.WriteTexture(specularOcclusion);
 		}
 

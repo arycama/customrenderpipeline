@@ -93,7 +93,7 @@ public class GrassRenderer : ViewRenderFeature
 			
 			using(var pass = renderGraph.AddFullscreenRenderPass("Grass Coverage Init"))
 			{
-				pass.Initialize(grassCoverageMaterial);
+				pass.Initialize(grassCoverageMaterial, terrain.terrainData.alphamapResolution);
 				pass.WriteTexture(coverageMap);
 				pass.ReadResource<TerrainRenderData>();
 				isInitialized = true;

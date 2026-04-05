@@ -85,7 +85,7 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 
 			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip, settings.Thickness)))
 			{
-				pass.Initialize(material);
+				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 				pass.WriteTexture(tempResult);
 				pass.WriteTexture(hitResult);

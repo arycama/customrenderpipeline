@@ -74,14 +74,10 @@ public abstract class RenderPass : IDisposable
     public virtual bool IsNativeRenderPass => false;
     public virtual bool OutputsToCameraTarget => false;
 
-    public bool IsRenderPassStart { get; set; } = false;
-    public bool IsNextSubPass { get; set; } = false;
-    public bool IsRenderPassEnd { get; set; } = false;
-    public bool AllowNewSubPass { get; set; } = false;
-    public int RenderPassIndex { get; set; } = -1;
     public RenderTargetIdentifier FrameBufferTarget { get; set; }
     public GraphicsFormat FrameBufferFormat { get; set; }
-    public Int3 FrameBufferSize { get; set; }
+    public Int2 Size { get; protected set; }
+    public int ViewCount { get; set; }
 
     public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
     public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);
@@ -115,7 +111,6 @@ public abstract class RenderPass : IDisposable
         readRtHandles.Clear();
         keywords.Clear();
         PropertyBlock.Clear();
-        AllowNewSubPass = false;
         frameBufferInputs.Clear();
 		colorTargets.Clear();
         depthBuffer = default;
@@ -183,8 +178,8 @@ public abstract class RenderPass : IDisposable
 		if(UseProfiler)
 			Command.BeginSample(Name);
 
-		// Move into some OnPreRender thing in buffer/RTHandles? 
-		foreach (var texture in readTextures)
+        // Move into some OnPreRender thing in buffer/RTHandles? 
+        foreach (var texture in readTextures)
 		{
 			var handle = texture.Item2;
 			SetTexture(texture.Item1, GetRenderTexture(handle), texture.Item3, texture.Item4);
@@ -201,30 +196,6 @@ public abstract class RenderPass : IDisposable
 
 		foreach (var buffer in writeBuffers)
 			SetBuffer(buffer.Item1, buffer.Item2);
-
-        if (IsNativeRenderPass)
-        {
-            if (IsRenderPassStart)
-            {
-                if (RenderGraph.EnableRenderPassValidation)
-                {
-                    // If render pass validation is enabled, for some reason it breaks if incompatible commands are in the same command buffer even if they are outside of the renderpass start/end. Work around this by manually executing and clearing the command buffer.
-                    // This messes with profiling markers however, so only enable when needed
-                    context.ExecuteCommandBuffer(Command);
-                    Command.Clear();
-                }
-
-                RenderGraph.BeginNativeRenderPass(RenderPassIndex, Command);
-                IsRenderPassStart = false;
-                RenderPassIndex = -1;
-            }
-
-            if (IsNextSubPass)
-            {
-                command.NextSubPass();
-                IsNextSubPass = false;
-            }
-        }
 
         SetupTargets();
 
@@ -249,30 +220,11 @@ public abstract class RenderPass : IDisposable
 
 		Execute();
 
-        // TODO: These two conditions are somewhat redundant since IsRenderPassEnd will only ever be true for native render passes
-        if(IsNativeRenderPass && IsRenderPassEnd)
-        {
-            command.EndRenderPass();
-            IsRenderPassEnd = false;
-
-            // If render pass validation is enabled, for some reason it breaks if incompatible commands are in the same command buffer even if they are outside of the renderpass start/end. Work around this by manually executing and clearing the command buffer.
-            // This messes with profiling markers however, so only enable when needed
-            if (RenderGraph.EnableRenderPassValidation)
-            {
-                context.ExecuteCommandBuffer(command);
-                command.Clear();
-            }
-        }
-        
-        PostExecute();
-
-		if (UseProfiler)
-			Command.EndSample(Name);
-
-		Reset();
+        if (UseProfiler)
+            Command.EndSample(Name);
 	}
 
-	protected virtual void PostExecute() { }
+	public virtual void PostExecute() { }
 
 	public override string ToString() => Name;
 

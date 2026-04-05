@@ -1,11 +1,8 @@
 using System;
 using System.Collections.Generic;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Assertions;
-using UnityEngine.Experimental.Rendering;
-using UnityEngine.Pool;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
@@ -15,11 +12,32 @@ public class RenderGraph : IDisposable
 
     private bool disposedValue;
     private readonly List<RenderPass> renderPasses = new();
+    private readonly List<int> renderPassIndices = new();
+    private readonly List<int> subPassIndices = new();
 
     private readonly GraphicsBuffer emptyBuffer;
     private readonly RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
     private readonly Dictionary<Type, RTHandleData> rtHandles = new();
-    private readonly NativeRenderPassSystem nativeRenderPassSystem;
+
+    private Int2 size;
+    private int viewCount;
+    private int mipLevel;
+    private AttachmentData? subPassDepth;
+    private bool isInRenderPass;
+    private string passName;
+    private int depthIndex = -1;
+    private int subPassIndex = -1;
+
+    private NativeList<AttachmentData> inputs = new(8, Allocator.Persistent), outputs = new(8, Allocator.Persistent);
+    private SubPassFlags flags;
+
+    private int startPassIndex, endPassIndex;
+
+    private readonly NativeList<AttachmentData> attachments = new(8, Allocator.Persistent);
+    private readonly NativeList<SubPassDescriptor> subPasses = new(Allocator.Persistent);
+    private readonly List<RenderPassDescriptor> renderPassDescriptors = new();
+
+    private RenderPass previousPass, currentPass;
 
     public RTHandleSystem RtHandleSystem { get; }
     public BufferHandleSystem BufferHandleSystem { get; }
@@ -36,14 +54,11 @@ public class RenderGraph : IDisposable
 
     public int FrameIndex { get; private set; }
     public bool IsExecuting { get; private set; }
-    public bool DebugRenderPasses { get; set; }
-    public bool EnableRenderPassValidation { get; set; }
 
     public RenderGraph(CustomRenderPipelineBase renderPipeline)
     {
         RtHandleSystem = new();
         BufferHandleSystem = new();
-        nativeRenderPassSystem = new(this);
 
         emptyBuffer = new GraphicsBuffer(GraphicsBuffer.Target.Structured, 1, sizeof(int)) { name = "Empty Structured Buffer" };
         emptyTexture = new RenderTexture(1, 1, 0) { hideFlags = HideFlags.HideAndDontSave, };
@@ -90,7 +105,10 @@ public class RenderGraph : IDisposable
         ResourceMap.Dispose();
         RtHandleSystem.Dispose();
         BufferHandleSystem.Dispose();
-        nativeRenderPassSystem.Dispose();
+
+        inputs.Dispose();
+        outputs.Dispose();
+
         disposedValue = true;
     }
 
@@ -117,6 +135,110 @@ public class RenderGraph : IDisposable
         result.Index = renderPasses.Count;
 
         renderPasses.Add(result);
+
+        if (currentPass != null)
+        {
+            var canMergePass = false;
+            if (currentPass.IsNativeRenderPass)
+            {
+                // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
+                canMergePass = isInRenderPass && size == currentPass.Size && viewCount == currentPass.ViewCount && mipLevel == currentPass.MipLevel;
+
+                if (canMergePass)
+                {
+                    // We allow some subpasses to have no depth attachment, by setting the flags to readonlydepthstencil
+                    if (!currentPass.depthBuffer.HasValue)
+                    {
+                        currentPass.flags = SubPassFlags.ReadOnlyDepthStencil;
+                    }
+
+                    if (depthIndex != -1 && currentPass.depthBuffer.HasValue)
+                    {
+                        var depthAttachment = attachments[depthIndex];
+                        if (depthAttachment.handle != currentPass.depthBuffer.Value || depthAttachment.mipLevel != currentPass.MipLevel || depthAttachment.cubemapFace != currentPass.CubemapFace || depthAttachment.depthSlice != currentPass.DepthSlice)
+                        {
+                            // If both passes have depth texutres that do not match, do not merge them
+                            canMergePass = false;
+                        }
+                    }
+                }
+
+                if (canMergePass)
+                {
+                    // If flags and attachements are identical, keep using the same subpass
+                    var inputCount = currentPass.frameBufferInputs.Count;
+                    var outputCount = currentPass.OutputsToCameraTarget ? 1 : currentPass.colorTargets.Count;
+
+                    var canMergeSubPass = subPasses.Length < 8 && currentPass.flags == flags && inputCount == inputs.Length && outputCount == outputs.Length;
+                    if (canMergeSubPass)
+                    {
+                        // Check if all the inputs and outputs are equal (And in identical order) since this must be true for the pass to merge
+                        for (var i = 0; i < inputCount; i++)
+                        {
+                            var input = inputs[i];
+                            if (currentPass.frameBufferInputs[i] == input.handle && currentPass.MipLevel == input.mipLevel && currentPass.CubemapFace == input.cubemapFace && currentPass.DepthSlice == input.depthSlice)
+                                continue;
+
+                            canMergeSubPass = false;
+                            break;
+                        }
+
+                        if (canMergeSubPass)
+                        {
+                            if (currentPass.OutputsToCameraTarget)
+                            {
+                                if (currentPass.FrameBufferTarget != outputs[0].frameBufferTarget)
+                                    canMergeSubPass = false;
+                            }
+                            else
+                            {
+                                for (var i = 0; i < currentPass.colorTargets.Count; i++)
+                                {
+                                    var output = outputs[i];
+                                    if (currentPass.colorTargets[i] == output.handle && currentPass.MipLevel == output.mipLevel && currentPass.CubemapFace == output.cubemapFace && currentPass.DepthSlice == output.depthSlice)
+                                        continue;
+
+                                    canMergeSubPass = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    if (!canMergeSubPass)
+                    {
+                        EndSubPass();
+                        BeginSubpass(currentPass);
+                    }
+                }
+            }
+
+            if (!canMergePass)
+            {
+                if (isInRenderPass)
+                    EndRenderPass(previousPass);
+
+                if (currentPass.IsNativeRenderPass)
+                {
+                    // Begin render pass
+                    BeginRenderPass(currentPass);
+                    BeginSubpass(currentPass);
+                }
+            }
+
+            previousPass = currentPass;
+
+            // If this is the first pass, either add 0 (Eg current count) or -1 if not a native render pass
+            if (previousPass.IsNativeRenderPass)
+                renderPassIndices.Add(renderPassDescriptors.Count);
+            else
+                renderPassIndices.Add(-1);
+
+            subPassIndices.Add(subPassIndex);
+        }
+
+        currentPass = result;
+
         return (T)result;
     }
 
@@ -125,124 +247,6 @@ public class RenderGraph : IDisposable
         var result = AddRenderPass<T>(name);
         result.renderData = data;
         return result;
-    }
-
-    public void AddProfileBeginPass(string name)
-    {
-        // TODO: There might be a more concise way to do this
-        var pass = this.AddGenericRenderPass(name);
-        pass.UseProfiler = false;
-
-        pass.SetRenderFunction(static (command, pass) =>
-        {
-            command.BeginSample(pass.Name);
-        });
-    }
-
-    public void AddProfileEndPass(string name)
-    {
-        // TODO: There might be a more concise way to do this
-        var pass = this.AddGenericRenderPass(name);
-        pass.UseProfiler = false;
-
-        pass.SetRenderFunction(static (command, pass) =>
-        {
-            command.EndSample(pass.Name);
-        });
-    }
-
-    public ProfilePassScope AddProfileScope(string name) => new(name, this);
-
-    public void Execute(CommandBuffer command, ScriptableRenderContext context)
-    {
-        BufferHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
-        RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
-
-        nativeRenderPassSystem.CreateNativeRenderPasses(renderPasses);
-        IsExecuting = true;
-
-        foreach (var renderPass in renderPasses)
-        {
-            renderPass.Run(command, context);
-        }
-
-        // Re-add the passes to the pool
-        foreach (var renderPass in renderPasses)
-        {
-            if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))
-            {
-                pool = new();
-                renderPassPool.Add(renderPass.GetType(), pool);
-            }
-
-            pool.Push(renderPass);
-        }
-
-        IsExecuting = false;
-    }
-
-    public void BeginNativeRenderPass(int index, CommandBuffer command)
-    {
-        nativeRenderPassSystem.BeginNativeRenderPass(index, command);
-    }
-
-    public ResourceHandle<RenderTexture> GetTexture(RtHandleDescriptor descriptor, bool isPersistent = false)
-    {
-        Assert.IsFalse(IsExecuting);
-        return RtHandleSystem.GetResourceHandle(descriptor, isPersistent);
-    }
-
-    /// <summary> Gets a texture with the same attributes as the handle </summary>
-    public ResourceHandle<RenderTexture> GetTexture(ResourceHandle<RenderTexture> handle, bool isPersistent = false)
-    {
-        var descriptor = RtHandleSystem.GetDescriptor(handle);
-        return RtHandleSystem.GetResourceHandle(descriptor, isPersistent);
-    }
-
-    public ResourceHandle<RenderTexture> GetTexture(Int2 size, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false, bool isRandomWrite = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrTextureUsage = VRTextureUsage.None)
-    {
-        return GetTexture(new RtHandleDescriptor(size.x, size.y, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isRandomWrite, isExactSize, clear, clearColor, clearDepth, clearStencil, vrTextureUsage), isPersistent);
-    }
-
-    public ResourceHandle<GraphicsBuffer> GetBuffer(int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)
-    {
-        Assert.IsFalse(IsExecuting);
-        return BufferHandleSystem.GetResourceHandle(new BufferHandleDescriptor(count, stride, target, usageFlags), isPersistent);
-    }
-
-    public void CleanupCurrentFrame()
-    {
-        renderPasses.Clear();
-        BufferHandleSystem.CleanupCurrentFrame(FrameIndex);
-        RtHandleSystem.CleanupCurrentFrame(FrameIndex);
-
-        if (!FrameDebugger.enabled)
-            FrameIndex++;
-    }
-
-    public void SetResource<T>(T resource, bool isPersistent = false) where T : struct, IRenderPassData
-    {
-        Assert.IsFalse(IsExecuting);
-        ResourceMap.SetRenderPassData(resource, FrameIndex, isPersistent);
-    }
-
-    public void ClearResource<T>() where T : struct, IRenderPassData
-    {
-        Assert.IsFalse(IsExecuting);
-        ResourceMap.SetRenderPassData<T>(default, -1, false);
-    }
-
-    public bool TryGetResource<T>(out T resource) where T : struct, IRenderPassData
-    {
-        Assert.IsFalse(IsExecuting);
-        return ResourceMap.TryGetResource<T>(FrameIndex, out resource);
-    }
-
-    public T GetResource<T>() where T : struct, IRenderPassData
-    {
-        var hasResource = TryGetResource<T>(out var resource);
-        Assert.IsTrue(hasResource);
-        return resource;
     }
 
     public void SetRTHandle<T>(ResourceHandle<RenderTexture> handle, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default) where T : struct, IRtHandleId
@@ -256,11 +260,6 @@ public class RenderGraph : IDisposable
         return rtHandles[type];
     }
 
-    public ResourceHandle<RenderTexture> GetRTHandle<T>() where T : IRtHandleId
-    {
-        return GetRTHandle(typeof(T)).handle;
-    }
-
     public bool TryGetRTHandle<T>(out ResourceHandle<RenderTexture> handle) where T : IRtHandleId
     {
         var result = rtHandles.TryGetValue(typeof(T), out var data);
@@ -268,144 +267,282 @@ public class RenderGraph : IDisposable
         return result;
     }
 
-    public unsafe ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(T data) where T : unmanaged
+    private void BeginRenderPass(RenderPass pass)
     {
-        Assert.IsFalse(IsExecuting);
-        Assert.AreEqual(0, UnsafeUtility.SizeOf<T>() % 4, "ConstantBuffer size must be a multiple of 4 bytes");
+        isInRenderPass = true;
+        startPassIndex = pass.Index;
+        passName = pass.Name;
+        size = pass.Size;
+        viewCount = pass.ViewCount;
+        mipLevel = pass.MipLevel;
+    }
 
-        var size = UnsafeUtility.SizeOf<T>();
-        var buffer = GetBuffer(1, size, GraphicsBuffer.Target.Constant);
+    private void BeginSubpass(RenderPass pass)
+    {
+        flags = pass.flags;
+        subPassIndex++;
 
-        using var pass = this.AddGenericRenderPass("Set Constant Buffer", (data, buffer, size));
-        pass.WriteBuffer("", buffer);
-        pass.SetRenderFunction(static (command, pass, data) =>
+        foreach (var input in pass.frameBufferInputs)
         {
-            var array = new NativeArray<T>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            {
-                array[0] = data.data;
-            }
-
-            command.SetBufferData(pass.GetBuffer(data.buffer), array);
-        });
-
-        return buffer;
-    }
-
-    public void ReleasePersistentResource(ResourceHandle<GraphicsBuffer> handle, int passIndex)
-    {
-        Assert.IsTrue(!IsExecuting || RenderPipeline.IsDisposing);
-        BufferHandleSystem.ReleasePersistentResource(handle, passIndex);
-    }
-
-    public void ReleasePersistentResource(ResourceHandle<RenderTexture> handle, int passIndex)
-    {
-        Assert.IsTrue(!IsExecuting || RenderPipeline.IsDisposing);
-        RtHandleSystem.ReleasePersistentResource(handle, passIndex);
-    }
-
-    public Float4 GetScaleLimit2D(ResourceHandle<RenderTexture> handle)
-    {
-        Assert.IsTrue(IsExecuting);
-
-        var descriptor = RtHandleSystem.GetDescriptor(handle);
-        var resource = RtHandleSystem.GetResource(handle);
-
-        var scaleX = (float)descriptor.width / resource.width;
-        var scaleY = (float)descriptor.height / resource.height;
-        var limitX = (descriptor.width - 0.5f) / resource.width;
-        var limitY = (descriptor.height - 0.5f) / resource.height;
-
-        return new Float4(scaleX, scaleY, limitX, limitY);
-    }
-
-    public Float3 GetScale3D(ResourceHandle<RenderTexture> handle)
-    {
-        Assert.IsTrue(IsExecuting);
-
-        var descriptor = RtHandleSystem.GetDescriptor(handle);
-        var resource = RtHandleSystem.GetResource(handle);
-
-        var scaleX = (float)descriptor.width / resource.width;
-        var scaleY = (float)descriptor.height / resource.height;
-        var scaleZ = (float)descriptor.volumeDepth / resource.volumeDepth;
-
-        return new Float3(scaleX, scaleY, scaleZ);
-    }
-
-    public Float3 GetLimit3D(ResourceHandle<RenderTexture> handle)
-    {
-        Assert.IsTrue(IsExecuting);
-
-        var descriptor = RtHandleSystem.GetDescriptor(handle);
-        var resource = RtHandleSystem.GetResource(handle);
-
-        var limitX = (descriptor.width - 0.5f) / resource.width;
-        var limitY = (descriptor.height - 0.5f) / resource.height;
-        var limitZ = (descriptor.volumeDepth - 0.5f) / resource.volumeDepth;
-
-        return new Float3(limitX, limitY, limitZ);
-    }
-
-    public ResourceHandle<GraphicsBuffer> GetGridIndexBuffer(int cellsPerRow, bool isQuad, bool alternateIndices)
-    {
-        var indexCount = cellsPerRow * cellsPerRow * (isQuad ? 4 : 6);
-        var indexBuffer = GetBuffer(indexCount, sizeof(ushort), GraphicsBuffer.Target.Index, isPersistent: true);
-
-        var indices = ListPool<ushort>.Get();
-        GraphicsUtilities.GenerateGridIndexBuffer(indices, cellsPerRow, isQuad, alternateIndices);
-
-        using (var pass = this.AddGenericRenderPass("Terrain Set Index Data", (indexBuffer, indices)))
-        {
-            pass.WriteBuffer("", indexBuffer);
-            pass.SetRenderFunction(static (command, pass, data) =>
-            {
-                command.SetBufferData(pass.GetBuffer(data.indexBuffer), data.indices);
-                ListPool<ushort>.Release(data.indices);
-            });
+            // TODO: Why are these just using default values?
+            inputs.Add(new(input, default, default, false, 0, CubemapFace.Unknown, -1));
         }
 
-        return indexBuffer;
-    }
-
-    public ResourceHandle<GraphicsBuffer> GetQuadIndexBuffer(int count, bool isQuad)
-    {
-        var indexCount = count * (isQuad ? 4 : 6);
-
-        var isShort = indexCount < ushort.MaxValue;
-        var size = isShort ? sizeof(ushort) : sizeof(uint);
-        var indexBuffer = GetBuffer(indexCount, size, GraphicsBuffer.Target.Index, isPersistent: true);
-
-        if (isShort)
+        if (pass.OutputsToCameraTarget)
         {
-            var indices = ListPool<ushort>.Get();
-            GraphicsUtilities.GenerateQuadIndexBuffer(indices, count, isQuad);
-
-            using (var pass = this.AddGenericRenderPass("Terrain Set Index Data", (indexBuffer, indices)))
-            {
-                pass.WriteBuffer("", indexBuffer);
-                pass.SetRenderFunction(static (command, pass, data) =>
-                {
-                    command.SetBufferData(pass.GetBuffer(data.indexBuffer), data.indices);
-                    ListPool<ushort>.Release(data.indices);
-                });
-            }
+            outputs.Add(new(default, pass.FrameBufferTarget, pass.FrameBufferFormat, true, 0, CubemapFace.Unknown, -1));
         }
         else
         {
-            var indices = ListPool<uint>.Get();
-            GraphicsUtilities.GenerateQuadIndexBuffer(indices, count, isQuad);
-
-            using (var pass = this.AddGenericRenderPass("Terrain Set Index Data", (indexBuffer, indices)))
+            if (pass.depthBuffer.HasValue)
             {
-                pass.WriteBuffer("", indexBuffer);
-                pass.SetRenderFunction(static (command, pass, data) =>
+                // If depth is not assigned, assign it, otherwise ensure it matches
+                if (depthIndex == -1)
                 {
-                    command.SetBufferData(pass.GetBuffer(data.indexBuffer), data.indices);
-                    ListPool<uint>.Release(data.indices);
-                });
+                    subPassDepth = new(pass.depthBuffer.Value, default, default, false, pass.MipLevel, pass.CubemapFace, pass.DepthSlice);
+                }
+                else
+                {
+                    Assert.IsTrue(attachments[depthIndex].handle == pass.depthBuffer.Value);
+                }
+            }
+
+            foreach (var colorTarget in pass.colorTargets)
+            {
+                outputs.Add(new(colorTarget, default, default, false, pass.MipLevel, pass.CubemapFace, pass.DepthSlice));
+            }
+        }
+    }
+
+    private void EndSubPass()
+    {
+        // Add depth first if needed
+        if (subPassDepth.HasValue)
+        {
+            var input = subPassDepth.Value;
+            var index = -1;
+            for (var j = 0; j < attachments.Length; j++)
+                if (attachments[j].handle == input.handle)
+                {
+                    index = j;
+                    break;
+                }
+
+            if (index == -1)
+            {
+                index = attachments.Length;
+                attachments.Add(input);
+            }
+
+            depthIndex = index;
+        }
+
+        var subPassInputs = new AttachmentIndexArray(inputs.Length);
+        {
+            for (var i = 0; i < inputs.Length; i++)
+            {
+                var input = inputs[i];
+                var index = -1;
+                for (var j = 0; j < attachments.Length; j++)
+                    if (attachments[j].handle == input.handle)
+                    {
+                        index = j;
+                        break;
+                    }
+
+                if (index == -1)
+                {
+                    index = attachments.Length;
+                    attachments.Add(input);
+                }
+
+                subPassInputs[i] = index;
             }
         }
 
-        return indexBuffer;
+        var subPassOutputs = new AttachmentIndexArray(outputs.Length);
+        {
+            // Find the index of each output in the existing attachments array if it exists
+            for (var i = 0; i < outputs.Length; i++)
+            {
+                var output = outputs[i];
+                var index = -1;
+                for (var j = 0; j < attachments.Length; j++)
+                {
+                    var attachment = attachments[j];
+
+                    if (output.isFrameBufferOutput)
+                    {
+                        // If this is a framebuffer output, the existing attachment must also be a framebuffer attachment pointing to the same target
+                        if (!attachment.isFrameBufferOutput)
+                            continue;
+
+                        if (attachment.frameBufferTarget != output.frameBufferTarget)
+                            continue;
+                    }
+                    else
+                    {
+                        // Otherwise check if the handles match
+                        if (output.handle != attachment.handle)
+                            continue;
+                    }
+
+                    index = j;
+                    break;
+                }
+
+                if (index == -1)
+                {
+                    index = attachments.Length;
+                    attachments.Add(output);
+                }
+
+                subPassOutputs[i] = index;
+            }
+        }
+
+        subPasses.Add(new()
+        {
+            inputs = subPassInputs,
+            colorOutputs = subPassOutputs,
+            flags = flags
+        });
+
+        outputs.Clear();
+        inputs.Clear();
+        flags = SubPassFlags.None;
+        subPassDepth = null;
+    }
+
+    private void EndRenderPass(RenderPass pass)
+    {
+        EndSubPass();
+
+        endPassIndex = pass.Index;
+        isInRenderPass = false;
+        renderPassDescriptors.Add(new(size, new(attachments.AsArray(), Allocator.Temp), new(subPasses.AsArray(), Allocator.Temp), startPassIndex, endPassIndex, pass.ViewCount, 1, depthIndex, -1, passName));
+        attachments.Clear();
+        subPasses.Clear();
+        passName = null;
+        depthIndex = -1;
+        subPassIndex = -1;
+    }
+
+    public void Execute(CommandBuffer command, ScriptableRenderContext context)
+    {
+        subPassIndices.Add(subPassIndex);
+
+        if (previousPass.IsNativeRenderPass)
+            renderPassIndices.Add(renderPassDescriptors.Count);
+        else
+            renderPassIndices.Add(-1);
+
+        currentPass = null;
+
+        // The frame may end on a final renderpass, in which case we need to end it
+        if (isInRenderPass)
+            EndRenderPass(previousPass);
+
+        previousPass = null;
+
+        // Check which resources need to be allocated
+        foreach (var descriptor in renderPassDescriptors)
+        {
+            for (var i = 0; i < descriptor.attachments.Length; i++)
+            {
+                var colorAttachment = descriptor.attachments[i];
+                if (colorAttachment.isFrameBufferOutput)
+                    continue;
+
+                var handleData = RtHandleSystem.GetHandleData(colorAttachment.handle);
+                if (handleData.freeIndex > descriptor.endPassIndex || handleData.freeIndex == -1)
+                    continue;
+
+                handleData.isUsed = false;
+                handleData.createIndex1 = handleData.createIndex;
+                handleData.freeIndex1 = handleData.freeIndex;
+                RtHandleSystem.SetHandleData(colorAttachment.handle, handleData);
+            }
+        }
+
+        BufferHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
+        RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
+
+        IsExecuting = true;
+
+        var previousNativePassIndex = -1;
+        var previousSubPassIndex = -1;
+        for (var i = 0; i < renderPasses.Count; i++)
+        {
+            var renderPass = renderPasses[i];
+            var currentNativePassIndex = renderPassIndices[i];
+            var currentSubPassIndex = subPassIndices[i];
+
+            // Begin a new pass if the index has increased
+            if (currentNativePassIndex != -1)
+            {
+                if (currentNativePassIndex != previousNativePassIndex)
+                {
+                    renderPassDescriptors[currentNativePassIndex].BeginRenderPass(command, this);
+                    previousSubPassIndex = 0;
+                }
+
+                // Incremnt subpass if needed
+                if (currentSubPassIndex > previousSubPassIndex)
+                    command.NextSubPass();
+            }
+
+            renderPass.Run(command, context);
+
+            // End pass if needed
+            if (i < renderPasses.Count - 1)
+            {
+                var nextNativePassIndex = renderPassIndices[i + 1];
+                if (currentNativePassIndex != -1 && nextNativePassIndex != currentNativePassIndex)
+                    command.EndRenderPass();
+            }
+            else if (currentNativePassIndex != -1)
+            {
+                command.EndRenderPass();
+            }
+
+            // TODO: Handle differently?
+            renderPass.PostExecute();
+
+            previousNativePassIndex = currentNativePassIndex;
+            previousSubPassIndex = currentSubPassIndex;
+        }
+
+        renderPassIndices.Clear();
+        subPassIndices.Clear();
+        renderPassDescriptors.Clear();
+
+        foreach (var renderPass in renderPasses)
+            renderPass.Reset();
+
+        // Re-add the passes to the pool
+        foreach (var renderPass in renderPasses)
+        {
+
+            if (!renderPassPool.TryGetValue(renderPass.GetType(), out var pool))
+            {
+                pool = new();
+                renderPassPool.Add(renderPass.GetType(), pool);
+            }
+
+            pool.Push(renderPass);
+        }
+
+        IsExecuting = false;
+    }
+
+    public void CleanupCurrentFrame()
+    {
+        renderPasses.Clear();
+        BufferHandleSystem.CleanupCurrentFrame(FrameIndex);
+        RtHandleSystem.CleanupCurrentFrame(FrameIndex);
+
+        if (!FrameDebugger.enabled)
+            FrameIndex++;
     }
 }
