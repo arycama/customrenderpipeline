@@ -7,25 +7,9 @@
 #include "../../TerrainCommon.hlsl"
 
 float DirectionCount, SampleCount, Radius;
-float TerrainHeightmapScaleY;
-float3 TerrainHeightmapScale;
 float Resolution;
 
 const static float kmaxHeight = 32766.0f / 65535.0f;
-
-float4 PackWeight(float4 input, float weight)
-{
-	input.xyz = normalize(input.xyz);
-	input /= weight;
-	return input;
-}
-
-float4 UnpackWeight(float4 input, out float weight)
-{
-	weight = rcp(length(input.xyz));
-	input.xyz *= weight;
-	return input;
-}
 
 float4 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {

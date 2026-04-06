@@ -40,8 +40,9 @@ public class TerrainRenderer : TerrainRendererBase
 			pass.ReadResource<TerrainViewData>();
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<VirtualTextureData>();
+            pass.ReadResource<TerrainFrameData>();
 
-			pass.SetRenderFunction(static (command, pass, cullingPlanes) =>
+            pass.SetRenderFunction(static (command, pass, cullingPlanes) =>
 			{
 				// TODO: Put into a struct?
 				pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);

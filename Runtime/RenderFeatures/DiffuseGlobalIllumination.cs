@@ -110,7 +110,7 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
         var rayDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Spatial", (settings.Intensity, settings.MaxSamples, settings.Thickness, settings.ResolveSamples, settings.ResolveSize)))
         {
-            pass.Initialize(material, 1);
+            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult);
             pass.WriteTexture(rayDepth);
@@ -153,7 +153,7 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
 			pass.renderData.wasCreated = wasCreated;
 			pass.renderData.history = history;
 
-			pass.Initialize(material, 2);
+			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current);
             pass.WriteTexture(currentWeight);

@@ -31,13 +31,10 @@ GBufferOutput Fragment(VertexFullscreenTriangleOutput input)
 	float height;
 	ShadeTerrain(uv, albedoRoughness.rgb, albedoRoughness.a, normal, normalMetalOcclusion.b, height);
 	
-	float visibilityAngle = normalMetalOcclusion.b;
-	
-	// TODO: Do this in the virtual texture
 	float4 visibilityCone = BentNormalVisibility.Sample(SurfaceSampler, normalUv);
 	visibilityCone.xyz = normalize(visibilityCone.xyz);
 	visibilityCone.a = cos((0.5 * visibilityCone.a + 0.5) * HalfPi);
-	visibilityCone = SphericalCapIntersection(normal, cos(visibilityAngle * HalfPi), visibilityCone.xyz, visibilityCone.a);
+	visibilityCone = SphericalCapIntersection(normal, cos(HalfPi * normalMetalOcclusion.b), visibilityCone.xyz, visibilityCone.a);
 	
 	float3 V = normalize(-input.worldDirection);
 	return OutputGBuffer(albedoRoughness.rgb, 0, normal, albedoRoughness.a, visibilityCone.xyz, visibilityCone.a, 0, 0, input.position.xy, V, WorldToView);

@@ -177,10 +177,14 @@ void ShadeTerrain(float2 uv, out float3 albedo, out float roughness, out float3 
 		}
 	}
 	
+	float2 normalUv = uv * TerrainHeightmapUvRemap.x + TerrainHeightmapUvRemap.y;
+	float3 terrainNormal = GetTerrainNormal(normalUv);
+	float2 partialDerivatives = terrainNormal.xz / terrainNormal.y;
+	
 	float transmittance = 1.0;
 	albedo = 0.0;
 	float3 albedoSum = 0.0;
-	float4 normalOcclusionRoughness = 0.0, normalOcclusionRoughnessSum = 0.0;
+	float4 normalOcclusionRoughness = float3(partialDerivatives, 0.0).xyzz, normalOcclusionRoughnessSum = 0.0;
 	float extinctionSum = 0.0;
 	height = 0.0;
 	
@@ -219,16 +223,12 @@ void ShadeTerrain(float2 uv, out float3 albedo, out float roughness, out float3 
 		height += heightDelta;
 	}
 	
-	normal = normalize(float3(normalOcclusionRoughness.rg, 1));
-	
+	// Normalize by opacity
 	albedo /= 1.0 - transmittance;
 	normalOcclusionRoughness.ba /= 1.0 - transmittance;
 	
-	float2 normalUv = uv * TerrainHeightmapUvRemap.x + TerrainHeightmapUvRemap.y;
-	float3 terrainNormal = GetTerrainNormal(normalUv);
-	terrainNormal = BlendNormalRNM(terrainNormal.xzy, normal).xzy;
+	normal = normalize(float3(normalOcclusionRoughness.xy, 1.0)).xzy;
 	
 	roughness = normalOcclusionRoughness.a;
 	occlusion = normalOcclusionRoughness.b;
-	normal = terrainNormal;
 }

@@ -65,7 +65,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	protected override List<FrameRenderFeature> InitializePerFrameRenderFeatures() => new()
 	{
         terrainSystem,
-        new SetTerrainFrameData(renderGraph, terrainSystem),
         virtualTextureUpdate,
 
         new GenericFrameRenderFeature(renderGraph, "", context =>

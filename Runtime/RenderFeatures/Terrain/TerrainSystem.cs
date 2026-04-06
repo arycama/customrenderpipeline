@@ -185,12 +185,39 @@ public class TerrainSystem : FrameRenderFeature
 
 		FillLayerData();
 
-		InitializeIdMap(false);
-
 		renderGraph.SetResource(new TerrainSystemData(minMaxHeight, Terrain, TerrainData, indexBuffer), true);
-	}
 
-	private void InitializeHeightmap()
+        InitializeIdMap(false);
+
+        var size = (Float3)TerrainData.size;
+
+        var terrainFrameData = renderGraph.SetConstantBuffer
+        ((
+            size,
+            (float)TerrainData.alphamapResolution,
+            GraphicsUtilities.HalfTexelRemap(TerrainData.heightmapResolution),
+            size.y,
+            (float)TerrainData.heightmapResolution
+        ));
+
+        renderGraph.SetResource<TerrainFrameData>
+        (new(
+            diffuseArray,
+            normalMapArray,
+            maskMapArray,
+            heightmap,
+            normalmap,
+            idMap,
+            TerrainData.holesTexture,
+            terrainLayerData,
+            aoMap,
+           terrainFrameData
+        ));
+
+        InitializeAoMap(false);
+    }
+
+    private void InitializeHeightmap()
 	{
 		var resolution = TerrainData.heightmapResolution;
 		var computeShader = Resources.Load<ComputeShader>("Terrain/InitTerrain");
@@ -379,44 +406,37 @@ public class TerrainSystem : FrameRenderFeature
 				//pass.SetTexture("ExtraLayers", tempArrayId);
 			});
 		}
-
-		if (!isUpdate)
-		{
-			using (var pass = renderGraph.AddFullscreenRenderPass("Terrain AO Map", (TerrainData, settings)))
-			{
-				pass.Initialize(terrainAmbientOcclusionMaterial, TerrainData.heightmapResolution);
-				pass.WriteTexture(aoMap);
-				pass.ReadTexture("TerrainNormalMap", normalmap);
-
-				pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					pass.SetTexture(TerrainHeightmapId, data.TerrainData.heightmapTexture);
-					pass.SetFloat("DirectionCount", data.settings.AmbientOcclusionDirections);
-					pass.SetFloat("SampleCount", data.settings.AmbientOcclusionSamples);
-					pass.SetFloat("Radius", data.settings.AmbientOcclusionRadius / data.TerrainData.size.x);
-					pass.SetFloat("Resolution", data.TerrainData.heightmapResolution);
-
-					var kmaxHeight = 32766.0f / 65535.0f;
-					pass.SetFloat("TerrainHeightmapScaleY", data.TerrainData.heightmapScale.y / kmaxHeight);
-					pass.SetVector("TerrainHeightmapScale", (Float3)data.TerrainData.heightmapScale);
-					pass.SetVector("TerrainSize", (Float3)data.TerrainData.size);
-
-					//if (texelRegion.HasValue)
-					//{
-					//	var region = texelRegion.Value;
-					//	command.SetViewport(new Rect(region.position, region.size));
-					//	properties.SetVector("UvScaleOffset", new Vector4(region.size.x, region.size.y, region.position.x, region.position.y) / terrainData.heightmapResolution);
-					//}
-					//else
-					{
-						pass.SetVector("UvScaleOffset", new Vector4(1, 1, 0, 0));
-					}
-				});
-			}
-		}
 	}
 
-	public override void Render(ScriptableRenderContext context)
+    private void InitializeAoMap(bool isUpdate, RectInt? texelRegion = null)
+    {
+        if (!isUpdate)
+        {
+            using (var pass = renderGraph.AddFullscreenRenderPass("Terrain AO Map", (TerrainData, settings)))
+            {
+                pass.Initialize(terrainAmbientOcclusionMaterial, TerrainData.heightmapResolution);
+                pass.WriteTexture(aoMap);
+
+                pass.ReadResource<TerrainFrameData>();
+
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    pass.SetTexture(TerrainHeightmapId, data.TerrainData.heightmapTexture);
+                    pass.SetFloat("DirectionCount", data.settings.AmbientOcclusionDirections);
+                    pass.SetFloat("SampleCount", data.settings.AmbientOcclusionSamples);
+                    pass.SetFloat("Radius", data.settings.AmbientOcclusionRadius / data.TerrainData.size.x);
+                    pass.SetFloat("Resolution", data.TerrainData.heightmapResolution);
+
+                    //var kmaxHeight = 32766.0f / 65535.0f;
+                    //pass.SetFloat("TerrainHeightmapScaleY", data.TerrainData.heightmapScale.y / kmaxHeight);
+                    //pass.SetVector("TerrainHeightmapScale", (Float3)data.TerrainData.heightmapScale);
+                    //pass.SetVector("TerrainSize", (Float3)data.TerrainData.size);
+                });
+            }
+        }
+    }
+
+    public override void Render(ScriptableRenderContext context)
 	{
 		// TODO: Logic here seems a bit off
 		if (Terrain != Terrain.activeTerrain)
@@ -461,6 +481,29 @@ public class TerrainSystem : FrameRenderFeature
 			}
 		}
 
+        var size = (Float3)TerrainData.size;
 
-	}
+        var terrainFrameData = renderGraph.SetConstantBuffer
+        ((
+            size,
+            (float)TerrainData.alphamapResolution,
+            GraphicsUtilities.HalfTexelRemap(TerrainData.heightmapResolution),
+            size.y,
+            (float)TerrainData.heightmapResolution
+        ));
+
+        renderGraph.SetResource<TerrainFrameData>
+        (new(
+            diffuseArray,
+            normalMapArray,
+            maskMapArray,
+            heightmap,
+            normalmap,
+            idMap,
+            TerrainData.holesTexture,
+            terrainLayerData,
+            aoMap,
+           terrainFrameData
+        ));
+    }
 }
