@@ -69,7 +69,7 @@ public abstract class RenderPass : IDisposable
     public CommandBuffer Command { get; private set; }
     public RenderGraph RenderGraph { get; set; }
     internal string Name { get; set; }
-    internal int Index { get; set; }
+    public int Index { get; set; }
     public bool UseProfiler { get; set; } = true;
     public virtual bool IsNativeRenderPass => false;
     public virtual bool OutputsToCameraTarget => false;

@@ -212,6 +212,15 @@ float QuadReadAcrossDiagonal(float value, uint2 screenPos)
 	return X - (ddy_fine(value) * quadDir.y);
 }
 
+float3 QuadReadAcrossDiagonal(float3 value, uint2 screenPos)
+{
+	float3 dX = ddx_fine(value);
+	float3 dY = ddy_fine(value);
+	float2 quadDir = QuadOffset(screenPos);
+	float3 X = value - (dX * quadDir.x);
+	return X - (ddy_fine(value) * quadDir.y);
+}
+
 float4 QuadReadAcrossDiagonal(float4 value, uint2 screenPos)
 {
 	float4 dX = ddx_fine(value);
