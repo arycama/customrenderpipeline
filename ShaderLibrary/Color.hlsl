@@ -3,12 +3,6 @@
 
 #include "Math.hlsl"
 
-// D65 illuminant in xy space
-static const float2 D65xy = float2(0.31272, 0.32903);
-
-// D65 illuminant in XYZ space
-static const float3 D65 = float3(0.95047, 1.0, 1.08883);
-
 static const uint ColorGamutSRGB = 0;
 static const uint ColorGamutRec709 = 1;
 static const uint ColorGamutRec2020 = 2;
@@ -66,24 +60,123 @@ static const Chromaticities P3D65_PRI =
 	{ 0.3127, 0.3290 }
 };
 
-float3 xyYToXYZ(float3 xyY)
+static const float3x3 Bradford = float3x3
+(
+	0.8951000, 0.2664000, -0.1614000,
+	-0.7502000, 1.7135000, 0.0367000,
+	0.0389000, -0.0685000, 1.0296000
+);
+
+static const float3x3 BradfordInverse = float3x3
+(
+	0.9869929, -0.1470543, 0.1599627,
+	0.4323053, 0.5183603, 0.0492912,
+	-0.0085287, 0.0400428, 0.9684867
+);
+
+const static float3x3 VonKries = float3x3
+(
+	0.4002400, 0.7076000, -0.0808100,
+	-0.2263000, 1.1653200, 0.0457000,
+	0.0000000, 0.0000000, 0.9182200
+);
+
+const static float3x3 VonKriesInverse = float3x3
+(
+	1.8599364, -1.1293816, 0.2198974,
+	0.3611914, 0.6388125, -0.0000064,
+	0.0000000, 0.0000000, 1.0890636
+);
+
+float3x3 Diagonal(float3 diagonal)
 {
-	if (xyY.y == 0.0f)
-		return float3(0, 0, 0);
+	return float3x3(diagonal.x, 0, 0, 0, diagonal.y, 0, 0, 0, diagonal.z);
+}
 
-	float Y = xyY.z;
-	float X = (xyY.x * Y) / xyY.y;
-	float Z = ((1.0f - xyY.x - xyY.y) * Y) / xyY.y;
+// XYZ
+float3 XyToXyz(float2 xy, float Y = 1.0)
+{
+	float3 xyz;
+	xyz.x = xy.y ? xy.x * Y * rcp(xy.y) : 0.0;
+	xyz.y = Y;
+	xyz.z = xy.y ? (1.0 - xy.x - xy.y) * Y * rcp(xy.y) : 0.0;
+	return xyz;
+}
 
+// D65 illuminant in xy space
+static const float2 D65xy = float2(0.31272, 0.32903);
+
+// D65 illuminant in XYZ space
+static const float3 D65 = XyToXyz(D65xy);
+
+float3 LMSToXYZ(float3 c)
+{
+	float3x3 mat = float3x3(2.07018005669561320, -1.32645687610302100, 0.206616006847855170, 0.36498825003265756, 0.68046736285223520, -0.045421753075853236, -0.04959554223893212, -0.04942116118675749, 1.187995941732803400);
+	return mul(mat, c);
+}
+
+float3 LuvToXYZ(float3 luv)
+{
+	float L = luv.x;
+	float u = luv.y;
+	float v = luv.z;
+	
+	float m_kK = 24389.0 / 27.0;
+	float m_kKE = 8.0;
+	
+	float Y = (L > m_kKE) ? pow((L + 16.0) / 116.0, 3.0) : (L / m_kK);
+	float3 triple = float3(0.95047, 1.0, 1.08883); // d65
+	
+	float u0 = (4.0 * triple.x) / (triple.x + 15.0 * triple.y + 3.0 * triple.z);
+	float v0 = (9.0 * triple.y) / (triple.x + 15.0 * triple.y + 3.0 * triple.z);
+    
+	float a = (((52.0 * L) / (u + 13.0 * L * u0)) - 1.0) / 3.0;
+	float b = -5.0 * Y;
+	float c = -1.0 / 3.0;
+	float d = Y * (((39.0 * L) / (v + 13.0 * L * v0)) - 5.0);
+    
+	float X = (d - b) / (a - c);
+	float Z = X * a + b;
 	return float3(X, Y, Z);
+}
+
+// Xyy
+float3 XyzToXyy(float3 xyz)
+{
+	float d = xyz.x + xyz.y + xyz.z;
+	float rcpD = rcp(d);
+	
+	float3 xyy;
+	xyy.x = d ? xyz.x * rcpD : D65xy.x;
+	xyy.y = d ? xyz.y * rcpD : D65xy.y;
+	xyy.z = xyz.y;
+	return xyy;
+}
+
+float3x3 ChromaticAdaptationMatrix(float3 srcXyz, float3 dstXyz)
+{
+	float3 srcConeResponse = mul(Bradford, srcXyz);
+	float3 dstConeResponse = mul(Bradford, dstXyz);
+	
+	float3 gain = dstConeResponse / srcConeResponse;
+	float3x3 vkMat = Diagonal(gain);
+
+	return mul(Inverse(Bradford), mul(vkMat, Bradford));
+}
+
+float3x3 ChromaticAdaptationMatrix(float2 srcXy, float2 dstXy)
+{
+	float3 srcXyz = XyToXyz(srcXy);
+	float3 dstXyz = XyToXyz(dstXy);
+	return ChromaticAdaptationMatrix(srcXyz, dstXyz);
 }
 
 float3x3 PrimariesToMatrix(float2 xy_red, float2 xy_green, float2 xy_blue, float2 xy_white)
 {
-	float3 XYZ_red = xyYToXYZ(float3(xy_red, 1.0));
-	float3 XYZ_green = xyYToXYZ(float3(xy_green, 1.0));
-	float3 XYZ_blue = xyYToXYZ(float3(xy_blue, 1.0));
-	float3 XYZ_white = xyYToXYZ(float3(xy_white, 1.0));
+	float3 XYZ_red = XyToXyz(xy_red);
+	float3 XYZ_green = XyToXyz(xy_green);
+	float3 XYZ_blue = XyToXyz(xy_blue);
+	float3 XYZ_white = XyToXyz(xy_white);
 
 	float3x3 temp = float3x3(XYZ_red, XYZ_green, XYZ_blue);
 
@@ -101,6 +194,31 @@ float3x3 RGBtoXYZ(Chromaticities chroma, float Y = 1.0)
 float3x3 XYZtoRGB(Chromaticities chroma, float Y = 1.0)
 {
 	return Inverse(RGBtoXYZ(chroma, Y));
+}
+
+float3 Rec709ToXYZ(float3 rec709)
+{
+	return mul(RGBtoXYZ(REC709_PRI), rec709);
+}
+
+float3 Rec2020ToXYZ(float3 rec2020)
+{
+	return mul(RGBtoXYZ(REC2020_PRI), rec2020);
+}
+
+float3 P3D65ToXYZ(float3 p3d65)
+{
+	return mul(RGBtoXYZ(P3D65_PRI), p3d65);
+}
+
+float3 Rec709ToXyy(float3 rec709)
+{
+	return XyzToXyy(Rec709ToXYZ(rec709));
+}
+
+float3 Rec2020ToXyy(float3 rec2020)
+{
+	return XyzToXyy(Rec2020ToXYZ(rec2020));
 }
 
 // Color spaces listed in the following order: XYZ, Xyy, LMS, RGB/Rec709, Rec2020, Luv, P3, ICtCp, YCoCg. RGB is Rec709 (Linear, not gamma) unless noted
@@ -150,122 +268,6 @@ float3 ICtCpToLMS(float3 iCtCp)
 	return mul(mat, iCtCp);
 }
 
-// XYZ
-float3 XyyToXYZ(float3 xyy)
-{
-	float3 xyz;
-	xyz.x = xyy.y ? xyy.x * xyy.z * rcp(xyy.y) : 0.0;
-	xyz.y = xyy.z;
-	xyz.z = xyy.y ? (1.0 - xyy.x - xyy.y) * xyy.z * rcp(xyy.y) : 0.0;
-	return xyz;
-}
-
-float3 Rec709ToXYZ(float3 rec709)
-{
-	return mul(RGBtoXYZ(REC709_PRI), rec709);
-}
-
-float3 Rec2020ToXYZ(float3 rec2020)
-{
-	return mul(RGBtoXYZ(REC2020_PRI), rec2020);
-}
-
-float3 P3D65ToXYZ(float3 p3d65)
-{
-	return mul(RGBtoXYZ(P3D65_PRI), p3d65);
-}
-
-float3 LMSToXYZ(float3 c)
-{
-	float3x3 mat = float3x3(2.07018005669561320, -1.32645687610302100, 0.206616006847855170, 0.36498825003265756, 0.68046736285223520, -0.045421753075853236, -0.04959554223893212, -0.04942116118675749, 1.187995941732803400);
-	return mul(mat, c);
-}
-
-float3 LuvToXYZ(float3 luv)
-{
-	float L = luv.x;
-	float u = luv.y;
-	float v = luv.z;
-	
-	float m_kK = 24389.0 / 27.0;
-	float m_kKE = 8.0;
-	
-	float Y = (L > m_kKE) ? pow((L + 16.0) / 116.0, 3.0) : (L / m_kK);
-	float3 triple = float3(0.95047, 1.0, 1.08883); // d65
-	
-	float u0 = (4.0 * triple.x) / (triple.x + 15.0 * triple.y + 3.0 * triple.z);
-	float v0 = (9.0 * triple.y) / (triple.x + 15.0 * triple.y + 3.0 * triple.z);
-    
-	float a = (((52.0 * L) / (u + 13.0 * L * u0)) - 1.0) / 3.0;
-	float b = -5.0 * Y;
-	float c = -1.0 / 3.0;
-	float d = Y * (((39.0 * L) / (v + 13.0 * L * v0)) - 5.0);
-    
-	float X = (d - b) / (a - c);
-	float Z = X * a + b;
-	return float3(X, Y, Z);
-}
-
-// Xyy
-float3 XYZToXyy(float3 xyz)
-{
-	float d = xyz.x + xyz.y + xyz.z;
-	float rcpD = rcp(d);
-	
-	float3 xyy;
-	xyy.x = d ? xyz.x * rcpD : D65xy.x;
-	xyy.y = d ? xyz.y * rcpD : D65xy.y;
-	xyy.z = xyz.y;
-	return xyy;
-}
-
-float3 Rec709ToXyy(float3 rec709)
-{
-	return XYZToXyy(Rec709ToXYZ(rec709));
-}
-
-float3 Rec2020ToXyy(float3 rec2020)
-{
-	return XYZToXyy(Rec2020ToXYZ(rec2020));
-}
-
-static const float3x3 CONE_RESP_MAT_BRADFORD =
-{
-	{ 0.89510, -0.75020, 0.03890 },
-	{ 0.26640, 1.71350, -0.06850 },
-	{ -0.16140, 0.03670, 1.02960 }
-};
-
-float3x3 calculate_cat_matrix
-  (
-	float2 src_xy, // x,y chromaticity of source white
-    float2 des_xy, // x,y chromaticity of destination white
-    float3x3 coneRespMat = CONE_RESP_MAT_BRADFORD
-  )
-{
-	// Calculates and returns a 3x3 Von Kries chromatic adaptation transform 
-	// from src_xy to des_xy using the cone response primaries defined 
-	// by coneRespMat. By default, coneRespMat is set to CONE_RESP_MAT_BRADFORD. 
-	// The default coneRespMat can be overridden at runtime. 
-	const float3 src_xyY = { src_xy[0], src_xy[1], 1. };
-	const float3 des_xyY = { des_xy[0], des_xy[1], 1. };
-
-	float3 src_XYZ = XyyToXYZ(src_xyY);
-	float3 des_XYZ = XyyToXYZ(des_xyY);
-
-	float3 src_coneResp = mul(src_XYZ, CONE_RESP_MAT_BRADFORD);
-	float3 des_coneResp = mul(des_XYZ, CONE_RESP_MAT_BRADFORD);
-
-	float3x3 vkMat =
-	{
-		{ des_coneResp[0] / src_coneResp[0], 0.0, 0.0 },
-		{ 0.0, des_coneResp[1] / src_coneResp[1], 0.0 },
-		{ 0.0, 0.0, des_coneResp[2] / src_coneResp[2] }
-	};
-
-	return mul(CONE_RESP_MAT_BRADFORD, mul(vkMat, Inverse(CONE_RESP_MAT_BRADFORD)));
-}
-
 float Rec709Luminance(float3 color, Chromaticities chromacity = REC709_PRI)
 {
 	return mul(RGBtoXYZ(REC709_PRI), color).y;
@@ -280,11 +282,6 @@ float Rec2020Luminance(float3 color, Chromaticities chromacity = REC2020_PRI)
 float3 XYZToRec2020(float3 XYZ)
 {
 	return mul(XYZtoRGB(REC2020_PRI), XYZ);
-}
-
-float3 XyyToRec2020(float3 xyY)
-{
-	return XYZToRec2020(XyyToXYZ(xyY));
 }
 
 float3 Rec709ToRec2020(float3 rec709)
@@ -314,11 +311,6 @@ float3 GammaToLinear(float3 c)
 float3 XYZToRec709(float3 xyz)
 {
 	return mul(XYZtoRGB(REC709_PRI), xyz);
-}
-
-float3 XyyToRec709(float3 xyy)
-{
-	return XYZToRec709(XyyToXYZ(xyy));
 }
 
 float3 LuvToRec709(float3 luv)
@@ -355,19 +347,19 @@ float3 XYZToLuv(float3 xyz)
 {
 	float yr = xyz.y / D65.y;
 	float d = xyz.x + 15.0 * xyz.y + 3.0 * xyz.z;
-    float up = d == 0.0 ? 0.0 : 4.0 * xyz.x * rcp(d);
-    float vp = d == 0.0 ? 0.0 : 9.0 * xyz.y * rcp(d);
+	float up = d == 0.0 ? 0.0 : 4.0 * xyz.x * rcp(d);
+	float vp = d == 0.0 ? 0.0 : 9.0 * xyz.y * rcp(d);
     
-    float urp = (4.0 * D65.x) / (D65.x + 15.0 * D65.y + 3.0 * D65.z);
-    float vrp = (9.0 * D65.y) / (D65.x + 15.0 * D65.y + 3.0 * D65.z);
+	float urp = (4.0 * D65.x) / (D65.x + 15.0 * D65.y + 3.0 * D65.z);
+	float vrp = (9.0 * D65.y) / (D65.x + 15.0 * D65.y + 3.0 * D65.z);
     
-    float m_kE = 216.0 / 24389.0;
-    float m_kK = 24389.0 / 27.0;
+	float m_kE = 216.0 / 24389.0;
+	float m_kK = 24389.0 / 27.0;
 	
 	float3 luv;
-    luv.x = (yr > m_kE) ? (116.0 * pow(yr, 1.0 / 3.0) - 16.0) : (m_kK * yr);
-    luv.y = 13.0 * luv.x * (up - urp);
-    luv.z = 13.0 * luv.x * (vp - vrp);
+	luv.x = (yr > m_kE) ? (116.0 * pow(yr, 1.0 / 3.0) - 16.0) : (m_kK * yr);
+	luv.y = 13.0 * luv.x * (up - urp);
+	luv.z = 13.0 * luv.x * (vp - vrp);
 	return luv;
 }
 
@@ -490,6 +482,23 @@ float3 HsvToRgb(float3 c)
 float RotateHue(float value, float low, float hi)
 {
 	return (value < low) ? value + hi : (value > hi) ? value - hi : value;
+}
+
+float2 CctToXy(float temp)
+{
+	float x, y;
+    
+	if (temp <= 4000.0)
+		x = 0.27475e9 / (temp * temp * temp) - 0.98598e6 / (temp * temp) + 1.17444e3 / temp + 0.145986;
+	else if (temp <= 7000.0)
+		x = -4.6070e9 / (temp * temp * temp) + 2.9678e6 / (temp * temp) + 0.09911e3 / temp + 0.244063;
+	else
+		x = -2.0064e9 / (temp * temp * temp) + 1.9018e6 / (temp * temp) + 0.24748e3 / temp + 0.237040;
+    
+    // Calculate y from x using Judd's approximation
+	y = -3.000 * x * x + 2.870 * x - 0.275;
+    
+	return float2(x, y);
 }
 
 #endif

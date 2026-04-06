@@ -4,10 +4,12 @@ using UnityEngine.Rendering;
 public class ScreenSpaceTerrain : ViewRenderFeature
 {
 	private readonly Material material;
+    private readonly TerrainSettings settings;
 
-	public ScreenSpaceTerrain(RenderGraph renderGraph) : base(renderGraph)
+    public ScreenSpaceTerrain(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
 	{
-		material = new Material(Shader.Find("Hidden/Screen Space Terrain")) { hideFlags = HideFlags.HideAndDontSave };
+        this.settings = settings;
+        material = new Material(Shader.Find("Hidden/Screen Space Terrain")) { hideFlags = HideFlags.HideAndDontSave };
 	}
 
 	public override void Render(ViewRenderData viewRenderData)
@@ -27,5 +29,8 @@ public class ScreenSpaceTerrain : ViewRenderFeature
 		pass.ReadResource<TerrainViewData>();
 		pass.ReadResource<ViewData>();
 		pass.ReadResource<VirtualTextureData>();
+
+        if (settings.VirtualTexturing)
+            pass.AddKeyword("VIRTUAL_TEXTURING_ON");
 	}
 }

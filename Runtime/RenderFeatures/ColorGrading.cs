@@ -112,6 +112,9 @@ public class ColorGrading : FrameRenderFeature
             pass.SetFloat("Saturation", settings.ColorAdjustments.Saturation * 0.01f + 1f);
             pass.SetVector("WhiteBalance", ColorspaceUtility.ColorBalanceToLMSCoeffs(settings.WhiteBalance.Temperature, settings.WhiteBalance.Tint));
 
+            pass.SetFloat("ColorTemperature", settings.WhiteBalance.ColorTemperature);
+            pass.SetFloat("UseColorTemperature", settings.WhiteBalance.UseColorTemperature ? 1 : 0);
+
             var splitColor = settings.SplitToning.Shadows;
             splitColor.a = settings.SplitToning.Balance * 0.01f;
 

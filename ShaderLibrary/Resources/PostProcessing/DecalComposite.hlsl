@@ -35,27 +35,26 @@ FragmentOutput FragmentCombine(VertexFullscreenTriangleOutput input)
 	float4 normalRoughness = NormalRoughnessCopy[input.position.xy];
 	float4 bentNormalOcclusion = BentNormalOcclusionCopy[input.position.xy];
 	float3 bentNormal = GBufferNormal(bentNormalOcclusion, V, WorldToView, ViewToWorld);
-	
-	float4 decal = DecalAlbedo[input.position.xy];
-	float4 decalNormal = DecalNormal[input.position.xy];
-	
 	float3 albedo = UnpackAlbedo(albedoMetallic.rg, input.position.xy);
 	float3 normal = GBufferNormal(normalRoughness, V, WorldToView, ViewToWorld);
 	float roughness = normalRoughness.b;
 	
+	float4 decal = DecalAlbedo[input.position.xy];
+	float4 decalNormal = DecalNormal[input.position.xy];
+	decalNormal.xyz = 2.0 * decalNormal.xyz - 1.0;
+	
 	albedo = lerp(albedo, decal.rgb, decal.a);
 	
-	decalNormal.xyz = 2.0 * decalNormal.xyz - 1.0;
 	normal = lerp(normal, decalNormal.xyz, decal.a); // Can skip normalize due to octahedral encode
 	bentNormal = lerp(bentNormal, decalNormal.xyz, decal.a); // Can skip normalize due to octahedral encode
 	
 	roughness = lerp(roughness, decalNormal.a, decal.a);
-	float visibilityAngle = lerp(bentNormalOcclusion.b, 1.0, decal.a); // TODO: Write out visibilityConeAngle from dbuffer pass
+	bentNormalOcclusion.b = lerp(bentNormalOcclusion.b, 0.0, decal.a); // TODO: Write out visibilityConeAngle from dbuffer pass
 
 	FragmentOutput output;
 	output.albedoMetallic = float4(PackAlbedo(albedo, input.position.xy), 0, albedoMetallic.a);
 	output.normalRoughness = float4(PackGBufferNormal(normal, V, WorldToView), roughness, 0);
-	output.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal, V, WorldToView), visibilityAngle, 0);
+	output.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal, V, WorldToView), bentNormalOcclusion.b, 0);
 	return output;
 	
 	// TODO: Implement

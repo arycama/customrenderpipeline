@@ -336,7 +336,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	float3 radiance = SkyReflection.SampleLevel(TrilinearClampSampler, skyUv, environmentMip) * rStrength;
 	
 	float BdotR = dot(input.bentNormal, R);
-	float specularOcclusion = GetSpecularOcclusion(input.cosVisibilityAngle, BdotR, input.perceptualRoughness, dot(input.N, R));
+	float specularOcclusion = GetSpecularOcclusion(0, BdotR, input.perceptualRoughness, dot(input.N, R));
 	radiance *= specularOcclusion;
 	
 	#ifdef UNDERWATER_LIGHTING_ON

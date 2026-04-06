@@ -150,7 +150,7 @@ void ShadeTerrain(float2 uv, out float3 albedo, out float roughness, out float3 
 		uint layerIndex = indices[i];
 		LayerData layerData = TerrainLayerData[layerIndex];
 		float2 scale = layerData.Scale * TerrainSize.xz;
-		heights[i] *= Mask.SampleGrad(TrilinearRepeatSampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale) * layerData.HeightScale;
+		heights[i] *= Mask.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale) * layerData.HeightScale;
 	}
 	
 	// https://bertdobbelaere.github.io/sorting_networks.html
@@ -194,8 +194,8 @@ void ShadeTerrain(float2 uv, out float3 albedo, out float roughness, out float3 
 		uint layerIndex = indices[i];
 		LayerData layerData = TerrainLayerData[layerIndex];
 		float2 scale = layerData.Scale * TerrainSize.xz;
-		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(TrilinearRepeatSampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale);
-		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(TrilinearRepeatSampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale);
+		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale);
+		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale);
 		
 		float3 normal = UnpackNormalUNorm(currentNormalOcclusionRoughness.rg);
 		currentNormalOcclusionRoughness.rg = normal.xy / normal.z;

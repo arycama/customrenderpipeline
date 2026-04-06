@@ -24,6 +24,9 @@ cbuffer Properties
 	float4 ChannelMixerRed;
 	float4 ChannelMixerGreen;
 	float4 ChannelMixerBlue;
+	
+	float ColorTemperature;
+	float UseColorTemperature;
 };
 
 float3 EvalLogContrastFunc(float3 x, float logMidpoint, float contrast)
@@ -77,9 +80,22 @@ float3 Fragment(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 	float luminance = Rec2020Luminance(color);
 	color = (color - luminance) * Saturation + luminance;
 	
-	color = Rec2020ToLMS(color);
-	color *= WhiteBalance.rgb;
-	color = LMSToRec2020(color);
+	if (UseColorTemperature)
+	{
+		float2 srcXy = CctToXy(ColorTemperature);
+		float3 srcXyz = XyToXyz(srcXy);
+		float3x3 adaptation = ChromaticAdaptationMatrix(srcXyz, D65);
+		
+		float3 xyz = Rec2020ToXYZ(color);
+		xyz = mul(adaptation, xyz);
+		color = XYZToRec2020(xyz);
+	}
+	else
+	{
+		color = Rec2020ToLMS(color);
+		color *= WhiteBalance.rgb;
+		color = LMSToRec2020(color);
+	}
 	
 	color = Tonemap(color, MaxLuminance, PaperWhite, MaxInputLuminance, LinearStart, FadeStart, FadeEnd, HuePreservation);
 	color = LinearToST2084(color);	

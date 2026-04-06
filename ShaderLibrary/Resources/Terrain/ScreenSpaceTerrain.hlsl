@@ -28,8 +28,10 @@ GBufferOutput Fragment(VertexFullscreenTriangleOutput input)
 	
 	float3 normal = UnpackNormalUNorm(normalMetalOcclusion.ag).xzy;
 	
-	float height;
-	ShadeTerrain(uv, albedoRoughness.rgb, albedoRoughness.a, normal, normalMetalOcclusion.b, height);
+	#ifndef VIRTUAL_TEXTURING_ON
+		float height;
+		ShadeTerrain(uv, albedoRoughness.rgb, albedoRoughness.a, normal, normalMetalOcclusion.b, height);
+	#endif
 	
 	float4 visibilityCone = BentNormalVisibility.Sample(SurfaceSampler, normalUv);
 	visibilityCone.xyz = normalize(visibilityCone.xyz);

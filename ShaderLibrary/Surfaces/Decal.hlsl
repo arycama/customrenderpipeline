@@ -88,8 +88,8 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float wetLevel = saturate(dot(geoNormal, float3(0, 1, 0)));
 	
 	float factor = lerp(1, 0.1, porosity);
-	gbufferAlbedo *= lerp(1, factor, wetLevel);
-	roughness = lerp(0.0, roughness, lerp(1, factor, wetLevel));
+	//gbufferAlbedo *= lerp(1, factor, wetLevel);
+	//roughness = lerp(0.0, roughness, lerp(1, factor, wetLevel));
 	
 	float NdotV;
 	float3 N = GetViewClampedNormal(worldNormal, V, NdotV);
@@ -101,6 +101,6 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	
 	FragmentOutput output;
 	output.albedoOpacity = albedoOpacity;
-	output.normalRoughness = float4(0.5 * worldNormal + 0.5, lerp(1.0, roughness, Smoothness));
+	output.normalRoughness = float4(0.5 * worldNormal + 0.5, lerp(normalOcclusionRoughness.a, 0.0, Smoothness));
 	return output;
 }

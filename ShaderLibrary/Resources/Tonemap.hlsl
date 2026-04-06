@@ -25,16 +25,29 @@ float4 CameraBloomScaleLimit, CameraBloom_TexelSize;
 float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
 	float2 position = input.position.xy;
+	float2 uv = input.uv;
 	
 	#ifndef SCENE_VIEW
 		position.y = ViewSize.y - position.y;
+	uv.y = 1 - uv.y;
 	#endif
 	
 	float3 color = CameraTarget[position];
 	
 	#ifdef BLOOM
-		//float3 bloom = SampleBloom(input.uv, 0, CameraBloom, CameraBloom_TexelSize.xy, CameraBloomScaleLimit);
-		//color = lerp(color, bloom, BloomStrength);
+		float3 bloom = CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, 1), CameraBloomScaleLimit)) * 0.0625;
+		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, 1), CameraBloomScaleLimit)) * 0.125;
+		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, 1), CameraBloomScaleLimit)) * 0.0625;
+
+		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, 0), CameraBloomScaleLimit)) * 0.125;
+		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, 0), CameraBloomScaleLimit)) * 0.25;
+		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, 0), CameraBloomScaleLimit)) * 0.125;
+
+		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, -1), CameraBloomScaleLimit)) * 0.0625;
+		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, -1), CameraBloomScaleLimit)) * 0.125;
+		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, -1), CameraBloomScaleLimit)) * 0.0625;
+	
+		color = lerp(color, bloom, BloomStrength);
 	#endif
 	
 	color *= PaperWhite;

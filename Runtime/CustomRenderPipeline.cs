@@ -246,7 +246,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new GrassRenderer(asset.Grass, renderGraph, quadtreeCull),
 
 		// Finalize gbuffer
-		new ScreenSpaceTerrain(renderGraph),
+		new ScreenSpaceTerrain(renderGraph, asset.TerrainSettings),
 		new VirtualTerrainReadback(renderGraph, asset.TerrainSettings, virtualTextureUpdate),
 
 		// Decals

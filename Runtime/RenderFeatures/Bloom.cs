@@ -60,7 +60,7 @@ public class Bloom : ViewRenderFeature
 			var width = Mathf.Max(1, viewRenderData.viewSize.x >> (i + 1));
 			var height = Mathf.Max(1, viewRenderData.viewSize.y >> (i + 1));
 
-			var resultId = renderGraph.GetTexture(new(width, height), GraphicsFormat.B10G11R11_UFloatPack32);
+			var resultId = renderGraph.GetTexture(new(width, height), GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true);
 			bloomIds.Add(resultId);
 		}
 
