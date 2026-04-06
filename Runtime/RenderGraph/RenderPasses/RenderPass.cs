@@ -262,7 +262,9 @@ public abstract class RenderPass : IDisposable
 		Assert.IsFalse(RenderGraph.IsExecuting);
 		var handle = RenderGraph.ResourceMap.GetResourceHandle(type);
 		var hasResource = RenderGraph.ResourceMap.TrySetInputs(handle, RenderGraph.FrameIndex, this);
-		Assert.IsTrue(isOptional || hasResource);
+
+        if (!isOptional && !hasResource)
+            throw new InvalidOperationException($"Non-optional resource of type {type} does not exist");
 
 		RenderPassDataHandles.Add((handle, isOptional));
 	}

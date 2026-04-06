@@ -4,6 +4,7 @@ using UnityEngine;
 [Serializable]
 public class TerrainSettings
 {
+    [field: SerializeField] public bool VirtualTexturing { get; private set; } = true;
 	[field: SerializeField] public Material Material { get; private set; } = null;
 	[field: SerializeField] public int CellCount { get; private set; } = 32;
 	[field: SerializeField] public int PatchVertices { get; private set; } = 32;

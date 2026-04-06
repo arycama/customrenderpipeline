@@ -33,8 +33,8 @@ float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	float3 color = CameraTarget[position];
 	
 	#ifdef BLOOM
-		float3 bloom = SampleBloom(input.uv, viewIndex, CameraBloom, CameraBloom_TexelSize.xy, CameraBloomScaleLimit);
-		color = lerp(color, bloom, BloomStrength);
+		//float3 bloom = SampleBloom(input.uv, 0, CameraBloom, CameraBloom_TexelSize.xy, CameraBloomScaleLimit);
+		//color = lerp(color, bloom, BloomStrength);
 	#endif
 	
 	color *= PaperWhite;

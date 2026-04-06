@@ -62,8 +62,7 @@ public class ColorGrading : FrameRenderFeature
         var maxLuminance = hdrSettings.peakLuminance;
         var colorGamut = hdrSettings.colorGamut;
 
-        var currentSettings =
-        (
+        var currentSettings = new ColorGradingData(
             (float)settings.Resolution,
             maxLuminance,
             settings.PaperWhite * Math.Sqrt(2.0f),
@@ -130,4 +129,46 @@ public class ColorGrading : FrameRenderFeature
         UpdateLut();
         renderGraph.SetRTHandle<ColorGradingTexture>(colorLut);
     }
+}
+
+internal struct ColorGradingData
+{
+    public float Item1;
+    public float maxLuminance;
+    public float Item3;
+    public float MaxInputLuminance;
+    public float LinearStart;
+    public float FadeStart;
+    public float FadeEnd;
+    public float HuePreservation;
+
+    public ColorGradingData(float item1, float maxLuminance, float item3, float maxInputLuminance, float linearStart, float fadeStart, float fadeEnd, float huePreservation)
+    {
+        Item1 = item1;
+        this.maxLuminance = maxLuminance;
+        Item3 = item3;
+        MaxInputLuminance = maxInputLuminance;
+        LinearStart = linearStart;
+        FadeStart = fadeStart;
+        FadeEnd = fadeEnd;
+        HuePreservation = huePreservation;
+    }
+
+    public override bool Equals(object obj) => obj is ColorGradingData other && Item1 == other.Item1 && maxLuminance == other.maxLuminance && Item3 == other.Item3 && MaxInputLuminance == other.MaxInputLuminance && LinearStart == other.LinearStart && FadeStart == other.FadeStart && FadeEnd == other.FadeEnd && HuePreservation == other.HuePreservation;
+    public override int GetHashCode() => HashCode.Combine(Item1, maxLuminance, Item3, MaxInputLuminance, LinearStart, FadeStart, FadeEnd, HuePreservation);
+
+    public void Deconstruct(out float item1, out float maxLuminance, out float item3, out float maxInputLuminance, out float linearStart, out float fadeStart, out float fadeEnd, out float huePreservation)
+    {
+        item1 = Item1;
+        maxLuminance = this.maxLuminance;
+        item3 = Item3;
+        maxInputLuminance = MaxInputLuminance;
+        linearStart = LinearStart;
+        fadeStart = FadeStart;
+        fadeEnd = FadeEnd;
+        huePreservation = HuePreservation;
+    }
+
+    public static implicit operator (float, float maxLuminance, float, float MaxInputLuminance, float LinearStart, float FadeStart, float FadeEnd, float HuePreservation)(ColorGradingData value) => (value.Item1, value.maxLuminance, value.Item3, value.MaxInputLuminance, value.LinearStart, value.FadeStart, value.FadeEnd, value.HuePreservation);
+    public static implicit operator ColorGradingData((float, float maxLuminance, float, float MaxInputLuminance, float LinearStart, float FadeStart, float FadeEnd, float HuePreservation) value) => new ColorGradingData(value.Item1, value.maxLuminance, value.Item3, value.MaxInputLuminance, value.LinearStart, value.FadeStart, value.FadeEnd, value.HuePreservation);
 }

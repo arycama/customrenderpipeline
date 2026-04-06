@@ -127,7 +127,7 @@ public class ShadowRenderer : ViewRenderFeature
     void RenderShadowMap(ShadowRequest request, BatchCullingProjectionType projectionType, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip, bool isPointLight, ViewRenderData viewRenderData, CullingResults cullingResults, Int2 resolution, int viewCount)
 	{
 		var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
-		var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, viewRenderData.transform.position, request.Near, request.LightPosition, request.Far, request.ViewRotation.Forward, 0));
+		var perCascadeData = renderGraph.SetConstantBuffer(new RenderShadowMapData(request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, viewRenderData.transform.position, request.Near, request.LightPosition, request.Far, request.ViewRotation.Forward, 0));
 		var shadowRequestData = new ShadowRequestData(request, bias, slopeBias, target, index, perCascadeData, zClip);
 
         renderGraph.SetResource(shadowRequestData);
@@ -144,5 +144,31 @@ public class ShadowRenderer : ViewRenderFeature
 		}
 
 		gpuDrivenRenderer.RenderShadow(viewRenderData.transform.position, shadowRequestData, viewRenderData.viewSize);
+    }
+}
+
+internal struct RenderShadowMapData
+{
+    public Matrix4x4 ViewMatrix;
+    public Matrix4x4 Item2;
+    public Matrix4x4 viewToShadowClip;
+    public Float3 position;
+    public float Near;
+    public Float3 LightPosition;
+    public float Far;
+    public Float3 Forward;
+    public int Item9;
+
+    public RenderShadowMapData(Matrix4x4 viewMatrix, Matrix4x4 item2, Matrix4x4 viewToShadowClip, Float3 position, float near, Float3 lightPosition, float far, Float3 forward, int item9)
+    {
+        ViewMatrix = viewMatrix;
+        Item2 = item2;
+        this.viewToShadowClip = viewToShadowClip;
+        this.position = position;
+        Near = near;
+        LightPosition = lightPosition;
+        Far = far;
+        Forward = forward;
+        Item9 = item9;
     }
 }

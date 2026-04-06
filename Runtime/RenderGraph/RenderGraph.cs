@@ -92,6 +92,8 @@ public class RenderGraph : IDisposable
         if (!disposing)
             Debug.LogError("Render Graph not disposed correctly");
 
+        AsyncGPUReadback.WaitAllRequests();
+
         emptyBuffer.Dispose();
         Object.DestroyImmediate(emptyTexture);
         Object.DestroyImmediate(emptyUavTexture);
