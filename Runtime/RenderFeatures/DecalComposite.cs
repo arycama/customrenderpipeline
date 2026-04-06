@@ -19,9 +19,10 @@ public class DecalComposite : ViewRenderFeature
 		var bentNormalOcclusionCopy = renderGraph.GetTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 
 		// Copy the existing gbuffer textures to new ones
+        // TODO: Would a direct copy be faster?
 		using (var pass = renderGraph.AddFullscreenRenderPass("Copy"))
 		{
-			pass.Initialize(material, 0);
+			pass.Initialize(material, viewRenderData.viewSize, 1, 0);
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(albedoMetallicCopy);
@@ -36,7 +37,7 @@ public class DecalComposite : ViewRenderFeature
 		// Now composite the decal buffers
 		using (var pass = renderGraph.AddFullscreenRenderPass("Combine", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy)))
 		{
-			pass.Initialize(material, 1);
+			pass.Initialize(material, viewRenderData.viewSize, 1, 1);
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());

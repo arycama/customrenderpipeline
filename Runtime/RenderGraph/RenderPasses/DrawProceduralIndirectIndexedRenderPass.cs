@@ -17,7 +17,7 @@ public class DrawProceduralIndirectIndexedRenderPass<T> : DrawRenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material, ResourceHandle<GraphicsBuffer> indexBuffer, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true, int argsOffset = 0)
+	public void Initialize(Material material, ResourceHandle<GraphicsBuffer> indexBuffer, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, Int2 size, int viewCount, MeshTopology topology = MeshTopology.Triangles, int passIndex = 0, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true, int argsOffset = 0)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
@@ -28,6 +28,8 @@ public class DrawProceduralIndirectIndexedRenderPass<T> : DrawRenderPass<T>
 		this.slopeDepthBias = slopeDepthBias;
 		this.zClip = zClip;
 		this.argsOffset = argsOffset;
+        Size = size;
+        ViewCount = viewCount;
 
 		ReadBuffer("", indexBuffer);
 		ReadBuffer("", indirectArgsBuffer);

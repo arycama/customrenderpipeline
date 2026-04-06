@@ -6,6 +6,11 @@ Shader "Hidden/Volumetric Clouds"
         ZWrite Off
         ZTest Off
 
+        HLSLINCLUDE
+		#pragma target 5.0
+        #pragma editor_sync_compilation
+		ENDHLSL
+
         Pass
         {
             Name "Weather Map"
@@ -23,7 +28,6 @@ Shader "Hidden/Volumetric Clouds"
             Name "Noise Texture"
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentNoise
             #define FLIP
@@ -36,7 +40,6 @@ Shader "Hidden/Volumetric Clouds"
             Name "Detail Noise Texture"
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentDetailNoise
             #define FLIP
@@ -49,7 +52,6 @@ Shader "Hidden/Volumetric Clouds"
             Name "Shadow"
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #define CLOUD_SHADOW
@@ -63,7 +65,6 @@ Shader "Hidden/Volumetric Clouds"
             Name "Render"
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #pragma multi_compile _ BELOW_CLOUD_LAYER ABOVE_CLOUD_LAYER
@@ -81,7 +82,6 @@ Shader "Hidden/Volumetric Clouds"
 			Blend 2 One SrcAlpha
 
             HLSLPROGRAM
-            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
             #define FLIP

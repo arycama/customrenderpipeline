@@ -9,7 +9,6 @@
 #include "../../VirtualTexturing.hlsl"
 
 Texture2D<float4> BentNormalVisibility;
-//Texture2D<float> TerrainDepth;
 
 [earlydepthstencil]
 GBufferOutput Fragment(VertexFullscreenTriangleOutput input)
@@ -24,12 +23,17 @@ GBufferOutput Fragment(VertexFullscreenTriangleOutput input)
 	
 	float scale;
 	float3 virtualUv = CalculateVirtualUv(uv, scale);
-	float4 albedoRoughness = VirtualTexture.SampleGrad(TrilinearClampAniso4Sampler, virtualUv, ddx(uv) * scale, ddy(uv) * scale);
-	float4 normalMetalOcclusion = VirtualNormalTexture.SampleGrad(TrilinearClampAniso4Sampler, virtualUv, ddx(uv) * scale, ddy(uv) * scale);
+	float4 albedoRoughness = VirtualTexture.SampleGrad(TrilinearClampAniso8Sampler, virtualUv, ddx(uv) * scale, ddy(uv) * scale);
+	float4 normalMetalOcclusion = VirtualNormalTexture.SampleGrad(TrilinearClampAniso8Sampler, virtualUv, ddx(uv) * scale, ddy(uv) * scale);
 	
 	float3 normal = UnpackNormalUNorm(normalMetalOcclusion.ag).xzy;
+	
+	float height;
+	ShadeTerrain(uv, albedoRoughness.rgb, albedoRoughness.a, normal, normalMetalOcclusion.b, height);
+	
 	float visibilityAngle = normalMetalOcclusion.b;
 	
+	// TODO: Do this in the virtual texture
 	float4 visibilityCone = BentNormalVisibility.Sample(SurfaceSampler, normalUv);
 	visibilityCone.xyz = normalize(visibilityCone.xyz);
 	visibilityCone.a = cos((0.5 * visibilityCone.a + 0.5) * HalfPi);

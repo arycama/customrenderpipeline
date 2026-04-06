@@ -92,8 +92,6 @@ public class RenderGraph : IDisposable
         if (!disposing)
             Debug.LogError("Render Graph not disposed correctly");
 
-        AsyncGPUReadback.WaitAllRequests();
-
         emptyBuffer.Dispose();
         Object.DestroyImmediate(emptyTexture);
         Object.DestroyImmediate(emptyUavTexture);
@@ -207,8 +205,15 @@ public class RenderGraph : IDisposable
 
                     if (!canMergeSubPass)
                     {
-                        EndSubPass();
-                        BeginSubpass(currentPass);
+                        if (currentPass.PreventNewSubPass)
+                        {
+                            canMergePass = false;
+                        }
+                        else
+                        {
+                            EndSubPass();
+                            BeginSubpass(currentPass);
+                        }
                     }
                 }
             }
@@ -446,24 +451,24 @@ public class RenderGraph : IDisposable
         previousPass = null;
 
         // Check which resources need to be allocated
-        foreach (var descriptor in renderPassDescriptors)
-        {
-            for (var i = 0; i < descriptor.attachments.Length; i++)
-            {
-                var colorAttachment = descriptor.attachments[i];
-                if (colorAttachment.isFrameBufferOutput)
-                    continue;
+        //foreach (var descriptor in renderPassDescriptors)
+        //{
+        //    for (var i = 0; i < descriptor.attachments.Length; i++)
+        //    {
+        //        var colorAttachment = descriptor.attachments[i];
+        //        if (colorAttachment.isFrameBufferOutput)
+        //            continue;
 
-                var handleData = RtHandleSystem.GetHandleData(colorAttachment.handle);
-                if (handleData.freeIndex > descriptor.endPassIndex || handleData.freeIndex == -1)
-                    continue;
+        //        var handleData = RtHandleSystem.GetHandleData(colorAttachment.handle);
+        //        if (handleData.freeIndex > descriptor.endPassIndex || handleData.freeIndex == -1)
+        //            continue;
 
-                handleData.isUsed = false;
-                handleData.createIndex1 = handleData.createIndex;
-                handleData.freeIndex1 = handleData.freeIndex;
-                RtHandleSystem.SetHandleData(colorAttachment.handle, handleData);
-            }
-        }
+        //        handleData.isUsed = false;
+        //        handleData.createIndex1 = handleData.createIndex;
+        //        handleData.freeIndex1 = handleData.freeIndex;
+        //        RtHandleSystem.SetHandleData(colorAttachment.handle, handleData);
+        //    }
+        //}
 
         BufferHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
         RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);

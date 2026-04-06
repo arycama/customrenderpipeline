@@ -40,7 +40,7 @@ public partial class DepthOfField : ViewRenderFeature
 				pass.ReadResource<LightingSetup.Result>();
 				pass.ReadResource<AutoExposureData>();
 				pass.ReadResource<AtmospherePropertiesAndTables>();
-				pass.ReadResource<TerrainRenderData>(true);
+				pass.ReadResource<TerrainViewData>(true);
 				pass.ReadResource<CloudShadowDataResult>();
 				pass.ReadResource<ShadowData>();
 				pass.ReadResource<ViewData>();
@@ -65,7 +65,7 @@ public partial class DepthOfField : ViewRenderFeature
 				pass.ReadRtHandle<CameraDepth>();
 				pass.ReadResource<ViewData>();
 				pass.ReadResource<FrameData>();
-				pass.ReadResource<TerrainRenderData>(true);
+				pass.ReadResource<TerrainViewData>(true);
 
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{

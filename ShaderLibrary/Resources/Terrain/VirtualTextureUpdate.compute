@@ -1,6 +1,7 @@
 ﻿#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Utility.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/VirtualTexturing.hlsl"
 
+#pragma editor_sync_compilation
 #pragma kernel CopyTilesToUnmap
 #pragma kernel MapNewData
 #pragma kernel VirtualTextureUpdate
@@ -9,7 +10,34 @@
 #pragma kernel GatherRequestedPages
 
 AppendStructuredBuffer<uint> VirtualRequests;
-uint IndirectionResolution;
+
+// Stores data to be added to the PageTable/TileCache
+// (tileCache x/y, mip, isMapped) 
+StructuredBuffer<uint> DestIndices, DestPixels;
+
+// Stores which PageTable Texels are mapped.
+// Stores X, Y
+RWStructuredBuffer<uint> MappedTiles;
+
+// Stores temporary indices that must be unmapped.
+RWStructuredBuffer<uint> TilesToUnmap;
+
+// Source pixels (Not sure if this has to be RW, but it's going to be the same texture as the destination, 
+// So we might need to Ensure that only one mip can be read at a time.
+RWTexture2D<uint> SourceMip, DestMip, PageTableWrite;
+RWTexture2D<float> PageTableMap;
+
+uint CurrentMip, MaxIndex;
+
+uint PackVirtualCoords(uint3 coords)
+{
+	return BitPack(coords, uint2(14u, 4u).xxy, uint3(0u, 14u, 28u));
+}
+
+uint3 UnpackVirtualCoords(uint packedVirtualCoords)
+{
+	return BitUnpack(packedVirtualCoords, uint2(14u, 4u).xxy, uint3(0u, 14u, 28u));
+}
 
 [numthreads(1024, 1, 1)]
 void GatherRequestedPages(uint id : SV_DispatchThreadID)
@@ -19,76 +47,47 @@ void GatherRequestedPages(uint id : SV_DispatchThreadID)
 		return;
 		
 	VirtualFeedbackTexture[id] = 0;
-	uint3 coords = TextureIndexToCoord(id, IndirectionResolution);
-	
-	uint packedCoord = BitPack(coords.x, 13, 0);
-	packedCoord |= BitPack(coords.y, 13, 13);
-	packedCoord |= BitPack(coords.z, 6, 26);
+	uint3 coords = TextureIndexToCoord(id, PageTableSize);
+	uint packedCoord = PackVirtualCoords(coords);
 	VirtualRequests.Append(packedCoord);
 }
 
-// Stores data to be added to the IndirectionTexture/TileCache
-// (tileCache x/y, mip, isMapped) 
-Buffer<uint> TileRequests, DestPixels;
-
-// Stores which Indirection Texels are mapped.
-// Stores X, Y
-RWBuffer<uint> MappedTiles;
-
-// Stores temporary indices that must be unmapped.
-RWBuffer<uint> TilesToUnmap;
-
-// Source pixels (Not sure if this has to be RW, but it's going to be the same texture as the destination, 
-// So we might need to Ensure that only one mip can be read at a time.
-RWTexture2D<uint> SourceMip, DestMip, IndirectionWrite;
-RWTexture2D<float> IndirectionTextureMap;
-
-uint CurrentMip, MaxIndex;
-
-[numthreads(128, 1, 1)]
+[numthreads(64, 1, 1)]
 void CopyTilesToUnmap(uint id : SV_DispatchThreadID)
 {
 	if (id >= MaxIndex)
 		return;
 		
 	// Get the currently mapped tile at the current position, and mark it for removal
-	TilesToUnmap[id] = MappedTiles[TileRequests[id] & 0xFFFF];
+	uint dstIndex = DestIndices[id];
+	TilesToUnmap[id] = MappedTiles[dstIndex];
 }
 
 // Copies the new data to the relevant section, and marks the modified area of the texture for updating
-[numthreads(128, 1, 1)]
+[numthreads(64, 1, 1)]
 void MapNewData(uint id : SV_DispatchThreadID)
 {
 	if (id >= MaxIndex)
 		return;
 	
 	// Unmap pending data if required 
-	uint3 unmapData;
-	unmapData.x = BitUnpack(TilesToUnmap[id], 13, 0);
-	unmapData.y = BitUnpack(TilesToUnmap[id], 13, 13);
-	unmapData.z = BitUnpack(TilesToUnmap[id], 6, 26);
+	uint3 unmapData = UnpackVirtualCoords(TilesToUnmap[id]);
 	if (unmapData.z == CurrentMip)
-		IndirectionTextureMap[unmapData.xy] = 0;
-	
-	// Get the current data from the mip
-	uint2 data = (TileRequests[id] >> uint2(0, 16)) & 0xFFFF;
-	if (data.y != CurrentMip)
-		return;
-	
+		PageTableMap[unmapData.xy] = 0;
+		
 	// Unpack the first data into an X and Y coordinate
-	uint2 destCoords = (DestPixels[id] >> uint2(0, 16)) & 0xFFFF;
+	uint packedSrcCoords = DestPixels[id];
+	uint3 srcCoords = UnpackVirtualCoords(packedSrcCoords);
+	if (srcCoords.z != CurrentMip)
+		return;
 		
-	IndirectionWrite[destCoords] = BitPack(data.x, 11, 0) | BitPack(data.y, 5, 11);
-	IndirectionTextureMap[destCoords] = 1;
-
-	// Update the MappedData with the location of this indirection texel
-	// Pack into (12, 12, 4, 4), as we don't need many mips for the latter data
-	uint mappedData = BitPack(destCoords.x, 13, 0); // x coord
-	mappedData |= BitPack(destCoords.y, 13, 13); // y coord
-	mappedData |= BitPack(data.y, 6, 26); // mip
+	// Get the current data from the mip
+	uint dstIndex = DestIndices[id];
 		
-	// Write to the new mip
-	MappedTiles[data.x] = mappedData;
+	// Update the MappedData with the location of this PageTable texel
+	MappedTiles[dstIndex] = packedSrcCoords;
+	PageTableWrite[srcCoords.xy] = BitPack(uint2(dstIndex, srcCoords.z), uint2(12u, 4u), uint2(0u, 12u));
+	PageTableMap[srcCoords.xy] = 1;
 }
 
 // Copies Texels from a lower mip to a higher mip, except for when the higher mip texels are mapped. (Eg their alpha is not 0)
@@ -101,7 +100,7 @@ void VirtualTextureUpdate(uint2 id : SV_DispatchThreadID)
 		return;
 	
 	// Return if this pixel is already mapped
-	if (IndirectionTextureMap[id])
+	if (PageTableMap[id])
 		return;
 	
 	DestMip[id] = SourceMip[id >> 1];

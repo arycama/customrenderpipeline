@@ -16,7 +16,7 @@ public class DrawInstancedIndirectRenderPass<T> : DrawRenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Mesh mesh, int submeshIndex, Material material, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, int passIndex = 0, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true, int argsOffset = 0)
+	public void Initialize(Mesh mesh, int submeshIndex, Material material, ResourceHandle<GraphicsBuffer> indirectArgsBuffer, Int2 size, int viewCount, int passIndex = 0, float depthBias = 0.0f, float slopeDepthBias = 0.0f, bool zClip = true, int argsOffset = 0)
 	{
 		this.mesh = mesh;
 		this.submeshIndex = submeshIndex;
@@ -27,6 +27,8 @@ public class DrawInstancedIndirectRenderPass<T> : DrawRenderPass<T>
 		this.slopeDepthBias = slopeDepthBias;
 		this.zClip = zClip;
 		this.argsOffset = argsOffset;
+        Size = size;
+        ViewCount = viewCount;
 
 		ReadBuffer("", indirectArgsBuffer);
 	}

@@ -124,7 +124,7 @@ public partial class LightingSetup : ViewRenderFeature
 						worldViewPosition = lightViewMatrix.inverse.MultiplyPoint3x4(worldViewPosition);
 						var viewRotation = lightViewMatrix.inverse.rotation;
 
-						directionalShadowRequests.Add(new(i, relativeViewMatrix, projectionMatrix, shadowSplitData, -1, Float3.Zero, hasShadowBounds, 0, viewLightBounds.Size.z, worldViewPosition, viewRotation, viewLightBounds.Size.x, viewLightBounds.Size.y));
+						directionalShadowRequests.Add(new(i, relativeViewMatrix, projectionMatrix, shadowSplitData, -1, Float3.Zero, hasShadowBounds, 0, viewLightBounds.Size.z, worldViewPosition, viewRotation, viewLightBounds.Size.x, viewLightBounds.Size.y, settings.DirectionalShadowResolution));
 						directionalShadowMatrices.Add((Float3x4)MatrixExtensions.ConvertToAtlasMatrix(projectionMatrix * relativeViewMatrix));
 
 						// Note it could be max(cascadeTexelSize * 0.5, but this means we'd get no anti-aliasing on the min filter size)
@@ -159,7 +159,7 @@ public partial class LightingSetup : ViewRenderFeature
 						var viewMatrixRws = Matrix4x4Extensions.WorldToLocal(light.transform.position - viewRenderData.transform.position, rotation);
 						viewMatrixRws.SetRow(1, -viewMatrixRws.GetRow(1));
 
-						pointShadowRequests.Add(new(i, viewMatrixRws, projectionMatrix, shadowSplitData, index, light.transform.position, hasShadowBounds, light.shadowNearPlane, light.range, light.transform.position, light.transform.rotation, 90, 1));
+						pointShadowRequests.Add(new(i, viewMatrixRws, projectionMatrix, shadowSplitData, index, light.transform.position, hasShadowBounds, light.shadowNearPlane, light.range, light.transform.position, light.transform.rotation, 90, 1, settings.PointShadowResolution));
                         splitBuffer.Add(shadowSplitData);
                     }
                 }
@@ -175,7 +175,7 @@ public partial class LightingSetup : ViewRenderFeature
 					var viewMatrixRws = Matrix4x4Extensions.WorldToLocal(light.transform.position - viewRenderData.transform.position, light.transform.rotation);
 
 					shadowIndex = (uint)spotShadowRequests.Count;
-					var shadowRequest = new ShadowRequest(i, viewMatrixRws, projectionMatrix, shadowSplitData, -1, light.transform.position, hasShadowBounds, light.shadowNearPlane, light.range, light.transform.position, light.transform.rotation, light.spotAngle, size.x / size.y);
+					var shadowRequest = new ShadowRequest(i, viewMatrixRws, projectionMatrix, shadowSplitData, -1, light.transform.position, hasShadowBounds, light.shadowNearPlane, light.range, light.transform.position, light.transform.rotation, light.spotAngle, size.x / size.y, settings.SpotShadowResolution);
 					spotShadowRequests.Add(shadowRequest);
 
                     splitRange = new RangeInt(splitBuffer.Length, 1);

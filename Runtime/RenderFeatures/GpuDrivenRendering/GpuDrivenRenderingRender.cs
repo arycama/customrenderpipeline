@@ -32,7 +32,7 @@ public class GpuDrivenRenderingRender : ViewRenderFeature
 			var draw = drawList[i];
 			using (var pass = renderGraph.AddDrawInstancedIndirectRenderPass("Gpu Driven Rendering", (draw.lodOffset, draw.objectToWorld)))
 			{
-				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, draw.passIndex, 0.0f, 0.0f, true, draw.indirectArgsOffset);
+				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, viewRenderData.viewSize, viewRenderData.viewCount, draw.passIndex, 0.0f, 0.0f, true, draw.indirectArgsOffset);
 				pass.AddKeyword("INDIRECT_RENDERING");
 				pass.UseProfiler = false;
 

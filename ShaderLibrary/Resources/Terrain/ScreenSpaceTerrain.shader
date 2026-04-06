@@ -17,6 +17,7 @@ Shader "Hidden/Screen Space Terrain"
 
             HLSLPROGRAM
             #pragma target 5.0
+            #pragma editor_sync_compilation
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #define FLIP

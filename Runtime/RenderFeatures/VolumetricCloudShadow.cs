@@ -115,7 +115,7 @@ public class VolumetricCloudShadow : ViewRenderFeature
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Cloud Shadow", (settings, time)))
         {
-            pass.Initialize(material, 3);
+            pass.Initialize(material, settings.ShadowResolution, 1, 3);
             pass.WriteTexture(cloudShadow);
             pass.ReadBuffer("CloudShadowData", cloudShadowDataBuffer);
             pass.ReadResource<CloudData>();

@@ -22,7 +22,7 @@ public class RainTextureUpdater : ViewRenderFeature
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Rain Texture", (settings.Resolution, settings.Size)))
 		{
-			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
+			pass.Initialize(material, settings.Resolution);
 
 			pass.WriteTexture(rainTexture);
 

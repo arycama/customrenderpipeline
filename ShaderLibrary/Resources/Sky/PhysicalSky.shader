@@ -9,6 +9,7 @@ Shader "Hidden/Physical Sky"
 
 		HLSLINCLUDE
 		#pragma target 5.0
+        #pragma editor_sync_compilation
 		ENDHLSL
 
         Pass

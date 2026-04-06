@@ -9,7 +9,6 @@ public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 
     [field: SerializeField] public bool NoiseDebug { get; private set; } = false;
 	[field: SerializeField] private bool useSrpBatching = true;
-    [field: SerializeField] public bool RenderGraphDebug { get; private set; } = false;
 
     [field: SerializeField] public RaytracingSystem.Settings RayTracingSettings { get; private set; }
 	[field: SerializeField] public WaterSettings OceanSettings { get; private set; }

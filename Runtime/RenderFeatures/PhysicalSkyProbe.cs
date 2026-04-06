@@ -39,9 +39,9 @@ public class PhysicalSkyProbe : ViewRenderFeature
 		}
 
 		var time = (float)renderGraph.GetResource<TimeData>().time;
-		using (var pass = renderGraph.AddFullscreenRenderPass("Environment Cubemap", (cloudSettings, time, skySettings)))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Environment Cubemap", (cloudSettings, time, skySettings, environmentLighting.Resolution, environmentLighting.Samples)))
 		{
-			pass.Initialize(skyMaterial, skyMaterial.FindPass("Reflection Probe"), 1);
+			pass.Initialize(skyMaterial, environmentLighting.Resolution, 1, skyMaterial.FindPass("Reflection Probe"), 1);
 
 			var keyword = string.Empty;
 			var viewHeight = viewRenderData.transform.position.y;
@@ -69,8 +69,8 @@ public class PhysicalSkyProbe : ViewRenderFeature
             pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				data.cloudSettings.SetCloudPassData(pass, data.time);
-				pass.SetFloat("_Samples", data.skySettings.ReflectionSamples);
-				pass.SetFloat("Resolution", data.skySettings.ReflectionResolution);
+				pass.SetFloat("_Samples", data.Samples);
+				pass.SetFloat("Resolution", data.Resolution);
             });
 		}
 

@@ -10,6 +10,7 @@ Shader "Hidden/Terrain Id Map"
         Pass
         {
             HLSLPROGRAM
+            #pragma editor_sync_compilation
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #define FLIP

@@ -48,7 +48,7 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 				pass.ReadResource<LightingSetup.Result>();
 				pass.ReadResource<AutoExposureData>();
 				pass.ReadResource<AtmospherePropertiesAndTables>();
-				pass.ReadResource<TerrainRenderData>(true);
+				pass.ReadResource<TerrainViewData>(true);
 				pass.ReadResource<CloudShadowDataResult>();
 				pass.ReadResource<ViewData>();
 				pass.ReadResource<FrameData>();
@@ -119,7 +119,7 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 		var rayDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddFullscreenRenderPass("Specular GI Spatial", (settings.ResolveSamples, settings.ResolveSize, settings.Intensity)))
         {
-            pass.Initialize(material, 1);
+            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult);
             pass.WriteTexture(rayDepth);
@@ -159,7 +159,7 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 			pass.renderData.history = history;
 			pass.renderData.wasCreated = wasCreated;
 
-			pass.Initialize(material, 2);
+			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current);
 			pass.WriteTexture(currentWeight);

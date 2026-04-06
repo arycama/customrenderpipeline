@@ -47,7 +47,7 @@ public partial class TemporalAA : ViewRenderFeature
 		));
 
 		//var keyword = null;// viewData.Scale < 1.0f ? "UPSCALE" : null; // TODO: Implement
-		pass.Initialize(material, 0, 1);
+		pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 0, 1);
 
 		(current, history, wasCreated) = colorCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
 		var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);

@@ -91,7 +91,7 @@ public class Bloom : ViewRenderFeature
 				settings.BloomStrength
 			));
 
-			pass.Initialize(material, i == settings.FlareMip ? 0 : 1);
+			pass.Initialize(material, new(width, height), viewRenderData.viewCount, i == settings.FlareMip ? 0 : 1);
 			pass.WriteTexture(bloomIds[i]);
 
 			pass.ReadTexture("Input", source);
@@ -148,7 +148,7 @@ public class Bloom : ViewRenderFeature
 				settings.BloomStrength
 			));
 
-			pass.Initialize(material, 2);
+			pass.Initialize(material, new(width, height), viewRenderData.viewCount, 2);
 			pass.WriteTexture(bloomIds[i - 1]);
 			pass.ReadTexture("Input", input);
 

@@ -15,7 +15,7 @@ public class DrawProceduralRenderPass<T> : DrawRenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material, Matrix4x4 matrix, int passIndex = 0, int vertexCount = 3, int primitiveCount = 1, MeshTopology topology = MeshTopology.Triangles)
+	public void Initialize(Material material, Matrix4x4 matrix, Int2 size, int viewCount, int passIndex = 0, int vertexCount = 3, int primitiveCount = 1, MeshTopology topology = MeshTopology.Triangles)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
@@ -23,6 +23,8 @@ public class DrawProceduralRenderPass<T> : DrawRenderPass<T>
 		this.primitiveCount = primitiveCount;
 		this.matrix = matrix;
 		this.topology = topology;
+        Size = size;
+        ViewCount = viewCount;
 	}
 
 	public override void Reset()

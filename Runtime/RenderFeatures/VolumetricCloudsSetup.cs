@@ -42,7 +42,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
 
         using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Weather Map", settings))
         {
-            pass.Initialize(material, 0);
+            pass.Initialize(material, settings.WeatherMapResolution, 1, 0);
             pass.WriteTexture(weatherMap);
 
             pass.SetRenderFunction(static (command, pass, settings) =>
@@ -58,7 +58,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
 		// High altitude map
 		using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds High Altitude Map", settings))
 		{
-			pass.Initialize(material, 0);
+			pass.Initialize(material, settings.HighAltitudeMapResolution, 1, 0);
 			pass.WriteTexture(highAltitudeTexture);
 
 			pass.SetRenderFunction(static (command, pass, settings) =>
@@ -72,7 +72,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
 		}
         using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Noise Texture", settings))
         {
-            pass.Initialize(material, 1, settings.NoiseResolution.z);
+            pass.Initialize(material, settings.NoiseResolution.xy, settings.NoiseResolution.z, 1, settings.NoiseResolution.z);
             pass.WriteTexture(noiseTexture);
 
             pass.SetRenderFunction(static (command, pass, settings) =>
@@ -92,7 +92,7 @@ public class VolumetricCloudsSetup : FrameRenderFeature
         // Detail
         using (var pass = renderGraph.AddFullscreenRenderPass("Volumetric Clouds Detail Noise Texture", settings))
         {
-            pass.Initialize(material, 2, settings.DetailNoiseResolution.z);
+            pass.Initialize(material, settings.DetailNoiseResolution.xy, settings.DetailNoiseResolution.z, 2, settings.DetailNoiseResolution.z);
             pass.WriteTexture(detailNoiseTexture);
 
             pass.SetRenderFunction(static (command, pass, settings) =>

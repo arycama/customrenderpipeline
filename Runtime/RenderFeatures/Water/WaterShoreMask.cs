@@ -110,7 +110,7 @@ public class WaterShoreMask : FrameRenderFeature
 
             using (var pass = renderGraph.AddFullscreenRenderPass("Water Shore Mask Jump Flood", (offset, terrainData.heightmapTexture, invResolution, heightmapResolution, cutoff, index, passes, minMaxValues)))
 			{
-				pass.Initialize(material, 1);
+				pass.Initialize(material, heightmapResolution, 1, 1);
 
 				if (i == passes - 1)
 				{
@@ -154,7 +154,7 @@ public class WaterShoreMask : FrameRenderFeature
 
         using (var pass = renderGraph.AddFullscreenRenderPass("Water Shore Final Combine", (heightmapTexture, cutoff, invResolution, heightmapResolution)))
         {
-            pass.Initialize(material, 2);
+            pass.Initialize(material, heightmapResolution, 1, 2);
             pass.ReadTexture("JumpFloodInput", src);
             pass.WriteTexture(result);
             pass.ReadBuffer("MinMaxValues", minMaxValues);

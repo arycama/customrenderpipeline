@@ -232,15 +232,19 @@ uint Log2Pow2(uint a)
 	return firstbitlow(a);
 }
 
-uint Exp2Pow2(uint a)
-{
-	return 1u << a;
-}
+uint1 Exp2Pow2(uint1 a) { return 1u << a; }
+uint2 Exp2Pow2(uint2 a) { return 1u << a; }
+uint3 Exp2Pow2(uint3 a) { return 1u << a; }
+uint4 Exp2Pow2(uint4 a) { return 1u << a; }
 
-uint BitPack(uint data, uint size, uint offset)
-{
-	return (data & (Exp2Pow2(size) - 1u)) << offset;
-}
+uint BitOr(uint2 x) { return x.x | x.y; }
+uint BitOr(uint3 x) { return x.x | BitOr(x.yz); }
+uint BitOr(uint4 x) { return x.x | BitOr(x.yzw); }
+
+uint BitPack(uint1 data, uint1 size, uint1 offset) { return (data & (Exp2Pow2(size) - 1u)) << offset; }
+uint BitPack(uint2 data, uint2 size, uint2 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
+uint BitPack(uint3 data, uint3 size, uint3 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
+uint BitPack(uint4 data, uint4 size, uint4 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
 
 uint BitPackFloat(float data, uint size, uint offset)
 {
@@ -248,10 +252,10 @@ uint BitPackFloat(float data, uint size, uint offset)
 	return BitPack(packedData, size, offset);
 }
 
-uint BitUnpack(uint data, uint size, uint offset)
-{
-	return (data >> offset) & (Exp2Pow2(size) - 1u);
-}
+uint1 BitUnpack(uint1 data, uint1 size, uint1 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
+uint2 BitUnpack(uint2 data, uint2 size, uint2 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
+uint3 BitUnpack(uint3 data, uint3 size, uint3 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
+uint4 BitUnpack(uint4 data, uint4 size, uint4 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
 
 float BitUnpackFloat(uint data, uint size, uint offset)
 {

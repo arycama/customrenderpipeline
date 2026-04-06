@@ -109,7 +109,7 @@ public class Rain : ViewRenderFeature
 		// TODO: Index buffer, but make some common function to build/get an index buffer 
 		using (var pass = renderGraph.AddDrawProceduralIndexedRenderPass("Render", (dropletCount, settings.Radius, settings.Velocity, settings.WindAngle, settings.WindStrength, settings.WindTurbulence)))
 		{
-			pass.Initialize(indexBuffer, settings.Material, Float4x4.Identity);
+			pass.Initialize(indexBuffer, settings.Material, Float4x4.Identity, viewRenderData.viewSize, viewRenderData.viewCount);
 
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepth);

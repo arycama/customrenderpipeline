@@ -13,7 +13,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 			return;
 
 		// Also ensure this is valid for current frame
-		if (!renderGraph.TryGetResource<TerrainRenderData>(out var terrainRenderData))
+		if (!renderGraph.TryGetResource<TerrainViewData>(out var terrainRenderData))
 			return;
 
 		var terrain = terrainSystemData.terrain;
@@ -43,7 +43,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", cullingPlanes))
 		{
-			pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex, shadowRequestData.Bias, shadowRequestData.SlopeBias, shadowRequestData.ZClip);
+			pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, shadowRequest.Resolution, 1, MeshTopology.Quads, passIndex, shadowRequestData.Bias, shadowRequestData.SlopeBias, shadowRequestData.ZClip);
 
 			pass.WriteDepth(shadowRequestData.Shadow);
 			pass.DepthSlice = shadowRequestData.CascadeIndex;
@@ -51,7 +51,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
 			pass.ReadResource<ShadowRequestData>();
-			pass.ReadResource<TerrainRenderData>();
+			pass.ReadResource<TerrainViewData>();
 			pass.ReadResource<TerrainQuadtreeData>();
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<VirtualTextureData>();

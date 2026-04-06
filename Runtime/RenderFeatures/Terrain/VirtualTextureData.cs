@@ -8,22 +8,22 @@ public readonly struct VirtualTextureData : IRenderPassData
 	private static readonly int VirtualHeightTextureId = Shader.PropertyToID("VirtualHeightTexture");
 
 	public readonly Texture2DArray albedoSmoothness, normal, height;
-	public readonly ResourceHandle<RenderTexture> indirectionTexture;
+	public readonly ResourceHandle<RenderTexture> pageTable;
 	public readonly ResourceHandle<GraphicsBuffer> feedbackBuffer, virtualTextureData;
 
-	public VirtualTextureData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray height, ResourceHandle<RenderTexture> indirectionTexture, ResourceHandle<GraphicsBuffer> feedbackBuffer, ResourceHandle<GraphicsBuffer> virtualTextureData)
+	public VirtualTextureData(Texture2DArray albedoSmoothness, Texture2DArray normal, Texture2DArray height, ResourceHandle<RenderTexture> pageTable, ResourceHandle<GraphicsBuffer> feedbackBuffer, ResourceHandle<GraphicsBuffer> virtualTextureData)
 	{
 		this.albedoSmoothness = albedoSmoothness;
 		this.normal = normal;
 		this.height = height;
-		this.indirectionTexture = indirectionTexture;
+		this.pageTable = pageTable;
 		this.feedbackBuffer = feedbackBuffer;
 		this.virtualTextureData = virtualTextureData;
 	}
 
 	void IRenderPassData.SetInputs(RenderPass pass)
 	{
-		pass.ReadTexture("IndirectionTexture", indirectionTexture);
+		pass.ReadTexture("PageTable", pageTable);
 		pass.WriteBuffer("VirtualFeedbackTexture", feedbackBuffer);
 		pass.ReadBuffer("VirtualFeedbackTexture", feedbackBuffer);
 		pass.ReadBuffer("VirtualTextureData", virtualTextureData);

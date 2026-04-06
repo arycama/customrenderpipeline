@@ -12,7 +12,7 @@ public class ScreenSpaceTerrain : ViewRenderFeature
 
 	public override void Render(ViewRenderData viewRenderData)
     {
-		if (!renderGraph.TryGetResource<TerrainRenderData>(out _))
+		if (!renderGraph.TryGetResource<TerrainViewData>(out _))
 			return;
 
 		using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Terrain");
@@ -24,7 +24,7 @@ public class ScreenSpaceTerrain : ViewRenderFeature
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 
 		//pass.ReadRtHandle<TerrainDepth>();
-		pass.ReadResource<TerrainRenderData>();
+		pass.ReadResource<TerrainViewData>();
 		pass.ReadResource<ViewData>();
 		pass.ReadResource<VirtualTextureData>();
 	}

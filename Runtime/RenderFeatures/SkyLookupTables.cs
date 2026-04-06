@@ -83,7 +83,7 @@ public class SkyLookupTables : FrameRenderFeature
         // Generate transmittance LUT
         using (var pass = renderGraph.AddFullscreenRenderPass("Atmosphere Transmittance", (settings.miePhase, result, settings)))
         {
-            pass.Initialize(skyMaterial, skyMaterial.FindPass("Transmittance Lookup"));
+            pass.Initialize(skyMaterial, new(settings.TransmittanceWidth, settings.TransmittanceHeight), 1, skyMaterial.FindPass("Transmittance Lookup"));
             pass.WriteTexture(transmittance);
             result.SetInputs(pass);
 

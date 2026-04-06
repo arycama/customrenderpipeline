@@ -45,7 +45,7 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
                 pass.ReadResource<LightingSetup.Result>();
                 pass.ReadResource<AutoExposureData>();
                 pass.ReadResource<AtmospherePropertiesAndTables>();
-                pass.ReadResource<TerrainRenderData>(true);
+                pass.ReadResource<TerrainViewData>(true);
                 pass.ReadResource<CloudShadowDataResult>();
                 pass.ReadResource<ViewData>();
                 pass.ReadResource<FrameData>();

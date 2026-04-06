@@ -95,7 +95,7 @@ public class GrassRenderer : ViewRenderFeature
 			{
 				pass.Initialize(grassCoverageMaterial, terrain.terrainData.alphamapResolution);
 				pass.WriteTexture(coverageMap);
-				pass.ReadResource<TerrainRenderData>();
+				pass.ReadResource<TerrainViewData>();
 				isInitialized = true;
 			}
 		}
@@ -125,7 +125,7 @@ public class GrassRenderer : ViewRenderFeature
 			patchScaleOffset: new Float4(size.x / cellCount, size.z / cellCount, position.x, position.z)
 		)))
 		{
-			pass.Initialize(material, indexBuffer, quadtreeCullResults.IndirectArgsBuffer);
+			pass.Initialize(material, indexBuffer, quadtreeCullResults.IndirectArgsBuffer, viewRenderData.viewSize, 1);
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
@@ -141,7 +141,7 @@ public class GrassRenderer : ViewRenderFeature
 			pass.ReadResource<FrameData>();
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<TemporalAAData>();
-			pass.ReadResource<TerrainRenderData>();
+			pass.ReadResource<TerrainViewData>();
 			pass.ReadResource<VirtualTextureData>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>

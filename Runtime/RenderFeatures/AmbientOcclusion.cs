@@ -73,7 +73,7 @@ public partial class AmbientOcclusion : ViewRenderFeature
 			result = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
 			using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Compute", (settings.Radius, settings.Directions, settings.Samples, settings.Falloff, settings.MaxScreenRadius, settings.ThinOccluderCompensation)))
 			{
-				pass.Initialize(material, 0);
+				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 0);
 				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 				pass.WriteTexture(result);
 
@@ -106,7 +106,7 @@ public partial class AmbientOcclusion : ViewRenderFeature
 			pass.renderData.wasCreated = false;
 			pass.renderData.history = history;
 
-			pass.Initialize(material, 1);
+			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(current);
 			pass.ReadTexture("Input", result);
@@ -129,7 +129,7 @@ public partial class AmbientOcclusion : ViewRenderFeature
 		var output = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Combine", (settings.AoStrength, current)))
 		{
-			pass.Initialize(material, 2);
+			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2);
 			pass.WriteTexture(output);
 			pass.ReadTexture("Input", current);
 			pass.ReadRtHandle<GBufferBentNormalOcclusion>();

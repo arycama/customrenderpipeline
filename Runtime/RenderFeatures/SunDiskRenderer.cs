@@ -20,7 +20,7 @@ public class SunDiskRenderer : ViewRenderFeature
 
 		using (var pass = renderGraph.AddDrawProceduralRenderPass("Sun Disk", (settings.SunAngularDiameter, lightData.light0Color, lightData.light0Direction)))
 		{
-			pass.Initialize(celestialBodyMaterial, matrix, 0, 4, 1, MeshTopology.Quads);
+			pass.Initialize(celestialBodyMaterial, matrix, viewRenderData.viewSize, 1, 0, 4, 1, MeshTopology.Quads);
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());

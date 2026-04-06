@@ -57,7 +57,7 @@ public class DeferredWater : ViewRenderFeature
             pass.ReadResource<EnvironmentData>();
 
             pass.ReadResource<OceanFftResult>();
-            pass.ReadResource<WaterShoreMask.Result>(true);
+            //pass.ReadResource<WaterShoreMask.Result>(true);
             pass.ReadResource<ViewData>();
             pass.ReadResource<FrameData>();
             pass.ReadResource<CausticsResult>();
@@ -107,7 +107,7 @@ public class DeferredWater : ViewRenderFeature
                 pass.ReadResource<LightingSetup.Result>();
                 pass.ReadResource<AutoExposureData>();
                 pass.ReadResource<AtmospherePropertiesAndTables>();
-                pass.ReadResource<TerrainRenderData>(true);
+                pass.ReadResource<TerrainViewData>(true);
                 pass.ReadResource<CloudShadowDataResult>();
                 pass.ReadResource<ShadowData>();
                 pass.ReadResource<DfgData>();
@@ -169,7 +169,7 @@ public class DeferredWater : ViewRenderFeature
 			if (settings.RaytracedRefractions)
                 pass.AddKeyword("RAYTRACED_REFRACTIONS_ON");
 
-            pass.Initialize(deferredWaterMaterial, 1);
+            pass.Initialize(deferredWaterMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 1);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.ReadTexture("_ScatterInput", scatterResult);
             pass.WriteTexture(current);

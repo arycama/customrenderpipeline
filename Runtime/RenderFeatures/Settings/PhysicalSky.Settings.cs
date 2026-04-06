@@ -58,10 +58,6 @@ public partial class Sky
 		[field: SerializeField] public int AmbientSkyHeight { get; private set; } = 64;
 		[field: SerializeField] public int AmbientSkySamples { get; private set; } = 64;
 
-		[field: Header("Reflection Probe")]
-		[field: SerializeField] public int ReflectionResolution { get; private set; } = 128;
-		[field: SerializeField] public int ReflectionSamples { get; private set; } = 16;
-
 		[field: Header("Rendering")]
 		[field: SerializeField] public int RenderSamples { get; private set; } = 32;
 

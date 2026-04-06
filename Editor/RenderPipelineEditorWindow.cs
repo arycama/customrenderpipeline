@@ -4,6 +4,7 @@ using UnityEngine.Rendering;
 public class RenderEditorWindow : EditorWindow
 {
     private Editor editor;
+    private static Float2 scrollPosition;
 
     [MenuItem("Window/Rendering/Render Pipeline")]
     public static void OpenWindow()
@@ -23,6 +24,10 @@ public class RenderEditorWindow : EditorWindow
         }
 
         if (editor != null)
-            editor.DrawDefaultInspector();
+        {
+            scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition);
+            editor.OnInspectorGUI();
+            EditorGUILayout.EndScrollView();
+        }
     }
 }

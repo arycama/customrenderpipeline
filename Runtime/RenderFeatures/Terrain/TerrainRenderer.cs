@@ -16,7 +16,7 @@ public class TerrainRenderer : TerrainRendererBase
 			return;
 
 		// Also ensure this is valid for current frame
-		if (!renderGraph.TryGetResource<TerrainRenderData>(out var terrainRenderData))
+		if (!renderGraph.TryGetResource<TerrainViewData>(out var terrainRenderData))
 			return;
 
 		var terrain = terrainSystemData.terrain;
@@ -32,12 +32,12 @@ public class TerrainRenderer : TerrainRendererBase
 
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", cullingPlanes))
 		{
-			pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
+			pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, viewRenderData.viewSize, 1, MeshTopology.Quads, passIndex);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
 			pass.ReadResource<TerrainQuadtreeData>();
-			pass.ReadResource<TerrainRenderData>();
+			pass.ReadResource<TerrainViewData>();
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<VirtualTextureData>();
 

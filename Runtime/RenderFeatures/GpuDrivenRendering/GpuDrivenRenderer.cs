@@ -276,7 +276,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 			using (var pass = renderGraph.AddDrawInstancedIndirectRenderPass("Gpu Driven Rendering Shadow", (draw.lodOffset, draw.objectToWorld)))
 			{
 				pass.UseProfiler = false;
-				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, draw.passIndex, request.Bias, request.SlopeBias, request.ZClip, draw.indirectArgsOffset);
+				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, request.ShadowRequest.Resolution, 1, draw.passIndex, request.Bias, request.SlopeBias, request.ZClip, draw.indirectArgsOffset);
 				pass.AddKeyword("INDIRECT_RENDERING");
 
 				pass.WriteDepth(request.Shadow);

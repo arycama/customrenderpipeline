@@ -26,6 +26,8 @@ public readonly struct RenderPassDescriptor
         this.debugName = debugName;
     }
 
+    public override string ToString() => $"{debugName} (size: {size}x{viewCount}, samples: {samples}, attachmentCount: {attachments.Length}, subpassCount: {subpasses.Length})";
+
     public readonly void BeginRenderPass(CommandBuffer command, RenderGraph renderGraph)
     {
         var attachments = new NativeArray<AttachmentDescriptor>(this.attachments.Length, Allocator.Temp, NativeArrayOptions.UninitializedMemory);

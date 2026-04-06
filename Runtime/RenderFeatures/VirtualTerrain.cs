@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
@@ -7,21 +6,18 @@ using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 using static Math;
 using UnityEngine.Pool;
+using Unity.Collections;
 
 public class VirtualTerrain : FrameRenderFeature
 {
     private readonly TerrainSettings settings;
-    private readonly TerrainSystem terrainSystem;
-    private readonly ResourceHandle<GraphicsBuffer> feedbackBuffer;
+    private readonly ResourceHandle<GraphicsBuffer> feedbackBuffer, mappedTiles;
+    private readonly ResourceHandle<RenderTexture> pageTable, pageTableMap;
     private readonly Texture2DArray albedoSmoothnessTexture, normalTexture, heightTexture;
-    private readonly ResourceHandle<RenderTexture> indirectionTexture;
-    private readonly ComputeShader virtualTextureUpdateShader, dxtCompressCS;
-
+    private readonly ComputeShader virtualTextureUpdate, dxtCompress;
     private readonly LruCache<int, int> lruCache = new();
-    private readonly ResourceHandle<GraphicsBuffer> tilesToUnmapBuffer, mappedTiles;
-    private readonly ResourceHandle<RenderTexture> indirectionTextureMapTexture;
-
-    private readonly HashSet<int> pendingRequests = new();
+    private readonly NativeList<int> pendingRequests = new(Allocator.Persistent);
+    private readonly HashSet<int> queuedRequests = new();
     private readonly Material virtualTextureBuildMaterial;
 
     private Terrain previousTerrain;
@@ -29,58 +25,62 @@ public class VirtualTerrain : FrameRenderFeature
     private bool[][,] pageTableResidency;
 
     private bool needsClear;
+    private int previousAniso;
 
     private int PageTableSize => settings.VirtualResolution / settings.TileResolution;
     private int PageTableMipCount => Texture2DExtensions.MipCount(PageTableSize);
+    private int Padding => Max(1, settings.AnisoLevel >> 1);
 
-    public VirtualTerrain(RenderGraph renderGraph, TerrainSettings settings, TerrainSystem terrainSystem) : base(renderGraph)
+    public VirtualTerrain(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
     {
         this.settings = settings;
-        this.terrainSystem = terrainSystem;
 
-        virtualTextureUpdateShader = Resources.Load<ComputeShader>("Terrain/VirtualTextureUpdate");
-        feedbackBuffer = renderGraph.GetBuffer(PageTableSize * PageTableSize * 4 / 3, isPersistent: true);
+        virtualTextureUpdate = Resources.Load<ComputeShader>("Terrain/VirtualTextureUpdate");
+        feedbackBuffer = renderGraph.GetBuffer(Texture2DExtensions.PixelCount(PageTableSize), isPersistent: true);
 
+        // Mapped tiles contains an array of packed coords for each tile. Eg for each tile index it says the original X Y Z coorsd.
         mappedTiles = renderGraph.GetBuffer(settings.VirtualTileCount, sizeof(int), isPersistent: true);
         pageTableResidency = new bool[PageTableMipCount][,];
-        for(var i = 0; i < PageTableMipCount; i++)
+        for (var i = 0; i < PageTableMipCount; i++)
         {
             var mipSize = PageTableSize >> i;
             pageTableResidency[i] = new bool[mipSize, mipSize];
         }
 
-        indirectionTextureMapTexture = renderGraph.GetTexture(PageTableSize, GraphicsFormat.R8_UNorm, hasMips: true, isRandomWrite: true, isPersistent: true);
-        indirectionTexture = renderGraph.GetTexture(PageTableSize, GraphicsFormat.R16_UInt, hasMips: true, isRandomWrite: true, isPersistent: true);
+        pageTableMap = renderGraph.GetTexture(PageTableSize, GraphicsFormat.R8_UNorm, hasMips: true, isRandomWrite: true, isPersistent: true);
+        pageTable = renderGraph.GetTexture(PageTableSize, GraphicsFormat.R16_UInt, hasMips: true, isRandomWrite: true, isPersistent: true);
 
         virtualTextureBuildMaterial = new Material(Shader.Find("Hidden/Virtual Texture Build")) { hideFlags = HideFlags.HideAndDontSave };
-        dxtCompressCS = Resources.Load<ComputeShader>("Terrain/DxtCompress");
+        dxtCompress = Resources.Load<ComputeShader>("Terrain/DxtCompress");
 
         var resolution = settings.TileResolution;
         albedoSmoothnessTexture = new(resolution, resolution, settings.VirtualTileCount, GraphicsFormat.RGBA_DXT5_SRGB, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
         {
             hideFlags = HideFlags.HideAndDontSave,
-            name = "Virtual AlbedoSmoothness Texture",
+            name = "Virtual AlbedoSmoothness Texture"
         };
 
         normalTexture = new(resolution, resolution, settings.VirtualTileCount, GraphicsFormat.RGBA_DXT5_UNorm, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
         {
             hideFlags = HideFlags.HideAndDontSave,
-            name = "Virtual Normal Texture",
+            name = "Virtual Normal Texture"
         };
 
         heightTexture = new(resolution, resolution, settings.VirtualTileCount, GraphicsFormat.R_BC4_UNorm, TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate, 2)
         {
             hideFlags = HideFlags.HideAndDontSave,
-            name = "Virtual Height Texture",
+            name = "Virtual Height Texture"
         };
     }
 
     protected override void Cleanup(bool disposing)
     {
-        renderGraph.ReleasePersistentResource(indirectionTextureMapTexture, -1);
+        renderGraph.ReleasePersistentResource(pageTableMap, -1);
         renderGraph.ReleasePersistentResource(mappedTiles, -1);
         renderGraph.ReleasePersistentResource(feedbackBuffer, -1);
-        renderGraph.ReleasePersistentResource(indirectionTexture, -1);
+        renderGraph.ReleasePersistentResource(pageTable, -1);
+
+        pendingRequests.Dispose();
 
         Object.DestroyImmediate(albedoSmoothnessTexture);
         Object.DestroyImmediate(normalTexture);
@@ -89,19 +89,21 @@ public class VirtualTerrain : FrameRenderFeature
 
     public override void Render(ScriptableRenderContext context)
     {
-        renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, indirectionTexture, feedbackBuffer, renderGraph.SetConstantBuffer
-            (new VirtualTextureCbufferData(
-                GraphicsUtilities.TexelRemapNormalized(new Rect(4, 4, settings.TileResolution - 8, settings.TileResolution - 8), settings.TileResolution),
-                (float)settings.AnisoLevel,
-                (float)PageTableSize,
-                Rcp(PageTableSize),
-                (float)settings.VirtualResolution,
-                Log2(settings.TileResolution),
-                (float)settings.TileResolution,
-                PageTableSize,
-                settings.VirtualResolution,
-                settings.TileResolution
-        ))));
+        var tileRect = new Rect(Padding, Padding, settings.TileResolution - 2 * Padding, settings.TileResolution - 2 * Padding);
+        var uvScaleOffset = GraphicsUtilities.TexelRemapNormalized(tileRect, settings.TileResolution);
+      //  uvScaleOffset.xy *= PageTableSize;
+
+        var virtualTextureDataBuffer = renderGraph.SetConstantBuffer
+        ((
+            uvScaleOffset,
+            (float)settings.VirtualResolution,
+            (float)settings.TileResolution,
+            (float)settings.AnisoLevel,
+            (float)Texture2DExtensions.MipCount(PageTableSize),
+            PageTableSize
+        ));
+
+        renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, pageTable, feedbackBuffer, virtualTextureDataBuffer));
 
         // Clear if terrain has changed
         if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
@@ -111,39 +113,8 @@ public class VirtualTerrain : FrameRenderFeature
         needsClear |= terrain != previousTerrain;
         previousTerrain = terrain;
 
-        var terrainPosition = (Float3)terrainSystem.Terrain.GetPosition();
-        var size = (Float3)terrain.terrainData.size;
-
-        renderGraph.SetResource<TerrainRenderData>
-        (
-            new
-            (
-                terrainSystem.diffuseArray,
-                terrainSystem.normalMapArray,
-                terrainSystem.maskMapArray,
-                terrainSystem.heightmap,
-                terrainSystem.normalmap,
-                terrainSystem.idMap,
-                terrainSystem.TerrainData.holesTexture,
-                terrainSystem.terrainLayerData,
-                terrainSystem.aoMap,
-                renderGraph.SetConstantBuffer
-                (
-                    new Pass0Data
-                    (
-                        size,
-                        terrainSystem.TerrainData.alphamapResolution,
-                        terrainSystem.Terrain.GetPosition(),
-                        size.y,
-                        GraphicsUtilities.HalfTexelRemap(terrainPosition.xz, size.xz, Vector2.one * terrainSystem.TerrainData.heightmapResolution),
-                        new Float4(1f / size.x, 1f / size.z, -terrainPosition.x / size.x, -terrainPosition.z / size.z),
-                        GraphicsUtilities.HalfTexelRemap(terrain.terrainData.heightmapResolution),
-                        terrainPosition.y,
-                        terrain.terrainData.heightmapResolution
-                    )
-                )
-            )
-        );
+        needsClear |= previousAniso != settings.AnisoLevel;
+        previousAniso = settings.AnisoLevel;
 
         // If terrain is different, clear the LRU cache
         if (needsClear)
@@ -159,7 +130,7 @@ public class VirtualTerrain : FrameRenderFeature
 
             using (var pass = renderGraph.AddComputeRenderPass("Clear Buffer"))
             {
-                pass.Initialize(virtualTextureUpdateShader, 3, settings.VirtualTileCount);
+                pass.Initialize(virtualTextureUpdate, 3, settings.VirtualTileCount);
                 pass.WriteBuffer("MappedTiles", mappedTiles);
             }
 
@@ -168,149 +139,138 @@ public class VirtualTerrain : FrameRenderFeature
             {
                 using var pass = renderGraph.AddComputeRenderPass("Clear Texture");
                 var mipSize = Texture2DExtensions.MipResolution(i, PageTableSize);
-                pass.Initialize(virtualTextureUpdateShader, 4, mipSize, mipSize);
-                pass.WriteTexture("DestMip", indirectionTextureMapTexture);
+                pass.Initialize(virtualTextureUpdate, Padding, mipSize, mipSize);
+                pass.WriteTexture("DestMip", pageTableMap);
             }
 
-            var indirectionMipCount = Texture2DExtensions.MipCount(PageTableSize) - 1;
-            for (var i = 0; i < indirectionMipCount; i++)
+            var pageTableMipCount = Texture2DExtensions.MipCount(PageTableSize);
+            for (var i = 0; i < pageTableMipCount; i++)
             {
                 var mipSize = Texture2DExtensions.MipResolution(i, PageTableSize);
                 using var pass = renderGraph.AddComputeRenderPass("Clear Texture");
-                pass.Initialize(virtualTextureUpdateShader, 4, mipSize, mipSize);
-                pass.WriteTexture("DestMip", indirectionTexture);
+                pass.Initialize(virtualTextureUpdate, Padding, mipSize, mipSize);
+                pass.WriteTexture("DestMip", pageTable);
             }
 
             needsClear = false;
         }
 
-        // Process pending request, if any
-        if (pendingRequests.Count == 0)
-            return;
-
-        // First, figure out which unused tiles we can use
-        var updateRect = new RectInt();
-        var updateMip = -1;
-
-        // TODO: List Pool
-        var scaleOffsets = ListPool<Float4>.Get();
-        var dstOffsets = ListPool<int>.Get();
-        var destPixels = ListPool<int>.Get();
-        var tileRequests = ListPool<int>.Get();
-        var tileCount = 0;
-
-        // Sort requests by mip, then distance from camera
-        var sortedRequests = pendingRequests.OrderByDescending(packedCoord => UnpackCoord(packedCoord).z);
-        foreach (var packedPosition in sortedRequests)
+        queuedRequests.Clear();
+        foreach (var packedPosition in pendingRequests)
         {
             var position = UnpackCoord(packedPosition);
 
-            int targetIndex;
-            if (updateMip == -1)
+            // If texture already mapped, nothing to do. (TODO: Can we detect this on GPU somehow to avoid adding to array? Probably not since we still should update the LRU cache)
+            if (pageTableResidency[position.z][position.y, position.x])
             {
-                updateMip = position.z;
-                updateRect = new RectInt(position.x, position.y, 1, 1);
+                // Mark this pixel as currently visible so it doesn't get evicted
+                lruCache.Update(packedPosition);
+                continue;
             }
 
-            // Remove currently-existing VirtualTextureTile in this location
-            var nextTileIndex = lruCache.Count;
-            if (nextTileIndex < settings.VirtualTileCount)
+            // We want to request the coarsest mip that is not yet rendered, to ensure there is a gradual transition to the
+            // target mip, with 1 mip changing per frame. Do this by starting from current mip, and working to coarsest
+            var iterations = PageTableMipCount - position.z;
+            for (var j = 1; j < iterations; j++)
             {
-                targetIndex = nextTileIndex;
+                var newPosition = new Int3(position.x >> 1, position.y >> 1, position.z + 1);
+                var isMapped = pageTableResidency[newPosition.z][newPosition.y, newPosition.x];
+                if (isMapped)
+                {
+                    // If we found a higher fallback, add the next finer tile to the queue (Which will be the previous iteration tile)
+                    _ = queuedRequests.Add(PackCoord(position));
+                    break;
+                }
+
+                if (j == iterations - 1)
+                {
+                    // Most coarse mip, add
+                    _ = queuedRequests.Add(PackCoord(newPosition));
+                }
+
+                position = newPosition;
+            }
+        }
+
+        pendingRequests.Clear();
+
+        // Process pending request, if any
+        if (queuedRequests.Count == 0)
+            return;
+
+        var scaleOffsets = ListPool<Float4>.Get();
+        var dstIndices = ListPool<int>.Get();
+        var destPixels = ListPool<int>.Get();
+        var tileCount = 0;
+
+        // Sort requests by mip, then distance from camera
+        var sortedRequests = queuedRequests.OrderByDescending(packedCoord => UnpackCoord(packedCoord).z);
+        foreach (var packedPosition in sortedRequests)
+        {
+            int dstIndex;
+            if (lruCache.Count < settings.VirtualTileCount)
+            {
+                // If we haven't exceeded our max tile count, use the next slot
+                dstIndex = lruCache.Count;
             }
             else
             {
+                // Otherwise get the slot of the least recently used tile
                 var lastTileUsed = lruCache.Remove();
-                targetIndex = lastTileUsed.Item2;
-                var lastPackedCoord = lastTileUsed.Item1;
-                var existingPosition = UnpackCoord(lastPackedCoord);
+                dstIndex = lastTileUsed.Item2;
 
                 // Invalidate existing position
-                pageTableResidency[existingPosition.z][existingPosition.x, existingPosition.y] = false;
-
-                // Set the mip just before the one being removed as the minimum update, so that it can fall back to the tile before it.
-                existingPosition.x >>= 1;
-                existingPosition.y >>= 1;
-                existingPosition.z += 1;
-
-                if (existingPosition.z > updateMip)
-                {
-                    var delta = 1 << existingPosition.z - updateMip;
-                    updateMip = existingPosition.z;
-
-                    updateRect.SetMinMax(updateRect.min / delta, updateRect.max / delta);
-                    updateRect = updateRect.Encapsulate(existingPosition.x, existingPosition.y);
-                }
-                else if (existingPosition.z == updateMip)
-                {
-                    updateRect = updateRect.Encapsulate(existingPosition.x, existingPosition.y);
-                }
-            }
-
-            // Track the highest mip, as the update starts at the highest mip and works down
-            // We only need to update mips higher than the one that has changed.
-            if (position.z > updateMip)
-            {
-                var delta = 1 << position.z - updateMip;
-                updateMip = position.z;
-
-                updateRect.SetMinMax(updateRect.min / delta, updateRect.max / delta);
-                updateRect = updateRect.Encapsulate(position.x, position.y);
-            }
-            else if (position.z == updateMip)
-            {
-                updateRect = updateRect.Encapsulate(position.x, position.y);
+                var previousCoord = UnpackCoord(lastTileUsed.Item1);
+                pageTableResidency[previousCoord.z][previousCoord.y, previousCoord.x] = false;
             }
 
             // Add new tile to cache
-            lruCache.Add(packedPosition, targetIndex);
+            lruCache.Add(packedPosition, dstIndex);
 
             // Mark this pixel as filled in the array
-            pageTableResidency[position.z][position.x, position.y] = true;
+            var position = UnpackCoord(packedPosition);
+            pageTableResidency[position.z][position.y, position.x] = true;
 
-            // Set some data for the ComputeShader to update the indirectiontexture
-            tileRequests.Add((targetIndex & 0xFFFF) | ((position.z & 0xFFFF) << 16));
-            destPixels.Add(position.x | (position.y << 16));
-            dstOffsets.Add(targetIndex);
+            // Set some data for the ComputeShader to update the page table
+            dstIndices.Add(dstIndex);
+            destPixels.Add(packedPosition);
 
-            var padding = 4;
-
-            var dstX = (position.x << position.z) * settings.TileResolution - (padding << position.z);
-            var dstY = (position.y << position.z) * settings.TileResolution - (padding << position.z);
-            var dstWidth = (settings.TileResolution + 2 * padding) << position.z;
-            var dstHeight = (settings.TileResolution + 2 * padding) << position.z;
+            var dstX = (position.x << position.z) * settings.TileResolution - (Padding << position.z);
+            var dstY = (position.y << position.z) * settings.TileResolution - (Padding << position.z);
+            var dstWidth = (settings.TileResolution + 2 * Padding) << position.z;
+            var dstHeight = (settings.TileResolution + 2 * Padding) << position.z;
 
             var dstRect = new Rect(dstX, dstY, dstWidth, dstHeight);
             scaleOffsets.Add(GraphicsUtilities.TexelRemapNormalized(dstRect, settings.VirtualResolution));
 
             // Exit if we've reached the max number of tiles for this frame
-            if (++tileCount == settings.UpdateTileCount)
+            if (++tileCount == settings.MaxUpdatesPerFrame)
                 break;
         }
 
-        pendingRequests.Clear();
+        queuedRequests.Clear();
 
-        // Update the page table
-        var tileRequestsBuffer = renderGraph.GetBuffer(tileRequests.Count);
-        using (var pass = renderGraph.AddComputeRenderPass("Copy Tiles To Unmap", (tileCount, tileRequestsBuffer, tileRequests)))
+        // Copy Tiles to Unmap
+        var destIndicesBuffer = renderGraph.GetBuffer(tileCount);
+        var tilesToUnmapBuffer = renderGraph.GetBuffer(tileCount);
+        using (var pass = renderGraph.AddComputeRenderPass("Copy Tiles To Unmap", (tileCount, destIndicesBuffer, dstIndices)))
         {
-            pass.Initialize(virtualTextureUpdateShader, 0, destPixels.Count);
+            pass.Initialize(virtualTextureUpdate, 0, tileCount);
             pass.WriteBuffer("TilesToUnmap", tilesToUnmapBuffer);
-            pass.WriteBuffer("", tileRequestsBuffer);
+            pass.WriteBuffer("", destIndicesBuffer);
 
-            pass.ReadBuffer("TileRequests", tileRequestsBuffer);
+            pass.ReadBuffer("DestIndices", destIndicesBuffer);
             pass.ReadBuffer("MappedTiles", mappedTiles);
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
-                command.SetBufferData(pass.GetBuffer(data.tileRequestsBuffer), data.tileRequests);
+                command.SetBufferData(pass.GetBuffer(data.destIndicesBuffer), data.dstIndices);
                 pass.SetInt("MaxIndex", data.tileCount);
-                ListPool<int>.Release(data.tileRequests);
             });
         }
 
         // dispatch mip updates
-        var destPixelbuffer = renderGraph.GetBuffer(destPixels.Count);
+        var destPixelbuffer = renderGraph.GetBuffer(tileCount);
         using (var pass = renderGraph.AddGenericRenderPass("Copy Dst Pixels", (destPixels, destPixelbuffer)))
         {
             pass.SetRenderFunction((command, pass, data) =>
@@ -320,44 +280,41 @@ public class VirtualTerrain : FrameRenderFeature
             });
         }
 
-        // Only update required mips (And extents?)
-        // Max(0) because highest mip might request it's parent mip too, this is easier (and fast enough)
-        //var start = Math.Max(0, mipCount - updateMip);
-        //for (var z = start; z < mipCount; z++)
-
+        // Map new data
         var virtualTextureData = renderGraph.GetResource<VirtualTextureData>();
-        for (var z = 0; z < PageTableMipCount; z++)
+        for (var i = 0; i < PageTableMipCount; i++)
         {
-            using (var pass = renderGraph.AddComputeRenderPass("Map New Data", (z, tileCount, destPixelbuffer)))
+            using (var pass = renderGraph.AddComputeRenderPass("Map New Data", (i, tileCount, destPixelbuffer)))
             {
-                pass.Initialize(virtualTextureUpdateShader, 1, tileCount);
-                pass.WriteTexture("IndirectionWrite", virtualTextureData.indirectionTexture, z);
-                pass.WriteTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
+                pass.Initialize(virtualTextureUpdate, 1, tileCount);
+                pass.WriteTexture("PageTableWrite", virtualTextureData.pageTable, i);
+                pass.WriteTexture("PageTableMap", pageTableMap, i);
                 pass.WriteBuffer("MappedTiles", mappedTiles);
                 pass.WriteBuffer("", destPixelbuffer);
 
-                pass.ReadTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
+                pass.ReadTexture("PageTableMap", pageTableMap, i);
                 pass.ReadBuffer("TilesToUnmap", tilesToUnmapBuffer);
-                pass.ReadBuffer("TileRequests", tileRequestsBuffer);
+                pass.ReadBuffer("DestIndices", destIndicesBuffer);
                 pass.ReadBuffer("DestPixels", destPixelbuffer);
 
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    pass.SetInt("CurrentMip", data.z);
+                    pass.SetInt("CurrentMip", data.i);
                     pass.SetInt("MaxIndex", data.tileCount);
                 });
             }
         }
 
-        for (var z = PageTableMipCount - 2; z >= 0; z--)
+        // Virtual Texture Update
+        for (var i = PageTableMipCount - 2; i >= 0; i--)
         {
-            var mipSize = PageTableSize >> z;
+            var mipSize = PageTableSize >> i;
             using (var pass = renderGraph.AddComputeRenderPass("Page Table Update", mipSize))
             {
-                pass.Initialize(virtualTextureUpdateShader, 2, mipSize, mipSize);
-                pass.WriteTexture("DestMip", virtualTextureData.indirectionTexture, z);
-                pass.ReadTexture("SourceMip", virtualTextureData.indirectionTexture, z + 1);
-                pass.ReadTexture("IndirectionTextureMap", indirectionTextureMapTexture, z);
+                pass.Initialize(virtualTextureUpdate, 2, mipSize, mipSize);
+                pass.WriteTexture("DestMip", virtualTextureData.pageTable, i);
+                pass.ReadTexture("SourceMip", virtualTextureData.pageTable, i + 1);
+                pass.ReadTexture("PageTableMap", pageTableMap, i);
 
                 pass.SetRenderFunction(static (command, pass, mipSize) =>
                 {
@@ -366,15 +323,15 @@ public class VirtualTerrain : FrameRenderFeature
             }
         }
 
-        var virtualAlbedoTemp = renderGraph.GetTexture(settings.TileResolution, GraphicsFormat.R8G8B8A8_SRGB, settings.UpdateTileCount, TextureDimension.Tex2DArray, isExactSize: true);
-        var virtualNormalTemp = renderGraph.GetTexture(settings.TileResolution, GraphicsFormat.R8G8B8A8_UNorm, settings.UpdateTileCount, TextureDimension.Tex2DArray, isExactSize: true);
-        var virtualHeightTemp = renderGraph.GetTexture(settings.TileResolution, GraphicsFormat.R8_UNorm, settings.UpdateTileCount, TextureDimension.Tex2DArray, isExactSize: true);
-        var scaleOffsetsBuffer = renderGraph.GetBuffer(scaleOffsets.Count, sizeof(float) * 4);
+        var virtualAlbedoTemp = renderGraph.GetTexture(settings.TileResolution, GraphicsFormat.R8G8B8A8_SRGB, settings.MaxUpdatesPerFrame, TextureDimension.Tex2DArray, isExactSize: true);
+        var virtualNormalTemp = renderGraph.GetTexture(settings.TileResolution, GraphicsFormat.R8G8B8A8_UNorm, settings.MaxUpdatesPerFrame, TextureDimension.Tex2DArray, isExactSize: true);
+        var virtualHeightTemp = renderGraph.GetTexture(settings.TileResolution, GraphicsFormat.R8_UNorm, settings.MaxUpdatesPerFrame, TextureDimension.Tex2DArray, isExactSize: true);
+        var scaleOffsetsBuffer = renderGraph.GetBuffer(tileCount, sizeof(float) * 4);
 
         // Build the virtual texture
         using (var pass = renderGraph.AddGenericRenderPass("Build", (scaleOffsetsBuffer, scaleOffsets, settings.TileResolution, virtualAlbedoTemp, virtualNormalTemp, virtualHeightTemp, virtualTextureBuildMaterial, tileCount)))
         {
-            pass.ReadResource<TerrainRenderData>();
+            pass.ReadResource<TerrainFrameData>();
 
             pass.WriteTexture(virtualAlbedoTemp);
             pass.WriteTexture(virtualNormalTemp);
@@ -397,16 +354,17 @@ public class VirtualTerrain : FrameRenderFeature
                 command.DrawProcedural(Matrix4x4.identity, data.virtualTextureBuildMaterial, 0, MeshTopology.Triangles, 3 * data.tileCount, 1, pass.PropertyBlock);
 
                 ListPool<Float4>.Release(data.scaleOffsets);
+                ArrayPool<RenderTargetIdentifier>.Release(targets);
             });
         }
 
-        var albedoCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, GraphicsFormat.R32G32B32A32_UInt, settings.UpdateTileCount, TextureDimension.Tex2DArray, hasMips: true);
-        var normalCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, GraphicsFormat.R32G32B32A32_UInt, settings.UpdateTileCount, TextureDimension.Tex2DArray, hasMips: true);
-        var heightCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, GraphicsFormat.R32G32_UInt, settings.UpdateTileCount, TextureDimension.Tex2DArray, hasMips: true);
+        var albedoCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, GraphicsFormat.R32G32B32A32_UInt, settings.MaxUpdatesPerFrame, TextureDimension.Tex2DArray, hasMips: true);
+        var normalCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, GraphicsFormat.R32G32B32A32_UInt, settings.MaxUpdatesPerFrame, TextureDimension.Tex2DArray, hasMips: true);
+        var heightCompressedTemp = renderGraph.GetTexture(settings.TileResolution >> 2, GraphicsFormat.R32G32_UInt, settings.MaxUpdatesPerFrame, TextureDimension.Tex2DArray, hasMips: true);
 
         using (var pass = renderGraph.AddComputeRenderPass("Compress"))
         {
-            pass.Initialize(dxtCompressCS, 0, settings.TileResolution >> 2, settings.TileResolution >> 2, tileCount);
+            pass.Initialize(dxtCompress, 0, settings.TileResolution >> 2, settings.TileResolution >> 2, tileCount);
 
             pass.WriteTexture("AlbedoResult0", albedoCompressedTemp, 0);
             pass.WriteTexture("AlbedoResult1", albedoCompressedTemp, 1);
@@ -422,7 +380,7 @@ public class VirtualTerrain : FrameRenderFeature
             pass.ReadTexture("HeightInput", virtualHeightTemp);
         }
 
-        using (var pass = renderGraph.AddGenericRenderPass("Copy", new VirtualCopyPassData(dstOffsets, settings.TileResolution, albedoCompressedTemp, normalCompressedTemp, heightCompressedTemp, virtualTextureData.albedoSmoothness, virtualTextureData.normal, virtualTextureData.height)))
+        using (var pass = renderGraph.AddGenericRenderPass("Copy", new VirtualCopyPassData(dstIndices, settings.TileResolution, albedoCompressedTemp, normalCompressedTemp, heightCompressedTemp, virtualTextureData.albedoSmoothness, virtualTextureData.normal, virtualTextureData.height)))
         {
             pass.ReadTexture("", albedoCompressedTemp);
             pass.ReadTexture("", normalCompressedTemp);
@@ -430,9 +388,9 @@ public class VirtualTerrain : FrameRenderFeature
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
-                for (var i = 0; i < data.dstOffsets.Count; i++)
+                for (var i = 0; i < data.targetIndices.Count; i++)
                 {
-                    var dstOffset = data.dstOffsets[i];
+                    var dstOffset = data.targetIndices[i];
 
                     for (var j = 0; j < 2; j++)
                     {
@@ -443,58 +401,22 @@ public class VirtualTerrain : FrameRenderFeature
                     }
                 }
 
-                ListPool<int>.Release(data.dstOffsets);
+                ListPool<int>.Release(data.targetIndices);
             });
         }
     }
 
     internal void ReadbackRequestComplete(AsyncGPUReadbackRequest request)
     {
-        pendingRequests.Clear();
+        // TODO: Does supplying our own native array reduce allocations or anything
+        if (request.hasError)
+            return;
 
         var requestData = request.GetData<int>();
 
         // First element is the number of elements
-        var count = requestData[0];
-
-        // For each tile request, attempt to queue it if not already cached, and not already pending
-        for (var i = 0; i < count; i++)
-        {
-            var packedPosition = requestData[i + 1];
-            var position = UnpackCoord(packedPosition);
-
-            // If texture already mapped, nothing to do. (TODO: Can we detect this on GPU somehow to avoid adding to array? Probably not since we still should update the LRU cache)
-            if (pageTableResidency[position.z][position.x, position.y])
-            {
-                // Mark this pixel as currently visible so it doesn't get evicted
-                lruCache.Update(packedPosition);
-                continue;
-            }
-
-            // We want to request the coarsest mip that is not yet rendered, to ensure there is a gradual transition to the
-            // target mip, with 1 mip changing per frame. Do this by starting from current mip, and working to coarsest
-            var iterations = PageTableMipCount - position.z;
-            for (var j = 1; j < iterations; j++)
-            {
-                var newPosition = new Int3(position.x >> 1, position.y >> 1, position.z + 1);
-                var isMapped = pageTableResidency[newPosition.z][newPosition.x, newPosition.y];
-                if (isMapped)
-                {
-                    // If we found a higher fallback, add the next finer tile to the queue (Which will be the previous iteration tile)
-                    _ = pendingRequests.Add(PackCoord(position));
-
-                    break;
-                }
-
-                position = newPosition;
-
-                if (j == iterations - 1)
-                {
-                    // Most coarse mip, add
-                    _ = pendingRequests.Add(PackCoord(position));
-                }
-            }
-        }
+        var count = requestData[0] - 1;
+        pendingRequests.AddRange(requestData.GetSubArray(1, count));
     }
 
     public static void OnTerrainTextureChanged(Terrain terrain, RectInt texelRegion)
@@ -537,32 +459,22 @@ public class VirtualTerrain : FrameRenderFeature
 
     private static int PackCoord(Int3 coord)
     {
-        static int BitPack(int data, int size, int offset)
-        {
-            return (data & ((1 << size) - 1)) << offset;
-        }
-
-        var data = BitPack(coord.x, 13, 0);
-        data |= BitPack(coord.y, 13, 13);
-        return data | BitPack(coord.z, 6, 26);
+        var data = BitPack(coord.x, 14, 0);
+        data |= BitPack(coord.y, 14, 14);
+        return data | BitPack(coord.z, 4, 28);
     }
 
     private static Int3 UnpackCoord(int packedCoord)
     {
-        static int BitUnpack(int data, int size, int offset)
-        {
-            return (data >> offset) & ((1 << size) - 1);
-        }
-
-        var x = BitUnpack(packedCoord, 13, 0);
-        var y = BitUnpack(packedCoord, 13, 13);
-        var mip = BitUnpack(packedCoord, 6, 26);
+        var x = BitUnpack(packedCoord, 14, 0);
+        var y = BitUnpack(packedCoord, 14, 14);
+        var mip = BitUnpack(packedCoord, 4, 28);
         return new(x, y, mip);
     }
 
     private struct VirtualCopyPassData
     {
-        public List<int> dstOffsets;
+        public List<int> targetIndices;
         public int TileResolution;
         public ResourceHandle<RenderTexture> albedoCompressId;
         public ResourceHandle<RenderTexture> normalCompressId;
@@ -571,9 +483,9 @@ public class VirtualTerrain : FrameRenderFeature
         public Texture2DArray normalTexture;
         public Texture2DArray heightTexture;
 
-        public VirtualCopyPassData(List<int> dstOffsets, int tileResolution, ResourceHandle<RenderTexture> albedoCompressId, ResourceHandle<RenderTexture> normalCompressId, ResourceHandle<RenderTexture> heightCompressId, Texture2DArray albedoSmoothnessTexture, Texture2DArray normalTexture, Texture2DArray heightTexture)
+        public VirtualCopyPassData(List<int> targetIndices, int tileResolution, ResourceHandle<RenderTexture> albedoCompressId, ResourceHandle<RenderTexture> normalCompressId, ResourceHandle<RenderTexture> heightCompressId, Texture2DArray albedoSmoothnessTexture, Texture2DArray normalTexture, Texture2DArray heightTexture)
         {
-            this.dstOffsets = dstOffsets;
+            this.targetIndices = targetIndices;
             TileResolution = tileResolution;
             this.albedoCompressId = albedoCompressId;
             this.normalCompressId = normalCompressId;
@@ -581,60 +493,6 @@ public class VirtualTerrain : FrameRenderFeature
             this.albedoSmoothnessTexture = albedoSmoothnessTexture;
             this.normalTexture = normalTexture;
             this.heightTexture = heightTexture;
-        }
-    }
-
-    struct VirtualTextureCbufferData
-    {
-        public Float4 Item1;
-        public float Item2;
-        public float Item3;
-        public float Item4;
-        public float Item5;
-        public float Item6;
-        public float Item7;
-        public int IndirectionTextureResolution;
-        public int VirtualResolution;
-        public int TileResolution;
-
-        public VirtualTextureCbufferData(Float4 item1, float item2, float item3, float item4, float item5, float item6, float item7, int indirectionTextureResolution, int virtualResolution, int tileResolution)
-        {
-            Item1 = item1;
-            Item2 = item2;
-            Item3 = item3;
-            Item4 = item4;
-            Item5 = item5;
-            Item6 = item6;
-            Item7 = item7;
-            IndirectionTextureResolution = indirectionTextureResolution;
-            VirtualResolution = virtualResolution;
-            TileResolution = tileResolution;
-        }
-    }
-
-    private struct Pass0Data
-    {
-        public Float3 size;
-        public float Item2;
-        public Vector3 Item3;
-        public float Item4;
-        public Float4 Item5;
-        public Float4 Item6;
-        public Float2 Item7;
-        public float Item8;
-        public float Item9;
-
-        public Pass0Data(Float3 size, float item2, Vector3 item3, float item4, Float4 item5, Float4 item6, Float2 item7, float item8, float item9)
-        {
-            this.size = size;
-            Item2 = item2;
-            Item3 = item3;
-            Item4 = item4;
-            Item5 = item5;
-            Item6 = item6;
-            Item7 = item7;
-            Item8 = item8;
-            Item9 = item9;
         }
     }
 }

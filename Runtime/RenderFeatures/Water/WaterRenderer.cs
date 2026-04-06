@@ -26,13 +26,10 @@ public class WaterRenderer : WaterRendererBase
         var passIndex = settings.Material.FindPass("Water");
         Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
 
-        var profile = settings.Profile;
-        var resolution = settings.Resolution;
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
-
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Ocean Render", (VerticesPerTileEdge, renderGraph.FrameIndex, settings, viewRenderData.transform, cullingPlanes)))
 		{
-			pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, MeshTopology.Quads, passIndex);
+			pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, viewRenderData.viewSize, 1, MeshTopology.Quads, passIndex);
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.WriteTexture(oceanRenderResult);
@@ -44,7 +41,7 @@ public class WaterRenderer : WaterRendererBase
 			pass.ReadResource<OceanFftResult>();
 			pass.ReadResource<AtmospherePropertiesAndTables>();
 			pass.ReadResource<TemporalAAData>();
-			pass.ReadResource<WaterShoreMask.Result>(true);
+			//pass.ReadResource<WaterShoreMask.Result>(true);
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<FrameData>();
 

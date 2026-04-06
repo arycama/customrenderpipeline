@@ -14,13 +14,15 @@ public class DrawProceduralIndexedRenderPass<T> : DrawRenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(ResourceHandle<GraphicsBuffer> indexBuffer, Material material, Matrix4x4 matrix, int passIndex = 0, MeshTopology topology = MeshTopology.Triangles)
+	public void Initialize(ResourceHandle<GraphicsBuffer> indexBuffer, Material material, Matrix4x4 matrix, Int2 size, int viewCount = 1, int passIndex = 0, MeshTopology topology = MeshTopology.Triangles)
 	{
 		this.material = material;
 		this.passIndex = passIndex;
 		this.matrix = matrix;
 		this.topology = topology;
 		this.indexBuffer = indexBuffer;
+        Size = size;
+        ViewCount = viewCount;
 	}
 
 	public override void Reset()

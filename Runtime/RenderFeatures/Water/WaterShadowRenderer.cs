@@ -113,18 +113,15 @@ public class WaterShadowRenderer : WaterRendererBase
         var passIndex = settings.Material.FindPass("WaterShadow");
         Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");
 
-        var profile = settings.Profile;
-        var resolution = settings.Resolution;
-
         using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Ocean Shadow", (viewProjectionMatrix, VerticesPerTileEdge, settings, viewPosition, cullingPlanes)))
         {
-            pass.Initialize(settings.Material, indexBuffer, cullResult.IndirectArgsBuffer, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
+            pass.Initialize(settings.Material, indexBuffer, cullResult.IndirectArgsBuffer, settings.ShadowResolution, 1, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
             pass.WriteDepth(waterShadow);
             pass.WriteTexture(waterIlluminance);
             pass.ReadBuffer("PatchData", cullResult.PatchDataBuffer);
 
             pass.ReadResource<OceanFftResult>();
-            pass.ReadResource<WaterShoreMask.Result>(true);
+            //pass.ReadResource<WaterShoreMask.Result>(true);
             pass.ReadResource<ViewData>();
             pass.ReadResource<FrameData>();
             pass.ReadResource<LightingData>();

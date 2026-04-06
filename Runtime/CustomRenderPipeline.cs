@@ -45,7 +45,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		cameraVelocityCache = new(GraphicsFormat.R16G16_SFloat, renderGraph, "Previous Velocity", isScreenTexture: true);
 
 		terrainSystem = new TerrainSystem(renderGraph, asset.TerrainSettings);
-        virtualTextureUpdate = new VirtualTerrain(renderGraph, asset.TerrainSettings, terrainSystem);
+        virtualTextureUpdate = new VirtualTerrain(renderGraph, asset.TerrainSettings);
         terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, asset.TerrainSettings, quadtreeCull);
 		gpuDrivenRenderer = new GpuDrivenRenderer(renderGraph);
         environmentConvolve = new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting);
@@ -65,11 +65,11 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 	protected override List<FrameRenderFeature> InitializePerFrameRenderFeatures() => new()
 	{
         terrainSystem,
+        new SetTerrainFrameData(renderGraph, terrainSystem),
         virtualTextureUpdate,
 
         new GenericFrameRenderFeature(renderGraph, "", context =>
         {
-            renderGraph.DebugRenderPasses = asset.RenderGraphDebug;
             QualitySettings.maxQueuedFrames = asset.MaxQueuedFrames;
         }),
 
@@ -140,7 +140,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new WaterFft(renderGraph, asset.OceanSettings),
 		
         new ProceduralGenerationGpu(renderGraph, RenderPipelineDependencyResolver.Resolve<ProceduralGenerationController>()),
-		new WaterShoreMask(renderGraph, asset.WaterShoreMaskSettings),
+		//new WaterShoreMask(renderGraph, asset.WaterShoreMaskSettings),
         new GpuDrivenRenderingSetup(renderGraph, RenderPipelineDependencyResolver.Resolve<ProceduralGenerationController>()),
 
         new ColorGrading(renderGraph, asset.ColorGrading)
@@ -178,8 +178,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			renderGraph.SetRTHandle<CameraStencil>(cameraDepth, subElement: RenderTextureSubElement.Stencil);
 		}),
 
-		new TerrainViewData(renderGraph, terrainSystem, asset.TerrainSettings),
-
+		new SetTerrainViewData(renderGraph, terrainSystem, asset.TerrainSettings),
 		new TerrainRenderer(renderGraph, asset.TerrainSettings, quadtreeCull),
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
@@ -205,7 +204,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<AutoExposureData>();
 		    pass.ReadResource<VirtualTextureData>(true);
-		    pass.ReadResource<TerrainRenderData>(true);
+		    pass.ReadResource<TerrainViewData>(true);
 		}),
 
         new GenericViewRenderFeature(renderGraph, viewRenderData =>
@@ -231,7 +230,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<TemporalAAData>();
 			pass.ReadResource<AutoExposureData>();
 		    pass.ReadResource<VirtualTextureData>(true);
-		    pass.ReadResource<TerrainRenderData>(true);
+		    pass.ReadResource<TerrainViewData>(true);
 		}),
 
         new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
@@ -408,7 +407,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<ClusteredLightCulling.Result>();
 			pass.ReadResource<ParticleShadowData>();
 		    pass.ReadResource<VirtualTextureData>(true);
-		    pass.ReadResource<TerrainRenderData>(true);
+		    pass.ReadResource<TerrainViewData>(true);
 		}),
 
         // Do rain after water so we can get raindrops on the water surface
