@@ -69,7 +69,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
         new GenericFrameRenderFeature(renderGraph, "", context =>
         {
-            renderGraph.DebugRenderPasses = asset.RenderGraphDebug;
             QualitySettings.maxQueuedFrames = asset.MaxQueuedFrames;
         }),
 
