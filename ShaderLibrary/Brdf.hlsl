@@ -150,17 +150,15 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 	
 	half iorRatio = ReflectivityToIorRatio(reflectivity).r;
 	half rcpIorRatio = ReflectivityToRcpIorRatio(reflectivity).r;
-	half rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
 	
 	half NdotH, LdotH, VdotH, NdotLt, NdotVt, LdotVt;
 	if (isThinApprox)
 	{
-		LdotV = LdotV - 2.0 * NdotL * NdotV;
-		rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
 		NdotL = -NdotL;
-		roughness = ((roughness) * (0.65 * iorRatio - 0.35));
+		LdotV = LdotV + 2.0 * NdotL * NdotV;
 	}
 	
+	half rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
 	half a2 = Sq(roughness);
 	
 	// Setup vectors, t is for transmitted/second layer. Other vectors always relate to the final outgoing layer, which for single layer bsdfs is simply L and V.
