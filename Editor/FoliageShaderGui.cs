@@ -18,7 +18,7 @@ public class FoliageShaderGui : ShaderGUI
         material.SetFloat("DoubleSided", hasOpacity ? 0 : 2);
         material.SetInteger("StencilRef", hasOpacity ? 17 : 1);
         material.SetInteger("StencilRefMotion", hasOpacity ? 19 : 3);
-        material.renderQueue = (int)(hasOpacity ? RenderQueue.AlphaTest : RenderQueue.Geometry);
+        material.renderQueue = hasOpacity ? (int)RenderQueue.AlphaTest : -1;
 
         EditorUtility.SetDirty(material);
     }

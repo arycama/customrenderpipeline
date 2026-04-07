@@ -23,7 +23,7 @@ public class SurfaceSimpleShaderGui : ShaderGUI
 			case Mode.Opaque:
 				material.SetFloat("SrcBlend", (float)BlendMode.One);
 				material.SetFloat("DstBlend", (float)BlendMode.Zero);
-				material.renderQueue = (int)RenderQueue.Geometry;
+				material.renderQueue = -1;
 				break;
 			case Mode.Cutout:
 				material.SetFloat("SrcBlend", (float)BlendMode.One);

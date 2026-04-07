@@ -6,6 +6,7 @@ public readonly struct ShadowRequest
     public int LightIndex { get; }
     public Matrix4x4 ViewMatrix { get; }
     public Matrix4x4 ProjectionMatrix { get; }
+    // TODO: This is only used for culling planes, maybe replace?
     public ShadowSplitData ShadowSplitData { get; }
     public int CubemapFace { get; }
     public Float3 LightPosition { get; }
