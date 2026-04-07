@@ -22,9 +22,9 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 	public Color clearColor;
 	public float clearDepth;
 	public uint clearStencil;
-	public VRTextureUsage vrTextureUsage;
+	public VRTextureUsage vrUsage;
 
-	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrTextureUsage = VRTextureUsage.None)
+	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrUsage = VRTextureUsage.None)
 	{
 		this.width = width;
 		this.height = height;
@@ -40,7 +40,7 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 		this.clearColor = clearColor;
 		this.clearDepth = clearDepth;
 		this.clearStencil = clearStencil;
-		this.vrTextureUsage = vrTextureUsage;
+		this.vrUsage = vrUsage;
 	}
 
 	public readonly override string ToString() => $"{width}x{height}x{volumeDepth} {format} {dimension}";
@@ -69,16 +69,26 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 		var depthFormat = isDepth ? format : GraphicsFormat.None;
 		var stencilFormat = isStencil ? GraphicsFormat.R8_UInt : GraphicsFormat.None;
 
-        var result = new RenderTexture(width, height, graphicsFormat, depthFormat)
+        var descriptor = new RenderTextureDescriptor
         {
-            autoGenerateMips = false, // Always false, we manually handle mip generation if needed
+            width = width,
+            height = height,
+            volumeDepth = volumeDepth,
+            msaaSamples = 1,
+            graphicsFormat = graphicsFormat,
+            depthStencilFormat = depthFormat,
+            mipCount = -1,
             dimension = dimension,
+            shadowSamplingMode = ShadowSamplingMode.None,
+            vrUsage = vrUsage,
             enableRandomWrite = enableRandomWrite,
-            hideFlags = HideFlags.HideAndDontSave,
             stencilFormat = stencilFormat,
             useMipMap = hasMips,
-            volumeDepth = volumeDepth,
-            vrUsage = vrTextureUsage,
+        };
+
+        var result = new RenderTexture(descriptor)
+        {
+            hideFlags = HideFlags.HideAndDontSave,
 
 #if UNITY_EDITOR
             name = $"{resourceCount++} {ToString()}"

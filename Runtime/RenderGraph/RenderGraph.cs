@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Assertions;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
@@ -36,6 +38,7 @@ public class RenderGraph : IDisposable
     private readonly NativeList<AttachmentData> attachments = new(8, Allocator.Persistent);
     private readonly NativeList<SubPassDescriptor> subPasses = new(Allocator.Persistent);
     private readonly List<RenderPassDescriptor> renderPassDescriptors = new();
+    private readonly NativeList<AttachmentDescriptor> passAttachments = new(8, Allocator.Persistent);
 
     private RenderPass previousPass, currentPass;
 
@@ -55,6 +58,8 @@ public class RenderGraph : IDisposable
     public int FrameIndex { get; private set; }
     public bool IsExecuting { get; private set; }
     public bool CullRtHandles { get; set; }
+    public bool IsCullingCcw { get; private set; }
+    public bool IsOutputFlipped { get; set; }
 
     public RenderGraph(CustomRenderPipelineBase renderPipeline)
     {
@@ -377,10 +382,10 @@ public class RenderGraph : IDisposable
                 {
                     var attachment = attachments[j];
 
-                    if (output.isFrameBufferOutput)
+                    if (output.frameBufferTarget.HasValue)
                     {
                         // If this is a framebuffer output, the existing attachment must also be a framebuffer attachment pointing to the same target
-                        if (!attachment.isFrameBufferOutput)
+                        if (!attachment.frameBufferTarget.HasValue)
                             continue;
 
                         if (attachment.frameBufferTarget != output.frameBufferTarget)
@@ -459,7 +464,7 @@ public class RenderGraph : IDisposable
                 for (var i = 0; i < descriptor.attachments.Length; i++)
                 {
                     var colorAttachment = descriptor.attachments[i];
-                    if (colorAttachment.isFrameBufferOutput)
+                    if (colorAttachment.frameBufferTarget.HasValue)
                         continue;
 
                     var handleData = RtHandleSystem.GetHandleData(colorAttachment.handle);
@@ -478,6 +483,7 @@ public class RenderGraph : IDisposable
         RtHandleSystem.AllocateFrameResources(renderPasses.Count, FrameIndex);
 
         IsExecuting = true;
+        IsCullingCcw = false;
 
         var previousNativePassIndex = -1;
         var previousSubPassIndex = -1;
@@ -486,13 +492,70 @@ public class RenderGraph : IDisposable
             var renderPass = renderPasses[i];
             var currentNativePassIndex = renderPassIndices[i];
             var currentSubPassIndex = subPassIndices[i];
+            var isCullingCcw = false;
 
             // Begin a new pass if the index has increased
             if (currentNativePassIndex != -1)
             {
                 if (currentNativePassIndex != previousNativePassIndex)
                 {
-                    renderPassDescriptors[currentNativePassIndex].BeginRenderPass(command, this);
+                    var descriptor = renderPassDescriptors[currentNativePassIndex];
+                    foreach (var colorAttachment in descriptor.attachments)
+                    {
+                        GraphicsFormat format;
+                        ResourceHandleData<RtHandleDescriptor, RenderTexture> handleData = default;
+                        if (colorAttachment.frameBufferTarget.HasValue)
+                        {
+                            format = colorAttachment.frameBufferFormat;
+                            isCullingCcw = IsOutputFlipped;
+                        }
+                        else
+                        {
+                            handleData = RtHandleSystem.GetHandleData(colorAttachment.handle);
+                            format = handleData.descriptor.format;
+                        }
+
+                        var attachment = new AttachmentDescriptor(format);
+                        if (colorAttachment.frameBufferTarget.HasValue)
+                        {
+                            attachment.loadStoreTarget = colorAttachment.frameBufferTarget.Value;
+                        }
+                        else
+                        {
+                            // If the handle was created before this native render pass started, we need to load the contents. Otherwise it can be cleared or discarded
+                            var requiresLoad = handleData.createIndex1 < descriptor.startPassIndex || handleData.createIndex1 == -1;
+                            if (requiresLoad)
+                                attachment.loadAction = RenderBufferLoadAction.Load;
+                            else if (handleData.descriptor.clear)
+                            {
+                                attachment.loadAction = RenderBufferLoadAction.Clear;
+                                attachment.clearColor = handleData.descriptor.clearColor;
+                            }
+
+                            // If the handle gets freed before this native render pass ends, we can discard the contents, otherwise they must be stored as another pass is going to use it
+                            var requiresStore = handleData.freeIndex1 > descriptor.endPassIndex || handleData.freeIndex1 == -1;
+                            if (requiresStore)
+                                attachment.storeAction = RenderBufferStoreAction.Store;
+
+                            // If the handle is created and freed during the renderpass, we can avoid allocating a target entirely. (TODO: The render target system may still create a texture which may be unused)
+                            if (requiresLoad || requiresStore)
+                            {
+                                var target = RtHandleSystem.GetResource(colorAttachment.handle);
+                                attachment.loadStoreTarget = new(target, colorAttachment.mipLevel, colorAttachment.cubemapFace, colorAttachment.depthSlice);
+                            }
+                        }
+
+                        passAttachments.Add(attachment);
+                    }
+
+                    Span<byte> debugNameUtf8 = stackalloc byte[Encoding.UTF8.GetByteCount(descriptor.debugName)];
+                    _ = Encoding.UTF8.GetBytes(descriptor.debugName, debugNameUtf8);
+
+                    IsCullingCcw = isCullingCcw;
+
+                    command.BeginRenderPass(descriptor.size.x, descriptor.size.y, descriptor.viewCount, descriptor.samples, passAttachments.AsArray(), descriptor.depthAttachmentIndex, descriptor.shadingRateImageAttachmentIndex, descriptor.subpasses, debugNameUtf8);
+
+                    passAttachments.Clear();
                     previousSubPassIndex = 0;
                 }
 

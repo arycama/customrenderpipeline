@@ -7,7 +7,6 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
     private int passIndex;
     private int primitiveCount;
     private SinglePassStereoMode stereoMode;
-    private bool flip;
     private bool foveated;
 
     public override string ToString()
@@ -15,13 +14,12 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
         return $"{Name} {material} {passIndex}";
     }
 
-    public virtual void Initialize(Material material, Int2 size, int viewCount = 1, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None, bool flip = false, bool foveated = false)
+    public virtual void Initialize(Material material, Int2 size, int viewCount = 1, int passIndex = 0, int primitiveCount = 1, SinglePassStereoMode stereoMode = SinglePassStereoMode.None, bool foveated = false)
     {
         this.material = material;
         this.passIndex = passIndex;
         this.primitiveCount = primitiveCount;
         this.stereoMode = stereoMode;
-        this.flip = flip;
         this.foveated = foveated;
         Size = size;
         ViewCount = viewCount;
@@ -57,7 +55,7 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
             }
         }
 
-        if (flip)
+        if (RenderGraph.IsCullingCcw)
             Command.EnableShaderKeyword("FLIP");
 
         if(foveated)
@@ -68,7 +66,7 @@ public class FullscreenRenderPass<T> : DrawRenderPass<T>
         if (foveated)
             Command.SetFoveatedRenderingMode(FoveatedRenderingMode.Disabled);
 
-        if (flip)
+        if (RenderGraph.IsCullingCcw)
             Command.DisableShaderKeyword("FLIP");
 
         if (stereoMode == SinglePassStereoMode.Instancing)
