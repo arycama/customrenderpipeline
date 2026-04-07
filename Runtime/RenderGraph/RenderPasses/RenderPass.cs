@@ -114,7 +114,7 @@ public abstract class RenderPass : IDisposable
         frameBufferInputs.Clear();
 		colorTargets.Clear();
         depthBuffer = default;
-        PreventNewSubPass = true;
+        PreventNewSubPass = false;
     }
 
     void IDisposable.Dispose() { }
