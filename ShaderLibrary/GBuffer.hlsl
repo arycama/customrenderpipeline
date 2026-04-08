@@ -68,6 +68,7 @@ half3 UnpackAlbedo(half2 enc, float2 screenPosition, half2 a0, half2 a1)
 	half coCg = W ? (w.x * a0.y + w.y * a1.y) / W : a0.y;
 	
 	half3 yCoCg = half3(enc, coCg);
+	
 	if (!Checker(screenPosition))
 		yCoCg.yz = yCoCg.zy;
 		

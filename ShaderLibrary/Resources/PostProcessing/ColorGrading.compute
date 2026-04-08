@@ -1,0 +1,49 @@
+#pragma kernel ColorGrading
+
+#include "../../ColorGradingCommon.hlsl"
+
+RWTexture3D<float3> Result;
+
+cbuffer Properties
+{
+	float LutResolution;
+	float MaxLuminance;
+	float PaperWhite;
+	float LinearStart;
+	float FadeStart;
+	float FadeEnd;
+	float HuePreservation;
+	
+	float3 Filter;
+	float Exposure;
+	float Contrast;
+	float Hue;
+	float Saturation;
+	float WhiteBalance;
+	float Tint;
+	
+	float3 SplitToneShadows;
+	float SplitToneBalance;
+	float3 SplitToneHighlights;
+	
+	float3 ChannelMixerRed;
+	float3 ChannelMixerGreen;
+	float3 ChannelMixerBlue;
+	
+	float3 Shadows;
+	float3 Midtones;
+	float3 Highlights;
+	
+	float ShadowsStart;
+	float ShadowsEnd;
+	float HighlightsStart;
+	float HighlightsEnd;
+};
+
+[numthreads(8, 8, 1)]
+void ColorGrading(uint3 id : SV_DispatchThreadID)
+{
+	float3 color = (id + 0.5) / LutResolution;
+	color = ColorGradeAndTonemap(color, Exposure, Contrast, Filter, Hue, Saturation, WhiteBalance, Tint, SplitToneShadows, SplitToneBalance, SplitToneHighlights, ChannelMixerRed, ChannelMixerGreen, ChannelMixerBlue, Shadows, Midtones, Highlights, ShadowsStart, ShadowsEnd, HighlightsStart, HighlightsEnd, MaxLuminance, PaperWhite, LinearStart, FadeStart, FadeEnd, HuePreservation);
+	Result[id] = color;
+}

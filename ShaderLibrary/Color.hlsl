@@ -109,6 +109,28 @@ static const float2 D65xy = float2(0.31272, 0.32903);
 // D65 illuminant in XYZ space
 static const float3 D65 = XyToXyz(D65xy);
 
+float StandardIlluminantY(float x)
+{
+    // Judd's approximation for y given x on the Planckian locus
+    // Valid for typical white point ranges
+	return -3 * x * x + 2.870 * x - 0.275;
+}
+
+float2 ColorTemperatureToXy(float temp, float tint = 0.5)
+{
+	float x, y;
+    
+	if (temp <= 4000.0)
+		x = 0.27475e9 / (temp * temp * temp) - 0.98598e6 / (temp * temp) + 1.17444e3 / temp + 0.145986;
+	else if (temp <= 7000.0)
+		x = -4.6070e9 / (temp * temp * temp) + 2.9678e6 / (temp * temp) + 0.09911e3 / temp + 0.244063;
+	else
+		x = -2.0064e9 / (temp * temp * temp) + 1.9018e6 / (temp * temp) + 0.24748e3 / temp + 0.237040;
+    
+	y = StandardIlluminantY(x) + Remap(tint, 0.0, 1.0, -0.1, 0.1);
+	return float2(x, y);
+}
+
 float3 LMSToXYZ(float3 c)
 {
 	float3x3 mat = float3x3(2.07018005669561320, -1.32645687610302100, 0.206616006847855170, 0.36498825003265756, 0.68046736285223520, -0.045421753075853236, -0.04959554223893212, -0.04942116118675749, 1.187995941732803400);
@@ -462,43 +484,55 @@ float3 FastTonemapYCoCgInverse(float3 yCoCg)
 	return FastTonemapInverse(yCoCg, yCoCg.r);
 }
 
-float3 RgbToHsv(float3 c)
+float3 HueToRgb(float H)
 {
-	const float4 K = float4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-	float4 p = lerp(float4(c.bg, K.wz), float4(c.gb, K.xy), step(c.b, c.g));
-	float4 q = lerp(float4(p.xyw, c.r), float4(c.r, p.yzx), step(p.x, c.r));
-	float d = q.x - min(q.w, q.y);
-	const float e = 1.0e-4;
-	return float3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+	float R = abs(H * 6 - 3) - 1;
+	float G = 2 - abs(H * 6 - 2);
+	float B = 2 - abs(H * 6 - 4);
+	return saturate(float3(R, G, B));
 }
 
-float3 HsvToRgb(float3 c)
+float3 RgbToHcv(float3 rgb)
 {
-	const float4 K = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-	float3 p = abs(frac(c.xxx + K.xyz) * 6.0 - K.www);
-	return c.z * lerp(K.xxx, saturate(p - K.xxx), c.y);
+    // Based on work by Sam Hocevar and Emil Persson
+	float4 P = (rgb.g < rgb.b) ? float4(rgb.bg, -1.0, 2.0 / 3.0) : float4(rgb.gb, 0.0, -1.0 / 3.0);
+	float4 Q = (rgb.r < P.x) ? float4(P.xyw, rgb.r) : float4(rgb.r, P.yzx);
+	float C = Q.x - min(Q.w, Q.y);
+	float H = abs((Q.w - Q.y) / (6 * C + HalfEps) + Q.z);
+	return float3(H, C, Q.x);
+}
+
+float3 HsvToRgb(float3 hsv)
+{
+	float3 rgb = HueToRgb(hsv.x);
+	return ((rgb - 1) * hsv.y + 1) * hsv.z;
+}
+
+float3 HslToRgb(float3 hsl)
+{
+	float3 rgb = HueToRgb(hsl.x);
+	float C = (1 - abs(2 * hsl.z - 1)) * hsl.y;
+	return (rgb - 0.5) * C + hsl.z;
+}
+
+float3 RgbToHsv(float3 rgb)
+{
+	float3 hcv = RgbToHcv(rgb);
+	float S = hcv.z ? hcv.y / hcv.z : 0.0;
+	return float3(hcv.x, S, hcv.z);
+}
+
+float3 RgbToHsl(float3 rgb)
+{
+	float3 hcv = RgbToHcv(rgb);
+	float L = hcv.z - hcv.y * 0.5;
+	float S = hcv.y / (1 - abs(L * 2 - 1) + HalfEps);
+	return float3(hcv.x, S, L);
 }
 
 float RotateHue(float value, float low, float hi)
 {
 	return (value < low) ? value + hi : (value > hi) ? value - hi : value;
-}
-
-float2 CctToXy(float temp)
-{
-	float x, y;
-    
-	if (temp <= 4000.0)
-		x = 0.27475e9 / (temp * temp * temp) - 0.98598e6 / (temp * temp) + 1.17444e3 / temp + 0.145986;
-	else if (temp <= 7000.0)
-		x = -4.6070e9 / (temp * temp * temp) + 2.9678e6 / (temp * temp) + 0.09911e3 / temp + 0.244063;
-	else
-		x = -2.0064e9 / (temp * temp * temp) + 1.9018e6 / (temp * temp) + 0.24748e3 / temp + 0.237040;
-    
-    // Calculate y from x using Judd's approximation
-	y = -3.000 * x * x + 2.870 * x - 0.275;
-    
-	return float2(x, y);
 }
 
 #endif

@@ -28,7 +28,6 @@ struct VertexFullscreenTriangleVolumeOutput
 {
 	float4 position : SV_Position;
 	float2 uv : TEXCOORD0;
-	
 	uint viewIndex : SV_RenderTargetArrayIndex;
 };
 
