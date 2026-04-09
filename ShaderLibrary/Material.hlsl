@@ -18,7 +18,7 @@ struct Material
 {
 	half3 albedo;
 	half roughness;
-	float3 normal;
+	half3 normal;
 	half metallic;
 	half occlusion;
 	half opacity;
@@ -70,7 +70,7 @@ half3 ReflectivityToIor(half3 reflectivity, half3 srcIor = AirIor)
 	return (r * srcIor + srcIor) * rcp(r - 1.0h);
 }
 
-half3 GetReflectivity(half3 color, half metallic, half opacity = 1.0, half3 destIor = DefaultDielectricIor, half3 srcIor = AirIor)
+half3 GetReflectivity(half3 color, half metallic, half opacity = 1.0h, half3 destIor = DefaultDielectricIor, half3 srcIor = AirIor)
 {
 	return lerp(IorToReflectivity(destIor, srcIor), color, metallic * opacity);
 }
@@ -87,7 +87,7 @@ half3 ReflectivityToIorRatio(half3 reflectivity)
 	half3 numerator = r + 1.0h;
 	half3 denominator = r - 1.0h;
 	SignSwap(numerator, denominator, reflectivity);
-	return reflectivity ? numerator * rcp(denominator) : 1.0;
+	return reflectivity ? numerator * rcp(denominator) : 1.0h;
 }
 
 // Returns srcIor / destIor, use for refract
@@ -97,7 +97,7 @@ half3 ReflectivityToRcpIorRatio(half3 reflectivity)
 	half3 numerator = r - 1.0h;
 	half3 denominator = r + 1.0h;
 	SignSwap(numerator, denominator, reflectivity);
-	return reflectivity ? numerator * rcp(denominator) : 1.0;
+	return reflectivity ? numerator * rcp(denominator) : 1.0h;
 }
 
 half SmoothnessToPerceptualRoughness(half smoothness)
@@ -120,39 +120,39 @@ half RoughnessToPerceptualRoughness(half roughness)
 	return sqrt(roughness);
 }
 
-float2 ClampScaleTextureUv(float2 uv, float4 scaleLimit)
+half2 ClampScaleTextureUv(half2 uv, half4 scaleLimit)
 {
 	return min(uv * scaleLimit.xy, scaleLimit.zw);
 }
 
 // Rotates backfacing normals so they do not point away from the camera
-float3 GetViewClampedNormal(float3 N, float3 V, out float NdotV)
+half3 GetViewClampedNormal(half3 N, half3 V, out half NdotV)
 {
 	// Due to smoothed normals, interpolation and normal maps, normals can end up pointing away from the view which causes issues with highlights
 	// This rotates the normal towards the view vector so that NdotV is zero, if needed, to avoid issues in the PBR math
 	NdotV = dot(N, V);
-	if (NdotV < 0.0)
+	if (NdotV < 0.0h)
 	{
 		N = (N - NdotV * V) * RcpSinFromCos(NdotV);
-		NdotV = 0.0;
+		NdotV = 0.0h;
 	}
 	
 	return N;
 }
 
-float SpecularAntiAliasing(float perceptualRoughness, float3 worldNormal)
+half SpecularAntiAliasing(half perceptualRoughness, half3 worldNormal)
 {
-	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
-	float roughness2 = Sq(roughness);
+	half roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
+	half roughness2 = Sq(roughness);
 
-	float SIGMA2 = 0.15915494;
-	float KAPPA = 0.18;
-	float3 dndu = ddx(worldNormal);
-	float3 dndv = ddy(worldNormal);
-	float kernelRoughness2 = SIGMA2 * (dot(dndu, dndu) + dot(dndv, dndv));
-	float clampedKernelRoughness2 = min(kernelRoughness2, KAPPA);
-	float filteredRoughness2 = saturate(roughness2 + clampedKernelRoughness2);
-	float filteredRoughness = sqrt(filteredRoughness2);
+	half SIGMA2 = 0.15915494h;
+	half KAPPA = 0.18h;
+	half3 dndu = ddx(worldNormal);
+	half3 dndv = ddy(worldNormal);
+	half kernelRoughness2 = SIGMA2 * (dot(dndu, dndu) + dot(dndv, dndv));
+	half clampedKernelRoughness2 = min(kernelRoughness2, KAPPA);
+	half filteredRoughness2 = saturate(roughness2 + clampedKernelRoughness2);
+	half filteredRoughness = sqrt(filteredRoughness2);
 	return RoughnessToPerceptualRoughness(filteredRoughness);
 }
 

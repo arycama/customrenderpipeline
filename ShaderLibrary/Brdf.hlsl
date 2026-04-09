@@ -9,14 +9,14 @@ Texture2D<float> DirectionalAlbedo, AverageAlbedo, AverageAlbedoMs;
 
 float LambdaGgx(float roughness2, float cosTheta)
 {
-	return sqrt((Sq(rcp(cosTheta)) - 1.0) * roughness2 + 1.0) * 0.5 - 0.5;
+	return sqrt((Sq(rcp(cosTheta)) - 1.0h) * roughness2 + 1.0h) * 0.5h - 0.5h;
 }
 
 float GgxG1(float a2, float NdotL, float LdotH)
 {
 	float cosThetaV2 = Sq(NdotL);
-	float tanThetaV2 = (1.0 - cosThetaV2) / cosThetaV2;
-	return 2 / (1 + sqrt(1.0 + a2 * tanThetaV2));
+	float tanThetaV2 = (1.0h - cosThetaV2) / cosThetaV2;
+	return 2.0h / (1.0h + sqrt(1.0h + a2 * tanThetaV2));
 }
 
 float GgxG2(float roughness2, float cosThetaI, float cosThetaO)
@@ -56,9 +56,9 @@ float GgxV(float NdotL, float NdotV, float roughness2, float partLambdaV)
 half GgxVFast(float roughness, float NdotV, float NdotL)
 {
 	float a = roughness;
-	float GGXV = NdotL * (NdotV * (1.0 - a) + a);
-	float GGXL = NdotV * (NdotL * (1.0 - a) + a);
-	return 0.5 / (GGXV + GGXL);
+	float GGXV = NdotL * (NdotV * (1.0h - a) + a);
+	float GGXL = NdotV * (NdotL * (1.0h - a) + a);
+	return 0.5h / (GGXV + GGXL);
 }
 
 half GgxDv(half roughness2, half NdotH, half NdotL, half NdotV, half partLambdaV)
@@ -104,7 +104,7 @@ float3 GgxSingleScatter(float roughness2, float NdotL, float LdotV, float NdotV,
 
 half3 AverageFresnel(half3 reflectivity)
 {
-	return (20 * rcp(21.0)) * reflectivity + rcp(21.0);
+	return (20.0h * rcp(21.0h)) * reflectivity + rcp(21.0h);
 }
 
 half AverageFresnel(half reflectivity)
@@ -114,23 +114,23 @@ half AverageFresnel(half reflectivity)
 
 float3 GgxMultiScatterTerm(float3 f0, float perceptualRoughness, float NdotV, float ems)
 {
-	float averageAlbedo = AverageAlbedo.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(perceptualRoughness, 0), float2(32, 1)));
+	float averageAlbedo = AverageAlbedo.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(perceptualRoughness, 0.0h), float2(32.0h, 1.0h)));
 	float3 averageFresnel = AverageFresnel(f0);
 	float3 denominator = averageAlbedo - averageFresnel * Sq(averageAlbedo);
 	
 	// AverageAlbedo for NdotL is already applied to each light contribution
-	return denominator ? (ems * Sq(averageFresnel) * (1.0 - averageAlbedo) * rcp(denominator)) : 0.0;
+	return denominator ? (ems * Sq(averageFresnel) * (1.0h - averageAlbedo) * rcp(denominator)) : 0.0h;
 }
 
 float3 Ggx(float roughness2, float NdotL, float LdotV, float NdotV, float partLambdaV, float perceptualRoughness, float3 f0, float3 multiScatterTerm)
 {
 	// TODO: Maybe can combine 2nd lookup with diffuse multi scatter LUT
-	return GgxSingleScatter(roughness2, NdotL, LdotV, NdotV, partLambdaV, f0) + DirectionalAlbedo.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float2(NdotL, perceptualRoughness), 32), 0.0) * multiScatterTerm;
+	return GgxSingleScatter(roughness2, NdotL, LdotV, NdotV, partLambdaV, f0) + DirectionalAlbedo.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float2(NdotL, perceptualRoughness), 32.0h), 0.0h) * multiScatterTerm;
 }
 
 half WrappedDiffuse(half NdotL, half wrap)
 {
-	return saturate((NdotL + wrap) / (Sq(1 + wrap)));
+	return saturate((NdotL + wrap) / (Sq(1.0h + wrap)));
 }
 
 half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half LdotV, bool isBackface, bool isThinSurface, half3 transmittance = 1.0)
@@ -146,7 +146,7 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 	
 	// If no valid cases, return
 	if(!isBrdf && !isFlippedBrdf && !isThin && !isVolume && !isThinApprox)
-		return 0.0;
+		return 0.0h;
 	
 	half iorRatio = ReflectivityToIorRatio(reflectivity).r;
 	half rcpIorRatio = ReflectivityToRcpIorRatio(reflectivity).r;
@@ -155,7 +155,7 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 	if (isThinApprox)
 	{
 		NdotL = -NdotL;
-		LdotV = LdotV + 2.0 * NdotL * NdotV;
+		LdotV = LdotV + 2.0h * NdotL * NdotV;
 	}
 	
 	half rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
@@ -242,7 +242,7 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 		half VdotHt = (rcpIorRatio + LdotVt) * rcpDenominator; // Invert to make positive for microfacet functions
 	
 		half dv = GgxDv(a2, NdotHt, NdotLt, NdotVt, GetPartLambdaV(a2, NdotVt));
-		half3 f = 1.0 - Fresnel(LdotHt, reflectivity);
+		half3 f = 1.0h - Fresnel(LdotHt, reflectivity);
 		bsdf *= f * dv * 4.0h * LdotHt * VdotHt * Sq(ReflectivityToIor(-reflectivity)) * rcp(Sq(rcpIorRatio * VdotHt + LdotHt)) * NdotLt * transmittance;
 	}
 	
