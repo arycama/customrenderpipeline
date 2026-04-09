@@ -15,29 +15,77 @@ Texture2D<float4> Input;
 uint _Mip;
 float _Resolution, _MaxIterations;
 
-[numthreads(8, 8, 1)]
-void GenerateLengthToSmoothness(uint2 id : SV_DispatchThreadID)
+float RoughnessToNormalLength1(float roughness)
 {
-	float uv = id.x / (_Resolution - 1.0);
-	float target = Remap(uv, 0.0, 1.0, 2.0 / 3.0, 1.0); // Remap target
-    
-	float t = 0; //xi;
-	float minDelta = FloatMax;
+	float a = sqrt(saturate(1.0 - Sq(roughness)));
+	return (a - (1.0 - a * a) * atanh(a)) / (a * a * a);
+}
 
-	for (float i = 0; i < 256.0; i++)
+float RoughnessToNormalLength1_Derivative(float a)
+{
+	return (a * a * a * a) / ((3.0 - a * a) * atanh(a) - 3.0 * a);
+}
+
+[numthreads(8, 8, 1)]
+void GenerateLengthToSmoothness(uint id : SV_DispatchThreadID)
+{
+	if (id == 0)
 	{
-		float xi = i / (256.0 - 1.0);
-		float currentLength = RoughnessToNormalLength(xi);
-
-		float delta = abs(currentLength - target);
-		if (delta < minDelta)
-		{
-			minDelta = delta;
-			t = xi;
-		}
+		_LengthToRoughnessResult[uint2(id, 0)] = 1.0;
 	}
-	
-	_LengthToRoughnessResult[id] = t;
+	else if (id == 255u)
+	{
+		_LengthToRoughnessResult[uint2(id, 0)] = 0.0;
+	}
+	else
+	{
+		float uv = id / (_Resolution - 1.0);
+		float target = Remap(uv, 0.0, 1.0, 2.0 / 3.0, 1.0); // Remap target
+		
+		// Initial guess: linear mapping from [2/3,1] to [0,1]
+		float t = uv;
+		float minDelta = FloatMax;
+		
+		float aLow = 0.0;
+		float aHigh = 1.0;
+		float fLow = 1.0 - target;
+		float fHigh = 2.0 / 3.0 - target;
+
+		for (float i = 0; i < 256.0; i++)
+		{
+			#if 0
+			float xi = i / (256.0 - 1.0);
+			float f = RoughnessToNormalLength1(xi) - target;
+
+			float delta = abs(f);
+			if (delta < minDelta)
+			{
+				minDelta = delta;
+				t = xi;
+			}
+			#else
+			float aMid = 0.5 * (aLow + aHigh);
+			float fMid = RoughnessToNormalLength1(aMid) - target;
+        
+			if (FastSign(fMid) != FastSign(fLow))
+			{
+				// Root is in [aLow, aMid]
+				aHigh = aMid;
+				fHigh = fMid;
+			}
+			else
+			{
+				// Root is in [aMid, aHigh]
+				aLow = aMid;
+				fLow = fMid;
+			}
+			#endif
+		}
+		
+		t = 0.5 * (aLow + aHigh);
+		
+		_LengthToRoughnessResult[uint2(id, 0)] = t;
+	}
 }
 
 [numthreads(8, 8, 1)]

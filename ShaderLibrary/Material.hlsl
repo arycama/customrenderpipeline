@@ -261,9 +261,9 @@ float LengthToPerceptualRoughness(float len)
 
 float RoughnessToNormalLength(float roughness)
 {
-	if (roughness < 1e-3)
+	if (roughness < 0.0000153787004998)
 		return 1.0;
-	if (roughness >= 1.0)
+	if (roughness > 0.992172241446)
 		return 2.0 / 3.0;
 
 	float a = sqrt(saturate(1.0 - Sq(roughness)));
