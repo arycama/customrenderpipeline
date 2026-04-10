@@ -12,7 +12,6 @@ Shader "Hidden/Rain Texture"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment Fragment
-            #define FLIP
             #include "RainTexture.hlsl"
             ENDHLSL
         }

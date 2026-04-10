@@ -29,7 +29,6 @@ Shader "Hidden/Deferred Lighting"
             #pragma multi_compile _ SCREEN_SPACE_SHADOWS
             #pragma multi_compile _ SCREENSPACE_REFLECTIONS_ON
             #pragma multi_compile _ SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
-            #define FLIP
             #include "DeferredLighting.hlsl"
             ENDHLSL
         }
@@ -56,7 +55,6 @@ Shader "Hidden/Deferred Lighting"
             #pragma multi_compile _ SCREENSPACE_REFLECTIONS_ON
             #pragma multi_compile _ SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
             #define TRANSLUCENCY
-            #define FLIP
             #include "DeferredLighting.hlsl"
             ENDHLSL
         }
@@ -80,7 +78,6 @@ Shader "Hidden/Deferred Lighting"
             #pragma editor_sync_compilation
             #pragma target 5.0
             #define UNDERWATER_LIGHTING_ON
-            #define FLIP
             #include "DeferredLighting.hlsl"
             ENDHLSL
         }

@@ -10,7 +10,6 @@ Shader "Hidden/PrecomputeDfg"
         HLSLINCLUDE
         #pragma editor_sync_compilation
         #pragma target 5.0
-        #define FLIP
         #include "PrecomputeDFG.hlsl"
         ENDHLSL
 

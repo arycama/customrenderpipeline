@@ -13,7 +13,6 @@ Shader "Hidden/Terrain Ambient Occlusion"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment Fragment
-            #define FLIP
             #include "TerrainAmbientOcclusion.hlsl"
             ENDHLSL
         }

@@ -27,9 +27,9 @@ float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	float2 position = input.position.xy;
 	float2 uv = input.uv;
 	
-	#ifndef SCENE_VIEW
+	#ifdef SCENE_VIEW
 		position.y = ViewSize.y - position.y;
-	uv.y = 1 - uv.y;
+		uv.y = 1 - uv.y;
 	#endif
 	
 	float3 color = CameraTarget[position];

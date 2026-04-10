@@ -21,7 +21,6 @@ Shader "Hidden/Screen Space Terrain"
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #pragma multi_compile _ VIRTUAL_TEXTURING_ON
-            #define FLIP
             #include "ScreenSpaceTerrain.hlsl"
             ENDHLSL
         }

@@ -15,7 +15,6 @@ Shader "Hidden/Bloom"
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentDownsample
             #define FIRST
-            #define FLIP
             #include "Bloom.hlsl"
             ENDHLSL
         }
@@ -27,7 +26,6 @@ Shader "Hidden/Bloom"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentDownsample
-            #define FLIP
             #include "Bloom.hlsl"
             ENDHLSL
         }
@@ -41,7 +39,6 @@ Shader "Hidden/Bloom"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentUpsample
-            #define FLIP
             #include "Bloom.hlsl"
             ENDHLSL
         }

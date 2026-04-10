@@ -20,7 +20,6 @@ Shader "Hidden/Camera Motion Vectors"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment Fragment
-            #define FLIP
             #include "CameraMotionVectors.hlsl"
             ENDHLSL
         }
@@ -32,7 +31,6 @@ Shader "Hidden/Camera Motion Vectors"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentPreDilate
-            #define FLIP
             #include "CameraMotionVectors.hlsl"
             ENDHLSL
         }

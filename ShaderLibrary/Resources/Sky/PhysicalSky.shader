@@ -23,7 +23,6 @@ Shader "Hidden/Physical Sky"
             #pragma fragment FragmentRender
             #pragma multi_compile _ BELOW_CLOUD_LAYER ABOVE_CLOUD_LAYER
             #define REFLECTION_PROBE
-            #define FLIP
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }
@@ -42,7 +41,6 @@ Shader "Hidden/Physical Sky"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentRender
-            #define FLIP
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }
@@ -61,7 +59,6 @@ Shader "Hidden/Physical Sky"
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentRender
             #define SCENE
-            #define FLIP
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }
@@ -76,7 +73,6 @@ Shader "Hidden/Physical Sky"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentTemporal
-            #define FLIP
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }

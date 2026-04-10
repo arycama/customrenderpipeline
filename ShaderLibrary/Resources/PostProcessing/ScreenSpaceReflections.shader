@@ -18,7 +18,6 @@ Shader "Hidden/ScreenSpaceReflections"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
-            #define FLIP
             #include "ScreenSpaceReflections.hlsl"
             ENDHLSL
         }
@@ -28,7 +27,6 @@ Shader "Hidden/ScreenSpaceReflections"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSpatial
-            #define FLIP
             #include "ScreenSpaceReflections.hlsl"
             ENDHLSL
         }
@@ -38,7 +36,6 @@ Shader "Hidden/ScreenSpaceReflections"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
-            #define FLIP
             #include "ScreenSpaceReflections.hlsl"
             ENDHLSL
         }

@@ -1,6 +1,4 @@
-﻿#define FLIP
-
-#include "../Common.hlsl"
+﻿#include "../Common.hlsl"
 #include "../Lighting.hlsl"
 #include "../Random.hlsl"
 

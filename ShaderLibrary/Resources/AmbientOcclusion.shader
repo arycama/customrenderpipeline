@@ -19,7 +19,6 @@ Shader "Hidden/Ambient Occlusion"
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentCompute
             #pragma multi_compile _ SINGLE_SAMPLE
-            #define FLIP
             #include "AmbientOcclusion.hlsl"
             ENDHLSL
         }
@@ -35,7 +34,6 @@ Shader "Hidden/Ambient Occlusion"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentTemporal
-            #define FLIP
             #include "AmbientOcclusion.hlsl"
             ENDHLSL
         }
@@ -51,7 +49,6 @@ Shader "Hidden/Ambient Occlusion"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentCombine
-            #define FLIP
             #include "AmbientOcclusion.hlsl"
             ENDHLSL
         }

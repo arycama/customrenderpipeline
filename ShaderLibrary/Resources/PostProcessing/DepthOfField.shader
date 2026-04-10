@@ -11,7 +11,6 @@ Shader "Hidden/Depth of Field"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
-            #define FLIP
             #include "DepthOfField.hlsl"
             ENDHLSL
         }

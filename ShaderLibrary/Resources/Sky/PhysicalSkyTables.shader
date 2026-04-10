@@ -18,7 +18,6 @@ Shader "Hidden/Physical Sky Tables"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentTransmittanceLut
-            #define FLIP
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
         }
@@ -30,7 +29,6 @@ Shader "Hidden/Physical Sky Tables"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentCdfLookup
-            #define FLIP
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
         }
@@ -42,7 +40,6 @@ Shader "Hidden/Physical Sky Tables"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentLuminance
-            #define FLIP
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
         }
@@ -54,7 +51,6 @@ Shader "Hidden/Physical Sky Tables"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentTransmittanceDepthLut
-            #define FLIP
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
         }
@@ -66,7 +62,6 @@ Shader "Hidden/Physical Sky Tables"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment FragmentTransmittanceLut2
-            #define FLIP
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
         }

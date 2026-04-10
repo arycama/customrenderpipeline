@@ -40,7 +40,7 @@ public class SetupCamera : ViewRenderFeature
 		{
 			m00 = 0.5f,
 			m03 = 0.5f,
-			m11 = -0.5f,
+			m11 = 0.5f,
 			m13 = 0.5f,
 			m22 = 1,
 			m33 = 1
@@ -59,8 +59,8 @@ public class SetupCamera : ViewRenderFeature
 		};
 
 		var viewToClip = viewToNonJitteredClip;
-		viewToClip.m02 = -jitter.x;
-		viewToClip.m11 = -viewToClip.m11;
+		viewToClip.m02 = jitter.x;
+		viewToClip.m11 = viewToClip.m11;
 		viewToClip.m12 = jitter.y;
 
 		var viewToScreen = clipToScreen * viewToClip;
@@ -124,8 +124,8 @@ public class SetupCamera : ViewRenderFeature
 		var renderDeltaTime = (float)(timeData.time - previousTime);
 		previousTimeCache[viewRenderData.viewId] = timeData.time;
 
-		// TODO: could make some of these float3's and pack with another float
-		renderGraph.SetResource(new ViewData(renderGraph.SetConstantBuffer(new ViewDataTemp
+        // TODO: could make some of these float3's and pack with another float
+        renderGraph.SetResource(new ViewData(renderGraph.SetConstantBuffer(new ViewDataTemp
 		(
 			worldToView,
 			worldToClip,
@@ -145,9 +145,9 @@ public class SetupCamera : ViewRenderFeature
 			pixelToView,
 			viewPosition,
 			viewPosition.y + sky.PlanetRadius * sky.EarthScale,
-			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (-1.0f + jitter.x), viewRenderData.tanHalfFov.y * (1.0f + jitter.y), 1.0f)), 0),
-			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (3.0f + jitter.x), viewRenderData.tanHalfFov.y * (1.0f + jitter.y), 1.0f)), 0),
-			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (-1.0f + jitter.x), viewRenderData.tanHalfFov.y * (-3.0f + jitter.y), 1.0f)), 0),
+			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (-1 + jitter.x), viewRenderData.tanHalfFov.y * (-1 + jitter.y), 1.0f)), 0),
+			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (-1 + jitter.x), viewRenderData.tanHalfFov.y * (3 + jitter.y), 1.0f)), 0),
+			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (3 + jitter.x), viewRenderData.tanHalfFov.y * (-1 + jitter.y), 1.0f)), 0),
 			(far - near) * Math.Rcp(near * far),
 			Math.Rcp(far),
 			near,

@@ -25,7 +25,6 @@ Shader "Hidden/Deferred Water"
 
             #pragma multi_compile _ LIGHT_COUNT_ONE LIGHT_COUNT_TWO
 
-            #define FLIP
             #include "DeferredWater.hlsl"
             ENDHLSL
         }
@@ -42,8 +41,6 @@ Shader "Hidden/Deferred Water"
             #pragma fragment FragmentTemporal
             #pragma target 5.0
             #pragma multi_compile _ RAYTRACED_REFRACTIONS_ON
-
-            #define FLIP
             #include "DeferredWater.hlsl"
             ENDHLSL
         }

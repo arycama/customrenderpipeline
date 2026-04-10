@@ -22,7 +22,6 @@ Shader "Hidden/Decal Composite"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentCopy
-            #define FLIP
             #include "DecalComposite.hlsl"
             ENDHLSL
         }
@@ -35,7 +34,6 @@ Shader "Hidden/Decal Composite"
             #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentCombine
-            #define FLIP
             #include "DecalComposite.hlsl"
             ENDHLSL
         }

@@ -9,7 +9,6 @@ Shader "Hidden/Virtual Texture Build"
             #pragma editor_sync_compilation
             #pragma vertex VertexFullscreenTriangleVolume
             #pragma fragment Fragment
-            #define FLIP
             #include "VirtualTextureBuild.hlsl"
             ENDHLSL
         }
