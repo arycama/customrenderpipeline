@@ -76,9 +76,9 @@ public static class RenderGraphExtensions
         return renderGraph.RtHandleSystem.GetResourceHandle(descriptor, isPersistent);
     }
 
-    public static ResourceHandle<RenderTexture> GetTexture(this RenderGraph renderGraph, Int2 size, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false, bool isRandomWrite = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrTextureUsage = VRTextureUsage.None)
+    public static ResourceHandle<RenderTexture> GetTexture(this RenderGraph renderGraph, Int2 size, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool isPersistent = false, bool isExactSize = false, bool isRandomWrite = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrTextureUsage = VRTextureUsage.None, int antiAliasing = 1)
     {
-        return renderGraph.GetTexture(new RtHandleDescriptor(size.x, size.y, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isRandomWrite, isExactSize, clear, clearColor, clearDepth, clearStencil, vrTextureUsage), isPersistent);
+        return renderGraph.GetTexture(new RtHandleDescriptor(size.x, size.y, format, volumeDepth, dimension, isScreenTexture, hasMips, autoGenerateMips, isRandomWrite, isExactSize, clear, clearColor, clearDepth, clearStencil, vrTextureUsage, antiAliasing), isPersistent);
     }
 
     public static ResourceHandle<GraphicsBuffer> GetBuffer(this RenderGraph renderGraph, int count = 1, int stride = sizeof(int), GraphicsBuffer.Target target = GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags usageFlags = GraphicsBuffer.UsageFlags.None, bool isPersistent = false)

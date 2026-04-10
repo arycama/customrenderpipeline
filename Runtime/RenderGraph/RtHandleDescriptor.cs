@@ -23,8 +23,9 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 	public float clearDepth;
 	public uint clearStencil;
 	public VRTextureUsage vrUsage;
+	public int antiAliasing;
 
-	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrUsage = VRTextureUsage.None)
+	public RtHandleDescriptor(int width, int height, GraphicsFormat format, int volumeDepth = 1, TextureDimension dimension = TextureDimension.Tex2D, bool isScreenTexture = false, bool hasMips = false, bool autoGenerateMips = false, bool enableRandomWrite = false, bool isExactSize = false, bool clear = false, Color clearColor = default, float clearDepth = 1f, uint clearStencil = 0u, VRTextureUsage vrUsage = VRTextureUsage.None, int antiAliasing = 1)
 	{
 		this.width = width;
 		this.height = height;
@@ -41,6 +42,7 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
 		this.clearDepth = clearDepth;
 		this.clearStencil = clearStencil;
 		this.vrUsage = vrUsage;
+		this.antiAliasing = antiAliasing;
 	}
 
 	public readonly override string ToString() => $"{width}x{height}x{volumeDepth} {format} {dimension}";
@@ -74,7 +76,7 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
             width = width,
             height = height,
             volumeDepth = volumeDepth,
-            msaaSamples = 1,
+            msaaSamples = antiAliasing,
             graphicsFormat = graphicsFormat,
             depthStencilFormat = depthFormat,
             mipCount = -1,

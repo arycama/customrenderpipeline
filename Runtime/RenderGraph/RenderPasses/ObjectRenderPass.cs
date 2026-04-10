@@ -9,9 +9,10 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 	private SinglePassStereoMode stereoMode;
     private ScriptableRenderContext context;
 
-	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, Int2 size, int viewCount = 1, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false)
+	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, Int2 size, int viewCount = 1, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false, int antiAliasing = 1)
 	{
         this.context = context;
+		AntiAliasing = antiAliasing;
         stereoMode = camera.stereoEnabled
             ? SystemInfo.supportsMultiview ? SinglePassStereoMode.Multiview : SinglePassStereoMode.Instancing
             : SinglePassStereoMode.None;

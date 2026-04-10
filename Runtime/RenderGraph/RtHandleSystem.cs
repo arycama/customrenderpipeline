@@ -47,6 +47,9 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
 		if (resource.volumeDepth < descriptor.volumeDepth)
 			return false;
 
+        if (resource.antiAliasing != descriptor.antiAliasing)
+            return false;
+
 		if (descriptor.isScreenTexture)
 		{
 			// For screen textures, ensure we get a rendertexture that is the actual screen width/height
