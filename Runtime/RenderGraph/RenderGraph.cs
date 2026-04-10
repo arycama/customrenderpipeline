@@ -29,6 +29,7 @@ public class RenderGraph : IDisposable
     private string passName;
     private int depthIndex = -1;
     private int subPassIndex = -1;
+    private int antiAliasing = 1;
 
     private NativeList<AttachmentData> inputs = new(8, Allocator.Persistent), outputs = new(8, Allocator.Persistent);
     private SubPassFlags flags;
@@ -146,7 +147,7 @@ public class RenderGraph : IDisposable
             if (currentPass.IsNativeRenderPass)
             {
                 // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
-                canMergePass = isInRenderPass && size == currentPass.Size && viewCount == currentPass.ViewCount && mipLevel == currentPass.MipLevel;
+                canMergePass = isInRenderPass && size == currentPass.Size && viewCount == currentPass.ViewCount && mipLevel == currentPass.MipLevel && antiAliasing == currentPass.AntiAliasing;
 
                 if (canMergePass)
                 {
@@ -286,6 +287,7 @@ public class RenderGraph : IDisposable
         size = pass.Size;
         viewCount = pass.ViewCount;
         mipLevel = pass.MipLevel;
+        antiAliasing = pass.AntiAliasing;
     }
 
     private void BeginSubpass(RenderPass pass)
@@ -431,12 +433,13 @@ public class RenderGraph : IDisposable
 
         endPassIndex = pass.Index;
         isInRenderPass = false;
-        renderPassDescriptors.Add(new(size, new(attachments.AsArray(), Allocator.Temp), new(subPasses.AsArray(), Allocator.Temp), startPassIndex, endPassIndex, pass.ViewCount, 1, depthIndex, -1, passName));
+        renderPassDescriptors.Add(new(size, new(attachments.AsArray(), Allocator.Temp), new(subPasses.AsArray(), Allocator.Temp), startPassIndex, endPassIndex, pass.ViewCount, antiAliasing, depthIndex, -1, passName));
         attachments.Clear();
         subPasses.Clear();
         passName = null;
         depthIndex = -1;
         subPassIndex = -1;
+        antiAliasing = 1;
     }
 
     public void Execute(CommandBuffer command, ScriptableRenderContext context)
@@ -518,7 +521,16 @@ public class RenderGraph : IDisposable
                         var attachment = new AttachmentDescriptor(format);
                         if (colorAttachment.frameBufferTarget.HasValue)
                         {
-                            attachment.loadStoreTarget = colorAttachment.frameBufferTarget.Value;
+                            if(descriptor.antiAliasing > 1)
+                            {
+                                attachment.resolveTarget = colorAttachment.frameBufferTarget.Value;
+                                attachment.storeAction = RenderBufferStoreAction.Resolve;
+                            }
+                            else
+                            {
+                                attachment.loadStoreTarget = colorAttachment.frameBufferTarget.Value;
+                                attachment.storeAction = RenderBufferStoreAction.Store;
+                            }
                         }
                         else
                         {
@@ -534,14 +546,25 @@ public class RenderGraph : IDisposable
 
                             // If the handle gets freed before this native render pass ends, we can discard the contents, otherwise they must be stored as another pass is going to use it
                             var requiresStore = handleData.freeIndex1 > descriptor.endPassIndex || handleData.freeIndex1 == -1;
+                            var requiresResolve = requiresStore && antiAliasing > 1 && handleData.descriptor.antiAliasing == 1;
                             if (requiresStore)
-                                attachment.storeAction = RenderBufferStoreAction.Store;
+                            {
+                                if(requiresResolve)
+                                    attachment.storeAction = RenderBufferStoreAction.Resolve;
+                                else
+                                    attachment.storeAction = RenderBufferStoreAction.Store;
+                            }
 
                             // If the handle is created and freed during the renderpass, we can avoid allocating a target entirely. (TODO: The render target system may still create a texture which may be unused)
-                            if (requiresLoad || requiresStore)
+                            if (requiresLoad || requiresStore || requiresResolve)
                             {
                                 var target = RtHandleSystem.GetResource(colorAttachment.handle);
-                                attachment.loadStoreTarget = new(target, colorAttachment.mipLevel, colorAttachment.cubemapFace, colorAttachment.depthSlice);
+
+                                if(requiresResolve)
+                                    attachment.resolveTarget = new(target, colorAttachment.mipLevel, colorAttachment.cubemapFace, colorAttachment.depthSlice);
+
+                                if(requiresLoad || (requiresStore && !requiresResolve))
+                                    attachment.loadStoreTarget = new(target, colorAttachment.mipLevel, colorAttachment.cubemapFace, colorAttachment.depthSlice);
                             }
                         }
 
@@ -553,7 +576,7 @@ public class RenderGraph : IDisposable
 
                     IsCullingCcw = isCullingCcw;
 
-                    command.BeginRenderPass(descriptor.size.x, descriptor.size.y, descriptor.viewCount, descriptor.samples, passAttachments.AsArray(), descriptor.depthAttachmentIndex, descriptor.shadingRateImageAttachmentIndex, descriptor.subpasses, debugNameUtf8);
+                    command.BeginRenderPass(descriptor.size.x, descriptor.size.y, descriptor.viewCount, descriptor.antiAliasing, passAttachments.AsArray(), descriptor.depthAttachmentIndex, descriptor.shadingRateImageAttachmentIndex, descriptor.subpasses, debugNameUtf8);
 
                     passAttachments.Clear();
                     previousSubPassIndex = 0;

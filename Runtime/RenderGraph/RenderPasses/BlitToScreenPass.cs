@@ -16,13 +16,14 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material, Int2 viewSize, int viewCount = 1, int passIndex = 0, bool flip = false)
+	public void Initialize(Material material, Int2 viewSize, int viewCount = 1, int passIndex = 0, bool flip = false, int antiAliasing = 1)
 	{
 		this.material = material;
         Size = viewSize;
         ViewCount = viewCount;
 		this.passIndex = passIndex;
         this.flip = flip;
+        AntiAliasing = antiAliasing;
     }
 
 	public override void Reset()
