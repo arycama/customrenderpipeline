@@ -22,7 +22,6 @@ Shader "Hidden/Deferred Water"
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #pragma target 5.0
-
             #pragma multi_compile _ LIGHT_COUNT_ONE LIGHT_COUNT_TWO
 
             #include "DeferredWater.hlsl"

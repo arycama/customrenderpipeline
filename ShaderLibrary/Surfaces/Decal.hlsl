@@ -40,7 +40,7 @@ FragmentInput Vertex(VertexInput input)
 	FragmentInput output;
 	output.worldPosition.xyz = ObjectToWorld(input.position, input.instanceId);
 	output.worldPosition.w = dot(output.worldPosition.xyz, ViewForward);
-	output.position = WorldToClip(output.worldPosition.xyz);
+	output.position = WorldToClipPosition(output.worldPosition.xyz);
 	output.instanceId = input.instanceId;
 	return output;
 }

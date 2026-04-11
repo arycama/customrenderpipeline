@@ -32,7 +32,7 @@ public class DeferredWater : ViewRenderFeature
 
 		using var scope = renderGraph.AddProfileScope("Deferred Water");
 
-        var scatterResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+        var scatterResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true, clear: true);
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Render", settings))
         {
@@ -43,6 +43,7 @@ public class DeferredWater : ViewRenderFeature
             pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
             pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
             pass.WriteTexture(scatterResult);
+            pass.PreventNewSubPass = true;
 
             pass.ReadResource<AtmospherePropertiesAndTables>();
             pass.ReadResource<AutoExposureData>();
@@ -165,15 +166,16 @@ public class DeferredWater : ViewRenderFeature
 
 			pass.renderData.history = history;
 			pass.renderData.wasCreated = wasCreated;
+            pass.PreventNewSubPass = true;
 
-			if (settings.RaytracedRefractions)
+            if (settings.RaytracedRefractions)
                 pass.AddKeyword("RAYTRACED_REFRACTIONS_ON");
 
             pass.Initialize(deferredWaterMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 1);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-            pass.ReadTexture("_ScatterInput", scatterResult);
             pass.WriteTexture(current);
             pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
+            pass.ReadTexture("_ScatterInput", scatterResult);
             pass.ReadTexture("_History", history);
 
 			pass.ReadRtHandle<GBufferNormalRoughness>();

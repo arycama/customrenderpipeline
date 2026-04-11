@@ -34,21 +34,33 @@ cbuffer FrameData
 cbuffer ViewData
 {
 	matrix WorldToView;
-	matrix WorldToFlippedClip;
+	matrix WorldToClip;
 	matrix WorldToPreviousClip;
 	matrix WorldToScreen;
 	matrix WorldToPixel;
+	
 	matrix ViewToWorld;
 	matrix ViewToClip;
+	matrix ViewToScreen;
 	matrix ViewToPixel;
+	
 	matrix ClipToWorld;
 	matrix ClipToView;
 	matrix ClipToScreen;
 	matrix ClipToPixel;
 	matrix ClipToPreviousClip;
+	
+	matrix ScreenToWorld;
+	matrix ScreenToView;
+	matrix ScreenToClip;
+	matrix ScreenToPixel;
+	
 	matrix PixelToWorld;
 	matrix PixelToWorldDirection;
 	matrix PixelToView;
+	matrix PixelToClip;
+	matrix PixelToScreen;
+	
 	float3 ViewPosition;
 	float ViewHeight;
 	float4 FrustumCorners[3];

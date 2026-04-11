@@ -50,7 +50,6 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	uint column = vertexId % vertsPerRowPlusOne;
 	uint row = vertexId / vertsPerRowPlusOne;
 	float2 uv = (float2(column, row) + 0.5) / vertsPerRow;
-	
 	float3 displacement = OceanDisplacement[uint3(column % vertsPerRow, row % vertsPerRow, _CausticsCascade)];
 	float3 worldPosition = (float3(column, 0, row) / vertsPerRow - float2(0.5, 0).xyx) * (float2(_PatchSize, 1).xyx) + displacement;
 
@@ -86,6 +85,7 @@ Texture2D<float3> _MainTex;
 
 float3 FragmentBlit(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1) : SV_Target
 {
+	uv.y = 1.0 - uv.y;
 	float3 col = 0.0;
 	col += _MainTex.Sample(LinearRepeatSampler, uv * 0.5 + float2(0, 0));
 	col += _MainTex.Sample(LinearRepeatSampler, uv * 0.5 + float2(0.5, 0));

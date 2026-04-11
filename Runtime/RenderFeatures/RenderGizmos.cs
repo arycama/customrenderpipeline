@@ -1,4 +1,5 @@
-﻿using UnityEngine.Rendering;
+﻿using UnityEngine;
+using UnityEngine.Rendering;
 
 public class RenderGizmos : ViewRenderFeature
 {
@@ -14,10 +15,12 @@ public class RenderGizmos : ViewRenderFeature
 
 		var preImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PreImageEffects);
 		var postImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PostImageEffects);
+        var worldToClip = Matrix4x4.identity;// GL.GetGPUProjectionMatrix(viewRenderData.camera.projectionMatrix * viewRenderData.camera.worldToCameraMatrix, false);
 
-		using var pass = renderGraph.AddGenericRenderPass("Render Gizmos", (preImageEffects, postImageEffects));
+		using var pass = renderGraph.AddGenericRenderPass("Render Gizmos", (preImageEffects, postImageEffects, worldToClip));
 		pass.SetRenderFunction(static (command, pass, data) =>
 		{
+            command.SetGlobalMatrix("unity_MatrixVP", data.worldToClip);
 			command.DrawRendererList(data.preImageEffects);
 			command.DrawRendererList(data.postImageEffects);
 		});

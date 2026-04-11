@@ -59,7 +59,7 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	FragmentInput output;
 	output.uv = uv;
 	//output.worldPosition = worldPosition;
-	output.position = WorldToClip(worldPosition);
+	output.position = WorldToClipPosition(worldPosition);
 	
 	float3 V = normalize(-worldPosition);
 	float3 lighting = AmbientHgTwoLobe(V, ForwardScatterPhase, -BackwardScatterPhase, ScatterBlend);

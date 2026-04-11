@@ -150,7 +150,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
 			// For text mesh pro, cbfed rewriting all their shaders
-			viewRenderData.context.SetupCameraProperties(viewRenderData.camera);
+			// viewRenderData.context.SetupCameraProperties(viewRenderData.camera);
 
 #if UNITY_EDITOR
 			if (viewRenderData.camera.cameraType == CameraType.SceneView)

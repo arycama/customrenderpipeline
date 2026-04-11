@@ -81,14 +81,6 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	smoothness = LengthToSmoothness(smoothness * 0.25);
 	 
 	// Foam calculations
-	
-	// Sample underwater depth with an offset based on fake refraction calculated from normal
-	float distortion = _RefractOffset * 0.5 / TanHalfFov / linearDepth;
-	float2 uvOffset = N.xz * distortion;
-	float2 refractionUv = uvOffset * ViewSize + input.position.xy;
-	float2 refractedPositionSS = clamp(refractionUv, 0.5, ViewSize - 0.5);
-	float underwaterDepth = CameraDepthCopy[refractedPositionSS];
-	
 	if (foam > 0)
 	{
 		float2 foamUv = oceanUv * _FoamTex_ST.xy + _FoamTex_ST.zw;
@@ -107,18 +99,40 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	
 	float perceptualRoughness = SmoothnessToPerceptualRoughness(smoothness);
 	perceptualRoughness = SpecularAntiAliasing(perceptualRoughness, N);
-
-	// If this offset is above water, revert to the non-refracted position to avoid above water objects bleeding into the refractions
-	if (underwaterDepth > depth)
+	
+	// Sample underwater depth with an offset based on fake refraction calculated from normal
+	//float distortion = _RefractOffset * 0.5 / TanHalfFov / linearDepth;
+	//float2 uvOffset = N.xz * distortion;
+	//float2 refractionUv = uvOffset * ViewSize + input.position.xy;
+	//float2 refractedPositionSS = clamp(refractionUv, 0.5, ViewSize - 0.5);
+	
+	float3 refr = refract(-V, N, 1.0 / 1.34);
+	float underwaterDepth = CameraDepthCopy[input.position.xy];
+	
+	float3 underwaterWorldPos = PixelToWorldPosition(float3(input.position.xy, underwaterDepth));
+	float3 underwaterPosition = IntersectRayPlane(worldPosition, refr, float3(0, underwaterWorldPos.y, 0), float3(0, 1, 0));
+	
+	float2 refractedPositionSS = MultiplyPointProj(WorldToPixel, underwaterPosition).xy;
+	
+	if (any(refractedPositionSS < 0 || refractedPositionSS > ViewSize - 1))
 	{
-		uvOffset = 0.0;
 		underwaterDepth = CameraDepthCopy[input.position.xy];
 		refractedPositionSS = input.position.xy;
 	}
 	
-	float3 underwaterPositionWS = PixelToWorldPosition(float3(refractedPositionSS, underwaterDepth));
-	float maxUnderwaterDistance = distance(worldPosition, underwaterPositionWS);
-	float3 underwaterV = normalize(worldPosition - underwaterPositionWS);
+	underwaterDepth = CameraDepthCopy[refractedPositionSS];
+	underwaterWorldPos = PixelToWorldPosition(float3(refractedPositionSS, underwaterDepth));
+
+	// If this offset is above water, revert to the non-refracted position to avoid above water objects bleeding into the refractions
+	if (underwaterDepth > depth)
+	{
+		//uvOffset = 0.0;
+		underwaterDepth = CameraDepthCopy[input.position.xy];
+		refractedPositionSS = input.position.xy;
+	}
+	
+	float maxUnderwaterDistance = distance(worldPosition, underwaterPosition);
+	float3 underwaterV = normalize(worldPosition - underwaterPosition);
 	
 	// Select random channel
 	float2 noise = Noise2D(input.position.xy);
@@ -158,7 +172,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	float3 underwater = 0.0;
 	if (underwaterDepth)
 	{
-		underwater = _UnderwaterResult.Sample(LinearClampSampler, ClampScaleTextureUv(input.uv + uvOffset, _UnderwaterResultScaleLimit));
+		underwater = _UnderwaterResult.Sample(LinearClampSampler, ClampScaleTextureUv(refractedPositionSS * RcpViewSize, _UnderwaterResultScaleLimit));
 		underwater *= exp(-_Extinction * maxUnderwaterDistance);
 	}
 

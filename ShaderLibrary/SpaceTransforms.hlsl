@@ -136,20 +136,20 @@ float3 WorldToViewPosition(float3 position)
 	#endif
 }
 
-float4 WorldToClip(float3 position)
+float4 WorldToClipPosition(float3 position)
 {
 	#ifdef UNITY_PASS_SHADOWCASTER
 		return MultiplyPoint(WorldToShadowClip, position);
 	#elif defined(UI_OVERLAY_RENDERING)
 		return MultiplyPoint(UiOverlayMatrix, position);
 	#else
-		return MultiplyPoint(WorldToFlippedClip, position);
+		return MultiplyPoint(WorldToClip, position);
 	#endif
 }
 
-float4 ObjectToClip(float3 position, uint instanceId)
+float4 ObjectToClip(float3 position, uint instanceId, bool cameraRelative = true)
 {
-	return WorldToClip(ObjectToWorld(position, instanceId));
+	return WorldToClipPosition(ObjectToWorld(position, instanceId, cameraRelative));
 }
 
 float LinearEyeDepth(float depth)
@@ -205,9 +205,9 @@ float4 PreviousClipPosition(float2 uv, float depth)
 	return mul(ClipToPreviousClip, clipPosition);
 }
 
-float2 PreviousScreenPosition(float4 previousClipPosition)
+float2 ClipToScreenPosition(float4 clipPosition)
 {
-	return PerspectiveDivide(previousClipPosition).xy * 0.5 + 0.5;
+	return PerspectiveDivide(clipPosition).xy * 0.5 + 0.5;
 }
 
 float3 PixelToWorldPosition(float3 position)

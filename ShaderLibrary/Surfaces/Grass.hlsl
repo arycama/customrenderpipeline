@@ -136,7 +136,7 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	output.previousPositionCS = WorldToClipPrevious(previousWorldPosition);
 	
 	output.worldPosition += (output.uv.y) * bitangent * _Height * scale;
-	output.position = WorldToClip(output.worldPosition);
+	output.position = WorldToClipPosition(output.worldPosition);
 	
 	float3 virtualUv = CalculateVirtualUv(terrainUv, 0, 0);
 	output.color = VirtualTexture.SampleLevel(LinearRepeatSampler, virtualUv, 0);
