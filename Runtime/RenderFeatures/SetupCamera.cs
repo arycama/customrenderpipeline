@@ -79,7 +79,7 @@ public class SetupCamera : ViewRenderFeature
 		var clipToPreviousClip = worldToPreviousClip.Mul(clipToWorld);
 
 		// TODO: I think this is similar to pixel to world view dir matrix, maybe make a shared function
-		var pixelToViewScaleOffset = new Float4(viewRenderData.tanHalfFov.x * 2.0f / viewRenderData.viewSize.x, viewRenderData.tanHalfFov.y * 2.0f / viewRenderData.viewSize.y, -viewRenderData.tanHalfFov.x * (1.0f - jitter.x), -viewRenderData.tanHalfFov.y * (1.0f + jitter.y));
+		var pixelToViewScaleOffset = new Float4(viewRenderData.tanHalfFov.x * 2.0f / viewRenderData.viewSize.x, viewRenderData.tanHalfFov.y * 2.0f / viewRenderData.viewSize.y, -viewRenderData.tanHalfFov.x * (1.0f - jitter.x), -viewRenderData.tanHalfFov.y * (1.0f - jitter.y));
 
 		if(!previousTimeCache.TryGetValue(viewRenderData.viewId, out var previousTime))
 			previousTime = 0f;
@@ -141,19 +141,10 @@ public class SetupCamera : ViewRenderFeature
 			previousTransform.Item1
 		))));
 
-		var frustumPlanes = ArrayPool<Plane>.Get(6);
-		var cameraProjMatrix = viewRenderData.camera.projectionMatrix;
-		cameraProjMatrix.m02 = jitter.x;
-		cameraProjMatrix.m12 = jitter.y;
-		cameraProjMatrix.SetColumn(2, -cameraProjMatrix.GetColumn(2));
-		GeometryUtility.CalculateFrustumPlanes(cameraProjMatrix * worldToView, frustumPlanes);
-
 		var cullingPlanes = new CullingPlanes() { Count = 6 };
 		for (var i = 0; i < 6; i++)
-			cullingPlanes.SetCullingPlane(i, frustumPlanes[i]);
+			cullingPlanes.SetCullingPlane(i, worldToClip.FrustumPlane(i));
 
 		renderGraph.SetResource(new CullingPlanesData(cullingPlanes));
-
-		ArrayPool<Plane>.Release(frustumPlanes);
 	}
 }

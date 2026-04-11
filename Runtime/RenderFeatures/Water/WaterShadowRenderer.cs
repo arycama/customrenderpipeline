@@ -71,18 +71,11 @@ public class WaterShadowRenderer : WaterRendererBase
             m33 = 1.0f
         };
 
-        var viewProjectionMatrix = projectionMatrix * worldToLight;
-
-        var frustumPlanes = ArrayPool<Plane>.Get(6);
-        GeometryUtility.CalculateFrustumPlanes(viewProjectionMatrix, frustumPlanes);
+        var viewProjectionMatrix = (Float4x4)(projectionMatrix * worldToLight);
 
         var cullingPlanes = new CullingPlanes() { Count = 6 };
         for (var j = 0; j < 6; j++)
-        {
-            cullingPlanes.SetCullingPlane(j, frustumPlanes[j]);
-        }
-
-        ArrayPool<Plane>.Release(frustumPlanes);
+            cullingPlanes.SetCullingPlane(j, viewProjectionMatrix.FrustumPlane(j));
 
         var cullResult = Cull(viewPosition, cullingPlanes, viewRenderData.viewSize, false);
 

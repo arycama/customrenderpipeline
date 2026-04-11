@@ -45,12 +45,12 @@ public class RefractVisualizer : MonoBehaviour
             Gizmos.DrawLine(Float3.Zero, T);
         }
 
-        NdotL = Float3.Dot(N, L);
-        NdotV = Float3.Dot(N, V);
-        NdotH = Float3.Dot(N, H);
-        LdotV = Float3.Dot(L, V);
-        LdotH = Float3.Dot(L, H);
-        VdotH = Float3.Dot(V, H);
+        NdotL = N.Dot(L);
+        NdotV = N.Dot(V);
+        NdotH = N.Dot(H);
+        LdotV = L.Dot(V);
+        LdotH = L.Dot(H);
+        VdotH = V.Dot(H);
 
         // Bottom layer
         var Nt = -N;
@@ -61,12 +61,12 @@ public class RefractVisualizer : MonoBehaviour
         if (no > ni)
             Ht = -Ht;
 
-        NdotLt = Float3.Dot(Nt, Lt);
-        NdotVt = Float3.Dot(Nt, Vt);
-        NdotHt = Float3.Dot(Nt, Ht);
-        LdotVt = Float3.Dot(Lt, Vt);
-        LdotHt = Float3.Dot(Lt, Ht);
-        VdotHt = Float3.Dot(Vt, Ht);
+        NdotLt = Nt.Dot(Lt);
+        NdotVt = Nt.Dot(Vt);
+        NdotHt = Nt.Dot(Ht);
+        LdotVt = Lt.Dot(Vt);
+        LdotHt = Lt.Dot(Ht);
+        VdotHt = Vt.Dot(Ht);
 
         if (incoming)
         {

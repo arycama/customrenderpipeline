@@ -23,6 +23,7 @@ public class DecalComposite : ViewRenderFeature
 		using (var pass = renderGraph.AddFullscreenRenderPass("Copy"))
 		{
 			pass.Initialize(material, viewRenderData.viewSize, 1, 0);
+            pass.PreventNewSubPass = true;
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(albedoMetallicCopy);
@@ -38,8 +39,9 @@ public class DecalComposite : ViewRenderFeature
 		using (var pass = renderGraph.AddFullscreenRenderPass("Combine", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy)))
 		{
 			pass.Initialize(material, viewRenderData.viewSize, 1, 1);
+            pass.PreventNewSubPass = true;
 
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());

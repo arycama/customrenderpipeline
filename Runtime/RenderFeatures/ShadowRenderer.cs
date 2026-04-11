@@ -126,8 +126,7 @@ public class ShadowRenderer : ViewRenderFeature
 
     void RenderShadowMap(ShadowRequest request, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip, bool isPointLight, ViewRenderData viewRenderData, CullingResults cullingResults, Int2 resolution, int viewCount)
 	{
-		var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
-		var perCascadeData = renderGraph.SetConstantBuffer(new RenderShadowMapData(request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, viewRenderData.transform.position, request.Near, request.LightPosition, request.Far, request.ViewRotation.Forward, 0));
+		var perCascadeData = renderGraph.SetConstantBuffer(new RenderShadowMapData(request.ViewMatrix, request.ProjectionMatrix.Mul(request.ViewMatrix), request.ProjectionMatrix, viewRenderData.transform.position, request.Near, request.LightPosition, request.Far, request.ViewRotation.Forward, 0));
 		var shadowRequestData = new ShadowRequestData(request, bias, slopeBias, target, index, perCascadeData, zClip);
 
         renderGraph.SetResource(shadowRequestData);
@@ -149,9 +148,9 @@ public class ShadowRenderer : ViewRenderFeature
 
 internal struct RenderShadowMapData
 {
-    public Matrix4x4 ViewMatrix;
-    public Matrix4x4 Item2;
-    public Matrix4x4 viewToShadowClip;
+    public Float4x4 ViewMatrix;
+    public Float4x4 Item2;
+    public Float4x4 viewToShadowClip;
     public Float3 position;
     public float Near;
     public Float3 LightPosition;
@@ -159,7 +158,7 @@ internal struct RenderShadowMapData
     public Float3 Forward;
     public int Item9;
 
-    public RenderShadowMapData(Matrix4x4 viewMatrix, Matrix4x4 item2, Matrix4x4 viewToShadowClip, Float3 position, float near, Float3 lightPosition, float far, Float3 forward, int item9)
+    public RenderShadowMapData(Float4x4 viewMatrix, Float4x4 item2, Float4x4 viewToShadowClip, Float3 position, float near, Float3 lightPosition, float far, Float3 forward, int item9)
     {
         ViewMatrix = viewMatrix;
         Item2 = item2;

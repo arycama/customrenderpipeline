@@ -4,8 +4,8 @@ using UnityEngine.Rendering;
 public readonly struct ShadowRequest
 {
     public int LightIndex { get; }
-    public Matrix4x4 ViewMatrix { get; }
-    public Matrix4x4 ProjectionMatrix { get; }
+    public Float4x4 ViewMatrix { get; }
+    public Float4x4 ProjectionMatrix { get; }
     // TODO: This is only used for culling planes, maybe replace?
     public ShadowSplitData ShadowSplitData { get; }
     public int CubemapFace { get; }
@@ -19,7 +19,7 @@ public readonly struct ShadowRequest
     public float Height { get; }
     public Int2 Resolution { get; }
 
-    public ShadowRequest(int lightIndex, Matrix4x4 viewMatrix, Matrix4x4 projectionMatrix, ShadowSplitData shadowSplitData, int cubemapFace, Float3 lightPosition, bool hasCasters, float near, float far, Float3 viewPosition, Quaternion viewRotation, float width, float height, Int2 resolution)
+    public ShadowRequest(int lightIndex, Float4x4 viewMatrix, Float4x4 projectionMatrix, ShadowSplitData shadowSplitData, int cubemapFace, Float3 lightPosition, bool hasCasters, float near, float far, Float3 viewPosition, Quaternion viewRotation, float width, float height, Int2 resolution)
     {
         LightIndex = lightIndex;
         ViewMatrix = viewMatrix;

@@ -63,7 +63,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	
 	float3 ddxWp = ddx(worldPosition);
 	float3 ddyWp = ddy(worldPosition);
-	float3 worldNormal = normalize(cross(ddyWp, ddxWp));
+	float3 worldNormal = normalize(cross(ddxWp, ddyWp));
 	float3 tangent = normalize(ddyWp);
 	
 	float3 tangentNormal = UnpackNormalUNorm(normalOcclusionRoughness.rg);
@@ -80,7 +80,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	//float depth = CameraDepth[position.xy];
 	//float eyeDepth = LinearEyeDepth(depth);
 	//float3 worldPosition = worldDir * eyeDepth;
-	float3 geoNormal = normalize(cross(ddy(worldPosition), ddx(worldPosition)));
+	float3 geoNormal = normalize(cross(ddx(worldPosition), ddy(worldPosition)));
 	
 	// Approx from https://seblagarde.wordpress.com/2013/04/14/water-drop-3b-physically-based-wet-surfaces/
 	float roughness = GBufferNormalRoughness[input.position.xy].b;

@@ -28,7 +28,7 @@ public static class CameraExtensions
     {
         var worldToView = (Float4x4)(camera.stereoEnabled ? camera.GetStereoViewMatrix(eye) : camera.worldToCameraMatrix);
         var translation = worldToView.c3.xyz;
-        return new(-Dot(worldToView.c0.xyz, translation), -Dot(worldToView.c1.xyz, translation), -Dot(worldToView.c2.xyz, translation));
+        return new(-worldToView.c0.xyz.Dot(translation), -worldToView.c1.xyz.Dot(translation), -worldToView.c2.xyz.Dot(translation));
     }
 
     public static Quaternion GetViewRotation(this Camera camera, Camera.StereoscopicEye eye = Camera.StereoscopicEye.Left)

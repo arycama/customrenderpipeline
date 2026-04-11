@@ -58,8 +58,7 @@ public class ParticleShadows : ViewRenderFeature
 
         void RenderShadowMap(ShadowRequest request, ResourceHandle<RenderTexture> target, int index, bool flipY, bool zClip, bool isPointLight)
 		{
-			var viewToShadowClip = GL.GetGPUProjectionMatrix(request.ProjectionMatrix, flipY);
-			var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, viewToShadowClip * request.ViewMatrix, viewToShadowClip, viewRenderData.transform.position, 0, request.LightPosition, 0));
+            var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, request.ProjectionMatrix.Mul(request.ViewMatrix), request.ProjectionMatrix, viewRenderData.transform.position, 0, request.LightPosition, 0));
 
 			while (cameras.Count <= index)
 			{
