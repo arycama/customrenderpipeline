@@ -36,11 +36,11 @@ public partial class ScreenSpaceShadows : ViewRenderFeature
 		if (settings.UseRaytracing)
 		{
 			using var pass = renderGraph.AddRaytracingRenderPass("Raytraced Shadows");
-
 			var raytracingData = renderGraph.GetResource<RaytracingResult>();
 			pass.Initialize(shadowRaytracingShader, "RayGeneration", "RaytracingVisibility", raytracingData.Rtas, viewRenderData.viewSize.x, viewRenderData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewRenderData.tanHalfFov.y);
+            pass.PreventNewSubPass = true;
 
-			pass.WriteTexture(tempResult, "HitResult");
+            pass.WriteTexture(tempResult, "HitResult");
 
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadResource<FrameData>();
@@ -54,9 +54,10 @@ public partial class ScreenSpaceShadows : ViewRenderFeature
 		else
 		{
 			using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows", (settings.MaxSamples, settings.Thickness, settings.Intensity, viewRenderData.viewSize));
-			pass.Initialize(material, 0, 1);
+			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 0, 1);
+            pass.PreventNewSubPass = true;
 
-			pass.WriteTexture(tempResult);
+            pass.WriteTexture(tempResult);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 
 			pass.ReadRtHandle<CameraDepth>();
@@ -77,8 +78,9 @@ public partial class ScreenSpaceShadows : ViewRenderFeature
 		var spatialResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_UNorm, isScreenTexture: true);
 		using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Shadows Spatial", (settings.Intensity, settings.MaxSamples, settings.Thickness, settings.ResolveSamples, settings.ResolveSize)))
 		{
-			pass.Initialize(material, 1);
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1);
+            pass.PreventNewSubPass = true;
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(spatialResult);
 
 			pass.ReadTexture("_Input", tempResult);
@@ -114,8 +116,9 @@ public partial class ScreenSpaceShadows : ViewRenderFeature
 			pass.renderData.wasCreated = wasCreated;
 			pass.renderData.history = history;
 
-			pass.Initialize(material, 2);
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2);
+            pass.PreventNewSubPass = true;
+            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(current);
 
 			pass.ReadTexture("_TemporalInput", spatialResult);

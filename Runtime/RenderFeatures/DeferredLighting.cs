@@ -62,7 +62,7 @@ public class DeferredLighting : ViewRenderFeature
             if (renderGraph.TryGetResource<ScreenSpaceShadows.Result>(out _))
             {
                 pass.ReadResource<ScreenSpaceShadows.Result>();
-                pass.AddKeyword("SCREEN_SPACE_GLOBAL_ILLUMINATION_ON");
+                pass.AddKeyword("SCREEN_SPACE_SHADOWS_ON");
             }
 		}
 

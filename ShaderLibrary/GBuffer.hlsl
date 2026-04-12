@@ -22,6 +22,8 @@ Texture2D<float4> GBufferAlbedoMetallic, GBufferNormalRoughness, GBufferBentNorm
 
 float2 PackGBufferNormal(float3 N, float3 V, matrix worldToView)
 {
+	return NormalToOctahedralUv(N);
+
 	V = mul((float3x3) worldToView, V);
 	N = mul((float3x3) worldToView, N);
 	N = FromToRotationZInverse(-V, -N);
@@ -31,6 +33,11 @@ float2 PackGBufferNormal(float3 N, float3 V, matrix worldToView)
 float3 GBufferNormal(float4 data, float3 V, out float NdotV, matrix worldToView, matrix viewToWorld)
 {
 	float3 N = PyramidUvToNormal(data.rg);
+	
+	N = OctahedralUvToNormal(data.xy);
+	NdotV = dot(N, V);
+	return N;
+	
 	NdotV = N.z;
 	V = mul((float3x3) worldToView, V);
 	N = -FromToRotationZ(-V, N);

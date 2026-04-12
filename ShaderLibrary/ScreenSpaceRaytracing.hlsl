@@ -13,8 +13,12 @@ float3 ScreenSpaceRaytrace(float3 rayOrigin, float3 worldPosition, float3 L, uin
 	float3 rayDir = reflPosSS - rayOrigin;
 	
 	float3 rayStep = FastSign(rayDir); // Which directions to move the ray when it hits a boundary
-	float2 dists = abs(0.5 / rayDir.xy);
-	float2 currentCell = round(rayOrigin.xy + (Min2(dists) == dists) * rayStep.xy * 0.5); // Starting cell center, assume pixel coords centered on 0.5
+	float3 bounds = float3((rayOrigin.xy + rayStep.xy * 0.5), rayOrigin.z);
+	
+	float3 dists = (bounds - rayOrigin) / rayDir;
+	
+	
+	float2 currentCell = rayOrigin.xy + (Min2(dists.xy) == dists.xy) * rayStep.xy;
 	uint mip = 0;
 	bool rayTowardsEye = rayDir.z >= 0;
 	
@@ -25,8 +29,8 @@ float3 ScreenSpaceRaytrace(float3 rayOrigin, float3 worldPosition, float3 L, uin
 		float4 dists = (bounds - rayOrigin.xyzz) / rayDir.xyzz; // Simplified ray-plane intersection for AABB planes, gives the distance to the x, y and z plane
 		float minT = Min2(dists.xy); // Min of the x and y intersections, eg which wall was hit first out of the two
 		
-		if (mip == 0 && any(bounds.xyz < 0 || bounds.xyz >= float3(ViewSize, 1.0)))
-			return 0;
+		//if (mip == 0 && any(bounds.xyz < 0 || bounds.xyz >= float3(ViewSize, 1.0)))
+		//	return 0;
 			
 		//if (skyIsMiss && mip == 0 && bounds.z <= 0.0)
 		//	return 0;

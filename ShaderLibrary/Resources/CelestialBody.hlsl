@@ -24,7 +24,7 @@ FragmentInput Vertex(uint id : SV_VertexID)
 }
 
 float AngularDiameter;
-float3 Direction, Luminance;
+float3 Direction, Illuminance;
 
 Texture2D<float4> CloudTexture;
 Texture2D<float3> SkyTexture, _Input;
@@ -43,8 +43,8 @@ float3 Fragment(FragmentInput input) : SV_Target
 	 // 1. Considering the sun as a perfect disk, evaluate  it's solid angle (Could be precomputed)
 	float solidAngle = TwoPi * (1.0 - cos(0.5 * radians(AngularDiameter)));
 
-    // 2. Evaluate sun luiminance at ground level accoridng to solidAngle and luminance at zenith (noon)
-	float3 illuminance = Luminance * Exposure / solidAngle;
+    // 2. Evaluate sun luiminance at ground level accoridng to solidAngle and illuminance at zenith (noon)
+	float3 illuminance = Illuminance * Exposure / solidAngle;
 	
 	// Limb darkening
 	float centerToEdge = length(2.0 * input.uv - 1.0);

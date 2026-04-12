@@ -109,6 +109,8 @@ Texture2D<float> _TemporalInput, _History;
 
 float FragmentTemporal(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
+	return _TemporalInput[input.position.xy];
+
 	float minValue, maxValue, result;
 	TemporalNeighborhood(_TemporalInput, input.position.xy, minValue, maxValue, result);
 	

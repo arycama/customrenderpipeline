@@ -266,21 +266,33 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	float averageAlbedoMs = AverageAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(input.perceptualRoughness, f0Avg), 16));
 	float diffuseTerm = averageAlbedoMs ? viewDirectionalAlbedoMs * rcp(averageAlbedoMs) : 0.0; // TODO: Bake into DFG?
 	
+	// Get most representative point to sun
+	half3 R = reflect(-input.V, input.N);
+	half sunAngularRadius = SunAngularRadius;
+	half3 D = _LightDirection0;
+	half r = sin(sunAngularRadius);
+	half d = cos(sunAngularRadius);
+	
+	// Closest point to a disk (since the radius is small, this is a good approximation)
+	half DdotR = dot(D, R);
+	half3 S = R - DdotR * D;
+	half3 L = DdotR < d ? normalize(d * D + normalize(S) * r) : R;
+	
 	// Direct lighting
-	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -input.V.y, _LightDirection0.y, length(input.worldPosition));
+	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -input.V.y, L.y, length(input.worldPosition));
 	
 	float shadow = GetDirectionalShadow(input.worldPosition, softShadows) * CloudTransmittance(input.worldPosition);
 	
-	#ifdef SCREEN_SPACE_SHADOWS
+	#ifdef SCREEN_SPACE_SHADOWS_ON
 		shadow = min(shadow, lerp(1.0, ScreenSpaceShadows[pixelCoordinate], ScreenSpaceShadowsIntensity));
 	#endif
 	
 	#ifdef UNDERWATER_LIGHTING_ON
 		float3 underwaterTransmittance = exp(-_WaterShadowExtinction * max(0.0, -(input.worldPosition.y + ViewPosition.y)));
-		lightTransmittance *= WaterShadow(input.worldPosition, _LightDirection0) * GetCaustics(input.worldPosition + ViewPosition, _LightDirection0);
+		lightTransmittance *= WaterShadow(input.worldPosition, L) * GetCaustics(input.worldPosition + ViewPosition, L);
 	#endif
 	
-	float3 luminance = EvaluateLight(input, diffuseTerm, f0Avg, _LightDirection0, multiScatterTerm) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
+	float3 luminance = EvaluateLight(input, diffuseTerm, f0Avg, L, multiScatterTerm) * (_LightColor0 * lightTransmittance * Exposure) * shadow;
 	
 	uint3 clusterIndex;
 	clusterIndex.xy = pixelCoordinate / TileSize;
@@ -316,7 +328,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	
 	// Indirect Lighting
 	float3 iblN = input.N;
-	float3 R = reflect(-input.V, input.N);
+	//float3 R = reflect(-input.V, input.N);
 	float3 rStrength = 1.0;
 	
 	// Reflection correction for water

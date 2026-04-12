@@ -26,7 +26,7 @@ Shader "Hidden/Deferred Lighting"
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #pragma editor_sync_compilation
-            #pragma multi_compile _ SCREEN_SPACE_SHADOWS
+            #pragma multi_compile _ SCREEN_SPACE_SHADOWS_ON
             #pragma multi_compile _ SCREENSPACE_REFLECTIONS_ON
             #pragma multi_compile _ SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
             #include "DeferredLighting.hlsl"
@@ -51,7 +51,7 @@ Shader "Hidden/Deferred Lighting"
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #pragma editor_sync_compilation
-            #pragma multi_compile _ SCREEN_SPACE_SHADOWS
+            #pragma multi_compile _ SCREEN_SPACE_SHADOWS_ON
             #pragma multi_compile _ SCREENSPACE_REFLECTIONS_ON
             #pragma multi_compile _ SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
             #define TRANSLUCENCY

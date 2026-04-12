@@ -27,11 +27,11 @@ public class SetupCamera : ViewRenderFeature
         // Matrices
         // Screen
         var screenToPixel = Float4x4.Scale(new Float3((Float2)viewRenderData.viewSize, 1));
-        var pixelToScreen = Float4x4.ScaleOffset(new Float3(new Float2(1, -1) / (Float2)viewRenderData.viewSize, 1), new Float3(0, 1, 0));
+        var pixelToScreen = Float4x4.Scale(new Float3(1 / (Float2)viewRenderData.viewSize, 1));
 
         // Clip
         var clipToScreen = Float4x4.ScaleOffset(new Float3(0.5f, -0.5f, 1), new Float2(0.5f, 0).xxy);
-        var screenToClip = Float4x4.ScaleOffset(new Float2(2, 1).xxy, new Float2(-1, 0).xxy);
+        var screenToClip = Float4x4.ScaleOffset(new Float3(2, -2, 1), new Float3(-1, 1, 0));
         var clipToPixel = screenToPixel.Mul(clipToScreen);
         var pixelToClip = screenToClip.Mul(pixelToScreen);
 
@@ -74,12 +74,16 @@ public class SetupCamera : ViewRenderFeature
 		var worldToPreviousView = Float4x4.WorldToLocal(previousTransform.Item1 - viewPosition, previousTransform.Item2);
 		var worldToPreviousClip = previousTransform.Item3.Mul(worldToPreviousView);
 
-		var pixelToWorldDir = Float4x4.PixelToWorldViewDirectionMatrix(viewRenderData.viewSize, jitter, viewRenderData.tanHalfFov, viewToWorld, false, false);
+		var pixelToWorldDir = Float4x4.PixelToWorldViewDirectionMatrix(viewRenderData.viewSize, jitter, viewRenderData.tanHalfFov, viewToWorld, true, false);
 
 		var clipToPreviousClip = worldToPreviousClip.Mul(clipToWorld);
 
 		// TODO: I think this is similar to pixel to world view dir matrix, maybe make a shared function
-		var pixelToViewScaleOffset = new Float4(viewRenderData.tanHalfFov.x * 2.0f / viewRenderData.viewSize.x, viewRenderData.tanHalfFov.y * 2.0f / viewRenderData.viewSize.y, -viewRenderData.tanHalfFov.x * (1.0f - jitter.x), -viewRenderData.tanHalfFov.y * (1.0f - jitter.y));
+		var pixelToViewScaleOffset = new Float4
+        (viewRenderData.tanHalfFov.x * 2.0f / viewRenderData.viewSize.x, 
+        -viewRenderData.tanHalfFov.y * 2.0f / viewRenderData.viewSize.y, 
+        -viewRenderData.tanHalfFov.x * (1.0f - jitter.x), 
+        viewRenderData.tanHalfFov.y * (1.0f - jitter.y));
 
 		if(!previousTimeCache.TryGetValue(viewRenderData.viewId, out var previousTime))
 			previousTime = 0f;

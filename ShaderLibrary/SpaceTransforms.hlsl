@@ -199,6 +199,7 @@ float Linear01ToDeviceDepth(float depth)
 
 float4 PreviousClipPosition(float2 uv, float depth)
 {
+	uv.y = 1 - uv.y;
 	float linearDepth = LinearEyeDepth(depth);
 	float4 clipPosition = float4(uv * 2 - 1, depth, linearDepth);
 	clipPosition.xyz *= linearDepth;

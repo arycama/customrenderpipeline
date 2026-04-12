@@ -57,6 +57,8 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	float3 refractDir = refract(-_LightDirection0, normal, rcp(1.34));
 	float3 refractedPosition = IntersectRayPlane(worldPosition, refractDir, float3(0, -_CausticsDepth, 0.0), float3(0, 1, 0));
 	
+	float strength = 1.0 - Fresnel(dot(normal, _LightDirection0), 0.02);
+	
 	float4 worldX = _Input.GatherRed(LinearRepeatSampler, uv);
 	float4 worldZ = _Input.GatherGreen(LinearRepeatSampler, uv);
 	float4 refractedX = _Input.GatherBlue(LinearRepeatSampler, uv);
@@ -69,7 +71,7 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	FragmentInput output;
 	output.worldRefractedPosition = float4(worldPosition.xz, refractedPosition.xz);
 	output.position = mul(unity_MatrixVP, float4(refractedPosition, 1));
-	output.ratio = max(0, ratio);
+	output.ratio = max(0, ratio * strength);
 	return output;
 }
 

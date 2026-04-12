@@ -70,6 +70,7 @@ float4 FragmentCompute(VertexFullscreenTriangleOutput input) : SV_Target
 		{
 			// Find the intersection with the next pixel, and use that as the starting point for the ray
 			float2 rayDir = directionV.xy * (2.0 * side - 1.0);
+			rayDir.y = -rayDir.y;
 			float minT = Min2(FastSign(rayDir) / rayDir);
 			float2 rayStart = minT * rayDir + input.position.xy;
 			
@@ -146,6 +147,8 @@ float4 FragmentCompute(VertexFullscreenTriangleOutput input) : SV_Target
 
 float4 FragmentTemporal(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
+	//return Input[input.position.xy];
+
 	float4 result = 0.0, mean = 0.0, stdDev = 0.0;
 	float totalWeight = 0.0;
 	

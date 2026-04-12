@@ -37,7 +37,7 @@ public class SunDiskRenderer : ViewRenderFeature
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				pass.SetFloat("AngularDiameter", data.SunAngularDiameter);
-				pass.SetVector("Luminance", ColorspaceUtility.Rec709ToRec2020(data.light0Color));
+				pass.SetVector("Illuminance", ColorspaceUtility.Rec709ToRec2020(data.light0Color));
 				pass.SetVector("Direction", data.light0Direction);
 			});
 		}

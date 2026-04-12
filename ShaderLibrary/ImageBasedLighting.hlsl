@@ -1,4 +1,5 @@
-#pragma once
+#ifndef IMAGE_BASED_LIGHTING_INCLUDED
+#define IMAGE_BASED_LIGHTING_INCLUDED
 
 #include "Brdf.hlsl"
 #include "Geometry.hlsl"
@@ -256,3 +257,5 @@ float GetSpecularLobeTanHalfAngle(float roughness, float percentOfVolume = 0.75)
 {
 	return tan(radians(90 * roughness * roughness / (1.0 + roughness * roughness)));
 }
+
+#endif

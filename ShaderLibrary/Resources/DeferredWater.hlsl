@@ -206,6 +206,8 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 		}
 	}
 	
+	result = _ScatterInput[input.position.xy];
+	
 	// Apply roughness to transmission
 	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
 	float3 V = normalize(-input.worldDirection);

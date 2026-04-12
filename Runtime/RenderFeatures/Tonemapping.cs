@@ -42,8 +42,8 @@ public partial class Tonemapping : ViewRenderFeature
         pass.FrameBufferFormat = viewRenderData.format;
 
         pass.ReadRtHandle<CameraTarget>();
-
         pass.ReadRtHandle<ColorGradingTexture>();
+        pass.ReadResource<ScreenSpaceReflectionResult>(true);
 
         if (bloomSettings.BloomStrength > 0.0f)
         {

@@ -30,7 +30,7 @@ float GetBoxFilterWeight(uint index)
 float2 CalculateVelocity(float2 uv, float4 previousClipPosition)
 {
 	// TODO: Revise
-	return (uv + _Jitter.zw - ClipToScreenPosition(previousClipPosition)) * float2(1, -1) + float2(0, 1);
+	return uv + _Jitter.zw - (ClipToScreenPosition(previousClipPosition) * float2(1, -1) + float2(0, 1));
 }
 
 float2 CalculateVelocity(float2 uv, float depth)
