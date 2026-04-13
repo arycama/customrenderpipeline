@@ -1,4 +1,5 @@
-#pragma once
+#ifndef GEOMETRY_INCLUDED
+#define GEOMETRY_INCLUDED
 
 #include "Math.hlsl"
 #include "Utility.hlsl"
@@ -539,3 +540,5 @@ half3x3 GetLocalFrame(half3 localZ)
     // s.t. if localZ = {0, 0, 1}, then localX = {-1, 0, 0} and localY = {0, -1, 0}.
 	return half3x3(localX, localY, localZ);
 }
+
+#endif

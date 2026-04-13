@@ -1,197 +1,35 @@
-#include "../Common.hlsl"
+#include "../BloomCommon.hlsl"
+#include "../CommonShaders.hlsl"
 #include "../Color.hlsl"
 #include "../Material.hlsl"
 #include "../Samplers.hlsl"
 
 Texture2D<float3> Input;
-float4 Input_TexelSize, InputScaleLimit;
+float4 InputScaleLimit;
+float2 RcpResolution;
 float Strength;
 
-Texture2D<float3> LensDirt, FlareInput;
-float4 ScaleOffset;
-float DirtStrength;
-Texture2D<float> Starburst;
-float DistortionQuality, Distortion, GhostCount, GhostSpacing, HaloWidth, StreakStrength, HaloStrength, GhostStrength, HaloRadius;
-
-float SampleWeight(float2 pos)
+float3 FragmentDownsample(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
-	float w = length(0.5 - pos) / length(float2(0.5, 0.5));
-	return pow(1.0 - w, 5.0);
-}
-
-// Cubic window; map [0, _radius] in [1, 0] as a cubic falloff from _center.
-float Window_Cubic(float _x, float _center, float _radius)
-{
-	_x = min(abs(_x - _center) / _radius, 1.0);
-	return 1.0 - _x * _x * (3.0 - 2.0 * _x);
-}
-
-float KarisAverage(float3 col)
-{
-    // Formula is 1 / (1 + luma)
-	float luma = Rec2020Luminance(col) * 0.25f;
-	return 1.0f / (1.0f + luma);
-}
-
-float3 textureDistorted(float2 uv, float2 direction, float2 distortion)
-{
-	float3 color = 0;
-	float divisor = 1.0;
-	color.r += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv - direction * distortion, InputScaleLimit)).r;
-	color.g += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv, InputScaleLimit)).g;
-	color.b += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + direction * distortion, InputScaleLimit)).b;
+	float3 color = Input.SampleLevel(LinearClampSampler, input.uv + float2(0.0, 0.0) * RcpResolution, 0.0) * 0.125;
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(1.0, 1.0) * RcpResolution, 0.0) * 0.125;
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(-1.0, 1.0) * RcpResolution, 0.0) * 0.125;
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(-1.0, -1.0) * RcpResolution, 0.0) * 0.125;
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(1.0, -1.0) * RcpResolution, 0.0) * 0.125;
 	
-	if (DistortionQuality == 2)
-	{
-		color.rg += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv - direction * distortion * 0.5, InputScaleLimit)).rg * float2(1.0, 0.5);
-		color.gb += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + direction * distortion * 0.5, InputScaleLimit)).gb * float2(0.5, 1.0);
-		divisor = 2.0;
-	}
-	else if (DistortionQuality == 3)
-	{
-		color.rg += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv - direction * distortion * 0.667, InputScaleLimit)).rg * float2(1.0, 0.333);
-		color.rg += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv - direction * distortion * 0.333, InputScaleLimit)).rg * float2(1.0, 0.667);
-		color.gb += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + direction * distortion * 0.333, InputScaleLimit)).gb * float2(0.667, 1.0);
-		color.gb += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + direction * distortion * 0.667, InputScaleLimit)).gb * float2(0.333, 1.0);
-		divisor = 3.0;
-	}
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(0.0, 2.0) * RcpResolution, 0.0) * 0.0625;
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(2.0, 0.0) * RcpResolution, 0.0) * 0.0625;
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(-2.0, 0.0) * RcpResolution, 0.0) * 0.0625;
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(0.0, -2.0) * RcpResolution, 0.0) * 0.0625;
 	
-	return color / divisor;
-}
-
-float3 LensFlare(float2 uv)
-{
-	uv = 1.0 - uv;
-	
-	// Ghost vector to image centre:
-	float2 ghostVec = (0.5 - uv) * GhostSpacing;
-	float2 direction = normalize(ghostVec);
-	
-	// Ghosts
-	float3 result = 0.0;
-	for (float i = 0.0; i < GhostCount; i++)
-	{
-		float2 suv = frac(uv + ghostVec * i);
-		float d = distance(suv, 0.5);
-		float weight = 1.0 - smoothstep(0.0, 0.5, d); // reduce contributions from samples at the screen edge
-		float3 s = Input.Sample(LinearClampSampler, ClampScaleTextureUv(suv, InputScaleLimit));
-		result += s * weight * GhostStrength;
-		
-		//result += textureDistorted(suv, direction, Distortion * weight) * weight * GhostStrength;
-	}
-	
-	//result *= texture(lens_color, float2(length(0.5 - uv) / length(0.5), 0)).rgb;
-	
-	// Halo
-	//float aspect = _Resolution.w / _Resolution.z;
-	//float2 haloVec = 0.5 - uv;
-	//haloVec.x /= aspect;
-	//haloVec = normalize(haloVec);
-	//haloVec.x *= aspect;
-	//float2 wuv = (uv - float2(0.5, 0.0)) / float2(aspect, 1.0) + float2(0.5, 0.0);
-	//float d = distance(wuv, 0.5);
-	//float haloWeight = Window_Cubic(d, _HaloRadius, _HaloWidth); // cubic window function
-	//haloVec *= _HaloRadius;
-	
-	//haloVec = normalize(ghostVec / float2(1.0, aspect)) * float2(1.0, aspect) * _HaloWidth;
-	//result += textureDistorted(uv + haloVec, direction, _Distortion) * SampleWeight(frac(uv + haloVec)) * _HaloStrength;
-	//result += _Input.Sample(LinearClampSampler, uv + haloVec, 0.0) * haloWeight;
-	
-	float2 aspect = float2(1.0, lerp(1.0, ViewSize.x / ViewSize.y, 0.0));
-	float2 haloVec = normalize(ghostVec / aspect) * aspect * HaloRadius;
-	float d = distance(uv + haloVec, 0.5);
-	float weight = 1.0 - smoothstep(0.0, 0.5, d);
-	result += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + haloVec, InputScaleLimit)) * SampleWeight(frac(uv + haloVec)) * HaloStrength;
-	//result += textureDistorted(uv + haloVec, direction, Distortion * weight) * weight * HaloStrength;
-	
-	// Starburst
-	float2 centerVec = uv - 0.5;
-	d = length(centerVec);
-	float radial = FastACos(centerVec.x / d);
-	
-	float starOffset = dot(ViewToWorld._13_23_33, 1.0);
-	float mask = Starburst.Sample(LinearRepeatSampler, float2(radial + starOffset, 0.0) * 4, 0.0) * Starburst.Sample(LinearRepeatSampler, float2(radial + starOffset * 0.5, 0.0) * 4, 0.0);
-	//mask = saturate(mask + (1.0 - smoothstep(0.0, 0.3, d)));
-	
-	//result *= lerp(1.0, mask, StreakStrength);
-	
-	result = IsInfOrNaN(result) ? 0 : result;
-	
-	return result;
-}
-
-float3 FragmentDownsample(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
-{
-	float3 a = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(-2.0, 2.0), InputScaleLimit), 0);
-	float3 b = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(0.0, 2.0), InputScaleLimit), 0);
-	float3 c = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(2.0, 2.0), InputScaleLimit), 0);
-
-	float3 d = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(-2.0, 0.0), InputScaleLimit), 0);
-	float3 e = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(0.0, 0.0), InputScaleLimit), 0);
-	float3 f = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(2.0, 0.0), InputScaleLimit), 0);
-
-	float3 g = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(-2.0, -2.0), InputScaleLimit), 0);
-	float3 h = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(0.0, -2.0), InputScaleLimit), 0);
-	float3 i = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(2.0, -2.0), InputScaleLimit), 0);
-
-	float3 j = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(-1.0, 1.0), InputScaleLimit), 0);
-	float3 k = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(1.0, 1.0), InputScaleLimit), 0);
-	float3 l = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(-1.0, -1.0), InputScaleLimit), 0);
-	float3 m = Input.SampleLevel(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(1.0, -1.0), InputScaleLimit), 0);
-	
-	//float3 color = e * 0.125;
-	//color += (a + c + g + i) * 0.03125;
-	//color += (b + d + f + h) * 0.0625;
-	//color += (j + k + l + m) * 0.125;
-	
-	float3 color;
-	
-	#ifdef FIRST
-		// We are writing to mip 0, so we need to apply Karis average to each block
-		// of 4 samples to prevent fireflies (very bright subpixels, leads to pulsating
-		// artifacts).
-		float3 groups[5];
-		groups[0] = (a + b + d + e) * (0.125f / 4.0f);
-		groups[1] = (b + c + e + f) * (0.125f / 4.0f);
-		groups[2] = (d + e + g + h) * (0.125f / 4.0f);
-		groups[3] = (e + f + h + i) * (0.125f / 4.0f);
-		groups[4] = (j + k + l + m) * (0.5f / 4.0f);
-		groups[0] *= KarisAverage(groups[0]);
-		groups[1] *= KarisAverage(groups[1]);
-		groups[2] *= KarisAverage(groups[2]);
-		groups[3] *= KarisAverage(groups[3]);
-		groups[4] *= KarisAverage(groups[4]);
-		color = groups[0] + groups[1] + groups[2] + groups[3] + groups[4];
-	#else
-		color = e * 0.125;
-		color += (a + c + g + i) * 0.03125;
-		color += (b + d + f + h) * 0.0625;
-		color += (j + k + l + m) * 0.125;
-	#endif
-	
-	#ifdef FIRST
-		color += LensFlare(uv);
-	#endif
-	
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(2.0, 2.0) * RcpResolution, 0.0) * 0.03125;
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(-2.0, 2.0) * RcpResolution, 0.0) * 0.03125;
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(-2.0, -2.0) * RcpResolution, 0.0) * 0.03125;
+	color += Input.SampleLevel(LinearClampSampler, input.uv + float2(2.0, -2.0) * RcpResolution, 0.0) * 0.03125;
 	return color;
 }
 
-float4 FragmentUpsample(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
+float4 FragmentUpsample(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
-	float3 color = Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(-1, 1), InputScaleLimit)) * 0.0625;
-	color += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(0, 1), InputScaleLimit)) * 0.125;
-	color += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(1, 1), InputScaleLimit)) * 0.0625;
-
-	color += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(-1, 0), InputScaleLimit)) * 0.125;
-	color += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(0, 0), InputScaleLimit)) * 0.25;
-	color += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(1, 0), InputScaleLimit)) * 0.125;
-
-	color += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(-1, -1), InputScaleLimit)) * 0.0625;
-	color += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(0, -1), InputScaleLimit)) * 0.125;
-	color += Input.Sample(LinearClampSampler, ClampScaleTextureUv(uv + Input_TexelSize.xy * float2(1, -1), InputScaleLimit)) * 0.0625;
-	
-	float3 dirt = LensDirt.Sample(LinearClampSampler, uv);
-	dirt = lerp(1.0, dirt, DirtStrength);
-	
-	return float4(color, Strength * dirt.r);
+	return float4(SampleBloom(input.uv, Input, RcpResolution, InputScaleLimit), Strength);
 }

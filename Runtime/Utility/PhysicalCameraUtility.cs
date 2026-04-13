@@ -53,4 +53,26 @@ public static class PhysicalCameraUtility
     {
         return Log2(Sq(aperture) * Sensitivity / (shutterSpeed * ISO));
     }
+
+    // Angular radius of Airy disc in radians
+    public static float AiryDiscRadius(float wavelength, float apertureDiameter, float focalLength)
+    {
+        return 1.22f * wavelength / apertureDiameter;
+    }
+
+    public static float FocalLength(float sensorSize, float tanHalfFov)
+    {
+        return 0.5f * sensorSize / tanHalfFov;
+    }
+
+    public static float ApertureRadius(float focalLength, float aperture)
+    {
+        return 0.5f * focalLength / aperture;
+    }
+
+    public static float CalculateAiryDiscPixels(float airyDiscRadius, float sensorSize, float focalLength, float resolution)
+    {
+        var physicalSize = 2.0f * focalLength * Tan(airyDiscRadius);
+        return physicalSize / sensorSize * resolution;
+    }
 }

@@ -34,7 +34,7 @@ public partial class Tonemapping : ViewRenderFeature
             viewRenderData.viewSize,
             GraphicsUtilities.HalfTexelRemap(colorGradingSettings.Resolution),
             colorGradingSettings.PaperWhite * Math.Sqrt(2.0f),
-            bloomSettings.BloomStrength,
+            bloomSettings.Strength,
             hdrSettings.peakLuminance));
 
         pass.Initialize(tonemapMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 0);
@@ -45,7 +45,7 @@ public partial class Tonemapping : ViewRenderFeature
         pass.ReadRtHandle<ColorGradingTexture>();
         pass.ReadResource<ScreenSpaceReflectionResult>(true);
 
-        if (bloomSettings.BloomStrength > 0.0f)
+        if (bloomSettings.Strength > 0.0f)
         {
             pass.ReadRtHandle<CameraBloom>();
             pass.AddKeyword("BLOOM");

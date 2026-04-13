@@ -1,4 +1,5 @@
-﻿#include "../Common.hlsl"
+﻿#include "../BloomCommon.hlsl"
+#include "../Common.hlsl"
 #include "../Color.hlsl"
 #include "../Exposure.hlsl"
 #include "../Material.hlsl"
@@ -13,14 +14,10 @@ Texture2D<float3> CameraBloom;
 Texture3D<float3> ColorGradingTexture;
 float4 CameraBloomScaleLimit, CameraBloom_TexelSize;
 
-//cbuffer Properties
-
-	float2 Resolution;
-	float2 LutScaleOffset;
-	//float PaperWhite;
-	float BloomStrength;
-	float MaxLuminance;
-
+float2 Resolution;
+float2 LutScaleOffset;
+float BloomStrength;
+float MaxLuminance;
 
 float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 {
@@ -35,22 +32,9 @@ float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	float3 color = CameraTarget[position];
 	
 	#ifdef BLOOM
-		float3 bloom = CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, 1), CameraBloomScaleLimit)) * 0.0625;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, 1), CameraBloomScaleLimit)) * 0.125;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, 1), CameraBloomScaleLimit)) * 0.0625;
-
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, 0), CameraBloomScaleLimit)) * 0.125;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, 0), CameraBloomScaleLimit)) * 0.25;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, 0), CameraBloomScaleLimit)) * 0.125;
-
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(-1, -1), CameraBloomScaleLimit)) * 0.0625;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(0, -1), CameraBloomScaleLimit)) * 0.125;
-		bloom += CameraBloom.Sample(LinearClampSampler, ClampScaleTextureUv(uv + CameraBloom_TexelSize.xy * float2(1, -1), CameraBloomScaleLimit)) * 0.0625;
-	
+		float3 bloom = SampleBloom(uv, CameraBloom, CameraBloom_TexelSize.xy, CameraBloomScaleLimit);
 		color = lerp(color, bloom, BloomStrength);
 	#endif
-	
-	//color = ScreenSpaceReflections[position].xyz;
 	
 	color *= PaperWhite;
 	color = Rec2020ToICtCp(color);

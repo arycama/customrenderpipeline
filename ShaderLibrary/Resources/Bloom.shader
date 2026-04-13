@@ -12,7 +12,7 @@ Shader "Hidden/Bloom"
             Name "Downsample First"
         
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentDownsample
             #define FIRST
             #include "Bloom.hlsl"
@@ -24,7 +24,7 @@ Shader "Hidden/Bloom"
             Name "Downsample"
         
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentDownsample
             #include "Bloom.hlsl"
             ENDHLSL
@@ -37,7 +37,7 @@ Shader "Hidden/Bloom"
             Name "Upsample"
             
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangle
+            #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentUpsample
             #include "Bloom.hlsl"
             ENDHLSL

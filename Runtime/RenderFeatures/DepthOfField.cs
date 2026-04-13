@@ -27,9 +27,8 @@ public partial class DepthOfField : ViewRenderFeature
 
 		var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
 		var tempId = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32);
-		var sensorSize = lensSettings.SensorSize * 0.001f; // Convert from mm to m
-		var focalLength = 0.5f * sensorSize / viewRenderData.tanHalfFov.y;
-		var apertureRadius = 0.5f * focalLength / lensSettings.Aperture;
+        var focalLength = PhysicalCameraUtility.FocalLength(lensSettings.SensorSize * 0.001f, viewRenderData.tanHalfFov.y);
+		var apertureRadius = PhysicalCameraUtility.ApertureRadius(focalLength, lensSettings.Aperture);
 
 		if (settings.UseRaytracing)
 		{
