@@ -31,7 +31,7 @@ public class ShaderFinder : ScriptableWizard
 
             if (material.shader == source)
             {
-				Debug.Log(path);
+				Debug.Log(path, material);
             }
         }
     }
