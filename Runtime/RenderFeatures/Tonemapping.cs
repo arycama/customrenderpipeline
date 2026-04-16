@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering;
 
 public partial class Tonemapping : ViewRenderFeature
 {
@@ -14,9 +12,6 @@ public partial class Tonemapping : ViewRenderFeature
 
     private bool previousNormalize;
     private readonly HashSet<int> renderedViewIndices = new();
-    private ResourceHandle<RenderTexture> colorLut;
-    private int previousLutResolution;
-    private int previousSettingsHash;
 
     public Tonemapping(RenderGraph renderGraph, ColorGrading.Settings colorGradingSettings, Bloom.Settings bloomSettings) : base(renderGraph)
     {
@@ -38,6 +33,7 @@ public partial class Tonemapping : ViewRenderFeature
             hdrSettings.peakLuminance));
 
         pass.Initialize(tonemapMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 0);
+        pass.PreventNewSubPass = true;
         pass.FrameBufferTarget = viewRenderData.target;
         pass.FrameBufferFormat = viewRenderData.format;
 

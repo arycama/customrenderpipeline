@@ -8,7 +8,6 @@
 #include "../../Lighting.hlsl"
 #include "../../ImageBasedLighting.hlsl"
 #include "../../ScreenSpaceRaytracing.hlsl"
-//#include "../../Water/WaterPrepassCommon.hlsl"
 
 cbuffer Properties
 {
@@ -39,43 +38,39 @@ TraceResult Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0, float
 	float rcpPdf;
 	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
 	
-	L = reflect(-V, N);
+	float3 rayOrigin = float3(position.xy, depth);
+	float3 rayDirection = MultiplyPointProj(WorldToPixel, worldPosition + L).xyz - rayOrigin;
 	
-	float3 pixelPosition = MultiplyPointProj(WorldToPixel, worldPosition + L * 0.1).xyz;
-	
-	pixelPosition.x = position.x;
-	pixelPosition.y = position.y - 1;
-	
-	float3 rayPos = ScreenSpaceRaytrace(float3(pixelPosition.xy, depth), worldPosition + L * 0.1, L, MaxSteps, Thickness, HiZMinDepth, MaxMip);
+	bool validHit;
+	float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, MaxSteps, Thickness, HiZMinDepth, MaxMip, validHit);
 	
 	float outDepth;
 	float3 color, hitRay;
-	//if(rayPos.z > 0.0)
-	//{
-		//float2 velocity = CameraVelocity[rayPos.xy];
-		//float2 hitUv = rayPos.xy * RcpViewSize - velocity * 0;
+	if (rayPos.z > 0.0 && validHit)
+	{
+		float2 velocity = CameraVelocity[rayPos.xy];
+		float2 hitUv = rayPos.xy * RcpViewSize - velocity;
 		outDepth = Linear01Depth(depth);
 		
-		//float3 worldHit = PixelToWorldPosition(rayPos);
-		//hitRay = worldHit - worldPosition;
+		float3 worldHit = PixelToWorldPosition(rayPos);
+		hitRay = worldHit - worldPosition;
 		
-		//float coneTangent = GetSpecularLobeTanHalfAngle(roughness);
-		//coneTangent *= lerp(saturate(NdotV * 2), 1, sqrt(roughness));
+		float coneTangent = GetSpecularLobeTanHalfAngle(roughness);
+		coneTangent *= lerp(saturate(NdotV * 2), 1, sqrt(roughness));
 		
-		//// Calculate size of a screenspace cone based on distance travelled and depth of sample (since distant pixels are smaller)
-		//float hitDist = length(hitRay);
-		//float linearHitDepth = LinearEyeDepth(rayPos.z);
-		//float mipLevel = log2(ViewSize.y * 0.5 * coneTangent * hitDist / (linearHitDepth * TanHalfFov));
+		// Calculate size of a screenspace cone based on distance travelled and depth of sample (since distant pixels are smaller)
+		float hitDist = length(hitRay);
+		float linearHitDepth = LinearEyeDepth(rayPos.z);
+		float mipLevel = log2(ViewSize.y * 0.5 * coneTangent * hitDist / (linearHitDepth * TanHalfFov));
 		
-		//color = PreviousCameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, PreviousCameraTargetScaleLimit), mipLevel * 0);
-		color = PreviousCameraTarget[rayPos.xy];
-	//}
-	//else
-	//{
-	//	color = 0.0;
-	//	hitRay = L;
-	//	outDepth = 0.0;
-	//}
+		color = PreviousCameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, PreviousCameraTargetScaleLimit), mipLevel);
+	}
+	else
+	{
+		color = 0.0;
+		hitRay = L;
+		outDepth = 0.0;
+	}
 	
     TraceResult output;
 	output.color = float4(color, rcpPdf);
@@ -172,8 +167,6 @@ SpatialResult FragmentSpatial(float4 position : SV_Position, float2 uv : TEXCOOR
 	// Final alpha is the ratio of hit weight vs non hit weight
 	result.a = totalWeight ? result.a / totalWeight : 0.0;
 	
-	result = float4(_Input[position.xy].rgb, 1);
-	
 	SpatialResult output;
 	output.result = result;
 	output.rayLength = avgRayLength;
@@ -201,12 +194,12 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
 	worldPosition += normalize(worldDir) * rayLength;
 	
-	float4 previousClipPosition = WorldToClipPrevious(worldPosition);
+	float4 previousPosition = WorldToPreviousScreenPosition(worldPosition);
 	
 	float2 velocity = CameraVelocity[position.xy];
-	velocity = CalculateVelocity(uv, previousClipPosition);
+	velocity = CalculateVelocity(uv, previousPosition);
 	
-	float2 historyUv = uv - velocity * 0;
+	float2 historyUv = uv - velocity;
 	float4 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
 	float historyWeight = WeightHistory[position.xy];
 	
@@ -226,7 +219,6 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 			current *= rcp(currentWeight);
 	}
 	
-	current = _TemporalInput[position.xy];
 	current = IsInfOrNaN(current) ? 0 : current;
 	
 	TemporalOutput result;

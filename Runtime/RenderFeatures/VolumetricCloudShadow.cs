@@ -95,7 +95,7 @@ public class VolumetricCloudShadow : ViewRenderFeature
         var viewMatrix = Matrix4x4.Rotate(worldToLight);
         var invViewMatrix = Matrix4x4.Rotate(lightRotation);
 
-        var projectionMatrix = Matrix4x4Extensions.OrthoOffCenterNormalized(minValue.x, maxValue.x, minValue.y, maxValue.y, minValue.z, maxValue.z);
+        var projectionMatrix = Float4x4.OrthoOffCenterNormalized(minValue.x, maxValue.x, minValue.y, maxValue.y, minValue.z, maxValue.z);
         var inverseProjectionMatrix = new Matrix4x4
         {
             m00 = 1.0f / settings.ShadowResolution * (maxValue.x - minValue.x),
@@ -146,7 +146,7 @@ public class VolumetricCloudShadow : ViewRenderFeature
             pass.ReadResource<LightingData>();
 			pass.ReadResource<FrameData>();
 			pass.ReadResource<ViewData>();
-			pass.ReadResource<SkyTransmittanceData>();
+			pass.ReadResource<SkyViewTransmittanceData>();
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {

@@ -255,27 +255,6 @@ uint BitOr(uint2 x) { return x.x | x.y; }
 uint BitOr(uint3 x) { return x.x | BitOr(x.yz); }
 uint BitOr(uint4 x) { return x.x | BitOr(x.yzw); }
 
-uint BitPack(uint1 data, uint1 size, uint1 offset) { return (data & (Exp2Pow2(size) - 1u)) << offset; }
-uint BitPack(uint2 data, uint2 size, uint2 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
-uint BitPack(uint3 data, uint3 size, uint3 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
-uint BitPack(uint4 data, uint4 size, uint4 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
-
-uint BitPackFloat(float data, uint size, uint offset)
-{
-	uint packedData = round(data * (Exp2Pow2(size) - 1u));
-	return BitPack(packedData, size, offset);
-}
-
-uint1 BitUnpack(uint1 data, uint1 size, uint1 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
-uint2 BitUnpack(uint2 data, uint2 size, uint2 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
-uint3 BitUnpack(uint3 data, uint3 size, uint3 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
-uint4 BitUnpack(uint4 data, uint4 size, uint4 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
-
-float BitUnpackFloat(uint data, uint size, uint offset)
-{
-	return BitUnpack(data, size, offset) / (float) (Exp2Pow2(size) - 1u);
-}
-
 bool Checker(float2 position)
 {
 	return frac(dot(position, 0.5)) < 0.5;
@@ -478,6 +457,19 @@ float Select4(float4 a, float b)
 {
 	//return dot(a, b == float4(0, 1, 2, 3));
 	return b ? (b == 3 ? a.w : (b == 2 ? a.z : a.y)) : a.x;
+}
+
+float CalculateMipLevel(float2 dx, float2 dy, float2 resolution)
+{
+	dx *= resolution;
+	dy *= resolution;
+
+	float lenDxSqr = dot(dx, dx);
+	float lenDySqr = dot(dy, dy);
+	float dMaxSqr = max(lenDxSqr, lenDySqr);
+
+	// Calculate mipmap levels directly from sqared distances. This uses log2(sqrt(x)) = 0.5 * log2(x) to save some sqrt's
+	return 0.5 * log2(dMaxSqr);
 }
 
 #endif

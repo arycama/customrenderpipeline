@@ -203,7 +203,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<AutoExposureData>();
 		    pass.ReadResource<VirtualTextureData>(true);
-		    pass.ReadResource<TerrainViewData>(true);
+			pass.ReadResource<TerrainFrameData>(true);
+            pass.ReadResource<TerrainViewData>(true);
 		}),
 
         new GenericViewRenderFeature(renderGraph, viewRenderData =>
@@ -228,6 +229,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<TemporalAAData>();
 			pass.ReadResource<AutoExposureData>();
+			pass.ReadResource<TerrainFrameData>(true);
 		    pass.ReadResource<VirtualTextureData>(true);
 		    pass.ReadResource<TerrainViewData>(true);
 		}),
@@ -340,42 +342,25 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// TODO: Could render clouds after deferred, then sky after that
 		new DeferredLighting(renderGraph, asset.Sky),
 
-		new GenericViewRenderFeature(renderGraph, viewRenderData =>
-		{
-            // Generate for next frame
-            var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
-            using (var pass = renderGraph.AddGenericRenderPass("Generate Color Pyramid", cameraTarget))
-			{
-				pass.ReadRtHandle<CameraTarget>();
-				pass.SetRenderFunction(static (command, pass, cameraTarget) =>
-				{
-					command.GenerateMips(pass.GetRenderTexture(cameraTarget));
-				});
-			}
-		}),
-
 		new SunDiskRenderer(renderGraph, asset.LightingSettings),
 
 		// Depends on atmosphere, depth and light
 		new VolumetricClouds(asset.Clouds, renderGraph, asset.Sky),
 		new Sky(renderGraph, asset.Sky),
 
-        //new GenericViewRenderFeature(renderGraph, viewRenderData =>
-        //{
-        //    // Generate for next frame
-        //    var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
-        //    var previousCameraTarget = renderGraph.GetRTHandle<PreviousCameraTarget>();
-        //    using (var pass = renderGraph.AddGenericRenderPass("Generate Color Pyramid", (cameraTarget, previousCameraTarget)))
-        //    {
-        //        pass.ReadRtHandle<CameraTarget>();
-
-        //        pass.SetRenderFunction(static (command, pass, data) =>
-        //        {
-        //            command.CopyTexture(pass.GetRenderTexture(data.cameraTarget), 0, 0, pass.GetRenderTexture(data.previousCameraTarget), 0, 0);
-        //            command.GenerateMips(pass.GetRenderTexture(data.previousCameraTarget));
-        //        });
-        //    }
-        //}),
+        new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        {
+            // Generate for next frame
+            var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
+            using (var pass = renderGraph.AddGenericRenderPass("Generate Color Pyramid", cameraTarget))
+            {
+                pass.ReadRtHandle<CameraTarget>();
+                pass.SetRenderFunction(static (command, pass, cameraTarget) =>
+                {
+                    command.GenerateMips(pass.GetRenderTexture(cameraTarget));
+                });
+            }
+        }),
 
         new GenericViewRenderFeature(renderGraph, viewRenderData =>
 		{
@@ -399,16 +384,19 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 			pass.ReadResource<AutoExposureData>();
 			pass.ReadResource<AtmospherePropertiesAndTables>();
 			pass.ReadResource<TemporalAAData>();
-			pass.ReadResource<SkyTransmittanceData>();
-			pass.ReadResource<CloudRenderResult>();
+			pass.ReadResource<SkyViewTransmittanceData>();
 			pass.ReadResource<CloudShadowDataResult>();
 			pass.ReadResource<VolumetricLighting.Result>();
 			pass.ReadResource<LightingSetup.Result>();
 			pass.ReadResource<ClusteredLightCulling.Result>();
 			pass.ReadResource<ParticleShadowData>();
 		    pass.ReadResource<VirtualTextureData>(true);
+			pass.ReadResource<TerrainFrameData>(true);
 		    pass.ReadResource<TerrainViewData>(true);
-		}),
+
+            if(pass.TryReadResource<CloudRenderResult>())
+                pass.AddKeyword("CLOUDS_ON");
+        }),
 
         // Do rain after water so we can get raindrops on the water surface
 		new RainTextureUpdater(renderGraph, asset.Rain),

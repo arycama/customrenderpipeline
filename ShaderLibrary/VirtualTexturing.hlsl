@@ -2,6 +2,7 @@
 #define VIRTUAL_TEXTURING_INCLUDED
 
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Math.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Utility.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Samplers.hlsl"
 
@@ -22,7 +23,7 @@ cbuffer VirtualTextureData
 	uint PageTableSize;
 };
 
-float CalculateMipLevel(float2 dx, float2 dy, float2 resolution, bool aniso = false, float maxAnisoLevel = 1)
+float CalculateVirtualMipLevel(float2 dx, float2 dy, float2 resolution, bool aniso = false, float maxAnisoLevel = 1)
 {
 	dx *= resolution;
 	dy *= resolution;
@@ -52,7 +53,7 @@ float CalculateMipLevel(float2 dx, float2 dy, float2 resolution, bool aniso = fa
 uint3 CalculatePageTableCoords(float2 uv, float2 dx, float2 dy)
 {
 	uint3 coord;
-	coord.z = CalculateMipLevel(dx, dy, VirtualTextureSize, true, AnisoLevel);
+	coord.z = CalculateVirtualMipLevel(dx, dy, VirtualTextureSize, true, AnisoLevel);
 	coord.xy = (PageTableSize >> coord.z) * uv;
 	return coord;
 }

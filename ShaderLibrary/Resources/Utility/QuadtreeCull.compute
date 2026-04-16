@@ -1,6 +1,7 @@
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Common.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Geometry.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/IndirectRendering.hlsl"
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Utility.hlsl"
 
 #pragma kernel InstanceCull

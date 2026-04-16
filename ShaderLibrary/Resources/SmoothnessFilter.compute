@@ -46,8 +46,8 @@ void GenerateLengthToSmoothness(uint id : SV_DispatchThreadID)
 		float t = uv;
 		float minDelta = FloatMax;
 		
-		float aLow = 0.0;
-		float aHigh = 1.0;
+		float a = 0.0;
+		float b = 1.0;
 		float fLow = 1.0 - target;
 		float fHigh = 2.0 / 3.0 - target;
 
@@ -64,25 +64,26 @@ void GenerateLengthToSmoothness(uint id : SV_DispatchThreadID)
 				t = xi;
 			}
 			#else
-			float aMid = 0.5 * (aLow + aHigh);
-			float fMid = RoughnessToNormalLength1(aMid) - target;
+			float c = 0.5 * (a + b);
+			float fMid = RoughnessToNormalLength1(c) - target;
         
-			if (FastSign(fMid) != FastSign(fLow))
+			if (FastSign(fMid) == FastSign(fLow))
 			{
-				// Root is in [aLow, aMid]
-				aHigh = aMid;
-				fHigh = fMid;
+				// Root is in [c, b]
+				a = c;
+				fLow = fMid;
+				
 			}
 			else
 			{
-				// Root is in [aMid, aHigh]
-				aLow = aMid;
-				fLow = fMid;
+				// Root is in [a, c]
+				b = c;
+				fHigh = fMid;
 			}
 			#endif
 		}
 		
-		t = 0.5 * (aLow + aHigh);
+		t = 0.5 * (a + b);
 		
 		_LengthToRoughnessResult[uint2(id, 0)] = t;
 	}

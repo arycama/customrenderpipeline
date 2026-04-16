@@ -57,11 +57,11 @@ Shader "Hidden/Physical Sky Tables"
 
         Pass
         {
-            Name "Transmittance Lookup 2"
+            Name "View Transmittance Lookup"
 
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangleVolume
-            #pragma fragment FragmentTransmittanceLut2
+            #pragma fragment FragmentViewTransmittanceLut
             #include "PhysicalSkyTables.hlsl"
             ENDHLSL
         }

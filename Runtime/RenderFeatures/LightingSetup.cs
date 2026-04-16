@@ -111,7 +111,7 @@ public partial class LightingSetup : ViewRenderFeature
 						var lightBounds = Geometry.GetFrustumBounds(viewRenderData.tanHalfFov, near, far, viewToLight);
 						var projectionMatrix = Float4x4.Ortho(lightBounds);
                         var viewToShadowClip = Float4x4.OrthoReverseZ(lightBounds);
-                        var shadowSplitData = CalculateShadowSplitData(viewToShadowClip.Mul(worldToLight), lightRotation.Forward, viewRenderData.camera, true);
+                        var shadowSplitData = CalculateShadowSplitData(projectionMatrix.Mul(worldToLight), lightRotation.Forward, true);
 						shadowSplitData.shadowCascadeBlendCullingFactor = 1;
 
 
@@ -148,14 +148,14 @@ public partial class LightingSetup : ViewRenderFeature
 						if (j == 2) index = 3;
 						else if (j == 3) index = 2;
 
-						var forward = Matrix4x4Extensions.lookAtList[index];
-						var rotation = Quaternion.LookRotation(forward, Matrix4x4Extensions.upVectorList[index]);
-						var viewMatrix = Matrix4x4Extensions.WorldToLocal(light.transform.position, rotation);
+						var forward = Float4x4.lookAtList[index];
+						var rotation = Quaternion.LookRotation(forward, Float4x4.upVectorList[index]);
+						var viewMatrix = Float4x4.WorldToLocal(light.transform.position, rotation);
 						var projectionMatrix = Float4x4.Perspective(90, 1, light.shadowNearPlane, light.range);
-						var viewProjectionMatrix = projectionMatrix * viewMatrix;
-						var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, forward, viewRenderData.camera, true);
-						var viewMatrixRws = Matrix4x4Extensions.WorldToLocal(light.transform.position - viewRenderData.transform.position, rotation);
-						viewMatrixRws.SetRow(1, -viewMatrixRws.GetRow(1));
+						var viewProjectionMatrix = projectionMatrix.Mul(viewMatrix);
+						var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, forward, true);
+						var viewMatrixRws = Float4x4.WorldToLocal(light.transform.position - viewRenderData.transform.position, rotation);
+                        viewMatrixRws.r1 = viewMatrixRws.r1 * -1;
 
 						pointShadowRequests.Add(new(i, viewMatrixRws, projectionMatrix, shadowSplitData, index, light.transform.position, hasShadowBounds, light.shadowNearPlane, light.range, light.transform.position, light.transform.rotation, 90, 1, settings.PointShadowResolution));
                         splitBuffer.Add(shadowSplitData);
@@ -169,7 +169,7 @@ public partial class LightingSetup : ViewRenderFeature
 					var projectionMatrix = Float4x4.Perspective(light.spotAngle, size.x / size.y, light.shadowNearPlane, light.range);
 
 					var viewProjectionMatrix = projectionMatrix * viewMatrix;
-					var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, light.transform.forward, viewRenderData.camera, true);
+					var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, light.transform.forward, true);
 					var viewMatrixRws = Matrix4x4Extensions.WorldToLocal(light.transform.position - viewRenderData.transform.position, light.transform.rotation);
 
 					shadowIndex = (uint)spotShadowRequests.Count;
@@ -323,20 +323,20 @@ public partial class LightingSetup : ViewRenderFeature
 		for (var i = FrustumPlane.Left; i < FrustumPlane.Count; i++)
 		{
 			if (!skipNearPlane || i != FrustumPlane.Near)
-				shadowSplitData.SetCullingPlane(shadowSplitData.cullingPlaneCount++, viewProjectionMatrix.FrustumPlane((int)i));
+				shadowSplitData.SetCullingPlane(shadowSplitData.cullingPlaneCount++, viewProjectionMatrix.GetFrustumPlane(i));
 		}
 
 		return shadowSplitData;
 	}
 
 	/// <summary> Add any planes that face away from the light direction. This avoids rendering shadowcasters that can never cast a visible shadow </summary>
-	private ShadowSplitData CalculateShadowSplitData(Float4x4 viewProjectionMatrix, Float3 forward, Camera camera, bool skipNearPlane)
+	private ShadowSplitData CalculateShadowSplitData(Float4x4 viewProjectionMatrix, Float3 forward, bool skipNearPlane)
 	{
 		var shadowSplitData = CalculateShadowSplitData(viewProjectionMatrix, skipNearPlane);
 		for (var i = FrustumPlane.Left; i < FrustumPlane.Count; i++)
 		{
-			var plane = viewProjectionMatrix.FrustumPlane((int)i);
-			if (Vector3.Dot(plane.xyz, forward) < 0.0f)
+			var plane = viewProjectionMatrix.GetFrustumPlane(i);
+			if (plane.xyz.Dot(forward) < 0.0f)
 				shadowSplitData.SetCullingPlane(shadowSplitData.cullingPlaneCount++, plane);
 		}
 

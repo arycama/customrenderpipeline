@@ -65,18 +65,17 @@ public class SetupCamera : ViewRenderFeature
         var worldToPixel = screenToPixel.Mul(worldToScreen);
         var pixelToWorld = viewToWorld.Mul(pixelToView);
 
-		// Previous frame matrices
-		if (!previousCameraTransform.TryGetValue(viewRenderData.viewId, out var previousTransform))
-			previousTransform = (viewPosition, viewRotation, viewToNonJitteredClip);
+        // Previous frame matrices
+        // Need to manually flip this since we're trying to match previous clip space but the renderer won't automatically flip since there's no viewport transform
+        var viewToNonJitteredScreen = clipToScreen.Mul(viewToNonJitteredClip);
+        if (!previousCameraTransform.TryGetValue(viewRenderData.viewId, out var previousTransform))
+			previousTransform = (viewPosition, viewRotation, viewToNonJitteredScreen);
 
-		previousCameraTransform[viewRenderData.viewId] = (viewPosition, viewRotation, viewToNonJitteredClip);
+		previousCameraTransform[viewRenderData.viewId] = (viewPosition, viewRotation, viewToNonJitteredScreen);
 
 		var worldToPreviousView = Float4x4.WorldToLocal(previousTransform.Item1 - viewPosition, previousTransform.Item2);
-		var worldToPreviousClip = previousTransform.Item3.Mul(worldToPreviousView);
-
-		var pixelToWorldDir = Float4x4.PixelToWorldViewDirectionMatrix(viewRenderData.viewSize, jitter, viewRenderData.tanHalfFov, viewToWorld, true, false);
-
-		var clipToPreviousClip = worldToPreviousClip.Mul(clipToWorld);
+        var worldToPreviousScreen = previousTransform.Item3.Mul(worldToPreviousView);
+        var pixelToWorldDir = Float4x4.PixelToWorldViewDirectionMatrix(viewRenderData.viewSize, jitter, viewRenderData.tanHalfFov, viewToWorld, true, false);
 
 		// TODO: I think this is similar to pixel to world view dir matrix, maybe make a shared function
 		var pixelToViewScaleOffset = new Float4
@@ -97,11 +96,11 @@ public class SetupCamera : ViewRenderFeature
 		(
 			worldToView,
 			worldToClip,
-			worldToPreviousClip,
 			worldToScreen,
+            worldToPreviousScreen,
 			worldToPixel,
 
-			viewToWorld,
+            viewToWorld,
 			viewToClip,
             viewToScreen,
 			viewToPixel,
@@ -110,7 +109,6 @@ public class SetupCamera : ViewRenderFeature
 			clipToView,
 			clipToScreen,
 			clipToPixel,
-			clipToPreviousClip,
 
             screenToWorld,
             screenToView,
@@ -125,9 +123,9 @@ public class SetupCamera : ViewRenderFeature
 
 			viewPosition,
 			viewPosition.y + sky.PlanetRadius * sky.EarthScale,
-			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (-1 + jitter.x), viewRenderData.tanHalfFov.y * (-1 + jitter.y), 1.0f)), 0),
-			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (-1 + jitter.x), viewRenderData.tanHalfFov.y * (3 + jitter.y), 1.0f)), 0),
-			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (3 + jitter.x), viewRenderData.tanHalfFov.y * (-1 + jitter.y), 1.0f)), 0),
+			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (-1 + -jitter.x), viewRenderData.tanHalfFov.y * (-1 + -jitter.y), 1.0f)), 0),
+			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (-1 + -jitter.x), viewRenderData.tanHalfFov.y * (3 + -jitter.y), 1.0f)), 0),
+			new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (3 + -jitter.x), viewRenderData.tanHalfFov.y * (-1 + -jitter.y), 1.0f)), 0),
 			(far - near) * Math.Rcp(near * far),
 			Math.Rcp(far),
 			near,
@@ -146,8 +144,8 @@ public class SetupCamera : ViewRenderFeature
 		))));
 
 		var cullingPlanes = new CullingPlanes() { Count = 6 };
-		for (var i = 0; i < 6; i++)
-			cullingPlanes.SetCullingPlane(i, worldToClip.FrustumPlane(i));
+		for (var i = FrustumPlane.Left; i < FrustumPlane.Count; i++)
+			cullingPlanes.SetCullingPlane((int)i, worldToClip.GetFrustumPlane(i));
 
 		renderGraph.SetResource(new CullingPlanesData(cullingPlanes));
 	}

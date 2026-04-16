@@ -97,13 +97,12 @@ public class WaterShoreMask : FrameRenderFeature
                     pass.WriteBuffer("MinMaxValuesWrite", minMaxValues);
                     pass.SetRenderFunction(static (command, pass, minMaxValues) =>
                     {
-                        var testData = ArrayPool<int>.Get(4);
+                        Span<int> testData = stackalloc int[4];
                         testData[0] = 0;
                         testData[1] = 0;
                         testData[2] = 0;
                         testData[3] = 0;
                         command.SetBufferData(pass.GetBuffer(minMaxValues), testData);
-                        ArrayPool<int>.Release(testData);
                     });
                 }
             }

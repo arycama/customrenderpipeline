@@ -2,6 +2,27 @@
 #define PACKING_INCLUDED
 
 #include "Math.hlsl"
+#include "Utility.hlsl"
+
+uint BitPack(uint1 data, uint1 size, uint1 offset) { return (data & (Exp2Pow2(size) - 1u)) << offset; }
+uint BitPack(uint2 data, uint2 size, uint2 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
+uint BitPack(uint3 data, uint3 size, uint3 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
+uint BitPack(uint4 data, uint4 size, uint4 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
+
+uint BitPackFloat(float1 data, uint1 size, uint1 offset) { return BitPack(round(data * (Exp2Pow2(size) - 1u)), size, offset); }
+uint BitPackFloat(float2 data, uint2 size, uint2 offset) { return BitPack(round(data * (Exp2Pow2(size) - 1u)), size, offset); }
+uint BitPackFloat(float3 data, uint3 size, uint3 offset) { return BitPack(round(data * (Exp2Pow2(size) - 1u)), size, offset); }
+uint BitPackFloat(float4 data, uint4 size, uint4 offset) { return BitPack(round(data * (Exp2Pow2(size) - 1u)), size, offset); }
+
+uint1 BitUnpack(uint1 data, uint1 size, uint1 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
+uint2 BitUnpack(uint2 data, uint2 size, uint2 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
+uint3 BitUnpack(uint3 data, uint3 size, uint3 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
+uint4 BitUnpack(uint4 data, uint4 size, uint4 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
+
+float1 BitUnpackFloat(uint data, uint1 size, uint1 offset) { return BitUnpack(data, size, offset) / (float) (Exp2Pow2(size) - 1u); }
+float2 BitUnpackFloat(uint data, uint2 size, uint2 offset) { return BitUnpack(data, size, offset) / (float) (Exp2Pow2(size) - 1u); }
+float3 BitUnpackFloat(uint data, uint3 size, uint3 offset) { return BitUnpack(data, size, offset) / (float) (Exp2Pow2(size) - 1u); }
+float4 BitUnpackFloat(uint data, uint4 size, uint4 offset) { return BitUnpack(data, size, offset) / (float) (Exp2Pow2(size) - 1u); }
 
 float1 Quantize(float1 a, float bits) { return floor(a * (exp2(bits) - 1.0) + 0.5); }
 float2 Quantize(float2 a, float bits) { return floor(a * (exp2(bits) - 1.0) + 0.5); }
@@ -173,6 +194,16 @@ float3 EncodeFloatRGB(float v)
 float DecodeFloatRGB(float3 rgb)
 {
 	return dot(rgb, float3(1.0, 1 / 255.0, 1 / 65025.0));
+}
+
+float4 R10G10B10A2UnormToFloat(uint packedInput)
+{
+	return BitUnpackFloat(packedInput, uint2(10, 2).xxxy, uint4(0, 10, 20, 30));
+}
+
+uint Float4ToR10G10B10A2Unorm(float4 input)
+{
+	return BitPackFloat(input, uint2(10, 2).xxxy, uint4(0, 10, 20, 30));
 }
 
 #endif

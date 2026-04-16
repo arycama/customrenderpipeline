@@ -1,3 +1,4 @@
+#include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Packing.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Random.hlsl"
 #include "Packages/com.arycama.customrenderpipeline/ShaderLibrary/Utility.hlsl"
 

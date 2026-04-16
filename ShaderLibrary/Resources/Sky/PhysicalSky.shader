@@ -41,6 +41,7 @@ Shader "Hidden/Physical Sky"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentRender
+            #pragma multi_compile _ CLOUDS_ON
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }
@@ -58,6 +59,7 @@ Shader "Hidden/Physical Sky"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentRender
+            #pragma multi_compile _ CLOUDS_ON
             #define SCENE
             #include "PhysicalSky.hlsl"
             ENDHLSL

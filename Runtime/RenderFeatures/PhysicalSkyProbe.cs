@@ -62,7 +62,7 @@ public class PhysicalSkyProbe : ViewRenderFeature
 			pass.ReadResource<CloudData>();
 			pass.ReadResource<LightingData>();
 			pass.ReadResource<ViewData>();
-			pass.ReadResource<SkyTransmittanceData>();
+			pass.ReadResource<SkyViewTransmittanceData>();
 			pass.ReadResource<SkyReflectionAmbientData>();
 			pass.ReadResource<CloudShadowDataResult>();
 

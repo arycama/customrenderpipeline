@@ -108,6 +108,7 @@ public class DeferredWater : ViewRenderFeature
                 pass.ReadResource<LightingSetup.Result>();
                 pass.ReadResource<AutoExposureData>();
                 pass.ReadResource<AtmospherePropertiesAndTables>();
+			    pass.ReadResource<TerrainFrameData>(true);
                 pass.ReadResource<TerrainViewData>(true);
                 pass.ReadResource<CloudShadowDataResult>();
                 pass.ReadResource<ShadowData>();

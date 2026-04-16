@@ -182,9 +182,9 @@ float3 PreviousObjectToWorld(float3 position, uint instanceID)
 	return MultiplyPoint3x4(MakeCameraRelative(previousObjectToWorld), position);
 }
 
-float4 WorldToClipPrevious(float3 position)
+float4 WorldToPreviousScreenPosition(float3 position)
 {
-	return MultiplyPoint(WorldToPreviousClip, position);
+	return MultiplyPoint(WorldToPreviousScreen, position);
 }
 
 float LinearToDeviceDepth(float eyeDepth)
@@ -199,21 +199,18 @@ float Linear01ToDeviceDepth(float depth)
 
 float4 PreviousClipPosition(float2 uv, float depth)
 {
-	uv.y = 1 - uv.y;
-	float linearDepth = LinearEyeDepth(depth);
-	float4 clipPosition = float4(uv * 2 - 1, depth, linearDepth);
-	clipPosition.xyz *= linearDepth;
-	return mul(ClipToPreviousClip, clipPosition);
-}
-
-float2 ClipToScreenPosition(float4 clipPosition)
-{
-	return PerspectiveDivide(clipPosition).xy * 0.5 + 0.5;
+	float3 worldPosition = MultiplyPointProj(ScreenToWorld, float3(uv, depth));
+	return WorldToPreviousScreenPosition(worldPosition);
 }
 
 float3 PixelToWorldPosition(float3 position)
 {
 	return MultiplyPointProj(PixelToWorld, position).xyz;
+}
+
+float3 PixelToViewPosition(float3 position)
+{
+	return MultiplyPointProj(PixelToView, position).xyz;
 }
 
 float3 TransformPixelToWorldDirection(float2 position, bool doNormalize)

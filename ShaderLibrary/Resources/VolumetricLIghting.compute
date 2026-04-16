@@ -40,8 +40,8 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	float viewDistance = eyeDepth * rcp(rcpWorldDirLength);
 	float3 worldPosition = worldDir * viewDistance;
 	
-	float2 positionNDC = (id.xy + 0.5) / float2(VolumeWidth, VolumeHeight);
-	float2 pixelPosition = positionNDC * ViewSize;
+	float2 screenPosition = (id.xy + 0.5) / float2(VolumeWidth, VolumeHeight);
+	float2 pixelPosition = screenPosition * ViewSize;
 	
 	uint3 clusterIndex;
 	clusterIndex.xy = floor(pixelPosition) / TileSize;
@@ -72,13 +72,8 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	float4 luminanceExtinction = float4(lighting, 0.0);
 	
 	// Reproject previous frame. Needs to use unjittered world position
-	float4 clipPosition;
-	clipPosition.w = linearUnjitteredDepth;
-	clipPosition.xy = (positionNDC * 2.0 - 1.0) * clipPosition.w;
-	clipPosition.z = LinearToDeviceDepth(clipPosition.w) * clipPosition.w;
-	
 	// TODO: Could do screen to previous screen to save a few instructions
-	float4 previousClipPosition = mul(ClipToPreviousClip, clipPosition);
+	float4 previousClipPosition = PreviousClipPosition(screenPosition, LinearToDeviceDepth(linearUnjitteredDepth));
 	previousClipPosition.xy = PerspectiveDivide(previousClipPosition).xy * 0.5 + 0.5;
 	
 	float3 volumeUv = float3(previousClipPosition.xy, LinearToVolumetricDepth(previousClipPosition.w));

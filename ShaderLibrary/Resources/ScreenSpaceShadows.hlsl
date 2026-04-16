@@ -24,14 +24,15 @@ float4 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	float3 localL = SampleConeUniform(u.x, u.y, SunCosAngle);
 	float3 L = FromToRotationZ(_LightDirection0, localL);
 	
-	float3 pixelPosition = MultiplyPointProj(WorldToPixel, worldPosition + L * 0.01).xyz;
+	float3 rayOrigin = float3(input.position.xy, depth);
+	float3 rayDirection = MultiplyPointProj(WorldToPixel, worldPosition + L).xyz - rayOrigin;
 	
-	float3 rayPos = ScreenSpaceRaytrace(pixelPosition, worldPosition + L * 0.01, L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip);
+	bool validHit;
+	float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);
 	
 	float outDepth;
 	float3 hitRay;
-	bool validHit;
-	if (rayPos.z > 0.0)
+	if (validHit && rayPos.z > 0.0)
 	{
 		float3 worldHit = MultiplyPointProj(PixelToWorld, rayPos);
 		hitRay = worldHit - worldPosition;

@@ -259,7 +259,19 @@ public abstract class RenderPass : IDisposable
 		writeBuffers.Add((propertyName, buffer));
 	}
 
-	public void ReadResource(Type type, bool isOptional = false)
+    public bool TryReadResource(Type type)
+    {
+        Assert.IsFalse(RenderGraph.IsExecuting);
+        var handle = RenderGraph.ResourceMap.GetResourceHandle(type);
+        var hasResource = RenderGraph.ResourceMap.TrySetInputs(handle, RenderGraph.FrameIndex, this);
+
+        if(hasResource)
+            RenderPassDataHandles.Add((handle, false));
+
+        return hasResource;
+    }
+
+    public void ReadResource(Type type, bool isOptional = false)
 	{
 		Assert.IsFalse(RenderGraph.IsExecuting);
 		var handle = RenderGraph.ResourceMap.GetResourceHandle(type);
@@ -275,4 +287,9 @@ public abstract class RenderPass : IDisposable
 	{
 		ReadResource(typeof(T), isOptional);
 	}
+
+    public bool TryReadResource<T>() where T : struct, IRenderPassData
+    {
+        return TryReadResource(typeof(T));
+    }
 }

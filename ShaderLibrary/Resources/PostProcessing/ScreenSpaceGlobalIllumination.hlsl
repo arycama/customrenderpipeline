@@ -39,11 +39,15 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 	float rcpPdf = Pi * rcp(noise3DCosine.z);
 	float3 L = FromToRotationZ(N, noise3DCosine);
 	
-	float3 rayPos = ScreenSpaceRaytrace(float3(input.position.xy, depth), worldPosition, L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip);
+	float3 rayOrigin = float3(input.position.xy, depth);
+	float3 rayDirection = MultiplyPointProj(WorldToPixel, worldPosition + L).xyz - rayOrigin;
+	
+	bool validHit;
+	float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);
 
 	float outDepth;
 	float3 color, hitRay;
-	if (rayPos.z)
+	if (validHit && rayPos.z)
 	{
 		float2 velocity = CameraVelocity[rayPos.xy];
 		float2 hitUv = rayPos.xy * RcpViewSize - velocity;

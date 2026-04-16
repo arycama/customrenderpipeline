@@ -45,22 +45,33 @@ public class SkyLookupTables : FrameRenderFeature
         var rayleigh = new Float3(RayleighScattering(680), RayleighScattering(550), RayleighScattering(440));
         rayleigh = ColorspaceUtility.Rec709ToRec2020(rayleigh);
 
-        var atmospherePropertiesBuffer = renderGraph.SetConstantBuffer(new AtmosphereData
-        (
-                rayleigh / settings.EarthScale,
-                settings.MieScatter / settings.EarthScale,
-                ColorspaceUtility.Rec709ToRec2020(settings.OzoneAbsorption) / settings.EarthScale,
-                settings.MieAbsorption / settings.EarthScale,
-                ColorspaceUtility.Rec709ToRec2020(settings.GroundColor.LinearFloat3()),
-                settings.MiePhase,
-                settings.RayleighHeight * settings.EarthScale,
-                settings.MieHeight * settings.EarthScale,
-                settings.OzoneWidth * settings.EarthScale,
-                settings.OzoneHeight * settings.EarthScale,
-                settings.PlanetRadius * settings.EarthScale,
-                settings.AtmosphereHeight * settings.EarthScale,
-                (settings.PlanetRadius + settings.AtmosphereHeight) * settings.EarthScale,
-                settings.CloudScatter
+        var radius = settings.PlanetRadius * settings.EarthScale;
+        var height = settings.AtmosphereHeight * settings.EarthScale;
+
+        var radiusSquared = Sq(radius);
+        var sqMaxAtmosphereDistance = height * (2.0f * radius + height);
+        var sqrtMaxAtmosphereDistance = Sqrt(sqMaxAtmosphereDistance);
+
+        var atmospherePropertiesBuffer = renderGraph.SetConstantBuffer
+        ((
+            rayleigh / settings.EarthScale,
+            settings.MieScatter / settings.EarthScale,
+            ColorspaceUtility.Rec709ToRec2020(settings.OzoneAbsorption) / settings.EarthScale,
+            settings.MieAbsorption / settings.EarthScale,
+            ColorspaceUtility.Rec709ToRec2020(settings.GroundColor.LinearFloat3()),
+            settings.MiePhase,
+            settings.RayleighHeight * settings.EarthScale,
+            settings.MieHeight * settings.EarthScale,
+            settings.OzoneWidth * settings.EarthScale,
+            settings.OzoneHeight * settings.EarthScale,
+            radius,
+            height,
+            radius + height,
+            settings.CloudScatter,
+            radiusSquared,
+            sqMaxAtmosphereDistance,
+            Rcp(sqrtMaxAtmosphereDistance),
+            sqrtMaxAtmosphereDistance
         ));
 
         var transmittanceRemap = GraphicsUtilities.HalfTexelRemap(settings.TransmittanceWidth, settings.TransmittanceHeight);
@@ -68,7 +79,7 @@ public class SkyLookupTables : FrameRenderFeature
         var groundAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientGroundWidth);
         var skyAmbientRemap = GraphicsUtilities.HalfTexelRemap(settings.AmbientSkyWidth, settings.AmbientSkyHeight);
 
-        var result = new AtmospherePropertiesAndTables(atmospherePropertiesBuffer, transmittance, multiScatter, groundAmbient, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap, new Float2(settings.TransmittanceWidth, settings.TransmittanceHeight));
+        var result = new AtmospherePropertiesAndTables(atmospherePropertiesBuffer, transmittance, multiScatter, groundAmbient, skyAmbient, transmittanceRemap, multiScatterRemap, skyAmbientRemap, groundAmbientRemap);
 
         renderGraph.SetResource(result, true);
 
@@ -92,9 +103,7 @@ public class SkyLookupTables : FrameRenderFeature
                 data.result.SetProperties(pass, command);
                 pass.SetTexture(_MiePhaseTextureId, data.settings.miePhase);
                 pass.SetFloat("_Samples", data.settings.TransmittanceSamples);
-                pass.SetVector("_ScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(data.settings.TransmittanceWidth, data.settings.TransmittanceHeight));
-                pass.SetFloat("_TransmittanceWidth", data.settings.TransmittanceWidth);
-                pass.SetFloat("_TransmittanceHeight", data.settings.TransmittanceHeight);
+                pass.SetVector("TransmittanceScaleOffset", GraphicsUtilities.RemapHalfTexelTo01(data.settings.TransmittanceWidth, data.settings.TransmittanceHeight));
             });
         }
 
@@ -146,41 +155,5 @@ public class SkyLookupTables : FrameRenderFeature
         }
 
         renderGraph.AddProfileEndPass("Sky Tables");
-    }
-}
-
-internal struct AtmosphereData
-{
-    public Vector3 rayleighScatter;
-    public float mieScatter;
-    public Vector3 ozoneAbsorption;
-    public float mieAbsorption;
-    public Float3 groundColor;
-    public float miePhase;
-    public float rayleighHeight;
-    public float mieHeight;
-    public float ozoneWidth;
-    public float ozoneHeight;
-    public float planetRadius;
-    public float atmosphereHeight;
-    public float topRadius;
-    public float cloudScatter;
-
-    public AtmosphereData(Vector3 rayleighScatter, float mieScatter, Vector3 ozoneAbsorption, float mieAbsorption, Float3 groundColor, float miePhase, float rayleighHeight, float mieHeight, float ozoneWidth, float ozoneHeight, float planetRadius, float atmosphereHeight, float topRadius, float cloudScatter)
-    {
-        this.rayleighScatter = rayleighScatter;
-        this.mieScatter = mieScatter;
-        this.ozoneAbsorption = ozoneAbsorption;
-        this.mieAbsorption = mieAbsorption;
-        this.groundColor = groundColor;
-        this.miePhase = miePhase;
-        this.rayleighHeight = rayleighHeight;
-        this.mieHeight = mieHeight;
-        this.ozoneWidth = ozoneWidth;
-        this.ozoneHeight = ozoneHeight;
-        this.planetRadius = planetRadius;
-        this.atmosphereHeight = atmosphereHeight;
-        this.topRadius = topRadius;
-        this.cloudScatter = cloudScatter;
     }
 }

@@ -47,7 +47,7 @@ public partial class VolumetricLighting : ViewRenderFeature
 
 		var rawJitter = renderGraph.GetResource<TemporalAASetupData>().jitter;
 		var jitter = 2.0f * rawJitter / (Float2)viewRenderData.viewSize;
-		var pixelToWorldViewDir = Matrix4x4Extensions.PixelToWorldViewDirectionMatrix(new(volumeWidth, volumeHeight), jitter, viewRenderData.tanHalfFov, Matrix4x4.Rotate(viewRenderData.transform.rotation));
+		var pixelToWorldViewDir = Float4x4.PixelToWorldViewDirectionMatrix(new(volumeWidth, volumeHeight), jitter, viewRenderData.tanHalfFov, Matrix4x4.Rotate(viewRenderData.transform.rotation));
 
 		ResourceHandle<RenderTexture> current, history = default;
 		bool wasCreated = false;

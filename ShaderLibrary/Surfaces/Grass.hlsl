@@ -27,7 +27,7 @@ struct FragmentInput
 {
 	float4 position : SV_POSITION;
 	float3 worldPosition : POSITION1;
-	float4 previousPositionCS : POSITION2;
+	float4 previousPosition : POSITION2;
 	float2 uv : TEXCOORD;
 	float3 normal : NORMAL;
 	float3 tangent : TANGENT;
@@ -81,6 +81,7 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	
 	float2 terrainUv = WorldToTerrainPosition(centerPosition);
 	float strength = GrassCoverage.SampleLevel(LinearClampSampler, terrainUv, 0.0);
+	strength = Remap(strength, 0.75, 1, 0, 1);
 	
 	FragmentInput output = (FragmentInput)0;
 	float rand = RandomFloat(quadId);
@@ -133,7 +134,7 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	
 	float3 previousWorldPosition = output.worldPosition;
 	previousWorldPosition += (output.uv.y) * bitangent1 * _Height * scale;
-	output.previousPositionCS = WorldToClipPrevious(previousWorldPosition);
+	output.previousPosition = WorldToPreviousScreenPosition(previousWorldPosition);
 	
 	output.worldPosition += (output.uv.y) * bitangent * _Height * scale;
 	output.position = WorldToClipPosition(output.worldPosition);
@@ -168,11 +169,11 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	albedo += translucency;
 	float t = dot(translucency, albedo) / SqrLength(albedo);
 	
-	//albedo = lerp(input.color, albedo, smoothstep(0, 0.5, input.uv.y));
+	albedo = lerp(input.color, albedo, smoothstep(0, 0.5, input.uv.y));
 	float3 V = normalize(-input.worldPosition);
 		
 	FragmentOutput output;
 	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, 1.0 - occlusion, 0, t, input.position.xy, V, WorldToView);
-	output.velocity = CalculateVelocity(input.position.xy * RcpViewSize, input.previousPositionCS);
+	output.velocity = CalculateVelocity(input.position.xy * RcpViewSize, input.previousPosition);
 	return output;
 }

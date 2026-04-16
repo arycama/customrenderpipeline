@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -32,19 +33,23 @@ public class AutoExposurePreRender : ViewRenderFeature
 			exposureBuffers.Add(viewRenderData.viewId, exposureBuffer);
 		}
 
-        using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", (exposureBuffer, lensSettings, autoExposureSettings.ExposureCompensation)))
+        var camera = viewRenderData.camera;
+        var iso = camera.usePhysicalProperties ? camera.iso : lensSettings.Iso;
+        var aperture = camera.usePhysicalProperties ? camera.aperture : lensSettings.Aperture;
+        var shutterSpeed = camera.usePhysicalProperties ? 1.0f / camera.shutterSpeed : lensSettings.ShutterSpeed;
+
+        using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", (exposureBuffer, iso, aperture, shutterSpeed, autoExposureSettings.ExposureCompensation)))
         {
             if (isFirst)
             {
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    var initialEv100 = PhysicalCameraUtility.ComputeEV100(data.lensSettings.Aperture, data.lensSettings.ShutterSpeed, data.lensSettings.Iso) - data.ExposureCompensation;
+                    var initialEv100 = PhysicalCameraUtility.ComputeEV100(data.aperture, data.shutterSpeed, data.iso) - data.ExposureCompensation;
                     var initialExposure = PhysicalCameraUtility.EV100ToExposure(initialEv100);
 
-                    var initialData = ArrayPool<Vector4>.Get(1);
-                    initialData[0] = new Vector4(initialExposure, Math.Rcp(initialExposure), 1.0f, data.ExposureCompensation);
+                    Span<Float4> initialData = stackalloc Float4[1];
+                    initialData[0] = new Float4(initialExposure, Math.Rcp(initialExposure), 1.0f, data.ExposureCompensation);
                     command.SetBufferData(pass.GetBuffer(data.exposureBuffer), initialData);
-                    ArrayPool<Vector4>.Release(initialData);
                 });
             }
 

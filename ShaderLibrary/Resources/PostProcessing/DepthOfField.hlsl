@@ -8,6 +8,34 @@ float4 DepthScaleLimit, CameraTargetScaleLimit;
 float3 _DefocusU, _DefocusV;
 float _ApertureRadius, _FocusDistance, _MaxMip, _SampleCount, _Test, _TaaEnabled;
 
+// Helper function to get perpendicular vector
+float2 perpendicular(float2 v)
+{
+	return float2(-v.y, v.x);
+}
+
+float2 ConcentricSampleDisk(float2 u)
+{
+	float2 uOffset = 2.0f * u - 1.0f;
+    
+	if (uOffset.x == 0.0f && uOffset.y == 0.0f)
+		return float2(0.0f, 0.0f);
+    
+	float theta, r;
+	if (abs(uOffset.x) > abs(uOffset.y))
+	{
+		r = uOffset.x;
+		theta = 3.14159f / 4.0f * (uOffset.y / uOffset.x);
+	}
+	else
+	{
+		r = uOffset.y;
+		theta = 3.14159f / 2.0f - 3.14159f / 4.0f * (uOffset.x / uOffset.y);
+	}
+    
+	return r * float2(cos(theta), sin(theta));
+}
+
 float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 {
 	//_FocusDistance = LinearEyeDepth(CameraDepth[ViewSize / 2]);
@@ -15,52 +43,53 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	float3 color = 0;
 	float weightSum = 0;
 	
-	float offset = Noise1D(input.position.xy);
-	float phi = offset * TwoPi;
-	float _MaxSteps = 64;
+	float2 offset = Noise2D(input.position.xy);
+	float phi = offset.x * TwoPi;
+	float _MaxSteps = 32;
 	float _Thickness = 0.1;
-	float thicknessScale = rcp(1.0 + _Thickness);
-	float thicknessOffset = -Near * rcp(Far - Near) * (_Thickness * thicknessScale);
 	
-	float3 worldPosition = _FocusDistance * input.worldDirection;
+	// Generate random points within a circular aperture on the image plane, then trace rays from this to the current pixel's position on the 'focal plane'. (Eg the plane where the pixel is fully in focus)
+	float3 focalPlanePosition = _FocusDistance * MultiplyVector(WorldToView, input.worldDirection);
+	float screenScale = ViewSize.y * rcp(2.0 * TanHalfFov);
+	float tanHalfAngle = _ApertureRadius / _FocusDistance;
 	
 	for (float i = 0.0; i < _SampleCount; i++)
 	{
+		// Generate random aperture sample
 		float2 uv = VogelDiskSample(i, _SampleCount, phi) * _ApertureRadius;
-		float3 rayOrigin = MultiplyPoint3x4(ViewToWorld, float3(uv, 0));
-		float3 rayDirection = normalize(worldPosition - rayOrigin);
-		
-		float3 CameraForward = ViewToWorld._m02_m12_m22;
-		rayOrigin = IntersectRayPlane(rayOrigin, rayDirection, CameraForward * Near, CameraForward);
-		
-		float4 rayOriginClipSpace = MultiplyPointProj(WorldToPixel, rayOrigin);
-		
-		float3 rayPos = ScreenSpaceRaytrace(MultiplyPointProj(WorldToPixel, rayOrigin).xyz, rayOrigin, rayDirection, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, false);
-		
-		//bool validHit;
-		//float3 rayPos = ScreenSpaceRaytrace(float4(position.xy, depth, linearDepth), L, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);
-		
-		if (all(!rayPos))
+		//uv = ConcentricSampleDisk(offset) * _ApertureRadius;
+    
+		// Ray from aperture to focal plane
+		float3 rayOrigin = float3(uv, 0);
+		float3 rayDirection = focalPlanePosition - rayOrigin;
+		float3 rayDirNorm = normalize(rayDirection);
+    
+		// Find ray intersection with near plane since we need to raymarchin in post-projection space which is undefined at z = 0
+		rayOrigin = IntersectRayPlane(rayOrigin, rayDirection, float3(0, 0, Near), float3(0, 0, 1));
+    
+		// Transform to screen space
+		float3 rayOriginSS = MultiplyPointProj(ViewToPixel, rayOrigin).xyz;
+		float3 rayDirectionSS = MultiplyPointProj(ViewToPixel, rayOrigin + rayDirection).xyz - rayOriginSS;
+    
+		// Screen space raytrace
+		bool validHit;
+		float3 rayPos = ScreenSpaceRaytrace(rayOriginSS, rayDirectionSS, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);
+    
+		if (!validHit)
 			continue;
-			
-		float3 worldHit = PixelToWorldPosition(rayPos);
-		float3 hitRay = worldHit - rayOrigin;
-		float hitDist = length(hitRay);
-	
-		//float2 velocity = CameraVelocity[rayPos.xy];
-		//float linearHitDepth = LinearEyeDepth(rayPos.z);
-		//float mipLevel = log2(_ConeAngle * hitDist * rcp(linearHitDepth));
-			
-		// Remove jitter, since we use the reproejcted last frame color, which is jittered, since it is before transparent/TAA pass
-		// TODO: Rethink this. We could do a filtered version of last frame.. but this might not be worth the extra cost
-		color += CameraTarget[rayPos.xy];
+    
+		// Calculate mip level 
+		float viewDepth = LinearEyeDepth(rayPos.z);
+		float mipLevel = log2(0.5 * ViewSize.y * tanHalfAngle * abs(viewDepth - _FocusDistance) / (viewDepth * TanHalfFov));
+		color += CameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(rayPos.xy * RcpViewSize, CameraTargetScaleLimit), mipLevel);
 		weightSum++;
 	}
 
-	if (weightSum)
+	if(weightSum)
 		color *= rcp(weightSum);
-	
-	//color = CameraTarget[input.position.xy];
-	return (color);
+	else
+		color = CameraTarget[input.position.xy];
+		
+	return color;
 	return _TaaEnabled ? Rec2020ToICtCp(color) + float2(0.0, 0.5).xyy : color;
 }

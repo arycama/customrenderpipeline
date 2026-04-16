@@ -1,3 +1,4 @@
+
 #ifndef COLOR_INCLUDED
 #define COLOR_INCLUDED
 
@@ -324,6 +325,14 @@ float3 ICtCpToRec2020(float3 iCtCp)
 	return LMSToRec2020(lms);
 }
 
+float3 OffsetICtCpToRec2020(float3 iCtCpOffset)
+{
+	float3 iCtCp = iCtCpOffset - float2(0.0, 0.5).xyy;
+	float3 pqLms = ICtCpToLMS(iCtCp);
+	float3 lms = ST2084ToLinear(pqLms);
+	return LMSToRec2020(lms);
+}
+
 // Rec 709
 float3 GammaToLinear(float3 c)
 {
@@ -413,8 +422,15 @@ float3 Rec2020ToICtCp(float3 rec2020)
 {
 	float3 lms = Rec2020ToLMS(rec2020);
 	float3 lmsPq = LinearToST2084(lms);
-	float3 result = LMSToICtCp(lmsPq);
-	return result;
+	return LMSToICtCp(lmsPq);
+}
+
+// ICtCp with yz in an 0 to 1 range instead of -0.5 to 0.5
+float3 Rec2020ToOffsetICtCp(float3 rec2020)
+{
+	float3 iCtCp = Rec2020ToICtCp(rec2020);
+	iCtCp.yz += 0.5;
+	return iCtCp;
 }
 
 float3 Rec709ToICtCp(float3 rec709)

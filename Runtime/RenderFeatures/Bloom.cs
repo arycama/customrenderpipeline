@@ -28,8 +28,8 @@ public class Bloom : ViewRenderFeature
 
 		renderGraph.AddProfileBeginPass("Bloom");
 
-		var bloomIds = ListPool<ResourceHandle<RenderTexture>>.Get();
 		var mipCount = Math.Min(settings.MaxMips, (int)Math.Log2(Math.Max(viewRenderData.viewSize.x, viewRenderData.viewSize.y)));
+        Span<ResourceHandle<RenderTexture>> bloomIds = stackalloc ResourceHandle<RenderTexture>[mipCount];
 
 		// Downsample
 		for (var i = 0; i < mipCount; i++)
@@ -38,7 +38,7 @@ public class Bloom : ViewRenderFeature
 			var height = Math.Max(1, viewRenderData.viewSize.y >> (i + 1));
 
             var dest = renderGraph.GetTexture(new(width, height), GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true);
-            bloomIds.Add(dest);
+            bloomIds[i] = dest;
 
             var source = i > 0 ? bloomIds[i - 1] : renderGraph.GetRTHandle<CameraTarget>();
 
@@ -72,17 +72,15 @@ public class Bloom : ViewRenderFeature
 			pass.WriteTexture(bloomIds[i - 1]);
 			pass.ReadTexture("Input", input);
 
-			pass.SetRenderFunction((static (command, pass, data) =>
+			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				pass.SetFloat("Strength", data.Strength);
 				pass.SetVector("RcpResolution", data.Item1);
 				pass.SetVector("InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.Item2));
-			}));
+			});
 		}
 
 		renderGraph.SetRTHandle<CameraBloom>(bloomIds[0]);
-		ListPool<ResourceHandle<RenderTexture>>.Release(bloomIds);
-
 		renderGraph.AddProfileEndPass("Bloom");
 	}
 }

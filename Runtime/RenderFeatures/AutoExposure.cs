@@ -56,15 +56,20 @@ public partial class AutoExposure : ViewRenderFeature
 		exposureTexture.Apply(false, false);
 
 		var histogram = renderGraph.GetBuffer(256);
-		using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", new AutoExposureStructData
+
+        var camera = viewRenderData.camera;
+        var iso = camera.usePhysicalProperties ? camera.iso : lensSettings.Iso;
+        var aperture = camera.usePhysicalProperties ? camera.aperture : lensSettings.Aperture;
+        var shutterSpeed = camera.usePhysicalProperties ? 1.0f / camera.shutterSpeed : lensSettings.ShutterSpeed;
+        using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", new AutoExposureStructData
 		(			
 			settings.MinEv,
 			settings.MaxEv,
 			settings.AdaptationSpeed,
 			settings.ExposureCompensation,
-			lensSettings.Iso,
-			lensSettings.Aperture,
-			lensSettings.ShutterSpeed,
+			iso,
+			aperture,
+			shutterSpeed,
 			settings.HistogramMin,
 			settings.HistogramMax,
 			GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1),

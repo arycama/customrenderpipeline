@@ -25,7 +25,7 @@ public class ScreenSpaceTerrain : ViewRenderFeature
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
 		pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 
-		//pass.ReadRtHandle<TerrainDepth>();
+		pass.ReadResource<TerrainFrameData>();
 		pass.ReadResource<TerrainViewData>();
 		pass.ReadResource<ViewData>();
 		pass.ReadResource<VirtualTextureData>();

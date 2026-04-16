@@ -27,15 +27,14 @@ float GetBoxFilterWeight(uint index)
 	return filterWeights[index];
 }
 
-float2 CalculateVelocity(float2 uv, float4 previousClipPosition)
-{
-	// TODO: Revise
-	return uv + _Jitter.zw - (ClipToScreenPosition(previousClipPosition) * float2(1, -1) + float2(0, 1));
+float2 CalculateVelocity(float2 uv, float4 previousScreenPosition)
+{	
+	return uv - _Jitter.zw * float2(1, -1) - previousScreenPosition.xy * rcp(previousScreenPosition.w);
 }
 
 float2 CalculateVelocity(float2 uv, float depth)
 {
-	return CalculateVelocity(uv, PreviousClipPosition(uv, depth));
+	return CalculateVelocity(uv + _Jitter.zw * float2(1, -1) * 2, PreviousClipPosition(uv, depth));
 }
 
 void TemporalNeighborhood(Texture2D<float4> input, int2 coord, out float4 minValue, out float4 maxValue, out float4 result)

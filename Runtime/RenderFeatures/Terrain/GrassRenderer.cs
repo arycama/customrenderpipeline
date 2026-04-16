@@ -95,6 +95,7 @@ public class GrassRenderer : ViewRenderFeature
 			{
 				pass.Initialize(grassCoverageMaterial, terrain.terrainData.alphamapResolution);
 				pass.WriteTexture(coverageMap);
+				pass.ReadResource<TerrainFrameData>();
 				pass.ReadResource<TerrainViewData>();
 				isInitialized = true;
 			}
@@ -141,6 +142,7 @@ public class GrassRenderer : ViewRenderFeature
 			pass.ReadResource<FrameData>();
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<TemporalAAData>();
+		pass.ReadResource<TerrainFrameData>();
 			pass.ReadResource<TerrainViewData>();
 			pass.ReadResource<VirtualTextureData>();
 

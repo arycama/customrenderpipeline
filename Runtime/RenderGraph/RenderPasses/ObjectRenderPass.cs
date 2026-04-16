@@ -17,15 +17,26 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
             ? SystemInfo.supportsMultiview ? SinglePassStereoMode.Multiview : SinglePassStereoMode.Instancing
             : SinglePassStereoMode.None;
 
-        var rendererListDesc = new RendererListDesc(new ShaderTagId(tag), cullingResults, camera)
-		{
-			renderQueueRange = renderQueueRange,
-			sortingCriteria = sortingCriteria,
-			excludeObjectMotionVectors = excludeMotionVectors,
-			rendererConfiguration = perObjectData
-		};
+        var sortingSettings = new SortingSettings(camera)
+        {
+            cameraPosition = camera.transform.position,
+            criteria = sortingCriteria,
+            worldToCameraMatrix = camera.worldToCameraMatrix
+        };
 
-		var rendererList = context.CreateRendererList(rendererListDesc);
+        var drawSettings = new DrawingSettings(new ShaderTagId(tag), sortingSettings)
+        {
+            enableInstancing = true,
+            perObjectData = perObjectData,
+        };
+
+        var filteringSettings = new FilteringSettings(renderQueueRange, excludeMotionVectorObjects: excludeMotionVectors ? 1 : 0)
+        {
+            forceAllMotionVectorObjects = false
+        };
+
+        var rendererListParams = new RendererListParams(cullingResults, drawSettings, filteringSettings);
+		var rendererList = context.CreateRendererList(ref rendererListParams);
         rendererLists.Clear();
         rendererLists.Add(rendererList);
         context.PrepareRendererListsAsync(rendererLists);

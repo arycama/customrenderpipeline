@@ -26,19 +26,26 @@ public partial class DepthOfField : ViewRenderFeature
 			return;
 
 		var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
-		var tempId = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32);
-        var focalLength = PhysicalCameraUtility.FocalLength(lensSettings.SensorSize * 0.001f, viewRenderData.tanHalfFov.y);
-		var apertureRadius = PhysicalCameraUtility.ApertureRadius(focalLength, lensSettings.Aperture);
+		var tempId = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+
+        var camera = viewRenderData.camera;
+        var focalDistance = camera.usePhysicalProperties ? camera.focusDistance : settings.FocalDistance;
+        var sensorSize = (camera.usePhysicalProperties ? camera.sensorSize.y : lensSettings.SensorSize) * 0.001f;
+        var aperture = camera.usePhysicalProperties ? camera.aperture : lensSettings.Aperture;
+        var focalLength = PhysicalCameraUtility.FocalLength(sensorSize, viewRenderData.tanHalfFov.y);
+		var apertureRadius = PhysicalCameraUtility.ApertureRadius(focalLength, aperture);
 
 		if (settings.UseRaytracing)
 		{
 			// Need to set some things as globals so that hit shaders can access them..
 			using (var pass = renderGraph.AddGenericRenderPass("Depth of Field Raytrace Setup"))
 			{
-				pass.ReadResource<SkyReflectionAmbientData>();
+                pass.PreventNewSubPass = true;
+                pass.ReadResource<SkyReflectionAmbientData>();
 				pass.ReadResource<LightingSetup.Result>();
 				pass.ReadResource<AutoExposureData>();
 				pass.ReadResource<AtmospherePropertiesAndTables>();
+			    pass.ReadResource<TerrainFrameData>(true);
 				pass.ReadResource<TerrainViewData>(true);
 				pass.ReadResource<CloudShadowDataResult>();
 				pass.ReadResource<ShadowData>();
@@ -48,7 +55,7 @@ public partial class DepthOfField : ViewRenderFeature
 
 			using (var pass = renderGraph.AddRaytracingRenderPass("Depth of Field", 
 			(
-				focusDistance: lensSettings.FocalDistance,
+				focusDistance: Math.Max(camera.nearClipPlane, focalDistance),
 				apertureRadius,
 				settings.SampleCount,
 				taaSettings.IsEnabled ? 1.0f : 0.0f
@@ -57,16 +64,18 @@ public partial class DepthOfField : ViewRenderFeature
 				var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
 				pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewRenderData.viewSize.x, viewRenderData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewRenderData.tanHalfFov.y);
-				pass.WriteTexture(tempId, "HitColor");
+                pass.PreventNewSubPass = true;
+                pass.WriteTexture(tempId, "HitColor");
 				//pass.WriteTexture(hitResult, "HitResult");
 
 				pass.ReadResource<AtmospherePropertiesAndTables>();
 				pass.ReadRtHandle<CameraDepth>();
 				pass.ReadResource<ViewData>();
 				pass.ReadResource<FrameData>();
+			    pass.ReadResource<TerrainFrameData>(true);
 				pass.ReadResource<TerrainViewData>(true);
 
-				pass.SetRenderFunction(static (command, pass, data) =>
+                pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					pass.SetFloat("_FocusDistance", data.focusDistance);
 					pass.SetFloat("_ApertureRadius", data.apertureRadius);
@@ -79,7 +88,7 @@ public partial class DepthOfField : ViewRenderFeature
 		{
 			using (var pass = renderGraph.AddFullscreenRenderPass("Depth of Field", 
 			(
-				focusDistance: lensSettings.FocalDistance,
+				focusDistance: Math.Max(camera.nearClipPlane, focalDistance),
 				apertureRadius,
 				settings.SampleCount,
 				taaSettings.IsEnabled ? 1.0f : 0.0f,
@@ -87,6 +96,7 @@ public partial class DepthOfField : ViewRenderFeature
 			)))
 			{
 				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
+                pass.PreventNewSubPass = true;
 				pass.WriteTexture(tempId);
 
 				pass.ReadRtHandle<CameraTarget>();
@@ -94,8 +104,10 @@ public partial class DepthOfField : ViewRenderFeature
 				pass.ReadRtHandle<HiZMinDepth>();
 				pass.ReadResource<FrameData>();
 				pass.ReadResource<ViewData>();
+                pass.ReadRtHandle<PreviousCameraTarget>();
+                pass.ReadRtHandle<CameraVelocity>();
 
-				pass.SetRenderFunction(static (command, pass, data) =>
+                pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					pass.SetFloat("_FocusDistance", data.focusDistance);
 					pass.SetFloat("_ApertureRadius", data.apertureRadius);

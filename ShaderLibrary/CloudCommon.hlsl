@@ -62,7 +62,7 @@ float CloudExtinction(float3 worldPosition, float height, bool useDetail)
 float3 AtmosphereTransmittance(float height, float cosAngle)
 {
 	float2 uv = float2(UvFromViewHeight(height), UvFromViewCosAngle(height, cosAngle, false));
-	return _Transmittance.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(uv, _TransmittanceSize), 0.0);
+	return SkyTransmittance.SampleLevel(LinearClampSampler, uv * SkyTransmittanceRemap.xy + SkyTransmittanceRemap.zw, 0.0);
 }
 
 float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float cosAngle1)

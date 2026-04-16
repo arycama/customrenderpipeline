@@ -1,6 +1,5 @@
 ﻿using UnityEngine;
 using UnityEngine.Assertions;
-using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 public class TerrainRenderer : TerrainRendererBase
@@ -30,13 +29,17 @@ public class TerrainRenderer : TerrainRendererBase
 		var passIndex = settings.Material.FindPass("Terrain");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no Terrain Pass");
 
+        renderGraph.AddProfileBeginPass("Render Terrain");
+
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", cullingPlanes))
 		{
-			pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, viewRenderData.viewSize, 1, MeshTopology.Quads, passIndex);
+            pass.UseProfiler = false;
+            pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, viewRenderData.viewSize, 1, MeshTopology.Quads, passIndex);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
 			pass.ReadResource<TerrainQuadtreeData>();
+		    pass.ReadResource<TerrainFrameData>();
 			pass.ReadResource<TerrainViewData>();
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<VirtualTextureData>();
@@ -57,25 +60,13 @@ public class TerrainRenderer : TerrainRendererBase
 
 		using (var pass = renderGraph.AddObjectRenderPass("Render Terrain Replacement"))
 		{
+            pass.UseProfiler = false;
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 			pass.Initialize("Terrain", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonOpaque);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.None);
 			pass.ReadResource<ViewData>();
 		}
 
-		//var terrainDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true);
-		//renderGraph.SetRTHandle<TerrainDepth>(terrainDepth);
-
-		//var cameraDepth = renderGraph.GetRTHandle<CameraDepth>();
-		//using (var pass = renderGraph.AddGenericRenderPass("Terrain Depth Copy", (cameraDepth, terrainDepth)))
-		//{
-		//	pass.WriteTexture(terrainDepth);
-		//	pass.ReadRtHandle<CameraDepth>();
-
-		//	pass.SetRenderFunction((commmand, pass, data) =>
-		//	{
-		//		commmand.CopyTexture(pass.GetRenderTexture(cameraDepth), pass.GetRenderTexture(terrainDepth));
-		//	});
-		//}
-	}
+        renderGraph.AddProfileEndPass("Render Terrain");
+    }
 }

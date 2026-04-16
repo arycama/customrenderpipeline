@@ -1,3 +1,5 @@
+using System;
+using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
@@ -23,14 +25,13 @@ public class QuadtreeCull
 			pass.WriteBuffer("", indirectArgsBuffer);
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
-				var indirectArgs = ListPool<int>.Get();
-				indirectArgs.Add(data.indexCountPerInstance); // index count per instance
-				indirectArgs.Add(0); // instance count (filled in later)
-				indirectArgs.Add(0); // start index location
-				indirectArgs.Add(0); // base vertex location
-				indirectArgs.Add(0); // start instance location
+                Span<int> indirectArgs = stackalloc int[5];
+				indirectArgs[0] = data.indexCountPerInstance; // index count per instanceS
+                indirectArgs[1] = 0; // instance count (filled in later)
+                indirectArgs[2] = 0; // start index location
+                indirectArgs[3] = 0; // base vertex location
+                indirectArgs[4] = 0; // start instance location
 				command.SetBufferData(pass.GetBuffer(data.indirectArgsBuffer), indirectArgs);
-				ListPool<int>.Release(indirectArgs);
 			});
 		}
 
@@ -48,11 +49,11 @@ public class QuadtreeCull
 			lodIndirectArgsBuffer = renderGraph.GetBuffer(3, target: GraphicsBuffer.Target.IndirectArguments);
 		}
 
-		var tempIds = ListPool<ResourceHandle<RenderTexture>>.Get();
+		Span<ResourceHandle<RenderTexture>> tempIds = stackalloc ResourceHandle<RenderTexture>[dispatchCount - 1];
 		for (var i = 0; i < dispatchCount - 1; i++)
 		{
 			var tempResolution = 1 << ((i + 1) * (maxPassesPerDispatch - 1));
-			tempIds.Add(renderGraph.GetTexture(tempResolution, GraphicsFormat.R16_UInt));
+			tempIds[i] = renderGraph.GetTexture(tempResolution, GraphicsFormat.R16_UInt);
 		}
 
 		var patchDataBuffer = renderGraph.GetBuffer(cellCount * cellCount, target: GraphicsBuffer.Target.Structured);
@@ -166,8 +167,6 @@ public class QuadtreeCull
 				});
 			}
 		}
-
-		ListPool<ResourceHandle<RenderTexture>>.Release(tempIds);
 
 		return new(indirectArgsBuffer, patchDataBuffer);
 	}

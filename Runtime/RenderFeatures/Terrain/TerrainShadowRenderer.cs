@@ -51,6 +51,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
 			pass.ReadResource<ShadowRequestData>();
+		    pass.ReadResource<TerrainFrameData>();
 			pass.ReadResource<TerrainViewData>();
 			pass.ReadResource<TerrainQuadtreeData>();
 			pass.ReadResource<ViewData>();

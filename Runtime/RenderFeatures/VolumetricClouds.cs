@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering;
 
 public partial class VolumetricClouds : ViewRenderFeature
 {
@@ -31,6 +30,9 @@ public partial class VolumetricClouds : ViewRenderFeature
 
     public override void Render(ViewRenderData viewRenderData)
     {
+        if (settings.WeatherMapStrength == 0 && settings.HighAltitudeMapStrength == 0)
+            return;
+
 		renderGraph.AddProfileBeginPass("Clouds");
 
         var cloudLuminanceTemp = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
@@ -69,7 +71,7 @@ public partial class VolumetricClouds : ViewRenderFeature
 			pass.ReadResource<AutoExposureData>();
 			pass.ReadResource<LightingData>();
 			pass.ReadResource<ViewData>();
-			pass.ReadResource<SkyTransmittanceData>();
+			pass.ReadResource<SkyViewTransmittanceData>();
 			pass.ReadRtHandle<CameraDepth>();
 
 			pass.SetRenderFunction(static (command, pass, data) =>

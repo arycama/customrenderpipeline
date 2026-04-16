@@ -38,7 +38,7 @@ public class DeferredLighting : ViewRenderFeature
 			pass.ReadResource<AtmospherePropertiesAndTables>();
 			pass.ReadResource<TemporalAAData>();
 
-			pass.ReadResource<SkyTransmittanceData>();
+			pass.ReadResource<SkyViewTransmittanceData>();
 			pass.ReadResource<CloudShadowDataResult>();
 
 			pass.ReadResource<LightingSetup.Result>();

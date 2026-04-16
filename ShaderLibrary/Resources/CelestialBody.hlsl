@@ -19,6 +19,7 @@ FragmentInput Vertex(uint id : SV_VertexID)
 
 	FragmentInput output;
 	output.position = ObjectToClip(position, id);
+	output.position.z = 0;
 	output.uv = uv;
 	return output;
 }
@@ -44,7 +45,7 @@ float3 Fragment(FragmentInput input) : SV_Target
 	float solidAngle = TwoPi * (1.0 - cos(0.5 * radians(AngularDiameter)));
 
     // 2. Evaluate sun luiminance at ground level accoridng to solidAngle and illuminance at zenith (noon)
-	float3 illuminance = Illuminance * Exposure / solidAngle;
+	float3 luminance = Illuminance * Exposure / solidAngle;
 	
 	// Limb darkening
 	float centerToEdge = length(2.0 * input.uv - 1.0);
@@ -70,8 +71,8 @@ float3 Fragment(FragmentInput input) : SV_Target
 	float mu5 = mu4 * mu;
 
 	factor = a0 + a1 * mu + a2 * mu2 + a3 * mu3 + a4 * mu4 + a5 * mu5;
-	illuminance *= max(0, factor);
-	illuminance *= TransmittanceToAtmosphere(ViewHeight, -V.y);
+	luminance *= max(0, factor);
+	luminance *= TransmittanceToAtmosphere(ViewHeight, -V.y);
 	
-	return illuminance;
+	return luminance;
 }

@@ -153,11 +153,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 			result.rgb *= rcp(result.a);
 	}
 	
-	float3 nonReprojectedHistory = History[input.position.xy];
-	nonReprojectedHistory.r *= PreviousToCurrentExposure;
-	
-	//result.rgb = lerp(result.rgb, nonReprojectedHistory, AfterImage);
-	
+	result = IsInfOrNaN(result) ? 0.0 : result;
 	
 	FragmentOutput output;
 	output.result = float4(ICtCpToRec2020(result.rgb) / (PaperWhite * sqrt(2.0)), 1.0);

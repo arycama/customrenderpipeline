@@ -35,8 +35,8 @@ cbuffer ViewData
 {
 	matrix WorldToView;
 	matrix WorldToClip;
-	matrix WorldToPreviousClip;
 	matrix WorldToScreen;
+	matrix WorldToPreviousScreen;
 	matrix WorldToPixel;
 	
 	matrix ViewToWorld;
@@ -48,7 +48,6 @@ cbuffer ViewData
 	matrix ClipToView;
 	matrix ClipToScreen;
 	matrix ClipToPixel;
-	matrix ClipToPreviousClip;
 	
 	matrix ScreenToWorld;
 	matrix ScreenToView;
@@ -93,78 +92,108 @@ cbuffer PerCascadeData
 // TODO: Should this be ifdef-d out in instanced/indirect passes?
 cbuffer UnityPerDraw
 {
-	matrix unity_ObjectToWorld, unity_WorldToObject;
+	float4x4 unity_ObjectToWorld;
+	float4x4 unity_WorldToObject;
 	float4 unity_LODFade; // x is the fade value ranging within [0,1]. y is x quantized into 16 levels
 	float4 unity_WorldTransformParams; // w is usually 1.0, or -1.0 for odd-negative scale transforms
-	
-	// Velocity
-	matrix unity_MatrixPreviousM, unity_MatrixPreviousMI;
-	
-	// (use last frame position, force no motion, z bias value, camera only)
+	float4 unity_RenderingLayer;
+
+	float4 unity_LightmapST;
+	float4 unity_DynamicLightmapST;
+
+    // SH lighting environment
+	float4 unity_SHAr;
+	float4 unity_SHAg;
+	float4 unity_SHAb;
+	float4 unity_SHBr;
+	float4 unity_SHBg;
+	float4 unity_SHBb;
+	float4 unity_SHC;
+
+    // Renderer bounding box.
+	float4 unity_RendererBounds_Min;
+	float4 unity_RendererBounds_Max;
+
+    // x = Disabled(0)/Enabled(1)
+    // y = Computation are done in global space(0) or local space(1)
+    // z = Texel size on U texture coordinate
+	float4 unity_ProbeVolumeParams;
+	float4x4 unity_ProbeVolumeWorldToObject;
+	float4 unity_ProbeVolumeSizeInv; // Note: This variable is float4 and not float3 (compare to builtin unity) to be compatible with SRP batcher
+	float4 unity_ProbeVolumeMin; // Note: This variable is float4 and not float3 (compare to builtin unity) to be compatible with SRP batcher
+
+    // This contain occlusion factor from 0 to 1 for dynamic objects (no SH here)
+	float4 unity_ProbesOcclusion;
+
+    // Velocity
+	float4x4 unity_MatrixPreviousM;
+	float4x4 unity_MatrixPreviousMI;
+    //X : Use last frame positions (right now skinned meshes are the only objects that use this
+    //Y : Force No Motion
+    //Z : Z bias value
+    //W : Camera only
 	float4 unity_MotionVectorsParams;
 };
 
-#ifdef INSTANCING_ON
-	cbuffer UnityDrawCallInfo
-	{
-		uint unity_BaseInstanceID;
-	};
+cbuffer UnityDrawCallInfo
+{
+	uint unity_BaseInstanceID;
+};
 
-	cbuffer UnityInstancing_PerDraw0
+cbuffer UnityInstancing_PerDraw0
+{
+	struct
 	{
-		struct
-		{
-			matrix unity_ObjectToWorldArray;
-			float2 unity_LODFadeArray;
-			float unity_RenderingLayerArray;
-		}
+		matrix unity_ObjectToWorldArray;
+		float2 unity_LODFadeArray;
+		float unity_RenderingLayerArray;
+	}
 	
-		unity_Builtins0Array[2];
-	};
+	unity_Builtins0Array[2];
+};
 	
-	cbuffer UnityInstancing_PerDraw1
+cbuffer UnityInstancing_PerDraw1
+{
+	struct
 	{
-		struct
-		{
-			matrix unity_WorldToObjectArray;
-			float4 unity_RendererBounds_MinArray;
-			float4 unity_RendererBounds_MaxArray;
-		}
+		matrix unity_WorldToObjectArray;
+		float4 unity_RendererBounds_MinArray;
+		float4 unity_RendererBounds_MaxArray;
+	}
 	
-		unity_Builtins1Array[2];
-	};
+	unity_Builtins1Array[2];
+};
 	
-	cbuffer UnityInstancing_PerDraw2
+cbuffer UnityInstancing_PerDraw2
+{
+	struct
 	{
-		struct
-		{
-			float4 unity_LightmapSTArray;
-			float4 unity_LightmapIndexArray;
-			float4 unity_DynamicLightmapSTArray;
-			float4 unity_SHArArray;
-			float4 unity_SHAgArray;
-			float4 unity_SHAbArray;
-			float4 unity_SHBrArray;
-			float4 unity_SHBgArray;
-			float4 unity_SHBbArray;
-			float4 unity_SHACArray;
-			float4 unity_ProbesOcclusionArray;
-		}
+		float4 unity_LightmapSTArray;
+		float4 unity_LightmapIndexArray;
+		float4 unity_DynamicLightmapSTArray;
+		float4 unity_SHArArray;
+		float4 unity_SHAgArray;
+		float4 unity_SHAbArray;
+		float4 unity_SHBrArray;
+		float4 unity_SHBgArray;
+		float4 unity_SHBbArray;
+		float4 unity_SHACArray;
+		float4 unity_ProbesOcclusionArray;
+	}
 	
-		unity_Builtins2Array[2];
-	};
+	unity_Builtins2Array[2];
+};
 
-	cbuffer UnityInstancing_PerDraw3
+cbuffer UnityInstancing_PerDraw3
+{
+	struct
 	{
-		struct
-		{
-			matrix unity_PrevObjectToWorldArray;
-			matrix unity_PrevWorldToObjectArray;
-		}
+		float4x4 unity_PrevObjectToWorldArray;
+		float4x4 unity_PrevWorldToObjectArray;
+	}
 	
-		unity_Builtins3Array[2];
-	};
-#endif
+	unity_Builtins3Array[2];
+};
 
 #ifdef INDIRECT_RENDERING
 StructuredBuffer<uint> _VisibleRendererInstanceIndices;

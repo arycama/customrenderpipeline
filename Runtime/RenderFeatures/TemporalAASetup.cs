@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 
 public class TemporalAASetup : ViewRenderFeature
 {
@@ -19,7 +20,8 @@ public class TemporalAASetup : ViewRenderFeature
 
 		jitter *= settings.JitterSpread;
 
-		var previousSampleIndex = Math.Max(0, renderGraph.FrameIndex - 1) % settings.SampleCount + 1;
+        // TODO: This seems incorrect
+		var previousSampleIndex = Math.Mod(renderGraph.FrameIndex - 1, settings.SampleCount) + 1;
 
 		Vector2 previousJitter;
 		previousJitter.x = Halton(previousSampleIndex, 2) - 0.5f;
@@ -33,14 +35,14 @@ public class TemporalAASetup : ViewRenderFeature
 		if (!settings.IsEnabled)
 			jitter = previousJitter = Vector2.zero;
 
-		var weights = ArrayPool<float>.Get(9);
+        Span<float> weights = stackalloc float[9];
 		float boxWeightSum = 0.0f, crossWeightSum = 0.0f;
 		float maxCrossWeight = 0.0f, maxBoxWeight = 0.0f;
 		for (int y = -1, i = 0; y <= 1; y++)
 		{
 			for (var x = -1; x <= 1; x++, i++)
 			{
-				var weight = Filter(x - jitter.x, y - jitter.y);
+				var weight = Filter(x - -jitter.x, y - -jitter.y);
 
 				if (!settings.IsEnabled)
 					weight = (x == 0 && y == 0) ? 1.0f : 0.0f;
@@ -77,7 +79,6 @@ public class TemporalAASetup : ViewRenderFeature
 			)
 		);
 
-		ArrayPool<float>.Release(weights);
 		renderGraph.SetResource(new TemporalAASetupData(jitter));
 	}
 
@@ -153,37 +154,4 @@ internal struct TemporalAABufferData
 		Item8 = item8;
 		Item9 = item9;
 	}
-
-	public override bool Equals(object obj) => obj is TemporalAABufferData other && Item1.Equals(other.Item1) && Item2.Equals(other.Item2) && crossWeightSum == other.crossWeightSum && boxWeightSum == other.boxWeightSum && Item5 == other.Item5 && Item6 == other.Item6 && Item7.Equals(other.Item7) && Item8.Equals(other.Item8) && Item9.Equals(other.Item9);
-
-	public override int GetHashCode()
-	{
-		var hash = new System.HashCode();
-		hash.Add(Item1);
-		hash.Add(Item2);
-		hash.Add(crossWeightSum);
-		hash.Add(boxWeightSum);
-		hash.Add(Item5);
-		hash.Add(Item6);
-		hash.Add(Item7);
-		hash.Add(Item8);
-		hash.Add(Item9);
-		return hash.ToHashCode();
-	}
-
-	public void Deconstruct(out Vector4 item1, out Vector4 item2, out float crossWeightSum, out float boxWeightSum, out float item5, out float item6, out Vector4 item7, out Vector4 item8, out Vector4 item9)
-	{
-		item1 = Item1;
-		item2 = Item2;
-		crossWeightSum = this.crossWeightSum;
-		boxWeightSum = this.boxWeightSum;
-		item5 = Item5;
-		item6 = Item6;
-		item7 = Item7;
-		item8 = Item8;
-		item9 = Item9;
-	}
-
-	public static implicit operator (Vector4, Vector4, float crossWeightSum, float boxWeightSum, float, float, Vector4, Vector4, Vector4)(TemporalAABufferData value) => (value.Item1, value.Item2, value.crossWeightSum, value.boxWeightSum, value.Item5, value.Item6, value.Item7, value.Item8, value.Item9);
-	public static implicit operator TemporalAABufferData((Vector4, Vector4, float crossWeightSum, float boxWeightSum, float, float, Vector4, Vector4, Vector4) value) => new TemporalAABufferData(value.Item1, value.Item2, value.crossWeightSum, value.boxWeightSum, value.Item5, value.Item6, value.Item7, value.Item8, value.Item9);
 }

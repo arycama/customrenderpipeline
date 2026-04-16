@@ -74,8 +74,8 @@ public class WaterShadowRenderer : WaterRendererBase
         var viewProjectionMatrix = (Float4x4)(projectionMatrix * worldToLight);
 
         var cullingPlanes = new CullingPlanes() { Count = 6 };
-        for (var j = 0; j < 6; j++)
-            cullingPlanes.SetCullingPlane(j, viewProjectionMatrix.FrustumPlane(j));
+        for (var j = FrustumPlane.Left; j < FrustumPlane.Count; j++)
+            cullingPlanes.SetCullingPlane((int)j, viewProjectionMatrix.GetFrustumPlane(j));
 
         var cullResult = Cull(viewPosition, cullingPlanes, viewRenderData.viewSize, false);
 
