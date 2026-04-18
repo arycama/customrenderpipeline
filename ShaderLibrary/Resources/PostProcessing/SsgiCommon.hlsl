@@ -24,16 +24,76 @@ struct TraceResult
 	float4 hit : SV_Target1;
 };
 
+void SampleGgxVndf(float3 V, float a, float2 u, float3x3 localToWorld, out float3 localV, out float3 localH, out float VdotH)
+{
+#if 1
+	localV = mul(V, transpose(localToWorld));
+
+    // Construct an orthonormal basis around the stretched view direction
+	float3x3 viewToLocal;
+	viewToLocal[2] = normalize(float3(a * localV.x, a * localV.y, localV.z));
+	viewToLocal[0] = (viewToLocal[2].z < 0.9999) ? normalize(cross(float3(0, 0, 1), viewToLocal[2])) : float3(1, 0, 0);
+	viewToLocal[1] = cross(viewToLocal[2], viewToLocal[0]);
+
+    // Compute a sample point with polar coordinates (r, phi)
+	float r = sqrt(u.x);
+	float phi = 2.0 * Pi * u.y;
+	float t1 = r * cos(phi);
+	float t2 = r * sin(phi);
+	float s = 0.5 * (1.0 + viewToLocal[2].z);
+	t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
+
+    // Reproject onto hemisphere
+	localH = t1 * viewToLocal[0] + t2 * viewToLocal[1] + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * viewToLocal[2];
+
+    // Transform the normal back to the ellipsoid configuration
+	localH = normalize(float3(a * localH.x, a * localH.y, max(0.0, localH.z)));
+
+	VdotH = saturate(dot(localV, localH));
+#else
+	// Section 3.2: transforming the view direction to the hemisphere configuration
+	float3 Vh = normalize(float3(alpha * V.x, alpha * V.y, V.z));
+	
+	// Section 4.1: orthonormal basis (with special case if cross product is zero)
+	float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
+	float3 T1 = lensq > 0 ? float3(-Vh.y, Vh.x, 0) * rsqrt(lensq) : float3(1, 0, 0);
+	float3 T2 = cross(Vh, T1);
+	
+	// Section 4.2: parameterization of the projected area
+	float r = sqrt(u.x);
+	float phi = 2.0 * Pi * u.y;
+	float t1 = r * cos(phi);
+	float t2 = r * sin(phi);
+	float s = 0.5 * (1.0 + Vh.z);
+	t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
+	
+	// Section 4.3: reprojection onto hemisphere
+	float3 Nh = t1 * T1 + t2 * T2 + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * Vh;
+	
+	// Section 3.4: transforming the normal back to the ellipsoid configuration
+	return normalize(float3(alpha * Nh.x, alpha * Nh.y, max(0.0, Nh.z)));
+	#endif
+}
+
+float GgxVndfPdf(float a, float NdotH, float NdotV, float VdotH)
+{
+	float D = GgxD(NdotH, a);
+	float G1 = GgxG1(NdotH, a);
+	return (D * G1 * VdotH) / NdotV;
+}
+
 TraceResult Fragment(VertexFullscreenTriangleOutput input)
 {
 	float depth = HiZMinDepth[input.position.xy];
 	float linearDepth = LinearEyeDepth(depth);
-	float3 worldPosition = input.worldDirection * linearDepth;
-	float3 V = normalize(-worldPosition);
+	
+	float3 viewVector = WorldToViewVector(input.worldDirection);
+	float3 viewPosition = viewVector * linearDepth;
+	float3 V = normalize(-viewVector);
 	
 	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV, WorldToView, ViewToWorld);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV);
 	float roughness = max(1e-3, Sq(normalRoughness.b));
 	
 	float3 L;
@@ -41,20 +101,31 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 	if (IsReflection)
 	{
 		float2 u = Noise2D(input.position.xy);
-		float rcpPdf;
-		L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
-		pdf = rcp(rcpPdf);
-
+		//L = ImportanceSampleGGX(roughness, N, V, u, NdotV, pdf);
+		
+		//float3 localV = FromToRotationZ(-N, V);
+		
+		float3x3 localToWorld = GetLocalFrame(N);
+		
+		float3 localV, localH;
+		float VdotH;
+		SampleGgxVndf(V, roughness, u, localToWorld, localV, localH, VdotH);
+		
+		float3 localL = 2.0 * VdotH * localH - localV;
+		L = mul(localL, localToWorld);
+		
+		//L = reflect(-V, H);
+		pdf = GgxVndfPdf(roughness, localH.z, localV.z, VdotH);
 	}
 	else
 	{
 		float3 noise3DCosine = Noise3DCosine(input.position.xy);
-		pdf = noise3DCosine.z * RcpPi;
+		pdf = noise3DCosine.z;
 		L = FromToRotationZ(N, noise3DCosine);
 	}
 	
 	float3 rayOrigin = float3(input.position.xy, depth);
-	float3 rayDirection = MultiplyPointProj(WorldToPixel, worldPosition + L).xyz - rayOrigin;
+	float3 rayDirection = MultiplyPointProj(ViewToPixel, viewPosition + L).xyz - rayOrigin;
 	
 	bool validHit;
 	float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, MaxSteps, Thickness, HiZMinDepth, MaxMip, validHit);
@@ -68,14 +139,13 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 		float2 hitUv = rayPos.xy * RcpViewSize - velocity;
 		outDepth = Linear01Depth(depth);
 	
-		float3 worldHit = PixelToWorldPosition(rayPos);
-		hitRay = worldHit - worldPosition;
+		float3 viewHit = PixelToViewPosition(rayPos);
+		hitRay = viewHit - viewPosition;
 		
 		// Calculate size of a screenspace cone based on distance travelled and depth of sample (since distant pixels are smaller)
 		float hitDist = length(hitRay);
-		float linearHitDepth = LinearEyeDepth(rayPos.z);
+		float coneRadius = ConeAngle * hitDist * rcp(viewHit.z);
 		
-		float coneRadius = ConeAngle * hitDist * rcp(linearHitDepth);
 		if (IsReflection)
 		{
 			float coneTangent = GetSpecularLobeTanHalfAngle(roughness);
@@ -117,8 +187,11 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
 	float NdotV;
 	float3 N = GBufferNormal(normalRoughness, V, NdotV, WorldToView, ViewToWorld);
+	N = MultiplyVector(WorldToView, N);
+	V = MultiplyVector(WorldToView, V);
 	
 	float3 worldPosition = input.worldDirection * LinearEyeDepth(CameraDepth[input.position.xy]);
+	float3 viewPosition = WorldToViewPosition(worldPosition);
 	float phi = Noise1D(input.position.xy) * TwoPi;
 	
 	float roughness = max(1e-3, Sq(normalRoughness.b));
@@ -147,8 +220,8 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 		bool hasHit = hitData.w;
 		if (hasHit)
 		{
-			float3 sampleWorldPosition = PixelToWorldPosition(float3(coord, Linear01ToDeviceDepth(hitData.w)));
-			L += sampleWorldPosition - worldPosition;
+			float3 sampleViewPosition = PixelToViewPosition(float3(coord, Linear01ToDeviceDepth(hitData.w)));
+			L += sampleViewPosition - viewPosition;
 		}
 		
 		// Normalize (In theory, shouldn't be required for no hit, but since it comes from 16-bit float, might not be unit length

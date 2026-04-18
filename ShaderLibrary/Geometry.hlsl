@@ -9,6 +9,7 @@ float4 _CullingPlanes[6];
 uint _CullingPlanesCount;
 
 const static float3x3 Identity3x3 = float3x3(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+const static float4x4 Identity4x4 = float4x4(1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0);
 
 float3 SphericalToCartesian(float cosPhi, float sinPhi, float cosTheta, float sinTheta)
 {

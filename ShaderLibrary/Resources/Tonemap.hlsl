@@ -36,6 +36,9 @@ float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 		color = lerp(color, bloom, BloomStrength);
 	#endif
 	
+	float4 ssgi = ScreenSpaceGlobalIllumination[position];
+	//color = ssgi;
+	
 	color *= PaperWhite;
 	color = Rec2020ToICtCp(color);
 	color.yz += 0.5;

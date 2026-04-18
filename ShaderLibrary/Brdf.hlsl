@@ -12,7 +12,7 @@ float LambdaGgx(float roughness2, float cosTheta)
 	return sqrt((Sq(rcp(cosTheta)) - 1.0h) * roughness2 + 1.0h) * 0.5h - 0.5h;
 }
 
-float GgxG1(float a2, float NdotL, float LdotH)
+float GgxG1(float a2, float NdotL)
 {
 	float cosThetaV2 = Sq(NdotL);
 	float tanThetaV2 = (1.0h - cosThetaV2) / cosThetaV2;
@@ -43,7 +43,7 @@ half GgxD(half roughness, half NdotH, half3 N, half3 H)
 
 float GgxG(float roughness2, half NdotL, half LdotH, half NdotV, half VdotH)
 {
-	return GgxG1(roughness2, NdotL, LdotH) * GgxG1(roughness2, NdotV, VdotH);
+	return GgxG1(roughness2, NdotL) * GgxG1(roughness2, NdotV);
 }
 
 float GgxV(float NdotL, float NdotV, float roughness2, float partLambdaV)
@@ -66,7 +66,6 @@ half GgxDv(half roughness2, half NdotH, half NdotL, half NdotV, half partLambdaV
 	half s2 = Sq((NdotH * roughness2 - NdotH) * NdotH + 1.0h);
 	half lambdaL = NdotV * GetPartLambdaV(roughness2, NdotL);
 	half denom = 2.0h * (NdotL * partLambdaV + lambdaL) * s2;
-	return roughness2 * rcp(denom);
 	return denom ? roughness2 * rcp(denom) : 0.0h;
 }
 

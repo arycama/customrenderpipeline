@@ -171,20 +171,20 @@ float3 SampleGGXIsotropic(float3 wi, float alpha, float2 u, float3 n)
 	return normalize(alpha * wmStd_xy + wmStd_z);
 }
 
-float RcpPdfGGXVndfIsotropic(float NdotV, float NdotH, float alpha)
+float PdfGgxVndfIsotropic(float NdotV, float NdotH, float alpha)
 {
-	float alphaSquare = alpha * alpha;
-	float nrm = rsqrt(Sq(NdotV) * (1.0f - alphaSquare) + alphaSquare);
+	float a2 = Sq(alpha);
+	float nrm = rsqrt(Sq(NdotV) * (1.0f - a2) + a2);
 	float sigmaStd = (NdotV * nrm) * 0.5f + 0.5f;
 	float sigmaI = sigmaStd / nrm;
-	float nrmN = Sq(NdotH) * (alphaSquare - 1.0f) + 1.0f;
-	return (FourPi * nrmN * nrmN * sigmaI) * rcp(alphaSquare);
+	float nrmN = Sq(NdotH) * (a2 - 1.0f) + 1.0f;
+	return a2 * rcp(FourPi * nrmN * nrmN * sigmaI);
 }
 
-float3 ImportanceSampleGGX(float a, float3 N, float3 V, float2 u, float NdotV, out float rcpPdf)
+float3 ImportanceSampleGGX(float a, float3 N, float3 V, float2 u, float NdotV, out float pdf)
 {
 	float3 H = SampleGGXIsotropic(V, a, u, N);
-	rcpPdf = RcpPdfGGXVndfIsotropic(NdotV, saturate(dot(N, H)), a);
+	pdf = PdfGgxVndfIsotropic(NdotV, saturate(dot(N, H)), a);
 	return reflect(-V, H);
 }
 
@@ -242,7 +242,7 @@ float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 localV, out flo
 	float3 localH = SampleGgxVndf(roughness, u, localV);
 	float3 localL = reflect(-localV, localH);
 	pdf = 0.25 * GgxD(roughness2, localH.z) * rcp(dot(localV, localH.z));
-	weightOverPdf = GgxG2(roughness2, localL.z, localV.z) * rcp(GgxG1(roughness2, localV.z, 1.0));
+	weightOverPdf = GgxG2(roughness2, localL.z, localV.z) * rcp(GgxG1(roughness2, localV.z));
 	return localL;
 }
 

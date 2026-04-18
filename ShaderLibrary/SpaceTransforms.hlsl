@@ -136,6 +136,15 @@ float3 WorldToViewPosition(float3 position)
 	#endif
 }
 
+float3 WorldToViewVector(float3 v)
+{
+	#ifdef UNITY_PASS_SHADOWCASTER
+		return MultiplyVector((float3x3)WorldToShadowView, v);
+	#else
+		return MultiplyVector((float3x3) WorldToView, v);
+	#endif
+}
+
 float4 WorldToClipPosition(float3 position)
 {
 	#ifdef UNITY_PASS_SHADOWCASTER

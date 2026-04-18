@@ -38,8 +38,8 @@ void RayGeneration()
 	float3 N = GBufferNormal(normalRoughness, V, NdotV, WorldToView, ViewToWorld);
 	
 	float roughness = Sq(normalRoughness.b);
-	float rcpPdf;
-	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
+	float pdf;
+	float3 L = ImportanceSampleGGX(roughness, N, V, u, NdotV, pdf);
 	
 	RayDesc ray;
 	ray.Origin = worldPosition + ViewPosition + N * EvaluateRayTracingBias(worldPosition, Near, Far, _RaytracingBias, _RaytracingDistantBias);
@@ -82,6 +82,6 @@ void RayGeneration()
 		color *= exp(-payload.hitDistance * _WaterExtinction);
 	}
 	
-	HitColor[position] = float4(color, rcpPdf);
+	HitColor[position] = float4(color, rcp(pdf));
 	HitResult[position] = float4(hitRay, outDepth);
 }
