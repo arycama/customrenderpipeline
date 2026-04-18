@@ -36,9 +36,16 @@ float3 SampleSphereUniform(float u1, float u2)
 	return SphericalToCartesian(phi, cosTheta);
 }
 
+float SphericalDot(float cosThetaA, float cosThetaB, float cosDeltaPhi)
+{
+	float sinThetaA = SinFromCos(cosThetaA);
+	float sinThetaB = SinFromCos(cosThetaB);
+	return cosThetaA * cosThetaB + sinThetaA * sinThetaB * cosDeltaPhi;
+}
+
 float SphericalDot(float cosThetaA, float phiA, float cosThetaB, float phiB)
 {
-	return SinFromCos(cosThetaA) * SinFromCos(cosThetaB) * cos(phiA - phiB) + cosThetaA * cosThetaB;
+	return SphericalDot(cosThetaA, cosThetaB, cos(phiA - phiB));
 }
 
 float DistanceToSphereInside(float height, float cosAngle, float radius)
@@ -539,6 +546,26 @@ half3x3 GetLocalFrame(half3 localZ)
     // Note: due to the quaternion formulation, the generated frame is rotated by 180 degrees,
     // s.t. if localZ = {0, 0, 1}, then localX = {-1, 0, 0} and localY = {0, -1, 0}.
 	return half3x3(localX, localY, localZ);
+}
+
+// Law of cosines: solve for side c opposite angle C
+// c² = a² + b² - 2ab·cos(C)
+float SideFromCosineRule(float a, float b, float cosC)
+{
+	return sqrt(a * a + b * b - 2.0f * a * b * cosC);
+}
+
+// Law of cosines: solve for cos(C) given sides a, b, c
+// cos(C) = (a² + b² - c²) / (2ab)
+float CosineFromSides(float a, float b, float c)
+{
+	return (Sq(a) + Sq(b) - Sq(c)) / (2.0 * a * b);
+}
+
+float SineRule(float a, float sinA, float b)
+{
+	// returns sin(b)
+	return b * sinA / a;
 }
 
 #endif

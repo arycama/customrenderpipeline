@@ -95,8 +95,8 @@ float3 ColorGradeAndTonemap(float3 color, float exposure, float contrast, float3
 {
 	color.yz -= 0.5;
 	color = ICtCpToRec2020(color);
-	//color = ColorGrade(color, exposure, contrast, colorFilter, hue, saturation, whiteBalance, tint, splitToneShadows, splitToneBalance, splitToneHighlights, channelMixerRed, channelMixerGreen, channelMixerBlue, shadows, midtones, highlights, shadowsStart, shadowsEnd, highlightsStart, highlightsEnd, paperWhite);
-	//color = Tonemap(color, maxLuminance, paperWhite, linearStart, fadeStart, fadeEnd, huePreservation);
+	color = ColorGrade(color, exposure, contrast, colorFilter, hue, saturation, whiteBalance, tint, splitToneShadows, splitToneBalance, splitToneHighlights, channelMixerRed, channelMixerGreen, channelMixerBlue, shadows, midtones, highlights, shadowsStart, shadowsEnd, highlightsStart, highlightsEnd, paperWhite);
+	color = Tonemap(color, maxLuminance, paperWhite, linearStart, fadeStart, fadeEnd, huePreservation);
 	return LinearToST2084(color);
 }
 

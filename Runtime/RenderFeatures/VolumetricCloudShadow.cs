@@ -44,8 +44,9 @@ public class VolumetricCloudShadow : ViewRenderFeature
             if (light.lightType != LightType.Directional)
                 continue;
 
-            lightDirection = -light.localToWorldMatrix.Forward();
-            lightRotation = light.localToWorldMatrix.rotation;
+            var viewToWorld = (Float4x4)light.localToWorldMatrix;
+            lightDirection = -viewToWorld.c2.xyz;
+            lightRotation = new Quaternion(viewToWorld.c0.xyz, viewToWorld.c1.xyz, viewToWorld.c2.xyz);
 
             // Only 1 light supported
             break;

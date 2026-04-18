@@ -16,8 +16,6 @@ struct FragmentOutput
 
 // TODO: Remove/precompute
 const static float3 _PlanetCenter = float3(0.0, -_PlanetRadius - ViewPosition.y, 0.0);
-TextureCube<float3> Stars;
-float StarExposure;
 
 FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 {
@@ -192,15 +190,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	output.luminance = float4(current.rgb, 1.0);
 	output.transmittance = current.a;
 	
-	current.rgb = ICtCpToRec2020(current.rgb - float2(0.0, 0.5).xyy) / (PaperWhite * sqrt(2.0));
-		
-	if (!rawDepth)
-	{
-		float3 stars = Stars.Sample(TrilinearClampSampler, input.worldDirection) * StarExposure * Exposure;
-		stars *= TransmittanceToAtmosphere(ViewHeight, normalize(input.worldDirection).y);
-		current.rgb += stars;
-	}
-	
+	current.rgb = ICtCpToRec2020(current.rgb - float2(0.0, 0.5).xyy) / (PaperWhite * sqrt(2.0));	
 	output.frameResult = current;
 	return output;
 }

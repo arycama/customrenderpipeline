@@ -45,6 +45,9 @@ public class SkyLookupTables : FrameRenderFeature
         var rayleigh = new Float3(RayleighScattering(680), RayleighScattering(550), RayleighScattering(440));
         rayleigh = ColorspaceUtility.Rec709ToRec2020(rayleigh);
 
+        // TODO: This doesn't work for some reason
+        //var rayleigh = new Float3(RayleighScattering(630), RayleighScattering(532), RayleighScattering(467));
+
         var radius = settings.PlanetRadius * settings.EarthScale;
         var height = settings.AtmosphereHeight * settings.EarthScale;
 

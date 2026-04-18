@@ -73,8 +73,9 @@ Shader "Hidden/Physical Sky"
             Blend 1 One Zero
 
             HLSLPROGRAM
-            #pragma vertex VertexFullscreenTriangleMinimal
+            #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
+            #pragma multi_compile _ CLOUDS_ON
             #include "PhysicalSky.hlsl"
             ENDHLSL
         }

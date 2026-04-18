@@ -92,22 +92,22 @@ float2 CubeMapFaceUv(float3 direction, uint index)
 	switch (index)
 	{
 		case CubemapFacePositiveX:
-			uv = float2(-direction.z, -direction.y) / abs(direction.x);
+			uv = -direction.zy / direction.x;
 			break;
 		case CubemapFaceNegativeX:
-			uv = float2(direction.z, -direction.y) / abs(direction.x);
+			uv = float2(-direction.z, direction.y) / direction.x;
 			break;
 		case CubemapFacePositiveY:
-			uv = float2(direction.x, direction.z) / abs(direction.y);
+			uv = direction.xz / direction.y;
 			break;
 		case CubemapFaceNegativeY:
-			uv = float2(direction.x, -direction.z) / abs(direction.y);
+			uv = float2(-direction.x, direction.z) / direction.y;
 			break;
 		case CubemapFacePositiveZ:
-			uv = float2(direction.x, -direction.y) / abs(direction.z);
+			uv = float2(direction.x, -direction.y) / direction.z;
 			break;
 		case CubemapFaceNegativeZ:
-			uv = float2(-direction.x, -direction.y) / abs(direction.z);
+			uv = direction.xy / direction.z;
 			break;
 	}
 	

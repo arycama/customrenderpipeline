@@ -213,12 +213,11 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
         // Point light
 		if (light.lightType == LightTypePoint)
 		{
-			float3 toLight = lightVector * float3(1, -1, 1);
-			float dominantAxis = Max3(abs(toLight));
+			float dominantAxis = Max3(abs(lightVector));
 			float depth = (dominantAxis * light.shadowProjectionX + light.shadowProjectionY) / dominantAxis;
 			
-			float faceIndex = CubeMapFaceID(-toLight);
-			float2 uv = CubeMapFaceUv(-toLight, faceIndex);
+			float faceIndex = CubeMapFaceID(-lightVector);
+			float2 uv = CubeMapFaceUv(-lightVector, faceIndex);
 			float shadowIndex = light.shadowIndex + faceIndex;
 			attenuation *= PointShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, shadowIndex), depth);
 		}
@@ -228,6 +227,7 @@ float GetLightAttenuation(LightData light, float3 worldPosition, float dither, b
 		{
 			float2 uv = positionLS.xy * light.size / positionLS.z * 0.5 + 0.5;
 			float depth = (positionLS.z * light.shadowProjectionX + light.shadowProjectionY) / positionLS.z;
+			uv.y = 1.0 - uv.y; // TODO: Why is this required?
 			attenuation *= SpotShadows.SampleCmpLevelZero(LinearClampCompareSampler, float3(uv, light.shadowIndex), depth);
 		}
         
@@ -279,7 +279,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	half3 L = DdotR < d ? normalize(d * D + normalize(S) * r) : R;
 	
 	// Direct lighting
-	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -input.V.y, L.y, length(input.worldPosition));
+	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -input.V.y, L.y, dot(L, input.V), length(input.worldPosition));
 	
 	float shadow = GetDirectionalShadow(input.worldPosition, softShadows) * CloudTransmittance(input.worldPosition);
 	

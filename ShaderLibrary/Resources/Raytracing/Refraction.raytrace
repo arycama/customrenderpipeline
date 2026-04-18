@@ -133,7 +133,7 @@ void RayGeneration()
 	float asymmetry = exp(-cp * (shadowDistance0 + t));
 	float LdotV0 = dot(_LightDirection0, L);
 	float phase = lerp(CsPhase(LdotV0, -0.3), CsPhase(LdotV0, 0.85), asymmetry);
-	float3 lightColor0 = phase * _LightColor0 * TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition));
+	float3 lightColor0 = phase * _LightColor0 * TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, dot(_LightDirection0, V), length(worldPosition));
 	lightColor0 *= GetCaustics(P + ViewPosition, _LightDirection0, true);
 	luminance += lightColor0 * attenuation * asymmetry;
 	

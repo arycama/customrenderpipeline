@@ -67,7 +67,7 @@ FragmentInput Vertex(uint vertexId : SV_VertexID)
 	float shadow = GetDirectionalShadow(worldPosition) * CloudTransmittance(worldPosition);
 	float LdotV = dot(_LightDirection0, V);
 	
-	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, length(worldPosition));
+	float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, dot(_LightDirection0, V), length(worldPosition));
 	float phase = lerp(HgPhase(-LdotV, ForwardScatterPhase), HgPhase(-LdotV, -BackwardScatterPhase), ScatterBlend);
 	lighting += shadow * phase * _LightColor0 * lightTransmittance * Exposure;
 	

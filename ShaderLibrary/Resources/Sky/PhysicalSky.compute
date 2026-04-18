@@ -29,13 +29,14 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	
 	float2 u = Hammersley2dSeq(groupIndex, _ThreadCount);
 	float lightCosAngle = 2.0 * uv.z - 1.0;
+	float3 L = float3(SinFromCos(lightCosAngle), 0.0, lightCosAngle);
 	
 	#ifdef AMBIENT_GROUND
 		float viewHeight = _PlanetRadius;
-		float viewCosAngle = SampleHemisphereCosine(u.x, u.y).z;
+		float3 V = SampleHemisphereCosine(u.x, u.y);
 	#else
 		float viewHeight = uv.x * _AtmosphereHeight + _PlanetRadius;
-		float viewCosAngle = SampleSphereUniform(u.x, u.y).z;
+		float3 V = SampleSphereUniform(u.x, u.y);
 	#endif
 	
 	#if defined(AMBIENT_GROUND) || defined(AMBIENT_SKY)
@@ -44,9 +45,9 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 		bool applyMultiScatter = false;
 	#endif
 	
-	bool rayIntersectsGround = RayIntersectsGround(viewHeight, viewCosAngle);
-	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, viewCosAngle, rayIntersectsGround);
-	AtmosphereResult result = SampleAtmosphere(viewHeight, viewCosAngle, lightCosAngle, _Samples, rayLength, applyMultiScatter, true, rayIntersectsGround);
+	bool rayIntersectsGround = RayIntersectsGround(viewHeight, V.z);
+	float rayLength = DistanceToNearestAtmosphereBoundary(viewHeight, V.y, rayIntersectsGround);
+	AtmosphereResult result = SampleAtmosphere(viewHeight, V.y, lightCosAngle, dot(L, V), _Samples, rayLength, applyMultiScatter, true, rayIntersectsGround);
 	ScatterShared[groupIndex] = result.luminance / _ThreadCount;
 	MultiScatterShared[groupIndex] = result.density / _ThreadCount;
 	

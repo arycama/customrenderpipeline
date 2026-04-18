@@ -5,8 +5,6 @@ using UnityEngine.Experimental.Rendering;
 
 public partial class VolumetricClouds : ViewRenderFeature
 {
-	private static readonly int StarsId = Shader.PropertyToID("Stars");
-
 	private readonly Material material;
     private readonly Settings settings;
     private readonly PersistentRTHandleCache cloudLuminanceTextureCache, cloudTransmittanceTextureCache;
@@ -140,12 +138,6 @@ public partial class VolumetricClouds : ViewRenderFeature
 
 				pass.SetInt("_MaxWidth", data.Item8.x - 1);
 				pass.SetInt("_MaxHeight", data.Item8.y - 1);
-
-				if (data.skySettings.StarMap != null)
-					pass.SetTexture(StarsId, data.skySettings.StarMap);
-
-				pass.SetFloat("StarExposure", data.skySettings.StarExposure);
-
 				data.settings.SetCloudPassData(pass, data.time);
 			});
 		}

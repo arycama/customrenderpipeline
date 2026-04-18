@@ -21,19 +21,20 @@ bool IsFirst;
 void Compute(uint3 id : SV_DispatchThreadID)
 {
 	float maxDepth = LinearEyeDepth(HiZMaxDepth.mips[VolumetricLog2TileSize][id.xy]);
-
+	float previousDepth = VolumetricToLinearDepth(max(0, id.z - 0.5));
+	if (maxDepth <= previousDepth)
+	{
+		// If depth is beyond, write 0 and return. (Must write out 0 for temporal to avoid reprojecting invalid data)
+		// The bounds is 0.5 before the current, as we start at 0, and if the depth is past the halfway point of the previous,
+		// this voxel will still be visible due to interpolation
+		Result[id] = float2(0.0, 1.0).xxxy;
+		return;
+	}
+	
 	float jitter = Noise1D(id.xy);
 	float3 worldDir = MultiplyVector(PixelToWorldViewDir, float3(id.xy + 0.5, 1.0));
 	float rcpWorldDirLength = RcpLength(worldDir);
 	worldDir *= rcpWorldDirLength;
-	
-	float linearUnjitteredDepth = VolumetricToLinearDepth(id.z + 0.5);
-	if (maxDepth <= linearUnjitteredDepth)
-	{
-		// If depth is beyond, write 0 and return. (Must write out 0 for temporal to avoid reprojecting invalid data)
-		Result[id] = float2(0, 1).xxxy;
-		return;
-	}
 	
 	float eyeDepth = VolumetricToLinearDepth(id.z + jitter);
 	
@@ -73,15 +74,17 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	
 	// Reproject previous frame. Needs to use unjittered world position
 	// TODO: Could do screen to previous screen to save a few instructions
-	float4 previousClipPosition = PreviousClipPosition(screenPosition, LinearToDeviceDepth(linearUnjitteredDepth));
-	previousClipPosition.xy = PerspectiveDivide(previousClipPosition).xy * 0.5 + 0.5;
+	float linearUnjitteredDepth = VolumetricToLinearDepth(id.z + 0.5);
+	float4 previousScreenPosition = PreviousScreenPosition(screenPosition, LinearToDeviceDepth(linearUnjitteredDepth));
+	previousScreenPosition.xy = PerspectiveDivide(previousScreenPosition).xy;
 	
-	float3 volumeUv = float3(previousClipPosition.xy, LinearToVolumetricDepth(previousClipPosition.w));
+	// TODO: This seems to overshoot the motion and sample too far or something
+	float3 volumeUv = float3(previousScreenPosition.xy, LinearToVolumetricDepth(previousScreenPosition.w));
 	if (!IsFirst && all(saturate(volumeUv) == volumeUv))
 	{
 		// TODO: Neighborood clamp? (May be expensive, probably best to combien with groupshared
-		float4 previousLuminanceExtinction = Input.SampleLevel(TrilinearClampSampler, min(volumeUv * InputScale, InputMax), 0.0);
-		luminanceExtinction = lerp(previousLuminanceExtinction, luminanceExtinction, 0.25);
+		float4 previousLuminanceExtinction = Input.SampleLevel(TrilinearClampSampler, volumeUv, 0.0);
+		luminanceExtinction = lerp(previousLuminanceExtinction, luminanceExtinction, 0.05);
 	}
 	
 	Result[id] = luminanceExtinction;
@@ -91,9 +94,9 @@ void Compute(uint3 id : SV_DispatchThreadID)
 void KERNEL(uint3 id : SV_DispatchThreadID)
 {
 	float maxDepth = LinearEyeDepth(HiZMaxDepth.mips[VolumetricLog2TileSize][id.xy]);
-	float linearUnjitteredDepth = VolumetricToLinearDepth(id.z + 0.5);
-	//if (maxDepth <= linearUnjitteredDepth)
-	//	return;
+	float linearUnjitteredDepth = VolumetricToLinearDepth(id.z - 0.5);
+	if (maxDepth <= linearUnjitteredDepth)
+		return;
 	
 	float4 result = 0.0;
 	float weightSum = 0.0;
@@ -128,7 +131,7 @@ void Accumulate(uint2 id : SV_DispatchThreadID)
 {
 	float maxDepth = LinearEyeDepth(HiZMaxDepth.mips[VolumetricLog2TileSize][id]);
 
-	float3 worldDir = MultiplyVector(PixelToWorldViewDir, float3(id.xy + 0.5, 1.0));
+	float3 worldDir = MultiplyVector(PixelToWorldViewDir, float3(id + 0.5, 1.0));
 	float rcpWorldDirLength = RcpLength(worldDir);
 	worldDir *= rcpWorldDirLength;
 	float worldDirLength = rcp(rcpWorldDirLength);
@@ -137,22 +140,21 @@ void Accumulate(uint2 id : SV_DispatchThreadID)
 	float4 result = float2(0.0, 1.0).xxxy;
 	for (uint i = 0; i < VolumeDepthInt; i++)
 	{
-		float t0 = VolumetricToLinearDepth(i + 0);
-		float t1 = VolumetricToLinearDepth(i + 1);
-		if (maxDepth < t0)
-		{
-			Result[uint3(id, i)] = float2(0.0, 1.0).xxxy;
-			continue;
-		}
-			
-		t0 *= worldDirLength;
-		t1 *= worldDirLength;
+		float previousT0 = VolumetricToLinearDepth(max(0, i - 0.5));
+		if (maxDepth < previousT0)
+			return;
+	
+		float rawT0 = VolumetricToLinearDepth(i + 0);
+		float rawT1 = VolumetricToLinearDepth(i + 1);
+
+		float t0 = rawT0 * worldDirLength;
+		float t1 = rawT1 * worldDirLength;
 		
 		float t = lerp(t0, t1, 0.5);
 		float ds = t1 - t0;
 	
 		// Attenuate due to atmosphere and local extinction
-		float4 luminanceExtinction = Input[uint3(id.xy, i)];
+		float4 luminanceExtinction = Input[uint3(id, i)];
 		float3 sampleExtinction = AtmosphereExtinction(ViewHeight, worldDir.y, t) + luminanceExtinction.a;
 		float3 sampleTransmittance = exp(-sampleExtinction * ds);
 		

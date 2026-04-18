@@ -18,7 +18,7 @@ float3 FragmentTransmittanceLut(VertexFullscreenTriangleMinimalOutput input) : S
 	float viewHeight = ViewHeightFromUv(uv.x);
 	float viewCosAngle = ViewCosAngleFromUv(uv.y, viewHeight, false, rayLength);
 	
-	return SampleAtmosphere(viewHeight, viewCosAngle, 0.0, _Samples, rayLength, false, false, false).transmittance;
+	return SampleAtmosphere(viewHeight, viewCosAngle, 0.0, 0.0, _Samples, rayLength, false, false, false).transmittance;
 }
 
 float3 FragmentViewTransmittanceLut(VertexFullscreenTriangleVolumeOutput input) : SV_Target
@@ -35,7 +35,7 @@ float3 FragmentViewTransmittanceLut(VertexFullscreenTriangleVolumeOutput input) 
 	float viewCosAngle = ViewCosAngleFromUv(uv.y, ViewHeight, rayIntersectsGround, rayLength);
 	rayLength *= uv.x;
 	
-	return SampleAtmosphere(ViewHeight, viewCosAngle, 0.0, _Samples, rayLength, false, false, rayIntersectsGround).transmittance;
+	return SampleAtmosphere(ViewHeight, viewCosAngle, 0.0, 0.0, _Samples, rayLength, false, false, rayIntersectsGround).transmittance;
 }
 
 float FragmentTransmittanceDepthLut(VertexFullscreenTriangleVolumeOutput input) : SV_Target
@@ -58,7 +58,9 @@ float3 FragmentLuminance(VertexFullscreenTriangleVolumeOutput input) : SV_Target
 	float viewCosAngle = ViewCosAngleFromUv(uv.y, ViewHeight, rayIntersectsGround, rayLength);
 	rayLength *= uv.x;
 	
-	return SampleAtmosphere(ViewHeight, viewCosAngle, _LightDirection0.y, _Samples, rayLength, true, false, rayIntersectsGround).luminance;
+	// TODO: This doesn't account for planet shadow since we're only accounting for the cos angle between them, since otherwise would require an extra dimension
+	float LdotV = CosineDifference(_LightDirection0.y, viewCosAngle);
+	return SampleAtmosphere(ViewHeight, viewCosAngle, _LightDirection0.y, LdotV, _Samples, rayLength, true, false, rayIntersectsGround).luminance;
 }
 
 float3 F(float x, float y, float rayIntersectsGround)

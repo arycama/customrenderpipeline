@@ -82,7 +82,7 @@ float3 TransmittanceToPoint(float radius0, float cosAngle0, float radius1, float
 	return highTransmittance == 0.0 ? 0.0 : lowTransmittance * rcp(highTransmittance);
 }
 
-float CosAngleAtDistance(float viewHeight, float cosAngle, float distance, float heightAtDistance)
+float LightCosAngleAtDistance(float viewHeight, float cosAngle, float distance, float heightAtDistance)
 {
 	return (viewHeight * cosAngle + distance) / heightAtDistance;
 }
@@ -90,7 +90,7 @@ float CosAngleAtDistance(float viewHeight, float cosAngle, float distance, float
 float3 TransmittanceToPoint1(float viewHeight, float cosAngle, float distance)
 {
 	float heightAtDistance = HeightAtDistance(viewHeight, cosAngle, distance);
-	float cosAngleAtDistance = CosAngleAtDistance(viewHeight, cosAngle, distance, heightAtDistance);
+	float cosAngleAtDistance = LightCosAngleAtDistance(viewHeight, cosAngle, distance, heightAtDistance);
 	return TransmittanceToPoint(viewHeight, cosAngle, heightAtDistance, cosAngleAtDistance);
 }
 
@@ -113,7 +113,7 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		
 		if (!isShadow && extinction)
 		{
-			float lightCosAngleAtDistance = LightCosAngleAtDistance(viewHeight, viewCosAngle, _LightDirection0.y, t);
+			float lightCosAngleAtDistance = LightCosAngleAtDistance(viewHeight, viewCosAngle, _LightDirection0.y, LdotV, t);
 			float lightOpticalDepth = 0.0;
 			float lightDs = _LightDistance / _LightSamples;
 			
@@ -148,7 +148,7 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 	
 	cloudDepth = weightedDepthSum * rcp(weightSum);
 	
-	float3 ambient = GetSkyAmbient(viewHeight, viewCosAngle, _LightDirection0.y, cloudDepth) * _LightColor0 * Exposure * RcpFourPi;
+	float3 ambient = GetSkyAmbient(viewHeight, viewCosAngle, _LightDirection0.y, LdotV, cloudDepth) * _LightColor0 * Exposure * RcpFourPi;
 	float4 result = float2(light0, transmittance).xxxy;
 	if (result.a < 1.0)
 	{
@@ -156,8 +156,11 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 			result.a = saturate(Remap(result.a, _TransmittanceThreshold));
 	
 		// Final lighting
-		float3 lightTransmittance = TransmittanceToAtmosphere(viewHeight, rd.y, _LightDirection0.y, cloudDepth);
+		float3 lightTransmittance = TransmittanceToAtmosphere(viewHeight, rd.y, _LightDirection0.y, LdotV, cloudDepth);
 		result.rgb *= lightTransmittance * _LightColor0 * Exposure;
+		
+		// Apply view transmittance
+		result.rgb *= sunShadow ? TransmittanceToPoint(viewHeight, viewCosAngle, cloudDepth) : TransmittanceToPoint1(viewHeight, viewCosAngle, cloudDepth);
 		
 		// Attenuate sky ambient by cloud coveerage
 		float3 amb = ambient;
@@ -169,8 +172,6 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 			float b = pow(ScatterContribution, j);
 			result.rgb += amb * b * (1.0 - result.a);
 		}
-		
-		result.rgb *= sunShadow ? TransmittanceToPoint(viewHeight, viewCosAngle, cloudDepth) : TransmittanceToPoint1(viewHeight, viewCosAngle, cloudDepth);
 	}
 	
 	// High altitude layer
@@ -198,7 +199,7 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		}
 		
 		// Final lighting
-		float3 lightTransmittance = TransmittanceToAtmosphere(viewHeight, rd.y, _LightDirection0.y, rayEnd);
+		float3 lightTransmittance = TransmittanceToAtmosphere(viewHeight, rd.y, _LightDirection0.y, LdotV, rayEnd);
 		result.rgb += light0 * lightTransmittance * _LightColor0 * Exposure * result.a;
 		
 		for (j = 0.0; j < ScatterOctaves; j++)
