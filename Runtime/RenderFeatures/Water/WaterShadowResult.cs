@@ -4,11 +4,11 @@ using UnityEngine.Rendering;
 public readonly struct WaterShadowResult : IRenderPassData
 {
     private readonly ResourceHandle<RenderTexture> waterShadowTexture, waterIlluminance;
-    private readonly Matrix4x4 waterShadowMatrix;
+    private readonly Float4x4 waterShadowMatrix;
     private readonly float waterShadowNear, waterShadowFar;
     private readonly Float3 waterShadowExtinction;
 
-    public WaterShadowResult(ResourceHandle<RenderTexture> waterShadowTexture, Matrix4x4 waterShadowMatrix, float waterShadowNear, float waterShadowFar, Float3 waterShadowExtinction, ResourceHandle<RenderTexture> waterIlluminance)
+    public WaterShadowResult(ResourceHandle<RenderTexture> waterShadowTexture, Float4x4 waterShadowMatrix, float waterShadowNear, float waterShadowFar, Float3 waterShadowExtinction, ResourceHandle<RenderTexture> waterIlluminance)
     {
         this.waterShadowTexture = waterShadowTexture;
         this.waterShadowMatrix = waterShadowMatrix;

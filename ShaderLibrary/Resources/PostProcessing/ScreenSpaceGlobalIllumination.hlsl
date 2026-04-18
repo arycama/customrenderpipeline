@@ -186,7 +186,7 @@ TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCO
 	float2 historyUv = uv - CameraVelocity[position.xy];
 	float4 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
 	
-	history.rgb = ClipToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
+	history.rgb = ClampToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
 	history.a = clamp(history.a, minValue.a, maxValue.a);
 	
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))

@@ -33,8 +33,9 @@ public partial class LightingSetup : ViewRenderFeature
 		var directionalShadowMatrices = ListPool<Float3x4>.Get();
 		var directionalCascadeSizes = ListPool<Float4>.Get();
 
-		// Find first 2 directional lights
-		Float3 lightColor0 = Float3.Zero, lightColor1 = Float3.Zero, lightDirection0 = Float3.Up, lightDirection1 = Float3.Up;
+        // Find first 2 directional lights
+        Float3 lightColor0 = Float3.Zero, lightColor1 = Float3.Zero;
+        Quaternion lightRotation0 = Quaternion.Identity, lightRotation1 = Quaternion.Identity;
 		var dirLightCount = 0;
 
 		var n = viewRenderData.near;
@@ -49,15 +50,16 @@ public partial class LightingSetup : ViewRenderFeature
 		{
             var visibleLight = cullingResults.visibleLights[i];
             var lightToWorld = (Float4x4)visibleLight.localToWorldMatrix;
-            var lightRotation = new Quaternion(lightToWorld.c0.xyz, lightToWorld.c1.xyz, lightToWorld.c2.xyz);
+            var lightPosition = lightToWorld.Translation;
+            var lightRotation = lightToWorld.Rotation;
 
             if (visibleLight.lightType == LightType.Directional)
             {
                 dirLightCount++;
                 if (dirLightCount == 1)
                 {
-                    lightDirection0 = -lightToWorld.c2.xyz;
-                    lightColor0 = visibleLight.finalColor.Float3();
+                    lightRotation0 = lightRotation;
+                    lightColor0 = ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3());
 
                     #if UNITY_EDITOR
                         // The default scene light only has an intensity of 1, set it to sun
@@ -67,8 +69,8 @@ public partial class LightingSetup : ViewRenderFeature
                 }
                 else if (dirLightCount < 3)
                 {
-                    lightDirection1 = -lightToWorld.c2.xyz;
-                    lightColor1 = visibleLight.finalColor.Float3();
+                    lightRotation1 = lightRotation;
+                    lightColor1 = ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3());
                 }
             }
 
@@ -81,7 +83,6 @@ public partial class LightingSetup : ViewRenderFeature
             BatchCullingProjectionType projectionType;
             ushort splitExclusionMask = 0;
             var splitRange = new RangeInt(0, 0);
-            var worldToLight = Float4x4.Rotate(lightRotation.Inverse);
 
             var size = light.areaSize;
 			if (light.shadows != LightShadows.None)
@@ -90,9 +91,9 @@ public partial class LightingSetup : ViewRenderFeature
 
 				if (light.type == LightType.Directional)
 				{
-					// ref https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
+                    // ref https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
                     var worldToView = Float4x4.Rotate(lightRotation.Inverse);
-                    var cameraToView = worldToLight.Mul(viewRenderData.camera.transform.localToWorldMatrix);
+                    var cameraToView = worldToView.Mul(viewRenderData.camera.transform.localToWorldMatrix);
 
 					float GetFrustumDepth(int j)
 					{
@@ -113,10 +114,10 @@ public partial class LightingSetup : ViewRenderFeature
                         // TODO: Can this be done in camera relative space to simplify, since we need the final viewProj matrix in camera relative space anyway? Though culling planes need to be in world space
                         var viewBounds = Geometry.GetFrustumBounds(viewRenderData.tanHalfFov, near, far, cameraToView);
                         var viewToClip = Float4x4.OrthoReverseZ(viewBounds);
-                        var shadowSplitData = CalculateShadowSplitData(viewToClip.Mul(worldToLight), lightRotation.Forward, true);
+                        var shadowSplitData = CalculateShadowSplitData(viewToClip.Mul(worldToView), lightRotation.Forward, true);
 
                         var cameraInverseTranslation = Float4x4.Translate(viewRenderData.camera.transform.position);
-                        var worldToCascade = worldToLight.Mul(cameraInverseTranslation);
+                        var worldToCascade = worldToView.Mul(cameraInverseTranslation);
 
 						var worldViewPosition = viewBounds.center;
 						worldViewPosition.z = viewBounds.Min.z;
@@ -145,7 +146,7 @@ public partial class LightingSetup : ViewRenderFeature
 					{
                         var forward = Float4x4.lookAtList[j];
 						var rotation = Quaternion.LookRotation(forward, Float4x4.upVectorList[j]);
-						var worldToView = Float4x4.WorldToLocal(light.transform.position, rotation);
+						var worldToView = Float4x4.WorldToLocal(lightPosition, rotation);
 						var viewToClip = Float4x4.PerspectiveReverseZ(1, light.shadowNearPlane, light.range);
 						var worldToClip = viewToClip.Mul(worldToView);
 						var shadowSplitData = CalculateShadowSplitData(worldToClip, forward, false);
@@ -154,7 +155,7 @@ public partial class LightingSetup : ViewRenderFeature
                         var cameraInverseTranslation = Float4x4.Translate(viewRenderData.camera.transform.position);
                         worldToView = worldToView.Mul(cameraInverseTranslation);
 
-						pointShadowRequests.Add(new(i, worldToView, viewToClip, shadowSplitData, j, light.transform.position, hasShadowBounds, light.shadowNearPlane, light.range, light.transform.position, light.transform.rotation, 1, 1, settings.PointShadowResolution));
+						pointShadowRequests.Add(new(i, worldToView, viewToClip, shadowSplitData, j, lightPosition, hasShadowBounds, light.shadowNearPlane, light.range, lightPosition, lightRotation, 1, 1, settings.PointShadowResolution));
                         splitBuffer.Add(shadowSplitData);
                     }
                 }
@@ -162,7 +163,7 @@ public partial class LightingSetup : ViewRenderFeature
                 // TODO: Box/Pyramid/Area/Disc
                 if (visibleLight.lightType == LightType.Spot)
 				{
-                    var worldToView = Float4x4.WorldToLocal(light.transform.position, light.transform.rotation);
+                    var worldToView = Float4x4.WorldToLocal(lightPosition, lightRotation);
 					var viewToClip = Float4x4.PerspectiveReverseZ(Tan(0.5f * Radians(light.spotAngle)) * new Float2(1.0f, size.x / size.y), light.shadowNearPlane, light.range);
 					var worldToClip = viewToClip.Mul(worldToView);
 					var shadowSplitData = CalculateShadowSplitData(worldToClip, light.transform.forward, false);
@@ -172,7 +173,7 @@ public partial class LightingSetup : ViewRenderFeature
                     worldToView = worldToView.Mul(cameraInverseTranslation);
 
 					shadowIndex = (uint)spotShadowRequests.Count;
-					var shadowRequest = new ShadowRequest(i, worldToView, viewToClip, shadowSplitData, -1, light.transform.position, hasShadowBounds, light.shadowNearPlane, light.range, light.transform.position, light.transform.rotation, light.spotAngle, size.x / size.y, settings.SpotShadowResolution);
+					var shadowRequest = new ShadowRequest(i, worldToView, viewToClip, shadowSplitData, -1, lightPosition, hasShadowBounds, light.shadowNearPlane, light.range, lightPosition, lightRotation, light.spotAngle, size.x / size.y, settings.SpotShadowResolution);
 					spotShadowRequests.Add(shadowRequest);
 
                     splitRange = new RangeInt(splitBuffer.Length, 1);
@@ -218,15 +219,15 @@ public partial class LightingSetup : ViewRenderFeature
 			}
 
 			var pointLightData = new LightData(
-				lightToWorld.c3.xyz - viewRenderData.transform.position,
+				lightToWorld.Translation - viewRenderData.transform.position,
 				light.range,
 				ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3()),
 				(uint)light.type,
-				lightToWorld.c0.xyz,
+				lightToWorld.Right,
 				angleScale,
-				lightToWorld.c1.xyz,
+				lightToWorld.Up,
 				angleOffset,
-				lightToWorld.c2.xyz,
+				lightToWorld.Forward,
 				shadowIndex,
 				size,
 				1.0f + light.range / (light.shadowNearPlane - light.range),
@@ -284,13 +285,13 @@ public partial class LightingSetup : ViewRenderFeature
 
 		var lightingData = renderGraph.SetConstantBuffer(new LightingDataStruct
 		(
-			lightDirection0,
+			-lightRotation0.Forward,
 			directionalShadowRequests.Count,
-			ColorspaceUtility.Rec709ToRec2020(lightColor0),
+			lightColor0,
 			dirLightCount,
-			lightDirection1,
+			-lightRotation1.Forward,
 			settings.DirectionalMaxFilterSize,
-            ColorspaceUtility.Rec709ToRec2020(lightColor1),
+            lightColor1,
 			settings.DirectionalBlockerDistance,
 			new Float4(E, F, G, 0),
 			fadeScale,
@@ -299,7 +300,7 @@ public partial class LightingSetup : ViewRenderFeature
 			Rcp(settings.DirectionalShadowResolution)
 		));
 
-		renderGraph.SetResource(new LightingData(lightDirection0, lightColor0, lightDirection1, lightColor1, lightingData, directionalShadowMatricesBuffer, directionalCascadeSizesBuffer));
+		renderGraph.SetResource(new LightingData(lightRotation0, lightColor0, lightRotation1, lightColor1, lightingData, directionalShadowMatricesBuffer, directionalCascadeSizesBuffer));
 
 		var pointLightBuffer = lightList.Count == 0 ? renderGraph.EmptyBuffer : renderGraph.GetBuffer(lightList.Count, UnsafeUtility.SizeOf<LightData>());
 		using (var pass = renderGraph.AddGenericRenderPass("Set Light Data", (lightList, pointLightBuffer)))

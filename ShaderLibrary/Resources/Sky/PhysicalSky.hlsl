@@ -285,7 +285,8 @@ FragmentOutputTemporal FragmentTemporal(VertexFullscreenTriangleOutput input)
 		{
 			history /= historyWeight;
 			history.r *= PreviousToCurrentExposure;
-			history = ClipToAABB(history, current, minValue, maxValue);
+			//history = ClampToAABB(history, current, minValue, maxValue);
+			history = clamp(history, minValue, maxValue);
 			current = lerp(current, history, speed);
 		}
 	}
@@ -355,6 +356,6 @@ FragmentOutputTemporal FragmentTemporal(VertexFullscreenTriangleOutput input)
 	current += volumetricLighting.rgb;
 	
 	output.target = float4(current, volumetricLighting.a);
-	output.speed = min(0.9, 1.0 / (2.0 - speed));
+	output.speed = min(0.95, 1.0 / (2.0 - speed));
 	return output;
 }

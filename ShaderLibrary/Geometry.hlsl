@@ -456,16 +456,18 @@ float ConeCosAngleToVisibility(float coneCosAngle) { return 1.0 - Sq(coneCosAngl
 float ConeAngleToVisibility(float coneAngle) { return ConeCosAngleToVisibility(cos(coneAngle)); }
 float VisibilityToConeAngle(float occlusion) { return CosConeAngleToConeAngle(VisibilityToConeCosAngle(occlusion)); }
 
-float DistToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
+float DistanceToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
 {
-	float3 rcpDir = rcp(target - origin);
-	return Max3(min(boxMin * rcpDir, boxMax * rcpDir) - origin * rcpDir);
+	float3 rayVector = target - origin;
+	float3 rcpDir = rcp(rayVector);
+	return Max3(((rayVector >= 0.0 ? boxMin : boxMax) - origin) * rcpDir);
 }
 
-float3 ClipToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
+float3 ClampToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
 {
-	float t = DistToAABB(origin, target, boxMin, boxMax);
-	return lerp(origin, target, saturate(t));
+	float3 rayVector = target - origin;
+	float t = DistanceToAABB(origin, target, boxMin, boxMax);
+	return origin + rayVector * max(0.0, t);
 }
 
 // TODO: Maybe make these switch back to returning cosAngle instead of solidAngle

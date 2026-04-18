@@ -50,7 +50,11 @@ public class UnderwaterLighting : ViewRenderFeature
             
             pass.SetRenderFunction(static (command, pass, settings) =>
             {
-                pass.SetVector("_WaterExtinction", settings.Material.GetColor("_Extinction").Float3());
+                var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
+                var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
+                var extinction = -new Float3(Math.Log(transmittance.x), Math.Log(transmittance.y), Math.Log(transmittance.z)) / transmittanceDistance;
+
+                pass.SetVector("_WaterExtinction", extinction);
             });
         }
 

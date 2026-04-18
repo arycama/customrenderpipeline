@@ -11,9 +11,9 @@
 
 RWTexture2D<float3> RefractionResult, ScatterResult;
 
-float3 _Extinction;
+float3 Extinction;
 float _RaytracingBias, _RaytracingDistantBias;
-float3 _Color;
+float3 Albedo;
 
 [shader("miss")]
 void MissShader(inout RayPayload payload : SV_RayPayload)
@@ -86,11 +86,12 @@ void RayGeneration()
 		hitRay = L * payload.hitDistance;
 		color = R11G11B10ToFloat3(payload.packedColor);
 		outDepth = Linear01Depth(depth);
-		color *= exp(-_Extinction * (isFrontFace ? payload.hitDistance : length(worldPosition)));
+		color *= exp(-Extinction * (isFrontFace ? payload.hitDistance : length(worldPosition)));
 	}
 	else
 	{
-		color = isFrontFace || isTotalInternalReflection ? 0.0 : SkyReflection.SampleLevel(LinearClampSampler, L, 0.0).rgb;
+		float2 skyUv = NormalToOctahedralUv(L);
+		color = isFrontFace || isTotalInternalReflection ? 0.0 : SkyReflection.SampleLevel(LinearClampSampler, skyUv, 0.0).rgb;
 		hitRay = L;
 		outDepth = 0.0;
 	}
@@ -101,8 +102,8 @@ void RayGeneration()
 	float2 noise = Noise2D(position.xy);
 	uint channelIndex = noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2);
 	float xi = min(noise.x, 0.999); // xi of 1 maps to infinity, so clamp
-	float3 c = _Extinction;
-	float cp = Select(_Extinction, channelIndex);
+	float3 c = Extinction;
+	float cp = Select(Extinction, channelIndex);
 	float l = _LightDirection0.y;
 	float v = V.y;
 	float b = validHit ? payload.hitDistance : 1e+32;
@@ -137,12 +138,12 @@ void RayGeneration()
 	lightColor0 *= GetCaustics(P + ViewPosition, _LightDirection0, true);
 	luminance += lightColor0 * attenuation * asymmetry;
 	
-	luminance *= _Extinction * weight * Exposure;
+	luminance *= Extinction * weight * Exposure;
 	
 	// Ambient 
-	float3 finalTransmittance = exp(-t * _Extinction);
+	float3 finalTransmittance = exp(-t * Extinction);
 	luminance += AmbientCosine(float3(0.0, 1.0, 0.0)) * (1.0 - finalTransmittance);
-	luminance *= _Color;
+	luminance *= Albedo;
 	
 	ScatterResult[position] = luminance;
 }

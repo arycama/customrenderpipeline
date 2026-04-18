@@ -201,7 +201,7 @@ public class GpuDrivenRenderingSetup : FrameRenderFeature
                     var rendererIsShadowCaster = renderer.shadowCastingMode != ShadowCastingMode.Off;
 
                     // TODO: Once we have combined mesh support, we should just transform the vertices by the matrix to avoid extra shader work
-                    var localToWorld = Matrix4x4.TRS(renderer.transform.localPosition, renderer.transform.localRotation, renderer.transform.localScale);
+                    var localToWorld = Float4x4.TRS(renderer.transform.localPosition, renderer.transform.localRotation, renderer.transform.localScale);
 
                     renderer.GetSharedMaterials(sharedMaterials);
 

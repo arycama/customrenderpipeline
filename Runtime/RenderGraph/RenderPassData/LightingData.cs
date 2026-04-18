@@ -3,19 +3,19 @@ using UnityEngine.Rendering;
 
 public readonly struct LightingData : IRenderPassData
 {
-	public readonly Float3 light0Direction;
+	public readonly Quaternion light0Rotation;
 	public readonly Float3 light0Color;
-	public readonly Float3 light1Direction;
+	public readonly Quaternion light1Rotation;
 	public readonly Float3 light1Color;
 	private readonly ResourceHandle<GraphicsBuffer> lightingData;
 	private readonly ResourceHandle<GraphicsBuffer> directionalShadowMatrices;
 	private readonly ResourceHandle<GraphicsBuffer> directionalCascadeSizes;
 
-	public LightingData(Float3 light0Direction, Float3 light0Color, Float3 light1Direction, Float3 light1Color, ResourceHandle<GraphicsBuffer> lightingData, ResourceHandle<GraphicsBuffer> directionalShadowMatrices, ResourceHandle<GraphicsBuffer> directionalCascadeSizes)
+	public LightingData(Quaternion light0Rotation, Float3 light0Color, Quaternion light1Rotation, Float3 light1Color, ResourceHandle<GraphicsBuffer> lightingData, ResourceHandle<GraphicsBuffer> directionalShadowMatrices, ResourceHandle<GraphicsBuffer> directionalCascadeSizes)
 	{
-		this.light0Direction = light0Direction;
+		this.light0Rotation = light0Rotation;
 		this.light0Color = light0Color;
-		this.light1Direction = light1Direction;
+		this.light1Rotation = light1Rotation;
 		this.light1Color = light1Color;
 		this.lightingData = lightingData;
 		this.directionalShadowMatrices = directionalShadowMatrices;

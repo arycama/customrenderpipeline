@@ -69,8 +69,14 @@ public class DeferredWater : ViewRenderFeature
 			pass.SetRenderFunction(static (command, pass, settings) =>
             {
                 var material = settings.Material;
-                pass.SetVector("_Color", material.GetColor("_Color").LinearFloat3());
-                pass.SetVector("_Extinction", material.GetColor("_Extinction").Float3());
+
+                var albedo = settings.Material.GetColor("Albedo").LinearFloat3();
+                var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
+                var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
+                var extinction = -new Float3(Math.Log(transmittance.x), Math.Log(transmittance.y), Math.Log(transmittance.z)) / transmittanceDistance;
+
+                pass.SetVector("Albedo", albedo);
+                pass.SetVector("Extinction", extinction);
                 pass.SetFloat("_WaterMieFactor", material.GetFloat("_MieFactor"));
                 pass.SetFloat("_WaterMiePhase", material.GetFloat("_MiePhase"));
 
@@ -150,11 +156,13 @@ public class DeferredWater : ViewRenderFeature
 
 				pass.SetRenderFunction(static (command, pass, settings) =>
                 {
-                    pass.SetVector("_Extinction", settings.Material.GetColor("_Extinction").Float3());
+                    var albedo = settings.Material.GetColor("Albedo").LinearFloat3();
+                    var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
+                    var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
+                    var extinction = -new Float3(Math.Log(transmittance.x), Math.Log(transmittance.y), Math.Log(transmittance.z)) / transmittanceDistance;
 
-                    var material = settings.Material;
-                    pass.SetVector("_Color", material.GetColor("_Color").LinearFloat3());
-                    pass.SetVector("_Extinction", material.GetColor("_Extinction").Float3());
+                    pass.SetVector("Albedo", albedo);
+                    pass.SetVector("Extinction", extinction);
                 });
             }
         }
@@ -195,11 +203,16 @@ public class DeferredWater : ViewRenderFeature
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
+                var albedo = data.settings.Material.GetColor("Albedo").LinearFloat3();
+                var transmittance = data.settings.Material.GetColor("Transmittance").LinearFloat3();
+                var transmittanceDistance = data.settings.Material.GetFloat("TransmittanceDistance");
+                var extinction = -new Float3(Math.Log(transmittance.x), Math.Log(transmittance.y), Math.Log(transmittance.z)) / transmittanceDistance;
+
                 pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
                 pass.SetVector("_HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
 
-                pass.SetVector("_Color", data.settings.Material.GetColor("_Color").LinearFloat3());
-                pass.SetVector("_Extinction", data.settings.Material.GetColor("_Extinction").Float3());
+                pass.SetVector("Albedo", albedo);
+                pass.SetVector("Extinction", extinction);
             });
         }
     }

@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Rendering;
 
 public class WaterShadowRenderer : WaterRendererBase
 {
@@ -14,99 +13,54 @@ public class WaterShadowRenderer : WaterRendererBase
         if (!settings.IsEnabled || (viewRenderData.camera.cameraType != CameraType.Game && viewRenderData.camera.cameraType != CameraType.SceneView))
             return;
 
-        var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
-        var lightRotation = Quaternion.Identity;
-        for (var i = 0; i < cullingResults.visibleLights.Length; i++)
-        {
-            var visibleLight = cullingResults.visibleLights[i];
-            if (visibleLight.lightType != LightType.Directional)
-                continue;
+        if (!renderGraph.TryGetResource<LightingData>(out var lightingData))
+            return;
 
-            lightRotation = visibleLight.localToWorldMatrix.rotation;
-            break;
-        }
-
-		// TODO: Should be able to simply just define a box and not even worry about view position since we translate it anyway
 		var viewPosition = viewRenderData.transform.position;
-        var size = new Vector3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
-        var min = new Vector3(-settings.ShadowRadius, -settings.Profile.MaxWaterHeight - viewPosition.y, -settings.ShadowRadius);
+        var size = new Float3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
+        var min = new Float3(-settings.ShadowRadius, -settings.Profile.MaxWaterHeight - viewPosition.y, -settings.ShadowRadius);
 
         var texelSize = settings.ShadowRadius * 2.0f / settings.ShadowResolution;
 
         var snappedViewPositionX = Math.Snap(viewPosition.x, texelSize) - viewPosition.x;
         var snappedViewPositionZ = Math.Snap(viewPosition.z, texelSize) - viewPosition.z;
+        var worldToView = Float4x4.Rotate(lightingData.light0Rotation.Inverse);
 
-        var worldToLight = Matrix4x4.Rotate(lightRotation.Inverse);
-        Vector3 minValue = Vector3.positiveInfinity, maxValue = Vector3.negativeInfinity;
-
-        for (var z = 0; z < 2; z++)
+		Bounds bounds = default;
+        for (int z = 0, i = 0; z < 2; z++)
         {
             for (var y = 0; y < 2; y++)
             {
-                for (var x = 0; x < 2; x++)
+                for (var x = 0; x < 2; x++, i++)
                 {
-                    var worldPosition = min + Vector3.Scale(size, new Vector3(x, y, z));
+                    var worldPosition = size * new Float3(x, y, z) + min;
                     worldPosition.x += snappedViewPositionX;
                     worldPosition.z += snappedViewPositionZ;
 
-                    var localPosition = worldToLight.MultiplyPoint3x4(worldPosition);
-                    minValue = Vector3.Min(minValue, localPosition);
-                    maxValue = Vector3.Max(maxValue, localPosition);
+                    var localPoint = worldToView.MultiplyPoint3x4(worldPosition);
+                    bounds = i == 0 ? new Bounds(localPoint, Float3.Zero) : bounds.Encapsulate(localPoint);
                 }
             }
         }
 
         // Calculate culling planes
-        var width = maxValue.x - minValue.x;
-        var height = maxValue.y - minValue.y;
-        var depth = maxValue.z - minValue.z;
-        var projectionMatrix = new Matrix4x4
-        {
-            m00 = 2.0f / width,
-            m03 = (maxValue.x + minValue.x) / -width,
-            m11 = -2.0f / height,
-            m13 = -(maxValue.y + minValue.y) / -height,
-            m22 = 1.0f / (minValue.z - maxValue.z),
-            m23 = maxValue.z / depth,
-            m33 = 1.0f
-        };
-
-        var viewProjectionMatrix = (Float4x4)(projectionMatrix * worldToLight);
+        var viewToClip = Float4x4.OrthoReverseZ(bounds);
+        var worldToClip = viewToClip.Mul(worldToView);
 
         var cullingPlanes = new CullingPlanes() { Count = 6 };
         for (var j = FrustumPlane.Left; j < FrustumPlane.Count; j++)
-            cullingPlanes.SetCullingPlane((int)j, viewProjectionMatrix.GetFrustumPlane(j));
+            cullingPlanes.SetCullingPlane((int)j, worldToClip.GetFrustumPlane(j));
 
         var cullResult = Cull(viewPosition, cullingPlanes, viewRenderData.viewSize, false);
-
-        var vm = worldToLight;
-        var shadowMatrix = new Matrix4x4
-        {
-            m00 = vm.m00 / width,
-            m01 = vm.m01 / width,
-            m02 = vm.m02 / width,
-            m03 = (vm.m03 - 0.5f * (maxValue.x + minValue.x)) / width + 0.5f,
-
-            m10 = vm.m10 / height,
-            m11 = vm.m11 / height,
-            m12 = vm.m12 / height,
-            m13 = (vm.m13 - 0.5f * (maxValue.y + minValue.y)) / height + 0.5f,
-
-            m20 = -vm.m20 / depth,
-            m21 = -vm.m21 / depth,
-            m22 = -vm.m22 / depth,
-            m23 = (-vm.m23 + 0.5f * (maxValue.z + minValue.z)) / depth + 0.5f,
-
-            m33 = 1.0f
-        };
+        var shadowMatrix = Float4x4.OrthoReverseZSample(bounds).Mul(worldToView);
 
         var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.D16_UNorm, isExactSize: true, clear: true);
-        var waterIlluminance = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.R16_UNorm, isExactSize: true);
+        var waterIlluminance = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.R8_UNorm, isExactSize: true, clear: true);
 
         var passIndex = settings.Material.FindPass("WaterShadow");
         Assert.IsTrue(passIndex != -1, "Water Material does not contain a Water Shadow Pass");
 
-        using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Ocean Shadow", (viewProjectionMatrix, VerticesPerTileEdge, settings, viewPosition, cullingPlanes)))
+        using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Ocean Shadow", (worldToClip, VerticesPerTileEdge, settings, viewPosition, cullingPlanes)))
         {
             pass.Initialize(settings.Material, indexBuffer, cullResult.IndirectArgsBuffer, settings.ShadowResolution, 1, MeshTopology.Quads, passIndex, depthBias: settings.ShadowBias, slopeDepthBias: settings.ShadowSlopeBias);
             pass.WriteDepth(waterShadow);
@@ -114,14 +68,13 @@ public class WaterShadowRenderer : WaterRendererBase
             pass.ReadBuffer("PatchData", cullResult.PatchDataBuffer);
 
             pass.ReadResource<OceanFftResult>();
-            //pass.ReadResource<WaterShoreMask.Result>(true);
             pass.ReadResource<ViewData>();
             pass.ReadResource<FrameData>();
             pass.ReadResource<LightingData>();
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetMatrix("_WaterShadowMatrix", data.viewProjectionMatrix);
+                pass.SetMatrix("_WaterShadowMatrix", data.worldToClip);
                 pass.SetInt("_VerticesPerEdge", data.VerticesPerTileEdge);
                 pass.SetInt("_VerticesPerEdgeMinusOne", data.VerticesPerTileEdge - 1);
                 pass.SetFloat("_RcpVerticesPerEdgeMinusOne", 1f / (data.VerticesPerTileEdge - 1));
@@ -145,6 +98,10 @@ public class WaterShadowRenderer : WaterRendererBase
             });
         }
 
-        renderGraph.SetResource(new WaterShadowResult(waterShadow, shadowMatrix, 0.0f, (float)(maxValue.z - minValue.z), settings.Material.GetColor("_Extinction").Float3(), waterIlluminance));
+        var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
+        var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
+        var extinction = -new Float3(Math.Log(transmittance.x), Math.Log(transmittance.y), Math.Log(transmittance.z)) / transmittanceDistance;
+
+        renderGraph.SetResource(new WaterShadowResult(waterShadow, shadowMatrix, 0.0f, (float)(bounds.Max.z - bounds.Min.z), extinction, waterIlluminance));
     }
 }

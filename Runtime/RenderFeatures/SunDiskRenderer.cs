@@ -15,10 +15,10 @@ public class SunDiskRenderer : ViewRenderFeature
     {
 		var lightData = renderGraph.GetResource<LightingData>();
 		var viewPosition = viewRenderData.transform.position;
-		var scale = 2 * Mathf.Tan(0.5f * settings.SunAngularDiameter * Mathf.Deg2Rad);
-		var matrix = Matrix4x4.TRS(viewPosition + lightData.light0Direction, Quaternion.LookRotation(lightData.light0Direction), Vector3.one * scale);
+		var scale = 2 * Math.Tan(0.5f * Math.Radians(settings.SunAngularDiameter));
 
-		using (var pass = renderGraph.AddDrawProceduralRenderPass("Sun Disk", (settings.SunAngularDiameter, lightData.light0Color, lightData.light0Direction)))
+        var matrix = Float4x4.TRS(viewPosition - lightData.light0Rotation.Forward, lightData.light0Rotation.ReverseForward, scale);
+		using (var pass = renderGraph.AddDrawProceduralRenderPass("Sun Disk", (settings.SunAngularDiameter, lightData.light0Color, -lightData.light0Rotation.Forward)))
 		{
 			pass.Initialize(celestialBodyMaterial, matrix, viewRenderData.viewSize, 1, 0, 4, 1, MeshTopology.Quads);
 
@@ -37,8 +37,8 @@ public class SunDiskRenderer : ViewRenderFeature
 			pass.SetRenderFunction(static (command, pass, data) =>
 			{
 				pass.SetFloat("AngularDiameter", data.SunAngularDiameter);
-				pass.SetVector("Illuminance", ColorspaceUtility.Rec709ToRec2020(data.light0Color));
-				pass.SetVector("Direction", data.light0Direction);
+				pass.SetVector("Illuminance", data.light0Color);
+				pass.SetVector("Direction", data.Item3);
 			});
 		}
 	}

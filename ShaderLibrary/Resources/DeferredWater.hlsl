@@ -22,7 +22,7 @@ float4 _HistoryScaleLimit;
 float _IsFirst;
 
 float4 _UnderwaterResultScaleLimit;
-float3 _Extinction, _Color;
+float3 Extinction, Albedo;
 float _RefractOffset, _Steps;
 
 // Fragment
@@ -134,11 +134,14 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	float maxUnderwaterDistance = distance(worldPosition, underwaterPosition);
 	float3 underwaterV = normalize(worldPosition - underwaterPosition);
 	
+	float3 atmosphereTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, dot(_LightDirection0, V), waterDistance);
+	float3 sunColor = _LightColor0 * Exposure * atmosphereTransmittance;
+	
 	// Select random channel
 	float2 noise = Noise2D(input.position.xy);
 	uint channelIndex = noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2);
-	float3 c = _Extinction;
-	float cp = Select(_Extinction, channelIndex);
+	float3 c = Extinction;
+	float cp = Select(Extinction, channelIndex);
 	float l = saturate(_LightDirection0.y);
 	float v = underwaterV.y;
 	float b = maxUnderwaterDistance;
@@ -151,21 +154,19 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	
 	// Direct light
 	float sunT = WaterShadowDistance(P, _LightDirection0);
-	float3 transmittance = exp(-_Extinction * (sunT + t));
+	float3 transmittance = exp(-Extinction * (sunT + t));
 	float shadow = GetDirectionalShadow(P) * CloudTransmittance(P);
-	float factor = GetWaterIlluminance(P);
+	float illuminance = GetWaterIlluminance(P);
 	
-	float3 atmosphereTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, dot(_LightDirection0, V), waterDistance);
-	float3 sunColor = _LightColor0 * Exposure * atmosphereTransmittance;
 	float LdotV = dot(_LightDirection0, -underwaterV);
 	float phase = CsPhase(LdotV, _WaterMiePhase);
-	float3 directLight = sunColor * factor * shadow * phase * transmittance;
-		
-	float3 ambientTransmittance = exp(-_Extinction * (t + max(0.0, -(P.y + ViewPosition.y))));
+	float3 directLight = sunColor * illuminance * shadow * phase * transmittance;
+	
+	float3 ambientTransmittance = exp(-Extinction * (t + max(0.0, -(P.y + ViewPosition.y))));
 	float3 ambient = AmbientCosine(float3(0.0, 1.0, 0.0));
 	float3 indirect = ambient * ambientTransmittance;
 	
-	float3 scatter = _Color * _Extinction;
+	float3 scatter = Albedo * Extinction;
 	float3 luminance = weight * (directLight + indirect) * scatter;
 	
 	// TODO: Stencil? Or hw blend?
@@ -173,7 +174,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	if (underwaterDepth)
 	{
 		underwater = _UnderwaterResult.Sample(LinearClampSampler, ClampScaleTextureUv(refractedPositionSS * RcpViewSize, _UnderwaterResultScaleLimit));
-		underwater *= exp(-_Extinction * maxUnderwaterDistance);
+		underwater *= exp(-Extinction * maxUnderwaterDistance);
 	}
 
 	FragmentOutput output;
@@ -200,23 +201,24 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 		
 		if(any(history != 0))
 		{
-			//history.r *= PreviousToCurrentExposure;
-			//history = ClipToAABB(history, result, minValue, maxValue);
+			history.r *= PreviousToCurrentExposure;
+			//history = ClampToAABB(history, result, minValue, maxValue);
 			//result = lerp(history, result, 0.05);
 		}
 	}
-	
-	result = _ScatterInput[input.position.xy];
 	
 	// Apply roughness to transmission
 	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
 	float3 V = normalize(-input.worldDirection);
 	float NdotV;
-	float3 N = GBufferNormal(normalRoughness, V, NdotV, WorldToView, ViewToWorld);
-	float kd = EnergyCompensationFactor(0.02, normalRoughness.b, NdotV).r;
+	GBufferNormal(normalRoughness, V, NdotV, WorldToView, ViewToWorld);
+	
+	float viewDirectionalAlbedoMs = DirectionalAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float3(NdotV, normalRoughness.b, 0.04), 16));
+	float averageAlbedoMs = AverageAlbedoMs.Sample(LinearClampSampler, Remap01ToHalfTexel(float2(normalRoughness.b, 0.04), 16));
+	float diffuseTerm = averageAlbedoMs ? viewDirectionalAlbedoMs * rcp(averageAlbedoMs) : 0.0; // TODO: Bake into DFG?
 	
 	TemporalOutput output;
 	output.temporal = float4(result, 1.0);
-	output.scene = float4(ICtCpToRec2020(result - float2(0.0, 0.5).xyy) / (PaperWhite * sqrt(2.0)), kd);
+	output.scene = float4(ICtCpToRec2020(result - float2(0.0, 0.5).xyy) / (PaperWhite * sqrt(2.0)), diffuseTerm);
 	return output;
 }
