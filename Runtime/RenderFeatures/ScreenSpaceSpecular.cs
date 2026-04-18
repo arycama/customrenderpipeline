@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class ScreenSpaceReflections : ViewRenderFeature
+public partial class ScreenSpaceSpecular : ViewRenderFeature
 {
     private readonly Material material;
     private readonly Settings settings;
@@ -10,7 +10,7 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
     private readonly PersistentRTHandleCache temporalCache, temporalWeightCache;
     private readonly RayTracingShader raytracingShader;
 
-    public ScreenSpaceReflections(RenderGraph renderGraph, Settings settings) : base(renderGraph)
+    public ScreenSpaceSpecular(RenderGraph renderGraph, Settings settings) : base(renderGraph)
     {
         this.settings = settings;
 
@@ -83,8 +83,9 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
             var thicknessScale = 1.0f / (1.0f + settings.Thickness);
             var thicknessOffset = -viewRenderData.near / (viewRenderData.far - viewRenderData.near) * (settings.Thickness * thicknessScale);
             var maxMip = Texture2DExtensions.MipCount(viewRenderData.viewSize) - 1;
+            var coneAngle = viewRenderData.viewSize.y * 0.5f / viewRenderData.tanHalfFov.y;
 
-            using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip, settings.Thickness)))
+            using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip, settings.Thickness, coneAngle)))
             {
                 pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
                 pass.PreventNewSubPass = true;
@@ -112,6 +113,7 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
                     pass.SetFloat("ThicknessScale", data.thicknessScale);
                     pass.SetFloat("ThicknessOffset", data.thicknessOffset);
                     pass.SetInt("MaxMip", data.maxMip);
+                    pass.SetFloat("ConeAngle", data.coneAngle);
                 });
             }
         }
@@ -128,8 +130,8 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
             pass.WriteTexture(rayDepth);
             pass.WriteTexture(spatialWeight);
 
-            pass.ReadTexture("_Input", tempResult);
-            pass.ReadTexture("_HitResult", hitResult);
+            pass.ReadTexture("Input", tempResult);
+            pass.ReadTexture("HitResult", hitResult);
             pass.ReadRtHandle<GBufferNormalRoughness>();
             pass.ReadRtHandle<GBufferAlbedoMetallic>();
 
@@ -145,8 +147,8 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetInt("_ResolveSamples", data.ResolveSamples);
-                pass.SetFloat("_ResolveSize", data.ResolveSize);
+                pass.SetInt("ResolveSamples", data.ResolveSamples);
+                pass.SetFloat("ResolveSize", data.ResolveSize);
                 pass.SetFloat("SpecularGiStrength", data.Intensity);
             });
         }
@@ -168,8 +170,8 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
             pass.WriteTexture(current);
             pass.WriteTexture(currentWeight);
 
-            pass.ReadTexture("_TemporalInput", spatialResult);
-            pass.ReadTexture("_History", history);
+            pass.ReadTexture("TemporalInput", spatialResult);
+            pass.ReadTexture("History", history);
             pass.ReadRtHandle<GBufferNormalRoughness>();
             pass.ReadRtHandle<GBufferAlbedoMetallic>();
             pass.ReadTexture("RayDepth", rayDepth);
@@ -188,8 +190,8 @@ public partial class ScreenSpaceReflections : ViewRenderFeature
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
-                pass.SetVector("_HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
+                pass.SetFloat("IsFirst", data.wasCreated ? 1.0f : 0.0f);
+                pass.SetVector("HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
             });
         }
 

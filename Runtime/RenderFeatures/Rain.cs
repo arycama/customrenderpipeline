@@ -64,10 +64,10 @@ public class Rain : ViewRenderFeature
 				indexBuffer = renderGraph.GetQuadIndexBuffer(dropletCount, false);
 				previousDropletCount = dropletCount;
 
-
 				pass.Initialize(rainComputeShader, 0, dropletCount);
+                pass.PreventNewSubPass = true;
 
-				pass.WriteBuffer("Positions", positionBuffer);
+                pass.WriteBuffer("Positions", positionBuffer);
 				pass.ReadBuffer("Positions", positionBuffer);
 
 				pass.ReadResource<ViewData>();
@@ -88,8 +88,9 @@ public class Rain : ViewRenderFeature
 		using (var pass = renderGraph.AddComputeRenderPass("Update", (dropletCount, settings.Radius, settings.Velocity, settings.WindAngle, settings.WindStrength, settings.WindTurbulence)))
 		{
 			pass.Initialize(rainComputeShader, 1, dropletCount);
+            pass.PreventNewSubPass = true;
 
-			pass.WriteBuffer("Positions", positionBuffer);
+            pass.WriteBuffer("Positions", positionBuffer);
 			pass.ReadBuffer("Positions", positionBuffer);
 
 			pass.ReadResource<ViewData>();
@@ -110,8 +111,9 @@ public class Rain : ViewRenderFeature
 		using (var pass = renderGraph.AddDrawProceduralIndexedRenderPass("Render", (dropletCount, settings.Radius, settings.Velocity, settings.WindAngle, settings.WindStrength, settings.WindTurbulence)))
 		{
 			pass.Initialize(indexBuffer, settings.Material, Float4x4.Identity, viewRenderData.viewSize, viewRenderData.viewCount);
+            pass.PreventNewSubPass = true;
 
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
+            pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepth);
 
 			pass.ReadBuffer("Positions", positionBuffer);

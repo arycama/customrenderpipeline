@@ -8,12 +8,15 @@
 #include "../../Lighting.hlsl"
 #include "../../ScreenSpaceRaytracing.hlsl"
 
-cbuffer Properties
-{
-	float4 PreviousCameraTargetScaleLimit;
-	float _MaxSteps, _Thickness, _Intensity, _ConeAngle, _ResolveSize, _MaxMip;
-	uint _ResolveSamples;
-};
+#ifdef REFLECTION
+const static bool IsReflection = true;
+#else
+const static bool IsReflection = false;
+#endif
+
+float4 PreviousCameraTargetScaleLimit;
+float MaxSteps, Thickness, Intensity, ConeAngle, ResolveSize, MaxMip;
+uint ResolveSamples;
 
 struct TraceResult
 {
@@ -23,32 +26,44 @@ struct TraceResult
 
 TraceResult Fragment(VertexFullscreenTriangleOutput input)
 {
-	float thicknessScale = rcp(1.0 + _Thickness);
-	float thicknessOffset = -Near * rcp(Far - Near) * (_Thickness * thicknessScale);
-
 	float depth = HiZMinDepth[input.position.xy];
 	float linearDepth = LinearEyeDepth(depth);
 	float3 worldPosition = input.worldDirection * linearDepth;
 	float3 V = normalize(-worldPosition);
 	
-	float3 noise3DCosine = Noise3DCosine(input.position.xy);
-	
+	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
 	float NdotV;
-	float3 N = GBufferNormal(input.position.xy, GBufferNormalRoughness, V, NdotV, WorldToView, ViewToWorld);
+	float3 N = GBufferNormal(normalRoughness, V, NdotV, WorldToView, ViewToWorld);
+	float roughness = max(1e-3, Sq(normalRoughness.b));
 	
-	float rcpPdf = Pi * rcp(noise3DCosine.z);
-	float3 L = FromToRotationZ(N, noise3DCosine);
+	float3 L;
+	float pdf;
+	if (IsReflection)
+	{
+		float2 u = Noise2D(input.position.xy);
+		float rcpPdf;
+		L = ImportanceSampleGGX(roughness, N, V, u, NdotV, rcpPdf);
+		pdf = rcp(rcpPdf);
+
+	}
+	else
+	{
+		float3 noise3DCosine = Noise3DCosine(input.position.xy);
+		pdf = noise3DCosine.z * RcpPi;
+		L = FromToRotationZ(N, noise3DCosine);
+	}
 	
 	float3 rayOrigin = float3(input.position.xy, depth);
 	float3 rayDirection = MultiplyPointProj(WorldToPixel, worldPosition + L).xyz - rayOrigin;
 	
 	bool validHit;
-	float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, _MaxSteps, _Thickness, HiZMinDepth, _MaxMip, validHit);
+	float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, MaxSteps, Thickness, HiZMinDepth, MaxMip, validHit);
 
 	float outDepth;
 	float3 color, hitRay;
 	if (validHit && rayPos.z)
 	{
+		// TODO: Is it better to reproject last frame and then generate mip chain based on that?
 		float2 velocity = CameraVelocity[rayPos.xy];
 		float2 hitUv = rayPos.xy * RcpViewSize - velocity;
 		outDepth = Linear01Depth(depth);
@@ -59,9 +74,16 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 		// Calculate size of a screenspace cone based on distance travelled and depth of sample (since distant pixels are smaller)
 		float hitDist = length(hitRay);
 		float linearHitDepth = LinearEyeDepth(rayPos.z);
-		float mipLevel = log2(_ConeAngle * hitDist * rcp(linearHitDepth));
 		
-		color = PreviousCameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, PreviousCameraTargetScaleLimit), mipLevel);
+		float coneRadius = ConeAngle * hitDist * rcp(linearHitDepth);
+		if (IsReflection)
+		{
+			float coneTangent = GetSpecularLobeTanHalfAngle(roughness);
+			coneTangent *= lerp(saturate(NdotV * 2), 1, normalRoughness.b);
+			coneRadius *= coneTangent;
+		}
+		
+		color = PreviousCameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, PreviousCameraTargetScaleLimit), log2(coneRadius));
 	}
 	else
 	{
@@ -71,15 +93,15 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 	}
 	
 	TraceResult output;
-	output.color = float4(color, rcpPdf);
+	output.color = float4(color, pdf);
 	output.hit = float4(hitRay, outDepth);
 	return output;
 }
 
-Texture2D<float4> _HitResult;
-Texture2D<float4> _Input;
-float4 _HistoryScaleLimit;
-float _IsFirst;
+Texture2D<float4> HitResult;
+Texture2D<float4> Input;
+float4 HistoryScaleLimit;
+float IsFirst;
 
 struct SpatialResult
 {
@@ -99,14 +121,22 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 	float3 worldPosition = input.worldDirection * LinearEyeDepth(CameraDepth[input.position.xy]);
 	float phi = Noise1D(input.position.xy) * TwoPi;
 	
+	float roughness = max(1e-3, Sq(normalRoughness.b));
+
+	float4 albedoMetallic = GBufferAlbedoMetallic[input.position.xy];
+	float3 f0 = lerp(0.04, albedoMetallic.rgb, albedoMetallic.a);
+	
+	float roughness2 = Sq(roughness);
+	float partLambdaV = GetPartLambdaV(roughness2, NdotV);
+	
 	float4 result = 0.0;
 	float nonHitWeight = 0.0;
 	float avgRayLength = 0.0;
-	for (uint i = 0; i <= _ResolveSamples; i++)
+	for (uint i = 0; i <= ResolveSamples; i++)
 	{
-		float2 u = i < _ResolveSamples ? VogelDiskSample(i, _ResolveSamples, phi) * _ResolveSize : 0;
+		float2 u = i < ResolveSamples ? VogelDiskSample(i, ResolveSamples, phi) * ResolveSize : 0;
 		float2 coord = clamp(floor(input.position.xy + u), 0.0, ViewSize - 1.0) + 0.5;
-		float4 hitData = _HitResult[coord];
+		float4 hitData = HitResult[coord];
 		
 		// Don't denoise from sky pixels
 		if (all(!hitData))
@@ -128,10 +158,15 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 		float NdotL = dot(N, L);
 		if (NdotL <= 0.0)
 			continue;
-			
-		float weight = RcpPi * NdotL;
-		float4 hitColor = _Input[coord];
-		float weightOverPdf = weight * hitColor.w;
+		
+		float4 hitColor = Input[coord];
+		float weight = NdotL;
+		if (IsReflection)
+		{
+			weight *= GgxSingleScatter(roughness2, NdotL, dot(L, V), NdotV, partLambdaV, f0);
+		}
+		
+		float weightOverPdf = weight * rcp(hitColor.w);
 		
 		if (hasHit)
 		{
@@ -160,12 +195,12 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 	SpatialResult output;
 	output.result = result;
 	output.rayLength = avgRayLength;
-	output.weight = result.a * rcp(_ResolveSamples + 1.0);
+	output.weight = totalWeight * rcp(ResolveSamples + 1.0);
 	return output;
 }
 
 Texture2D<float> RayDepth, WeightInput, WeightHistory;
-Texture2D<float4> _TemporalInput, _History;
+Texture2D<float4> TemporalInput, History;
 float4 WeightHistoryScaleLimit;
 
 struct TemporalOutput
@@ -174,37 +209,45 @@ struct TemporalOutput
 	float weight : SV_Target1;
 };
 
-TemporalOutput FragmentTemporal(float4 position : SV_Position, float2 uv : TEXCOORD0, float3 worldDir : TEXCOORD1)
+TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 {
 	float4 minValue, maxValue, current;
-	TemporalNeighborhood(_TemporalInput, position.xy, minValue, maxValue, current);
+	TemporalNeighborhood(TemporalInput, input.position.xy, minValue, maxValue, current);
+	float currentWeight = WeightInput[input.position.xy];
 	
-	float rayLength = RayDepth[position.xy];
-	float3 worldPosition = worldDir * LinearEyeDepth(CameraDepth[position.xy]);
-	worldPosition += normalize(worldDir) * rayLength;
+	float rayLength = RayDepth[input.position.xy];
+	float3 worldPosition = input.worldDirection * LinearEyeDepth(CameraDepth[input.position.xy]);
+	worldPosition += normalize(input.worldDirection) * rayLength;
 	
-	float2 historyUv = uv - CameraVelocity[position.xy];
-	float4 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
+	float4 previousPosition = WorldToPreviousScreenPosition(worldPosition);
 	
-	history.rgb = ClampToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
-	history.a = clamp(history.a, minValue.a, maxValue.a);
+	float2 velocity = CameraVelocity[input.position.xy];
+	velocity = CalculateVelocity(input.uv, previousPosition);
 	
-	if (!_IsFirst && all(saturate(historyUv) == historyUv))
+	float2 historyUv = input.uv - velocity;
+	if (!IsFirst && all(saturate(historyUv) == historyUv))
 	{
+		float4 history = History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, HistoryScaleLimit));
+		float historyWeight = WeightHistory[input.position.xy];
+	
+		history.rgb = ClampToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
+		history.a = clamp(history.a, minValue.a, maxValue.a);
+		
 		// Weigh current and history
-		//current.rgb *= current.a;
-		//history.rgb *= history.a;
+		//current *= currentWeight;
+		//history *= historyWeight;
 		current = lerp(history, current, 0.05);
+		currentWeight = lerp(historyWeight, currentWeight, 0.05);
 		
 		// Remove weight and store
-		//if (current.a)
-		//	current *= rcp(current.a);
+		//if (currentWeight)
+		//	current *= rcp(currentWeight);
 	}
 	
 	current = IsInfOrNaN(current) ? 0 : current;
 	
 	TemporalOutput result;
 	result.color = current;
-	result.weight = 1;
+	result.weight = currentWeight;
 	return result;
 }

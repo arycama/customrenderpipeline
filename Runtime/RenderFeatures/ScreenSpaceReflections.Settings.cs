@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
-public partial class ScreenSpaceReflections
+public partial class ScreenSpaceSpecular
 {
     [Serializable]
     public class Settings

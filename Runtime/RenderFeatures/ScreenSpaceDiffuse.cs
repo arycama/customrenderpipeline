@@ -2,7 +2,7 @@
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
-public partial class DiffuseGlobalIllumination : ViewRenderFeature
+public partial class ScreenSpaceDiffuse : ViewRenderFeature
 {
     private readonly Material material;
     private readonly Settings settings;
@@ -10,7 +10,7 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
     private readonly PersistentRTHandleCache temporalCache, temporalWeightCache;
     private readonly RayTracingShader raytracingShader;
 
-    public DiffuseGlobalIllumination(RenderGraph renderGraph, Settings settings) : base(renderGraph)
+    public ScreenSpaceDiffuse(RenderGraph renderGraph, Settings settings) : base(renderGraph)
     {
         material = new Material(Shader.Find("Hidden/ScreenSpaceGlobalIllumination")) { hideFlags = HideFlags.HideAndDontSave };
         this.settings = settings;
@@ -77,7 +77,9 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
 			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Trace", (settings.Intensity, settings.MaxSamples, settings.Thickness, viewRenderData.viewSize, settings.ConeAngle, viewRenderData.tanHalfFov.y)))
 			{
 				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
-				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+                pass.PreventNewSubPass = true;
+
+                pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 				pass.WriteTexture(tempResult);
 				pass.WriteTexture(hitResult);
 
@@ -97,11 +99,11 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
 
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					pass.SetFloat("_Intensity", data.Intensity);
-					pass.SetFloat("_MaxSteps", data.MaxSamples);
-					pass.SetFloat("_Thickness", data.Thickness);
-					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.viewSize) - 1);
-					pass.SetFloat("_ConeAngle", Mathf.Tan(0.5f * data.ConeAngle * Mathf.Deg2Rad) * (data.viewSize.y / data.y * 0.5f));
+					pass.SetFloat("Intensity", data.Intensity);
+					pass.SetFloat("MaxSteps", data.MaxSamples);
+					pass.SetFloat("Thickness", data.Thickness);
+					pass.SetFloat("MaxMip", Texture2DExtensions.MipCount(data.viewSize) - 1);
+					pass.SetFloat("ConeAngle", Mathf.Tan(0.5f * data.ConeAngle * Mathf.Deg2Rad) * (data.viewSize.y / data.y * 0.5f));
 				});
 			}
         }
@@ -112,13 +114,15 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
         using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Spatial", (settings.Intensity, settings.MaxSamples, settings.Thickness, settings.ResolveSamples, settings.ResolveSize)))
         {
             pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1);
+            pass.PreventNewSubPass = true;
+
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult);
             pass.WriteTexture(rayDepth);
             pass.WriteTexture(spatialWeight);
 
-            pass.ReadTexture("_Input", tempResult);
-            pass.ReadTexture("_HitResult", hitResult);
+            pass.ReadTexture("Input", tempResult);
+            pass.ReadTexture("HitResult", hitResult);
 
             pass.ReadResource<TemporalAAData>();
             pass.ReadResource<SkyReflectionAmbientData>();
@@ -126,6 +130,7 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
             pass.ReadResource<AutoExposureData>();
             pass.ReadResource<ViewData>();
             pass.ReadResource<FrameData>();
+            pass.ReadRtHandle<GBufferAlbedoMetallic>();
             pass.ReadRtHandle<GBufferBentNormalOcclusion>();
             pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();
@@ -134,11 +139,11 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetFloat("_Intensity", data.Intensity);
-                pass.SetFloat("_MaxSteps", data.MaxSamples);
-                pass.SetFloat("_Thickness", data.Thickness);
-                pass.SetInt("_ResolveSamples", data.ResolveSamples);
-                pass.SetFloat("_ResolveSize", data.ResolveSize);
+                pass.SetFloat("Intensity", data.Intensity);
+                pass.SetFloat("MaxSteps", data.MaxSamples);
+                pass.SetFloat("Thickness", data.Thickness);
+                pass.SetInt("ResolveSamples", data.ResolveSamples);
+                pass.SetFloat("ResolveSize", data.ResolveSize);
                 pass.SetFloat("DiffuseGiStrength", data.Intensity);
             });
         }
@@ -155,13 +160,15 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
 			pass.renderData.history = history;
 
 			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2);
+            pass.PreventNewSubPass = true;
+
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current);
             pass.WriteTexture(currentWeight);
 
-            pass.ReadTexture("_TemporalInput", spatialResult);
-            pass.ReadTexture("_History", history);
-            pass.ReadTexture("_HitResult", hitResult);
+            pass.ReadTexture("TemporalInput", spatialResult);
+            pass.ReadTexture("History", history);
+            pass.ReadTexture("HitResult", hitResult);
             pass.ReadTexture("RayDepth", rayDepth);
             pass.ReadTexture("WeightInput", spatialWeight);
             pass.ReadTexture("WeightHistory", historyWeight);
@@ -180,11 +187,11 @@ public partial class DiffuseGlobalIllumination : ViewRenderFeature
 
 			pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
-                pass.SetVector("_HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
-                pass.SetFloat("_Intensity", data.Intensity);
-                pass.SetFloat("_MaxSteps", data.MaxSamples);
-                pass.SetFloat("_Thickness", data.Thickness);
+                pass.SetFloat("IsFirst", data.wasCreated ? 1.0f : 0.0f);
+                pass.SetVector("HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));
+                pass.SetFloat("Intensity", data.Intensity);
+                pass.SetFloat("MaxSteps", data.MaxSamples);
+                pass.SetFloat("Thickness", data.Thickness);
             });
         }
 

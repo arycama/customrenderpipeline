@@ -333,11 +333,14 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new UnderwaterLighting(renderGraph, asset.OceanSettings),
 		new DeferredWater(renderGraph, asset.OceanSettings),
 
+        // Do rain after water so we can get raindrops on the water surface
+		new RainTextureUpdater(renderGraph, asset.Rain),
+
 		// Could do SSR+SSGI+SSSSS here too, all the screen passes
 		new AmbientOcclusion(renderGraph, asset.AmbientOcclusionSettings),
 		new ScreenSpaceShadows(renderGraph, asset.ScreenSpaceShadows, asset.LightingSettings),
-		new DiffuseGlobalIllumination(renderGraph, asset.DiffuseGlobalIlluminationSettings),
-		new ScreenSpaceReflections(renderGraph, settings: asset.ScreenSpaceReflectionsSettings),
+		new ScreenSpaceDiffuse(renderGraph, asset.DiffuseGlobalIlluminationSettings),
+		new ScreenSpaceSpecular(renderGraph, settings: asset.ScreenSpaceReflectionsSettings),
 		
 		// TODO: Could render clouds after deferred, then sky after that
 		new DeferredLighting(renderGraph, asset.Sky),
@@ -397,9 +400,6 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
             if(pass.TryReadResource<CloudRenderResult>())
                 pass.AddKeyword("CLOUDS_ON");
         }),
-
-        // Do rain after water so we can get raindrops on the water surface
-		new RainTextureUpdater(renderGraph, asset.Rain),
 
         new Rain(renderGraph, asset.Rain),
 		new AutoExposure(asset.AutoExposureSettings, asset.LensSettings, renderGraph, asset.ColorGrading),

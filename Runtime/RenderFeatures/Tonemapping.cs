@@ -40,6 +40,7 @@ public partial class Tonemapping : ViewRenderFeature
         pass.ReadRtHandle<CameraTarget>();
         pass.ReadRtHandle<ColorGradingTexture>();
         pass.ReadResource<ScreenSpaceReflectionResult>(true);
+        pass.ReadResource<ScreenSpaceDiffuse.Result>(true);
 
         if (bloomSettings.Strength > 0.0f)
         {

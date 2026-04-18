@@ -1,7 +1,7 @@
 ﻿using System;
 using UnityEngine;
 
-public partial class DiffuseGlobalIllumination
+public partial class ScreenSpaceDiffuse
 {
 	[Serializable]
 	public class Settings

@@ -16,7 +16,7 @@ float3 ScreenSpaceRaytrace(float3 rayOrigin, float3 rayDirection, uint maxSteps,
 
     // We start tracing from the center of the current pixel, and do so up to the far plane.
 	float3 raySign = FastSign(rayDirection);
-	int2 rayStep = raySign == 1;
+	int2 rayStep = raySign.xy == 1;
 	bool rayTowardsEye = rayDirection.z >= 0;
 
     // Note that we don't need to store or read the perceptualRoughness value

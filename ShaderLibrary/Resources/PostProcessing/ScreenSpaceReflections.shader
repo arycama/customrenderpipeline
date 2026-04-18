@@ -18,7 +18,8 @@ Shader "Hidden/ScreenSpaceReflections"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
-            #include "ScreenSpaceReflections.hlsl"
+            #define REFLECTION
+            #include "SsgiCommon.hlsl"
             ENDHLSL
         }
 
@@ -27,7 +28,8 @@ Shader "Hidden/ScreenSpaceReflections"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSpatial
-            #include "ScreenSpaceReflections.hlsl"
+            #define REFLECTION
+            #include "SsgiCommon.hlsl"
             ENDHLSL
         }
 
@@ -36,7 +38,8 @@ Shader "Hidden/ScreenSpaceReflections"
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
-            #include "ScreenSpaceReflections.hlsl"
+            #define REFLECTION
+            #include "SsgiCommon.hlsl"
             ENDHLSL
         }
     }

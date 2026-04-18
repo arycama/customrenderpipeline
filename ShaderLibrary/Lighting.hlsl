@@ -357,13 +357,13 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	
 	#ifdef SCREENSPACE_REFLECTIONS_ON
 		float4 ssr = ScreenSpaceReflections[pixelCoordinate];
-		radiance = lerp(radiance + ssr.rgb * SpecularGiStrength, lerp(radiance, ssr.rgb, ssr.a * SpecularGiStrength), specularOcclusion);
+		radiance = lerp(radiance * specularOcclusion, ssr.rgb, ssr.a * SpecularGiStrength);
 	#endif
 
 	float3 fssEss = dfg.x * input.reflectivity + dfg.y;
 	luminance += radiance * fssEss;
 
-	float3 irradiance = lerp(AmbientCosine(input.bentNormal, input.cosVisibilityAngle), AmbientCosine(-input.bentNormal, input.cosVisibilityAngle), input.translucency);
+	float3 irradiance = AmbientCosine(input.bentNormal, input.cosVisibilityAngle);
 	
 	#ifdef UNDERWATER_LIGHTING_ON
 		irradiance *= underwaterTransmittance;
@@ -371,7 +371,8 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float4 ssgi = ScreenSpaceGlobalIllumination[pixelCoordinate];
-		irradiance = lerp(irradiance + ssgi.rgb * DiffuseGiStrength, lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength), ConeCosAngleToVisibility(input.cosVisibilityAngle));
+		irradiance = lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength);
+		//return float4(irradiance, 1);
 	#endif
 	
 	float3 fAvg = AverageFresnel(input.reflectivity);

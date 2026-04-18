@@ -47,9 +47,9 @@ public class DeferredLighting : ViewRenderFeature
 
             pass.ReadResource<ParticleShadowData>();
 
-            if(renderGraph.TryGetResource<DiffuseGlobalIllumination.Result>(out _))
+            if(renderGraph.TryGetResource<ScreenSpaceDiffuse.Result>(out _))
             {
-                pass.ReadResource<DiffuseGlobalIllumination.Result>();
+                pass.ReadResource<ScreenSpaceDiffuse.Result>();
                 pass.AddKeyword("SCREEN_SPACE_GLOBAL_ILLUMINATION_ON");
             }
 

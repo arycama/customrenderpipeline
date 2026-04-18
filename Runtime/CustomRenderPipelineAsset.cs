@@ -25,8 +25,8 @@ public class CustomRenderPipelineAsset : CustomRenderPipelineAssetBase
 
 	[field: SerializeField] public ScreenSpaceShadows.Settings ScreenSpaceShadows { get; private set; }
 	[field: SerializeField] public AmbientOcclusion.Settings AmbientOcclusionSettings { get; private set; }
-	[field: SerializeField] public ScreenSpaceReflections.Settings ScreenSpaceReflectionsSettings { get; private set; }
-	[field: SerializeField] public DiffuseGlobalIllumination.Settings DiffuseGlobalIlluminationSettings { get; private set; }
+	[field: SerializeField] public ScreenSpaceSpecular.Settings ScreenSpaceReflectionsSettings { get; private set; }
+	[field: SerializeField] public ScreenSpaceDiffuse.Settings DiffuseGlobalIlluminationSettings { get; private set; }
 
 	[field: SerializeField] public VolumetricClouds.Settings Clouds { get; private set; }
 	[field: SerializeField] public Sky.Settings Sky { get; private set; }
