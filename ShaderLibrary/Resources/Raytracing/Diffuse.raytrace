@@ -33,7 +33,7 @@ void RayGeneration()
 	
 	float3 noise3DCosine = Noise3DCosine(position);
 	float rcpPdf = Pi * rcp(noise3DCosine.z);
-	float3 L = FromToRotationZ(N, noise3DCosine);
+	float3 L = FromToRotationZ(N, noise3DCosine, false);
 	
 	// We also need to undo the planet curve, since it's not accounted for in the BLAS
 	worldPosition = PlanetCurveInverse(worldPosition);

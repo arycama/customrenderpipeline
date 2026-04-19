@@ -33,10 +33,10 @@ void KERNEL(uint2 groupId : SV_GroupID, uint groupIndex : SV_GroupIndex)
 	
 	#ifdef AMBIENT_GROUND
 		float viewHeight = _PlanetRadius;
-		float3 V = SampleHemisphereCosine(u.x, u.y);
+		float3 V = SampleHemisphereCosine(u);
 	#else
 		float viewHeight = uv.x * _AtmosphereHeight + _PlanetRadius;
-		float3 V = SampleSphereUniform(u.x, u.y);
+		float3 V = SampleSphereUniform(u);
 	#endif
 	
 	#if defined(AMBIENT_GROUND) || defined(AMBIENT_SKY)

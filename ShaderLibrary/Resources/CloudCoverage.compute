@@ -16,7 +16,7 @@ void CloudCoverage(uint groupIndex : SV_GroupIndex)
 {
 	float2 uv = Hammersley2dSeq(groupIndex, _ThreadCount);
 	float sampleCount = _ThreadCount;
-	float3 V = SampleHemisphereUniform(uv.x, uv.y).xzy;
+	float3 V = SampleHemisphereUniform(uv).xzy;
 
 	float rayStart = DistanceToSphereInside(_PlanetRadius, V.y, _PlanetRadius + _StartHeight);
 	float rayEnd = DistanceToSphereInside(_PlanetRadius, V.y, _PlanetRadius + _StartHeight + _LayerThickness);

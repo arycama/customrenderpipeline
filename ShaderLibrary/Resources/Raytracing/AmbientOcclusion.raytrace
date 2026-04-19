@@ -43,7 +43,7 @@ void RayGeneration()
 		float2 u = Hammersley2dSeq(i, samples);
 		u = frac(u + noise2D);
 	
-		float3 L = SampleHemisphereCosine(u.x, u.y, N);
+		float3 L = SampleHemisphereCosine(u, N);
 		
 		RayDesc ray;
 		ray.Origin = worldPosition + ViewPosition;//+N * EvaluateRayTracingBias(worldPosition, Near, Far, _RaytracingBias, _RaytracingDistantBias);

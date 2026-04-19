@@ -16,6 +16,8 @@ float3 Tonemap(float3 color, float peakBrightness, float paperWhite = 100.0, flo
 	float3 toe = 2.0 * Sq(color) / linearStart - pow(color, 3.0) / Sq(linearStart);
 	float3 shoulder = paperWhite + (color - paperWhite) / (1.0 + (color - paperWhite) / (peakBrightness - paperWhite));
 	
+	shoulder = peakBrightness - Sq(peakBrightness - paperWhite) / (color - paperWhite + peakBrightness - paperWhite);
+	
 	// Color volume mapping similar to GT7: https://blog.selfshadow.com/publications/s2025-shading-course/pdi/s2025_pbs_pdi_slides.pdf
 	float3 iCtCp = Rec2020ToICtCp(color);
 	float3 skewedRgb = color < linearStart ? toe : color > paperWhite ? shoulder : color;

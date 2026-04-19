@@ -22,7 +22,7 @@ float4 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	
 	float2 u = Noise2D(input.position.xy);
 	float3 localL = SampleConeUniform(u.x, u.y, SunCosAngle);
-	float3 L = FromToRotationZ(_LightDirection0, localL);
+	float3 L = FromToRotationZ(_LightDirection0, localL, false);
 	
 	float3 rayOrigin = float3(input.position.xy, depth);
 	float3 rayDirection = MultiplyPointProj(WorldToPixel, worldPosition + L).xyz - rayOrigin;

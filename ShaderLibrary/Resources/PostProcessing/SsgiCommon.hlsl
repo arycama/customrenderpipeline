@@ -24,64 +24,6 @@ struct TraceResult
 	float4 hit : SV_Target1;
 };
 
-void SampleGgxVndf(float3 V, float a, float2 u, float3x3 localToWorld, out float3 localV, out float3 localH, out float VdotH)
-{
-#if 1
-	localV = mul(V, transpose(localToWorld));
-
-    // Construct an orthonormal basis around the stretched view direction
-	float3x3 viewToLocal;
-	viewToLocal[2] = normalize(float3(a * localV.x, a * localV.y, localV.z));
-	viewToLocal[0] = (viewToLocal[2].z < 0.9999) ? normalize(cross(float3(0, 0, 1), viewToLocal[2])) : float3(1, 0, 0);
-	viewToLocal[1] = cross(viewToLocal[2], viewToLocal[0]);
-
-    // Compute a sample point with polar coordinates (r, phi)
-	float r = sqrt(u.x);
-	float phi = 2.0 * Pi * u.y;
-	float t1 = r * cos(phi);
-	float t2 = r * sin(phi);
-	float s = 0.5 * (1.0 + viewToLocal[2].z);
-	t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
-
-    // Reproject onto hemisphere
-	localH = t1 * viewToLocal[0] + t2 * viewToLocal[1] + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * viewToLocal[2];
-
-    // Transform the normal back to the ellipsoid configuration
-	localH = normalize(float3(a * localH.x, a * localH.y, max(0.0, localH.z)));
-
-	VdotH = saturate(dot(localV, localH));
-#else
-	// Section 3.2: transforming the view direction to the hemisphere configuration
-	float3 Vh = normalize(float3(alpha * V.x, alpha * V.y, V.z));
-	
-	// Section 4.1: orthonormal basis (with special case if cross product is zero)
-	float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
-	float3 T1 = lensq > 0 ? float3(-Vh.y, Vh.x, 0) * rsqrt(lensq) : float3(1, 0, 0);
-	float3 T2 = cross(Vh, T1);
-	
-	// Section 4.2: parameterization of the projected area
-	float r = sqrt(u.x);
-	float phi = 2.0 * Pi * u.y;
-	float t1 = r * cos(phi);
-	float t2 = r * sin(phi);
-	float s = 0.5 * (1.0 + Vh.z);
-	t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
-	
-	// Section 4.3: reprojection onto hemisphere
-	float3 Nh = t1 * T1 + t2 * T2 + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * Vh;
-	
-	// Section 3.4: transforming the normal back to the ellipsoid configuration
-	return normalize(float3(alpha * Nh.x, alpha * Nh.y, max(0.0, Nh.z)));
-	#endif
-}
-
-float GgxVndfPdf(float a, float NdotH, float NdotV, float VdotH)
-{
-	float D = GgxD(NdotH, a);
-	float G1 = GgxG1(NdotH, a);
-	return (D * G1 * VdotH) / NdotV;
-}
-
 TraceResult Fragment(VertexFullscreenTriangleOutput input)
 {
 	float depth = HiZMinDepth[input.position.xy];
@@ -101,21 +43,19 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 	if (IsReflection)
 	{
 		float2 u = Noise2D(input.position.xy);
-		//L = ImportanceSampleGGX(roughness, N, V, u, NdotV, pdf);
+		float3 localV = FromToRotationZInverse(-N, -V);
+		float weightOverPdf;
+		float3 localL = ImportanceSampleGgxVndf(roughness, u, localV, weightOverPdf, pdf);
+		L = FromToRotationZ(-N, -localL);
 		
-		//float3 localV = FromToRotationZ(-N, V);
-		
-		float3x3 localToWorld = GetLocalFrame(N);
-		
-		float3 localV, localH;
-		float VdotH;
-		SampleGgxVndf(V, roughness, u, localToWorld, localV, localH, VdotH);
-		
-		float3 localL = 2.0 * VdotH * localH - localV;
-		L = mul(localL, localToWorld);
-		
-		//L = reflect(-V, H);
-		pdf = GgxVndfPdf(roughness, localH.z, localV.z, VdotH);
+		// Reject rays that go under the horizon
+		if(localL.z <= 0.0)
+		{
+			TraceResult output;
+			output.color = 0.0;
+			output.hit = 0.0;
+			return output;
+		}
 	}
 	else
 	{
@@ -233,10 +173,13 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 			continue;
 		
 		float4 hitColor = Input[coord];
+		if (!hitColor.w || IsInfOrNaN(hitColor.w))
+			continue;
+		
 		float weight = NdotL;
 		if (IsReflection)
 		{
-			weight *= GgxSingleScatter(roughness2, NdotL, dot(L, V), NdotV, partLambdaV, f0);
+			weight *= GgxSingleScatter(roughness2, NdotL, dot(L, V), NdotV, partLambdaV, f0).r;
 		}
 		
 		float weightOverPdf = weight * rcp(hitColor.w);
@@ -307,7 +250,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 		history.a = clamp(history.a, minValue.a, maxValue.a);
 		
 		// Weigh current and history
-		//current *= currentWeight;
+		//current *= currentWeight;w
 		//history *= historyWeight;
 		current = lerp(history, current, 0.05);
 		currentWeight = lerp(historyWeight, currentWeight, 0.05);

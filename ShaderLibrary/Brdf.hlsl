@@ -14,9 +14,7 @@ float LambdaGgx(float roughness2, float cosTheta)
 
 float GgxG1(float a2, float NdotL)
 {
-	float cosThetaV2 = Sq(NdotL);
-	float tanThetaV2 = (1.0h - cosThetaV2) / cosThetaV2;
-	return 2.0h / (1.0h + sqrt(1.0h + a2 * tanThetaV2));
+	return rcp(1.0 + LambdaGgx(a2, NdotL));
 }
 
 float GgxG2(float roughness2, float cosThetaI, float cosThetaO)
@@ -39,11 +37,6 @@ half GgxD(half roughness, half NdotH, half3 N, half3 H)
 	// Version using Lagrange's identity to avoid precision issues with half
 	half a = NdotH * roughness;
 	return Sq(roughness * rcp(SqrLength(cross(N, H)) + Sq(a)));
-}
-
-float GgxG(float roughness2, half NdotL, half LdotH, half NdotV, half VdotH)
-{
-	return GgxG1(roughness2, NdotL) * GgxG1(roughness2, NdotV);
 }
 
 float GgxV(float NdotL, float NdotV, float roughness2, float partLambdaV)

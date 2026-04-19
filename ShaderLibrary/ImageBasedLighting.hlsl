@@ -211,45 +211,57 @@ float GetSpecularOcclusion(float cosVisibilityAngle, float BdotR, float perceptu
 	return lerp(specOcc0, specOcc1, qWeight);
 }
 
-float3 SampleGgxVndf(float roughness, float2 u, float3 localV)
+float3 SampleGgxVndf(float alpha, float2 u, float3 V)
 {
-	// Section 3.2: transforming the view direction to the hemisphere configuration
-	float3 Vh = normalize(float3(roughness * localV.xy, localV.z));
+	// Flatten the hemipshere based on roughness and calculate the new view direction relative to this 
+	float3 Vh = normalize(float3(alpha * V.xy, V.z));
 	
-	 // Section 4.1: orthonormal basis (with special case if cross product is zero)
-	float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
-	float3 T1 = lensq ? float3(-Vh.y, Vh.x, 0) * rsqrt(lensq) : float3(1, 0, 0);
-	float3 T2 = cross(Vh, T1);
-
-	// Section 4.2: parameterization of the projected area
-	float phi = TwoPi * u.y;
+	// Compute a point on a disc, and shrink the y axis based on view angle to account for the projection of the visible 
+	// section of the hemisphere on the view plane
+	float rcpA = 1.0 + Vh.z;
+	float a = rcp(rcpA);
 	float r = sqrt(u.x);
-	float t1 = r * cos(phi);
-	float t2 = r * sin(phi);
-	float s = 0.5 * Vh.z + 0.5;
-	t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
-		
-	// Section 4.3: reprojection onto hemisphere
-	float3 Nh = float3(t1, t2, sqrt(saturate(1.0 - Sq(t1) - Sq(t2))));
+	float phi = u.y * rcpA * Pi;
+	if (u.y < a)
+		phi += Pi - a * rcpA * Pi;
 	
-	// Section 3.4: transforming the normal back to the ellipsoid configuration
-	return normalize(float3(roughness * Nh.x, roughness * Nh.y, max(0.0, Nh.z)));
+	float3 H;
+	H.x = r * cos(phi);
+	H.y = r * sin(phi) * ((u.y < a) ? 1.0 : Vh.z);
+
+	// Reconstruct the Z component of the direction from XY
+	H.z = sqrt(saturate(1.0 - SqrLength(H.xy)));
+	
+	if (Vh.z < 1.0)
+	{
+		// Transform the vector into the space aligned with the normal
+		float3 tangent = float3(-Vh.y, Vh.x, 0) * RcpLength(Vh.xy);
+		H = TangentToWorldNormal(H, Vh, tangent, 1.0, false);
+	}
+
+	// Conver the flattened hemisphere back to a regular hemisphere
+	return normalize(float3(alpha * H.xy, H.z));
 }
 
-float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 localV, out float weightOverPdf, out float pdf)
+float GgxVndfPdf(float a2, float NdotH, float NdotV)
 {
-	float roughness2 = Sq(roughness);
-	float3 localH = SampleGgxVndf(roughness, u, localV);
-	float3 localL = reflect(-localV, localH);
-	pdf = 0.25 * GgxD(roughness2, localH.z) * rcp(dot(localV, localH.z));
-	weightOverPdf = GgxG2(roughness2, localL.z, localV.z) * rcp(GgxG1(roughness2, localV.z));
-	return localL;
+	return 0.25 * GgxD(a2, NdotH) * GgxG1(a2, NdotV) * rcp(max(1e-3, NdotV));
 }
 
-float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 localV, out float weightOverPdf)
+float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 V, out float weightOverPdf, out float pdf)
+{
+	float a2 = Sq(roughness);
+	float3 H = SampleGgxVndf(roughness, u, V);
+	float3 L = reflect(-V, H);
+	pdf = GgxVndfPdf(a2, H.z, V.z);
+	weightOverPdf = GgxG2(a2, L.z, V.z) * rcp(GgxG1(a2, V.z));
+	return L;
+}
+
+float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 V, out float weightOverPdf)
 {
 	float pdf;
-	return ImportanceSampleGgxVndf(roughness, u, localV, weightOverPdf, pdf);
+	return ImportanceSampleGgxVndf(roughness, u, V, weightOverPdf, pdf);
 }
 
 // https://seblagarde.wordpress.com/2015/07/14/siggraph-2014-moving-frostbite-to-physically-based-rendering/ (4-9-3-DistanceBasedRoughnessLobeBounding.pdf, page 3)

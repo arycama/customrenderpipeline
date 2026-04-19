@@ -20,27 +20,34 @@ struct GBufferOutput
 
 Texture2D<float4> GBufferAlbedoMetallic, GBufferNormalRoughness, GBufferBentNormalOcclusion;
 
+// Assumes N and V are already in view space
+float2 PackGBufferNormal(float3 N, float3 V)
+{
+	N = FromToRotationZInverse(-V, -N, false);
+	return NormalToPyramidUv(N);
+}
+
+// Assumes N and V are in world space
 float2 PackGBufferNormal(float3 N, float3 V, matrix worldToView)
 {
 	V = mul((float3x3) worldToView, V);
 	N = mul((float3x3) worldToView, N);
-	N = FromToRotationZInverse(-V, -N);
-	return NormalToPyramidUv(N);
+	return PackGBufferNormal(N, V);
 }
 
+// Returns N in view space, assumes V is in viewspace
 float3 GBufferNormal(float4 data, float3 V, out float NdotV)
 {
 	float3 N = PyramidUvToNormal(data.rg);
 	NdotV = N.z;
-	return -FromToRotationZ(-V, N);
+	return -FromToRotationZ(-V, N, false);
 }
 
+// Returns N in world space, assumes V is in world space
 float3 GBufferNormal(float4 data, float3 V, out float NdotV, matrix worldToView, matrix viewToWorld)
 {
-	float3 N = PyramidUvToNormal(data.rg);
-	NdotV = N.z;
 	V = mul((float3x3) worldToView, V);
-	N = -FromToRotationZ(-V, N);
+	float3 N = GBufferNormal(data, V, NdotV);
 	return mul((float3x3) viewToWorld, N);
 }
 

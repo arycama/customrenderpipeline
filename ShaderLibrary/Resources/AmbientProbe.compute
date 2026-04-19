@@ -19,7 +19,7 @@ RWStructuredBuffer<float4> _AmbientProbeOutputBuffer;
 void AmbientProbe(uint groupIndex : SV_GroupIndex)
 {
 	float2 u = Hammersley2dSeq(groupIndex, _SampleCount);
-	float3 N = SampleSphereUniform(u.x, u.y);
+	float3 N = SampleSphereUniform(u);
 	float2 uv = NormalToOctahedralUv(N);
 	float3 value = Input.SampleLevel(TrilinearClampSampler, uv, _MipLevel);
 	

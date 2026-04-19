@@ -5,7 +5,7 @@
 #include "Utility.hlsl"
 
 // TODO: Move to a common place or pass as args
-float4 _CullingPlanes[6];
+float4 _CullingPlanes[10];
 uint _CullingPlanesCount;
 
 const static float3x3 Identity3x3 = float3x3(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
@@ -27,14 +27,6 @@ float3 SphericalToCartesian(float phi, float cosTheta)
 {
 	float sinTheta = SinFromCos(cosTheta);
 	return SphericalToCartesian(phi, cosTheta, sinTheta);
-}
-
-float3 SampleSphereUniform(float u1, float u2)
-{
-	float phi = TwoPi * u2;
-	float cosTheta = 1.0 - 2.0 * u1;
-
-	return SphericalToCartesian(phi, cosTheta);
 }
 
 float SphericalDot(float cosThetaA, float cosThetaB, float cosDeltaPhi)
@@ -105,12 +97,15 @@ bool FrustumCull(float3 center, float3 extents)
 	const uint maxCullingPlanes = 10;
 	
 	[unroll]
-	for (uint i = 0; i < min(maxCullingPlanes, _CullingPlanesCount); i++)
+	for (uint i = 0; i < maxCullingPlanes; i++)
 	{
-		float4 plane = _CullingPlanes[i];
-		float3 p = center + (plane.xyz >= 0.0 ? extents : -extents);
-		if (DistanceFromPlane(p, plane) < 0.0)
-			return false;
+		if (i < _CullingPlanesCount)
+		{
+			float4 plane = _CullingPlanes[i];
+			float3 p = center + (plane.xyz >= 0.0 ? extents : -extents);
+			if (DistanceFromPlane(p, plane) < 0.0)
+				return false;
+		}
 	}
 	
 	return true;
@@ -191,20 +186,22 @@ float4 Quaternion(float theta, float phi)
 }
 
 // Calculates a rotation from (0,0,1) to baseNormal, and applies that rotation to detailNormal using shortest arc quaternion
-// https://blog.selfshadow.com/publications/blending-in-detail/
-float3 FromToRotationZ(float3 t, float3 u)
+float3 FromToRotationZ(float3 t, float3 u, bool correctSign = true)
 {
+	// https://blog.selfshadow.com/publications/blending-in-detail/
+	// After rotation, xy will point in the opposite direction. For cases where the inverse is always applied (Eg pack/unpack) 
+	// or where the exact xy orientation doesn't matter (Eg cosine importance sampling) it can be skipped.
 	t.z += 1.0;
-	u.xy = -u.xy;
+	u.xy = correctSign ? -u.xy : u.xy;
 	return (dot(t, u) * rcp(t.z)) * t - u;
 }
 
-float3 FromToRotationZInverse(float3 t, float3 detailNormal)
+float3 FromToRotationZInverse(float3 t, float3 u, bool correctSign = true)
 {
-	t = t + float3(0, 0, 1);
-	float k = dot(detailNormal, t) / (dot(t, t) - t.z);
-	float3 u = k * t - detailNormal;
-	return u * float3(-1, -1, 1);
+	t.z += 1.0;
+	float3 v = (dot(t, u) * rcp(t.z)) * t - u;
+	v.xy = correctSign ? -v.xy : v.xy;
+	return v;
 }
 
 float3 SampleConeUniform(float u1, float u2, float cosTheta)
@@ -217,7 +214,7 @@ float3 SampleConeUniform(float u1, float u2, float cosTheta)
 float3 SampleConeUniform(float u1, float u2, float cosTheta, float3 normal)
 {
 	float3 localNormal = SampleConeUniform(u1, u2, cosTheta);
-	return FromToRotationZ(normal, localNormal);
+	return FromToRotationZ(normal, localNormal, false);
 }
 
 // Projects a vector onto another vector (Assumes vectors are normalized)
@@ -241,10 +238,10 @@ float Angle(float3 from, float3 to)
 
 // Performs uniform sampling of the unit disk.
 // Ref: PBRT v3, p. 777.
-float2 SampleDiskUniform(float u1, float u2)
+float2 SampleDiskUniform(float2 u)
 {
-	float r = sqrt(u1);
-	float phi = TwoPi * u2;
+	float r = sqrt(u.x);
+	float phi = TwoPi * u.y;
 
 	float sinPhi, cosPhi;
 	sincos(phi, sinPhi, cosPhi);
@@ -254,38 +251,29 @@ float2 SampleDiskUniform(float u1, float u2)
 
 // Performs cosine-weighted sampling of the hemisphere.
 // Ref: PBRT v3, p. 780.
-float3 SampleHemisphereCosine(float u1, float u2)
+float3 SampleHemisphereCosine(float2 u)
 {
-	float3 localL;
-
-    // Since we don't really care about the area distortion,
-    // we substitute uniform disk sampling for the concentric one.
-	localL.xy = SampleDiskUniform(u1, u2);
-
-    // Project the point from the disk onto the hemisphere.
-	localL.z = sqrt(1.0 - u1);
-
-	return localL;
+	float cosTheta = sqrt(u.x);
+	float phi = TwoPi * u.y;
+	return SphericalToCartesian(phi, cosTheta);
 }
 
 // Generates a sample, then rotates it into the hemisphere of normal using reoriented normal mapping
-float3 SampleHemisphereCosine(float u1, float u2, float3 normal)
+float3 SampleHemisphereCosine(float2 u, float3 normal)
 {
-	// This function needs to used safenormalize because there is a probability
-    // that the generated direction is the exact opposite of the normal and that would lead
-    // to a nan vector otheriwse.
-	//float3 pointOnSphere = SampleSphereUniform(u1, u2);
-	//return normalize(normal + pointOnSphere);
-	
-	float3 result = SampleHemisphereCosine(u1, u2);
-	return FromToRotationZ(normal, result);
+	float3 result = SampleHemisphereCosine(u);
+	return FromToRotationZ(normal, result, false);
 }
 
-float3 SampleHemisphereUniform(float u1, float u2)
+float3 SampleHemisphereUniform(float2 u)
 {
-	float phi = TwoPi * u2;
-	float cosTheta = 1.0 - u1;
+	return SphericalToCartesian(TwoPi * u.y, u.x);
+}
 
+float3 SampleSphereUniform(float2 u)
+{
+	float phi = TwoPi * u.y;
+	float cosTheta = 2.0 * u.x - 1.0;
 	return SphericalToCartesian(phi, cosTheta);
 }
 
@@ -442,20 +430,56 @@ float3 RotateTowards(float3 a, float3 b, float cosAngle)
 	return (SineDifference(cosTheta, sinTheta, cosAngle, sinAngle) * a + sinAngle * b) * rcp(sinTheta);
 }
 
-float AngularDiameterToAngularRadius(float angularDiameter) { return 0.5 * angularDiameter; }
-float AngularRadiusToConeCosAngle(float angularRadius) { return cos(angularRadius); }
-float ConeCosAngleToSolidAngle(float coneCosAngle) { return -TwoPi * coneCosAngle + TwoPi; }
-float SolidAngleToConeCosAngle(float solidAngle) { return -RcpTwoPi * solidAngle + 1.0; }
-float CosConeAngleToConeAngle(float cosConeAngle) { return FastACos(cosConeAngle); }
+float AngularDiameterToAngularRadius(float angularDiameter)
+{
+	return 0.5 * angularDiameter;
+}
+float AngularRadiusToConeCosAngle(float angularRadius)
+{
+	return cos(angularRadius);
+}
+float ConeCosAngleToSolidAngle(float coneCosAngle)
+{
+	return -TwoPi * coneCosAngle + TwoPi;
+}
+float SolidAngleToConeCosAngle(float solidAngle)
+{
+	return -RcpTwoPi * solidAngle + 1.0;
+}
+float CosConeAngleToConeAngle(float cosConeAngle)
+{
+	return FastACos(cosConeAngle);
+}
 
-float AngularDiameterToConeCosAngle(float angularDiameter) { return AngularRadiusToConeCosAngle(AngularDiameterToAngularRadius(angularDiameter)); }
-float AngularRadiusToSolidAngle(float angularRadius) { return ConeCosAngleToSolidAngle(AngularRadiusToConeCosAngle(angularRadius)); }
-float AngularDiameterToSolidAngle(float angularDiameter) { return AngularRadiusToSolidAngle(AngularDiameterToAngularRadius(angularDiameter)); }
+float AngularDiameterToConeCosAngle(float angularDiameter)
+{
+	return AngularRadiusToConeCosAngle(AngularDiameterToAngularRadius(angularDiameter));
+}
+float AngularRadiusToSolidAngle(float angularRadius)
+{
+	return ConeCosAngleToSolidAngle(AngularRadiusToConeCosAngle(angularRadius));
+}
+float AngularDiameterToSolidAngle(float angularDiameter)
+{
+	return AngularRadiusToSolidAngle(AngularDiameterToAngularRadius(angularDiameter));
+}
 
-float VisibilityToConeCosAngle(float occlusion) { return sqrt(saturate(1.0 - occlusion)); }
-float ConeCosAngleToVisibility(float coneCosAngle) { return 1.0 - Sq(coneCosAngle); }
-float ConeAngleToVisibility(float coneAngle) { return ConeCosAngleToVisibility(cos(coneAngle)); }
-float VisibilityToConeAngle(float occlusion) { return CosConeAngleToConeAngle(VisibilityToConeCosAngle(occlusion)); }
+float VisibilityToConeCosAngle(float occlusion)
+{
+	return sqrt(saturate(1.0 - occlusion));
+}
+float ConeCosAngleToVisibility(float coneCosAngle)
+{
+	return 1.0 - Sq(coneCosAngle);
+}
+float ConeAngleToVisibility(float coneAngle)
+{
+	return ConeCosAngleToVisibility(cos(coneAngle));
+}
+float VisibilityToConeAngle(float occlusion)
+{
+	return CosConeAngleToConeAngle(VisibilityToConeCosAngle(occlusion));
+}
 
 float DistanceToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
 {
