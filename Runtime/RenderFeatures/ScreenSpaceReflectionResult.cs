@@ -3,23 +3,24 @@ using UnityEngine.Rendering;
 
 public readonly struct ScreenSpaceReflectionResult : IRenderPassData
 {
-    public ResourceHandle<RenderTexture> ScreenSpaceReflections { get; }
+    public readonly ResourceHandle<RenderTexture> screenSpaceReflections, opacity;
     private readonly float intensity;
 
-    public ScreenSpaceReflectionResult(ResourceHandle<RenderTexture> screenSpaceReflections, float intensity)
+    public ScreenSpaceReflectionResult(ResourceHandle<RenderTexture> screenSpaceReflections, ResourceHandle<RenderTexture> opacity, float intensity)
     {
-        ScreenSpaceReflections = screenSpaceReflections;
+        this.screenSpaceReflections = screenSpaceReflections;
         this.intensity = intensity;
+        this.opacity = opacity;
     }
 
 	void IRenderPassData.SetInputs(RenderPass pass)
 	{
-        pass.ReadTexture("ScreenSpaceReflections", ScreenSpaceReflections);
+        pass.ReadTexture("ScreenSpaceReflections", screenSpaceReflections);
+        pass.ReadTexture("ScreenSpaceReflectionsOpacity", opacity);
 	}
 
 	void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
 	{
-		pass.SetVector("ScreenSpaceReflectionsScaleLimit", pass.RenderGraph.GetScaleLimit2D(ScreenSpaceReflections));
 		pass.SetFloat("SpecularGiStrength", intensity);
 	}
 }

@@ -285,11 +285,12 @@ FragmentOutputTemporal FragmentTemporal(VertexFullscreenTriangleOutput input)
 		{
 			history /= historyWeight;
 			history.r *= PreviousToCurrentExposure;
-			//history = ClampToAABB(history, current, minValue, maxValue);
-			history = clamp(history, minValue, maxValue);
+			history = ClampToAABB(history, current, minValue, maxValue);
 			current = lerp(current, history, speed);
 		}
 	}
+	
+	current = IsInfOrNaN(current) ? 0 : current;
 	
 	FragmentOutputTemporal output;
 	output.history = Float4ToR10G10B10A2Unorm(float4(current, 1.0));

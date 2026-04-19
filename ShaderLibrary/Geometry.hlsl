@@ -483,16 +483,57 @@ float VisibilityToConeAngle(float occlusion)
 
 float DistanceToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
 {
-	float3 rayVector = target - origin;
-	float3 rcpDir = rcp(rayVector);
-	return Max3(((rayVector >= 0.0 ? boxMin : boxMax) - origin) * rcpDir);
+	if(all(target == origin))
+		return 0.0;
+
+	float3 invDir = 1.0 / (target - origin);
+	int3 sign = invDir < 0;
+
+	float tmin, tmax, tymin, tymax, tzmin, tzmax;
+    
+    // Use arrays for bounds to match original indexing
+	float3 bounds[2];
+	bounds[0] = boxMin;
+	bounds[1] = boxMax;
+    
+	tmin = (bounds[sign.x].x - origin.x) * invDir.x;
+	tmax = (bounds[1 - sign.x].x - origin.x) * invDir.x;
+	tymin = (bounds[sign.y].y - origin.y) * invDir.y;
+	tymax = (bounds[1 - sign.y].y - origin.y) * invDir.y;
+    
+	if ((tmin > tymax) || (tymin > tmax))
+		return 0.0;
+    
+	if (tymin > tmin)
+		tmin = tymin;
+	if (tymax < tmax)
+		tmax = tymax;
+    
+	tzmin = (bounds[sign.z].z - origin.z) * invDir.z;
+	tzmax = (bounds[1 - sign.z].z - origin.z) * invDir.z;
+    
+	if ((tmin > tzmax) || (tzmin > tmax))
+		return 0.0;
+    
+	if (tzmin > tmin)
+		tmin = tzmin;
+	if (tzmax < tmax)
+		tmax = tzmax;
+    
+	return tmin;
+
+	//float3 rayVector = target - origin;
+	//float3 rcpDir = rcp(rayVector);
+	//return Max3(((rayVector >= 0.0 ? boxMin : boxMax) - origin) * rcpDir);
 }
 
 float3 ClampToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
 {
-	float3 rayVector = target - origin;
 	float t = DistanceToAABB(origin, target, boxMin, boxMax);
-	return origin + rayVector * max(0.0, t);
+	
+	// TODO: Ensure t doesn't go nan/inf
+	// t may be negative if already in the box, and may also shoot to inf/nan in rare cases, saturate handles both
+	return lerp(origin, target, max(0.0, t));
 }
 
 // TODO: Maybe make these switch back to returning cosAngle instead of solidAngle

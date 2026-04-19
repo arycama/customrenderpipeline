@@ -16,7 +16,7 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
         this.settings = settings;
 
         temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "SSGI Color", isScreenTexture: true);
-		temporalWeightCache = new PersistentRTHandleCache(GraphicsFormat.R16_UNorm, renderGraph, "SSGI Weight", isScreenTexture: true);
+		temporalWeightCache = new PersistentRTHandleCache(GraphicsFormat.R8_UNorm, renderGraph, "SSGI Weight", isScreenTexture: true);
         raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Diffuse");
     }
 
@@ -109,7 +109,7 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
         }
 
         var spatialResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-        var spatialWeight = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_UNorm, isScreenTexture: true);
+        var spatialWeight = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8_UNorm, isScreenTexture: true);
         var rayDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Spatial", (settings.Intensity, settings.MaxSamples, settings.Thickness, settings.ResolveSamples, settings.ResolveSize)))
         {
@@ -136,6 +136,8 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
             pass.ReadRtHandle<CameraDepth>();
             pass.ReadRtHandle<CameraStencil>();
 			pass.ReadRtHandle<GBufferNormalRoughness>();
+            pass.ReadRtHandle<PreviousCameraDepth>();
+            pass.ReadRtHandle<PreviousCameraVelocity>();
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {

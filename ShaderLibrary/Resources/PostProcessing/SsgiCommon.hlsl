@@ -45,15 +45,15 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 		float2 u = Noise2D(input.position.xy);
 		float3 localV = FromToRotationZInverse(-N, -V);
 		float weightOverPdf;
-		float3 localL = ImportanceSampleGgxVndf(roughness, u, localV, weightOverPdf, pdf);
+		float3 localL = ImportanceSampleGgxVndf(roughness, u, localV, weightOverPdf, pdf, true, true);
 		L = FromToRotationZ(-N, -localL);
 		
-		// Reject rays that go under the horizon
-		if(localL.z <= 0.0)
+		// If ray goes below horizon, return input color (Eg assume it hits surface immediately)
+		if (localL.z <= 0.0)
 		{
 			TraceResult output;
-			output.color = 0.0;
-			output.hit = 0.0;
+			output.color = float4(PreviousCameraTarget[input.position.xy], pdf) * 0;
+			output.hit = float4(L, Linear01Depth(depth)) * 0;
 			return output;
 		}
 	}
@@ -117,7 +117,7 @@ struct SpatialResult
 {
 	float4 result : SV_Target0;
 	float rayLength : SV_Target1;
-	float weight : SV_Target2;
+	float opacity : SV_Target2;
 };
 
 SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
@@ -178,9 +178,7 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 		
 		float weight = NdotL;
 		if (IsReflection)
-		{
 			weight *= GgxSingleScatter(roughness2, NdotL, dot(L, V), NdotV, partLambdaV, f0).r;
-		}
 		
 		float weightOverPdf = weight * rcp(hitColor.w);
 		
@@ -205,65 +203,126 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 	// Add the nonhit and hit weights to get a total weight
 	float totalWeight = result.a + nonHitWeight;
 	
-	// Final alpha is the ratio of hit weight vs non hit weight
-	result.a = totalWeight ? result.a / totalWeight : 0.0;
-	
 	SpatialResult output;
 	output.result = result;
 	output.rayLength = avgRayLength;
-	output.weight = totalWeight * rcp(ResolveSamples + 1.0);
+	output.opacity = totalWeight ? result.a / totalWeight : 0.0;
 	return output;
 }
 
-Texture2D<float> RayDepth, WeightInput, WeightHistory;
+Texture2D<float> RayDepth, Opacity, OpacityHistory, SpeedHistory;
 Texture2D<float4> TemporalInput, History;
-float4 WeightHistoryScaleLimit;
 
 struct TemporalOutput
 {
 	float4 color : SV_Target0;
-	float weight : SV_Target1;
+	float speed : SV_Target1;
+	float weight : SV_Target2;
 };
 
 TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 {
-	float4 minValue, maxValue, current;
-	TemporalNeighborhood(TemporalInput, input.position.xy, minValue, maxValue, current);
-	float currentWeight = WeightInput[input.position.xy];
+	float4 mean = 0.0, stdDev = 0.0, current = 0.0;
+	float centerDepthRaw = CameraDepth[input.position.xy];
+	float centerDepth = LinearEyeDepth(centerDepthRaw);
+	float weightSum = 0.0;
+	float depthWeightSum = 0.0;
 	
+	[unroll]
+	for (int y = -1, i = 0; y <= 1; y++)
+	{
+		[unroll]
+		for (int x = -1; x <= 1; x++, i++)
+		{
+			float weight = GetBoxFilterWeight(i);
+			uint2 coord = clamp(input.position.xy + int2(x, y), 0, ViewSizeMinusOne);
+			
+			float depth = LinearEyeDepth(CameraDepth[coord]);
+			
+			// Weigh contribution to the result and bounding box 
+			float DepthThreshold = 1.0;
+			float depthWeight = saturate(1.0 - abs(centerDepth - depth) / max(1, centerDepth) * DepthThreshold);
+			
+			float4 color;
+			color.rgb = TemporalInput[coord].rgb;
+			color.a = Opacity[coord];
+			
+			current = i == 0 ? (color * weight * depthWeight) : (current + color * weight * depthWeight);
+			mean += color * depthWeight;
+			stdDev += Sq(color) * depthWeight;
+			
+			depthWeightSum += depthWeight;
+			weightSum += weight * depthWeight;
+		}
+	}
+	
+	// TODO: Should this also be filtered?
 	float rayLength = RayDepth[input.position.xy];
 	float3 worldPosition = input.worldDirection * LinearEyeDepth(CameraDepth[input.position.xy]);
 	worldPosition += normalize(input.worldDirection) * rayLength;
 	
+	current /= weightSum;
+	mean /= depthWeightSum;
+	stdDev /= depthWeightSum;
+	stdDev = sqrt(abs(stdDev - mean * mean));
+	float4 minValue = mean - stdDev;
+	float4 maxValue = mean + stdDev;
+	
+	// TODO: How can we combine velocity from motion vectors texture with ray length?
 	float4 previousPosition = WorldToPreviousScreenPosition(worldPosition);
 	
 	float2 velocity = CameraVelocity[input.position.xy];
 	velocity = CalculateVelocity(input.uv, previousPosition);
 	
-	float2 historyUv = input.uv - velocity;
-	if (!IsFirst && all(saturate(historyUv) == historyUv))
+	float speed = 0.0;
+	float2 previousUv = input.uv - velocity;
+	if (!IsFirst && all(saturate(previousUv) == previousUv))
 	{
-		float4 history = History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, HistoryScaleLimit));
-		float historyWeight = WeightHistory[input.position.xy];
+		previousUv = ClampScaleTextureUv(previousUv, HistoryScaleLimit);
+		
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, input.uv));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, previousUv));
 	
-		history.rgb = ClampToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
-		history.a = clamp(history.a, minValue.a, maxValue.a);
+		//uint4 packedHistory = PreviousLuminance.Gather(LinearClampSampler, previousUv);
 		
-		// Weigh current and history
-		//current *= currentWeight;w
-		//history *= historyWeight;
-		current = lerp(history, current, 0.05);
-		currentWeight = lerp(historyWeight, currentWeight, 0.05);
+		float4 historyR = History.GatherRed(LinearClampSampler, previousUv);
+		float4 historyG = History.GatherGreen(LinearClampSampler, previousUv);
+		float4 historyB = History.GatherBlue(LinearClampSampler, previousUv);
 		
-		// Remove weight and store
-		//if (currentWeight)
-		//	current *= rcp(currentWeight);
+		float4 opacityHistory = OpacityHistory.Gather(LinearClampSampler, previousUv);
+		float4 speedHistory = SpeedHistory.Gather(LinearClampSampler, previousUv);
+	
+		float DepthThreshold = 1.0; // TODO: Make a property
+		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);
+		float4 bilinearWeights = BilinearWeights(previousUv, ViewSize);
+		float4 weights = bilinearWeights * depthWeights;
+		
+		float4 history = 0.0;
+		float historyWeight = 0.0;
+		
+		[unroll]
+		for (uint i = 0; i < 4; i++)
+		{
+			history += weights[i] * float4(historyR[i], historyG[i], historyB[i], opacityHistory[i]);
+			speed += weights[i] * speedHistory[i];
+			historyWeight += weights[i];
+		}
+		
+		if (historyWeight)
+		{
+			history /= historyWeight;
+			history.r *= PreviousToCurrentExposure;
+			history.rgb = ClampToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
+			history.a = clamp(history.a, minValue.a, maxValue.a);
+			current = lerp(current, history, speed);
+		}
 	}
 	
 	current = IsInfOrNaN(current) ? 0 : current;
 	
 	TemporalOutput result;
-	result.color = current;
-	result.weight = currentWeight;
+	result.color = float4(current.rgb, 0.0);
+	result.weight = current.a;
+	result.speed = min(0.95, 1.0 / (2.0 - speed));
 	return result;
 }

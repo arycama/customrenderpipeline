@@ -131,10 +131,10 @@ float2 QuadOffset(uint2 screenPos)
 	return float2(screenPos & 1) * 2.0 - 1.0;
 }
 
-float2 QuadOffset(float2 screenPos)
-{
-	return 4.0 * frac(0.5 * screenPos) - 1.0;
-}
+//float2 QuadOffset(float2 screenPos)
+//{
+//	return 4.0 * frac(0.5 * screenPos) - 1.0;
+//}
 
 float1 QuadReadAcrossX(float1 value, uint2 screenPos)
 {

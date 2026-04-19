@@ -142,6 +142,29 @@ float MipmapLevelToPerceptualRoughness(float mipmapLevel)
 	return saturate(1.7 / 1.4 - sqrt(2.89 / 1.96 - (2.8 / 1.96) * perceptualRoughness));
 }
 
+float GetSpecularOcclusion(float cosVisibilityAngle, float BdotR, float perceptualRoughness, float NdotR)
+{
+	float4 uv = Remap01ToHalfTexel(float4(cosVisibilityAngle, BdotR, perceptualRoughness, NdotR), 32);
+
+	// 4D LUT
+	float3 uvw0;
+	uvw0.xy = uv.xy;
+	float q0Slice = clamp(floor(uv.w * 32 - 0.5), 0, 31.0);
+	q0Slice = clamp(q0Slice, 0, 32 - 1.0);
+	float qWeight = max(uv.w * 32 - 0.5 - q0Slice, 0);
+	float2 sliceMinMaxZ = float2(q0Slice, q0Slice + 1) / 32 + float2(0.5, -0.5) / (32 * 32); //?
+	uvw0.z = (q0Slice + uv.z) / 32.0;
+	uvw0.z = clamp(uvw0.z, sliceMinMaxZ.x, sliceMinMaxZ.y);
+
+	float q1Slice = min(q0Slice + 1, 32 - 1);
+	float nextSliceOffset = (q1Slice - q0Slice) / 32;
+	float3 uvw1 = uvw0 + float3(0, 0, nextSliceOffset);
+
+	float specOcc0 = SpecularOcclusion.Sample(TrilinearClampSampler, uvw0);
+	float specOcc1 = SpecularOcclusion.Sample(TrilinearClampSampler, uvw1);
+	return lerp(specOcc0, specOcc1, qWeight);
+}
+
 float3 SampleGGXIsotropic(float3 wi, float alpha, float2 u, float3 n)
 {
     // decompose the floattor in parallel and perpendicular components
@@ -188,80 +211,75 @@ float3 ImportanceSampleGGX(float a, float3 N, float3 V, float2 u, float NdotV, o
 	return reflect(-V, H);
 }
 
-float GetSpecularOcclusion(float cosVisibilityAngle, float BdotR, float perceptualRoughness, float NdotR)
+float3 SampleGgxVndf(float a, float2 u, float3 V, bool useSphericalCap, bool useBoundedSampling)
 {
-	float4 uv = Remap01ToHalfTexel(float4(cosVisibilityAngle, BdotR, perceptualRoughness, NdotR), 32);
-
-	// 4D LUT
-	float3 uvw0;
-	uvw0.xy = uv.xy;
-	float q0Slice = clamp(floor(uv.w * 32 - 0.5), 0, 31.0);
-	q0Slice = clamp(q0Slice, 0, 32 - 1.0);
-	float qWeight = max(uv.w * 32 - 0.5 - q0Slice, 0);
-	float2 sliceMinMaxZ = float2(q0Slice, q0Slice + 1) / 32 + float2(0.5, -0.5) / (32 * 32); //?
-	uvw0.z = (q0Slice + uv.z) / 32.0;
-	uvw0.z = clamp(uvw0.z, sliceMinMaxZ.x, sliceMinMaxZ.y);
-
-	float q1Slice = min(q0Slice + 1, 32 - 1);
-	float nextSliceOffset = (q1Slice - q0Slice) / 32;
-	float3 uvw1 = uvw0 + float3(0, 0, nextSliceOffset);
-
-	float specOcc0 = SpecularOcclusion.Sample(TrilinearClampSampler, uvw0);
-	float specOcc1 = SpecularOcclusion.Sample(TrilinearClampSampler, uvw1);
-	return lerp(specOcc0, specOcc1, qWeight);
-}
-
-float3 SampleGgxVndf(float alpha, float2 u, float3 V)
-{
-	// Flatten the hemipshere based on roughness and calculate the new view direction relative to this 
-	float3 Vh = normalize(float3(alpha * V.xy, V.z));
+	float3 vh = normalize(float3(a * V.xy, V.z));
 	
-	// Compute a point on a disc, and shrink the y axis based on view angle to account for the projection of the visible 
-	// section of the hemisphere on the view plane
-	float rcpA = 1.0 + Vh.z;
-	float a = rcp(rcpA);
-	float r = sqrt(u.x);
-	float phi = u.y * rcpA * Pi;
-	if (u.y < a)
-		phi += Pi - a * rcpA * Pi;
-	
-	float3 H;
-	H.x = r * cos(phi);
-	H.y = r * sin(phi) * ((u.y < a) ? 1.0 : Vh.z);
-
-	// Reconstruct the Z component of the direction from XY
-	H.z = sqrt(saturate(1.0 - SqrLength(H.xy)));
-	
-	if (Vh.z < 1.0)
+	float3 h;
+	if (useSphericalCap)
 	{
-		// Transform the vector into the space aligned with the normal
-		float3 tangent = float3(-Vh.y, Vh.x, 0) * RcpLength(Vh.xy);
-		H = TangentToWorldNormal(H, Vh, tangent, 1.0, false);
+		float phi = TwoPi * u.x;
+		
+		float bound = vh.z;
+		if (useBoundedSampling)
+		{
+			float s = 1.0 + sqrt(SinFromCos(V.z));
+			bound *= (1.0 - Sq(a)) * Sq(s) / (Sq(s) + Sq(a) * Sq(V.z));
+		}
+		
+		float cosTheta = lerp(-bound, 1.0, u.y);
+		float3 c = SphericalToCartesian(phi, cosTheta);
+		h = c + vh;
+	}
+	else
+	{
+		h.xy = SampleDiskUniform(u);
+		float s = vh.z * 0.5 + 0.5;
+		h.y = lerp(SinFromCos(h.x), h.y, s);
+		h.z = sqrt(saturate(1.0 - SqrLength(h.xy)));
+	
+		if (vh.z < 1.0)
+		{
+			float3 tangent = float3(-vh.y, vh.x, 0) * RcpLength(vh.xy);
+			h = TangentToWorldNormal(h, vh, tangent, 1.0, false);
+		}
 	}
 
-	// Conver the flattened hemisphere back to a regular hemisphere
-	return normalize(float3(alpha * H.xy, H.z));
+	return normalize(float3(a * h.xy, h.z));
 }
 
-float GgxVndfPdf(float a2, float NdotH, float NdotV)
+float GgxVndfPdf(float a, float NdotH, float NdotV, bool useSphericalCap, bool useBoundedSampling)
 {
-	return 0.25 * GgxD(a2, NdotH) * GgxG1(a2, NdotV) * rcp(max(1e-3, NdotV));
+	float ndf = GgxD(a * a, NdotH);
+	
+	if (!useSphericalCap)
+		return ndf * GgxG1(a * a, NdotV) * rcp(max(1e-3, NdotV * 4.0));
+		
+	float t = sqrt(lerp(Sq(a), 1.0, Sq(NdotV)));
+	if (useBoundedSampling)
+	{
+		float s = 1.0 + sqrt(SinFromCos(NdotV));
+		float k = (1.0 - Sq(a)) * Sq(s) / (Sq(s) + Sq(a) * Sq(NdotV));
+		return 0.5 * ndf / (k * NdotV + t);
+	}
+	
+	return 0.5 * ndf / (NdotV + t);
 }
 
-float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 V, out float weightOverPdf, out float pdf)
+float3 ImportanceSampleGgxVndf(float a, float2 u, float3 V, out float weightOverPdf, out float pdf, bool useSphericalCap = false, bool useBoundedSampling = false)
 {
-	float a2 = Sq(roughness);
-	float3 H = SampleGgxVndf(roughness, u, V);
+	float a2 = Sq(a);
+	float3 H = SampleGgxVndf(a, u, V, useSphericalCap, useBoundedSampling);
 	float3 L = reflect(-V, H);
-	pdf = GgxVndfPdf(a2, H.z, V.z);
-	weightOverPdf = GgxG2(a2, L.z, V.z) * rcp(GgxG1(a2, V.z));
+	pdf = GgxVndfPdf(a, H.z, V.z, useSphericalCap, useBoundedSampling);
+	weightOverPdf = GgxG2(a2, L.z, V.z) * rcp(GgxG1(a2, V.z)); // TODO: This may be incorrect for spherical cap approach
 	return L;
 }
 
-float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 V, out float weightOverPdf)
+float3 ImportanceSampleGgxVndf(float roughness, float2 u, float3 V, out float weightOverPdf, bool useSphericalCap = false, bool useBoundedSampling = false)
 {
 	float pdf;
-	return ImportanceSampleGgxVndf(roughness, u, V, weightOverPdf, pdf);
+	return ImportanceSampleGgxVndf(roughness, u, V, weightOverPdf, pdf, useSphericalCap, useBoundedSampling);
 }
 
 // https://seblagarde.wordpress.com/2015/07/14/siggraph-2014-moving-frostbite-to-physically-based-rendering/ (4-9-3-DistanceBasedRoughnessLobeBounding.pdf, page 3)

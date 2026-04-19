@@ -37,7 +37,7 @@ float4 ScreenSpaceGlobalIlluminationScaleLimit;
 float DiffuseGiStrength;
 
 Texture2D<float4> ScreenSpaceReflections;
-float4 ScreenSpaceReflectionsScaleLimit;
+Texture2D<float> ScreenSpaceReflectionsOpacity;
 float SpecularGiStrength;
 
 struct LightingInput
@@ -356,8 +356,9 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	#endif
 	
 	#ifdef SCREENSPACE_REFLECTIONS_ON
-		float4 ssr = ScreenSpaceReflections[pixelCoordinate];
-		radiance = lerp(radiance * specularOcclusion, ssr.rgb, ssr.a * SpecularGiStrength);
+		float3 ssr = ScreenSpaceReflections[pixelCoordinate].rgb;
+		float ssrStrength = ScreenSpaceReflectionsOpacity[pixelCoordinate];
+		radiance = lerp(radiance * specularOcclusion, ssr.rgb, ssrStrength * SpecularGiStrength);
 	#endif
 
 	float3 fssEss = dfg.x * input.reflectivity + dfg.y;

@@ -7,7 +7,7 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
     private readonly Material material;
     private readonly Settings settings;
 
-    private readonly PersistentRTHandleCache temporalCache, temporalWeightCache;
+    private readonly PersistentRTHandleCache temporalCache, speedCache, opacityCache;
     private readonly RayTracingShader raytracingShader;
 
     public ScreenSpaceSpecular(RenderGraph renderGraph, Settings settings) : base(renderGraph)
@@ -16,14 +16,16 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
 
         material = new Material(Shader.Find("Hidden/ScreenSpaceReflections")) { hideFlags = HideFlags.HideAndDontSave };
         temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Screen Space Reflections", isScreenTexture: true);
-        temporalWeightCache = new PersistentRTHandleCache(GraphicsFormat.R16_UNorm, renderGraph, "SSGI Weight", isScreenTexture: true);
+        speedCache = new PersistentRTHandleCache(GraphicsFormat.R8_UNorm, renderGraph, "SSGI Weight", isScreenTexture: true);
+        opacityCache = new PersistentRTHandleCache(GraphicsFormat.R8_UNorm, renderGraph, "SSGI Weight", isScreenTexture: true);
         raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Specular");
     }
 
     protected override void Cleanup(bool disposing)
     {
         temporalCache.Dispose();
-        temporalWeightCache.Dispose();
+        speedCache.Dispose();
+        opacityCache.Dispose();
     }
 
     public override void Render(ViewRenderData viewRenderData)
@@ -33,12 +35,8 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
 
         using var scope = renderGraph.AddProfileScope("Specular Global Illumination");
 
-        // Must be screen texture since we use stencil to skip sky pixels
-        var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clear: true);
-
-        // Slight fuzzyness with 16 bits, probably due to depth.. would like to investigate
-        var hitResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R32G32B32A32_SFloat, isScreenTexture: true, clear: true);
-
+        var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clear: true);
+        var hitResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clear: true);
         if (settings.UseRaytracing)
         {
             // Need to set some things as globals so that hit shaders can access them..
@@ -119,7 +117,7 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
         }
 
         var spatialResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
-        var spatialWeight = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_UNorm, isScreenTexture: true);
+        var spatialWeight = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8_UNorm, isScreenTexture: true);
         var rayDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddFullscreenRenderPass("Specular GI Spatial", (settings.ResolveSamples, settings.ResolveSize, settings.Intensity)))
         {
@@ -154,12 +152,14 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
         }
 
         bool wasCreated = default;
-        ResourceHandle<RenderTexture> current, history = default;
+        ResourceHandle<RenderTexture> current, opacity, history = default;
 
         using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Temporal", (wasCreated, history)))
         {
             (current, history, wasCreated) = temporalCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
-            var (currentWeight, historyWeight, wasCreatedWeight) = temporalWeightCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+            var (currentSpeed, speedHistory, _) = speedCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+            var (currentOpacity, opacityHistory, _) = opacityCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+            opacity = currentOpacity;
 
             pass.renderData.history = history;
             pass.renderData.wasCreated = wasCreated;
@@ -168,15 +168,17 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
             pass.PreventNewSubPass = true;
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current);
-            pass.WriteTexture(currentWeight);
+            pass.WriteTexture(currentSpeed);
+            pass.WriteTexture(currentOpacity);
 
             pass.ReadTexture("TemporalInput", spatialResult);
             pass.ReadTexture("History", history);
             pass.ReadRtHandle<GBufferNormalRoughness>();
             pass.ReadRtHandle<GBufferAlbedoMetallic>();
             pass.ReadTexture("RayDepth", rayDepth);
-            pass.ReadTexture("WeightInput", spatialWeight);
-            pass.ReadTexture("WeightHistory", historyWeight);
+            pass.ReadTexture("Opacity", spatialWeight);
+            pass.ReadTexture("SpeedHistory", speedHistory);
+            pass.ReadTexture("OpacityHistory", opacityHistory);
 
             pass.ReadResource<TemporalAAData>();
             pass.ReadResource<AutoExposureData>();
@@ -187,6 +189,8 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
             pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();
             pass.ReadRtHandle<CameraStencil>();
+            pass.ReadRtHandle<PreviousCameraDepth>();
+            pass.ReadRtHandle<PreviousCameraVelocity>();
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
@@ -195,6 +199,6 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
             });
         }
 
-        renderGraph.SetResource(new ScreenSpaceReflectionResult(current, settings.Intensity));
+        renderGraph.SetResource(new ScreenSpaceReflectionResult(current, opacity, settings.Intensity));
     }
 }

@@ -16,6 +16,7 @@ Shader "Hidden/ScreenSpaceReflections"
         Pass
         {
             HLSLPROGRAM
+            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment
             #define REFLECTION
@@ -26,6 +27,7 @@ Shader "Hidden/ScreenSpaceReflections"
         Pass
         {
             HLSLPROGRAM
+            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentSpatial
             #define REFLECTION
@@ -36,6 +38,7 @@ Shader "Hidden/ScreenSpaceReflections"
 		Pass
         {
             HLSLPROGRAM
+            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentTemporal
             #define REFLECTION
