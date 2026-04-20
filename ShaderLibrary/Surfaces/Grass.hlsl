@@ -152,14 +152,13 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float4 normalOcclusionRoughness = NormalOcclusionRoughness.Sample(SurfaceSampler, uv);
 	
 	#ifdef CUTOUT_ON
-		clip(albedoOpacity.a - 0.65);
+		clip(albedoOpacity.a - 0.5);
 	#endif
 	
 	float3 tangentNormal = UnpackNormalUNorm(normalOcclusionRoughness.xy);
-	if (!isFrontFace)
-		tangentNormal.z = -tangentNormal.z;
-	
 	float3 worldNormal = TangentToWorldNormal(tangentNormal, input.normal, input.tangent, 1);
+	if (!isFrontFace)
+		worldNormal = -worldNormal;
 	
 	float3 albedo = albedoOpacity.rgb;
 	float occlusion = normalOcclusionRoughness.b;
@@ -169,7 +168,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	albedo += translucency;
 	float t = dot(translucency, albedo) / SqrLength(albedo);
 	
-	albedo = lerp(input.color, albedo, smoothstep(0, 0.5, input.uv.y));
+	albedo = lerp(input.color, albedo, smoothstep(0, 0.25, input.uv.y));
 	float3 V = normalize(-input.worldPosition);
 		
 	FragmentOutput output;

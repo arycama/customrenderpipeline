@@ -136,10 +136,20 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	
 	float3 atmosphereTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, dot(_LightDirection0, V), waterDistance);
 	float3 sunColor = _LightColor0 * Exposure * atmosphereTransmittance;
-	
+	float3 ambient = AmbientCosine(float3(0.0, 1.0, 0.0));
+
 	// Select random channel
 	float2 noise = Noise2D(input.position.xy);
-	uint channelIndex = noise.y < 1.0 / 3.0 ? 0 : (noise.y < 2.0 / 3.0 ? 1 : 2);
+	
+	// Calcualte the max possible luminance from the underwater path, and use that to influecne channel selection
+	float LdotV = dot(_LightDirection0, -underwaterV);
+	float phase = lerp(CsPhase(LdotV, _WaterMiePhase), CsPhase(LdotV, -0.15), 0.25);
+	float3 maxLuminance = (sunColor + ambient) * Albedo * (1.0 - exp(-Extinction * maxUnderwaterDistance)) * phase;
+	float3 luminanceWeights = float3(Rec2020Luminance(float3(maxLuminance.r, 0, 0)), Rec2020Luminance(float3(0, maxLuminance.g, 0)), Rec2020Luminance(float3(0, 0, maxLuminance.b)));
+	float total = dot(luminanceWeights, 1.0);
+	float3 channelProbability = luminanceWeights / total;
+	uint channelIndex = noise.y < channelProbability.r ? 0 : (noise.y < (channelProbability.r + channelProbability.g) ? 1 : 2);
+	
 	float3 c = Extinction;
 	float cp = Select(Extinction, channelIndex);
 	float l = saturate(_LightDirection0.y);
@@ -148,8 +158,8 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 
 	float xi = min(0.99, noise.x); // Clamp to avoid sampling at infinity
 	float t = -l * log(xi * (exp(b * cp * (-v / l - 1)) - 1) + 1) / (cp * (l + v));
-	float3 pdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
-	float weight = rcp(dot(pdf, rcp(3.0)));
+	float3 rgbPdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
+	float pdf = dot(rgbPdf, channelProbability);
 	float3 P = worldPosition + -underwaterV * t;
 	
 	// Direct light
@@ -158,16 +168,13 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	float shadow = GetDirectionalShadow(P) * CloudTransmittance(P);
 	float illuminance = GetWaterIlluminance(P);
 	
-	float LdotV = dot(_LightDirection0, -underwaterV);
-	float phase = CsPhase(LdotV, _WaterMiePhase);
 	float3 directLight = sunColor * illuminance * shadow * phase * transmittance;
 	
 	float3 ambientTransmittance = exp(-Extinction * (t + max(0.0, -(P.y + ViewPosition.y))));
-	float3 ambient = AmbientCosine(float3(0.0, 1.0, 0.0));
 	float3 indirect = ambient * ambientTransmittance;
 	
 	float3 scatter = Albedo * Extinction;
-	float3 luminance = weight * (directLight + indirect) * scatter;
+	float3 luminance = (directLight + indirect) * scatter / pdf;
 	
 	// TODO: Stencil? Or hw blend?
 	float3 underwater = 0.0;
@@ -202,8 +209,8 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 		if(any(history != 0))
 		{
 			history.r *= PreviousToCurrentExposure;
-			//history = ClampToAABB(history, result, minValue, maxValue);
-			//result = lerp(history, result, 0.05);
+			history = ClampToAABB(history, result, minValue, maxValue);
+			result = lerp(history, result, 0.05);
 		}
 	}
 	

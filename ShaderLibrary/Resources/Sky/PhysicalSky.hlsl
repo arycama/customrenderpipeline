@@ -75,18 +75,18 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 	
 	#ifdef REFLECTION_PROBE
 		bool evaluateCloud = true;
-	#ifdef BELOW_CLOUD_LAYER
-		float rayStart = DistanceToSphereInside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
-		float rayEnd = DistanceToSphereInside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
-		evaluateCloud = !RayIntersectsGround(ViewHeight, viewCosAngle);
-	#elif defined(ABOVE_CLOUD_LAYER) || defined(CLOUD_SHADOW)
-		float rayStart = DistanceToSphereOutside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
-		float rayEnd = DistanceToSphereOutside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
-	#else
-		float rayStart = 0.0;
-		bool rayIntersectsLowerCloud = RayIntersectsSphere(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
-		float rayEnd = rayIntersectsLowerCloud ? DistanceToSphereOutside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight) : DistanceToSphereInside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
-	#endif
+		#ifdef BELOW_CLOUD_LAYER
+			float rayStart = DistanceToSphereInside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
+			float rayEnd = DistanceToSphereInside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+			evaluateCloud = !RayIntersectsGround(ViewHeight, viewCosAngle);
+		#elif defined(ABOVE_CLOUD_LAYER) || defined(CLOUD_SHADOW)
+			float rayStart = DistanceToSphereOutside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+			float rayEnd = DistanceToSphereOutside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
+		#else
+			float rayStart = 0.0;
+			bool rayIntersectsLowerCloud = RayIntersectsSphere(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight);
+			float rayEnd = rayIntersectsLowerCloud ? DistanceToSphereOutside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight) : DistanceToSphereInside(ViewHeight, viewCosAngle, _PlanetRadius + _StartHeight + _LayerThickness);
+		#endif
 		
 		float cloudDistance = 0;
 		float4 clouds = evaluateCloud ? EvaluateCloud(rayStart, rayEnd - rayStart, 12, rayDirection, ViewHeight, rayDirection.y, offsets, 0.0, false, cloudDistance, false) : float2(0.0, 1.0).xxxy;
@@ -97,7 +97,7 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 		float cloudDistance = LinearEyeDepth(CloudDepthTexture[input.position.xy]) * rcp(rcpRdLength); // TODO: Should this just be single channel
 	#endif
 	
-	#ifndef CLOUDS_ON
+	#if !defined(REFLECTION_PROBE) && !defined(CLOUDS_ON)
 		cloudTransmittance = 1;
 		cloudDistance = 0;
 	#endif
@@ -155,35 +155,35 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 		float3 currentLuminance = maxLuminance;
 		float offset = offsets.x;
 		
-		//if (cloudTransmittance == 0.0)
-		//{
-		//	currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, cloudDistance, rayIntersectsGround, maxRayLength);
-		//	offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
-		//	luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
-		//}
-		//else
-		//{
-		//	// These need to always be sampeld. Conditional sampling causes some halos on the edges of clouds
-		//	// TODO: Some logic here is wrong, needs to be fixed
-		//	//if (cloudTransmittance < 1.0)
-		//	{
-		//		// If there are clouds, sample randomly between the view and cloud depth
-		//		currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, cloudDistance, rayIntersectsGround, maxRayLength);
-		//		offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
-		//	}
+		if (cloudTransmittance == 0.0)
+		{
+			currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, cloudDistance, rayIntersectsGround, maxRayLength);
+			offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
+			luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
+		}
+		else
+		{
+			// These need to always be sampeld. Conditional sampling causes some halos on the edges of clouds
+			// TODO: Some logic here is wrong, needs to be fixed
+			//if (cloudTransmittance < 1.0)
+			{
+				// If there are clouds, sample randomly between the view and cloud depth
+				currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, cloudDistance, rayIntersectsGround, maxRayLength);
+				offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
+			}
 		
-		//	luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
+			luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
 		
-		//	// These need to always be sampeld. Conditional sampling causes some halos on the edges of clouds
-		//	//if (cloudTransmittance > 0.0 && cloudTransmittance < 1.0)
-		//	{
-		//		// If the cloud is not completely opaque, randomly sample a second time behind the cloud
-		//		offset = Select(Remap(offsets.x, 0, 1, currentLuminance / maxLuminance), colorIndex);
-		//		luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, maxLuminance - currentLuminance, LdotV, channelProbability) * cloudTransmittance;
-		//	}
-		//}
+			// These need to always be sampeld. Conditional sampling causes some halos on the edges of clouds
+			//if (cloudTransmittance > 0.0 && cloudTransmittance < 1.0)
+			{
+				// If the cloud is not completely opaque, randomly sample a second time behind the cloud
+				offset = Select(Remap(offsets.x, 0, 1, currentLuminance / maxLuminance), colorIndex);
+				luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, maxLuminance - currentLuminance, LdotV, channelProbability) * cloudTransmittance;
+			}
+		}
 		
-		luminance = SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
+		//luminance = SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
 	#endif
 	
 	// TODO: Diagonose
@@ -234,7 +234,7 @@ FragmentOutputTemporal FragmentTemporal(VertexFullscreenTriangleOutput input)
 			float DepthThreshold = 1.0;
 			float depthWeight = saturate(1.0 - abs(centerDepth - depth) / max(1, centerDepth) * DepthThreshold);
 			
-			float3 color = Input[coord];
+			float3 color = Input[coord].rgb;
 			current = i == 0 ? (color * weight * depthWeight) : (current + color * weight * depthWeight);
 			mean += color * depthWeight;
 			stdDev += Sq(color) * depthWeight;
