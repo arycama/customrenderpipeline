@@ -5,6 +5,7 @@
 #include "../Temporal.hlsl"
 
 Texture2D<float4> History, Input;
+Texture2D<float> SpeedHistory;
 
 float4 DepthScaleLimit, HistoryScaleLimit, InputScaleLimit;
 float Radius, Samples, Directions, Falloff, ThinOccluderCompensation, Strength, HasHistory, MaxScreenRadius;
@@ -145,7 +146,13 @@ float4 FragmentCompute(VertexFullscreenTriangleOutput input) : SV_Target
 	return float4(result.xyz, VisibilityToConeAngle(result.w));
 }
 
-float4 FragmentTemporal(VertexFullscreenTriangleMinimalOutput input) : SV_Target
+struct TemporalOutput
+{
+	float4 color : SV_Target0;
+	float speed : SV_Target1;
+};
+
+TemporalOutput FragmentTemporal(VertexFullscreenTriangleMinimalOutput input)
 {
 	//return Input[input.position.xy];
 
@@ -190,33 +197,53 @@ float4 FragmentTemporal(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	float4 minValue = mean - stdDev;
 	float4 maxValue = mean + stdDev;
 	
-	if (HasHistory)
+	float2 velocity = CameraVelocity[input.position.xy];
+	
+	float speed = 0.0;
+	float2 previousUv = input.uv - velocity;
+	if (HasHistory && all(saturate(previousUv.xy) == previousUv.xy))
 	{
-		float2 velocity = CameraVelocity[input.position.xy];
-		float2 previousUv = input.uv - velocity;
-
-		if (all(saturate(previousUv.xy) == previousUv.xy))
+		previousUv = ClampScaleTextureUv(previousUv, HistoryScaleLimit);
+	
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, input.uv));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, previousUv));
+	
+		float4 packedHistoryR = History.GatherRed(LinearClampSampler, previousUv);
+		float4 packedHistoryG = History.GatherGreen(LinearClampSampler, previousUv);
+		float4 packedHistoryB = History.GatherBlue(LinearClampSampler, previousUv);
+		float4 packedHistoryA = History.GatherAlpha(LinearClampSampler, previousUv);
+		float4 previousSpeed = SpeedHistory.Gather(LinearClampSampler, previousUv);
+		
+		float DepthThreshold = 1.0; // TODO: Make a property
+		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);
+		float4 bilinearWeights = BilinearWeights(previousUv, ViewSize);
+		float4 weights = bilinearWeights * depthWeights;
+		
+		float4 history = 0.0;
+		float historyWeight = 0.0;
+		
+		[unroll]
+		for (uint i = 0; i < 4; i++)
 		{
-			float4 history = History.Sample(LinearClampSampler, ClampScaleTextureUv(previousUv.xy, HistoryScaleLimit));
-			history = clamp(history, minValue, maxValue);
-			
-			// Apply weights
-			float historyWeight;
-			history = UnpackWeight(history, historyWeight);
-			history.a *= historyWeight;
-			
-			result = UnpackWeight(result, totalWeight);
-			result.a *= totalWeight;
-			
-			// Blend
-			result = lerp(history, result, 0.05);
-			totalWeight = lerp(historyWeight, totalWeight, 0.05);
-			
-			result = PackWeight(result, totalWeight);
+			float4 color = float4(packedHistoryR[i], packedHistoryG[i], packedHistoryB[i], packedHistoryA[i]);
+			history += weights[i] * color;
+			speed += weights[i] * previousSpeed[i];
+			historyWeight += weights[i];
+		}
+		
+		if (historyWeight)
+		{
+			history /= historyWeight;
+			history.rgb = ClampToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
+			history.a = clamp(history.a, minValue.a, maxValue.a);
+			result = lerp(result, history, speed);
 		}
 	}
 	
-	return result;
+	TemporalOutput output;
+	output.color = result;
+	output.speed = min(0.95, 1.0 / (2.0 - speed));
+	return output;
 }
 
 float4 FragmentCombine(VertexFullscreenTriangleOutput input) : SV_Target

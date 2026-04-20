@@ -1,4 +1,5 @@
-#pragma once
+#ifndef TEMPORAL_INCLUDED
+#define TEMPORAL_INCLUDED
 
 #include "Common.hlsl"
 #include "Color.hlsl"
@@ -117,3 +118,5 @@ void TemporalNeighborhood(Texture2D<float> input, int2 coord, out float minValue
 	minValue = max(minValue, mean - stdDev);
 	maxValue = min(maxValue, mean + stdDev);
 }
+
+#endif

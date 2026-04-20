@@ -23,7 +23,7 @@ public partial class AmbientOcclusion : ViewRenderFeature
     private readonly Settings settings;
     private readonly RayTracingShader ambientOcclusionRaytracingShader;
 
-    private readonly PersistentRTHandleCache temporalCache;
+    private readonly PersistentRTHandleCache temporalCache, speedCache;
 
     public AmbientOcclusion(RenderGraph renderGraph, Settings settings) : base(renderGraph)
     {
@@ -31,11 +31,13 @@ public partial class AmbientOcclusion : ViewRenderFeature
         this.settings = settings;
         temporalCache = new(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Ambient Occlusion", isScreenTexture: true);
         ambientOcclusionRaytracingShader = Resources.Load<RayTracingShader>("Raytracing/AmbientOcclusion");
+        speedCache = new PersistentRTHandleCache(GraphicsFormat.R8_UNorm, renderGraph, "SSGI Weight", isScreenTexture: true);
     }
 
     protected override void Cleanup(bool disposing)
     {
         temporalCache.Dispose();
+        speedCache.Dispose();
     }
 
     public override void Render(ViewRenderData viewRenderData)
@@ -104,6 +106,7 @@ public partial class AmbientOcclusion : ViewRenderFeature
         using (var pass = renderGraph.AddFullscreenRenderPass("Ambient Occlusion Temporal", (wasCreated, history)))
         {
             (current, history, wasCreated) = temporalCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+            var (currentSpeed, speedHistory, _) = speedCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
             pass.renderData.wasCreated = false;
             pass.renderData.history = history;
 
@@ -111,8 +114,10 @@ public partial class AmbientOcclusion : ViewRenderFeature
             pass.PreventNewSubPass = true;
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current);
+            pass.WriteTexture(currentSpeed);
             pass.ReadTexture("Input", result);
             pass.ReadTexture("History", history);
+            pass.ReadTexture("SpeedHistory", speedHistory);
 
             pass.ReadResource<FrameData>();
             pass.ReadRtHandle<CameraDepth>();

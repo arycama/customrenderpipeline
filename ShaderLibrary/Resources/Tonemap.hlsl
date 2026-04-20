@@ -37,7 +37,7 @@ float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 		color = lerp(color, bloom, BloomStrength);
 	#endif
 	
-	float4 ssgi = ScreenSpaceGlobalIllumination[position];
+	float3 ssgi = OffsetICtCpToRec2020(R10G10B10A2UnormToFloat(ScreenSpaceGlobalIllumination[position]).rgb) / (PaperWhite * sqrt(2.0));
 	float3 ssr = OffsetICtCpToRec2020(R10G10B10A2UnormToFloat(ScreenSpaceReflections[position]).rgb) / (PaperWhite * sqrt(2.0));
 	//color = ssr;
 	

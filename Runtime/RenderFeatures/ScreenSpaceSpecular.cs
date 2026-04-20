@@ -92,18 +92,16 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
                 pass.WriteTexture(hitResult);
                 pass.ReadRtHandle<CameraDepth>();
 
-                pass.ReadResource<SkyReflectionAmbientData>();
-                pass.ReadResource<TemporalAAData>();
                 pass.ReadResource<AutoExposureData>();
                 pass.ReadResource<ViewData>();
                 pass.ReadResource<FrameData>();
-                pass.ReadRtHandle<GBufferBentNormalOcclusion>();
                 pass.ReadRtHandle<CameraVelocity>();
                 pass.ReadRtHandle<HiZMinDepth>();
                 pass.ReadRtHandle<CameraDepth>();
-                pass.ReadRtHandle<CameraStencil>();
                 pass.ReadRtHandle<GBufferNormalRoughness>();
                 pass.ReadRtHandle<PreviousCameraTarget>();
+                pass.ReadResource<TemporalAAData>();
+
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
                     pass.SetInt("MaxSteps", data.MaxSamples);
@@ -131,18 +129,12 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
 
             pass.ReadTexture("Input", tempResult);
             pass.ReadTexture("HitResult", hitResult);
+
             pass.ReadRtHandle<GBufferNormalRoughness>();
             pass.ReadRtHandle<GBufferAlbedoMetallic>();
-
-            pass.ReadResource<TemporalAAData>();
-            pass.ReadResource<SkyReflectionAmbientData>();
-            pass.ReadResource<AtmospherePropertiesAndTables>();
             pass.ReadResource<FrameData>();
             pass.ReadResource<ViewData>();
-            pass.ReadRtHandle<GBufferBentNormalOcclusion>();
-            pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();
-            pass.ReadRtHandle<CameraStencil>();
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
@@ -174,8 +166,6 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
 
             pass.ReadTexture("TemporalInput", spatialResult);
             pass.ReadTexture("History", history);
-            pass.ReadRtHandle<GBufferNormalRoughness>();
-            pass.ReadRtHandle<GBufferAlbedoMetallic>();
             pass.ReadTexture("RayDepth", rayDepth);
             pass.ReadTexture("Opacity", spatialWeight);
             pass.ReadTexture("SpeedHistory", speedHistory);
@@ -183,13 +173,10 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
 
             pass.ReadResource<TemporalAAData>();
             pass.ReadResource<AutoExposureData>();
-            pass.ReadResource<SkyReflectionAmbientData>();
             pass.ReadResource<FrameData>();
             pass.ReadResource<ViewData>();
-            pass.ReadRtHandle<GBufferBentNormalOcclusion>();
             pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();
-            pass.ReadRtHandle<CameraStencil>();
             pass.ReadRtHandle<PreviousCameraDepth>();
             pass.ReadRtHandle<PreviousCameraVelocity>();
 

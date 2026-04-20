@@ -16,6 +16,7 @@ Shader "Hidden/Ambient Occlusion"
             }
 
             HLSLPROGRAM
+            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentCompute
             #pragma multi_compile _ SINGLE_SAMPLE
@@ -32,6 +33,7 @@ Shader "Hidden/Ambient Occlusion"
             }
 
             HLSLPROGRAM
+            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangleMinimal
             #pragma fragment FragmentTemporal
             #include "AmbientOcclusion.hlsl"
@@ -47,6 +49,7 @@ Shader "Hidden/Ambient Occlusion"
             }
 
             HLSLPROGRAM
+            #pragma target 5.0
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment FragmentCombine
             #include "AmbientOcclusion.hlsl"

@@ -71,9 +71,12 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 	bool validHit;
 	float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, MaxSteps, Thickness, HiZMinDepth, MaxMip, validHit);
 
+	if (!rayPos.z || any(rayPos.xy < 0.5 || rayPos.xy >= ViewSize - 0.5))
+		validHit = false;
+	
 	float4 color;
 	float3 hitRay;
-	if (validHit && rayPos.z)
+	if (validHit)
 	{
 		// TODO: Is it better to reproject last frame and then generate mip chain based on that?
 		float2 velocity = CameraVelocity[rayPos.xy];
@@ -249,6 +252,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 			
 			float4 color;
 			color.rgb = TemporalInput[coord].rgb;
+			color.gb -= 0.5;
 			color.a = Opacity[coord];
 			
 			current = i == 0 ? (color * weight * depthWeight) : (current + color * weight * depthWeight);
@@ -302,7 +306,10 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 		[unroll]
 		for (uint i = 0; i < 4; i++)
 		{
-			history += weights[i] * float4(R10G10B10A2UnormToFloat(packedHistory[i]).rgb, opacityHistory[i]);
+			float3 color = R10G10B10A2UnormToFloat(packedHistory[i]).rgb;
+			color.gb -= 0.5;
+			
+			history += weights[i] * float4(color, opacityHistory[i]);
 			speed += weights[i] * previousSpeed[i];
 			historyWeight += weights[i];
 		}
@@ -317,6 +324,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 		}
 	}
 	
+	current.gb += 0.5;
 	current = IsInfOrNaN(current) ? 0 : current;
 	
 	TemporalOutput result;
