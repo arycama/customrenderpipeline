@@ -240,8 +240,8 @@ float Angle(float3 from, float3 to)
 // Ref: PBRT v3, p. 777.
 float2 SampleDiskUniform(float2 u)
 {
-	float r = sqrt(u.x);
-	float phi = TwoPi * u.y;
+	float phi = TwoPi * u.x;
+	float r = sqrt(1.0 - u.y);
 
 	float sinPhi, cosPhi;
 	sincos(phi, sinPhi, cosPhi);

@@ -36,7 +36,7 @@ Texture2D<float4> ScreenSpaceGlobalIllumination;
 float4 ScreenSpaceGlobalIlluminationScaleLimit;
 float DiffuseGiStrength;
 
-Texture2D<float4> ScreenSpaceReflections;
+Texture2D<uint> ScreenSpaceReflections;
 Texture2D<float> ScreenSpaceReflectionsOpacity;
 float SpecularGiStrength;
 
@@ -356,7 +356,9 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	#endif
 	
 	#ifdef SCREENSPACE_REFLECTIONS_ON
-		float3 ssr = ScreenSpaceReflections[pixelCoordinate].rgb;
+		float3 ssr = R10G10B10A2UnormToFloat(ScreenSpaceReflections[pixelCoordinate]).rgb;
+		ssr = OffsetICtCpToRec2020(ssr) / (PaperWhite * sqrt(2.0));
+		//float ssrStrength = saturate(Remap(pow(ScreenSpaceReflectionsOpacity[pixelCoordinate], 0.5), 0.0, 0.5));
 		float ssrStrength = ScreenSpaceReflectionsOpacity[pixelCoordinate];
 		radiance = lerp(radiance * specularOcclusion, ssr.rgb, ssrStrength * SpecularGiStrength);
 	#endif
@@ -373,7 +375,6 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	#ifdef SCREEN_SPACE_GLOBAL_ILLUMINATION_ON
 		float4 ssgi = ScreenSpaceGlobalIllumination[pixelCoordinate];
 		irradiance = lerp(irradiance, ssgi.rgb, ssgi.a * DiffuseGiStrength);
-		//return float4(irradiance, 1);
 	#endif
 	
 	float3 fAvg = AverageFresnel(input.reflectivity);

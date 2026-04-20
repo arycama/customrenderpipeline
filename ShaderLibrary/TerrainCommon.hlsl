@@ -117,7 +117,7 @@ void ShadeTerrain(float2 uv, out float3 albedo, out float roughness, out float3 
 	for (uint i = 0; i < 8; i++)
 	{
 		uint offset = i < 4 ? 0 : 13;
-		uint layerIndex = BitUnpack(layerData[i % 4], 4, offset);
+		uint layerIndex = BitUnpack(layerData[i % 4], 5, offset);
 		float blend = Remap(BitUnpack(layerData[i % 4], 4, 26), 0.0, 15.0, 0.0, 0.5);
 		
 		if (i < 4)

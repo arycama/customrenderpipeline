@@ -248,30 +248,34 @@ float3 SampleGgxVndf(float a, float2 u, float3 V, bool useSphericalCap, bool use
 	return normalize(float3(a * h.xy, h.z));
 }
 
-float GgxVndfPdf(float a, float NdotH, float NdotV, bool useSphericalCap, bool useBoundedSampling)
+float GgxVndfRcpPdf(float a, float NdotH, float NdotV, bool useSphericalCap, bool useBoundedSampling)
 {
-	float ndf = GgxD(a * a, NdotH);
+	float a2 = Sq(a);
+	float ndf = GgxD(a2, NdotH) * RcpPi;
+	
+	float ggxNumerator = a2;
+	float ggxDenominator = Sq((NdotH * a2 - NdotH) * NdotH + 1.0h);
 	
 	if (!useSphericalCap)
-		return ndf * GgxG1(a * a, NdotV) * rcp(max(1e-3, NdotV * 4.0));
+		return NdotV * 4.0 * ggxDenominator * rcp(ggxNumerator * GgxG1(a * a, NdotV));
 		
-	float t = sqrt(lerp(Sq(a), 1.0, Sq(NdotV)));
+	float t = sqrt(lerp(a2, 1.0, Sq(NdotV)));
 	if (useBoundedSampling)
 	{
 		float s = 1.0 + sqrt(SinFromCos(NdotV));
-		float k = (1.0 - Sq(a)) * Sq(s) / (Sq(s) + Sq(a) * Sq(NdotV));
-		return 0.5 * ndf / (k * NdotV + t);
+		float k = (1.0 - a2) * Sq(s) / (Sq(s) + a2 * Sq(NdotV));
+		return 2.0 * (k * NdotV + t) * ggxDenominator * rcp(a2);
 	}
 	
-	return 0.5 * ndf / (NdotV + t);
+	return 2.0 * (NdotV + t) * ggxDenominator * rcp(a2);
 }
 
-float3 ImportanceSampleGgxVndf(float a, float2 u, float3 V, out float weightOverPdf, out float pdf, bool useSphericalCap = false, bool useBoundedSampling = false)
+float3 ImportanceSampleGgxVndf(float a, float2 u, float3 V, out float weightOverPdf, out float rcpPdf, bool useSphericalCap = false, bool useBoundedSampling = false)
 {
 	float a2 = Sq(a);
 	float3 H = SampleGgxVndf(a, u, V, useSphericalCap, useBoundedSampling);
 	float3 L = reflect(-V, H);
-	pdf = GgxVndfPdf(a, H.z, V.z, useSphericalCap, useBoundedSampling);
+	rcpPdf = GgxVndfRcpPdf(a, H.z, V.z, useSphericalCap, useBoundedSampling);
 	weightOverPdf = GgxG2(a2, L.z, V.z) * rcp(GgxG1(a2, V.z)); // TODO: This may be incorrect for spherical cap approach
 	return L;
 }

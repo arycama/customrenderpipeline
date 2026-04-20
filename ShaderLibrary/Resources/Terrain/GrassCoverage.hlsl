@@ -8,8 +8,8 @@ float Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {
 	uint layerData = IdMap[uv * IdMapResolution];
 	
-	uint layerIndex0 = BitUnpack(layerData, 4, 0);
-	uint layerIndex1 = BitUnpack(layerData, 4, 13);
+	uint layerIndex0 = BitUnpack(layerData, 5, 0);
+	uint layerIndex1 = BitUnpack(layerData, 5, 13);
 	float blend = Remap(BitUnpack(layerData, 4, 26), 0.0, 15.0, 0.0, 0.5);
 	
 	float layerStrength0 = (layerIndex0 == 0 || layerIndex0 == 2 || layerIndex0 == 7 || layerIndex0 == 9) * (1.0 - blend);

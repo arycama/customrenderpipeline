@@ -15,7 +15,7 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
         this.settings = settings;
 
         material = new Material(Shader.Find("Hidden/ScreenSpaceReflections")) { hideFlags = HideFlags.HideAndDontSave };
-        temporalCache = new PersistentRTHandleCache(GraphicsFormat.R16G16B16A16_SFloat, renderGraph, "Screen Space Reflections", isScreenTexture: true);
+        temporalCache = new PersistentRTHandleCache(GraphicsFormat.R32_UInt, renderGraph, "Screen Space Reflections", isScreenTexture: true);
         speedCache = new PersistentRTHandleCache(GraphicsFormat.R8_UNorm, renderGraph, "SSGI Weight", isScreenTexture: true);
         opacityCache = new PersistentRTHandleCache(GraphicsFormat.R8_UNorm, renderGraph, "SSGI Weight", isScreenTexture: true);
         raytracingShader = Resources.Load<RayTracingShader>("Raytracing/Specular");
@@ -35,7 +35,7 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
 
         using var scope = renderGraph.AddProfileScope("Specular Global Illumination");
 
-        var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clear: true);
+        var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true, clear: true);
         var hitResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clear: true);
         if (settings.UseRaytracing)
         {
@@ -83,7 +83,7 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
             var maxMip = Texture2DExtensions.MipCount(viewRenderData.viewSize) - 1;
             var coneAngle = viewRenderData.viewSize.y * 0.5f / viewRenderData.tanHalfFov.y;
 
-            using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip, settings.Thickness, coneAngle)))
+            using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip, settings.Thickness, coneAngle, settings.RoughnessBias)))
             {
                 pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
                 pass.PreventNewSubPass = true;
@@ -112,11 +112,12 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
                     pass.SetFloat("ThicknessOffset", data.thicknessOffset);
                     pass.SetInt("MaxMip", data.maxMip);
                     pass.SetFloat("ConeAngle", data.coneAngle);
+                    pass.SetFloat("RoughnessBias", data.RoughnessBias);
                 });
             }
         }
 
-        var spatialResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true);
+        var spatialResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
         var spatialWeight = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8_UNorm, isScreenTexture: true);
         var rayDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddFullscreenRenderPass("Specular GI Spatial", (settings.ResolveSamples, settings.ResolveSize, settings.Intensity)))

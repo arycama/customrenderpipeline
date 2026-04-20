@@ -174,15 +174,43 @@ half3 UnpackNormal(half4 packedNormal)
 	#endif
 }
 
-float4 EncodeFloatRGBA(float v)
+float4 EncodeFloatRGBA(float x)
 {
-	float4 enc = frac(float4(1.0, 255.0, 65025.0, 16581375.0) * v);
+	float4 enc = frac(float4(1.0, 255.0, 65025.0, 16581375.0) * x);
 	return enc - enc.yzww * float4(1.0 / 255.0, 1.0 / 255.0, 1.0 / 255.0, 0.0);
+
+	#if 0
+	// silly test thing
+	float t = 4; // total components
+	float b = 8; // bits per component
+	float m = exp2(t * b) - 1;
+	float s = exp2(b);
+	
+	return frac(x * float4(16777215.99609375, 65535.99998474121, 255.99999994039536, 0.9999999997671694)+ float4(0.001953125, 0.00000762939453125, 2.98023223876953125e-8, 1.16415321826934814453125e-10)) * 1.003921568627451 - 0.00196078431372549;
+	
+	float4 fracScale = (m / pow(s, float4(1, 2, 3, 4)));
+	float4 fracOffset = 1.0 / (2 * pow(s, float4(1, 2, 3, 4)));
+	float4 outputScale = s / (s - 1);
+	float4 outputOffset = -1 / (2 * (s - 1));
+	return frac(x * fracScale + fracOffset) * outputScale + outputOffset;
+#endif
 }
 
 float DecodeFloatRGBA(float4 rgba)
 {
 	return dot(rgba, float4(1.0, 1 / 255.0, 1 / 65025.0, 1 / 16581375.0));
+
+#if 0
+	// silly test thing
+	return dot(rgba, float4(5.936046101850955e-8, 1.5198342220561504e-5, 0.0038909912109375, 0.9961090087890625));
+	
+	float t = 4; // total components
+	float b = 8; // bits per component
+	float m = exp2(t * b) - 1;
+	float s = exp2(b);
+	float4 scale = (pow(s, float4(1, 2, 3, 4)) - pow(s, float4(0, 1, 2, 3))) / m;
+	return dot(rgba, scale);
+	#endif
 }
 
 float3 EncodeFloatRGB(float v)

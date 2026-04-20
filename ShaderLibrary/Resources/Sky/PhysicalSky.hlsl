@@ -193,7 +193,7 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 	#ifdef REFLECTION_PROBE
 		return float4(luminance, 0.05); // Blend with previous
 	#else
-		return float4(Rec2020ToOffsetICtCp(luminance * PaperWhite * sqrt(2.0)), 1.0);
+		return float4(Rec2020ToOffsetICtCp(luminance * PaperWhite * sqrt(2.0)), 0.0);
 	#endif
 }
 
@@ -276,7 +276,7 @@ FragmentOutputTemporal FragmentTemporal(VertexFullscreenTriangleOutput input)
 		[unroll]
 		for (uint i = 0; i < 4; i++)
 		{
-			history += weights[i] * R10G10B10A2UnormToFloat(packedHistory[i]);;
+			history += weights[i] * R10G10B10A2UnormToFloat(packedHistory[i]).rgb;
 			speed += weights[i] * previousSpeed[i];
 			historyWeight += weights[i];
 		}
@@ -293,7 +293,7 @@ FragmentOutputTemporal FragmentTemporal(VertexFullscreenTriangleOutput input)
 	current = IsInfOrNaN(current) ? 0 : current;
 	
 	FragmentOutputTemporal output;
-	output.history = Float4ToR10G10B10A2Unorm(float4(current, 1.0));
+	output.history = Float4ToR10G10B10A2Unorm(float4(current, 0.0));
 	
 	current = OffsetICtCpToRec2020(current) / (PaperWhite * sqrt(2.0));
 	

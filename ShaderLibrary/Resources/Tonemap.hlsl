@@ -9,6 +9,7 @@
 
 // For ssr/ssgi debug only
 #include "../Lighting.hlsl"
+#include "../Packing.hlsl"
 
 Texture2D<float3> CameraBloom;
 Texture3D<float3> ColorGradingTexture;
@@ -37,7 +38,8 @@ float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	#endif
 	
 	float4 ssgi = ScreenSpaceGlobalIllumination[position];
-	//color = ssgi;
+	float3 ssr = OffsetICtCpToRec2020(R10G10B10A2UnormToFloat(ScreenSpaceReflections[position]).rgb) / (PaperWhite * sqrt(2.0));
+	//color = ssr;
 	
 	color *= PaperWhite;
 	color = Rec2020ToICtCp(color);

@@ -129,15 +129,15 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	//if(weight1 == 0.0)
 	//	index1 = index0;
 	
-	uint result = BitPack(index0, 4, 0);
-	result |= BitPackFloat(offsetX0, 2, 4);
-	result |= BitPackFloat(offsetY0, 2, 6);
-	result |= BitPackFloat(rotation0, 5, 8);
+	uint result = BitPack(index0, 5, 0);
+	result |= BitPackFloat(offsetX0, 2, 5);
+	result |= BitPackFloat(offsetY0, 2, 7);
+	result |= BitPackFloat(rotation0, 4, 9);
 	
-	result |= BitPack(index1, 4, 13);
-	result |= BitPackFloat(offsetX1, 2, 17);
-	result |= BitPackFloat(offsetY1, 2, 19);
-	result |= BitPackFloat(rotation1, 5, 21);
+	result |= BitPack(index1, 5, 13);
+	result |= BitPackFloat(offsetX1, 2, 18);
+	result |= BitPackFloat(offsetY1, 2, 20);
+	result |= BitPackFloat(rotation1, 4, 22);
 	
 	result |= BitPackFloat(blend, 4, 26);
 	result |= BitPack(triplanar, 2, 30);

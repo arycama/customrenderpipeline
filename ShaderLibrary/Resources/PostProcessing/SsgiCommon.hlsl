@@ -15,7 +15,7 @@ const static bool IsReflection = false;
 #endif
 
 float4 PreviousCameraTargetScaleLimit;
-float MaxSteps, Thickness, Intensity, ConeAngle, ResolveSize, MaxMip;
+float MaxSteps, Thickness, Intensity, ConeAngle, ResolveSize, MaxMip, RoughnessBias;
 uint ResolveSamples;
 
 struct TraceResult
@@ -39,28 +39,29 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 	float roughness = max(1e-3, Sq(normalRoughness.b));
 	
 	float3 L;
-	float pdf;
+	float rcpPdf;
 	if (IsReflection)
 	{
 		float2 u = Noise2D(input.position.xy);
+		u.y = lerp(u.y, 1.0, RoughnessBias);
 		float3 localV = FromToRotationZInverse(-N, -V);
 		float weightOverPdf;
-		float3 localL = ImportanceSampleGgxVndf(roughness, u, localV, weightOverPdf, pdf, true, true);
+		float3 localL = ImportanceSampleGgxVndf(roughness, u, localV, weightOverPdf, rcpPdf, true, true);
 		L = FromToRotationZ(-N, -localL);
 		
 		// If ray goes below horizon, return input color (Eg assume it hits surface immediately)
 		if (localL.z <= 0.0)
 		{
 			TraceResult output;
-			output.color = float4(PreviousCameraTarget[input.position.xy], pdf) * 0;
-			output.hit = float4(L, Linear01Depth(depth)) * 0;
+			output.color = float4(Rec2020ToOffsetICtCp(PreviousCameraTarget[input.position.xy].rgb * PaperWhite * sqrt(2.0)), 0.0);
+			output.hit = float4(L, rcpPdf);
 			return output;
 		}
 	}
 	else
 	{
 		float3 noise3DCosine = Noise3DCosine(input.position.xy);
-		pdf = noise3DCosine.z;
+		rcpPdf = Pi * rcp(noise3DCosine.z);
 		L = FromToRotationZ(N, noise3DCosine);
 	}
 	
@@ -70,14 +71,13 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 	bool validHit;
 	float3 rayPos = ScreenSpaceRaytrace(rayOrigin, rayDirection, MaxSteps, Thickness, HiZMinDepth, MaxMip, validHit);
 
-	float outDepth;
-	float3 color, hitRay;
+	float4 color;
+	float3 hitRay;
 	if (validHit && rayPos.z)
 	{
 		// TODO: Is it better to reproject last frame and then generate mip chain based on that?
 		float2 velocity = CameraVelocity[rayPos.xy];
 		float2 hitUv = rayPos.xy * RcpViewSize - velocity;
-		outDepth = Linear01Depth(depth);
 	
 		float3 viewHit = PixelToViewPosition(rayPos);
 		hitRay = viewHit - viewPosition;
@@ -88,28 +88,26 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 		
 		if (IsReflection)
 		{
-			float coneTangent = GetSpecularLobeTanHalfAngle(roughness);
+			float coneTangent = GetSpecularLobeTanHalfAngle(roughness * (1.0 - RoughnessBias));
 			coneTangent *= lerp(saturate(NdotV * 2), 1, normalRoughness.b);
 			coneRadius *= coneTangent;
 		}
 		
-		color = PreviousCameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, PreviousCameraTargetScaleLimit), log2(coneRadius));
+		color = float4(PreviousCameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, PreviousCameraTargetScaleLimit), log2(coneRadius)), 1.0);
 	}
 	else
 	{
 		color = 0.0;
 		hitRay = L;
-		outDepth = 0.0;
 	}
 	
 	TraceResult output;
-	output.color = float4(color, pdf);
-	output.hit = float4(hitRay, outDepth);
+	output.color = float4(Rec2020ToOffsetICtCp(color.rgb * PaperWhite * sqrt(2.0)), color.a);
+	output.hit = float4(hitRay, rcpPdf);
 	return output;
 }
 
-Texture2D<float4> HitResult;
-Texture2D<float4> Input;
+Texture2D<float4> HitResult, Input;
 float4 HistoryScaleLimit;
 float IsFirst;
 
@@ -150,17 +148,21 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 		float2 u = i < ResolveSamples ? VogelDiskSample(i, ResolveSamples, phi) * ResolveSize : 0;
 		float2 coord = clamp(floor(input.position.xy + u), 0.0, ViewSize - 1.0) + 0.5;
 		float4 hitData = HitResult[coord];
+		float4 hitColor = Input[coord];
+		hitColor.r /= PaperWhite * sqrt(2.0);
+		hitColor.yz -= 0.5;
 		
 		// Don't denoise from sky pixels
-		if (all(!hitData))
+		if (all(!hitData) || IsInfOrNaN(hitData.w))
 			continue;
 		
 		// For misses, we just store the ray direction, since it represents a hit at an infinite distance (eg probe)
 		float3 L = hitData.xyz;
-		bool hasHit = hitData.w;
+		
+		bool hasHit = hitColor.a;
 		if (hasHit)
 		{
-			float3 sampleViewPosition = PixelToViewPosition(float3(coord, Linear01ToDeviceDepth(hitData.w)));
+			float3 sampleViewPosition = PixelToViewPosition(float3(coord, CameraDepth[coord]));
 			L += sampleViewPosition - viewPosition;
 		}
 		
@@ -172,18 +174,16 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 		if (NdotL <= 0.0)
 			continue;
 		
-		float4 hitColor = Input[coord];
-		if (!hitColor.w || IsInfOrNaN(hitColor.w))
-			continue;
-		
 		float weight = NdotL;
 		if (IsReflection)
 			weight *= GgxSingleScatter(roughness2, NdotL, dot(L, V), NdotV, partLambdaV, f0).r;
 		
-		float weightOverPdf = weight * rcp(hitColor.w);
+		float weightOverPdf = weight * hitData.w;
 		
 		if (hasHit)
 		{
+			hitColor.rgb /= (1.0 + hitColor.r);
+			
 			result += float4(hitColor.rgb, 1.0) * weightOverPdf;
 			avgRayLength += rcp(rcpRayLength) * weightOverPdf;
 		}
@@ -197,25 +197,29 @@ SpatialResult FragmentSpatial(VertexFullscreenTriangleOutput input)
 	if (result.a)
 	{
 		avgRayLength *= rcp(result.a);
+		result.rgb /= 1.0 - result.r;
 		result.rgb *= rcp(result.a);
 	}
 	
 	// Add the nonhit and hit weights to get a total weight
 	float totalWeight = result.a + nonHitWeight;
+	result.r *= PaperWhite * sqrt(2.0);
+	result.gb += 0.5;
 	
 	SpatialResult output;
-	output.result = result;
+	output.result = float4(result.rgb, 0.0);
 	output.rayLength = avgRayLength;
 	output.opacity = totalWeight ? result.a / totalWeight : 0.0;
 	return output;
 }
 
 Texture2D<float> RayDepth, Opacity, OpacityHistory, SpeedHistory;
-Texture2D<float4> TemporalInput, History;
+Texture2D<float4> TemporalInput;
+Texture2D<uint> History;
 
 struct TemporalOutput
 {
-	float4 color : SV_Target0;
+	uint color : SV_Target0;
 	float speed : SV_Target1;
 	float weight : SV_Target2;
 };
@@ -283,14 +287,9 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, input.uv));
 		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, previousUv));
 	
-		//uint4 packedHistory = PreviousLuminance.Gather(LinearClampSampler, previousUv);
-		
-		float4 historyR = History.GatherRed(LinearClampSampler, previousUv);
-		float4 historyG = History.GatherGreen(LinearClampSampler, previousUv);
-		float4 historyB = History.GatherBlue(LinearClampSampler, previousUv);
-		
+		uint4 packedHistory = History.Gather(LinearClampSampler, previousUv);
 		float4 opacityHistory = OpacityHistory.Gather(LinearClampSampler, previousUv);
-		float4 speedHistory = SpeedHistory.Gather(LinearClampSampler, previousUv);
+		float4 previousSpeed = SpeedHistory.Gather(LinearClampSampler, previousUv);
 	
 		float DepthThreshold = 1.0; // TODO: Make a property
 		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);
@@ -303,8 +302,8 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 		[unroll]
 		for (uint i = 0; i < 4; i++)
 		{
-			history += weights[i] * float4(historyR[i], historyG[i], historyB[i], opacityHistory[i]);
-			speed += weights[i] * speedHistory[i];
+			history += weights[i] * float4(R10G10B10A2UnormToFloat(packedHistory[i]).rgb, opacityHistory[i]);
+			speed += weights[i] * previousSpeed[i];
 			historyWeight += weights[i];
 		}
 		
@@ -321,7 +320,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	current = IsInfOrNaN(current) ? 0 : current;
 	
 	TemporalOutput result;
-	result.color = float4(current.rgb, 0.0);
+	result.color = Float4ToR10G10B10A2Unorm(float4(current.rgb, 0.0));
 	result.weight = current.a;
 	result.speed = min(0.95, 1.0 / (2.0 - speed));
 	return result;

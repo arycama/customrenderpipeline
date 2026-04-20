@@ -184,8 +184,6 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 		current = lerp(history, current, 0.05);
 	}
 	
-	current = float4(_Input[pixelId], _InputTransmittance[pixelId]);
-	
 	TemporalOutput output;
 	output.luminance = float4(current.rgb, 1.0);
 	output.transmittance = current.a;
