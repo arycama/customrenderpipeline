@@ -19,7 +19,28 @@ public class Pow2Drawer : PropertyDrawer
 		{
 			var value = 1 << (valueStart + i);
 			values[i] = value;
-			valueNames[i] = new GUIContent($"{value}x{value}");
+
+            string valueName;
+            switch(property.propertyType)
+            {
+                case SerializedPropertyType.Integer:
+                case SerializedPropertyType.Float:
+                    valueName = value.ToString();
+                    break;
+                case SerializedPropertyType.Vector2:
+                case SerializedPropertyType.Vector2Int:
+                    valueName = $"{value}x{value}";
+                    break;
+                case SerializedPropertyType.Vector3:
+                case SerializedPropertyType.Vector3Int:
+                    valueName = $"{value}x{value}x{value}";
+                    break;
+                default:
+                    Debug.LogError("Pow2 drawer used on unsupported type");
+                    return;
+            }
+
+            valueNames[i] = new GUIContent(valueName);
 		}
 
 		property.intValue = EditorGUI.IntPopup(position, label, property.intValue, valueNames, values);
