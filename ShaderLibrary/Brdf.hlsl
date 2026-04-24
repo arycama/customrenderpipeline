@@ -125,16 +125,16 @@ half WrappedDiffuse(half NdotL, half wrap)
 	return saturate((NdotL + wrap) / (Sq(1.0h + wrap)));
 }
 
-half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half LdotV, bool isBackface, bool isThinSurface, half3 transmittance = 1.0)
+half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half LdotV, bool isBackface, half3 opacity)
 {
 	// NdotL will always be in the same hemisphere as L, and NdotV must be negative in refractive cases.
 	// Note reflectivity is rgb but this is only used for metals, which have no transmittance, so the red channel is used in most places, rgb is only used for reflection
 	// TODO: Handle this more explicitly, eg maybe pass in an rgb reflection reflectivity and scatter reflectivity?
 	bool isBrdf = !isBackface && NdotV >= 0.0h && NdotL > 0.0h;
 	bool isFlippedBrdf = false; // (isBackface && NdotV <= 0.0h && NdotL < 0.0h); // TODO: Only used for water currently and we don't want sunset highlights to show up on underwater waves, make configurable
-	bool isThin = false;//!isBackface && NdotV >= 0.0h && isThinSurface && NdotL < 0.0h;
-	bool isVolume = (isBackface && NdotV <= 0.0h && NdotL > 0.0h);
-	bool isThinApprox = !isBackface && NdotV >= 0.0h && isThinSurface && NdotL < 0.0h;
+	bool isThin = false;//!isBackface && NdotV >= 0.0h && NdotL < 0.0h;
+	bool isVolume = isBackface && NdotV <= 0.0h && NdotL > 0.0h;
+	bool isThinApprox = !isBackface && NdotV >= 0.0h && NdotL < 0.0h;
 	
 	// If no valid cases, return
 	if(!isBrdf && !isFlippedBrdf && !isThin && !isVolume && !isThinApprox)
@@ -235,12 +235,12 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 	
 		half dv = GgxDv(a2, NdotHt, NdotLt, NdotVt, GetPartLambdaV(a2, NdotVt));
 		half3 f = 1.0h - Fresnel(LdotHt, reflectivity);
-		bsdf *= f * dv * 4.0h * LdotHt * VdotHt * Sq(ReflectivityToIor(-reflectivity)) * rcp(Sq(rcpIorRatio * VdotHt + LdotHt)) * NdotLt * transmittance;
+		bsdf *= f * dv * 4.0h * LdotHt * VdotHt * Sq(ReflectivityToIor(-reflectivity)) * rcp(Sq(rcpIorRatio * VdotHt + LdotHt)) * NdotLt * (1.0 - opacity);
 	}
 	
 	if(isThinApprox)
 	{
-		bsdf *= transmittance;
+		bsdf *= (1.0 - opacity);
 	}
 	
 	// TODO: Combine NdotL product with diffuse

@@ -40,16 +40,14 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 		float metallic = 0;
 		bool isWater = false;
 		bool hasMetallic = false;
-		bool isThinSurface = false;//true;
 	#else
 		float translucency = 0;
 		float metallic = albedoMetallic.a;
 		bool isWater = (stencil & 8) != 0;
 		bool hasMetallic = true;
-		bool isThinSurface = false;
 	#endif
 	
-	Material material = CreateMaterial(albedo, perceptualRoughness, normal, metallic, cosVisibilityAngle, 1.0, 0.0, hasMetallic, false, 1.5, false, false, translucency, false, isThinSurface, isThinSurface, bentNormal);
+	Material material = CreateMaterial(albedo, perceptualRoughness, normal, metallic, cosVisibilityAngle, 1.0, 0.0, hasMetallic, false, 1.5, false, false, translucency, false, bentNormal);
 	LightingInput lightingInput = CreateLightingInput(material, worldPosition, V, 0.0, eyeDepth);
 	
 	float3 result = EvaluateLighting(lightingInput, input.position.xy, isWater, true).rgb;

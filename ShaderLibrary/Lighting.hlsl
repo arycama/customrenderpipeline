@@ -59,8 +59,6 @@ struct LightingInput
 	half diffuseOpacity;
 	half specularOpacity;
 	half translucency;
-	half3 transmittance;
-	bool transmission;
 	half3 bentNormal;
 	half cosVisibilityAngle;
 	half partLambdaV;
@@ -68,8 +66,6 @@ struct LightingInput
 	
 	bool isVolume;
 	bool refractedEnvironment;
-	bool isThinSurface;
-	bool thinSurfaceApprox; // TODO: Support, or maybe control with a define
 };
 
 // Converts material and geometry into a struct for lighting
@@ -101,13 +97,10 @@ LightingInput CreateLightingInput(Material material, float3 worldPosition, float
 	output.cosVisibilityAngle = material.occlusion;
 	output.vertexAmbient = vertexAmbient;
 	output.emission = material.emission;
-	output.transmission = material.transmission;
-	output.transmittance = lerp(1.0, output.albedo * output.translucency, material.opacity);
 	
 	// TODO: Maybe handle this another way? Could move refracted skybox sampling out of the lighting function and apply later
 	output.refractedEnvironment = material.refractedEnvironment;
 	output.isVolume = material.isBackFace;
-	output.isThinSurface = material.isThinSurface;
 	return output;
 }
 
@@ -127,22 +120,13 @@ float CloudTransmittance(float3 positionWS)
 float3 EvaluateLight(LightingInput input, float diffuseTerm, float f0Avg, float3 L, float3 multiScatterTerm)
 {
 	float NdotL = dot(input.N, L);
-	
 	diffuseTerm *= DirectionalAlbedoMs.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float3(abs(NdotL), input.perceptualRoughness, f0Avg), 16), 0.0);
 	
+	float3 result = NdotL >= 0.0 ? NdotL * (1.0 - input.translucency) : -NdotL * input.translucency;
+	result *= diffuseTerm * input.albedo;
+	
 	float LdotV = dot(L, input.V);
-	
-	float3 result = 0.0;
-	if (NdotL > 0.0)
-	{
-		result += diffuseTerm * (1.0 - input.translucency) * input.albedo * NdotL;
-	}
-	else
-	{
-		result += diffuseTerm * input.translucency * input.albedo * -NdotL;
-	}
-	
-	result += GgxBsdf(input.roughness2, input.reflectivity, NdotL, input.NdotV, LdotV, input.isVolume, input.isThinSurface, input.transmittance);
+	result += GgxBsdf(input.roughness2, input.reflectivity, NdotL, input.NdotV, LdotV, input.isVolume, input.diffuseOpacity);
 	return RcpPi * result;
 }
 
@@ -362,8 +346,8 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 		radiance = lerp(radiance * specularOcclusion, ssr.rgb, ssrStrength * SpecularGiStrength);
 	#endif
 
-	float3 fssEss = dfg.x * input.reflectivity + dfg.y;
-	luminance += radiance * fssEss;
+	float3 environmentWeight = dfg.x * input.reflectivity + dfg.y;
+	luminance += radiance * environmentWeight;
 
 	float3 irradiance = AmbientCosine(input.bentNormal, input.cosVisibilityAngle);
 	
@@ -379,54 +363,44 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	#endif
 	
 	float3 fAvg = AverageFresnel(input.reflectivity);
-	float3 fmsEms = fssEss * ems * fAvg * rcp(1.0 - fAvg * ems);
-	float3 kd = 1.0 - fssEss - fmsEms;
+	float3 fmsEms = environmentWeight * ems * fAvg * rcp(1.0 - fAvg * ems);
+	float3 kd = 1.0 - environmentWeight - fmsEms;
 	luminance += irradiance * (fmsEms + input.albedo * (1.0 - input.translucency) * kd);
 	
 	// Environment specular transmission
-	// TODO: This is all a bit messy, would like to try and share the fresnel/refraction logic as much as possible
-	// Specular vs diffuse fade is also intermixed and handled a bit inconsistently
+	half opacity = lerp(input.diffuseOpacity, 1.0, environmentWeight.r);
+	
 	// Critical angle for refraction/total internal reflection
-	half3 eta = ReflectivityToIorRatio(input.reflectivity);
-	half3 sinThetaSq = Sq(eta) * (1.0h - Sq(input.NdotV));
-	half3 environmentWeight = (input.NdotV < 0.0h && sinThetaSq >= 1.0h) ? 1.0h : fssEss;
+	half eta = ReflectivityToIorRatio(input.reflectivity).r;
+	half sinThetaSq = Sq(eta) * (1.0h - Sq(input.NdotV));
+	opacity = (input.NdotV <= 0.0h && sinThetaSq >= 1.0h) ? 1.0h : opacity;
 	
-	// Specular IBL for translucent/transparent objects.
-	half3 transmittance = input.transmittance;
-	if (input.transmission)
+	half3 refractDirection = -input.V;
+	if (input.NdotV <= 0.0h)
+		refractDirection = eta * refractDirection + (eta * -input.NdotV - sqrt(1.0h - sinThetaSq)) * -input.N;
+	
+	half3 environmentRefraction;
+	if (input.refractedEnvironment)
 	{
-		half3 refractDirection = -input.V;
-		if (input.NdotV <= 0.0h)
-			refractDirection = eta * refractDirection + (eta * -input.NdotV - sqrt(1.0h - sinThetaSq)) * -input.N;
-	
+		float linearHitDepth = LinearEyeDepth(CameraDepth[pixelCoordinate]);
+		float hitDist = linearHitDepth;
+		float coneTangent = GetSpecularLobeTanHalfAngle(input.roughness);
+		coneTangent *= lerp(saturate(input.NdotV * 2), 1, sqrt(input.roughness));
+		float mipLevel = log2(ViewSize.y * 0.5 * coneTangent * hitDist / (linearHitDepth * TanHalfFov));
+			
+		environmentRefraction = PreviousCameraTarget.SampleLevel(TrilinearClampSampler, (pixelCoordinate + 0.5) / ViewSize, mipLevel);
+	}
+	else
+	{
 		half2 refractUv = NormalToOctahedralUv(refractDirection);
-		half3 environmentRefraction = SkyReflection.SampleLevel(TrilinearClampSampler, refractUv, environmentMip);
-		
-		if (input.refractedEnvironment)
-		{
-			float linearHitDepth = LinearEyeDepth(CameraDepth[pixelCoordinate]);
-			float hitDist = linearHitDepth;
-			float coneTangent = GetSpecularLobeTanHalfAngle(input.roughness);
-			coneTangent *= lerp(saturate(input.NdotV * 2), 1, sqrt(input.roughness));
-			float mipLevel = log2(ViewSize.y * 0.5 * coneTangent * hitDist / (linearHitDepth * TanHalfFov));
-			
-			environmentRefraction = PreviousCameraTarget.SampleLevel(TrilinearClampSampler, (pixelCoordinate + 0.5) / ViewSize, mipLevel);
-			luminance += input.specularOpacity * (1.0h - environmentWeight) * specularOcclusion * environmentRefraction * transmittance;
-			
-			transmittance = 0.0; // We have refracted the sky, so don't want to blend with it too
-		}
-		else
-		{
-			luminance += input.specularOpacity * (1.0h - environmentWeight) * specularOcclusion * environmentRefraction * transmittance;
-		}
+		environmentRefraction = SkyReflection.SampleLevel(TrilinearClampSampler, refractUv, environmentMip);
 	}
 	
-	// Use final environment weight as opacity
-	half opacity = input.transmission ? 1.0 - Rec709Luminance(transmittance) : input.diffuseOpacity;
-	opacity = lerp(opacity, 1.0h, environmentWeight.r);
-	opacity *= input.specularOpacity;
+	luminance += input.specularOpacity * (1.0 - opacity) * specularOcclusion * environmentRefraction;
+	opacity = lerp(0.0, opacity, input.specularOpacity);
 	
-	
+	if (input.refractedEnvironment)
+		opacity = input.specularOpacity; // We have refracted the sky, so don't want to blend with it too
 	
 	return float4(luminance, opacity);
 }
