@@ -335,13 +335,13 @@ public class TerrainSystem : FrameRenderFeature
         var layerData = ListPool<TerrainLayerData>.Get();
         foreach (var layer in terrainLayers)
         {
-            var heightScale = layer.Key.metallic;
+            var heightScale = Max(layer.Key.metallic, 1e-3f);
             var stochasticScale = layer.Key.normalScale;
             var density = layer.Key.smoothness;
 
             // Convert opacity at distance to density
             maxHeightExtents = Max(maxHeightExtents, heightScale * 0.5f);
-            var extinction = Rcp(Max(1e-3f, Square(1.0f - density))) / heightScale;
+            var extinction = Rcp(Square(Max(1e-3f, 1.0f - density))) / heightScale;
             layerData.Add(new(Rcp(layer.Key.tileSize.x), extinction, stochasticScale, heightScale));
         }
 

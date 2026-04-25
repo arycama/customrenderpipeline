@@ -174,6 +174,16 @@ half3 UnpackNormal(half4 packedNormal)
 	#endif
 }
 
+half2 UnpackNormalDerivativesSNorm(half2 packedNormal)
+{
+	return packedNormal * rsqrt(saturate(1.0 - SqrLength(packedNormal)));
+}
+
+half2 UnpackNormalDerivativesUNorm(half2 packedNormal)
+{
+	return UnpackNormalDerivativesSNorm(2.0 * packedNormal - 1.0);
+}
+
 float4 EncodeFloatRGBA(float x)
 {
 	float4 enc = frac(float4(1.0, 255.0, 65025.0, 16581375.0) * x);

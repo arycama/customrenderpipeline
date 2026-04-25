@@ -182,39 +182,36 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 	
 	float transmittance = 1.0;
 	albedo = 0.0;
-	float3 albedoSum = 0.0;
-	float4 normalOcclusionRoughness = 0.0, normalOcclusionRoughnessSum = 0.0;
-	float extinctionSum = 0.0;
+	float3 albedoScatter = 0.0;
+	float4 normalOcclusionRoughness = 0.0, normalOcclusionRoughnessScatter = 0.0;
+	float extinction = 0.0;
 	
 	[unroll]
 	for (i = 0; i < 8; i++)
 	{
 		uint layerIndex = indices[i];
 		LayerData layerData = TerrainLayerData[layerIndex];
-		float2 scale = layerData.Scale * TerrainSize.xz;
-		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), dxUv * scale, dyUv * scale);
-		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), dxUv * scale, dyUv * scale);
 		
-		float3 normal = UnpackNormalUNorm(currentNormalOcclusionRoughness.rg);
-		currentNormalOcclusionRoughness.rg = normal.xy / normal.z;
+		// Previous layers contain density from that layer, so we just add the extinction for the new layer
+		float currentExtinction = layerData.Blending;
+		extinction += currentExtinction;
 		
 		// Get distance from the current height to the next
 		float currentHeight = heights[i];
 		float nextHeight = i > 6 ? 0 : heights[min(7, i + 1)];
-		float heightDelta = currentHeight - nextHeight;
+		float dt = currentHeight - nextHeight;
+		float currentTransmittance = exp(-extinction * dt);
+		float currentWeight = transmittance * (1.0 - currentTransmittance) * rcp(extinction);
 		
-		// Previous layers contain density from that layer, so we just add the extinction for the new layer
-		float extinction = layerData.Blending;
-		extinctionSum += extinction;
+		float2 scale = layerData.Scale * TerrainSize.xz;
+		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), dxUv * scale, dyUv * scale);
+		albedoScatter += currentAlbedo * currentExtinction;
+		albedo += albedoScatter * currentWeight;
 		
-		float currentTransmittance = exp(-heightDelta * extinctionSum);
-		float currentWeight = rcp(extinctionSum) * (1.0 - currentTransmittance) * transmittance;
-		
-		albedoSum += currentAlbedo * extinction;
-		albedo += albedoSum * currentWeight;
-		
-		normalOcclusionRoughnessSum += currentNormalOcclusionRoughness * extinction;
-		normalOcclusionRoughness += normalOcclusionRoughnessSum * currentWeight;
+		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), dxUv * scale, dyUv * scale);
+		currentNormalOcclusionRoughness.rg = UnpackNormalDerivativesUNorm(currentNormalOcclusionRoughness.rg);
+		normalOcclusionRoughnessScatter += currentNormalOcclusionRoughness * currentExtinction;
+		normalOcclusionRoughness += normalOcclusionRoughnessScatter * currentWeight;
 		
 		transmittance *= currentTransmittance;
 	}
