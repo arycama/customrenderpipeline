@@ -12,7 +12,7 @@
 struct LayerData
 {
 	float Scale;
-	float Blending;
+	float Extinction;
 	float Stochastic;
 	float HeightScale;
 };
@@ -145,14 +145,21 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 	}
 	
 	// Sample heights
+	float heightOffset = 0;
+	float weightSum = 0.0;
+	
     [unroll]
 	for (i = 0; i < 8; i++)
 	{
 		uint layerIndex = indices[i];
 		LayerData layerData = TerrainLayerData[layerIndex];
 		float2 scale = layerData.Scale * TerrainSize.xz;
+		heightOffset += layerData.HeightScale * heights[i];
+		weightSum += heights[i];
 		heights[i] *= Mask.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), dxUv * scale, dyUv * scale) * layerData.HeightScale;
 	}
+	
+	heightOffset /= weightSum;
 	
 	// https://bertdobbelaere.github.io/sorting_networks.html
 	uint2 comparisons[19] =
@@ -178,7 +185,7 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		}
 	}
 	
-	float2 normalUv = uv * TerrainHeightmapUvRemap.x + TerrainHeightmapUvRemap.y;
+	height = heights[0] - heightOffset * 0.5;
 	
 	float transmittance = 1.0;
 	albedo = 0.0;
@@ -193,7 +200,7 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		LayerData layerData = TerrainLayerData[layerIndex];
 		
 		// Previous layers contain density from that layer, so we just add the extinction for the new layer
-		float currentExtinction = layerData.Blending;
+		float currentExtinction = layerData.Extinction;
 		extinction += currentExtinction;
 		
 		// Get distance from the current height to the next
@@ -216,14 +223,9 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		transmittance *= currentTransmittance;
 	}
 	
-	height = heights[0];
-	
-	// Normalize by opacity
-	albedo /= 1.0 - transmittance;
-	normalOcclusionRoughness.ba /= 1.0 - transmittance;
-	
 	normal = normalize(float3(normalOcclusionRoughness.xy, 1.0));
 	
+	float2 normalUv = uv * TerrainHeightmapUvRemap.x + TerrainHeightmapUvRemap.y;
 	float3 terrainNormal = GetTerrainNormal(normalUv);
 	normal = BlendNormalRNM(terrainNormal.xzy, normal).xzy;
 	
