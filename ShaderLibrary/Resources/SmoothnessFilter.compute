@@ -95,7 +95,7 @@ void ShortenNormal(uint2 id : SV_DispatchThreadID)
 	float4 data = Input[id];
 	float3 normal = UnpackNormalUNorm(data.rg);
 	float len = PerceptualRoughnessToNormalLength(data.a);
-	Result[id] = float4(normal * len, VisibilityToConeAngle(data.b) * RcpHalfPi);
+	Result[id] = float4(normal * len, VisibilityToConeCosAngle(data.b));
 }
 
 [numthreads(8, 8, 1)]

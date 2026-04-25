@@ -32,6 +32,7 @@ cbuffer TerrainFrameData
 	float2 TerrainHeightmapUvRemap;
 	float TerrainHeightScale;
 	float TerrainHeightmapResolution;
+	float TerrainHeightExtents;
 };
 
 cbuffer TerrainViewData
@@ -104,7 +105,7 @@ float3 GetTerrainNormalLevel(float3 worldPosition)
 	return GetTerrainNormalLevel(terrainUv);
 }
 
-void ShadeTerrain(float2 uv, out float3 albedo, out float roughness, out float3 normal, out float occlusion, out float height)
+void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out float roughness, out float3 normal, out float occlusion, out float height)
 {
 	uint4 layerData = IdMap.Gather(TrilinearRepeatSampler, uv);
 	float4 bilinearWeights = BilinearWeights(uv, IdMapResolution);
@@ -150,7 +151,7 @@ void ShadeTerrain(float2 uv, out float3 albedo, out float roughness, out float3 
 		uint layerIndex = indices[i];
 		LayerData layerData = TerrainLayerData[layerIndex];
 		float2 scale = layerData.Scale * TerrainSize.xz;
-		heights[i] *= Mask.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale) * layerData.HeightScale;
+		heights[i] *= Mask.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), dxUv * scale, dyUv * scale) * layerData.HeightScale;
 	}
 	
 	// https://bertdobbelaere.github.io/sorting_networks.html
@@ -178,15 +179,12 @@ void ShadeTerrain(float2 uv, out float3 albedo, out float roughness, out float3 
 	}
 	
 	float2 normalUv = uv * TerrainHeightmapUvRemap.x + TerrainHeightmapUvRemap.y;
-	float3 terrainNormal = GetTerrainNormal(normalUv);
-	float2 partialDerivatives = terrainNormal.xz / terrainNormal.y;
 	
 	float transmittance = 1.0;
 	albedo = 0.0;
 	float3 albedoSum = 0.0;
-	float4 normalOcclusionRoughness = float3(partialDerivatives, 0.0).xyzz, normalOcclusionRoughnessSum = 0.0;
+	float4 normalOcclusionRoughness = 0.0, normalOcclusionRoughnessSum = 0.0;
 	float extinctionSum = 0.0;
-	height = 0.0;
 	
 	[unroll]
 	for (i = 0; i < 8; i++)
@@ -194,8 +192,8 @@ void ShadeTerrain(float2 uv, out float3 albedo, out float roughness, out float3 
 		uint layerIndex = indices[i];
 		LayerData layerData = TerrainLayerData[layerIndex];
 		float2 scale = layerData.Scale * TerrainSize.xz;
-		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale);
-		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), ddx(uv) * scale, ddy(uv) * scale);
+		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), dxUv * scale, dyUv * scale);
+		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), dxUv * scale, dyUv * scale);
 		
 		float3 normal = UnpackNormalUNorm(currentNormalOcclusionRoughness.rg);
 		currentNormalOcclusionRoughness.rg = normal.xy / normal.z;
@@ -219,15 +217,18 @@ void ShadeTerrain(float2 uv, out float3 albedo, out float roughness, out float3 
 		normalOcclusionRoughness += normalOcclusionRoughnessSum * currentWeight;
 		
 		transmittance *= currentTransmittance;
-		
-		height += heightDelta;
 	}
+	
+	height = heights[0];
 	
 	// Normalize by opacity
 	albedo /= 1.0 - transmittance;
 	normalOcclusionRoughness.ba /= 1.0 - transmittance;
 	
-	normal = normalize(float3(normalOcclusionRoughness.xy, 1.0)).xzy;
+	normal = normalize(float3(normalOcclusionRoughness.xy, 1.0));
+	
+	float3 terrainNormal = GetTerrainNormal(normalUv);
+	normal = BlendNormalRNM(terrainNormal.xzy, normal).xzy;
 	
 	roughness = normalOcclusionRoughness.a;
 	occlusion = normalOcclusionRoughness.b;

@@ -472,4 +472,13 @@ float CalculateMipLevel(float2 dx, float2 dy, float2 resolution)
 	return 0.5 * log2(dMaxSqr);
 }
 
+float2 SmoothstepUv(float2 uv, float2 resolution, float2 rcpResolution)
+{
+	float2 p = uv * resolution + 0.5;
+	float2 i = floor(p);
+	float2 f = p - i;
+	p = i + smoothstep(0.0, 1.0, f);
+	return (p - 0.5) * rcpResolution;
+}
+
 #endif

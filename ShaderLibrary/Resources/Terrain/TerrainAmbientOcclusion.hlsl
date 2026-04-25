@@ -77,6 +77,6 @@ float4 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	
 	result.xyz = normalize(result.xyz);
 	result.w *= rcp(correction);
-	result.w = VisibilityToConeAngle(result.a) * RcpHalfPi;
+	result.w = VisibilityToConeCosAngle(result.a);
 	return float4(result.xyz, result.w * 2.0 - 1.0);
 }

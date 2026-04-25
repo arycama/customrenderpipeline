@@ -18,11 +18,11 @@ FragmentOutput Fragment(VertexFullscreenTriangleVolumeOutput input)
 	
 	float3 albedo, normal;
 	float roughness, occlusion, height;
-	ShadeTerrain(uv, albedo, roughness, normal, occlusion, height);
+	ShadeTerrain(uv, ddx(uv), ddy(uv), albedo, roughness, normal, occlusion, height);
 	
 	FragmentOutput output;
 	output.albedoRoughness = float4(albedo, roughness);
 	output.normalMetalOcclusion = float4(0, 0.5 * normal.z + 0.5, occlusion, 0.5 * normal.x + 0.5);
-	output.height = height;
+	output.height = Remap(height, -TerrainHeightExtents, TerrainHeightExtents);
 	return output;
 }

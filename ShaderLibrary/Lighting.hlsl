@@ -127,7 +127,18 @@ float3 EvaluateLight(LightingInput input, float diffuseTerm, float f0Avg, float3
 	
 	float LdotV = dot(L, input.V);
 	result += GgxBsdf(input.roughness2, input.reflectivity, NdotL, input.NdotV, LdotV, input.isVolume, input.diffuseOpacity);
-	return RcpPi * result;
+	
+	half BdotL = dot(input.bentNormal, L);
+	half microShadow = MicroShadows ? saturate(Sq(BdotL / input.cosVisibilityAngle)) : 1.0;
+	
+	//if (MicroShadows)
+	//{
+	//	half sunCosAngle = SphericalCapIntersection(input.bentNormal, input.cosVisibilityAngle, L, SunCosAngle).a;
+	//	sunCosAngle = SphericalCapIntersectionCosAngle(input.bentNormal, input.cosVisibilityAngle, L, SunCosAngle);
+	//	microShadow = ConeCosAngleToSolidAngle(sunCosAngle) * SunRcpSolidAngle;
+	//}
+	
+	return RcpPi * result * microShadow;
 }
 
 float GetLightAttenuation(LightData light, float3 worldPosition, float dither, bool softShadows)

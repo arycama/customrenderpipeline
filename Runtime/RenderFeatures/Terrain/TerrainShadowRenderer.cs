@@ -57,7 +57,10 @@ public class TerrainShadowRenderer : TerrainRendererBase
 			pass.ReadResource<ViewData>();
 			pass.ReadResource<VirtualTextureData>();
 
-			pass.SetRenderFunction(static (command, pass, cullingPlanes) =>
+            if (settings.VirtualTexturing)
+                pass.AddKeyword("VIRTUAL_TEXTURING_ON");
+
+            pass.SetRenderFunction(static (command, pass, cullingPlanes) =>
 			{
                 // TODO: Put into a struct?
                 pass.SetInt("_CullingPlanesCount", cullingPlanes.Count);

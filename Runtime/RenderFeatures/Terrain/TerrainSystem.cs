@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
@@ -5,187 +6,189 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
 using static Math;
+using Object = UnityEngine.Object;
 
 public class TerrainSystem : FrameRenderFeature
 {
-	private static readonly int HeightmapInputId = Shader.PropertyToID("HeightmapInput");
-	private static readonly int InitNormalMapInputId = Shader.PropertyToID("InitNormalMapInput");
-	private static readonly int TerrainHeightmapId = Shader.PropertyToID("TerrainHeightmap");
+    private static readonly int HeightmapInputId = Shader.PropertyToID("HeightmapInput");
+    private static readonly int InitNormalMapInputId = Shader.PropertyToID("InitNormalMapInput");
+    private static readonly int TerrainHeightmapId = Shader.PropertyToID("TerrainHeightmap");
 
-	private readonly TerrainSettings settings;
-	public ResourceHandle<GraphicsBuffer> terrainLayerData, indexBuffer;
-	public ResourceHandle<RenderTexture> minMaxHeight, heightmap, normalmap, idMap, aoMap;
-	private readonly Material generateIdMapMaterial, terrainAmbientOcclusionMaterial;
-	public readonly Dictionary<TerrainLayer, int> terrainLayers = new();
-	private readonly Dictionary<TerrainLayer, int> terrainProceduralLayers = new();
+    private readonly TerrainSettings settings;
+    public ResourceHandle<GraphicsBuffer> terrainLayerData, indexBuffer;
+    public ResourceHandle<RenderTexture> minMaxHeight, heightmap, normalmap, idMap, aoMap;
+    private readonly Material generateIdMapMaterial, terrainAmbientOcclusionMaterial;
+    public readonly Dictionary<TerrainLayer, int> terrainLayers = new();
+    private readonly Dictionary<TerrainLayer, int> terrainProceduralLayers = new();
+    private float maxHeightExtents;
 
-	public Texture2DArray diffuseArray, normalMapArray, maskMapArray;
+    public Texture2DArray diffuseArray, normalMapArray, maskMapArray;
 
-	public Terrain Terrain { get; private set; }
-	public TerrainData TerrainData => Terrain.terrainData;
+    public Terrain Terrain { get; private set; }
+    public TerrainData TerrainData => Terrain.terrainData;
 
-	public TerrainSystem(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
-	{
-		this.settings = settings;
+    public TerrainSystem(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
+    {
+        this.settings = settings;
 
-		generateIdMapMaterial = new Material(Shader.Find("Hidden/Terrain Id Map")) { hideFlags = HideFlags.HideAndDontSave };
-		terrainAmbientOcclusionMaterial = new Material(Shader.Find("Hidden/Terrain Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
+        generateIdMapMaterial = new Material(Shader.Find("Hidden/Terrain Id Map")) { hideFlags = HideFlags.HideAndDontSave };
+        terrainAmbientOcclusionMaterial = new Material(Shader.Find("Hidden/Terrain Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
 
-		TerrainCallbacks.textureChanged += TerrainCallbacks_textureChanged;
-		TerrainCallbacks.heightmapChanged += TerrainCallbacks_heightmapChanged;
-	}
+        TerrainCallbacks.textureChanged += TerrainCallbacks_textureChanged;
+        TerrainCallbacks.heightmapChanged += TerrainCallbacks_heightmapChanged;
+    }
 
-	protected override void Cleanup(bool disposing)
-	{
-		TerrainCallbacks.textureChanged -= TerrainCallbacks_textureChanged;
-		TerrainCallbacks.heightmapChanged -= TerrainCallbacks_heightmapChanged;
+    protected override void Cleanup(bool disposing)
+    {
+        TerrainCallbacks.textureChanged -= TerrainCallbacks_textureChanged;
+        TerrainCallbacks.heightmapChanged -= TerrainCallbacks_heightmapChanged;
 
-		if (diffuseArray != null)
-			Object.DestroyImmediate(diffuseArray);
+        if (diffuseArray != null)
+            Object.DestroyImmediate(diffuseArray);
 
-		if (normalMapArray != null)
-			Object.DestroyImmediate(normalMapArray);
+        if (normalMapArray != null)
+            Object.DestroyImmediate(normalMapArray);
 
-		if (maskMapArray != null)
-			Object.DestroyImmediate(maskMapArray);
-	}
+        if (maskMapArray != null)
+            Object.DestroyImmediate(maskMapArray);
+    }
 
-	private void TerrainCallbacks_heightmapChanged(Terrain terrain, RectInt heightRegion, bool synched)
-	{
-		if (terrain != Terrain)
-			return;
+    private void TerrainCallbacks_heightmapChanged(Terrain terrain, RectInt heightRegion, bool synched)
+    {
+        if (terrain != Terrain)
+            return;
 
-		InitializeHeightmap();
-		InitializeIdMap(true, heightRegion);
-	}
+        InitializeHeightmap();
+        InitializeIdMap(true, heightRegion);
+    }
 
-	private void TerrainCallbacks_textureChanged(Terrain terrain, string textureName, RectInt texelRegion, bool synched)
-	{
-		if (terrain == Terrain && textureName == TerrainData.AlphamapTextureName)
-			InitializeIdMap(true, texelRegion);
-	}
+    private void TerrainCallbacks_textureChanged(Terrain terrain, string textureName, RectInt texelRegion, bool synched)
+    {
+        if (terrain == Terrain && textureName == TerrainData.AlphamapTextureName)
+            InitializeIdMap(true, texelRegion);
+    }
 
-	private void CleanupResources()
-	{
-		renderGraph.ReleasePersistentResource(minMaxHeight, -1);
-		renderGraph.ReleasePersistentResource(heightmap, -1);
-		renderGraph.ReleasePersistentResource(normalmap, -1);
-		renderGraph.ReleasePersistentResource(idMap, -1);
-		renderGraph.ReleasePersistentResource(aoMap, -1);
-		Object.DestroyImmediate(diffuseArray);
-		Object.DestroyImmediate(normalMapArray);
-		Object.DestroyImmediate(maskMapArray);
-		renderGraph.ReleasePersistentResource(terrainLayerData, -1);
-		renderGraph.ReleasePersistentResource(indexBuffer, -1);
-	}
+    private void CleanupResources()
+    {
+        renderGraph.ReleasePersistentResource(minMaxHeight, -1);
+        renderGraph.ReleasePersistentResource(heightmap, -1);
+        renderGraph.ReleasePersistentResource(normalmap, -1);
+        renderGraph.ReleasePersistentResource(idMap, -1);
+        renderGraph.ReleasePersistentResource(aoMap, -1);
+        Object.DestroyImmediate(diffuseArray);
+        Object.DestroyImmediate(normalMapArray);
+        Object.DestroyImmediate(maskMapArray);
+        renderGraph.ReleasePersistentResource(terrainLayerData, -1);
+        renderGraph.ReleasePersistentResource(indexBuffer, -1);
+    }
 
-	private void InitializeTerrain()
-	{
-		var resolution = TerrainData.heightmapResolution;
-		minMaxHeight = renderGraph.GetTexture(resolution, GraphicsFormat.R16G16_UNorm, hasMips: true, isPersistent: true);
-		heightmap = renderGraph.GetTexture(resolution, GraphicsFormat.R16_UNorm, hasMips: true, autoGenerateMips: true, isPersistent: true);
-		normalmap = renderGraph.GetTexture(resolution, GraphicsFormat.R8G8_SNorm, autoGenerateMips: true, hasMips: true, isPersistent: true);
-		indexBuffer = renderGraph.GetGridIndexBuffer(settings.PatchVertices, true, false);
+    private void InitializeTerrain()
+    {
+        var resolution = TerrainData.heightmapResolution;
+        minMaxHeight = renderGraph.GetTexture(resolution, GraphicsFormat.R16G16_UNorm, hasMips: true, isPersistent: true);
+        heightmap = renderGraph.GetTexture(resolution, GraphicsFormat.R16_UNorm, hasMips: true, autoGenerateMips: true, isPersistent: true);
+        normalmap = renderGraph.GetTexture(resolution, GraphicsFormat.R8G8_SNorm, autoGenerateMips: true, hasMips: true, isPersistent: true);
+        indexBuffer = renderGraph.GetGridIndexBuffer(settings.PatchVertices, true, false);
 
-		InitializeHeightmap();
+        InitializeHeightmap();
 
-		// Initialize terrain layers
-		terrainLayers.Clear();
-		terrainProceduralLayers.Clear();
-		var layers1 = TerrainData.terrainLayers;
+        // Initialize terrain layers
+        terrainLayers.Clear();
+        terrainProceduralLayers.Clear();
+        var layers1 = TerrainData.terrainLayers;
 
-		if (layers1 != null)
-		{
-			for (var i = 0; i < layers1.Length; i++)
-			{
-				terrainLayers.Add(layers1[i], i);
-			}
-		}
+        if (layers1 != null)
+        {
+            for (var i = 0; i < layers1.Length; i++)
+            {
+                terrainLayers.Add(layers1[i], i);
+            }
+        }
 
-		var idMapResolution = TerrainData.alphamapResolution;
-		idMap = renderGraph.GetTexture(idMapResolution, GraphicsFormat.R32_UInt, isPersistent: true);
-		aoMap = renderGraph.GetTexture(TerrainData.heightmapResolution, GraphicsFormat.R8G8B8A8_SNorm, isPersistent: true);
+        var idMapResolution = TerrainData.alphamapResolution;
+        idMap = renderGraph.GetTexture(idMapResolution, GraphicsFormat.R32_UInt, isPersistent: true);
+        aoMap = renderGraph.GetTexture(TerrainData.heightmapResolution, GraphicsFormat.R8G8B8A8_SNorm, isPersistent: true);
 
-		// Process any alphamap modifications
-		var alphamapModifiers = Terrain.GetComponents<ITerrainAlphamapModifier>();
+        // Process any alphamap modifications
+        var alphamapModifiers = Terrain.GetComponents<ITerrainAlphamapModifier>();
 
-		// Need to do some setup bvefore the graph executes to calculate buffer sizes
-		foreach (var component in alphamapModifiers)
-			component.PreGenerate(terrainLayers, terrainProceduralLayers);
+        // Need to do some setup bvefore the graph executes to calculate buffer sizes
+        foreach (var component in alphamapModifiers)
+            component.PreGenerate(terrainLayers, terrainProceduralLayers);
 
-		var layerCount = terrainLayers.Count;
-		if (alphamapModifiers.Length > 0 && layerCount > 0)
-		{
-			using (var pass = renderGraph.AddGenericRenderPass("Terrain Generate Alphamap Callback", (idMapResolution, layerCount, alphamapModifiers, terrainLayers, terrainProceduralLayers, idMap)))
-			{
-				pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					var tempArrayId = Shader.PropertyToID("_TempTerrainId");
-					command.GetTemporaryRTArray(tempArrayId, data.idMapResolution, data.idMapResolution, data.layerCount, 0, FilterMode.Bilinear, GraphicsFormat.R16_SFloat, 1, true);
+        var layerCount = terrainLayers.Count;
+        if (alphamapModifiers.Length > 0 && layerCount > 0)
+        {
+            using (var pass = renderGraph.AddGenericRenderPass("Terrain Generate Alphamap Callback", (idMapResolution, layerCount, alphamapModifiers, terrainLayers, terrainProceduralLayers, idMap)))
+            {
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    var tempArrayId = Shader.PropertyToID("_TempTerrainId");
+                    command.GetTemporaryRTArray(tempArrayId, data.idMapResolution, data.idMapResolution, data.layerCount, 0, FilterMode.Bilinear, GraphicsFormat.R16_SFloat, 1, true);
 
-					foreach (var component in data.alphamapModifiers)
-					{
-						component.Generate(command, data.terrainLayers, data.terrainProceduralLayers, pass.GetRenderTexture(data.idMap));
-					}
-				});
-			}
-		}
+                    foreach (var component in data.alphamapModifiers)
+                    {
+                        component.Generate(command, data.terrainLayers, data.terrainProceduralLayers, pass.GetRenderTexture(data.idMap));
+                    }
+                });
+            }
+        }
 
-		int diffuseWidth = 1, diffuseHeight = 1, normalWidth = 1, normalHeight = 1, maskWidth = 1, maskHeight = 1;
-		GraphicsFormat diffuseFormat = GraphicsFormat.None, normalFormat = GraphicsFormat.None, maskFormat = GraphicsFormat.None;
+        int diffuseWidth = 1, diffuseHeight = 1, normalWidth = 1, normalHeight = 1, maskWidth = 1, maskHeight = 1;
+        GraphicsFormat diffuseFormat = GraphicsFormat.None, normalFormat = GraphicsFormat.None, maskFormat = GraphicsFormat.None;
 
-		foreach (var layer in terrainLayers)
-		{
-			static void CheckTexture(Texture2D texture, ref int width, ref int height, ref GraphicsFormat format)
-			{
-				if (texture == null)
-					return;
+        foreach (var layer in terrainLayers)
+        {
+            static void CheckTexture(Texture2D texture, ref int width, ref int height, ref GraphicsFormat format)
+            {
+                if (texture == null)
+                    return;
 
-				width = Max(width, texture.width);
-				height = Max(height, texture.height);
+                width = Max(width, texture.width);
+                height = Max(height, texture.height);
 
-				if (format == GraphicsFormat.None)
-					format = texture.graphicsFormat;
-				else if (texture.graphicsFormat != format)
-					Debug.LogWarning($"Texture format {texture.graphicsFormat} does not match previous format of {format} and will not be rendered");
-			}
+                if (format == GraphicsFormat.None)
+                    format = texture.graphicsFormat;
+                else if (texture.graphicsFormat != format)
+                    Debug.LogWarning($"Texture format {texture.graphicsFormat} does not match previous format of {format} and will not be rendered");
+            }
 
-			CheckTexture(layer.Key.diffuseTexture, ref diffuseWidth, ref diffuseHeight, ref diffuseFormat);
-			CheckTexture(layer.Key.normalMapTexture, ref normalWidth, ref normalHeight, ref normalFormat);
-			CheckTexture(layer.Key.maskMapTexture, ref maskWidth, ref maskHeight, ref maskFormat);
-		}
+            CheckTexture(layer.Key.diffuseTexture, ref diffuseWidth, ref diffuseHeight, ref diffuseFormat);
+            CheckTexture(layer.Key.normalMapTexture, ref normalWidth, ref normalHeight, ref normalFormat);
+            CheckTexture(layer.Key.maskMapTexture, ref maskWidth, ref maskHeight, ref maskFormat);
+        }
 
-		var arraySize = Mathf.Max(1, layerCount);
+        var arraySize = Mathf.Max(1, layerCount);
 
-		// Initialize arrays, use the first texture, since everything must be the same resolution
-		// Create texture arrays and copy textures. (Initialize with defaults if empty to avoid errors
-		var flags = TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate;
-		diffuseArray = new(diffuseWidth, diffuseHeight, arraySize, diffuseFormat == GraphicsFormat.None ? GraphicsFormat.R8_UNorm : diffuseFormat, flags) { name = "Terrain Diffuse" };
-		diffuseArray.Apply(false, true);
-		normalMapArray = new(normalWidth, normalHeight, arraySize, normalFormat == GraphicsFormat.None ? GraphicsFormat.R8_UNorm : normalFormat, flags) { name = "Terrain Normal" };
-		normalMapArray.Apply(false, true);
-		maskMapArray = new(maskWidth, maskHeight, arraySize, maskFormat == GraphicsFormat.None ? GraphicsFormat.R8_UNorm : maskFormat, flags) { name = "Terrain Mask" };
-		maskMapArray.Apply(false, true);
+        // Initialize arrays, use the first texture, since everything must be the same resolution
+        // Create texture arrays and copy textures. (Initialize with defaults if empty to avoid errors
+        var flags = TextureCreationFlags.MipChain | TextureCreationFlags.DontInitializePixels | TextureCreationFlags.DontUploadUponCreate;
+        diffuseArray = new(diffuseWidth, diffuseHeight, arraySize, diffuseFormat == GraphicsFormat.None ? GraphicsFormat.R8_UNorm : diffuseFormat, flags) { name = "Terrain Diffuse" };
+        diffuseArray.Apply(false, true);
+        normalMapArray = new(normalWidth, normalHeight, arraySize, normalFormat == GraphicsFormat.None ? GraphicsFormat.R8_UNorm : normalFormat, flags) { name = "Terrain Normal" };
+        normalMapArray.Apply(false, true);
+        maskMapArray = new(maskWidth, maskHeight, arraySize, maskFormat == GraphicsFormat.None ? GraphicsFormat.R8_UNorm : maskFormat, flags) { name = "Terrain Mask" };
+        maskMapArray.Apply(false, true);
 
-		terrainLayerData = renderGraph.GetBuffer(arraySize, UnsafeUtility.SizeOf<TerrainLayerData>(), GraphicsBuffer.Target.Structured, GraphicsBuffer.UsageFlags.LockBufferForWrite, true);
+        terrainLayerData = renderGraph.GetBuffer(arraySize, UnsafeUtility.SizeOf<TerrainLayerData>(), isPersistent: true);
 
-		using (var pass = renderGraph.AddGenericRenderPass("Terrain Layer Data Init", (terrainLayers, diffuseArray, normalMapArray, maskMapArray)))
-		{
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				// Add to texture array
-				foreach (var layer in data.terrainLayers)
-				{
-					command.CopyTexture(layer.Key.diffuseTexture, 0, data.diffuseArray, layer.Value);
-					command.CopyTexture(layer.Key.normalMapTexture, 0, data.normalMapArray, layer.Value);
-					command.CopyTexture(layer.Key.maskMapTexture, 0, data.maskMapArray, layer.Value);
-				}
-			});
-		}
+        using (var pass = renderGraph.AddGenericRenderPass("Terrain Layer Data Init", (terrainLayers, diffuseArray, normalMapArray, maskMapArray)))
+        {
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                // Add to texture array
+                foreach (var layer in data.terrainLayers)
+                {
+                    command.CopyTexture(layer.Key.diffuseTexture, 0, data.diffuseArray, layer.Value);
+                    command.CopyTexture(layer.Key.normalMapTexture, 0, data.normalMapArray, layer.Value);
+                    command.CopyTexture(layer.Key.maskMapTexture, 0, data.maskMapArray, layer.Value);
+                }
+            });
+        }
 
-		FillLayerData();
+        FillLayerData();
 
-		renderGraph.SetResource(new TerrainSystemData(minMaxHeight, Terrain, TerrainData, indexBuffer), true);
+        renderGraph.SetResource(new TerrainSystemData(minMaxHeight, Terrain, TerrainData, indexBuffer), true);
 
         InitializeIdMap(false);
 
@@ -218,195 +221,201 @@ public class TerrainSystem : FrameRenderFeature
     }
 
     private void InitializeHeightmap()
-	{
-		var resolution = TerrainData.heightmapResolution;
-		var computeShader = Resources.Load<ComputeShader>("Terrain/InitTerrain");
+    {
+        var resolution = TerrainData.heightmapResolution;
+        var computeShader = Resources.Load<ComputeShader>("Terrain/InitTerrain");
 
-		// Initialize the height map
-		using (var pass = renderGraph.AddComputeRenderPass("Terrain Heightmap Init", TerrainData.heightmapTexture))
-		{
-			pass.Initialize(computeShader, 0, resolution, resolution);
-			pass.WriteTexture("HeightmapResult", heightmap, 0);
+        // Initialize the height map
+        using (var pass = renderGraph.AddComputeRenderPass("Terrain Heightmap Init", TerrainData.heightmapTexture))
+        {
+            pass.Initialize(computeShader, 0, resolution, resolution);
+            pass.WriteTexture("HeightmapResult", heightmap, 0);
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				// Can't use pass.readTexture here since this comes from unity
-				pass.SetTexture(HeightmapInputId, data);
-			});
-		}
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                // Can't use pass.readTexture here since this comes from unity
+                pass.SetTexture(HeightmapInputId, data);
+            });
+        }
 
-		// Process any heightmap modifications
-		var heightmapModifiers = Terrain.GetComponents<ITerrainHeightmapModifier>();
-		if (heightmapModifiers.Length > 0)
-		{
-			using (var pass = renderGraph.AddGenericRenderPass("Terrain Generate Heightmap Callback", (heightmapModifiers, heightmap, TerrainData.heightmapTexture)))
-			{
-				pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					foreach (var component in data.heightmapModifiers)
-					{
-						component.Generate(command, data.heightmap, data.heightmapTexture);
-					}
-				});
-			}
-		}
+        // Process any heightmap modifications
+        var heightmapModifiers = Terrain.GetComponents<ITerrainHeightmapModifier>();
+        if (heightmapModifiers.Length > 0)
+        {
+            using (var pass = renderGraph.AddGenericRenderPass("Terrain Generate Heightmap Callback", (heightmapModifiers, heightmap, TerrainData.heightmapTexture)))
+            {
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    foreach (var component in data.heightmapModifiers)
+                    {
+                        component.Generate(command, data.heightmap, data.heightmapTexture);
+                    }
+                });
+            }
+        }
 
-		// Initialize normal map
-		using (var pass = renderGraph.AddComputeRenderPass("Terrain Normalmap Init", (TerrainData.heightmapTexture, TerrainData.heightmapScale, TerrainData.size.y, TerrainData.heightmapResolution)))
-		{
-			pass.Initialize(computeShader, 1, resolution, resolution);
-			pass.WriteTexture("InitNormalMapOutput", normalmap, 0);
+        // Initialize normal map
+        using (var pass = renderGraph.AddComputeRenderPass("Terrain Normalmap Init", (TerrainData.heightmapTexture, TerrainData.heightmapScale, TerrainData.size.y, TerrainData.heightmapResolution)))
+        {
+            pass.Initialize(computeShader, 1, resolution, resolution);
+            pass.WriteTexture("InitNormalMapOutput", normalmap, 0);
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				// Can't use pass.readTexture here since this comes from unity
-				pass.SetTexture(InitNormalMapInputId, data.heightmapTexture);
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                // Can't use pass.readTexture here since this comes from unity
+                pass.SetTexture(InitNormalMapInputId, data.heightmapTexture);
 
-				var scale = data.heightmapScale;
-				var height = data.y;
-				pass.SetInt("MaxWidth", data.heightmapResolution - 1);
-				pass.SetInt("MaxHeight", data.heightmapResolution - 1);
-				pass.SetVector("Scale", new Float2(height / (8f * scale.x), height / (8f * scale.z)));
-			});
-		}
+                var scale = data.heightmapScale;
+                var height = data.y;
+                pass.SetInt("MaxWidth", data.heightmapResolution - 1);
+                pass.SetInt("MaxHeight", data.heightmapResolution - 1);
+                pass.SetVector("Scale", new Float2(height / (8f * scale.x), height / (8f * scale.z)));
+            });
+        }
 
-		// Hrm, just used for node graphs..
-		var terrainRenderers = Terrain.GetComponents<ITerrainRenderer>();
-		if (terrainRenderers.Length > 0)
-		{
-			using (var pass = renderGraph.AddGenericRenderPass("Terrain Generate Heightmap Callback", (terrainRenderers, heightmap, normalmap)))
-			{
-				pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					foreach (var component in data.terrainRenderers)
-					{
-						component.Heightmap = pass.GetRenderTexture(data.heightmap);
-						component.NormalMap = pass.GetRenderTexture(data.normalmap);
-					}
-				});
-			}
-		}
+        // Hrm, just used for node graphs..
+        var terrainRenderers = Terrain.GetComponents<ITerrainRenderer>();
+        if (terrainRenderers.Length > 0)
+        {
+            using (var pass = renderGraph.AddGenericRenderPass("Terrain Generate Heightmap Callback", (terrainRenderers, heightmap, normalmap)))
+            {
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    foreach (var component in data.terrainRenderers)
+                    {
+                        component.Heightmap = pass.GetRenderTexture(data.heightmap);
+                        component.NormalMap = pass.GetRenderTexture(data.normalmap);
+                    }
+                });
+            }
+        }
 
-		// Generate min/max for terrain.
-		// Todo: Could generate this as part of heightmap pass using LDS
-		using (var pass = renderGraph.AddComputeRenderPass("Terrain Min Max Height Init"))
-		{
-			pass.Initialize(computeShader, 2, resolution, resolution);
-			pass.WriteTexture("DepthCopyResult", minMaxHeight, 0);
-			pass.ReadTexture("DepthCopyInput", heightmap);
-		}
+        // Generate min/max for terrain.
+        // Todo: Could generate this as part of heightmap pass using LDS
+        using (var pass = renderGraph.AddComputeRenderPass("Terrain Min Max Height Init"))
+        {
+            pass.Initialize(computeShader, 2, resolution, resolution);
+            pass.WriteTexture("DepthCopyResult", minMaxHeight, 0);
+            pass.ReadTexture("DepthCopyInput", heightmap);
+        }
 
-		var mipCount = Texture2DExtensions.MipCount(resolution, resolution);
-		for (var i = 1; i < mipCount; i++)
-		{
-			var index = i;
-			using (var pass = renderGraph.AddComputeRenderPass("Terrain Min Max Height", (resolution, index)))
-			{
-				// For some resolutions, we can end up with a 1x2, followed by a 1x1.
-				var xSize = Mathf.Max(1, resolution >> index);
-				var ySize = Mathf.Max(1, resolution >> index);
+        var mipCount = Texture2DExtensions.MipCount(resolution, resolution);
+        for (var i = 1; i < mipCount; i++)
+        {
+            var index = i;
+            using (var pass = renderGraph.AddComputeRenderPass("Terrain Min Max Height", (resolution, index)))
+            {
+                // For some resolutions, we can end up with a 1x2, followed by a 1x1.
+                var xSize = Mathf.Max(1, resolution >> index);
+                var ySize = Mathf.Max(1, resolution >> index);
 
-				pass.Initialize(computeShader, 3, xSize, ySize);
-				pass.WriteTexture("GenerateMinMaxHeightsResult", minMaxHeight, index);
-				pass.WriteTexture("GenerateMinMaxHeightsInput", minMaxHeight, index - 1);
+                pass.Initialize(computeShader, 3, xSize, ySize);
+                pass.WriteTexture("GenerateMinMaxHeightsResult", minMaxHeight, index);
+                pass.WriteTexture("GenerateMinMaxHeightsInput", minMaxHeight, index - 1);
 
-				pass.SetRenderFunction(static (command, pass, data) =>
-				{
-					var prevWidth = Mathf.Max(1, data.resolution >> (data.index - 1));
-					var prevHeight = Mathf.Max(1, data.resolution >> (data.index - 1));
+                pass.SetRenderFunction(static (command, pass, data) =>
+                {
+                    var prevWidth = Mathf.Max(1, data.resolution >> (data.index - 1));
+                    var prevHeight = Mathf.Max(1, data.resolution >> (data.index - 1));
 
-					pass.SetInt("_Width", prevWidth);
-					pass.SetInt("_Height", prevHeight);
-				});
-			}
-		}
-	}
+                    pass.SetInt("_Width", prevWidth);
+                    pass.SetInt("_Height", prevHeight);
+                });
+            }
+        }
+    }
 
-	private void FillLayerData()
-	{
-		var count = terrainLayers.Count;
-		if (count == 0)
-			return;
+    private void FillLayerData()
+    {
+        var count = terrainLayers.Count;
+        maxHeightExtents = 0f;
+        if (count == 0)
+            return;
 
-		using (var pass = renderGraph.AddGenericRenderPass("Terrain Layer Data Init", (terrainLayerData, terrainLayers)))
-		{
-			pass.WriteBuffer("", terrainLayerData);
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				using var layerData = pass.GetBuffer(data.terrainLayerData).DirectWrite<TerrainLayerData>();
-				foreach (var layer in data.terrainLayers)
-				{
-					var index = layer.Value;
+        var layerData = ListPool<TerrainLayerData>.Get();
+        foreach (var layer in terrainLayers)
+        {
+            var heightScale = layer.Key.metallic;
+            var stochasticScale = layer.Key.normalScale;
+            var density = layer.Key.smoothness;
 
-					// Convert opacity at distance to density
-					var extinction = Rcp(Max(1e-3f, Square(1.0f - layer.Key.smoothness))) / layer.Key.metallic;
+            // Convert opacity at distance to density
+            maxHeightExtents = Max(maxHeightExtents, heightScale * 0.5f);
+            var extinction = Rcp(Max(1e-3f, Square(1.0f - density))) / heightScale;
+            layerData.Add(new(Rcp(layer.Key.tileSize.x), extinction, stochasticScale, heightScale));
+        }
 
-					layerData.SetData(index, new TerrainLayerData(Rcp(layer.Key.tileSize.x), extinction, layer.Key.normalScale, layer.Key.metallic));
-				}
-			});
-		}
-	}
+        using (var pass = renderGraph.AddGenericRenderPass("Terrain Layer Data Init", (terrainLayerData, layerData)))
+        {
+            pass.WriteBuffer("", terrainLayerData);
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                command.SetBufferData(pass.GetBuffer(data.terrainLayerData), data.layerData);
+                ListPool<TerrainLayerData>.Release(data.layerData);
+            });
+        }
+    }
 
-	private void InitializeIdMap(bool isUpdate, RectInt? texelRegion = null)
-	{
-		if (terrainLayers.Count == 0)
-			return;
+    private void InitializeIdMap(bool isUpdate, RectInt? texelRegion = null)
+    {
+        if (terrainLayers.Count == 0)
+            return;
 
-		var idMapResolution = TerrainData.alphamapResolution;
-		using (var pass = renderGraph.AddFullscreenRenderPass("Terrain Layer Data Init", (TerrainData.alphamapLayers, (Float3)Terrain.terrainData.size, terrainLayers.Count, TerrainData.alphamapLayers, TerrainData.alphamapTextureCount, TerrainData.alphamapTextures)))
-		{
-			//var indicesBuffer = renderGraph.GetBuffer(terrainLayers.Count);
-			pass.Initialize(generateIdMapMaterial, idMapResolution);
-			pass.WriteTexture(idMap);
-			pass.ReadTexture("TerrainNormalMap", normalmap);
-			//pass.WriteBuffer("ProceduralIndices", indicesBuffer);
-			//pass.ReadBuffer("ProceduralIndices", indicesBuffer);
-			pass.ReadBuffer("TerrainLayerData", terrainLayerData);
+        var idMapResolution = TerrainData.alphamapResolution;
+        using (var pass = renderGraph.AddFullscreenRenderPass("Terrain Layer Data Init", (TerrainData.alphamapLayers, (Float3)Terrain.terrainData.size, terrainLayers.Count, TerrainData.alphamapLayers, TerrainData.alphamapTextureCount, TerrainData.alphamapTextures)))
+        {
+            //var indicesBuffer = renderGraph.GetBuffer(terrainLayers.Count);
+            pass.Initialize(generateIdMapMaterial, idMapResolution);
+            pass.WriteTexture(idMap);
+            pass.ReadTexture("TerrainNormalMap", normalmap);
+            //pass.WriteBuffer("ProceduralIndices", indicesBuffer);
+            //pass.ReadBuffer("ProceduralIndices", indicesBuffer);
+            pass.ReadBuffer("TerrainLayerData", terrainLayerData);
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetInt("LayerCount", data.Item1);
-				pass.SetVector("TerrainSize", data.Item2);
-				pass.SetInt("TotalLayers", data.Count);
-				pass.SetInt("TextureCount", data.Item4);
-				pass.SetVector("PositionOffset", Float2.Zero);
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                pass.SetInt("LayerCount", data.Item1);
+                pass.SetVector("TerrainSize", data.Item2);
+                pass.SetInt("TotalLayers", data.Count);
+                pass.SetInt("TextureCount", data.Item4);
+                pass.SetVector("PositionOffset", Float2.Zero);
 
-				//if (texelRegion.HasValue)
-				//{
-				//	var region = texelRegion.Value;
-				//	command.SetViewport(new Rect(region.position, region.size));
-				//	pass.SetVector("PositionOffset", (Vector2)region.position);
-				//	pass.SetVector("UvScaleOffset", new Vector4(region.size.x, region.size.y, region.position.x, region.position.y) / terrainData.alphamapResolution);
-				//}
-				//else
-				{
-					pass.SetVector("UvScaleOffset", new Vector4(1, 1, 0, 0));
-				}
+                //if (texelRegion.HasValue)
+                //{
+                //	var region = texelRegion.Value;
+                //	command.SetViewport(new Rect(region.position, region.size));
+                //	pass.SetVector("PositionOffset", (Vector2)region.position);
+                //	pass.SetVector("UvScaleOffset", new Vector4(region.size.x, region.size.y, region.position.x, region.position.y) / terrainData.alphamapResolution);
+                //}
+                //else
+                {
+                    pass.SetVector("UvScaleOffset", new Vector4(1, 1, 0, 0));
+                }
 
-				// Shader supports up to 8 layers. Can easily be increased by modifying shader though
-				for (var i = 0; i < 8; i++)
-				{
-					var texture = i < data.alphamapTextureCount ? data.alphamapTextures[i] : Texture2D.blackTexture;
-					pass.SetTexture(Shader.PropertyToID($"Input{i}"), texture);
-				}
+                // Shader supports up to 8 layers. Can easily be increased by modifying shader though
+                for (var i = 0; i < 8; i++)
+                {
+                    var texture = i < data.alphamapTextureCount ? data.alphamapTextures[i] : Texture2D.blackTexture;
+                    pass.SetTexture(Shader.PropertyToID($"Input{i}"), texture);
+                }
 
-				// Need to build buffer of layer to array index
-				//var layers = new NativeArray<int>(terrainLayers.Count, Allocator.Temp);
-				//foreach (var layer in terrainLayers)
-				//{
-				//	if (terrainProceduralLayers.TryGetValue(layer.Key, out var proceduralIndex))
-				//	{
-				//		// Use +1 so we can use 0 to indicate no data
-				//		layers[layer.Value] = proceduralIndex + 1;
-				//	}
-				//}
+                // Need to build buffer of layer to array index
+                //var layers = new NativeArray<int>(terrainLayers.Count, Allocator.Temp);
+                //foreach (var layer in terrainLayers)
+                //{
+                //	if (terrainProceduralLayers.TryGetValue(layer.Key, out var proceduralIndex))
+                //	{
+                //		// Use +1 so we can use 0 to indicate no data
+                //		layers[layer.Value] = proceduralIndex + 1;
+                //	}
+                //}
 
-				//command.SetBufferData(pass.GetBuffer(indicesBuffer), layers);
-				//var tempArrayId = Shader.PropertyToID("TempTerrainId");
-				//pass.SetTexture("ExtraLayers", tempArrayId);
-			});
-		}
-	}
+                //command.SetBufferData(pass.GetBuffer(indicesBuffer), layers);
+                //var tempArrayId = Shader.PropertyToID("TempTerrainId");
+                //pass.SetTexture("ExtraLayers", tempArrayId);
+            });
+        }
+    }
 
     private void InitializeAoMap(bool isUpdate, RectInt? texelRegion = null)
     {
@@ -437,49 +446,51 @@ public class TerrainSystem : FrameRenderFeature
     }
 
     public override void Render(ScriptableRenderContext context)
-	{
-		// TODO: Logic here seems a bit off
-		if (Terrain != Terrain.activeTerrain)
-		{
-			if (Terrain != null)
-				CleanupResources();
+    {
+        float maxHeight;
 
-			Terrain = Terrain.activeTerrain;
-			if (Terrain == null)
-				return;
+        // TODO: Logic here seems a bit off
+        if (Terrain != Terrain.activeTerrain)
+        {
+            if (Terrain != null)
+                CleanupResources();
 
-			InitializeTerrain();
-		}
-		else
-		{
-			if (Terrain == null)
-				return;
+            Terrain = Terrain.activeTerrain;
+            if (Terrain == null)
+                return;
 
-			using var scope = ListPool<ITerrainAlphamapModifier>.Get(out var alphamapModifiers);
-			Terrain.GetComponents(alphamapModifiers);
-			var needsUpdate = false;
-			foreach (var alphamapModifier in alphamapModifiers)
-			{
-				if (!alphamapModifier.NeedsUpdate)
-					continue;
+            InitializeTerrain();
+        }
+        else
+        {
+            if (Terrain == null)
+                return;
 
-				needsUpdate = true;
-				break;
-			}
+            using var scope = ListPool<ITerrainAlphamapModifier>.Get(out var alphamapModifiers);
+            Terrain.GetComponents(alphamapModifiers);
+            var needsUpdate = false;
+            foreach (var alphamapModifier in alphamapModifiers)
+            {
+                if (!alphamapModifier.NeedsUpdate)
+                    continue;
 
-			if (needsUpdate)
-			{
-				CleanupResources();
-				InitializeTerrain();
-			}
-			else
-			{
-				// Set this every frame incase of changes..
-				// TODO: Only do when data changed?
-				// Only do this if terrain wasn't initialized, 
-				FillLayerData();
-			}
-		}
+                needsUpdate = true;
+                break;
+            }
+
+            if (needsUpdate)
+            {
+                CleanupResources();
+                InitializeTerrain();
+            }
+            else
+            {
+                // Set this every frame incase of changes..
+                // TODO: Only do when data changed?
+                // Only do this if terrain wasn't initialized, 
+                FillLayerData();
+            }
+        }
 
         var size = (Float3)TerrainData.size;
 
@@ -489,7 +500,8 @@ public class TerrainSystem : FrameRenderFeature
             (float)TerrainData.alphamapResolution,
             GraphicsUtilities.HalfTexelRemap(TerrainData.heightmapResolution),
             size.y,
-            (float)TerrainData.heightmapResolution
+            (float)TerrainData.heightmapResolution,
+            maxHeightExtents
         ));
 
         renderGraph.SetResource<TerrainFrameData>
