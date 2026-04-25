@@ -23,6 +23,6 @@ FragmentOutput Fragment(VertexFullscreenTriangleVolumeOutput input)
 	FragmentOutput output;
 	output.albedoRoughness = float4(albedo, roughness);
 	output.normalMetalOcclusion = float4(0, 0.5 * normal.z + 0.5, occlusion, 0.5 * normal.x + 0.5);
-	output.height = Remap(height, -TerrainHeightExtents, TerrainHeightExtents);
+	output.height = Remap(height, 0, 2.0 * TerrainHeightExtents);
 	return output;
 }
