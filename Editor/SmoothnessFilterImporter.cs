@@ -14,22 +14,25 @@ public class SmoothnessFilterImporter : AssetPostprocessor
 	[MenuItem("Assets/Texture/Filter Roughness", false)]
 	public static void OnMenuSelect()
 	{
-		var importer = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(Selection.activeObject)) as TextureImporter;
-		var properties = importer.userData;
+        foreach (var selectedObject in Selection.objects)
+        {
+            var importer = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(selectedObject)) as TextureImporter;
+            var properties = importer.userData;
 
-		if (properties.Contains("RoughnessFilter"))
-		{
-			properties = null;
-			Debug.Log("Disabled Roughness Filtering");
-		}
-		else
-		{
-			properties = "RoughnessFilter";
-			Debug.Log("Enabled Roughness Filtering");
-		}
+            if (properties.Contains("RoughnessFilter"))
+            {
+                properties = null;
+                Debug.Log("Disabled Roughness Filtering");
+            }
+            else
+            {
+                properties = "RoughnessFilter";
+                Debug.Log("Enabled Roughness Filtering");
+            }
 
-		importer.userData = properties;
-		importer.SaveAndReimport();
+            importer.userData = properties;
+            importer.SaveAndReimport();
+        }
 	}
 
 

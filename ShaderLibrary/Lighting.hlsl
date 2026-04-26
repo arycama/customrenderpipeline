@@ -284,7 +284,7 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 	
 	#ifdef UNDERWATER_LIGHTING_ON
 		float3 underwaterTransmittance = exp(-_WaterShadowExtinction * max(0.0, -(input.worldPosition.y + ViewPosition.y)));
-		lightTransmittance *= WaterShadow(input.worldPosition, L) * GetCaustics(input.worldPosition + ViewPosition, L);
+		lightTransmittance *= WaterShadow(input.worldPosition, _LightDirection0) * GetCaustics(input.worldPosition + ViewPosition, _LightDirection0);
 	#endif
 	
 	float3 luminance = EvaluateLight(input, diffuseTerm, f0Avg, L, multiScatterTerm) * (_LightColor0 * lightTransmittance * Exposure) * shadow;

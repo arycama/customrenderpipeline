@@ -70,27 +70,27 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	float3 terrainNormal = UnpackNormalSNorm(TerrainNormalMap.Sample(LinearClampSampler, uv)).xzy;
 	
 	// If stochastic, use a random rotation, otherwise find the rotation of the terrain's normal
-	float terrainAspect = Remap(atan2(terrainNormal.z, terrainNormal.x), -Pi, Pi);
+	float terrainAspect = terrainNormal.y < 1.0 ? Remap(atan2(terrainNormal.z, terrainNormal.x), -Pi, Pi) : 0.0;
 	
 	float stochastic0 = TerrainLayerData[index0].Stochastic;
-	uint rand00 = PcgHash2(uv * TerrainSize.xz / TerrainLayerData[index0].Scale);
+	uint rand00 = PcgHash2(uv * TerrainSize.xz * TerrainLayerData[index0].Scale);
 	float rotation0 = lerp(terrainAspect, ConstructFloat(rand00), stochastic0);
 	
 	uint rand01 = PcgHash(rand00);
-	float offsetX0 = ConstructFloat(rand01);
+	float offsetX0 = lerp(0.0, ConstructFloat(rand01), stochastic0);
 	
 	uint rand02 = PcgHash(rand01);
-	float offsetY0 = ConstructFloat(rand02);
+	float offsetY0 = lerp(0.0, ConstructFloat(rand02), stochastic0);
 	
 	float stochastic1 = TerrainLayerData[index1].Stochastic;
-	uint rand10 = PcgHash2(uv * TerrainSize.xz / TerrainLayerData[index1].Scale);
+	uint rand10 = PcgHash2(uv * TerrainSize.xz * TerrainLayerData[index1].Scale);
 	float rotation1 = lerp(terrainAspect, ConstructFloat(rand10), stochastic1);
 	
 	uint rand11 = PcgHash(rand10);
-	float offsetX1 = ConstructFloat(rand11);
+	float offsetX1 = lerp(0.0, ConstructFloat(rand11), stochastic1);
 	
 	uint rand12 = PcgHash(rand11);
-	float offsetY1 = ConstructFloat(rand12);
+	float offsetY1 = lerp(0.0, ConstructFloat(rand12), stochastic1);
 	
 	uint triplanar;
 	float3 absNormal = abs(terrainNormal);

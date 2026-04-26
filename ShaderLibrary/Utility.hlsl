@@ -21,10 +21,10 @@ float2 SignFlip(float2 a, float2 s) { return Flip(a, FastSign(s)); }
 float3 SignFlip(float3 a, float3 s) { return Flip(a, FastSign(s)); }
 float4 SignFlip(float4 a, float4 s) { return Flip(a, FastSign(s)); }
 
-void Swap(inout float1 a, inout float1 b, bool1 swap) { float1 t = a; a = swap ? b : a; b = swap ? t : b; }
-void Swap(inout float2 a, inout float2 b, bool2 swap) { float2 t = a; a = swap ? b : a; b = swap ? t : b; }
-void Swap(inout float3 a, inout float3 b, bool3 swap) { float3 t = a; a = swap ? b : a; b = swap ? t : b; }
-void Swap(inout float4 a, inout float4 b, bool4 swap) { float4 t = a; a = swap ? b : a; b = swap ? t : b; }
+void Swap(inout float1 a, inout float1 b, bool1 swap = true) { float1 t = a; a = swap ? b : a; b = swap ? t : b; }
+void Swap(inout float2 a, inout float2 b, bool2 swap = true) { float2 t = a; a = swap ? b : a; b = swap ? t : b; }
+void Swap(inout float3 a, inout float3 b, bool3 swap = true) { float3 t = a; a = swap ? b : a; b = swap ? t : b; }
+void Swap(inout float4 a, inout float4 b, bool4 swap = true) { float4 t = a; a = swap ? b : a; b = swap ? t : b; }
 
 void SignSwap(inout float1 a, inout float1 b, float1 s) { Swap(a, b, s < 0.0); }
 void SignSwap(inout float2 a, inout float2 b, float2 s) { Swap(a, b, s < 0.0); }
@@ -287,20 +287,6 @@ float2 GetQuadVertexPosition(uint vertexID)
 	float x = topBit;
 	float y = 1 - (topBit + botBit) & 1; // produces 1 for indices 0,3 and 0 for 1,2
 	return float2(x, y);
-}
-
-void Swap(inout float a, inout float b)
-{
-	float temp = a;
-	a = b;
-	b = temp;
-}
-
-void Swap(inout uint a, inout uint b)
-{
-	uint temp = a;
-	a = b;
-	b = temp;
 }
 
 void CompareSwap(inout float key0, inout uint value0, inout float key1, inout uint value1)

@@ -109,21 +109,21 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	float3 refr = refract(-V, N, 1.0 / 1.34);
 	float underwaterDepth = CameraDepthCopy[input.position.xy];
 	
-	float3 underwaterWorldPos = PixelToWorldPosition(float3(input.position.xy, underwaterDepth));
-	float3 underwaterPosition = IntersectRayPlane(worldPosition, refr, float3(0, underwaterWorldPos.y, 0), float3(0, 1, 0));
-	
-	float2 refractedPositionSS = MultiplyPointProj(WorldToPixel, underwaterPosition).xy;
+	float3 underwaterBackgroundPosition = PixelToWorldPosition(float3(input.position.xy, underwaterDepth));
+	float3 underwaterWorldPosition = IntersectRayPlane(worldPosition, refr, float3(0, underwaterBackgroundPosition.y, 0), float3(0, 1, 0));
+	float2 refractedPositionSS = MultiplyPointProj(WorldToPixel, underwaterWorldPosition).xy;
 	
 	if (any(refractedPositionSS < 0 || refractedPositionSS > ViewSize - 1))
 	{
-		underwaterDepth = CameraDepthCopy[input.position.xy];
 		refractedPositionSS = input.position.xy;
+		underwaterWorldPosition = underwaterBackgroundPosition;
 	}
 	
 	underwaterDepth = CameraDepthCopy[refractedPositionSS];
-	underwaterWorldPos = PixelToWorldPosition(float3(refractedPositionSS, underwaterDepth));
+	underwaterWorldPosition = PixelToWorldPosition(float3(refractedPositionSS, underwaterDepth));
 
 	// If this offset is above water, revert to the non-refracted position to avoid above water objects bleeding into the refractions
+	// TODO: Combine with above check
 	if (underwaterDepth > depth)
 	{
 		//uvOffset = 0.0;
@@ -131,8 +131,8 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 		refractedPositionSS = input.position.xy;
 	}
 	
-	float maxUnderwaterDistance = distance(worldPosition, underwaterPosition);
-	float3 underwaterV = normalize(worldPosition - underwaterPosition);
+	float maxUnderwaterDistance = distance(worldPosition, underwaterWorldPosition);
+	float3 underwaterV = normalize(worldPosition - underwaterWorldPosition);
 	
 	float3 atmosphereTransmittance = TransmittanceToAtmosphere(ViewHeight, -V.y, _LightDirection0.y, dot(_LightDirection0, V), waterDistance);
 	float3 sunColor = _LightColor0 * Exposure * atmosphereTransmittance;
@@ -156,7 +156,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	float v = underwaterV.y;
 	float b = maxUnderwaterDistance;
 
-	float xi = min(0.99, noise.x); // Clamp to avoid sampling at infinity
+	float xi = min(0.999, noise.x); // Clamp to avoid sampling at infinity
 	float t = -l * log(xi * (exp(b * cp * (-v / l - 1)) - 1) + 1) / (cp * (l + v));
 	float3 rgbPdf = -c * (l + v) * exp(c * t * (-v / l - 1)) / (l * (exp(b * c * (-v / l - 1)) - 1));
 	float pdf = dot(rgbPdf, channelProbability);
@@ -169,6 +169,9 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	float illuminance = GetWaterIlluminance(P);
 	
 	float3 directLight = sunColor * illuminance * shadow * phase * transmittance;
+	
+	// TODO: Causes random huge bright spots, probably need to adjust the caustics texture first
+	//directLight *= GetCaustics(P + ViewPosition, _LightDirection0, true);
 	
 	float3 ambientTransmittance = exp(-Extinction * (t + max(0.0, -(P.y + ViewPosition.y))));
 	float3 indirect = ambient * ambientTransmittance;

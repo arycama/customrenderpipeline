@@ -107,31 +107,100 @@ float3 GetTerrainNormalLevel(float3 worldPosition)
 
 void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out float roughness, out float3 normal, out float occlusion, out float height)
 {
-	uint4 layerData = IdMap.Gather(TrilinearRepeatSampler, uv);
 	float4 bilinearWeights = BilinearWeights(uv, IdMapResolution);
+	float2 localUv = uv * IdMapResolution - 0.5;
+	float2 uvCenter = (floor(localUv) + 0.5) / IdMapResolution;
+	uint4 layerData = IdMap.Gather(PointClampSampler, uv);
 	
 	uint indices[8];
+	float weights[8];
+	float3 albedos[8];
+	float4 normalOcclusionRoughnesses[8];
+	float heightOffset = 0;
+	float weightSum = 0.0;
 	float heights[8];
+	
+	float2 offsets[4];
+	offsets[0] = float2(0, 1);
+	offsets[1] = float2(1, 1);
+	offsets[2] = float2(1, 0);
+	offsets[3] = float2(0, 0);
+	
+	[unroll]
+	for (uint i = 0; i < 8; i++)
+	{
+		weights[i] = 0;
+		albedos[i] = 0;
+		normalOcclusionRoughnesses[i] = 0;
+		heights[i] = 0;
+	}
 	
 	// Build up to 8 unique layer pairs
     [unroll]
-	for (uint i = 0; i < 8; i++)
+	for (i = 0; i < 8; i++)
 	{
 		uint offset = i < 4 ? 0 : 13;
-		uint layerIndex = BitUnpack(layerData[i % 4], 5, offset);
-		float blend = Remap(BitUnpack(layerData[i % 4], 4, 26), 0.0, 15.0, 0.0, 0.5);
+		uint data = layerData[i % 4];
+		uint layerIndex = BitUnpack(data, 5, offset);
+		float blend = Remap(BitUnpack(data, 4, 26), 0.0, 15.0, 0.0, 0.5);
+		
+		LayerData layerData = TerrainLayerData[layerIndex];
+		float2 scale = layerData.Scale * TerrainSize.xz;
+		
+		float offsetX, offsetY, rotation;
+		if (i < 4)
+		{
+			offsetX = BitUnpackFloat(data, 2, 5);
+			offsetY = BitUnpackFloat(data, 2, 7);
+			rotation = BitUnpackFloat(data, 4, 9);
+		}
+		else
+		{
+			offsetX = BitUnpackFloat(data, 2, 18);
+			offsetY = BitUnpackFloat(data, 2, 20);
+			rotation = BitUnpackFloat(data, 4, 22);
+		}
+		
+		offsetX = lerp(-0.375, 0.375, offsetX);
+		offsetY = lerp(-0.375, 0.375, offsetY);
+		
+		// Rotate around control point center
+		float s, c;
+		sincos(rotation * TwoPi, s, c);
+		float2x2 rotationMatrix = float2x2(c, s, -s, c);
+		
+		// Center in terrain layer space
+		float2 localUv = uv * TerrainSize.xz * layerData.Scale;
+		float2 center = floor((uvCenter + offsets[i % 4] / IdMapResolution) * TerrainSize.xz * layerData.Scale) + 0.5;
+		float2 sampleUv = mul(rotationMatrix, localUv - center) + center + float2(offsetX, offsetY);
+		float2 localDx = mul(rotationMatrix, dxUv * scale);
+		float2 localDy = mul(rotationMatrix, dyUv * scale);
+		
+		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(TrilinearRepeatAniso8Sampler, float3(sampleUv, layerIndex), localDx, localDy);
+		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(TrilinearRepeatAniso8Sampler, float3(sampleUv, layerIndex), localDx, localDy);
+		currentNormalOcclusionRoughness.rg = UnpackNormalDerivativesUNorm(currentNormalOcclusionRoughness.rg);
+		currentNormalOcclusionRoughness.rg = mul(currentNormalOcclusionRoughness.rg, rotationMatrix);
+		
+		float currentHeight = Mask.SampleGrad(TrilinearRepeatAniso8Sampler, float3(sampleUv, layerIndex), localDx, localDy) * layerData.HeightScale;
 		
 		if (i < 4)
 			blend = 1.0 - blend;
 		
 		bool hasMatch = false;
 		float weight = bilinearWeights[i % 4] * blend;
+		
+		heightOffset += layerData.HeightScale * weight;
+		weightSum += weight;
+		
 		[unroll]
 		for (uint j = 0; j < i; j++)
 		{
 			if (indices[j] == layerIndex)
 			{
-				heights[j] += weight;
+				weights[j] += weight;
+				albedos[j] += currentAlbedo * weight;
+				normalOcclusionRoughnesses[j] += currentNormalOcclusionRoughness * weight;
+				heights[j] += currentHeight * weight;
 				hasMatch = true;
 				break;
 			}
@@ -140,26 +209,23 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		if (!hasMatch)
 		{
 			indices[i] = layerIndex;
-			heights[i] = weight;
+			weights[i] = weight;
+			albedos[i] = currentAlbedo * weight;
+			heights[i] = currentHeight * weight;
+			normalOcclusionRoughnesses[i] = currentNormalOcclusionRoughness * weight;
 		}
 	}
 	
-	// Sample heights
-	float heightOffset = 0;
-	float weightSum = 0.0;
+	heightOffset /= weightSum;
 	
-    [unroll]
 	for (i = 0; i < 8; i++)
 	{
-		uint layerIndex = indices[i];
-		LayerData layerData = TerrainLayerData[layerIndex];
-		float2 scale = layerData.Scale * TerrainSize.xz;
-		heightOffset += layerData.HeightScale * heights[i];
-		weightSum += heights[i];
-		heights[i] *= Mask.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), dxUv * scale, dyUv * scale) * layerData.HeightScale;
+		if(weights[i])
+		{
+			albedos[i] /= weights[i];
+			normalOcclusionRoughnesses[i] /= weights[i];
+		}
 	}
-	
-	heightOffset /= weightSum;
 	
 	// https://bertdobbelaere.github.io/sorting_networks.html
 	uint2 comparisons[19] =
@@ -182,6 +248,8 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		{
 			Swap(heights[a], heights[b]);
 			Swap(indices[a], indices[b]);
+			Swap(albedos[a], albedos[b]);
+			Swap(normalOcclusionRoughnesses[a], normalOcclusionRoughnesses[b]);
 		}
 	}
 	
@@ -211,13 +279,10 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		float currentWeight = transmittance * (1.0 - currentTransmittance) * rcp(extinction);
 		
 		float2 scale = layerData.Scale * TerrainSize.xz;
-		float3 currentAlbedo = AlbedoSmoothness.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), dxUv * scale, dyUv * scale);
-		albedoScatter += currentAlbedo * currentExtinction;
+		albedoScatter += albedos[i] * currentExtinction;
 		albedo += albedoScatter * currentWeight;
 		
-		float4 currentNormalOcclusionRoughness = Normal.SampleGrad(TrilinearRepeatAniso8Sampler, float3(uv * scale, layerIndex), dxUv * scale, dyUv * scale);
-		currentNormalOcclusionRoughness.rg = UnpackNormalDerivativesUNorm(currentNormalOcclusionRoughness.rg);
-		normalOcclusionRoughnessScatter += currentNormalOcclusionRoughness * currentExtinction;
+		normalOcclusionRoughnessScatter += normalOcclusionRoughnesses[i] * currentExtinction;
 		normalOcclusionRoughness += normalOcclusionRoughnessScatter * currentWeight;
 		
 		transmittance *= currentTransmittance;

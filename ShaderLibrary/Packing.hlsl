@@ -4,15 +4,20 @@
 #include "Math.hlsl"
 #include "Utility.hlsl"
 
+float1 Quantize(float1 a, uint1 bits) { return a * (Exp2Pow2(bits) - 1u) + 0.5; }
+float2 Quantize(float2 a, uint2 bits) { return a * (Exp2Pow2(bits) - 1u) + 0.5; }
+float3 Quantize(float3 a, uint3 bits) { return a * (Exp2Pow2(bits) - 1u) + 0.5; }
+float4 Quantize(float4 a, uint4 bits) { return a * (Exp2Pow2(bits) - 1u) + 0.5; }
+
 uint BitPack(uint1 data, uint1 size, uint1 offset) { return (data & (Exp2Pow2(size) - 1u)) << offset; }
 uint BitPack(uint2 data, uint2 size, uint2 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
 uint BitPack(uint3 data, uint3 size, uint3 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
 uint BitPack(uint4 data, uint4 size, uint4 offset) { return BitOr((data & (Exp2Pow2(size) - 1u)) << offset); }
 
-uint BitPackFloat(float1 data, uint1 size, uint1 offset) { return BitPack(round(data * (Exp2Pow2(size) - 1u)), size, offset); }
-uint BitPackFloat(float2 data, uint2 size, uint2 offset) { return BitPack(round(data * (Exp2Pow2(size) - 1u)), size, offset); }
-uint BitPackFloat(float3 data, uint3 size, uint3 offset) { return BitPack(round(data * (Exp2Pow2(size) - 1u)), size, offset); }
-uint BitPackFloat(float4 data, uint4 size, uint4 offset) { return BitPack(round(data * (Exp2Pow2(size) - 1u)), size, offset); }
+uint BitPackFloat(float1 data, uint1 size, uint1 offset) { return BitPack(Quantize(data, size), size, offset); }
+uint BitPackFloat(float2 data, uint2 size, uint2 offset) { return BitPack(Quantize(data, size), size, offset); }
+uint BitPackFloat(float3 data, uint3 size, uint3 offset) { return BitPack(Quantize(data, size), size, offset); }
+uint BitPackFloat(float4 data, uint4 size, uint4 offset) { return BitPack(Quantize(data, size), size, offset); }
 
 uint1 BitUnpack(uint1 data, uint1 size, uint1 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
 uint2 BitUnpack(uint2 data, uint2 size, uint2 offset) { return (data >> offset) & (Exp2Pow2(size) - 1u); }
@@ -23,11 +28,6 @@ float1 BitUnpackFloat(uint data, uint1 size, uint1 offset) { return BitUnpack(da
 float2 BitUnpackFloat(uint data, uint2 size, uint2 offset) { return BitUnpack(data, size, offset) / (float) (Exp2Pow2(size) - 1u); }
 float3 BitUnpackFloat(uint data, uint3 size, uint3 offset) { return BitUnpack(data, size, offset) / (float) (Exp2Pow2(size) - 1u); }
 float4 BitUnpackFloat(uint data, uint4 size, uint4 offset) { return BitUnpack(data, size, offset) / (float) (Exp2Pow2(size) - 1u); }
-
-float1 Quantize(float1 a, float bits) { return floor(a * (exp2(bits) - 1.0) + 0.5); }
-float2 Quantize(float2 a, float bits) { return floor(a * (exp2(bits) - 1.0) + 0.5); }
-float3 Quantize(float3 a, float bits) { return floor(a * (exp2(bits) - 1.0) + 0.5); }
-float4 Quantize(float4 a, float bits) { return floor(a * (exp2(bits) - 1.0) + 0.5); }
 
 // Pack float2 (each of 12 bit) in 888
 float3 PackFloat2To888(float2 f)

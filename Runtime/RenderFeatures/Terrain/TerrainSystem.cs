@@ -190,10 +190,7 @@ public class TerrainSystem : FrameRenderFeature
 
         renderGraph.SetResource(new TerrainSystemData(minMaxHeight, Terrain, TerrainData, indexBuffer), true);
 
-        InitializeIdMap(false);
-
         var size = (Float3)TerrainData.size;
-
         var terrainFrameData = renderGraph.SetConstantBuffer
         ((
             size,
@@ -216,6 +213,8 @@ public class TerrainSystem : FrameRenderFeature
             aoMap,
            terrainFrameData
         ));
+
+        InitializeIdMap(false);
 
         InitializeAoMap(false);
     }
@@ -371,6 +370,7 @@ public class TerrainSystem : FrameRenderFeature
             //pass.WriteBuffer("ProceduralIndices", indicesBuffer);
             //pass.ReadBuffer("ProceduralIndices", indicesBuffer);
             pass.ReadBuffer("TerrainLayerData", terrainLayerData);
+            pass.ReadResource<TerrainFrameData>();
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {

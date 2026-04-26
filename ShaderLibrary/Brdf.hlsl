@@ -125,7 +125,7 @@ half WrappedDiffuse(half NdotL, half wrap)
 	return saturate((NdotL + wrap) / (Sq(1.0h + wrap)));
 }
 
-half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half LdotV, bool isBackface, half3 opacity)
+half3 GgxBsdf(half roughness2, half3 reflectivity, half NdotL, half NdotV, half LdotV, bool isBackface, half3 opacity)
 {
 	// NdotL will always be in the same hemisphere as L, and NdotV must be negative in refractive cases.
 	// Note reflectivity is rgb but this is only used for metals, which have no transmittance, so the red channel is used in most places, rgb is only used for reflection
@@ -151,7 +151,6 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 	}
 	
 	half rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
-	half a2 = Sq(roughness);
 	
 	// Setup vectors, t is for transmitted/second layer. Other vectors always relate to the final outgoing layer, which for single layer bsdfs is simply L and V.
 	if (isBrdf || isFlippedBrdf || isThinApprox)
@@ -202,10 +201,10 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 			return 0.0h;
 	}
 	
-	half partLambdaV = GetPartLambdaV(a2, NdotV);
+	half partLambdaV = GetPartLambdaV(roughness2, NdotV);
 	
 	// Smith-GGX joint DV term. (V = G2 / (4 * NdotL * NdotV) This also has the interesting property of being valid for NdotV == 0, which means we can rotate incorrectly backfacing normals/geometry so that NdotV == 0, and still perform the BRDF which keeps them looking consistent with the rest of the front-facing geometry. (This also works for environment reflections which are also valid for NdotV == 0)
-	half dv = GgxDv(a2, NdotH, NdotL, NdotV, partLambdaV);
+	half dv = GgxDv(roughness2, NdotH, NdotL, NdotV, partLambdaV);
 	
 	// Calcuilate fresnel. Schlick-fresnel is used for all cases, but in the case of a BTDF we use a variant that handles TIR which correctly attenuates refractions on backfaces that should not be visible.
 	// Note the rgb variant is used, but this is only required for metals. Optimising for the dielectric case means divergence though, so rgb is used for both cases to avoid seperate shader paths or variants.
@@ -233,7 +232,7 @@ half3 GgxBsdf(half roughness, half3 reflectivity, half NdotL, half NdotV, half L
 		half LdotHt = -(rcpIorRatio * LdotVt + 1.0h) * rcpDenominator;
 		half VdotHt = (rcpIorRatio + LdotVt) * rcpDenominator; // Invert to make positive for microfacet functions
 	
-		half dv = GgxDv(a2, NdotHt, NdotLt, NdotVt, GetPartLambdaV(a2, NdotVt));
+		half dv = GgxDv(roughness2, NdotHt, NdotLt, NdotVt, GetPartLambdaV(roughness2, NdotVt));
 		half3 f = 1.0h - Fresnel(LdotHt, reflectivity);
 		bsdf *= f * dv * 4.0h * LdotHt * VdotHt * Sq(ReflectivityToIor(-reflectivity)) * rcp(Sq(rcpIorRatio * VdotHt + LdotHt)) * NdotLt * (1.0 - opacity);
 	}
