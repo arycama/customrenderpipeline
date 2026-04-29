@@ -2,7 +2,7 @@
 
 #include "../../ColorGradingCommon.hlsl"
 
-RWTexture3D<float3> Result;
+RWTexture3D<unorm min10float4> Result;
 
 cbuffer Properties
 {
@@ -45,5 +45,5 @@ void ColorGrading(uint3 id : SV_DispatchThreadID)
 {
 	float3 color = (id + 0.5) / LutResolution;
 	color = ColorGradeAndTonemap(color, Exposure, Contrast, Filter, Hue, Saturation, WhiteBalance, Tint, SplitToneShadows, SplitToneBalance, SplitToneHighlights, ChannelMixerRed, ChannelMixerGreen, ChannelMixerBlue, Shadows, Midtones, Highlights, ShadowsStart, ShadowsEnd, HighlightsStart, HighlightsEnd, MaxLuminance, PaperWhite, LinearStart, FadeStart, FadeEnd, HuePreservation);
-	Result[id] = color;
+	Result[id] = float4(color, 0);
 }

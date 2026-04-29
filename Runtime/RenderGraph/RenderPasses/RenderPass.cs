@@ -155,13 +155,13 @@ public abstract class RenderPass : IDisposable
         if (depthBuffer == null)
         {
             depthBuffer = rtHandle;
-            flags = SubPassFlags.ReadOnlyDepthStencil;
+            flags |= SubPassFlags.ReadOnlyDepth;
         }
         else if(depthBuffer.HasValue)
         {
             if(depthBuffer.Value == rtHandle)
             {
-                flags = SubPassFlags.ReadOnlyDepthStencil;
+                flags |= SubPassFlags.ReadOnlyDepth;
             }
             else
             {
