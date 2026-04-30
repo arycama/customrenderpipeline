@@ -49,39 +49,53 @@ public class ColorGrading : FrameRenderFeature
     }
 
     private readonly Settings settings;
+    private readonly Material material;
     private readonly ComputeShader computeShader;
     private RenderTexture colorGrading;
     private int previousResolution, previousSettingsHash;
+    private ResourceHandle<RenderTexture> colorLut;
 
     public ColorGrading(RenderGraph renderGraph, Settings settings) : base(renderGraph)
     {
         this.settings = settings;
+        material = new Material(Shader.Find("Hidden/Color Grading")) { hideFlags = HideFlags.HideAndDontSave };
         computeShader = Resources.Load<ComputeShader>("PostProcessing/ColorGrading");
 
-        colorGrading = new RenderTexture(settings.Resolution, settings.Resolution, GraphicsFormat.A2B10G10R10_UNormPack32, GraphicsFormat.None)
+        colorGrading = new RenderTexture(new RenderTextureDescriptor
         {
-            dimension = TextureDimension.Tex3D,
-            enableRandomWrite = true,
+            width = settings.Resolution,
+            height = settings.Resolution,
             volumeDepth = settings.Resolution,
+            msaaSamples = 1,
+            graphicsFormat = GraphicsFormat.A2B10G10R10_UNormPack32,
+            depthStencilFormat = GraphicsFormat.None,
+            mipCount = Texture.GenerateAllMips,
+            dimension = TextureDimension.Tex3D,
+            shadowSamplingMode = ShadowSamplingMode.None,
+            vrUsage = VRTextureUsage.None,
+            enableRandomWrite = true,
+            stencilFormat = GraphicsFormat.None,
+            useMipMap = false,
+        }) 
+        {
             hideFlags = HideFlags.HideAndDontSave
         };
 
-        var wasCreated = colorGrading.Create();
-        if (!wasCreated)
-            Debug.LogError("Color grading creation failed");
-
+        colorLut = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.A2B10G10R10_UNormPack32, settings.Resolution, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true, isPersistent: true);
+        _ = colorGrading.Create();
         previousResolution = settings.Resolution;
     }
 
     protected override void Cleanup(bool disposing)
     {
         colorGrading.Release();
+        renderGraph.ReleasePersistentResource(colorLut, -1);
     }
 
     public override void Render(ScriptableRenderContext context)
     {
         var maxLuminance = settings.SdrLuminance;
-        var colorGradingData = new ColorGradingData(
+        var currentSettings = new ColorGradingData(
             (float)settings.Resolution,
             maxLuminance,
             settings.PaperWhite * Math.Sqrt(2.0f),
@@ -123,69 +137,101 @@ public class ColorGrading : FrameRenderFeature
             settings.HighlightsEnd
         );
 
-        var hash = colorGradingData.GetHashCode();
+        var hash = currentSettings.GetHashCode();
         if (hash == previousSettingsHash)
             return;
 
         previousSettingsHash = hash;
 
-        if (!colorGrading.IsCreated())
-            Debug.LogError("Color grading is not created");
+        var properties = renderGraph.SetConstantBuffer(currentSettings);
 
-        if (settings.Resolution != previousResolution)
+        var useCompute = true;// !SystemInfo.supportsRenderTargetArrayIndexFromVertexShader;
+        RenderPass<ColorGradingData> pass;
+        using (pass = useCompute ? renderGraph.AddComputeRenderPass("Color Grading", currentSettings) : renderGraph.AddFullscreenRenderPass("Color Grading Lut", currentSettings))
         {
-            colorGrading.Release();
-
-            colorGrading = new RenderTexture(settings.Resolution, settings.Resolution, GraphicsFormat.A2B10G10R10_UNormPack32, GraphicsFormat.None)
+            if (settings.Resolution != previousResolution)
             {
-                dimension = TextureDimension.Tex3D,
-                enableRandomWrite = true,
-                volumeDepth = settings.Resolution,
-                hideFlags = HideFlags.HideAndDontSave
-            };
+                colorGrading.Release();
 
-            colorGrading.Create();
-            previousResolution = settings.Resolution;
+                var descriptor = new RenderTextureDescriptor
+                {
+                    width = settings.Resolution,
+                    height = settings.Resolution,
+                    volumeDepth = settings.Resolution,
+                    msaaSamples = 1,
+                    graphicsFormat = GraphicsFormat.A2B10G10R10_UNormPack32,
+                    depthStencilFormat = GraphicsFormat.None,
+                    mipCount = Texture.GenerateAllMips,
+                    dimension = TextureDimension.Tex3D,
+                    shadowSamplingMode = ShadowSamplingMode.None,
+                    vrUsage = VRTextureUsage.None,
+                    enableRandomWrite = true,
+                    stencilFormat = GraphicsFormat.None,
+                    useMipMap = false,
+                };
+
+                colorGrading = new RenderTexture(descriptor)
+                {
+                    hideFlags = HideFlags.HideAndDontSave
+                };
+
+                colorGrading.Create();
+
+                renderGraph.ReleasePersistentResource(colorLut, pass.Index);
+                colorLut = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.A2B10G10R10_UNormPack32, settings.Resolution, TextureDimension.Tex3D, isRandomWrite: true, isExactSize: true, isPersistent: true);
+
+                previousResolution = settings.Resolution;
+            }
+
+            if (useCompute)
+            {
+                var computePass = pass as ComputeRenderPass<ColorGradingData>;
+                computePass.Initialize(computeShader, 0, settings.Resolution, settings.Resolution, settings.Resolution);
+            }
+            else
+            {
+                var fullscreenPass = pass as FullscreenRenderPass<ColorGradingData>;
+                fullscreenPass.Initialize(material, settings.Resolution, settings.Resolution, 0, settings.Resolution);
+                fullscreenPass.WriteTexture(colorLut);
+            }
+
+            pass.ReadBuffer("Properties", properties);
+
+            if (useCompute)
+            {
+                pass.SetRenderFunction((command, pass, data) =>
+                {
+                    command.SetComputeTextureParam(computeShader, 0, "Result", colorGrading);
+                });
+            }
         }
 
-        var properties = renderGraph.SetConstantBuffer(colorGradingData);
-
-        using var pass = renderGraph.AddGenericRenderPass("Color Grading", (properties, settings.Verbose, computeShader, colorGrading, settings.Resolution));
-        pass.ReadBuffer("", properties);
-
-        if(settings.Verbose)
-            Debug.Log("Created color grading pass");
-
-        pass.SetRenderFunction(static (command, pass, data) =>
+        using (var pass1 = renderGraph.AddComputeRenderPass("Color Grading", currentSettings))
         {
-            var propertiesBuffer = pass.GetBuffer(data.properties);
-            command.SetComputeConstantBufferParam(data.computeShader, "Properties", propertiesBuffer, 0, propertiesBuffer.count * propertiesBuffer.stride);
-            command.SetComputeTextureParam(data.computeShader, 0, "Result", data.colorGrading);
-            command.DispatchNormalized(data.computeShader, 0, data.Resolution, data.Resolution, data.Resolution);
+            pass1.Initialize(computeShader, 0, settings.Resolution, settings.Resolution, settings.Resolution);
+            pass1.WriteTexture("Result", colorLut);
+            pass1.ReadBuffer("Properties", properties);
+        }
 
-            if(data.Verbose)
-                Debug.Log("Executing color grading pass");
-        });
-
-        renderGraph.SetResource<Result>(new(colorGrading, GraphicsUtilities.HalfTexelRemap(settings.Resolution)), true);
-
-        if(settings.Verbose)
-            Debug.Log("Set color grading pass result");
+        renderGraph.SetResource<Result>(new(colorGrading, GraphicsUtilities.HalfTexelRemap(settings.Resolution), colorLut), true);
     }
 
     public readonly struct Result : IRenderPassData
     {
         public readonly RenderTexture colorGrading;
         public readonly Float2 scaleOffset;
+        public readonly ResourceHandle<RenderTexture> colorLut;
 
-        public Result(RenderTexture colorGrading, Float2 scaleOffset)
+        public Result(RenderTexture colorGrading, Float2 scaleOffset, ResourceHandle<RenderTexture> colorLut)
         {
             this.colorGrading = colorGrading;
             this.scaleOffset = scaleOffset;
+            this.colorLut = colorLut;
         }
 
         void IRenderPassData.SetInputs(RenderPass pass)
         {
+            pass.ReadTexture("ColorLut", colorLut);
         }
 
         void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
