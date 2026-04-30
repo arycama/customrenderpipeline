@@ -9,6 +9,8 @@ public class ColorGrading : FrameRenderFeature
     [Serializable]
     public class Settings
     {
+        [field: SerializeField] public bool Verbose { get; private set; } = false;
+
         [field: Header("Color Adjustments")]
         [field: SerializeField] public float Exposure { get; private set; } = 0.0f;
         [field: SerializeField, Range(0, 1)] public float Contrast { get; private set; } = 0.5f;
@@ -48,24 +50,27 @@ public class ColorGrading : FrameRenderFeature
 
     private readonly Settings settings;
     private readonly ComputeShader computeShader;
-    private readonly RenderTexture colorGrading;
+    private RenderTexture colorGrading;
+    private int previousResolution, previousSettingsHash;
 
     public ColorGrading(RenderGraph renderGraph, Settings settings) : base(renderGraph)
     {
         this.settings = settings;
         computeShader = Resources.Load<ComputeShader>("PostProcessing/ColorGrading");
 
-        colorGrading = new RenderTexture(16, 16, GraphicsFormat.A2B10G10R10_UNormPack32, GraphicsFormat.None)
+        colorGrading = new RenderTexture(settings.Resolution, settings.Resolution, GraphicsFormat.A2B10G10R10_UNormPack32, GraphicsFormat.None)
         {
             dimension = TextureDimension.Tex3D,
             enableRandomWrite = true,
-            volumeDepth = 16,
+            volumeDepth = settings.Resolution,
             hideFlags = HideFlags.HideAndDontSave
         };
 
         var wasCreated = colorGrading.Create();
         if (!wasCreated)
             Debug.LogError("Color grading creation failed");
+
+        previousResolution = settings.Resolution;
     }
 
     protected override void Cleanup(bool disposing)
@@ -75,12 +80,8 @@ public class ColorGrading : FrameRenderFeature
 
     public override void Render(ScriptableRenderContext context)
     {
-        if(!colorGrading.IsCreated())
-            Debug.LogError("Color grading is not created");
-
         var maxLuminance = settings.SdrLuminance;
-        var properties = renderGraph.SetConstantBuffer(
-        (
+        var colorGradingData = new ColorGradingData(
             (float)settings.Resolution,
             maxLuminance,
             settings.PaperWhite * Math.Sqrt(2.0f),
@@ -120,23 +121,56 @@ public class ColorGrading : FrameRenderFeature
 
             Float3.Zero,
             settings.HighlightsEnd
-        ));
+        );
 
-        using var pass = renderGraph.AddGenericRenderPass("Color Grading");
-        pass.ReadBuffer("", properties);
-        Debug.Log("Created color grading pass");
+        var hash = colorGradingData.GetHashCode();
+        if (hash == previousSettingsHash)
+            return;
 
-        pass.SetRenderFunction((command, pass) =>
+        previousSettingsHash = hash;
+
+        if (!colorGrading.IsCreated())
+            Debug.LogError("Color grading is not created");
+
+        if (settings.Resolution != previousResolution)
         {
-            var propertiesBuffer = pass.GetBuffer(properties);
-            command.SetComputeConstantBufferParam(computeShader, "Properties", propertiesBuffer, 0, propertiesBuffer.count * propertiesBuffer.stride);
-            command.SetComputeTextureParam(computeShader, 0, "Result", colorGrading);
-            command.DispatchCompute(computeShader, 0, 2, 2, 2);
-            Debug.Log("Executing color grading pass");
+            colorGrading.Release();
+
+            colorGrading = new RenderTexture(settings.Resolution, settings.Resolution, GraphicsFormat.A2B10G10R10_UNormPack32, GraphicsFormat.None)
+            {
+                dimension = TextureDimension.Tex3D,
+                enableRandomWrite = true,
+                volumeDepth = settings.Resolution,
+                hideFlags = HideFlags.HideAndDontSave
+            };
+
+            colorGrading.Create();
+            previousResolution = settings.Resolution;
+        }
+
+        var properties = renderGraph.SetConstantBuffer(colorGradingData);
+
+        using var pass = renderGraph.AddGenericRenderPass("Color Grading", (properties, settings.Verbose, computeShader, colorGrading, settings.Resolution));
+        pass.ReadBuffer("", properties);
+
+        if(settings.Verbose)
+            Debug.Log("Created color grading pass");
+
+        pass.SetRenderFunction(static (command, pass, data) =>
+        {
+            var propertiesBuffer = pass.GetBuffer(data.properties);
+            command.SetComputeConstantBufferParam(data.computeShader, "Properties", propertiesBuffer, 0, propertiesBuffer.count * propertiesBuffer.stride);
+            command.SetComputeTextureParam(data.computeShader, 0, "Result", data.colorGrading);
+            command.DispatchNormalized(data.computeShader, 0, data.Resolution, data.Resolution, data.Resolution);
+
+            if(data.Verbose)
+                Debug.Log("Executing color grading pass");
         });
 
-        renderGraph.SetResource<Result>(new(colorGrading, GraphicsUtilities.HalfTexelRemap(settings.Resolution)));
-        Debug.Log("Set color grading pass result");
+        renderGraph.SetResource<Result>(new(colorGrading, GraphicsUtilities.HalfTexelRemap(settings.Resolution)), true);
+
+        if(settings.Verbose)
+            Debug.Log("Set color grading pass result");
     }
 
     public readonly struct Result : IRenderPassData
@@ -157,5 +191,103 @@ public class ColorGrading : FrameRenderFeature
         void IRenderPassData.SetProperties(RenderPass pass, CommandBuffer command)
         {
         }
+    }
+}
+
+internal struct ColorGradingData
+{
+    public float Item1;
+    public float maxLuminance;
+    public float Item3;
+    public float LinearStart;
+    public float FadeStart;
+    public float FadeEnd;
+    public float HuePreservation;
+    public float Exposure;
+    public Float3 Item9;
+    public float Contrast;
+    public Float3 Item11;
+    public float Hue;
+    public Float3 Item13;
+    public float Saturation;
+    public Float3 ChannelMixerRed;
+    public float WhiteBalance;
+    public Float3 ChannelMixerGreen;
+    public float Tint;
+    public Float3 ChannelMixerBlue;
+    public float SplitToneBalance;
+    public Float3 Item21;
+    public float ShadowsStart;
+    public Float3 Item23;
+    public float ShadowsEnd;
+    public Float3 Item25;
+    public float HighlightsStart;
+    public Float3 Zero;
+    public float HighlightsEnd;
+
+    public ColorGradingData(float item1, float maxLuminance, float item3, float linearStart, float fadeStart, float fadeEnd, float huePreservation, float exposure, Float3 item9, float contrast, Float3 item11, float hue, Float3 item13, float saturation, Float3 channelMixerRed, float whiteBalance, Float3 channelMixerGreen, float tint, Float3 channelMixerBlue, float splitToneBalance, Float3 item21, float shadowsStart, Float3 item23, float shadowsEnd, Float3 item25, float highlightsStart, Float3 zero, float highlightsEnd)
+    {
+        Item1 = item1;
+        this.maxLuminance = maxLuminance;
+        Item3 = item3;
+        LinearStart = linearStart;
+        FadeStart = fadeStart;
+        FadeEnd = fadeEnd;
+        HuePreservation = huePreservation;
+        Exposure = exposure;
+        Item9 = item9;
+        Contrast = contrast;
+        Item11 = item11;
+        Hue = hue;
+        Item13 = item13;
+        Saturation = saturation;
+        ChannelMixerRed = channelMixerRed;
+        WhiteBalance = whiteBalance;
+        ChannelMixerGreen = channelMixerGreen;
+        Tint = tint;
+        ChannelMixerBlue = channelMixerBlue;
+        SplitToneBalance = splitToneBalance;
+        Item21 = item21;
+        ShadowsStart = shadowsStart;
+        Item23 = item23;
+        ShadowsEnd = shadowsEnd;
+        Item25 = item25;
+        HighlightsStart = highlightsStart;
+        Zero = zero;
+        HighlightsEnd = highlightsEnd;
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Item1);
+        hash.Add(maxLuminance);
+        hash.Add(Item3);
+        hash.Add(LinearStart);
+        hash.Add(FadeStart);
+        hash.Add(FadeEnd);
+        hash.Add(HuePreservation);
+        hash.Add(Exposure);
+        hash.Add(Item9);
+        hash.Add(Contrast);
+        hash.Add(Item11);
+        hash.Add(Hue);
+        hash.Add(Item13);
+        hash.Add(Saturation);
+        hash.Add(ChannelMixerRed);
+        hash.Add(WhiteBalance);
+        hash.Add(ChannelMixerGreen);
+        hash.Add(Tint);
+        hash.Add(ChannelMixerBlue);
+        hash.Add(SplitToneBalance);
+        hash.Add(Item21);
+        hash.Add(ShadowsStart);
+        hash.Add(Item23);
+        hash.Add(ShadowsEnd);
+        hash.Add(Item25);
+        hash.Add(HighlightsStart);
+        hash.Add(Zero);
+        hash.Add(HighlightsEnd);
+        return hash.ToHashCode();
     }
 }
