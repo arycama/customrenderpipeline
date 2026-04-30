@@ -20,7 +20,7 @@ public abstract class BaseComputeRenderPass<T> : RenderPass<T>
 		colorBindings.Add(new(rtHandle, propertyId, mip));
 
 		var descriptor = RenderGraph.RtHandleSystem.GetDescriptor(rtHandle);
-		descriptor = new RtHandleDescriptor(descriptor.width, descriptor.height, descriptor.format, descriptor.volumeDepth, descriptor.dimension, descriptor.isScreenTexture, descriptor.hasMips, descriptor.autoGenerateMips, true, descriptor.isExactSize, descriptor.clear, descriptor.clearColor, descriptor.clearDepth, descriptor.clearStencil);
+        descriptor.enableRandomWrite = true;
 		RenderGraph.RtHandleSystem.SetDescriptor(rtHandle, descriptor);
 	}
 

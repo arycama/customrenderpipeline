@@ -79,7 +79,7 @@ public struct RtHandleDescriptor : IResourceDescriptor<RenderTexture>
             msaaSamples = antiAliasing,
             graphicsFormat = graphicsFormat,
             depthStencilFormat = depthFormat,
-            mipCount = -1,
+            mipCount = Texture.GenerateAllMips,
             dimension = dimension,
             shadowSamplingMode = ShadowSamplingMode.None,
             vrUsage = vrUsage,

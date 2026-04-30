@@ -27,7 +27,7 @@ public class RTHandleSystem : ResourceHandleSystem<RenderTexture, RtHandleDescri
 
 	protected override void DestroyResource(RenderTexture resource) => Object.DestroyImmediate(resource);
 
-	protected override RtHandleDescriptor CreateDescriptorFromResource(RenderTexture resource) => new(resource.width, resource.height, resource.graphicsFormat, resource.volumeDepth, resource.dimension, false, resource.useMipMap, resource.autoGenerateMips);
+	protected override RtHandleDescriptor CreateDescriptorFromResource(RenderTexture resource) => new(resource.width, resource.height, resource.graphicsFormat, resource.volumeDepth, resource.dimension, false, resource.useMipMap, resource.autoGenerateMips, resource.enableRandomWrite, true, vrUsage: resource.vrUsage, antiAliasing: resource.antiAliasing);
 
 	protected override bool DoesResourceMatchDescriptor(RenderTexture resource, RtHandleDescriptor descriptor)
 	{
