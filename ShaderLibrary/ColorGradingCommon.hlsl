@@ -14,9 +14,7 @@ float3 Tonemap(float3 color, float peakBrightness, float paperWhite = 100.0, flo
 {
 	// Tone curve based on a simple cubic toe function, a linear start, paper white target, and a smooth shoulder rolloff: https://www.desmos.com/calculator/w74i49qdcu
 	float3 toe = 2.0 * Sq(color) / linearStart - pow(color, 3.0) / Sq(linearStart);
-	float3 shoulder = paperWhite + (color - paperWhite) / (1.0 + (color - paperWhite) / (peakBrightness - paperWhite));
-	
-	shoulder = peakBrightness - Sq(peakBrightness - paperWhite) / (color - paperWhite + peakBrightness - paperWhite);
+	float3 shoulder = peakBrightness - Sq(peakBrightness - paperWhite) * rcp(-2.0 * paperWhite + color + peakBrightness);
 	
 	// Color volume mapping similar to GT7: https://blog.selfshadow.com/publications/s2025-shading-course/pdi/s2025_pbs_pdi_slides.pdf
 	float3 iCtCp = Rec2020ToICtCp(color);

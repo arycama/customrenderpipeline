@@ -10,37 +10,44 @@ cbuffer Properties
 	float MaxLuminance;
 	float PaperWhite;
 	float LinearStart;
+	
 	float FadeStart;
 	float FadeEnd;
 	float HuePreservation;
+	float Exposure;
 	
 	float3 Filter;
-	float Exposure;
 	float Contrast;
-	float Hue;
-	float Saturation;
-	float WhiteBalance;
-	float Tint;
 	
 	float3 SplitToneShadows;
-	float SplitToneBalance;
+	float Hue;
+	
 	float3 SplitToneHighlights;
+	float Saturation;
 	
 	float3 ChannelMixerRed;
+	float WhiteBalance;
+	
 	float3 ChannelMixerGreen;
+	float Tint;
+	
 	float3 ChannelMixerBlue;
+	float SplitToneBalance;
 	
 	float3 Shadows;
-	float3 Midtones;
-	float3 Highlights;
-	
 	float ShadowsStart;
+	
+	float3 Midtones;
 	float ShadowsEnd;
+	
+	float3 Highlights;
 	float HighlightsStart;
+		
+	float3 PropertiesPadding0;
 	float HighlightsEnd;
 };
 
-[numthreads(8, 8, 1)]
+[numthreads(8, 8, 8)]
 void ColorGrading(uint3 id : SV_DispatchThreadID)
 {
 	float3 color = (id + 0.5) / LutResolution;
