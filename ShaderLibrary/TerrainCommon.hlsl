@@ -1,6 +1,5 @@
-#pragma once
-
-// TODO: Rename to terrainCommon so it doesn't get mixed up with existing terrain
+#ifndef TERRAIN_COMMON_INCLUDED
+#define TERRAIN_COMMON_INCLUDED
 
 #include "Common.hlsl"
 #include "Geometry.hlsl"
@@ -107,10 +106,10 @@ float3 GetTerrainNormalLevel(float3 worldPosition)
 
 void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out float roughness, out float3 normal, out float occlusion, out float height)
 {
-	float4 bilinearWeights = BilinearWeights(uv, IdMapResolution);
-	float2 localUv = uv * IdMapResolution - 0.5;
+	float2 localUv = uv * IdMapResolution - 0.5 + rcp(512.0);
+	float4 bilinearWeights = BilinearWeights(frac(localUv));
 	float2 uvCenter = (floor(localUv) + 0.5) / IdMapResolution;
-	uint4 layerData = IdMap.Gather(PointClampSampler, uv);
+	uint4 layerData = IdMap.Gather(PointClampSampler, uvCenter);
 	
 	uint indices[8];
 	float weights[8];
@@ -297,3 +296,5 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 	roughness = normalOcclusionRoughness.a;
 	occlusion = normalOcclusionRoughness.b;
 }
+
+#endif

@@ -24,13 +24,16 @@ public partial class Tonemapping : ViewRenderFeature
     {
         var hdrSettings = renderGraph.GetResource<HdrOutputData>();
 
+        var colorGrading = renderGraph.GetResource<ColorGrading.Result>();
         var isFirst = renderedViewIndices.Add(viewRenderData.viewId);
+
         using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (
             viewRenderData.viewSize,
             GraphicsUtilities.HalfTexelRemap(colorGradingSettings.Resolution),
             colorGradingSettings.PaperWhite * Math.Sqrt(2.0f),
             bloomSettings.Strength,
-            hdrSettings.peakLuminance));
+            hdrSettings.peakLuminance, 
+            colorGrading.colorGrading));
 
         pass.Initialize(tonemapMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 0);
         pass.PreventNewSubPass = true;
@@ -38,7 +41,7 @@ public partial class Tonemapping : ViewRenderFeature
         pass.FrameBufferFormat = viewRenderData.format;
 
         pass.ReadRtHandle<CameraTarget>();
-        pass.ReadRtHandle<ColorGradingTexture>();
+        //pass.ReadRtHandle<ColorGradingTexture>();
         pass.ReadResource<ScreenSpaceReflectionResult>(true);
         pass.ReadResource<ScreenSpaceDiffuse.Result>(true);
 
@@ -77,6 +80,7 @@ public partial class Tonemapping : ViewRenderFeature
             pass.SetFloat("PaperWhite", data.Item3);
             pass.SetFloat("BloomStrength", data.Item4);
             pass.SetFloat("MaxLuminance", data.Item5);
+            pass.PropertyBlock.SetTexture("ColorGrading", data.colorGrading);
         });
     }
 

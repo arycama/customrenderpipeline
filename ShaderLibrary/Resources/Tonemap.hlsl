@@ -12,7 +12,7 @@
 #include "../Packing.hlsl"
 
 Texture2D<float3> CameraBloom;
-Texture3D<float3> ColorGradingTexture;
+Texture3D<float3> ColorGrading;
 float4 CameraBloomScaleLimit, CameraBloom_TexelSize;
 
 float2 Resolution;
@@ -45,7 +45,7 @@ float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	color = Rec2020ToICtCp(color);
 	color.yz += 0.5;
 	color = LutScaleOffset.x * color + LutScaleOffset.y;
-	color = ColorGradingTexture.Sample(TrilinearClampSampler, color);
+	color = ColorGrading.Sample(TrilinearClampSampler, color);
 	
 	#ifdef PREVIEW
 		color = ST2084ToLinear(color);
