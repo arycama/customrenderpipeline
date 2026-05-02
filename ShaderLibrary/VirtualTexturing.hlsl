@@ -129,9 +129,9 @@ float3 UnpackPageData(uint3 coord, float2 uv, out float scale)
 	uint pageData = PageTable.mips[coord.z][coord.xy];
 	uint index = BitUnpack(pageData, 12, 0);
 	uint mipLevel = BitUnpack(pageData, 4, 12);
-	scale = PageTableSize >> mipLevel;
+	scale = PageTableSize / exp2(mipLevel);
 	
-	float2 uvScale = VirtualTileScaleOffset.xy * (PageTableSize / exp2(mipLevel));
+	float2 uvScale = VirtualTileScaleOffset.xy * scale;
 	
 	float2 offset = (coord.xy << coord.z) >> mipLevel;
 	float2 uvOffset = -offset * VirtualTileScaleOffset.xy + VirtualTileScaleOffset.zw;

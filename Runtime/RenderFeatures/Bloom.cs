@@ -1,7 +1,6 @@
 ﻿using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
-using UnityEngine.Pool;
 
 public class Bloom : ViewRenderFeature
 {

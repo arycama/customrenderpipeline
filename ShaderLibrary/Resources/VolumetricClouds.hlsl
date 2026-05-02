@@ -6,11 +6,11 @@
 struct FragmentOutput
 {
 	#ifdef CLOUD_SHADOW
-		float3 result : SV_Target0;
+		float4 result : SV_Target0;
 	#else
-	float4 luminance : SV_Target0;
-	float transmittance : SV_Target1;
-	float depth : SV_Target2;
+		float4 luminance : SV_Target0;
+		float transmittance : SV_Target1;
+		float depth : SV_Target2;
 	#endif
 };
 
@@ -88,7 +88,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	result = IsInfOrNaN(result) ? 0 : result;
 	
 	#ifdef CLOUD_SHADOW
-		output.result = float3(cloudDistance * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a);
+		output.result = float4(cloudDistance * _CloudShadowDepthScale, (result.a && totalRayLength) ? -log2(result.a) * rcp(totalRayLength) * _CloudShadowExtinctionScale : 0.0, result.a, 0.05);
 	#else
 		output.luminance = float4(Rec2020ToICtCp(result.rgb * PaperWhite * sqrt(2.0)) + float2(0.0, 0.5).xyy, 1.0);
 		output.transmittance = result.a;

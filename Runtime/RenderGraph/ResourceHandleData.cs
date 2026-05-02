@@ -1,6 +1,4 @@
-﻿using UnityEngine.Assertions;
-
-public struct ResourceHandleData<V, T> where V : IResourceDescriptor<T>
+﻿public struct ResourceHandleData<V, T> where V : IResourceDescriptor<T>
 {
 	public int createIndex;
 	public int createIndex1;

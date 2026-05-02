@@ -9,7 +9,8 @@ public class VolumetricCloudShadow : ViewRenderFeature
     private readonly Sky.Settings physicalSkySettings;
     private readonly Material material;
     private readonly ComputeShader cloudCoverageComputeShader;
-	private Dictionary<int, ResourceHandle<GraphicsBuffer>> perCameraCoverage = new();
+	private readonly Dictionary<int, ResourceHandle<GraphicsBuffer>> perCameraCoverage = new();
+	private readonly Dictionary<int, ResourceHandle<RenderTexture>> perCameraShadow = new();
 
     public VolumetricCloudShadow(VolumetricClouds.Settings settings, Sky.Settings physicalSkySettings, RenderGraph renderGraph) : base(renderGraph)
     {
@@ -26,7 +27,12 @@ public class VolumetricCloudShadow : ViewRenderFeature
 		{
 			renderGraph.ReleasePersistentResource(buffer, -1);
 		}
-	}
+
+        foreach (var shadow in perCameraShadow.Values)
+        {
+            renderGraph.ReleasePersistentResource(shadow, -1);
+        }
+    }
 
 	public override void Render(ViewRenderData viewRenderData)
     {
@@ -110,7 +116,13 @@ public class VolumetricCloudShadow : ViewRenderFeature
         var invViewProjection = invViewMatrix * inverseProjectionMatrix;
         var worldToShadow = projectionMatrix * viewMatrix;
 
-        var cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32);
+        var isFirstShadow = !perCameraShadow.TryGetValue(viewRenderData.viewId, out var cloudShadow);
+        if (isFirstShadow)
+        {
+            cloudShadow = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.B10G11R11_UFloatPack32, isPersistent: true, isExactSize: true);
+            perCameraShadow.Add(viewRenderData.viewId, cloudShadow);
+        }
+
         var cloudShadowDataBuffer = renderGraph.SetConstantBuffer((invViewProjection, -lightDirection, 1f / depth, 1f / settings.Density, (float)settings.ShadowSamples, 0.0f, 0.0f));
 		var time = (float)renderGraph.GetResource<TimeData>().time;
 

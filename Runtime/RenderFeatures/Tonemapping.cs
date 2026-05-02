@@ -35,10 +35,8 @@ public partial class Tonemapping : ViewRenderFeature
             hdrSettings.peakLuminance, 
             colorGrading.colorGrading));
 
-        pass.Initialize(tonemapMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 0);
+        pass.Initialize(tonemapMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 0, false, 1, viewRenderData.target, viewRenderData.format);
         pass.PreventNewSubPass = true;
-        pass.FrameBufferTarget = viewRenderData.target;
-        pass.FrameBufferFormat = viewRenderData.format;
 
         pass.ReadRtHandle<CameraTarget>();
         //pass.ReadRtHandle<ColorGradingTexture>();

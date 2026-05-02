@@ -48,6 +48,8 @@ Shader "Hidden/Volumetric Clouds"
         {
             Name "Shadow"
 
+           // Blend SrcAlpha OneMinusSrcAlpha
+
             HLSLPROGRAM
             #pragma vertex VertexFullscreenTriangle
             #pragma fragment Fragment

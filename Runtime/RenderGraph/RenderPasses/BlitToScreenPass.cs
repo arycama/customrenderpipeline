@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
 public class BlitToScreenPass<T> : RenderPass<T>
@@ -16,7 +17,7 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(Material material, Int2 viewSize, int viewCount = 1, int passIndex = 0, bool flip = false, int antiAliasing = 1)
+	public void Initialize(Material material, Int2 viewSize, int viewCount = 1, int passIndex = 0, bool flip = false, int antiAliasing = 1, RenderTargetIdentifier frameBufferTarget = default, GraphicsFormat frameBufferFormat = default)
 	{
 		this.material = material;
         Size = viewSize;
@@ -24,6 +25,8 @@ public class BlitToScreenPass<T> : RenderPass<T>
 		this.passIndex = passIndex;
         this.flip = flip;
         AntiAliasing = antiAliasing;
+        FrameBufferTarget = frameBufferTarget;
+        FrameBufferFormat = frameBufferFormat;
     }
 
 	public override void Reset()

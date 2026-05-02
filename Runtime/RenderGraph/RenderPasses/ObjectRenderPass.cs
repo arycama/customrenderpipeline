@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
-using UnityEngine.Rendering.RendererUtils;
 
 public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 {
@@ -9,7 +8,7 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 	private SinglePassStereoMode stereoMode;
     private ScriptableRenderContext context;
 
-	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, Int2 size, int viewCount = 1, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false, int antiAliasing = 1)
+	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, Int2 size, int viewCount = 1, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false, int antiAliasing = 1, bool isScreenPass = false)
 	{
         this.context = context;
 		AntiAliasing = antiAliasing;
@@ -43,6 +42,7 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 
         Size = size;
         ViewCount = viewCount;
+        IsScreenPass = isScreenPass;
     }
 
 	public override void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)

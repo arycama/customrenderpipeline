@@ -34,7 +34,7 @@ public class TerrainRenderer : TerrainRendererBase
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", cullingPlanes))
 		{
             pass.UseProfiler = false;
-            pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, viewRenderData.viewSize, 1, MeshTopology.Quads, passIndex);
+            pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, viewRenderData.viewSize, 1, MeshTopology.Quads, passIndex, isScreenPass: true);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
@@ -65,7 +65,7 @@ public class TerrainRenderer : TerrainRendererBase
 		{
             pass.UseProfiler = false;
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
-			pass.Initialize("Terrain", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonOpaque);
+			pass.Initialize("Terrain", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonOpaque, isScreenPass: true);
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.None);
 			pass.ReadResource<ViewData>();
 		}

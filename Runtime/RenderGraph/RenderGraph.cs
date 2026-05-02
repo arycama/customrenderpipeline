@@ -21,7 +21,7 @@ public class RenderGraph : IDisposable
     private readonly RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
     private readonly Dictionary<Type, RTHandleData> rtHandles = new();
 
-    private Int2 size;
+    private Int2 currentNativeRenderPassSize;
     private int viewCount;
     private int mipLevel;
     private AttachmentData? subPassDepth;
@@ -30,6 +30,7 @@ public class RenderGraph : IDisposable
     private int depthIndex = -1;
     private int subPassIndex = -1;
     private int antiAliasing = 1;
+    public bool isScreenPass = false;
 
     private NativeList<AttachmentData> inputs = new(8, Allocator.Persistent), outputs = new(8, Allocator.Persistent);
     private SubPassFlags flags;
@@ -147,7 +148,7 @@ public class RenderGraph : IDisposable
             if (currentPass.IsNativeRenderPass)
             {
                 // Passes can merge if they have the same size and depth attachment. (But may require seperate subpasses if color attachments or flags differ)
-                canMergePass = isInRenderPass && size == currentPass.Size && viewCount == currentPass.ViewCount && mipLevel == currentPass.MipLevel && antiAliasing == currentPass.AntiAliasing;
+                canMergePass = isInRenderPass && currentNativeRenderPassSize == currentPass.Size && viewCount == currentPass.ViewCount && mipLevel == currentPass.MipLevel && antiAliasing == currentPass.AntiAliasing && isScreenPass == currentPass.IsScreenPass;
 
                 if (canMergePass)
                 {
@@ -284,10 +285,11 @@ public class RenderGraph : IDisposable
         isInRenderPass = true;
         startPassIndex = pass.Index;
         passName = pass.Name;
-        size = pass.Size;
+        currentNativeRenderPassSize = pass.Size;
         viewCount = pass.ViewCount;
         mipLevel = pass.MipLevel;
         antiAliasing = pass.AntiAliasing;
+        isScreenPass = pass.IsScreenPass;
     }
 
     private void BeginSubpass(RenderPass pass)
@@ -433,13 +435,14 @@ public class RenderGraph : IDisposable
 
         endPassIndex = pass.Index;
         isInRenderPass = false;
-        renderPassDescriptors.Add(new(size, new(attachments.AsArray(), Allocator.Temp), new(subPasses.AsArray(), Allocator.Temp), startPassIndex, endPassIndex, pass.ViewCount, antiAliasing, depthIndex, -1, passName));
+        renderPassDescriptors.Add(new(currentNativeRenderPassSize, new(attachments.AsArray(), Allocator.Temp), new(subPasses.AsArray(), Allocator.Temp), startPassIndex, endPassIndex, pass.ViewCount, antiAliasing, depthIndex, -1, isScreenPass, passName));
         attachments.Clear();
         subPasses.Clear();
         passName = null;
         depthIndex = -1;
         subPassIndex = -1;
         antiAliasing = 1;
+        isScreenPass = false;
     }
 
     public void Execute(CommandBuffer command, ScriptableRenderContext context)
@@ -576,7 +579,9 @@ public class RenderGraph : IDisposable
 
                     IsCullingCcw = isCullingCcw;
 
-                    command.BeginRenderPass(descriptor.size.x, descriptor.size.y, descriptor.viewCount, descriptor.antiAliasing, passAttachments.AsArray(), descriptor.depthAttachmentIndex, descriptor.shadingRateImageAttachmentIndex, descriptor.subpasses, debugNameUtf8);
+                    var size = descriptor.isScreenPass ? RtHandleSystem.ScreenSize : descriptor.size;
+
+                    command.BeginRenderPass(size.x, size.y, descriptor.viewCount, descriptor.antiAliasing, passAttachments.AsArray(), descriptor.depthAttachmentIndex, descriptor.shadingRateImageAttachmentIndex, descriptor.subpasses, debugNameUtf8);
 
                     passAttachments.Clear();
                     previousSubPassIndex = 0;

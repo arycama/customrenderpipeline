@@ -22,7 +22,7 @@ public class DecalComposite : ViewRenderFeature
         // TODO: Would a direct copy be faster?
 		using (var pass = renderGraph.AddFullscreenRenderPass("Copy"))
 		{
-			pass.Initialize(material, viewRenderData.viewSize, 1, 0);
+			pass.Initialize(material, viewRenderData.viewSize, 1, 0, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
@@ -38,7 +38,7 @@ public class DecalComposite : ViewRenderFeature
 		// Now composite the decal buffers
 		using (var pass = renderGraph.AddFullscreenRenderPass("Combine", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy)))
 		{
-			pass.Initialize(material, viewRenderData.viewSize, 1, 1);
+			pass.Initialize(material, viewRenderData.viewSize, 1, 1, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);

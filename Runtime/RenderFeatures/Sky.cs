@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -38,7 +37,7 @@ public partial class Sky : ViewRenderFeature
         {
             using (var pass = renderGraph.AddFullscreenRenderPass("Render Sky", settings.RenderSamples))
             {
-                pass.Initialize(skyMaterial, viewRenderData.viewSize, 1, skyMaterial.FindPass(passName));
+                pass.Initialize(skyMaterial, viewRenderData.viewSize, 1, skyMaterial.FindPass(passName), isScreenPass: true);
                 pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(skyTemp);
 
@@ -79,7 +78,7 @@ public partial class Sky : ViewRenderFeature
             pass.renderData.history = history;
 			pass.renderData.wasCreated = wasCreated;
 
-			pass.Initialize(skyMaterial, viewRenderData.viewSize, 1, skyMaterial.FindPass("Temporal"));
+			pass.Initialize(skyMaterial, viewRenderData.viewSize, 1, skyMaterial.FindPass("Temporal"), isScreenPass: true);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
 			pass.WriteTexture(current);

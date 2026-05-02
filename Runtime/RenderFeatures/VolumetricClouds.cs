@@ -40,7 +40,7 @@ public partial class VolumetricClouds : ViewRenderFeature
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Render", (settings, time)))
 		{
-			pass.Initialize(material, viewRenderData.viewSize, 1, 4, 1);
+			pass.Initialize(material, viewRenderData.viewSize, 1, 4, 1, isScreenPass: true);
 
             pass.PreventNewSubPass = true;
 
@@ -104,7 +104,7 @@ public partial class VolumetricClouds : ViewRenderFeature
 			pass.renderData.luminanceHistory = luminanceHistory;
 			pass.renderData.transmittanceHistory = transmittanceHistory;
 
-			pass.Initialize(material, viewRenderData.viewSize, 1, 5);
+			pass.Initialize(material, viewRenderData.viewSize, 1, 5, isScreenPass: true);
 
             pass.PreventNewSubPass = true;
 

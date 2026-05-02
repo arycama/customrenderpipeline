@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using Unity.Collections;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
@@ -74,11 +73,12 @@ public abstract class RenderPass : IDisposable
     public virtual bool IsNativeRenderPass => false;
     public virtual bool OutputsToCameraTarget => false;
     public bool PreventNewSubPass { get; set; } = false;
-    public RenderTargetIdentifier FrameBufferTarget { get; set; }
-    public GraphicsFormat FrameBufferFormat { get; set; }
+    public RenderTargetIdentifier FrameBufferTarget { get; protected set; }
+    public GraphicsFormat FrameBufferFormat { get; protected set; }
     public Int2 Size { get; protected set; }
-    public int ViewCount { get; set; }
+    public int ViewCount { get; protected set; }
 	public int AntiAliasing { get; protected set; } = 1;
+    public bool IsScreenPass { get; protected set; }
 
     public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
     public abstract void SetBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer);

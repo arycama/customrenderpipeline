@@ -126,7 +126,7 @@ public class GrassRenderer : ViewRenderFeature
 			patchScaleOffset: new Float4(size.x / cellCount, size.z / cellCount, position.x, position.z)
 		)))
 		{
-			pass.Initialize(material, indexBuffer, quadtreeCullResults.IndirectArgsBuffer, viewRenderData.viewSize, 1);
+			pass.Initialize(material, indexBuffer, quadtreeCullResults.IndirectArgsBuffer, viewRenderData.viewSize, 1, isScreenPass: true);
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
