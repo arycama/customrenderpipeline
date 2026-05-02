@@ -85,7 +85,7 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
 
             using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip, settings.Thickness, coneAngle, settings.RoughnessBias)))
             {
-                pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
+                pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
                 pass.PreventNewSubPass = true;
                 pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(tempResult);
@@ -120,7 +120,7 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
         var rayDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddFullscreenRenderPass("Specular GI Spatial", (settings.ResolveSamples, settings.ResolveSize, settings.Intensity)))
         {
-            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1);
+            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1, isScreenPass: true);
             pass.PreventNewSubPass = true;
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult);
@@ -157,7 +157,7 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
             pass.renderData.history = history;
             pass.renderData.wasCreated = wasCreated;
 
-            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2);
+            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2, isScreenPass: true);
             pass.PreventNewSubPass = true;
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current);

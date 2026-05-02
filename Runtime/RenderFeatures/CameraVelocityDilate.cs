@@ -20,7 +20,7 @@ public class CameraVelocityDilate : ViewRenderFeature
         var result = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16_SFloat);
         using (var pass = renderGraph.AddFullscreenRenderPass("Velocity Dilate"))
         {
-            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1);
+            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1, isScreenPass: true);
             pass.WriteTexture(result);
             pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();

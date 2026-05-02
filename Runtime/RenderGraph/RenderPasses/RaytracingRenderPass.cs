@@ -113,11 +113,11 @@ public class RaytracingRenderPass<T> : RenderPass<T>
 			Command.DisableKeyword(new GlobalKeyword(keyword));
 	}
 
-	protected override void SetupTargets()
-	{
-		for (var i = 0; i < colorBindings.Count; i++)
-			Command.SetRayTracingTextureParam(shader, colorBindings[i].Item2, GetRenderTexture(colorBindings[i].Item1));
-	}
+	//protected override void SetupTargets()
+	//{
+	//	for (var i = 0; i < colorBindings.Count; i++)
+	//		Command.SetRayTracingTextureParam(shader, colorBindings[i].Item2, GetRenderTexture(colorBindings[i].Item1));
+	//}
 
 	public override void SetMatrix(string propertyName, Matrix4x4 value)
 	{

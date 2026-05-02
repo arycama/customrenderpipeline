@@ -19,7 +19,10 @@ public class ComputeRenderPass<T> : BaseComputeRenderPass<T>
 
 	protected override void Execute()
 	{
-		foreach (var keyword in keywords)
+        for (var i = 0; i < colorBindings.Count; i++)
+            Command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].Item2, GetRenderTexture(colorBindings[i].Item1), colorBindings[i].Item3);
+
+        foreach (var keyword in keywords)
 			Command.EnableKeyword(computeShader, new LocalKeyword(computeShader, keyword));
 
 		if (normalizedDispatch)

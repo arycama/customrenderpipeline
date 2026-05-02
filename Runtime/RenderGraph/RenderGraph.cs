@@ -161,7 +161,7 @@ public class RenderGraph : IDisposable
                     if (depthIndex != -1 && currentPass.depthBuffer.HasValue)
                     {
                         var depthAttachment = attachments[depthIndex];
-                        if (depthAttachment.handle != currentPass.depthBuffer.Value || depthAttachment.mipLevel != currentPass.MipLevel || depthAttachment.cubemapFace != currentPass.CubemapFace || depthAttachment.depthSlice != currentPass.DepthSlice)
+                        if (depthAttachment.handle != currentPass.depthBuffer.Value || mipLevel != currentPass.MipLevel || depthAttachment.cubemapFace != currentPass.CubemapFace || depthAttachment.depthSlice != currentPass.DepthSlice)
                         {
                             // If both passes have depth texutres that do not match, do not merge them
                             canMergePass = false;
@@ -182,7 +182,7 @@ public class RenderGraph : IDisposable
                         for (var i = 0; i < inputCount; i++)
                         {
                             var input = inputs[i];
-                            if (currentPass.frameBufferInputs[i] == input.handle && currentPass.MipLevel == input.mipLevel && currentPass.CubemapFace == input.cubemapFace && currentPass.DepthSlice == input.depthSlice)
+                            if (currentPass.frameBufferInputs[i] == input.handle && currentPass.CubemapFace == input.cubemapFace && currentPass.DepthSlice == input.depthSlice)
                                 continue;
 
                             canMergeSubPass = false;
@@ -201,7 +201,7 @@ public class RenderGraph : IDisposable
                                 for (var i = 0; i < currentPass.colorTargets.Count; i++)
                                 {
                                     var output = outputs[i];
-                                    if (currentPass.colorTargets[i] == output.handle && currentPass.MipLevel == output.mipLevel && currentPass.CubemapFace == output.cubemapFace && currentPass.DepthSlice == output.depthSlice)
+                                    if (currentPass.colorTargets[i] == output.handle && currentPass.CubemapFace == output.cubemapFace && currentPass.DepthSlice == output.depthSlice)
                                         continue;
 
                                     canMergeSubPass = false;
@@ -435,7 +435,7 @@ public class RenderGraph : IDisposable
 
         endPassIndex = pass.Index;
         isInRenderPass = false;
-        renderPassDescriptors.Add(new(currentNativeRenderPassSize, new(attachments.AsArray(), Allocator.Temp), new(subPasses.AsArray(), Allocator.Temp), startPassIndex, endPassIndex, pass.ViewCount, antiAliasing, depthIndex, -1, isScreenPass, passName));
+        renderPassDescriptors.Add(new(currentNativeRenderPassSize, new(attachments.AsArray(), Allocator.Temp), new(subPasses.AsArray(), Allocator.Temp), startPassIndex, endPassIndex, pass.ViewCount, antiAliasing, depthIndex, -1, mipLevel, isScreenPass, passName));
         attachments.Clear();
         subPasses.Clear();
         passName = null;
@@ -580,8 +580,16 @@ public class RenderGraph : IDisposable
                     IsCullingCcw = isCullingCcw;
 
                     var size = descriptor.isScreenPass ? RtHandleSystem.ScreenSize : descriptor.size;
-
                     command.BeginRenderPass(size.x, size.y, descriptor.viewCount, descriptor.antiAliasing, passAttachments.AsArray(), descriptor.depthAttachmentIndex, descriptor.shadingRateImageAttachmentIndex, descriptor.subpasses, debugNameUtf8);
+
+                    // We disable Unity's annoying internal Y flip, but it will still attempt to flip any viewports we set, so we need to negate the viewport to undo Unity's negation
+                    // However if the target is only a depth buffer, Unity will not flip it
+                    var viewportSize = new Int2(descriptor.size.x >> descriptor.mipLevel, descriptor.size.y >> descriptor.mipLevel);
+
+                    if(passAttachments.Length == 1 && descriptor.depthAttachmentIndex != -1)
+                        command.SetViewport(new Rect(0, 0, viewportSize.x, viewportSize.y));
+                    else
+                        command.SetViewport(new Rect(0, size.y - (descriptor.size.y >> descriptor.mipLevel), viewportSize.x, viewportSize.y));
 
                     passAttachments.Clear();
                     previousSubPassIndex = 0;

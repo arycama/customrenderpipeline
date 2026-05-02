@@ -36,7 +36,7 @@ public class DeferredWater : ViewRenderFeature
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Render", settings))
         {
-            pass.Initialize(deferredWaterMaterial, viewRenderData.viewSize, viewRenderData.viewCount);
+            pass.Initialize(deferredWaterMaterial, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
             pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
@@ -180,7 +180,7 @@ public class DeferredWater : ViewRenderFeature
             if (settings.RaytracedRefractions)
                 pass.AddKeyword("RAYTRACED_REFRACTIONS_ON");
 
-            pass.Initialize(deferredWaterMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 1);
+            pass.Initialize(deferredWaterMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 1, isScreenPass: true);
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current);
             pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());

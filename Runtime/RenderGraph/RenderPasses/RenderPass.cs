@@ -95,8 +95,6 @@ public abstract class RenderPass : IDisposable
 
     protected abstract void Execute();
 
-    protected virtual void SetupTargets() { }
-
     protected abstract void ExecuteRenderPassBuilder();
 
     public virtual void Reset()
@@ -198,8 +196,6 @@ public abstract class RenderPass : IDisposable
 
 		foreach (var buffer in writeBuffers)
 			SetBuffer(buffer.Item1, buffer.Item2);
-
-        SetupTargets();
 
 		// Set any data from each pass
 		foreach (var renderPassDataHandle in RenderPassDataHandles)

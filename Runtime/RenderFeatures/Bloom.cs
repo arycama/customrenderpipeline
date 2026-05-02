@@ -36,15 +36,16 @@ public class Bloom : ViewRenderFeature
 			var width = Math.Max(1, viewRenderData.viewSize.x >> (i + 1));
 			var height = Math.Max(1, viewRenderData.viewSize.y >> (i + 1));
 
-            var dest = renderGraph.GetTexture(new(width, height), GraphicsFormat.B10G11R11_UFloatPack32, isExactSize: true);
+            var dest = renderGraph.GetTexture(new(width, height), GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             bloomIds[i] = dest;
 
             var source = i > 0 ? bloomIds[i - 1] : renderGraph.GetRTHandle<CameraTarget>();
 
             using var pass = renderGraph.AddFullscreenRenderPass("Bloom Down",(1.0f / new Float2(width, height), source));
+
             pass.UseProfiler = false;
 
-            pass.Initialize(material, new(width, height), viewRenderData.viewCount, i == 0 ? 0 : 1);
+            pass.Initialize(material, new(width, height), viewRenderData.viewCount, i == 0 ? 0 : 1, isScreenPass: true);
 			pass.WriteTexture(dest);
 
 			pass.ReadTexture("Input", source);
@@ -67,7 +68,7 @@ public class Bloom : ViewRenderFeature
 			using var pass = renderGraph.AddFullscreenRenderPass("Bloom Up", (1.0f / new Float2(width, height), input, settings.Strength));
             pass.UseProfiler = false;
 
-			pass.Initialize(material, new(width, height), viewRenderData.viewCount, 2);
+			pass.Initialize(material, new(width, height), viewRenderData.viewCount, 2, isScreenPass: true);
 			pass.WriteTexture(bloomIds[i - 1]);
 			pass.ReadTexture("Input", input);
 

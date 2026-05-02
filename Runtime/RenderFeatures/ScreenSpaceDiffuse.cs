@@ -77,7 +77,7 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
         {
 			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Trace", (settings.Intensity, settings.MaxSamples, settings.Thickness, viewRenderData.viewSize, settings.ConeAngle, viewRenderData.tanHalfFov.y)))
 			{
-				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
+				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
                 pass.PreventNewSubPass = true;
 
                 pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
@@ -114,7 +114,7 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
         var rayDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Spatial", (settings.Intensity, settings.MaxSamples, settings.Thickness, settings.ResolveSamples, settings.ResolveSize)))
         {
-            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1);
+            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
@@ -155,7 +155,7 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
             pass.renderData.wasCreated = wasCreated;
 			pass.renderData.history = history;
 
-			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2);
+			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
             pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);

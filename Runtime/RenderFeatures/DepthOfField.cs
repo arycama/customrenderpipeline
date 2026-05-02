@@ -95,7 +95,7 @@ public partial class DepthOfField : ViewRenderFeature
 				viewRenderData.viewSize
 			)))
 			{
-				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount);
+				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
                 pass.PreventNewSubPass = true;
 				pass.WriteTexture(tempId);
 

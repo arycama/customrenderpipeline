@@ -7,11 +7,11 @@ public readonly struct RenderPassDescriptor
     public readonly int viewCount, antiAliasing, depthAttachmentIndex, shadingRateImageAttachmentIndex;
     public readonly NativeArray<AttachmentData> attachments;
     public readonly NativeArray<SubPassDescriptor> subpasses;
-    public readonly int startPassIndex, endPassIndex;
+    public readonly int startPassIndex, endPassIndex, mipLevel;
     public readonly bool isScreenPass;
     public readonly string debugName;
 
-    public RenderPassDescriptor(Int2 size, NativeArray<AttachmentData> attachments, NativeArray<SubPassDescriptor> subpasses, int startPassIndex, int endPassIndex, int viewCount = 1, int antiAliasing = 1, int depthAttachmentIndex = -1, int shadingRateImageAttachmentIndex = -1, bool isScreenPass = false, string debugName = default)
+    public RenderPassDescriptor(Int2 size, NativeArray<AttachmentData> attachments, NativeArray<SubPassDescriptor> subpasses, int startPassIndex, int endPassIndex, int viewCount = 1, int antiAliasing = 1, int depthAttachmentIndex = -1, int shadingRateImageAttachmentIndex = -1, int mipLevel = 0, bool isScreenPass = false, string debugName = default)
     {
         this.size = size;
         this.viewCount = viewCount;
@@ -23,6 +23,7 @@ public readonly struct RenderPassDescriptor
         this.subpasses = subpasses;
         this.startPassIndex = startPassIndex;
         this.endPassIndex = endPassIndex;
+        this.mipLevel = mipLevel;
         this.debugName = debugName;
     }
 

@@ -64,12 +64,6 @@ public abstract class BaseComputeRenderPass<T> : RenderPass<T>
 		Command.SetComputeIntParam(computeShader, propertyName, value);
 	}
 
-	protected override void SetupTargets()
-	{
-		for (var i = 0; i < colorBindings.Count; i++)
-			Command.SetComputeTextureParam(computeShader, kernelIndex, colorBindings[i].Item2, GetRenderTexture(colorBindings[i].Item1), colorBindings[i].Item3);
-	}
-
 	public override void SetMatrix(string propertyName, Matrix4x4 value)
 	{
 		Command.SetComputeMatrixParam(computeShader, propertyName, value);

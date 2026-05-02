@@ -45,12 +45,6 @@ public abstract class GraphicsRenderPass<T> : RenderPass<T>
             throw new InvalidOperationException($"{Name} is attempting to write to a texture whose resolution does not match the pass");
     }
 
-    protected override void SetupTargets()
-    {
-        var viewportSize = new Int2(Size.x >> MipLevel, Size.y >> MipLevel);
-        Command.SetViewport(new Rect(0, Size.y - (Size.y >> MipLevel), viewportSize.x, viewportSize.y));
-    }
-
     public sealed override void PostExecute()
     {
         foreach (var colorTarget in colorTargets)

@@ -5,6 +5,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Assertions;
 
 #if UNITY_EDITOR
+    using UnityEditor;
     using UnityEditorInternal;
 #endif
 
