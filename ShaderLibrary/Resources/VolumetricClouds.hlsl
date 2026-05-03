@@ -162,8 +162,8 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	{
 		float4 bilinearWeights  = BilinearWeights(historyUv, ViewSize);
 	
-		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, input.uv));
-		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, historyUv));
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CameraDepthScaleLimit)));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousCameraDepthScaleLimit)));
 	
 		float4 historyR = _History.GatherRed(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit)) * PreviousToCurrentExposure;
 		float4 historyG = _History.GatherGreen(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));

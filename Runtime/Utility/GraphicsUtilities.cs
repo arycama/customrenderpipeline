@@ -247,4 +247,14 @@ public static class GraphicsUtilities
 		var rcp = 1.0f / destResolution;
 		return TexelRemap(new Rect(0, 0, 1, 1), new Rect(rcp * dest.x, rcp * dest.y, rcp * dest.width, rcp * dest.height));
 	}
+
+    public static Float4 ScaleLimit(Int2 targetSize, Int2 actualSize)
+    {
+        var scaleX = (float)targetSize.x / actualSize.x;
+        var scaleY = (float)targetSize.y / actualSize.y;
+        var limitX = (targetSize.x - 0.5f) / actualSize.x;
+        var limitY = (targetSize.y - 0.5f) / actualSize.y;
+
+        return new Float4(scaleX, scaleY, limitX, limitY);
+    }
 }

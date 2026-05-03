@@ -342,13 +342,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// TODO: Could render clouds after deferred, then sky after that
 		new DeferredLighting(renderGraph, asset.Sky),
 
-        new SunDiskRenderer(renderGraph, asset.LightingSettings),
-
-		// Depends on atmosphere, depth and light
-		new VolumetricClouds(asset.Clouds, renderGraph, asset.Sky),
-        new Sky(renderGraph, asset.Sky),
-
-        new GenericViewRenderFeature(renderGraph, viewRenderData =>
+         new GenericViewRenderFeature(renderGraph, viewRenderData =>
         {
             // Generate for next frame
             var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
@@ -361,6 +355,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
                 });
             }
         }),
+
+        new SunDiskRenderer(renderGraph, asset.LightingSettings),
+
+		// Depends on atmosphere, depth and light
+		new VolumetricClouds(asset.Clouds, renderGraph, asset.Sky),
+        new Sky(renderGraph, asset.Sky),
 
         new GenericViewRenderFeature(renderGraph, viewRenderData =>
         {

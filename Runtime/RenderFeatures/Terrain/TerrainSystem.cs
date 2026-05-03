@@ -446,8 +446,6 @@ public class TerrainSystem : FrameRenderFeature
 
     public override void Render(ScriptableRenderContext context)
     {
-        float maxHeight;
-
         // TODO: Logic here seems a bit off
         if (Terrain != Terrain.activeTerrain)
         {

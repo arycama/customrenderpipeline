@@ -1,3 +1,4 @@
+using System;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
@@ -129,11 +130,8 @@ public static class RenderGraphExtensions
         pass.WriteBuffer("", buffer);
         pass.SetRenderFunction(static (command, pass, data) =>
         {
-            var array = new NativeArray<T>(1, Allocator.Temp, NativeArrayOptions.UninitializedMemory);
-            {
-                array[0] = data.data;
-            }
-
+            Span<T> array = stackalloc T[1];
+            array[0] = data.data;
             command.SetBufferData(pass.GetBuffer(data.buffer), array);
         });
 
@@ -155,16 +153,9 @@ public static class RenderGraphExtensions
     public static Float4 GetScaleLimit2D(this RenderGraph renderGraph, ResourceHandle<RenderTexture> handle)
     {
         Assert.IsTrue(renderGraph.IsExecuting);
-
         var descriptor = renderGraph.RtHandleSystem.GetDescriptor(handle);
         var resource = renderGraph.RtHandleSystem.GetResource(handle);
-
-        var scaleX = (float)descriptor.width / resource.width;
-        var scaleY = (float)descriptor.height / resource.height;
-        var limitX = (descriptor.width - 0.5f) / resource.width;
-        var limitY = (descriptor.height - 0.5f) / resource.height;
-
-        return new Float4(scaleX, scaleY, limitX, limitY);
+        return GraphicsUtilities.ScaleLimit(new Int2(descriptor.width, descriptor.height), new Int2(resource.width, resource.height));
     }
 
     public static Float3 GetScale3D(this RenderGraph renderGraph, ResourceHandle<RenderTexture> handle)

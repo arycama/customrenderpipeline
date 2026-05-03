@@ -14,7 +14,6 @@ const static bool IsReflection = true;
 const static bool IsReflection = false;
 #endif
 
-float4 PreviousCameraTargetScaleLimit;
 float MaxSteps, Thickness, Intensity, ConeAngle, ResolveSize, MaxMip, RoughnessBias;
 uint ResolveSamples;
 
@@ -53,7 +52,7 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 		if (localL.z <= 0.0)
 		{
 			TraceResult output;
-			output.color = float4(Rec2020ToOffsetICtCp(PreviousCameraTarget[input.position.xy].rgb * PaperWhite * sqrt(2.0)), 0.0);
+			output.color = float4(Rec2020ToOffsetICtCp(min(10000.0, PreviousCameraTarget[input.position.xy].rgb * PaperWhite * sqrt(2.0))), 0.0);
 			output.hit = float4(L, rcpPdf);
 			return output;
 		}
@@ -74,14 +73,14 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 	if (!rayPos.z || any(rayPos.xy < 0.5 || rayPos.xy >= ViewSize - 0.5))
 		validHit = false;
 	
+	// TODO: Is it better to reproject last frame and then generate mip chain based on that?
+	float2 velocity = CameraVelocity[rayPos.xy];
+	float2 hitUv = rayPos.xy * RcpViewSize - velocity;
+	
 	float4 color;
 	float3 hitRay;
-	if (validHit)
+	if (validHit && all(hitUv == saturate(hitUv)))
 	{
-		// TODO: Is it better to reproject last frame and then generate mip chain based on that?
-		float2 velocity = CameraVelocity[rayPos.xy];
-		float2 hitUv = rayPos.xy * RcpViewSize - velocity;
-	
 		float3 viewHit = PixelToViewPosition(rayPos);
 		hitRay = viewHit - viewPosition;
 		
@@ -96,7 +95,9 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 			coneRadius *= coneTangent;
 		}
 		
-		color = float4(PreviousCameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, PreviousCameraTargetScaleLimit), log2(coneRadius)), 1.0);
+		float mipLevel = log2(coneRadius);
+		
+		color = float4(PreviousCameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, PreviousScaleLimit), mipLevel), 1.0);
 	}
 	else
 	{
@@ -105,13 +106,12 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 	}
 	
 	TraceResult output;
-	output.color = float4(Rec2020ToOffsetICtCp(color.rgb * PaperWhite * sqrt(2.0)), color.a);
+	output.color = float4(Rec2020ToOffsetICtCp(min(10000.0, color.rgb * PaperWhite * sqrt(2.0))), color.a);
 	output.hit = float4(hitRay, rcpPdf);
 	return output;
 }
 
 Texture2D<float4> HitResult, Input;
-float4 HistoryScaleLimit;
 float IsFirst;
 
 struct SpatialResult
@@ -286,14 +286,12 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	float2 previousUv = input.uv - velocity;
 	if (!IsFirst && all(saturate(previousUv) == previousUv))
 	{
-		previousUv = ClampScaleTextureUv(previousUv, HistoryScaleLimit);
-		
-		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, input.uv));
-		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, previousUv));
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CurrentScaleLimit)));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit)));
 	
-		uint4 packedHistory = History.Gather(LinearClampSampler, previousUv);
-		float4 opacityHistory = OpacityHistory.Gather(LinearClampSampler, previousUv);
-		float4 previousSpeed = SpeedHistory.Gather(LinearClampSampler, previousUv);
+		uint4 packedHistory = History.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit));
+		float4 opacityHistory = OpacityHistory.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit)); // Using history scale limit because both are screenspace anyway
+		float4 previousSpeed = SpeedHistory.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit)); // Using history scale limit because both are screenspace anyway
 	
 		float DepthThreshold = 1.0; // TODO: Make a property
 		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);

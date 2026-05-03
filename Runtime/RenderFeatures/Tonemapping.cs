@@ -7,10 +7,10 @@ public partial class Tonemapping : ViewRenderFeature
     private readonly Material tonemapMaterial;
     private readonly ColorGrading.Settings colorGradingSettings;
     private readonly Bloom.Settings bloomSettings;
-    private Matrix4x4 RgbToLmsr;
-    private Matrix4x4 LmsToRgb;
+   // private Matrix4x4 RgbToLmsr;
+    //private Matrix4x4 LmsToRgb;
 
-    private bool previousNormalize;
+    //private bool previousNormalize;
     private readonly HashSet<int> renderedViewIndices = new();
 
     public Tonemapping(RenderGraph renderGraph, ColorGrading.Settings colorGradingSettings, Bloom.Settings bloomSettings) : base(renderGraph)

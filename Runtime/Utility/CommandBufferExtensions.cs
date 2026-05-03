@@ -34,7 +34,7 @@ public static class CommandBufferExtensions
         var handle = AtomicSafetyHandle.Create();
 #endif
 
-        fixed (void* ptr = span)
+        fixed (T* ptr = span)
         {
             var arr = NativeArrayUnsafeUtility.ConvertExistingDataToNativeArray<T>(ptr, length, Allocator.None);
 #if ENABLE_UNITY_COLLECTIONS_CHECKS

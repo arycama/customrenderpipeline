@@ -203,16 +203,14 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleMinimalOutput input)
 	float2 previousUv = input.uv - velocity;
 	if (HasHistory && all(saturate(previousUv.xy) == previousUv.xy))
 	{
-		previousUv = ClampScaleTextureUv(previousUv, HistoryScaleLimit);
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CameraDepthScaleLimit)));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousCameraDepthScaleLimit)));
 	
-		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, input.uv));
-		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, previousUv));
-	
-		float4 packedHistoryR = History.GatherRed(LinearClampSampler, previousUv);
-		float4 packedHistoryG = History.GatherGreen(LinearClampSampler, previousUv);
-		float4 packedHistoryB = History.GatherBlue(LinearClampSampler, previousUv);
-		float4 packedHistoryA = History.GatherAlpha(LinearClampSampler, previousUv);
-		float4 previousSpeed = SpeedHistory.Gather(LinearClampSampler, previousUv);
+		float4 packedHistoryR = History.GatherRed(LinearClampSampler, ClampScaleTextureUv(previousUv, HistoryScaleLimit));
+		float4 packedHistoryG = History.GatherGreen(LinearClampSampler, ClampScaleTextureUv(previousUv, HistoryScaleLimit));
+		float4 packedHistoryB = History.GatherBlue(LinearClampSampler, ClampScaleTextureUv(previousUv, HistoryScaleLimit));
+		float4 packedHistoryA = History.GatherAlpha(LinearClampSampler, ClampScaleTextureUv(previousUv, HistoryScaleLimit));
+		float4 previousSpeed = SpeedHistory.Gather(LinearClampSampler, (previousUv ));
 		
 		float DepthThreshold = 1.0; // TODO: Make a property
 		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);

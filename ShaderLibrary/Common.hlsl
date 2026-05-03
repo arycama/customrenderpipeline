@@ -9,6 +9,8 @@ Texture2D<float2> CameraVelocity, PreviousCameraVelocity;
 Texture2D<float3> PreviousCameraTarget, CameraTarget;
 Texture2D<uint2> CameraStencil;
 
+float4 CameraDepthScaleLimit, PreviousCameraDepthScaleLimit;
+
 cbuffer FrameData
 {
 	matrix UiOverlayMatrix;
@@ -72,6 +74,9 @@ cbuffer ViewData
 	float4 PixelToViewScaleOffset;
 	float RenderDeltaTime;
 	float3 PreviousViewPosition;
+	
+	float4 CurrentScaleLimit;
+	float4 PreviousScaleLimit;
 };
 
 const static float3 ViewForward = ViewToWorld._13_23_33;
