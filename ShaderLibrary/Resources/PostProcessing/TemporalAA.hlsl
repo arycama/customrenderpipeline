@@ -9,7 +9,6 @@ Texture2D<float> InputVelocityMagnitudeHistory, HistoryWeight;
 
 cbuffer Properties
 {
-	float4 HistoryScaleLimit, HistoryWeightScaleLimit;
 	float _HasHistory, _SpatialSharpness, _MotionSharpness, _StationaryBlending, _Scale, _SpatialBlur, _SpatialSize, _VelocityBlending, _VelocityWeight;
 	float PropertiesPadding0, PropertiesPadding1, PropertiesPadding2, AfterImage;
 };
@@ -128,9 +127,9 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	
 	if (_HasHistory && all(saturate(historyUv) == historyUv))
 	{
-		float3 historySample = History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, HistoryScaleLimit)).rgb - float2(0.0, 0.5).xyy;
+		float3 historySample = History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit)).rgb - float2(0.0, 0.5).xyy;
 		historySample.r *= PreviousToCurrentExposure;
-		float historyWeight = HistoryWeight.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, HistoryWeightScaleLimit));
+		float historyWeight = HistoryWeight.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
 		
 		// TODO: does clamping in un-weighted space make any sense
 		historySample = ClampToAABB(historySample, mean, minValue, maxValue);

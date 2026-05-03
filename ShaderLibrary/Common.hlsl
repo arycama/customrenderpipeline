@@ -6,10 +6,8 @@
 Texture2D<float> CameraDepth, HiZMinDepth, HiZMaxDepth;
 Texture2D<float> PreviousCameraDepth;
 Texture2D<float2> CameraVelocity, PreviousCameraVelocity;
-Texture2D<float3> PreviousCameraTarget, CameraTarget;
+Texture2D<float3> SceneColor, CameraTarget;
 Texture2D<uint2> CameraStencil;
-
-float4 CameraDepthScaleLimit, PreviousCameraDepthScaleLimit;
 
 cbuffer FrameData
 {

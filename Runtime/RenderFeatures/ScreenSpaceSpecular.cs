@@ -64,7 +64,7 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
                 pass.WriteTexture(tempResult, "HitColor");
                 pass.WriteTexture(hitResult, "HitResult");
                 pass.ReadRtHandle<GBufferNormalRoughness>();
-                pass.ReadRtHandle<PreviousCameraTarget>();
+                pass.ReadRtHandle<SceneColor>();
                 pass.ReadResource<SkyReflectionAmbientData>();
                 pass.ReadResource<LightingSetup.Result>();
                 pass.ReadResource<AutoExposureData>();
@@ -99,7 +99,7 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
                 pass.ReadRtHandle<HiZMinDepth>();
                 pass.ReadRtHandle<CameraDepth>();
                 pass.ReadRtHandle<GBufferNormalRoughness>();
-                pass.ReadRtHandle<PreviousCameraTarget>();
+                pass.ReadRtHandle<SceneColor>();
                 pass.ReadResource<TemporalAAData>();
 
                 pass.SetRenderFunction(static (command, pass, data) =>

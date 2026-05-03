@@ -150,6 +150,9 @@ half3 GgxBsdf(half roughness2, half3 reflectivity, half NdotL, half NdotV, half 
 		LdotV = LdotV + 2.0h * NdotL * NdotV;
 	}
 	
+	if (LdotV <= -1.0h)
+		return 0.0h;
+	
 	half rcpLenLv = rsqrt(LdotV * 2.0h + 2.0h);
 	
 	// Setup vectors, t is for transmitted/second layer. Other vectors always relate to the final outgoing layer, which for single layer bsdfs is simply L and V.

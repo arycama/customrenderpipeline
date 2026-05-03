@@ -2,7 +2,6 @@ Shader "Hidden/ScreenSpaceReflections"
 {
     SubShader
     {
-        Cull Off
         ZWrite Off
         ZTest Off
 

@@ -62,7 +62,7 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
                 pass.WriteTexture(tempResult, "HitColor");
                 pass.WriteTexture(hitResult, "HitResult");
 				pass.ReadRtHandle<GBufferNormalRoughness>();
-				pass.ReadRtHandle<PreviousCameraTarget>();
+				pass.ReadRtHandle<SceneColor>();
                 pass.ReadResource<SkyReflectionAmbientData>();
                 pass.ReadResource<LightingSetup.Result>();
                 pass.ReadResource<AutoExposureData>();
@@ -75,7 +75,11 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
 		}
         else
         {
-			using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Trace", (settings.Intensity, settings.MaxSamples, settings.Thickness, viewRenderData.viewSize, settings.ConeAngle, viewRenderData.tanHalfFov.y)))
+            var maxMip = Texture2DExtensions.MipCount(viewRenderData.viewSize) - 1;
+            var coneTanHalfAngle = Math.Tan(0.5f * Math.Radians(settings.ConeAngle));
+            var coneAngle = coneTanHalfAngle;// * viewRenderData.viewSize.y / viewRenderData.tanHalfFov.y;
+
+            using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Trace", (settings.Intensity, settings.MaxSamples, settings.Thickness, maxMip, coneAngle)))
 			{
 				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
                 pass.PreventNewSubPass = true;
@@ -96,15 +100,15 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
 				pass.ReadRtHandle<HiZMinDepth>();
 				pass.ReadRtHandle<CameraDepth>();
 				pass.ReadRtHandle<GBufferNormalRoughness>();
-				pass.ReadRtHandle<PreviousCameraTarget>();
+				pass.ReadRtHandle<SceneColor>();
 
 				pass.SetRenderFunction(static (command, pass, data) =>
 				{
 					pass.SetFloat("Intensity", data.Intensity);
 					pass.SetFloat("MaxSteps", data.MaxSamples);
 					pass.SetFloat("Thickness", data.Thickness);
-					pass.SetFloat("MaxMip", Texture2DExtensions.MipCount(data.viewSize) - 1);
-					pass.SetFloat("ConeAngle", Mathf.Tan(0.5f * data.ConeAngle * Mathf.Deg2Rad) * (data.viewSize.y / data.y * 0.5f));
+					pass.SetFloat("MaxMip", data.maxMip);
+					pass.SetFloat("ConeAngle", data.coneAngle);
 				});
 			}
         }

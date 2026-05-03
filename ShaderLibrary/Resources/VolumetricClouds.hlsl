@@ -99,7 +99,6 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 }
 
 Texture2D<float> _InputTransmittance, _TransmittanceHistory, WeightHistory;
-float4 _HistoryScaleLimit, _TransmittanceHistoryScaleLimit, WeightHistoryScaleLimit;
 float _IsFirst;
 float _StationaryBlend, _MotionBlend, _MotionFactor;
 float DepthThreshold;
@@ -142,6 +141,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 			float depthWeight = saturate(1.0 - abs(centerDepth - depth) / max(1, centerDepth) * DepthThreshold);
 			
 			float4 color = float4(_Input[coord], _InputTransmittance[coord]);
+			color.gb -= 0.5;
 			current = i == 0 ? (color * weight * depthWeight) : (current + color * weight * depthWeight);
 			mean += color * depthWeight;
 			stdDev += Sq(color) * depthWeight;
@@ -160,35 +160,49 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
-		float4 bilinearWeights  = BilinearWeights(historyUv, ViewSize);
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CurrentScaleLimit)));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit)));
 	
-		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CameraDepthScaleLimit)));
-		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousCameraDepthScaleLimit)));
-	
-		float4 historyR = _History.GatherRed(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit)) * PreviousToCurrentExposure;
-		float4 historyG = _History.GatherGreen(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
-		float4 historyB = _History.GatherBlue(LinearClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
-		float4 historyA = _TransmittanceHistory.Gather(LinearClampSampler, ClampScaleTextureUv(historyUv, _TransmittanceHistoryScaleLimit));
+		float4 historyR = _History.GatherRed(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
+		float4 historyG = _History.GatherGreen(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
+		float4 historyB = _History.GatherBlue(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
+		float4 historyA = _TransmittanceHistory.Gather(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
 		
 		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);
+		float4 bilinearWeights = BilinearWeights(historyUv, ViewSize);
+		float4 weights = bilinearWeights * depthWeights;
 		
 		float4 history = 0;
+		float historyWeight = 0.0;
+		
 		[unroll]
 		for (uint i = 0; i < 4; i++)
 		{
 			float4 historySample = float4(historyR[i], historyG[i], historyB[i], historyA[i]);
-			history += bilinearWeights[i] * lerp(current, historySample, depthWeights[i]);
+			historySample.gb -= 0.5;
+			
+			history += weights[i] * lerp(current, historySample, depthWeights[i]);
+			historyWeight += weights[i];
 		}
 		
-		history = clamp(history, minValue, maxValue);
-		current = lerp(history, current, 0.05);
+		if (historyWeight)
+		{
+			history /= historyWeight;
+			history.r *= PreviousToCurrentExposure;
+			history.rgb = ClampToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
+			history.a = clamp(history.a, minValue.a, maxValue.a);
+			current = lerp(current, history, 0.95);
+		} 
 	}
+	
+	current.gb += 0.5;
+	current = IsInfOrNaN(current) ? 0 : current;
 	
 	TemporalOutput output;
 	output.luminance = float4(current.rgb, 1.0);
 	output.transmittance = current.a;
 	
-	current.rgb = ICtCpToRec2020(current.rgb - float2(0.0, 0.5).xyy) / (PaperWhite * sqrt(2.0));	
+	current.rgb = ICtCpToRec2020(current.rgb - float2(0.0, 0.5).xyy) / (PaperWhite * sqrt(2.0));
 	output.frameResult = current;
 	return output;
 }

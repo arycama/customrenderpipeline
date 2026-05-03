@@ -18,10 +18,8 @@ Texture2D<float4> _WaterNormalFoam;
 Texture2D<float3> _WaterEmission, _UnderwaterResult;
 Texture2D<float3> _RefractionInput, _ScatterInput, _History;
 Texture2D<float> CameraDepthCopy;
-float4 _HistoryScaleLimit;
 float _IsFirst;
 
-float4 _UnderwaterResultScaleLimit;
 float3 Extinction, Albedo;
 float _RefractOffset, _Steps;
 
@@ -183,7 +181,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 	float3 underwater = 0.0;
 	if (underwaterDepth)
 	{
-		underwater = _UnderwaterResult.Sample(LinearClampSampler, ClampScaleTextureUv(refractedPositionSS * RcpViewSize, _UnderwaterResultScaleLimit));
+		underwater = _UnderwaterResult.Sample(LinearClampSampler, ClampScaleTextureUv(refractedPositionSS * RcpViewSize, CurrentScaleLimit));
 		underwater *= exp(-Extinction * maxUnderwaterDistance);
 	}
 
@@ -207,7 +205,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	float2 historyUv = input.uv - CameraVelocity[input.position.xy];
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
-		float3 history = _History.Sample(PointClampSampler, ClampScaleTextureUv(historyUv, _HistoryScaleLimit));
+		float3 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
 		
 		if(any(history != 0))
 		{

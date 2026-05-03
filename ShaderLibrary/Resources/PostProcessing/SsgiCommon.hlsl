@@ -52,7 +52,7 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 		if (localL.z <= 0.0)
 		{
 			TraceResult output;
-			output.color = float4(Rec2020ToOffsetICtCp(min(10000.0, PreviousCameraTarget[input.position.xy].rgb * PaperWhite * sqrt(2.0))), 0.0);
+			output.color = float4(Rec2020ToOffsetICtCp(min(10000.0, SceneColor[input.position.xy].rgb * PaperWhite * sqrt(2.0))), 0.0);
 			output.hit = float4(L, rcpPdf);
 			return output;
 		}
@@ -74,30 +74,29 @@ TraceResult Fragment(VertexFullscreenTriangleOutput input)
 		validHit = false;
 	
 	// TODO: Is it better to reproject last frame and then generate mip chain based on that?
-	float2 velocity = CameraVelocity[rayPos.xy];
-	float2 hitUv = rayPos.xy * RcpViewSize - velocity;
-	
 	float4 color;
 	float3 hitRay;
-	if (validHit && all(hitUv == saturate(hitUv)))
+	if (validHit)
 	{
 		float3 viewHit = PixelToViewPosition(rayPos);
 		hitRay = viewHit - viewPosition;
 		
 		// Calculate size of a screenspace cone based on distance travelled and depth of sample (since distant pixels are smaller)
-		float hitDist = length(hitRay);
-		float coneRadius = ConeAngle * hitDist * rcp(viewHit.z);
-		
+		float coneTanHalfAngle;
 		if (IsReflection)
 		{
-			float coneTangent = GetSpecularLobeTanHalfAngle(roughness * (1.0 - RoughnessBias));
-			coneTangent *= lerp(saturate(NdotV * 2), 1, normalRoughness.b);
-			coneRadius *= coneTangent;
+			coneTanHalfAngle = GetSpecularLobeTanHalfAngle(roughness * (1.0 - RoughnessBias));
+			coneTanHalfAngle *= lerp(saturate(NdotV * 2), 1, normalRoughness.b);
+		}
+		else
+		{
+			coneTanHalfAngle = ConeAngle;
 		}
 		
-		float mipLevel = log2(coneRadius);
-		
-		color = float4(PreviousCameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(hitUv, PreviousScaleLimit), mipLevel), 1.0);
+		float rcpHitDist = RcpLength(hitRay);
+		float dxy = coneTanHalfAngle * ViewSize.y * rcp(2.0 * TanHalfFov * viewHit.z * rcpHitDist);
+		float mipLevel = 0.5 * log2(Sq(dxy));
+		color = float4(SceneColor.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(rayPos.xy * RcpViewSize, PreviousScaleLimit), mipLevel), 1.0);
 	}
 	else
 	{

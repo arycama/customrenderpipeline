@@ -121,7 +121,6 @@ public class Rain : ViewRenderFeature
 			pass.ReadResource<FrameData>();
 			pass.ReadResource<ViewData>();
 			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<PreviousCameraTarget>();
 			pass.ReadResource<EnvironmentData>();
 			pass.ReadResource<LightingData>();
 

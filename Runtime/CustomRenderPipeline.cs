@@ -26,7 +26,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
     private double previousTime;
 
-    private readonly PersistentRTHandleCache cameraTargetCache, cameraDepthCache, cameraVelocityCache;
+    private readonly PersistentRTHandleCache sceneColorCache, cameraDepthCache, cameraVelocityCache;
     private readonly TerrainSystem terrainSystem;
     private readonly VirtualTerrain virtualTextureUpdate;
     private readonly TerrainShadowRenderer terrainShadowRenderer;
@@ -36,11 +36,13 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
     protected override float SdrLuminance => asset.ColorGrading.SdrLuminance;
 
+    private readonly Material reprojectPreviousFrameMaterial;
+
     public CustomRenderPipeline(CustomRenderPipelineAsset renderPipelineAsset) : base(renderPipelineAsset)
     {
         quadtreeCull = new(renderGraph);
 
-        cameraTargetCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Previous Scene Color", hasMips: true, isScreenTexture: true, clear: true);
+        sceneColorCache = new(GraphicsFormat.B10G11R11_UFloatPack32, renderGraph, "Scene Color", isScreenTexture: true);
         cameraDepthCache = new(GraphicsFormat.D32_SFloat_S8_UInt, renderGraph, "Previous Depth", isScreenTexture: true, clear: true);
         cameraVelocityCache = new(GraphicsFormat.R16G16_SFloat, renderGraph, "Previous Velocity", isScreenTexture: true);
 
@@ -49,13 +51,15 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         terrainShadowRenderer = new TerrainShadowRenderer(renderGraph, asset.TerrainSettings, quadtreeCull);
         gpuDrivenRenderer = new GpuDrivenRenderer(renderGraph);
         environmentConvolve = new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting);
+
+        reprojectPreviousFrameMaterial = new Material(Shader.Find("Hidden/Reproject Previous Frame"));
     }
 
     protected override void Dispose(bool disposing)
     {
         base.Dispose(disposing);
 
-        cameraTargetCache.Dispose();
+        sceneColorCache.Dispose();
         cameraDepthCache.Dispose();
         cameraVelocityCache.Dispose();
         terrainShadowRenderer.Dispose();
@@ -186,10 +190,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         {
             using var pass = renderGraph.AddObjectRenderPass("GBuffer");
 
-            var (cameraTarget, previousScene, currentSceneCreated) = cameraTargetCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
-            renderGraph.SetRTHandle<CameraTarget>(cameraTarget);
-            renderGraph.SetRTHandle<PreviousCameraTarget>(previousScene);
-
+            renderGraph.SetRTHandle<CameraTarget>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true, clear: true));
             renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
             renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
             renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
@@ -302,8 +303,38 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         }),
 
         new WaterRenderer(renderGraph, asset.OceanSettings, quadtreeCull),
-
         new GenerateCameraVelocity(renderGraph),
+
+        new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        {
+            // Generate mips for the reprojected previous frame
+            var (sceneColorCopy, previousSceneColorCopy, sceneColorCopyCreated) = sceneColorCache.GetTextures(viewRenderData.viewSize, renderGraph.RenderPassCount, viewRenderData.viewId);
+
+            // Set current copy as rt handle for later access
+            renderGraph.SetRTHandle<SceneColorCopy>(sceneColorCopy);
+
+            var sceneColor = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true);
+            using(var pass = renderGraph.AddFullscreenRenderPass("Reproject Previous Frame"))
+            {
+                pass.Initialize(reprojectPreviousFrameMaterial, viewRenderData.viewSize, isScreenPass: true);
+                pass.WriteTexture(sceneColor);
+                pass.ReadTexture("PreviousSceneColorCopy", previousSceneColorCopy);
+
+                pass.ReadRtHandle<CameraVelocity>();
+            }
+
+            using (var pass = renderGraph.AddGenericRenderPass("Generate Scene Color Mips", sceneColor))
+            {
+                pass.WriteTexture(sceneColor);
+                pass.ReadTexture("", sceneColor);
+                pass.SetRenderFunction(static (command, pass, sceneColor) =>
+                {
+                    command.GenerateMips(pass.GetRenderTexture(sceneColor));
+                });
+            }
+
+            renderGraph.SetRTHandle<SceneColor>(sceneColor);
+        }),
 
 		// Depth Processing
 		new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Min),
@@ -342,16 +373,18 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// TODO: Could render clouds after deferred, then sky after that
 		new DeferredLighting(renderGraph, asset.Sky),
 
-         new GenericViewRenderFeature(renderGraph, viewRenderData =>
+       new GenericViewRenderFeature(renderGraph, viewRenderData =>
         {
-            // Generate for next frame
+            // Copy for next frame (TODO: Could also output from deferred pass, hrm)
+            var sceneColorCopy = renderGraph.GetRTHandle<SceneColorCopy>();
             var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
-            using (var pass = renderGraph.AddGenericRenderPass("Generate Color Pyramid", cameraTarget))
+            using (var pass = renderGraph.AddGenericRenderPass("Copy Scene Color", (cameraTarget, sceneColorCopy)))
             {
                 pass.ReadRtHandle<CameraTarget>();
-                pass.SetRenderFunction(static (command, pass, cameraTarget) =>
+                pass.WriteTexture(renderGraph.GetRTHandle<SceneColorCopy>());
+                pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    command.GenerateMips(pass.GetRenderTexture(cameraTarget));
+                    command.CopyTexture(pass.GetRenderTexture(data.cameraTarget), pass.GetRenderTexture(data.sceneColorCopy));
                 });
             }
         }),

@@ -197,7 +197,6 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 	#endif
 }
 
-float4 PreviousLuminanceScaleLimit, PreviousSpeedScaleLimit;
 Texture2D<float4> Input;
 Texture2D<uint> PreviousLuminance;
 Texture2D<float> PreviousSpeed;
@@ -257,11 +256,11 @@ FragmentOutputTemporal FragmentTemporal(VertexFullscreenTriangleOutput input)
 	
 	if (!IsFirst && all(saturate(previousUv) == previousUv))
 	{
-		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CameraDepthScaleLimit)));
-		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousCameraDepthScaleLimit)));
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CurrentScaleLimit)));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit)));
 	
-		uint4 packedHistory = PreviousLuminance.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousLuminanceScaleLimit));
-		float4 previousSpeed = PreviousSpeed.GatherRed(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousSpeedScaleLimit));
+		uint4 packedHistory = PreviousLuminance.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit));
+		float4 previousSpeed = PreviousSpeed.GatherRed(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit));
 		
 		float DepthThreshold = 5.0; // TODO: Make a property
 		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);

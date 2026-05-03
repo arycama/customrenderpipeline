@@ -30,7 +30,6 @@ float3 Direction, Illuminance;
 Texture2D<float4> CloudTexture;
 Texture2D<float3> SkyTexture, _Input;
 Texture2D<float> CloudTransmittanceTexture;
-float4 CloudTextureScaleLimit, SkyTextureScaleLimit;
 
 float3 Fragment(FragmentInput input) : SV_Target
 {

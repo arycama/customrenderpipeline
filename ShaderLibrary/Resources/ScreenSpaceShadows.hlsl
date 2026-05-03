@@ -49,12 +49,10 @@ float4 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 	return float4(rayPos, validHit); // float4(hitRay, outDepth);
 }
 
-float4 PreviousCameraTargetScaleLimit;
 float _ConeAngle, _ResolveSize;
 uint _ResolveSamples;
 
 Texture2D<float4> _Input;
-float4 _HistoryScaleLimit;
 float _IsFirst;
 
 float FragmentSpatial(VertexFullscreenTriangleOutput input) : SV_Target
@@ -116,7 +114,7 @@ float FragmentTemporal(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	TemporalNeighborhood(_TemporalInput, input.position.xy, minValue, maxValue, result);
 	
 	float2 historyUv = input.uv - CameraVelocity[input.position.xy];
-	float history = _History.Sample(LinearClampSampler, min(historyUv * _HistoryScaleLimit.xy, _HistoryScaleLimit.zw));
+	float history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
 
 	history = clamp(history, minValue, maxValue);
 	

@@ -12,8 +12,6 @@ struct FragmentOutput
 
 Texture2D<float4> AlbedoMetallicCopy, NormalRoughnessCopy, BentNormalOcclusionCopy;
 
-float4 AlbedoMetallicCopyScaleLimit, NormalRoughnessCopyScaleLimit, BentNormalOcclusionCopyScaleLimit;
-
 FragmentOutput FragmentCopy(VertexFullscreenTriangleMinimalOutput input)
 {
 	FragmentOutput output;

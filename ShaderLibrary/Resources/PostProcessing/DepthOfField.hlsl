@@ -4,37 +4,8 @@
 #include "../../Random.hlsl"
 #include "../../ScreenSpaceRaytracing.hlsl"
 
-float4 DepthScaleLimit, CameraTargetScaleLimit;
 float3 _DefocusU, _DefocusV;
 float _ApertureRadius, _FocusDistance, _MaxMip, _SampleCount, _Test, _TaaEnabled;
-
-// Helper function to get perpendicular vector
-float2 perpendicular(float2 v)
-{
-	return float2(-v.y, v.x);
-}
-
-float2 ConcentricSampleDisk(float2 u)
-{
-	float2 uOffset = 2.0f * u - 1.0f;
-    
-	if (uOffset.x == 0.0f && uOffset.y == 0.0f)
-		return float2(0.0f, 0.0f);
-    
-	float theta, r;
-	if (abs(uOffset.x) > abs(uOffset.y))
-	{
-		r = uOffset.x;
-		theta = 3.14159f / 4.0f * (uOffset.y / uOffset.x);
-	}
-	else
-	{
-		r = uOffset.y;
-		theta = 3.14159f / 2.0f - 3.14159f / 4.0f * (uOffset.x / uOffset.y);
-	}
-    
-	return r * float2(cos(theta), sin(theta));
-}
 
 float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 {
@@ -85,7 +56,7 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 		float sizeAtDist = 0.5 * size / (viewDepth * TanHalfFov);
 		float lenSqr = Sq(ViewSize.y * sizeAtDist);
 		float mipLevel = 0.5 * log2(lenSqr);
-		color += CameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(rayPos.xy * RcpViewSize, CameraTargetScaleLimit), mipLevel);
+		color += CameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(rayPos.xy * RcpViewSize, CurrentScaleLimit), mipLevel);
 		weightSum++;
 	}
 

@@ -7,7 +7,6 @@
 Texture2D<float4> History, Input;
 Texture2D<float> SpeedHistory;
 
-float4 DepthScaleLimit, HistoryScaleLimit, InputScaleLimit;
 float Radius, Samples, Directions, Falloff, ThinOccluderCompensation, Strength, HasHistory, MaxScreenRadius;
 
 float3 ComputeViewspacePosition(float2 coord)
@@ -203,14 +202,14 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleMinimalOutput input)
 	float2 previousUv = input.uv - velocity;
 	if (HasHistory && all(saturate(previousUv.xy) == previousUv.xy))
 	{
-		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CameraDepthScaleLimit)));
-		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousCameraDepthScaleLimit)));
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CurrentScaleLimit)));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit)));
 	
-		float4 packedHistoryR = History.GatherRed(LinearClampSampler, ClampScaleTextureUv(previousUv, HistoryScaleLimit));
-		float4 packedHistoryG = History.GatherGreen(LinearClampSampler, ClampScaleTextureUv(previousUv, HistoryScaleLimit));
-		float4 packedHistoryB = History.GatherBlue(LinearClampSampler, ClampScaleTextureUv(previousUv, HistoryScaleLimit));
-		float4 packedHistoryA = History.GatherAlpha(LinearClampSampler, ClampScaleTextureUv(previousUv, HistoryScaleLimit));
-		float4 previousSpeed = SpeedHistory.Gather(LinearClampSampler, (previousUv ));
+		float4 packedHistoryR = History.GatherRed(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit));
+		float4 packedHistoryG = History.GatherGreen(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit));
+		float4 packedHistoryB = History.GatherBlue(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit));
+		float4 packedHistoryA = History.GatherAlpha(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit));
+		float4 previousSpeed = SpeedHistory.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit));
 		
 		float DepthThreshold = 1.0; // TODO: Make a property
 		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);
@@ -232,8 +231,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleMinimalOutput input)
 		if (historyWeight)
 		{
 			history /= historyWeight;
-			history.rgb = ClampToAABB(history.rgb, result.rgb, minValue.rgb, maxValue.rgb);
-			history.a = clamp(history.a, minValue.a, maxValue.a);
+			history = clamp(history, minValue, maxValue);
 			result = lerp(result, history, speed);
 		}
 	}

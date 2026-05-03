@@ -18,7 +18,6 @@
 float _CloudCoverageScale, _CloudCoverageOffset;
 matrix _WorldToCloudShadow;
 float _CloudShadowDepthInvScale, _CloudShadowExtinctionInvScale;
-float4 _CloudShadowScaleLimit;
 
 Texture2D<float3> _CloudShadow;
 
@@ -110,7 +109,7 @@ float CloudTransmittance(float3 positionWS)
 	if (any(saturate(coords.xy) != coords.xy) || coords.z < 0.0)
 		return 1.0;
 	
-	float3 shadowData = _CloudShadow.SampleLevel(LinearClampSampler, ClampScaleTextureUv(coords.xy, _CloudShadowScaleLimit), 0.0);
+	float3 shadowData = _CloudShadow.SampleLevel(LinearClampSampler, coords.xy, 0.0);
 	float depth = max(0.0, coords.z - shadowData.r) * _CloudShadowDepthInvScale;
 	float transmittance = exp2(-depth * shadowData.g * _CloudShadowExtinctionInvScale);
 	return max(transmittance, shadowData.b);
@@ -391,17 +390,17 @@ float4 EvaluateLighting(LightingInput input, uint2 pixelCoordinate, bool isWater
 		refractDirection = eta * refractDirection + (eta * -input.NdotV - sqrt(1.0h - sinThetaSq)) * -input.N;
 	
 	half3 environmentRefraction;
-	if (input.refractedEnvironment)
-	{
-		float linearHitDepth = LinearEyeDepth(CameraDepth[pixelCoordinate]);
-		float hitDist = linearHitDepth;
-		float coneTangent = GetSpecularLobeTanHalfAngle(input.roughness);
-		coneTangent *= lerp(saturate(input.NdotV * 2), 1, sqrt(input.roughness));
-		float mipLevel = log2(ViewSize.y * 0.5 * coneTangent * hitDist / (linearHitDepth * TanHalfFov));
+	//if (input.refractedEnvironment)
+	//{
+	//	float linearHitDepth = LinearEyeDepth(CameraDepth[pixelCoordinate]);
+	//	float hitDist = linearHitDepth;
+	//	float coneTangent = GetSpecularLobeTanHalfAngle(input.roughness);
+	//	coneTangent *= lerp(saturate(input.NdotV * 2), 1, sqrt(input.roughness));
+	//	float mipLevel = log2(ViewSize.y * 0.5 * coneTangent * hitDist / (linearHitDepth * TanHalfFov));
 			
-		environmentRefraction = PreviousCameraTarget.SampleLevel(TrilinearClampSampler, (pixelCoordinate + 0.5) / ViewSize, mipLevel);
-	}
-	else
+	//	environmentRefraction = SceneColor.SampleLevel(TrilinearClampSampler, (pixelCoordinate + 0.5) / ViewSize, mipLevel);
+	//}
+	//else
 	{
 		half2 refractUv = NormalToOctahedralUv(refractDirection);
 		environmentRefraction = SkyReflection.SampleLevel(TrilinearClampSampler, refractUv, environmentMip);

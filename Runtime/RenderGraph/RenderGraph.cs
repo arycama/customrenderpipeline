@@ -57,6 +57,7 @@ public class RenderGraph : IDisposable
     public ResourceHandle<RenderTexture> EmptyCubemap { get; }
     public ResourceHandle<RenderTexture> EmptyCubemapArray { get; }
 
+    public int RenderPassCount => renderPasses.Count;
     public int FrameIndex { get; private set; }
     public bool IsExecuting { get; private set; }
     public bool CullRtHandles { get; set; }
