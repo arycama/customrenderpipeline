@@ -121,15 +121,17 @@ float3 EvaluateLight(LightingInput input, float diffuseTerm, float f0Avg, float3
 	float NdotL = dot(input.N, L);
 	diffuseTerm *= DirectionalAlbedoMs.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float3(abs(NdotL), input.perceptualRoughness, f0Avg), 16), 0.0);
 	
-	float3 result = saturate(NdotL) * (1.0 - input.translucency);
+	half BdotL = dot(input.bentNormal, L);
+	half microShadow = MicroShadows ? saturate(Sq(BdotL / input.cosVisibilityAngle)) : 1.0;
+	
+	float3 result = saturate(NdotL) * (1.0 - input.translucency) * microShadow;
+	
 	result += WrappedDiffuse(-NdotL, 1) * input.translucency;
 	result *= diffuseTerm * input.albedo;
 	
 	float LdotV = dot(L, input.V);
-	result += GgxBsdf(input.roughness2, input.reflectivity, NdotL, input.NdotV, LdotV, input.isVolume, input.diffuseOpacity);
+	result += GgxBsdf(input.roughness2, input.reflectivity, NdotL, input.NdotV, LdotV, input.isVolume, input.diffuseOpacity) * microShadow;
 	
-	half BdotL = dot(input.bentNormal, L);
-	half microShadow = MicroShadows ? saturate(Sq(BdotL / input.cosVisibilityAngle)) : 1.0;
 	
 	//if (MicroShadows)
 	//{
@@ -138,7 +140,7 @@ float3 EvaluateLight(LightingInput input, float diffuseTerm, float f0Avg, float3
 	//	microShadow = ConeCosAngleToSolidAngle(sunCosAngle) * SunRcpSolidAngle;
 	//}
 	
-	return RcpPi * result * microShadow;
+	return RcpPi * result;
 }
 
 float GetLightAttenuation(LightData light, float3 worldPosition, float dither, bool softShadows)
