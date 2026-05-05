@@ -52,10 +52,8 @@ float3 Fragment(VertexFullscreenTriangleOutput input) : SV_Target
 		// Calculate mip level 
 		float viewDepth = LinearEyeDepth(rayPos.z);
 		float dist = abs(viewDepth - _FocusDistance);
-		float size = dist * tanHalfAngle;
-		float sizeAtDist = 0.5 * size / (viewDepth * TanHalfFov);
-		float lenSqr = Sq(ViewSize.y * sizeAtDist);
-		float mipLevel = 0.5 * log2(lenSqr);
+		float dxy = tanHalfAngle * dist * rcp(2.0 * TanHalfFov * viewDepth);
+		float mipLevel = 0.5 * log2(Sq(dxy * ViewSize.y));
 		color += CameraTarget.SampleLevel(TrilinearClampSampler, ClampScaleTextureUv(rayPos.xy * RcpViewSize, CurrentScaleLimit), mipLevel);
 		weightSum++;
 	}

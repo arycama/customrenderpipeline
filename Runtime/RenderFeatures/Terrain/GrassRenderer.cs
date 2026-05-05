@@ -41,6 +41,9 @@ public class GrassRenderer : ViewRenderFeature
 
 	public override void Render(ViewRenderData viewRenderData)
     {
+        if (viewRenderData.camera.cameraType == CameraType.Preview)
+            return;
+
         if (!settings.Enabled)
             return;
 

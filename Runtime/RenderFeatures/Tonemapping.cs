@@ -44,6 +44,14 @@ public partial class Tonemapping : ViewRenderFeature
         pass.ReadResource<ScreenSpaceDiffuse.Result>(true);
         pass.ReadResource<ViewData>();
 
+#if UNITY_EDITOR
+        if(renderGraph.TryGetRTHandle< GizmosTarget>(out _))
+        {
+            pass.ReadRtHandle<GizmosTarget>();
+            pass.AddKeyword("GIZMOS_ON");
+        }
+#endif
+
         if (bloomSettings.Strength > 0.0f)
         {
             pass.ReadRtHandle<CameraBloom>();

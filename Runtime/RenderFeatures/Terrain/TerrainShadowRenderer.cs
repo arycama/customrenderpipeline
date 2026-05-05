@@ -35,7 +35,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 
 		var passData = Cull(viewRenderData.transform.position, cullingPlanes, viewRenderData.viewSize);
 
-		var passIndex = shadowRequestData.ZClip ? settings.Material.FindPass("PointShadow") : settings.Material.FindPass("DirectionalShadow");
+		var passIndex = settings.Material.FindPass("ShadowCaster");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no ShadowCaster Pass");
 
 		var size = terrainData.size;

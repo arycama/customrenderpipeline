@@ -55,13 +55,13 @@ float2 Unpack888ToFloat2(float3 x)
 
 float2 NormalToPyramidUv(float3 n)
 {
-	return 0.5 * rcp(max(abs(n.x), abs(n.y)) + n.z) * n.xy + 0.5;
+	return 0.5 * rcp(Max2(abs(n.xy)) + n.z) * n.xy + 0.5;
 }
 
 float3 PyramidUvToNormal(float2 uv)
 {
 	uv = 2.0 * uv - 1.0;
-	return normalize(float3(uv, 1.0 - max(abs(uv.x), abs(uv.y))));
+	return normalize(float3(uv, 1.0 - Max2(abs(uv))));
 }
 
 // Packs a normal into a uv using hemi-octahedral encoding

@@ -199,21 +199,48 @@ struct TemporalOutput
 
 TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 {
-	float3 minValue, maxValue, result;
-	TemporalNeighborhood(_ScatterInput, input.position.xy, minValue, maxValue, result);
+	float3 minValue, maxValue, current;
+	float3 mean = 0.0, stdDev = 0.0;
+	
+	[unroll]
+	for (int y = -1, i = 0; y <= 1; y++)
+	{
+		[unroll]
+		for (int x = -1; x <= 1; x++, i++)
+		{
+			float weight = GetBoxFilterWeight(i);
+			float3 color = _ScatterInput[clamp(input.position.xy + int2(x, y), 0, ViewSizeMinusOne)];
+			color.gb -= 0.5;
+			current = i == 0 ? color * weight : current + color * weight;
+			mean += color;
+			stdDev += color * color;
+			minValue = i == 0 ? color : min(minValue, color);
+			maxValue = i == 0 ? color : max(maxValue, color);
+		}
+	}
+	
+	mean /= 9.0;
+	stdDev /= 9.0;
+	stdDev = sqrt(abs(stdDev - mean * mean));
+	minValue = mean - stdDev;
+	maxValue = mean + stdDev;
 
 	float2 historyUv = input.uv - CameraVelocity[input.position.xy];
 	if (!_IsFirst && all(saturate(historyUv) == historyUv))
 	{
 		float3 history = _History.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
+		history.gb -= 0.5;
 		
 		if(any(history != 0))
 		{
 			history.r *= PreviousToCurrentExposure;
-			history = ClampToAABB(history, result, minValue, maxValue);
-			result = lerp(history, result, 0.05);
+			history = ClampToAABB(history, current, minValue, maxValue);
+			current = lerp(history, current, 0.05);
 		}
 	}
+	
+	current.gb += 0.5;
+	current = IsInfOrNaN(current) ? 0 : current;
 	
 	// Apply roughness to transmission
 	float4 normalRoughness = GBufferNormalRoughness[input.position.xy];
@@ -226,7 +253,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	float diffuseTerm = averageAlbedoMs ? viewDirectionalAlbedoMs * rcp(averageAlbedoMs) : 0.0; // TODO: Bake into DFG?
 	
 	TemporalOutput output;
-	output.temporal = float4(result, 1.0);
-	output.scene = float4(ICtCpToRec2020(result - float2(0.0, 0.5).xyy) / (PaperWhite * sqrt(2.0)), diffuseTerm);
+	output.temporal = float4(current, 1.0);
+	output.scene = float4(ICtCpToRec2020(current - float2(0.0, 0.5).xyy) / (PaperWhite * sqrt(2.0)), diffuseTerm);
 	return output;
 }

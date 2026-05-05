@@ -35,6 +35,17 @@ public partial class DepthOfField : ViewRenderFeature
         var focalLength = PhysicalCameraUtility.FocalLength(sensorSize, viewRenderData.tanHalfFov.y);
 		var apertureRadius = PhysicalCameraUtility.ApertureRadius(focalLength, aperture);
 
+        var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
+        using (var pass = renderGraph.AddGenericRenderPass("Generate Scene Color Mips", cameraTarget))
+        {
+            pass.WriteTexture(cameraTarget);
+            pass.ReadTexture("", cameraTarget);
+            pass.SetRenderFunction(static (command, pass, cameraTarget) =>
+            {
+                command.GenerateMips(pass.GetRenderTexture(cameraTarget));
+            });
+        }
+
 		if (settings.UseRaytracing)
 		{
 			// Need to set some things as globals so that hit shaders can access them..

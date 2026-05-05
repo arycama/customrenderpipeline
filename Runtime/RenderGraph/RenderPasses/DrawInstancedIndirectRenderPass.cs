@@ -52,10 +52,12 @@ public class DrawInstancedIndirectRenderPass<T> : DrawRenderPass<T>
 
         if (mesh == null)
             return;
-		
-        Command.DrawMeshInstancedIndirect(mesh, submeshIndex, material, passIndex, RenderGraph.BufferHandleSystem.GetResource(indirectArgsBuffer), argsOffset, PropertyBlock);
 
-		if (depthBias != 0.0f || slopeDepthBias != 0.0f)
+        Command.SetGlobalFloat("ZClip", zClip ? 1 : 0);
+        Command.DrawMeshInstancedIndirect(mesh, submeshIndex, material, passIndex, RenderGraph.BufferHandleSystem.GetResource(indirectArgsBuffer), argsOffset, PropertyBlock);
+        Command.SetGlobalFloat("ZClip", 1);
+
+        if (depthBias != 0.0f || slopeDepthBias != 0.0f)
 			Command.SetGlobalDepthBias(0.0f, 0.0f);
 
 		foreach (var keyword in keywords)

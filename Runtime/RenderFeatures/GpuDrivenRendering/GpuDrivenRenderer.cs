@@ -252,7 +252,7 @@ public class GpuDrivenRenderer : RenderFeatureBase
 		if (!renderGraph.ResourceMap.TryGetResource<GpuDrivenRenderingData>(renderGraph.FrameIndex, out var instanceData))
 			return;
 
-        var passName = request.ZClip ? "PointShadow" : "DirectionalShadow";
+        var passName = "ShadowCaster";
         if (!instanceData.rendererDrawCallData.TryGetValue(passName, out var drawList))
 			return;
 

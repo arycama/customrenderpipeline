@@ -165,12 +165,14 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		// Attenuate sky ambient by cloud coveerage
 		float3 amb = ambient;
 		if (applyCloudCoverage)
+		{
 			amb = amb * _CloudCoverage.a;
 		
-		for (float j = 0.0; j < ScatterOctaves; j++)
-		{
-			float b = pow(ScatterContribution, j);
-			result.rgb += amb * b * (1.0 - result.a);
+			for (float j = 0.0; j < ScatterOctaves; j++)
+			{
+				float b = pow(ScatterContribution, j);
+				result.rgb += amb * b * (1.0 - result.a);
+			}
 		}
 	}
 	
@@ -202,10 +204,16 @@ float4 EvaluateCloud(float rayStart, float rayLength, float sampleCount, float3 
 		float3 lightTransmittance = TransmittanceToAtmosphere(viewHeight, rd.y, _LightDirection0.y, LdotV, rayEnd);
 		result.rgb += light0 * lightTransmittance * _LightColor0 * Exposure * result.a;
 		
-		for (j = 0.0; j < ScatterOctaves; j++)
+		float3 amb = ambient;
+		if (applyCloudCoverage)
 		{
-			float b = pow(ScatterContribution, j);
-			result.rgb += ambient * b * result.a * highCloudOpacity;
+			amb = amb * _CloudCoverage.a;
+		
+			for (j = 0.0; j < ScatterOctaves; j++)
+			{
+				float b = pow(ScatterContribution, j);
+				result.rgb += amb * b * result.a * highCloudOpacity;
+			}
 		}
 		
 		result.a *= highCloudTransmittance;

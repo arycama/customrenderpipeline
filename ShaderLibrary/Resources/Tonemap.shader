@@ -17,6 +17,7 @@ Shader "Hidden/Tonemap"
             #pragma multi_compile SRGB REC709 REC2020 DISPLAYP3 HDR10 DOLBYHDR P3D65G22
             #pragma multi_compile _ SCENE_VIEW
             #pragma multi_compile _ PREVIEW
+            #pragma multi_compile _ GIZMOS_ON
             #include "Tonemap.hlsl"
             ENDHLSL
         }

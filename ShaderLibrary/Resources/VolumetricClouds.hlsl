@@ -118,7 +118,7 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	//float2 motion = depth ? CameraVelocity[position.xy] : CalculateVelocity(uv, CloudDepthTexture[pixelId]);
 	float2 motion = CalculateVelocity(input.uv, CloudDepthTexture[pixelId]);
 	
-	float2 historyUv = input.uv - motion;
+	float2 previousUv = input.uv - motion;
 	float4 mean = 0.0, stdDev = 0.0, current = 0.0;
 	
 	float rawDepth = CameraDepth[input.position.xy];
@@ -158,41 +158,41 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	float4 minValue = mean - stdDev;
 	float4 maxValue = mean + stdDev;
 
-	if (!_IsFirst && all(saturate(historyUv) == historyUv))
+	if (!_IsFirst && all(saturate(previousUv) == previousUv))
 	{
+		float4 bilinearWeights = BilinearWeights(previousUv, ViewSize);
+		previousUv = ClampScaleTextureUv(previousUv, PreviousScaleLimit);
+		
 		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CurrentScaleLimit)));
-		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit)));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, previousUv));
 	
-		float4 historyR = _History.GatherRed(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
-		float4 historyG = _History.GatherGreen(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
-		float4 historyB = _History.GatherBlue(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
-		float4 historyA = _TransmittanceHistory.Gather(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
-		
 		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);
-		float4 bilinearWeights = BilinearWeights(historyUv, ViewSize);
 		float4 weights = bilinearWeights * depthWeights;
-		
-		float4 history = 0;
-		float historyWeight = 0.0;
-		
-		[unroll]
-		for (uint i = 0; i < 4; i++)
+		float historyWeightSum = dot(weights, 1.0);
+
+		if (historyWeightSum > 0.0)
 		{
-			float4 historySample = float4(historyR[i], historyG[i], historyB[i], historyA[i]);
-			historySample.gb -= 0.5;
+			float4 history = 0;
 			
-			history += weights[i] * lerp(current, historySample, depthWeights[i]);
-			historyWeight += weights[i];
-		}
+			float4 historyR = _History.GatherRed(LinearClampSampler, previousUv);
+			float4 historyG = _History.GatherGreen(LinearClampSampler, previousUv);
+			float4 historyB = _History.GatherBlue(LinearClampSampler, previousUv);
+			float4 historyA = _TransmittanceHistory.Gather(LinearClampSampler, previousUv);
 		
-		if (historyWeight)
-		{
-			history /= historyWeight;
+			[unroll]
+			for (uint i = 0; i < 4; i++)
+			{
+				float4 historySample = float4(historyR[i], historyG[i], historyB[i], historyA[i]);
+				historySample.gb -= 0.5;
+			
+				history += weights[i] / historyWeightSum * lerp(current, historySample, depthWeights[i]);
+			}
+		
 			history.r *= PreviousToCurrentExposure;
 			history.rgb = ClampToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
 			history.a = clamp(history.a, minValue.a, maxValue.a);
 			current = lerp(current, history, 0.95);
-		} 
+		}
 	}
 	
 	current.gb += 0.5;

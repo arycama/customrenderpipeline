@@ -285,35 +285,35 @@ TemporalOutput FragmentTemporal(VertexFullscreenTriangleOutput input)
 	float2 previousUv = input.uv - velocity;
 	if (!IsFirst && all(saturate(previousUv) == previousUv))
 	{
+		float4 bilinearWeights = BilinearWeights(previousUv, ViewSize);
+		previousUv = ClampScaleTextureUv(previousUv, PreviousScaleLimit);
+		
 		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CurrentScaleLimit)));
-		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit)));
-	
-		uint4 packedHistory = History.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit));
-		float4 opacityHistory = OpacityHistory.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit)); // Using history scale limit because both are screenspace anyway
-		float4 previousSpeed = SpeedHistory.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit)); // Using history scale limit because both are screenspace anyway
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, previousUv));
 	
 		float DepthThreshold = 1.0; // TODO: Make a property
 		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);
-		float4 bilinearWeights = BilinearWeights(previousUv, ViewSize);
 		float4 weights = bilinearWeights * depthWeights;
-		
-		float4 history = 0.0;
-		float historyWeight = 0.0;
-		
-		[unroll]
-		for (uint i = 0; i < 4; i++)
+		float historyWeightSum = dot(weights, 1.0);
+
+		if (historyWeightSum > 0.0)
 		{
-			float3 color = R10G10B10A2UnormToFloat(packedHistory[i]).rgb;
-			color.gb -= 0.5;
+			float4 history = 0.0;
 			
-			history += weights[i] * float4(color, opacityHistory[i]);
-			speed += weights[i] * previousSpeed[i];
-			historyWeight += weights[i];
-		}
+			uint4 packedHistory = History.Gather(LinearClampSampler, previousUv);
+			float4 opacityHistory = OpacityHistory.Gather(LinearClampSampler, previousUv);
+			float4 previousSpeed = SpeedHistory.Gather(LinearClampSampler, previousUv);
 		
-		if (historyWeight)
-		{
-			history /= historyWeight;
+			[unroll]
+			for (uint i = 0; i < 4; i++)
+			{
+				float3 color = R10G10B10A2UnormToFloat(packedHistory[i]).rgb;
+				color.gb -= 0.5;
+			
+				history += weights[i] / historyWeightSum * float4(color, opacityHistory[i]);
+				speed += weights[i] * previousSpeed[i];
+			}
+		
 			history.r *= PreviousToCurrentExposure;
 			history.rgb = ClampToAABB(history.rgb, current.rgb, minValue.rgb, maxValue.rgb);
 			history.a = clamp(history.a, minValue.a, maxValue.a);

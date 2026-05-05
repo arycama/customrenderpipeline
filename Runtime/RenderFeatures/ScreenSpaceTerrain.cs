@@ -14,7 +14,10 @@ public class ScreenSpaceTerrain : ViewRenderFeature
 
 	public override void Render(ViewRenderData viewRenderData)
     {
-		if (!renderGraph.TryGetResource<TerrainViewData>(out _))
+        if (viewRenderData.camera.cameraType == CameraType.Preview)
+            return;
+
+        if (!renderGraph.TryGetResource<TerrainViewData>(out _))
 			return;
 
 		using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Terrain");

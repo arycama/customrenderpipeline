@@ -233,6 +233,56 @@ float3 Parallax(float2 uv, float3 tangentViewDirection, float scale, float offse
 	}
 }
 
+float2 ParallaxUv(float2 uv, float3 rayDirection, float scale, Texture2D<float> heightMap, SamplerState samplerState, out float dist, float samples = 1, float offset = 0.5)
+{
+	float dt = -scale * rcp(rayDirection.z) / samples;
+	float4 scaleOffset = float4(dt * rayDirection.xy, offset * dt * rayDirection.xy + uv);
+	
+	float4 dxyScale = float4(ddx(scaleOffset.xy), ddy(scaleOffset.xy));
+	float4 dxyOffset = float4(ddx(scaleOffset.zw), ddy(scaleOffset.zw));
+	
+	dist = 0.0;
+	for (float i = 0; i < samples; i++)
+	{
+		float t = (i + offset) * dt;
+		float2 p = t * rayDirection.xy + uv;
+		
+		float4 dxy = i * dxyScale + dxyOffset;
+		float height = (heightMap.SampleGrad(samplerState, p, dxy.xy, dxy.zw) - 1.0) * scale;
+		dist = RayPlaneDistance(float3(uv, 0.0), rayDirection, height, float3(0, 0, 1));
+		
+		if (t >= dist)
+			break;
+	}
+	
+	return dist * rayDirection.xy + uv;
+}
+
+float2 ParallaxUv(float3 uv, float3 rayDirection, float scale, Texture2DArray<float> heightMap, SamplerState samplerState, out float dist, float samples = 1, float offset = 0.5)
+{
+	float dt = -scale * rcp(rayDirection.z) / samples;
+	float4 scaleOffset = float4(dt * rayDirection.xy, offset * dt * rayDirection.xy + uv.xy);
+	
+	float4 dxyScale = float4(ddx(scaleOffset.xy), ddy(scaleOffset.xy));
+	float4 dxyOffset = float4(ddx(scaleOffset.zw), ddy(scaleOffset.zw));
+	
+	dist = 0.0;
+	for (float i = 0; i < samples; i++)
+	{
+		float t = (i + offset) * dt;
+		float2 p = t * rayDirection.xy + uv.xy;
+		
+		float4 dxy = i * dxyScale + dxyOffset;
+		float height = (heightMap.SampleGrad(samplerState, float3(p, uv.z), dxy.xy, dxy.zw) - 1.0) * scale;
+		dist = RayPlaneDistance(float3(uv.xy, 0.0), rayDirection, height, float3(0, 0, 1));
+		
+		if (t >= dist)
+			break;
+	}
+	
+	return dist * rayDirection.xy + uv.xy;
+}
+
 float4 BilinearWeights(float2 localUv)
 {
 	float4 weights = localUv.xxyy * float4(-1, 1, 1, -1) + float4(1, 0, 0, 1);

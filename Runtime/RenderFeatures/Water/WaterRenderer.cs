@@ -29,6 +29,7 @@ public class WaterRenderer : WaterRendererBase
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Ocean Render", (VerticesPerTileEdge, renderGraph.FrameIndex, settings, viewRenderData.transform, cullingPlanes)))
 		{
 			pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, viewRenderData.viewSize, 1, MeshTopology.Quads, passIndex, isScreenPass: true);
+            pass.PreventNewSubPass = true;
 
 			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
 			pass.WriteTexture(oceanRenderResult);

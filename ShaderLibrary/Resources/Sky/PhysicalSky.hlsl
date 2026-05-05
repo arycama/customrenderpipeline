@@ -191,6 +191,47 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 		luminance = 0;
 		
 	#ifdef REFLECTION_PROBE
+		if (rayIntersectsGround)
+		{
+			float maxRayLength = DistanceToNearestAtmosphereBoundary(ViewHeight, viewCosAngle, rayIntersectsGround);
+			float LdotV = dot(_LightDirection0, rayDirection);
+		
+			float3 transmittance = TransmittanceToPoint(ViewHeight, viewCosAngle, maxRayLength, true, maxRayLength);
+			float lightCosAngleAtDistance = LightCosAngleAtDistance(ViewHeight, viewCosAngle, _LightDirection0.y, LdotV, maxRayLength);
+			float3 lightTransmittance = TransmittanceToAtmosphere(ViewHeight, viewCosAngle, _LightDirection0.y, LdotV, maxRayLength);
+			
+			float attenuation = 1;//GetDirectionalShadow(rayDirection * maxRayLength);
+			
+			//#ifdef CLOUDS_ON
+				attenuation *= CloudTransmittance(rayDirection * maxRayLength);
+			//#endif
+		
+			lightTransmittance *= attenuation;
+			
+			float3 groundLighting = lightTransmittance * saturate(lightCosAngleAtDistance) * RcpPi * _LightColor0 * Exposure;
+			float3 groundAmbient = GetGroundAmbient(ViewHeight, viewCosAngle, _LightDirection0.y, LdotV, maxRayLength) * _LightColor0 * Exposure;
+			groundAmbient = groundAmbient * _CloudCoverage.a + _CloudCoverage.rgb * RcpPi;
+			
+			groundLighting += groundAmbient;
+			
+			//#ifdef CLOUDS_ON
+			//	groundLighting *= cloudTransmittance;
+			//#endif
+			
+			luminance += groundLighting * _GroundColor * transmittance;
+		}
+		else
+		{
+			float3 stars = Stars.Sample(TrilinearClampSampler, input.worldDirection) * StarExposure * Exposure;
+			stars *= TransmittanceToAtmosphere(ViewHeight, normalize(input.worldDirection).y);
+			
+			//#ifdef CLOUDS_ON
+			//	stars *= cloudTransmittance;
+			//#endif
+			
+			luminance.rgb += stars;
+		}
+	
 		return float4(luminance, 0.05); // Blend with previous
 	#else
 		return float4(Rec2020ToOffsetICtCp(luminance * PaperWhite * sqrt(2.0)), 0.0);
@@ -256,31 +297,31 @@ FragmentOutputTemporal FragmentTemporal(VertexFullscreenTriangleOutput input)
 	
 	if (!IsFirst && all(saturate(previousUv) == previousUv))
 	{
-		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CurrentScaleLimit)));
-		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit)));
+		float4 bilinearWeights = BilinearWeights(previousUv, ViewSize);
+		previousUv = ClampScaleTextureUv(previousUv, PreviousScaleLimit);
 	
-		uint4 packedHistory = PreviousLuminance.Gather(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit));
-		float4 previousSpeed = PreviousSpeed.GatherRed(LinearClampSampler, ClampScaleTextureUv(previousUv, PreviousScaleLimit));
-		
+		float4 currentDepths = LinearEyeDepth(CameraDepth.Gather(LinearClampSampler, ClampScaleTextureUv(input.uv, CurrentScaleLimit)));
+		float4 previousDepths = LinearEyeDepth(PreviousCameraDepth.Gather(LinearClampSampler, previousUv));
+	
 		float DepthThreshold = 5.0; // TODO: Make a property
 		float4 depthWeights = saturate(1.0 - abs(currentDepths - previousDepths) / max(1, currentDepths) * DepthThreshold);
-		float4 bilinearWeights = BilinearWeights(previousUv, ViewSize);
 		float4 weights = bilinearWeights * depthWeights;
+		float historyWeightSum = dot(weights, 1.0);
 		
-		float3 history = 0.0;
-		float historyWeight = 0.0;
-		
-		[unroll]
-		for (uint i = 0; i < 4; i++)
+		if (historyWeightSum > 0.0)
 		{
-			history += weights[i] * R10G10B10A2UnormToFloat(packedHistory[i]).rgb;
-			speed += weights[i] * previousSpeed[i];
-			historyWeight += weights[i];
-		}
+			float3 history = 0.0;
+			
+			uint4 packedHistory = PreviousLuminance.Gather(LinearClampSampler, previousUv);
+			float4 previousSpeed = PreviousSpeed.GatherRed(LinearClampSampler, previousUv);
 		
-		if (historyWeight)
-		{
-			history /= historyWeight;
+			[unroll]
+			for (uint i = 0; i < 4; i++)
+			{
+				history += weights[i] / historyWeightSum * R10G10B10A2UnormToFloat(packedHistory[i]).rgb;
+				speed += weights[i] * previousSpeed[i];
+			}
+		
 			history.r *= PreviousToCurrentExposure;
 			history = ClampToAABB(history, current, minValue, maxValue);
 			current = lerp(current, history, speed);

@@ -113,18 +113,21 @@ public partial class LightingSetup : ViewRenderFeature
 
                         // TODO: Can this be done in camera relative space to simplify, since we need the final viewProj matrix in camera relative space anyway? Though culling planes need to be in world space
                         var viewBounds = Geometry.GetFrustumBounds(viewRenderData.tanHalfFov, near, far, cameraToView);
-                        var viewToClip = Float4x4.OrthoReverseZ(viewBounds);
-                        var shadowSplitData = CalculateShadowSplitData(viewToClip.Mul(worldToView), lightRotation.Forward, true);
+                        var viewToClip = Float4x4.OrthoReverseZ(-viewBounds.extents.x, viewBounds.extents.x, -viewBounds.extents.y, viewBounds.extents.y, 0, viewBounds.Size.z);
+
+                        var worldViewPosition = viewBounds.center;
+						worldViewPosition.z = viewBounds.Min.z;
+                        worldViewPosition = lightToWorld.MultiplyPoint3x4(worldViewPosition);
+
+                        var worldToCascade = Float4x4.WorldToLocal(worldViewPosition, lightRotation);
+
+                        var shadowSplitData = CalculateShadowSplitData(viewToClip.Mul(worldToCascade), lightRotation.Forward, true);
 
                         var cameraInverseTranslation = Float4x4.Translate(viewRenderData.camera.transform.position);
-                        var worldToCascade = worldToView.Mul(cameraInverseTranslation);
+                        worldToCascade = worldToCascade.Mul(cameraInverseTranslation);
 
-						var worldViewPosition = viewBounds.center;
-						worldViewPosition.z = viewBounds.Min.z;
-						worldViewPosition = lightToWorld.MultiplyPoint3x4(worldViewPosition);
-
-						directionalShadowRequests.Add(new(i, worldToCascade, viewToClip, shadowSplitData, -1, Float3.Zero, hasShadowBounds, 0, viewBounds.Size.z, worldViewPosition, lightRotation, viewBounds.Size.x, viewBounds.Size.y, settings.DirectionalShadowResolution));
-						directionalShadowMatrices.Add((Float3x4)Float4x4.OrthoReverseZSample(viewBounds).Mul(worldToCascade));
+                        directionalShadowRequests.Add(new(i, worldToCascade, viewToClip, shadowSplitData, -1, Float3.Zero, hasShadowBounds, 0, viewBounds.Size.z, worldViewPosition, lightRotation, viewBounds.Size.x, viewBounds.Size.y, settings.DirectionalShadowResolution));
+						directionalShadowMatrices.Add((Float3x4)Float4x4.OrthoReverseZSample(-viewBounds.extents.x, viewBounds.extents.x, -viewBounds.extents.y, viewBounds.extents.y, 0, viewBounds.Size.z).Mul(worldToCascade));
 
 						// Note it could be max(cascadeTexelSize * 0.5, but this means we'd get no anti-aliasing on the min filter size)
                         var worldUnitsPerTexel = viewBounds.Size.xy / settings.DirectionalShadowResolution;

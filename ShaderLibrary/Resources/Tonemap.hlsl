@@ -13,6 +13,7 @@
 
 Texture2D<float3> CameraBloom;
 Texture3D<float3> ColorGrading;
+Texture2D<float4> GizmosTarget;
 float4 CameraBloomScaleLimit, CameraBloom_TexelSize;
 
 float2 Resolution;
@@ -40,6 +41,10 @@ float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	float3 ssgi = OffsetICtCpToRec2020(R10G10B10A2UnormToFloat(ScreenSpaceGlobalIllumination[position]).rgb) / (PaperWhite * sqrt(2.0));
 	float3 ssr = OffsetICtCpToRec2020(R10G10B10A2UnormToFloat(ScreenSpaceReflections[position]).rgb) / (PaperWhite * sqrt(2.0));
 	//color = ssr;
+	
+	#ifdef GIZMOS_ON
+		color += GizmosTarget[position];
+	#endif
 	
 	color *= PaperWhite;
 	color = Rec2020ToICtCp(color);

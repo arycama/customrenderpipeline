@@ -196,11 +196,26 @@ float3 FromToRotationZ(float3 t, float3 u, bool correctSign = true)
 	return (dot(t, u) * rcp(t.z)) * t - u;
 }
 
+float3 FromToRotationY(float3 t, float3 u, bool correctSign = true)
+{
+	t.y += 1.0;
+	u.xz = correctSign ? -u.xz : u.xz;
+	return (dot(t, u) * rcp(t.y)) * t - u;
+}
+
 float3 FromToRotationZInverse(float3 t, float3 u, bool correctSign = true)
 {
 	t.z += 1.0;
 	float3 v = (dot(t, u) * rcp(t.z)) * t - u;
 	v.xy = correctSign ? -v.xy : v.xy;
+	return v;
+}
+
+float3 FromToRotationYInverse(float3 t, float3 u, bool correctSign = true)
+{
+	t.y += 1.0;
+	float3 v = (dot(t, u) * rcp(t.y)) * t - u;
+	v.xz = correctSign ? -v.xz : v.xz;
 	return v;
 }
 

@@ -190,7 +190,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         {
             using var pass = renderGraph.AddObjectRenderPass("GBuffer");
 
-            renderGraph.SetRTHandle<CameraTarget>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true, clear: true));
+            renderGraph.SetRTHandle<CameraTarget>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true, clear: true, hasMips: true));
             renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
             renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
             renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
@@ -384,7 +384,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
                 pass.WriteTexture(renderGraph.GetRTHandle<SceneColorCopy>());
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
-                    command.CopyTexture(pass.GetRenderTexture(data.cameraTarget), pass.GetRenderTexture(data.sceneColorCopy));
+                    command.CopyTexture(pass.GetRenderTexture(data.cameraTarget), 0, 0, pass.GetRenderTexture(data.sceneColorCopy), 0, 0);
                 });
             }
         }),
@@ -437,8 +437,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new CameraVelocityDilate(renderGraph, asset.TemporalAASettings),
         new TemporalAA(asset.TemporalAASettings, renderGraph),
         new Bloom(renderGraph, asset.Bloom),
-        new Tonemapping(renderGraph, asset.ColorGrading, asset.Bloom),
         new RenderGizmos(renderGraph),
+        new Tonemapping(renderGraph, asset.ColorGrading, asset.Bloom),
     };
 }
 

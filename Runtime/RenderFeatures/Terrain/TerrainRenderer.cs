@@ -10,8 +10,11 @@ public class TerrainRenderer : TerrainRendererBase
 
 	public override void Render(ViewRenderData viewRenderData)
     {
-		// Ensure terrain system data is set
-		if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
+        if (viewRenderData.camera.cameraType == CameraType.Preview)
+            return;
+
+        // Ensure terrain system data is set
+        if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
 			return;
 
 		// Also ensure this is valid for current frame
