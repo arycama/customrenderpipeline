@@ -1,4 +1,5 @@
 #include "../Common.hlsl"
+#include "../FoliageCommon.hlsl"
 #include "../SpaceTransforms.hlsl"
 #include "../Random.hlsl"
 #include "../TerrainCommon.hlsl"
@@ -31,7 +32,7 @@ struct FragmentInput
 	float2 uv : TEXCOORD;
 	float3 normal : NORMAL;
 	float3 tangent : TANGENT;
-	float3 color : COLOR;
+	float4 colorHueVariation : COLOR;
 };
 
 struct FragmentOutput
@@ -140,7 +141,8 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	output.position = WorldToClipPosition(output.worldPosition);
 	
 	float3 virtualUv = CalculateVirtualUv(terrainUv, 0, 0);
-	output.color = VirtualTexture.SampleLevel(LinearRepeatSampler, virtualUv, 0);
+	output.colorHueVariation.xyz = VirtualTexture.SampleLevel(LinearRepeatSampler, virtualUv, 0);
+	output.colorHueVariation.w = HueVariationFactor(centerPosition + ViewPosition);
 	
 	return output;
 }
@@ -160,19 +162,17 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	if (!isFrontFace)
 		worldNormal = -worldNormal;
 	
-	float3 albedo = albedoOpacity.rgb;
+	float4 albedoTranslucency = PackTranslucency(albedoOpacity.rgb, Rec709Luminance(albedoOpacity.rgb) * _Translucency.rgb * 2);
+	albedoTranslucency.rgb = HueVariation(albedoTranslucency.rgb, input.colorHueVariation.w);
+	albedoTranslucency.rgb = lerp(input.colorHueVariation.rgb, albedoTranslucency.rgb, smoothstep(0, 0.5, input.uv.y));
+	
 	float occlusion = normalOcclusionRoughness.b;
 	float roughness = normalOcclusionRoughness.a;
-	float3 translucency = Translucency.Sample(SurfaceSampler, uv);
 		
-	albedo += translucency;
-	float t = dot(translucency, albedo) / SqrLength(albedo);
-	
-	albedo = lerp(input.color, albedo, smoothstep(0, 0.25, input.uv.y));
 	float3 V = normalize(-input.worldPosition);
-		
+	
 	FragmentOutput output;
-	output.gBuffer = OutputGBuffer(albedo, 0, worldNormal, roughness, worldNormal, 1.0 - occlusion, 0, t, input.position.xy, V, WorldToView);
+	output.gBuffer = OutputGBuffer(albedoTranslucency.rgb, 0, worldNormal, roughness, worldNormal, 0.0, 0, albedoTranslucency.a, input.position.xy, V, WorldToView);
 	output.velocity = CalculateVelocity(input.position.xy * RcpViewSize, input.previousPosition);
 	return output;
 }

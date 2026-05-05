@@ -136,17 +136,17 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                 cameraRenderFeature.Render(viewRenderData);
             }
 
-            if (RenderWireframe)
-            {
-                var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
-                using (var pass = renderGraph.AddGenericRenderPass("Wire Overlay", wireOverlay))
-                {
-                    pass.SetRenderFunction(static (command, pass, data) =>
-                    {
-                        command.DrawRendererList(data);
-                    });
-                }
-            }
+            //if (RenderWireframe)
+            //{
+            //    var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
+            //    using (var pass = renderGraph.AddGenericRenderPass("Wire Overlay", wireOverlay))
+            //    {
+            //        pass.SetRenderFunction(static (command, pass, data) =>
+            //        {
+            //            command.DrawRendererList(data);
+            //        });
+            //    }
+            //}
 
             // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
             if (RenderUiOverlay && viewRenderData.camera.cameraType == CameraType.Game && viewRenderData.camera == Camera.main)

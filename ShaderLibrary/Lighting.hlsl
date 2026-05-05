@@ -121,7 +121,8 @@ float3 EvaluateLight(LightingInput input, float diffuseTerm, float f0Avg, float3
 	float NdotL = dot(input.N, L);
 	diffuseTerm *= DirectionalAlbedoMs.SampleLevel(LinearClampSampler, Remap01ToHalfTexel(float3(abs(NdotL), input.perceptualRoughness, f0Avg), 16), 0.0);
 	
-	float3 result = NdotL >= 0.0 ? NdotL * (1.0 - input.translucency) : -NdotL * input.translucency;
+	float3 result = saturate(NdotL) * (1.0 - input.translucency);
+	result += WrappedDiffuse(-NdotL, 1) * input.translucency;
 	result *= diffuseTerm * input.albedo;
 	
 	float LdotV = dot(L, input.V);

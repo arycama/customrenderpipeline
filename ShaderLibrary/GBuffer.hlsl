@@ -96,12 +96,12 @@ float3 UnpackAlbedo(float2 enc, float2 screenPosition)
 	return UnpackAlbedo(enc, screenPosition, a0, a1);
 }
 
-GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float perceptualRoughness, float3 bentNormal, float visibilityAngle, float3 emissive, float translucency, float2 screenPosition, float3 V, matrix worldToView)
+GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float roughness, float3 bentNormal, float cosVisibilityAngle, float3 emissive, float translucency, float2 screenPosition, float3 V)
 {
 	GBufferOutput gbuffer;
 	gbuffer.albedoMetallic = float4(PackAlbedo(albedo, screenPosition), translucency, metallic);
-	gbuffer.normalRoughness = float4(PackGBufferNormal(normal, V, worldToView), perceptualRoughness, 0);
-	gbuffer.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal, V, worldToView), visibilityAngle, 0);
+	gbuffer.normalRoughness = float4(PackGBufferNormal(normal, V), roughness, 0);
+	gbuffer.bentNormalOcclusion = float4(PackGBufferNormal(bentNormal, V), cosVisibilityAngle, 0);
 	
 	#ifndef EMISSION_DISABLED
 		gbuffer.emissive = emissive;
@@ -110,16 +110,16 @@ GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float 
 	return gbuffer;
 }
 
+GBufferOutput OutputGBuffer(float3 albedo, float metallic, float3 normal, float roughness, float3 bentNormal, float cosVisibilityAngle, float3 emissive, float translucency, float2 screenPosition, float3 V, matrix worldToView)
+{
+	V = mul((float3x3) worldToView, V);
+	normal = mul((float3x3) worldToView, normal);
+	bentNormal = mul((float3x3) worldToView, bentNormal);
+
+	return OutputGBuffer(albedo, metallic, normal, roughness, bentNormal, cosVisibilityAngle, emissive, translucency, screenPosition, V);
+}
+
 GBufferOutput OutputGBuffer(Material material, float2 screenPosition, float3 V, matrix worldToView)
 {
-	GBufferOutput gbuffer;
-	gbuffer.albedoMetallic = float4(PackAlbedo(material.albedo, screenPosition), material.translucency, material.metallic);
-	gbuffer.normalRoughness = float4(PackGBufferNormal(material.normal, V, worldToView), material.roughness, 0);
-	gbuffer.bentNormalOcclusion = float4(PackGBufferNormal(material.bentNormal, V, worldToView), material.occlusion, 0);
-	
-	#ifndef EMISSION_DISABLED
-		gbuffer.emissive = material.emission;
-	#endif
-	
-	return gbuffer;
+	return OutputGBuffer(material.albedo, material.metallic, material.normal, material.roughness, material.bentNormal, material.occlusion, material.emission, material.translucency, screenPosition, V, worldToView);
 }
