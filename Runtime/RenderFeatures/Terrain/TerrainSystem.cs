@@ -14,14 +14,23 @@ public class TerrainSystem : FrameRenderFeature
     private static readonly int TerrainHeightmapId = Shader.PropertyToID("TerrainHeightmap");
 
     private readonly TerrainSettings settings;
-    public ResourceHandle<GraphicsBuffer> terrainLayerData, indexBuffer;
-    public ResourceHandle<RenderTexture> minMaxHeight, heightmap, normalmap, idMap, aoMap;
+   
     private readonly Material generateIdMapMaterial, terrainAmbientOcclusionMaterial;
-    public readonly Dictionary<TerrainLayer, int> terrainLayers = new();
+    private readonly ComputeShader heightmapComputeShader;
+
+    private readonly Dictionary<TerrainLayer, int> terrainLayers = new();
     private readonly Dictionary<TerrainLayer, int> terrainProceduralLayers = new();
+    private readonly List<RectInt> heightmapUpdateRects = new(), idMapUpdateRects = new();
+
+    private Texture2DArray diffuseArray, normalMapArray, maskMapArray;
+
+    private ResourceHandle<GraphicsBuffer> terrainLayerData, indexBuffer;
+    private ResourceHandle<RenderTexture> minMaxHeight, heightmap, normalmap, idMap, aoMap;
     private float maxHeightExtents;
 
-    public Texture2DArray diffuseArray, normalMapArray, maskMapArray;
+    private int heightmapVersion = -1, idMapVersion = -1;
+    private int previousHeightmapVersion = -1, previousIdMapVersion = -1;
+
 
     public Terrain Terrain { get; private set; }
     public TerrainData TerrainData => Terrain.terrainData;
@@ -32,15 +41,16 @@ public class TerrainSystem : FrameRenderFeature
 
         generateIdMapMaterial = new Material(Shader.Find("Hidden/Terrain Id Map")) { hideFlags = HideFlags.HideAndDontSave };
         terrainAmbientOcclusionMaterial = new Material(Shader.Find("Hidden/Terrain Ambient Occlusion")) { hideFlags = HideFlags.HideAndDontSave };
+        heightmapComputeShader = Resources.Load<ComputeShader>("Terrain/InitTerrain");
 
-        TerrainCallbacks.textureChanged += TerrainCallbacks_textureChanged;
-        TerrainCallbacks.heightmapChanged += TerrainCallbacks_heightmapChanged;
+        TerrainCallbacks.textureChanged += TextureModified;
+        TerrainCallbacks.heightmapChanged += HeightmapModified;
     }
 
     protected override void Cleanup(bool disposing)
     {
-        TerrainCallbacks.textureChanged -= TerrainCallbacks_textureChanged;
-        TerrainCallbacks.heightmapChanged -= TerrainCallbacks_heightmapChanged;
+        TerrainCallbacks.textureChanged -= TextureModified;
+        TerrainCallbacks.heightmapChanged -= HeightmapModified;
 
         if (diffuseArray != null)
             Object.DestroyImmediate(diffuseArray);
@@ -52,19 +62,33 @@ public class TerrainSystem : FrameRenderFeature
             Object.DestroyImmediate(maskMapArray);
     }
 
-    private void TerrainCallbacks_heightmapChanged(Terrain terrain, RectInt heightRegion, bool synched)
+    private void QueueHeightmapUpdate(RectInt region)
+    {
+        heightmapVersion++;
+        heightmapUpdateRects.Add(region);
+    }
+
+    private void QueueIdMapUpdate(RectInt region)
+    {
+        idMapVersion++;
+        idMapUpdateRects.Add(region);
+    }
+
+    private void HeightmapModified(Terrain terrain, RectInt region, bool synched)
     {
         if (terrain != Terrain)
             return;
 
-        InitializeHeightmap();
-        InitializeIdMap(true, heightRegion);
+        QueueHeightmapUpdate(region);
+        QueueIdMapUpdate(region);
     }
 
-    private void TerrainCallbacks_textureChanged(Terrain terrain, string textureName, RectInt texelRegion, bool synched)
+    private void TextureModified(Terrain terrain, string textureName, RectInt region, bool synched)
     {
-        if (terrain == Terrain && textureName == TerrainData.AlphamapTextureName)
-            InitializeIdMap(true, texelRegion);
+        if (terrain != Terrain || textureName != TerrainData.AlphamapTextureName)
+            return;
+
+        QueueIdMapUpdate(region);
     }
 
     private void CleanupResources()
@@ -83,13 +107,16 @@ public class TerrainSystem : FrameRenderFeature
 
     private void InitializeTerrain()
     {
-        var resolution = TerrainData.heightmapResolution;
-        minMaxHeight = renderGraph.GetTexture(resolution, GraphicsFormat.R16G16_UNorm, hasMips: true, isPersistent: true);
-        heightmap = renderGraph.GetTexture(resolution, GraphicsFormat.R16_UNorm, hasMips: true, autoGenerateMips: true, isPersistent: true);
-        normalmap = renderGraph.GetTexture(resolution, GraphicsFormat.R8G8_SNorm, autoGenerateMips: true, hasMips: true, isPersistent: true);
+        var heightmapResolution = TerrainData.heightmapResolution;
+        var idMapResolution = TerrainData.alphamapResolution;
+
+        minMaxHeight = renderGraph.GetTexture(heightmapResolution, GraphicsFormat.R16G16_UNorm, hasMips: true, isPersistent: true);
+        heightmap = renderGraph.GetTexture(heightmapResolution, GraphicsFormat.R16_UNorm, hasMips: true, autoGenerateMips: true, isPersistent: true);
+        normalmap = renderGraph.GetTexture(heightmapResolution, GraphicsFormat.R8G8_SNorm, autoGenerateMips: true, hasMips: true, isPersistent: true);
         indexBuffer = renderGraph.GetGridIndexBuffer(settings.PatchVertices, true, false);
 
-        InitializeHeightmap();
+        idMap = renderGraph.GetTexture(idMapResolution, GraphicsFormat.R32_UInt, isPersistent: true);
+        aoMap = renderGraph.GetTexture(TerrainData.heightmapResolution, GraphicsFormat.R8G8B8A8_SNorm, isPersistent: true);
 
         // Initialize terrain layers
         terrainLayers.Clear();
@@ -104,17 +131,8 @@ public class TerrainSystem : FrameRenderFeature
             }
         }
 
-        var idMapResolution = TerrainData.alphamapResolution;
-        idMap = renderGraph.GetTexture(idMapResolution, GraphicsFormat.R32_UInt, isPersistent: true);
-        aoMap = renderGraph.GetTexture(TerrainData.heightmapResolution, GraphicsFormat.R8G8B8A8_SNorm, isPersistent: true);
-
         // Process any alphamap modifications
         var alphamapModifiers = Terrain.GetComponents<ITerrainAlphamapModifier>();
-
-        // Need to do some setup bvefore the graph executes to calculate buffer sizes
-        foreach (var component in alphamapModifiers)
-            component.PreGenerate(terrainLayers, terrainProceduralLayers);
-
         var layerCount = terrainLayers.Count;
         if (alphamapModifiers.Length > 0 && layerCount > 0)
         {
@@ -185,7 +203,14 @@ public class TerrainSystem : FrameRenderFeature
             });
         }
 
-        FillLayerData();
+        UpdateLayerData();
+        QueueHeightmapUpdate(new(0, 0, TerrainData.heightmapResolution, TerrainData.heightmapResolution));
+        QueueIdMapUpdate(new(0, 0, idMapResolution, idMapResolution));
+        UpdateHeightmap(new(0, 0, TerrainData.heightmapResolution, TerrainData.heightmapResolution));
+
+        // Need to do some setup bvefore the graph executes to calculate buffer sizes
+        foreach (var component in alphamapModifiers)
+            component.PreGenerate(terrainLayers, terrainProceduralLayers);
 
         renderGraph.SetResource(new TerrainSystemData(minMaxHeight, Terrain, TerrainData, indexBuffer), true);
 
@@ -213,20 +238,49 @@ public class TerrainSystem : FrameRenderFeature
            terrainFrameData
         ));
 
-        InitializeIdMap(false);
-
-        InitializeAoMap(false);
+        UpdateIdMap();
+        UpdateAoMap();
     }
 
-    private void InitializeHeightmap()
+    private void UpdateLayerData()
+    {
+        var count = terrainLayers.Count;
+        maxHeightExtents = 0f;
+        if (count == 0)
+            return;
+
+        var layerData = ListPool<TerrainLayerData>.Get();
+        foreach (var layer in terrainLayers)
+        {
+            var heightScale = Max(layer.Key.metallic, 1e-3f);
+            var stochasticScale = layer.Key.normalScale;
+            var density = layer.Key.smoothness;
+
+            // Convert opacity at distance to density
+            maxHeightExtents = Max(maxHeightExtents, heightScale * 0.5f);
+            var extinction = Rcp(Square(Max(1e-3f, 1.0f - density))) / heightScale;
+            layerData.Add(new(Rcp(layer.Key.tileSize.x), extinction, stochasticScale, heightScale));
+        }
+
+        using (var pass = renderGraph.AddGenericRenderPass("Terrain Layer Data Init", (terrainLayerData, layerData)))
+        {
+            pass.WriteBuffer("", terrainLayerData);
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                command.SetBufferData(pass.GetBuffer(data.terrainLayerData), data.layerData);
+                ListPool<TerrainLayerData>.Release(data.layerData);
+            });
+        }
+    }
+
+    private void UpdateHeightmap(RectInt? region)
     {
         var resolution = TerrainData.heightmapResolution;
-        var computeShader = Resources.Load<ComputeShader>("Terrain/InitTerrain");
 
         // Initialize the height map
         using (var pass = renderGraph.AddComputeRenderPass("Terrain Heightmap Init", TerrainData.heightmapTexture))
         {
-            pass.Initialize(computeShader, 0, resolution, resolution);
+            pass.Initialize(heightmapComputeShader, 0, resolution, resolution);
             pass.WriteTexture("HeightmapResult", heightmap, 0);
 
             pass.SetRenderFunction(static (command, pass, data) =>
@@ -255,7 +309,7 @@ public class TerrainSystem : FrameRenderFeature
         // Initialize normal map
         using (var pass = renderGraph.AddComputeRenderPass("Terrain Normalmap Init", (TerrainData.heightmapTexture, TerrainData.heightmapScale, TerrainData.size.y, TerrainData.heightmapResolution)))
         {
-            pass.Initialize(computeShader, 1, resolution, resolution);
+            pass.Initialize(heightmapComputeShader, 1, resolution, resolution);
             pass.WriteTexture("InitNormalMapOutput", normalmap, 0);
 
             pass.SetRenderFunction(static (command, pass, data) =>
@@ -292,7 +346,7 @@ public class TerrainSystem : FrameRenderFeature
         // Todo: Could generate this as part of heightmap pass using LDS
         using (var pass = renderGraph.AddComputeRenderPass("Terrain Min Max Height Init"))
         {
-            pass.Initialize(computeShader, 2, resolution, resolution);
+            pass.Initialize(heightmapComputeShader, 2, resolution, resolution);
             pass.WriteTexture("DepthCopyResult", minMaxHeight, 0);
             pass.ReadTexture("DepthCopyInput", heightmap);
         }
@@ -307,7 +361,7 @@ public class TerrainSystem : FrameRenderFeature
                 var xSize = Mathf.Max(1, resolution >> index);
                 var ySize = Mathf.Max(1, resolution >> index);
 
-                pass.Initialize(computeShader, 3, xSize, ySize);
+                pass.Initialize(heightmapComputeShader, 3, xSize, ySize);
                 pass.WriteTexture("GenerateMinMaxHeightsResult", minMaxHeight, index);
                 pass.WriteTexture("GenerateMinMaxHeightsInput", minMaxHeight, index - 1);
 
@@ -323,44 +377,13 @@ public class TerrainSystem : FrameRenderFeature
         }
     }
 
-    private void FillLayerData()
-    {
-        var count = terrainLayers.Count;
-        maxHeightExtents = 0f;
-        if (count == 0)
-            return;
-
-        var layerData = ListPool<TerrainLayerData>.Get();
-        foreach (var layer in terrainLayers)
-        {
-            var heightScale = Max(layer.Key.metallic, 1e-3f);
-            var stochasticScale = layer.Key.normalScale;
-            var density = layer.Key.smoothness;
-
-            // Convert opacity at distance to density
-            maxHeightExtents = Max(maxHeightExtents, heightScale * 0.5f);
-            var extinction = Rcp(Square(Max(1e-3f, 1.0f - density))) / heightScale;
-            layerData.Add(new(Rcp(layer.Key.tileSize.x), extinction, stochasticScale, heightScale));
-        }
-
-        using (var pass = renderGraph.AddGenericRenderPass("Terrain Layer Data Init", (terrainLayerData, layerData)))
-        {
-            pass.WriteBuffer("", terrainLayerData);
-            pass.SetRenderFunction(static (command, pass, data) =>
-            {
-                command.SetBufferData(pass.GetBuffer(data.terrainLayerData), data.layerData);
-                ListPool<TerrainLayerData>.Release(data.layerData);
-            });
-        }
-    }
-
-    private void InitializeIdMap(bool isUpdate, RectInt? texelRegion = null)
+    private void UpdateIdMap(RectInt? region = null)
     {
         if (terrainLayers.Count == 0)
             return;
 
         var idMapResolution = TerrainData.alphamapResolution;
-        using (var pass = renderGraph.AddFullscreenRenderPass("Terrain Layer Data Init", (TerrainData.alphamapLayers, (Float3)Terrain.terrainData.size, terrainLayers.Count, TerrainData.alphamapLayers, TerrainData.alphamapTextureCount, TerrainData.alphamapTextures)))
+        using (var pass = renderGraph.AddFullscreenRenderPass("Terrain Layer Data Init", (TerrainData.alphamapLayers, (Float3)Terrain.terrainData.size, terrainLayers.Count, TerrainData.alphamapLayers, TerrainData.alphamapTextureCount, TerrainData.alphamapTextures, idMapResolution, region)))
         {
             //var indicesBuffer = renderGraph.GetBuffer(terrainLayers.Count);
             pass.Initialize(generateIdMapMaterial, idMapResolution);
@@ -379,12 +402,12 @@ public class TerrainSystem : FrameRenderFeature
                 pass.SetInt("TextureCount", data.Item4);
                 pass.SetVector("PositionOffset", Float2.Zero);
 
-                //if (texelRegion.HasValue)
+                //if (data.region.HasValue)
                 //{
-                //	var region = texelRegion.Value;
-                //	command.SetViewport(new Rect(region.position, region.size));
-                //	pass.SetVector("PositionOffset", (Vector2)region.position);
-                //	pass.SetVector("UvScaleOffset", new Vector4(region.size.x, region.size.y, region.position.x, region.position.y) / terrainData.alphamapResolution);
+                //    var region = data.region.Value;
+                //    command.SetViewport(new Rect(region.position, region.size));
+                //    pass.SetVector("PositionOffset", new Float4((Vector2)region.position, 0));
+                //    pass.SetVector("UvScaleOffset", new Vector4(region.size.x, region.size.y, region.position.x, region.position.y) / data.idMapResolution);
                 //}
                 //else
                 {
@@ -416,31 +439,28 @@ public class TerrainSystem : FrameRenderFeature
         }
     }
 
-    private void InitializeAoMap(bool isUpdate, RectInt? texelRegion = null)
+    private void UpdateAoMap(RectInt? texelRegion = null)
     {
-        if (!isUpdate)
+        using (var pass = renderGraph.AddFullscreenRenderPass("Terrain AO Map", (TerrainData, settings)))
         {
-            using (var pass = renderGraph.AddFullscreenRenderPass("Terrain AO Map", (TerrainData, settings)))
+            pass.Initialize(terrainAmbientOcclusionMaterial, TerrainData.heightmapResolution);
+            pass.WriteTexture(aoMap);
+
+            pass.ReadResource<TerrainFrameData>();
+
+            pass.SetRenderFunction(static (command, pass, data) =>
             {
-                pass.Initialize(terrainAmbientOcclusionMaterial, TerrainData.heightmapResolution);
-                pass.WriteTexture(aoMap);
+                pass.SetTexture(TerrainHeightmapId, data.TerrainData.heightmapTexture);
+                pass.SetFloat("DirectionCount", data.settings.AmbientOcclusionDirections);
+                pass.SetFloat("SampleCount", data.settings.AmbientOcclusionSamples);
+                pass.SetFloat("Radius", data.settings.AmbientOcclusionRadius / data.TerrainData.size.x);
+                pass.SetFloat("Resolution", data.TerrainData.heightmapResolution);
 
-                pass.ReadResource<TerrainFrameData>();
-
-                pass.SetRenderFunction(static (command, pass, data) =>
-                {
-                    pass.SetTexture(TerrainHeightmapId, data.TerrainData.heightmapTexture);
-                    pass.SetFloat("DirectionCount", data.settings.AmbientOcclusionDirections);
-                    pass.SetFloat("SampleCount", data.settings.AmbientOcclusionSamples);
-                    pass.SetFloat("Radius", data.settings.AmbientOcclusionRadius / data.TerrainData.size.x);
-                    pass.SetFloat("Resolution", data.TerrainData.heightmapResolution);
-
-                    //var kmaxHeight = 32766.0f / 65535.0f;
-                    //pass.SetFloat("TerrainHeightmapScaleY", data.TerrainData.heightmapScale.y / kmaxHeight);
-                    //pass.SetVector("TerrainHeightmapScale", (Float3)data.TerrainData.heightmapScale);
-                    //pass.SetVector("TerrainSize", (Float3)data.TerrainData.size);
-                });
-            }
+                //var kmaxHeight = 32766.0f / 65535.0f;
+                //pass.SetFloat("TerrainHeightmapScaleY", data.TerrainData.heightmapScale.y / kmaxHeight);
+                //pass.SetVector("TerrainHeightmapScale", (Float3)data.TerrainData.heightmapScale);
+                //pass.SetVector("TerrainSize", (Float3)data.TerrainData.size);
+            });
         }
     }
 
@@ -485,12 +505,11 @@ public class TerrainSystem : FrameRenderFeature
                 // Set this every frame incase of changes..
                 // TODO: Only do when data changed?
                 // Only do this if terrain wasn't initialized, 
-                FillLayerData();
+                UpdateLayerData();
             }
         }
 
         var size = (Float3)TerrainData.size;
-
         var terrainFrameData = renderGraph.SetConstantBuffer
         ((
             size,
@@ -514,5 +533,28 @@ public class TerrainSystem : FrameRenderFeature
             aoMap,
            terrainFrameData
         ));
+
+        if(previousHeightmapVersion != heightmapVersion)
+        {
+            RectInt? region = default;
+            foreach(var updateRect in heightmapUpdateRects)
+                region = region.HasValue ? region.Value.Encapsulate(updateRect) : updateRect;
+
+            heightmapUpdateRects.Clear();
+            UpdateHeightmap(region);
+            previousHeightmapVersion = heightmapVersion;
+        }
+
+        if(previousIdMapVersion != idMapVersion)
+        {
+            RectInt? region = default;
+            foreach (var updateRect in idMapUpdateRects)
+                region = region.HasValue ? region.Value.Encapsulate(updateRect) : updateRect;
+
+            idMapUpdateRects.Clear();
+
+            UpdateIdMap(region);
+            previousIdMapVersion = idMapVersion;
+        }
     }
 }

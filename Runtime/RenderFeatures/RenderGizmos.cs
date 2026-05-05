@@ -19,18 +19,21 @@ public class RenderGizmos : ViewRenderFeature
         var wireOverlay = viewRenderData.context.CreateWireOverlayRendererList(viewRenderData.camera);
         var gizmosTarget = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
-        using var pass = renderGraph.AddGenericRenderPass("Render Gizmos", (preImageEffects, postImageEffects, wireOverlay, gizmosTarget));
+        var size = renderGraph.RtHandleSystem.ScreenSize;
+        //var viewport = new Rect(0, 0, viewRenderData.viewSize.x, viewRenderData.viewSize.y);
+        var viewport = new Rect(0, size.y - viewRenderData.viewSize.y, viewRenderData.viewSize.x, viewRenderData.viewSize.y);
+
+        using var pass = renderGraph.AddGenericRenderPass("Render Gizmos", (preImageEffects, postImageEffects, wireOverlay, gizmosTarget, viewport));
         pass.WriteTexture(gizmosTarget);
 
-		pass.SetRenderFunction(static (command, pass, data) =>
+        pass.SetRenderFunction(static (command, pass, data) =>
 		{
-            command.SetInvertCulling(false);
             command.SetRenderTarget(pass.GetRenderTexture(data.gizmosTarget));
             command.ClearRenderTarget(RTClearFlags.Color, Color.clear);
+            command.SetViewport(data.viewport);
 			command.DrawRendererList(data.preImageEffects);
 			command.DrawRendererList(data.postImageEffects);
 			command.DrawRendererList(data.wireOverlay);
-            command.SetInvertCulling(false);
 		});
 
         renderGraph.SetRTHandle<GizmosTarget>(gizmosTarget);

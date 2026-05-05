@@ -150,7 +150,7 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 {
 	float2 uv = input.uv * AlbedoOpacity_ST.xy + AlbedoOpacity_ST.zw;
-	float4 albedoOpacity = AlbedoOpacity.Sample(SurfaceSampler, uv);
+	float4 albedoOpacity = AlbedoOpacity.Sample(SurfaceSampler, uv) * _Color * 2;
 	float4 normalOcclusionRoughness = NormalOcclusionRoughness.Sample(SurfaceSampler, uv);
 	
 	#ifdef CUTOUT_ON
@@ -162,12 +162,12 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	if (!isFrontFace)
 		worldNormal = -worldNormal;
 	
-	float4 albedoTranslucency = PackTranslucency(albedoOpacity.rgb, Rec709Luminance(albedoOpacity.rgb) * _Translucency.rgb * 2);
+	float4 albedoTranslucency = PackTranslucency(albedoOpacity.rgb, Rec709Luminance(albedoOpacity.rgb) * _Translucency.rgb * 8);
 	albedoTranslucency.rgb = HueVariation(albedoTranslucency.rgb, input.colorHueVariation.w);
 	albedoTranslucency.rgb = lerp(input.colorHueVariation.rgb, albedoTranslucency.rgb, smoothstep(0, 0.5, input.uv.y));
 	
 	float occlusion = normalOcclusionRoughness.b;
-	float roughness = normalOcclusionRoughness.a;
+	float roughness = lerp(normalOcclusionRoughness.a, 0.0, _Smoothness);
 		
 	float3 V = normalize(-input.worldPosition);
 	
