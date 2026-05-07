@@ -5,7 +5,7 @@ using UnityEngine.Experimental.Rendering;
 using UnityEngine.Assertions;
 
 #if UNITY_EDITOR
-    using UnityEditor;
+using UnityEditor;
     using UnityEditorInternal;
 #endif
 
@@ -20,6 +20,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
     private bool isInitialized;
     private readonly bool renderDocLoaded;
     private readonly List<ViewRenderData> viewRenderDatas = new();
+    private readonly Dictionary<int, string> renderCameraProfileMarkers = new();
 
     public bool IsDisposingFromRenderDoc { get; protected set; }
     public bool IsDisposing { get; private set; }
@@ -130,7 +131,13 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
         foreach (var viewRenderData in viewRenderDatas)
         {
-            using var renderCameraScope = renderGraph.AddProfileScope("Render Camera");
+            if(!renderCameraProfileMarkers.TryGetValue(viewRenderData.viewId, out var profileMarker))
+            {
+                profileMarker = $"Render View ({viewRenderData.camera.name})";
+                renderCameraProfileMarkers.Add(viewRenderData.viewId, profileMarker);
+            }
+
+            using var renderCameraScope = renderGraph.AddProfileScope(profileMarker);
             foreach (var cameraRenderFeature in perCameraRenderFeatures)
             {
                 cameraRenderFeature.Render(viewRenderData);
