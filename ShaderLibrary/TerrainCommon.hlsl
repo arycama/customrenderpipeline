@@ -287,6 +287,9 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		transmittance *= currentTransmittance;
 	}
 	
+	albedo /= 1.0 - transmittance;
+	normalOcclusionRoughness.ba /= 1.0 - transmittance;
+	
 	normal = normalize(float3(normalOcclusionRoughness.xy, 1.0));
 	
 	float2 normalUv = uv * TerrainHeightmapUvRemap.x + TerrainHeightmapUvRemap.y;

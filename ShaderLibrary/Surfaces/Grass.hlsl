@@ -12,7 +12,7 @@
 
 Texture2D AlbedoOpacity, NormalOcclusionRoughness, Translucency;
 Texture2D<float> GrassCoverage;
-Buffer<uint> PatchData, InstanceData;
+StructuredBuffer<uint> PatchData, InstanceData;
 float4 PatchScaleOffset;
 float BladeCount;
 
@@ -53,7 +53,7 @@ float3 RotateAroundAxis(float3 v, float3 axis, float angle)
 FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 {
 	uint quadId = id >> 2;
-		
+
 	uint data = InstanceData[quadId];
 	float offsetX = BitUnpackFloat(data, 6, 0);
 	float offsetY = BitUnpackFloat(data, 6, 6);
@@ -71,9 +71,28 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	// Quad position
 	uint x = quadId % (uint) BladeCount;
 	uint y = quadId / (uint) BladeCount;
+	uint2 coord = uint2(x, y);
+	
+	// Randomly rotate/flip each grass patch to reduce tiling
+	float3 rand0 = Hash32(uint2(dataColumn, dataRow));
+
+	// Apply rotation (90-degree increments)
+	if(rand0.x > 0.75)
+		coord = uint2(BladeCount - 1 - coord.y, coord.x);
+	else if(rand0.x > 0.5)
+		coord = uint2(BladeCount.x - 1 - coord.x, BladeCount - 1 - coord.y);
+	else if(rand0.x > 0.25)
+		coord = uint2(coord.y, BladeCount.x - 1 - coord.x);
+    
+    // Apply flips (these affect the rotated coordinates)
+	if (rand0.y > 0.5)
+		coord.x = BladeCount - 1 - coord.x;
+    
+	if (rand0.z > 0.5)
+		coord.y = BladeCount - 1 - coord.y;
 	
 	float3 centerPosition;
-	centerPosition.xz = ((uint2(x, y) << lod)) * rcp(BladeCount);
+	centerPosition.xz = ((coord << lod)) * rcp(BladeCount);
 	centerPosition.xz += float2(offsetX, offsetY);
 	
 	// Patch position
@@ -82,7 +101,7 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	
 	float2 terrainUv = WorldToTerrainPosition(centerPosition);
 	float strength = GrassCoverage.SampleLevel(LinearClampSampler, terrainUv, 0.0);
-	strength = Remap(strength, 0.75, 1, 0, 1);
+	strength = saturate(Remap(strength, 0.0, 1, 0, 1));
 	
 	FragmentInput output = (FragmentInput)0;
 	float rand = RandomFloat(quadId);
@@ -91,7 +110,8 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 		output.position = asfloat(0x7F800000);
 		return output;
 	}
-		
+	
+	scale *= strength;
 	centerPosition.y = GetTerrainHeight(centerPosition);
 	
 	// Generate grass vector

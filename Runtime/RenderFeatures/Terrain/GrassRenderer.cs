@@ -21,11 +21,15 @@ public class GrassRenderer : ViewRenderFeature
 	private bool isInitialized;
 	private ResourceHandle<RenderTexture> coverageMap;
 	private Material grassCoverageMaterial;
+    private TerrainSystem terrainSystem;
 
-	public GrassRenderer(Settings settings, RenderGraph renderGraph, QuadtreeCull quadtreeCull) : base(renderGraph)
+    private int idMapVersion, heightMapVersion;
+
+	public GrassRenderer(Settings settings, RenderGraph renderGraph, QuadtreeCull quadtreeCull, TerrainSystem terrainSystem) : base(renderGraph)
 	{
 		this.settings = settings;
 		this.quadtreeCull = quadtreeCull;
+        this.terrainSystem = terrainSystem;
 		grassDataComputeShader = Resources.Load<ComputeShader>("GpuInstancedRendering/GrassData");
 		grassCoverageMaterial = new Material(Shader.Find("Hidden/Grass Coverage")){ hideFlags = HideFlags.HideAndDontSave };
 	}
@@ -37,6 +41,9 @@ public class GrassRenderer : ViewRenderFeature
 			renderGraph.ReleasePersistentResource(indexBuffer, -1);
 			renderGraph.ReleasePersistentResource(instanceDataBuffer, -1);
 		}
+
+        if (isInitialized)
+            renderGraph.ReleasePersistentResource(coverageMap, -1);
 	}
 
 	public override void Render(ViewRenderData viewRenderData)
@@ -89,10 +96,17 @@ public class GrassRenderer : ViewRenderFeature
 			}
 		}
 
-		// Calculate coverage map if needed
-		if(!isInitialized)
+        // Calculate coverage map if needed
+        // TODO: Only update the required region
+        if (idMapVersion != terrainSystem.IdMapVersion)
 		{
-			coverageMap = renderGraph.GetTexture(terrain.terrainData.alphamapResolution, GraphicsFormat.R8_UNorm, isPersistent: true);
+            idMapVersion = terrainSystem.IdMapVersion;
+
+            if(!isInitialized)
+            {
+                coverageMap = renderGraph.GetTexture(terrain.terrainData.alphamapResolution, GraphicsFormat.R8_UNorm, isPersistent: true);
+                isInitialized = true;
+            }
 			
 			using(var pass = renderGraph.AddFullscreenRenderPass("Grass Coverage Init"))
 			{
@@ -100,7 +114,6 @@ public class GrassRenderer : ViewRenderFeature
 				pass.WriteTexture(coverageMap);
 				pass.ReadResource<TerrainFrameData>();
 				pass.ReadResource<TerrainViewData>();
-				isInitialized = true;
 			}
 		}
 

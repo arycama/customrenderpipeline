@@ -257,4 +257,10 @@ public static class GraphicsUtilities
 
         return new Float4(scaleX, scaleY, limitX, limitY);
     }
+
+    public static Rect NonFlippedViewport(Rect rect, Int2 targetSize)
+    {
+        rect.y = targetSize.y - rect.size.y;
+        return rect;
+    }
 }

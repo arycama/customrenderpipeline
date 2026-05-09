@@ -585,12 +585,12 @@ public class RenderGraph : IDisposable
 
                     // We disable Unity's annoying internal Y flip, but it will still attempt to flip any viewports we set, so we need to negate the viewport to undo Unity's negation
                     // However if the target is only a depth buffer, Unity will not flip it
-                    var viewportSize = new Int2(descriptor.size.x >> descriptor.mipLevel, descriptor.size.y >> descriptor.mipLevel);
+                    var viewport = new Rect(0, 0, descriptor.size.x >> descriptor.mipLevel, descriptor.size.y >> descriptor.mipLevel);
 
-                    if(passAttachments.Length == 1 && descriptor.depthAttachmentIndex != -1)
-                        command.SetViewport(new Rect(0, 0, viewportSize.x, viewportSize.y));
-                    else
-                        command.SetViewport(new Rect(0, size.y - (descriptor.size.y >> descriptor.mipLevel), viewportSize.x, viewportSize.y));
+                    if (passAttachments.Length != 1 || descriptor.depthAttachmentIndex == -1)
+                        viewport = GraphicsUtilities.NonFlippedViewport(viewport, size);
+
+                    command.SetViewport(viewport);
 
                     passAttachments.Clear();
                     previousSubPassIndex = 0;

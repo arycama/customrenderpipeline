@@ -13,8 +13,7 @@ float4 UvScaleOffset;
 
 uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {
-	uv = uv * UvScaleOffset.xy + UvScaleOffset.zw;
-	float2 offsetPosition = position.xy;
+	//uv = uv * UvScaleOffset.xy + UvScaleOffset.zw;
 
 	uint index0 = 0, index1 = 0;
 	float weight0 = 0.0, weight1 = 0.0;
@@ -27,27 +26,22 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 		if (i < TextureCount)
 		{
 			if (i < 4)
-				weight += Input0[offsetPosition][i % 4];
+				weight += Input0[position.xy][i % 4];
 			else if (i < 8)
-				weight += Input1[offsetPosition][i % 4];
+				weight += Input1[position.xy][i % 4];
 			else if (i < 12)
-				weight += Input2[offsetPosition][i % 4];
+				weight += Input2[position.xy][i % 4];
 			else if (i < 16)
-				weight += Input3[offsetPosition][i % 4];
+				weight += Input3[position.xy][i % 4];
 			else if (i < 20)
-				weight += Input4[offsetPosition][i % 4];
+				weight += Input4[position.xy][i % 4];
 			else if (i < 24)
-				weight += Input5[offsetPosition][i % 4];
+				weight += Input5[position.xy][i % 4];
 			else if (i < 28)
-				weight += Input6[offsetPosition][i % 4];
+				weight += Input6[position.xy][i % 4];
 			else if (i < 32)
-				weight += Input7[offsetPosition][i % 4];
+				weight += Input7[position.xy][i % 4];
 		}
-			
-		// Procedural layer
-		//uint proceduralIndex = ProceduralIndices[i];
-		//if (proceduralIndex > 0)
-		//	weight += ExtraLayers[uint3(offsetPosition, proceduralIndex - 1)];
 		
         // Check the strength of the current splatmap layer
 		if (weight > weight0)

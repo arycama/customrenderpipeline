@@ -52,7 +52,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         gpuDrivenRenderer = new GpuDrivenRenderer(renderGraph);
         environmentConvolve = new EnvironmentConvolve(renderGraph, asset.EnvironmentLighting);
 
-        reprojectPreviousFrameMaterial = new Material(Shader.Find("Hidden/Reproject Previous Frame"));
+        reprojectPreviousFrameMaterial = new Material(Shader.Find("Hidden/Reproject Previous Frame")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
     protected override void Dispose(bool disposing)
@@ -249,7 +249,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
         new GpuDrivenRenderingRender(gpuDrivenRenderer, renderGraph),
 
-        new GrassRenderer(asset.Grass, renderGraph, quadtreeCull),
+        new GrassRenderer(asset.Grass, renderGraph, quadtreeCull, terrainSystem),
 
 		// Finalize gbuffer
 		new ScreenSpaceTerrain(renderGraph, asset.TerrainSettings),

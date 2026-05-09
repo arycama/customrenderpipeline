@@ -28,9 +28,10 @@ public class TerrainSystem : FrameRenderFeature
     private ResourceHandle<RenderTexture> minMaxHeight, heightmap, normalmap, idMap, aoMap;
     private float maxHeightExtents;
 
-    private int heightmapVersion = -1, idMapVersion = -1;
-    private int previousHeightmapVersion = -1, previousIdMapVersion = -1;
+    public int HeightmapVersion { get; private set; }
+    public int IdMapVersion { get; private set; }
 
+    private int previousHeightmapVersion, previousIdMapVersion;
 
     public Terrain Terrain { get; private set; }
     public TerrainData TerrainData => Terrain.terrainData;
@@ -64,13 +65,13 @@ public class TerrainSystem : FrameRenderFeature
 
     private void QueueHeightmapUpdate(RectInt region)
     {
-        heightmapVersion++;
+        HeightmapVersion++;
         heightmapUpdateRects.Add(region);
     }
 
     private void QueueIdMapUpdate(RectInt region)
     {
-        idMapVersion++;
+        IdMapVersion++;
         idMapUpdateRects.Add(region);
     }
 
@@ -238,7 +239,7 @@ public class TerrainSystem : FrameRenderFeature
            terrainFrameData
         ));
 
-        UpdateIdMap();
+        UpdateIdMap(new RectInt(0, 0, idMapResolution, idMapResolution));
         UpdateAoMap();
     }
 
@@ -377,20 +378,19 @@ public class TerrainSystem : FrameRenderFeature
         }
     }
 
-    private void UpdateIdMap(RectInt? region = null)
+    private void UpdateIdMap(RectInt region)
     {
         if (terrainLayers.Count == 0)
             return;
 
         var idMapResolution = TerrainData.alphamapResolution;
-        using (var pass = renderGraph.AddFullscreenRenderPass("Terrain Layer Data Init", (TerrainData.alphamapLayers, (Float3)Terrain.terrainData.size, terrainLayers.Count, TerrainData.alphamapLayers, TerrainData.alphamapTextureCount, TerrainData.alphamapTextures, idMapResolution, region)))
+        var viewport = new Rect(new Vector2(region.position.x, idMapResolution - region.position.y - region.size.y), region.size);
+
+        using (var pass = renderGraph.AddFullscreenRenderPass("Terrain Layer Data Init", (TerrainData.alphamapLayers, (Float3)Terrain.terrainData.size, terrainLayers.Count, TerrainData.alphamapLayers, TerrainData.alphamapTextureCount, TerrainData.alphamapTextures, idMapResolution, viewport)))
         {
-            //var indicesBuffer = renderGraph.GetBuffer(terrainLayers.Count);
             pass.Initialize(generateIdMapMaterial, idMapResolution);
             pass.WriteTexture(idMap);
             pass.ReadTexture("TerrainNormalMap", normalmap);
-            //pass.WriteBuffer("ProceduralIndices", indicesBuffer);
-            //pass.ReadBuffer("ProceduralIndices", indicesBuffer);
             pass.ReadBuffer("TerrainLayerData", terrainLayerData);
             pass.ReadResource<TerrainFrameData>();
 
@@ -402,17 +402,7 @@ public class TerrainSystem : FrameRenderFeature
                 pass.SetInt("TextureCount", data.Item4);
                 pass.SetVector("PositionOffset", Float2.Zero);
 
-                //if (data.region.HasValue)
-                //{
-                //    var region = data.region.Value;
-                //    command.SetViewport(new Rect(region.position, region.size));
-                //    pass.SetVector("PositionOffset", new Float4((Vector2)region.position, 0));
-                //    pass.SetVector("UvScaleOffset", new Vector4(region.size.x, region.size.y, region.position.x, region.position.y) / data.idMapResolution);
-                //}
-                //else
-                {
-                    pass.SetVector("UvScaleOffset", new Vector4(1, 1, 0, 0));
-                }
+                command.EnableScissorRect(data.viewport);
 
                 // Shader supports up to 8 layers. Can easily be increased by modifying shader though
                 for (var i = 0; i < 8; i++)
@@ -420,21 +410,14 @@ public class TerrainSystem : FrameRenderFeature
                     var texture = i < data.alphamapTextureCount ? data.alphamapTextures[i] : Texture2D.blackTexture;
                     pass.SetTexture(Shader.PropertyToID($"Input{i}"), texture);
                 }
+            });
+        }
 
-                // Need to build buffer of layer to array index
-                //var layers = new NativeArray<int>(terrainLayers.Count, Allocator.Temp);
-                //foreach (var layer in terrainLayers)
-                //{
-                //	if (terrainProceduralLayers.TryGetValue(layer.Key, out var proceduralIndex))
-                //	{
-                //		// Use +1 so we can use 0 to indicate no data
-                //		layers[layer.Value] = proceduralIndex + 1;
-                //	}
-                //}
-
-                //command.SetBufferData(pass.GetBuffer(indicesBuffer), layers);
-                //var tempArrayId = Shader.PropertyToID("TempTerrainId");
-                //pass.SetTexture("ExtraLayers", tempArrayId);
+        using (var pass = renderGraph.AddGenericRenderPass("Terrain Layer Data Init"))
+        {
+            pass.SetRenderFunction((command, pass) =>
+            {
+                command.DisableScissorRect();
             });
         }
     }
@@ -534,7 +517,7 @@ public class TerrainSystem : FrameRenderFeature
            terrainFrameData
         ));
 
-        if(previousHeightmapVersion != heightmapVersion)
+        if(previousHeightmapVersion != HeightmapVersion)
         {
             RectInt? region = default;
             foreach(var updateRect in heightmapUpdateRects)
@@ -542,10 +525,10 @@ public class TerrainSystem : FrameRenderFeature
 
             heightmapUpdateRects.Clear();
             UpdateHeightmap(region);
-            previousHeightmapVersion = heightmapVersion;
+            previousHeightmapVersion = HeightmapVersion;
         }
 
-        if(previousIdMapVersion != idMapVersion)
+        if(previousIdMapVersion != IdMapVersion)
         {
             RectInt? region = default;
             foreach (var updateRect in idMapUpdateRects)
@@ -553,8 +536,8 @@ public class TerrainSystem : FrameRenderFeature
 
             idMapUpdateRects.Clear();
 
-            UpdateIdMap(region);
-            previousIdMapVersion = idMapVersion;
+            UpdateIdMap(region.Value);
+            previousIdMapVersion = IdMapVersion;
         }
     }
 }

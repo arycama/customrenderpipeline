@@ -216,3 +216,102 @@ float2 VogelDiskSample(int sampleIndex, int samplesCount, float phi)
   
 	return float2(r * cosine, r * sine);
 }
+
+float Hash11(float p)
+{
+	p = frac(p * .1031);
+	p *= p + 33.33;
+	p *= p + p;
+	return frac(p);
+}
+
+float Hash12(float2 p)
+{
+	float3 p3 = frac(p.xyx * 0.1031);
+	p3 += dot(p3, p3.yzx + 33.33);
+	return frac((p3.x + p3.y) * p3.z);
+}
+
+float Hash13(float3 p3)
+{
+	p3 = frac(p3 * 0.1031);
+	p3 += dot(p3, p3.zyx + 33.33);
+	return frac((p3.x + p3.y) * p3.z);
+}
+
+float Hash14(float4 p4)
+{
+	p4 = frac(p4 * float4(0.1031, 0.1030, 0.0973, 0.1099));
+	p4 += dot(p4, p4.wzxy + 33.33);
+	return frac((p4.x + p4.y) * (p4.z + p4.w));
+}
+
+float2 Hash21(float p)
+{
+	float3 p3 = frac(p * float3(0.1031, 0.1030, 0.0973));
+	p3 += dot(p3, p3.yzx + 33.33);
+	return frac((p3.xx + p3.yz) * p3.zy);
+}
+
+float2 Hash22(float2 p)
+{
+	float3 p3 = frac(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
+	p3 += dot(p3, p3.yzx + 33.33);
+	return frac((p3.xx + p3.yz) * p3.zy);
+}
+
+float2 Hash23(float3 p3)
+{
+	p3 = frac(p3 * float3(0.1031, 0.1030, 0.0973));
+	p3 += dot(p3, p3.yzx + 33.33);
+	return frac((p3.xx + p3.yz) * p3.zy);
+}
+
+float3 Hash31(float p)
+{
+	float3 p3 = frac(p * float3(0.1031, 0.1030, 0.0973));
+	p3 += dot(p3, p3.yzx + 33.33);
+	return frac((p3.xxy + p3.yzz) * p3.zyx);
+}
+
+float3 Hash32(float2 p)
+{
+	float3 p3 = frac(p.xyx * float3(0.1031, 0.1030, 0.0973));
+	p3 += dot(p3, p3.yxz + 33.33);
+	return frac((p3.xxy + p3.yzz) * p3.zyx);
+}
+
+float3 Hash33(float3 p3)
+{
+	p3 = frac(p3 * float3(0.1031, 0.1030, 0.0973));
+	p3 += dot(p3, p3.yxz + 33.33);
+	return frac((p3.xxy + p3.yxx) * p3.zyx);
+}
+
+float4 Hash41(float p)
+{
+	float4 p4 = frac(p * float4(0.1031, 0.1030, 0.0973, 0.1099));
+	p4 += dot(p4, p4.wzxy + 33.33);
+	return frac((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+
+float4 Hash42(float2 p)
+{
+	float4 p4 = frac(p.xyxy * float4(0.1031, 0.1030, 0.0973, 0.1099));
+	p4 += dot(p4, p4.wzxy + 33.33);
+	return frac((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+
+float4 Hash43(float3 p)
+{
+	float4 p4 = frac(float4(p.xyzx) * float4(0.1031, 0.1030, 0.0973, 0.1099));
+	p4 += dot(p4, p4.wzxy + 33.33);
+	return frac((p4.xxyz + p4.yzzw) * p4.zywx);
+}
+
+float4 Hash44(float4 p4)
+{
+	p4 = frac(p4 * float4(0.1031, 0.1030, 0.0973, 0.1099));
+	p4 += dot(p4, p4.wzxy + 33.33);
+	return frac((p4.xxyz + p4.yzzw) * p4.zywx);
+}
