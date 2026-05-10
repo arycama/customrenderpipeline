@@ -122,7 +122,7 @@ float3 Ggx(float roughness2, float NdotL, float LdotV, float NdotV, float partLa
 
 half WrappedDiffuse(half NdotL, half wrap)
 {
-	return saturate((NdotL + wrap) / (Sq(1.0h + wrap)));
+	return saturate((NdotL + wrap) / Sq(1.0h + wrap));
 }
 
 half3 GgxBsdf(half roughness2, half3 reflectivity, half NdotL, half NdotV, half LdotV, bool isBackface, half3 opacity)

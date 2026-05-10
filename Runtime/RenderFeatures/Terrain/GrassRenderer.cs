@@ -24,6 +24,7 @@ public class GrassRenderer : ViewRenderFeature
     private TerrainSystem terrainSystem;
 
     private int idMapVersion, heightMapVersion;
+    private int previousResolution;
 
 	public GrassRenderer(Settings settings, RenderGraph renderGraph, QuadtreeCull quadtreeCull, TerrainSystem terrainSystem) : base(renderGraph)
 	{
@@ -102,19 +103,45 @@ public class GrassRenderer : ViewRenderFeature
 		{
             idMapVersion = terrainSystem.IdMapVersion;
 
-            if(!isInitialized)
+            var resolution = terrain.terrainData.alphamapResolution;
+            RectInt region;
+            if (!isInitialized || previousResolution != resolution)
             {
-                coverageMap = renderGraph.GetTexture(terrain.terrainData.alphamapResolution, GraphicsFormat.R8_UNorm, isPersistent: true);
+                if (isInitialized)
+                    renderGraph.ReleasePersistentResource(coverageMap, renderGraph.RenderPassCount);
+
+                coverageMap = renderGraph.GetTexture(resolution, GraphicsFormat.R8_UNorm, isPersistent: true);
+                previousResolution = resolution;
                 isInitialized = true;
+                region = new RectInt(0, 0, resolution, resolution);
             }
-			
-			using(var pass = renderGraph.AddFullscreenRenderPass("Grass Coverage Init"))
+            else
+            {
+                region = terrainSystem.LastIdUpdateRect;
+            }
+
+            var viewport = new Rect(new Vector2(region.position.x, resolution - region.position.y - region.size.y), region.size);
+
+            using (var pass = renderGraph.AddFullscreenRenderPass("Grass Coverage Update", viewport))
 			{
 				pass.Initialize(grassCoverageMaterial, terrain.terrainData.alphamapResolution);
 				pass.WriteTexture(coverageMap);
 				pass.ReadResource<TerrainFrameData>();
 				pass.ReadResource<TerrainViewData>();
+
+                pass.SetRenderFunction((command, pass, viewport) =>
+                {
+                    command.EnableScissorRect(viewport);
+                });
 			}
+
+            using (var pass = renderGraph.AddGenericRenderPass("Grass Coverage Update"))
+            {
+                pass.SetRenderFunction((command, pass, viewport) =>
+                {
+                    command.DisableScissorRect();
+                });
+            }
 		}
 
 		// Need to resize buffer for visible indices

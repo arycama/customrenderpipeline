@@ -20,8 +20,8 @@ GBufferOutput Fragment(VertexFullscreenTriangleOutput input)
 	#ifndef VIRTUAL_TEXTURING_ON
 		float4 albedoRoughness, normalMetalOcclusion;
 		float3 normal;
-		float height;
-		ShadeTerrain(uv, ddx(uv), ddy(uv), albedoRoughness.rgb, albedoRoughness.a, normal, normalMetalOcclusion.b, height);
+		float height, translucency;
+		ShadeTerrain(uv, ddx(uv), ddy(uv), albedoRoughness.rgb, albedoRoughness.a, normal, normalMetalOcclusion.b, height, translucency);
 	#else
 		float scale;
 		float3 virtualUv = CalculateVirtualUv(uv, scale);
@@ -29,6 +29,7 @@ GBufferOutput Fragment(VertexFullscreenTriangleOutput input)
 		float4 normalMetalOcclusion = VirtualNormalTexture.SampleGrad(TrilinearClampAniso8Sampler, virtualUv, ddx(uv) * scale, ddy(uv) * scale);
 	
 		float3 normal = UnpackNormalUNorm(normalMetalOcclusion.ag).xzy;
+		float translucency = 0;
 	
 		// Write to feedback buffer
 		uint feedbackPosition = CalculateFeedbackBufferPosition(uv);
@@ -41,5 +42,5 @@ GBufferOutput Fragment(VertexFullscreenTriangleOutput input)
 	visibilityCone = SphericalCapIntersection(normal, normalMetalOcclusion.b, visibilityCone.xyz, visibilityCone.a);
 	
 	float3 V = normalize(-input.worldDirection);
-	return OutputGBuffer(albedoRoughness.rgb, 0, normal, albedoRoughness.a, visibilityCone.xyz, visibilityCone.a, 0, 0, input.position.xy, V, WorldToView);
+	return OutputGBuffer(albedoRoughness.rgb, 0, normal, albedoRoughness.a, visibilityCone.xyz, visibilityCone.a, 0, translucency, input.position.xy, V, WorldToView);
 }

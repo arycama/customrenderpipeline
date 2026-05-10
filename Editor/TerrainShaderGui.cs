@@ -9,12 +9,16 @@ public class TerrainShaderGui : ShaderGUI, ITerrainLayerCustomUI
 
 		Undo.RecordObject(terrainLayer, "Modify Terrain Layer");
 
-		terrainLayer.tileSize = Vector2.one * Math.Max(0, EditorGUILayout.FloatField("Size", terrainLayer.tileSize.x));
+        terrainLayer.tileSize = Vector2.one * Math.Max(0, EditorGUILayout.Slider("Size (m)", terrainLayer.tileSize.x, 0, 4));
 		terrainLayer.smoothness = Math.Max(0, EditorGUILayout.Slider("Opacity", terrainLayer.smoothness, 0, 1));
-		terrainLayer.metallic = Math.Max(0, EditorGUILayout.FloatField("Height Scale", terrainLayer.metallic));
+		terrainLayer.metallic = Math.Max(0, EditorGUILayout.Slider("Height Scale (cm)", terrainLayer.metallic * 32, 0, 32) / 32);
 		terrainLayer.normalScale = EditorGUILayout.Slider("Stochastic", terrainLayer.normalScale, 0, 1);
 
-		terrainLayer.diffuseTexture = EditorGUILayout.ObjectField("Albedo", terrainLayer.diffuseTexture, typeof(Texture2D), false) as Texture2D;
+        var spec = terrainLayer.specular;
+        spec.a = EditorGUILayout.Slider("Translucency", spec.a, 0, 1);
+        terrainLayer.specular = spec;
+
+        terrainLayer.diffuseTexture = EditorGUILayout.ObjectField("Albedo", terrainLayer.diffuseTexture, typeof(Texture2D), false) as Texture2D;
 		terrainLayer.normalMapTexture = EditorGUILayout.ObjectField("Normal Occlusion Roughness", terrainLayer.normalMapTexture, typeof(Texture2D), false) as Texture2D;
 		terrainLayer.maskMapTexture = EditorGUILayout.ObjectField("Height", terrainLayer.maskMapTexture, typeof(Texture2D), false) as Texture2D;
 

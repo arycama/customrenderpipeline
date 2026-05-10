@@ -17,8 +17,8 @@ FragmentOutput Fragment(VertexFullscreenTriangleVolumeOutput input)
 	float2 uv = input.uv * scaleOffset.xy + scaleOffset.zw;
 	
 	float3 albedo, normal;
-	float roughness, occlusion, height;
-	ShadeTerrain(uv, ddx(uv), ddy(uv), albedo, roughness, normal, occlusion, height);
+	float roughness, occlusion, height, translucency;
+	ShadeTerrain(uv, ddx(uv), ddy(uv), albedo, roughness, normal, occlusion, height, translucency);
 	
 	FragmentOutput output;
 	output.albedoRoughness = float4(albedo, roughness);

@@ -123,21 +123,11 @@ float3 EvaluateLight(LightingInput input, float diffuseTerm, float f0Avg, float3
 	
 	half BdotL = saturate(dot(input.bentNormal, L));
 	half microShadow = MicroShadows ? saturate(Sq(BdotL / input.cosVisibilityAngle)) : 1.0;
-	float3 result = saturate(NdotL) * (1.0 - input.translucency) * microShadow;
-	
-	result += (WrappedDiffuse(-NdotL, 1) + WrappedDiffuse(NdotL, 1)) * 0.5 * input.translucency;
+	float3 result = WrappedDiffuse(NdotL, input.translucency) * lerp(microShadow, 1.0, input.translucency);
 	result *= diffuseTerm * input.albedo;
 	
 	float LdotV = dot(L, input.V);
 	result += GgxBsdf(input.roughness2, input.reflectivity, NdotL, input.NdotV, LdotV, input.isVolume, input.diffuseOpacity) * microShadow;
-	
-	
-	//if (MicroShadows)
-	//{
-	//	half sunCosAngle = SphericalCapIntersection(input.bentNormal, input.cosVisibilityAngle, L, SunCosAngle).a;
-	//	sunCosAngle = SphericalCapIntersectionCosAngle(input.bentNormal, input.cosVisibilityAngle, L, SunCosAngle);
-	//	microShadow = ConeCosAngleToSolidAngle(sunCosAngle) * SunRcpSolidAngle;
-	//}
 	
 	return RcpPi * result;
 }

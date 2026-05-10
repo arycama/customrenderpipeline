@@ -8,15 +8,8 @@
 #include "Samplers.hlsl"
 #include "Utility.hlsl"
 
-struct LayerData
-{
-	float Scale;
-	float Extinction;
-	float Stochastic;
-	float HeightScale;
-};
 
-StructuredBuffer<LayerData> TerrainLayerData;
+StructuredBuffer<uint> TerrainLayerData;
 Texture2DArray<float1> Mask;
 Texture2DArray<float3> AlbedoSmoothness;
 Texture2DArray<float4> Normal;
@@ -104,7 +97,7 @@ float3 GetTerrainNormalLevel(float3 worldPosition)
 	return GetTerrainNormalLevel(terrainUv);
 }
 
-void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out float roughness, out float3 normal, out float occlusion, out float height)
+void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out float roughness, out float3 normal, out float occlusion, out float height, out float translucency)
 {
 	float2 localUv = uv * IdMapResolution - 0.5 + rcp(512.0);
 	float4 bilinearWeights = BilinearWeights(frac(localUv));
@@ -143,8 +136,9 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		uint layerIndex = BitUnpack(data, 5, offset);
 		float blend = Remap(BitUnpack(data, 4, 26), 0.0, 15.0, 0.0, 0.5);
 		
-		LayerData layerData = TerrainLayerData[layerIndex];
-		float2 scale = layerData.Scale * TerrainSize.xz;
+		uint layerData = TerrainLayerData[layerIndex];
+		float layerScale = BitUnpackFloat(layerData, 5, 12) * 4;
+		float2 scale = layerScale * TerrainSize.xz;
 		
 		float offsetX, offsetY, rotation;
 		if (i < 4)
@@ -169,8 +163,8 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		float2x2 rotationMatrix = float2x2(c, s, -s, c);
 		
 		// Center in terrain layer space
-		float2 localUv = uv * TerrainSize.xz * layerData.Scale;
-		float2 center = floor((uvCenter + offsets[i % 4] / IdMapResolution) * TerrainSize.xz * layerData.Scale) + 0.5;
+		float2 localUv = uv * TerrainSize.xz * layerScale;
+		float2 center = floor((uvCenter + offsets[i % 4] / IdMapResolution) * TerrainSize.xz * layerScale) + 0.5;
 		float2 sampleUv = mul(rotationMatrix, localUv - center) + center + float2(offsetX, offsetY);
 		float2 localDx = mul(rotationMatrix, dxUv * scale);
 		float2 localDy = mul(rotationMatrix, dyUv * scale);
@@ -180,7 +174,8 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		currentNormalOcclusionRoughness.rg = UnpackNormalDerivativesUNorm(currentNormalOcclusionRoughness.rg);
 		currentNormalOcclusionRoughness.rg = mul(currentNormalOcclusionRoughness.rg, rotationMatrix);
 		
-		float currentHeight = Mask.SampleGrad(TrilinearRepeatAniso8Sampler, float3(sampleUv, layerIndex), localDx, localDy) * layerData.HeightScale;
+		float layerHeightScale = BitUnpackFloat(layerData, 5, 17) * 0.32;
+		float currentHeight = Mask.SampleGrad(TrilinearRepeatAniso8Sampler, float3(sampleUv, layerIndex), localDx, localDy) * layerHeightScale;
 		
 		if (i < 4)
 			blend = 1.0 - blend;
@@ -188,7 +183,7 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 		bool hasMatch = false;
 		float weight = bilinearWeights[i % 4] * blend;
 		
-		heightOffset += layerData.HeightScale * weight;
+		heightOffset += layerHeightScale * weight;
 		weightSum += weight;
 		
 		[unroll]
@@ -256,38 +251,44 @@ void ShadeTerrain(float2 uv, float2 dxUv, float2 dyUv, out float3 albedo, out fl
 	
 	float transmittance = 1.0;
 	albedo = 0.0;
+	translucency = 0.0;
 	float3 albedoScatter = 0.0;
 	float4 normalOcclusionRoughness = 0.0, normalOcclusionRoughnessScatter = 0.0;
+	float translucencyScatter = 0.0;
 	float extinction = 0.0;
 	
 	[unroll]
 	for (i = 0; i < 8; i++)
 	{
 		uint layerIndex = indices[i];
-		LayerData layerData = TerrainLayerData[layerIndex];
+		uint layerData = TerrainLayerData[layerIndex];
 		
 		// Previous layers contain density from that layer, so we just add the extinction for the new layer
-		float currentExtinction = layerData.Extinction;
-		extinction += currentExtinction;
+		float layerExtinction = BitUnpackFloat(layerData, 12, 0) * HalfMax;
+		extinction += layerExtinction;
 		
 		// Get distance from the current height to the next
 		float currentHeight = heights[i];
 		float nextHeight = i > 6 ? 0 : heights[min(7, i + 1)];
 		float dt = currentHeight - nextHeight;
-		float currentTransmittance = exp(-extinction * dt);
+		float currentTransmittance = exp2(-extinction * dt);
 		float currentWeight = transmittance * (1.0 - currentTransmittance) * rcp(extinction);
 		
-		float2 scale = layerData.Scale * TerrainSize.xz;
-		albedoScatter += albedos[i] * currentExtinction;
+		albedoScatter += albedos[i] * layerExtinction;
 		albedo += albedoScatter * currentWeight;
 		
-		normalOcclusionRoughnessScatter += normalOcclusionRoughnesses[i] * currentExtinction;
+		float layerTranslucency = BitUnpackFloat(layerData, 5, 22);
+		translucencyScatter += layerTranslucency * layerExtinction;
+		translucency += translucencyScatter * currentWeight;
+		
+		normalOcclusionRoughnessScatter += normalOcclusionRoughnesses[i] * layerExtinction;
 		normalOcclusionRoughness += normalOcclusionRoughnessScatter * currentWeight;
 		
 		transmittance *= currentTransmittance;
 	}
 	
 	albedo /= 1.0 - transmittance;
+	translucency /= 1.0 - transmittance;
 	normalOcclusionRoughness.ba /= 1.0 - transmittance;
 	
 	normal = normalize(float3(normalOcclusionRoughness.xy, 1.0));

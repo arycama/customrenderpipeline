@@ -121,16 +121,18 @@ public abstract class RenderPass : IDisposable
     public GraphicsBuffer GetBuffer(ResourceHandle<GraphicsBuffer> handle)
 	{
 		Assert.IsTrue(RenderGraph.IsExecuting);
-		return RenderGraph.BufferHandleSystem.GetResource(handle);
-	}
+		var result = RenderGraph.BufferHandleSystem.GetResource(handle);
+        return result ?? throw new InvalidOperationException($"{Name} is trying to retrieve a GraphicsBuffer that does not exist. Handle: {handle.index} ({RenderGraph.BufferHandleSystem.GetDescriptor(handle)}");
+    }
 
-	public RenderTexture GetRenderTexture(ResourceHandle<RenderTexture> handle)
+    public RenderTexture GetRenderTexture(ResourceHandle<RenderTexture> handle)
 	{
 		Assert.IsTrue(RenderGraph.IsExecuting);
-		return RenderGraph.RtHandleSystem.GetResource(handle);
-	}
+		var result = RenderGraph.RtHandleSystem.GetResource(handle);
+        return result ?? throw new InvalidOperationException($"{Name} is trying to retrieve a RenderTexture that does not exist. Handle: {handle.index} ({RenderGraph.RtHandleSystem.GetDescriptor(handle)}");
+    }
 
-	public void AddKeyword(string keyword)
+    public void AddKeyword(string keyword)
 	{
 		keywords.Add(keyword);
 	}

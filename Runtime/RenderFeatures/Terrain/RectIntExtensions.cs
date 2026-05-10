@@ -24,10 +24,10 @@ public static class RectIntExtensions
 
     public static RectInt Encapsulate(this RectInt a, RectInt b)
     {
-        a.xMin = Math.Min(b.xMin, a.xMin);
-        a.xMax = Math.Max(b.xMax, a.xMax);
-        a.yMin = Math.Min(a.yMin, a.yMin);
-        a.yMax = Math.Max(a.yMax, a.yMax);
+        a.xMin = Math.Min(a.xMin, b.xMin);
+        a.xMax = Math.Max(a.xMax, b.xMax);
+        a.yMin = Math.Min(a.yMin, b.yMin);
+        a.yMax = Math.Max(a.yMax, b.yMax);
         return a;
     }
 }

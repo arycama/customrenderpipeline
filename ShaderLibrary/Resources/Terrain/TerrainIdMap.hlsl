@@ -8,13 +8,9 @@ float2 PositionOffset;
 Texture2D<float4> Input0, Input1, Input2, Input3, Input4, Input5, Input6, Input7;
 uint LayerCount, TotalLayers, TextureCount;
 Buffer<uint> ProceduralIndices;
-//Texture2DArray<float> ExtraLayers;
-float4 UvScaleOffset;
 
 uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {
-	//uv = uv * UvScaleOffset.xy + UvScaleOffset.zw;
-
 	uint index0 = 0, index1 = 0;
 	float weight0 = 0.0, weight1 = 0.0;
 	
@@ -66,25 +62,31 @@ uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 	// If stochastic, use a random rotation, otherwise find the rotation of the terrain's normal
 	float terrainAspect = terrainNormal.y < 1.0 ? Remap(atan2(terrainNormal.z, terrainNormal.x), -Pi, Pi) : 0.0;
 	
-	float stochastic0 = TerrainLayerData[index0].Stochastic;
-	uint rand00 = PcgHash2(uv * TerrainSize.xz * TerrainLayerData[index0].Scale);
-	float rotation0 = lerp(terrainAspect, ConstructFloat(rand00), stochastic0);
+	uint layerData0 = TerrainLayerData[index0];
+	float layer0Stochastic = BitUnpackFloat(layerData0, 5, 27);
+	float layer0Scale = BitUnpackFloat(layerData0, 5, 12) * 4;
+	
+	uint rand00 = PcgHash2(uv * TerrainSize.xz * layer0Scale);
+	float rotation0 = lerp(terrainAspect, ConstructFloat(rand00), layer0Stochastic);
 	
 	uint rand01 = PcgHash(rand00);
-	float offsetX0 = lerp(0.0, ConstructFloat(rand01), stochastic0);
+	float offsetX0 = lerp(0.0, ConstructFloat(rand01), layer0Stochastic);
 	
 	uint rand02 = PcgHash(rand01);
-	float offsetY0 = lerp(0.0, ConstructFloat(rand02), stochastic0);
+	float offsetY0 = lerp(0.0, ConstructFloat(rand02), layer0Stochastic);
 	
-	float stochastic1 = TerrainLayerData[index1].Stochastic;
-	uint rand10 = PcgHash2(uv * TerrainSize.xz * TerrainLayerData[index1].Scale);
-	float rotation1 = lerp(terrainAspect, ConstructFloat(rand10), stochastic1);
+	uint layerData1 = TerrainLayerData[index1];
+	float layer1Stochastic = BitUnpackFloat(layerData1, 5, 27);
+	float layer1Scale = BitUnpackFloat(layerData1, 5, 12) * 4;
+	
+	uint rand10 = PcgHash2(uv * TerrainSize.xz * layer1Scale);
+	float rotation1 = lerp(terrainAspect, ConstructFloat(rand10), layer1Stochastic);
 	
 	uint rand11 = PcgHash(rand10);
-	float offsetX1 = lerp(0.0, ConstructFloat(rand11), stochastic1);
+	float offsetX1 = lerp(0.0, ConstructFloat(rand11), layer1Stochastic);
 	
 	uint rand12 = PcgHash(rand11);
-	float offsetY1 = lerp(0.0, ConstructFloat(rand12), stochastic1);
+	float offsetY1 = lerp(0.0, ConstructFloat(rand12), layer1Stochastic);
 	
 	uint triplanar;
 	float3 absNormal = abs(terrainNormal);

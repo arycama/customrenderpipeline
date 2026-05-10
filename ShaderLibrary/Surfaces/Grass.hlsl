@@ -18,7 +18,7 @@ float BladeCount;
 
 cbuffer UnityPerMaterial
 {
-	float4 _Color, _Translucency;
+	float4 _Color;
 	float _Width, _Height, _Smoothness;
 	float WindStrength, WindAngle, WindWavelength, WindSpeed, TerrainMipBias;
 	float4 AlbedoOpacity_ST;
@@ -101,17 +101,17 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 	
 	float2 terrainUv = WorldToTerrainPosition(centerPosition);
 	float strength = GrassCoverage.SampleLevel(LinearClampSampler, terrainUv, 0.0);
-	strength = saturate(Remap(strength, 0.0, 1, 0, 1));
+	strength = saturate(Remap(strength, 0.5, 1, 0, 1));
+	scale *= strength;
 	
 	FragmentInput output = (FragmentInput)0;
 	float rand = RandomFloat(quadId);
-	if (rand > strength)
+	if (scale <= 0.0)
 	{
 		output.position = asfloat(0x7F800000);
 		return output;
 	}
 	
-	scale *= strength;
 	centerPosition.y = GetTerrainHeight(centerPosition);
 	
 	// Generate grass vector
@@ -170,7 +170,7 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 {
 	float2 uv = input.uv * AlbedoOpacity_ST.xy + AlbedoOpacity_ST.zw;
-	float4 albedoOpacity = AlbedoOpacity.Sample(SurfaceSampler, uv) * _Color * 2;
+	float4 albedoOpacity = AlbedoOpacity.Sample(SurfaceSampler, uv);
 	float4 normalOcclusionRoughness = NormalOcclusionRoughness.Sample(SurfaceSampler, uv);
 	
 	#ifdef CUTOUT_ON
@@ -182,9 +182,14 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	if (!isFrontFace)
 		worldNormal = -worldNormal;
 	
-	float4 albedoTranslucency = PackTranslucency(albedoOpacity.rgb, Rec709Luminance(albedoOpacity.rgb) * _Translucency.rgb * 8);
-	albedoTranslucency.rgb = HueVariation(albedoTranslucency.rgb, input.colorHueVariation.w);
-	albedoTranslucency.rgb = lerp(input.colorHueVariation.rgb, albedoTranslucency.rgb, smoothstep(0, 0.5, input.uv.y));
+	float groundFactor = saturate(Remap(input.uv.y, 0.0, 0.5));
+	float3 albedo = lerp(input.colorHueVariation.rgb, albedoOpacity.rgb, groundFactor);
+	
+	float3 translucency = Translucency.Sample(SurfaceSampler, uv);
+	translucency /= Max3(translucency * 2);
+	translucency = lerp(input.colorHueVariation.rgb, translucency, groundFactor);
+	
+	float4 albedoTranslucency = PackTranslucency(albedo, translucency);
 	
 	float occlusion = normalOcclusionRoughness.b;
 	float roughness = lerp(normalOcclusionRoughness.a, 0.0, _Smoothness);

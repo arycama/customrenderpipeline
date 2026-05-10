@@ -66,14 +66,10 @@ public abstract class ResourceHandleSystem<T, V> : ResourceHandleSystemBase, IDi
 	public T GetResource(ResourceHandle<T> handle)
 	{
 		var resourceIndex = handleInfo[handle.index].resourceIndex;
+        return resourceIndex == -1 ? null : resources[resourceIndex].resource;
+    }
 
-        if (resourceIndex == -1)
-            throw new InvalidOperationException($"Trying to get resource of type {typeof(T)} but it does not exist. Handle: {handle.index} ({GetDescriptor(handle)}");
-
-		return resources[resourceIndex].resource;
-	}
-
-	public void ReleasePersistentResource(ResourceHandle<T> handle, int passIndex)
+    public void ReleasePersistentResource(ResourceHandle<T> handle, int passIndex)
 	{
 		var info = handleInfo[handle.index];
 		Assert.IsTrue(info.isPersistent);

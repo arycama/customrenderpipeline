@@ -11,8 +11,9 @@ Shader "Hidden/Screen Space Terrain"
         {
             Stencil
             {
-                Ref 5
+                Ref 4
                 Comp Equal
+                ReadMask 4
             }
 
             HLSLPROGRAM
