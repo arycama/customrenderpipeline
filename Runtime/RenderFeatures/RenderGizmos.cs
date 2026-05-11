@@ -17,7 +17,7 @@ public class RenderGizmos : ViewRenderFeature
 		var preImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PreImageEffects);
 		var postImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PostImageEffects);
         var wireOverlay = viewRenderData.context.CreateWireOverlayRendererList(viewRenderData.camera);
-        var gizmosTarget = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+        var gizmosTarget = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true);
 
         var size = renderGraph.RtHandleSystem.ScreenSize;
         //var viewport = new Rect(0, 0, viewRenderData.viewSize.x, viewRenderData.viewSize.y);
