@@ -7,7 +7,7 @@ public partial class Tonemapping : ViewRenderFeature
     private readonly Material tonemapMaterial;
     private readonly ColorGrading.Settings colorGradingSettings;
     private readonly Bloom.Settings bloomSettings;
-   // private Matrix4x4 RgbToLmsr;
+    // private Matrix4x4 RgbToLmsr;
     //private Matrix4x4 LmsToRgb;
 
     //private bool previousNormalize;
@@ -32,7 +32,7 @@ public partial class Tonemapping : ViewRenderFeature
             GraphicsUtilities.HalfTexelRemap(colorGradingSettings.Resolution),
             colorGradingSettings.PaperWhite * Math.Sqrt(2.0f),
             bloomSettings.Strength,
-            hdrSettings.peakLuminance, 
+            hdrSettings.peakLuminance,
             colorGrading.colorGrading));
 
         pass.Initialize(tonemapMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 0, false, 1, viewRenderData.target, viewRenderData.format);
@@ -45,7 +45,7 @@ public partial class Tonemapping : ViewRenderFeature
         pass.ReadResource<ViewData>();
 
 #if UNITY_EDITOR
-        if(renderGraph.TryGetRTHandle< GizmosTarget>(out _))
+        if (renderGraph.TryGetRTHandle<GizmosTarget>(out _))
         {
             pass.ReadRtHandle<GizmosTarget>();
             pass.AddKeyword("GIZMOS_ON");
@@ -58,7 +58,7 @@ public partial class Tonemapping : ViewRenderFeature
             pass.AddKeyword("BLOOM");
         }
 
-		var colorGamut = hdrSettings.colorGamut;
+        var colorGamut = hdrSettings.colorGamut;
         var keyword = colorGamut switch
         {
             ColorGamut.sRGB => "SRGB",

@@ -268,8 +268,8 @@ public class RenderGraph : IDisposable
         var type = typeof(T);
         if (!rtHandles.TryGetValue(type, out var rtHandleData))
         {
-            var data = new T();
-            rtHandles.Add(type, new(handle, data.PropertyId, data.ScaleLimitPropertyId, mip, subElement));
+            var typeName = type.Name;
+            rtHandles.Add(type, new(handle, Shader.PropertyToID(typeName), Shader.PropertyToID($"{typeName}ScaleLimit"), mip, subElement));
         }
         else
         {
