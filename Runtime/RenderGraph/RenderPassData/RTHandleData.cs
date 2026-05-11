@@ -1,32 +1,19 @@
-using UnityEngine;
 using UnityEngine.Rendering;
 
 /// <summary>
 /// Utility class for an IRenderPassData that contains a single ResourceHandle<RenderTexture>
 /// </summary>
-public readonly struct RTHandleData : IRenderPassData
+public readonly struct RTHandleData
 {
-	public readonly ResourceHandle<RenderTexture> handle;
-	private readonly int propertyNameId, scaleLimitPropertyId;
-	private readonly int mip;
-	private readonly RenderTextureSubElement subElement;
+    public readonly int propertyNameId, scaleLimitPropertyId;
+    public readonly int mip;
+    public readonly RenderTextureSubElement subElement;
 
-	public RTHandleData(ResourceHandle<RenderTexture> handle, int propertyNameId, int scaleLimitPropertyId, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
-	{
-		this.handle = handle;
-		this.mip = mip;
-		this.subElement = subElement;
-		this.propertyNameId = propertyNameId;
-		this.scaleLimitPropertyId = scaleLimitPropertyId;
-	}
-
-	public void SetInputs(RenderPass pass)
-	{
-		pass.ReadTexture(propertyNameId, handle, mip, subElement);
-	}
-
-	public void SetProperties(RenderPass pass, CommandBuffer command)
-	{
-		pass.SetVector(scaleLimitPropertyId, pass.RenderGraph.GetScaleLimit2D(handle));
-	}
+    public RTHandleData(int propertyNameId, int scaleLimitPropertyId, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+    {
+        this.mip = mip;
+        this.subElement = subElement;
+        this.propertyNameId = propertyNameId;
+        this.scaleLimitPropertyId = scaleLimitPropertyId;
+    }
 }

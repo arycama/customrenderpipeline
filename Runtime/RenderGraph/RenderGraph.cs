@@ -19,7 +19,9 @@ public class RenderGraph : IDisposable
 
     private readonly GraphicsBuffer emptyBuffer;
     private readonly RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
-    private readonly Dictionary<Type, RTHandleData> rtHandles = new();
+    private readonly Dictionary<Type, int> rtHandleIndices = new();
+    private readonly List<RTHandleData> rtHandleData = new();
+    private readonly List<ResourceHandle<RenderTexture>> rtHandles = new();
 
     private Int2 currentNativeRenderPassSize;
     private int viewCount;
@@ -263,22 +265,62 @@ public class RenderGraph : IDisposable
         return result;
     }
 
-    public void SetRTHandle<T>(ResourceHandle<RenderTexture> handle, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default) where T : struct, IRtHandleId
+    public bool TryGetRtHandleIndex<T>(out int index)
     {
-        var data = new T();
-        rtHandles[typeof(T)] = new RTHandleData(handle, data.PropertyId, data.ScaleLimitPropertyId, mip, subElement);
+        return rtHandleIndices.TryGetValue(typeof(T), out index);
     }
 
-    public RTHandleData GetRTHandle(Type type)
+    public int GetRtHandleIndex<T>()
     {
-        return rtHandles[type];
+        var hasIndex = TryGetRtHandleIndex<T>(out var index);
+        return hasIndex ? index : throw new InvalidOperationException($"Trying to get index for type {typeof(T)} which has not been set");
+    }
+
+    public void SetRTHandle<T>(ResourceHandle<RenderTexture> handle, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default) where T : struct, IRtHandleId
+    {
+        var type = typeof(T);
+        if (!TryGetRtHandleIndex<T>(out var index))
+        {
+            index = rtHandleIndices.Count;
+            rtHandleIndices.Add(type, index);
+
+            var typeName = type.Name;
+            rtHandleData.Add(new(Shader.PropertyToID(typeName), Shader.PropertyToID($"{typeName}ScaleLimit"), mip, subElement));
+            rtHandles.Add(handle);
+        }
+        else
+        {
+            rtHandles[index] = handle;
+        }
+    }
+
+    public RTHandleData GetRTHandleData(int index)
+    {
+        return rtHandleData[index];
+    }
+
+    public RTHandleData GetRTHandleData<T>(Type type) where T : IRtHandleId
+    {
+        var hasIndex = TryGetRtHandleIndex<T>(out var index);
+        return hasIndex ? GetRTHandleData(index) : throw new InvalidOperationException($"Trying to get index for type {type} which has not been set");
+    }
+
+    public ResourceHandle<RenderTexture> GetRTHandle(int index)
+    {
+        return rtHandles[index];
+    }
+
+    public ResourceHandle<RenderTexture> GetRTHandle<T>() where T : IRtHandleId
+    {
+        var hasIndex = TryGetRtHandleIndex<T>(out var index);
+        return hasIndex ? GetRTHandle(index) : throw new InvalidOperationException($"Trying to get RtHandle for type {typeof(T)} which has not been set");
     }
 
     public bool TryGetRTHandle<T>(out ResourceHandle<RenderTexture> handle) where T : IRtHandleId
     {
-        var result = rtHandles.TryGetValue(typeof(T), out var data);
-        handle = data.handle;
-        return result;
+        var hasIndex = TryGetRtHandleIndex<T>(out var index);
+        handle = hasIndex ? rtHandles[index] : default;
+        return hasIndex;
     }
 
     private void BeginRenderPass(RenderPass pass)
@@ -525,7 +567,7 @@ public class RenderGraph : IDisposable
                         var attachment = new AttachmentDescriptor(format);
                         if (colorAttachment.frameBufferTarget.HasValue)
                         {
-                            if(descriptor.antiAliasing > 1)
+                            if (descriptor.antiAliasing > 1)
                             {
                                 attachment.resolveTarget = colorAttachment.frameBufferTarget.Value;
                                 attachment.storeAction = RenderBufferStoreAction.Resolve;
@@ -553,7 +595,7 @@ public class RenderGraph : IDisposable
                             var requiresResolve = requiresStore && antiAliasing > 1 && handleData.descriptor.antiAliasing == 1;
                             if (requiresStore)
                             {
-                                if(requiresResolve)
+                                if (requiresResolve)
                                     attachment.storeAction = RenderBufferStoreAction.Resolve;
                                 else
                                     attachment.storeAction = RenderBufferStoreAction.Store;
@@ -564,10 +606,10 @@ public class RenderGraph : IDisposable
                             {
                                 var target = RtHandleSystem.GetResource(colorAttachment.handle);
 
-                                if(requiresResolve)
+                                if (requiresResolve)
                                     attachment.resolveTarget = new(target, colorAttachment.mipLevel, colorAttachment.cubemapFace, colorAttachment.depthSlice);
 
-                                if(requiresLoad || (requiresStore && !requiresResolve))
+                                if (requiresLoad || (requiresStore && !requiresResolve))
                                     attachment.loadStoreTarget = new(target, colorAttachment.mipLevel, colorAttachment.cubemapFace, colorAttachment.depthSlice);
                             }
                         }

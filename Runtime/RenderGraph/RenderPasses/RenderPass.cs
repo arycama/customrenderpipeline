@@ -7,35 +7,35 @@ using UnityEngine.Rendering;
 
 public abstract class RenderPass<T> : RenderPass
 {
-	private Action<CommandBuffer, RenderPass> defaultRenderFunction;
-	private Action<CommandBuffer, RenderPass, T> renderFunction;
-	public T renderData;
+    private Action<CommandBuffer, RenderPass> defaultRenderFunction;
+    private Action<CommandBuffer, RenderPass, T> renderFunction;
+    public T renderData;
 
-	public override void Reset()
-	{
-		base.Reset();
-		defaultRenderFunction = null;
-		renderFunction = null;
-		renderData = default;
-	}
+    public override void Reset()
+    {
+        base.Reset();
+        defaultRenderFunction = null;
+        renderFunction = null;
+        renderData = default;
+    }
 
-	protected override void ExecuteRenderPassBuilder()
-	{
-		if (defaultRenderFunction != null)
-			defaultRenderFunction(Command, this);
-		else
-			renderFunction?.Invoke(Command, this, renderData);
-	}
+    protected override void ExecuteRenderPassBuilder()
+    {
+        if (defaultRenderFunction != null)
+            defaultRenderFunction(Command, this);
+        else
+            renderFunction?.Invoke(Command, this, renderData);
+    }
 
-	public void SetRenderFunction(Action<CommandBuffer, RenderPass> renderFunction)
-	{
-		defaultRenderFunction = renderFunction;
-	}
+    public void SetRenderFunction(Action<CommandBuffer, RenderPass> renderFunction)
+    {
+        defaultRenderFunction = renderFunction;
+    }
 
-	public void SetRenderFunction(Action<CommandBuffer, RenderPass, T> renderFunction)
-	{
-		this.renderFunction = renderFunction;
-	}
+    public void SetRenderFunction(Action<CommandBuffer, RenderPass, T> renderFunction)
+    {
+        this.renderFunction = renderFunction;
+    }
 }
 
 public abstract class RenderPass : IDisposable
@@ -46,7 +46,7 @@ public abstract class RenderPass : IDisposable
     protected readonly List<(string, ResourceHandle<GraphicsBuffer>)> writeBuffers = new();
 
     private readonly List<(RenderPassDataHandle, bool)> RenderPassDataHandles = new();
-    private readonly List<Type> readRtHandles = new();
+    private readonly List<int> readRtHandles = new();
     protected readonly List<string> keywords = new();
 
     public SubPassFlags flags;
@@ -77,7 +77,7 @@ public abstract class RenderPass : IDisposable
     public GraphicsFormat FrameBufferFormat { get; protected set; }
     public Int2 Size { get; protected set; }
     public int ViewCount { get; protected set; }
-	public int AntiAliasing { get; protected set; } = 1;
+    public int AntiAliasing { get; protected set; } = 1;
     public bool IsScreenPass { get; protected set; }
 
     public abstract void SetTexture(int propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default);
@@ -111,7 +111,7 @@ public abstract class RenderPass : IDisposable
         keywords.Clear();
         PropertyBlock.Clear();
         frameBufferInputs.Clear();
-		colorTargets.Clear();
+        colorTargets.Clear();
         depthBuffer = default;
         PreventNewSubPass = false;
     }
@@ -119,30 +119,37 @@ public abstract class RenderPass : IDisposable
     void IDisposable.Dispose() { }
 
     public GraphicsBuffer GetBuffer(ResourceHandle<GraphicsBuffer> handle)
-	{
-		Assert.IsTrue(RenderGraph.IsExecuting);
-		var result = RenderGraph.BufferHandleSystem.GetResource(handle);
+    {
+        Assert.IsTrue(RenderGraph.IsExecuting);
+        var result = RenderGraph.BufferHandleSystem.GetResource(handle);
         return result ?? throw new InvalidOperationException($"{Name} is trying to retrieve a GraphicsBuffer that does not exist. Handle: {handle.index} ({RenderGraph.BufferHandleSystem.GetDescriptor(handle)}");
     }
 
     public RenderTexture GetRenderTexture(ResourceHandle<RenderTexture> handle)
-	{
-		Assert.IsTrue(RenderGraph.IsExecuting);
-		var result = RenderGraph.RtHandleSystem.GetResource(handle);
+    {
+        Assert.IsTrue(RenderGraph.IsExecuting);
+        var result = RenderGraph.RtHandleSystem.GetResource(handle);
         return result ?? throw new InvalidOperationException($"{Name} is trying to retrieve a RenderTexture that does not exist. Handle: {handle.index} ({RenderGraph.RtHandleSystem.GetDescriptor(handle)}");
     }
 
     public void AddKeyword(string keyword)
-	{
-		keywords.Add(keyword);
-	}
+    {
+        keywords.Add(keyword);
+    }
 
-	public void ReadRtHandle<T>()
-	{
-		readRtHandles.Add(typeof(T));
-		var handleData = RenderGraph.GetRTHandle(typeof(T));
-		handleData.SetInputs(this);
-	}
+    public void ReadRtHandle(int index)
+    {
+        readRtHandles.Add(index);
+        var handle = RenderGraph.GetRTHandle(index);
+        var handleData = RenderGraph.GetRTHandleData(index);
+        ReadTexture(handleData.propertyNameId, handle, handleData.mip, handleData.subElement);
+    }
+
+    public void ReadRtHandle<T>()
+    {
+        var index = RenderGraph.GetRtHandleIndex<T>();
+        ReadRtHandle(index);
+    }
 
     public void ReadFrameBuffer(ResourceHandle<RenderTexture> rtHandle)
     {
@@ -157,9 +164,9 @@ public abstract class RenderPass : IDisposable
             depthBuffer = rtHandle;
             flags |= SubPassFlags.ReadOnlyDepth;
         }
-        else if(depthBuffer.HasValue)
+        else if (depthBuffer.HasValue)
         {
-            if(depthBuffer.Value == rtHandle)
+            if (depthBuffer.Value == rtHandle)
             {
                 flags |= SubPassFlags.ReadOnlyDepth;
             }
@@ -174,88 +181,85 @@ public abstract class RenderPass : IDisposable
     }
 
     public void Run(CommandBuffer command, ScriptableRenderContext context)
-	{
-		Command = command;
+    {
+        Command = command;
 
-		if(UseProfiler)
-			Command.BeginSample(Name);
+        if (UseProfiler)
+            Command.BeginSample(Name);
 
         // Move into some OnPreRender thing in buffer/RTHandles? 
         foreach (var texture in readTextures)
-		{
-			var handle = texture.Item2;
-			SetTexture(texture.Item1, GetRenderTexture(handle), texture.Item3, texture.Item4);
-		}
+        {
+            var handle = texture.Item2;
+            SetTexture(texture.Item1, GetRenderTexture(handle), texture.Item3, texture.Item4);
+        }
 
-		foreach (var buffer in readBuffers)
-		{
-			var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(buffer.Item2);
-			if (descriptor.Target.HasFlag(GraphicsBuffer.Target.Constant))
-				SetConstantBuffer(buffer.Item1, buffer.Item2, buffer.size, buffer.offset);
-			else
-				SetBuffer(buffer.Item1, buffer.Item2);
-		}
+        foreach (var buffer in readBuffers)
+        {
+            var descriptor = RenderGraph.BufferHandleSystem.GetDescriptor(buffer.Item2);
+            if (descriptor.Target.HasFlag(GraphicsBuffer.Target.Constant))
+                SetConstantBuffer(buffer.Item1, buffer.Item2, buffer.size, buffer.offset);
+            else
+                SetBuffer(buffer.Item1, buffer.Item2);
+        }
 
-		foreach (var buffer in writeBuffers)
-			SetBuffer(buffer.Item1, buffer.Item2);
+        foreach (var buffer in writeBuffers)
+            SetBuffer(buffer.Item1, buffer.Item2);
 
-		// Set any data from each pass
-		foreach (var renderPassDataHandle in RenderPassDataHandles)
-		{
-			var hasResource = RenderGraph.ResourceMap.TrySetProperties(renderPassDataHandle.Item1, RenderGraph.FrameIndex, this, command);
-			Assert.IsTrue(hasResource || renderPassDataHandle.Item2);
-		}
+        // Set any data from each pass
+        foreach (var renderPassDataHandle in RenderPassDataHandles)
+        {
+            var hasResource = RenderGraph.ResourceMap.TrySetProperties(renderPassDataHandle.Item1, RenderGraph.FrameIndex, this, command);
+            Assert.IsTrue(hasResource || renderPassDataHandle.Item2);
+        }
 
-		foreach(var handle in readRtHandles)
-		{
-			var handleData = RenderGraph.GetRTHandle(handle);
-			handleData.SetProperties(this, Command);
-		}
+        // TODO: Are these even neccessary since we're not really using the scale offsets anymore?
+        foreach (var handle in readRtHandles)
+        {
+            var rtHandle = RenderGraph.GetRTHandle(handle);
+            var handleData = RenderGraph.GetRTHandleData(handle);
+            SetVector(handleData.scaleLimitPropertyId, RenderGraph.GetScaleLimit2D(rtHandle));
+        }
 
-		ExecuteRenderPassBuilder();
+        ExecuteRenderPassBuilder();
 
-		readTextures.Clear();
-		readBuffers.Clear();
-		writeBuffers.Clear();
+        readTextures.Clear();
+        readBuffers.Clear();
+        writeBuffers.Clear();
 
-		Execute();
+        Execute();
 
         if (UseProfiler)
             Command.EndSample(Name);
-	}
+    }
 
-	public virtual void PostExecute() { }
+    public virtual void PostExecute() { }
 
-	public override string ToString() => Name;
+    public override string ToString() => Name;
 
-	//public void SetTexture(string propertyName, Texture texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
-	//{
-	//	SetTexture(Shader.PropertyToID(propertyName), texture, mip, subElement);
-	//}
+    public void ReadTexture(int propertyId, ResourceHandle<RenderTexture> texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+    {
+        Assert.IsFalse(RenderGraph.IsExecuting);
+        readTextures.Add((propertyId, texture, mip, subElement));
+        RenderGraph.RtHandleSystem.ReadResource(texture, Index);
+    }
 
-	public void ReadTexture(int propertyId, ResourceHandle<RenderTexture> texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
-	{
-		Assert.IsFalse(RenderGraph.IsExecuting);
-		readTextures.Add((propertyId, texture, mip, subElement));
-		RenderGraph.RtHandleSystem.ReadResource(texture, Index);
-	}
+    public void ReadTexture(string propertyName, ResourceHandle<RenderTexture> texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
+    {
+        ReadTexture(Shader.PropertyToID(propertyName), texture, mip, subElement);
+    }
 
-	public void ReadTexture(string propertyName, ResourceHandle<RenderTexture> texture, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
-	{
-		ReadTexture(Shader.PropertyToID(propertyName), texture, mip, subElement);
-	}
+    public void ReadBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer, int size = 0, int offset = 0)
+    {
+        RenderGraph.BufferHandleSystem.ReadResource(buffer, Index);
+        readBuffers.Add((propertyName, buffer, size, offset));
+    }
 
-	public void ReadBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer, int size = 0, int offset = 0)
-	{
-		RenderGraph.BufferHandleSystem.ReadResource(buffer, Index);
-		readBuffers.Add((propertyName, buffer, size, offset));
-	}
-
-	public void WriteBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
-	{
-		RenderGraph.BufferHandleSystem.WriteResource(buffer, Index);
-		writeBuffers.Add((propertyName, buffer));
-	}
+    public void WriteBuffer(string propertyName, ResourceHandle<GraphicsBuffer> buffer)
+    {
+        RenderGraph.BufferHandleSystem.WriteResource(buffer, Index);
+        writeBuffers.Add((propertyName, buffer));
+    }
 
     public bool TryReadResource(Type type)
     {
@@ -263,28 +267,28 @@ public abstract class RenderPass : IDisposable
         var handle = RenderGraph.ResourceMap.GetResourceHandle(type);
         var hasResource = RenderGraph.ResourceMap.TrySetInputs(handle, RenderGraph.FrameIndex, this);
 
-        if(hasResource)
+        if (hasResource)
             RenderPassDataHandles.Add((handle, false));
 
         return hasResource;
     }
 
     public void ReadResource(Type type, bool isOptional = false)
-	{
-		Assert.IsFalse(RenderGraph.IsExecuting);
-		var handle = RenderGraph.ResourceMap.GetResourceHandle(type);
-		var hasResource = RenderGraph.ResourceMap.TrySetInputs(handle, RenderGraph.FrameIndex, this);
+    {
+        Assert.IsFalse(RenderGraph.IsExecuting);
+        var handle = RenderGraph.ResourceMap.GetResourceHandle(type);
+        var hasResource = RenderGraph.ResourceMap.TrySetInputs(handle, RenderGraph.FrameIndex, this);
 
         if (!isOptional && !hasResource)
             throw new InvalidOperationException($"Non-optional resource of type {type} does not exist");
 
-		RenderPassDataHandles.Add((handle, isOptional));
-	}
+        RenderPassDataHandles.Add((handle, isOptional));
+    }
 
-	public void ReadResource<T>(bool isOptional = false) where T : struct, IRenderPassData
-	{
-		ReadResource(typeof(T), isOptional);
-	}
+    public void ReadResource<T>(bool isOptional = false) where T : struct, IRenderPassData
+    {
+        ReadResource(typeof(T), isOptional);
+    }
 
     public bool TryReadResource<T>() where T : struct, IRenderPassData
     {
