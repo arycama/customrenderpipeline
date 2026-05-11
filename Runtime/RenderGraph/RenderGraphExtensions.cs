@@ -113,11 +113,6 @@ public static class RenderGraphExtensions
         return resource;
     }
 
-    public static ResourceHandle<RenderTexture> GetRTHandle<T>(this RenderGraph renderGraph) where T : IRtHandleId
-    {
-        return renderGraph.GetRTHandle(typeof(T)).handle;
-    }
-
     public static ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(this RenderGraph renderGraph, T data) where T : unmanaged
     {
         Assert.IsFalse(renderGraph.IsExecuting);
