@@ -265,8 +265,16 @@ public class RenderGraph : IDisposable
 
     public void SetRTHandle<T>(ResourceHandle<RenderTexture> handle, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default) where T : struct, IRtHandleId
     {
-        var data = new T();
-        rtHandles[typeof(T)] = new RTHandleData(handle, data.PropertyId, data.ScaleLimitPropertyId, mip, subElement);
+        var type = typeof(T);
+        if (!rtHandles.TryGetValue(type, out var rtHandleData))
+        {
+            var data = new T();
+            rtHandles.Add(type, new(handle, data.PropertyId, data.ScaleLimitPropertyId, mip, subElement));
+        }
+        else
+        {
+            rtHandles[type] = new(handle, rtHandleData.propertyNameId, rtHandleData.scaleLimitPropertyId, mip, subElement);
+        }
     }
 
     public RTHandleData GetRTHandle(Type type)
@@ -525,7 +533,7 @@ public class RenderGraph : IDisposable
                         var attachment = new AttachmentDescriptor(format);
                         if (colorAttachment.frameBufferTarget.HasValue)
                         {
-                            if(descriptor.antiAliasing > 1)
+                            if (descriptor.antiAliasing > 1)
                             {
                                 attachment.resolveTarget = colorAttachment.frameBufferTarget.Value;
                                 attachment.storeAction = RenderBufferStoreAction.Resolve;
@@ -553,7 +561,7 @@ public class RenderGraph : IDisposable
                             var requiresResolve = requiresStore && antiAliasing > 1 && handleData.descriptor.antiAliasing == 1;
                             if (requiresStore)
                             {
-                                if(requiresResolve)
+                                if (requiresResolve)
                                     attachment.storeAction = RenderBufferStoreAction.Resolve;
                                 else
                                     attachment.storeAction = RenderBufferStoreAction.Store;
@@ -564,10 +572,10 @@ public class RenderGraph : IDisposable
                             {
                                 var target = RtHandleSystem.GetResource(colorAttachment.handle);
 
-                                if(requiresResolve)
+                                if (requiresResolve)
                                     attachment.resolveTarget = new(target, colorAttachment.mipLevel, colorAttachment.cubemapFace, colorAttachment.depthSlice);
 
-                                if(requiresLoad || (requiresStore && !requiresResolve))
+                                if (requiresLoad || (requiresStore && !requiresResolve))
                                     attachment.loadStoreTarget = new(target, colorAttachment.mipLevel, colorAttachment.cubemapFace, colorAttachment.depthSlice);
                             }
                         }

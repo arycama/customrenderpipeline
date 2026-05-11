@@ -7,9 +7,9 @@ using UnityEngine.Rendering;
 public readonly struct RTHandleData : IRenderPassData
 {
 	public readonly ResourceHandle<RenderTexture> handle;
-	private readonly int propertyNameId, scaleLimitPropertyId;
-	private readonly int mip;
-	private readonly RenderTextureSubElement subElement;
+    public readonly int propertyNameId, scaleLimitPropertyId;
+    public readonly int mip;
+    public readonly RenderTextureSubElement subElement;
 
 	public RTHandleData(ResourceHandle<RenderTexture> handle, int propertyNameId, int scaleLimitPropertyId, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default)
 	{
