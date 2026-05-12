@@ -33,9 +33,11 @@ struct Material
 	half translucency;
 	bool isFade;
 	half alphaThreshold;
+	bool alphaClip;
+	bool twoSided;
 };
 
-Material CreateMaterial(half3 albedo = 1.0h, half roughness = 1.0h, half3 normal = half3(0.0h, 1.0h, 0.0h), half metallic = 0.0h, half occlusion = 1.0h, half opacity = 1.0h, half3 emission = 0.0h, bool hasMetallic = false, bool isBackface = false, half ior = 1.5h, bool applyUnderwaterFog = true, bool refractedEnvironment = false, half translucency = 0.0h, bool isFade = false, half3 bentNormal = half3(0.0h, 1.0h, 0.0h), half alphaThreshold = 0.5)
+Material CreateMaterial(half3 albedo = 1.0h, half roughness = 1.0h, half3 normal = half3(0.0h, 1.0h, 0.0h), half metallic = 0.0h, half occlusion = 1.0h, half opacity = 1.0h, half3 emission = 0.0h, bool hasMetallic = false, bool isBackface = false, half ior = 1.5h, bool applyUnderwaterFog = true, bool refractedEnvironment = false, half translucency = 0.0h, bool isFade = false, half3 bentNormal = half3(0.0h, 1.0h, 0.0h), half alphaThreshold = 0.5, bool alphaClip = false, bool twoSided = false)
 {
 	Material material;
 	material.albedo = albedo;
@@ -54,6 +56,8 @@ Material CreateMaterial(half3 albedo = 1.0h, half roughness = 1.0h, half3 normal
 	material.translucency = translucency;
 	material.isFade = isFade;
 	material.alphaThreshold = alphaThreshold;
+	material.alphaClip = alphaClip;
+	material.twoSided = twoSided;
 	return material;
 }
 

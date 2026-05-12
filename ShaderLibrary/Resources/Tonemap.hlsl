@@ -41,16 +41,27 @@ float3 Fragment(VertexFullscreenTriangleMinimalOutput input) : SV_Target
 	float3 ssgi = OffsetICtCpToRec2020(R10G10B10A2UnormToFloat(ScreenSpaceGlobalIllumination[position]).rgb) / (PaperWhite * sqrt(2.0));
 	float3 ssr = OffsetICtCpToRec2020(R10G10B10A2UnormToFloat(ScreenSpaceReflections[position]).rgb) / (PaperWhite * sqrt(2.0));
 	//color = ssr;
-	
-	#ifdef GIZMOS_ON
-		color += GizmosTarget[position];
-	#endif
-	
+
 	color *= PaperWhite;
 	color = Rec2020ToICtCp(color);
 	color.yz += 0.5;
 	color = LutScaleOffset.x * color + LutScaleOffset.y;
 	color = ColorGrading.Sample(TrilinearClampSampler, color);
+	
+	#ifdef GIZMOS_ON
+		color = ST2084ToLinear(color);
+		color = Rec2020ToRec709(color);
+		color /= MaxLuminance;
+		//color = LinearToGamma(color);
+	
+		float4 gizmos = GizmosTarget[position];
+		color = lerp(color, gizmos.rgb, gizmos.a);
+		
+		//color = GammaToLinear(color);
+		color *= MaxLuminance;
+		color = Rec709ToRec2020(color);
+		color = LinearToST2084(color);
+	#endif
 	
 	#ifdef PREVIEW
 		color = ST2084ToLinear(color);

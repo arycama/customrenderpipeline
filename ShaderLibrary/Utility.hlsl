@@ -383,11 +383,6 @@ bool RayIntersectsPlane(float3 rayOrigin, float3 rayDirection, float3 planePosit
 	return denom != 0 && distance > 0;
 }
 
-float CopySign(float x, float s)
-{
-	return (s >= 0) ? abs(x) : -abs(x);
-}
-
 float DistanceThroughSphere(float height, float cosAngle, float radius)
 {
 	float discriminant = Sq(height) * (Sq(cosAngle) - 1.0) + Sq(radius);
