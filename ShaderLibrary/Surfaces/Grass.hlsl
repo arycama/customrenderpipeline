@@ -92,8 +92,7 @@ FragmentInput Vertex(uint id : SV_VertexID, uint instanceId : SV_InstanceID)
 		coord.y = BladeCount - 1 - coord.y;
 	
 	float3 centerPosition;
-	centerPosition.xz = ((coord << lod)) * rcp(BladeCount);
-	centerPosition.xz += float2(offsetX, offsetY);
+	centerPosition.xz = (coord + float2(offsetX, offsetY)) * exp2(lod) * rcp(BladeCount);
 	
 	// Patch position
 	centerPosition.xz += (uint2(dataColumn, dataRow) << lod);
