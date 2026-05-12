@@ -89,9 +89,12 @@ public class VirtualTerrain : FrameRenderFeature
 
     public override void Render(ScriptableRenderContext context)
     {
+        if (!settings.VirtualTexturing || !renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
+            return;
+
         var tileRect = new Rect(Padding, Padding, settings.TileResolution - 2 * Padding, settings.TileResolution - 2 * Padding);
         var uvScaleOffset = GraphicsUtilities.TexelRemapNormalized(tileRect, settings.TileResolution);
-      //  uvScaleOffset.xy *= PageTableSize;
+        //  uvScaleOffset.xy *= PageTableSize;
 
         var virtualTextureDataBuffer = renderGraph.SetConstantBuffer
         ((
@@ -106,8 +109,6 @@ public class VirtualTerrain : FrameRenderFeature
         renderGraph.SetResource<VirtualTextureData>(new(albedoSmoothnessTexture, normalTexture, heightTexture, pageTable, feedbackBuffer, virtualTextureDataBuffer));
 
         // Clear if terrain has changed
-        if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
-            return;
 
         var terrain = terrainSystemData.terrain;
         needsClear |= terrain != previousTerrain;

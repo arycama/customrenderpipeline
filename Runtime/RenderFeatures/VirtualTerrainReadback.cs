@@ -19,6 +19,9 @@ public class VirtualTerrainReadback : ViewRenderFeature
 
 	public override void Render(ViewRenderData viewRenderData)
     {
+        if (!settings.VirtualTexturing)
+            return;
+
 		var maxRequestBufferSize = viewRenderData.viewSize.x * viewRenderData.viewSize.y + 1;
         var requestBuffer = renderGraph.GetBuffer(maxRequestBufferSize, target: GraphicsBuffer.Target.Append);
         var virtualTextureData = renderGraph.GetResource<VirtualTextureData>();
