@@ -45,10 +45,9 @@ public class TerrainRenderer : TerrainRendererBase
 		    pass.ReadResource<TerrainFrameData>();
 			pass.ReadResource<TerrainViewData>();
 			pass.ReadResource<ViewData>();
-			pass.ReadResource<VirtualTextureData>();
             pass.ReadResource<TerrainFrameData>();
 
-            if (settings.VirtualTexturing)
+            if (pass.TryReadResource<VirtualTextureData>())
                 pass.AddKeyword("VIRTUAL_TEXTURING_ON");
 
             pass.SetRenderFunction(static (command, pass, cullingPlanes) =>

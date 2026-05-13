@@ -3,40 +3,39 @@ using UnityEngine.Rendering;
 
 public class ScreenSpaceTerrain : ViewRenderFeature
 {
-	private readonly Material material;
+    private readonly Material material;
     private readonly TerrainSettings settings;
 
     public ScreenSpaceTerrain(RenderGraph renderGraph, TerrainSettings settings) : base(renderGraph)
-	{
+    {
         this.settings = settings;
         material = new Material(Shader.Find("Hidden/Screen Space Terrain")) { hideFlags = HideFlags.HideAndDontSave };
-	}
+    }
 
-	public override void Render(ViewRenderData viewRenderData)
+    public override void Render(ViewRenderData viewRenderData)
     {
         if (viewRenderData.camera.cameraType == CameraType.Preview)
             return;
 
         if (!renderGraph.TryGetResource<TerrainViewData>(out _))
-			return;
+            return;
 
-		using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Terrain");
+        using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Terrain");
         pass.PreventNewSubPass = true;
 
-		pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
-		pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-		pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-		pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-		pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
+        pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
+        pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+        pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
+        pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
+        pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
 
         pass.ReadRtHandle<CameraDepth>();
 
         pass.ReadResource<TerrainFrameData>();
-		pass.ReadResource<TerrainViewData>();
-		pass.ReadResource<ViewData>();
-		pass.ReadResource<VirtualTextureData>();
+        pass.ReadResource<TerrainViewData>();
+        pass.ReadResource<ViewData>();
 
-        if (settings.VirtualTexturing)
+        if (pass.TryReadResource<VirtualTextureData>())
             pass.AddKeyword("VIRTUAL_TEXTURING_ON");
-	}
+    }
 }

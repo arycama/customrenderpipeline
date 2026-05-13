@@ -55,9 +55,8 @@ public class TerrainShadowRenderer : TerrainRendererBase
 			pass.ReadResource<TerrainViewData>();
 			pass.ReadResource<TerrainQuadtreeData>();
 			pass.ReadResource<ViewData>();
-			pass.ReadResource<VirtualTextureData>();
 
-            if (settings.VirtualTexturing)
+            if (pass.TryReadResource<VirtualTextureData>())
                 pass.AddKeyword("VIRTUAL_TEXTURING_ON");
 
             pass.SetRenderFunction(static (command, pass, cullingPlanes) =>

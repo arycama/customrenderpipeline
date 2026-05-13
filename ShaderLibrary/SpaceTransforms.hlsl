@@ -75,28 +75,16 @@ float3 ObjectToWorldVector(float3 direction, uint instanceId)
 	return MultiplyVector(objectToWorld, direction);
 }
 
-float3 ObjectToWorldDirection(float3 direction, uint instanceId)
+float3 ObjectToWorldDirection(float3 direction, uint instanceId, bool doNormalize = true)
 {
 	float3x4 objectToWorld = GetObjectToWorld(instanceId);
-	return normalize(MultiplyVector(objectToWorld, direction));
+	return ConditionalNormalize(MultiplyVector(objectToWorld, direction), doNormalize);
 }
 
-float3 ObjectToWorldNormal(float3 normal, uint instanceId)
+float3 ObjectToWorldNormal(float3 normal, uint instanceId, bool doNormalize = true)
 {
-	// https://github.com/graphitemaster/normals_revisited
-	float3x3 m = (float3x3) GetObjectToWorld(instanceId);
-	
-	float3x3 adjugate;
-	adjugate._m00_m10_m20 = cross(m._m01_m11_m21, m._m02_m12_m22);
-	adjugate._m01_m11_m21 = cross(m._m02_m12_m22, m._m00_m10_m20);
-	adjugate._m02_m12_m22 = cross(m._m00_m10_m20, m._m01_m11_m21);
-	
-	float3 result = normalize(mul(adjugate, normal));
-	float det = dot(adjugate._m02_m12_m22, m._m02_m12_m22);
-	if (det < 0)
-		result = -result;
-		
-	return result;
+	float3x4 worldToObject = GetWorldToObject(instanceId);
+	return ConditionalNormalize(MultiplyVector(normal, worldToObject), doNormalize);
 }
 
 float GetTangentSign(uint instanceId)

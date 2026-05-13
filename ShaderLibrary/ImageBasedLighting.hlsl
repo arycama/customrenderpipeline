@@ -241,7 +241,7 @@ float3 SampleGgxVndf(float a, float2 u, float3 V, bool useSphericalCap, bool use
 		if (vh.z < 1.0)
 		{
 			float3 tangent = float3(-vh.y, vh.x, 0) * RcpLength(vh.xy);
-			h = TangentToWorldNormal(h, vh, tangent, 1.0, false);
+			h = TangentToLocalNormal(h, vh, tangent, 1.0, false);
 		}
 	}
 

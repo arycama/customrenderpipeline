@@ -348,27 +348,27 @@ float3 IntersectRayPlaneZ(float3 rayOrigin, float3 rayDirection, float planeDist
 	return rayDirection * t + rayOrigin;
 }
 
-float3x3 WorldToTangentMatrix(float3 worldNormal, float3 worldTangent, float bitangentSign = 1.0)
+float3x3 LocalToTangentMatrix(float3 normal, float3 tangent, float bitangentSign = 1.0)
 {
-	float3 bitangent = cross(worldNormal, worldTangent) * bitangentSign;
-	return float3x3(worldTangent, bitangent, worldNormal);
+	float3 bitangent = cross(normal, tangent) * bitangentSign;
+	return float3x3(tangent, bitangent, normal);
 }
 
-float3x3 TangentToWorldMatrix(float3 worldNormal, float3 worldTangent, float bitangentSign = 1.0)
+float3x3 TangentToLocalMatrix(float3 normal, float3 tangent, float bitangentSign = 1.0)
 {
-	return transpose(WorldToTangentMatrix(worldNormal, worldTangent, bitangentSign));
+	return transpose(LocalToTangentMatrix(normal, tangent, bitangentSign));
 }
 
-float3 TangentToWorldNormal(float3 tangentNormal, float3 worldNormal, float3 worldTangent, float bitangentSign, bool doNormalize = true)
+float3 TangentToLocalNormal(float3 tangentNormal, float3 normal, float3 tangent, float bitangentSign, bool doNormalize = true)
 {
-	float3x3 tangentToWorld = TangentToWorldMatrix(worldNormal, worldTangent, bitangentSign);
+	float3x3 tangentToWorld = TangentToLocalMatrix(normal, tangent, bitangentSign);
 	float3 result = mul(tangentToWorld, tangentNormal);
 	return doNormalize ? normalize(result) : result;
 }
 
-float3 TangentToWorldNormal(float3 tangentNormal, float3 worldNormal, float4 worldTangent, bool doNormalize = true)
+float3 TangentToLocalNormal(float3 tangentNormal, float3 normal, float4 tangent, bool doNormalize = true)
 {
-	return TangentToWorldNormal(tangentNormal, worldNormal, worldTangent.xyz, worldTangent.w, doNormalize);
+	return TangentToLocalNormal(tangentNormal, normal, tangent.xyz, tangent.w, doNormalize);
 }
 
 float CosAngle(float3 a, float3 b)

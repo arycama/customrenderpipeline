@@ -177,7 +177,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	#endif
 	
 	float3 tangentNormal = UnpackNormalUNorm(normalOcclusionRoughness.xy);
-	float3 worldNormal = TangentToWorldNormal(tangentNormal, input.normal, input.tangent, 1);
+	float3 worldNormal = TangentToLocalNormal(tangentNormal, input.normal, input.tangent, 1);
 	if (!isFrontFace)
 		worldNormal = -worldNormal;
 	

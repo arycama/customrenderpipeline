@@ -67,7 +67,7 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float3 tangent = normalize(ddyWp);
 	
 	float3 tangentNormal = UnpackNormalUNorm(normalOcclusionRoughness.rg);
-	worldNormal = TangentToWorldNormal(tangentNormal, worldNormal, tangent, 1.0);
+	worldNormal = TangentToLocalNormal(tangentNormal, worldNormal, tangent, 1.0);
 	
 	float3 V = -normalize(worldPosition);
 	float3 gbufferNormal = GBufferNormal(input.position.xy, GBufferNormalRoughness, V, WorldToView, ViewToWorld);

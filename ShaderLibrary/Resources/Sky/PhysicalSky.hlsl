@@ -15,6 +15,10 @@ Texture2D<float3> CloudTexture;
 TextureCube<float3> Stars;
 float StarExposure;
 
+#ifdef __INTELLISENSE__
+#define SCENE
+#endif
+
 float3 SampleLuminance(float3 rayDirection, float xi, uint colorIndex, bool rayIntersectsGround, float maxRayLength, float3 maxLuminance, float LdotV, float3 channelProbability)
 {
 	float viewCosAngle = rayDirection.y;
@@ -117,73 +121,83 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 	// TODO: These branches are a bit insane after compilation, need to optimize.
 	// TODO: Cases such as cloud transmittance of 1 cause a ray to sample at 0, causing issues with sky logic returning black.
 	#ifdef SCENE
-		float offset = offsets.x;
-		if (cloudTransmittance == 0.0)
-		{
-			// Sample at cloud position only
-			float3 currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, cloudDistance, rayIntersectsGround, maxRayLength);
-			offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
-			luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
-		}
-		else
-		{
-			float sceneDistance = LinearEyeDepth(CameraDepth[input.position.xy]) * rcp(rcpRdLength);
+		float sceneDistance = LinearEyeDepth(CameraDepth[input.position.xy]) * rcp(rcpRdLength);
 		
-			if(cloudTransmittance < 1.0)
+		#ifdef CLOUDS_ON
+			float offset = offsets.x;
+			if (cloudTransmittance == 0.0)
 			{
-				// Sample between the view and cloud depth
+				// Sample at cloud position only
 				float3 currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, cloudDistance, rayIntersectsGround, maxRayLength);
 				offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
 				luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
-		
-				// Sample between the clouds and the scene 
-				// If the cloud is not completely opaque, randomly sample a second time behind the cloud
-				float3 sceneLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, sceneDistance, rayIntersectsGround, maxRayLength);
-			
-				offset = Select(Remap(offsets.x, 0, 1, currentLuminance / maxLuminance, sceneLuminance / maxLuminance), colorIndex);
-				luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, sceneLuminance - currentLuminance, LdotV, channelProbability) * cloudTransmittance;
 			}
 			else
 			{
-				// Sample at object position
-				float3 currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, sceneDistance, rayIntersectsGround, maxRayLength);
+		
+				if(cloudTransmittance < 1.0)
+				{
+					// Sample between the view and cloud depth
+					float3 currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, cloudDistance, rayIntersectsGround, maxRayLength);
+					offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
+					luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
+		
+					// Sample between the clouds and the scene 
+					// If the cloud is not completely opaque, randomly sample a second time behind the cloud
+					float3 sceneLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, sceneDistance, rayIntersectsGround, maxRayLength);
+			
+					offset = Select(Remap(offsets.x, 0, 1, currentLuminance / maxLuminance, sceneLuminance / maxLuminance), colorIndex);
+					luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, sceneLuminance - currentLuminance, LdotV, channelProbability) * cloudTransmittance;
+				}
+				else
+				{
+					// Sample at object position
+					float3 currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, sceneDistance, rayIntersectsGround, maxRayLength);
+					offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
+					luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
+				}
+			}
+		#else
+			// Sample at object position
+			float3 currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, sceneDistance, rayIntersectsGround, maxRayLength);
+			float offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
+			luminance = SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
+		#endif
+	#else
+		float offset = offsets.x;
+		
+		#ifdef CLOUDS_ON
+			float3 currentLuminance = maxLuminance;
+			if (cloudTransmittance == 0.0)
+			{
+				currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, cloudDistance, rayIntersectsGround, maxRayLength);
 				offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
 				luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
 			}
-		}
-	#else
-		float3 currentLuminance = maxLuminance;
-		float offset = offsets.x;
-		
-		if (cloudTransmittance == 0.0)
-		{
-			currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, cloudDistance, rayIntersectsGround, maxRayLength);
-			offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
-			luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
-		}
-		else
-		{
-			// These need to always be sampeld. Conditional sampling causes some halos on the edges of clouds
-			// TODO: Some logic here is wrong, needs to be fixed
-			//if (cloudTransmittance < 1.0)
+			else
 			{
-				// If there are clouds, sample randomly between the view and cloud depth
-				currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, cloudDistance, rayIntersectsGround, maxRayLength);
-				offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
+				// These need to always be sampeld. Conditional sampling causes some halos on the edges of clouds
+				// TODO: Some logic here is wrong, needs to be fixed
+				//if (cloudTransmittance < 1.0)
+				{
+					// If there are clouds, sample randomly between the view and cloud depth
+					currentLuminance = LuminanceToPoint(ViewHeight, viewCosAngle, cloudDistance, rayIntersectsGround, maxRayLength);
+					offset = Select(Remap(offsets.x, 0, 1, 0, currentLuminance / maxLuminance), colorIndex);
+				}
+		
+				luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
+		
+				// These need to always be sampeld. Conditional sampling causes some halos on the edges of clouds
+				//if (cloudTransmittance > 0.0 && cloudTransmittance < 1.0)
+				{
+					// If the cloud is not completely opaque, randomly sample a second time behind the cloud
+					offset = Select(Remap(offsets.x, 0, 1, currentLuminance / maxLuminance), colorIndex);
+					luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, maxLuminance - currentLuminance, LdotV, channelProbability) * cloudTransmittance;
+				}
 			}
-		
-			luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
-		
-			// These need to always be sampeld. Conditional sampling causes some halos on the edges of clouds
-			//if (cloudTransmittance > 0.0 && cloudTransmittance < 1.0)
-			{
-				// If the cloud is not completely opaque, randomly sample a second time behind the cloud
-				offset = Select(Remap(offsets.x, 0, 1, currentLuminance / maxLuminance), colorIndex);
-				luminance += SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, maxLuminance - currentLuminance, LdotV, channelProbability) * cloudTransmittance;
-			}
-		}
-		
-		//luminance = SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, currentLuminance, LdotV, channelProbability);
+		#else
+			luminance = SampleLuminance(rayDirection, offset, colorIndex, rayIntersectsGround, maxRayLength, maxLuminance, LdotV, channelProbability);
+		#endif
 	#endif
 	
 	// TODO: Diagonose
