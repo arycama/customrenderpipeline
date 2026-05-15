@@ -37,11 +37,11 @@ public class DeferredWater : ViewRenderFeature
 		using (var pass = renderGraph.AddFullscreenRenderPass("Render", settings))
         {
             pass.Initialize(deferredWaterMaterial, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-            pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-            pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-            pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
-            pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteRtHandle<GBufferAlbedoMetallic>();
+            pass.WriteRtHandle<GBufferNormalRoughness>();
+            pass.WriteRtHandle<GBufferBentNormalOcclusion>();
+            pass.WriteRtHandle<CameraTarget>();
             pass.WriteTexture(scatterResult);
             pass.PreventNewSubPass = true;
 
@@ -181,9 +181,9 @@ public class DeferredWater : ViewRenderFeature
                 pass.AddKeyword("RAYTRACED_REFRACTIONS_ON");
 
             pass.Initialize(deferredWaterMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 1, isScreenPass: true);
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current);
-            pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
+            pass.WriteRtHandle<CameraTarget>();
             pass.ReadTexture("_ScatterInput", scatterResult);
             pass.ReadTexture("_History", history);
 

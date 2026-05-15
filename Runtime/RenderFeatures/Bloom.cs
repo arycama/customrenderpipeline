@@ -39,7 +39,7 @@ public class Bloom : ViewRenderFeature
             var dest = renderGraph.GetTexture(new(width, height), GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             bloomIds[i] = dest;
 
-            var source = i > 0 ? bloomIds[i - 1] : renderGraph.GetRTHandle<CameraTarget>();
+            var source = i > 0 ? bloomIds[i - 1] : renderGraph.GetRtHandleData<CameraTarget>().handle;
 
             using var pass = renderGraph.AddFullscreenRenderPass("Bloom Down",(1.0f / new Float2(width, height), source));
 

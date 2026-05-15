@@ -79,7 +79,7 @@ public partial class AutoExposure : ViewRenderFeature
 		)))
 		{
 			pass.Initialize(computeShader, 0, viewRenderData.viewSize.x >> 1, viewRenderData.viewSize.y >> 1);
-			pass.ReadTexture(nameof(CameraTarget), renderGraph.GetRTHandle<CameraTarget>());
+			pass.ReadRtHandle<CameraTarget>();
 			pass.WriteBuffer("LuminanceHistogram", histogram);
 			pass.ReadResource<AutoExposureData>();
 

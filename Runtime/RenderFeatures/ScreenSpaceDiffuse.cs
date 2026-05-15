@@ -84,7 +84,7 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
 				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
                 pass.PreventNewSubPass = true;
 
-                pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+                pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
 				pass.WriteTexture(tempResult);
 				pass.WriteTexture(hitResult);
 
@@ -121,7 +121,7 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
             pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult);
             pass.WriteTexture(rayDepth);
             pass.WriteTexture(spatialWeight);
@@ -162,7 +162,7 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
 			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current);
             pass.WriteTexture(currentSpeed);
             pass.WriteTexture(currentOpacity);

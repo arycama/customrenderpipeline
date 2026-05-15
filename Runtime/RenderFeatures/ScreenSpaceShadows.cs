@@ -58,7 +58,7 @@ public partial class ScreenSpaceShadows : ViewRenderFeature
             pass.PreventNewSubPass = true;
 
             pass.WriteTexture(tempResult);
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+			pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
 
 			pass.ReadRtHandle<CameraDepth>();
 			pass.ReadRtHandle<HiZMinDepth>();
@@ -80,7 +80,7 @@ public partial class ScreenSpaceShadows : ViewRenderFeature
 		{
 			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1, isScreenPass: true);
             pass.PreventNewSubPass = true;
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(spatialResult);
 
 			pass.ReadTexture("_Input", tempResult);
@@ -118,7 +118,7 @@ public partial class ScreenSpaceShadows : ViewRenderFeature
 
 			pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2, isScreenPass: true);
             pass.PreventNewSubPass = true;
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(current);
 
 			pass.ReadTexture("_TemporalInput", spatialResult);

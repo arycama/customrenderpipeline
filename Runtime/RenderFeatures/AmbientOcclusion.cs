@@ -77,7 +77,7 @@ public partial class AmbientOcclusion : ViewRenderFeature
             {
                 pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 0, isScreenPass: true);
                 pass.PreventNewSubPass = true;
-                pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+                pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(result);
 
                 pass.ReadRtHandle<CameraDepth>();
@@ -112,7 +112,7 @@ public partial class AmbientOcclusion : ViewRenderFeature
 
             pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1, isScreenPass: true);
             pass.PreventNewSubPass = true;
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current);
             pass.WriteTexture(currentSpeed);
             pass.ReadTexture("Input", result);

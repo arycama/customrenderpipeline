@@ -25,11 +25,12 @@ public class GenerateHiZ : ViewRenderFeature
 		// Set is screen to true to get exact fit
 		var result = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R32_SFloat, hasMips: true, isScreenTexture: true);
 
-		// First pass
-		using (var pass = renderGraph.AddComputeRenderPass("Hi Z First Pass", (viewRenderData.viewSize, hasSecondPass ? maxMipsPerPass : mipCount, renderGraph.GetRTHandle<CameraDepth>())))
+        // First pass
+        var cameraDepthHandle = renderGraph.GetRtHandleData<CameraDepth>().handle;
+        using (var pass = renderGraph.AddComputeRenderPass("Hi Z First Pass", (viewRenderData.viewSize, hasSecondPass ? maxMipsPerPass : mipCount, cameraDepthHandle)))
 		{
 			pass.Initialize(computeShader, kernel, viewRenderData.viewSize.x, viewRenderData.viewSize.y);
-			pass.ReadTexture("_Input", renderGraph.GetRTHandle<CameraDepth>());
+			pass.ReadTexture("_Input", cameraDepthHandle);
 
 			for (var i = 0; i < maxMipsPerPass; i++)
 			{
@@ -43,7 +44,7 @@ public class GenerateHiZ : ViewRenderFeature
 				pass.SetInt("_Width", data.viewSize.x);
 				pass.SetInt("_Height", data.viewSize.y);
 				pass.SetInt("_MaxMip", data.Item2);
-				pass.SetVector("_InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.Item3));
+                pass.SetVector("_InputScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.cameraDepthHandle));
 			});
 		}
 

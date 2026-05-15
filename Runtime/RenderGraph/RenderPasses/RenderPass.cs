@@ -46,7 +46,6 @@ public abstract class RenderPass : IDisposable
     protected readonly List<(string, ResourceHandle<GraphicsBuffer>)> writeBuffers = new();
 
     private readonly List<(RenderPassDataHandle, bool)> RenderPassDataHandles = new();
-    private readonly List<int> readRtHandles = new();
     protected readonly List<string> keywords = new();
 
     public SubPassFlags flags;
@@ -107,7 +106,6 @@ public abstract class RenderPass : IDisposable
         Name = null;
         Index = -1;
         UseProfiler = true;
-        readRtHandles.Clear();
         keywords.Clear();
         PropertyBlock.Clear();
         frameBufferInputs.Clear();
@@ -137,36 +135,34 @@ public abstract class RenderPass : IDisposable
         keywords.Add(keyword);
     }
 
-    public void ReadRtHandle(int index)
+    public void ReadRtHandle<T>() where T : IRtHandleId
     {
-        readRtHandles.Add(index);
-        var handle = RenderGraph.GetRTHandle(index);
-        var handleData = RenderGraph.GetRTHandleData(index);
-        ReadTexture(handleData.propertyNameId, handle, handleData.mip, handleData.subElement);
+        var (handle, mip, subElement) = RenderGraph.GetRtHandleData<T>();
+        ReadTexture(RTHandleHolder<T>.propertyNameId, handle, mip, subElement);
     }
 
-    public void ReadRtHandle<T>()
+    public void ReadFrameBuffer<T>() where T : IRtHandleId
     {
-        var index = RenderGraph.GetRtHandleIndex<T>();
-        ReadRtHandle(index);
+        var index = RTHandleHolder<T>.index;
+        var handleData = RTHandleHolder.GetHandleData(index);
+        frameBufferInputs.Add(handleData.handle);
+        RenderGraph.RtHandleSystem.ReadResource(handleData.handle, Index);
     }
 
-    public void ReadFrameBuffer(ResourceHandle<RenderTexture> rtHandle)
+    public void ReadFrameDepth<T>() where T : IRtHandleId
     {
-        frameBufferInputs.Add(rtHandle);
-        RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
-    }
+        var index = RTHandleHolder<T>.index;
+        var handleData = RTHandleHolder.GetHandleData(index);
+        var handle = handleData.handle;
 
-    public void ReadFrameDepth(ResourceHandle<RenderTexture> rtHandle)
-    {
         if (depthBuffer == null)
         {
-            depthBuffer = rtHandle;
+            depthBuffer = handle;
             flags |= SubPassFlags.ReadOnlyDepth;
         }
         else if (depthBuffer.HasValue)
         {
-            if (depthBuffer.Value == rtHandle)
+            if (depthBuffer.Value == handle)
             {
                 flags |= SubPassFlags.ReadOnlyDepth;
             }
@@ -176,8 +172,8 @@ public abstract class RenderPass : IDisposable
             }
         }
 
-        frameBufferInputs.Add(rtHandle);
-        RenderGraph.RtHandleSystem.ReadResource(rtHandle, Index);
+        frameBufferInputs.Add(handle);
+        RenderGraph.RtHandleSystem.ReadResource(handle, Index);
     }
 
     public void Run(CommandBuffer command, ScriptableRenderContext context)
@@ -211,14 +207,6 @@ public abstract class RenderPass : IDisposable
         {
             var hasResource = RenderGraph.ResourceMap.TrySetProperties(renderPassDataHandle.Item1, RenderGraph.FrameIndex, this, command);
             Assert.IsTrue(hasResource || renderPassDataHandle.Item2);
-        }
-
-        // TODO: Are these even neccessary since we're not really using the scale offsets anymore?
-        foreach (var handle in readRtHandles)
-        {
-            var rtHandle = RenderGraph.GetRTHandle(handle);
-            var handleData = RenderGraph.GetRTHandleData(handle);
-            SetVector(handleData.scaleLimitPropertyId, RenderGraph.GetScaleLimit2D(rtHandle));
         }
 
         ExecuteRenderPassBuilder();

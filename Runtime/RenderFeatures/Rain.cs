@@ -113,10 +113,10 @@ public class Rain : ViewRenderFeature
 			pass.Initialize(indexBuffer, settings.Material, Float4x4.Identity, viewRenderData.viewSize, viewRenderData.viewCount);
             pass.PreventNewSubPass = true;
 
-            pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepth);
+			pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepth);
+            pass.WriteRtHandle<CameraTarget>();
 
-			pass.ReadBuffer("Positions", positionBuffer);
+            pass.ReadBuffer("Positions", positionBuffer);
 
 			pass.ReadResource<FrameData>();
 			pass.ReadResource<ViewData>();

@@ -36,12 +36,12 @@ public class GpuDrivenRenderingRender : ViewRenderFeature
 				pass.AddKeyword("INDIRECT_RENDERING");
 				pass.UseProfiler = false;
 
-				pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-				pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-				pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-				pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
-				pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
-				pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
+				pass.WriteRtHandleDepth<CameraDepth>();
+				pass.WriteRtHandle<GBufferAlbedoMetallic>();
+				pass.WriteRtHandle<GBufferNormalRoughness>();
+				pass.WriteRtHandle<GBufferBentNormalOcclusion>();
+				pass.WriteRtHandle<CameraTarget>();
+				pass.WriteRtHandle<CameraVelocity>();
 				pass.ReadResource<AutoExposureData>();
 				pass.ReadResource<TemporalAAData>();
 				pass.ReadResource<AtmospherePropertiesAndTables>();

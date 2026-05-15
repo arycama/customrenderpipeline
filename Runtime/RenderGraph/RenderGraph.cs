@@ -19,9 +19,6 @@ public class RenderGraph : IDisposable
 
     private readonly GraphicsBuffer emptyBuffer;
     private readonly RenderTexture emptyTexture, emptyUavTexture, emptyTextureArray, empty3DTexture, emptyCubemap, emptyCubemapArray;
-    private readonly Dictionary<Type, int> rtHandleIndices = new();
-    private readonly List<RTHandleData> rtHandleData = new();
-    private readonly List<ResourceHandle<RenderTexture>> rtHandles = new();
 
     private Int2 currentNativeRenderPassSize;
     private int viewCount;
@@ -265,62 +262,15 @@ public class RenderGraph : IDisposable
         return result;
     }
 
-    public bool TryGetRtHandleIndex<T>(out int index)
-    {
-        return rtHandleIndices.TryGetValue(typeof(T), out index);
-    }
-
-    public int GetRtHandleIndex<T>()
-    {
-        var hasIndex = TryGetRtHandleIndex<T>(out var index);
-        return hasIndex ? index : throw new InvalidOperationException($"Trying to get index for type {typeof(T)} which has not been set");
-    }
-
     public void SetRTHandle<T>(ResourceHandle<RenderTexture> handle, int mip = 0, RenderTextureSubElement subElement = RenderTextureSubElement.Default) where T : struct, IRtHandleId
     {
-        var type = typeof(T);
-        if (!TryGetRtHandleIndex<T>(out var index))
-        {
-            index = rtHandleIndices.Count;
-            rtHandleIndices.Add(type, index);
-
-            var typeName = type.Name;
-            rtHandleData.Add(new(Shader.PropertyToID(typeName), Shader.PropertyToID($"{typeName}ScaleLimit"), mip, subElement));
-            rtHandles.Add(handle);
-        }
-        else
-        {
-            rtHandles[index] = handle;
-        }
+        RTHandleHolder.SetHandle<T>(handle, mip, subElement);
     }
 
-    public RTHandleData GetRTHandleData(int index)
+    public (ResourceHandle<RenderTexture> handle, int mip, RenderTextureSubElement subElement) GetRtHandleData<T>() where T : IRtHandleId
     {
-        return rtHandleData[index];
-    }
-
-    public RTHandleData GetRTHandleData<T>(Type type) where T : IRtHandleId
-    {
-        var hasIndex = TryGetRtHandleIndex<T>(out var index);
-        return hasIndex ? GetRTHandleData(index) : throw new InvalidOperationException($"Trying to get index for type {type} which has not been set");
-    }
-
-    public ResourceHandle<RenderTexture> GetRTHandle(int index)
-    {
-        return rtHandles[index];
-    }
-
-    public ResourceHandle<RenderTexture> GetRTHandle<T>() where T : IRtHandleId
-    {
-        var hasIndex = TryGetRtHandleIndex<T>(out var index);
-        return hasIndex ? GetRTHandle(index) : throw new InvalidOperationException($"Trying to get RtHandle for type {typeof(T)} which has not been set");
-    }
-
-    public bool TryGetRTHandle<T>(out ResourceHandle<RenderTexture> handle) where T : IRtHandleId
-    {
-        var hasIndex = TryGetRtHandleIndex<T>(out var index);
-        handle = hasIndex ? rtHandles[index] : default;
-        return hasIndex;
+        var index = RTHandleHolder<T>.index;
+        return RTHandleHolder.GetHandleData(index);
     }
 
     private void BeginRenderPass(RenderPass pass)
