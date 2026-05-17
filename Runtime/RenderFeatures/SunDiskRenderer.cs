@@ -22,8 +22,8 @@ public class SunDiskRenderer : ViewRenderFeature
 		{
 			pass.Initialize(celestialBodyMaterial, matrix, viewRenderData.viewSize, 1, 0, 4, 1, MeshTopology.Quads, isScreenPass: true);
 
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
+            pass.WriteRtHandleDepth<CameraDepth>(UnityEngine.Rendering.SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteRtHandle<CameraTarget>();
 
 			pass.ReadResource<AutoExposureData>();
 			pass.ReadResource<ViewData>();

@@ -110,7 +110,7 @@ public partial class VolumetricClouds : ViewRenderFeature
 
             pass.WriteTexture(luminanceCurrent);
 			pass.WriteTexture(transmittanceCurrent);
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
+            pass.WriteRtHandle<CameraTarget>();
 			pass.ReadTexture("_Input", cloudLuminanceTemp);
 			pass.ReadTexture("_InputTransmittance", cloudTransmittanceTemp);
 			pass.ReadTexture("_History", luminanceHistory);

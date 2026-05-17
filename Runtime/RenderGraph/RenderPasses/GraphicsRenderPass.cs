@@ -16,6 +16,25 @@ public abstract class GraphicsRenderPass<T> : RenderPass<T>
         CubemapFace = CubemapFace.Unknown;
     }
 
+    public void WriteRtHandle<K>() where K : IRtHandleId
+    {
+        var handle = RenderGraph.GetRtHandleData<K>().handle;
+        colorTargets.Add(handle);
+        WriteResource(handle);
+    }
+
+    public void WriteRtHandleDepth<K>(SubPassFlags flags = SubPassFlags.None) where K : IRtHandleId
+    {
+        var handle = RenderGraph.GetRtHandleData<K>().handle;
+        this.flags = flags;
+        depthBuffer = handle;
+        WriteResource(handle);
+
+        // Since depth textures are 'read' during rendering for comparisons, we also mark it as read if it's depth or stencil can be modified
+        if (flags != SubPassFlags.ReadOnlyDepthStencil)
+            RenderGraph.RtHandleSystem.ReadResource(handle, Index);
+    }
+
     public void WriteTexture(ResourceHandle<RenderTexture> rtHandle)
     {
         colorTargets.Add(rtHandle);

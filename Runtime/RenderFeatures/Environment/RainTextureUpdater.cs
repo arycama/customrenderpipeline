@@ -39,16 +39,16 @@ public class RainTextureUpdater : ViewRenderFeature
 			renderGraph.SetResource(new RainTextureResult(rainTexture, settings.Size));
 		}
 
-		var albedoMetallicCopy = renderGraph.GetTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-		var normalRoughnessCopy = renderGraph.GetTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-		var bentNormalOcclusionCopy = renderGraph.GetTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
+		var albedoMetallicCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferAlbedoMetallic>().handle);
+		var normalRoughnessCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferNormalRoughness>().handle);
+		var bentNormalOcclusionCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferBentNormalOcclusion>().handle);
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Composite", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy, settings.WetLevel)))
 		{
 			pass.Initialize(compositeMaterial, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteTexture(albedoMetallicCopy);
 			pass.WriteTexture(normalRoughnessCopy);
 			pass.WriteTexture(bentNormalOcclusionCopy);

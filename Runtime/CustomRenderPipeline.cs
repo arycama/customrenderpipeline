@@ -197,11 +197,11 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
             var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
             pass.Initialize("Deferred", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonOpaque, PerObjectData.None, true, isScreenPass: true);
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-            pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-            pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-            pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
-            pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
+            pass.WriteRtHandleDepth<CameraDepth>();
+            pass.WriteRtHandle<GBufferAlbedoMetallic>();
+            pass.WriteRtHandle<GBufferNormalRoughness>();
+            pass.WriteRtHandle<GBufferBentNormalOcclusion>();
+            pass.WriteRtHandle<CameraTarget>();
 
             pass.ReadResource<FrameData>();
             pass.ReadResource<ViewData>();
@@ -222,12 +222,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
             var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
             pass.Initialize("MotionVectors", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonOpaque, PerObjectData.MotionVectors, false, isScreenPass: true);
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-            pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-            pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-            pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
-            pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
-            pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
+            pass.WriteRtHandleDepth<CameraDepth>();
+            pass.WriteRtHandle<GBufferAlbedoMetallic>();
+            pass.WriteRtHandle<GBufferNormalRoughness>();
+            pass.WriteRtHandle<GBufferBentNormalOcclusion>();
+            pass.WriteRtHandle<CameraTarget>();
+            pass.WriteRtHandle<CameraVelocity>();
 
             pass.ReadResource<FrameData>();
             pass.ReadResource<ViewData>();
@@ -270,7 +270,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
             pass.Initialize("Decal", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.QuantizedFrontToBack, PerObjectData.None, isScreenPass: true);
             pass.PreventNewSubPass = true;
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepth);
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepth);
             pass.WriteTexture(decalAlbedo);
             pass.WriteTexture(decalNormal);
 
@@ -292,9 +292,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
             renderGraph.SetRTHandle<CameraDepthCopy>(cameraDepthCopy, subElement: RenderTextureSubElement.Depth);
 
             // TODO: Could avoid this by using another depth texture for water.. will require some extra logic in other passes though
-            using var pass = renderGraph.AddGenericRenderPass("Copy Depth Texture", (renderGraph.GetRTHandle<CameraDepth>(), cameraDepthCopy));
-            pass.ReadTexture("", renderGraph.GetRTHandle<CameraDepth>());
-            pass.WriteTexture(renderGraph.GetRTHandle<CameraDepthCopy>());
+            using var pass = renderGraph.AddGenericRenderPass("Copy Depth Texture", (renderGraph.GetRtHandleData<CameraDepth>().handle, cameraDepthCopy));
+            pass.ReadTexture("", renderGraph.GetRtHandleData<CameraDepth>().handle);
+            pass.WriteTexture(renderGraph.GetRtHandleData<CameraDepthCopy>().handle);
 
             pass.SetRenderFunction(static (command, pass, data) =>
             {
@@ -376,12 +376,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
        new GenericViewRenderFeature(renderGraph, viewRenderData =>
         {
             // Copy for next frame (TODO: Could also output from deferred pass, hrm)
-            var sceneColorCopy = renderGraph.GetRTHandle<SceneColorCopy>();
-            var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
+            var sceneColorCopy = renderGraph.GetRtHandleData<SceneColorCopy>().handle;
+            var cameraTarget = renderGraph.GetRtHandleData<CameraTarget>().handle;
             using (var pass = renderGraph.AddGenericRenderPass("Copy Scene Color", (cameraTarget, sceneColorCopy)))
             {
                 pass.ReadRtHandle<CameraTarget>();
-                pass.WriteTexture(renderGraph.GetRTHandle<SceneColorCopy>());
+                pass.WriteTexture(renderGraph.GetRtHandleData<SceneColorCopy>().handle);
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
                     command.CopyTexture(pass.GetRenderTexture(data.cameraTarget), 0, 0, pass.GetRenderTexture(data.sceneColorCopy), 0, 0);
@@ -402,8 +402,8 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
             var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
             pass.Initialize("SRPDefaultUnlit", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.transparent, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonTransparent, PerObjectData.None, false, isScreenPass: true);
 
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepth);
-            pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepth);
+            pass.WriteRtHandle<CameraTarget>();
 
             //pass.ReadRtHandle<PreviousCameraTarget>();
 

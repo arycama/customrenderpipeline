@@ -35,7 +35,7 @@ public partial class DepthOfField : ViewRenderFeature
         var focalLength = PhysicalCameraUtility.FocalLength(sensorSize, viewRenderData.tanHalfFov.y);
 		var apertureRadius = PhysicalCameraUtility.ApertureRadius(focalLength, aperture);
 
-        var cameraTarget = renderGraph.GetRTHandle<CameraTarget>();
+        var cameraTarget = renderGraph.GetRtHandleData<CameraTarget>().handle;
         using (var pass = renderGraph.AddGenericRenderPass("Generate Scene Color Mips", cameraTarget))
         {
             pass.WriteTexture(cameraTarget);

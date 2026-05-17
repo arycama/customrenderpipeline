@@ -31,9 +31,9 @@ public class WaterRenderer : WaterRendererBase
 			pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, viewRenderData.viewSize, 1, MeshTopology.Quads, passIndex, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
+            pass.WriteRtHandleDepth<CameraDepth>();
 			pass.WriteTexture(oceanRenderResult);
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
+			pass.WriteRtHandle<CameraVelocity>();
 			pass.WriteTexture(waterTriangleNormal);
 
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);

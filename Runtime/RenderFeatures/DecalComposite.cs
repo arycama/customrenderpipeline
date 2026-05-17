@@ -3,64 +3,64 @@ using UnityEngine.Rendering;
 
 public class DecalComposite : ViewRenderFeature
 {
-	private readonly Material material;
+    private readonly Material material;
 
-	public DecalComposite(RenderGraph renderGraph) : base(renderGraph)
-	{
-		material = new Material(Shader.Find("Hidden/Decal Composite")) { hideFlags = HideFlags.HideAndDontSave };
-	}
-
-	public override void Render(ViewRenderData viewRenderData)
+    public DecalComposite(RenderGraph renderGraph) : base(renderGraph)
     {
-		using var scope = renderGraph.AddProfileScope("Decal Composite");
+        material = new Material(Shader.Find("Hidden/Decal Composite")) { hideFlags = HideFlags.HideAndDontSave };
+    }
 
-		var albedoMetallicCopy = renderGraph.GetTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-		var normalRoughnessCopy = renderGraph.GetTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-		var bentNormalOcclusionCopy = renderGraph.GetTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
+    public override void Render(ViewRenderData viewRenderData)
+    {
+        using var scope = renderGraph.AddProfileScope("Decal Composite");
 
-		// Copy the existing gbuffer textures to new ones
+        var albedoMetallicCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferAlbedoMetallic>().handle);
+        var normalRoughnessCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferNormalRoughness>().handle);
+        var bentNormalOcclusionCopy = renderGraph.GetTexture(renderGraph.GetRtHandleData<GBufferBentNormalOcclusion>().handle);
+
+        // Copy the existing gbuffer textures to new ones
         // TODO: Would a direct copy be faster?
-		using (var pass = renderGraph.AddFullscreenRenderPass("Copy"))
-		{
-			pass.Initialize(material, viewRenderData.viewSize, 1, 0, isScreenPass: true);
+        using (var pass = renderGraph.AddFullscreenRenderPass("Copy"))
+        {
+            pass.Initialize(material, viewRenderData.viewSize, 1, 0, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-			pass.WriteTexture(albedoMetallicCopy);
-			pass.WriteTexture(normalRoughnessCopy);
-			pass.WriteTexture(bentNormalOcclusionCopy);
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteTexture(albedoMetallicCopy);
+            pass.WriteTexture(normalRoughnessCopy);
+            pass.WriteTexture(bentNormalOcclusionCopy);
 
-			pass.ReadRtHandle<GBufferAlbedoMetallic>();
-			pass.ReadRtHandle<GBufferNormalRoughness>();
-			pass.ReadRtHandle<GBufferBentNormalOcclusion>();
-		}
+            pass.ReadRtHandle<GBufferAlbedoMetallic>();
+            pass.ReadRtHandle<GBufferNormalRoughness>();
+            pass.ReadRtHandle<GBufferBentNormalOcclusion>();
+        }
 
-		// Now composite the decal buffers
-		using (var pass = renderGraph.AddFullscreenRenderPass("Combine", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy)))
-		{
-			pass.Initialize(material, viewRenderData.viewSize, 1, 1, isScreenPass: true);
+        // Now composite the decal buffers
+        using (var pass = renderGraph.AddFullscreenRenderPass("Combine", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy)))
+        {
+            pass.Initialize(material, viewRenderData.viewSize, 1, 1, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
-            pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>(), SubPassFlags.ReadOnlyDepthStencil);
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
+            pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
+            pass.WriteRtHandle<GBufferAlbedoMetallic>();
+            pass.WriteRtHandle<GBufferNormalRoughness>();
+            pass.WriteRtHandle<GBufferBentNormalOcclusion>();
 
-			pass.ReadTexture("AlbedoMetallicCopy", albedoMetallicCopy);
-			pass.ReadTexture("NormalRoughnessCopy", normalRoughnessCopy);
-			pass.ReadTexture("BentNormalOcclusionCopy", bentNormalOcclusionCopy);
+            pass.ReadTexture("AlbedoMetallicCopy", albedoMetallicCopy);
+            pass.ReadTexture("NormalRoughnessCopy", normalRoughnessCopy);
+            pass.ReadTexture("BentNormalOcclusionCopy", bentNormalOcclusionCopy);
 
-			pass.ReadRtHandle<CameraTarget>();
-			pass.ReadRtHandle<CameraDepth>();
-			pass.ReadRtHandle<DecalAlbedo>();
-			pass.ReadRtHandle<DecalNormal>();
+            pass.ReadRtHandle<CameraTarget>();
+            pass.ReadRtHandle<CameraDepth>();
+            pass.ReadRtHandle<DecalAlbedo>();
+            pass.ReadRtHandle<DecalNormal>();
 
-			pass.SetRenderFunction(static (command, pass, data) =>
-			{
-				pass.SetVector("AlbedoMetallicCopyScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.albedoMetallicCopy));
-				pass.SetVector("NormalRoughnessCopyScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.normalRoughnessCopy));
-				pass.SetVector("BentNormalOcclusionCopyScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.bentNormalOcclusionCopy));
-			});
-		}
-	}
+            pass.SetRenderFunction(static (command, pass, data) =>
+            {
+                pass.SetVector("AlbedoMetallicCopyScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.albedoMetallicCopy));
+                pass.SetVector("NormalRoughnessCopyScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.normalRoughnessCopy));
+                pass.SetVector("BentNormalOcclusionCopyScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.bentNormalOcclusionCopy));
+            });
+        }
+    }
 }

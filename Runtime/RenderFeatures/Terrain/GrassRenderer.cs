@@ -171,12 +171,12 @@ public class GrassRenderer : ViewRenderFeature
 		{
 			pass.Initialize(material, indexBuffer, quadtreeCullResults.IndirectArgsBuffer, viewRenderData.viewSize, 1, isScreenPass: true);
 
-			pass.WriteDepth(renderGraph.GetRTHandle<CameraDepth>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferAlbedoMetallic>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferNormalRoughness>());
-			pass.WriteTexture(renderGraph.GetRTHandle<GBufferBentNormalOcclusion>());
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraTarget>());
-			pass.WriteTexture(renderGraph.GetRTHandle<CameraVelocity>());
+            pass.WriteRtHandleDepth<CameraDepth>();
+            pass.WriteRtHandle<GBufferAlbedoMetallic>();
+            pass.WriteRtHandle<GBufferNormalRoughness>();
+            pass.WriteRtHandle<GBufferBentNormalOcclusion>();
+            pass.WriteRtHandle<CameraTarget>();
+            pass.WriteRtHandle<CameraVelocity>();
 
 			pass.ReadBuffer("PatchData", quadtreeCullResults.PatchDataBuffer);
 			pass.ReadBuffer("InstanceData", instanceDataBuffer);
