@@ -132,7 +132,7 @@ FragmentOutput Fragment(VertexFullscreenTriangleOutput input)
 		float historyWeight = HistoryWeight.Sample(LinearClampSampler, ClampScaleTextureUv(historyUv, PreviousScaleLimit));
 		
 		// TODO: does clamping in un-weighted space make any sense
-		historySample = ClampToAABB(historySample, mean, minValue, maxValue);
+		historySample = ClampToAABB(historySample, result.rgb, minValue, maxValue);
 		history.rgb += historySample;
 		history.a = historyWeight;
 		 

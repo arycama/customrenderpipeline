@@ -44,7 +44,7 @@ public class PhysicalSkyProbe : ViewRenderFeature
 			pass.Initialize(skyMaterial, environmentLighting.Resolution, 1, skyMaterial.FindPass("Reflection Probe"), 1);
 
 			var keyword = string.Empty;
-			var viewHeight = viewRenderData.transform.position.y;
+			var viewHeight = Math.Max(0, viewRenderData.transform.position.y);
 			if (viewHeight > cloudSettings.StartHeight)
 			{
 				if (viewHeight > cloudSettings.StartHeight + cloudSettings.LayerThickness)

@@ -101,11 +101,6 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 		float cloudDistance = LinearEyeDepth(CloudDepthTexture[input.position.xy]) * rcp(rcpRdLength); // TODO: Should this just be single channel
 	#endif
 	
-	#if !defined(REFLECTION_PROBE) && !defined(CLOUDS_ON)
-		cloudTransmittance = 1;
-		cloudDistance = 0;
-	#endif
-	
 	bool rayIntersectsGround = RayIntersectsGround(ViewHeight, viewCosAngle);
 	float maxRayLength = DistanceToNearestAtmosphereBoundary(ViewHeight, viewCosAngle, rayIntersectsGround);
 	float3 maxLuminance = LuminanceToAtmosphere(ViewHeight, viewCosAngle, rayIntersectsGround);
@@ -200,10 +195,6 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 		#endif
 	#endif
 	
-	// TODO: Diagonose
-	if (any(IsInfOrNaN(luminance)))
-		luminance = 0;
-		
 	#ifdef REFLECTION_PROBE
 		if (rayIntersectsGround)
 		{
@@ -245,9 +236,21 @@ float4 FragmentRender(VertexFullscreenTriangleOutput input) : SV_Target
 			
 			luminance.rgb += stars;
 		}
+		
+		// TODO: Diagonose
+		float blend = 0.05;
+		if (any(IsInfOrNaN(luminance)))
+		{
+			luminance = 0;
+			blend = 1;
+		}
 	
-		return float4(luminance, 0.05); // Blend with previous
+		return float4(luminance, blend); // Blend with previous
 	#else
+		// TODO: Diagonose
+		if (any(IsInfOrNaN(luminance)))
+			luminance = 0;
+		
 		return float4(Rec2020ToOffsetICtCp(luminance * PaperWhite * sqrt(2.0)), 0.0);
 	#endif
 }

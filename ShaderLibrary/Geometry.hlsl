@@ -544,6 +544,9 @@ float DistanceToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
 
 float3 ClampToAABB(float3 origin, float3 target, float3 boxMin, float3 boxMax)
 {
+	// TODO: Make this work properly
+	return clamp(origin, boxMin, boxMax);
+
 	float t = DistanceToAABB(origin, target, boxMin, boxMax);
 	
 	// TODO: Ensure t doesn't go nan/inf

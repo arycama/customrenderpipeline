@@ -4,18 +4,18 @@ using UnityEngine.Rendering;
 
 public class RenderGizmos : ViewRenderFeature
 {
-	public RenderGizmos(RenderGraph renderGraph) : base(renderGraph)
-	{
-	}
+    public RenderGizmos(RenderGraph renderGraph) : base(renderGraph)
+    {
+    }
 
-	public override void Render(ViewRenderData viewRenderData)
+    public override void Render(ViewRenderData viewRenderData)
     {
 #if UNITY_EDITOR
-		if (!UnityEditor.Handles.ShouldRenderGizmos())
-			return;
+        if (!UnityEditor.Handles.ShouldRenderGizmos())
+            return;
 
-		var preImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PreImageEffects);
-		var postImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PostImageEffects);
+        var preImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PreImageEffects);
+        var postImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PostImageEffects);
         var wireOverlay = viewRenderData.context.CreateWireOverlayRendererList(viewRenderData.camera);
         var gizmosTarget = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true);
 
@@ -27,16 +27,16 @@ public class RenderGizmos : ViewRenderFeature
         pass.WriteTexture(gizmosTarget);
 
         pass.SetRenderFunction(static (command, pass, data) =>
-		{
+        {
             command.SetRenderTarget(pass.GetRenderTexture(data.gizmosTarget));
             command.ClearRenderTarget(RTClearFlags.Color, Color.clear);
             command.SetViewport(data.viewport);
-			command.DrawRendererList(data.preImageEffects);
-			command.DrawRendererList(data.postImageEffects);
-			command.DrawRendererList(data.wireOverlay);
-		});
+            command.DrawRendererList(data.preImageEffects);
+            command.DrawRendererList(data.postImageEffects);
+            command.DrawRendererList(data.wireOverlay);
+        });
 
-        renderGraph.SetRTHandle<GizmosTarget>(gizmosTarget);
-	#endif
-	}
+        renderGraph.SetResource<GizmosTarget>(new(gizmosTarget));
+#endif
+    }
 }
