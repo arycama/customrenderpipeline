@@ -27,13 +27,17 @@ public partial class Tonemapping : ViewRenderFeature
         var colorGrading = renderGraph.GetResource<ColorGrading.Result>();
         var isFirst = renderedViewIndices.Add(viewRenderData.viewId);
 
+        var halfViewSize = new Int2(viewRenderData.viewSize.x >> 1, viewRenderData.viewSize.y >> 1);
+
         using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (
             viewRenderData.viewSize,
             GraphicsUtilities.HalfTexelRemap(colorGradingSettings.Resolution),
             colorGradingSettings.PaperWhite * Math.Sqrt(2.0f),
             bloomSettings.Strength,
             hdrSettings.peakLuminance,
-            colorGrading.colorGrading));
+            colorGrading.colorGrading,
+            halfViewSize,
+            renderGraph.RtHandleSystem));
 
         pass.Initialize(tonemapMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 0, false, 1, viewRenderData.target, viewRenderData.format);
         pass.PreventNewSubPass = true;
@@ -77,7 +81,7 @@ public partial class Tonemapping : ViewRenderFeature
         if (viewRenderData.camera.cameraType == CameraType.Preview)
             pass.AddKeyword("PREVIEW");
 
-        pass.SetRenderFunction((command, pass, data) =>
+        pass.SetRenderFunction(static (command, pass, data) =>
         {
             pass.SetVector("Resolution", data.viewSize);
             pass.SetVector("LutScaleOffset", data.Item2);
@@ -85,6 +89,9 @@ public partial class Tonemapping : ViewRenderFeature
             pass.SetFloat("BloomStrength", data.Item4);
             pass.SetFloat("MaxLuminance", data.Item5);
             pass.PropertyBlock.SetTexture("ColorGrading", data.colorGrading);
+
+            var bloomScaleLimit = GraphicsUtilities.ScaleLimit(data.halfViewSize, data.RtHandleSystem.ScreenSize);
+            pass.SetVector("CameraBloomScaleLimit", bloomScaleLimit);
         });
     }
 
