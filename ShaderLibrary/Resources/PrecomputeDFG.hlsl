@@ -138,7 +138,9 @@ float FragmentSpecularOcclusion(VertexFullscreenTriangleVolumeOutput input) : SV
 	
 	float NdotV = uv.w;
 	float sinThetaV = SinFromCos(NdotV);
-	float3 V = float3(sinThetaV, 0, NdotV);
+	
+	// TODO: This normalize is nececssary for some reason
+	float3 V = normalize(float3(sinThetaV, 0, NdotV));
 	
 	float perceptualRoughness = uv.z;
 	float roughness = PerceptualRoughnessToRoughness(perceptualRoughness);
@@ -147,7 +149,7 @@ float FragmentSpecularOcclusion(VertexFullscreenTriangleVolumeOutput input) : SV
 	
 	float cosBeta = uv.y;
 	float BdotR = CosineDifference(NdotV, cosBeta);
-	float3 B = float3(SinFromCos(BdotR), 0, BdotR);
+	float3 B = normalize(float3(SinFromCos(BdotR), 0, BdotR));
 	float visibilityCosAngle = uv.x;
 	
 	uint samples = 1024;
@@ -171,7 +173,7 @@ float FragmentSpecularOcclusion(VertexFullscreenTriangleVolumeOutput input) : SV
 		float3 H = SphericalToCartesian(phi, NdotH);
 		float3 L = reflect(-V, H);
 		float BdotL = dot(B, L);
-		if (BdotL >= visibilityCosAngle)
+		if (BdotL > visibilityCosAngle)
 			result += weightOverPdf;
 			
 		normalizationTerm += weightOverPdf;
