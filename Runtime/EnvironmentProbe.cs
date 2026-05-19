@@ -41,7 +41,7 @@ public class EnvironmentProbe : MonoBehaviour
 #if UNITY_EDITOR
 	private static void OnPreSceneGUICallback(SceneView _)
     {
-        if (!UnityEditor.Handles.ShouldRenderGizmos())
+        if (!Handles.ShouldRenderGizmos())
             return;
 
         if (previewMaterial == null)

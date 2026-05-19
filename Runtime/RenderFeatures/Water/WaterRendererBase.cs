@@ -13,7 +13,7 @@ public abstract class WaterRendererBase : ViewRenderFeature
     {
         this.settings = settings;
 		this.quadtreeCull = quadtreeCull;
-		indexBuffer = renderGraph.GetGridIndexBuffer(settings.PatchVertices, true, false);
+		indexBuffer = renderGraph.GetGridIndexBuffer(settings.PatchVertices, true, false, true);
 	}
 
 	protected override void Cleanup(bool disposing)

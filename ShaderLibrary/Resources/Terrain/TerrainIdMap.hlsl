@@ -7,7 +7,6 @@
 float2 PositionOffset;
 Texture2D<float4> Input0, Input1, Input2, Input3, Input4, Input5, Input6, Input7;
 uint LayerCount, TotalLayers, TextureCount;
-Buffer<uint> ProceduralIndices;
 
 uint Fragment(float4 position : SV_Position, float2 uv : TEXCOORD0) : SV_Target
 {

@@ -91,6 +91,7 @@ public abstract class RenderPass : IDisposable
     public abstract void SetConstantBuffer(string propertyName, ResourceHandle<GraphicsBuffer> value, int size, int offset);
 
     public void SetVector(string propertyName, Float4 value) => SetVector(Shader.PropertyToID(propertyName), value);
+    public void SetVector(string propertyName, Float3 value) => SetVector(propertyName, (Float4)value);
 
     protected abstract void Execute();
 

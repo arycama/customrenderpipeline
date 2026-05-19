@@ -11,7 +11,7 @@ public class WaterCaustics : ViewRenderFeature
 	{
 		this.settings = settings;
 		material = new Material(Shader.Find("Hidden/Water Caustics")) { hideFlags = HideFlags.HideAndDontSave };
-		indexBuffer = renderGraph.GetGridIndexBuffer(128, false, false);
+		indexBuffer = renderGraph.GetGridIndexBuffer(128, false, false, true);
 	}
 
 	protected override void Cleanup(bool disposing)

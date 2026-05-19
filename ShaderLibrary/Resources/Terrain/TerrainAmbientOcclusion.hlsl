@@ -1,13 +1,12 @@
-#include "../../Common.hlsl"
+#include "../../CommonShaders.hlsl"
 #include "../../Geometry.hlsl"
-#include "../../Material.hlsl"
 #include "../../Packing.hlsl"
-#include "../../Random.hlsl"
-#include "../../Samplers.hlsl"
-#include "../../TerrainCommon.hlsl"
+#include "../../Utility.hlsl"
 
-float DirectionCount, SampleCount, Radius;
-float Resolution;
+float DirectionCount, SampleCount, Radius, Resolution;
+float3 TerrainSize;
+Texture2D<float2> TerrainNormalMap;
+Texture2D<float> TerrainHeightmap;
 
 const static float kmaxHeight = 32766.0f / 65535.0f;
 

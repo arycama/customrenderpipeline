@@ -23,7 +23,7 @@ public class SetTerrainViewData : ViewRenderFeature
 
         renderGraph.SetResource<TerrainViewData>(new(renderGraph.SetConstantBuffer
         ((
-            GraphicsUtilities.HalfTexelRemap(position.xz, size.xz, Vector2.one * terrainSystem.TerrainData.heightmapResolution),
+            GraphicsUtilities.HalfTexelRemap(position.xz, size.xz, Vector2.one * terrain.terrainData.heightmapResolution),
             new Float4(1f / size.x, 1f / size.z, -position.x / size.x, -position.z / size.z),
             position.y
         ))));

@@ -181,10 +181,10 @@ public static class RenderGraphExtensions
         return new Float3(limitX, limitY, limitZ);
     }
 
-    public static ResourceHandle<GraphicsBuffer> GetGridIndexBuffer(this RenderGraph renderGraph, int cellsPerRow, bool isQuad, bool alternateIndices)
+    public static ResourceHandle<GraphicsBuffer> GetGridIndexBuffer(this RenderGraph renderGraph, int cellsPerRow, bool isQuad, bool alternateIndices, bool isPersistent)
     {
         var indexCount = cellsPerRow * cellsPerRow * (isQuad ? 4 : 6);
-        var indexBuffer = renderGraph.GetBuffer(indexCount, sizeof(ushort), GraphicsBuffer.Target.Index, isPersistent: true);
+        var indexBuffer = renderGraph.GetBuffer(indexCount, sizeof(ushort), GraphicsBuffer.Target.Index, isPersistent: isPersistent);
 
         var indices = ListPool<ushort>.Get();
         GraphicsUtilities.GenerateGridIndexBuffer(indices, cellsPerRow, isQuad, alternateIndices);
