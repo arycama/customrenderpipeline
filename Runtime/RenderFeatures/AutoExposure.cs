@@ -59,7 +59,7 @@ public partial class AutoExposure : ViewRenderFeature
         var camera = viewRenderData.camera;
         var iso = camera.usePhysicalProperties ? camera.iso : lensSettings.Iso;
         var aperture = camera.usePhysicalProperties ? camera.aperture : lensSettings.Aperture;
-        var shutterSpeed = camera.usePhysicalProperties ? 1.0f / camera.shutterSpeed : lensSettings.ShutterSpeed;
+        var shutterSpeed = camera.usePhysicalProperties ? camera.shutterSpeed : lensSettings.ShutterSpeed;
         using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", new AutoExposureStructData
 		(			
 			settings.MinEv,
