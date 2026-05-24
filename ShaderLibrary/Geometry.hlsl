@@ -654,4 +654,26 @@ float SineRule(float a, float sinA, float b)
 	return b * sinA / a;
 }
 
+float3 ClosestPointOnSegment(float3 P, float3 A, float3 B)
+{
+	float3 AB = B - A;
+	float3 AP = P - A;
+    
+	float t = dot(AP, AB) / dot(AB, AB);
+	t = saturate(t); // Clamp between 0 and 1
+    
+	return A + AB * t;
+}
+
+float2 ClosestPointOnSegment(float2 P, float2 A, float2 B)
+{
+	float2 AB = B - A;
+	float2 AP = P - A;
+    
+	float t = dot(AP, AB) / dot(AB, AB);
+	t = saturate(t); // Clamp between 0 and 1
+    
+	return A + AB * t;
+}
+
 #endif
