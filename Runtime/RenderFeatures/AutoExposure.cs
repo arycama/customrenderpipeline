@@ -124,7 +124,7 @@ public partial class AutoExposure : ViewRenderFeature
         }
 
         var exposureBuffer = renderGraph.GetResource<AutoExposureData>().ExposureBuffer;
-        using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", (output, exposureBuffer, settings.DebugExposure, viewRenderData.camera)))
+        using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", (output, exposureBuffer, settings.DebugExposure, viewRenderData.camera, renderGraph.RenderPipeline)))
         {
             pass.ReadBuffer("", output);
             pass.WriteBuffer("", exposureBuffer);
@@ -134,6 +134,11 @@ public partial class AutoExposure : ViewRenderFeature
                 command.CopyBuffer(pass.GetBuffer(data.output), pass.GetBuffer(data.exposureBuffer));
                 command.RequestAsyncReadback(pass.GetBuffer(data.exposureBuffer), readback =>
                 {
+                    // When disposing, we wait all async requests which causes this to get triggered, but camera will be destroyed, so need to early return
+                    // TODO: Figure out better way
+                    if (data.RenderPipeline.IsDisposing)
+                        return;
+
                     var readbackData = readback.GetData<float>();
                     var exposure = readbackData[0];
                     var exposureCompensation = readbackData[3];
