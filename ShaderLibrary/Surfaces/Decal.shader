@@ -2,9 +2,10 @@ Shader "Surface/Decal"
 {
 	Properties
 	{
+		Index("Index", Integer) = 0
 		Tint("Tint", Color) = (1, 1, 1, 1)
-		AlbedoOpacity("Albedo Opacity", 2D) = "white" {}
-		NormalOcclusionRoughness("Normal Occlusion Roughness", 2D) = "white" {}
+		[NoScaleOffset] AlbedoOpacity("Albedo Opacity", 2DArray) = "white" {}
+		[NoScaleOffset] NormalOcclusionRoughness("Normal Occlusion Roughness", 2DArray) = "bump" {}
 		Transparency("Transparency", Range(0, 1)) = 0
 		Smoothness("Smoothness", Range(0, 1)) = 1
 		NormalBlend("Normal Blend", Range(0, 1)) = 0

@@ -50,9 +50,9 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
     protected override void Dispose(bool disposing)
     {
-        AsyncGPUReadback.WaitAllRequests();
-
         IsDisposing = true;
+
+        AsyncGPUReadback.WaitAllRequests();
 
         // Could dispose in reverse order?
         foreach (var renderFeature in perFrameRenderFeatures)

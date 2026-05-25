@@ -26,13 +26,13 @@ struct FragmentOutput
 	float4 normalRoughness : SV_Target1;
 };
 
-Texture2D<float4> AlbedoOpacity, NormalOcclusionRoughness;
+Texture2DArray<float4> AlbedoOpacity, NormalOcclusionRoughness;
 
 cbuffer UnityPerMaterial
 {
 	float4 AlbedoOpacity_ST;
 	float4 Tint;
-	float Smoothness, Transparency, NormalBlend;
+	float Smoothness, Transparency, NormalBlend, Index;
 };
 
 FragmentInput Vertex(VertexInput input)
@@ -54,12 +54,12 @@ FragmentOutput Fragment(FragmentInput input, bool isFrontFace : SV_IsFrontFace)
 	float3 uv = objectPosition + 0.5;
 	clip(0.5 - abs(objectPosition));
 	
-	float4 albedoOpacity = AlbedoOpacity.Sample(SurfaceSampler, uv.xy * AlbedoOpacity_ST.xy + AlbedoOpacity_ST.zw) * Tint;
+	float4 albedoOpacity = AlbedoOpacity.Sample(SurfaceSampler, float3(uv.xy, Index)) * Tint;
 	// Discard empty pixels, saves compositing invisible pixels
 	//if (!albedoOpacity.a)
 	//	discard;
 	
-	float4 normalOcclusionRoughness = NormalOcclusionRoughness.Sample(SurfaceSampler, uv.xy * AlbedoOpacity_ST.xy + AlbedoOpacity_ST.zw);
+	float4 normalOcclusionRoughness = NormalOcclusionRoughness.Sample(SurfaceSampler, float3(uv.xy, Index));
 	
 	float3 ddxWp = ddx(worldPosition);
 	float3 ddyWp = ddy(worldPosition);
