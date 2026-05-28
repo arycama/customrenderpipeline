@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -13,17 +14,17 @@ public class UnderwaterLighting : ViewRenderFeature
         material = new Material(Shader.Find("Hidden/Deferred Lighting")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
-		if (!settings.IsEnabled || (viewRenderData.camera.cameraType != CameraType.Game && viewRenderData.camera.cameraType != CameraType.SceneView))
+		if (!settings.IsEnabled || (viewPassData.cameraType != CameraType.Game && viewPassData.cameraType != CameraType.SceneView))
 			return;
 
-        var underwaterResultId = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+        var underwaterResultId = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
         var passIndex = material.FindPass("Deferred Lighting (Underwater)");
 
         using (var pass = renderGraph.AddFullscreenRenderPass("Ocean Underwater Lighting", settings))
         {
-            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, passIndex, isScreenPass: true);
+            pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, passIndex, isScreenPass: true);
             pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(underwaterResultId);
 

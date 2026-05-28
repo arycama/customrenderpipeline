@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using static Math;
@@ -21,20 +22,20 @@ public partial class VolumetricLighting : ViewRenderFeature
         colorHistory.Dispose();
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		renderGraph.AddProfileBeginPass("Volumetric Lighting");
 
-		var volumeWidth = DivRoundUp(viewRenderData.viewSize.x, settings.TileSize);
-        var volumeHeight = DivRoundUp(viewRenderData.viewSize.y, settings.TileSize);
+		var volumeWidth = DivRoundUp(viewPassData.viewSize.x, settings.TileSize);
+        var volumeHeight = DivRoundUp(viewPassData.viewSize.y, settings.TileSize);
 
-		var linearToVolumetricScale = Rcp(Log2(settings.MaxDistance / viewRenderData.near));
+		var linearToVolumetricScale = Rcp(Log2(settings.MaxDistance / viewPassData.near));
 		var volumetricLightingData = renderGraph.SetConstantBuffer(new VolumetricLightingData
 		(
 			linearToVolumetricScale,
-			-Log2(viewRenderData.near) * linearToVolumetricScale,
-			(Log2(settings.MaxDistance) - Log2(viewRenderData.near)) / settings.DepthSlices,
-			Log2(viewRenderData.near),
+			-Log2(viewPassData.near) * linearToVolumetricScale,
+			(Log2(settings.MaxDistance) - Log2(viewPassData.near)) / settings.DepthSlices,
+			Log2(viewPassData.near),
 			volumeWidth,
 			volumeHeight,
 			settings.DepthSlices,
@@ -46,15 +47,15 @@ public partial class VolumetricLighting : ViewRenderFeature
 		));
 
 		var rawJitter = renderGraph.GetResource<TemporalAASetupData>().jitter;
-		var jitter = 2.0f * rawJitter / (Float2)viewRenderData.viewSize;
-		var pixelToWorldViewDir = Float4x4.PixelToWorldViewDirectionMatrix(new(volumeWidth, volumeHeight), jitter, viewRenderData.tanHalfFov, Matrix4x4.Rotate(viewRenderData.transform.rotation), true);
+		var jitter = 2.0f * rawJitter / (Float2)viewPassData.viewSize;
+		var pixelToWorldViewDir = Float4x4.PixelToWorldViewDirectionMatrix(new(volumeWidth, volumeHeight), jitter, viewPassData.tanHalfFov, Matrix4x4.Rotate(viewPassData.rotation), true);
 
 		ResourceHandle<RenderTexture> current, history = default;
 		bool wasCreated = false;
 
 		using (var pass = renderGraph.AddComputeRenderPass("Volumetric Lighting", (pixelToWorldViewDir, history, wasCreated)))
         {
-			(current, history, wasCreated) = colorHistory.GetTextures(new(volumeWidth, volumeHeight), pass.Index, viewRenderData.viewId, settings.DepthSlices);
+			(current, history, wasCreated) = colorHistory.GetTextures(new(volumeWidth, volumeHeight), pass.Index, viewPassData.viewId, settings.DepthSlices);
 			pass.renderData.history = history;
 			pass.renderData.wasCreated = wasCreated;
 

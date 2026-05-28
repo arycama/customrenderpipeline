@@ -3,10 +3,13 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Assertions;
+using UnityEngine.XR;
+using System;
+using UnityEngine.Pool;
 
 #if UNITY_EDITOR
 using UnityEditor;
-    using UnityEditorInternal;
+using UnityEditorInternal;
 #endif
 
 public abstract class CustomRenderPipelineBase : RenderPipeline
@@ -19,7 +22,6 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
     protected readonly RenderGraph renderGraph;
     private bool isInitialized;
     private readonly bool renderDocLoaded;
-    private readonly List<ViewRenderData> viewRenderDatas = new();
     private readonly Dictionary<int, string> renderCameraProfileMarkers = new();
 
     public bool IsDisposingFromRenderDoc { get; protected set; }
@@ -31,6 +33,8 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
     protected virtual bool RenderUiOverlay { get; } = true;
     protected virtual bool RenderWireframe { get; } = true;
     protected virtual float SdrLuminance { get; } = 250f;
+    protected virtual float RenderScale { get; } = 1.0f;
+    protected virtual int AntiAliasing { get; } = 1;
 
     public CustomRenderPipelineBase()
     {
@@ -44,6 +48,9 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
         GraphicsSettings.realtimeDirectRectangularAreaLights = true;
 
         renderGraph = new(this);
+
+        GraphicsSettings.disableBuiltinCustomRenderTextureUpdate = true;
+        LoadStoreActionDebugModeSettings.LoadStoreDebugModeEnabled = false;
 
         command = new CommandBuffer();// { name = "Render Camera" };
     }
@@ -70,30 +77,6 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
     protected abstract List<ViewRenderFeature> InitializePerCameraRenderFeatures();
 
-    /// <summary> Creates a list of render loops that will be rendered </summary>
-    protected virtual void CollectViewRenderData(List<Camera> cameras, ScriptableRenderContext context, List<ViewRenderData> viewRenderDatas)
-    {
-        var hdrSettings = HDROutputSettings.main;
-        var hdrAvailable = hdrSettings.available;
-        var colorGamut = hdrAvailable ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
-        var peakLuminance = hdrAvailable ? hdrSettings.maxToneMapLuminance : SdrLuminance;
-        renderGraph.SetResource<HdrOutputData>(new(colorGamut, peakLuminance, hdrAvailable, hdrSettings), true);
-
-        foreach (var camera in cameras)
-        {
-            if (!camera.TryGetCullingParameters(out var cullingParameters))
-                continue;
-
-            var screenSize = camera.targetTexture == null ? new Int2(Screen.width, Screen.height) : new Int2(camera.targetTexture.width, camera.targetTexture.height);
-            var target = (RenderTargetIdentifier)(camera.targetTexture == null ? BuiltinRenderTextureType.CameraTarget : camera.targetTexture);
-
-            // Somewhat hacky.. but this is kind of required to deal with some unity hacks so meh
-            camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
-            viewRenderDatas.Add(new ViewRenderData(camera.ViewSize(), camera.nearClipPlane, camera.farClipPlane, camera.TanHalfFov(), camera.transform.WorldRigidTransform(), camera, context, cullingParameters, target, VRTextureUsage.None, SinglePassStereoMode.None, 1, string.Empty, GraphicsFormat.R8G8B8A8_SRGB, 1, false));
-            renderGraph.RtHandleSystem.SetScreenSize(screenSize.x, screenSize.y);
-        }
-    }
-
     protected override void Render(ScriptableRenderContext context, List<Camera> cameras)
     {
         Assert.IsFalse(renderGraph.IsExecuting);
@@ -111,15 +94,166 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
         GraphicsSettings.useScriptableRenderPipelineBatching = UseSrpBatching;
 
-        viewRenderDatas.Clear();
-        CollectViewRenderData(cameras, context, viewRenderDatas);
-
         if (!isInitialized)
         {
             perFrameRenderFeatures = InitializePerFrameRenderFeatures();
             perCameraRenderFeatures = InitializePerCameraRenderFeatures();
             isInitialized = true;
         }
+
+        var xrDisplaySubsystems = ListPool<XRDisplaySubsystem>.Get();
+        SubsystemManager.GetSubsystems(xrDisplaySubsystems);
+
+        // Setup display output infos
+        Span<DisplayData> displayOutputDatas = stackalloc DisplayData[xrDisplaySubsystems.Count + 1];
+
+        var mainHdrSettings = HDROutputSettings.main;
+        var mainColorGamut = mainHdrSettings.available ? mainHdrSettings.displayColorGamut : ColorGamut.sRGB;
+        var mainPeakLuminance = mainHdrSettings.available ? mainHdrSettings.maxToneMapLuminance : SdrLuminance;
+        displayOutputDatas[0] = new(mainColorGamut, mainPeakLuminance, mainHdrSettings.available);
+
+        for (var i = 0; i < xrDisplaySubsystems.Count; i++)
+        {
+            var xrDisplaySubsystem = xrDisplaySubsystems[i];
+
+            // TODO: How can we do this just one instead of every frame? We cant' do it on init since the subsystem creation is delayed
+            xrDisplaySubsystem.disableLegacyRenderer = true;
+            xrDisplaySubsystem.scaleOfAllRenderTargets = RenderScale;
+            xrDisplaySubsystem.sRGB = true;
+            xrDisplaySubsystem.textureLayout = XRDisplaySubsystem.TextureLayout.Texture2DArray;
+            xrDisplaySubsystem.SetMSAALevel(AntiAliasing);
+
+            var hdrSettings = xrDisplaySubsystem.hdrOutputSettings;
+            var colorGamut = hdrSettings.available ? hdrSettings.displayColorGamut : ColorGamut.sRGB;
+            var peakLuminance = hdrSettings.available ? hdrSettings.maxToneMapLuminance : SdrLuminance;
+            displayOutputDatas[i + 1] = new(colorGamut, peakLuminance, hdrSettings.available);
+        }
+
+        // TODO: Convert these to spans? Will require doing two passes though, one to calculate count, and one to actually do the thing
+        var viewPassDatas = ListPool<ViewPassData>.Get();
+        var viewParameters = ListPool<ViewParameter>.Get();
+
+        foreach (var camera in cameras)
+        {
+            // TODO: Would it be better to use an array and an index instead for per-camera data
+            var viewId = camera.GetHashCode();
+
+            if (!renderCameraProfileMarkers.TryGetValue(viewId, out var profileMarker))
+            {
+                profileMarker = $"Render View ({camera.name})";
+                renderCameraProfileMarkers.Add(viewId, profileMarker);
+            }
+
+            var distanceMetric = camera.transparencySortMode switch
+            {
+                TransparencySortMode.Perspective => DistanceMetric.Perspective,
+                TransparencySortMode.Orthographic => DistanceMetric.Orthographic,
+                TransparencySortMode.CustomAxis => DistanceMetric.CustomAxis,
+                _ => camera.orthographic ? DistanceMetric.Orthographic : DistanceMetric.Perspective,
+            };
+
+            var sortAxis = distanceMetric == DistanceMetric.CustomAxis ? (Float3)camera.transparencySortAxis : camera.transform.WorldRotation().Forward;
+            var tanHalfFov = Geometry.TanHalfFovDegrees(camera.fieldOfView);
+
+            ViewPassData GetDisplayRenderPass(int displayIndex, int viewCount, bool isFliped, Int2 size, RenderTargetIdentifier target, GraphicsFormat format, VRTextureUsage vrUsage, in ScriptableCullingParameters cullingParameters, int mirrorBlitMode, IntPtr foveatedRenderingInfo)
+            {
+                return new ViewPassData
+                (
+                    viewParameters.Count,
+                    displayIndex,
+                    viewCount,
+                    isFliped,
+                    size,
+                    viewCount == 1 ? SinglePassStereoMode.None : (SystemInfo.supportsMultiview ? SinglePassStereoMode.Multiview : SinglePassStereoMode.Instancing),
+                    target,
+                    format,
+                    vrUsage,
+                    1,
+                    viewId,
+                    cullingParameters,
+                    mirrorBlitMode,
+                    foveatedRenderingInfo,
+                    camera.cameraType,
+                    camera.nearClipPlane,
+                    camera.farClipPlane,
+                    camera.transform.position,
+                    camera.transform.rotation,
+                    distanceMetric,
+                    sortAxis,
+                    new Float2(tanHalfFov * camera.aspect, tanHalfFov),
+                    0,
+                    camera,
+                    camera.iso,
+                    camera.aperture,
+                    camera.shutterSpeed,
+                    camera.focalLength,
+                    camera.focusDistance,
+                    PhysicalCameraUtility.ApertureRadius(camera.focalLength, camera.aperture),
+                    PhysicalCameraUtility.EV100ToExposure(PhysicalCameraUtility.ComputeEV100(camera.aperture, camera.shutterSpeed, camera.iso))
+                );
+            }
+
+            // Only cameras with no target texture output to the display
+            if (camera.targetTexture == null && xrDisplaySubsystems.Count > 0)
+            {
+                for (var i = 0; i < xrDisplaySubsystems.Count; i++)
+                {
+                    var xrDisplaySubsystem = xrDisplaySubsystems[i];
+                    var mirrorBlitMode = xrDisplaySubsystem.GetPreferredMirrorBlitMode();
+
+                    var passCount = xrDisplaySubsystem.GetRenderPassCount();
+                    for (var j = 0; j < passCount; j++)
+                    {
+                        xrDisplaySubsystem.GetRenderPass(j, out var renderPass);
+                        xrDisplaySubsystem.GetCullingParameters(camera, renderPass.cullingPassIndex, out var cullingParameters);
+
+                        // TODO: Any reason to not use renderTargetDesc.width and height?
+                        var size = new Int2(renderPass.renderTargetScaledWidth, renderPass.renderTargetScaledHeight);
+                        renderGraph.RtHandleSystem.SetScreenSize(size.x, size.y);
+
+                        var renderTargetDesc = renderPass.renderTargetDesc;
+                        var viewCount = renderPass.GetRenderParameterCount();
+
+                        var isFlipped = renderTargetDesc.flags.HasFlag(RenderTextureCreationFlags.AllowVerticalFlip);
+                        var displayRenderPass = GetDisplayRenderPass(i + 1, viewCount, isFlipped, size, renderPass.renderTarget, renderTargetDesc.graphicsFormat, renderTargetDesc.vrUsage, cullingParameters, mirrorBlitMode, renderPass.foveatedRenderingInfo);
+                        viewPassDatas.Add(displayRenderPass);
+
+                        for (var k = 0; k < viewCount; k++)
+                        {
+                            renderPass.GetRenderParameter(camera, k, out var renderParameter);
+                            viewParameters.Add(new(renderParameter.view, renderParameter.projection));
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (!camera.TryGetCullingParameters(out var cullingParameters))
+                    continue;
+
+                var targetTexture = camera.targetTexture;
+                var size = targetTexture == null ? new Int2(camera.pixelWidth, camera.pixelHeight) : new Int2(targetTexture.width, targetTexture.height);
+                renderGraph.RtHandleSystem.SetScreenSize(size.x, size.y);
+
+                var targetDesc = targetTexture == null ? default : camera.targetTexture.descriptor;
+                var isFlipped = targetTexture == null ? false : targetDesc.flags.HasFlag(RenderTextureCreationFlags.AllowVerticalFlip);
+                var format = targetTexture == null ? SystemInfo.GetGraphicsFormat(DefaultFormat.HDR) : targetTexture.graphicsFormat;
+                var target = (RenderTargetIdentifier)(targetTexture == null ? BuiltinRenderTextureType.CameraTarget : targetTexture);
+
+                var displayRenderPass = GetDisplayRenderPass(0, 1, isFlipped, size, target, format, VRTextureUsage.None, cullingParameters, XRMirrorViewBlitMode.None, IntPtr.Zero);
+                viewPassDatas.Add(displayRenderPass);
+                viewParameters.Add(new(camera.worldToCameraMatrix, camera.projectionMatrix));
+            }
+
+#if UNITY_EDITOR
+            if (camera.cameraType == CameraType.SceneView)
+                ScriptableRenderContext.EmitWorldGeometryForSceneView(camera);
+            else
+#endif
+                ScriptableRenderContext.EmitGeometryForCamera(camera);
+        }
+
+        ListPool<XRDisplaySubsystem>.Release(xrDisplaySubsystems);
 
         using (renderGraph.AddProfileScope("Prepare Frame"))
         {
@@ -129,38 +263,36 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
             }
         }
 
-        foreach (var viewRenderData in viewRenderDatas)
+        foreach (var displayRenderPass in viewPassDatas)
         {
-            if(!renderCameraProfileMarkers.TryGetValue(viewRenderData.viewId, out var profileMarker))
-            {
-                profileMarker = $"Render View ({viewRenderData.camera.name})";
-                renderCameraProfileMarkers.Add(viewRenderData.viewId, profileMarker);
-            }
+            var profileMarker = renderCameraProfileMarkers[displayRenderPass.viewId];
+
+            Span<ViewParameter> displayViewParameters = stackalloc ViewParameter[displayRenderPass.viewCount];
+            for (var i = 0; i < displayRenderPass.viewCount; i++)
+                displayViewParameters[i] = viewParameters[displayRenderPass.parameterStart + i];
 
             using var renderCameraScope = renderGraph.AddProfileScope(profileMarker);
             foreach (var cameraRenderFeature in perCameraRenderFeatures)
+                cameraRenderFeature.Render(displayViewParameters, displayRenderPass, displayOutputDatas[displayRenderPass.displayInfoIndex], context);
+
+            if (RenderWireframe)
             {
-                cameraRenderFeature.Render(viewRenderData);
+                var wireOverlay = context.CreateWireOverlayRendererList(displayRenderPass.camera);
+                using (var pass = renderGraph.AddGenericRenderPass("Wire Overlay", wireOverlay))
+                {
+                    pass.SetRenderFunction(static (command, pass, data) =>
+                    {
+                        command.DrawRendererList(data);
+                    });
+                }
             }
 
-            //if (RenderWireframe)
-            //{
-            //    var wireOverlay = context.CreateWireOverlayRendererList(viewRenderData.camera);
-            //    using (var pass = renderGraph.AddGenericRenderPass("Wire Overlay", wireOverlay))
-            //    {
-            //        pass.SetRenderFunction(static (command, pass, data) =>
-            //        {
-            //            command.DrawRendererList(data);
-            //        });
-            //    }
-            //}
-
             // Draw overlay UI for the main camera. (TODO: Render to a seperate target and composite seperately for hdr compatibility
-            if (RenderUiOverlay && viewRenderData.camera.cameraType == CameraType.Game && viewRenderData.camera == Camera.main)
+            if (RenderUiOverlay && displayRenderPass.cameraType == CameraType.Game && displayRenderPass.camera == Camera.main)
             {
-                var uiOverlay = context.CreateUIOverlayRendererList(viewRenderData.camera);
+                var uiOverlay = context.CreateUIOverlayRendererList(displayRenderPass.camera);
 
-                using var pass = renderGraph.AddGenericRenderPass("UI Overlay", (uiOverlay, viewRenderData.camera));
+                using var pass = renderGraph.AddGenericRenderPass("UI Overlay", (uiOverlay, displayRenderPass.camera));
                 pass.UseProfiler = false;
 
                 pass.SetRenderFunction(static (command, pass, data) =>
@@ -173,6 +305,9 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                 });
             }
         }
+
+        ListPool<ViewPassData>.Release(viewPassDatas);
+        ListPool<ViewParameter>.Release(viewParameters);
 
         renderGraph.Execute(command, context);
 

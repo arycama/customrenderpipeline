@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -20,20 +21,13 @@ public partial class DepthOfField : ViewRenderFeature
 		raytracingShader = Resources.Load<RayTracingShader>("Raytracing/DepthOfField");
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		if (!settings.IsEnabled)
 			return;
 
 		var computeShader = Resources.Load<ComputeShader>("PostProcessing/DepthOfField");
-		var tempId = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
-
-        var camera = viewRenderData.camera;
-        var focalDistance = camera.usePhysicalProperties ? camera.focusDistance : settings.FocalDistance;
-        var sensorSize = (camera.usePhysicalProperties ? camera.sensorSize.y : lensSettings.SensorSize) * 0.001f;
-        var aperture = camera.usePhysicalProperties ? camera.aperture : lensSettings.Aperture;
-        var focalLength = PhysicalCameraUtility.FocalLength(sensorSize, viewRenderData.tanHalfFov.y);
-		var apertureRadius = PhysicalCameraUtility.ApertureRadius(focalLength, aperture);
+		var tempId = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 
         var cameraTarget = renderGraph.GetRtHandleData<CameraTarget>().handle;
         using (var pass = renderGraph.AddGenericRenderPass("Generate Scene Color Mips", cameraTarget))
@@ -66,15 +60,15 @@ public partial class DepthOfField : ViewRenderFeature
 
 			using (var pass = renderGraph.AddRaytracingRenderPass("Depth of Field", 
 			(
-				focusDistance: Math.Max(camera.nearClipPlane, focalDistance),
-				apertureRadius,
+				viewPassData.focalDistance,
+                viewPassData.apertureRadius,
 				settings.SampleCount,
 				taaSettings.IsEnabled ? 1.0f : 0.0f
 			)))
 			{
 				var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-				pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewRenderData.viewSize.x, viewRenderData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewRenderData.tanHalfFov.y);
+				pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewPassData.viewSize.x, viewPassData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewPassData.tanHalfFov.y);
                 pass.PreventNewSubPass = true;
                 pass.WriteTexture(tempId, "HitColor");
 				//pass.WriteTexture(hitResult, "HitResult");
@@ -88,7 +82,7 @@ public partial class DepthOfField : ViewRenderFeature
 
                 pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					pass.SetFloat("_FocusDistance", data.focusDistance);
+					pass.SetFloat("_FocusDistance", data.focalDistance);
 					pass.SetFloat("_ApertureRadius", data.apertureRadius);
 					pass.SetFloat("_SampleCount", data.SampleCount);
 					pass.SetFloat("_TaaEnabled", data.Item4);
@@ -99,14 +93,14 @@ public partial class DepthOfField : ViewRenderFeature
 		{
 			using (var pass = renderGraph.AddFullscreenRenderPass("Depth of Field", 
 			(
-				focusDistance: Math.Max(camera.nearClipPlane, focalDistance),
-				apertureRadius,
+                viewPassData.focalDistance,
+                viewPassData.apertureRadius,
 				settings.SampleCount,
 				taaSettings.IsEnabled ? 1.0f : 0.0f,
-				viewRenderData.viewSize
+				viewPassData.viewSize
 			)))
 			{
-				pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
+				pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
                 pass.PreventNewSubPass = true;
 				pass.WriteTexture(tempId);
 
@@ -119,7 +113,7 @@ public partial class DepthOfField : ViewRenderFeature
 
                 pass.SetRenderFunction(static (command, pass, data) =>
 				{
-					pass.SetFloat("_FocusDistance", data.focusDistance);
+					pass.SetFloat("_FocusDistance", data.focalDistance);
 					pass.SetFloat("_ApertureRadius", data.apertureRadius);
 					pass.SetFloat("_SampleCount", data.SampleCount);
 					pass.SetFloat("_MaxMip", Texture2DExtensions.MipCount(data.viewSize) - 1);

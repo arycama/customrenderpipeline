@@ -1,4 +1,6 @@
+using System;
 using UnityEngine;
+using UnityEngine.Rendering;
 using static Math;
 
 public class SetTerrainViewData : ViewRenderFeature
@@ -12,13 +14,13 @@ public class SetTerrainViewData : ViewRenderFeature
         this.settings = settings;
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
         var terrain = terrainSystem.Terrain;
         if (terrain == null)
             return;
 
-        var position = terrainSystem.Terrain.GetPosition() - viewRenderData.transform.position;
+        var position = terrainSystem.Terrain.GetPosition() - viewPassData.position;
         var size = (Float3)terrain.terrainData.size;
 
         renderGraph.SetResource<TerrainViewData>(new(renderGraph.SetConstantBuffer

@@ -3,16 +3,14 @@ using UnityEngine.Rendering;
 
 public class GenericFrameRenderFeature : FrameRenderFeature
 {
-	private Action<ScriptableRenderContext> render;
-	private string profilerName;
+    public delegate void RenderFunction(ScriptableRenderContext context);
 
-	public GenericFrameRenderFeature(RenderGraph renderGraph, string profilerName, Action<ScriptableRenderContext> render) : base(renderGraph)
+    private readonly RenderFunction render;
+
+	public GenericFrameRenderFeature(RenderGraph renderGraph, RenderFunction render) : base(renderGraph)
 	{
-		this.profilerName = profilerName;
 		this.render = render;
 	}
-
-	public override string ProfilerNameOverride => profilerName;
 
 	public override void Render(ScriptableRenderContext context)
 	{

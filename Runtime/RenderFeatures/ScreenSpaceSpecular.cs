@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -28,15 +29,15 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
         opacityCache.Dispose();
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
         if (settings.Intensity == 0)
             return;
 
         using var scope = renderGraph.AddProfileScope("Specular Global Illumination");
 
-        var tempResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true, clear: true);
-        var hitResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clear: true);
+        var tempResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true, clear: true);
+        var hitResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16G16B16A16_SFloat, isScreenTexture: true, clear: true);
         if (settings.UseRaytracing)
         {
             // Need to set some things as globals so that hit shaders can access them..
@@ -60,7 +61,7 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
             {
                 var raytracingData = renderGraph.GetResource<RaytracingResult>();
 
-                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewRenderData.viewSize.x, viewRenderData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewRenderData.tanHalfFov.y);
+                pass.Initialize(raytracingShader, "RayGeneration", "Raytracing", raytracingData.Rtas, viewPassData.viewSize.x, viewPassData.viewSize.y, 1, raytracingData.Bias, raytracingData.DistantBias, viewPassData.tanHalfFov.y);
                 pass.WriteTexture(tempResult, "HitColor");
                 pass.WriteTexture(hitResult, "HitResult");
                 pass.ReadRtHandle<GBufferNormalRoughness>();
@@ -79,13 +80,13 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
         else
         {
             var thicknessScale = 1.0f / (1.0f + settings.Thickness);
-            var thicknessOffset = -viewRenderData.near / (viewRenderData.far - viewRenderData.near) * (settings.Thickness * thicknessScale);
-            var maxMip = Texture2DExtensions.MipCount(viewRenderData.viewSize) - 1;
-            var coneAngle = viewRenderData.viewSize.y * 0.5f / viewRenderData.tanHalfFov.y;
+            var thicknessOffset = -viewPassData.near / (viewPassData.far - viewPassData.near) * (settings.Thickness * thicknessScale);
+            var maxMip = Texture2DExtensions.MipCount(viewPassData.viewSize) - 1;
+            var coneAngle = viewPassData.viewSize.y * 0.5f / viewPassData.tanHalfFov.y;
 
             using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Trace", (settings.MaxSamples, thicknessScale, thicknessOffset, maxMip, settings.Thickness, coneAngle, settings.RoughnessBias)))
             {
-                pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
+                pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
                 pass.PreventNewSubPass = true;
                 pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(tempResult);
@@ -115,12 +116,12 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
             }
         }
 
-        var spatialResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
-        var spatialWeight = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8_UNorm, isScreenTexture: true);
-        var rayDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
+        var spatialResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+        var spatialWeight = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R8_UNorm, isScreenTexture: true);
+        var rayDepth = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
         using (var pass = renderGraph.AddFullscreenRenderPass("Specular GI Spatial", (settings.ResolveSamples, settings.ResolveSize, settings.Intensity)))
         {
-            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1, isScreenPass: true);
+            pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 1, isScreenPass: true);
             pass.PreventNewSubPass = true;
             pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(spatialResult);
@@ -149,15 +150,15 @@ public partial class ScreenSpaceSpecular : ViewRenderFeature
 
         using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Reflections Temporal", (wasCreated, history)))
         {
-            (current, history, wasCreated) = temporalCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
-            var (currentSpeed, speedHistory, _) = speedCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
-            var (currentOpacity, opacityHistory, _) = opacityCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+            (current, history, wasCreated) = temporalCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+            var (currentSpeed, speedHistory, _) = speedCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+            var (currentOpacity, opacityHistory, _) = opacityCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
             opacity = currentOpacity;
 
             pass.renderData.history = history;
             pass.renderData.wasCreated = wasCreated;
 
-            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 2, isScreenPass: true);
+            pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 2, isScreenPass: true);
             pass.PreventNewSubPass = true;
             pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteTexture(current);

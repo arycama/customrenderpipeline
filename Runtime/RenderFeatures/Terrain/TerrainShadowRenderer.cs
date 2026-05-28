@@ -1,5 +1,7 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Assertions;
+using UnityEngine.Rendering;
 
 public class TerrainShadowRenderer : TerrainRendererBase
 {
@@ -7,7 +9,7 @@ public class TerrainShadowRenderer : TerrainRendererBase
 	{
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		if (!renderGraph.TryGetResource<TerrainSystemData>(out var terrainSystemData))
 			return;
@@ -29,17 +31,17 @@ public class TerrainShadowRenderer : TerrainRendererBase
 		for (var i = 0; i < cullingPlanes.Count; i++)
 		{
 			var plane = shadowRequest.ShadowSplitData.GetCullingPlane(i);
-			plane.Translate(viewRenderData.transform.position);
+			plane.Translate(viewPassData.position);
 			cullingPlanes.SetCullingPlane(i, plane);
 		}
 
-		var passData = Cull(viewRenderData.transform.position, cullingPlanes, viewRenderData.viewSize);
+		var passData = Cull(viewPassData.position, cullingPlanes, viewPassData.viewSize);
 
 		var passIndex = settings.Material.FindPass("ShadowCaster");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no ShadowCaster Pass");
 
 		var size = terrainData.size;
-		var position = terrain.GetPosition() - viewRenderData.transform.position;
+		var position = terrain.GetPosition() - viewPassData.position;
 
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", cullingPlanes))
 		{

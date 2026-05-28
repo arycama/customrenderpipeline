@@ -1,5 +1,7 @@
+using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 public partial class TemporalAA : ViewRenderFeature
 {
@@ -21,7 +23,7 @@ public partial class TemporalAA : ViewRenderFeature
 		weightCache.Dispose();
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		if (!settings.IsEnabled)
 			return;
@@ -29,7 +31,7 @@ public partial class TemporalAA : ViewRenderFeature
 		bool wasCreated = default;
 		ResourceHandle<RenderTexture> current, history = default;
 
-		var result = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
+		var result = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
 		using var pass = renderGraph.AddFullscreenRenderPass("Temporal AA", new TemporalAADataStruct
 		(
 			settings.SpatialBlur,
@@ -46,11 +48,11 @@ public partial class TemporalAA : ViewRenderFeature
 		));
 
 		//var keyword = null;// viewData.Scale < 1.0f ? "UPSCALE" : null; // TODO: Implement
-		pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 0, 1, isScreenPass: true);
+		pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 0, 1, isScreenPass: true);
         pass.PreventNewSubPass = true;
 
-		(current, history, wasCreated) = colorCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
-		var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+		(current, history, wasCreated) = colorCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+		var (currentWeight, historyWeight, wasCreated1) = weightCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
 
 		pass.renderData.history = history;
 		pass.renderData.hasHistory = wasCreated ? 0f : 1f;

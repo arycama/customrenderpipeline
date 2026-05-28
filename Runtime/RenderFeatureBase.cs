@@ -7,9 +7,6 @@ public abstract class RenderFeatureBase : IDisposable
 	protected readonly RenderGraph renderGraph;
 	private bool disposedValue;
 
-	public virtual bool HasProfilerMarker => true;
-	public virtual string ProfilerNameOverride => null;
-
 	public RenderFeatureBase(RenderGraph renderGraph) 
 	{
 		this.renderGraph = renderGraph;

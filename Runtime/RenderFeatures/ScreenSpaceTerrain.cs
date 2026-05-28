@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -12,9 +13,9 @@ public class ScreenSpaceTerrain : ViewRenderFeature
         material = new Material(Shader.Find("Hidden/Screen Space Terrain")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
-        if (viewRenderData.camera.cameraType == CameraType.Preview)
+        if (viewPassData.cameraType == CameraType.Preview)
             return;
 
         if (!renderGraph.TryGetResource<TerrainViewData>(out _))
@@ -23,7 +24,7 @@ public class ScreenSpaceTerrain : ViewRenderFeature
         using var pass = renderGraph.AddFullscreenRenderPass("Screen Space Terrain");
         pass.PreventNewSubPass = true;
 
-        pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
+        pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
         pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
         pass.WriteRtHandle<GBufferAlbedoMetallic>();
         pass.WriteRtHandle<GBufferNormalRoughness>();

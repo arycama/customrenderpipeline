@@ -8,7 +8,7 @@ public class ShadowRenderPass<T> : GraphicsRenderPass<T>
 	private bool zClip;
 	private bool isPointLight;
 
-	public void Initialize(ScriptableRenderContext context, CullingResults cullingResults, int lightIndex, float bias, float slopeBias, bool zClip, bool isPointLight, Int2 size, int viewCount)
+	public void Initialize(ScriptableRenderContext context, in CullingResults cullingResults, int lightIndex, float bias, float slopeBias, bool zClip, bool isPointLight, Int2 size, int viewCount)
 	{
 		this.bias = bias;
 		this.slopeBias = slopeBias;

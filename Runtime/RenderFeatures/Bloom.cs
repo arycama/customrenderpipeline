@@ -1,6 +1,7 @@
 ﻿using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 public class Bloom : ViewRenderFeature
 {
@@ -20,21 +21,21 @@ public class Bloom : ViewRenderFeature
 		material = new Material(Shader.Find("Hidden/Bloom")) { hideFlags = HideFlags.HideAndDontSave };
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
         if (settings.Strength == 0)
             return;
 
 		renderGraph.AddProfileBeginPass("Bloom");
 
-		var mipCount = Math.Min(settings.MaxMips, (int)Math.Log2(Math.Max(viewRenderData.viewSize.x, viewRenderData.viewSize.y)));
+		var mipCount = Math.Min(settings.MaxMips, (int)Math.Log2(Math.Max(viewPassData.viewSize.x, viewPassData.viewSize.y)));
         Span<ResourceHandle<RenderTexture>> bloomIds = stackalloc ResourceHandle<RenderTexture>[mipCount];
 
 		// Downsample
 		for (var i = 0; i < mipCount; i++)
 		{
-			var width = Math.Max(1, viewRenderData.viewSize.x >> (i + 1));
-			var height = Math.Max(1, viewRenderData.viewSize.y >> (i + 1));
+			var width = Math.Max(1, viewPassData.viewSize.x >> (i + 1));
+			var height = Math.Max(1, viewPassData.viewSize.y >> (i + 1));
 
             var dest = renderGraph.GetTexture(new(width, height), GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             bloomIds[i] = dest;
@@ -45,7 +46,7 @@ public class Bloom : ViewRenderFeature
 
             pass.UseProfiler = false;
 
-            pass.Initialize(material, new(width, height), viewRenderData.viewCount, i == 0 ? 0 : 1, isScreenPass: true);
+            pass.Initialize(material, new(width, height), viewPassData.viewCount, i == 0 ? 0 : 1, isScreenPass: true);
 			pass.WriteTexture(dest);
 
 			pass.ReadTexture("Input", source);
@@ -62,13 +63,13 @@ public class Bloom : ViewRenderFeature
 		for (var i = mipCount - 1; i > 0; i--)
 		{
 			var input = bloomIds[i];
-			var width = Math.Max(1, viewRenderData.viewSize.x >> i);
-			var height = Math.Max(1, viewRenderData.viewSize.y >> i);
+			var width = Math.Max(1, viewPassData.viewSize.x >> i);
+			var height = Math.Max(1, viewPassData.viewSize.y >> i);
 
 			using var pass = renderGraph.AddFullscreenRenderPass("Bloom Up", (1.0f / new Float2(width, height), input, settings.Strength));
             pass.UseProfiler = false;
 
-			pass.Initialize(material, new(width, height), viewRenderData.viewCount, 2, isScreenPass: true);
+			pass.Initialize(material, new(width, height), viewPassData.viewCount, 2, isScreenPass: true);
 			pass.WriteTexture(bloomIds[i - 1]);
 			pass.ReadTexture("Input", input);
 

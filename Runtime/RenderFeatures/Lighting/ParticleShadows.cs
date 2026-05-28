@@ -41,7 +41,7 @@ public class ParticleShadows : ViewRenderFeature
 		cameras.Clear();
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		using var renderShadowsScope = renderGraph.AddProfileScope("Particle Shadows");
 
@@ -56,9 +56,11 @@ public class ParticleShadows : ViewRenderFeature
 		// Since 3D texture arrays aren't a thing, allocate one wide texture
 		var directionalShadows = renderGraph.GetTexture(new(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), GraphicsFormat.R8_UNorm, settings.DirectionalDepth, TextureDimension.Tex3D, isExactSize: true, clear: true, clearColor: Color.white);
 
-        void RenderShadowMap(ShadowRequest request, ResourceHandle<RenderTexture> target, int index, bool flipY, bool zClip, bool isPointLight)
+        var viewPosition = viewPassData.position;
+
+        void RenderShadowMap(in ShadowRequest request, ResourceHandle<RenderTexture> target, int index, bool flipY, bool zClip, bool isPointLight, ScriptableRenderContext context)
 		{
-            var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, request.ProjectionMatrix.Mul(request.ViewMatrix), request.ProjectionMatrix, viewRenderData.transform.position, 0, request.LightPosition, 0));
+            var perCascadeData = renderGraph.SetConstantBuffer((request.ViewMatrix, request.ProjectionMatrix.Mul(request.ViewMatrix), request.ProjectionMatrix, viewPosition, 0, request.LightPosition, 0));
 
 			while (cameras.Count <= index)
 			{
@@ -76,9 +78,8 @@ public class ParticleShadows : ViewRenderFeature
 			}
 
 			var particleCamera = cameras[index];
-			particleCamera.transform.position = request.ViewPosition;
-			particleCamera.transform.rotation = request.ViewRotation;
-			particleCamera.nearClipPlane = request.Near;
+			particleCamera.transform.SetPositionAndRotation(request.ViewPosition, request.ViewRotation);
+            particleCamera.nearClipPlane = request.Near;
 			particleCamera.farClipPlane = request.Far;
 			particleCamera.orthographicSize = request.Height * 0.5f;
 			particleCamera.aspect = request.Width / request.Height;
@@ -90,8 +91,8 @@ public class ParticleShadows : ViewRenderFeature
 			using (var pass = renderGraph.AddObjectRenderPass("Particle Shadows", (target, index, settings.DirectionalResolution, settings.DirectionalDepth, zClip, voxelSize)))
 			{
 				cullingPrameters.cullingOptions = CullingOptions.ForceEvenIfCameraIsNotActive | CullingOptions.DisablePerObjectCulling;
-				var cullingResults = viewRenderData.context.Cull(ref cullingPrameters);
-				pass.Initialize("ParticleShadow", viewRenderData.context, cullingResults, particleCamera, RenderQueueRange.transparent, new Int2(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), settings.DirectionalDepth, SortingCriteria.CommonTransparent);
+				var cullingResults = context.Cull(ref cullingPrameters);
+				pass.Initialize("ParticleShadow", context, cullingResults, RenderQueueRange.transparent, new Int2(settings.DirectionalResolution * directionalShadowCount, settings.DirectionalResolution), request.ViewPosition, request.ViewRotation, request.ViewRotation.Forward, DistanceMetric.Orthographic, SortingCriteria.CommonTransparent, viewCount: settings.DirectionalDepth);
 
 				// Doesn't actually do anything for this pass, except tells the rendergraph system that it gets written to
 				pass.WriteTexture(directionalShadows);
@@ -140,7 +141,7 @@ public class ParticleShadows : ViewRenderFeature
                     using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
                     {
                         var request = requestData.directionalShadowRequests[i];
-                        RenderShadowMap(request, directionalShadows, i, true, false, false);
+                        RenderShadowMap(request, directionalShadows, i, true, false, false, context);
                         directionalShadowSizes[i] = (request.Far - request.Near) / settings.DirectionalDepth;
                     }
                 }

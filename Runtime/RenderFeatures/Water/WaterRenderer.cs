@@ -1,6 +1,8 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 public class WaterRenderer : WaterRendererBase
 {
@@ -8,27 +10,27 @@ public class WaterRenderer : WaterRendererBase
 	{
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
-        if (!settings.IsEnabled || (viewRenderData.camera.cameraType != CameraType.Game && viewRenderData.camera.cameraType != CameraType.SceneView))
+        if (!settings.IsEnabled || (viewPassData.cameraType != CameraType.Game && viewPassData.cameraType != CameraType.SceneView))
             return;
 
-        var passData = Cull(viewRenderData.transform.position, renderGraph.GetResource<CullingPlanesData>().cullingPlanes, viewRenderData.viewSize, true);
+        var passData = Cull(viewPassData.position, renderGraph.GetResource<CullingPlanesData>().cullingPlanes, viewPassData.viewSize, true);
 
         // Writes (worldPos - displacementPos).xz. Uv coord is reconstructed later from delta and worldPosition (reconstructed from depth)
-        var oceanRenderResult = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);
+        var oceanRenderResult = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16G16_SFloat, isScreenTexture: true);
 
         // Also write triangleNormal to another texture with oct encoding. This allows reconstructing the derivative correctly to avoid mip issues on edges,
         // As well as backfacing triangle detection for rendering under the surface
-        var waterTriangleNormal = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16_UNorm, isScreenTexture: true, clear: true);
+        var waterTriangleNormal = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16G16_UNorm, isScreenTexture: true, clear: true);
 
         var passIndex = settings.Material.FindPass("Water");
         Assert.IsTrue(passIndex != -1, "Water Material has no Water Pass");
 
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
-		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Ocean Render", (VerticesPerTileEdge, renderGraph.FrameIndex, settings, viewRenderData.transform, cullingPlanes)))
+		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Ocean Render", (VerticesPerTileEdge, renderGraph.FrameIndex, settings, viewPassData.position, cullingPlanes)))
 		{
-			pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, viewRenderData.viewSize, 1, MeshTopology.Quads, passIndex, isScreenPass: true);
+			pass.Initialize(settings.Material, indexBuffer, passData.IndirectArgsBuffer, viewPassData.viewSize, 1, MeshTopology.Quads, passIndex, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
             pass.WriteRtHandleDepth<CameraDepth>();
@@ -54,8 +56,8 @@ public class WaterRenderer : WaterRendererBase
 
 				// Snap to quad-sized increments on largest cell
 				var texelSize = data.settings.Size / (float)data.settings.PatchVertices;
-				var positionX = Math.Snap(data.transform.position.x, texelSize) - data.transform.position.x - data.settings.Size * 0.5f;
-				var positionZ = Math.Snap(data.transform.position.z, texelSize) - data.transform.position.z - data.settings.Size * 0.5f;
+				var positionX = Math.Snap(data.position.x, texelSize) - data.position.x - data.settings.Size * 0.5f;
+				var positionZ = Math.Snap(data.position.z, texelSize) - data.position.z - data.settings.Size * 0.5f;
 				pass.SetVector("_PatchScaleOffset", new Vector4(data.settings.Size / (float)data.settings.CellCount, data.settings.Size / (float)data.settings.CellCount, positionX, positionZ));
 
 				pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);

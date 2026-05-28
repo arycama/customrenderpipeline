@@ -4,9 +4,7 @@ using UnityEngine.Rendering;
 
 public class PrecomputeDfg : FrameRenderFeature
 {
-	public override string ProfilerNameOverride => "Precompute Dfg";
-
-	private Material precomputeDfgMaterial;
+	private readonly Material precomputeDfgMaterial;
 	private readonly ResourceHandle<RenderTexture> precomputeDfg, directionalAlbedo, averageAlbedo, directionalAlbedoMs, averageAlbedoMs, specularOcclusion;
 
 	public PrecomputeDfg(RenderGraph renderGraph) : base(renderGraph)

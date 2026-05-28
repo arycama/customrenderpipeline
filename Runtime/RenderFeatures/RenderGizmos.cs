@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 
@@ -8,20 +9,20 @@ public class RenderGizmos : ViewRenderFeature
     {
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 #if UNITY_EDITOR
         if (!UnityEditor.Handles.ShouldRenderGizmos())
             return;
 
-        var preImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PreImageEffects);
-        var postImageEffects = viewRenderData.context.CreateGizmoRendererList(viewRenderData.camera, GizmoSubset.PostImageEffects);
-        var wireOverlay = viewRenderData.context.CreateWireOverlayRendererList(viewRenderData.camera);
-        var gizmosTarget = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true);
+        var preImageEffects = context.CreateGizmoRendererList(viewPassData.camera, GizmoSubset.PreImageEffects);
+        var postImageEffects = context.CreateGizmoRendererList(viewPassData.camera, GizmoSubset.PostImageEffects);
+        var wireOverlay = context.CreateWireOverlayRendererList(viewPassData.camera);
+        var gizmosTarget = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true);
 
         var size = renderGraph.RtHandleSystem.ScreenSize;
-        //var viewport = new Rect(0, 0, viewRenderData.viewSize.x, viewRenderData.viewSize.y);
-        var viewport = new Rect(0, size.y - viewRenderData.viewSize.y, viewRenderData.viewSize.x, viewRenderData.viewSize.y);
+        //var viewport = new Rect(0, 0, viewPassData.viewSize.x, viewPassData.viewSize.y);
+        var viewport = new Rect(0, size.y - viewPassData.viewSize.y, viewPassData.viewSize.x, viewPassData.viewSize.y);
 
         using var pass = renderGraph.AddGenericRenderPass("Render Gizmos", (preImageEffects, postImageEffects, wireOverlay, gizmosTarget, viewport));
         pass.WriteTexture(gizmosTarget);

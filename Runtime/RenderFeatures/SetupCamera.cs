@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
-using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class SetupCamera : ViewRenderFeature
 {
@@ -16,21 +16,21 @@ public class SetupCamera : ViewRenderFeature
         this.sky = sky;
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
         var rawJitter = renderGraph.GetResource<TemporalAASetupData>().jitter;
 
-        var jitter = 2.0f * rawJitter / (Float2)viewRenderData.viewSize;
+        var jitter = 2.0f * rawJitter / (Float2)viewPassData.viewSize;
 
-        var near = viewRenderData.near;
-        var far = viewRenderData.far;
-        var viewPosition = viewRenderData.transform.position;
-        var viewRotation = viewRenderData.transform.rotation;
+        var near = viewPassData.near;
+        var far = viewPassData.far;
+        var viewPosition = viewPassData.position;
+        var viewRotation = viewPassData.rotation;
 
         // Matrices
         // Screen
-        var screenToPixel = Float4x4.Scale(new Float3((Float2)viewRenderData.viewSize, 1));
-        var pixelToScreen = Float4x4.Scale(new Float3(1 / (Float2)viewRenderData.viewSize, 1));
+        var screenToPixel = Float4x4.Scale(new Float3((Float2)viewPassData.viewSize, 1));
+        var pixelToScreen = Float4x4.Scale(new Float3(1 / (Float2)viewPassData.viewSize, 1));
 
         // Clip
         var clipToScreen = Float4x4.ScaleOffset(new Float3(0.5f, -0.5f, 1), new Float2(0.5f, 0).xxy);
@@ -39,15 +39,15 @@ public class SetupCamera : ViewRenderFeature
         var pixelToClip = screenToClip.Mul(pixelToScreen);
 
         // View
-        var viewToNonJitteredClip = Float4x4.PerspectiveReverseZ(viewRenderData.tanHalfFov, near, far);
-        var nonJitteredClipToView = Float4x4.PerspectiveReverseZInverse(viewRenderData.tanHalfFov, near, far);
+        var viewToNonJitteredClip = Float4x4.PerspectiveReverseZ(viewPassData.tanHalfFov, near, far);
+        var nonJitteredClipToView = Float4x4.PerspectiveReverseZInverse(viewPassData.tanHalfFov, near, far);
 
         var viewToClip = viewToNonJitteredClip;
         viewToClip.m02 = jitter.x;
         viewToClip.m12 = jitter.y;
         var clipToView = nonJitteredClipToView;
-        clipToView.m03 = viewRenderData.tanHalfFov.x * jitter.x;
-        clipToView.m13 = viewRenderData.tanHalfFov.y * jitter.y;
+        clipToView.m03 = viewPassData.tanHalfFov.x * jitter.x;
+        clipToView.m13 = viewPassData.tanHalfFov.y * jitter.y;
 
         var viewToScreen = clipToScreen.Mul(viewToClip);
         var screenToView = clipToView.Mul(screenToClip);
@@ -71,28 +71,28 @@ public class SetupCamera : ViewRenderFeature
         // Previous frame matrices
         // Need to manually flip this since we're trying to match previous clip space but the renderer won't automatically flip since there's no viewport transform
         var viewToNonJitteredScreen = clipToScreen.Mul(viewToNonJitteredClip);
-        if (!previousCameraTransform.TryGetValue(viewRenderData.viewId, out var previousTransform))
+        if (!previousCameraTransform.TryGetValue(viewPassData.viewId, out var previousTransform))
             previousTransform = (viewPosition, viewRotation, viewToNonJitteredScreen);
 
-        previousCameraTransform[viewRenderData.viewId] = (viewPosition, viewRotation, viewToNonJitteredScreen);
+        previousCameraTransform[viewPassData.viewId] = (viewPosition, viewRotation, viewToNonJitteredScreen);
 
         var worldToPreviousView = Float4x4.WorldToLocal(previousTransform.Item1 - viewPosition, previousTransform.Item2);
         var worldToPreviousScreen = previousTransform.Item3.Mul(worldToPreviousView);
-        var pixelToWorldDir = Float4x4.PixelToWorldViewDirectionMatrix(viewRenderData.viewSize, jitter, viewRenderData.tanHalfFov, viewToWorld, true, false);
+        var pixelToWorldDir = Float4x4.PixelToWorldViewDirectionMatrix(viewPassData.viewSize, jitter, viewPassData.tanHalfFov, viewToWorld, true, false);
 
         // TODO: I think this is similar to pixel to world view dir matrix, maybe make a shared function
         var pixelToViewScaleOffset = new Float4
-        (viewRenderData.tanHalfFov.x * 2.0f / viewRenderData.viewSize.x,
-        -viewRenderData.tanHalfFov.y * 2.0f / viewRenderData.viewSize.y,
-        -viewRenderData.tanHalfFov.x * (1.0f - jitter.x),
-        viewRenderData.tanHalfFov.y * (1.0f - jitter.y));
+        (viewPassData.tanHalfFov.x * 2.0f / viewPassData.viewSize.x,
+        -viewPassData.tanHalfFov.y * 2.0f / viewPassData.viewSize.y,
+        -viewPassData.tanHalfFov.x * (1.0f - jitter.x),
+        viewPassData.tanHalfFov.y * (1.0f - jitter.y));
 
-        if (!previousTimeCache.TryGetValue(viewRenderData.viewId, out var previousTime))
+        if (!previousTimeCache.TryGetValue(viewPassData.viewId, out var previousTime))
             previousTime = 0f;
 
         var timeData = renderGraph.GetResource<TimeData>();
         var renderDeltaTime = (float)(timeData.time - previousTime);
-        previousTimeCache[viewRenderData.viewId] = timeData.time;
+        previousTimeCache[viewPassData.viewId] = timeData.time;
 
         // TODO: could make some of these float3's and pack with another float
         var data = new ViewDataStruct
@@ -126,21 +126,21 @@ public class SetupCamera : ViewRenderFeature
 
             viewPosition,
             viewPosition.y + sky.PlanetRadius * sky.EarthScale,
-            new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (-1 + -jitter.x), viewRenderData.tanHalfFov.y * (-1 + -jitter.y), 1.0f)), 0),
-            new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (-1 + -jitter.x), viewRenderData.tanHalfFov.y * (3 + -jitter.y), 1.0f)), 0),
-            new Float4(viewRotation.Rotate(new Float3(viewRenderData.tanHalfFov.x * (3 + -jitter.x), viewRenderData.tanHalfFov.y * (-1 + -jitter.y), 1.0f)), 0),
+            new Float4(viewRotation.Rotate(new Float3(viewPassData.tanHalfFov.x * (-1 + -jitter.x), viewPassData.tanHalfFov.y * (-1 + -jitter.y), 1.0f)), 0),
+            new Float4(viewRotation.Rotate(new Float3(viewPassData.tanHalfFov.x * (-1 + -jitter.x), viewPassData.tanHalfFov.y * (3 + -jitter.y), 1.0f)), 0),
+            new Float4(viewRotation.Rotate(new Float3(viewPassData.tanHalfFov.x * (3 + -jitter.x), viewPassData.tanHalfFov.y * (-1 + -jitter.y), 1.0f)), 0),
             (far - near) * Math.Rcp(near * far),
             Math.Rcp(far),
             near,
             far,
-            (float)viewRenderData.viewSize.x,
-            (float)viewRenderData.viewSize.y,
-            Math.Rcp(viewRenderData.viewSize.x),
-            Math.Rcp(viewRenderData.viewSize.y),
-            viewRenderData.viewSize.x - 1,
-            viewRenderData.viewSize.y - 1,
-            viewRenderData.camera.aspect,
-            viewRenderData.tanHalfFov.y,
+            (float)viewPassData.viewSize.x,
+            (float)viewPassData.viewSize.y,
+            Math.Rcp(viewPassData.viewSize.x),
+            Math.Rcp(viewPassData.viewSize.y),
+            viewPassData.viewSize.x - 1,
+            viewPassData.viewSize.y - 1,
+            viewPassData.tanHalfFov.x / viewPassData.tanHalfFov.y,
+            viewPassData.tanHalfFov.y,
             pixelToViewScaleOffset,
             renderDeltaTime,
             previousTransform.Item1,
@@ -152,7 +152,7 @@ public class SetupCamera : ViewRenderFeature
         var size = UnsafeUtility.SizeOf<ViewDataStruct>();
         var buffer = renderGraph.GetBuffer(1, size, GraphicsBuffer.Target.Constant);
 
-        using var pass = renderGraph.AddGenericRenderPass("Set View Data Constant Buffer", (data, buffer, size, previousViewScaleLimit, viewRenderData.viewId, viewRenderData.viewSize, renderGraph.RtHandleSystem));
+        using var pass = renderGraph.AddGenericRenderPass("Set View Data Constant Buffer", (data, buffer, size, previousViewScaleLimit, viewPassData.viewId, viewPassData.viewSize, renderGraph.RtHandleSystem));
         pass.WriteBuffer("", buffer);
         pass.SetRenderFunction(static (command, pass, data) =>
         {

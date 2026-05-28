@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 public partial class VolumetricClouds : ViewRenderFeature
 {
@@ -26,27 +27,27 @@ public partial class VolumetricClouds : ViewRenderFeature
         cloudTransmittanceTextureCache.Dispose();
 	}
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
         if (settings.WeatherMapStrength == 0 && settings.HighAltitudeMapStrength == 0)
             return;
 
 		renderGraph.AddProfileBeginPass("Clouds");
 
-        var cloudLuminanceTemp = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
-        var cloudTransmittanceTemp = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_UNorm, isScreenTexture: true);
-        var cloudDepth = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
+        var cloudLuminanceTemp = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+        var cloudTransmittanceTemp = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16_UNorm, isScreenTexture: true);
+        var cloudDepth = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16_SFloat, isScreenTexture: true);
 		var time = (float)renderGraph.GetResource<TimeData>().time;
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Render", (settings, time)))
 		{
-			pass.Initialize(material, viewRenderData.viewSize, 1, 4, 1, isScreenPass: true);
+			pass.Initialize(material, viewPassData.viewSize, 1, 4, 1, isScreenPass: true);
 
             pass.PreventNewSubPass = true;
 
 			// Determine pass
 			var keyword = string.Empty;
-			var viewHeight1 = viewRenderData.transform.position.y;
+			var viewHeight1 = viewPassData.position.y;
 			if (viewHeight1 > settings.StartHeight)
 			{
 				if (viewHeight1 > settings.StartHeight + settings.LayerThickness)
@@ -91,20 +92,20 @@ public partial class VolumetricClouds : ViewRenderFeature
 			settings.DepthThreshold,
 			luminanceHistory, 
 			transmittanceHistory,
-			viewRenderData.viewSize,
+			viewPassData.viewSize,
 			skySettings,
 			settings,
 			time
 		)))
 		{
-			(luminanceCurrent, luminanceHistory, luminanceWasCreated) = cloudLuminanceTextureCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
-			(transmittanceCurrent, transmittanceHistory, transmittanceWasCreated) = cloudTransmittanceTextureCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+			(luminanceCurrent, luminanceHistory, luminanceWasCreated) = cloudLuminanceTextureCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+			(transmittanceCurrent, transmittanceHistory, transmittanceWasCreated) = cloudTransmittanceTextureCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
 
 			pass.renderData.luminanceWasCreated = luminanceWasCreated;
 			pass.renderData.luminanceHistory = luminanceHistory;
 			pass.renderData.transmittanceHistory = transmittanceHistory;
 
-			pass.Initialize(material, viewRenderData.viewSize, 1, 5, isScreenPass: true);
+			pass.Initialize(material, viewPassData.viewSize, 1, 5, isScreenPass: true);
 
             pass.PreventNewSubPass = true;
 

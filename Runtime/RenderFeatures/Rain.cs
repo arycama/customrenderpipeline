@@ -41,7 +41,7 @@ public class Rain : ViewRenderFeature
 		}
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		var dropletCount = (int)(settings.DropletCount * settings.WetLevel * (4.0f / 3.0f) * Math.Pi * Math.Pow(settings.Radius, 3));
 		if (settings.Material == null || dropletCount == 0)
@@ -110,7 +110,7 @@ public class Rain : ViewRenderFeature
 		// TODO: Index buffer, but make some common function to build/get an index buffer 
 		using (var pass = renderGraph.AddDrawProceduralIndexedRenderPass("Render", (dropletCount, settings.Radius, settings.Velocity, settings.WindAngle, settings.WindStrength, settings.WindTurbulence)))
 		{
-			pass.Initialize(indexBuffer, settings.Material, Float4x4.Identity, viewRenderData.viewSize, viewRenderData.viewCount);
+			pass.Initialize(indexBuffer, settings.Material, Float4x4.Identity, viewPassData.viewSize, viewPassData.viewCount);
             pass.PreventNewSubPass = true;
 
 			pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepth);

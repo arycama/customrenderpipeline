@@ -2,21 +2,21 @@
 
 public readonly struct ShadowRequest
 {
-    public int LightIndex { get; }
-    public Float4x4 ViewMatrix { get; }
-    public Float4x4 ProjectionMatrix { get; }
+    public readonly int LightIndex;
+    public readonly Float4x4 ViewMatrix;
+    public readonly Float4x4 ProjectionMatrix;
     // TODO: This is only used for culling planes, maybe replace?
-    public ShadowSplitData ShadowSplitData { get; }
-    public int CubemapFace { get; }
-    public Float3 LightPosition { get; }
-    public bool HasCasters { get; }
-    public float Near { get; }
-    public float Far { get; }
-    public Float3 ViewPosition { get; }
-    public Quaternion ViewRotation { get; }
-    public float Width { get; }
-    public float Height { get; }
-    public Int2 Resolution { get; }
+    public readonly ShadowSplitData ShadowSplitData;
+    public readonly int CubemapFace;
+    public readonly Float3 LightPosition;
+    public readonly bool HasCasters;
+    public readonly float Near;
+    public readonly float Far;
+    public readonly Float3 ViewPosition;
+    public readonly Quaternion ViewRotation;
+    public readonly float Width;
+    public readonly float Height;
+    public readonly Int2 Resolution;
 
     public ShadowRequest(int lightIndex, Float4x4 viewMatrix, Float4x4 projectionMatrix, ShadowSplitData shadowSplitData, int cubemapFace, Float3 lightPosition, bool hasCasters, float near, float far, Float3 viewPosition, Quaternion viewRotation, float width, float height, Int2 resolution)
     {

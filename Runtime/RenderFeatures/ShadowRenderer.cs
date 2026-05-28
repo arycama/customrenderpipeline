@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
@@ -21,7 +22,7 @@ public class ShadowRenderer : ViewRenderFeature
 		this.gpuDrivenRenderer = gpuDrivenRenderer;
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		using var renderShadowsScope = renderGraph.AddProfileScope("Render Shadows");
 
@@ -53,7 +54,7 @@ public class ShadowRenderer : ViewRenderFeature
 				using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
 				{
 					var request = requestData.directionalShadowRequests[i];
-					RenderShadowMap(request, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false, false, viewRenderData, cullingResults, settings.DirectionalShadowResolution, settings.DirectionalCascadeCount);
+					RenderShadowMap(request, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false, viewPassData, cullingResults, settings.DirectionalShadowResolution, settings.DirectionalCascadeCount, viewParameters, displayOutputData, context);
 				}
 			}
 
@@ -84,7 +85,7 @@ public class ShadowRenderer : ViewRenderFeature
 				using (renderGraph.AddProfileScope(pointLightIds[i]))
 				{
 					var request = requestData.pointShadowRequests[i];
-                    RenderShadowMap(request, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, true, viewRenderData, cullingResults, settings.PointShadowResolution, pointShadowCount);
+                    RenderShadowMap(request, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, viewPassData, cullingResults, settings.PointShadowResolution, pointShadowCount, viewParameters, displayOutputData, context);
 				}
 			}
 			ListPool<ShadowRequest>.Release(requestData.pointShadowRequests);
@@ -114,7 +115,7 @@ public class ShadowRenderer : ViewRenderFeature
 				using (renderGraph.AddProfileScope(SpotLightIds[i]))
 				{
 					var request = requestData.spotShadowRequests[i];
-                    RenderShadowMap(request, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, false, viewRenderData, cullingResults, settings.SpotShadowResolution, spotShadowCount);
+                    RenderShadowMap(request, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, viewPassData, cullingResults, settings.SpotShadowResolution, spotShadowCount, viewParameters, displayOutputData, context);
 				}
 			}
 
@@ -124,39 +125,38 @@ public class ShadowRenderer : ViewRenderFeature
         renderGraph.SetResource(new ShadowData(directionalShadows, pointShadows, spotShadows));
     }
 
-    void RenderShadowMap(ShadowRequest request, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool flipY, bool zClip, bool isPointLight, ViewRenderData viewRenderData, CullingResults cullingResults, Int2 resolution, int viewCount)
+    void RenderShadowMap(in ShadowRequest request, ResourceHandle<RenderTexture> target, int index, float bias, float slopeBias, bool zClip, bool isPointLight, in ViewPassData viewPassData, in CullingResults cullingResults, Int2 resolution, int viewCount, in ReadOnlySpan<ViewParameter> viewParameters, in DisplayData displayOutputData, ScriptableRenderContext context)
 	{
-		var perCascadeData = renderGraph.SetConstantBuffer(new RenderShadowMapData(request.ViewMatrix, request.ProjectionMatrix.Mul(request.ViewMatrix), request.ProjectionMatrix, viewRenderData.transform.position, request.Near, request.LightPosition, request.Far, request.ViewRotation.Forward, 0));
+		var perCascadeData = renderGraph.SetConstantBuffer(new RenderShadowMapData(request.ViewMatrix, request.ProjectionMatrix.Mul(request.ViewMatrix), request.ProjectionMatrix, viewPassData.position, request.Near, request.LightPosition, request.Far, request.ViewRotation.Forward, 0));
 		var shadowRequestData = new ShadowRequestData(request, bias, slopeBias, target, index, perCascadeData, zClip);
 
         renderGraph.SetResource(shadowRequestData);
-        terrainShadowRenderer.Render(viewRenderData);
+        terrainShadowRenderer.Render(viewParameters, viewPassData, displayOutputData, context);
 		if (request.HasCasters)
 		{
-			using (var pass = renderGraph.AddShadowRenderPass("Render Shadow"))
-			{
-				pass.Initialize(viewRenderData.context, cullingResults, request.LightIndex, bias, slopeBias, zClip, isPointLight, resolution, viewCount);
-				pass.DepthSlice = index;
-				pass.WriteDepth(target);
-				pass.ReadResource<ShadowRequestData>();
-			}
-		}
+            using var pass = renderGraph.AddShadowRenderPass("Render Shadow");
 
-		gpuDrivenRenderer.RenderShadow(viewRenderData.transform.position, shadowRequestData, viewRenderData.viewSize);
+            pass.Initialize(context, cullingResults, request.LightIndex, bias, slopeBias, zClip, isPointLight, resolution, viewCount);
+            pass.DepthSlice = index;
+            pass.WriteDepth(target);
+            pass.ReadResource<ShadowRequestData>();
+        }
+
+		gpuDrivenRenderer.RenderShadow(viewPassData.position, shadowRequestData, viewPassData.viewSize);
     }
 }
 
-internal struct RenderShadowMapData
+public readonly struct RenderShadowMapData
 {
-    public Float4x4 ViewMatrix;
-    public Float4x4 Item2;
-    public Float4x4 viewToShadowClip;
-    public Float3 position;
-    public float Near;
-    public Float3 LightPosition;
-    public float Far;
-    public Float3 Forward;
-    public int Item9;
+    public readonly Float4x4 ViewMatrix;
+    public readonly Float4x4 Item2;
+    public readonly Float4x4 viewToShadowClip;
+    public readonly Float3 position;
+    public readonly float Near;
+    public readonly Float3 LightPosition;
+    public readonly float Far;
+    public readonly Float3 Forward;
+    public readonly int Item9;
 
     public RenderShadowMapData(Float4x4 viewMatrix, Float4x4 item2, Float4x4 viewToShadowClip, Float3 position, float near, Float3 lightPosition, float far, Float3 forward, int item9)
     {

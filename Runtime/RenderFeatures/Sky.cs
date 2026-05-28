@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
@@ -28,16 +29,18 @@ public partial class Sky : ViewRenderFeature
         weightCache.Dispose();
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		renderGraph.AddProfileBeginPass("Sky");
 
-		var skyTemp = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+		var skyTemp = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true);
+        var viewSize = viewPassData.viewSize;
+
         void RenderPass(string passName)
         {
             using (var pass = renderGraph.AddFullscreenRenderPass("Render Sky", settings.RenderSamples))
             {
-                pass.Initialize(skyMaterial, viewRenderData.viewSize, 1, skyMaterial.FindPass(passName), isScreenPass: true);
+                pass.Initialize(skyMaterial, viewSize, 1, skyMaterial.FindPass(passName), isScreenPass: true);
                 pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
                 pass.WriteTexture(skyTemp);
 
@@ -70,15 +73,15 @@ public partial class Sky : ViewRenderFeature
 		ResourceHandle<RenderTexture> current, history = default;
 
 		// Reprojection+combine
-		using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", (history, wasCreated, settings.StationaryBlend, settings.MotionBlend, settings.MotionFactor, settings.DepthFactor, settings.ClampWindow, settings.MaxFrameCount, viewRenderData.viewSize, settings.StarMap, settings.StarExposure)))
+		using (var pass = renderGraph.AddFullscreenRenderPass("Temporal", (history, wasCreated, settings.StationaryBlend, settings.MotionBlend, settings.MotionFactor, settings.DepthFactor, settings.ClampWindow, settings.MaxFrameCount, viewPassData.viewSize, settings.StarMap, settings.StarExposure)))
 		{
-			(current, history, wasCreated) = textureCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
-            var (weightCurrent, weightHistory, weightWasCreated) = weightCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+			(current, history, wasCreated) = textureCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
+            var (weightCurrent, weightHistory, weightWasCreated) = weightCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
 
             pass.renderData.history = history;
 			pass.renderData.wasCreated = wasCreated;
 
-			pass.Initialize(skyMaterial, viewRenderData.viewSize, 1, skyMaterial.FindPass("Temporal"), isScreenPass: true);
+			pass.Initialize(skyMaterial, viewPassData.viewSize, 1, skyMaterial.FindPass("Temporal"), isScreenPass: true);
             pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteRtHandle<CameraTarget>();
 			pass.WriteTexture(current);

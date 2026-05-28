@@ -88,7 +88,7 @@ public static class RenderGraphExtensions
         return renderGraph.BufferHandleSystem.GetResourceHandle(new BufferHandleDescriptor(count, stride, target, usageFlags), isPersistent);
     }
 
-    public static void SetResource<T>(this RenderGraph renderGraph, T resource, bool isPersistent = false) where T : struct, IRenderPassData
+    public static void SetResource<T>(this RenderGraph renderGraph, in T resource, bool isPersistent = false) where T : struct, IRenderPassData
     {
         Assert.IsFalse(renderGraph.IsExecuting);
         renderGraph.ResourceMap.SetRenderPassData(resource, renderGraph.FrameIndex, isPersistent);
@@ -113,7 +113,7 @@ public static class RenderGraphExtensions
         return resource;
     }
 
-    public static ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(this RenderGraph renderGraph, T data) where T : unmanaged
+    public static ResourceHandle<GraphicsBuffer> SetConstantBuffer<T>(this RenderGraph renderGraph, in T data) where T : unmanaged
     {
         Assert.IsFalse(renderGraph.IsExecuting);
         Assert.AreEqual(0, UnsafeUtility.SizeOf<T>() % 4, "ConstantBuffer size must be a multiple of 4 bytes");

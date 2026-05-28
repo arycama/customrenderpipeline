@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
 
@@ -8,9 +9,9 @@ public class TerrainRenderer : TerrainRendererBase
 	{
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
-        if (viewRenderData.camera.cameraType == CameraType.Preview)
+        if (viewPassData.cameraType == CameraType.Preview)
             return;
 
         // Ensure terrain system data is set
@@ -28,7 +29,7 @@ public class TerrainRenderer : TerrainRendererBase
 
 		// Used by tessellation to calculate lod
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
-		var passData = Cull(viewRenderData.transform.position, cullingPlanes, viewRenderData.viewSize);
+		var passData = Cull(viewPassData.position, cullingPlanes, viewPassData.viewSize);
 		var passIndex = settings.Material.FindPass("Terrain");
 		Assert.IsFalse(passIndex == -1, "Terrain Material has no Terrain Pass");
 
@@ -37,7 +38,7 @@ public class TerrainRenderer : TerrainRendererBase
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Terrain Render", cullingPlanes))
 		{
             pass.UseProfiler = false;
-            pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, viewRenderData.viewSize, 1, MeshTopology.Quads, passIndex, isScreenPass: true);
+            pass.Initialize(settings.Material, terrainSystemData.indexBuffer, passData.IndirectArgsBuffer, viewPassData.viewSize, 1, MeshTopology.Quads, passIndex, isScreenPass: true);
             pass.WriteRtHandleDepth<CameraDepth>();
 			pass.ReadBuffer("PatchData", passData.PatchDataBuffer);
 
@@ -67,7 +68,7 @@ public class TerrainRenderer : TerrainRendererBase
 		{
             pass.UseProfiler = false;
 			var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
-			pass.Initialize("Terrain", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonOpaque, isScreenPass: true);
+			pass.Initialize("Terrain", context, cullingResults, RenderQueueRange.opaque, viewPassData.viewSize, viewPassData.position, viewPassData.rotation, viewPassData.sortAxis, viewPassData.distanceMetric, SortingCriteria.CommonOpaque, isScreenPass: true);
             pass.WriteRtHandleDepth<CameraDepth>();
 			pass.ReadResource<ViewData>();
 		}

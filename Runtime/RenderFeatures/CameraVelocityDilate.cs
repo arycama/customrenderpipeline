@@ -1,5 +1,7 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 public class CameraVelocityDilate : ViewRenderFeature
 {
@@ -12,15 +14,15 @@ public class CameraVelocityDilate : ViewRenderFeature
         this.setings = setings;
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
         if (!setings.IsEnabled)
             return;
 
-        var result = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R16G16_SFloat);
+        var result = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R16G16_SFloat);
         using (var pass = renderGraph.AddFullscreenRenderPass("Velocity Dilate"))
         {
-            pass.Initialize(material, viewRenderData.viewSize, viewRenderData.viewCount, 1, isScreenPass: true);
+            pass.Initialize(material, viewPassData.viewSize, viewPassData.viewCount, 1, isScreenPass: true);
             pass.WriteTexture(result);
             pass.ReadRtHandle<CameraVelocity>();
             pass.ReadRtHandle<CameraDepth>();

@@ -23,7 +23,7 @@ public partial class LightingSetup : ViewRenderFeature
         splitBuffer.Dispose();
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 		var directionalShadowRequests = ListPool<ShadowRequest>.Get();
@@ -38,7 +38,7 @@ public partial class LightingSetup : ViewRenderFeature
         Quaternion lightRotation0 = Quaternion.Identity, lightRotation1 = Quaternion.Identity;
 		var dirLightCount = 0;
 
-		var n = viewRenderData.near;
+		var n = viewPassData.near;
 		var f = settings.DirectionalShadowDistance;
 		var m = (float)settings.DirectionalCascadeCount;
 		var c = Pow(Max(1e-3f, settings.CascadeUniformity), 2.2f);
@@ -63,7 +63,7 @@ public partial class LightingSetup : ViewRenderFeature
 
                     #if UNITY_EDITOR
                         // The default scene light only has an intensity of 1, set it to sun
-                        if (viewRenderData.camera.cameraType == CameraType.SceneView && !UnityEditor.SceneView.currentDrawingSceneView.sceneLighting || viewRenderData.camera.cameraType == CameraType.Preview)
+                        if (viewPassData.cameraType == CameraType.SceneView && !UnityEditor.SceneView.currentDrawingSceneView.sceneLighting || viewPassData.cameraType == CameraType.Preview)
                             lightColor0 *= 120000;
                     #endif
                 }
@@ -93,7 +93,8 @@ public partial class LightingSetup : ViewRenderFeature
 				{
                     // ref https://developer.nvidia.com/gpugems/gpugems3/part-ii-light-and-shadows/chapter-10-parallel-split-shadow-maps-programmable-gpus
                     var worldToView = Float4x4.Rotate(lightRotation.Inverse);
-                    var cameraToView = worldToView.Mul(viewRenderData.camera.transform.localToWorldMatrix);
+                    var cameraToWorld = Float4x4.TRS(viewPassData.position, viewPassData.rotation, 1);
+                    var cameraToView = worldToView.Mul(cameraToWorld);
 
 					float GetFrustumDepth(int j)
 					{
@@ -112,7 +113,7 @@ public partial class LightingSetup : ViewRenderFeature
 						var far = GetFrustumDepth(j + 1);
 
                         // TODO: Can this be done in camera relative space to simplify, since we need the final viewProj matrix in camera relative space anyway? Though culling planes need to be in world space
-                        var viewBounds = Geometry.GetFrustumBounds(viewRenderData.tanHalfFov, near, far, cameraToView);
+                        var viewBounds = Geometry.GetFrustumBounds(viewPassData.tanHalfFov, near, far, cameraToView);
                         var viewToClip = Float4x4.OrthoReverseZ(-viewBounds.extents.x, viewBounds.extents.x, -viewBounds.extents.y, viewBounds.extents.y, 0, viewBounds.Size.z);
 
                         var worldViewPosition = viewBounds.center;
@@ -123,7 +124,7 @@ public partial class LightingSetup : ViewRenderFeature
 
                         var shadowSplitData = CalculateShadowSplitData(viewToClip.Mul(worldToCascade), lightRotation.Forward, true);
 
-                        var cameraInverseTranslation = Float4x4.Translate(viewRenderData.camera.transform.position);
+                        var cameraInverseTranslation = Float4x4.Translate(viewPassData.position);
                         worldToCascade = worldToCascade.Mul(cameraInverseTranslation);
 
                         directionalShadowRequests.Add(new(i, worldToCascade, viewToClip, shadowSplitData, -1, Float3.Zero, hasShadowBounds, 0, viewBounds.Size.z, worldViewPosition, lightRotation, viewBounds.Size.x, viewBounds.Size.y, settings.DirectionalShadowResolution));
@@ -155,7 +156,7 @@ public partial class LightingSetup : ViewRenderFeature
 						var shadowSplitData = CalculateShadowSplitData(worldToClip, forward, false);
 
                         // Convert to camera relative
-                        var cameraInverseTranslation = Float4x4.Translate(viewRenderData.camera.transform.position);
+                        var cameraInverseTranslation = Float4x4.Translate(viewPassData.position);
                         worldToView = worldToView.Mul(cameraInverseTranslation);
 
 						pointShadowRequests.Add(new(i, worldToView, viewToClip, shadowSplitData, j, lightPosition, hasShadowBounds, light.shadowNearPlane, light.range, lightPosition, lightRotation, 1, 1, settings.PointShadowResolution));
@@ -172,7 +173,7 @@ public partial class LightingSetup : ViewRenderFeature
 					var shadowSplitData = CalculateShadowSplitData(worldToClip, light.transform.forward, false);
 
                     // Convert to camera relative
-                    var cameraInverseTranslation = Float4x4.Translate(viewRenderData.camera.transform.position);
+                    var cameraInverseTranslation = Float4x4.Translate(viewPassData.position);
                     worldToView = worldToView.Mul(cameraInverseTranslation);
 
 					shadowIndex = (uint)spotShadowRequests.Count;
@@ -222,7 +223,7 @@ public partial class LightingSetup : ViewRenderFeature
 			}
 
 			var pointLightData = new LightData(
-				lightToWorld.Translation - viewRenderData.transform.position,
+				lightToWorld.Translation - viewPassData.position,
 				light.range,
 				ColorspaceUtility.Rec709ToRec2020(visibleLight.finalColor.Float3()),
 				(uint)light.type,
@@ -253,7 +254,7 @@ public partial class LightingSetup : ViewRenderFeature
             splitBuffer = splitBuffer.AsArray()
         };
 
-        viewRenderData.context.CullShadowCasters(cullingResults, infos);
+        context.CullShadowCasters(cullingResults, infos);
 
 		// Set final matrices
 		var directionalShadowMatricesBuffer = renderGraph.GetBuffer(Max(1, directionalShadowMatrices.Count), UnsafeUtility.SizeOf<Float3x4>());

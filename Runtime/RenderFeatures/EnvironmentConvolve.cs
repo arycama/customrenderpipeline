@@ -1,11 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 public class EnvironmentConvolve : ViewRenderFeature
 {
-    public override string ProfilerNameOverride => "Ggx Convolve";
-
     private readonly Material convolveMaterial;
     private readonly EnvironmentLightingSettings settings;
     private readonly Dictionary<int, (ResourceHandle<RenderTexture> reflection, ResourceHandle<GraphicsBuffer> ambient)> viewBuffers = new();
@@ -35,16 +35,16 @@ public class EnvironmentConvolve : ViewRenderFeature
         }
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
         ResourceHandle<RenderTexture> reflection;
         ResourceHandle<GraphicsBuffer> ambient;
-        var wasCreated = !viewBuffers.TryGetValue(viewRenderData.viewId, out var viewBuffer);
+        var wasCreated = !viewBuffers.TryGetValue(viewPassData.viewId, out var viewBuffer);
         if (wasCreated)
         {
             reflection = renderGraph.GetTexture(settings.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, isExactSize: true, isPersistent: true);
             ambient = renderGraph.GetBuffer(7, sizeof(float) * 4, GraphicsBuffer.Target.Constant | GraphicsBuffer.Target.CopyDestination, GraphicsBuffer.UsageFlags.None, true);
-            viewBuffers[viewRenderData.viewId] = (reflection, ambient);
+            viewBuffers[viewPassData.viewId] = (reflection, ambient);
         }
         else
         {
@@ -52,9 +52,9 @@ public class EnvironmentConvolve : ViewRenderFeature
             ambient = viewBuffer.ambient;
         }
 
-        if (viewIndexGenerationCounter.TryGetValue(viewRenderData.viewId, out var viewIndexGeneration) && viewIndexGeneration.requested > viewIndexGeneration.current)
+        if (viewIndexGenerationCounter.TryGetValue(viewPassData.viewId, out var viewIndexGeneration) && viewIndexGeneration.requested > viewIndexGeneration.current)
         {
-            viewIndexGenerationCounter[viewRenderData.viewId] = (viewIndexGeneration.requested, viewIndexGeneration.requested);
+            viewIndexGenerationCounter[viewPassData.viewId] = (viewIndexGeneration.requested, viewIndexGeneration.requested);
 
             var reflectionProbeTemp = renderGraph.GetResource<EnvironmentProbeTempResult>();
             using var scope = renderGraph.AddProfileScope("Environment Probe Convolve");

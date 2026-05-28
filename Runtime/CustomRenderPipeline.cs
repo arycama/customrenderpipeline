@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using static Math;
+using System;
+
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -71,14 +73,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         terrainSystem,
         virtualTextureUpdate,
 
-        new GenericFrameRenderFeature(renderGraph, "", context =>
-        {
-            QualitySettings.maxQueuedFrames = asset.MaxQueuedFrames;
-        }),
-
         new RaytracingSystem(renderGraph, asset.RayTracingSettings),
 
-        new GenericFrameRenderFeature(renderGraph, "Per Frame Data", context =>
+        new GenericFrameRenderFeature(renderGraph, (ScriptableRenderContext context) =>
         {
             var overlayMatrix = Float4x4.Ortho(-Screen.width / 2f, Screen.width / 2f, -Screen.height / 2f, Screen.height / 2f, 0, 1);
             overlayMatrix = GL.GetGPUProjectionMatrix(overlayMatrix, false);
@@ -151,33 +148,23 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
     protected override List<ViewRenderFeature> InitializePerCameraRenderFeatures() => new()
     {
-        new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        new GenericViewRenderFeature(renderGraph, (in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context) =>
         {
-			// For text mesh pro, cbfed rewriting all their shaders
-			// viewRenderData.context.SetupCameraProperties(viewRenderData.camera);
-
-#if UNITY_EDITOR
-			if (viewRenderData.camera.cameraType == CameraType.SceneView)
-                ScriptableRenderContext.EmitWorldGeometryForSceneView(viewRenderData.camera);
-            else
-#endif
-			ScriptableRenderContext.EmitGeometryForCamera(viewRenderData.camera);
-
-            var cullingParameters = viewRenderData.cullingParameters;
+            var cullingParameters = viewPassData.cullingParameters;
             cullingParameters.shadowDistance = asset.LightingSettings.DirectionalShadowDistance;
             cullingParameters.cullingOptions = CullingOptions.NeedsLighting | CullingOptions.DisablePerObjectCulling | CullingOptions.ShadowCasters;
 
-            renderGraph.SetResource(new CullingResultsData(viewRenderData.context.Cull(ref cullingParameters)));
+            renderGraph.SetResource(new CullingResultsData(context.Cull(ref cullingParameters)));
         }),
 
         new TemporalAASetup(renderGraph, asset.TemporalAASettings),
         new AutoExposurePreRender(renderGraph, asset.ColorGrading, asset.LensSettings, asset.AutoExposureSettings),
         new SetupCamera(renderGraph, asset.Sky),
 
-        new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        new GenericViewRenderFeature(renderGraph, (in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context) =>
         {
             using var pass = renderGraph.AddGenericRenderPass("Target Setup");
-                var (cameraDepth, previousDepthCopy, cameraDepthCreated) = cameraDepthCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+                var (cameraDepth, previousDepthCopy, cameraDepthCreated) = cameraDepthCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
 
                 renderGraph.SetRTHandle<CameraDepth>(cameraDepth, subElement: RenderTextureSubElement.Depth);
                 renderGraph.SetRTHandle<CameraStencil>(cameraDepth, subElement: RenderTextureSubElement.Stencil);
@@ -186,17 +173,17 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 
         new SetTerrainViewData(renderGraph, terrainSystem, asset.TerrainSettings),
         new TerrainRenderer(renderGraph, asset.TerrainSettings, quadtreeCull),
-        new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        new GenericViewRenderFeature(renderGraph, (in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context) =>
         {
             using var pass = renderGraph.AddObjectRenderPass("GBuffer");
 
-            renderGraph.SetRTHandle<CameraTarget>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true, clear: true, hasMips: true));
-            renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
-            renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
-            renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
+            renderGraph.SetRTHandle<CameraTarget>(renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true, clear: true, hasMips: true));
+            renderGraph.SetRTHandle<GBufferAlbedoMetallic>(renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true));
+            renderGraph.SetRTHandle<GBufferNormalRoughness>(renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
+            renderGraph.SetRTHandle<GBufferBentNormalOcclusion>(renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.A2B10G10R10_UNormPack32, isScreenTexture: true));
 
             var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
-            pass.Initialize("Deferred", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonOpaque, PerObjectData.None, true, isScreenPass: true);
+            pass.Initialize("Deferred", context, cullingResults, RenderQueueRange.opaque, viewPassData.viewSize, viewPassData.position, viewPassData.rotation, viewPassData.sortAxis, viewPassData.distanceMetric, SortingCriteria.CommonOpaque, PerObjectData.None, true, isScreenPass: true);
             pass.WriteRtHandleDepth<CameraDepth>();
             pass.WriteRtHandle<GBufferAlbedoMetallic>();
             pass.WriteRtHandle<GBufferNormalRoughness>();
@@ -211,17 +198,17 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
             pass.ReadResource<TerrainViewData>(true);
         }),
 
-        new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        new GenericViewRenderFeature(renderGraph, (in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context) =>
         {
             using var pass = renderGraph.AddObjectRenderPass("Velocity");
 
-            var (velocity, previousVelocity, currentVelocityCreated) = cameraVelocityCache.GetTextures(viewRenderData.viewSize, pass.Index, viewRenderData.viewId);
+            var (velocity, previousVelocity, currentVelocityCreated) = cameraVelocityCache.GetTextures(viewPassData.viewSize, pass.Index, viewPassData.viewId);
             renderGraph.SetRTHandle<CameraVelocity>(velocity);
             renderGraph.SetRTHandle<PreviousCameraVelocity>(previousVelocity);
 
             var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
-            pass.Initialize("MotionVectors", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonOpaque, PerObjectData.MotionVectors, false, isScreenPass: true);
+            pass.Initialize("MotionVectors", context, cullingResults, RenderQueueRange.opaque, viewPassData.viewSize, viewPassData.position, viewPassData.rotation, viewPassData.sortAxis, viewPassData.distanceMetric, SortingCriteria.CommonOpaque, PerObjectData.MotionVectors, false, isScreenPass: true);
             pass.WriteRtHandleDepth<CameraDepth>();
             pass.WriteRtHandle<GBufferAlbedoMetallic>();
             pass.WriteRtHandle<GBufferNormalRoughness>();
@@ -241,7 +228,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new GenerateHiZ(renderGraph, GenerateHiZ.HiZMode.Max),
 
 		// This is just here to avoid memory leaks when GPU driven rendering isn't used.
-        new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        new GenericViewRenderFeature(renderGraph, (in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context) =>
         {
             using var pass = renderGraph.AddGenericRenderPass("HiZ Read Temp");
             pass.ReadRtHandle<HiZMaxDepth>();
@@ -256,19 +243,19 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new VirtualTerrainReadback(renderGraph, asset.TerrainSettings, virtualTextureUpdate),
 
 		// Decals
-		new GenericViewRenderFeature(renderGraph, viewRenderData =>
+		new GenericViewRenderFeature(renderGraph, (in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context) =>
         {
-            var decalAlbedo = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true, clear: true);
+            var decalAlbedo = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R8G8B8A8_SRGB, isScreenTexture: true, clear: true);
             renderGraph.SetRTHandle<DecalAlbedo>(decalAlbedo);
 
-            var decalNormal = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true, clear: true);
+            var decalNormal = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.R8G8B8A8_UNorm, isScreenTexture: true, clear: true);
             renderGraph.SetRTHandle<DecalNormal>(decalNormal);
 
             var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
 
             using var pass = renderGraph.AddObjectRenderPass("Decal");
 
-            pass.Initialize("Decal", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.opaque, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.QuantizedFrontToBack, PerObjectData.None, isScreenPass: true);
+            pass.Initialize("Decal", context, cullingResults, RenderQueueRange.opaque, viewPassData.viewSize, viewPassData.position, viewPassData.rotation, viewPassData.sortAxis, viewPassData.distanceMetric, SortingCriteria.QuantizedFrontToBack, PerObjectData.None, isScreenPass: true);
             pass.PreventNewSubPass = true;
             pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepth);
             pass.WriteTexture(decalAlbedo);
@@ -286,9 +273,9 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new DecalComposite(renderGraph),
 
         // Copy scene depth (Required for underwater lighting)
-		new GenericViewRenderFeature(renderGraph, viewRenderData =>
+		new GenericViewRenderFeature(renderGraph, (in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context) =>
         {
-            var cameraDepthCopy = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true);
+            var cameraDepthCopy = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.D32_SFloat_S8_UInt, isScreenTexture: true);
             renderGraph.SetRTHandle<CameraDepthCopy>(cameraDepthCopy, subElement: RenderTextureSubElement.Depth);
 
             // TODO: Could avoid this by using another depth texture for water.. will require some extra logic in other passes though
@@ -305,18 +292,18 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
         new WaterRenderer(renderGraph, asset.OceanSettings, quadtreeCull),
         new GenerateCameraVelocity(renderGraph),
 
-        new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        new GenericViewRenderFeature(renderGraph, (in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context) =>
         {
             // Generate mips for the reprojected previous frame
-            var (sceneColorCopy, previousSceneColorCopy, sceneColorCopyCreated) = sceneColorCache.GetTextures(viewRenderData.viewSize, renderGraph.RenderPassCount, viewRenderData.viewId);
+            var (sceneColorCopy, previousSceneColorCopy, sceneColorCopyCreated) = sceneColorCache.GetTextures(viewPassData.viewSize, renderGraph.RenderPassCount, viewPassData.viewId);
 
             // Set current copy as rt handle for later access
             renderGraph.SetRTHandle<SceneColorCopy>(sceneColorCopy);
 
-            var sceneColor = renderGraph.GetTexture(viewRenderData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true);
+            var sceneColor = renderGraph.GetTexture(viewPassData.viewSize, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true);
             using(var pass = renderGraph.AddFullscreenRenderPass("Reproject Previous Frame"))
             {
-                pass.Initialize(reprojectPreviousFrameMaterial, viewRenderData.viewSize, isScreenPass: true);
+                pass.Initialize(reprojectPreviousFrameMaterial, viewPassData.viewSize, isScreenPass: true);
                 pass.WriteTexture(sceneColor);
                 pass.ReadTexture("PreviousSceneColorCopy", previousSceneColorCopy);
 
@@ -373,7 +360,7 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		// TODO: Could render clouds after deferred, then sky after that
 		new DeferredLighting(renderGraph, asset.Sky),
 
-       new GenericViewRenderFeature(renderGraph, viewRenderData =>
+       new GenericViewRenderFeature(renderGraph, (in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context) =>
         {
             // Copy for next frame (TODO: Could also output from deferred pass, hrm)
             var sceneColorCopy = renderGraph.GetRtHandleData<SceneColorCopy>().handle;
@@ -395,12 +382,12 @@ public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelin
 		new VolumetricClouds(asset.Clouds, renderGraph, asset.Sky),
         new Sky(renderGraph, asset.Sky),
 
-        new GenericViewRenderFeature(renderGraph, viewRenderData =>
+        new GenericViewRenderFeature(renderGraph, (in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context) =>
         {
             using var pass = renderGraph.AddObjectRenderPass("Render Transparent");
 
             var cullingResults = renderGraph.GetResource<CullingResultsData>().cullingResults;
-            pass.Initialize("SRPDefaultUnlit", viewRenderData.context, cullingResults, viewRenderData.camera, RenderQueueRange.transparent, viewRenderData.viewSize, viewRenderData.viewCount, SortingCriteria.CommonTransparent, PerObjectData.None, false, isScreenPass: true);
+            pass.Initialize("SRPDefaultUnlit", context, cullingResults, RenderQueueRange.transparent, viewPassData.viewSize, viewPassData.position, viewPassData.rotation, viewPassData.sortAxis, viewPassData.distanceMetric, SortingCriteria.CommonTransparent, PerObjectData.None, false, isScreenPass: true);
 
             pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepth);
             pass.WriteRtHandle<CameraTarget>();

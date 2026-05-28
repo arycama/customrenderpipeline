@@ -1,4 +1,6 @@
+using System;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public class SunDiskRenderer : ViewRenderFeature
 {
@@ -11,16 +13,16 @@ public class SunDiskRenderer : ViewRenderFeature
 		celestialBodyMaterial = new Material(Shader.Find("Surface/Celestial Body")){ hideFlags = HideFlags.HideAndDontSave };
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		var lightData = renderGraph.GetResource<LightingData>();
-		var viewPosition = viewRenderData.transform.position;
+		var viewPosition = viewPassData.position;
 		var scale = 2 * Math.Tan(0.5f * Math.Radians(settings.SunAngularDiameter));
 
         var matrix = Float4x4.TRS(viewPosition - lightData.light0Rotation.Forward, lightData.light0Rotation.ReverseForward, scale);
 		using (var pass = renderGraph.AddDrawProceduralRenderPass("Sun Disk", (settings.SunAngularDiameter, lightData.light0Color, -lightData.light0Rotation.Forward)))
 		{
-			pass.Initialize(celestialBodyMaterial, matrix, viewRenderData.viewSize, 1, 0, 4, 1, MeshTopology.Quads, isScreenPass: true);
+			pass.Initialize(celestialBodyMaterial, matrix, viewPassData.viewSize, 1, 0, 4, 1, MeshTopology.Quads, isScreenPass: true);
 
             pass.WriteRtHandleDepth<CameraDepth>(UnityEngine.Rendering.SubPassFlags.ReadOnlyDepthStencil);
             pass.WriteRtHandle<CameraTarget>();

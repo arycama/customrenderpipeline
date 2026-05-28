@@ -593,7 +593,7 @@ public class RenderGraph : IDisposable
                     command.NextSubPass();
             }
 
-            renderPass.Run(command, context);
+            renderPass.Run(command);
 
             // End pass if needed
             if (i < renderPasses.Count - 1)

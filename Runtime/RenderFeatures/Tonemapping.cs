@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 public partial class Tonemapping : ViewRenderFeature
 {
@@ -20,26 +21,24 @@ public partial class Tonemapping : ViewRenderFeature
         tonemapMaterial = new Material(Shader.Find("Hidden/Tonemap")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
-        var hdrSettings = renderGraph.GetResource<HdrOutputData>();
-
         var colorGrading = renderGraph.GetResource<ColorGrading.Result>();
-        var isFirst = renderedViewIndices.Add(viewRenderData.viewId);
+        var isFirst = renderedViewIndices.Add(viewPassData.viewId);
 
-        var halfViewSize = new Int2(viewRenderData.viewSize.x >> 1, viewRenderData.viewSize.y >> 1);
+        var halfViewSize = new Int2(viewPassData.viewSize.x >> 1, viewPassData.viewSize.y >> 1);
 
         using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (
-            viewRenderData.viewSize,
+            viewPassData.viewSize,
             GraphicsUtilities.HalfTexelRemap(colorGradingSettings.Resolution),
             colorGradingSettings.PaperWhite * Math.Sqrt(2.0f),
             bloomSettings.Strength,
-            hdrSettings.peakLuminance,
+            displayOutputData.peakLuminance,
             colorGrading.colorGrading,
             halfViewSize,
             renderGraph.RtHandleSystem));
 
-        pass.Initialize(tonemapMaterial, viewRenderData.viewSize, viewRenderData.viewCount, 0, false, 1, viewRenderData.target, viewRenderData.format);
+        pass.Initialize(tonemapMaterial, viewPassData.viewSize, viewPassData.viewCount, 0, false, 1, viewPassData.target, viewPassData.format);
         pass.PreventNewSubPass = true;
 
         pass.ReadRtHandle<CameraTarget>();
@@ -59,7 +58,7 @@ public partial class Tonemapping : ViewRenderFeature
             pass.AddKeyword("BLOOM");
         }
 
-        var colorGamut = hdrSettings.colorGamut;
+        var colorGamut = displayOutputData.colorGamut;
         var keyword = colorGamut switch
         {
             ColorGamut.sRGB => "SRGB",
@@ -75,10 +74,10 @@ public partial class Tonemapping : ViewRenderFeature
         pass.AddKeyword(keyword);
 
         // Unity does some annoying tonemapping in scene view, to get consistent results between scene and game mode, need to reverse it
-        if (viewRenderData.camera.cameraType == CameraType.SceneView)
+        if (viewPassData.cameraType == CameraType.SceneView)
             pass.AddKeyword("SCENE_VIEW");
 
-        if (viewRenderData.camera.cameraType == CameraType.Preview)
+        if (viewPassData.cameraType == CameraType.Preview)
             pass.AddKeyword("PREVIEW");
 
         pass.SetRenderFunction(static (command, pass, data) =>

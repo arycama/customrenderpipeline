@@ -1,4 +1,6 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
+using UnityEngine.Rendering;
 
 public class GpuDrivenRenderingRender : ViewRenderFeature
 {
@@ -9,9 +11,9 @@ public class GpuDrivenRenderingRender : ViewRenderFeature
 		this.gpuDrivenRenderer = gpuDrivenRenderer;
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
-		if (viewRenderData.camera.cameraType != CameraType.SceneView && viewRenderData.camera.cameraType != CameraType.Game && viewRenderData.camera.cameraType != CameraType.Reflection)
+		if (viewPassData.cameraType != CameraType.SceneView && viewPassData.cameraType != CameraType.Game && viewPassData.cameraType != CameraType.Reflection)
 			return;
 
 		if (!renderGraph.ResourceMap.TryGetResource<GpuDrivenRenderingData>(renderGraph.FrameIndex, out var instanceData))
@@ -23,7 +25,7 @@ public class GpuDrivenRenderingRender : ViewRenderFeature
 		using var scope = renderGraph.AddProfileScope("Gpu Driven Rendering");
 
 		var cullingPlanes = renderGraph.GetResource<CullingPlanesData>().cullingPlanes;
-		var renderingData = gpuDrivenRenderer.Setup(viewRenderData.viewSize, false, cullingPlanes, instanceData);
+		var renderingData = gpuDrivenRenderer.Setup(viewPassData.viewSize, false, cullingPlanes, instanceData);
 
 		using var renderScope = renderGraph.AddProfileScope("Render");
 
@@ -32,7 +34,7 @@ public class GpuDrivenRenderingRender : ViewRenderFeature
 			var draw = drawList[i];
 			using (var pass = renderGraph.AddDrawInstancedIndirectRenderPass("Gpu Driven Rendering", (draw.lodOffset, draw.objectToWorld)))
 			{
-				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, viewRenderData.viewSize, viewRenderData.viewCount, draw.passIndex, 0.0f, 0.0f, true, draw.indirectArgsOffset, isScreenPass: true);
+				pass.Initialize(draw.mesh, draw.submeshIndex, draw.material, instanceData.drawCallArgs, viewPassData.viewSize, viewPassData.viewCount, draw.passIndex, 0.0f, 0.0f, true, draw.indirectArgsOffset, isScreenPass: true);
 				pass.AddKeyword("INDIRECT_RENDERING");
 				pass.UseProfiler = false;
 

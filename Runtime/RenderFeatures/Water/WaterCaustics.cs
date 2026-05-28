@@ -1,5 +1,7 @@
+using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 public class WaterCaustics : ViewRenderFeature
 {
@@ -19,7 +21,7 @@ public class WaterCaustics : ViewRenderFeature
 		renderGraph.ReleasePersistentResource(indexBuffer, -1);
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		if (!settings.IsEnabled)
 			return;

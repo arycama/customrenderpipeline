@@ -1,6 +1,7 @@
 using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 public class GrassRenderer : ViewRenderFeature
 {
@@ -47,9 +48,9 @@ public class GrassRenderer : ViewRenderFeature
             renderGraph.ReleasePersistentResource(coverageMap, -1);
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
-        if (viewRenderData.camera.cameraType == CameraType.Preview)
+        if (viewPassData.cameraType == CameraType.Preview)
             return;
 
         if (!settings.Enabled)
@@ -153,14 +154,14 @@ public class GrassRenderer : ViewRenderFeature
 		var height = material.GetFloat("_Height");
 
         var terrainData = terrainSystemData.terrainData;
-		var position = terrain.GetPosition() - viewRenderData.transform.position;
+		var position = terrain.GetPosition() - viewPassData.position;
 		var positionOffset = new Vector4(terrainData.size.x, terrainData.size.z, position.x, position.z);
 		var mipCount = Texture2DExtensions.MipCount(terrainData.heightmapResolution) - 1;
 
 		var edgeLength = material.GetFloat("_EdgeLength");
 		var cellCount = patchCounts.x;
 
-		var quadtreeCullResults = quadtreeCull.Cull(cellCount, cullingPlanes, vertexCount * 6, edgeLength, positionOffset, true, viewRenderData.viewSize, true, terrainSystemData.minMaxHeights, terrainData.size.y, position.y, mipCount, height);
+		var quadtreeCullResults = quadtreeCull.Cull(cellCount, cullingPlanes, vertexCount * 6, edgeLength, positionOffset, true, viewPassData.viewSize, true, terrainSystemData.minMaxHeights, terrainData.size.y, position.y, mipCount, height);
 
 		var size = terrainSystemData.terrainData.size;
 		using (var pass = renderGraph.AddDrawProceduralIndirectIndexedRenderPass("Render Grass",
@@ -169,7 +170,7 @@ public class GrassRenderer : ViewRenderFeature
 			patchScaleOffset: new Float4(size.x / cellCount, size.z / cellCount, position.x, position.z)
 		)))
 		{
-			pass.Initialize(material, indexBuffer, quadtreeCullResults.IndirectArgsBuffer, viewRenderData.viewSize, 1, isScreenPass: true);
+			pass.Initialize(material, indexBuffer, quadtreeCullResults.IndirectArgsBuffer, viewPassData.viewSize, 1, isScreenPass: true);
 
             pass.WriteRtHandleDepth<CameraDepth>();
             pass.WriteRtHandle<GBufferAlbedoMetallic>();

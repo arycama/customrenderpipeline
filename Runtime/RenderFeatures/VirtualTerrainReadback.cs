@@ -17,12 +17,12 @@ public class VirtualTerrainReadback : ViewRenderFeature
         OnReadbackComplete = virtualTerrain.ReadbackRequestComplete;
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
         if (!settings.VirtualTexturing)
             return;
 
-		var maxRequestBufferSize = viewRenderData.viewSize.x * viewRenderData.viewSize.y + 1;
+		var maxRequestBufferSize = viewPassData.viewSize.x * viewPassData.viewSize.y + 1;
         var requestBuffer = renderGraph.GetBuffer(maxRequestBufferSize, target: GraphicsBuffer.Target.Append);
         var virtualTextureData = renderGraph.GetResource<VirtualTextureData>();
         using (var pass = renderGraph.AddComputeRenderPass("Gather Requested Pages", (requestBuffer, virtualTextureUpdateShader, PageTableSize)))

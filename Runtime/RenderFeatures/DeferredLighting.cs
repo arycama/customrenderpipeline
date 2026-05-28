@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Rendering;
 
 public class DeferredLighting : ViewRenderFeature
@@ -12,13 +13,15 @@ public class DeferredLighting : ViewRenderFeature
 		this.skySettings = skySettings;
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
+        var viewSize = viewPassData.viewSize;
+
 		void RenderPass(int index)
 		{
 			using var pass = renderGraph.AddFullscreenRenderPass("Deferred Lighting");
 
-			pass.Initialize(material, viewRenderData.viewSize, 1, index, isScreenPass: true);
+			pass.Initialize(material, viewSize, 1, index, isScreenPass: true);
 			pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
 			pass.WriteRtHandle<CameraTarget>();
 

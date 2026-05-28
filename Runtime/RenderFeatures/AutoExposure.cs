@@ -1,4 +1,6 @@
+using System;
 using UnityEngine;
+using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
 
 public partial class AutoExposure : ViewRenderFeature
@@ -39,7 +41,7 @@ public partial class AutoExposure : ViewRenderFeature
         Object.DestroyImmediate(exposureTexture);
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
         // TODO: Only do when changed
         var exposurePixels = exposureTexture.GetRawTextureData<float>();
@@ -55,20 +57,15 @@ public partial class AutoExposure : ViewRenderFeature
         exposureTexture.Apply(false, false);
 
         var histogram = renderGraph.GetBuffer(256);
-
-        var camera = viewRenderData.camera;
-        var iso = camera.usePhysicalProperties ? camera.iso : lensSettings.Iso;
-        var aperture = camera.usePhysicalProperties ? camera.aperture : lensSettings.Aperture;
-        var shutterSpeed = camera.usePhysicalProperties ? camera.shutterSpeed : lensSettings.ShutterSpeed;
         using (var pass = renderGraph.AddComputeRenderPass("Auto Exposure", new AutoExposureStructData
         (
             settings.MinEv,
             settings.MaxEv,
             settings.AdaptationSpeed,
             settings.ExposureCompensation,
-            iso,
-            aperture,
-            shutterSpeed,
+            viewPassData.iso,
+            viewPassData.aperture,
+            viewPassData.shutterSpeed,
             settings.HistogramMin,
             settings.HistogramMax,
             GraphicsUtilities.HalfTexelRemap(settings.ExposureResolution, 1),
@@ -78,7 +75,7 @@ public partial class AutoExposure : ViewRenderFeature
             settings.ProceduralSoftness
         )))
         {
-            pass.Initialize(computeShader, 0, viewRenderData.viewSize.x >> 1, viewRenderData.viewSize.y >> 1);
+            pass.Initialize(computeShader, 0, viewPassData.viewSize.x >> 1, viewPassData.viewSize.y >> 1);
             pass.ReadRtHandle<CameraTarget>();
             pass.WriteBuffer("LuminanceHistogram", histogram);
             pass.ReadResource<AutoExposureData>();
@@ -124,7 +121,7 @@ public partial class AutoExposure : ViewRenderFeature
         }
 
         var exposureBuffer = renderGraph.GetResource<AutoExposureData>().ExposureBuffer;
-        using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", (output, exposureBuffer, settings.DebugExposure, viewRenderData.camera, renderGraph.RenderPipeline)))
+        using (var pass = renderGraph.AddGenericRenderPass("Auto Exposure", (output, exposureBuffer, settings.DebugExposure, renderGraph.RenderPipeline)))
         {
             pass.ReadBuffer("", output);
             pass.WriteBuffer("", exposureBuffer);
@@ -143,7 +140,9 @@ public partial class AutoExposure : ViewRenderFeature
                     var exposure = readbackData[0];
                     var exposureCompensation = readbackData[3];
                     var ev100 = PhysicalCameraUtility.ExposureToEV100(exposure) + exposureCompensation;
-                    data.camera.iso = (int)PhysicalCameraUtility.ComputeISO(data.camera.aperture, data.camera.shutterSpeed, ev100);
+
+                    // TODO: Figure out a better way to do this since we no longer have access to camera directly
+                    //data.camera.iso = (int)PhysicalCameraUtility.ComputeISO(data.camera.aperture, data.camera.shutterSpeed, ev100);
 
                     if (data.DebugExposure)
                     {

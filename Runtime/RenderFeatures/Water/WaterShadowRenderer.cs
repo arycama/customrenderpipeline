@@ -1,6 +1,8 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 public class WaterShadowRenderer : WaterRendererBase
 {
@@ -8,15 +10,15 @@ public class WaterShadowRenderer : WaterRendererBase
 	{
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
-        if (!settings.IsEnabled || (viewRenderData.camera.cameraType != CameraType.Game && viewRenderData.camera.cameraType != CameraType.SceneView))
+        if (!settings.IsEnabled || (viewPassData.cameraType != CameraType.Game && viewPassData.cameraType != CameraType.SceneView))
             return;
 
         if (!renderGraph.TryGetResource<LightingData>(out var lightingData))
             return;
 
-		var viewPosition = viewRenderData.transform.position;
+		var viewPosition = viewPassData.position;
         var size = new Float3(settings.ShadowRadius * 2, settings.Profile.MaxWaterHeight * 2, settings.ShadowRadius * 2);
         var min = new Float3(-settings.ShadowRadius, -settings.Profile.MaxWaterHeight - viewPosition.y, -settings.ShadowRadius);
 
@@ -51,7 +53,7 @@ public class WaterShadowRenderer : WaterRendererBase
         for (var j = FrustumPlane.Left; j < FrustumPlane.Count; j++)
             cullingPlanes.SetCullingPlane((int)j, worldToClip.GetFrustumPlane(j));
 
-        var cullResult = Cull(viewPosition, cullingPlanes, viewRenderData.viewSize, false);
+        var cullResult = Cull(viewPosition, cullingPlanes, viewPassData.viewSize, false);
         var shadowMatrix = Float4x4.OrthoReverseZSample(bounds).Mul(worldToView);
 
         var waterShadow = renderGraph.GetTexture(settings.ShadowResolution, GraphicsFormat.D16_UNorm, isExactSize: true, clear: true);

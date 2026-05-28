@@ -8,19 +8,19 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 	private SinglePassStereoMode stereoMode;
     private ScriptableRenderContext context;
 
-	public void Initialize(string tag, ScriptableRenderContext context, CullingResults cullingResults, Camera camera, RenderQueueRange renderQueueRange, Int2 size, int viewCount = 1, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false, int antiAliasing = 1, bool isScreenPass = false)
+	public void Initialize(string tag, ScriptableRenderContext context, in CullingResults cullingResults, RenderQueueRange renderQueueRange, Int2 size, Float3 viewPosition, Quaternion viewRotation, Float3 sortAxis, DistanceMetric distanceMetric, SortingCriteria sortingCriteria = SortingCriteria.None, PerObjectData perObjectData = PerObjectData.None, bool excludeMotionVectors = false, int viewCount = 1, int antiAliasing = 1, bool isScreenPass = false, SinglePassStereoMode stereoMode = SinglePassStereoMode.None)
 	{
         this.context = context;
 		AntiAliasing = antiAliasing;
-        stereoMode = camera.stereoEnabled
-            ? SystemInfo.supportsMultiview ? SinglePassStereoMode.Multiview : SinglePassStereoMode.Instancing
-            : SinglePassStereoMode.None;
+        this.stereoMode = stereoMode;
 
-        var sortingSettings = new SortingSettings(camera)
+        var sortingSettings = new SortingSettings 
         {
-            cameraPosition = camera.transform.position,
+            worldToCameraMatrix = Float4x4.WorldToLocal(viewPosition, viewRotation),
+            cameraPosition = viewPosition,
+            customAxis = sortAxis,
             criteria = sortingCriteria,
-            worldToCameraMatrix = camera.worldToCameraMatrix
+            distanceMetric = distanceMetric
         };
 
         var drawSettings = new DrawingSettings(new ShaderTagId(tag), sortingSettings)
@@ -82,12 +82,8 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 
 	protected override void Execute()
 	{
-        var status = context.QueryRendererListStatus(rendererLists[0]);
-        if (status == RendererListStatus.kRendererListProcessing)
-            Debug.Log("Still Processing");
-
         foreach (var keyword in keywords)
-			Command.EnableKeyword(new GlobalKeyword(keyword));
+			Command.EnableShaderKeyword(keyword);
 
 		if (stereoMode == SinglePassStereoMode.Instancing)
 		{
@@ -116,7 +112,7 @@ public class ObjectRenderPass<T> : GraphicsRenderPass<T>
         }
 
         foreach (var keyword in keywords)
-			Command.DisableKeyword(new GlobalKeyword(keyword));
+			Command.DisableShaderKeyword(keyword);
 	}
 
 	public override void SetMatrix(string propertyName, Matrix4x4 value)

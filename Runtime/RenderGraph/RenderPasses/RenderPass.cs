@@ -177,7 +177,7 @@ public abstract class RenderPass : IDisposable
         RenderGraph.RtHandleSystem.ReadResource(handle, Index);
     }
 
-    public void Run(CommandBuffer command, ScriptableRenderContext context)
+    public void Run(CommandBuffer command)
     {
         Command = command;
 

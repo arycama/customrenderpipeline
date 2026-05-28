@@ -1,18 +1,21 @@
 ﻿using System;
 using UnityEngine.Assertions;
+using UnityEngine.Rendering;
 
 public class GenericViewRenderFeature : ViewRenderFeature
 {
-	private readonly Action<ViewRenderData> render;
+    public delegate void RenderFunction(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context);
 
-	public GenericViewRenderFeature(RenderGraph renderGraph, Action<ViewRenderData> render) : base(renderGraph)
+    private readonly RenderFunction render;
+
+	public GenericViewRenderFeature(RenderGraph renderGraph, RenderFunction render) : base(renderGraph)
 	{
 		Assert.IsNotNull(render);
 		this.render = render;
 	}
 
-	public override void Render(ViewRenderData camera)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
-		render(camera);
+		render(viewParameters, viewPassData, displayOutputData, context);
 	}
 }

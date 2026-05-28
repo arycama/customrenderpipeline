@@ -56,14 +56,14 @@ public class ClusteredLightCulling : ViewRenderFeature
 		}
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
-		var clusterWidth = Math.DivRoundUp(viewRenderData.viewSize.x, settings.TileSize);
-		var clusterHeight = Math.DivRoundUp(viewRenderData.viewSize.y, settings.TileSize);
+        var clusterWidth = Math.DivRoundUp(viewPassData.viewSize.x, settings.TileSize);
+		var clusterHeight = Math.DivRoundUp(viewPassData.viewSize.y, settings.TileSize);
 		var clusterCount = clusterWidth * clusterHeight * settings.ClusterDepth;
 
-		var clusterScale = settings.ClusterDepth / Mathf.Log(viewRenderData.far / viewRenderData.near, 2f);
-		var clusterBias = -(settings.ClusterDepth * Mathf.Log(viewRenderData.near, 2f) / Mathf.Log(viewRenderData.far / viewRenderData.near, 2f));
+		var clusterScale = settings.ClusterDepth / Math.Log2(viewPassData.far / viewPassData.near);
+		var clusterBias = -(settings.ClusterDepth * Math.Log2(viewPassData.near) / Math.Log2(viewPassData.far / viewPassData.near));
 
 		var computeShader = Resources.Load<ComputeShader>("ClusteredLightCulling");
 		var lightClusterIndices = renderGraph.GetTexture(new(clusterWidth, clusterHeight), GraphicsFormat.R32G32_SInt, settings.ClusterDepth, TextureDimension.Tex3D);

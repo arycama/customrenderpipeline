@@ -1,11 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using UnityEngine.Rendering;
 
 public class PhysicalSkyProbe : ViewRenderFeature
 {
-	public override string ProfilerNameOverride => "Ggx Convolve";
-
 	private readonly Material skyMaterial;
 	private readonly EnvironmentLightingSettings environmentLighting;
 	private readonly VolumetricClouds.Settings cloudSettings;
@@ -28,14 +28,14 @@ public class PhysicalSkyProbe : ViewRenderFeature
 			renderGraph.ReleasePersistentResource(probe.Value, -1);
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		using var scope = renderGraph.AddProfileScope("Environment Probe Update");
 
-		if(!cameraProbeHandles.TryGetValue(viewRenderData.viewId, out var reflectionProbeTemp))
+		if(!cameraProbeHandles.TryGetValue(viewPassData.viewId, out var reflectionProbeTemp))
 		{
 			reflectionProbeTemp = renderGraph.GetTexture(environmentLighting.Resolution, GraphicsFormat.B10G11R11_UFloatPack32, hasMips: true, autoGenerateMips: true, isPersistent: true, isExactSize: true);
-			cameraProbeHandles.Add(viewRenderData.viewId, reflectionProbeTemp);
+			cameraProbeHandles.Add(viewPassData.viewId, reflectionProbeTemp);
 		}
 
 		var time = (float)renderGraph.GetResource<TimeData>().time;
@@ -44,7 +44,7 @@ public class PhysicalSkyProbe : ViewRenderFeature
 			pass.Initialize(skyMaterial, environmentLighting.Resolution, 1, skyMaterial.FindPass("Reflection Probe"), 1);
 
 			var keyword = string.Empty;
-			var viewHeight = Math.Max(0, viewRenderData.transform.position.y);
+			var viewHeight = Math.Max(0, viewPassData.position.y);
 			if (viewHeight > cloudSettings.StartHeight)
 			{
 				if (viewHeight > cloudSettings.StartHeight + cloudSettings.LayerThickness)
@@ -75,6 +75,6 @@ public class PhysicalSkyProbe : ViewRenderFeature
 		}
 
 		renderGraph.SetResource(new EnvironmentProbeTempResult(reflectionProbeTemp));
-        environmentConvolve.UpdateView(viewRenderData.viewId);
+        environmentConvolve.UpdateView(viewPassData.viewId);
     }
 }

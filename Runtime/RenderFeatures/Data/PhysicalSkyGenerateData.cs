@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
@@ -24,7 +25,7 @@ public class PhysicalSkyGenerateData : ViewRenderFeature
         Object.DestroyImmediate(ggxConvolutionMaterial);
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
 		renderGraph.AddProfileBeginPass("Sky Precompute");
 
@@ -106,7 +107,7 @@ public class PhysicalSkyGenerateData : ViewRenderFeature
         }
 
         var keyword = string.Empty;
-        var viewHeight = viewRenderData.transform.position.y;
+        var viewHeight = viewPassData.position.y;
         if (viewHeight > cloudSettings.StartHeight)
         {
             if (viewHeight > cloudSettings.StartHeight + cloudSettings.LayerThickness)

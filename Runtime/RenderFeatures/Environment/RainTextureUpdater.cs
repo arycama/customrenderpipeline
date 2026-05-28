@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -13,7 +14,7 @@ public class RainTextureUpdater : ViewRenderFeature
 		compositeMaterial = new Material(Shader.Find("Hidden/Rain Composite")) { hideFlags = HideFlags.HideAndDontSave };
 	}
 
-	public override void Render(ViewRenderData viewRenderData)
+	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
         if (settings.WetLevel == 0)
             return;
@@ -45,7 +46,7 @@ public class RainTextureUpdater : ViewRenderFeature
 
 		using (var pass = renderGraph.AddFullscreenRenderPass("Composite", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy, settings.WetLevel)))
 		{
-			pass.Initialize(compositeMaterial, viewRenderData.viewSize, viewRenderData.viewCount, isScreenPass: true);
+			pass.Initialize(compositeMaterial, viewPassData.viewSize, viewPassData.viewCount, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
             pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);

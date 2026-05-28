@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 
@@ -10,7 +11,7 @@ public class DecalComposite : ViewRenderFeature
         material = new Material(Shader.Find("Hidden/Decal Composite")) { hideFlags = HideFlags.HideAndDontSave };
     }
 
-    public override void Render(ViewRenderData viewRenderData)
+    public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
         using var scope = renderGraph.AddProfileScope("Decal Composite");
 
@@ -22,7 +23,7 @@ public class DecalComposite : ViewRenderFeature
         // TODO: Would a direct copy be faster?
         using (var pass = renderGraph.AddFullscreenRenderPass("Copy"))
         {
-            pass.Initialize(material, viewRenderData.viewSize, 1, 0, isScreenPass: true);
+            pass.Initialize(material, viewPassData.viewSize, 1, 0, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
             pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
@@ -38,7 +39,7 @@ public class DecalComposite : ViewRenderFeature
         // Now composite the decal buffers
         using (var pass = renderGraph.AddFullscreenRenderPass("Combine", (albedoMetallicCopy, normalRoughnessCopy, bentNormalOcclusionCopy)))
         {
-            pass.Initialize(material, viewRenderData.viewSize, 1, 1, isScreenPass: true);
+            pass.Initialize(material, viewPassData.viewSize, 1, 1, isScreenPass: true);
             pass.PreventNewSubPass = true;
 
             pass.WriteRtHandleDepth<CameraDepth>(SubPassFlags.ReadOnlyDepthStencil);
