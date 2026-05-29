@@ -20,9 +20,11 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
     private readonly CommandBuffer command;
 
     protected readonly RenderGraph renderGraph;
-    private bool isInitialized;
     private readonly bool renderDocLoaded;
     private readonly Dictionary<int, string> renderCameraProfileMarkers = new();
+
+    private ViewParameter[] viewParameters = new ViewParameter[1];
+    private bool isInitialized;
 
     public bool IsDisposingFromRenderDoc { get; protected set; }
     public bool IsDisposing { get; private set; }
@@ -131,7 +133,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
         // TODO: Convert these to spans? Will require doing two passes though, one to calculate count, and one to actually do the thing
         var viewPassDatas = ListPool<ViewPassData>.Get();
-        var viewParameters = ListPool<ViewParameter>.Get();
+        var viewParameterCount = 0;
 
         foreach (var camera in cameras)
         {
@@ -159,7 +161,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
             {
                 return new ViewPassData
                 (
-                    viewParameters.Count,
+                    viewParameterCount,
                     displayIndex,
                     viewCount,
                     isFliped,
@@ -193,6 +195,14 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                 );
             }
 
+            void AddViewParameter(ViewParameter viewParameter)
+            {
+                if (viewParameters.Length < viewParameterCount + 1)
+                    Array.Resize(ref viewParameters, viewParameterCount + 1);
+
+                viewParameters[viewParameterCount++] = viewParameter;
+            }
+
             // Only cameras with no target texture output to the display
             if (camera.targetTexture == null && xrDisplaySubsystems.Count > 0)
             {
@@ -221,7 +231,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                         for (var k = 0; k < viewCount; k++)
                         {
                             renderPass.GetRenderParameter(camera, k, out var renderParameter);
-                            viewParameters.Add(new(renderParameter.view, renderParameter.projection));
+                            AddViewParameter(new(renderParameter.view, renderParameter.projection));
                         }
                     }
                 }
@@ -242,7 +252,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
                 var displayRenderPass = GetDisplayRenderPass(0, 1, isFlipped, size, target, format, VRTextureUsage.None, cullingParameters, XRMirrorViewBlitMode.None, IntPtr.Zero);
                 viewPassDatas.Add(displayRenderPass);
-                viewParameters.Add(new(camera.worldToCameraMatrix, camera.projectionMatrix));
+                AddViewParameter(new(camera.worldToCameraMatrix, camera.projectionMatrix));
             }
 
 #if UNITY_EDITOR
@@ -266,14 +276,11 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
         foreach (var displayRenderPass in viewPassDatas)
         {
             var profileMarker = renderCameraProfileMarkers[displayRenderPass.viewId];
-
-            Span<ViewParameter> displayViewParameters = stackalloc ViewParameter[displayRenderPass.viewCount];
-            for (var i = 0; i < displayRenderPass.viewCount; i++)
-                displayViewParameters[i] = viewParameters[displayRenderPass.parameterStart + i];
+            ReadOnlySpan<ViewParameter> displayViewParameters = viewParameters.AsSpan(displayRenderPass.parameterStart, displayRenderPass.viewCount);
 
             using var renderCameraScope = renderGraph.AddProfileScope(profileMarker);
             foreach (var cameraRenderFeature in perCameraRenderFeatures)
-                cameraRenderFeature.Render(displayViewParameters, displayRenderPass, displayOutputDatas[displayRenderPass.displayInfoIndex], context);
+                cameraRenderFeature.Render(in displayViewParameters, in displayRenderPass, in displayOutputDatas[displayRenderPass.displayInfoIndex], context);
 
             if (RenderWireframe)
             {
@@ -307,7 +314,6 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
         }
 
         ListPool<ViewPassData>.Release(viewPassDatas);
-        ListPool<ViewParameter>.Release(viewParameters);
 
         renderGraph.Execute(command, context);
 
