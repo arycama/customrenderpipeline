@@ -103,17 +103,23 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
             isInitialized = true;
         }
 
+        var displayOutputDatasCount = 1;
+
+#if ENABLE_XR_MODULE
         var xrDisplaySubsystems = ListPool<XRDisplaySubsystem>.Get();
         SubsystemManager.GetSubsystems(xrDisplaySubsystems);
+        displayOutputDatasCount += xrDisplaySubsystems.Count;
+#endif
 
         // Setup display output infos
-        Span<DisplayData> displayOutputDatas = stackalloc DisplayData[xrDisplaySubsystems.Count + 1];
+        Span<DisplayData> displayOutputDatas = stackalloc DisplayData[displayOutputDatasCount];
 
         var mainHdrSettings = HDROutputSettings.main;
         var mainColorGamut = mainHdrSettings.available ? mainHdrSettings.displayColorGamut : ColorGamut.sRGB;
         var mainPeakLuminance = mainHdrSettings.available ? mainHdrSettings.maxToneMapLuminance : SdrLuminance;
         displayOutputDatas[0] = new(mainColorGamut, mainPeakLuminance, mainHdrSettings.available);
 
+#if ENABLE_XR_MODULE
         for (var i = 0; i < xrDisplaySubsystems.Count; i++)
         {
             var xrDisplaySubsystem = xrDisplaySubsystems[i];
@@ -130,6 +136,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
             var peakLuminance = hdrSettings.available ? hdrSettings.maxToneMapLuminance : SdrLuminance;
             displayOutputDatas[i + 1] = new(colorGamut, peakLuminance, hdrSettings.available);
         }
+#endif
 
         // TODO: Convert these to spans? Will require doing two passes though, one to calculate count, and one to actually do the thing
         var viewPassDatas = ListPool<ViewPassData>.Get();
@@ -203,6 +210,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                 viewParameters[viewParameterCount++] = viewParameter;
             }
 
+#if ENABLE_XR_MODULE
             // Only cameras with no target texture output to the display
             if (camera.targetTexture == null && xrDisplaySubsystems.Count > 0)
             {
@@ -237,6 +245,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                 }
             }
             else
+#endif
             {
                 if (!camera.TryGetCullingParameters(out var cullingParameters))
                     continue;
@@ -250,7 +259,7 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                 var format = targetTexture == null ? SystemInfo.GetGraphicsFormat(DefaultFormat.HDR) : targetTexture.graphicsFormat;
                 var target = (RenderTargetIdentifier)(targetTexture == null ? BuiltinRenderTextureType.CameraTarget : targetTexture);
 
-                var displayRenderPass = GetDisplayRenderPass(0, 1, isFlipped, size, target, format, VRTextureUsage.None, cullingParameters, XRMirrorViewBlitMode.None, IntPtr.Zero);
+                var displayRenderPass = GetDisplayRenderPass(0, 1, isFlipped, size, target, format, VRTextureUsage.None, cullingParameters, -6, IntPtr.Zero);
                 viewPassDatas.Add(displayRenderPass);
                 AddViewParameter(new(camera.worldToCameraMatrix, camera.projectionMatrix));
             }
@@ -263,7 +272,9 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
                 ScriptableRenderContext.EmitGeometryForCamera(camera);
         }
 
+#if ENABLE_XR_MODULE
         ListPool<XRDisplaySubsystem>.Release(xrDisplaySubsystems);
+#endif
 
         using (renderGraph.AddProfileScope("Prepare Frame"))
         {

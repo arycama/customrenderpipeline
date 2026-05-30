@@ -12,6 +12,12 @@
     "precompiledReferences": [],
     "autoReferenced": false,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "com.unity.modules.xr",
+            "expression": "",
+            "define": "ENABLE_XR_MODULE"
+        }
+    ],
     "noEngineReferences": false
 }
