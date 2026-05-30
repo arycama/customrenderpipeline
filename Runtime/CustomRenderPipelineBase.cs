@@ -144,6 +144,8 @@ public abstract class CustomRenderPipelineBase : RenderPipeline
 
         foreach (var camera in cameras)
         {
+            camera.depthTextureMode = DepthTextureMode.Depth | DepthTextureMode.MotionVectors;
+
             // TODO: Would it be better to use an array and an index instead for per-camera data
             var viewId = camera.GetHashCode();
 

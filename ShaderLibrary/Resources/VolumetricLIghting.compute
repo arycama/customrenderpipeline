@@ -75,7 +75,7 @@ void Compute(uint3 id : SV_DispatchThreadID)
 	// Reproject previous frame. Needs to use unjittered world position
 	// TODO: Could do screen to previous screen to save a few instructions
 	float linearUnjitteredDepth = VolumetricToLinearDepth(id.z + 0.5);
-	float4 previousScreenPosition = PreviousScreenPosition(screenPosition, LinearToDeviceDepth(linearUnjitteredDepth));
+	float4 previousScreenPosition = ScreenToPreviousScreenPosition(screenPosition, LinearToDeviceDepth(linearUnjitteredDepth));
 	previousScreenPosition.xy = PerspectiveDivide(previousScreenPosition).xy;
 	
 	// TODO: This seems to overshoot the motion and sample too far or something
