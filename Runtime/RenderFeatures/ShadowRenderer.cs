@@ -54,7 +54,7 @@ public class ShadowRenderer : ViewRenderFeature
 				using (renderGraph.AddProfileScope(directionalCascadeIds[i]))
 				{
 					var request = requestData.directionalShadowRequests[i];
-					RenderShadowMap(request, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, true, false, viewPassData, cullingResults, settings.DirectionalShadowResolution, settings.DirectionalCascadeCount, viewParameters, displayOutputData, context);
+					RenderShadowMap(request, directionalShadows, i, settings.DirectionalShadowBias, settings.DirectionalShadowSlopeBias, false, false, viewPassData, cullingResults, settings.DirectionalShadowResolution, settings.DirectionalCascadeCount, viewParameters, displayOutputData, context);
 				}
 			}
 
@@ -85,7 +85,7 @@ public class ShadowRenderer : ViewRenderFeature
 				using (renderGraph.AddProfileScope(pointLightIds[i]))
 				{
 					var request = requestData.pointShadowRequests[i];
-                    RenderShadowMap(request, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, false, true, viewPassData, cullingResults, settings.PointShadowResolution, pointShadowCount, viewParameters, displayOutputData, context);
+                    RenderShadowMap(request, pointShadows, i, settings.PointShadowBias, settings.PointShadowSlopeBias, true, true, viewPassData, cullingResults, settings.PointShadowResolution, pointShadowCount, viewParameters, displayOutputData, context);
 				}
 			}
 			ListPool<ShadowRequest>.Release(requestData.pointShadowRequests);
@@ -115,7 +115,7 @@ public class ShadowRenderer : ViewRenderFeature
 				using (renderGraph.AddProfileScope(SpotLightIds[i]))
 				{
 					var request = requestData.spotShadowRequests[i];
-                    RenderShadowMap(request, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, true, viewPassData, cullingResults, settings.SpotShadowResolution, spotShadowCount, viewParameters, displayOutputData, context);
+                    RenderShadowMap(request, spotShadows, i, settings.SpotShadowBias, settings.SpotShadowSlopeBias, true, false, viewPassData, cullingResults, settings.SpotShadowResolution, spotShadowCount, viewParameters, displayOutputData, context);
 				}
 			}
 
