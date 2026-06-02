@@ -3,7 +3,6 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Assertions;
-using UnityEngine.XR;
 using System;
 using UnityEngine.Pool;
 using Unmath;
