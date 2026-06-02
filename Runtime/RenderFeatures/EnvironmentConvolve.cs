@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using Unmath;
 using static Unmath.Math;
 
 public class EnvironmentConvolve : ViewRenderFeature

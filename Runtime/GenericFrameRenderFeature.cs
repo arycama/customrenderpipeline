@@ -1,5 +1,4 @@
-﻿using System;
-using UnityEngine.Rendering;
+﻿using UnityEngine.Rendering;
 
 public class GenericFrameRenderFeature : FrameRenderFeature
 {
