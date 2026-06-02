@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
+using Unmath;
 
 public partial class AutoExposure : ViewRenderFeature
 {

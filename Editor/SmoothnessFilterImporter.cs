@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
 
 public class SmoothnessFilterImporter : AssetPostprocessor
 {

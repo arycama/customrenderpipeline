@@ -2,6 +2,7 @@ using System;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
+using Unmath;
 
 public abstract class GraphicsRenderPass<T> : RenderPass<T>
 {

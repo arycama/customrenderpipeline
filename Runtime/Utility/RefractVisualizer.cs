@@ -1,4 +1,6 @@
 using UnityEngine;
+using Unmath;
+using Quaternion = Unmath.Quaternion;
 
 public class RefractVisualizer : MonoBehaviour
 {

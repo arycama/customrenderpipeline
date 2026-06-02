@@ -3,7 +3,8 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
-using static Math;
+using Unmath;
+using static Unmath.Math;
 
 public class ShadowRenderer : ViewRenderFeature
 {

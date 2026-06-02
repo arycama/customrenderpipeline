@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public partial class Tonemapping : ViewRenderFeature
 {
@@ -31,7 +33,7 @@ public partial class Tonemapping : ViewRenderFeature
         using var pass = renderGraph.AddBlitToScreenPass("Tonemapping", (
             viewPassData.viewSize,
             GraphicsUtilities.HalfTexelRemap(colorGradingSettings.Resolution),
-            colorGradingSettings.PaperWhite * Math.Sqrt(2.0f),
+            colorGradingSettings.PaperWhite * Sqrt(2.0f),
             bloomSettings.Strength,
             displayOutputData.peakLuminance,
             colorGrading.colorGrading,

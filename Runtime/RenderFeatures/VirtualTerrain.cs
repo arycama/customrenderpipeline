@@ -4,7 +4,8 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
 using Object = UnityEngine.Object;
-using static Math;
+using Unmath;
+using static Unmath.Math;
 using UnityEngine.Pool;
 using Unity.Collections;
 

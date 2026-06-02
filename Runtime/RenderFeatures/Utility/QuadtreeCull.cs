@@ -1,6 +1,8 @@
 using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public class QuadtreeCull
 {
@@ -35,8 +37,8 @@ public class QuadtreeCull
 
 		// We can do 32x32 cells in a single pass, larger counts need to be broken up into several passes
 		var maxPassesPerDispatch = 6;
-		var totalPassCount = (int)Math.Log2(cellCount) + 1;
-		var dispatchCount = Math.DivRoundUp(totalPassCount, maxPassesPerDispatch);
+		var totalPassCount = (int)Log2(cellCount) + 1;
+		var dispatchCount = DivRoundUp(totalPassCount, maxPassesPerDispatch);
 
 		ResourceHandle<RenderTexture> tempLodId = default;
 		ResourceHandle<GraphicsBuffer> lodIndirectArgsBuffer = default;

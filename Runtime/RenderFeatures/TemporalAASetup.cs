@@ -1,6 +1,7 @@
 ﻿using System;
 using UnityEngine;
 using UnityEngine.Rendering;
+using static Unmath.Math;
 
 public class TemporalAASetup : ViewRenderFeature
 {
@@ -22,7 +23,7 @@ public class TemporalAASetup : ViewRenderFeature
 		jitter *= settings.JitterSpread;
 
         // TODO: This seems incorrect
-		var previousSampleIndex = Math.Mod(renderGraph.FrameIndex - 1, settings.SampleCount) + 1;
+		var previousSampleIndex = Mod(renderGraph.FrameIndex - 1, settings.SampleCount) + 1;
 
 		Vector2 previousJitter;
 		previousJitter.x = Halton(previousSampleIndex, 2) - 0.5f;

@@ -1,7 +1,8 @@
 using System;
 using UnityEngine;
 using UnityEngine.Rendering;
-using static Math;
+using Unmath;
+using static Unmath.Math;
 
 public class SetTerrainViewData : ViewRenderFeature
 {

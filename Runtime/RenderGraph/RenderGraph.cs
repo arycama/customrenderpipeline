@@ -6,6 +6,7 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
 using Object = UnityEngine.Object;
 
 public class RenderGraph : IDisposable

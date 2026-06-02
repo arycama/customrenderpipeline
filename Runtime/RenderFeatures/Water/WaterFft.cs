@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using static Math;
+using static Unmath.Math;
 
 public class WaterFft : FrameRenderFeature
 {

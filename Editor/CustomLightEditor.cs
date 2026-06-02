@@ -3,7 +3,8 @@ using UnityEditor;
 using UnityEditor.IMGUI.Controls;
 using UnityEngine;
 using UnityEngine.Rendering;
-using static Math;
+using Unmath;
+using static Unmath.Math;
 
 [CustomEditorForRenderPipeline(typeof(Light), typeof(CustomRenderPipelineAsset))]
 public class CustomLightEditor : LightEditor
@@ -966,7 +967,7 @@ public class CustomLightEditor : LightEditor
 		{
 			light.spotAngle = outerAngle;
 			light.innerSpotAngle = innerAngle;
-			light.range = Math.Max(range, 0.01f);
+			light.range = Max(range, 0.01f);
 			light.shadowNearPlane = Mathf.Clamp(nearPlaneRange, 0.1f, light.range);
 		}
 	}
@@ -1128,7 +1129,7 @@ public class CustomLightEditor : LightEditor
 
 	private static float SizeSliderSpotAngle(Vector3 position, Vector3 forward, Vector3 axis, float range, float spotAngle, string controlName)
 	{
-		if (Math.Abs(spotAngle) <= 0.05f)
+		if (Abs(spotAngle) <= 0.05f)
 			return spotAngle;
 		var angledForward = UnityEngine.Quaternion.AngleAxis(Mathf.Max(spotAngle, 0.05f) * 0.5f, axis) * forward;
 		var centerToLeftOnSphere = (angledForward * range + position) - (position + forward * range);

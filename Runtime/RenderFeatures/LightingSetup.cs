@@ -4,7 +4,9 @@ using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
-using static Math;
+using Unmath;
+using static Unmath.Math;
+using Quaternion = Unmath.Quaternion;
 
 public partial class LightingSetup : ViewRenderFeature
 {

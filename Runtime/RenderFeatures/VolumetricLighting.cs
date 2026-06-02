@@ -2,7 +2,8 @@
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using static Math;
+using Unmath;
+using static Unmath.Math;
 
 public partial class VolumetricLighting : ViewRenderFeature
 {

@@ -6,6 +6,7 @@ using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
+using Unmath;
 
 public static class RenderGraphExtensions
 {

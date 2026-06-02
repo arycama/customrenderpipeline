@@ -2,7 +2,8 @@ using System;
 using Unity.Collections;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
-using static Math;
+using Unmath;
+using static Unmath.Math;
 
 [ExecuteAlways]
 public class TerrainGpuTreeRenderer : MonoBehaviour, IGpuProceduralGenerator

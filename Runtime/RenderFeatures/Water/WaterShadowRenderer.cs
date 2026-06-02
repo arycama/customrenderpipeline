@@ -3,6 +3,9 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
+using Bounds = Unmath.Bounds;
 
 public class WaterShadowRenderer : WaterRendererBase
 {
@@ -24,8 +27,8 @@ public class WaterShadowRenderer : WaterRendererBase
 
         var texelSize = settings.ShadowRadius * 2.0f / settings.ShadowResolution;
 
-        var snappedViewPositionX = Math.Snap(viewPosition.x, texelSize) - viewPosition.x;
-        var snappedViewPositionZ = Math.Snap(viewPosition.z, texelSize) - viewPosition.z;
+        var snappedViewPositionX = Snap(viewPosition.x, texelSize) - viewPosition.x;
+        var snappedViewPositionZ = Snap(viewPosition.z, texelSize) - viewPosition.z;
         var worldToView = Float4x4.Rotate(lightingData.light0Rotation.Inverse);
 
 		Bounds bounds = default;
@@ -83,8 +86,8 @@ public class WaterShadowRenderer : WaterRendererBase
 
                 // Snap to quad-sized increments on largest cell
                 var texelSize = data.settings.Size / (float)data.settings.PatchVertices;
-                var positionX = Math.Snap(data.viewPosition.x, texelSize) - data.viewPosition.x - data.settings.Size * 0.5f;
-                var positionZ = Math.Snap(data.viewPosition.z, texelSize) - data.viewPosition.z - data.settings.Size * 0.5f;
+                var positionX = Snap(data.viewPosition.x, texelSize) - data.viewPosition.x - data.settings.Size * 0.5f;
+                var positionZ = Snap(data.viewPosition.z, texelSize) - data.viewPosition.z - data.settings.Size * 0.5f;
                 pass.SetVector("_PatchScaleOffset", new Vector4(data.settings.Size / (float)data.settings.CellCount, data.settings.Size / (float)data.settings.CellCount, positionX, positionZ));
 
                 var cullingPlanesArray = ArrayPool<Vector4>.Get(data.cullingPlanes.Count);
@@ -102,7 +105,7 @@ public class WaterShadowRenderer : WaterRendererBase
 
         var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
         var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
-        var extinction = -new Float3(Math.Log(transmittance.x), Math.Log(transmittance.y), Math.Log(transmittance.z)) / transmittanceDistance;
+        var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
 
         renderGraph.SetResource(new WaterShadowResult(waterShadow, shadowMatrix, 0.0f, (float)(bounds.Max.z - bounds.Min.z), extinction, waterIlluminance));
     }

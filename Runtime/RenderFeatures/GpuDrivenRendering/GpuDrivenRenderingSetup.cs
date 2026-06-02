@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
 
 public class GpuDrivenRenderingSetup : FrameRenderFeature
 {

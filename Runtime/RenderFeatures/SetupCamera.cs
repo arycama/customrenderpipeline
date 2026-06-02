@@ -3,6 +3,9 @@ using System.Collections.Generic;
 using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
+using Quaternion = Unmath.Quaternion;
+using static Unmath.Math;
 
 public class SetupCamera : ViewRenderFeature
 {
@@ -129,14 +132,14 @@ public class SetupCamera : ViewRenderFeature
             new Float4(viewRotation.Rotate(new Float3(viewPassData.tanHalfFov.x * (-1 + -jitter.x), viewPassData.tanHalfFov.y * (-1 + -jitter.y), 1.0f)), 0),
             new Float4(viewRotation.Rotate(new Float3(viewPassData.tanHalfFov.x * (-1 + -jitter.x), viewPassData.tanHalfFov.y * (3 + -jitter.y), 1.0f)), 0),
             new Float4(viewRotation.Rotate(new Float3(viewPassData.tanHalfFov.x * (3 + -jitter.x), viewPassData.tanHalfFov.y * (-1 + -jitter.y), 1.0f)), 0),
-            (far - near) * Math.Rcp(near * far),
-            Math.Rcp(far),
+            (far - near) * Rcp(near * far),
+            Rcp(far),
             near,
             far,
             (float)viewPassData.viewSize.x,
             (float)viewPassData.viewSize.y,
-            Math.Rcp(viewPassData.viewSize.x),
-            Math.Rcp(viewPassData.viewSize.y),
+            Rcp(viewPassData.viewSize.x),
+            Rcp(viewPassData.viewSize.y),
             viewPassData.viewSize.x - 1,
             viewPassData.viewSize.y - 1,
             viewPassData.tanHalfFov.x / viewPassData.tanHalfFov.y,

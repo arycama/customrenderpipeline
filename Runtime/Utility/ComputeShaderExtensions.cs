@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using static Unmath.Math;
 
 public static class ComputeShaderExtensions
 {
@@ -6,9 +7,9 @@ public static class ComputeShaderExtensions
 	public static void GetThreadGroupSizes(this ComputeShader computeShader, int kernelIndex, Vector3Int threads, out uint groupsX, out uint groupsY, out uint groupsZ)
 	{
 		computeShader.GetKernelThreadGroupSizes(kernelIndex, out var x, out var y, out var z);
-		groupsX = Math.DivRoundUp((uint)threads.x, x);
-		groupsY = Math.DivRoundUp((uint)threads.y, y);
-		groupsZ = Math.DivRoundUp((uint)threads.z, z);
+		groupsX = DivRoundUp((uint)threads.x, x);
+		groupsY = DivRoundUp((uint)threads.y, y);
+		groupsZ = DivRoundUp((uint)threads.z, z);
 	}
 
 	// TODO: Return int/int2/int3 for these methods

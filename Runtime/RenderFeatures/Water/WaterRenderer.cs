@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public class WaterRenderer : WaterRendererBase
 {
@@ -56,8 +58,8 @@ public class WaterRenderer : WaterRendererBase
 
 				// Snap to quad-sized increments on largest cell
 				var texelSize = data.settings.Size / (float)data.settings.PatchVertices;
-				var positionX = Math.Snap(data.position.x, texelSize) - data.position.x - data.settings.Size * 0.5f;
-				var positionZ = Math.Snap(data.position.z, texelSize) - data.position.z - data.settings.Size * 0.5f;
+				var positionX = Snap(data.position.x, texelSize) - data.position.x - data.settings.Size * 0.5f;
+				var positionZ = Snap(data.position.z, texelSize) - data.position.z - data.settings.Size * 0.5f;
 				pass.SetVector("_PatchScaleOffset", new Vector4(data.settings.Size / (float)data.settings.CellCount, data.settings.Size / (float)data.settings.CellCount, positionX, positionZ));
 
 				pass.SetInt("_CullingPlanesCount", data.cullingPlanes.Count);
@@ -76,7 +78,7 @@ public class WaterRenderer : WaterRendererBase
         var albedo = settings.Material.GetColor("Albedo").LinearFloat3();
         var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
         var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
-        var extinction = -new Float3(Math.Log(transmittance.x), Math.Log(transmittance.y), Math.Log(transmittance.z)) / transmittanceDistance;
+        var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
 
         renderGraph.SetResource(new WaterPrepassResult(oceanRenderResult, waterTriangleNormal, albedo, extinction));
     }

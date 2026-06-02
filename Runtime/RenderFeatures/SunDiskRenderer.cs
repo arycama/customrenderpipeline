@@ -1,6 +1,8 @@
 using System;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public class SunDiskRenderer : ViewRenderFeature
 {
@@ -17,7 +19,7 @@ public class SunDiskRenderer : ViewRenderFeature
     {
 		var lightData = renderGraph.GetResource<LightingData>();
 		var viewPosition = viewPassData.position;
-		var scale = 2 * Math.Tan(0.5f * Math.Radians(settings.SunAngularDiameter));
+		var scale = 2 * Tan(0.5f * Radians(settings.SunAngularDiameter));
 
         var matrix = Float4x4.TRS(viewPosition - lightData.light0Rotation.Forward, lightData.light0Rotation.ReverseForward, scale);
 		using (var pass = renderGraph.AddDrawProceduralRenderPass("Sun Disk", (settings.SunAngularDiameter, lightData.light0Color, -lightData.light0Rotation.Forward)))

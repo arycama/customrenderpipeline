@@ -2,6 +2,8 @@ using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public class DeferredWater : ViewRenderFeature
 {
@@ -74,7 +76,7 @@ public class DeferredWater : ViewRenderFeature
                 var albedo = settings.Material.GetColor("Albedo").LinearFloat3();
                 var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
                 var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
-                var extinction = -new Float3(Math.Log(transmittance.x), Math.Log(transmittance.y), Math.Log(transmittance.z)) / transmittanceDistance;
+                var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
 
                 pass.SetVector("Albedo", albedo);
                 pass.SetVector("Extinction", extinction);
@@ -160,7 +162,7 @@ public class DeferredWater : ViewRenderFeature
                     var albedo = settings.Material.GetColor("Albedo").LinearFloat3();
                     var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
                     var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
-                    var extinction = -new Float3(Math.Log(transmittance.x), Math.Log(transmittance.y), Math.Log(transmittance.z)) / transmittanceDistance;
+                    var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
 
                     pass.SetVector("Albedo", albedo);
                     pass.SetVector("Extinction", extinction);
@@ -207,7 +209,7 @@ public class DeferredWater : ViewRenderFeature
                 var albedo = data.settings.Material.GetColor("Albedo").LinearFloat3();
                 var transmittance = data.settings.Material.GetColor("Transmittance").LinearFloat3();
                 var transmittanceDistance = data.settings.Material.GetFloat("TransmittanceDistance");
-                var extinction = -new Float3(Math.Log(transmittance.x), Math.Log(transmittance.y), Math.Log(transmittance.z)) / transmittanceDistance;
+                var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
 
                 pass.SetFloat("_IsFirst", data.wasCreated ? 1.0f : 0.0f);
                 pass.SetVector("_HistoryScaleLimit", pass.RenderGraph.GetScaleLimit2D(data.history));

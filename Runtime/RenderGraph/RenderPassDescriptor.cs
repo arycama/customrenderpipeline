@@ -1,5 +1,6 @@
 using Unity.Collections;
 using UnityEngine.Rendering;
+using Unmath;
 
 public readonly struct RenderPassDescriptor
 {

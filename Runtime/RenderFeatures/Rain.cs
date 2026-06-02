@@ -1,6 +1,8 @@
 using System;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public class Rain : ViewRenderFeature
 {
@@ -11,7 +13,7 @@ public class Rain : ViewRenderFeature
 		[field: SerializeField, Min(0)] public float Radius { get; private set; } = 32;
 		[field: SerializeField, Min(0)] public float Velocity { get; private set; } = 9.81f;
 		[field: SerializeField, Range(0, 1)] public float WindAngle { get; private set; } = 0;
-		[field: SerializeField, Range(0, Math.Pi)] public float WindTurbulence { get; private set; } = 0.1f;
+		[field: SerializeField, Range(0, Pi)] public float WindTurbulence { get; private set; } = 0.1f;
 		[field: SerializeField, Min(0)] public float WindStrength { get; private set; } = 0.5f;
 		[field: SerializeField] public Material Material { get; private set; }
 		[field: SerializeField, Range(0f, 1f)] public float WetLevel { get; private set; } = 0.5f;
@@ -43,7 +45,7 @@ public class Rain : ViewRenderFeature
 
 	public override void Render(in ReadOnlySpan<ViewParameter> viewParameters, in ViewPassData viewPassData, in DisplayData displayOutputData, ScriptableRenderContext context)
     {
-		var dropletCount = (int)(settings.DropletCount * settings.WetLevel * (4.0f / 3.0f) * Math.Pi * Math.Pow(settings.Radius, 3));
+		var dropletCount = (int)(settings.DropletCount * settings.WetLevel * (4.0f / 3.0f) * Pi * Pow(settings.Radius, 3));
 		if (settings.Material == null || dropletCount == 0)
 			return;
 

@@ -1,10 +1,10 @@
-﻿using UnityEngine;
+﻿using Unmath;
 
 public struct RendererBounds
 {
-    public Vector3 min;
+    public Float3 min;
     public float pad0;
-    public Vector3 size;
+    public Float3 size;
     public float pad1;
 
     public RendererBounds(Bounds bounds)

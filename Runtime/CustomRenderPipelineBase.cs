@@ -6,9 +6,9 @@ using UnityEngine.Assertions;
 using UnityEngine.XR;
 using System;
 using UnityEngine.Pool;
+using Unmath;
 
 #if UNITY_EDITOR
-using UnityEditor;
 using UnityEditorInternal;
 #endif
 

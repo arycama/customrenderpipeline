@@ -1,4 +1,5 @@
 ﻿using UnityEngine.Rendering;
+using Unmath;
 
 public readonly struct TemporalAASetupData : IRenderPassData
 {

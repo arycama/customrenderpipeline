@@ -1,4 +1,4 @@
-using static Math;
+using static Unmath.Math;
 
 public static class PhysicalCameraUtility
 {

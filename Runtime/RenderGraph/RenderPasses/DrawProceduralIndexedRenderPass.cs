@@ -1,11 +1,12 @@
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
 
 public class DrawProceduralIndexedRenderPass<T> : DrawRenderPass<T>
 {
 	private Material material;
 	private int passIndex;
-	private Matrix4x4 matrix;
+	private Float4x4 matrix;
 	private MeshTopology topology;
 	private ResourceHandle<GraphicsBuffer> indexBuffer;
 
@@ -14,7 +15,7 @@ public class DrawProceduralIndexedRenderPass<T> : DrawRenderPass<T>
 		return $"{Name} {material} {passIndex}";
 	}
 
-	public void Initialize(ResourceHandle<GraphicsBuffer> indexBuffer, Material material, Matrix4x4 matrix, Int2 size, int viewCount = 1, int passIndex = 0, MeshTopology topology = MeshTopology.Triangles)
+	public void Initialize(ResourceHandle<GraphicsBuffer> indexBuffer, Material material, Float4x4 matrix, Int2 size, int viewCount = 1, int passIndex = 0, MeshTopology topology = MeshTopology.Triangles)
 	{
 		this.material = material;
 		this.passIndex = passIndex;

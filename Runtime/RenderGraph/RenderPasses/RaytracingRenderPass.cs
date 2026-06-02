@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
 
 // TODO: Maybe share some cfuncionality with graphics render pass  or compute render pass
 public class RaytracingRenderPass<T> : RenderPass<T>

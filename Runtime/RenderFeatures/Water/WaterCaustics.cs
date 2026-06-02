@@ -2,6 +2,8 @@ using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public class WaterCaustics : ViewRenderFeature
 {
@@ -29,7 +31,7 @@ public class WaterCaustics : ViewRenderFeature
 		using var scope = renderGraph.AddProfileScope("Water Caustics");
 
 		var Profile = settings.Profile;
-		var patchSizes = new Vector4(Profile.PatchSize / Math.Pow(Profile.CascadeScale, 0f), Profile.PatchSize / Math.Pow(Profile.CascadeScale, 1f), Profile.PatchSize / Math.Pow(Profile.CascadeScale, 2f), Profile.PatchSize / Math.Pow(Profile.CascadeScale, 3f));
+		var patchSizes = new Vector4(Profile.PatchSize / Pow(Profile.CascadeScale, 0f), Profile.PatchSize / Pow(Profile.CascadeScale, 1f), Profile.PatchSize / Pow(Profile.CascadeScale, 2f), Profile.PatchSize / Pow(Profile.CascadeScale, 3f));
 		var patchSize = patchSizes[settings.CasuticsCascade];
 
 		var temp0 = renderGraph.GetTexture(129, GraphicsFormat.R16G16B16A16_SFloat, isExactSize: true);

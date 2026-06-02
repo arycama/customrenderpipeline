@@ -2,6 +2,8 @@
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public class Bloom : ViewRenderFeature
 {
@@ -28,14 +30,14 @@ public class Bloom : ViewRenderFeature
 
 		renderGraph.AddProfileBeginPass("Bloom");
 
-		var mipCount = Math.Min(settings.MaxMips, (int)Math.Log2(Math.Max(viewPassData.viewSize.x, viewPassData.viewSize.y)));
+		var mipCount = Min(settings.MaxMips, (int)Log2(Max(viewPassData.viewSize.x, viewPassData.viewSize.y)));
         Span<ResourceHandle<RenderTexture>> bloomIds = stackalloc ResourceHandle<RenderTexture>[mipCount];
 
 		// Downsample
 		for (var i = 0; i < mipCount; i++)
 		{
-			var width = Math.Max(1, viewPassData.viewSize.x >> (i + 1));
-			var height = Math.Max(1, viewPassData.viewSize.y >> (i + 1));
+			var width = Max(1, viewPassData.viewSize.x >> (i + 1));
+			var height = Max(1, viewPassData.viewSize.y >> (i + 1));
 
             var dest = renderGraph.GetTexture(new(width, height), GraphicsFormat.B10G11R11_UFloatPack32, isScreenTexture: true);
             bloomIds[i] = dest;
@@ -63,8 +65,8 @@ public class Bloom : ViewRenderFeature
 		for (var i = mipCount - 1; i > 0; i--)
 		{
 			var input = bloomIds[i];
-			var width = Math.Max(1, viewPassData.viewSize.x >> i);
-			var height = Math.Max(1, viewPassData.viewSize.y >> i);
+			var width = Max(1, viewPassData.viewSize.x >> i);
+			var height = Max(1, viewPassData.viewSize.y >> i);
 
 			using var pass = renderGraph.AddFullscreenRenderPass("Bloom Up", (1.0f / new Float2(width, height), input, settings.Strength));
             pass.UseProfiler = false;

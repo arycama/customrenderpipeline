@@ -2,6 +2,8 @@
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public class ColorGrading : FrameRenderFeature
 {
@@ -97,7 +99,7 @@ public class ColorGrading : FrameRenderFeature
         var currentSettings = new ColorGradingData(
             (float)settings.Resolution,
             maxLuminance,
-            settings.PaperWhite * Math.Sqrt(2.0f),
+            settings.PaperWhite * Sqrt(2.0f),
             settings.LinearStart,
 
             settings.FadeStart,

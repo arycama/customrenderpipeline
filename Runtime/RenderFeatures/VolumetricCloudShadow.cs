@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
+using Quaternion = Unmath.Quaternion;
 
 public class VolumetricCloudShadow : ViewRenderFeature
 {

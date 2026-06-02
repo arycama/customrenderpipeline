@@ -4,7 +4,8 @@ using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Pool;
 using UnityEngine.Rendering;
-using static Math;
+using Unmath;
+using static Unmath.Math;
 using Object = UnityEngine.Object;
 
 public class TerrainSystem : FrameRenderFeature

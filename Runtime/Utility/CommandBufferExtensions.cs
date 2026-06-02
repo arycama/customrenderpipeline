@@ -4,6 +4,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Assertions;
 using UnityEngine.Rendering;
+using static Unmath.Math;
 
 public static class CommandBufferExtensions
 {
@@ -11,9 +12,9 @@ public static class CommandBufferExtensions
     {
         computeShader.GetKernelThreadGroupSizes(kernelIndex, out var x, out var y, out var z);
 
-        var threadGroupsX = Math.DivRoundUp(threadsX, (int)x);
-        var threadGroupsY = Math.DivRoundUp(threadsY, (int)y);
-        var threadGroupsZ = Math.DivRoundUp(threadsZ, (int)z);
+        var threadGroupsX = DivRoundUp(threadsX, (int)x);
+        var threadGroupsY = DivRoundUp(threadsY, (int)y);
+        var threadGroupsZ = DivRoundUp(threadsZ, (int)z);
 
         Assert.IsTrue(threadGroupsX > 0);
         Assert.IsTrue(threadGroupsY > 0);

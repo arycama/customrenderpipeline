@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public class EnvironmentConvolve : ViewRenderFeature
 {
@@ -75,13 +77,13 @@ public class EnvironmentConvolve : ViewRenderFeature
                     var sampleCount = 512;
 
                     // Solid angle associated with the texel of the cubemap
-                    var omegaP = Math.FourPi / (6.0f * reflectionResolution * reflectionResolution);
+                    var omegaP = FourPi / (6.0f * reflectionResolution * reflectionResolution);
 
                     // Solid angle associated with the sample
-                    var pdf = Math.Rcp(Math.FourPi);
-                    var omegaS = Math.Rcp(sampleCount * pdf);
+                    var pdf = Rcp(FourPi);
+                    var omegaS = Rcp(sampleCount * pdf);
 
-                    var mipLevel = 0.5f * Math.Log2(omegaS / omegaP);
+                    var mipLevel = 0.5f * Log2(omegaS / omegaP);
                     pass.SetFloat("_MipLevel", mipLevel);
                 });
             }
@@ -113,14 +115,14 @@ public class EnvironmentConvolve : ViewRenderFeature
 
                     pass.SetRenderFunction(static (command, pass, data) =>
                     {
-                        var perceptualRoughness = Math.Saturate(data.i / (float)mipLevels);
-                        var mipPerceptualRoughness = Math.Saturate(1.7f / 1.4f - Math.Sqrt(2.89f / 1.96f - 2.8f / 1.96f * perceptualRoughness));
+                        var perceptualRoughness = Saturate(data.i / (float)mipLevels);
+                        var mipPerceptualRoughness = Saturate(1.7f / 1.4f - Sqrt(2.89f / 1.96f - 2.8f / 1.96f * perceptualRoughness));
                         var mipRoughness = mipPerceptualRoughness * mipPerceptualRoughness;
 
                         pass.SetInt("Samples", data.Samples);
-                        pass.SetFloat("RcpSamples", Math.Rcp(data.Samples));
+                        pass.SetFloat("RcpSamples", Rcp(data.Samples));
                         pass.SetFloat("Level", data.i);
-                        pass.SetFloat("RcpOmegaP", data.envResolution * data.envResolution / (4.0f * Math.Pi * data.Samples));
+                        pass.SetFloat("RcpOmegaP", data.envResolution * data.envResolution / (4.0f * Pi * data.Samples));
                         pass.SetFloat("PerceptualRoughness", mipPerceptualRoughness);
                         pass.SetFloat("Roughness", mipRoughness);
                         pass.SetFloat("Resolution", data.envResolution);

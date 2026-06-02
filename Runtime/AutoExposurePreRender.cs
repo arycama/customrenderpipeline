@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public class AutoExposurePreRender : ViewRenderFeature
 {
@@ -41,7 +43,7 @@ public class AutoExposurePreRender : ViewRenderFeature
                 pass.SetRenderFunction(static (command, pass, data) =>
                 {
                     Span<Float4> initialData = stackalloc Float4[1];
-                    initialData[0] = new Float4(data.exposure, Math.Rcp(data.exposure), 1.0f, data.ExposureCompensation);
+                    initialData[0] = new Float4(data.exposure, Rcp(data.exposure), 1.0f, data.ExposureCompensation);
                     command.SetBufferData(pass.GetBuffer(data.exposureBuffer), initialData);
                 });
             }

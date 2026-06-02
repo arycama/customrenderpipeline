@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
 
 /// <summary> Has no specific functionality but can be used as a general wrapper around render functionality </summary>
 public class GenericRenderPass<T> : RenderPass<T>

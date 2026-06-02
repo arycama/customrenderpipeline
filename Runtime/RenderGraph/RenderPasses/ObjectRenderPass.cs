@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
+using Quaternion = Unmath.Quaternion;
 
 public class ObjectRenderPass<T> : GraphicsRenderPass<T>
 {

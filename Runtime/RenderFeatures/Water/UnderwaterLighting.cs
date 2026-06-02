@@ -2,6 +2,8 @@ using System;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public class UnderwaterLighting : ViewRenderFeature
 {
@@ -53,7 +55,7 @@ public class UnderwaterLighting : ViewRenderFeature
             {
                 var transmittance = settings.Material.GetColor("Transmittance").LinearFloat3();
                 var transmittanceDistance = settings.Material.GetFloat("TransmittanceDistance");
-                var extinction = -new Float3(Math.Log(transmittance.x), Math.Log(transmittance.y), Math.Log(transmittance.z)) / transmittanceDistance;
+                var extinction = -new Float3(Log(transmittance.x), Log(transmittance.y), Log(transmittance.z)) / transmittanceDistance;
 
                 pass.SetVector("_WaterExtinction", extinction);
             });

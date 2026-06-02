@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
+using Unmath;
+using Quaternion = Unmath.Quaternion;
 
 #if UNITY_EDITOR
 using UnityEditor;

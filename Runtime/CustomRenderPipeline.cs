@@ -1,14 +1,16 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
-using static Math;
-using System;
+using Unmath;
 
+using static Unmath.Math;
 
 #if UNITY_EDITOR
-using UnityEditor;
+    using UnityEditor;
 #endif
+
 public class CustomRenderPipeline : CustomRenderPipelineBase<CustomRenderPipelineAsset>
 {
     private static readonly IndexedString blueNoise1DIds = new("STBN/stbn_vec1_2Dx1D_128x128x64_", 64);

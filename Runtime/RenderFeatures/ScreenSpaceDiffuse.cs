@@ -2,6 +2,8 @@
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
+using static Unmath.Math;
 
 public partial class ScreenSpaceDiffuse : ViewRenderFeature
 {
@@ -77,7 +79,7 @@ public partial class ScreenSpaceDiffuse : ViewRenderFeature
         else
         {
             var maxMip = Texture2DExtensions.MipCount(viewPassData.viewSize) - 1;
-            var coneTanHalfAngle = Math.Tan(0.5f * Math.Radians(settings.ConeAngle));
+            var coneTanHalfAngle = Tan(0.5f * Radians(settings.ConeAngle));
             var coneAngle = coneTanHalfAngle;// * viewPassData.viewSize.y / viewParameters[0].tanHalfFov.y;
 
             using (var pass = renderGraph.AddFullscreenRenderPass("Screen Space Global Illumination Trace", (settings.Intensity, settings.MaxSamples, settings.Thickness, maxMip, coneAngle)))

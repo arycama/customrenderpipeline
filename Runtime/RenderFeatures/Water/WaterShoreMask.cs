@@ -3,6 +3,7 @@ using Unity.Collections.LowLevel.Unsafe;
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
 
 public class WaterShoreMask : FrameRenderFeature
 {

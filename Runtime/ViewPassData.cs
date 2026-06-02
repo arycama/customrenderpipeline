@@ -2,6 +2,8 @@
 using UnityEngine;
 using UnityEngine.Experimental.Rendering;
 using UnityEngine.Rendering;
+using Unmath;
+using Quaternion = Unmath.Quaternion;
 
 public readonly struct ViewPassData
 {

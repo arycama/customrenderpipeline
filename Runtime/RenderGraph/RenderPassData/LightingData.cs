@@ -1,5 +1,7 @@
 using UnityEngine;
 using UnityEngine.Rendering;
+using Unmath;
+using Quaternion = Unmath.Quaternion;
 
 public readonly struct LightingData : IRenderPassData
 {

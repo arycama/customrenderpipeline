@@ -1,5 +1,7 @@
 ﻿using System;
 using UnityEngine;
+using Unmath;
+using static Unmath.Math;
 
 public partial class VolumetricClouds
 {
@@ -69,19 +71,19 @@ public partial class VolumetricClouds
         {
 			// TODO: Cbuffer
             pass.SetFloat("_WeatherMapStrength", WeatherMapStrength);
-            pass.SetFloat("_WeatherMapScale", Math.Rcp(WeatherMapScale));
+            pass.SetFloat("_WeatherMapScale", Rcp(WeatherMapScale));
             pass.SetVector("_WeatherMapOffset", WeatherMapSpeed * deltaTime / WeatherMapScale);
 
-            pass.SetFloat("_NoiseScale", Math.Rcp(NoiseScale));
+            pass.SetFloat("_NoiseScale", Rcp(NoiseScale));
             pass.SetFloat("_NoiseStrength", NoiseStrength);
 
-            pass.SetFloat("_DetailNoiseScale", Math.Rcp(DetailScale));
+            pass.SetFloat("_DetailNoiseScale", Rcp(DetailScale));
             pass.SetFloat("_DetailNoiseStrength", DetailStrength);
 
             pass.SetFloat("_StartHeight", StartHeight);
             pass.SetFloat("_LayerThickness", LayerThickness);
             pass.SetFloat("_LightDistance", LightDistance);
-            pass.SetFloat("_Density", Density * Math.Log2e);
+            pass.SetFloat("_Density", Density * Log2e);
 
             pass.SetFloat("_TransmittanceThreshold", TransmittanceThreshold);
 
