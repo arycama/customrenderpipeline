@@ -132,7 +132,7 @@ cbuffer UnityPerDraw
 	float4x4 unity_MatrixPreviousM;
 	float4x4 unity_MatrixPreviousMI;
     //X : Use last frame positions (right now skinned meshes are the only objects that use this
-    //Y : Force No Motion
+    //Y : Force No Motion (0 = no motion, 1 = motion)
     //Z : Z bias value
     //W : Camera only
 	float4 unity_MotionVectorsParams;

@@ -194,7 +194,7 @@ float Linear01ToDeviceDepth(float depth)
 	return Near * (1.0 - depth) * rcp(depth * (Far - Near));
 }
 
-float4 PreviousScreenPosition(float2 uv, float depth)
+float4 ScreenToPreviousScreenPosition(float2 uv, float depth)
 {
 	float3 worldPosition = MultiplyPointProj(ScreenToWorld, float3(uv, depth)).xyz;
 	return WorldToPreviousScreenPosition(worldPosition);
