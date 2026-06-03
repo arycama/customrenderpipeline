@@ -24,9 +24,11 @@ namespace CustomRenderPipeline
             if (!settings.VirtualTexturing)
                 return;
 
+            if (!renderGraph.TryGetResource<VirtualTextureData>(out var virtualTextureData))
+                return;
+
             var maxRequestBufferSize = viewPassData.viewSize.x * viewPassData.viewSize.y + 1;
             var requestBuffer = renderGraph.GetBuffer(maxRequestBufferSize, target: GraphicsBuffer.Target.Append);
-            var virtualTextureData = renderGraph.GetResource<VirtualTextureData>();
             using (var pass = renderGraph.AddComputeRenderPass("Gather Requested Pages", (requestBuffer, virtualTextureUpdateShader, PageTableSize)))
             {
                 var threadCount = Texture2DExtensions.PixelCount(PageTableSize);
